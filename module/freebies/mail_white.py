@@ -1,7 +1,8 @@
+from module.base.button import Button
 from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2
-from module.freebies.assets import *
+from module.freebies import assets as freebies_assets
 from module.logger import logger
 from module.ui.page import GOTO_MAIN_WHITE, page_mail, page_main, page_main_white
 from module.ui.setting import Setting
@@ -21,7 +22,13 @@ class MailWhite(UI):
         setting.need_deselect = True
         setting.add_setting(
             setting="contains",
-            option_buttons=[MAIL_SELECT_CUBE, MAIL_SELECT_COINS, MAIL_SELECT_OIL, MAIL_SELECT_MERIT, MAIL_SELECT_GEMS],
+            option_buttons=[
+                freebies_assets.MAIL_SELECT_CUBE,
+                freebies_assets.MAIL_SELECT_COINS,
+                freebies_assets.MAIL_SELECT_OIL,
+                freebies_assets.MAIL_SELECT_MERIT,
+                freebies_assets.MAIL_SELECT_GEMS,
+            ],
             option_names=["cube", "coins", "oil", "merit", "gems"],
             option_default="merit",
         )
@@ -31,7 +38,12 @@ class MailWhite(UI):
     def mail_select_all_setting(self):
         setting = MailSelectSetting("MailAll", main=self)
         setting.reset_first = False
-        setting.add_setting(setting="all", option_buttons=[MAIL_SELECT_ALL], option_names=["all"], option_default="all")
+        setting.add_setting(
+            setting="all",
+            option_buttons=[freebies_assets.MAIL_SELECT_ALL],
+            option_names=["all"],
+            option_default="all",
+        )
         return setting
 
     def _mail_enter(self, skip_first_screenshot=True):
@@ -44,7 +56,7 @@ class MailWhite(UI):
             out: MAIL_BATCH_CLAIM
         """
         logger.info("Mail enter")
-        self.interval_clear([MAIL_MANAGE])
+        self.interval_clear([freebies_assets.MAIL_MANAGE])
         timeout = Timer(0.6, count=1)
         has_mail = False
         while 1:
@@ -53,11 +65,11 @@ class MailWhite(UI):
             else:
                 self.device.screenshot()
 
-            # End
-            if self.appear(MAIL_BATCH_CLAIM, offset=(20, 20)):
+            # 结束。
+            if self.appear(freebies_assets.MAIL_BATCH_CLAIM, offset=(20, 20)):
                 logger.info("Mail entered")
                 return True
-            if self.appear(MAIL_WHITE_EMPTY, offset=(20, 20)):
+            if self.appear(freebies_assets.MAIL_WHITE_EMPTY, offset=(20, 20)):
                 logger.info("Mail empty")
                 return False
             if not has_mail and self.appear(GOTO_MAIN_WHITE, offset=(20, 20)):
@@ -66,8 +78,8 @@ class MailWhite(UI):
                     logger.info("Mail empty, wait GOTO_MAIN_WHITE timeout")
                     return False
 
-            # Click
-            if self.appear_then_click(MAIL_MANAGE, offset=(30, 30), interval=3):
+            # 点击进入。
+            if self.appear_then_click(freebies_assets.MAIL_MANAGE, offset=(30, 30), interval=3):
                 has_mail = True
                 continue
             if self.ui_main_appear_then_click(page_mail, offset=(30, 30), interval=3):
@@ -84,7 +96,7 @@ class MailWhite(UI):
         logger.info("Mail quit")
         self.interval_clear(
             [
-                MAIL_BATCH_CLAIM,
+                freebies_assets.MAIL_BATCH_CLAIM,
                 GOTO_MAIN_WHITE,
                 GET_ITEMS_1,
                 GET_ITEMS_2,
@@ -97,17 +109,17 @@ class MailWhite(UI):
             else:
                 self.device.screenshot()
 
-            # End
+            # 结束。
             if self.ui_page_appear(page_main):
                 logger.info("Mail quit to page_main")
                 break
 
-            # Click
+            # 点击退出。
             if self.handle_popup_confirm("MAIL_QUIT"):
                 continue
-            if self.appear(MAIL_BATCH_CLAIM, offset=(30, 30), interval=3):
-                logger.info(f"{MAIL_BATCH_CLAIM} -> {MAIL_MANAGE}")
-                self.device.click(MAIL_MANAGE)
+            if self.appear(freebies_assets.MAIL_BATCH_CLAIM, offset=(30, 30), interval=3):
+                logger.info(f"{freebies_assets.MAIL_BATCH_CLAIM} -> {freebies_assets.MAIL_MANAGE}")
+                self.device.click(freebies_assets.MAIL_MANAGE)
                 continue
             if self.appear_then_click(GOTO_MAIN_WHITE, offset=(30, 30), interval=3):
                 continue
@@ -116,12 +128,12 @@ class MailWhite(UI):
 
     def _handle_mail_reward(self):
         if self.appear(GET_ITEMS_1, offset=(30, 30), interval=3):
-            logger.info(f"{GET_ITEMS_1} -> {MAIL_BATCH_CLAIM}")
-            self.device.click(MAIL_BATCH_CLAIM)
+            logger.info(f"{GET_ITEMS_1} -> {freebies_assets.MAIL_BATCH_CLAIM}")
+            self.device.click(freebies_assets.MAIL_BATCH_CLAIM)
             return True
         if self.appear(GET_ITEMS_2, offset=(30, 30), interval=3):
-            logger.info(f"{GET_ITEMS_2} -> {MAIL_BATCH_CLAIM}")
-            self.device.click(MAIL_BATCH_CLAIM)
+            logger.info(f"{GET_ITEMS_2} -> {freebies_assets.MAIL_BATCH_CLAIM}")
+            self.device.click(freebies_assets.MAIL_BATCH_CLAIM)
             return True
         return False
 
@@ -137,7 +149,7 @@ class MailWhite(UI):
         self.handle_info_bar()
         self.interval_clear(
             [
-                MAIL_BATCH_CLAIM,
+                freebies_assets.MAIL_BATCH_CLAIM,
                 GET_ITEMS_1,
                 GET_ITEMS_2,
             ]
@@ -151,11 +163,11 @@ class MailWhite(UI):
             else:
                 self.device.screenshot()
 
-            # End
-            if claimed and self.appear(MAIL_BATCH_CLAIM, offset=(30, 30)):
+            # 结束。
+            if claimed and self.appear(freebies_assets.MAIL_BATCH_CLAIM, offset=(30, 30)):
                 break
-            # Click
-            if not claimed and self.appear_then_click(MAIL_BATCH_CLAIM, offset=(30, 30), interval=3):
+            # 点击领取。
+            if not claimed and self.appear_then_click(freebies_assets.MAIL_BATCH_CLAIM, offset=(30, 30), interval=3):
                 continue
             if self.handle_popup_confirm("MAIL_CLAIM"):
                 claimed = True
@@ -175,7 +187,7 @@ class MailWhite(UI):
             out: MAIL_BATCH_DELETE
         """
         self.handle_info_bar()
-        self.interval_clear([MAIL_BATCH_DELETE])
+        self.interval_clear([freebies_assets.MAIL_BATCH_DELETE])
         self.popup_interval_clear()
 
         deleted = False
@@ -185,11 +197,11 @@ class MailWhite(UI):
             else:
                 self.device.screenshot()
 
-            # End
-            if deleted and self.appear(MAIL_BATCH_DELETE, offset=(30, 30)):
+            # 结束。
+            if deleted and self.appear(freebies_assets.MAIL_BATCH_DELETE, offset=(30, 30)):
                 break
-            # Click
-            if not deleted and self.appear_then_click(MAIL_BATCH_DELETE, offset=(30, 30), interval=3):
+            # 点击删除。
+            if not deleted and self.appear_then_click(freebies_assets.MAIL_BATCH_DELETE, offset=(30, 30), interval=3):
                 continue
             if self.handle_popup_confirm("MAIL_CLAIM"):
                 deleted = True
@@ -197,7 +209,7 @@ class MailWhite(UI):
             if self._handle_mail_reward():
                 continue
 
-        # info_bar appears if mail success to delete and no mail deleted
+        # 删除成功且没有邮件被删时，会出现 info_bar。
         return True
 
     def mail_claim(
@@ -253,7 +265,7 @@ class MailWhite(UI):
             logger.warning("Nothing to claim")
             return False
 
-        # Must using white UI
+        # 必须使用白色 UI。
         self.ui_ensure(page_main)
         if self.appear(page_main_white.check_button, offset=(30, 30)):
             logger.info("At page_main_white")
@@ -265,7 +277,7 @@ class MailWhite(UI):
             logger.warning("Unknown page_main, cannot enter mail page")
             return False
 
-        # Claim
+        # 领取邮件。
         self.mail_claim(
             merit=merit,
             maintenance=maintenance,
