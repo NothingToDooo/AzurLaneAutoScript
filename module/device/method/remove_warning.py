@@ -60,15 +60,15 @@ def remove_screenshot_warning(s: str) -> str: ...
 
 def remove_screenshot_warning(s):
     """
-    Remove warnings when taking screenshot
+    移除截图输出前面的告警文本。
 
-    1. Errors in waydroid screencap render
+    1. 某些环境的 screencap 渲染错误。
     https://github.com/LmeSzinc/AzurLaneAutoScript/issues/4760
 
     Failed to create //.cache for shader cache (Read-only file system)---disabling.\n
     \x89PNG...
 
-    2. Warning when taking screenshot from multiscreen device
+    2. 多屏设备截图时的告警。
 
     [Warning] Multiple displays were found, but no display id was specified! Defaulting to the first display found,
     however this default is not guaranteed to be consistent across captures.\n
@@ -76,7 +76,7 @@ def remove_screenshot_warning(s):
     See "dumpsys SurfaceFlinger --display-id" for valid display IDs.\n
     \x89PNG...
 
-    3. Another format of multiscreen warning
+    3. 另一种多屏告警格式。
     https://github.com/LmeSzinc/AzurLaneAutoScript/issues/5682
 
     [Warning] Multiple displays were found, but no display id was specified! Defaulting to the first display found,

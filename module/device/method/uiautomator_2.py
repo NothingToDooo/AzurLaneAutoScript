@@ -38,23 +38,23 @@ def retry(func):
                     time.sleep(retry_sleep(_))
                     init()
                 return func(self, *args, **kwargs)
-            # Can't handle
+            # 无法自动处理。
             except RequestHumanTakeover:
                 break
-            # When adb server was killed
+            # ADB server 被杀掉。
             except ConnectionResetError as e:
                 logger.error(e)
 
                 def init():
                     self.adb_reconnect()
-            # In `device.set_new_command_timeout(604800)`
+            # 发生在 `device.set_new_command_timeout(604800)` 中。
             # json.decoder.JSONDecodeError: Expecting value: line 1 column 2 (char 1)
             except JSONDecodeError as e:
                 logger.error(e)
 
                 def init():
                     self.install_uiautomator2()
-            # AdbError
+            # ADB 错误。
             except AdbError as e:
                 if handle_adb_error(e):
 
@@ -75,24 +75,24 @@ def retry(func):
                         self.adb_reconnect()
                 else:
                     break
-            # In `assert c.read string(4) == _OKAY`
-            # ADB on emulator not enabled
+            # 发生在 `assert c.read string(4) == _OKAY` 中。
+            # 模拟器没有启用 ADB。
             except AssertionError as e:
                 logger.exception(e)
                 break
-            # Package not installed
+            # 游戏包未安装。
             except PackageNotInstalled as e:
                 logger.error(e)
 
                 def init():
                     self.detect_package()
-            # ImageTruncated
+            # 图片数据损坏。
             except ImageTruncated as e:
                 logger.error(e)
 
                 def init():
                     pass
-            # Unknown
+            # 未知错误。
             except Exception as e:
                 logger.exception(e)
 
@@ -153,12 +153,12 @@ class Uiautomator2(Connection):
 
     @retry
     def _drag_along(self, path):
-        """Swipe following path.
+        """按路径滑动。
 
-        Args:
-            path (list): (x, y, sleep)
+        参数：
+            path (list)：(x, y, sleep)。
 
-        Examples:
+        示例：
             al.drag_along([
                 (403, 421, 0.2),
                 (821, 326, 0.1),
@@ -166,7 +166,7 @@ class Uiautomator2(Connection):
                 (821, 326+10, 0.1),
                 (821, 326, 0),
             ])
-            Equals to:
+            等价于：
             al.device.touch.down(403, 421)
             time.sleep(0.2)
             al.device.touch.move(821, 326)
@@ -209,15 +209,15 @@ class Uiautomator2(Connection):
         普通滑动或拖拽只有两个点，效果不够稳定。
         增加一些路径点，让它更接近真实滑动。
 
-        Args:
-            p1 (tuple): Start point, (x, y).
-            p2 (tuple): End point, (x, y).
+        参数：
+            p1 (tuple)：起点 (x, y)。
+            p2 (tuple)：终点 (x, y)。
             segments (int):
-            shake (tuple): Shake after arrive end point.
-            point_random: Add random to start point and end point.
-            shake_random: Add random to shake array.
-            swipe_duration: Duration between way points.
-            shake_duration: Duration between shake points.
+            shake (tuple)：到达终点后的晃动幅度。
+            point_random：给起点和终点增加随机偏移。
+            shake_random：给晃动点增加随机偏移。
+            swipe_duration：路径点之间的间隔。
+            shake_duration：晃动点之间的间隔。
         """
         p1 = np.array(p1) - random_rectangle_point(point_random)
         p2 = np.array(p2) - random_rectangle_point(point_random)
@@ -233,8 +233,8 @@ class Uiautomator2(Connection):
     @retry
     def app_current_uiautomator2(self):
         """
-        Returns:
-            str: Package name.
+        返回：
+            str：包名。
         """
         result = self.u2.app_current()
         return result["package"]
@@ -242,14 +242,14 @@ class Uiautomator2(Connection):
     @retry
     def _app_start_u2_monkey(self, package_name=None, allow_failure=False):
         """
-        Args:
+        参数：
             package_name (str):
             allow_failure (bool):
 
-        Returns:
-            bool: If success to start
+        返回：
+            bool：是否启动成功。
 
-        Raises:
+        抛出：
             PackageNotInstalled:
         """
         if not package_name:
@@ -298,7 +298,7 @@ class Uiautomator2(Connection):
                 elif "not found" in str(e):
                     logger.error(e)
                     raise PackageNotInstalled(package_name)
-                # Unknown error
+                # 未知错误。
                 else:
                     raise
             activity_name = info["mainActivity"]
@@ -313,10 +313,8 @@ class Uiautomator2(Connection):
             "-n",
             f"{package_name}/{activity_name}",
         ]
-        if self.is_local_network_device and self.is_waydroid:
-            cmd += ["--windowingMode", "4"]
         ret = self.u2.shell(cmd)
-        # Invalid activity
+        # Activity 无效。
         # Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=... }
         # Error type 3
         # Error: Activity class {.../...} does not exist.
@@ -326,7 +324,7 @@ class Uiautomator2(Connection):
             else:
                 logger.error(ret)
                 return False
-        # Already running
+        # 已经在运行。
         # Warning: Activity not started, intent has been delivered to currently running top-most instance.
         if "Warning: Activity not started" in ret.output:
             logger.info("App activity is already started")
@@ -349,11 +347,11 @@ class Uiautomator2(Connection):
                 logger.error(ret)
                 logger.error("Permission Denial while starting app, probably because activity invalid")
                 return False
-        # Success
+        # 启动成功。
         # Starting: Intent...
         return True
 
-    # No @retry decorator since _app_start_adb_am and _app_start_adb_monkey have @retry already
+    # _app_start_adb_am 和 _app_start_adb_monkey 已有 @retry，这里不再添加。
     # @retry
     def app_start_uiautomator2(self, package_name=None, activity_name=None, allow_failure=False):
         """

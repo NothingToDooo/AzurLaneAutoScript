@@ -1,101 +1,54 @@
 Deploy:
   Git:
-    # Filepath of git executable `git.exe`
-    # [Easy installer] Use './toolkit/Git/mingw64/bin/git.exe'
-    # [Other] Use you own git
-    GitExecutable: ./toolkit/Git/mingw64/bin/git.exe
+    # git 可执行文件。
+    # 默认使用 PATH 中的 git。
+    GitExecutable: git
 
   Python:
-    # Filepath of python executable `python.exe`
-    # [uv] Use './.venv/Scripts/python.exe'
-    # [Other] Use your own Python 3.14.6 executable
+    # Python 可执行文件。
+    # uv 环境默认使用 './.venv/Scripts/python.exe'。
     PythonExecutable: ./.venv/Scripts/python.exe
 
   Adb:
-    # Filepath of ADB executable `adb.exe`
-    # [uv] Use './.venv/Lib/site-packages/adbutils/binaries/adb.exe'
-    # [Other] Use you own latest ADB, but not the ADB in your emulator
+    # ADB 可执行文件。
+    # uv 环境默认使用 adbutils 自带的 adb.exe。
     AdbExecutable: ./.venv/Lib/site-packages/adbutils/binaries/adb.exe
     # 是否替换 MuMu 目录内的 ADB。
     ReplaceAdb: true
     # 是否自动连接 MuMu 实例。
     AutoConnect: true
-    # Re-install uiautomator2
-    # [In most cases] Use true
+    # 是否重新安装 uiautomator2。
     InstallUiautomator2: true
 
   Ocr:
-    # Run Ocr as a service, can reduce memory usage by not import mxnet everytime you start an alas instance
+    # 是否把 OCR 作为服务运行，减少多实例重复加载 OCR 的内存占用。
 
-    # Whether to use ocr server
-    # [Default] false
+    # 是否使用 OCR 服务。
     UseOcrServer: false
-    # Whether to start ocr server when start GUI
-    # [Default] false
+    # 是否在启动 WebUI 时启动 OCR 服务。
     StartOcrServer: false
-    # Port of ocr server runs by GUI
-    # [Default] 22268
+    # WebUI 启动的 OCR 服务端口。
     OcrServerPort: 22268
-    # Address of ocr server for alas instance to connect
-    # [Default] 127.0.0.1:22268
+    # Alas 实例连接 OCR 服务的地址。
     OcrClientAddress: 127.0.0.1:22268
 
   Misc:
-    # Enable discord rich presence
+    # 是否启用 Discord 状态展示。
     DiscordRichPresence: false
 
-  RemoteAccess:
-    # Enable remote access (using ssh reverse tunnel serve by https://github.com/wang0618/localshare)
-    # ! You need to set Password below to enable remote access since everyone can access to your alas if they have your url.
-    # See here (http://app.azurlane.cloud/en.html) for more infomation.
-    EnableRemoteAccess: false
-    # Username when login into ssh server
-    # [Default] null (will generate a random one when startup)
-    SSHUser: null
-    # Server to connect
-    # [Default] null
-    # [Format] host:port
-    SSHServer: null
-    # Filepath of SSH executable `ssh.exe`
-    # [Default] ssh (find ssh in system PATH)
-    # If you don't have one, install OpenSSH or download it here (https://github.com/PowerShell/Win32-OpenSSH/releases)
-    SSHExecutable: ssh
-
   Webui:
-    # --host. Host to listen
-    # [Use IPv6] '::'
-    # [In most cases] Default to '0.0.0.0'
-    WebuiHost: 0.0.0.0
-    # --port. Port to listen
-    # You will be able to access webui via `http://{host}:{port}`
-    # [In most cases] Default to 22267
+    # WebUI 监听地址，默认只允许本机访问。
+    WebuiHost: 127.0.0.1
+    # WebUI 监听端口。
     WebuiPort: 22267
-    # Theme of web ui
-    # 'default' for light theme
-    # 'dark' for dark theme
+    # WebUI 主题，default 为亮色，dark 为暗色。
     Theme: default
-    # Follow system DPI scaling
-    # [In most cases] true
-    # [In few cases] false to make Alas smaller, if you have a low resolution but high DPI scaling.
+    # 是否跟随系统 DPI 缩放。
     DpiScaling: true
-    # --key. Password of web ui
-    # Useful when expose Alas to the public network
+    # WebUI 密码，默认不启用。
     Password: null
-    # --cdn. Use jsdelivr cdn for pywebio static files (css, js).
-    # 'true' for jsdelivr cdn
-    # 'false' for self host cdn (automatically)
-    # 'https://path.to.your/cdn' to use custom cdn
+    # 是否用 jsdelivr 加载 pywebio 静态文件，false 表示本地提供。
     CDN: false
-    # --run. Auto-run specified config when startup
-    # 'null' default no specified config
-    # '["alas"]' specified "alas" config
-    # '["alas","alas2"]' specified "alas" "alas2" configs
+    # 启动 WebUI 时自动运行的配置名。
+    # null 表示不自动运行；'["alas"]' 表示自动运行 alas。
     Run: null
-    # SSL support
-    # Only effective when both parameters below are set
-    # --ssl-key. Path to SSL key file
-    # [Default] null (no SSL)
-    WebuiSSLKey: null
-    # --ssl-cert. Path to SSL cert file
-    # [Default] null (no SSL)
-    WebuiSSLCert: null

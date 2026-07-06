@@ -2584,11 +2584,7 @@
     "DeviceType": {
       "name": "设备类型",
       "help": "",
-      "emulator": "模拟器",
-      "plone_cloud_with_adb": "云手机 有公网ADB",
-      "phone_cloud_without_adb": "云手机 无公网ADB",
-      "android_phone": "安卓真机",
-      "android_phone_vmos": "安卓真机VMOS虚拟机"
+      "emulator": "模拟器"
     },
     "TestScene": {
       "name": "测试场景",
@@ -2660,7 +2656,6 @@
     },
     "MenuDevelop": {
       "HomePage": "主页",
-      "Remote": "远程控制",
       "Utils": "工具"
     },
     "Overview": {
@@ -2700,14 +2695,6 @@
       "Name": "配置名称",
       "Mod": "插件",
       "Actions": "操作"
-    },
-    "Remote": {
-      "Running": "运行中",
-      "NotRunning": "未运行，与服务器的连接断开或服务器离线",
-      "NotEnable": "未启用，在 deploy.yaml 中设置 webui 密码并启用远程控制",
-      "EntryPoint": "远程访问 url 地址:",
-      "ConfigureHint": "配置教程：",
-      "SSHNotInstall": "系统中没有 ssh 工具，请参考教程下载或安装 ssh"
     },
     "Text": {
       "InvalidFeedBack": "格式错误。 示例：{0}",

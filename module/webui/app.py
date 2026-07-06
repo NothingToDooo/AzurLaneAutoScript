@@ -7,7 +7,7 @@ from datetime import datetime
 from functools import partial
 from typing import Dict, List, Optional
 
-# Import fake module before import pywebio to avoid importing unnecessary module PIL
+# 先导入伪 PIL 模块，避免 pywebio 拉起不需要的 PIL。
 from module.webui.fake_pil_module import import_fake_pil_module
 
 import_fake_pil_module()
@@ -25,14 +25,12 @@ from pywebio.output import (
     put_column,
     put_error,
     put_html,
-    put_link,
     put_loading,
     put_markdown,
     put_row,
     put_scope,
     put_table,
     put_text,
-    put_warning,
     toast,
     use_scope,
 )
@@ -42,7 +40,6 @@ from pywebio.session import download, go_app, info, local, register_thread, run_
 import module.webui.lang as lang
 from module.config.config import AzurLaneConfig, Function
 from module.config.deep import deep_get, deep_iter, deep_set
-from module.config.env import IS_ON_PHONE_CLOUD
 from module.config.server import to_server
 from module.config.utils import (
     alas_instance,
@@ -63,7 +60,6 @@ from module.webui.lang import t
 from module.webui.patch import fix_py37_subprocess_communicate, patch_executor, patch_mimetype
 from module.webui.pin import put_input, put_select
 from module.webui.process_manager import ProcessManager
-from module.webui.remote_access import RemoteAccess
 from module.webui.setting import State
 from module.webui.utils import (
     Icon,
@@ -108,14 +104,14 @@ class AlasGUI(Frame):
 
     def __init__(self) -> None:
         super().__init__()
-        # modified keys, return values of pin_wait_change()
+        # 已修改的键，值来自 pin_wait_change()。
         self.modified_config_queue = queue.Queue()
-        # alas config name
+        # Alas 配置名。
         self.alas_name = ""
         self.alas_mod = "alas"
         self.alas_config = AzurLaneConfig("template")
         self.initial()
-        # rendered state cache
+        # 渲染状态缓存。
         self.rendered_cache = []
         self.inst_cache = []
         self.load_home = False
@@ -166,13 +162,13 @@ class AlasGUI(Frame):
             return rendered_state
 
         if not len(self.rendered_cache) or self.load_home:
-            # Reload when add/delete new instance | first start app.py | go to HomePage (HomePage load call force reload)
+            # 添加/删除实例、首次启动 app.py、进入首页时重新加载。
             flag = False
             self.inst_cache.clear()
             self.inst_cache = alas_instance()
         if flag:
             for index, inst in enumerate(self.inst_cache):
-                # Check for state change
+                # 检查状态变化。
                 state = ProcessManager.get_manager(inst).state
                 if state != self.rendered_cache[index]:
                     self.rendered_cache[index] = update(inst, index)
@@ -184,7 +180,7 @@ class AlasGUI(Frame):
                 self.rendered_cache.append(update(inst, index))
             self.load_home = False
         if not flag:
-            # Redraw lost focus, now focus on aside button
+            # 重绘会丢失焦点，这里恢复侧边栏按钮焦点。
             aside_name = get_localstorage("aside")
             self.active_button("aside", aside_name)
 
@@ -193,14 +189,14 @@ class AlasGUI(Frame):
     @use_scope("header_status")
     def set_status(self, state: int) -> None:
         """
-        Args:
+        参数：
             state (int):
-                1 (running)
-                2 (not running)
-                3 (warning, stop unexpectedly)
-                4 (stop for update)
-                0 (hide)
-                -1 (*state not changed)
+                1：运行中。
+                2：未运行。
+                3：警告，异常停止。
+                4：更新时停止。
+                0：隐藏。
+                -1：状态未变化。
         """
         if state == -1:
             return
@@ -225,7 +221,7 @@ class AlasGUI(Frame):
     @use_scope("menu", clear=True)
     def alas_set_menu(self) -> None:
         """
-        Set menu
+        设置菜单。
         """
         put_buttons(
             [
@@ -285,7 +281,7 @@ class AlasGUI(Frame):
     @use_scope("content", clear=True)
     def alas_set_group(self, task: str) -> None:
         """
-        Set arg groups from dict
+        根据字典设置参数组。
         """
         self.init_menu(name=task)
         self.set_title(t(f"Task.{task}.name"))
@@ -314,29 +310,29 @@ class AlasGUI(Frame):
         for arg, arg_dict in deep_iter(arg_dict, depth=1):
             output_kwargs: T_Output_Kwargs = arg_dict.copy()
 
-            # Skip hide
+            # 跳过隐藏项。
             display: Optional[str] = output_kwargs.pop("display", None)
             if display == "hide":
                 continue
-            # Disable
+            # 禁用项。
             elif display == "disabled":
                 output_kwargs["disabled"] = True
-            # Output type
+            # 输出类型。
             output_kwargs["widget_type"] = output_kwargs.pop("type")
 
             arg_name = arg[0]  # [arg_name,]
-            # Internal pin widget name
+            # 内部 pin 组件名。
             output_kwargs["name"] = f"{task}_{group_name}_{arg_name}"
-            # Display title
+            # 显示标题。
             output_kwargs["title"] = t(f"{group_name}.{arg_name}.name")
 
-            # Get value from config
+            # 从配置中读取值。
             value = deep_get(config, [task, group_name, arg_name], output_kwargs["value"])
-            # idk
+            # datetime 需要先转成字符串才能给 pin 使用。
             value = str(value) if isinstance(value, datetime) else value
-            # Default value
+            # 默认值。
             output_kwargs["value"] = value
-            # Options
+            # 可选项。
             options = output_kwargs.pop("option", [])
             server_options = output_kwargs.get(f"option_{server}")
             if output_kwargs["widget_type"] == "select" and isinstance(server_options, list) and server_options:
@@ -354,22 +350,22 @@ class AlasGUI(Frame):
                 only_option = options[0]
                 if only_option in output_kwargs.get("option_bold", []):
                     output_kwargs["widget_type"] = "state"
-            # Options label
+            # 可选项标签。
             options_label = []
             for opt in options:
                 options_label.append(t(f"{group_name}.{arg_name}.{opt}"))
             output_kwargs["options_label"] = options_label
-            # Help
+            # 帮助文本。
             arg_help = t(f"{group_name}.{arg_name}.help")
             if arg_help == "" or not arg_help:
                 arg_help = None
             output_kwargs["help"] = arg_help
-            # Invalid feedback
+            # 无效输入反馈。
             output_kwargs["invalid_feedback"] = t("Gui.Text.InvalidFeedBack", value)
 
             o = put_output(output_kwargs)
             if o is not None:
-                # output will inherit current scope when created, override here
+                # output 创建时会继承当前 scope，这里手动覆盖。
                 o.spec["scope"] = f"#pywebio-scope-group_{group_name}"
                 output_list.append(o)
 
@@ -734,12 +730,6 @@ class AlasGUI(Frame):
         ).style("--menu-HomePage--")
 
         put_button(
-            label=t("Gui.MenuDevelop.Remote"),
-            onclick=self.dev_remote,
-            color="menu",
-        ).style("--menu-Remote--")
-
-        put_button(
             label=t("Gui.MenuDevelop.Utils"),
             onclick=self.dev_utils,
             color="menu",
@@ -749,52 +739,7 @@ class AlasGUI(Frame):
     def dev_utils(self) -> None:
         self.init_menu(name="Utils")
         self.set_title(t("Gui.MenuDevelop.Utils"))
-        put_button(label="Raise exception", onclick=raise_exception)
-
-    @use_scope("content", clear=True)
-    def dev_remote(self) -> None:
-        self.init_menu(name="Remote")
-        self.set_title(t("Gui.MenuDevelop.Remote"))
-        put_row(
-            content=[put_scope("remote_loading"), None, put_scope("remote_state")],
-            size="auto .25rem 1fr",
-        )
-        put_scope("remote_info")
-
-        def u(state):
-            if state == -1:
-                return
-            clear("remote_loading")
-            clear("remote_state")
-            clear("remote_info")
-            if state in (1, 2):
-                put_loading("grow", "success", "remote_loading").style("--loading-grow--")
-                put_text(t("Gui.Remote.Running"), scope="remote_state")
-                put_text(t("Gui.Remote.EntryPoint"), scope="remote_info")
-                entrypoint = RemoteAccess.get_entry_point()
-                if entrypoint:
-                    put_link(name=entrypoint, url=entrypoint, scope="remote_info")
-                else:
-                    put_text("Loading...", scope="remote_info")
-            elif state in (0, 3):
-                put_loading("border", "secondary", "remote_loading").style("--loading-border-fill--")
-                if State.deploy_config.EnableRemoteAccess and State.deploy_config.Password:
-                    put_text(t("Gui.Remote.NotRunning"), scope="remote_state")
-                else:
-                    put_text(t("Gui.Remote.NotEnable"), scope="remote_state")
-                put_text(t("Gui.Remote.ConfigureHint"), scope="remote_info")
-                url = "http://app.azurlane.cloud"
-                put_html(f'<a href="{url}" target="_blank">{url}</a>', scope="remote_info")
-                if state == 3:
-                    put_warning(
-                        t("Gui.Remote.SSHNotInstall"),
-                        closable=False,
-                        scope="remote_info",
-                    )
-
-        remote_switch = Switch(status=u, get_state=RemoteAccess.get_state, name="remote")
-
-        self.task_handler.add(remote_switch.g(), delay=1, pending_delete=True)
+        put_button(label="抛出异常", onclick=raise_exception)
 
     def ui_develop(self) -> None:
         if not self.is_mobile:
@@ -905,22 +850,22 @@ class AlasGUI(Frame):
             put_text("更改主题").style("text-align: center")
             put_buttons(
                 [
-                    {"label": "Light", "value": "default", "color": "light"},
-                    {"label": "Dark", "value": "dark", "color": "dark"},
+                    {"label": "亮色", "value": "default", "color": "light"},
+                    {"label": "暗色", "value": "dark", "color": "dark"},
                 ],
                 onclick=lambda t: set_theme(t),
             ).style("text-align: center")
 
-            # show something
+            # 显示项目提示。
             put_markdown(
                 """
             Alas 是一款免费开源软件，如果你在任何渠道付费购买了 Alas，请退款。
-            Project repository 项目地址：`https://github.com/LmeSzinc/AzurLaneAutoScript`
+            项目地址：`https://github.com/LmeSzinc/AzurLaneAutoScript`
             """
             ).style("text-align: center")
 
     def run(self) -> None:
-        # setup gui
+        # 设置 GUI。
         set_env(title="Alas", output_animation=False)
         add_css(filepath_css("alas"))
         if self.is_mobile:
@@ -933,8 +878,8 @@ class AlasGUI(Frame):
         else:
             add_css(filepath_css("light-alas"))
 
-        # Auto refresh when lost connection
-        # [For develop] Disable by run `reload=0` in console
+        # 连接丢失时自动刷新。
+        # 开发时可在控制台执行 `reload=0` 禁用。
         run_js(
             """
         reload = 1;
@@ -955,10 +900,10 @@ class AlasGUI(Frame):
         aside = get_localstorage("aside")
         self.show()
 
-        # init config watcher
+        # 初始化配置监听器。
         self._init_alas_config_watcher()
 
-        # save config
+        # 保存配置。
         _thread_save_config = threading.Thread(target=self._alas_thread_update_config)
         register_thread(_thread_save_config)
         _thread_save_config.start()
@@ -990,7 +935,7 @@ class AlasGUI(Frame):
         self.task_handler.add(visibility_state_switch.g(), 15)
         self.task_handler.start()
 
-        # Return to previous page
+        # 返回上一次打开的页面。
         if aside not in ["Home", None]:
             self.ui_alas(aside)
 
@@ -1012,9 +957,7 @@ def app_manage():
         file: bytes = resp["content"]
         file_name: str = resp["filename"]
 
-        if IS_ON_PHONE_CLOUD:
-            config_name = mod_name = "alas"
-        elif len(file_name.split(".")) == 2:
+        if len(file_name.split(".")) == 2:
             config_name, _ = file_name.split(".")
             mod_name = "alas"
         else:
@@ -1128,13 +1071,12 @@ def app_manage():
             {
                 "label": t("Gui.AppManage.New"),
                 "value": "new",
-                "disabled": IS_ON_PHONE_CLOUD,
             },
             {"label": t("Gui.AppManage.Import"), "value": "import"},
             {"label": t("Gui.AppManage.Back"), "value": "back"},
         ],
         onclick=[
-            (lambda: None) if IS_ON_PHONE_CLOUD else _new,
+            _new,
             _import,
             partial(go_app, "index", new_window=False),
         ],
@@ -1143,8 +1085,9 @@ def app_manage():
 
 
 def debug():
-    """For interactive python.
-    $ python3
+    """交互式 Python 调试入口。
+
+    $ python
     >>> from module.webui.app import *
     >>> debug()
     >>>
@@ -1161,16 +1104,13 @@ def startup():
         init_discord_rpc()
     if State.deploy_config.StartOcrServer:
         start_ocr_server_process(State.deploy_config.OcrServerPort)
-    if State.deploy_config.EnableRemoteAccess and State.deploy_config.Password is not None:
-        task_handler.add(RemoteAccess.keep_ssh_alive(), 60)
 
 
 def clearup():
     """
-    Notice: Ensure run it before uvicorn reload app.
+    注意：必须在 uvicorn 重新加载 app 前执行。
     """
     logger.info("Start clearup")
-    RemoteAccess.kill_ssh_process()
     close_discord_rpc()
     stop_ocr_server_process()
     for alas in ProcessManager._processes.values():
@@ -1181,22 +1121,22 @@ def clearup():
 
 
 def app():
-    parser = argparse.ArgumentParser(description="Alas web service")
-    parser.add_argument("-k", "--key", type=str, help="Password of alas. No password by default")
+    parser = argparse.ArgumentParser(description="Alas WebUI 服务")
+    parser.add_argument("-k", "--key", type=str, help="WebUI 密码，默认不启用。")
     parser.add_argument(
         "--cdn",
         action="store_true",
-        help="Use jsdelivr cdn for pywebio static files (css, js). Self host cdn by default.",
+        help="使用 jsdelivr 加载 pywebio 静态文件，默认本地提供。",
     )
     parser.add_argument(
         "--run",
         nargs="+",
         type=str,
-        help="Run alas by config names on startup",
+        help="启动时自动运行指定配置。",
     )
     args, _ = parser.parse_known_args()
 
-    # Apply config
+    # 应用配置。
     AlasGUI.set_theme(theme=State.deploy_config.Theme)
     key = args.key or State.deploy_config.Password
     cdn = args.cdn if args.cdn else State.deploy_config.CDN
@@ -1213,7 +1153,6 @@ def app():
     logger.attr("Theme", State.deploy_config.Theme)
     logger.attr("Password", True if key else False)
     logger.attr("CDN", cdn)
-    logger.attr("IS_ON_PHONE_CLOUD", IS_ON_PHONE_CLOUD)
 
     from deploy.atomic import atomic_failure_cleanup
 

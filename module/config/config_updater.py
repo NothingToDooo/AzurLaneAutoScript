@@ -7,7 +7,6 @@ from cached_property import cached_property
 from deploy.utils import DEPLOY_TEMPLATE, poor_yaml_read, poor_yaml_write
 from module.base.timer import timer
 from module.config.deep import deep_default, deep_get, deep_iter, deep_pop, deep_set
-from module.config.env import IS_ON_PHONE_CLOUD
 from module.config.redirect_utils.utils import *
 from module.config.server import VALID_CHANNEL_PACKAGE, VALID_PACKAGE, VALID_SERVER_LIST, to_package, to_server
 from module.config.utils import *
@@ -88,7 +87,7 @@ class ConfigGenerator:
             arg = {
                 "type": "input",
                 "value": "",
-                # option
+                # 可选项
             }
             if not isinstance(value, dict):
                 value = {"value": value}
@@ -96,11 +95,11 @@ class ConfigGenerator:
             if isinstance(value["value"], datetime):
                 arg["type"] = "datetime"
                 arg["validate"] = "datetime"
-            # Manual definition has the highest priority
+            # 手动定义优先级最高。
             arg.update(value)
             deep_set(data, keys=path, value=arg)
 
-        # Define storage group
+        # 定义存储组。
         arg = {
             "type": "storage",
             "value": {},
@@ -149,7 +148,7 @@ class ConfigGenerator:
     @timer
     def args(self):
         """
-        Merge definitions into standardised json.
+        合并定义并生成标准化 json。
 
             task.yaml ---+
         argument.yaml ---+-----> args.json
@@ -157,13 +156,13 @@ class ConfigGenerator:
          default.yaml ---+
 
         """
-        # Construct args
+        # 构造参数。
         data = {}
         for path, groups in deep_iter(self.task, depth=3):
             if "tasks" not in path:
                 continue
             task = path[2]
-            # Add storage to all task
+            # 给所有任务加入存储组。
             groups.append("Storage")
             for group in groups:
                 if group not in self.argument:
@@ -172,13 +171,12 @@ class ConfigGenerator:
                 deep_set(data, keys=[task, group], value=deepcopy(self.argument[group]))
 
         def check_override(path, value):
-            # Check existence
+            # 检查参数是否存在。
             old = deep_get(data, keys=path, default=None)
             if old is None:
                 print(f"`{'.'.join(path)}` is not a existing argument")
                 return False
-            # Check type
-            # But allow `Interval` to be different
+            # 检查类型，但允许 `Interval` 使用不同类型。
             old_value = old.get("value", None) if isinstance(old, dict) else old
             value = old.get("value", None) if isinstance(value, dict) else value
             if (
@@ -188,19 +186,19 @@ class ConfigGenerator:
             ):
                 print(f"`{value}` ({type(value)}) and `{'.'.join(path)}` ({type(old_value)}) are in different types")
                 return False
-            # Check option
+            # 检查可选项。
             if isinstance(old, dict) and "option" in old:
                 if value not in old["option"]:
                     print(f"`{value}` is not an option of argument `{'.'.join(path)}`")
                     return False
             return True
 
-        # Set defaults
+        # 写入默认值。
         for p, v in deep_iter(self.default, depth=3):
             if not check_override(p, v):
                 continue
             deep_set(data, keys=p + ["value"], value=v)
-        # Override non-modifiable arguments
+        # 覆盖不可直接修改的参数。
         for p, v in deep_iter(self.override, depth=3):
             if not check_override(p, v):
                 continue
@@ -217,7 +215,7 @@ class ConfigGenerator:
             else:
                 deep_set(data, keys=p + ["value"], value=v)
                 deep_set(data, keys=p + ["display"], value="hide")
-        # Set command
+        # 写入任务命令。
         for path, groups in deep_iter(self.task, depth=3):
             if "tasks" not in path:
                 continue
@@ -231,7 +229,7 @@ class ConfigGenerator:
     @timer
     def generate_code(self):
         """
-        Generate python code.
+        生成 Python 配置代码。
 
         args.json ---> config_generated.py
 
@@ -243,7 +241,7 @@ class ConfigGenerator:
             group, arg = path
             if group not in visited_group:
                 lines.append("")
-                lines.append(f"    # Group `{group}`")
+                lines.append(f"    # 配置组 `{group}`")
                 visited_group.add(group)
 
             option = ""
@@ -260,7 +258,7 @@ class ConfigGenerator:
     @timer
     def generate_i18n(self, lang):
         """
-        Load old translations and generate new translation file.
+        读取旧翻译并生成新的翻译文件。
 
                      args.json ---+-----> i18n/<lang>.json
         (old) i18n/<lang>.json ---+
@@ -276,14 +274,14 @@ class ConfigGenerator:
                 v = deep_get(old, keys=k, default=d)
                 deep_set(new, keys=k, value=v)
 
-        # Menu
+        # 菜单。
         for path, data in deep_iter(self.task, depth=3):
             if "tasks" not in path:
                 continue
             task_group, _, task = path
             deep_load(["Menu", task_group])
             deep_load(["Task", task])
-        # Arguments
+        # 参数。
         visited_group = set()
         for path, data in deep_iter(self.argument, depth=2):
             if path[0] not in visited_group:
@@ -292,8 +290,8 @@ class ConfigGenerator:
             deep_load(path)
             if "option" in data:
                 deep_load(path, words=data["option"], default=False)
-        # Event names
-        # Names come from SameLanguageServer > en > cn > jp > tw
+        # 活动名称。
+        # 名称优先级：同语言服务器 > 国际服 > 国服 > 日服 > 台服。
         events = {}
         for event in self.event:
             if lang in LANG_TO_SERVER:
@@ -308,7 +306,7 @@ class ConfigGenerator:
         for event in sorted(self.event):
             name = events.get(event.directory, event.directory)
             deep_set(new, keys=f"Campaign.Event.{event.directory}", value=name)
-        # Package names
+        # 包名。
         for package, server in VALID_PACKAGE.items():
             path = ["Emulator", "PackageName", package]
             if deep_get(new, keys=path) == package:
@@ -322,18 +320,18 @@ class ConfigGenerator:
             else:
                 value = f"{name} {package}"
             deep_set(new, keys=["Emulator", "PackageName", package], value=value)
-        # Game server names
+        # 游戏服务器名称。
         for server, _list in VALID_SERVER_LIST.items():
             for index in range(len(_list)):
                 path = ["Emulator", "ServerName", f"{server}-{index}"]
                 prefix = server.split("_")[0].upper()
                 prefix = "国服" if prefix == "CN" else prefix
                 deep_set(new, keys=path, value=f"[{prefix}] {_list[index]}")
-        # GUI i18n
+        # GUI 翻译。
         for path, _ in deep_iter(self.gui, depth=2):
             group, key = path
             deep_load(keys=["Gui", group], words=(key,))
-        # zh-TW
+        # 繁体中文用字替换。
         dic_repl = {
             "設置": "設定",
             "支持": "支援",
@@ -353,7 +351,7 @@ class ConfigGenerator:
     @cached_property
     def menu(self):
         """
-        Generate menu definitions
+        生成菜单定义。
 
         task.yaml --> menu.json
 
@@ -378,8 +376,8 @@ class ConfigGenerator:
     @timer
     def event(self):
         """
-        Returns:
-            list[Event]: From latest to oldest
+        返回：
+            list[Event]：从新到旧排列的活动列表。
         """
 
         def calc_width(text):
@@ -393,10 +391,10 @@ class ConfigGenerator:
         with open("./campaign/Readme.md", encoding="utf-8") as f:
             for text in f.readlines():
                 if not re.search(r"^\|.+\|$", text):
-                    # not a table line
+                    # 不是表格行。
                     lines.append(text)
                 elif re.search(r"^.*\-{3,}.*$", text):
-                    # is a delimiter line
+                    # 是表格分隔行。
                     continue
                 else:
                     line_entries = [x.strip() for x in text.strip("| \n").split("|")]
@@ -423,7 +421,7 @@ class ConfigGenerator:
 
     def insert_event(self):
         """
-        Insert event information into `self.args`.
+        将活动信息写入 `self.args`。
 
         ./campaign/Readme.md -----+
                                   v
@@ -520,7 +518,7 @@ class ConfigGenerator:
 
 
 class ConfigUpdater:
-    # source, target, (optional)convert_func
+    # source、target、可选转换函数。
     redirection = [
         # ('OpsiDaily.OpsiDaily.BuySupply', 'OpsiShop.Scheduler.Enable'),
         # ('OpsiDaily.Scheduler.Enable', 'OpsiDaily.OpsiDaily.DoMission'),
@@ -609,14 +607,14 @@ class ConfigUpdater:
             value = parse_value(value, data=data)
             deep_set(new, keys=keys, value=value)
 
-        # AzurStatsID
+        # AzurStatsID。
         if is_template:
             deep_set(new, "Alas.DropRecord.AzurStatsID", None)
         else:
             deep_default(new, "Alas.DropRecord.AzurStatsID", random_id())
         if deep_get(new, keys="OpsiHazard1Leveling.Scheduler.Enable"):
             deep_set(new, keys="OpsiMeowfficerFarming.Scheduler.Enable", value=True)
-        # Update to latest event
+        # 更新到最新活动。
         server = to_server(deep_get(new, "Alas.Emulator.PackageName", "cn"))
         if not is_template:
             for task in EVENTS + RAIDS + COALITIONS:
@@ -628,13 +626,13 @@ class ConfigUpdater:
                 opts = deep_get(self.args, keys=f"{task}.Campaign.Event.option_{server}", default=[])
                 if opts and deep_get(new, keys=f"{task}.Campaign.Event", default="campaign_main") not in opts:
                     deep_set(new, keys=f"{task}.Campaign.Event", value=opts[0])
-        # War archive does not allow campaign_main
+        # 作战档案不允许使用 campaign_main。
         for task in WAR_ARCHIVES:
             opts = deep_get(self.args, keys=f"{task}.Campaign.Event.option_{server}", default=[])
             if opts and deep_get(new, keys=f"{task}.Campaign.Event", default="campaign_main") == "campaign_main":
                 deep_set(new, keys=f"{task}.Campaign.Event", value=opts[0])
 
-        # Events does not allow default stage 12-4
+        # 活动任务不允许默认关卡 12-4。
         def default_stage(t, stage):
             if deep_get(new, keys=f"{t}.Campaign.Name", default="12-4") in ["7-2", "12-4"]:
                 deep_set(new, keys=f"{t}.Campaign.Name", value=stage)
@@ -652,7 +650,7 @@ class ConfigUpdater:
 
     def config_redirect(self, old, new):
         """
-        Convert old settings to the new.
+        将旧配置迁移到新配置。
 
         Args:
             old (dict):
@@ -691,7 +689,7 @@ class ConfigUpdater:
 
             if isinstance(target, tuple):
                 for k, v in zip(target, value):
-                    # Allow update same key
+                    # 允许更新同一个键。
                     if (deep_get(old, keys=k) is None) or (source == target):
                         deep_set(new, keys=k, value=v)
             elif (deep_get(old, keys=target) is None) or (source == target):
@@ -700,33 +698,17 @@ class ConfigUpdater:
         return new
 
     def _override(self, data):
-        def remove_drop_save(key):
-            value = deep_get(data, keys=key, default="do_not")
-            if value == "save_and_upload":
-                value = "upload"
-                deep_set(data, keys=key, value=value)
-            elif value == "save":
-                value = "do_not"
-                deep_set(data, keys=key, value=value)
-
-        if IS_ON_PHONE_CLOUD:
-            deep_set(data, "Alas.Emulator.Serial", "127.0.0.1:5555")
-            deep_set(data, "Alas.Emulator.ScreenshotMethod", "nemu_ipc")
-            deep_set(data, "Alas.Emulator.ControlMethod", "minitouch")
-            for arg in deep_get(self.args, keys="Alas.DropRecord", default={}).keys():
-                remove_drop_save(arg)
-
         return data
 
     def save_callback(self, key: str, value: t.Any) -> t.Iterable[t.Tuple[str, t.Any]]:
         """
-        Args:
-            key: Key path in config json, such as "Main.Emotion.Fleet1Value"
-            value: Value set by user, such as "98"
+        参数：
+            key：配置 json 中的键路径，例如 "Main.Emotion.Fleet1Value"。
+            value：用户设置的值，例如 "98"。
 
-        Yields:
-            str: Key path to set config json, such as "Main.Emotion.Fleet1Record"
-            any: Value to set, such as "2020-01-01 00:00:00"
+        生成：
+            str：需要写入配置 json 的键路径，例如 "Main.Emotion.Fleet1Record"。
+            any：需要写入的值，例如 "2020-01-01 00:00:00"。
         """
         if "Emotion" in key and "Value" in key:
             keys = key.split(".")
@@ -735,7 +717,7 @@ class ConfigUpdater:
 
     def read_file(self, config_name, is_template=False):
         """
-        Read and update config file.
+        读取并更新配置文件。
 
         Args:
             config_name (str): ./config/{file}.json
@@ -746,15 +728,14 @@ class ConfigUpdater:
         """
         old = read_file(filepath_config(config_name))
         new = self.config_update(old, is_template=is_template)
-        # The updated config did not write into file, although it doesn't matters.
-        # Commented for performance issue
+        # 更新后的配置不会立刻写回文件；这里为了性能保留只读行为。
         # self.write_file(config_name, new)
         return new
 
     @staticmethod
     def write_file(config_name, data, mod_name="alas"):
         """
-        Write config file.
+        写入配置文件。
 
         Args:
             config_name (str): ./config/{file}.json
@@ -766,7 +747,7 @@ class ConfigUpdater:
     @timer
     def update_file(self, config_name, is_template=False):
         """
-        Read, update and write config file.
+        读取、更新并写入配置文件。
 
         Args:
             config_name (str): ./config/{file}.json
@@ -792,7 +773,7 @@ if __name__ == "__main__":
     (old) i18n/<lang>.json --------\\========> i18n/<lang>.json
     (old)    template.json ---------\========> template.json
     """
-    # Ensure running in Alas root folder
+    # 确保在 Alas 根目录运行。
     import os
 
     os.chdir(os.path.join(os.path.dirname(__file__), "../../"))

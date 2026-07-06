@@ -13,36 +13,30 @@ class ExecutionError(Exception):
 
 
 class ConfigModel:
-    # Git
-    GitExecutable: str = "./toolkit/Git/mingw64/bin/git.exe"
+    # Git 配置
+    GitExecutable: str = "git"
 
-    # Python
+    # Python 配置
     PythonExecutable: str = "./.venv/Scripts/python.exe"
 
-    # Adb
+    # ADB 配置
     AdbExecutable: str = "./.venv/Lib/site-packages/adbutils/binaries/adb.exe"
     ReplaceAdb: bool = True
     AutoConnect: bool = True
     InstallUiautomator2: bool = True
 
-    # Ocr
+    # OCR 配置
     UseOcrServer: bool = False
     StartOcrServer: bool = False
     OcrServerPort: int = 22268
     OcrClientAddress: str = "127.0.0.1:22268"
 
-    # Misc
+    # 其他配置
     DiscordRichPresence: bool = False
 
-    # Remote Access
-    EnableRemoteAccess: bool = False
-    SSHUser: Optional[str] = None
-    SSHServer: Optional[str] = None
-    SSHExecutable: Optional[str] = None
-
-    # Webui
-    WebuiHost: str = "0.0.0.0"
-    WebuiPort: int = 22367
+    # WebUI 配置
+    WebuiHost: str = "127.0.0.1"
+    WebuiPort: int = 22267
     Theme: str = "default"
     DpiScaling: bool = True
     Password: Optional[str] = None
@@ -53,8 +47,8 @@ class ConfigModel:
 class DeployConfig(ConfigModel):
     def __init__(self, file=DEPLOY_CONFIG):
         """
-        Args:
-            file (str): User deploy config.
+        参数：
+            file (str)：用户 deploy 配置文件。
         """
         self.file = file
         self.config = {}
@@ -64,15 +58,15 @@ class DeployConfig(ConfigModel):
         self.show_config()
 
     def show_config(self):
-        logger.hr("Show deploy config", 1)
+        logger.hr("显示 deploy 配置", 1)
         for k, v in self.config.items():
-            if k in ("Password", "SSHUser"):
+            if k == "Password":
                 continue
             if self.config_template.get(k) == v:
                 continue
             logger.info(f"{k}: {v}")
 
-        logger.info("Rest of the configs are the same as default")
+        logger.info("其余配置与默认值一致")
 
     def read(self):
         self.config = poor_yaml_read(DEPLOY_TEMPLATE)
@@ -92,11 +86,11 @@ class DeployConfig(ConfigModel):
 
     def filepath(self, path):
         """
-        Args:
+        参数：
             path (str):
 
-        Returns:
-            str: Absolute filepath.
+        返回：
+            str：绝对路径。
         """
         if os.path.isabs(path):
             return path
@@ -113,7 +107,7 @@ class DeployConfig(ConfigModel):
         if os.path.exists(exe):
             return exe
 
-        logger.warning(f"AdbExecutable: {exe} does not exist, use `adb` instead")
+        logger.warning(f"AdbExecutable: {exe} 不存在，改用 `adb`")
         return "adb"
 
     @cached_property
@@ -122,7 +116,7 @@ class DeployConfig(ConfigModel):
         if os.path.exists(exe):
             return exe
 
-        logger.warning(f"GitExecutable: {exe} does not exist, use `git` instead")
+        logger.warning(f"GitExecutable: {exe} 不存在，改用 `git`")
         return "git"
 
     @cached_property
@@ -132,19 +126,18 @@ class DeployConfig(ConfigModel):
             return exe
 
         current = sys.executable.replace("\\", "/")
-        logger.warning(f"PythonExecutable: {exe} does not exist, use current python instead: {current}")
+        logger.warning(f"PythonExecutable: {exe} 不存在，改用当前 Python: {current}")
         return current
 
     def execute(self, command, allow_failure=False, output=True):
         """
-        Args:
+        参数：
             command (str):
             allow_failure (bool):
             output(bool):
 
-        Returns:
-            bool: If success.
-                Terminate installation if failed to execute and not allow_failure.
+        返回：
+            bool：是否成功。
         """
         command = command.replace(r"\\", "/").replace("\\", "/").replace('"', '"')
         if not output:
@@ -153,23 +146,23 @@ class DeployConfig(ConfigModel):
         error_code = os.system(command)
         if error_code:
             if allow_failure:
-                logger.info(f"[ allowed failure ], error_code: {error_code}")
+                logger.info(f"[允许失败]，error_code: {error_code}")
                 return False
             else:
-                logger.info(f"[ failure ], error_code: {error_code}")
+                logger.info(f"[失败]，error_code: {error_code}")
                 self.show_error(command)
                 raise ExecutionError
         else:
-            logger.info("[ success ]")
+            logger.info("[成功]")
             return True
 
     def subprocess_execute(self, cmd, timeout=10):
         """
-        Args:
+        参数：
             cmd (list[str]):
             timeout:
 
-        Returns:
+        返回：
             str:
         """
         logger.info(" ".join(cmd))
@@ -184,9 +177,9 @@ class DeployConfig(ConfigModel):
         return stdout.decode()
 
     def show_error(self, command=None):
-        logger.hr("Command failed", 0)
+        logger.hr("命令执行失败", 0)
         self.show_config()
         logger.info("")
-        logger.info(f"Last command: {command}")
-        logger.info("Please check your deploy settings in config/deploy.yaml")
-        logger.info("Take the screenshot of entire window if you need help")
+        logger.info(f"最后执行的命令: {command}")
+        logger.info("请检查 config/deploy.yaml 中的 deploy 配置")
+        logger.info("如果需要排查，请保留完整窗口截图")

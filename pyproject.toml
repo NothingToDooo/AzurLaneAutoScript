@@ -21,17 +21,16 @@ dependencies = [
     "inflection",
     "pydantic",
     "aiofiles",
-    "anyio",
     "onepush",
     "pypresence",
     "cnocr",
     "pywebio",
     "starlette",
-    "uvicorn[standard]",
     "zerorpc",
     "pyzmq",
     "cached-property>=2.0.1",
     "onnxruntime>=1.27.0",
+    "uvicorn>=0.50.2",
 ]
 
 [tool.uv]

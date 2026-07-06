@@ -1,6 +1,4 @@
-"""
-Copy from pywebio.platform.fastapi
-"""
+"""基于 pywebio.platform.fastapi 精简出的本地 WebUI 服务。"""
 
 import asyncio
 import os
@@ -12,7 +10,6 @@ from pywebio.platform.fastapi import (
     cdn_validation,
     get_free_port,
     open_webbrowser_on_server_started,
-    start_remote_access_service,
     webio_routes,
 )
 from starlette.applications import Starlette
@@ -61,7 +58,6 @@ def start_server(
     host="",
     cdn=True,
     static_dir=None,
-    remote_access=False,
     debug=False,
     allowed_origins=None,
     check_origin=None,
@@ -82,12 +78,9 @@ def start_server(
         asyncio.get_event_loop().create_task(open_webbrowser_on_server_started("localhost", port))
 
     if not host:
-        host = "0.0.0.0"
+        host = "127.0.0.1"
 
     if port == 0:
         port = get_free_port()
-
-    if remote_access:
-        start_remote_access_service(local_port=port)
 
     uvicorn.run(app, host=host, port=port, **uvicorn_settings)

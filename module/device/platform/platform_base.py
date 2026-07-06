@@ -16,21 +16,18 @@ class EmulatorInfo(BaseModel):
     name: str = ""
     path: str = ""
 
-    # For APIs of chinac.com, a phone cloud platform.
-    # access_key: SecretStr = ''
-    # secret: SecretStr = ''
-
 
 def serial_to_id(serial: str):
     """
-    Predict instance ID from serial
-    E.g.
+    从 serial 推算 MuMu 实例 ID。
+
+    例如：
         "127.0.0.1:16384" -> 0
         "127.0.0.1:16416" -> 1
-        Port from 16414 to 16418 -> 1
+        16414 到 16418 端口 -> 1
 
-    Returns:
-        int: instance_id, or None if failed to predict
+    返回：
+        int：实例 ID；无法推算时返回 None。
     """
     try:
         port = int(serial.split(":")[1])
@@ -46,8 +43,9 @@ def serial_to_id(serial: str):
 
 class PlatformBase(Connection, EmulatorManagerBase):
     """
-    Base interface of a platform, platform can be various operating system or phone clouds.
-    For each `Platform` class, the following APIs must be implemented.
+    Windows 模拟器平台的基类。
+
+    每个 `Platform` 类需要实现以下接口：
     - all_emulators()
     - all_emulator_instances()
     - emulator_start()
@@ -56,15 +54,16 @@ class PlatformBase(Connection, EmulatorManagerBase):
 
     def emulator_start(self):
         """
-        Start a emulator, until startup completed.
-        - Retry is required.
-        - Using bored sleep to wait startup is forbidden.
+        启动模拟器并等待启动完成。
+
+        - 需要自行重试。
+        - 不要用固定 sleep 等待启动。
         """
         logger.info(f"Current platform {sys.platform} does not support emulator_start, skip")
 
     def emulator_stop(self):
         """
-        Stop a emulator.
+        停止模拟器。
         """
         logger.info(f"Current platform {sys.platform} does not support emulator_stop, skip")
 
@@ -95,8 +94,8 @@ class PlatformBase(Connection, EmulatorManagerBase):
     @cached_property
     def emulator_instance(self) -> t.Optional[EmulatorInstanceBase]:
         """
-        Returns:
-            EmulatorInstanceBase: Emulator instance or None
+        返回：
+            EmulatorInstanceBase：模拟器实例；找不到时返回 None。
         """
         data = self.emulator_info
         old_info = dict(
@@ -104,7 +103,7 @@ class PlatformBase(Connection, EmulatorManagerBase):
             path=data.path,
             name=data.name,
         )
-        # Redirect emulator-5554 to 127.0.0.1:5555
+        # 将 emulator-5554 重定向到 127.0.0.1:5555。
         serial = self.serial
         port_serial, _ = get_serial_pair(self.serial)
         if port_serial is not None:
@@ -117,7 +116,7 @@ class PlatformBase(Connection, EmulatorManagerBase):
             emulator=data.emulator,
         )
 
-        # Write complete emulator data
+        # 写入完整模拟器信息。
         if instance is not None:
             new_info = dict(
                 emulator=instance.type,
@@ -137,14 +136,14 @@ class PlatformBase(Connection, EmulatorManagerBase):
         self, serial: str, name: str = None, path: str = None, emulator: str = None
     ) -> t.Optional[EmulatorInstanceBase]:
         """
-        Args:
-            serial: Serial like "127.0.0.1:5555"
-            name: Instance name like "Nougat64"
-            path: Emulator install path like "C:/Program Files/MuMuPlayer-12.0/shell/MuMuPlayer.exe"
-            emulator: Emulator type defined in Emulator class, like "MuMuPlayer12"
+        参数：
+            serial：类似 "127.0.0.1:5555" 的 serial。
+            name：类似 "Nougat64" 的实例名称。
+            path：类似 "C:/Program Files/MuMuPlayer-12.0/shell/MuMuPlayer.exe" 的模拟器安装路径。
+            emulator：Emulator 类中定义的模拟器类型，例如 "MuMuPlayer12"。
 
-        Returns:
-            EmulatorInstance: Emulator instance or None if no instances not found.
+        返回：
+            EmulatorInstance：模拟器实例；找不到时返回 None。
         """
         logger.hr("Find emulator instance", level=2)
         instances = SelectedGrids(self.all_emulator_instances)
@@ -152,7 +151,7 @@ class PlatformBase(Connection, EmulatorManagerBase):
             logger.info(instance)
         search_args = dict(serial=serial)
 
-        # Search by serial
+        # 按 serial 查找。
         select = instances.select(**search_args)
         if select.count == 0:
             logger.warning(f"No emulator instance with {search_args}, serial invalid")
@@ -163,22 +162,21 @@ class PlatformBase(Connection, EmulatorManagerBase):
             logger.info(f"Found emulator instance: {instance}")
             return instance
 
-        # Additional fixup for MuMu12
-        # MuMu12 may have 127.0.0.1:7555 in vbox config but user setting serial=127.0.0.1:16xxx
-        # If that happens, we check if serial pairs with instance_id
+        # MuMu12 额外修正。
+        # MuMu12 的 vbox 配置中可能是 127.0.0.1:7555，但用户配置 serial=127.0.0.1:16xxx。
+        # 遇到这种情况时，检查 serial 是否能和实例 ID 对应。
         instance_id = serial_to_id(self.serial)
         if instance_id is not None:
             select = instances.select(MuMuPlayer12_id=instance_id)
-            # No logs for if select.count == 1:
-            # because this is just a trial
+            # 这里只是试探，因此 select.count == 1 时不单独记录日志。
             if select.count == 1:
                 instance = select[0]
                 logger.hr("Emulator instance", level=2)
                 logger.info(f"Found emulator instance: {instance}")
                 return instance
 
-        # search by emulator type first, which is the easiest setting for user to setup, so more trustworthy
-        # Multiple instances in given serial, name and path, search by emulator
+        # 先按模拟器类型查找；这是用户最容易设置的项，因此更可信。
+        # 给定 serial、name、path 后仍有多个实例时，按模拟器类型收窄。
         if emulator:
             search_args["type"] = emulator
             select = instances.select(**search_args)
@@ -191,7 +189,7 @@ class PlatformBase(Connection, EmulatorManagerBase):
                 logger.info(f"Found emulator instance: {instance}")
                 return instance
 
-        # Multiple instances in given serial, search by name
+        # 给定 serial 后仍有多个实例时，按名称查找。
         if name:
             search_args["name"] = name
             select = instances.select(**search_args)
@@ -204,7 +202,7 @@ class PlatformBase(Connection, EmulatorManagerBase):
                 logger.info(f"Found emulator instance: {instance}")
                 return instance
 
-        # Multiple instances in given serial and name, search by path
+        # 给定 serial 和 name 后仍有多个实例时，按路径查找。
         if path:
             search_args["path"] = path
             select = instances.select(**search_args)
@@ -217,14 +215,14 @@ class PlatformBase(Connection, EmulatorManagerBase):
                 logger.info(f"Found emulator instance: {instance}")
                 return instance
 
-        # Still too many instances, search from running emulators
+        # 仍有太多实例时，从正在运行的模拟器里查找。
         running = remove_duplicated_path(list(self.iter_running_emulator()))
         logger.info("Running emulators")
         for exe in running:
             logger.info(exe)
         if len(running) == 1:
             logger.info("Only one running emulator")
-            # Same as searching path
+            # 等价于按路径查找。
             search_args["path"] = running[0]
             select = instances.select(**search_args)
             if select.count == 0:
@@ -236,6 +234,6 @@ class PlatformBase(Connection, EmulatorManagerBase):
                 logger.info(f"Found emulator instance: {instance}")
                 return instance
 
-        # Still too many instances
+        # 仍然无法唯一确定实例。
         logger.warning(f"Found multiple emulator instances with {search_args}")
         return None

@@ -6,7 +6,7 @@ from typing import Any, Callable, Generic, Iterable, TypeVar, overload
 T = TypeVar("T")
 
 DEPLOY_CONFIG = "./config/deploy.yaml"
-DEPLOY_TEMPLATE = "./deploy/Windows/template.yaml"
+DEPLOY_TEMPLATE = "./deploy/template"
 
 
 class cached_property(Generic[T]):

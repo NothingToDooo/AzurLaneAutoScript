@@ -1,5 +1,5 @@
-# Translations web gui
-# This will insert to `config/i18n/{lang}.json`, under key `Gui`
+# WebUI 翻译条目。
+# 这些内容会写入 `config/i18n/{lang}.json` 的 `Gui` 节点。
 
 Aside:
   Install:
@@ -32,7 +32,6 @@ MenuAlas:
 
 MenuDevelop:
   HomePage:
-  Remote:
   Utils:
 
 Overview:
@@ -72,14 +71,6 @@ AppManage:
   Name:
   Mod:
   Actions:
-
-Remote:
-  Running:
-  NotRunning:
-  NotEnable:
-  EntryPoint:
-  ConfigureHint:
-  SSHNotInstall:
 
 Text:
   InvalidFeedBack:

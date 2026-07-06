@@ -1,5 +1,4 @@
 import os
-import re
 
 import adbutils
 import uiautomator2 as u2
@@ -8,7 +7,6 @@ from adbutils import AdbClient, AdbDevice
 from module.base.decorator import cached_property
 from module.config.config import AzurLaneConfig
 from module.config.deep import deep_iter
-from module.config.env import IS_ON_PHONE_CLOUD
 from module.device.method.utils import get_serial_pair
 from module.logger import logger
 
@@ -32,8 +30,6 @@ class ConnectionAttr:
             self.config = AzurLaneConfig(config, task=None)
         else:
             self.config = config
-
-        logger.attr("IS_ON_PHONE_CLOUD", IS_ON_PHONE_CLOUD)
 
         # 初始化 ADB 客户端。
         logger.attr("AdbBinary", self.adb_binary)
@@ -144,26 +140,8 @@ class ConnectionAttr:
         return self.serial == "127.0.0.1:7555" or self.is_mumu12_family
 
     @cached_property
-    def is_vmos(self):
-        return 5667 <= self.port <= 5699
-
-    @cached_property
     def is_emulator(self):
         return self.serial.startswith("emulator-") or self.serial.startswith("127.0.0.1:")
-
-    @cached_property
-    def is_network_device(self):
-        return bool(re.match(r"\d+\.\d+\.\d+\.\d+:\d+", self.serial))
-
-    @cached_property
-    def is_local_network_device(self):
-        return bool(re.match(r"192\.168\.\d+\.\d+:\d+", self.serial))
-
-    @cached_property
-    def is_chinac_phone_cloud(self):
-        # 公网 ADB 连接的云手机。
-        # serial 形如 xxx.xxx.xxx.xxx:301。
-        return bool(re.search(r":30[0-9]$", self.serial))
 
     @cached_property
     def adb_binary(self):
@@ -214,11 +192,7 @@ class ConnectionAttr:
 
     @cached_property
     def u2(self) -> u2.Device:
-        if self.serial.startswith("emulator-") or self.serial.startswith("127.0.0.1:"):
-            device = u2.connect_usb(self.serial)
-        else:
-            device = u2.connect(self.serial)
-
+        device = u2.connect_usb(self.serial)
         # 长时间运行时保持 uiautomator2 会话可用。
         device.set_new_command_timeout(604800)
 

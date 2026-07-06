@@ -9,7 +9,7 @@ class GeneratedConfig:
     Auto generated configuration
     """
 
-    # Group `Scheduler`
+    # 配置组 `Scheduler`
     Scheduler_Enable = False  # True, False
     Scheduler_NextRun = datetime.datetime(2020, 1, 1, 0, 0)
     Scheduler_Command = "Alas"
@@ -17,7 +17,7 @@ class GeneratedConfig:
     Scheduler_FailureInterval = 120
     Scheduler_ServerUpdate = "00:00"
 
-    # Group `Emulator`
+    # 配置组 `Emulator`
     Emulator_Serial = "auto"
     Emulator_PackageName = "auto"  # auto, com.bilibili.azurlane, com.YoStarEN.AzurLane, com.YoStarJP.AzurLane, com.hkmanjuu.azurlane.gp, com.bilibili.blhx.huawei, com.bilibili.blhx.honor, com.bilibili.blhx.mi, com.tencent.tmgp.bilibili.blhx, com.bilibili.blhx.baidu, com.bilibili.blhx.qihoo, com.bilibili.blhx.nearme.gamecenter, com.bilibili.blhx.vivo, com.bilibili.blhx.mz, com.bilibili.blhx.dl, com.bilibili.blhx.lenovo, com.bilibili.blhx.uc, com.bilibili.blhx.mzw, com.yiwu.blhx.yx15, com.bilibili.blhx.m4399, com.bilibili.blhx.bilibiliMove, com.hkmanjuu.azurlane.gp.mc
     Emulator_ServerName = "disabled"  # disabled, cn_android-0, cn_android-1, cn_android-2, cn_android-3, cn_android-4, cn_android-5, cn_android-6, cn_android-7, cn_android-8, cn_android-9, cn_android-10, cn_android-11, cn_android-12, cn_android-13, cn_android-14, cn_android-15, cn_android-16, cn_android-17, cn_android-18, cn_android-19, cn_android-20, cn_android-21, cn_android-22, cn_android-23, cn_android-24, cn_android-25, cn_android-26, cn_android-27, cn_android-28, cn_ios-0, cn_ios-1, cn_ios-2, cn_ios-3, cn_ios-4, cn_ios-5, cn_ios-6, cn_ios-7, cn_ios-8, cn_ios-9, cn_ios-10, cn_channel-0, cn_channel-1, cn_channel-2, cn_channel-3, cn_channel-4, cn_channel-5, en-0, en-1, en-2, en-3, en-4, en-5, jp-0, jp-1, jp-2, jp-3, jp-4, jp-5, jp-6, jp-7, jp-8, jp-9, jp-10, jp-11, jp-12, jp-13, jp-14, jp-15, jp-16, jp-17
@@ -26,24 +26,24 @@ class GeneratedConfig:
     Emulator_ScreenshotDedithering = False
     Emulator_AdbRestart = False
 
-    # Group `EmulatorInfo`
+    # 配置组 `EmulatorInfo`
     EmulatorInfo_Emulator = "auto"  # auto, MuMuPlayer, MuMuPlayerX, MuMuPlayer12
     EmulatorInfo_name = None
     EmulatorInfo_path = None
 
-    # Group `Error`
+    # 配置组 `Error`
     Error_HandleError = True
     Error_SaveError = True
     Error_OnePushConfig = "provider: null"
     Error_ScreenshotLength = 1
 
-    # Group `Optimization`
+    # 配置组 `Optimization`
     Optimization_ScreenshotInterval = 0.3
     Optimization_CombatScreenshotInterval = 1.0
     Optimization_TaskHoardingDuration = 0
     Optimization_WhenTaskQueueEmpty = "goto_main"  # stay_there, goto_main, close_game
 
-    # Group `DropRecord`
+    # 配置组 `DropRecord`
     DropRecord_SaveFolder = "./screenshots"
     DropRecord_AzurStatsID = None
     DropRecord_API = "default"  # default, cn_gz_reverse_proxy
@@ -54,25 +54,25 @@ class GeneratedConfig:
     DropRecord_MeowfficerBuy = "do_not"  # do_not, save
     DropRecord_MeowfficerTalent = "do_not"  # do_not, save, upload, save_and_upload
 
-    # Group `Retirement`
+    # 配置组 `Retirement`
     Retirement_RetireMode = "one_click_retire"  # one_click_retire, enhance, old_retire
 
-    # Group `OneClickRetire`
+    # 配置组 `OneClickRetire`
     OneClickRetire_KeepLimitBreak = "keep_limit_break"  # keep_limit_break, do_not_keep
 
-    # Group `Enhance`
+    # 配置组 `Enhance`
     Enhance_ShipToEnhance = "all"  # all, favourite
     Enhance_Filter = None
     Enhance_CheckPerCategory = 5
 
-    # Group `OldRetire`
+    # 配置组 `OldRetire`
     OldRetire_N = True
     OldRetire_R = True
     OldRetire_SR = False
     OldRetire_SSR = False
     OldRetire_RetireAmount = "retire_all"  # retire_all, retire_10
 
-    # Group `Campaign`
+    # 配置组 `Campaign`
     Campaign_Name = "12-4"
     Campaign_Event = "campaign_main"  # campaign_main
     Campaign_Mode = "normal"  # normal, hard
@@ -82,7 +82,7 @@ class GeneratedConfig:
     Campaign_Use2xBook = False
     Campaign_AmbushEvade = True
 
-    # Group `StopCondition`
+    # 配置组 `StopCondition`
     StopCondition_OilLimit = 1000
     StopCondition_RunCount = 0
     StopCondition_MapAchievement = (
@@ -92,7 +92,7 @@ class GeneratedConfig:
     StopCondition_GetNewShip = False
     StopCondition_ReachLevel = 0
 
-    # Group `Fleet`
+    # 配置组 `Fleet`
     Fleet_Fleet1 = 1  # 1, 2, 3, 4, 5, 6
     Fleet_Fleet1Formation = "double_line"  # line_ahead, double_line, diamond
     Fleet_Fleet1Mode = (
@@ -107,7 +107,7 @@ class GeneratedConfig:
     Fleet_Fleet2Step = 2  # 2, 3, 4, 5
     Fleet_FleetOrder = "fleet1_mob_fleet2_boss"  # fleet1_mob_fleet2_boss, fleet1_boss_fleet2_mob, fleet1_all_fleet2_standby, fleet1_standby_fleet2_all
 
-    # Group `Submarine`
+    # 配置组 `Submarine`
     Submarine_Fleet = 0  # 0, 1, 2
     Submarine_Mode = "do_not_use"  # do_not_use, hunt_only, boss_only, hunt_and_boss, every_combat
     Submarine_AutoSearchMode = "sub_standby"  # sub_standby, sub_auto_call
@@ -115,7 +115,7 @@ class GeneratedConfig:
         "2_grid_to_boss"  # to_boss_position, 1_grid_to_boss, 2_grid_to_boss, use_open_ocean_support
     )
 
-    # Group `Emotion`
+    # 配置组 `Emotion`
     Emotion_Mode = "calculate"  # calculate, ignore, calculate_ignore
     Emotion_Fleet1Value = 119
     Emotion_Fleet1Record = datetime.datetime(2020, 1, 1, 0, 0)
@@ -132,7 +132,7 @@ class GeneratedConfig:
     Emotion_Fleet2Recover = "not_in_dormitory"  # not_in_dormitory, dormitory_floor_1, dormitory_floor_2
     Emotion_Fleet2Oath = False
 
-    # Group `HpControl`
+    # 配置组 `HpControl`
     HpControl_UseHpBalance = False
     HpControl_UseEmergencyRepair = False
     HpControl_UseLowHpRetreat = False
@@ -142,81 +142,81 @@ class GeneratedConfig:
     HpControl_RepairUseMultiThreshold = 0.6
     HpControl_LowHpRetreatThreshold = 0.3
 
-    # Group `EnemyPriority`
+    # 配置组 `EnemyPriority`
     EnemyPriority_EnemyScaleBalanceWeight = "default_mode"  # default_mode, S3_enemy_first, S1_enemy_first
 
-    # Group `C11AffinityFarming`
+    # 配置组 `C11AffinityFarming`
     C11AffinityFarming_RunCount = 32
 
-    # Group `C72MysteryFarming`
+    # 配置组 `C72MysteryFarming`
     C72MysteryFarming_StepOnA3 = True
 
-    # Group `C122MediumLeveling`
+    # 配置组 `C122MediumLeveling`
     C122MediumLeveling_LargeEnemyTolerance = 1  # 0, 1, 2, 10
 
-    # Group `C124LargeLeveling`
+    # 配置组 `C124LargeLeveling`
     C124LargeLeveling_NonLargeEnterTolerance = 1  # 0, 1, 2
     C124LargeLeveling_NonLargeRetreatTolerance = 1  # 0, 1, 2, 10
     C124LargeLeveling_PickupAmmo = 3  # 3, 4, 5
 
-    # Group `GemsFarming`
+    # 配置组 `GemsFarming`
     GemsFarming_CommonCV = "any"  # any, langley, bogue, ranger, hermes
     GemsFarming_ChangeVanguard = "ship"  # disabled, ship
     GemsFarming_CommonDD = "any"  # any, favourite, aulick_or_foote, cassin_or_downes, z20_or_z21
     GemsFarming_CommissionLimit = True
 
-    # Group `EventGeneral`
+    # 配置组 `EventGeneral`
     EventGeneral_PtLimit = 0
     EventGeneral_TimeLimit = datetime.datetime(2020, 1, 1, 0, 0)
 
-    # Group `TaskBalancer`
+    # 配置组 `TaskBalancer`
     TaskBalancer_Enable = False
     TaskBalancer_CoinLimit = 10000
     TaskBalancer_TaskCall = "Main"  # Main, Main2, Main3
 
-    # Group `EventDaily`
+    # 配置组 `EventDaily`
     EventDaily_StageFilter = "A1 > A2 > A3"
     EventDaily_LastStage = 0
 
-    # Group `Raid`
+    # 配置组 `Raid`
     Raid_Mode = "hard"  # easy, normal, hard, ex
     Raid_UseTicket = False
 
-    # Group `RaidDaily`
+    # 配置组 `RaidDaily`
     RaidDaily_StageFilter = "hard > normal > easy"
 
-    # Group `Hospital`
+    # 配置组 `Hospital`
     Hospital_UseRecommendFleet = True
 
-    # Group `MaritimeEscort`
+    # 配置组 `MaritimeEscort`
     MaritimeEscort_Enable = True
 
-    # Group `Coalition`
+    # 配置组 `Coalition`
     Coalition_Mode = "tc3"  # tc1, tc2, tc3, sp, ex
     Coalition_Fleet = "single"  # single, multi
 
-    # Group `Commission`
+    # 配置组 `Commission`
     Commission_PresetFilter = "cube"  # cube, cube_24h, chip, chip_24h, oil, custom
     Commission_CustomFilter = "DailyEvent > Gem-4 > Gem-2 > Gem-8 > ExtraCube-0:30\n> UrgentCube-1:30 > UrgentCube-1:45 > UrgentCube-3\n> ExtraDrill-5:20 > ExtraDrill-2 > ExtraDrill-3:20\n> UrgentCube-2:15 > UrgentCube-4\n> ExtraDrill-1 > UrgentCube-6 > ExtraCube-1:30\n> ExtraDrill-2:40 > ExtraDrill-0:20\n> Major > DailyChip > DailyResource\n> ExtraPart-0:30 > ExtraOil-1 > UrgentBox-6\n> ExtraCube-3 > ExtraPart-1 > UrgentBox-3\n> ExtraCube-4 > ExtraPart-1:30 > ExtraOil-4\n> UrgentBox-1 > ExtraCube-5 > UrgentBox-1\n> ExtraCube-8 > ExtraOil-8\n> UrgentDrill-4 > UrgentDrill-2:40 > UrgentDrill-2\n> UrgentDrill-1 > UrgentDrill-1:30 > UrgentDrill-1:10\n> Extra-0:20 > Extra-0:30 > Extra-1:00 > Extra-1:30 > Extra-2:00\n> shortest"
     Commission_DoMajorCommission = False
 
-    # Group `Tactical`
+    # 配置组 `Tactical`
     Tactical_TacticalFilter = "SameT4 > SameT3 > SameT2 > SameT1\n> BlueT2 > YellowT2 > RedT2\n> BlueT3 > YellowT3 > RedT3\n> BlueT4 > YellowT4 > RedT4\n> BlueT1 > YellowT1 > RedT1\n> first"
     Tactical_RapidTrainingSlot = "do_not_use"  # do_not_use, slot_1, slot_2, slot_3, slot_4
 
-    # Group `ControlExpOverflow`
+    # 配置组 `ControlExpOverflow`
     ControlExpOverflow_Enable = True
     ControlExpOverflow_T4Allow = 100
     ControlExpOverflow_T3Allow = 100
     ControlExpOverflow_T2Allow = 200
     ControlExpOverflow_T1Allow = 200
 
-    # Group `AddNewStudent`
+    # 配置组 `AddNewStudent`
     AddNewStudent_Enable = False
     AddNewStudent_Favorite = False
     AddNewStudent_MinLevel = 50
 
-    # Group `Research`
+    # 配置组 `Research`
     Research_UseCube = "only_05_hour"  # always_use, only_05_hour, only_no_project, do_not_use
     Research_UseCoin = "always_use"  # always_use, only_05_hour, only_no_project, do_not_use
     Research_UsePart = "always_use"  # always_use, only_05_hour, only_no_project, do_not_use
@@ -224,22 +224,22 @@ class GeneratedConfig:
     Research_PresetFilter = "series_8_blueprint_305"  # custom, series_8_blueprint_305, series_8_blueprint_only, series_8_305_only, series_7_blueprint_la9, series_7_blueprint_only, series_7_la9_only, series_6_blueprint_203, series_6_blueprint_only, series_6_203_only, series_5_blueprint_152, series_5_blueprint_only, series_5_152_only, series_4_blueprint_tenrai, series_4_blueprint_only, series_4_tenrai_only, series_3_blueprint_234, series_3_blueprint_only, series_3_234_only, series_2_than_3_457_234, series_2_blueprint_457, series_2_blueprint_only, series_2_457_only
     Research_CustomFilter = "S8-DR0.5 > S8-PRY0.5 > S8-Q0.5 > S8-H0.5 > Q0.5 > S8-DR2.5\n> S8-G1.5 > S8-Q1 > S8-DR5 > 0.5 > S8-G4 > S8-Q2 > S8-PRY2.5 > reset\n> S8-DR8 > Q1 > 1 > S8-E-315 > S8-G2.5 > G1.5 > 1.5 > S8-E-031\n> S8-Q4 > Q2 > E2 > 2 > DR2.5 > PRY2.5 > G2.5 > 2.5 > S8-PRY5\n> S8-PRY8 > Q4 > G4 > 4 > S8-C6 > DR5 > PRY5 > 5 > C6 > 6 > S8-C8\n> S8-C12 > DR8 > PRY8 > C8 > 8 > C12 > 12"
 
-    # Group `Dorm`
+    # 配置组 `Dorm`
     Dorm_Collect = True
     Dorm_Feed = True
     Dorm_FeedFilter = "20000 > 10000 > 5000 > 3000 > 2000 > 1000"
 
-    # Group `BuyFurniture`
+    # 配置组 `BuyFurniture`
     BuyFurniture_Enable = False
     BuyFurniture_BuyOption = "all"  # set, all
     BuyFurniture_LastRun = datetime.datetime(2020, 1, 1, 0, 0)
 
-    # Group `Meowfficer`
+    # 配置组 `Meowfficer`
     Meowfficer_BuyAmount = 1
     Meowfficer_FortChoreMeowfficer = True
     Meowfficer_OverflowCoins = -1
 
-    # Group `MeowfficerTrain`
+    # 配置组 `MeowfficerTrain`
     MeowfficerTrain_Enable = False
     MeowfficerTrain_Mode = "seamlessly"  # seamlessly, once_a_day
     MeowfficerTrain_RetainTalentedGold = True
@@ -247,12 +247,12 @@ class GeneratedConfig:
     MeowfficerTrain_EnhanceIndex = 1
     MeowfficerTrain_MaxFeedLevel = 5
 
-    # Group `GuildLogistics`
+    # 配置组 `GuildLogistics`
     GuildLogistics_Enable = True
     GuildLogistics_SelectNewMission = False
     GuildLogistics_ExchangeFilter = "PlateTorpedoT1 > PlateAntiAirT1 > PlatePlaneT1 > PlateGunT1 > PlateGeneralT1\n> PlateTorpedoT2 > PlateAntiAirT2 > PlatePlaneT2 > PlateGunT2 > PlateGeneralT2\n> PlateTorpedoT3 > PlateAntiAirT3 > PlatePlaneT3 > PlateGunT3 > PlateGeneralT3\n> OxyCola > Coolant > Merit > Coin > Oil"
 
-    # Group `GuildOperation`
+    # 配置组 `GuildOperation`
     GuildOperation_Enable = True
     GuildOperation_SelectNewOperation = False
     GuildOperation_NewOperationMaxDate = 15
@@ -260,25 +260,25 @@ class GeneratedConfig:
     GuildOperation_AttackBoss = True
     GuildOperation_BossFleetRecommend = False
 
-    # Group `Reward`
+    # 配置组 `Reward`
     Reward_CollectOil = True
     Reward_CollectCoin = True
     Reward_CollectExp = True
     Reward_CollectMission = True
     Reward_CollectWeeklyMission = True
 
-    # Group `Awaken`
+    # 配置组 `Awaken`
     Awaken_LevelCap = "level120"  # level120, level125
     Awaken_Favourite = False
 
-    # Group `GeneralShop`
+    # 配置组 `GeneralShop`
     GeneralShop_UseGems = False
     GeneralShop_Refresh = False
     GeneralShop_BuySkinBox = False
     GeneralShop_ConsumeCoins = False
     GeneralShop_Filter = "BookRedT3 > BookYellowT3 > BookBlueT3 > BookRedT2\n> Cube\n> FoodT6 > FoodT5"
 
-    # Group `GuildShop`
+    # 配置组 `GuildShop`
     GuildShop_Refresh = True
     GuildShop_Filter = "PlateT4 > BookT3 > PR > CatT3 > Chip > BookT2 > Retrofit > FoodT6 > FoodT5 > CatT2 > BoxT4"
     GuildShop_BOX_T3 = "ironblood"  # eagle, royal, sakura, ironblood
@@ -294,7 +294,7 @@ class GeneratedConfig:
     GuildShop_PR2 = "seattle"  # seattle, georgia, kitakaze, gascogne
     GuildShop_PR3 = "cheshire"  # cheshire, mainz, odin, champagne
 
-    # Group `MedalShop2`
+    # 配置组 `MedalShop2`
     MedalShop2_Filter = "DR > PR\n> BookRedT3 > BookYellowT3 > BookBlueT3\n> BookRedT2 > BookYellowT2 > BookBlueT2\n> RetrofitT3\n> FoodT6 > FoodT5\n> PlateGeneralT3 > PlateWildT3"
     MedalShop2_RETROFIT_T1 = "cl"  # dd, cl, bb, cv
     MedalShop2_RETROFIT_T2 = "cl"  # dd, cl, bb, cv
@@ -303,58 +303,58 @@ class GeneratedConfig:
     MedalShop2_PLATE_T2 = "general"  # general, gun, torpedo, antiair, plane
     MedalShop2_PLATE_T3 = "general"  # general, gun, torpedo, antiair, plane
 
-    # Group `MeritShop`
+    # 配置组 `MeritShop`
     MeritShop_Refresh = False
     MeritShop_Filter = "Cube"
 
-    # Group `CoreShop`
+    # 配置组 `CoreShop`
     CoreShop_Filter = "Array"
 
-    # Group `ShipyardDr`
+    # 配置组 `ShipyardDr`
     ShipyardDr_ResearchSeries = 2  # 2, 3, 4, 5
     ShipyardDr_ShipIndex = 0  # 0, 1, 2, 3, 4, 5, 6
     ShipyardDr_BuyAmount = 2
     ShipyardDr_LastRun = datetime.datetime(2020, 1, 1, 0, 0)
 
-    # Group `Shipyard`
+    # 配置组 `Shipyard`
     Shipyard_ResearchSeries = 1  # 1, 2, 3, 4, 5, 6
     Shipyard_ShipIndex = 0  # 0, 1, 2, 3, 4, 5, 6
     Shipyard_BuyAmount = 2
     Shipyard_LastRun = datetime.datetime(2020, 1, 1, 0, 0)
 
-    # Group `Gacha`
+    # 配置组 `Gacha`
     Gacha_Pool = "light"  # light, heavy, special, event, wishing_well
     Gacha_Amount = 1  # 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
     Gacha_UseTicket = True
     Gacha_UseDrill = False
 
-    # Group `BattlePass`
+    # 配置组 `BattlePass`
     BattlePass_Collect = True
 
-    # Group `DataKey`
+    # 配置组 `DataKey`
     DataKey_Collect = True
     DataKey_ForceCollect = False
 
-    # Group `Mail`
+    # 配置组 `Mail`
     Mail_ClaimMerit = True
     Mail_ClaimMaintenance = False
     Mail_ClaimTradeLicense = False
     Mail_DeleteCollected = True
 
-    # Group `SupplyPack`
+    # 配置组 `SupplyPack`
     SupplyPack_Collect = True
     SupplyPack_DayOfWeek = 0  # 0, 1, 2, 3, 4, 5, 6
 
-    # Group `Minigame`
+    # 配置组 `Minigame`
     Minigame_Collect = False
 
-    # Group `PrivateQuarters`
+    # 配置组 `PrivateQuarters`
     PrivateQuarters_BuyRoses = True
     PrivateQuarters_BuyCake = False
     PrivateQuarters_TargetInteract = True
     PrivateQuarters_TargetShip = "anchorage"  # anchorage, noshiro, sirius, new_jersey, taihou, aegir, nakhimov
 
-    # Group `Daily`
+    # 配置组 `Daily`
     Daily_UseDailySkip = True
     Daily_EscortMission = "first"  # skip, first, second, third
     Daily_EscortMissionFleet = 1  # 1, 2, 3, 4, 5, 6
@@ -370,11 +370,11 @@ class GeneratedConfig:
     Daily_EmergencyModuleDevelopment = "first"  # skip, first, second
     Daily_EmergencyModuleDevelopmentFleet = 1  # 1, 2, 3, 4, 5, 6
 
-    # Group `Hard`
+    # 配置组 `Hard`
     Hard_HardStage = "11-4"
     Hard_HardFleet = 1  # 1, 2
 
-    # Group `Exercise`
+    # 配置组 `Exercise`
     Exercise_OpponentChooseMode = "max_exp"  # max_exp, easiest, leftmost, easiest_else_exp
     Exercise_OpponentTrial = 1
     Exercise_ExerciseStrategy = "aggressive"  # aggressive, fri18, sat0, sat12, sat18, sun0, sun12, sun18
@@ -383,13 +383,13 @@ class GeneratedConfig:
     Exercise_OpponentRefreshValue = 0
     Exercise_OpponentRefreshRecord = datetime.datetime(2020, 1, 1, 0, 0)
 
-    # Group `Sos`
+    # 配置组 `Sos`
     Sos_Chapter = 3  # 3, 4, 5, 6, 7, 8, 9, 10
 
-    # Group `OpsiAshAssist`
+    # 配置组 `OpsiAshAssist`
     OpsiAshAssist_Tier = 15
 
-    # Group `OpsiGeneral`
+    # 配置组 `OpsiGeneral`
     OpsiGeneral_UseLogger = True
     OpsiGeneral_BuyActionPointLimit = 0  # 0, 1, 2, 3, 4, 5
     OpsiGeneral_OilLimit = 1000
@@ -397,79 +397,77 @@ class GeneratedConfig:
     OpsiGeneral_DoRandomMapEvent = True
     OpsiGeneral_AkashiShopFilter = "ActionPoint > PurpleCoins"
 
-    # Group `OpsiAshBeacon`
+    # 配置组 `OpsiAshBeacon`
     OpsiAshBeacon_AttackMode = "current"  # current, current_dossier
     OpsiAshBeacon_OneHitMode = True
     OpsiAshBeacon_DossierAutoAttackMode = False
     OpsiAshBeacon_RequestAssist = True
     OpsiAshBeacon_EnsureFullyCollected = True
 
-    # Group `OpsiFleetFilter`
+    # 配置组 `OpsiFleetFilter`
     OpsiFleetFilter_Filter = "Fleet-4 > CallSubmarine > Fleet-2 > Fleet-3 > Fleet-1"
 
-    # Group `OpsiFleet`
+    # 配置组 `OpsiFleet`
     OpsiFleet_Fleet = 1  # 1, 2, 3, 4
     OpsiFleet_Submarine = False
 
-    # Group `OpsiExplore`
+    # 配置组 `OpsiExplore`
     OpsiExplore_SpecialRadar = False
     OpsiExplore_ForceRun = False
     OpsiExplore_LastZone = 0
 
-    # Group `OpsiShop`
+    # 配置组 `OpsiShop`
     OpsiShop_PresetFilter = "max_benefit_meta"  # max_benefit, max_benefit_meta, no_meta, all, custom
     OpsiShop_CustomFilter = "LoggerAbyssalT6 > LoggerAbyssalT5 > LoggerObscure > LoggerAbyssalT4 > ActionPoint > PurpleCoins\n> GearDesignPlanT3 > PlateRandomT4 > DevelopmentMaterialT3 > GearDesignPlanT2 > GearPart\n> OrdnanceTestingReportT3 > OrdnanceTestingReportT2 > DevelopmentMaterialT2 > OrdnanceTestingReportT1\n> METARedBook > CrystallizedHeatResistantSteel > NanoceramicAlloy > NeuroplasticProstheticArm > SupercavitationGenerator"
 
-    # Group `OpsiVoucher`
+    # 配置组 `OpsiVoucher`
     OpsiVoucher_Filter = "LoggerAbyssal > LoggerObscure > Book > Coin > Fragment"
 
-    # Group `OpsiDaily`
+    # 配置组 `OpsiDaily`
     OpsiDaily_DoMission = True
     OpsiDaily_UseTuningSample = True
 
-    # Group `OpsiObscure`
+    # 配置组 `OpsiObscure`
     OpsiObscure_ForceRun = False
 
-    # Group `OpsiAbyssal`
+    # 配置组 `OpsiAbyssal`
     OpsiAbyssal_ForceRun = False
 
-    # Group `OpsiStronghold`
+    # 配置组 `OpsiStronghold`
     OpsiStronghold_ForceRun = False
 
-    # Group `OpsiMonthBoss`
+    # 配置组 `OpsiMonthBoss`
     OpsiMonthBoss_Mode = "normal"  # normal, normal_hard
     OpsiMonthBoss_CheckAdaptability = True
     OpsiMonthBoss_ForceRun = False
 
-    # Group `OpsiMeowfficerFarming`
+    # 配置组 `OpsiMeowfficerFarming`
     OpsiMeowfficerFarming_ActionPointPreserve = 1000
     OpsiMeowfficerFarming_HazardLevel = 5  # 3, 4, 5, 6, 10
     OpsiMeowfficerFarming_TargetZone = 0
 
-    # Group `OpsiHazard1Leveling`
+    # 配置组 `OpsiHazard1Leveling`
     OpsiHazard1Leveling_TargetZone = 0  # 0, 44, 22
 
-    # Group `Daemon`
+    # 配置组 `Daemon`
     Daemon_EnterMap = True
 
-    # Group `OpsiDaemon`
+    # 配置组 `OpsiDaemon`
     OpsiDaemon_RepairShip = True
     OpsiDaemon_SelectEnemy = True
 
-    # Group `EventStory`
+    # 配置组 `EventStory`
     EventStory_SkipBattle = False  # True, False
 
-    # Group `Benchmark`
-    Benchmark_DeviceType = (
-        "emulator"  # emulator, plone_cloud_with_adb, phone_cloud_without_adb, android_phone, android_phone_vmos
-    )
+    # 配置组 `Benchmark`
+    Benchmark_DeviceType = "emulator"  # emulator
     Benchmark_TestScene = "screenshot_click"  # screenshot_click, screenshot, click
 
-    # Group `AzurLaneUncensored`
+    # 配置组 `AzurLaneUncensored`
     AzurLaneUncensored_Repository = "https://gitee.com/LmeSzinc/AzurLaneUncensored"
 
-    # Group `GameManager`
+    # 配置组 `GameManager`
     GameManager_AutoRestart = True
 
-    # Group `Storage`
+    # 配置组 `Storage`
     Storage_Storage = {}
