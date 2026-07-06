@@ -68,16 +68,16 @@ def deep_get_with_error(d, keys):
         for k in keys:
             d = d[k]
         return d
-    # No such key
+    # 没有这个键。
     # except KeyError:
     #     raise
-    # No such key
-    except IndexError:
-        raise KeyError
-    # Input `keys` is not iterable or input `d` is not dict
-    # list indices must be integers or slices, not str
-    except TypeError:
-        raise KeyError
+    # 没有这个键。
+    except IndexError as e:
+        raise KeyError from e
+    # `keys` 不可迭代，或者 `d` 不是字典。
+    # 例如：list indices must be integers or slices, not str。
+    except TypeError as e:
+        raise KeyError from e
 
 
 def deep_exist(d, keys):

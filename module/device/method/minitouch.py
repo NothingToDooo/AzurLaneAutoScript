@@ -439,11 +439,11 @@ class Minitouch(Connection):
             # 协议版本，通常是 1，这里不用。
             try:
                 out = socket_out.readline().replace("\n", "").replace("\r", "")
-            except TimeoutError:
+            except TimeoutError as e:
                 client.close()
                 raise MinitouchOccupiedError(
                     "Timeout when connecting to minitouch, probably because another connection has been established"
-                )
+                ) from e
             logger.info(out)
 
             # ^ <max-contacts> <max-x> <max-y> <max-pressure>
@@ -452,12 +452,12 @@ class Minitouch(Connection):
             try:
                 _, max_contacts, max_x, max_y, max_pressure, *_ = out.split(" ")
                 break
-            except ValueError:
+            except ValueError as e:
                 client.close()
                 if retry_timeout.reached():
                     raise MinitouchNotInstalledError(
                         "Received empty data from minitouch, probably because minitouch is not installed"
-                    )
+                    ) from e
                 else:
                     # minitouch 可能还没启动完成。
                     self.sleep(1)

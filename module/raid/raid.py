@@ -110,8 +110,8 @@ def raid_entrance(raid, mode):
     key = f"{raid_name_shorten(raid)}_RAID_{mode.upper()}"
     try:
         return globals()[key]
-    except KeyError:
-        raise ScriptError(f"Raid entrance asset not exists: {key}")
+    except KeyError as e:
+        raise ScriptError(f"Raid entrance asset not exists: {key}") from e
 
 
 def raid_ocr(raid, mode):
@@ -127,8 +127,8 @@ def raid_ocr(raid, mode):
     key = f"{raid}_OCR_REMAIN_{mode.upper()}"
     try:
         button = globals()[key]
-    except KeyError:
-        raise ScriptError(f"Raid entrance asset not exists: {key}")
+    except KeyError as e:
+        raise ScriptError(f"Raid entrance asset not exists: {key}") from e
     # Old raids use RaidCounter to compatible with old OCR model and its assets
     # New raids use DigitCounter
     if raid == "ESSEX":

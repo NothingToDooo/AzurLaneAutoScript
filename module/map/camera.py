@@ -145,15 +145,15 @@ class Camera(MapOperation):
                 return False
             elif self.is_in_stage():
                 logger.warning("Image is in stage")
-                raise CampaignEnd("Image is in stage")
+                raise CampaignEnd("Image is in stage") from e
             elif self.appear(MAP_PREPARATION, offset=(20, 20)):
                 logger.warning("Image is in MAP_PREPARATION")
                 self.enter_map_cancel()
-                raise CampaignEnd("Image is in MAP_PREPARATION")
+                raise CampaignEnd("Image is in MAP_PREPARATION") from e
             elif self.appear(AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset):
                 logger.warning("Image is in auto search menu")
                 self.ensure_auto_search_exit()
-                raise CampaignEnd("Image is in auto search menu")
+                raise CampaignEnd("Image is in auto search menu") from e
             elif self.appear(GLOBE_GOTO_MAP, offset=(20, 20)):
                 logger.warning("Image is in OS globe map")
                 self.ui_click(
@@ -207,10 +207,10 @@ class Camera(MapOperation):
                 logger.warning(string)
                 x, y = string.split("=")[1].strip("() ").split(",")
                 self._map_swipe((-int(x.strip()), -int(y.strip())))
-            # Finally check if game is alive
+            # 最后检查游戏是否仍在运行。
             elif not self.device.app_is_running():
                 logger.error("Trying to update camera but game died")
-                raise GameNotRunningError
+                raise GameNotRunningError from e
             else:
                 raise e
 

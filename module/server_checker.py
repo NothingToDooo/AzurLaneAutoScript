@@ -80,9 +80,9 @@ class ServerChecker:
                 self._state.append(False)
             else:
                 self._state.append(self.fast_retry())
-        except JSONDecodeError:
+        except JSONDecodeError as e:
             self._state.append(False)
-            raise ScriptError(f'Response "{resp.text}" seems not to be a JSON.')
+            raise ScriptError(f'Response "{resp.text}" seems not to be a JSON.') from e
         except Exception as e:
             logger.error(e)
             self._state.append(False)

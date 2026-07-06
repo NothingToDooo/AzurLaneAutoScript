@@ -164,7 +164,7 @@ class CoalitionUI(Combat):
             return dic[(event, stage)]
         except KeyError as e:
             logger.error(e)
-            raise CampaignNameError
+            raise CampaignNameError from e
 
     @staticmethod
     def coalition_20251120_get_entrance_difficulty(event, stage):
@@ -196,7 +196,7 @@ class CoalitionUI(Combat):
             return dic[(event, stage)]
         except KeyError as e:
             logger.error(e)
-            raise CampaignNameError
+            raise CampaignNameError from e
 
     @staticmethod
     def coalition_get_battles(event, stage):
@@ -252,7 +252,7 @@ class CoalitionUI(Combat):
             return dic[(event, stage)]
         except KeyError as e:
             logger.error(e)
-            raise CampaignNameError
+            raise CampaignNameError from e
 
     @staticmethod
     def coalition_get_fleet_preparation(event):

@@ -123,9 +123,9 @@ class ShopClerk(ShopBase, Retirement):
                         return item_info["grid"][series_key].buttons[index]
             else:
                 return item_info["grid"].buttons[index]
-        except Exception:
+        except Exception as e:
             logger.critical(f"SELECT_ITEM_INFO_MAP may be malformed; item group '{group}' entry is compromised")
-            raise ScriptError
+            raise ScriptError from e
 
     def shop_buy_select_execute(self, item):
         """

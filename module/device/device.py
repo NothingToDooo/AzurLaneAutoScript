@@ -81,10 +81,10 @@ class Device(Screenshot, Control, AppControl):
             try:
                 super().__init__(*args, **kwargs)
                 break
-            except EmulatorNotRunningError:
+            except EmulatorNotRunningError as e:
                 if trial >= 3:
                     logger.critical("Failed to start emulator after 3 trial")
-                    raise RequestHumanTakeover
+                    raise RequestHumanTakeover from e
                 # 尝试启动模拟器。
                 if self.emulator_instance is not None:
                     self.emulator_start()
@@ -92,7 +92,7 @@ class Device(Screenshot, Control, AppControl):
                     logger.critical(
                         f'No emulator with serial "{self.config.Emulator_Serial}" found, please set a correct serial'
                     )
-                    raise RequestHumanTakeover
+                    raise RequestHumanTakeover from e
 
         # 自动补全模拟器信息。
         if IS_WINDOWS and self.config.EmulatorInfo_Emulator == "auto":

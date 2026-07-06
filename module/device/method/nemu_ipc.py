@@ -505,7 +505,7 @@ class NemuIpc(Platform):
         except (NemuIpcIncompatible, NemuIpcError, JobTimeout) as e:
             logger.error(e)
             logger.error("Unable to initialize NemuIpc")
-            raise RequestHumanTakeover
+            raise RequestHumanTakeover from e
 
     def nemu_ipc_available(self) -> bool:
         if not IS_WINDOWS:

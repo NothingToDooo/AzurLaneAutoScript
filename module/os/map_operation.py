@@ -85,7 +85,7 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
         try:
             self.zone = self.name_to_zone(name)
         except ScriptError as e:
-            raise MapDetectionError(*e.args)
+            raise MapDetectionError(*e.args) from e
         logger.attr("Zone", self.zone)
         self.zone_config_set()
         return self.zone

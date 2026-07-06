@@ -158,8 +158,8 @@ def recv_all(stream, chunk_size=4096, recv_interval=0.000) -> bytes:
             else:
                 break
         return remove_shell_warning(b"".join(fragments))
-    except TimeoutError:
-        raise AdbTimeout("adb read timeout")
+    except TimeoutError as e:
+        raise AdbTimeout("adb read timeout") from e
 
 
 def possible_reasons(*args):

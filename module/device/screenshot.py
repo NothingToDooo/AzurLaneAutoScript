@@ -99,9 +99,9 @@ class Screenshot(Adb, NemuIpc):
     def screenshot_deque(self):
         try:
             length = int(self.config.Error_ScreenshotLength)
-        except ValueError:
+        except ValueError as e:
             logger.error(f"Error_ScreenshotLength={self.config.Error_ScreenshotLength} is not an integer")
-            raise RequestHumanTakeover
+            raise RequestHumanTakeover from e
         # 限制在 1~300。
         length = max(1, min(length, 300))
         return deque(maxlen=length)

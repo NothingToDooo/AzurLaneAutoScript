@@ -47,7 +47,7 @@ class CampaignRun(CampaignEvent):
 
         try:
             self.module = importlib.import_module("." + name, f"campaign.{folder}")
-        except ModuleNotFoundError:
+        except ModuleNotFoundError as e:
             logger.warning(f"Map file not found: campaign.{folder}.{name}")
             if not os.path.exists(f"./campaign/{folder}"):
                 logger.warning(f"Folder not exists: ./campaign/{folder}")
@@ -60,7 +60,7 @@ class CampaignRun(CampaignEvent):
                 "Possible reason #2: You are using an old Alas, "
                 "please check for update, or make map files yourself using dev_tools/map_extractor.py"
             )
-            raise RequestHumanTakeover
+            raise RequestHumanTakeover from e
 
         config = copy.deepcopy(self.config).merge(self.module.Config())
         device = self.device

@@ -410,10 +410,10 @@ class Connection(ConnectionAttr):
         try:
             # 服务端接受连接。
             conn, conn_port = server.accept()
-        except TimeoutError:
+        except TimeoutError as e:
             output = recv_all(stream, chunk_size=chunk_size)
             logger.warning(str(output))
-            raise AdbTimeout("reverse server accept timeout")
+            raise AdbTimeout("reverse server accept timeout") from e
 
         # 服务端接收数据。
         data = recv_all(conn, chunk_size=chunk_size, recv_interval=0.001)

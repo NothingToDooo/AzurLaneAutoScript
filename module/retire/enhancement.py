@@ -237,9 +237,9 @@ class Enhancement(Dock):
 
             try:
                 state = locals()[state]()
-            except KeyError:
+            except KeyError as e:
                 logger.warning(f"Unknown state function: {state}")
-                raise ScriptError(f"Unknown state function: {state}")
+                raise ScriptError(f"Unknown state function: {state}") from e
 
         return state, ship_count
 

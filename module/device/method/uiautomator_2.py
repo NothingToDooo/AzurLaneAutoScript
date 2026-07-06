@@ -297,7 +297,7 @@ class Uiautomator2(Connection):
                 # BaseError('package "111" not found')
                 elif "not found" in str(e):
                     logger.error(e)
-                    raise PackageNotInstalled(package_name)
+                    raise PackageNotInstalled(package_name) from e
                 # 未知错误。
                 else:
                     raise
