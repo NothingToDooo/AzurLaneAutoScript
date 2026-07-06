@@ -2,7 +2,7 @@ from module.base.timer import Timer
 from module.base.utils import rgb2gray
 from module.campaign.campaign_ui import CampaignUI
 from module.combat.combat import Combat
-from module.eventstory.assets import *
+from module.eventstory import assets as eventstory_assets
 from module.handler.login import LoginHandler
 from module.logger import logger
 from module.ui.page import page_event, page_sp
@@ -18,16 +18,16 @@ class EventStory(CampaignUI, Combat, LoginHandler):
         if event in [
             "event_20251023_cn",
         ]:
-            # SP event
+            # SP 活动。
             self.ui_ensure(page_sp)
         else:
-            # most events show as page_event
+            # 大多数活动位于 page_event。
             self.ui_ensure(page_event)
         self.campaign_ensure_mode_20241219("story")
 
         state = "unknown"
         for _ in range(3):
-            # wait any story state
+            # 等待任意剧情状态。
             timeout = Timer(2, count=6).start()
             for _ in self.loop():
                 state = self.get_event_story_state()
@@ -38,8 +38,7 @@ class EventStory(CampaignUI, Combat, LoginHandler):
                     logger.warning("Wait EventStoryState timeout")
                     break
             if state == "unknown":
-                # Story page get swiped, can't find story entrance
-                # Reset mode to reset swipe
+                # 剧情页可能被滑动过，导致找不到入口；重置模式以恢复位置。
                 self.campaign_ensure_mode_20241219("combat")
                 self.campaign_ensure_mode_20241219("story")
                 continue
@@ -56,16 +55,16 @@ class EventStory(CampaignUI, Combat, LoginHandler):
         area = (0, 72, 1280, 560)
         image = self.image_crop(area, copy=False)
         image = rgb2gray(image)
-        sim, button = TEMPLATE_ALCHEMIST_STORY.match_result(image)
+        sim, button = eventstory_assets.TEMPLATE_ALCHEMIST_STORY.match_result(image)
         if sim >= 0.85:
             button = button.move(area[:2])
-            # move down to click the text
+            # 下移以点击文字。
             button = button.move((0, 44))
             return button
-        sim, button = TEMPLATE_ALCHEMIST_BATTLE.match_result(image)
+        sim, button = eventstory_assets.TEMPLATE_ALCHEMIST_BATTLE.match_result(image)
         if sim >= 0.85:
             button = button.move(area[:2])
-            # move down to click the text
+            # 下移以点击文字。
             button = button.move((0, 44))
             return button
         return None
@@ -77,7 +76,7 @@ class EventStory(CampaignUI, Combat, LoginHandler):
         Returns:
             bool: If clicked
         """
-        interval = self.get_interval_timer(TEMPLATE_ALCHEMIST_STORY, interval=interval)
+        interval = self.get_interval_timer(eventstory_assets.TEMPLATE_ALCHEMIST_STORY, interval=interval)
         if not interval.reached():
             return False
         button = self.get_event_20250724_button()
@@ -103,42 +102,42 @@ class EventStory(CampaignUI, Combat, LoginHandler):
             else:
                 self.device.screenshot()
 
-            # End
+            # 结束。
             if self.is_combat_executing() or self.is_combat_loading():
                 logger.info("run_story end at battle")
                 return "battle"
-            if self.match_template_color(STORY_FINISHED, offset=(20, 20), interval=3):
+            if self.match_template_color(eventstory_assets.STORY_FINISHED, offset=(20, 20), interval=3):
                 logger.info("run_story end at STORY_FINISHED")
                 return "finish"
-            if self.appear(REWARD_GOT, offset=(50, 30)):
+            if self.appear(eventstory_assets.REWARD_GOT, offset=(50, 30)):
                 logger.info("run_story end at REWARD_GOT")
                 return "finish"
 
-            # Story skip
+            # 跳过剧情。
             if self.handle_story_skip():
-                self.interval_clear([STORY_MIDDLE, BATTLE_MIDDLE])
+                self.interval_clear([eventstory_assets.STORY_MIDDLE, eventstory_assets.BATTLE_MIDDLE])
                 continue
             if self.handle_get_items():
                 continue
 
-            # Clicks
-            if self.appear_then_click(STORY_FIRST, offset=(20, 20), interval=3):
+            # 点击剧情入口。
+            if self.appear_then_click(eventstory_assets.STORY_FIRST, offset=(20, 20), interval=3):
                 self.story_skip_interval_clear()
                 self.popup_interval_clear()
                 self.device.click_record_clear()
                 continue
-            if self.match_template_color(STORY_LAST, offset=(20, 20), interval=3):
-                self.device.click(STORY_LAST)
+            if self.match_template_color(eventstory_assets.STORY_LAST, offset=(20, 20), interval=3):
+                self.device.click(eventstory_assets.STORY_LAST)
                 self.story_skip_interval_clear()
                 self.popup_interval_clear()
                 self.device.click_record_clear()
                 continue
-            if self.appear_then_click(STORY_MIDDLE, offset=(20, 200), interval=3):
+            if self.appear_then_click(eventstory_assets.STORY_MIDDLE, offset=(20, 200), interval=3):
                 self.story_skip_interval_clear()
                 self.popup_interval_clear()
                 self.device.click_record_clear()
                 continue
-            if self.appear_then_click(BATTLE_MIDDLE, offset=(20, 200), interval=3):
+            if self.appear_then_click(eventstory_assets.BATTLE_MIDDLE, offset=(20, 200), interval=3):
                 self.story_skip_interval_clear()
                 self.popup_interval_clear()
                 self.device.click_record_clear()
@@ -148,9 +147,8 @@ class EventStory(CampaignUI, Combat, LoginHandler):
                 self.popup_interval_clear()
                 self.device.click_record_clear()
                 continue
-            # Secrets of the Abyss (event_20250814_cn)
-            # popup after all story finished
-            if self.appear_then_click(POPUP_RPG_STATUS, offset=(20, 20), interval=3):
+            # 深渊秘境（event_20250814_cn）全部剧情结束后会弹出状态窗口。
+            if self.appear_then_click(eventstory_assets.POPUP_RPG_STATUS, offset=(20, 20), interval=3):
                 continue
 
     def run_event_story(self):
@@ -164,15 +162,14 @@ class EventStory(CampaignUI, Combat, LoginHandler):
                 break
             result = self.event_story()
             if result == "battle":
-                # Kill game is considered cleared battles
-                # It's much faster than waiting event battles
+                # 关闭游戏会被视为战斗已清理，比等待活动战斗更快。
                 logger.hr("Event Story Battle", level=2)
                 self.config.override(Error_HandleError=True)
                 self.app_stop()
                 self.app_start()
                 continue
             if result == "finish":
-                # Run after finished event story, in order to close GET_ITEMS
+                # 剧情结束后再跑一次，用来关闭 GET_ITEMS。
                 logger.hr("Event story finish", level=2)
                 self.ui_goto_main()
                 self.ui_goto_event_story()
@@ -182,18 +179,18 @@ class EventStory(CampaignUI, Combat, LoginHandler):
         Returns:
             str: 'finish', 'story', 'unknown'
         """
-        if self.match_template_color(STORY_FINISHED, offset=(20, 20)):
+        if self.match_template_color(eventstory_assets.STORY_FINISHED, offset=(20, 20)):
             return "finish"
-        if self.appear(REWARD_GOT, offset=(50, 30)):
+        if self.appear(eventstory_assets.REWARD_GOT, offset=(50, 30)):
             return "finish"
 
-        if self.appear_then_click(STORY_FIRST, offset=(20, 20)):
+        if self.appear_then_click(eventstory_assets.STORY_FIRST, offset=(20, 20)):
             return "story"
-        if self.match_template_color(STORY_LAST, offset=(20, 20)):
+        if self.match_template_color(eventstory_assets.STORY_LAST, offset=(20, 20)):
             return "story"
-        if self.appear_then_click(STORY_MIDDLE, offset=(20, 200)):
+        if self.appear_then_click(eventstory_assets.STORY_MIDDLE, offset=(20, 200)):
             return "story"
-        if self.appear_then_click(BATTLE_MIDDLE, offset=(20, 200)):
+        if self.appear_then_click(eventstory_assets.BATTLE_MIDDLE, offset=(20, 200)):
             return "story"
         if self.get_event_20250724_button():
             return "story_alchemist"
@@ -203,7 +200,7 @@ class EventStory(CampaignUI, Combat, LoginHandler):
     def run(self):
         event = self.config.cross_get("Event.Campaign.Event", "")
         if event in [
-            # event story is in event minigame
+            # 活动剧情在活动小游戏中。
             "event_20260226_cn",
         ]:
             logger.info(f"Current event ({event}) does not have event story, stopped")
@@ -215,7 +212,7 @@ class EventStory(CampaignUI, Combat, LoginHandler):
 
         self.run_event_story()
 
-        # Scheduler
+        # 调度由外层任务处理。
         pass
 
 
