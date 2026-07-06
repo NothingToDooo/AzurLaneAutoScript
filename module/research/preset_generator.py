@@ -98,7 +98,7 @@ def convert_name(name, series):
 
 
 if __name__ == "__main__":
-    from module.config.code_generator import *
+    from module.config.code_generator import Comment, Dict, DictItem, Value, generator
 
     Value(FILTER_STRING_SHORTEST="0.5 > 1 > 1.5 > 2 > 2.5 > 3 > 4 > 5 > 6 > 8 > 10 > 12")
     Value(
