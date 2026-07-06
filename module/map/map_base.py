@@ -1,4 +1,5 @@
 import copy
+from itertools import pairwise
 
 import numpy as np
 
@@ -675,13 +676,13 @@ class CampaignMap:
         else:
             if step == 0:
                 return [route[-1]]
-            # Index of the last node
+            # 最后一个节点的索引。
             # res = [6]
             res = [max(len(route) - 1, 0)]
 
         res.insert(0, 0)
         inserted = []
-        for left, right in zip(res[:-1], res[1:], strict=True):
+        for left, right in pairwise(res):
             for index in list(range(left, right, step))[1:]:
                 way_node = self[route[index]]
                 if way_node.is_fleet or way_node.is_portal or way_node.is_flare:
@@ -708,15 +709,15 @@ class CampaignMap:
 
         portal_path = []
         index = [0]
-        for i, loca in enumerate(zip(path[:-1], path[1:], strict=True)):
-            grid = self[loca[0]]
-            if grid.is_portal and grid.portal_link == loca[1]:
+        for i, (current, next_location) in enumerate(pairwise(path)):
+            grid = self[current]
+            if grid.is_portal and grid.portal_link == next_location:
                 index += [i, i + 1]
             if grid.is_maze and i != 0:
                 index += [i]
         if len(path) not in index:
             index.append(len(path))
-        for start, end in zip(index[:-1], index[1:], strict=True):
+        for start, end in pairwise(index):
             if end - start == 1 and self[path[start]].is_portal and self[path[start]].portal_link == path[end]:
                 continue
             local_path = path[start : end + 1]

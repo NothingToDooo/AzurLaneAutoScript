@@ -68,6 +68,7 @@ select = [
     "PLW0127",
     "PLW3301",
     "RUF006",
+    "RUF007",
     "RUF010",
     "RUF013",
     "RUF017",
