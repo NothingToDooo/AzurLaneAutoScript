@@ -1,9 +1,12 @@
+import re
 from datetime import timedelta
 
+import cv2
+import numpy as np
 from scipy import signal
 
 from module.base.decorator import cached_property
-from module.base.utils import *
+from module.base.utils import color_similarity_2d, crop, extract_white_letters, get_color, load_image, resize
 from module.device.method.utils import removesuffix
 from module.logger import logger
 from module.ocr.ocr import Duration, Ocr
