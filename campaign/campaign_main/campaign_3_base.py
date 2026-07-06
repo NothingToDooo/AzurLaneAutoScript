@@ -1,5 +1,4 @@
 from module.campaign.campaign_base import CampaignBase as CampaignBase_
-from module.logger import logger
 from module.ui.page import page_campaign
 
 

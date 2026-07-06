@@ -1,7 +1,5 @@
 from module.base.utils import color_similarity_2d
-from module.logger import logger
 from module.map.map_base import CampaignMap
-from module.map.map_grids import RoadGrids, SelectedGrids
 from module.template.assets import TEMPLATE_ENEMY_BOSS
 
 from .campaign_base import CampaignBase

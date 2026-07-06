@@ -1,7 +1,7 @@
 from module.campaign.assets import D3 as ENTRANCE
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap
-from module.map.map_grids import RoadGrids, SelectedGrids
+from module.map.map_grids import RoadGrids
 
 MAP = CampaignMap("d3")
 MAP.shape = "H7"

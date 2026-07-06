@@ -2,7 +2,7 @@ from module.campaign.assets import C2 as ENTRANCE
 from module.campaign.campaign_base import CampaignBase
 from module.logger import logger
 from module.map.map_base import CampaignMap
-from module.map.map_grids import RoadGrids, SelectedGrids
+from module.map.map_grids import RoadGrids
 
 MAP = CampaignMap("c2")
 MAP.shape = "G7"

@@ -1,7 +1,5 @@
 from campaign.campaign_main.campaign_3_1 import Config as Config31
-from module.logger import logger
 from module.map.map_base import CampaignMap
-from module.map.map_grids import RoadGrids, SelectedGrids
 
 from .campaign_3_base import CampaignBase
 

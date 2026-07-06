@@ -1,6 +1,5 @@
-from module.logger import logger
 from module.map.map_base import CampaignMap
-from module.map.map_grids import RoadGrids, SelectedGrids
+from module.map.map_grids import RoadGrids
 
 from .campaign_14_base import CampaignBase
 from .campaign_14_base import Config as ConfigBase

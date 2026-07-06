@@ -1,8 +1,6 @@
 from module.base.utils import color_similarity_2d, location2node
 from module.campaign.campaign_base import CampaignBase
-from module.logger import logger
 from module.map.map_base import CampaignMap, location_ensure
-from module.map.map_grids import RoadGrids, SelectedGrids
 from module.map_detection.grid import Grid
 from module.template.assets import TEMPLATE_FLEET_CURRENT
 

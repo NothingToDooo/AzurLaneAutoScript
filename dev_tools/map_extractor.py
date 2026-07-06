@@ -496,17 +496,11 @@ class MapData:
         else:
             base_import = "from module.campaign.campaign_base import CampaignBase"
 
-        header = f"""
-            {base_import}
-            from module.map.map_base import CampaignMap
-            from module.map.map_grids import SelectedGrids, RoadGrids
-            from module.logger import logger
-        """
         lines = []
 
         # Import
-        for head in header.strip().split("\n"):
-            lines.append(head.strip())
+        lines.append(base_import)
+        lines.append("from module.map.map_base import CampaignMap")
         if self.chapter_name[-1].isdigit():
             chap, stage = self.chapter_name[:-1], self.chapter_name[-1]
             if stage != "1":

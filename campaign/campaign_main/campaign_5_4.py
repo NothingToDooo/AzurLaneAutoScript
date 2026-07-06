@@ -1,8 +1,7 @@
 from campaign.campaign_main.campaign_5_1 import Config as Config51
 from module.campaign.campaign_base import CampaignBase
-from module.logger import logger
 from module.map.map_base import CampaignMap
-from module.map.map_grids import RoadGrids, SelectedGrids
+from module.map.map_grids import RoadGrids
 
 MAP = CampaignMap()
 MAP.shape = "H5"

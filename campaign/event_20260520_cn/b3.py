@@ -1,8 +1,6 @@
 from module.base.utils import location2node
 from module.campaign.campaign_base import CampaignBase
-from module.logger import logger
 from module.map.map_base import CampaignMap, location_ensure
-from module.map.map_grids import RoadGrids, SelectedGrids
 
 from .b1 import Config as ConfigBase
 from .d3 import GridCurrentFleet

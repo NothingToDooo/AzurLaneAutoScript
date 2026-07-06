@@ -1,5 +1,3 @@
-from module.base.button import Button
-from module.base.utils import *
 from module.campaign.campaign_base import CampaignBase as CampaignBase_
 from module.exception import CampaignNameError
 from module.template.assets import TEMPLATE_STAGE_SOS

@@ -1,6 +1,3 @@
-from module.exception import CampaignNameError
-from module.logger import logger
-
 from ..campaign_war_archives.campaign_base import CampaignBase as CampaignBase_
 
 

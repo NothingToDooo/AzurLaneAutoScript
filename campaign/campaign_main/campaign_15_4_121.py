@@ -4,7 +4,7 @@ from .campaign_15_4 import MAP as MAP_15_4
 from .campaign_15_4 import Campaign as Campaign_15_4
 
 # Do not remove the Config import. It's inherited from 15-4 and needs to be exported.
-from .campaign_15_4 import Config  # pylint: disable=unused-import
+from .campaign_15_4 import Config as Config  # pylint: disable=unused-import
 
 MAP = copy.copy(MAP_15_4)
 MAP.name = "15-4-121"

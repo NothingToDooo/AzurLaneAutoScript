@@ -1,8 +1,5 @@
-from module.logger import logger
 from module.map.map_base import CampaignMap
-from module.map.map_grids import RoadGrids, SelectedGrids
 from module.map_detection.grid import Grid
-from module.template.assets import TEMPLATE_FLEET_CURRENT
 
 from ..campaign_war_archives.campaign_base import CampaignBase
 

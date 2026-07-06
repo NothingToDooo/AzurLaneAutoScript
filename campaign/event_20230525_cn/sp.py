@@ -2,7 +2,6 @@ from module.base.utils import location2node
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
 from module.map.map_base import CampaignMap
-from module.map.map_grids import RoadGrids, SelectedGrids
 
 from .campaign_base import CampaignBase
 from .config_base import ConfigBase

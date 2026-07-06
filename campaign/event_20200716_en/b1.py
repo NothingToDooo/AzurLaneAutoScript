@@ -1,7 +1,6 @@
 from module.campaign.campaign_base import CampaignBase
-from module.logger import logger
 from module.map.map_base import CampaignMap
-from module.map.map_grids import RoadGrids, SelectedGrids
+from module.map.map_grids import RoadGrids
 
 MAP = CampaignMap("B1")
 MAP.camera_sight = (-4, -2, 4, 2)

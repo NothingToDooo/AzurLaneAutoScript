@@ -1,4 +1,3 @@
-from module.base.mask import Mask
 from module.base.timer import Timer
 from module.handler.assets import STRATEGY_OPENED
 from module.handler.strategy import MOB_MOVE_OFFSET

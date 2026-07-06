@@ -1,5 +1,7 @@
+import numpy as np
+
 from module.base.button import Button
-from module.base.utils import *
+from module.base.utils import get_color
 from module.campaign.campaign_base import CampaignBase as CampaignBase_
 from module.exception import CampaignNameError
 from module.logger import logger

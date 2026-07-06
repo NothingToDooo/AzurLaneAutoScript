@@ -1,7 +1,4 @@
-from module.base.utils import color_similarity_2d
 from module.campaign.campaign_base import CampaignBase as CampaignBase_
-from module.map_detection.grid import Grid
-from module.template.assets import TEMPLATE_ENEMY_BOSS
 
 
 class CampaignBase(CampaignBase_):
