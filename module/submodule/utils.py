@@ -56,7 +56,6 @@ def list_mod_template():
 
 
 def list_mod_instance():
-    global MOD_CONFIG_DICT
     MOD_CONFIG_DICT.clear()
     out = []
     for file in os.listdir("./config"):

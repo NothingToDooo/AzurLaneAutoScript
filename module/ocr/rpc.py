@@ -265,7 +265,6 @@ def stop_ocr_server_process():
 
 
 def alive() -> bool:
-    global process
     if process is not None:
         return process.is_alive()
     else:
