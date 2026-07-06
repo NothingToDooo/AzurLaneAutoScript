@@ -81,7 +81,7 @@ class Emulator(EmulatorBase):
             str: Emulator type, such as Emulator.MuMuPlayer12
         """
         folder, exe = os.path.split(path)
-        folder, dir1 = os.path.split(folder)
+        folder = os.path.dirname(folder)
         _, dir2 = os.path.split(folder)
         exe = exe.lower()
         dir2 = dir2.lower()

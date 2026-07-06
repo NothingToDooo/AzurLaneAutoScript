@@ -96,7 +96,7 @@ class WatchScreen(ModuleBase):
         image_save(before, file)
         for image in self.loop():
             res = cv2.matchTemplate(image, before, cv2.TM_CCOEFF_NORMED)
-            _, sim, _, loca = cv2.minMaxLoc(res)
+            sim = cv2.minMaxLoc(res)[1]
 
             if sim < similarity:
                 name = now()

@@ -409,7 +409,7 @@ class Connection(ConnectionAttr):
         stream = self.adb_shell(cmd, stream=True, recvall=False)
         try:
             # 服务端接受连接。
-            conn, conn_port = server.accept()
+            conn, _conn_port = server.accept()
         except TimeoutError as e:
             output = recv_all(stream, chunk_size=chunk_size)
             logger.warning(str(output))

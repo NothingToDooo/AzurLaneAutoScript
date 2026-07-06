@@ -229,7 +229,7 @@ class EmulatorConnect:
         for emulator in self.emulators:
             serial += emulator.serial
             for s in emulator.serial:
-                ip, port = s.split(":")
+                _ip, port = s.split(":")
                 port = int(port) - 1
                 if 5554 <= int(port) < 5600:
                     serial.append(f"emulator-{port}")

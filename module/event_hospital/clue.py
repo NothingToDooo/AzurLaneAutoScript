@@ -125,7 +125,7 @@ class HospitalClue(HospitalUI):
         image = rgb2gray(image)
 
         # 截图太小时没有足够空间显示剩余次数。
-        x, y = image_size(image)
+        _x, y = image_size(image)
         if y < 50:
             return None
 

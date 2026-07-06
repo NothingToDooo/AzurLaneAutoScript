@@ -251,8 +251,8 @@ class EmulatorManagerBase:
         out = []
         for emulator in self.all_emulator_instances:
             out.append(emulator.serial)
-            # Also add serial like `emulator-5554`
-            port_serial, emu_serial = get_serial_pair(emulator.serial)
+            # 同时添加 `emulator-5554` 形式的 serial。
+            _port_serial, emu_serial = get_serial_pair(emulator.serial)
             if emu_serial:
                 out.append(emu_serial)
         return out

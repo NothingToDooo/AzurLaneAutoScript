@@ -82,7 +82,7 @@ class RelativeRecord:
 
             image = self.images[np.argmin(mask)]
             res = cv2.matchTemplate(image, template_0, cv2.TM_CCOEFF_NORMED)
-            _, sim, _, loca = cv2.minMaxLoc(res)
+            loca = cv2.minMaxLoc(res)[3]
             template = crop(image, area=area_offset(area, np.subtract(loca, area[:2])))
 
         return count

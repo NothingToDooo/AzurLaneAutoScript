@@ -293,7 +293,7 @@ class ConfigGenerator:
         visited_path = set()
         lines: list[str] = list(CONFIG_IMPORT)
         for path, data in deep_iter(self.argument, depth=2):
-            group, arg = path
+            group = path[0]
             if group not in visited_group:
                 lines.append("")
                 lines.append(f"    # 配置组 `{group}`")

@@ -172,7 +172,7 @@ def alas_instance():
     out = []
     for file in os.listdir("./config"):
         name, extension = os.path.splitext(file)
-        config_name, mod_name = os.path.splitext(name)
+        _config_name, mod_name = os.path.splitext(name)
         mod_name = mod_name[1:]
         if name != "template" and extension == ".json" and mod_name == "":
             out.append(name)

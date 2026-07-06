@@ -1046,7 +1046,7 @@ def position_insert(string, insert, position):
 
 
 def epoch_worker(data):
-    index, total, sample_count, select_index, forward_index, string = data
+    index, total, sample_count, _select_index, _forward_index, string = data
     hr3(f"Start Testing: {index}/{total}")
     return FilterSimulator(string).run(sample_count)
 

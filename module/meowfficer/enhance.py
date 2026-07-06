@@ -170,8 +170,8 @@ class MeowfficerEnhance(MeowfficerBase):
             else:
                 self.device.screenshot()
 
-            # Exit if maximum clicked
-            current, remain, total = MEOWFFICER_FEED.ocr(self.device.image)
+            # 达到最大点击次数后退出。
+            current, remain, _total = MEOWFFICER_FEED.ocr(self.device.image)
             if not remain:
                 break
 

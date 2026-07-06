@@ -1,5 +1,4 @@
 import re
-import sys
 from numbers import Number
 
 import six
@@ -252,8 +251,7 @@ class SLPP:
                         raise ParseError(ERRORS["mfnumber_sci"])
                     n += next_digit(ERRORS["mfnumber_sci"])
                     n += self.digit()
-        except ParseError:
-            t, e = sys.exc_info()[:2]
+        except ParseError as e:
             print(e)
             return 0
         try:

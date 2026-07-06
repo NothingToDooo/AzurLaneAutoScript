@@ -411,7 +411,7 @@ class ButtonGrid:
         if name:
             self._name = name
         else:
-            (filename, line_number, function_name, text) = traceback.extract_stack()[-2]
+            text = traceback.extract_stack()[-2].line or ""
             self._name = text[: text.find("=")].strip()
 
     def __getitem__(self, item):

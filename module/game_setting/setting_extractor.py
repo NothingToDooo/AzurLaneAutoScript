@@ -55,7 +55,7 @@ class LuaSetting:
     @cached_property
     def default(self):
         if "," in self.code:
-            name, default = self.code.split(",", 1)
+            _name, default = self.code.split(",", 1)
             default = default.strip(' ",')
             if self.typ == "Int":
                 try:
