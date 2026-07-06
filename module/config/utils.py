@@ -2,7 +2,7 @@ import json
 import os
 import random
 import string
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import yaml
 from yaml.representer import SafeRepresenter
@@ -298,7 +298,7 @@ def server_time_offset() -> timedelta:
     To convert server time to local time:
         local_time = server_time - server_time_offset()
     """
-    local_offset = datetime.now(timezone.utc).astimezone().utcoffset() or timedelta()
+    local_offset = datetime.now(UTC).astimezone().utcoffset() or timedelta()
     return local_offset - server_timezone()
 
 

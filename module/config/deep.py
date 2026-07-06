@@ -258,8 +258,7 @@ def deep_iter_depth1(data):
         Any: Value
     """
     try:
-        for k, v in data.items():
-            yield k, v
+        yield from data.items()
         return
     except AttributeError:
         # `data` is not dict
