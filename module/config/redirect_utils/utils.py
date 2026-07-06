@@ -1,5 +1,16 @@
 from module.config.server import to_server
 
+_COALITION_TO_FROSTFALL = {
+    "easy": "tc1",
+    "normal": "tc2",
+    "hard": "tc3",
+}
+_COALITION_TO_LITTLE_ACADEMY = {
+    "tc1": "easy",
+    "tc2": "normal",
+    "tc3": "hard",
+}
+
 
 def upload_redirect(value):
     """
@@ -106,27 +117,13 @@ def api_redirect2(value):
 
 def coalition_to_frostfall(value):
     """
-    Redirect Little Academy stage names to Frostfall
+    将小学院关卡名重定向到飓风与青春之泉。
     """
-    if value == "easy":
-        return "tc1"
-    elif value == "normal":
-        return "tc2"
-    elif value == "hard":
-        return "tc3"
-    else:
-        return value
+    return _COALITION_TO_FROSTFALL.get(value, value)
 
 
 def coalition_to_little_academy(value):
     """
-    Redirect Little Academy stage names to Frostfall
+    将飓风与青春之泉关卡名重定向回小学院。
     """
-    if value == "tc1":
-        return "easy"
-    elif value == "tc2":
-        return "normal"
-    elif value == "tc3":
-        return "hard"
-    else:
-        return value
+    return _COALITION_TO_LITTLE_ACADEMY.get(value, value)

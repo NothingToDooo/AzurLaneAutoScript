@@ -417,23 +417,21 @@ def col2name(col):
 
 def name2col(col_str):
     """
-    Convert a cell reference in A1 notation to a zero indexed row and column.
+    将 A1 表示法中的列名转换为从零开始的列索引。
 
     Args:
-       col_str:  A1 style string.
+        col_str: A1 风格列名。
 
     Returns:
-        row, col: Zero indexed cell row and column indices.
+        int: 从零开始的列索引。
     """
-    # Convert base26 column string to number.
-    expn = 0
+    # 将 base26 列名转换成数字。
     col = 0
     col_neg = col_str.startswith("-")
     col_str = col_str.strip("-").upper()
 
-    for char in reversed(col_str):
+    for expn, char in enumerate(reversed(col_str)):
         col += (ord(char) - 64) * (26**expn)
-        expn += 1
 
     if col_neg:
         return -col
