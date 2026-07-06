@@ -70,7 +70,7 @@ class View(MapDetector):
 
         # Handle grids offset
         offset = list(grids.keys())
-        if not len(offset):
+        if not offset:
             raise MapDetectionError("No map grids found")
         offset = np.min(offset, axis=0)
         if np.sum(np.abs(offset)) > 0:

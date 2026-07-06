@@ -402,7 +402,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         if minute is not None:
             run.append(datetime.now() + ensure_delta(minute))
 
-        if len(run):
+        if run:
             run = min(run).replace(microsecond=0)
             kv = dict_to_kv(
                 {

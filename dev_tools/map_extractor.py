@@ -682,7 +682,7 @@ class ChapterTemplate:
             print(f"Found map: {data}")
             maps = [data]
 
-        if not len(maps):
+        if not maps:
             print("No maps found")
             return []
         print("")

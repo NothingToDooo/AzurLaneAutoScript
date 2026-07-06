@@ -340,8 +340,8 @@ def separate_edges(edges, inner):
     else:
         lower = [edge for edge in edges if edge < inner]
         upper = [edge for edge in edges if edge > inner]
-        lower = lower[0] if len(lower) else None
-        upper = upper[-1] if len(upper) else None
+        lower = lower[0] if lower else None
+        upper = upper[-1] if upper else None
         return lower, upper
 
 

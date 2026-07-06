@@ -167,7 +167,7 @@ def match_movable(before, spawn, after, fleets, fleet_step=2):
     for row in distance:
         match = np.where(row >= encourage_weight)[0].tolist()
         permutations = list(combine(permutations, match, limit=x))
-        if not len(permutations):
+        if not permutations:
             permutations = [[x]]
 
     if len(permutations) == 0 or len(permutations[0]) == 0:

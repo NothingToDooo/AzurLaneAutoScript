@@ -179,7 +179,7 @@ def alas_instance():
 
     out.extend(list_mod_instance())
 
-    if not len(out):
+    if not out:
         out = ["alas"]
 
     return out

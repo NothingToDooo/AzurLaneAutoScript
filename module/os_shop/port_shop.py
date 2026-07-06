@@ -116,7 +116,7 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
                 continue
             else:
                 _items = [item for item in items if item.name == name and item.price == price]
-                if len(_items):
+                if _items:
                     return _items.pop()
 
         return None

@@ -622,7 +622,7 @@ class RewardCommission(UI, InfoHandler):
         total = self.daily.add_by_eq(self.urgent)
         future_finish = sorted([f for f in total.get("finish_time") if f is not None])
         logger.info(f"Commission finish: {[str(f) for f in future_finish]}")
-        if len(future_finish):
+        if future_finish:
             self.config.task_delay(target=future_finish)
         else:
             logger.info("No commission running")
@@ -635,11 +635,7 @@ class RewardCommission(UI, InfoHandler):
             logger.info(f"Daily commission: {daily}, filtered_urgent: {filtered_urgent}")
             if daily > 0 and filtered_urgent >= 1:
                 logger.info("Having daily commissions to do, delay task `GemsFarming`")
-                self.config.task_delay(
-                    minute=120, target=future_finish if len(future_finish) else None, task="GemsFarming"
-                )
+                self.config.task_delay(minute=120, target=future_finish if future_finish else None, task="GemsFarming")
             elif filtered_urgent >= 4:
                 logger.info("Having too many urgent commissions, delay task `GemsFarming`")
-                self.config.task_delay(
-                    minute=120, target=future_finish if len(future_finish) else None, task="GemsFarming"
-                )
+                self.config.task_delay(minute=120, target=future_finish if future_finish else None, task="GemsFarming")

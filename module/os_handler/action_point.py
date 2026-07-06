@@ -406,7 +406,7 @@ class ActionPointHandler(UI, MapEventHandler):
                         box.insert(0, index)
 
             # 使用行动力箱。
-            if len(box):
+            if box:
                 if self._action_point_total > self.config.OS_ACTION_POINT_PRESERVE:
                     self.action_point_set_button(box[0])
                     self.action_point_use()

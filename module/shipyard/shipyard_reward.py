@@ -40,13 +40,13 @@ class RewardShipyard(ShipyardUI):
 
         if rarity == "PR":
             cost = [v for k, v in PRBP_BUY_PRIZE.items() if amount in k]
-            if len(cost):
+            if cost:
                 return cost[0]
             else:
                 return 1500
         elif rarity == "DR":
             cost = [v for k, v in DRBP_BUY_PRIZE.items() if amount in k]
-            if len(cost):
+            if cost:
                 return cost[0]
             else:
                 return 6000

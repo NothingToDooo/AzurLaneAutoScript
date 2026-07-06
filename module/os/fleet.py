@@ -783,7 +783,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 else:
                     # Refocus camera if fleet not
                     others = [f for f in fleets if isinstance(f, BossFleet) and f != fleet]
-                    if len(others):
+                    if others:
                         other: BossFleet = others[0]
                         self.fleet_set(other.fleet_index)
                         self.fleet_set(fleet.fleet_index)

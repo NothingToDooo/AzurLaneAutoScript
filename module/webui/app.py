@@ -525,7 +525,7 @@ class AlasGUI(Frame):
                 valuetype = deep_get(self.ALAS_ARGS, k + ".valuetype")
                 v = parse_pin_value(v, valuetype)
                 validate = deep_get(self.ALAS_ARGS, k + ".validate")
-                if not len(str(v)):
+                if not str(v):
                     default = deep_get(self.ALAS_ARGS, k + ".value")
                     modified[k] = default
                     deep_set(config, k, default)

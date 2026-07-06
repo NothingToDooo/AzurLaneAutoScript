@@ -251,7 +251,7 @@ class SelectedGrids:
         """
         if not self:
             return self
-        if len(args):
+        if args:
             grids = sorted(self.grids, key=operator.attrgetter(*args))
             return SelectedGrids(grids)
         else:
