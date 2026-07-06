@@ -372,13 +372,12 @@ class FleetPreparation(InfoHandler):
         # Check if ship is prepared in hard mode
         h1, h2, h3 = fleet_1.is_hard_satisfied(), fleet_2.is_hard_satisfied(), submarine.is_hard_satisfied()
         logger.info(f"Hard satisfied: Fleet_1: {h1}, Fleet_2: {h2}, Submarine: {h3}")
-        if self.config.SERVER in ["cn", "en", "jp"]:
-            if self.config.Fleet_Fleet1:
-                fleet_1.raise_hard_not_satisfied()
-            if self.config.Fleet_Fleet2:
-                fleet_2.raise_hard_not_satisfied()
-            if self.config.Submarine_Fleet:
-                submarine.raise_hard_not_satisfied()
+        if self.config.Fleet_Fleet1:
+            fleet_1.raise_hard_not_satisfied()
+        if self.config.Fleet_Fleet2:
+            fleet_2.raise_hard_not_satisfied()
+        if self.config.Submarine_Fleet:
+            submarine.raise_hard_not_satisfied()
 
         # Skip fleet preparation in hard mode
         self.map_is_hard_mode = h1 or h2 or h3

@@ -93,4 +93,4 @@ class QuickRetireSettingHandler(UI):
         """
         Fallback to the correct quick retire settings if user has wrong set.
         """
-        return self.config.SERVER in ["cn", "en", "jp"]
+        return True

@@ -94,22 +94,13 @@ class VoucherShop(ShopClerk, ShopStatus):
         # Original grid is:
         # shop_grid = ButtonGrid(
         #     origin=(463, 200), delta=(156, 191), button_shape=(99, 99), grid_shape=(5, 2), name='SHOP_GRID')
-        if self.config.SERVER in ["cn", "jp", "tw"]:
-            shop_grid = ButtonGrid(
-                origin=(305, origin_y),
-                delta=(189.5, delta_y),
-                button_shape=(99, 99),
-                grid_shape=(5, row),
-                name="SHOP_GRID",
-            )
-        else:
-            shop_grid = ButtonGrid(
-                origin=(463, origin_y),
-                delta=(156, delta_y),
-                button_shape=(99, 99),
-                grid_shape=(5, row),
-                name="SHOP_GRID",
-            )
+        shop_grid = ButtonGrid(
+            origin=(305, origin_y),
+            delta=(189.5, delta_y),
+            button_shape=(99, 99),
+            grid_shape=(5, row),
+            name="SHOP_GRID",
+        )
         return shop_grid
 
     shop_template_folder = "./assets/shop/voucher"
@@ -190,10 +181,9 @@ class VoucherShop(ShopClerk, ShopStatus):
             return True
         if self.handle_popup_confirm(name="SHOP_BUY_VOUCHER", offset=(20, 50)):
             return True
-        if self.config.SERVER in ["cn", "jp", "tw"]:
-            # A button named `Exchange` when buying item in amount of 1.
-            if self.appear_then_click(SHOP_BUY_CONFIRM_AMOUNT, offset=(-20, -160, 20, -120), interval=3):
-                return True
+        # 购买数量为 1 时会出现 `Exchange` 按钮。
+        if self.appear_then_click(SHOP_BUY_CONFIRM_AMOUNT, offset=(-20, -160, 20, -120), interval=3):
+            return True
 
         return False
 

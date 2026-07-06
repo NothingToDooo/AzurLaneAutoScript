@@ -128,9 +128,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
                     # EQUIP_CONFIRM_2 may be detected as popup confirm
                     self.interval_reset([EQUIP_CONFIRM, EQUIP_CONFIRM_2])
                     continue
-                if self.config.SERVER in ["cn", "jp", "tw"] and self.appear_then_click(
-                    SR_SSR_CONFIRM, offset=(20, 50), interval=2
-                ):
+                if self.appear_then_click(SR_SSR_CONFIRM, offset=(20, 50), interval=2):
                     # Avoid clicking the undelying SHIP_CONFIRM again
                     self.interval_reset([SHIP_CONFIRM, SHIP_CONFIRM_2])
                     # EQUIP_CONFIRM_2 may be detected as popup confirm

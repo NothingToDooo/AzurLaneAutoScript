@@ -88,10 +88,9 @@ class BattlePass(Combat, UI):
             if self.handle_battle_pass_popup():
                 confirm_timer.reset()
                 continue
-            if self.config.SERVER in ["cn", "jp", "en"]:
-                if self.appear_then_click(POPUP_CONFIRM_WHITE_BATTLEPASS, offset=(20, 20), interval=3):
-                    confirm_timer.reset()
-                    continue
+            if self.appear_then_click(POPUP_CONFIRM_WHITE_BATTLEPASS, offset=(20, 20), interval=3):
+                confirm_timer.reset()
+                continue
             if self.handle_popup_confirm("BATTLE_PASS"):
                 # Lock new META ships
                 confirm_timer.reset()

@@ -44,11 +44,6 @@ class UI(InfoHandler):
             if self.appear(page_main.check_button, offset=(5, 5), interval=interval):
                 return True
             return False
-        # shitty EN localization changing font width of ACADEMY title,
-        # check other buttons also
-        if self.config.SERVER == "en" and page == page_academy:
-            if self.appear(ACADEMY_GOTO_MUNITIONS, offset=offset, interval=interval):
-                return True
         return self.appear(page.check_button, offset=offset, interval=interval)
 
     def is_in_main(self, offset=(30, 30), interval=0):

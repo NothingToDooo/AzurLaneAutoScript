@@ -115,19 +115,10 @@ class BeaconReward(Combat, UI):
                 logger.info("meta_sync_receive ends at REWARD_ENTER")
                 break
 
-            if self.config.SERVER == "en":
-                if self.appear(SYNC_ENTER, offset=(20, 20)):
+            if self.appear(SYNC_ENTER, offset=(20, 20)):
+                if not self.meta_sync_notice_appear():
                     logger.info("meta_sync_receive ends at SYNC_ENTER")
                     break
-                elif self.appear(SYNC_ENTER2, offset=(20, 20)):
-                    if not self.meta_sync_notice_appear():
-                        logger.info("meta_sync_receive ends at SYNC_ENTER2")
-                        break
-            else:
-                if self.appear(SYNC_ENTER, offset=(20, 20)):
-                    if not self.meta_sync_notice_appear():
-                        logger.info("meta_sync_receive ends at SYNC_ENTER")
-                        break
 
             # Click
             if self.handle_popup_confirm("META_REWARD"):
@@ -168,17 +159,9 @@ class BeaconReward(Combat, UI):
             if self.appear(REWARD_ENTER, offset=(20, 20)):
                 logger.info(f"meta_wait_reward_page ends at {REWARD_ENTER}")
                 break
-            if self.config.SERVER == "en":
-                if self.appear(SYNC_ENTER, offset=(20, 20)):
-                    logger.info(f"meta_wait_reward_page ends at {SYNC_ENTER}")
-                    break
-                elif self.appear(SYNC_ENTER2, offset=(20, 20)):
-                    logger.info(f"meta_wait_reward_page ends at {SYNC_ENTER2}")
-                    break
-            else:
-                if self.appear(SYNC_ENTER, offset=(20, 20)):
-                    logger.info(f"meta_wait_reward_page ends at {SYNC_ENTER}")
-                    break
+            if self.appear(SYNC_ENTER, offset=(20, 20)):
+                logger.info(f"meta_wait_reward_page ends at {SYNC_ENTER}")
+                break
             if self.appear(SYNC_TAP, offset=(20, 20)):
                 logger.info(f"meta_wait_reward_page ends at {SYNC_TAP}")
                 break
@@ -190,12 +173,6 @@ class BeaconReward(Combat, UI):
                 break
 
     def run(self):
-        if self.config.SERVER in ["cn", "en", "jp"]:
-            pass
-        else:
-            logger.info(f"MetaReward is not supported in {self.config.SERVER}, please contact server maintainers")
-            return
-
         self.ui_ensure(page_meta)
         self.meta_wait_reward_page()
 
@@ -302,12 +279,6 @@ class DossierReward(Combat, UI):
         return received
 
     def run(self):
-        if self.config.SERVER in ["cn", "en", "jp"]:
-            pass
-        else:
-            logger.info(f"MetaReward is not supported in {self.config.SERVER}, please contact server maintainers")
-            return
-
         from module.os_ash.meta import OpsiAshBeacon
 
         OpsiAshBeacon(self.config, self.device).ensure_dossier_page()
