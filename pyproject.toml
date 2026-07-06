@@ -48,6 +48,10 @@ target-version = "py314"
 
 [tool.ruff.lint]
 select = [
+    "B009",
+    "B010",
+    "B032",
+    "C409",
     "E713",
     "E712",
     "E721",
@@ -56,6 +60,9 @@ select = [
     "F541",
     "F841",
     "I",
+    "PIE808",
+    "PLW0120",
+    "PLW0127",
     "RUF006",
     "RUF010",
     "RUF017",

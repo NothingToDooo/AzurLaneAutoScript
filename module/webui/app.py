@@ -775,8 +775,7 @@ class AlasGUI(Frame):
                 for i in range(2, 100):
                     if f"alas{i}" not in all_name:
                         return f"alas{i}"
-                else:
-                    return ""
+                return ""
 
             def add():
                 name = pin["AddAlas_name"]
@@ -984,8 +983,7 @@ def app_manage():
             for i in range(2, 100):
                 if f"alas{i}" not in all_name:
                     return f"alas{i}"
-            else:
-                return ""
+            return ""
 
         def validate(s: str):
             if s in alas_instance():

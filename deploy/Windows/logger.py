@@ -45,8 +45,8 @@ def attr(name, text):
     print(f"[{name}] {text}")
 
 
-setattr(_logger, "hr", hr)
-setattr(_logger, "attr", attr)
+_logger.hr = hr
+_logger.attr = attr
 
 
 class Percentage:

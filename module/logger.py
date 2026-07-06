@@ -332,7 +332,6 @@ logger.set_file_logger = set_file_logger
 logger.set_func_logger = set_func_logger
 logger.rule = rule
 logger.print = print
-logger.log_file: str
 
 logger.set_file_logger()
 logger.hr("Start", level=0)

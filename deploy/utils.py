@@ -33,7 +33,7 @@ class cached_property(Generic[T]):
         if obj is None:
             return self
 
-        value = obj.__dict__[getattr(self.func, "__name__")] = self.func(obj)
+        value = obj.__dict__[self.func.__name__] = self.func(obj)
         return value
 
 

@@ -43,9 +43,8 @@ class StrategicSearchHandler(MapEventHandler):
                 return True
             else:
                 logger.warning("STRATEGIC_SEARCH_SCROLL disappeared")
-        else:
-            logger.warning("STRATEGIC_SEARCH_SCROLL disappeared confirm")
-            return False
+        logger.warning("STRATEGIC_SEARCH_SCROLL disappeared confirm")
+        return False
 
     def _strategy_option_selected(self, button):
         """

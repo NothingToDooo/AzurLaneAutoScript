@@ -258,9 +258,8 @@ class ActionPointHandler(UI, MapEventHandler):
             else:
                 self.device.click(ACTION_POINT_GRID[index, 0])
                 self.device.sleep(0.3)
-        else:
-            logger.warning("FSet action point button timeout")
-            return False
+        logger.warning("FSet action point button timeout")
+        return False
 
     def action_point_get_buy_remain(self):
         """

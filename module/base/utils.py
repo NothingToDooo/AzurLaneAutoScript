@@ -143,7 +143,7 @@ def random_line_segments(p1, p2, n, random_range=(0, 0, 0, 0)):
     """
     return [
         tuple((((n - index) * p1 + index * p2) / n).astype(int) + random_rectangle_point(random_range))
-        for index in range(0, n + 1)
+        for index in range(n + 1)
     ]
 
 

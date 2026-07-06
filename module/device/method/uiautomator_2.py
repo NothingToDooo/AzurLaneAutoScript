@@ -478,9 +478,7 @@ class Uiautomator2(Connection):
         """
         if isinstance(cmdline, (list, tuple)):
             cmdline = list2cmdline(cmdline)
-        elif isinstance(cmdline, str):
-            cmdline = cmdline
-        else:
+        elif not isinstance(cmdline, str):
             raise TypeError("cmdargs type invalid", type(cmdline))
 
         data = dict(command=cmdline, timeout=str(timeout))

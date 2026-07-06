@@ -104,9 +104,8 @@ class AutoSearchHandler(EnemySearchingHandler):
                 self.device.click(sidebar[0, index - 1])
                 interval.reset()
                 continue
-        else:
-            logger.warning("Sidebar could not be ensured")
-            return False
+        logger.warning("Sidebar could not be ensured")
+        return False
 
     def _auto_search_set_click(self, setting):
         """

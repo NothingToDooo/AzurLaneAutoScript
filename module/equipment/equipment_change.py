@@ -31,7 +31,7 @@ class EquipmentChange(Equipment):
         if equipping_filter.set("on" if enable else "off", main=self):
             self.wait_until_stable(SWIPE_AREA)
 
-    def ship_equipment_record_image(self, index_list=range(0, 5)):
+    def ship_equipment_record_image(self, index_list=range(5)):
         """
         Record equipment through upgrade page
         Notice: The equipment icons in the upgrade page are the same size as the icons in the equipment status
@@ -83,7 +83,7 @@ class EquipmentChange(Equipment):
 
         logger.info(f"Recorded equipment index list: {list(self.equipment_list.keys())}")
 
-    def ship_equipment_take_on_image(self, index_list=range(0, 5), skip_first_screenshot=True):
+    def ship_equipment_take_on_image(self, index_list=range(5), skip_first_screenshot=True):
         """
         Equip the equipment previously recorded
         """
@@ -154,7 +154,7 @@ class EquipmentChange(Equipment):
             self.ui_back(check_button=globals()[f"EQUIP_TAKE_ON_{index}"], appear_button=EQUIPPING_OFF)
             return
 
-        for _ in range(0, 15):
+        for _ in range(15):
             self._equipment_swipe()
 
             if self.appear(EQUIP_CONFIRM, offset=(20, 20), interval=2):

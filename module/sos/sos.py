@@ -108,7 +108,7 @@ class CampaignSos(CampaignRun, CampaignBase):
         )
 
         detection_area = (620, 285, 720, 485)
-        for _ in range(0, 5):
+        for _ in range(5):
             target_button = self._find_target_chapter(chapter)
             if target_button is not None:
                 self._sos_signal_confirm(entrance=target_button)
