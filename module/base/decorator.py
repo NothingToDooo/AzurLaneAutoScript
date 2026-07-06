@@ -1,5 +1,6 @@
 import random
 import re
+from contextlib import suppress
 from functools import wraps
 from typing import Callable, Generic, TypeVar
 
@@ -109,10 +110,8 @@ def del_cached_property(obj, name):
         obj:
         name (str):
     """
-    try:
+    with suppress(KeyError):
         del obj.__dict__[name]
-    except KeyError:
-        pass
 
 
 def has_cached_property(obj, name):

@@ -2,6 +2,7 @@ import copy
 import importlib
 import os
 import random
+from contextlib import suppress
 
 from module.campaign.campaign_base import CampaignBase
 from module.campaign.campaign_event import CampaignEvent
@@ -409,10 +410,8 @@ class CampaignRun(CampaignEvent):
             self.campaign.device.image = self.device.image
             if self.campaign.is_in_map():
                 logger.info("Already in map, retreating.")
-                try:
+                with suppress(CampaignEnd):
                     self.campaign.withdraw()
-                except CampaignEnd:
-                    pass
                 self.campaign.ensure_campaign_ui(name=self.stage, mode=mode)
             elif self.campaign.is_in_auto_search_menu():
                 if self.can_use_auto_search_continue():

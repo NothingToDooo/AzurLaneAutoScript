@@ -1,3 +1,5 @@
+from contextlib import suppress
+
 from module.base.timer import Timer
 from module.base.utils import area_offset
 from module.campaign.assets import *
@@ -377,10 +379,8 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         if self.appear(WITHDRAW, offset=(30, 30)):
             # logger.info("WITHDRAW button found, wait until map loaded to prevent bugs in game client")
             self.ensure_no_info_bar(timeout=2)
-            try:
+            with suppress(CampaignEnd):
                 self.withdraw()
-            except CampaignEnd:
-                pass
             return True
         return False
 

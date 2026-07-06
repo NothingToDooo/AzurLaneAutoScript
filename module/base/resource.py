@@ -1,4 +1,5 @@
 import re
+from contextlib import suppress
 
 import module.config.server as server
 from module.base.decorator import cached_property, del_cached_property
@@ -89,10 +90,8 @@ def release_resources(next_task=""):
             # Disconnect OCR server on idle
             from module.ocr.ocr import OCR_MODEL
 
-            try:
+            with suppress(AttributeError):
                 OCR_MODEL.close()
-            except AttributeError:
-                pass
     else:
         # Release only when using per-instance OCR
         from module.ocr.ocr import OCR_MODEL

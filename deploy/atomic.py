@@ -2,6 +2,7 @@ import os
 import random
 import string
 import time
+from contextlib import suppress
 from typing import Iterable, Union
 
 IS_WINDOWS = os.name == "nt"
@@ -471,13 +472,10 @@ def atomic_read_bytes_stream(file: str, chunk_size: int = 8192) -> Iterable[byte
 
 def file_remove(file: str):
     """
-    Remove a file non-atomic
+    非原子地删除文件。
     """
-    try:
+    with suppress(FileNotFoundError):
         os.unlink(file)
-    except FileNotFoundError:
-        # If file not exist, just no need to remove
-        pass
 
 
 def atomic_remove(file: str):
@@ -520,33 +518,28 @@ def folder_rmtree(folder, may_symlinks=True):
         bool: If success
     """
     try:
-        # If it's a symlinks, unlink it
+        # 如果是符号链接，只删除链接本身。
         if may_symlinks and os.path.islink(folder):
             file_remove(folder)
             return True
-        # Iter folder
+        # 遍历文件夹。
         with os.scandir(folder) as entries:
             for entry in entries:
                 if entry.is_dir(follow_symlinks=False):
                     folder_rmtree(entry.path, may_symlinks=False)
                 else:
-                    # File or symlink
-                    # Just remove the symlink, not what it points to
-                    try:
+                    # 文件或符号链接；只删除链接本身，不删除链接目标。
+                    with suppress(PermissionError):
                         file_remove(entry.path)
-                    except PermissionError:
-                        # Another process is reading/writing
-                        pass
 
     except FileNotFoundError:
-        # directory to clean up does not exist, no need to clean up
+        # 需要清理的目录不存在，不需要处理。
         return True
     except NotADirectoryError:
         file_remove(folder)
         return True
 
-    # Remove empty folder
-    # May raise OSError if it's still not empty
+    # 删除空文件夹；如果仍非空，可能抛出 OSError。
     try:
         os.rmdir(folder)
         return True

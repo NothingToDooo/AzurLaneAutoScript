@@ -1,3 +1,5 @@
+from contextlib import suppress
+
 from module.base.decorator import Config, cached_property
 from module.campaign.campaign_ui import CampaignUI
 from module.combat.auto_search_combat import AutoSearchCombat
@@ -151,10 +153,8 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
         logger.warning("Battle function exhausted.")
         if self.config.Error_HandleError:
             logger.warning("ScriptError, Battle function exhausted, Withdrawing")
-            try:
+            with suppress(CampaignEnd):
                 self.withdraw()
-            except CampaignEnd:
-                pass
         else:
             raise ScriptError("Battle function exhausted.")
 
