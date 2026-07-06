@@ -9,7 +9,6 @@ from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_3, GET_SHIP
 from module.logger import logger
 from module.shop.assets import SHOP_CLICK_SAFE_AREA
-from module.shop.shop_select_globals import *
 from module.statistics.item import Item, ItemGrid
 from module.tactical.tactical_class import Book
 from module.ui.ui import UI

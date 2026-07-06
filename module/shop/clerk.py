@@ -23,7 +23,7 @@ from module.shop.assets import (
     SHOP_SELECT_STOCK,
 )
 from module.shop.base import ShopBase
-from module.shop.shop_select_globals import *
+from module.shop.shop_select_globals import SELECT_ITEM_INFO_MAP
 from module.ui.assets import SHOP_BACK_ARROW
 
 
