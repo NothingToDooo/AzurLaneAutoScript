@@ -4,19 +4,25 @@ import module.config.server as server
 from module.base.utils import get_color
 from module.combat.assets import BATTLE_PREPARATION
 from module.combat.combat import Combat
-from module.daily.assets import *
+from module.daily import assets as daily_assets
 from module.daily.equipment import DailyEquipment
 from module.logger import logger
 from module.ocr.ocr import Digit
 from module.ui.assets import BACK_ARROW, DAILY_CHECK
 from module.ui.page import page_campaign_menu, page_daily
 
-DAILY_MISSION_LIST = [DAILY_MISSION_1, DAILY_MISSION_2, DAILY_MISSION_3]
+DAILY_MISSION_LIST = [
+    daily_assets.DAILY_MISSION_1,
+    daily_assets.DAILY_MISSION_2,
+    daily_assets.DAILY_MISSION_3,
+]
 if server.server != "jp":
-    OCR_REMAIN = Digit(OCR_REMAIN, threshold=128, alphabet="01234")
+    OCR_REMAIN = Digit(daily_assets.OCR_REMAIN, threshold=128, alphabet="01234")
 else:
-    OCR_REMAIN = Digit(OCR_REMAIN, letter=(222, 223, 222), threshold=128, alphabet="01234")
-OCR_DAILY_FLEET_INDEX = Digit(OCR_DAILY_FLEET_INDEX, letter=(90, 154, 255), threshold=128, alphabet="123456")
+    OCR_REMAIN = Digit(daily_assets.OCR_REMAIN, letter=(222, 223, 222), threshold=128, alphabet="01234")
+OCR_DAILY_FLEET_INDEX = Digit(
+    daily_assets.OCR_DAILY_FLEET_INDEX, letter=(90, 154, 255), threshold=128, alphabet="123456"
+)
 
 
 class Daily(Combat, DailyEquipment):
@@ -25,7 +31,7 @@ class Daily(Combat, DailyEquipment):
     emergency_module_development = False
 
     def is_active(self):
-        color = get_color(image=self.device.image, area=DAILY_ACTIVE.area)
+        color = get_color(image=self.device.image, area=daily_assets.DAILY_ACTIVE.area)
         color = np.array(color).astype(float)
         color = (np.max(color) + np.min(color)) / 2
         active = color > 30
@@ -41,14 +47,14 @@ class Daily(Combat, DailyEquipment):
     def next(self):
         self.daily_current += 1
         logger.info("Switch to %s" % str(self.daily_current))
-        self.device.click(DAILY_NEXT)
+        self.device.click(daily_assets.DAILY_NEXT)
         self._wait_daily_switch()
         self.device.screenshot()
 
     def prev(self):
         self.daily_current -= 1
         logger.info("Switch to %s" % str(self.daily_current))
-        self.device.click(DAILY_PREV)
+        self.device.click(daily_assets.DAILY_PREV)
         self._wait_daily_switch()
         self.device.screenshot()
 
@@ -64,7 +70,7 @@ class Daily(Combat, DailyEquipment):
             int: Fleet index, 1 to 6
         """
         if self.emergency_module_development:
-            # Meaning of daily_current
+            # daily_current 含义：
             # 1 Emergency Module Development 限时兵装训练
             # 2 Escort Mission 商船护送
             # 3 Advance Mission 海域突进
@@ -79,7 +85,7 @@ class Daily(Combat, DailyEquipment):
                 self.config.Daily_AdvanceMissionFleet,
                 self.config.Daily_FierceAssaultFleet,
                 self.config.Daily_TacticalTrainingFleet,
-                0,  # Supply Line Disruption, which needs to be done manually or to be done by daily skip
+                0,  # 破交作战需要手动完成，或通过每日跳过完成。
                 self.config.Daily_ModuleDevelopmentFleet,
                 0,
             ]
@@ -95,20 +101,20 @@ class Daily(Combat, DailyEquipment):
                 0,
             ]
         else:
-            # Meaning of daily_current
+            # daily_current 含义：
             # 1 Tactical Training 战术研修
             # 2 Supply Line Disruption 破交作战
             # 3 Module Development 兵装训练
-            # 4 (not open)
+            # 4 未开放
             # 5 Escort Mission 商船护送
             # 6 Advance Mission 海域突进
             # 7 Fierce Assault 斩首行动
             fleets = [
                 0,
                 self.config.Daily_TacticalTrainingFleet,
-                0,  # Supply Line Disruption, which needs to be done manually or to be done by daily skip
+                0,  # 破交作战需要手动完成，或通过每日跳过完成。
                 self.config.Daily_ModuleDevelopmentFleet,
-                0,  # Empty
+                0,  # 空位。
                 self.config.Daily_EscortMissionFleet,
                 self.config.Daily_AdvanceMissionFleet,
                 self.config.Daily_FierceAssaultFleet,
@@ -119,7 +125,7 @@ class Daily(Combat, DailyEquipment):
                 self.config.Daily_TacticalTraining,
                 self.config.Daily_SupplyLineDisruption,
                 self.config.Daily_ModuleDevelopment,
-                0,  # Empty
+                0,  # 空位。
                 self.config.Daily_EscortMission,
                 self.config.Daily_AdvanceMission,
                 self.config.Daily_FierceAssault,
@@ -171,20 +177,20 @@ class Daily(Combat, DailyEquipment):
         logger.info(f"remain={remain}, stage={stage}, fleet={fleet}")
 
         def daily_enter_check():
-            return self.appear(DAILY_ENTER_CHECK, threshold=30)
+            return self.appear(daily_assets.DAILY_ENTER_CHECK, threshold=30)
 
         def daily_end():
             if self.appear(BATTLE_PREPARATION, offset=(20, 20), interval=2):
                 self.device.click(BACK_ARROW)
-            return self.appear(DAILY_ENTER_CHECK, threshold=30) or self.appear(BACK_ARROW, offset=(30, 30))
+            return self.appear(daily_assets.DAILY_ENTER_CHECK, threshold=30) or self.appear(BACK_ARROW, offset=(30, 30))
 
         self.ui_click(
-            click_button=DAILY_ENTER,
+            click_button=daily_assets.DAILY_ENTER,
             check_button=daily_enter_check,
             appear_button=DAILY_CHECK,
             skip_first_screenshot=True,
         )
-        if self.appear(DAILY_LOCKED):
+        if self.appear(daily_assets.DAILY_LOCKED):
             logger.info("Daily locked")
             self.ui_click(click_button=BACK_ARROW, check_button=DAILY_CHECK)
             self.device.sleep((1, 1.2))
@@ -200,12 +206,12 @@ class Daily(Combat, DailyEquipment):
                 logger.info("Submarine daily skip not unlocked, skip")
                 self.ui_click(click_button=BACK_ARROW, check_button=daily_enter_check, skip_first_screenshot=True)
                 break
-            # Execute classic daily run
+            # 执行传统每日战斗。
             self.ui_ensure_index(
                 fleet,
                 letter=OCR_DAILY_FLEET_INDEX,
-                prev_button=DAILY_FLEET_PREV,
-                next_button=DAILY_FLEET_NEXT,
+                prev_button=daily_assets.DAILY_FLEET_PREV,
+                next_button=daily_assets.DAILY_FLEET_NEXT,
                 fast=False,
                 skip_first_screenshot=True,
             )
@@ -240,17 +246,17 @@ class Daily(Combat, DailyEquipment):
             else:
                 self.device.screenshot()
 
-            if self.appear(DAILY_ENTER_CHECK, threshold=30, interval=5):
+            if self.appear(daily_assets.DAILY_ENTER_CHECK, threshold=30, interval=5):
                 self.device.click(button)
                 continue
             if self.handle_get_items():
                 reward_received = True
                 continue
             if self.config.Daily_UseDailySkip:
-                if self.appear_then_click(DAILY_SKIP, offset=(20, 20), interval=5):
+                if self.appear_then_click(daily_assets.DAILY_SKIP, offset=(20, 20), interval=5):
                     continue
             else:
-                if self.appear_then_click(DAILY_NORMAL_RUN, offset=(20, 20), interval=5):
+                if self.appear_then_click(daily_assets.DAILY_NORMAL_RUN, offset=(20, 20), interval=5):
                     continue
             if self.handle_combat_automation_confirm():
                 continue
@@ -259,13 +265,13 @@ class Daily(Combat, DailyEquipment):
             if self.handle_popup_confirm("DAILY_SKIP"):
                 continue
 
-            # End
-            if self.appear(DAILY_SKIP, offset=(20, 20)):
+            # 结束。
+            if self.appear(daily_assets.DAILY_SKIP, offset=(20, 20)):
                 if reward_received:
                     return False
                 if self.info_bar_count():
                     return False
-            if self.appear(DAILY_ENTER_CHECK, threshold=30):
+            if self.appear(daily_assets.DAILY_ENTER_CHECK, threshold=30):
                 if self.info_bar_count():
                     return False
             if self.combat_appear():
@@ -284,7 +290,9 @@ class Daily(Combat, DailyEquipment):
         self.device.sleep(0.2)
         self.device.screenshot()
         self.daily_current = 1
-        self.emergency_module_development = self.appear(ENTRANCE_EMERGENCY_MODULE_DEVELOPMENT, offset=(25, 50))
+        self.emergency_module_development = self.appear(
+            daily_assets.ENTRANCE_EMERGENCY_MODULE_DEVELOPMENT, offset=(25, 50)
+        )
         logger.attr("emergency_module_development", self.emergency_module_development)
 
         logger.info(f"Checked_list: {self.daily_checked}")
@@ -327,8 +335,7 @@ class Daily(Combat, DailyEquipment):
             else:
                 self.daily_execute(remain=remain, stage=stage, fleet=fleet)
                 self.daily_check()
-                # The order of daily tasks will be disordered after execute a daily, exit and re-enter to reset.
-                # 打完一次之后每日任务的顺序会乱掉, 退出再进入来重置顺序.
+                # 打完一次之后每日任务的顺序会乱掉，退出再进入来重置顺序。
                 self.ui_goto(page_campaign_menu)
                 break
 
@@ -351,9 +358,7 @@ class Daily(Combat, DailyEquipment):
             in: Any page
             out: page_daily
         """
-        # self.equipment_take_on()
         self.daily_run()
-        # self.equipment_take_off()
 
-        # Cannot stay in page_daily, because order is disordered.
+        # 不能停留在 page_daily，因为顺序已经乱掉。
         self.config.task_delay(server_update=True)
