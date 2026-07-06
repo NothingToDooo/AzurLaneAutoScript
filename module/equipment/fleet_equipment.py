@@ -1,22 +1,22 @@
 from module.base.timer import Timer
-from module.equipment.assets import *
+from module.equipment import assets as equipment_assets
 from module.equipment.equipment_change import EquipmentChange
 from module.logger import logger
 from module.ocr.ocr import Digit
 from module.ui.assets import FLEET_CHECK
 from module.ui.page import page_fleet
 
-OCR_FLEET_INDEX = Digit(OCR_FLEET_INDEX, letter=(90, 154, 255), threshold=128, alphabet="123456")
+OCR_FLEET_INDEX = Digit(equipment_assets.OCR_FLEET_INDEX, letter=(90, 154, 255), threshold=128, alphabet="123456")
 
 
 class FleetEquipment(EquipmentChange):
     def fleet_enter(self, fleet):
         self.ui_ensure(page_fleet)
 
-        # ui_ensure_index, set fleet
+        # 切换到目标舰队编号。
         letter = OCR_FLEET_INDEX
-        next_button = FLEET_NEXT
-        prev_button = FLEET_PREV
+        next_button = equipment_assets.FLEET_NEXT
+        prev_button = equipment_assets.FLEET_PREV
         interval = (0.2, 0.3)
 
         retry = Timer(1, count=2)
@@ -24,8 +24,7 @@ class FleetEquipment(EquipmentChange):
             current = letter.ocr(self.device.image)
             logger.attr("Index", current)
 
-            # ui_ensure_index but ignore default value 0
-            # otherwise we would have 1 extra click switching from 1 to 4
+            # 忽略 OCR 默认值 0，避免从 1 切到 4 时多点一次。
             if current == 0:
                 continue
 
@@ -39,24 +38,36 @@ class FleetEquipment(EquipmentChange):
                 retry.reset()
 
     def fleet_equipment_take_on_preset(
-        self, preset_record, enter=FLEET_DETAIL_ENTER_FLAGSHIP, long_click=False, out=FLEET_DETAIL_CHECK
+        self,
+        preset_record,
+        enter=equipment_assets.FLEET_DETAIL_ENTER_FLAGSHIP,
+        long_click=False,
+        out=equipment_assets.FLEET_DETAIL_CHECK,
     ):
         self.ui_click(
-            FLEET_DETAIL,
+            equipment_assets.FLEET_DETAIL,
             appear_button=page_fleet.check_button,
-            check_button=FLEET_DETAIL_CHECK,
+            check_button=equipment_assets.FLEET_DETAIL_CHECK,
             skip_first_screenshot=True,
         )
         super().fleet_equipment_take_on_preset(
-            preset_record=preset_record, enter=FLEET_DETAIL_ENTER_FLAGSHIP, long_click=False, out=FLEET_DETAIL_CHECK
+            preset_record=preset_record,
+            enter=equipment_assets.FLEET_DETAIL_ENTER_FLAGSHIP,
+            long_click=False,
+            out=equipment_assets.FLEET_DETAIL_CHECK,
         )
         self.ui_back(FLEET_CHECK)
 
-    def fleet_equipment_take_off(self, enter=FLEET_DETAIL_ENTER_FLAGSHIP, long_click=False, out=FLEET_DETAIL_CHECK):
+    def fleet_equipment_take_off(
+        self,
+        enter=equipment_assets.FLEET_DETAIL_ENTER_FLAGSHIP,
+        long_click=False,
+        out=equipment_assets.FLEET_DETAIL_CHECK,
+    ):
         self.ui_click(
-            FLEET_DETAIL,
+            equipment_assets.FLEET_DETAIL,
             appear_button=page_fleet.check_button,
-            check_button=FLEET_DETAIL_CHECK,
+            check_button=equipment_assets.FLEET_DETAIL_CHECK,
             skip_first_screenshot=True,
         )
         super().fleet_equipment_take_off(enter=enter, long_click=long_click, out=out)
@@ -64,13 +75,13 @@ class FleetEquipment(EquipmentChange):
 
     def fleet_enter_ship(self, button):
         self.ui_click(
-            FLEET_DETAIL,
+            equipment_assets.FLEET_DETAIL,
             appear_button=page_fleet.check_button,
-            check_button=FLEET_DETAIL_CHECK,
+            check_button=equipment_assets.FLEET_DETAIL_CHECK,
             skip_first_screenshot=True,
         )
         self.ship_info_enter(button, long_click=False)
 
     def fleet_back(self):
-        self.ui_back(FLEET_DETAIL_CHECK)
+        self.ui_back(equipment_assets.FLEET_DETAIL_CHECK)
         self.ui_back(FLEET_CHECK)

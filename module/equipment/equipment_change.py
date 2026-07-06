@@ -4,7 +4,7 @@ import numpy as np
 from module.base.button import Button, ButtonGrid
 from module.base.decorator import Config
 from module.base.utils import random_rectangle_vector
-from module.equipment.assets import *
+from module.equipment import assets as equipment_assets
 from module.equipment.equipment import Equipment
 from module.logger import logger
 from module.ui.assets import BACK_ARROW
@@ -19,13 +19,13 @@ EQUIP_INFO_BAR = ButtonGrid(
 EQUIPMENT_GRID = ButtonGrid(
     origin=(696, 170), delta=(86.25, 0), button_shape=(32, 32), grid_shape=(5, 1), name="EQUIPMENT_GRID"
 )
-EQUIPMENT_SCROLL = Scroll(EQUIP_SCROLL, color=(247, 211, 66), name="EQUIP_SCROLL")
+EQUIPMENT_SCROLL = Scroll(equipment_assets.EQUIP_SCROLL, color=(247, 211, 66), name="EQUIP_SCROLL")
 SIM_VALUE = 0.90
 EQUIPMENT_INDEXES = range(5)
 
 equipping_filter = Switch("Equipping_filter")
-equipping_filter.add_state("on", check_button=EQUIPPING_ON)
-equipping_filter.add_state("off", check_button=EQUIPPING_OFF)
+equipping_filter.add_state("on", check_button=equipment_assets.EQUIPPING_ON)
+equipping_filter.add_state("off", check_button=equipment_assets.EQUIPPING_OFF)
 
 
 class EquipmentChange(Equipment):
@@ -33,7 +33,7 @@ class EquipmentChange(Equipment):
 
     def equipping_set(self, enable=False):
         if equipping_filter.set("on" if enable else "off", main=self):
-            self.wait_until_stable(SWIPE_AREA)
+            self.wait_until_stable(equipment_assets.SWIPE_AREA)
 
     def ship_equipment_record_image(self, index_list=EQUIPMENT_INDEXES):
         """
@@ -51,7 +51,7 @@ class EquipmentChange(Equipment):
                 skip_first_screenshot = False
             else:
                 self.device.screenshot()
-            if self.appear(EQUIPMENT_OPEN, offset=(5, 5)):
+            if self.appear(equipment_assets.EQUIPMENT_OPEN, offset=(5, 5)):
                 break
 
         self.equipment_list = {}
@@ -67,20 +67,26 @@ class EquipmentChange(Equipment):
             if edge_value > 10:
                 # 进入装备详情。
                 self.ui_click(
-                    appear_button=EQUIPMENT_OPEN, click_button=EQUIP_INFO_BAR[(index, 0)], check_button=UPGRADE_ENTER
+                    appear_button=equipment_assets.EQUIPMENT_OPEN,
+                    click_button=EQUIP_INFO_BAR[(index, 0)],
+                    check_button=equipment_assets.UPGRADE_ENTER,
                 )
                 # 进入强化信息。
-                self.ui_click(click_button=UPGRADE_ENTER, check_button=UPGRADE_ENTER_CHECK, skip_first_screenshot=True)
+                self.ui_click(
+                    click_button=equipment_assets.UPGRADE_ENTER,
+                    check_button=equipment_assets.UPGRADE_ENTER_CHECK,
+                    skip_first_screenshot=True,
+                )
                 # 保存装备模板。
                 if not info_bar_disappeared:
                     self.handle_info_bar()
                     info_bar_disappeared = True
-                self.equipment_list[index] = self.image_crop(EQUIP_SAVE)
+                self.equipment_list[index] = self.image_crop(equipment_assets.EQUIP_SAVE)
                 # 退出强化信息。
                 self.ui_click(
-                    click_button=UPGRADE_QUIT,
-                    check_button=EQUIPMENT_OPEN,
-                    appear_button=UPGRADE_ENTER_CHECK,
+                    click_button=equipment_assets.UPGRADE_QUIT,
+                    check_button=equipment_assets.EQUIPMENT_OPEN,
+                    appear_button=equipment_assets.UPGRADE_ENTER_CHECK,
                     skip_first_screenshot=True,
                 )
             else:
@@ -98,10 +104,13 @@ class EquipmentChange(Equipment):
         for index in index_list:
             if index in self.equipment_list:
                 logger.info(f"Take on {index}")
-                enter_button = globals()[f"EQUIP_TAKE_ON_{index}"]
+                enter_button = getattr(equipment_assets, f"EQUIP_TAKE_ON_{index}")
 
                 self.ui_click(
-                    enter_button, check_button=EQUIPPING_ON, skip_first_screenshot=skip_first_screenshot, offset=(5, 5)
+                    enter_button,
+                    check_button=equipment_assets.EQUIPPING_ON,
+                    skip_first_screenshot=skip_first_screenshot,
+                    offset=(5, 5),
                 )
                 self.handle_info_bar()
                 self._find_equipment(index)
@@ -124,26 +133,36 @@ class EquipmentChange(Equipment):
 
     def _equip_equipment(self, point, offset=(100, 100)):
         """
-        Equip Equipment then back to ship details
-        Confirm the popup
-        Pages:
-            in: EQUIPMENT STATUS
-            out: SHIP_SIDEBAR_EQUIPMENT
+        穿上装备并回到舰船详情。
+
+        过程里会确认弹窗。
+        页面：
+            进入：装备状态。
+            退出：舰船侧栏装备页。
         """
         logger.info("Equip equipment")
         button = Button(
             area=(), color=(), button=(point[0], point[1], point[0] + offset[0], point[1] + offset[1]), name="EQUIPMENT"
         )
-        self.ui_click(appear_button=EQUIPPING_OFF, click_button=button, check_button=EQUIP_CONFIRM)
+        self.ui_click(
+            appear_button=equipment_assets.EQUIPPING_OFF,
+            click_button=button,
+            check_button=equipment_assets.EQUIP_CONFIRM,
+        )
         logger.info("Equip confirm")
-        self.ui_click(click_button=EQUIP_CONFIRM, check_button=SHIP_INFO_EQUIPMENT_CHECK)
+        self.ui_click(
+            click_button=equipment_assets.EQUIP_CONFIRM,
+            check_button=equipment_assets.SHIP_INFO_EQUIPMENT_CHECK,
+        )
 
     def _find_equipment(self, index):
         """
-        Find the equipment previously recorded
-        Pages:
-            in: EQUIPMENT STATUS
+        查找之前记录过的装备。
+
+        页面：
+            进入：装备状态。
         """
+        enter_button = getattr(equipment_assets, f"EQUIP_TAKE_ON_{index}")
 
         self.equipping_set(False)
 
@@ -156,13 +175,13 @@ class EquipmentChange(Equipment):
 
         if not EQUIPMENT_SCROLL.appear(main=self):
             logger.warning("No recorded equipment was found.")
-            self.ui_back(check_button=globals()[f"EQUIP_TAKE_ON_{index}"], appear_button=EQUIPPING_OFF)
+            self.ui_back(check_button=enter_button, appear_button=equipment_assets.EQUIPPING_OFF)
             return
 
         for _ in range(15):
             self._equipment_swipe()
 
-            if self.appear(EQUIP_CONFIRM, offset=(20, 20), interval=2):
+            if self.appear(equipment_assets.EQUIP_CONFIRM, offset=(20, 20), interval=2):
                 self.device.click(BACK_ARROW)
                 continue
             res = cv2.matchTemplate(
@@ -173,9 +192,9 @@ class EquipmentChange(Equipment):
             if sim > SIM_VALUE:
                 self._equip_equipment(point)
                 break
-            if self.appear(EQUIPMENT_SCROLL_BOTTOM):
+            if self.appear(equipment_assets.EQUIPMENT_SCROLL_BOTTOM):
                 logger.warning("No recorded equipment was found.")
-                self.ui_back(check_button=globals()[f"EQUIP_TAKE_ON_{index}"], appear_button=EQUIPPING_OFF)
+                self.ui_back(check_button=enter_button, appear_button=equipment_assets.EQUIPPING_OFF)
                 break
 
         return
