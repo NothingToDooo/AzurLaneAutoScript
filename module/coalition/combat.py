@@ -1,6 +1,6 @@
 from module.base.timer import Timer
 from module.campaign.campaign_base import CampaignBase
-from module.coalition.assets import *
+from module.coalition.assets import COALITION_REWARD_CONFIRM
 from module.coalition.ui import CoalitionUI
 from module.exception import CampaignEnd
 from module.logger import logger

@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from module.config.utils import get_server_last_update
-from module.exercise.assets import *
+from module.exercise import assets as exercise_assets
 from module.exercise.combat import ExerciseCombat
 from module.logger import logger
 from module.ocr.ocr import Digit, Ocr, OcrYuv
@@ -62,8 +62,8 @@ class DatedDurationYuv(DatedDuration, OcrYuv):
     pass
 
 
-OCR_EXERCISE_REMAIN = Digit(OCR_EXERCISE_REMAIN, letter=(173, 247, 74), threshold=128)
-OCR_PERIOD_REMAIN = DatedDuration(OCR_PERIOD_REMAIN, letter=(255, 255, 255), threshold=128)
+OCR_EXERCISE_REMAIN = Digit(exercise_assets.OCR_EXERCISE_REMAIN, letter=(173, 247, 74), threshold=128)
+OCR_PERIOD_REMAIN = DatedDuration(exercise_assets.OCR_PERIOD_REMAIN, letter=(255, 255, 255), threshold=128)
 ADMIRAL_TRIAL_HOUR_INTERVAL = {
     # "aggressive": [336, 0]
     "sun18": [6, 0],
@@ -83,7 +83,7 @@ class Exercise(ExerciseCombat):
 
     def _new_opponent(self):
         logger.info("New opponent")
-        self.appear_then_click(NEW_OPPONENT)
+        self.appear_then_click(exercise_assets.NEW_OPPONENT)
         self.opponent_change_count += 1
 
         logger.attr("Change_opponent_count", self.opponent_change_count)

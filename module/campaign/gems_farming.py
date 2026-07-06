@@ -1,7 +1,7 @@
 from module.campaign.campaign_base import CampaignBase
 from module.campaign.run import CampaignRun
 from module.combat.assets import BATTLE_PREPARATION
-from module.equipment.assets import *
+from module.equipment.assets import FLEET_ENTER, FLEET_ENTER_FLAGSHIP
 from module.equipment.fleet_equipment import FleetEquipment
 from module.exception import CampaignEnd, ScriptError
 from module.handler.assets import AUTO_SEARCH_MAP_OPTION_OFF
