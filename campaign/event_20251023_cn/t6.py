@@ -133,7 +133,6 @@ class Config(ConfigBase):
     MAP_SWIPE_PREDICT_WITH_CURRENT_FLEET = True
     MAP_SWIPE_MULTIPLY = (1.171, 1.193)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.132, 1.153)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (1.099, 1.119)
 
 
 class Campaign(CampaignBase):

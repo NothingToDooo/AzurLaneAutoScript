@@ -113,28 +113,16 @@
       },
       "ScreenshotMethod": {
         "type": "select",
-        "value": "auto",
+        "value": "nemu_ipc",
         "option": [
-          "auto",
-          "ADB",
-          "ADB_nc",
-          "uiautomator2",
-          "aScreenCap",
-          "aScreenCap_nc",
-          "DroidCast",
-          "DroidCast_raw",
           "nemu_ipc"
         ]
       },
       "ControlMethod": {
         "type": "select",
-        "value": "MaaTouch",
+        "value": "minitouch",
         "option": [
-          "ADB",
-          "uiautomator2",
-          "minitouch",
-          "Hermit",
-          "MaaTouch"
+          "minitouch"
         ]
       },
       "ScreenshotDedithering": {

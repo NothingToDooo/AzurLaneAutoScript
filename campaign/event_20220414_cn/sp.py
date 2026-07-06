@@ -197,7 +197,6 @@ class Config:
     MAP_ENSURE_EDGE_INSIGHT_CORNER = "bottom"
     MAP_SWIPE_MULTIPLY = (0.963, 0.981)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (0.932, 0.949)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (0.904, 0.921)
 
 
 class Campaign(CampaignBase):

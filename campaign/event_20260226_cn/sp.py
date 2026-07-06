@@ -119,7 +119,6 @@ class Config:
     MAP_SIREN_HAS_BOSS_ICON_SMALL = True
     MAP_SWIPE_MULTIPLY = (1.162, 1.184)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.124, 1.145)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (1.091, 1.111)
 
 
 class Campaign(CampaignBase):

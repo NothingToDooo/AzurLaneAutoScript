@@ -158,7 +158,6 @@ class Config(ConfigBase):
     MAP_WALK_USE_CURRENT_FLEET = True
     MAP_SWIPE_MULTIPLY = (1.102, 1.123)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.066, 1.086)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (1.035, 1.054)
 
 
 class Campaign(CampaignBase):

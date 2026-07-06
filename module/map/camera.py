@@ -42,14 +42,9 @@ class Camera(MapOperation):
         vector = np.array(vector)
         name = "MAP_SWIPE_" + "_".join([str(int(round(x))) for x in vector])
         if np.any(np.abs(vector) > self.config.MAP_SWIPE_DROP):
-            # Map grid fit
-            if self.config.DEVICE_CONTROL_METHOD == "minitouch":
-                distance = self.view.swipe_base * self.config.MAP_SWIPE_MULTIPLY_MINITOUCH
-            elif self.config.DEVICE_CONTROL_METHOD == "MaaTouch":
-                distance = self.view.swipe_base * self.config.MAP_SWIPE_MULTIPLY_MAATOUCH
-            else:
-                distance = self.view.swipe_base * self.config.MAP_SWIPE_MULTIPLY
-            # Optimize swipe path
+            # 地图格子滑动倍率按 minitouch 固定。
+            distance = self.view.swipe_base * self.config.MAP_SWIPE_MULTIPLY_MINITOUCH
+            # 优化滑动路径。
             if self.config.MAP_SWIPE_OPTIMIZE:
                 whitelist, blacklist = self.get_swipe_area_opt(vector)
             else:

@@ -5,10 +5,10 @@ from lxml import etree
 
 from module.device.env import IS_WINDOWS
 
-# Patch pkg_resources before importing adbutils and uiautomator2
+# 在导入 adbutils 和 uiautomator2 之前先修补 pkg_resources。
 from module.device.pkg_resources import get_distribution
 
-# Just avoid being removed by import optimization
+# 避免导入优化移除上面的修补。
 _ = get_distribution
 
 from module.base.timer import Timer
@@ -85,7 +85,7 @@ class Device(Screenshot, Control, AppControl):
                 if trial >= 3:
                     logger.critical("Failed to start emulator after 3 trial")
                     raise RequestHumanTakeover
-                # Try to start emulator
+                # 尝试启动模拟器。
                 if self.emulator_instance is not None:
                     self.emulator_start()
                 else:
@@ -94,69 +94,45 @@ class Device(Screenshot, Control, AppControl):
                     )
                     raise RequestHumanTakeover
 
-        # Auto-fill emulator info
+        # 自动补全模拟器信息。
         if IS_WINDOWS and self.config.EmulatorInfo_Emulator == "auto":
             _ = self.emulator_instance
 
-        self.screenshot_interval_set()
         self.method_check()
+        self.screenshot_interval_set()
 
-        # Auto-select the fastest screenshot method
-        if not self.config.is_template_config and self.config.Emulator_ScreenshotMethod == "auto":
-            self.run_simple_screenshot_benchmark()
-
-        # Early init
+        # 提前初始化 minitouch，避免第一次点击时才安装服务。
         if self.config.is_actual_task:
-            if self.config.Emulator_ControlMethod == "MaaTouch":
-                self.early_maatouch_init()
             if self.config.Emulator_ControlMethod == "minitouch":
                 self.early_minitouch_init()
 
     def run_simple_screenshot_benchmark(self):
         """
-        Perform a screenshot method benchmark, test 3 times on each method.
-        The fastest one will be set into config.
+        固定使用 nemu_ipc，并保留旧入口给调用方兼容。
         """
         logger.info("run_simple_screenshot_benchmark")
-        # Check resolution first
+        # 先确认分辨率，再固定使用 nemu_ipc。
         self.resolution_check_uiautomator2()
-        # Perform benchmark
-        from module.daemon.benchmark import Benchmark
-
-        bench = Benchmark(config=self.config, device=self)
-        method = bench.run_simple_screenshot_benchmark()
-        # Set
         with self.config.multi_set():
-            self.config.Emulator_ScreenshotMethod = method
-            # if method == 'nemu_ipc':
-            #     self.config.Emulator_ControlMethod = 'nemu_ipc'
+            self.config.Emulator_ScreenshotMethod = "nemu_ipc"
 
     def method_check(self):
         """
-        Check combinations of screenshot method and control methods
+        检查当前个人版保留的截图和控制方案。
         """
-        # nemu_ipc should be together
-        # if self.config.Emulator_ScreenshotMethod == 'nemu_ipc' and self.config.Emulator_ControlMethod != 'nemu_ipc':
-        #     logger.warning('When using nemu_ipc, both screenshot and control should use nemu_ipc')
-        #     self.config.Emulator_ControlMethod = 'nemu_ipc'
-        # if self.config.Emulator_ScreenshotMethod != 'nemu_ipc' and self.config.Emulator_ControlMethod == 'nemu_ipc':
-        #     logger.warning('When not using nemu_ipc, both screenshot and control should not use nemu_ipc')
-        #     self.config.Emulator_ControlMethod = 'minitouch'
-        # Allow Hermit on VMOS only
-        if self.config.Emulator_ControlMethod == "Hermit" and not self.is_vmos:
-            logger.warning("ControlMethod Hermit is allowed on VMOS only")
-            self.config.Emulator_ControlMethod = "MaaTouch"
-        # 在非 MuMu 环境选择 nemu_ipc 时回退到自动截图。
-        if self.config.Emulator_ScreenshotMethod == "nemu_ipc":
-            if not (self.is_emulator and self.is_mumu_family):
-                logger.warning("ScreenshotMethod nemu_ipc is available on MuMu Player 12 only, fallback to auto")
-                self.config.Emulator_ScreenshotMethod = "auto"
-        if not IS_WINDOWS and self.config.Emulator_ScreenshotMethod == "nemu_ipc":
-            logger.warning(
-                f"ScreenshotMethod {self.config.Emulator_ScreenshotMethod} is available on Windows only, "
-                f"fallback to auto"
-            )
-            self.config.Emulator_ScreenshotMethod = "auto"
+        if self.config.Emulator_ScreenshotMethod != "nemu_ipc":
+            logger.warning("当前个人版只保留截图方案 nemu_ipc，已自动改为 nemu_ipc")
+            self.config.Emulator_ScreenshotMethod = "nemu_ipc"
+        if self.config.Emulator_ControlMethod != "minitouch":
+            logger.warning("当前个人版只保留控制方案 minitouch，已自动改为 minitouch")
+            self.config.Emulator_ControlMethod = "minitouch"
+
+        if not IS_WINDOWS:
+            logger.critical("nemu_ipc 仅支持 Windows")
+            raise RequestHumanTakeover
+        if not (self.is_emulator and self.is_mumu_family):
+            logger.critical("当前个人版只保留 MuMu + nemu_ipc 运行路径")
+            raise RequestHumanTakeover
 
     def handle_night_commission(self, daily_trigger="21:00", threshold=30):
         """
@@ -187,15 +163,7 @@ class Device(Screenshot, Control, AppControl):
         """
         self.stuck_record_check()
 
-        try:
-            super().screenshot()
-        except RequestHumanTakeover:
-            if not self.ascreencap_available:
-                logger.error("aScreenCap unavailable on current device, fallback to auto")
-                self.run_simple_screenshot_benchmark()
-                super().screenshot()
-            else:
-                raise
+        super().screenshot()
 
         if self.handle_night_commission():
             super().screenshot()
@@ -207,10 +175,6 @@ class Device(Screenshot, Control, AppControl):
         return super().dump_hierarchy()
 
     def release_during_wait(self):
-        # Scrcpy server is still sending video stream,
-        # stop it during wait
-        if self.config.Emulator_ScreenshotMethod == "scrcpy":
-            self._scrcpy_server_stop()
         if self.config.Emulator_ScreenshotMethod == "nemu_ipc":
             self.nemu_ipc_release()
 
@@ -218,11 +182,7 @@ class Device(Screenshot, Control, AppControl):
         """
         Callbacks when orientation changed.
         """
-        o = super().get_orientation()
-
-        self.on_orientation_change_maatouch()
-
-        return o
+        return super().get_orientation()
 
     def stuck_record_add(self, button):
         self.detect_record.add(str(button))

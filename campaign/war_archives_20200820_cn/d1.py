@@ -114,7 +114,6 @@ class Config:
     MAP_HAS_MOVABLE_ENEMY = True
     MAP_SWIPE_MULTIPLY = (1.108, 1.129)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.072, 1.092)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (1.041, 1.060)
 
 
 class Campaign(CampaignBase):

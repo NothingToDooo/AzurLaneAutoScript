@@ -152,7 +152,6 @@ class Config:
     }
     MAP_SWIPE_MULTIPLY = (1.033, 1.053)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (0.999, 1.018)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (0.970, 0.988)
     MAP_ENEMY_TEMPLATE = ["LightInvertedOrthant", "MainInvertedOrthant", "CarrierInvertedOrthant"]
     MAP_ENSURE_EDGE_INSIGHT_CORNER = "bottom"
 

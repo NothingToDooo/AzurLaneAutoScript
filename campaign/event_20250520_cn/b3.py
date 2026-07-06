@@ -150,7 +150,6 @@ class Config(ConfigBase):
     MAP_ENEMY_TEMPLATE = []
     MAP_SWIPE_MULTIPLY = (1.100, 1.121)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.064, 1.084)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (1.033, 1.052)
 
 
 class Campaign(CampaignBase):

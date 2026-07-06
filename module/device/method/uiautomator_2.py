@@ -202,12 +202,12 @@ class Uiautomator2(Connection):
         swipe_duration=0.25,
         shake_duration=0.1,
     ):
-        """Drag and shake, like:
-                     /\
+        """拖拽并在终点附近轻微晃动，例如:
+                     /\\
         +-----------+  +  +
-                        \/
-        A simple swipe or drag don't work well, because it only has two points.
-        Add some way point to make it more like swipe.
+                        \\/
+        普通滑动或拖拽只有两个点，效果不够稳定。
+        增加一些路径点，让它更接近真实滑动。
 
         Args:
             p1 (tuple): Start point, (x, y).

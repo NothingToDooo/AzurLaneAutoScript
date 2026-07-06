@@ -222,7 +222,6 @@ class Config(ConfigBase):
     MAP_HAS_WALL = True
     MAP_SWIPE_MULTIPLY = (1.001, 1.020)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (0.968, 0.986)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (0.940, 0.957)
 
 
 class Campaign(CampaignBase):

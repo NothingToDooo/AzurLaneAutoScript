@@ -11,15 +11,12 @@ from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.base.utils import get_color, image_size, limit_in, save_image
 from module.device.method.adb import Adb
-from module.device.method.ascreencap import AScreenCap
-from module.device.method.droidcast import DroidCast
 from module.device.method.nemu_ipc import NemuIpc
-from module.device.method.scrcpy import Scrcpy
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
 
 
-class Screenshot(Adb, DroidCast, AScreenCap, Scrcpy, NemuIpc):
+class Screenshot(Adb, NemuIpc):
     _screen_size_checked = False
     _screen_black_checked = False
     _minicap_uninstalled = False
@@ -30,14 +27,6 @@ class Screenshot(Adb, DroidCast, AScreenCap, Scrcpy, NemuIpc):
     @cached_property
     def screenshot_methods(self):
         return {
-            "ADB": self.screenshot_adb,
-            "ADB_nc": self.screenshot_adb_nc,
-            "uiautomator2": self.screenshot_uiautomator2,
-            "aScreenCap": self.screenshot_ascreencap,
-            "aScreenCap_nc": self.screenshot_ascreencap_nc,
-            "DroidCast": self.screenshot_droidcast,
-            "DroidCast_raw": self.screenshot_droidcast_raw,
-            "scrcpy": self.screenshot_scrcpy,
             "nemu_ipc": self.screenshot_nemu_ipc,
         }
 
@@ -58,11 +47,11 @@ class Screenshot(Adb, DroidCast, AScreenCap, Scrcpy, NemuIpc):
                 method = self.screenshot_method_override
             else:
                 method = self.config.Emulator_ScreenshotMethod
-            method = self.screenshot_methods.get(method, self.screenshot_adb)
+            method = self.screenshot_methods.get(method, self.screenshot_nemu_ipc)
             self.image = method()
 
             if self.config.Emulator_ScreenshotDedithering:
-                # This will take 40-60ms
+                # 这里通常会额外花费 40-60ms。
                 cv2.fastNlMeansDenoising(self.image, self.image, h=17, templateWindowSize=1, searchWindowSize=2)
             self.image = self._handle_orientated_image(self.image)
 
@@ -92,7 +81,7 @@ class Screenshot(Adb, DroidCast, AScreenCap, Scrcpy, NemuIpc):
         if width == 1280 and height == 720:
             return image
 
-        # Rotate screenshots only when they're not 1280x720
+        # 截图方向不为 1280x720 时再按设备方向旋转。
         if self.orientation == 0:
             pass
         elif self.orientation == 1:
@@ -113,7 +102,7 @@ class Screenshot(Adb, DroidCast, AScreenCap, Scrcpy, NemuIpc):
         except ValueError:
             logger.error(f"Error_ScreenshotLength={self.config.Error_ScreenshotLength} is not an integer")
             raise RequestHumanTakeover
-        # Limit in 1~300
+        # 限制在 1~300。
         length = max(1, min(length, 300))
         return deque(maxlen=length)
 
@@ -180,11 +169,6 @@ class Screenshot(Adb, DroidCast, AScreenCap, Scrcpy, NemuIpc):
         else:
             logger.warning(f"Unknown screenshot interval: {interval}")
             raise ScriptError(f"Unknown screenshot interval: {interval}")
-        # Screenshot interval in scrcpy is meaningless,
-        # video stream is received continuously no matter you use it or not.
-        if self.config.Emulator_ScreenshotMethod == "scrcpy":
-            interval = 0.1
-
         if interval != self._screenshot_interval.limit:
             logger.info(f"Screenshot interval set to {interval}s")
             self._screenshot_interval.limit = interval
@@ -237,29 +221,18 @@ class Screenshot(Adb, DroidCast, AScreenCap, Scrcpy, NemuIpc):
     def check_screen_black(self):
         if self._screen_black_checked:
             return True
-        # Check screen color
-        # May get a pure black screenshot on some emulators.
+        # 某些模拟器偶尔会返回纯黑截图。
         color = get_color(self.image, area=(0, 0, 1280, 720))
         if sum(color) < 1:
-            if self.config.Emulator_ScreenshotMethod == "uiautomator2":
-                logger.warning(f"Received pure black screenshots from emulator, color: {color}")
-                logger.warning("Uninstall minicap and retry")
-                self.uninstall_minicap()
-                self._screen_black_checked = False
-                return False
-            else:
-                logger.warning(f"Received pure black screenshots from emulator, color: {color}")
-                logger.warning(
-                    f"Screenshot method `{self.config.Emulator_ScreenshotMethod}` "
-                    f"may not work on emulator `{self.serial}`, or the emulator is not fully started"
-                )
-                if self.is_mumu_family:
-                    if self.config.Emulator_ScreenshotMethod == "DroidCast":
-                        self.droidcast_stop()
-                    else:
-                        logger.warning("If you are using MuMu X, please upgrade to version >= 12.1.5.0")
-                self._screen_black_checked = False
-                return False
+            logger.warning(f"Received pure black screenshots from emulator, color: {color}")
+            logger.warning(
+                f"Screenshot method `{self.config.Emulator_ScreenshotMethod}` "
+                f"may not work on emulator `{self.serial}`, or the emulator is not fully started"
+            )
+            if self.is_mumu_family:
+                logger.warning("如果正在使用 MuMu X，请升级到 12.1.5.0 或更高版本")
+            self._screen_black_checked = False
+            return False
         else:
             self._screen_black_checked = True
             return True

@@ -77,23 +77,7 @@ class ManualConfig:
     FORWARD_PORT_RANGE = (20000, 21000)
     REVERSE_SERVER_PORT = 7903
 
-    ASCREENCAP_FILEPATH_LOCAL = "./bin/ascreencap"
-    ASCREENCAP_FILEPATH_REMOTE = "/data/local/tmp/ascreencap"
-
-    # 'DroidCast', 'DroidCast_raw'
-    DROIDCAST_VERSION = "DroidCast"
-    DROIDCAST_FILEPATH_LOCAL = "./bin/DroidCast/DroidCast_raw-release-1.0.apk"
-    DROIDCAST_FILEPATH_REMOTE = "/data/local/tmp/DroidCast_raw.apk"
-
     MINITOUCH_FILEPATH_REMOTE = "/data/local/tmp/minitouch"
-
-    HERMIT_FILEPATH_LOCAL = "./bin/hermit/hermit.apk"
-
-    SCRCPY_FILEPATH_LOCAL = "./bin/scrcpy/scrcpy-server-v1.20.jar"
-    SCRCPY_FILEPATH_REMOTE = "/data/local/tmp/scrcpy-server-v1.20.jar"
-
-    MAATOUCH_FILEPATH_LOCAL = "./bin/MaaTouch/maatouchsync"
-    MAATOUCH_FILEPATH_REMOTE = "/data/local/tmp/maatouchsync"
 
     """
     module.campaign.gems_farming
@@ -163,21 +147,18 @@ class ManualConfig:
     MOVABLE_NORMAL_ENEMY_TURN = (1,)
 
     POOR_MAP_DATA = False
-    # Convert map grid distance to swipe distance
-    # Usually range from 1/0.62 to 1/0.61
-    # Value may be different in different maps
-    # Before 2023.05.25
+    # 将地图格子距离转换为滑动距离。
+    # 常见范围在 1/0.62 到 1/0.61，不同地图可能不同。
+    # 2023.05.25 之前
     # MAP_SWIPE_MULTIPLY = 1.626
     # MAP_SWIPE_MULTIPLY_MINITOUCH = 1.572
     # MAP_SWIPE_MULTIPLY_MINITOUCH = 1.525
-    # 2023.05.25, swipe fit in 14-1
+    # 2023.05.25，适配 14-1 滑动。
     # MAP_SWIPE_MULTIPLY = (1.006, 1.025)
     # MAP_SWIPE_MULTIPLY_MINITOUCH = (0.973, 0.991)
-    # MAP_SWIPE_MULTIPLY_MAATOUCH = (0.944, 0.961)
-    # 2023.05.25, swipe converts to 7-2 baseline
+    # 2023.05.25，换算到 7-2 基准。
     MAP_SWIPE_MULTIPLY = (1.064, 1.084)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.029, 1.048)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (0.999, 1.017)
     # Swipe distance in map grid lower than this will be dropped,
     # because a closing swipe will be treat as a click in game.
     MAP_SWIPE_DROP = 0.25

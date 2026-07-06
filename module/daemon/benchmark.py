@@ -101,18 +101,9 @@ class Benchmark(DaemonBase, CampaignUI):
         +--------------+--------+--------+
         |  Screenshot  |  time  | Speed  |
         +--------------+--------+--------+
-        |     ADB      | 0.319s |  Fast  |
-        | uiautomator2 | 0.476s | Medium |
-        |  aScreenCap  | Failed | Failed |
+        |   nemu_ipc   | 0.019s |  Fast  |
         +--------------+--------+--------+
         """
-        # table = PrettyTable()
-        # table.field_names = [test, 'Time', 'Speed']
-        # for row in data:
-        #     table.add_row([row[0], f'{float2str(row[1])}', evaluate_func(row[1])])
-
-        # for row in table.get_string().split('\n'):
-        #     logger.info(row)
         table = Table(show_lines=True)
         table.add_column(test, header_style="bright_cyan", style="cyan", no_wrap=True)
         table.add_column("Time", style="magenta")
@@ -150,7 +141,7 @@ class Benchmark(DaemonBase, CampaignUI):
                 return res
 
         logger.hr("Benchmark Results", level=1)
-        fastest_screenshot = "ADB_nc"
+        fastest_screenshot = "nemu_ipc"
         fastest_click = "minitouch"
         if screenshot_result:
             self.show(test="Screenshot", data=screenshot_result, evaluate_func=self.evaluate_screenshot)
@@ -160,41 +151,14 @@ class Benchmark(DaemonBase, CampaignUI):
         if click_result:
             self.show(test="Control", data=click_result, evaluate_func=self.evaluate_click)
             fastest = sorted(click_result, key=lambda item: compare(item))[0]
-            # Prefer MaaTouch if both minitouch and MaaTouch are fastest
-            if "MaaTouch" in click and fastest[0] == "minitouch":
-                fastest[0] = "MaaTouch"
             logger.info(f"Recommend control method: {fastest[0]} ({float2str(fastest[1])})")
             fastest_click = fastest[0]
 
         return fastest_screenshot, fastest_click
 
     def get_test_methods(self) -> t.Tuple[t.Tuple[str], t.Tuple[str]]:
-        device = self.config.Benchmark_DeviceType
-        # device == 'emulator'
-        screenshot = ["ADB", "ADB_nc", "uiautomator2", "aScreenCap", "aScreenCap_nc", "DroidCast", "DroidCast_raw"]
-        click = ["ADB", "uiautomator2", "minitouch", "MaaTouch"]
-
-        def remove(*args):
-            return [l for l in screenshot if l not in args]
-
-        # No ascreencap on Android > 9
-        sdk = self.device.sdk_ver
-        logger.info(f"sdk_ver: {sdk}")
-        if not (21 <= sdk <= 28):
-            screenshot = remove("aScreenCap", "aScreenCap_nc")
-        # No nc loopback
-        if device in ["plone_cloud_with_adb"]:
-            screenshot = remove("ADB_nc", "aScreenCap_nc")
-        # VMOS
-        if device == "android_phone_vmos":
-            screenshot = ["ADB", "aScreenCap", "DroidCast", "DroidCast_raw"]
-            click = ["ADB", "Hermit", "MaaTouch"]
-        # Droidcast on SDK 23 (Android 6.0) to SDK 32 (Android 12)
-        if not (23 <= sdk <= 32):
-            screenshot = remove("DroidCast", "DroidCast_raw")
-
-        if self.device.nemu_ipc_available():
-            screenshot.append("nemu_ipc")
+        screenshot = ["nemu_ipc"] if self.device.nemu_ipc_available() else []
+        click = ["minitouch"]
 
         scene = self.config.Benchmark_TestScene
         if "screenshot" not in scene:
@@ -205,8 +169,7 @@ class Benchmark(DaemonBase, CampaignUI):
         return tuple(screenshot), tuple(click)
 
     def run(self):
-        self.config.override(Emulator_ScreenshotMethod="ADB")
-        self.device.uninstall_minicap()
+        self.config.override(Emulator_ScreenshotMethod="nemu_ipc", Emulator_ControlMethod="minitouch")
         self.ensure_campaign_ui("7-2", mode="normal")
 
         logger.attr("DeviceType", self.config.Benchmark_DeviceType)
@@ -219,24 +182,13 @@ class Benchmark(DaemonBase, CampaignUI):
         Returns:
             str: The fastest screenshot method on current device.
         """
-        screenshot = ["ADB", "ADB_nc", "uiautomator2", "aScreenCap", "aScreenCap_nc", "DroidCast", "DroidCast_raw"]
-
-        def remove(*args):
-            return [l for l in screenshot if l not in args]
-
-        sdk = self.device.sdk_ver
-        logger.info(f"sdk_ver: {sdk}")
-        if not (21 <= sdk <= 28):
-            screenshot = remove("aScreenCap", "aScreenCap_nc")
-        if self.device.is_chinac_phone_cloud:
-            screenshot = remove("ADB_nc", "aScreenCap_nc")
-        if self.device.nemu_ipc_available():
-            screenshot.append("nemu_ipc")
-        screenshot = tuple(screenshot)
+        if not self.device.nemu_ipc_available():
+            logger.critical("当前个人版只保留 MuMu + nemu_ipc 截图方案")
+            raise RequestHumanTakeover
 
         self.TEST_TOTAL = 3
         self.TEST_BEST = 1
-        method, _ = self.benchmark(screenshot, tuple())
+        method, _ = self.benchmark(("nemu_ipc",), tuple())
 
         return method
 

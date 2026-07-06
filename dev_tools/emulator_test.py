@@ -17,14 +17,11 @@ class EmulatorChecker(Device):
     def stress_test(self):
         record = []
         count = 0
-        self._screenshot_adb()
+        self.screenshot_nemu_ipc()
         while 1:
             t0 = time.time()
-            self._screenshot_adb()
-            # self._screenshot_uiautomator2()
-            # self._screenshot_ascreencap()
-            # self._click_adb(1270, 360)
-            # self._click_uiautomator2(1270, 360)
+            self.screenshot_nemu_ipc()
+            # self.click_minitouch(1270, 360)
 
             cost = time.time() - t0
             record.append(cost)
@@ -39,11 +36,9 @@ class Config:
     # SERIAL = 'emulator-5554'
     # SERIAL = '127.0.0.1:21503'
 
-    # Speed: aScreenCap >> uiautomator2 > ADB
-    DEVICE_SCREENSHOT_METHOD = "aScreenCap"  # ADB, uiautomator2, aScreenCap
+    Emulator_ScreenshotMethod = "nemu_ipc"
 
-    # Speed: uiautomator2 >> ADB
-    DEVICE_CONTROL_METHOD = "uiautomator2"  # ADB, uiautomator2
+    Emulator_ControlMethod = "minitouch"
 
 
 az = EmulatorChecker(AzurLaneConfig("template").merge(Config()))

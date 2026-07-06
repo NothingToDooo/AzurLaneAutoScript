@@ -711,8 +711,8 @@ class ConfigUpdater:
 
         if IS_ON_PHONE_CLOUD:
             deep_set(data, "Alas.Emulator.Serial", "127.0.0.1:5555")
-            deep_set(data, "Alas.Emulator.ScreenshotMethod", "DroidCast_raw")
-            deep_set(data, "Alas.Emulator.ControlMethod", "MaaTouch")
+            deep_set(data, "Alas.Emulator.ScreenshotMethod", "nemu_ipc")
+            deep_set(data, "Alas.Emulator.ControlMethod", "minitouch")
             for arg in deep_get(self.args, keys="Alas.DropRecord", default={}).keys():
                 remove_drop_save(arg)
 
@@ -732,11 +732,6 @@ class ConfigUpdater:
             keys = key.split(".")
             keys[-1] = keys[-1].replace("Value", "Record")
             yield ".".join(keys), datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        # Oh no, dynamic dropdown update can only be used on pywebio > 1.8.0
-        # elif key == 'Alas.Emulator.ScreenshotMethod' and value == 'nemu_ipc':
-        #     yield 'Alas.Emulator.ControlMethod', 'nemu_ipc'
-        # elif key == 'Alas.Emulator.ControlMethod' and value == 'nemu_ipc':
-        #     yield 'Alas.Emulator.ScreenshotMethod', 'nemu_ipc'
 
     def read_file(self, config_name, is_template=False):
         """

@@ -133,32 +133,6 @@ class RewardDorm(UI):
         builder.up().commit()
         builder.send()
 
-    @Config.when(DEVICE_CONTROL_METHOD="MaaTouch")
-    def _dorm_feed_long_tap(self, button, count):
-        timeout = Timer(count // 5 + 5).start()
-        x, y = random_rectangle_point(button.button)
-        builder = self.device.maatouch_builder
-        builder.down(x, y).commit()
-        builder.send()
-
-        while 1:
-            builder.move(x, y).commit().wait(10)
-            builder.send()
-            self.device.screenshot()
-
-            if (
-                not self._dorm_has_food(button)
-                or self.handle_info_bar()
-                or self.appear(POPUP_CONFIRM, offset=self._popup_offset)
-            ):
-                break
-            if timeout.reached():
-                logger.warning("Wait dorm feed timeout")
-                break
-
-        builder.up().commit()
-        builder.send()
-
     @Config.when(DEVICE_CONTROL_METHOD="uiautomator2")
     def _dorm_feed_long_tap(self, button, count):
         timeout = Timer(count // 5 + 5).start()

@@ -128,7 +128,6 @@ class Config(ConfigBase):
 
     MAP_SWIPE_MULTIPLY = (1.038, 1.058)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.004, 1.023)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (0.975, 0.993)
 
 
 class Campaign(CampaignBase):

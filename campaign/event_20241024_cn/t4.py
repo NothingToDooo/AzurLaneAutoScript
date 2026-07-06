@@ -152,7 +152,6 @@ class Config(ConfigBase):
     }
     MAP_SWIPE_MULTIPLY = (1.264, 1.287)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.222, 1.245)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (1.186, 1.208)
 
 
 class EventGrid(Grid):

@@ -4,8 +4,8 @@
       "Serial": "auto",
       "PackageName": "auto",
       "ServerName": "disabled",
-      "ScreenshotMethod": "auto",
-      "ControlMethod": "MaaTouch",
+      "ScreenshotMethod": "nemu_ipc",
+      "ControlMethod": "minitouch",
       "ScreenshotDedithering": false,
       "AdbRestart": false
     },

@@ -10,7 +10,7 @@ from module.logger import logger
 
 class AppControl(Adb, Uiautomator2):
     hierarchy: etree._Element
-    _app_u2_family = ["uiautomator2", "minitouch", "scrcpy", "MaaTouch", "nemu_ipc"]
+    _app_u2_family = ["minitouch", "nemu_ipc"]
     _hierarchy_interval = Timer(0.1)
 
     def app_current(self) -> str:
@@ -60,7 +60,7 @@ class AppControl(Adb, Uiautomator2):
     def dump_hierarchy(self) -> etree._Element:
         """
         Returns:
-            etree._Element: Select elements with `self.hierarchy.xpath('//*[@text="Hermit"]')` for example.
+            etree._Element: 可用 `self.hierarchy.xpath('//*[@text="确定"]')` 这类表达式选择元素。
         """
         self._hierarchy_interval.wait()
         self._hierarchy_interval.reset()

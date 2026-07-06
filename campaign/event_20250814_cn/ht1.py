@@ -125,7 +125,6 @@ class Config:
     EDGE_LINES_FIND_PEAKS_PARAMETERS = {"height": (255 - 33, 255), "prominence": 10, "distance": 50, "wlen": 1000}
     MAP_SWIPE_MULTIPLY = (1.267, 1.290)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.225, 1.248)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (1.189, 1.211)
 
 
 class Campaign(CampaignBase):

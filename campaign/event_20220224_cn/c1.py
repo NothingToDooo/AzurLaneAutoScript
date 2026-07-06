@@ -125,7 +125,6 @@ class Config:
     MAP_HAS_BOUNCING_ENEMY = True
     MAP_SWIPE_MULTIPLY = (1.111, 1.132)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.075, 1.094)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (1.043, 1.062)
 
 
 class Campaign(CampaignBase):

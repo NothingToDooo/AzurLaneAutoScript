@@ -150,7 +150,6 @@ class Config:
     MAP_ENEMY_TEMPLATE = ["Light", "Main", "Carrier", "Treasure", "Vestal_ghost"]
     MAP_SWIPE_MULTIPLY = (1.141, 1.163)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.104, 1.124)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (1.071, 1.091)
 
 
 class Campaign(CampaignBase):

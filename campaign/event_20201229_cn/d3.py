@@ -168,7 +168,6 @@ class Config(ConfigBase):
 
     MAP_SWIPE_MULTIPLY = (0.946, 0.963)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (0.914, 0.931)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (0.888, 0.904)
     MAP_ENEMY_GENRE_DETECTION_SCALING = {
         "BBpurple": 1.111,
         "CVpurple": 1.111,

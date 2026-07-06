@@ -138,7 +138,6 @@ class Config(ConfigBase):
     MAP_HAS_SIREN = True
     MAP_SWIPE_MULTIPLY = (1.123, 1.144)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.086, 1.106)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (1.054, 1.073)
 
 
 class Campaign(CampaignBase):

@@ -125,10 +125,8 @@ class SwipeSimulate:
         print("Result to copy:")
         print()
 
-        adb, minitouch, maatouch = get_multiplier(self.multiply[0])
-        print(f"    MAP_SWIPE_MULTIPLY = {adb}")
+        (minitouch,) = get_multiplier(self.multiply[0])
         print(f"    MAP_SWIPE_MULTIPLY_MINITOUCH = {minitouch}")
-        print(f"    MAP_SWIPE_MULTIPLY_MAATOUCH = {maatouch}")
         print()
 
     def run(self):
@@ -139,17 +137,9 @@ class SwipeSimulate:
 
 
 def get_multiplier(minitouch_x):
-    # MAP_SWIPE_MULTIPLY = (1.064, 1.084)
     # MAP_SWIPE_MULTIPLY_MINITOUCH = (1.029, 1.048)
-    # MAP_SWIPE_MULTIPLY_MAATOUCH = (0.999, 1.017)
     minitouch = np.array((1.029, 1.048)) / 1.029 * minitouch_x
-    adb = np.array((1.064, 1.084)) / 1.029 * minitouch_x
-    maatouch = np.array((0.999, 1.017)) / 1.029 * minitouch_x
-    return (
-        f"({adb[0]:.3f}, {adb[1]:.3f})",
-        f"({minitouch[0]:.3f}, {minitouch[1]:.3f})",
-        f"({maatouch[0]:.3f}, {maatouch[1]:.3f})",
-    )
+    return (f"({minitouch[0]:.3f}, {minitouch[1]:.3f})",)
 
 
 if __name__ == "__main__":

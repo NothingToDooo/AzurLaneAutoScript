@@ -95,12 +95,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
             logger.warning(f"Globe swipe to short: {vector}")
             vector = np.sign(vector) * 25
 
-        if self.config.DEVICE_CONTROL_METHOD == "minitouch":
-            distance = self.config.MAP_SWIPE_MULTIPLY_MINITOUCH
-        elif self.config.DEVICE_CONTROL_METHOD == "MaaTouch":
-            distance = self.config.MAP_SWIPE_MULTIPLY_MAATOUCH
-        else:
-            distance = self.config.MAP_SWIPE_MULTIPLY
+        distance = self.config.MAP_SWIPE_MULTIPLY_MINITOUCH
         vector = np.array(distance) * vector
 
         vector = -vector

@@ -114,7 +114,6 @@ class Config(ConfigBase):
     # ===== End of generated config =====
     MAP_SWIPE_MULTIPLY = (1.176, 1.198)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.137, 1.158)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (1.104, 1.124)
 
 
 class Campaign(CampaignBase):

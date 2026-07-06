@@ -117,7 +117,6 @@ class Config(ConfigBase):
     HOMO_STORAGE = ((7, 4), [(179.668, 262.579), (1042.431, 262.579), (89.435, 660.188), (1122.585, 660.188)])
     MAP_SWIPE_MULTIPLY = (1.246, 1.269)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.205, 1.227)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (1.170, 1.191)
 
 
 class Campaign(CampaignBase):

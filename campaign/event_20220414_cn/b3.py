@@ -158,7 +158,6 @@ class Config(ConfigBase):
     GRID_IMAGE_A_MULTIPLY = 1 / 1.2
     MAP_SWIPE_MULTIPLY = (0.967, 0.985)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (0.935, 0.953)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (0.908, 0.924)
 
 
 class Campaign(CampaignBase):

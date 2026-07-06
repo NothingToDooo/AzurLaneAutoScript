@@ -853,10 +853,7 @@ class Connection(ConnectionAttr):
         return True
 
     def release_resource(self):
-        del_cached_property(self, "hermit_session")
-        del_cached_property(self, "droidcast_session")
         del_cached_property(self, "_minitouch_builder")
-        del_cached_property(self, "_maatouch_builder")
         del_cached_property(self, "reverse_server")
 
     def adb_disconnect(self):

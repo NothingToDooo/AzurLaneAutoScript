@@ -424,24 +424,12 @@
     "ScreenshotMethod": {
       "name": "模拟器截图方案",
       "help": "",
-      "auto": "自动选择最快的",
-      "ADB": "ADB",
-      "ADB_nc": "ADB_nc",
-      "uiautomator2": "uiautomator2",
-      "aScreenCap": "aScreenCap",
-      "aScreenCap_nc": "aScreenCap_nc",
-      "DroidCast": "DroidCast",
-      "DroidCast_raw": "DroidCast_raw",
       "nemu_ipc": "nemu_ipc"
     },
     "ControlMethod": {
       "name": "模拟器控制方案",
       "help": "",
-      "ADB": "ADB",
-      "uiautomator2": "uiautomator2",
-      "minitouch": "minitouch",
-      "Hermit": "Hermit",
-      "MaaTouch": "MaaTouch"
+      "minitouch": "minitouch"
     },
     "ScreenshotDedithering": {
       "name": "去除图片色彩抖动",

@@ -114,7 +114,6 @@ class Config:
     MAP_SIREN_TEMPLATE = ["U73", "U81", "U552"]
     MAP_SWIPE_MULTIPLY = (1.191, 1.213)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.152, 1.173)
-    MAP_SWIPE_MULTIPLY_MAATOUCH = (1.118, 1.138)
 
 
 class Campaign(CampaignBase):
