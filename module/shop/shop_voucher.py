@@ -1,5 +1,6 @@
 from module.base.button import ButtonGrid
 from module.base.decorator import cached_property, del_cached_property
+from module.base.template import Template
 from module.base.timer import Timer
 from module.config.redirect_utils.shop_filter import voucher_redirect
 from module.handler.assets import POPUP_CANCEL, POPUP_CONFIRM
