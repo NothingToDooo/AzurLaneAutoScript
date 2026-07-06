@@ -56,8 +56,7 @@ class CampaignABCD(EventBase):
                         f'you should use task "Event" to unlock it instead of using task "{task}"'
                     )
                     raise RequestHumanTakeover from e
-                else:
-                    raise
+                raise
 
             if self.run_count > 0:
                 with self.config.multi_set():

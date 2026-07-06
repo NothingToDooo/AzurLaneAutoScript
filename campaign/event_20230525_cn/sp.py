@@ -209,7 +209,7 @@ class Campaign(CampaignBase):
                     raise RequestHumanTakeover(
                         f"Fleet{fleet_index} fail to move {src} -> {dst}, now on {fleet_location}"
                     )
-                elif fleet_location == dst:
+                if fleet_location == dst:
                     break
                 else:
                     logger.warning(f"Fleet{fleet_index} did not move, retry")

@@ -231,9 +231,8 @@ class MapEventHandler(EnemySearchingHandler):
             if self.os_auto_search_quit(drop=drop):
                 # 当前地图没有更多道具。
                 raise CampaignEnd
-            else:
-                # 自动搜索已停止，但地图尚未清空。
-                return True
+            # 自动搜索已停止，但地图尚未清空。
+            return True
 
         if enable is None:
             pass

@@ -214,8 +214,7 @@ class Device(Screenshot, Control, AppControl):
 
         if self.app_is_running():
             raise GameStuckError("Wait too long")
-        else:
-            raise GameNotRunningError("Game died")
+        raise GameNotRunningError("Game died")
 
     def handle_control_check(self, button):
         self.stuck_record_clear()

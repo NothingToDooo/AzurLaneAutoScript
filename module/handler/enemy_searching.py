@@ -37,8 +37,7 @@ class EnemySearchingHandler(InfoHandler):
                 logger.info("In stage.")
                 self.ensure_no_info_bar(timeout=1.2)
                 raise CampaignEnd("In stage.")
-            else:
-                return False
+            return False
         else:
             if self.appear(MAP_PREPARATION, offset=(20, 20)) or self.appear(FLEET_PREPARATION, offset=(20, 50)):
                 self.device.click(MAP_PREPARATION_CANCEL)

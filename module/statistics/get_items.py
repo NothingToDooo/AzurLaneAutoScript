@@ -57,7 +57,7 @@ class GetItemsStatistics:
         ITEM_GROUP.grids = None
         if INFO_BAR_1.appear_on(image):
             raise ImageError("Stat image has info_bar")
-        elif GET_ITEMS_1.match(image, offset=(5, 0)):
+        if GET_ITEMS_1.match(image, offset=(5, 0)):
             ITEM_GROUP.grids = ITEM_GRIDS_1_ODD if self._stats_get_items_is_odd(image) else ITEM_GRIDS_1_EVEN
         elif GET_ITEMS_2.match(image, offset=(5, 0)):
             ITEM_GROUP.grids = ITEM_GRIDS_2

@@ -941,7 +941,7 @@ class Connection(ConnectionAttr):
                     'please set an exact serial in Alas.Emulator.Serial instead of using "auto"'
                 )
                 raise RequestHumanTakeover
-            elif available.count == 1:
+            if available.count == 1:
                 logger.info("Auto device detection found only one device, using it")
                 self.config.Emulator_Serial = self.serial = available[0].serial
                 del_cached_property(self, "adb")

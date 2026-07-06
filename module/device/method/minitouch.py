@@ -459,10 +459,9 @@ class Minitouch(Connection):
                     raise MinitouchNotInstalledError(
                         "Received empty data from minitouch, probably because minitouch is not installed"
                     ) from e
-                else:
-                    # minitouch 可能还没启动完成。
-                    self.sleep(1)
-                    continue
+                # minitouch 可能还没启动完成。
+                self.sleep(1)
+                continue
 
         # self.max_contacts = max_contacts
         self.max_x = int(max_x)

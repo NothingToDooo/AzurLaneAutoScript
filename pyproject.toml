@@ -85,6 +85,7 @@ select = [
     "RUF100",
     "RET501",
     "RET502",
+    "RET506",
     "SIM105",
     "SIM109",
     "SIM110",

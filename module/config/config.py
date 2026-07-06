@@ -559,8 +559,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         """
         if message:
             raise TaskEnd(message)
-        else:
-            raise TaskEnd
+        raise TaskEnd
 
     def task_switched(self):
         """

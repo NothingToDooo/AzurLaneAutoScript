@@ -308,8 +308,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             if self.handle_walk_out_of_step():
                 if walk_out_of_step:
                     raise MapWalkError("walk_out_of_step")
-                else:
-                    continue
+                continue
             if self.handle_popup_confirm("WALK_UNTIL_STABLE"):
                 # Confirm to submit items, in siren scanning devices
                 confirm_timer.reset()
@@ -455,10 +454,9 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 if confirm_timer.reached():
                     logger.warning("Arrive port on radar but port entrance not appear")
                     raise MapWalkError
-                else:
-                    logger.info("Arrive port on radar but port entrance not appear, confirming")
-                    self.device.screenshot()
-                    continue
+                logger.info("Arrive port on radar but port entrance not appear, confirming")
+                self.device.screenshot()
+                continue
             elif not allow_port_arrive and radar_arrive:
                 logger.info("Arrive port (radar_arrive)")
                 break
