@@ -1,9 +1,10 @@
+import numpy as np
+
 from campaign.campaign_main.campaign_7_2 import MAP
 from module.campaign.campaign_base import CampaignBase
 from module.config.config import AzurLaneConfig
 from module.logger import logger
 from module.map_detection.homography import Homography
-from module.map_detection.utils import *
 
 
 class Config:

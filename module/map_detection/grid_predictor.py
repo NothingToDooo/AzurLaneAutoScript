@@ -1,9 +1,13 @@
-from module.base.utils import *
+import cv2
+import numpy as np
+
+from module.base.decorator import cached_property
+from module.base.utils import area_offset, area_pad, color_similarity_2d, crop, rgb2gray
 from module.exception import ScriptError
 from module.logger import logger
-from module.map_detection.utils import *
-from module.map_detection.utils_assets import *
-from module.template.assets import *
+from module.map_detection.utils import area2corner, corner2area, perspective_transform
+from module.map_detection.utils_assets import ASSETS, DETECTING_AREA, UI_MASK, UI_MASK_OS
+from module.template import assets as template_assets
 
 
 class GridPredictor:
@@ -30,10 +34,10 @@ class GridPredictor:
 
         self.template_enemy_genre = {}
         for name in self.config.MAP_ENEMY_TEMPLATE:
-            self.template_enemy_genre[name] = globals().get(f"TEMPLATE_ENEMY_{name}")
+            self.template_enemy_genre[name] = getattr(template_assets, f"TEMPLATE_ENEMY_{name}", None)
         if self.config.MAP_HAS_SIREN:
             for name in self.config.MAP_SIREN_TEMPLATE:
-                self.template_enemy_genre[f"Siren_{name}"] = globals().get(f"TEMPLATE_SIREN_{name}")
+                self.template_enemy_genre[f"Siren_{name}"] = getattr(template_assets, f"TEMPLATE_SIREN_{name}", None)
 
         self.area = corner2area(self.corner)
         self.homo_data = cv2.getPerspectiveTransform(
@@ -174,11 +178,11 @@ class GridPredictor:
         red = color_similarity_2d(image, (255, 130, 132))
         yellow = color_similarity_2d(image, (255, 235, 156))
 
-        if TEMPLATE_ENEMY_L.match(red, similarity=0.75):
+        if template_assets.TEMPLATE_ENEMY_L.match(red, similarity=0.75):
             scale = 3
-        elif TEMPLATE_ENEMY_M.match(yellow):
+        elif template_assets.TEMPLATE_ENEMY_M.match(yellow):
             scale = 2
-        elif TEMPLATE_ENEMY_S.match(yellow):
+        elif template_assets.TEMPLATE_ENEMY_S.match(yellow):
             scale = 1
         else:
             scale = 0
@@ -192,13 +196,13 @@ class GridPredictor:
             image = self.relative_crop((-0.55, -0.2, 0.45, 0.2), shape=(50, 20))
             image = color_similarity_2d(image, color=(255, 150, 24))
             if image[image > 221].shape[0] > 200:
-                if TEMPLATE_ENEMY_BOSS.match(image, similarity=0.6):
+                if template_assets.TEMPLATE_ENEMY_BOSS.match(image, similarity=0.6):
                     return "Siren_Siren"
         if self.config.MAP_SIREN_HAS_BOSS_ICON_SMALL:
             if self.relative_hsv_count(area=(0.03, -0.15, 0.63, 0.15), h=(32 - 3, 32 + 3), shape=(50, 20)) > 100:
                 image = self.relative_crop((0.03, -0.15, 0.63, 0.15), shape=(50, 20))
                 image = color_similarity_2d(image, color=(255, 150, 33))
-                if TEMPLATE_ENEMY_BOSS.match(image, similarity=0.7):
+                if template_assets.TEMPLATE_ENEMY_BOSS.match(image, similarity=0.7):
                     return "Siren_Siren"
 
         image_dic = {}
@@ -231,14 +235,14 @@ class GridPredictor:
 
         image = self.relative_crop((-0.55, -0.2, 0.45, 0.2), shape=(50, 20))
         image = color_similarity_2d(image, color=(255, 77, 82))
-        if TEMPLATE_ENEMY_BOSS.match(image, similarity=0.75):
+        if template_assets.TEMPLATE_ENEMY_BOSS.match(image, similarity=0.75):
             return True
 
         # Small boss icon
         if self.relative_hsv_count(area=(0.03, -0.15, 0.63, 0.15), h=(358 - 3, 358 + 3), shape=(50, 20)) > 100:
             image = self.relative_crop((0.03, -0.15, 0.63, 0.15), shape=(50, 20))
             image = color_similarity_2d(image, color=(255, 77, 82))
-            if TEMPLATE_ENEMY_BOSS.match(image, similarity=0.7):
+            if template_assets.TEMPLATE_ENEMY_BOSS.match(image, similarity=0.7):
                 return True
 
         return False
@@ -249,16 +253,16 @@ class GridPredictor:
     def predict_fleet(self):
         image = self.relative_crop((-1, -2, -0.5, -1.5), shape=(50, 50))
         image = color_similarity_2d(image, color=(255, 255, 255))
-        return TEMPLATE_FLEET_AMMO.match(image)
+        return template_assets.TEMPLATE_FLEET_AMMO.match(image)
 
     def predict_submarine(self):
         image = self.relative_crop((-0.86, 0.08, -0.36, 0.58), shape=(50, 50))
         image = color_similarity_2d(image, color=(255, 243, 156))
-        return TEMPLATE_SUBMARINE.match(image)
+        return template_assets.TEMPLATE_SUBMARINE.match(image)
 
     def predict_caught_by_siren(self):
         image = self.relative_crop((-1, -1.5, 1, 0.5), shape=(120, 120))
-        return TEMPLATE_CAUGHT_BY_SIREN.match(image, similarity=0.6)
+        return template_assets.TEMPLATE_CAUGHT_BY_SIREN.match(image, similarity=0.6)
 
     def predict_mystery(self):
         """
@@ -282,7 +286,7 @@ class GridPredictor:
 
         image = self.relative_crop((-0.5, -3.5, 0.5, -2.5), shape=(60, 60))
         image = color_similarity_2d(image, color=(24, 255, 107))
-        if not TEMPLATE_FLEET_CURRENT.match(image):
+        if not template_assets.TEMPLATE_FLEET_CURRENT.match(image):
             return False
 
         return True
@@ -318,14 +322,14 @@ class GridPredictor:
 
     def predict_mob_move_icon(self):
         image = rgb2gray(self.relative_crop(area=(-0.5, -0.5, 0.5, 0.5), shape=(60, 60)))
-        return TEMPLATE_MOB_MOVE_ICON.match(image)
+        return template_assets.TEMPLATE_MOB_MOVE_ICON.match(image)
 
     def predict_air_strike_icon(self):
         # area = area_pad((0, 0, 140, 140), pad=5)
         # image = color_similarity_2d(crop(self.image_trans, area=area, copy=False), color=(255, 255, 160))
         image = color_similarity_2d(self.image_trans, color=(255, 255, 160))
         cv2.threshold(image, 175, 255, cv2.THRESH_BINARY, dst=image)
-        return TEMPLATE_AIR_STRIKE_ICON.match(image, similarity=0.7)
+        return template_assets.TEMPLATE_AIR_STRIKE_ICON.match(image, similarity=0.7)
 
     @cached_property
     def _image_similar_piece(self):
