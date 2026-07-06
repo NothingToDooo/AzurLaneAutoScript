@@ -125,9 +125,9 @@ class LuaSetting:
     @cached_property
     def generated(self):
         if self.key == "":
-            return [*_comment_lines(self.raw), "pass  # Unknown"]
+            return [*_comment_lines(self.raw), "# 未识别"]
         if self.duplicate:
-            return [*_comment_lines(self.raw), "pass  # Duplicate"]
+            return [*_comment_lines(self.raw), "# 重复项"]
 
         return [
             *_comment_lines(self.raw),

@@ -86,7 +86,6 @@ class MinigameRun(UI):
             in: page_game_room choosing_game
             out: page_game_room game_entrance
         """
-        pass
 
     def use_coin(self, skip_first_screenshot=True):
         return False
@@ -100,7 +99,6 @@ class MinigameRun(UI):
             in: page_game_room new_year_challenge_end
             out: page_game_room choose_game
         """
-        pass
 
 
 class Minigame(UI):

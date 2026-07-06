@@ -25,7 +25,7 @@ class DetectionBackendExample:
             image (np.ndarray): Shape (720, 1280, 3)
         """
         self.image = image
-        pass  # Do map detection here.
+        # 在这里执行地图检测。
 
     """
     Output

@@ -8,7 +8,6 @@ from module.map_detection.homography import Homography
 
 
 class Config:
-    pass
     # Universal configs to reduce error
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 40
     EDGE_LINES_HOUGHLINES_THRESHOLD = 40

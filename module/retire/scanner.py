@@ -506,7 +506,6 @@ class DockScanner(ShipScanner):
         Scan all ships in a certain fleet.
         It fleet is not specified, use self.fleet.
         """
-        pass
 
     def scan_whole_dock(self) -> List[Ship]:
         pass

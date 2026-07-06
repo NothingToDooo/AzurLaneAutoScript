@@ -32,8 +32,6 @@ class OperationSiren(
     Operation Siren main class that combines all task modules.
     """
 
-    pass
-
 
 if __name__ == "__main__":
     self = OperationSiren("alas", task="OpsiMonthBoss")

@@ -43,7 +43,6 @@ class AzurLaneDaemon(DaemonBase, CampaignBase):
                 continue
 
             # Emotion
-            pass
 
             # Urgent commission
             if self.handle_urgent_commission():

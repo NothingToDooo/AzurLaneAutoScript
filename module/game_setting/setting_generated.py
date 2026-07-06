@@ -29,13 +29,13 @@ class GameSettingsGenerated:
 
     # /mgr/uimgr.lua
     # PlayerPrefs.GetInt(SHOW_TOUCH_EFFECT, 1)
-    pass  # Unknown
+    # 未识别
 
     # /mgr/custom/cpkplaymgr.lua
     # PlayerPrefs.GetFloat("bgm_vol", DEFAULT_BGMVOLUME)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetFloat("bgm_vol", DEFAULT_BGMVOLUME)
-    pass  # Duplicate
+    # 重复项
 
     # /mgr/reddot/reddotmgr.lua
     # PlayerPrefs.GetFloat("firstIntoOtherPanel")
@@ -49,11 +49,11 @@ class GameSettingsGenerated:
 
     # /mod/battle/battlestate.lua
     # PlayerPrefs.GetInt("autoBotIsAcitve" .. AutoBotCommand.GetAutoBotMark(slot0), 0)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetInt("autoSubIsAcitve" .. AutoSubCommand.GetAutoSubMark(slot0), 0)
     autoSubIsAcitve = Field(formatter=int, default=0, regex="autoSubIsAcitve(.*)")
     # PlayerPrefs.GetInt(HIDE_CHAT_FLAG)
-    pass  # Unknown
+    # 未识别
 
     # /mod/battle/data/battledataproxy.lua
     # PlayerPrefs.GetInt("stage_scratch")
@@ -61,7 +61,7 @@ class GameSettingsGenerated:
 
     # /mod/battle/view/battleresourcemanager.lua
     # PlayerPrefs.GetInt(BATTLE_HIDE_BG, 1)
-    pass  # Unknown
+    # 未识别
 
     # /mod/battle/view/ui/battleuimediator.lua
     # PlayerPrefs.GetFloat("joystick_anchorX", slot1.x)
@@ -77,21 +77,21 @@ class GameSettingsGenerated:
     # PlayerPrefs.GetFloat("auto_anchorY", slot1.y)
     auto_anchorY = Field(formatter=float, default=0.0, regex="auto_anchorY")
     # PlayerPrefs.GetInt(BATTLE_EXPOSE_LINE, 1)
-    pass  # Unknown
+    # 未识别
 
     # /mod/battle/view/ui/formationpanel/battleskillview.lua
     # PlayerPrefs.GetFloat("skill_" .. slot2 .. "_scale", slot3.scale)
     skill = Field(formatter=float, default=0.0, regex="skill_(.*)_scale")
     # PlayerPrefs.GetFloat("skill_" .. slot2 .. "_anchorX", slot3.x)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetFloat("skill_" .. slot2 .. "_anchorY", slot3.y)
-    pass  # Duplicate
+    # 重复项
 
     # /mod/experiment/world/model/world.lua
     # PlayerPrefs.GetInt(AUTOFIGHT_BATTERY_SAVEMODE, 0)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt(AUTOFIGHT_DOWN_FRAME, 0)
-    pass  # Unknown
+    # 未识别
 
     # /mod/experiment/world/model/worldconst.lua
     # PlayerPrefs.GetInt("world_help_progress")
@@ -101,11 +101,11 @@ class GameSettingsGenerated:
     # PlayerPrefs.GetString("world_stamina_reset_tip", "")
     world_stamina_reset_tip = Field(formatter=str, default="", regex="world_stamina_reset_tip")
     # PlayerPrefs.GetString("world_stamina_reset_tip", "")
-    pass  # Duplicate
+    # 重复项
 
     # /mod/experiment/world/model/boss/worldbossproxy.lua
     # PlayerPrefs.GetString(slot1 .. getProxy(PlayerProxy):getRawData().id)
-    pass  # Unknown
+    # 未识别
 
     # /mod/experiment/world/view/svorderpanel.lua
     # PlayerPrefs.GetInt("world_sub_auto_call", 0)
@@ -117,7 +117,7 @@ class GameSettingsGenerated:
     # PlayerPrefs.GetInt("world_skip_precombat", 0)
     world_skip_precombat = Field(formatter=int, default=0, regex="world_skip_precombat")
     # PlayerPrefs.GetInt(slot0[1], 0)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt("auto_switch_mode", 0)
     auto_switch_mode = Field(formatter=int, default=0, regex="auto_switch_mode")
     # PlayerPrefs.GetString("auto_switch_difficult_safe", "only")
@@ -127,7 +127,7 @@ class GameSettingsGenerated:
 
     # /mod/experiment/world/view/wsmapright.lua
     # PlayerPrefs.GetInt("world_skip_precombat", 0)
-    pass  # Duplicate
+    # 重复项
 
     # /model/const/chapterconst.lua
     # PlayerPrefs.GetInt("chapter_skip_battle")
@@ -147,19 +147,19 @@ class GameSettingsGenerated:
 
     # /model/proxy/chapterproxy.lua
     # PlayerPrefs.GetInt(slot1 .. getProxy(PlayerProxy):getRawData().id)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt("chapter_skip_precombat", 0)
     chapter_skip_precombat = Field(formatter=int, default=0, regex="chapter_skip_precombat")
     # PlayerPrefs.GetInt(AUTOFIGHT_BATTERY_SAVEMODE, 0)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt(AUTOFIGHT_DOWN_FRAME, 0)
-    pass  # Unknown
+    # 未识别
 
     # /model/proxy/chatproxy.lua
     # PlayerPrefs.GetString(ChatConst.EMOJI_SAVE_TAG .. getProxy(PlayerProxy):getRawData().id)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetString(ChatConst.EMOJI_ICON_SAVE_TAG .. getProxy(PlayerProxy):getRawData().id)
-    pass  # Unknown
+    # 未识别
 
     # /model/proxy/coloringproxy.lua
     # PlayerPrefs.GetInt("pixelDraw_maxPage_" .. slot1.id .. "_" .. getProxy(PlayerProxy):getRawData().id, 0)
@@ -173,7 +173,7 @@ class GameSettingsGenerated:
 
     # /model/proxy/emojiproxy.lua
     # PlayerPrefs.GetString(uv0.NEW_EMOJI_SAVE_TAG .. getProxy(PlayerProxy):getRawData().id)
-    pass  # Unknown
+    # 未识别
 
     # /model/proxy/guildproxy.lua
     # PlayerPrefs.GetInt("guild_battle_btn_flag" .. getProxy(PlayerProxy):getRawData().id, 0)
@@ -185,9 +185,9 @@ class GameSettingsGenerated:
 
     # /model/proxy/servernoticeproxy.lua
     # PlayerPrefs.GetInt(uv0.KEY_STOP_REMIND)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt(uv0.KEY_NEWLY_ID)
-    pass  # Unknown
+    # 未识别
 
     # /model/proxy/serverproxy.lua
     # PlayerPrefs.GetInt("server.id" .. slot1)
@@ -235,15 +235,15 @@ class GameSettingsGenerated:
     # PlayerPrefs.GetFloat(tostring(slot1) .. "_x", 0)
     x = Field(formatter=float, default=0.0, regex="(.*)_x")
     # PlayerPrefs.GetInt(tostring(slot1) .. "_" .. slot2, 1)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt("currentSecretaryIndex", 1)
     currentSecretaryIndex = Field(formatter=int, default=1, regex="currentSecretaryIndex")
     # PlayerPrefs.GetInt("currentSecretaryIndex", 1)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetInt(slot1, 0)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt(slot1, 0)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetString("HitMonsterNianLayer2020" .. getProxy(PlayerProxy):getRawData().id, "0")
     HitMonsterNianLayer2020 = Field(formatter=str, default="0", regex="HitMonsterNianLayer2020(.*)")
     # PlayerPrefs.GetInt("event_act_help1" .. getProxy(PlayerProxy):getRawData().id, 0)
@@ -284,9 +284,9 @@ class GameSettingsGenerated:
     # PlayerPrefs.GetString("transcode")
     transcode = Field(formatter=str, default="", regex="transcode")
     # PlayerPrefs.GetInt(uv0 .. slot1, PLATFORM)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt(uv0 .. slot1, PLATFORM)
-    pass  # Unknown
+    # 未识别
 
     # /model/proxy/worldproxy.lua
     # PlayerPrefs.GetInt("world_skip_battle")
@@ -300,7 +300,7 @@ class GameSettingsGenerated:
     # PlayerPrefs.GetInt("chapter_quickPlay_flag_" .. slot0.id, 0)
     chapter_quickPlay_flag = Field(formatter=int, default=0, regex="chapter_quickPlay_flag_(.*)")
     # PlayerPrefs.GetInt(uv0.GetChapterLastFleetCacheKey(slot0), 0)
-    pass  # Unknown
+    # 未识别
 
     # /model/vo/chapterfleet.lua
     # PlayerPrefs.GetInt("team_formation_" .. slot0.id, 1)
@@ -308,7 +308,7 @@ class GameSettingsGenerated:
 
     # /model/vo/eventinfo.lua
     # PlayerPrefs.GetString(uv0 .. slot1:getRawData().id)
-    pass  # Unknown
+    # 未识别
 
     # /model/vo/ship.lua
     # PlayerPrefs.GetInt("paint_hide_other_obj_" .. slot2.painting, 0)
@@ -322,23 +322,23 @@ class GameSettingsGenerated:
 
     # /model/vo/notice/notice.lua
     # PlayerPrefs.GetInt(slot0:prefKey())
-    pass  # Unknown
+    # 未识别
 
     # /support/helpers/m02.lua
     # PlayerPrefs.GetInt("paint_hide_other_obj_" .. slot1, 0)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetInt("paint_hide_other_obj_" .. slot1, 0)
-    pass  # Duplicate
+    # 重复项
 
     # /support/utils/hxset.lua
     # PlayerPrefs.GetInt(uv0.codeModeKey)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt("localization_use", 0)
     localization_use = Field(formatter=int, default=0, regex="localization_use")
 
     # /view/activity/activitymediator.lua
     # PlayerPrefs.GetString("permanent_time", "")
-    pass  # Duplicate
+    # 重复项
 
     # /view/activity/activitypermanentlayer.lua
     # PlayerPrefs.GetInt("permanent_select", 0)
@@ -358,7 +358,7 @@ class GameSettingsGenerated:
 
     # /view/activity/refluxmediator.lua
     # PlayerPrefs.GetInt(slot6.id .. "_" .. slot2.data2)
-    pass  # Unknown
+    # 未识别
 
     # /view/activity/banaiactivity/blackwhitegridlayer.lua
     # PlayerPrefs.GetString("BlackWhiteGridMapData-" .. slot1.id .. "-" .. slot0.player.id, "")
@@ -376,7 +376,7 @@ class GameSettingsGenerated:
 
     # /view/activity/lanternriddlesview/lanternriddlesmodel.lua
     # PlayerPrefs.GetInt(slot0 .. "_" .. slot1 .. "_" .. uv0, 0)
-    pass  # Unknown
+    # 未识别
 
     # /view/activity/newservercarnival/newservercarnivalscene.lua
     # PlayerPrefs.GetInt("newserver_shop_first_" .. slot0.player.id)
@@ -392,7 +392,7 @@ class GameSettingsGenerated:
 
     # /view/activity/subpages/collectioneventptpage.lua
     # PlayerPrefs.GetInt("ACTIVITY_TYPE_EVENT_" .. slot0.activity.id .. "_" .. getProxy(PlayerProxy):getData().id)
-    pass  # Duplicate
+    # 重复项
 
     # /view/activity/subpages/crusingdisplayactpage.lua
     # PlayerPrefs.GetInt("first_crusing_page_display:" .. uv0.activity.id, 0)
@@ -400,7 +400,7 @@ class GameSettingsGenerated:
 
     # /view/activity/subpages/icecreamptpage.lua
     # PlayerPrefs.GetInt(uv0.Icecream_Save_Tag_Pre .. slot4, 0)
-    pass  # Unknown
+    # 未识别
 
     # /view/activity/subpages/jiujiuyoyopage.lua
     # PlayerPrefs.GetInt("jiujiuyoyo_first_" .. getProxy(PlayerProxy):getData().id)
@@ -412,7 +412,7 @@ class GameSettingsGenerated:
 
     # /view/activity/subpages/pizzahutptpage.lua
     # PlayerPrefs.GetInt(uv0.Pizza_Save_Tag_Pre .. slot4, 0)
-    pass  # Unknown
+    # 未识别
 
     # /view/activity/subpages/pockyskinpage.lua
     # PlayerPrefs.GetInt("PockySkinSignDay" .. (getProxy(PlayerProxy):getRawData().id or "-1"), 0)
@@ -424,11 +424,11 @@ class GameSettingsGenerated:
     # PlayerPrefs.GetInt("wwf_select_index_" .. slot0.playerId)
     wwf_select_index = Field(formatter=int, default=0, regex="wwf_select_index_(.*)")
     # PlayerPrefs.GetInt("wwf_select_index_" .. slot0.playerId)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetInt("wwf_todo_task_num_" .. slot0.playerId)
     wwf_todo_task_num = Field(formatter=int, default=0, regex="wwf_todo_task_num_(.*)")
     # PlayerPrefs.GetInt("wwf_todo_task_num_" .. getProxy(PlayerProxy):getData().id)
-    pass  # Duplicate
+    # 重复项
 
     # /view/activity/worldinpicture/worldinpicturescene.lua
     # PlayerPrefs.GetString("WorldInPictureScene_1" .. getProxy(PlayerProxy):getRawData().id, "0#0")
@@ -436,15 +436,15 @@ class GameSettingsGenerated:
 
     # /view/battle/battleresultlayer.lua
     # PlayerPrefs.GetInt(DISPLAY_SHIP_GET_EFFECT)
-    pass  # Unknown
+    # 未识别
 
     # /view/battle/battleresultmediator.lua
     # PlayerPrefs.GetInt(AUTO_BATTLE_LABEL, 0)
-    pass  # Unknown
+    # 未识别
 
     # /view/battle/battleworldbossresultlayer.lua
     # PlayerPrefs.GetInt(DISPLAY_SHIP_GET_EFFECT)
-    pass  # Unknown
+    # 未识别
 
     # /view/battle/combatloadui.lua
     # PlayerPrefs.GetInt("bgFitMode", 0)
@@ -468,7 +468,7 @@ class GameSettingsGenerated:
 
     # /view/collection/galleryconst.lua
     # PlayerPrefs.GetInt(uv0.Set_BG_Func_Save_Tag .. getProxy(PlayerProxy):getRawData().id)
-    pass  # Unknown
+    # 未识别
 
     # /view/equipment/transformation/equipmenttransformtreescene.lua
     # PlayerPrefs.GetInt("ShowTransformTip_" .. slot2[3], 0)
@@ -476,7 +476,7 @@ class GameSettingsGenerated:
 
     # /view/helper/shipwordhelper.lua
     # PlayerPrefs.GetInt(CV_LANGUAGE_KEY .. uv0[slot0].ship_group)
-    pass  # Unknown
+    # 未识别
 
     # /view/helper/tagtiphelper.lua
     # PlayerPrefs.GetInt("Ever_Enter_Mall_", 0)
@@ -490,31 +490,31 @@ class GameSettingsGenerated:
     # PlayerPrefs.GetInt("autoFight_firstUse_sp", 0)
     autoFight_firstUse_sp = Field(formatter=int, default=0, regex="autoFight_firstUse_sp")
     # PlayerPrefs.GetInt(uv0, 1)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt(uv0, 1)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt("lastFleetDuty_" .. (slot0.chapter.id or 0), 0)
     lastFleetDuty = Field(formatter=int, default=0, regex="lastFleetDuty_(.*)")
     # PlayerPrefs.GetInt("SPOPItemReminder")
     SPOPItemReminder = Field(formatter=int, default=0, regex="SPOPItemReminder")
     # PlayerPrefs.GetInt("lastFleetDuty_" .. (slot0.chapter.id or 0), 0)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetInt("autoFight_firstUse_sp", 0)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetInt(uv0, 1)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt(uv0, 1)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt(Chapter.GetSPOperationItemCacheKey(slot0.chapter.id), 0)
-    pass  # Unknown
+    # 未识别
 
     # /view/level/levelinfoview.lua
     # PlayerPrefs.GetInt("chapter_loop_flag_" .. slot1.id, -1)
     chapter_loop_flag = Field(formatter=int, default=-1, regex="chapter_loop_flag_(.*)")
     # PlayerPrefs.GetInt("chapter_autofight_flag_" .. slot1.id, 1)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetInt("chapter_quickPlay_flag_" .. slot1.id, 0)
-    pass  # Duplicate
+    # 重复项
 
     # /view/level/leveloperationitempanel.lua
     # PlayerPrefs.GetInt("extraOperationItemID", 0)
@@ -522,17 +522,17 @@ class GameSettingsGenerated:
 
     # /view/level/levelremasterview.lua
     # PlayerPrefs.GetInt(slot4, slot5)
-    pass  # Unknown
+    # 未识别
 
     # /view/level/levelstagetotalrewardpanel.lua
     # PlayerPrefs.GetInt(AUTO_BATTLE_LABEL, 0)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt("autoFight_firstUse_sp", 0)
-    pass  # Duplicate
+    # 重复项
 
     # /view/level/levelstageview.lua
     # PlayerPrefs.GetInt(slot6, 1)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt("help_displayed_on_" .. uv1.id, 0)
     help_displayed_on = Field(formatter=int, default=0, regex="help_displayed_on_(.*)")
 
@@ -582,29 +582,29 @@ class GameSettingsGenerated:
 
     # /view/newmain/view/mainchatroomview.lua
     # PlayerPrefs.GetInt(HIDE_CHAT_FLAG)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt(HIDE_CHAT_FLAG)
-    pass  # Unknown
+    # 未识别
 
     # /view/newmain/view/mainpaintingview.lua
     # PlayerPrefs.GetInt("paint_hide_other_obj_" .. slot0.painting.paintingName, 0)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetInt("paint_hide_other_obj_" .. slot0.painting.paintingName, 0)
-    pass  # Duplicate
+    # 重复项
 
     # /view/setting/newsettingsscene.lua
     # PlayerPrefs.GetFloat("firstIntoOtherPanel")
-    pass  # Duplicate
+    # 重复项
 
     # /view/setting/pages/settingsbattlepage.lua
     # PlayerPrefs.GetFloat(slot2, slot4.x)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetFloat(slot3, slot4.y)
-    pass  # Unknown
+    # 未识别
 
     # /view/setting/pages/settingsotherpage.lua
     # PlayerPrefs.GetFloat("firstIntoOtherPanel")
-    pass  # Duplicate
+    # 重复项
 
     # /view/setting/panels/settingsfpspanle.lua
     # PlayerPrefs.GetInt("fps_limit", DevicePerformanceUtil.GetDefaultFps())
@@ -614,7 +614,7 @@ class GameSettingsGenerated:
     # PlayerPrefs.GetInt("AUTOFIGHT_BATTERY_SAVEMODE", 0)
     AUTOFIGHT_BATTERY_SAVEMODE = Field(formatter=int, default=0, regex="AUTOFIGHT_BATTERY_SAVEMODE")
     # PlayerPrefs.GetInt(_G[slot1.name], slot1.default or 0)
-    pass  # Unknown
+    # 未识别
 
     # /view/setting/panels/settingssecondpasswordpanle.lua
     # PlayerPrefs.GetFloat("firstOpenSecondaryPassword")
@@ -630,11 +630,11 @@ class GameSettingsGenerated:
     # PlayerPrefs.GetFloat("cv_vol_mute_setting", DEFAULT_CVVOLUME)
     cv_vol_mute_setting = Field(formatter=float, default=0.0, regex="cv_vol_mute_setting")
     # PlayerPrefs.GetFloat("bgm_vol_mute_setting", DEFAULT_BGMVOLUME)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetFloat("se_vol_mute_setting", DEFAULT_SEVOLUME)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetFloat("cv_vol_mute_setting", DEFAULT_CVVOLUME)
-    pass  # Duplicate
+    # 重复项
 
     # /view/ship/dockyardquickselectsettingpage.lua
     # PlayerPrefs.GetString("QuickSelectWithoutMaxstar", "KeepAll")
@@ -652,33 +652,33 @@ class GameSettingsGenerated:
 
     # /view/ship/dockyardscene.lua
     # PlayerPrefs.GetInt("QuickSelectRarity1", 3)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetInt("QuickSelectRarity2", 4)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetInt("QuickSelectRarity3", 2)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetString("QuickSelectWhenHasAtLeastOneMaxstar", "KeepNone")
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetString("QuickSelectWithoutMaxstar", "KeepAll")
-    pass  # Duplicate
+    # 重复项
 
     # /view/ship/live2d.lua
     # PlayerPrefs.GetInt(GYRO_ENABLE, 1)
-    pass  # Unknown
+    # 未识别
     # PlayerPrefs.GetInt(GYRO_ENABLE, 1)
-    pass  # Unknown
+    # 未识别
 
     # /view/ship/newshiplayer.lua
     # PlayerPrefs.GetInt(RARE_SHIP_VIBRATE, 1)
-    pass  # Unknown
+    # 未识别
 
     # /view/ship/proposeui.lua
     # PlayerPrefs.GetInt("paint_hide_other_obj_" .. slot1, 0)
-    pass  # Duplicate
+    # 重复项
 
     # /view/ship/shipskincard.lua
     # PlayerPrefs.GetInt("paint_hide_other_obj_" .. slot0.paintingName, 0)
-    pass  # Duplicate
+    # 重复项
 
     # /view/ship/shipinfoview/shipdetailview.lua
     # PlayerPrefs.GetInt("QUICK_CHANGE_EQUIP", 1)
@@ -686,23 +686,23 @@ class GameSettingsGenerated:
 
     # /view/ship/shipinfoview/shipfashionview.lua
     # PlayerPrefs.GetInt("paint_hide_other_obj_" .. uv2.paintingName, 0)
-    pass  # Duplicate
+    # 重复项
 
     # /view/ship/shipprofileview/shipprofilescene.lua
     # PlayerPrefs.GetInt("paint_hide_other_obj_" .. slot0.skin.painting, 0)
-    pass  # Duplicate
+    # 重复项
 
     # /view/shops/pages/newservershoppage.lua
     # PlayerPrefs.GetInt("newserver_shop_phase_" .. slot1 .. "_" .. slot0.playerId)
     newserver_shop_phase = Field(formatter=int, default=0, regex="newserver_shop_phase_(.*)_(.*)")
     # PlayerPrefs.GetInt("newserver_shop_first_" .. slot0.playerId)
-    pass  # Duplicate
+    # 重复项
 
     # /view/snapshot/snapshotscene.lua
     # PlayerPrefs.GetInt("hadShowForVideoTip")
     hadShowForVideoTip = Field(formatter=int, default=0, regex="hadShowForVideoTip")
     # PlayerPrefs.GetInt(SHOW_TOUCH_EFFECT, 1)
-    pass  # Unknown
+    # 未识别
 
     # /view/snapshot/snapshotsharelayer.lua
     # PlayerPrefs.GetInt("snapshotAgress")
@@ -716,26 +716,26 @@ class GameSettingsGenerated:
     # PlayerPrefs.GetInt("first_auto_fight_mark", 0)
     first_auto_fight_mark = Field(formatter=int, default=0, regex="first_auto_fight_mark")
     # PlayerPrefs.GetInt("world_sub_auto_call", 0)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetInt("world_sub_call_line", 0)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetInt("auto_switch_mode", 0)
-    pass  # Duplicate
+    # 重复项
 
     # /view/world/worldswitchplanninglayer.lua
     # PlayerPrefs.GetString("auto_switch_difficult_safe", "all")
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetInt("auto_switch_wait", 0)
     auto_switch_wait = Field(formatter=int, default=0, regex="auto_switch_wait")
     # PlayerPrefs.GetInt("auto_switch_wait_2", 0)
     auto_switch_wait_2 = Field(formatter=int, default=0, regex="auto_switch_wait_2")
     # PlayerPrefs.GetInt("auto_switch_mode", 0)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetString(slot6, slot7)
-    pass  # Unknown
+    # 未识别
 
     # /view/world/worldmediacollection/worldmediacollectionmemorygrouplayer.lua
     # PlayerPrefs.GetInt("MEMORY_GROUP_NOTIFICATION" .. getProxy(PlayerProxy):getRawData().id .. " " .. slot3.id, 0)
-    pass  # Duplicate
+    # 重复项
     # PlayerPrefs.GetInt("MEMORY_GROUP_NOTIFICATION" .. slot2 .. " " .. slot7.id, 0)
-    pass  # Duplicate
+    # 重复项

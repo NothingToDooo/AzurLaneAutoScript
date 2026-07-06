@@ -795,8 +795,6 @@ class ImageNotSupported(Exception):
     Raised if we can't perform image calculation on this image
     """
 
-    pass
-
 
 def get_bbox(image, threshold=0):
     """

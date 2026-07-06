@@ -19,7 +19,6 @@ class CampaignBase(CampaignBase_):
             bool: If mode changed.
         """
         # No need to switch
-        pass
 
     def _campaign_get_chapter_index(self, name):
         """

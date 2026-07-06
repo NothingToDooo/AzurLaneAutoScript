@@ -54,7 +54,6 @@ class Config:
     Step 1:
         Paste your config here.
     """
-    pass
 
 
 """

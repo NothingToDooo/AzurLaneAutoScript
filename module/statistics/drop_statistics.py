@@ -178,7 +178,6 @@ if __name__ == "__main__":
         Goto {DROP_FOLDER}/{TEMPLATE_FOLDER}.
         Manually rename the templates you interested in.
     """
-    pass
 
     """
     Step 3:

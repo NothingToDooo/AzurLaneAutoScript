@@ -213,7 +213,6 @@ class EventStory(CampaignUI, Combat, LoginHandler):
         self.run_event_story()
 
         # 调度由外层任务处理。
-        pass
 
 
 if __name__ == "__main__":

@@ -12,15 +12,11 @@ class ImageBroken(Exception):
     Raised if image is empty
     """
 
-    pass
-
 
 class ImageNotSupported(Exception):
     """
     Raised if we can't perform image calculation on this image
     """
-
-    pass
 
 
 def image_encode(image, ext="png", encode=None):

@@ -436,7 +436,6 @@ class Camera(MapOperation):
             if self.map.missing_is_none(battle_count, mystery_count, siren_count, carrier_count, mode):
                 if must_scan and queue.count != queue.delete(must_scan).count:
                     logger.info("Continue scanning.")
-                    pass
                 else:
                     logger.info("All spawn found, Early stopped.")
                     break

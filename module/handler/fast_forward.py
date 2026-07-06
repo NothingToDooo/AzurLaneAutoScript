@@ -216,7 +216,6 @@ class FastForwardHandler(AutoSearchHandler):
             self.map_is_clear_mode = False
             self.map_is_auto_search = False
             self.map_is_2x_book = False
-            pass
 
         state = "on" if self.config.Campaign_UseClearMode else "off"
         changed = FAST_FORWARD.set(state, main=self)

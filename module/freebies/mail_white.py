@@ -269,10 +269,8 @@ class MailWhite(UI):
         self.ui_ensure(page_main)
         if self.appear(page_main_white.check_button, offset=(30, 30)):
             logger.info("At page_main_white")
-            pass
         elif self.appear(page_main.check_button, offset=(5, 5)):
             logger.info("At page_main")
-            pass
         else:
             logger.warning("Unknown page_main, cannot enter mail page")
             return False

@@ -33,7 +33,6 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
 
             if self.appear(BATTLE_PREPARATION, offset=(20, 20), interval=2):
                 # self.equipment_take_on()
-                pass
 
                 self.device.click(BATTLE_PREPARATION)
                 continue

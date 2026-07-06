@@ -789,7 +789,6 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                         self.fleet_set(fleet.fleet_index)
                     else:
                         logger.warning(f"No other fleets from {fleets}, skip refocus")
-                        pass
 
                 # Check fleet
                 self.handle_os_map_fleet_lock(enable=False)

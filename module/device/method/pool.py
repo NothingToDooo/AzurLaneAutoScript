@@ -40,7 +40,6 @@ class Outcome(abc.ABC, Generic[ValueT]):
            x = outcome.capture(fn, *args).unwrap()
 
         """
-        pass
 
 
 class Value(Outcome[ValueT], Generic[ValueT]):

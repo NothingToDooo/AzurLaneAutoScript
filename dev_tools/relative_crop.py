@@ -18,8 +18,6 @@ class Config:
     Paste the config of map file here
     """
 
-    pass
-
 
 from module.os.config import OSConfig
 

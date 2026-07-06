@@ -360,7 +360,6 @@ class Device(u2.Device):
         """
         Don't show float windows.
         """
-        pass
 
 
 # Monkey patch

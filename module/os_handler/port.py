@@ -26,7 +26,7 @@ class PortHandler(OSShop):
             if self.handle_map_event():
                 continue
         # 底部按钮有出现动画。
-        pass  # ui_click 已经确保等待完成。
+        # ui_click 已经确保等待完成。
 
     def port_quit(self, skip_first_screenshot=True):
         """

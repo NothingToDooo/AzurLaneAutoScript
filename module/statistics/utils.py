@@ -8,13 +8,9 @@ from module.base.utils import crop, image_size
 class ImageError(Exception):
     """Error when parsing images"""
 
-    pass
-
 
 class ImageInvalidResolution(ImageError):
     """Image is not in 1280x720"""
-
-    pass
 
 
 def load_folder(folder, ext=".png"):

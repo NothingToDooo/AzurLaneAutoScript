@@ -99,6 +99,5 @@ class Campaign(CampaignBase, HardEquipment):
                 continue
 
             # Emotion
-            pass
 
         return True
