@@ -7,7 +7,6 @@ import numpy as np
 from adbutils.errors import AdbError
 from lxml import etree
 
-from module.base.decorator import Config
 from module.config.server import DICT_PACKAGE_TO_ACTIVITY
 from module.device.connection import Connection
 from module.device.method.remove_warning import remove_screenshot_warning
@@ -160,23 +159,12 @@ class Adb(Connection):
         raise OSError("cannot load screenshot")
 
     @retry
-    @Config.when(DEVICE_OVER_HTTP=False)
     def screenshot_adb(self):
         data = self.adb_shell(["screencap", "-p"], stream=True)
         if len(data) < 500:
             logger.warning(f"Unexpected screenshot: {data}")
 
         return self.__process_screenshot(data)
-
-    @retry
-    @Config.when(DEVICE_OVER_HTTP=True)
-    def screenshot_adb(self):
-        data = self.adb_shell(["screencap"], stream=True)
-        data = remove_screenshot_warning(data)
-        if len(data) < 500:
-            logger.warning(f"Unexpected screenshot: {data}")
-
-        return load_screencap(data)
 
     @retry
     def screenshot_adb_nc(self):

@@ -73,7 +73,6 @@ class ManualConfig:
     """
     module.device
     """
-    DEVICE_OVER_HTTP = False
     FORWARD_PORT_RANGE = (20000, 21000)
     REVERSE_SERVER_PORT = 7903
 

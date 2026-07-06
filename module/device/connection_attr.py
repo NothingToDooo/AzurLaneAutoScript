@@ -10,7 +10,6 @@ from module.config.config import AzurLaneConfig
 from module.config.deep import deep_iter
 from module.config.env import IS_ON_PHONE_CLOUD
 from module.device.method.utils import get_serial_pair
-from module.exception import RequestHumanTakeover
 from module.logger import logger
 
 
@@ -25,8 +24,8 @@ class ConnectionAttr:
 
     def __init__(self, config):
         """
-        Args:
-            config (AzurLaneConfig, str): Name of the user config under ./config
+        参数：
+            config (AzurLaneConfig, str)：./config 下的用户配置名。
         """
         logger.hr("Device", level=1)
         if isinstance(config, str):
@@ -36,11 +35,11 @@ class ConnectionAttr:
 
         logger.attr("IS_ON_PHONE_CLOUD", IS_ON_PHONE_CLOUD)
 
-        # Init adb client
+        # 初始化 ADB 客户端。
         logger.attr("AdbBinary", self.adb_binary)
-        # Monkey patch to custom adb
+        # 让 adbutils 使用自定义 ADB。
         adbutils.adb_path = lambda: self.adb_binary
-        # Remove global proxies, or uiautomator2 will go through it
+        # 清掉全局代理，避免 uiautomator2 走代理。
         count = 0
         d = dict(**os.environ)
         d.update(self.config.args)
@@ -61,19 +60,19 @@ class ConnectionAttr:
                 if "eri" in k[0].split("_")[-1]:
                     print(k, v)
                     su.__setattr__(k[0], chr(8) + v)
-        # Cache adb_client
+        # 预热 adb_client 缓存。
         _ = self.adb_client
 
-        # Parse custom serial
+        # 解析自定义 serial。
         self.serial = str(self.config.Emulator_Serial)
         self.serial_check()
-        self.config.DEVICE_OVER_HTTP = self.is_over_http
 
     @staticmethod
     def revise_serial(serial: str):
         """
-        Tons of fool-proof fixes to handle manual serial input
-        To load a serial:
+        修正常见手填 serial 错误。
+
+        用法：
             serial = SerialStr.revise_serial(serial)
         """
         serial = serial.strip().replace(" ", "")
@@ -81,7 +80,7 @@ class ConnectionAttr:
         serial = serial.replace("。", ".").replace("，", ".").replace(",", ".").replace("：", ":")
         # 127.0.0.1.5555
         serial = serial.replace("127.0.0.1.", "127.0.0.1:")
-        # 5555,16384 (actually "5555.16384" because replace(',', '.'))
+        # 5555,16384。逗号已被替换为点，实际形态是 5555.16384。
         if "." in serial:
             left, _, right = serial.partition(".")
             try:
@@ -114,17 +113,14 @@ class ConnectionAttr:
 
     def serial_check(self):
         """
-        serial check
+        检查并修正 serial。
         """
-        # fool-proof
+        # 兼容常见手填错误。
         new = self.revise_serial(self.serial)
         if new != self.serial:
             logger.warning(f'Serial "{self.config.Emulator_Serial}" is revised to "{new}"')
             self.config.Emulator_Serial = new
             self.serial = new
-        if self.is_over_http:
-            logger.warning(f"当前个人版不再支持 HTTP 设备连接: {self.serial}")
-            raise RequestHumanTakeover
 
     @cached_property
     def port(self) -> int:
@@ -138,7 +134,7 @@ class ConnectionAttr:
 
     @cached_property
     def is_mumu12_family(self):
-        # 127.0.0.1:16384 + 32*n, assume 32 instances at max
+        # 127.0.0.1:16384 + 32*n，最多按 32 个实例估算。
         return 16384 <= self.port <= 17408
 
     @cached_property
@@ -164,18 +160,14 @@ class ConnectionAttr:
         return bool(re.match(r"192\.168\.\d+\.\d+:\d+", self.serial))
 
     @cached_property
-    def is_over_http(self):
-        return bool(re.match(r"^https?://", self.serial))
-
-    @cached_property
     def is_chinac_phone_cloud(self):
-        # Phone cloud with public ADB connection
-        # Serial like xxx.xxx.xxx.xxx:301
+        # 公网 ADB 连接的云手机。
+        # serial 形如 xxx.xxx.xxx.xxx:301。
         return bool(re.search(r":30[0-9]$", self.serial))
 
     @cached_property
     def adb_binary(self):
-        # Try adb in deploy.yaml
+        # 优先使用 deploy.yaml 指定的 ADB。
         from module.webui.setting import State
 
         file = State.deploy_config.AdbExecutable
@@ -183,12 +175,12 @@ class ConnectionAttr:
         if os.path.exists(file):
             return os.path.abspath(file)
 
-        # Try existing adb.exe
+        # 再尝试项目内已有的 adb.exe。
         for file in self.adb_binary_list:
             if os.path.exists(file):
                 return os.path.abspath(file)
 
-        # Try adb in python environment
+        # 再尝试 Python 环境里的 ADB。
         import sys
 
         file = os.path.join(sys.executable, "../Lib/site-packages/adbutils/binaries/adb.exe")
@@ -196,7 +188,7 @@ class ConnectionAttr:
         if os.path.exists(file):
             return file
 
-        # Use adb in system PATH
+        # 最后使用系统 PATH 里的 ADB。
         file = "adb"
         return file
 
@@ -205,7 +197,7 @@ class ConnectionAttr:
         host = "127.0.0.1"
         port = 5037
 
-        # Trying to get adb port from env
+        # 允许通过环境变量覆盖 ADB server 端口。
         env = os.environ.get("ANDROID_ADB_SERVER_PORT", None)
         if env is not None:
             try:
@@ -222,17 +214,12 @@ class ConnectionAttr:
 
     @cached_property
     def u2(self) -> u2.Device:
-        if self.is_over_http:
-            # Using uiautomator2_http
-            device = u2.connect(self.serial)
+        if self.serial.startswith("emulator-") or self.serial.startswith("127.0.0.1:"):
+            device = u2.connect_usb(self.serial)
         else:
-            # Normal uiautomator2
-            if self.serial.startswith("emulator-") or self.serial.startswith("127.0.0.1:"):
-                device = u2.connect_usb(self.serial)
-            else:
-                device = u2.connect(self.serial)
+            device = u2.connect(self.serial)
 
-        # Stay alive
+        # 长时间运行时保持 uiautomator2 会话可用。
         device.set_new_command_timeout(604800)
 
         logger.attr("u2.Device", f"Device(atx_agent_url={device._get_atx_agent_url()})")
