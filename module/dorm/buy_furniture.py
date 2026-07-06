@@ -218,8 +218,7 @@ class BuyFurniture(UI):
         while 1:
             if self._buy_furniture_run():
                 continue
-            else:
-                break
+            break
         # 退出到宿舍页。
         logger.info("Fallback to dorm_page")
         self.furniture_details_page_quit(skip_first_screenshot=True)

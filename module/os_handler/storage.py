@@ -119,9 +119,8 @@ class StorageHandler(GlobeOperation, ZoneManager):
             if len(items):
                 self._storage_item_use(items[0])
                 continue
-            else:
-                logger.info("All loggers in storage have been used")
-                break
+            logger.info("All loggers in storage have been used")
+            break
 
     def storage_sample_use_all(self):
         """

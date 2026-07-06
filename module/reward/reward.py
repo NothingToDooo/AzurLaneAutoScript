@@ -191,8 +191,7 @@ class Reward(UI):
                 self._reward_mission_claim_click()
                 state = self._reward_mission_claim_receive()
                 continue
-            else:
-                logger.warning("Empty mission state, mission collect finished")
+            logger.warning("Empty mission state, mission collect finished")
 
         return state
 

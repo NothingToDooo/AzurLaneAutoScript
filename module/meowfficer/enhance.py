@@ -432,7 +432,6 @@ class MeowfficerEnhance(MeowfficerBase):
                 self.config.MeowfficerTrain_EnhanceIndex += 1
                 logger.info(f"Increase MeowfficerTrain_EnhanceIndex to {self.config.MeowfficerTrain_EnhanceIndex}")
                 continue
-            else:
-                logger.warning("The 12th meowfficer reached LV.30, disable MeowfficerTrain")
-                self.config.MeowfficerTrain_Enable = False
-                break
+            logger.warning("The 12th meowfficer reached LV.30, disable MeowfficerTrain")
+            self.config.MeowfficerTrain_Enable = False
+            break

@@ -43,10 +43,9 @@ class ResearchQueue(ResearchUI):
                 if self._research_queue_add_available():
                     self.device.click(research_assets.RESEARCH_QUEUE_ADD)
                     continue
-                else:
-                    logger.info("Project requirements not satisfied, cancel it")
-                    self.research_detail_cancel()
-                    return False
+                logger.info("Project requirements not satisfied, cancel it")
+                self.research_detail_cancel()
+                return False
 
             if self.handle_popup_confirm("RESEARCH_QUEUE"):
                 self.interval_reset(research_assets.RESEARCH_QUEUE_ADD)

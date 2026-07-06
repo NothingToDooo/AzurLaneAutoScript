@@ -332,12 +332,11 @@ class Daily(Combat, DailyEquipment):
                 self.daily_check()
                 self.next()
                 continue
-            else:
-                self.daily_execute(remain=remain, stage=stage, fleet=fleet)
-                self.daily_check()
-                # 打完一次之后每日任务的顺序会乱掉，退出再进入来重置顺序。
-                self.ui_goto(page_campaign_menu)
-                break
+            self.daily_execute(remain=remain, stage=stage, fleet=fleet)
+            self.daily_check()
+            # 打完一次之后每日任务的顺序会乱掉，退出再进入来重置顺序。
+            self.ui_goto(page_campaign_menu)
+            break
 
     def daily_run(self):
         self.daily_checked = [0]

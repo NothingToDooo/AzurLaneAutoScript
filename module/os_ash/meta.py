@@ -116,9 +116,8 @@ class OpsiAshBeacon(Meta):
             if state == MetaState.INIT:
                 if self._begin_meta():
                     continue
-                else:
-                    # Normal finish
-                    break
+                # 正常结束。
+                break
             if state == MetaState.ATTACKING:
                 if not self._pre_attack():
                     continue

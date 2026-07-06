@@ -151,10 +151,9 @@ class Exercise(ExerciseCombat):
                     self._new_opponent()
                     self._opponent_fleet_check_all()
                     continue
-                else:
-                    logger.info("Cannot beat calculated easiest opponent, MAX EXP then")
-                    method = "max_exp"
-                    threshold = 0
+                logger.info("Cannot beat calculated easiest opponent, MAX EXP then")
+                method = "max_exp"
+                threshold = 0
 
     def _get_opponent_change_count(self):
         """

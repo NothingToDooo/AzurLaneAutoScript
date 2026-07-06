@@ -273,8 +273,7 @@ class ShopBase(UI):
             if known == 0 or known != record:
                 record = known
                 continue
-            else:
-                record = known
+            record = known
 
             # End
             if self.shop_has_loaded(items):

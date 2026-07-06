@@ -413,5 +413,4 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
                     self.config.task_stop()
 
                 continue
-            else:
-                break
+            break

@@ -42,8 +42,7 @@ class EventStory(CampaignUI, Combat, LoginHandler):
                 self.campaign_ensure_mode_20241219("combat")
                 self.campaign_ensure_mode_20241219("story")
                 continue
-            else:
-                break
+            break
 
         return state
 

@@ -94,9 +94,8 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
                 self.device.sleep((1, 1.5))
                 timeout.reset()
                 continue
-            else:
-                logger.warning("SWITCH_OVER not found")
-                continue
+            logger.warning("SWITCH_OVER not found")
+            continue
 
         return count > 0
 

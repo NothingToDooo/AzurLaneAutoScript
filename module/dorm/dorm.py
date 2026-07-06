@@ -557,11 +557,10 @@ class RewardDorm(UI):
                 break
             if total == 0:
                 continue
-            elif current not in [0, 1, 2, 3, 4, 5, 6]:
+            if current not in [0, 1, 2, 3, 4, 5, 6]:
                 logger.warning(f"Invalid dorm slot amount: {current}")
                 continue
-            else:
-                break
+            break
 
         return current
 

@@ -162,8 +162,7 @@ class CampaignSos(CampaignRun, CampaignBase):
                 super().run(name, folder=folder, mode=mode, total=total)
                 if self.run_count > 0:
                     continue
-                else:
-                    self.config.task_stop()
+                self.config.task_stop()
             else:
                 self.ui_click(
                     sos_assets.SIGNAL_SEARCH_CLOSE,

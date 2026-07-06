@@ -83,8 +83,7 @@ class ResearchSelector(ResearchUI):
                 self.device.sleep(1)
                 self.device.screenshot()
                 continue
-            else:
-                break
+            break
 
         self.projects = projects
 

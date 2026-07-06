@@ -386,8 +386,7 @@ class ActionPointHandler(UI, MapEventHandler):
                 if self.action_point_buy(preserve=self.config.OpsiGeneral_OilLimit):
                     self.action_point_safe_get()
                     continue
-                else:
-                    buy_checked = True
+                buy_checked = True
 
             # 重新检查总行动力是否小于消耗；如果不足，跳过使用箱子。
             if self._action_point_total < cost:
@@ -410,14 +409,12 @@ class ActionPointHandler(UI, MapEventHandler):
                     self.action_point_set_button(box[0])
                     self.action_point_use()
                     continue
-                else:
-                    logger.info(f"Reach the limit of action points, preserve={self.config.OS_ACTION_POINT_PRESERVE}")
-                    self.action_point_quit()
-                    raise ActionPointLimit
-            else:
-                logger.info("No more action point boxes")
+                logger.info(f"Reach the limit of action points, preserve={self.config.OS_ACTION_POINT_PRESERVE}")
                 self.action_point_quit()
                 raise ActionPointLimit
+            logger.info("No more action point boxes")
+            self.action_point_quit()
+            raise ActionPointLimit
 
         logger.warning("Failed to get action points after 12 trial")
         return False

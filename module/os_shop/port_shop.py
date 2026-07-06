@@ -114,10 +114,9 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
                 self.device.screenshot()
                 items = self.os_shop_get_items()
                 continue
-            else:
-                _items = [item for item in items if item.name == name and item.price == price]
-                if _items:
-                    return _items.pop()
+            _items = [item for item in items if item.name == name and item.price == price]
+            if _items:
+                return _items.pop()
 
         return None
 
@@ -145,9 +144,8 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
                         self.device.sleep((0.3, 0.5))
                         self.device.screenshot()
                         continue
-                    else:
-                        logger.info(f"Found {len(_items)} items in shop {i + 1} at pos {cur_pos:.2f}")
-                        break
+                    logger.info(f"Found {len(_items)} items in shop {i + 1} at pos {cur_pos:.2f}")
+                    break
                 # always add items, even if last item list contains unknown items
                 # so any known items can be scanned
                 items += _items

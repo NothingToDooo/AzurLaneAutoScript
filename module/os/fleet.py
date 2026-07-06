@@ -372,17 +372,16 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 confirm_timer.reset()
                 stuck_timer.reset()
                 continue
-            else:
-                if enemy_searching_appear:
-                    self.handle_enemy_flashing()
-                    self.device.sleep(0.3)
-                    logger.info("Enemy searching appeared.")
-                    enemy_searching_appear = False
-                    confirm_timer.reset()
-                    stuck_timer.reset()
-                    result.add("search")
-                if self.is_in_map():
-                    self.enemy_searching_color_initial()
+            if enemy_searching_appear:
+                self.handle_enemy_flashing()
+                self.device.sleep(0.3)
+                logger.info("Enemy searching appeared.")
+                enemy_searching_appear = False
+                confirm_timer.reset()
+                stuck_timer.reset()
+                result.add("search")
+            if self.is_in_map():
+                self.enemy_searching_color_initial()
 
             # Arrive
             # Check colors, because screen goes black when something is unlocking.
@@ -457,11 +456,10 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 logger.info("Arrive port on radar but port entrance not appear, confirming")
                 self.device.screenshot()
                 continue
-            elif not allow_port_arrive and radar_arrive:
+            if not allow_port_arrive and radar_arrive:
                 logger.info("Arrive port (radar_arrive)")
                 break
-            else:
-                confirm_timer.reset()
+            confirm_timer.reset()
 
             # Update local view
             self.update_os()
@@ -743,9 +741,8 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                     self.device.click(button)
                     click_timer.reset()
                     continue
-                else:
-                    logger.info("Fleet left boss, current fleet found")
-                    break
+                logger.info("Fleet left boss, current fleet found")
+                break
 
     def boss_clear(self, has_fleet_step=True, is_month=False):
         """

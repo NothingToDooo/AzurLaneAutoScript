@@ -599,16 +599,15 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
                 logger.info("Find common CV from bottom to top")
                 RETIRE_CONFIRM_SCROLL.set_bottom(main=self)
                 continue
-            else:
-                if RETIRE_CONFIRM_SCROLL.at_top(main=self):
-                    logger.info("Scroll bar reached top, stop")
-                    break
-                # Swipe prev page
-                if swipe_count >= 7:
-                    logger.info("Reached maximum swipes to find common CV")
-                    break
-                RETIRE_CONFIRM_SCROLL.prev_page(main=self)
-                swipe_count += 1
+            if RETIRE_CONFIRM_SCROLL.at_top(main=self):
+                logger.info("Scroll bar reached top, stop")
+                break
+            # 滑动到上一页。
+            if swipe_count >= 7:
+                logger.info("Reached maximum swipes to find common CV")
+                break
+            RETIRE_CONFIRM_SCROLL.prev_page(main=self)
+            swipe_count += 1
 
         return button
 

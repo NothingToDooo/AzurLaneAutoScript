@@ -62,9 +62,8 @@ class VirtualBoxEmulator:
                 backup = f"{adb}.bak{n}" if n else f"{adb}.bak"
                 if os.path.exists(backup):
                     continue
-                else:
-                    files.append(backup)
-                    break
+                files.append(backup)
+                break
         return files
 
     @cached_property

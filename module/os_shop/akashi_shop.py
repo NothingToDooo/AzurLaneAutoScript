@@ -69,11 +69,10 @@ class AkashiShop(OSStatus, OSShopUI, Selector, MapEventHandler):
                 self.device.screenshot()
                 items = self.os_shop_get_items_in_akashi()
                 continue
+            items = self.items_filter_in_akashi_shop(items)
+            if not len(items):
+                return None
             else:
-                items = self.items_filter_in_akashi_shop(items)
-                if not len(items):
-                    return None
-                else:
-                    return items.pop()
+                return items.pop()
 
         return None

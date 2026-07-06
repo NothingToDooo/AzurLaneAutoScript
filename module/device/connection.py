@@ -928,10 +928,8 @@ class Connection(ConnectionAttr):
                 if IS_WINDOWS:
                     brute_force_connect()
                     continue
-                else:
-                    break
-            else:
                 break
+            break
 
         # 自动检测设备。
         if self.config.Emulator_Serial == "auto":
@@ -990,9 +988,8 @@ class Connection(ConnectionAttr):
                     if not len(available):
                         logger.info("No available devices")
                     continue
-                else:
-                    # MuMu6
-                    break
+                # MuMu6
+                break
 
         # 如果 16384 被占用，MuMu12 会使用 16385，这里自动重定向。
         # 这是动态端口，不写回配置。

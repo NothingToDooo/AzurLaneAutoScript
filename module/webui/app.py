@@ -313,7 +313,7 @@ class AlasGUI(Frame):
             if display == "hide":
                 continue
             # 禁用项。
-            elif display == "disabled":
+            if display == "disabled":
                 output_kwargs["disabled"] = True
             # 输出类型。
             output_kwargs["widget_type"] = output_kwargs.pop("type")

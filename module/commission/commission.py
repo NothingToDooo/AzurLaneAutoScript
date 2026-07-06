@@ -105,8 +105,7 @@ class RewardCommission(UI, InfoHandler):
             if commissions.count >= 2 and commissions.select(valid=False).count == 1:
                 logger.warning("Found 1 invalid commission, retry commission detect")
                 continue
-            else:
-                return commissions
+            return commissions
 
         logger.info("trials of commission detect exhausted, stop")
         return commissions
@@ -454,10 +453,9 @@ class RewardCommission(UI, InfoHandler):
                 self._commission_swipe_to_top()
                 self.device.click_record_clear()
                 continue
-            else:
-                logger.warning(f"Commission not found: {comm}")
-                self.device.click_record_clear()
-                return False
+            logger.warning(f"Commission not found: {comm}")
+            self.device.click_record_clear()
+            return False
 
         logger.warning("Failed to select commission after 3 trial")
         self.device.click_record_clear()

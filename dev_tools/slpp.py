@@ -177,7 +177,7 @@ class SLPP:
                     o[idx] = self.object()
                     idx += 1
                     continue
-                elif self.ch == "}":
+                if self.ch == "}":
                     self.depth -= 1
                     self.next_chr()
                     if k is not None:
@@ -194,10 +194,9 @@ class SLPP:
                     if self.ch == ",":
                         self.next_chr()
                         continue
-                    else:
-                        k = self.value()
-                        if self.ch == "]":
-                            self.next_chr()
+                    k = self.value()
+                    if self.ch == "]":
+                        self.next_chr()
                     self.white()
                     ch = self.ch
                     if ch in ("=", ","):

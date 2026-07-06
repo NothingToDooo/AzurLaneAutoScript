@@ -392,8 +392,7 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
                     return pt
                 if pt in [70000, 70001]:
                     continue
-                else:
-                    return pt
+                return pt
         else:
             logger.info(f"Raid {self.config.Campaign_Event} does not support PT ocr, skip")
             return 0

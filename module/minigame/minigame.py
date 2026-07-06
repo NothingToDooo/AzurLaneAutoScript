@@ -228,10 +228,9 @@ class Minigame(UI):
             if minigame_instance is not None and minigame_instance.minigame_run():
                 play_count += 1
                 continue
-            elif minigame_instance is None:
+            if minigame_instance is None:
                 logger.error(f"unknown game name {specific_game_name}")
                 break
-            else:
-                break
+            break
 
         self.config.task_delay(server_update=True)

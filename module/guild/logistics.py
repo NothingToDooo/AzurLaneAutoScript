@@ -228,8 +228,7 @@ class GuildLogistics(GuildBase):
                         click_interval.reset()
                     confirm_timer.reset()
                     continue
-                else:
-                    supply_checked = True
+                supply_checked = True
                 # Mission
                 if not mission_checked and self._guild_logistics_mission_available():
                     if click_interval.reached():
@@ -237,8 +236,7 @@ class GuildLogistics(GuildBase):
                         click_interval.reset()
                     confirm_timer.reset()
                     continue
-                else:
-                    mission_checked = True
+                mission_checked = True
                 # Exchange
                 if not exchange_checked and exchange_interval.reached():
                     if self._guild_exchange():
@@ -246,8 +244,7 @@ class GuildLogistics(GuildBase):
                         exchange_interval.reset()
                         exchange_count += 1
                         continue
-                    else:
-                        exchange_checked = True
+                    exchange_checked = True
                 # End
                 if not self.info_bar_count() and confirm_timer.reached():
                     break

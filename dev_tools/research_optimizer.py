@@ -927,18 +927,15 @@ def simulate(project_select_index, reset_index, target, active=1.0, interval=0.0
                 if index == 1000:
                     has_reset = False
                     continue
-                else:
-                    break
-            else:
-                if index_no_reset == 1000:
-                    # 刷新次数用完，且需要刷新时，等到明天，使用明天的刷新次数
-                    day_cost = int(day_cost) + 1
-                    rewards = events_add(rewards, condition)
-                    has_reset = False
-                    continue
-                else:
-                    index = index_no_reset
-                    break
+                break
+            if index_no_reset == 1000:
+                # 刷新次数用完，且需要刷新时，等到明天，使用明天的刷新次数
+                day_cost = int(day_cost) + 1
+                rewards = events_add(rewards, condition)
+                has_reset = False
+                continue
+            index = index_no_reset
+            break
 
         """
         收获科研项目，计算收益和消耗时间

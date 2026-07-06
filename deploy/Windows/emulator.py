@@ -102,8 +102,7 @@ class EmulatorManager(AlasManager):
             if os.path.exists(backup):
                 if new_backup:
                     continue
-                else:
-                    return backup
+                return backup
             else:
                 if new_backup:
                     return backup

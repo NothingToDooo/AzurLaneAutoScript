@@ -43,5 +43,4 @@ class OpsiObscure(OSMap):
             if self.config.OpsiObscure_ForceRun:
                 self.config.check_task_switch()
                 continue
-            else:
-                break
+            break

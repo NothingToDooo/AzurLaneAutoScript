@@ -99,8 +99,7 @@ class CampaignBase(CampaignBase_):
                 else:
                     WAR_ARCHIVES_SCROLL.next_page(main=self, page=0.66)
                 continue
-            else:
-                break
+            break
 
         logger.warning("Failed to find archives entrance")
         return None

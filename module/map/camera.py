@@ -320,12 +320,11 @@ class Camera(MapOperation):
                     # No error
                     error_confirm.reset()
                     continue
-                else:
-                    if success:
-                        break
-                    # MapDetectionError 已在 _update_view() 内处理，这里重新更新。
-                    error_confirm.reset()
-                    continue
+                if success:
+                    break
+                # MapDetectionError 已在 _update_view() 内处理，这里重新更新。
+                error_confirm.reset()
+                continue
             except MapDetectionError:
                 if allow_error:
                     break

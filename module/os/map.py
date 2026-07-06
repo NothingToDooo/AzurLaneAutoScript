@@ -348,9 +348,8 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 if has_emp_debuff():
                     logger.info(f"Fleet {fleet} is under EMP debuff")
                     continue
-                else:
-                    logger.info(f"Fleet {fleet} is not under EMP debuff")
-                    break
+                logger.info(f"Fleet {fleet} is not under EMP debuff")
+                break
 
             logger.info("Solve EMP debuff by going somewhere else")
             self.port_goto(allow_port_arrive=False)
@@ -638,15 +637,12 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 if self.handle_ash_beacon_attack() or self.ash_popup_canceled:
                     strategic = False
                     continue
-                else:
-                    break
-            else:
-                if self.info_bar_count() >= 2:
-                    break
-                if self.ash_popup_canceled:
-                    continue
-                else:
-                    break
+                break
+            if self.info_bar_count() >= 2:
+                break
+            if self.ash_popup_canceled:
+                continue
+            break
 
         return finished_combat
 

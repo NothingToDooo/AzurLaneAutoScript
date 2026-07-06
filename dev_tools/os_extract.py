@@ -89,11 +89,10 @@ class OSChapter:
         for chapter in data.values():
             if "serial_number" not in chapter:
                 continue
-            else:
-                index = int(chapter["serial_number"])
-                if index < 10:
-                    index -= 1
-                out[index] = {}
+            index = int(chapter["serial_number"])
+            if index < 10:
+                index -= 1
+            out[index] = {}
 
             area = chapter["area_pos"]
             out[index]["area_pos"] = (area[0], area[1])

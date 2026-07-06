@@ -232,9 +232,8 @@ class StorageHandler(StorageUI):
             if sim > 0.9:
                 used += self._storage_use_one_box(box_button, amount)
                 continue
-            else:
-                logger.info("No boxes found")
-                continue
+            logger.info("No boxes found")
+            continue
 
         return used
 

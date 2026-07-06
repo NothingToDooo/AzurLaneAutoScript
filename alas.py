@@ -664,13 +664,12 @@ class AzurLaneAutoScript:
             if success:
                 del_cached_property(self, "config")
                 continue
-            elif self.config.Error_HandleError:
+            if self.config.Error_HandleError:
                 # self.config.task_delay(success=False)
                 del_cached_property(self, "config")
                 self.checker.check_now()
                 continue
-            else:
-                break
+            break
 
 
 if __name__ == "__main__":

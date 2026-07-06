@@ -289,8 +289,7 @@ class PlatformWindows(PlatformBase, EmulatorManager):
                 # Failed to start, stop and start again
                 if self._emulator_function_wrapper(self._emulator_stop):
                     continue
-                else:
-                    return False
+                return False
 
         logger.error("Failed to start emulator 3 times, stopped")
         return False
@@ -306,8 +305,7 @@ class PlatformWindows(PlatformBase, EmulatorManager):
                 # Failed to stop, start and stop again
                 if self._emulator_function_wrapper(self._emulator_start):
                     continue
-                else:
-                    return False
+                return False
 
         logger.error("Failed to stop emulator 3 times, stopped")
         return False

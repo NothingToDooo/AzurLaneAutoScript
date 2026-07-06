@@ -77,8 +77,7 @@ class OSStatus(UI):
                 # OCR may get 0 or 1 when amount is not immediately loaded
                 logger.info("Yellow coins less than 100, assuming it is an ocr error")
                 continue
-            else:
-                break
+            break
 
         return yellow_coins
 
