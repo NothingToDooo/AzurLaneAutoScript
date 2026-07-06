@@ -1,7 +1,7 @@
 import module.config.server as server
 from module.combat.assets import GET_ITEMS_1
 from module.logger import logger
-from module.minigame.assets import *
+from module.minigame import assets as minigame_assets
 from module.ocr.ocr import Digit
 from module.ui.assets import ACADEMY_GOTO_GAME_ROOM, GAME_ROOM_CHECK
 from module.ui.page import page_academy, page_game_room
@@ -9,10 +9,10 @@ from module.ui.scroll import Scroll
 from module.ui.ui import UI
 
 if server.server != "jp":
-    OCR_COIN = Digit(COIN_HOLDER, name="OCR_COIN", letter=(255, 235, 115), threshold=128)
+    OCR_COIN = Digit(minigame_assets.COIN_HOLDER, name="OCR_COIN", letter=(255, 235, 115), threshold=128)
 else:
-    OCR_COIN = Digit(COIN_HOLDER, name="OCR_COIN", letter=(211, 196, 95), threshold=128)
-MINIGAME_SCROLL = Scroll(MINIGAME_SCROLL_AREA, color=(247, 247, 247), name="MINIGAME_SCROLL")
+    OCR_COIN = Digit(minigame_assets.COIN_HOLDER, name="OCR_COIN", letter=(211, 196, 95), threshold=128)
+MINIGAME_SCROLL = Scroll(minigame_assets.MINIGAME_SCROLL_AREA, color=(247, 247, 247), name="MINIGAME_SCROLL")
 
 
 class MinigameRun(UI):
@@ -33,17 +33,17 @@ class MinigameRun(UI):
                 skip_first_screenshot = False
             else:
                 self.device.screenshot()
-            # End
-            # both minigame main and minigame list has GOTO_CHOOSE_GAME
-            if self.appear(GAME_ROOM_CHECK, offset=(5, 5)) and not self.appear(GOTO_CHOOSE_GAME, offset=(20, 20)):
+            # 小游戏主页和小游戏列表都有 GOTO_CHOOSE_GAME。
+            if self.appear(GAME_ROOM_CHECK, offset=(5, 5)) and not self.appear(
+                minigame_assets.GOTO_CHOOSE_GAME, offset=(20, 20)
+            ):
                 if MINIGAME_SCROLL.appear(main=self):
                     break
-            # unable to get more ticket popup
+            # 无法获得更多游戏券的弹窗。
             if self.deal_popup():
                 continue
-            if self.appear_then_click(GOTO_CHOOSE_GAME, offset=(5, 5), interval=3):
-                # note: GOTO_CHOOSE_GAME is some where safe to click
-                # that won't enter any minigame on the minigame list page
+            if self.appear_then_click(minigame_assets.GOTO_CHOOSE_GAME, offset=(5, 5), interval=3):
+                # GOTO_CHOOSE_GAME 位于安全区域，在列表页点击不会进入具体小游戏。
                 continue
 
         logger.info("Choose minigame")
@@ -59,19 +59,20 @@ class MinigameRun(UI):
 
     def deal_popup(self):
         """
-        deal possible popups
-        need re-screenshot if return true
+        处理可能出现的弹窗。
+
+        返回 True 时需要重新截图。
         """
-        # specific
+        # 具体小游戏自己的弹窗。
         if self.deal_specific_popup():
             return True
         if self.handle_popup_confirm("TICKETS_FULL"):
-            self.interval_reset(COIN_POPUP, interval=3)
+            self.interval_reset(minigame_assets.COIN_POPUP, interval=3)
             return True
-        # coins more than 31, deal popup
-        if self.appear_then_click(COIN_POPUP, offset=(5, 5), interval=3):
+        # 代币超过 31 时会出现弹窗。
+        if self.appear_then_click(minigame_assets.COIN_POPUP, offset=(5, 5), interval=3):
             return True
-        # coins/tickets received
+        # 领取代币或游戏券。
         if self.appear_then_click(GET_ITEMS_1, offset=(5, 5), interval=3):
             return True
         return False
@@ -132,12 +133,14 @@ class Minigame(UI):
                 self.device.screenshot()
             if self.ui_additional():
                 continue
-            if self.appear_then_click(COIN_POPUP, offset=(5, 5), interval=2):
+            if self.appear_then_click(minigame_assets.COIN_POPUP, offset=(5, 5), interval=2):
                 continue
-            if self.appear(GAME_ROOM_CHECK, offset=(5, 5)) and not self.appear(GOTO_CHOOSE_GAME, offset=(5, 5)):
-                self.appear_then_click(BACK, offset=(5, 5), interval=2)
+            if self.appear(GAME_ROOM_CHECK, offset=(5, 5)) and not self.appear(
+                minigame_assets.GOTO_CHOOSE_GAME, offset=(5, 5)
+            ):
+                self.appear_then_click(minigame_assets.BACK, offset=(5, 5), interval=2)
                 continue
-            if self.appear(GOTO_CHOOSE_GAME, offset=(5, 5)):
+            if self.appear(minigame_assets.GOTO_CHOOSE_GAME, offset=(5, 5)):
                 break
 
     def collect_coin(self, skip_first_screenshot=True):
@@ -154,18 +157,20 @@ class Minigame(UI):
                 self.device.screenshot()
             if self.ui_additional():
                 continue
-            if self.appear_then_click(COIN_POPUP, offset=(5, 5), interval=3):
+            if self.appear_then_click(minigame_assets.COIN_POPUP, offset=(5, 5), interval=3):
                 continue
-            # game room and choose game have same header, go to game room first
-            if self.appear(GAME_ROOM_CHECK, offset=(5, 5)) and not self.appear(GOTO_CHOOSE_GAME, offset=(5, 5)):
-                self.appear_then_click(BACK, offset=(5, 5), interval=3)
+            # 游戏室和选择游戏页共用同一个页头，先回到游戏室主页。
+            if self.appear(GAME_ROOM_CHECK, offset=(5, 5)) and not self.appear(
+                minigame_assets.GOTO_CHOOSE_GAME, offset=(5, 5)
+            ):
+                self.appear_then_click(minigame_assets.BACK, offset=(5, 5), interval=3)
                 continue
-            # collect coins
-            if not coin_collected and self.appear(COIN, offset=(5, 5)):
-                self.appear_then_click(COIN, offset=(5, 5), interval=3)
+            # 收取代币。
+            if not coin_collected and self.appear(minigame_assets.COIN, offset=(5, 5)):
+                self.appear_then_click(minigame_assets.COIN, offset=(5, 5), interval=3)
                 coin_collected = True
                 continue
-            if self.appear(GOTO_CHOOSE_GAME, offset=(5, 5)):
+            if self.appear(minigame_assets.GOTO_CHOOSE_GAME, offset=(5, 5)):
                 break
         return coin_collected
 
@@ -175,12 +180,11 @@ class Minigame(UI):
             in: Any page
             out: page_game_room
         """
-        # TEMP: 2026.02.18 separate self.ui_ensure(page_game_room) into 2 steps
-        # EN has different page_academy detection, to use ui_ensure(page_game_room),
-        # ui_goto must use `if self.ui_page_appear(page)` instead of `if self.appear(page.check_button)`
-        # But that would cause page_main/page_main_white clicking a static switch button
+        # 临时处理：2026.02.18 将 self.ui_ensure(page_game_room) 拆成两步。
+        # EN 服的学院页识别不同；若直接 ui_ensure(page_game_room)，ui_goto 必须改用 ui_page_appear。
+        # 这会导致 page_main/page_main_white 点击静态切换按钮，所以这里先保持局部处理。
         self.ui_ensure(page_academy)
-        # page_academy -> page_game_room
+        # 学院页 -> 游戏室。
         for _ in self.loop():
             if self.ui_page_appear(page_game_room):
                 break
@@ -192,12 +196,12 @@ class Minigame(UI):
             if self.handle_popup_confirm("MINIGAME_ENTER"):
                 continue
 
-        # game room and choose game have same header, go to game room first
+        # 游戏室和选择游戏页共用同一个页头，先回到游戏室主页。
         self.go_to_main_page()
         coin_collected = False
         play_count = 0
 
-        # choose game
+        # 选择具体小游戏。
         specific_game_name = "new_year_challenge"
         minigame_instance = None
         if specific_game_name == "new_year_challenge":
@@ -206,23 +210,23 @@ class Minigame(UI):
             minigame_instance = NewYearChallenge(config=self.config, device=self.device)
 
         while 1:
-            # play count limit
+            # 游玩次数上限。
             if play_count >= 10:
                 break
-            # ocr to get coin count and ticket count
+            # OCR 获取代币数量。
             coin_count = self.get_coin_amount()
             logger.info(f"coin count : {coin_count}")
-            # collect coins
+            # 收取代币。
             if coin_count <= 30 and not coin_collected:
                 coin_collected = True
                 if self.collect_coin():
                     continue
-            # no coin left
+            # 没有代币时结束。
             if coin_count == 0:
                 logger.info(f"coin count : {coin_count}, finished")
                 break
             logger.info("coin count > 0, spend")
-            # specific game logic
+            # 执行具体小游戏逻辑。
             if minigame_instance is not None and minigame_instance.minigame_run():
                 play_count += 1
                 continue
