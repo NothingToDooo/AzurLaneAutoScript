@@ -10,7 +10,7 @@ from module.ocr.ocr import Duration, Ocr
 from module.research.assets import *
 from module.research.project_data import LIST_RESEARCH_PROJECT
 from module.research.series import get_detail_series, get_research_series_3
-from module.statistics.utils import *
+from module.statistics.utils import load_folder
 
 RESEARCH_SERIES = (SERIES_1, SERIES_2, SERIES_3, SERIES_4, SERIES_5)
 RESEARCH_STATUS = [STATUS_1, STATUS_2, STATUS_3, STATUS_4, STATUS_5]

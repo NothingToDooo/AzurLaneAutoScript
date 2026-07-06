@@ -1,3 +1,4 @@
+import os
 import shutil
 
 import numpy as np
@@ -5,12 +6,13 @@ from tqdm import tqdm
 
 import module.config.server as server
 
-server.server = "cn"  # Edit your server here.
+server.server = "cn"  # 在这里修改服务器。
 
+from module.base.utils import load_image
 from module.logger import logger
 from module.statistics.battle_status import BattleStatusStatistics
 from module.statistics.get_items import GetItemsStatistics
-from module.statistics.utils import *
+from module.statistics.utils import ImageError, load_folder
 
 STATUS_ITEMS_INTERVAL = 10
 

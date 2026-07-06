@@ -1,4 +1,5 @@
 import csv
+import os
 import shutil
 
 from tqdm import tqdm
@@ -11,7 +12,7 @@ from module.ocr.ocr import Ocr
 from module.statistics.battle_status import BattleStatusStatistics
 from module.statistics.campaign_bonus import CampaignBonusStatistics
 from module.statistics.get_items import GetItemsStatistics
-from module.statistics.utils import *
+from module.statistics.utils import ImageError, load_folder, unpack
 
 
 class DropStatistics:

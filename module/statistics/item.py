@@ -1,10 +1,13 @@
+import os
+
+import cv2
 import numpy as np
 
 import module.config.server as server
-from module.base.utils import *
+from module.base.utils import area_offset, color_similar, crop, extract_white_letters, load_image, rgb2gray, save_image
 from module.logger import logger
 from module.ocr.ocr import Digit, DigitYuv
-from module.statistics.utils import *
+from module.statistics.utils import load_folder
 
 
 class AmountOcr(Digit):
