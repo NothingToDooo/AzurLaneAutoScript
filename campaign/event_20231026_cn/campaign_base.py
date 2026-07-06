@@ -11,7 +11,7 @@ class CampaignBase(CampaignBase_):
         """
     ]
 
-    def campaign_set_chapter_event(self, chapter, mode='normal'):
+    def campaign_set_chapter_event(self, chapter, mode="normal"):
         self.ui_goto_event()
         self.campaign_ensure_chapter(chapter)
         return True
@@ -24,13 +24,13 @@ class CampaignBase(CampaignBase_):
         Returns:
             int
         """
-        if name == 't1':
+        if name == "t1":
             return 1
-        if name == 't2':
+        if name == "t2":
             return 2
-        if name == 'ex_sp':
+        if name == "ex_sp":
             return 3
-        if name == 'ex_ex':
+        if name == "ex_ex":
             return 4
 
         return super(CampaignBase, CampaignBase)._campaign_get_chapter_index(name)
@@ -44,13 +44,13 @@ class CampaignBase(CampaignBase_):
         Returns:
             tuple[str]: Campaign_name and stage index in lowercase, Such as ['7', '2'], ['d', '3'], ['sp', '3'].
         """
-        if name in ['t1', 't2', 't3']:
-            return 't1', name[-1]
-        if name in ['t4', 't5', 't6']:
-            return 't2', name[-1]
-        if 'esp' in name:
-            return ['ex_sp', '1']
-        if 'ex' in name:
-            return ['ex_ex', '1']
+        if name in ["t1", "t2", "t3"]:
+            return "t1", name[-1]
+        if name in ["t4", "t5", "t6"]:
+            return "t2", name[-1]
+        if "esp" in name:
+            return ["ex_sp", "1"]
+        if "ex" in name:
+            return ["ex_ex", "1"]
 
         return super(CampaignBase, CampaignBase)._campaign_separate_name(name)

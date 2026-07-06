@@ -2,7 +2,7 @@ import copy
 import json
 import random
 import string
-from typing import Any, Callable, Dict, Generator, List, Optional, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional, Union
 
 from pywebio.exceptions import SessionException
 from pywebio.io_ctrl import Output
@@ -10,7 +10,7 @@ from pywebio.output import *
 from pywebio.session import eval_js, local, run_js
 from rich.console import ConsoleRenderable
 
-from module.logger import HTMLConsole, Highlighter, WEB_THEME
+from module.logger import WEB_THEME, Highlighter, HTMLConsole
 from module.webui.lang import t
 from module.webui.pin import put_checkbox, put_input, put_select, put_textarea
 from module.webui.process_manager import ProcessManager
@@ -37,8 +37,7 @@ class ScrollableCode:
 
         self.id = "".join(random.choice(string.ascii_letters) for _ in range(10))
         self.html = (
-                """<pre id="%s" class="container-log"><code style="white-space:break-spaces;"></code></pre>"""
-                % self.id
+            """<pre id="%s" class="container-log"><code style="white-space:break-spaces;"></code></pre>""" % self.id
         )
 
     def output(self):
@@ -48,10 +47,8 @@ class ScrollableCode:
     def append(self, text: str) -> None:
         if text:
             run_js(
-                """$("#{dom_id}>code").append(text);
-            """.format(
-                    dom_id=self.id
-                ),
+                f"""$("#{self.id}>code").append(text);
+            """,
                 text=str(text),
             )
             if self.keep_bottom:
@@ -59,14 +56,12 @@ class ScrollableCode:
 
     def scroll(self) -> None:
         run_js(
-            r"""$("\#{dom_id}").animate({{scrollTop: $("\#{dom_id}").prop("scrollHeight")}}, 0);
-        """.format(
-                dom_id=self.id
-            )
+            rf"""$("\#{self.id}").animate({{scrollTop: $("\#{self.id}").prop("scrollHeight")}}, 0);
+        """
         )
 
     def reset(self) -> None:
-        run_js(r"""$("\#{dom_id}>code").empty();""".format(dom_id=self.id))
+        run_js(rf"""$("\#{self.id}>code").empty();""")
 
     def set_scroll(self, b: bool) -> None:
         # use for lambda callback function
@@ -114,10 +109,8 @@ class RichLog:
     def extend(self, text):
         if text:
             run_js(
-                """$("#pywebio-scope-{scope}>div").append(text);
-            """.format(
-                    scope=self.scope
-                ),
+                f"""$("#pywebio-scope-{self.scope}>div").append(text);
+            """,
                 text=str(text),
             )
             if self.keep_bottom:
@@ -128,10 +121,8 @@ class RichLog:
 
     def scroll(self) -> None:
         run_js(
-            """$("#pywebio-scope-{scope}").scrollTop($("#pywebio-scope-{scope}").prop("scrollHeight"));
-        """.format(
-                scope=self.scope
-            )
+            f"""$("#pywebio-scope-{self.scope}").scrollTop($("#pywebio-scope-{self.scope}").prop("scrollHeight"));
+        """
         )
 
     def set_scroll(self, b: bool) -> None:
@@ -139,7 +130,7 @@ class RichLog:
         self.keep_bottom = b
 
     def get_width(self):
-        js = """
+        js = f"""
         let canvas = document.createElement('canvas');
         canvas.style.position = "absolute";
         let ctx = canvas.getContext('2d');
@@ -149,11 +140,9 @@ class RichLog:
         let text = ctx.measureText('0');
         ctx.fillText('0', 50, 50);
 
-        ($('#pywebio-scope-{scope}').width()-16)/\
-        $('#pywebio-scope-{scope}').css('font-size').slice(0, -2)/text.width*16;\
-        """.format(
-            scope=self.scope
-        )
+        ($('#pywebio-scope-{self.scope}').width()-16)/\
+        $('#pywebio-scope-{self.scope}').css('font-size').slice(0, -2)/text.width*16;\
+        """
         width = eval_js(js)
         return 80 if width is None else 128 if width > 128 else int(width)
 
@@ -211,15 +200,15 @@ class RichLog:
 
 class BinarySwitchButton(Switch):
     def __init__(
-            self,
-            get_state,
-            label_on,
-            label_off,
-            onclick_on,
-            onclick_off,
-            scope,
-            color_on="success",
-            color_off="secondary",
+        self,
+        get_state,
+        label_on,
+        label_off,
+        onclick_on,
+        onclick_off,
+        scope,
+        color_on="success",
+        color_off="secondary",
     ):
         """
         Args:
@@ -268,16 +257,14 @@ class BinarySwitchButton(Switch):
 
 
 def put_icon_buttons(
-        icon_html: str,
-        buttons: List[Dict[str, str]],
-        onclick: Union[List[Callable[[], None]], Callable[[], None]],
+    icon_html: str,
+    buttons: List[Dict[str, str]],
+    onclick: Union[List[Callable[[], None]], Callable[[], None]],
 ) -> Output:
     value = buttons[0]["value"]
     return put_column(
         [
-            output(put_html(icon_html)).style(
-                "z-index: 1; margin-left: 8px;text-align: center"
-            ),
+            output(put_html(icon_html)).style("z-index: 1; margin-left: 8px;text-align: center"),
             put_buttons(buttons, onclick).style(f"z-index: 2; --aside-{value}--;"),
         ],
         size="0",
@@ -327,7 +314,7 @@ def put_arg_input(kwargs: T_Output_Kwargs) -> Output:
 
 def product_stored_row(kwargs: T_Output_Kwargs, key, value):
     kwargs = copy.copy(kwargs)
-    kwargs["name"] += f'_{key}'
+    kwargs["name"] += f"_{key}"
     kwargs["value"] = value
     return put_input(**kwargs).style("--input--")
 
@@ -349,8 +336,8 @@ def put_arg_stored(kwargs: T_Output_Kwargs) -> Output:
             put_scope(
                 f"arg_stored-stored-value-{name}",
                 rows,
-            )
-        ]
+            ),
+        ],
     )
 
 
@@ -363,17 +350,22 @@ def put_arg_select(kwargs: T_Output_Kwargs) -> Output:
     _: str = kwargs.pop("invalid_feedback", None)
 
     if disabled:
-        option = [{
-            "label": next((opt_label for opt, opt_label in zip(options, options_label) if opt == value), value),
-            "value": value,
-            "selected": True,
-        }]
+        option = [
+            {
+                "label": next((opt_label for opt, opt_label in zip(options, options_label) if opt == value), value),
+                "value": value,
+                "selected": True,
+            }
+        ]
     else:
-        option = [{
-            "label": opt_label,
-            "value": opt,
-            "select": opt == value,
-        } for opt, opt_label in zip(options, options_label)]
+        option = [
+            {
+                "label": opt_label,
+                "value": opt,
+                "select": opt == value,
+            }
+            for opt, opt_label in zip(options, options_label)
+        ]
     kwargs["options"] = option
 
     return put_scope(
@@ -394,11 +386,13 @@ def put_arg_state(kwargs: T_Output_Kwargs) -> Output:
     bold: bool = value in kwargs.pop("option_bold", [])
     light: bool = value in kwargs.pop("option_light", [])
 
-    option = [{
-        "label": next((opt_label for opt, opt_label in zip(options, options_label) if opt == value), value),
-        "value": value,
-        "selected": True,
-    }]
+    option = [
+        {
+            "label": next((opt_label for opt, opt_label in zip(options, options_label) if opt == value), value),
+            "value": value,
+            "selected": True,
+        }
+    ]
     if bold:
         kwargs["class"] = "form-control state state-bold"
     elif light:
@@ -419,9 +413,7 @@ def put_arg_state(kwargs: T_Output_Kwargs) -> Output:
 def put_arg_textarea(kwargs: T_Output_Kwargs) -> Output:
     name: str = kwargs["name"]
     mode: str = kwargs.pop("mode", None)
-    kwargs.setdefault(
-        "code", {"lineWrapping": True, "lineNumbers": False, "mode": mode}
-    )
+    kwargs.setdefault("code", {"lineWrapping": True, "lineNumbers": False, "mode": mode})
 
     return put_scope(
         f"arg_contianer-textarea-{name}",
@@ -464,18 +456,12 @@ def put_arg_storage(kwargs: T_Output_Kwargs) -> Optional[Output]:
     if kwargs["value"] == {}:
         return None
 
-    kwargs["value"] = json.dumps(
-        kwargs["value"], indent=2, ensure_ascii=False, sort_keys=False, default=str
-    )
-    kwargs.setdefault(
-        "code", {"lineWrapping": True, "lineNumbers": False, "mode": "json"}
-    )
+    kwargs["value"] = json.dumps(kwargs["value"], indent=2, ensure_ascii=False, sort_keys=False, default=str)
+    kwargs.setdefault("code", {"lineWrapping": True, "lineNumbers": False, "mode": "json"})
 
     def clear_callback():
-        alasgui: "AlasGUI" = local.gui
-        alasgui.modified_config_queue.put(
-            {"name": ".".join(name.split("_")), "value": {}}
-        )
+        alasgui: AlasGUI = local.gui
+        alasgui.modified_config_queue.put({"name": ".".join(name.split("_")), "value": {}})
         # https://github.com/pywebio/PyWebIO/issues/459
         # pin[name] = "{}"
 
@@ -483,9 +469,9 @@ def put_arg_storage(kwargs: T_Output_Kwargs) -> Optional[Output]:
         f"arg_container-storage-{name}",
         [
             put_textarea(**kwargs),
-            put_html(
-                f'<button class="btn btn-outline-warning btn-block">{t("Gui.Text.Clear")}</button>'
-            ).onclick(clear_callback),
+            put_html(f'<button class="btn btn-outline-warning btn-block">{t("Gui.Text.Clear")}</button>').onclick(
+                clear_callback
+            ),
         ],
     )
 
@@ -515,11 +501,11 @@ def get_loading_style(shape: str, fill: bool) -> str:
 
 
 def put_loading_text(
-        text: str,
-        shape: str = "border",
-        color: str = "dark",
-        fill: bool = False,
-        size: str = "auto 2px 1fr",
+    text: str,
+    shape: str = "border",
+    color: str = "dark",
+    fill: bool = False,
+    size: str = "auto 2px 1fr",
 ):
     loading_style = get_loading_style(shape=shape, fill=fill)
     return put_row(

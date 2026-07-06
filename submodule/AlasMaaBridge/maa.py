@@ -1,26 +1,27 @@
-import os
-import json
 import ctypes
+import json
+import os
+
 from cached_property import cached_property
 
 # In order for MAA submodule to exexute,
 # it is necessary to load runtime before module PIL
-if os.name == 'nt':
+if os.name == "nt":
     # This DLL is the dependency for next DLL
     # Try loading to avoid mix different versions of runtime
     try:
-        ctypes.WinDLL(os.path.join(os.environ['SystemRoot'], 'System32/vcruntime140_1.dll'))
+        ctypes.WinDLL(os.path.join(os.environ["SystemRoot"], "System32/vcruntime140_1.dll"))
     except Exception as e:
         print(e)
 
     # This DLL must be loaded due to conflict issues
-    ctypes.WinDLL(os.path.join(os.environ['SystemRoot'], 'System32/msvcp140.dll'))
+    ctypes.WinDLL(os.path.join(os.environ["SystemRoot"], "System32/msvcp140.dll"))
 
     # These DLLS are other DLLS that MAA depends on
     # Try loading to avoid mix different versions of runtime
     try:
-        ctypes.WinDLL(os.path.join(os.environ['SystemRoot'], 'System32/msvcp140_1.dll'))
-        ctypes.WinDLL(os.path.join(os.environ['SystemRoot'], 'System32/concrt140.dll'))
+        ctypes.WinDLL(os.path.join(os.environ["SystemRoot"], "System32/msvcp140_1.dll"))
+        ctypes.WinDLL(os.path.join(os.environ["SystemRoot"], "System32/concrt140.dll"))
     except Exception as e:
         print(e)
 
@@ -52,7 +53,7 @@ class ArknightsAutoScript(AzurLaneAutoScript):
             config = ArknightsConfig(config_name=self.config_name)
             return config
         except RequestHumanTakeover:
-            logger.critical('Request human takeover')
+            logger.critical("Request human takeover")
             exit(1)
         except Exception as e:
             logger.exception(e)
@@ -64,45 +65,47 @@ class ArknightsAutoScript(AzurLaneAutoScript):
 
     @cached_property
     def asst(self):
-        if self.config.task.command != 'Maa':
-            self.config.task_call('MaaStartup', True)
-            if self.config.task.command != 'MaaStartup':
+        if self.config.task.command != "Maa":
+            self.config.task_call("MaaStartup", True)
+            if self.config.task.command != "MaaStartup":
                 self.config.task_stop()
 
         # Fix MaaPath=*\MAA.exe
         if os.path.isfile(self.config.MaaEmulator_MaaPath):
             path = os.path.dirname(self.config.MaaEmulator_MaaPath)
-            logger.info(f'MaaEmulator_MaaPath: {self.config.MaaEmulator_MaaPath} is revised to {path}')
+            logger.info(f"MaaEmulator_MaaPath: {self.config.MaaEmulator_MaaPath} is revised to {path}")
             self.config.MaaEmulator_MaaPath = path
 
-        logger.info(f'MAA安装路径：{self.config.MaaEmulator_MaaPath}')
+        logger.info(f"MAA安装路径：{self.config.MaaEmulator_MaaPath}")
         if not os.path.exists(self.config.MaaEmulator_MaaPath):
             logger.critical(
-                f'未找到路径 {self.config.MaaEmulator_MaaPath}，请确认MAA已安装在该路径。'
-                f'如果你是第一次使用MAA插件，需要自选安装MAA，并在 "MAA设置" - "MAA安装路径" 中填入MAA的安装路径')
+                f"未找到路径 {self.config.MaaEmulator_MaaPath}，请确认MAA已安装在该路径。"
+                f'如果你是第一次使用MAA插件，需要自选安装MAA，并在 "MAA设置" - "MAA安装路径" 中填入MAA的安装路径'
+            )
             raise RequestHumanTakeover
         try:
-            incremental_path = [os.path.join(self.config.MaaEmulator_MaaPath, './cache')]
+            incremental_path = [os.path.join(self.config.MaaEmulator_MaaPath, "./cache")]
             if self.config.MaaEmulator_PackageName in ["YoStarEN", "YoStarJP", "YoStarKR", "txwy"]:
-                incremental_path.append(os.path.join(
-                    self.config.MaaEmulator_MaaPath,
-                    './resource/global/' + self.config.MaaEmulator_PackageName)
+                incremental_path.append(
+                    os.path.join(
+                        self.config.MaaEmulator_MaaPath, "./resource/global/" + self.config.MaaEmulator_PackageName
+                    )
                 )
-                incremental_path.append(os.path.join(
-                    self.config.MaaEmulator_MaaPath,
-                    './cache/resource/global/' + self.config.MaaEmulator_PackageName)
+                incremental_path.append(
+                    os.path.join(
+                        self.config.MaaEmulator_MaaPath,
+                        "./cache/resource/global/" + self.config.MaaEmulator_PackageName,
+                    )
                 )
             AssistantHandler.load(self.config.MaaEmulator_MaaPath, incremental_path)
         except ModuleNotFoundError:
-            logger.critical('找不到MAA，请检查安装路径是否正确')
+            logger.critical("找不到MAA，请检查安装路径是否正确")
             raise RequestHumanTakeover
         except OSError as e:
             # OSError: [WinError 126] 找不到指定的模块。
-            if '[WinError 126]' in str(e):
+            if "[WinError 126]" in str(e):
                 logger.exception(e)
-                logger.critical(
-                    f'无法导入MAA，请确认MAA已正确安装在 {self.config.MaaEmulator_MaaPath}'
-                )
+                logger.critical(f"无法导入MAA，请确认MAA已正确安装在 {self.config.MaaEmulator_MaaPath}")
                 raise RequestHumanTakeover
             else:
                 raise
@@ -116,7 +119,7 @@ class ArknightsAutoScript(AzurLaneAutoScript):
                 arg (c_void_p):
             """
             m = AssistantHandler.Message(msg)
-            d = json.loads(details.decode('utf-8', 'ignore'))
+            d = json.loads(details.decode("utf-8", "ignore"))
             log_callback(m, d)
             handler = AssistantHandler.ASST_HANDLER
             if handler:
@@ -128,12 +131,12 @@ class ArknightsAutoScript(AzurLaneAutoScript):
         asst = AssistantHandler.Asst(callback)
 
         asst.set_instance_option(AssistantHandler.InstanceOptionType.touch_type, self.config.MaaEmulator_TouchMethod)
-        asst.set_instance_option(AssistantHandler.InstanceOptionType.adblite_enabled, '0')
+        asst.set_instance_option(AssistantHandler.InstanceOptionType.adblite_enabled, "0")
         if self.config.MaaEmulator_DeploymentWithPause:
-            if self.config.MaaEmulator_TouchMethod == 'maatouch':
-                asst.set_instance_option(AssistantHandler.InstanceOptionType.deployment_with_pause, '1')
+            if self.config.MaaEmulator_TouchMethod == "maatouch":
+                asst.set_instance_option(AssistantHandler.InstanceOptionType.deployment_with_pause, "1")
             else:
-                logger.critical('使用了不支持暂停下干员的触控方案')
+                logger.critical("使用了不支持暂停下干员的触控方案")
                 raise RequestHumanTakeover
 
         return asst
@@ -179,7 +182,7 @@ def set_stop_event(e):
 
 def maa_copilot(config_name):
     script = ArknightsAutoScript(config_name)
-    script.config.bind('MaaCopilot')
+    script.config.bind("MaaCopilot")
     handler = AssistantHandler(config=script.config, asst=script.asst)
     handler.connect()
     handler.copilot()

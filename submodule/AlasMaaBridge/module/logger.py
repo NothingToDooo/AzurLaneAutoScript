@@ -6,7 +6,7 @@ from module.logger import logger
 
 
 def _log_callback(msg, details):
-    logger.info(f'[{msg}] {details}')
+    logger.info(f"[{msg}] {details}")
 
 
 class CallbackDetails:
@@ -23,17 +23,17 @@ class CallbackDetails:
         INFO │ ------=> StageTheme
         INFO │ ------<= StageTheme
         """
-        if 'SubTaskStart' in msg:
-            suffix = '=>'
-        elif 'SubTaskCompleted' in msg:
+        if "SubTaskStart" in msg:
+            suffix = "=>"
+        elif "SubTaskCompleted" in msg:
             cls.task_nested -= 1
-            suffix = '<='
+            suffix = "<="
         else:
-            suffix = '??'
+            suffix = "??"
 
-        logger.info(f'{"--" * cls.task_nested} {suffix} {task}')
+        logger.info(f"{'--' * cls.task_nested} {suffix} {task}")
 
-        if 'SubTaskStart' in msg:
+        if "SubTaskStart" in msg:
             cls.task_nested += 1
 
     @classmethod
@@ -60,29 +60,33 @@ class CallbackDetails:
 
     @cached_property
     def serial(self):
-        return self.get('details.address')
+        return self.get("details.address")
 
     @cached_property
     def task(self):
-        return self.multi_get([
-            'details.task',
-            'subtask',
-        ])
+        return self.multi_get(
+            [
+                "details.task",
+                "subtask",
+            ]
+        )
 
     @cached_property
     def taskchain(self):
-        return self.multi_get([
-            'details.taskchain',
-            'taskchain',
-        ])
+        return self.multi_get(
+            [
+                "details.taskchain",
+                "taskchain",
+            ]
+        )
 
     @cached_property
     def what(self):
-        return self.get('what')
+        return self.get("what")
 
     @cached_property
     def stats(self):
-        return self.get('details.stats')
+        return self.get("details.stats")
 
 
 def parse_callback(msg, details):
@@ -92,17 +96,17 @@ def parse_callback(msg, details):
     msg = str(msg)
     details = CallbackDetails(details)
 
-    if 'Error' in msg:
-        logger.error(f'{msg} {details}')
+    if "Error" in msg:
+        logger.error(f"{msg} {details}")
         return True
     elif msg in [
-        'Message.SubTaskStart',
-        'Message.SubTaskCompleted',
+        "Message.SubTaskStart",
+        "Message.SubTaskCompleted",
     ]:
         if details.task:
             CallbackDetails.show_nested(msg, details.task)
             return True
-    elif msg == 'Message.SubTaskExtraInfo':
+    elif msg == "Message.SubTaskExtraInfo":
         if details.task:
             if details.stats:
                 _log_callback(msg, details.stats)
@@ -110,15 +114,15 @@ def parse_callback(msg, details):
                 _log_callback(msg, details.task)
             return True
     elif msg in [
-        'Message.TaskChainCompleted',
-        'Message.AllTasksCompleted',
+        "Message.TaskChainCompleted",
+        "Message.AllTasksCompleted",
     ]:
         CallbackDetails.clear_nested()
         if details.taskchain:
             _log_callback(msg, details.taskchain)
             return True
     elif msg in [
-        'Message.TaskChainStart',
+        "Message.TaskChainStart",
     ]:
         CallbackDetails.clear_nested()
         if details.taskchain:
@@ -126,10 +130,10 @@ def parse_callback(msg, details):
             _log_callback(msg, details.taskchain)
             return True
     elif msg in [
-        'Message.ConnectionInfo',
+        "Message.ConnectionInfo",
     ]:
         if details.serial and details.what:
-            _log_callback(msg, f'{details.serial} {details.what}')
+            _log_callback(msg, f"{details.serial} {details.what}")
             return True
 
     return False

@@ -1,16 +1,17 @@
 from module.base.utils import color_similarity_2d, location2node
 from module.campaign.campaign_base import CampaignBase
-from module.map.map_base import CampaignMap, location_ensure
-from module.map.map_grids import SelectedGrids, RoadGrids
 from module.logger import logger
+from module.map.map_base import CampaignMap, location_ensure
+from module.map.map_grids import RoadGrids, SelectedGrids
 from module.map_detection.grid import Grid
 from module.template.assets import TEMPLATE_FLEET_CURRENT
+
 from .d1 import Config as ConfigBase
 
-MAP = CampaignMap('D3')
-MAP.shape = 'I9'
-MAP.camera_data = ['D3', 'D5', 'D7', 'F3', 'F5', 'F7']
-MAP.camera_data_spawn_point = ['D7']
+MAP = CampaignMap("D3")
+MAP.shape = "I9"
+MAP.camera_data = ["D3", "D5", "D7", "F3", "F5", "F7"]
+MAP.camera_data_spawn_point = ["D7"]
 # Big pillar at E4 covering D1:F2
 # mark covering grids as land, since we won't go there anyway
 MAP.map_data = """
@@ -36,24 +37,97 @@ MAP.weight_data = """
     50 50 50 50 50 50 50 50 50
 """
 MAP.spawn_data = [
-    {'battle': 0, 'enemy': 2, 'siren': 2},
-    {'battle': 1, 'enemy': 1},
-    {'battle': 2, 'enemy': 2, 'siren': 1},
-    {'battle': 3, 'enemy': 1},
-    {'battle': 4, 'enemy': 2},
-    {'battle': 5, 'enemy': 1},
-    {'battle': 6, 'boss': 1},
+    {"battle": 0, "enemy": 2, "siren": 2},
+    {"battle": 1, "enemy": 1},
+    {"battle": 2, "enemy": 2, "siren": 1},
+    {"battle": 3, "enemy": 1},
+    {"battle": 4, "enemy": 2},
+    {"battle": 5, "enemy": 1},
+    {"battle": 6, "boss": 1},
 ]
-A1, B1, C1, D1, E1, F1, G1, H1, I1, \
-A2, B2, C2, D2, E2, F2, G2, H2, I2, \
-A3, B3, C3, D3, E3, F3, G3, H3, I3, \
-A4, B4, C4, D4, E4, F4, G4, H4, I4, \
-A5, B5, C5, D5, E5, F5, G5, H5, I5, \
-A6, B6, C6, D6, E6, F6, G6, H6, I6, \
-A7, B7, C7, D7, E7, F7, G7, H7, I7, \
-A8, B8, C8, D8, E8, F8, G8, H8, I8, \
-A9, B9, C9, D9, E9, F9, G9, H9, I9, \
-    = MAP.flatten()
+(
+    A1,
+    B1,
+    C1,
+    D1,
+    E1,
+    F1,
+    G1,
+    H1,
+    I1,
+    A2,
+    B2,
+    C2,
+    D2,
+    E2,
+    F2,
+    G2,
+    H2,
+    I2,
+    A3,
+    B3,
+    C3,
+    D3,
+    E3,
+    F3,
+    G3,
+    H3,
+    I3,
+    A4,
+    B4,
+    C4,
+    D4,
+    E4,
+    F4,
+    G4,
+    H4,
+    I4,
+    A5,
+    B5,
+    C5,
+    D5,
+    E5,
+    F5,
+    G5,
+    H5,
+    I5,
+    A6,
+    B6,
+    C6,
+    D6,
+    E6,
+    F6,
+    G6,
+    H6,
+    I6,
+    A7,
+    B7,
+    C7,
+    D7,
+    E7,
+    F7,
+    G7,
+    H7,
+    I7,
+    A8,
+    B8,
+    C8,
+    D8,
+    E8,
+    F8,
+    G8,
+    H8,
+    I8,
+    A9,
+    B9,
+    C9,
+    D9,
+    E9,
+    F9,
+    G9,
+    H9,
+    I9,
+) = MAP.flatten()
 
 
 class Config(ConfigBase):
@@ -67,7 +141,7 @@ class Config(ConfigBase):
     MAP_HAS_AMBUSH = False
     MAP_HAS_MYSTERY = False
     MAP_CHAPTER_SWITCH_20241219 = True
-    STAGE_ENTRANCE = ['half', '20240725']
+    STAGE_ENTRANCE = ["half", "20240725"]
     MAP_HAS_MODE_SWITCH = True
     STAGE_INCREASE_AB = True
     MAP_WALK_USE_CURRENT_FLEET = True
@@ -91,15 +165,15 @@ class GridCurrentFleet(Grid):
 
 class Campaign(CampaignBase):
     MAP = MAP
-    ENEMY_FILTER = '1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C'
+    ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
     grid_class = GridCurrentFleet
 
     def in_sight(self, location, sight=None):
         # Focus E3 when insight E3, to avoid ammo icon covered by pillar
         location = location_ensure(location)
         node = location2node(location)
-        if node == 'E3':
-            return self.focus_to('E3')
+        if node == "E3":
+            return self.focus_to("E3")
         return super().in_sight(location, sight=sight)
 
     def battle_0(self):

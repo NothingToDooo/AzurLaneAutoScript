@@ -3,7 +3,6 @@ from datetime import datetime
 
 from module.config.config import AzurLaneConfig, name_to_function
 from module.config.utils import filepath_config
-
 from submodule.AlasMaaBridge.module.config.config_generated import GeneratedConfig
 from submodule.AlasMaaBridge.module.config.config_updater import ConfigUpdater
 
@@ -29,14 +28,14 @@ class ArknightsConfig(AzurLaneConfig, ConfigUpdater, GeneratedConfig):
 
     def bind(self, func, func_list=None):
         if func_list is None:
-            func_list = ['Maa']
+            func_list = ["Maa"]
         super().bind(func, func_list)
 
-    def save(self, mod_name='maa'):
+    def save(self, mod_name="maa"):
         super().save(mod_name)
 
     def get_mtime(self):
-        timestamp = os.stat(filepath_config(self.config_name, mod_name='maa')).st_mtime
+        timestamp = os.stat(filepath_config(self.config_name, mod_name="maa")).st_mtime
         mtime = datetime.fromtimestamp(timestamp).replace(microsecond=0)
         return mtime
 

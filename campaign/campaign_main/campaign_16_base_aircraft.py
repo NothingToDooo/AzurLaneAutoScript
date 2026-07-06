@@ -1,7 +1,7 @@
 from module.base.decorator import del_cached_property
 from module.base.timer import Timer
-from module.base.utils import red_overlay_transparency, get_color
-from module.handler.assets import MAP_AIR_STRIKE, STRATEGY_OPENED, AIR_STRIKE_CONFIRM
+from module.base.utils import get_color, red_overlay_transparency
+from module.handler.assets import AIR_STRIKE_CONFIRM, MAP_AIR_STRIKE, STRATEGY_OPENED
 from module.handler.strategy import AIR_STRIKE_OFFSET
 from module.logger import logger
 from module.map.utils import location_ensure
@@ -13,9 +13,9 @@ class Config:
     MAP_WALK_TURNING_OPTIMIZE = False
     MAP_HAS_MYSTERY = False
     INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
-        'height': (80, 255 - 33),
-        'prominence': 10,
-        'distance': 35,
+        "height": (80, 255 - 33),
+        "prominence": 10,
+        "distance": 35,
     }
     # Handle fog on map, static homography parameters and lower canny threshold
     HOMO_STORAGE = ((8, 6), [(137.405, 104.804), (1046.044, 104.804), (-12.171, 652.093), (1166.717, 652.093)])
@@ -24,18 +24,20 @@ class Config:
 
 class CampaignBase(CampaignBase_):
     MAP_AIR_STRIKE_OVERLAY_TRANSPARENCY_THRESHOLD = 0.35
-    ENEMY_FILTER = '1L > 1M > 1E > 2L > 3L > 2M > 2E > 1C > 2C > 3M > 3E > 3C'
+    ENEMY_FILTER = "1L > 1M > 1E > 2L > 3L > 2M > 2E > 1C > 2C > 3M > 3E > 3C"
 
     def _air_strike_appear(self):
-        return red_overlay_transparency(MAP_AIR_STRIKE.color, get_color(self.device.image, MAP_AIR_STRIKE.area)) > \
-               self.MAP_AIR_STRIKE_OVERLAY_TRANSPARENCY_THRESHOLD
+        return (
+            red_overlay_transparency(MAP_AIR_STRIKE.color, get_color(self.device.image, MAP_AIR_STRIKE.area))
+            > self.MAP_AIR_STRIKE_OVERLAY_TRANSPARENCY_THRESHOLD
+        )
 
     def _air_strike(self, location):
         self.in_sight(location)
         attack_grid = self.convert_global_to_local(location)
         attack_grid.__str__ = location
 
-        logger.info('Select grid to air strike')
+        logger.info("Select grid to air strike")
         skip_first_screenshot = True
         interval = Timer(5, count=10)
         for _ in self.loop(skip_first=skip_first_screenshot):
@@ -51,7 +53,7 @@ class CampaignBase(CampaignBase_):
                 interval.reset()
                 continue
 
-        logger.info('Confirm air strike')
+        logger.info("Confirm air strike")
         skip_first_screenshot = True
         interval = Timer(3, count=6)
         MAP_AIR_STRIKE.load_color(self.device.image)
@@ -82,11 +84,11 @@ class CampaignBase(CampaignBase_):
         """
         location = location_ensure(location)
         if self.map[location].is_land:
-            logger.warning(f'Air strike location {location} is on land, will abandon attacking')
+            logger.warning(f"Air strike location {location} is on land, will abandon attacking")
             return False
         self.strategy_open()
         if not self.strategy_has_air_strike():
-            logger.warning(f'No remain air strike trials, will abandon attacking')
+            logger.warning("No remain air strike trials, will abandon attacking")
             self.strategy_close()
             return False
         self.strategy_air_strike_enter()

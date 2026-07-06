@@ -29,13 +29,15 @@ class HeadlessCliApplication:
         print(line)
 
     def start_orphan_slayer(self, pid, cmd):
-        self.orphan_slayer = Popen([
-            sys.executable,
-            os.path.join(os.path.dirname(__file__), "orphanSlayer.py"),
-            str(os.getpid()),
-            pid,
-            "" if cmd is None else cmd,
-        ])
+        self.orphan_slayer = Popen(
+            [
+                sys.executable,
+                os.path.join(os.path.dirname(__file__), "orphanSlayer.py"),
+                str(os.getpid()),
+                pid,
+                "" if cmd is None else cmd,
+            ]
+        )
 
     def feed(self, cmd):
         self.pipe.stdin.write(cmd.strip() + "\n")

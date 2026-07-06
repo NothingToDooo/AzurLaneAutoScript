@@ -11,7 +11,7 @@ class CampaignBase(CampaignBase_):
         """,
     ]
 
-    def campaign_set_chapter_event(self, chapter, mode='normal'):
+    def campaign_set_chapter_event(self, chapter, mode="normal"):
         self.ui_goto_event()
         self.campaign_ensure_chapter(chapter)
         return True
@@ -24,13 +24,13 @@ class CampaignBase(CampaignBase_):
         Returns:
             int
         """
-        if name == 't':
+        if name == "t":
             return 1
-        if name == 'tsk':
+        if name == "tsk":
             return 2
-        if name == 'ex_sp':
+        if name == "ex_sp":
             return 3
-        if name == 'ex_ex':
+        if name == "ex_ex":
             return 4
 
         return super(CampaignBase, CampaignBase)._campaign_get_chapter_index(name)

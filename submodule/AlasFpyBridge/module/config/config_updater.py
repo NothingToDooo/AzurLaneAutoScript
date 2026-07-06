@@ -2,7 +2,7 @@ from cached_property import cached_property
 
 from module.base.timer import timer
 from module.config import config_updater
-from module.config.deep import deep_get, deep_set, deep_iter
+from module.config.deep import deep_get, deep_iter, deep_set
 from module.config.utils import *
 
 
@@ -36,11 +36,11 @@ class ConfigGenerator(config_updater.ConfigGenerator):
 
         # Menu
         for path, data in deep_iter(self.task, depth=3):
-            if 'tasks' not in path:
+            if "tasks" not in path:
                 continue
             task_group, _, task = path
-            deep_load(['Menu', task_group])
-            deep_load(['Task', task])
+            deep_load(["Menu", task_group])
+            deep_load(["Task", task])
         # Arguments
         visited_group = set()
         for path, data in deep_iter(self.argument, depth=2):
@@ -87,13 +87,7 @@ class ConfigUpdater(config_updater.ConfigUpdater):
 
         for keys, data in deep_iter(self.args, depth=3):
             value = deep_get(old, keys=keys, default=data["value"])
-            if (
-                    is_template
-                    or value is None
-                    or value == ""
-                    or data["type"] == "lock"
-                    or data.get("display") == "hide"
-            ):
+            if is_template or value is None or value == "" or data["type"] == "lock" or data.get("display") == "hide":
                 value = data["value"]
             value = parse_value(value, data=data)
             deep_set(new, keys=keys, value=value)

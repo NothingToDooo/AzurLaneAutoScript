@@ -10,7 +10,7 @@ class ConfigGenerator(config_updater.ConfigGenerator):
     @timer
     def generate(self):
         write_file(filepath_args(), self.args)
-        write_file(filepath_args('menu'), self.menu)
+        write_file(filepath_args("menu"), self.menu)
         self.generate_code()
         for lang in LANGUAGES:
             self.generate_i18n(lang)
@@ -27,7 +27,7 @@ class ConfigGenerator(config_updater.ConfigGenerator):
         new = {}
         old = read_file(filepath_i18n(lang))
 
-        def deep_load(keys, default=True, words=('name', 'help')):
+        def deep_load(keys, default=True, words=("name", "help")):
             for word in words:
                 k = keys + [str(word)]
                 d = ".".join(k) if default else str(word)
@@ -36,34 +36,34 @@ class ConfigGenerator(config_updater.ConfigGenerator):
 
         # Menu
         for path, data in deep_iter(self.task, depth=3):
-            if 'tasks' not in path:
+            if "tasks" not in path:
                 continue
             task_group, _, task = path
-            deep_load(['Menu', task_group])
-            deep_load(['Task', task])
+            deep_load(["Menu", task_group])
+            deep_load(["Task", task])
         # Arguments
         visited_group = set()
         for path, data in deep_iter(self.argument, depth=2):
             if path[0] not in visited_group:
-                deep_load([path[0], '_info'])
+                deep_load([path[0], "_info"])
                 visited_group.add(path[0])
             deep_load(path)
-            if 'option' in data:
-                deep_load(path, words=data['option'], default=False)
+            if "option" in data:
+                deep_load(path, words=data["option"], default=False)
 
         # GUI i18n
         for path, _ in deep_iter(self.gui, depth=2):
             group, key = path
-            deep_load(keys=['Gui', group], words=(key,))
+            deep_load(keys=["Gui", group], words=(key,))
 
         # Copy stage names from MaaFight to MaaFightWeekly
-        day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        for stage, trans in deep_get(new, keys='MaaFight.Stage', default={}).items():
-            if '-' not in stage:
+        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        for stage, trans in deep_get(new, keys="MaaFight.Stage", default={}).items():
+            if "-" not in stage:
                 continue
             for day in day_names:
-                if deep_get(new, keys=['MaaFightWeekly', day, stage]):
-                    deep_set(new, keys=['MaaFightWeekly', day, stage], value=trans)
+                if deep_get(new, keys=["MaaFightWeekly", day, stage]):
+                    deep_set(new, keys=["MaaFightWeekly", day, stage], value=trans)
 
         write_file(filepath_i18n(lang), new)
 
@@ -73,14 +73,14 @@ class ConfigUpdater(config_updater.ConfigUpdater):
 
     @cached_property
     def args(self):
-        return read_file(filepath_args(mod_name='maa'))
+        return read_file(filepath_args(mod_name="maa"))
 
     def read_file(self, config_name, is_template=False):
-        old = read_file(filepath_config(config_name, 'maa'))
+        old = read_file(filepath_config(config_name, "maa"))
         return self.config_update(old, is_template=is_template)
 
     @staticmethod
-    def write_file(config_name, data, mod_name='maa'):
+    def write_file(config_name, data, mod_name="maa"):
         write_file(filepath_config(config_name, mod_name), data)
 
     def config_update(self, old, is_template=False):
@@ -95,9 +95,9 @@ class ConfigUpdater(config_updater.ConfigUpdater):
         new = {}
 
         for keys, data in deep_iter(self.args, depth=3):
-            value = deep_get(old, keys=keys, default=data['value'])
-            if is_template or value is None or value == '' or data['type'] == 'lock' or data.get('display') == 'hide':
-                value = data['value']
+            value = deep_get(old, keys=keys, default=data["value"])
+            if is_template or value is None or value == "" or data["type"] == "lock" or data.get("display") == "hide":
+                value = data["value"]
             value = parse_value(value, data=data)
             deep_set(new, keys=keys, value=value)
 
@@ -107,7 +107,7 @@ class ConfigUpdater(config_updater.ConfigUpdater):
         return new
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     """
     Process the whole config generation.
 
@@ -124,5 +124,5 @@ if __name__ == '__main__':
 
     os.chdir(os.path.join(os.path.dirname(__file__), "../../"))
     ConfigGenerator().generate()
-    os.chdir('../../')
-    ConfigUpdater().update_file('template', is_template=True)
+    os.chdir("../../")
+    ConfigUpdater().update_file("template", is_template=True)

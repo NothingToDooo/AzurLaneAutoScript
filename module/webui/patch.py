@@ -9,8 +9,9 @@ class CachedThreadPoolExecutor:
     @cached_class_property
     def executor(cls):
         from concurrent.futures.thread import ThreadPoolExecutor
+
         pool = ThreadPoolExecutor(max_workers=5)
-        logger.info('Patched ThreadPoolExecutor created')
+        logger.info("Patched ThreadPoolExecutor created")
         return pool
 
 
@@ -50,6 +51,7 @@ def patch_mimetype():
     all deployment, we use the builtin mimetype table only.
     """
     import mimetypes
+
     # lock as inited
     mimetypes.inited = True
     # create a new clean instance
@@ -78,7 +80,7 @@ def fix_py37_subprocess_communicate():
     import sys
     import threading
 
-    if sys.platform != 'win32' or sys.version_info[:2] != (3, 7):
+    if sys.platform != "win32" or sys.version_info[:2] != (3, 7):
         return
 
     def _communicate_fixed(self, input, endtime, orig_timeout):
@@ -86,16 +88,12 @@ def fix_py37_subprocess_communicate():
         # object, unless they've already been started.
         if self.stdout and not hasattr(self, "_stdout_buff"):
             self._stdout_buff = []
-            self.stdout_thread = \
-                threading.Thread(target=self._readerthread,
-                                 args=(self.stdout, self._stdout_buff))
+            self.stdout_thread = threading.Thread(target=self._readerthread, args=(self.stdout, self._stdout_buff))
             self.stdout_thread.daemon = True
             self.stdout_thread.start()
         if self.stderr and not hasattr(self, "_stderr_buff"):
             self._stderr_buff = []
-            self.stderr_thread = \
-                threading.Thread(target=self._readerthread,
-                                 args=(self.stderr, self._stderr_buff))
+            self.stderr_thread = threading.Thread(target=self._readerthread, args=(self.stderr, self._stderr_buff))
             self.stderr_thread.daemon = True
             self.stderr_thread.start()
 

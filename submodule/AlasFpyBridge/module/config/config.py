@@ -3,7 +3,6 @@ from datetime import datetime
 
 from module.config.config import AzurLaneConfig, name_to_function
 from module.config.utils import filepath_config
-
 from submodule.AlasFpyBridge.module.config.config_generated import GeneratedConfig
 from submodule.AlasFpyBridge.module.config.config_updater import ConfigUpdater
 

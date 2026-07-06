@@ -29,9 +29,9 @@ class ModelProxy:
     @classmethod
     def close(cls):
         if cls.client is not None:
-            logger.info('Disconnect to OCR server')
+            logger.info("Disconnect to OCR server")
             cls.client.close()
-            logger.info('Successfully disconnected to OCR server')
+            logger.info("Successfully disconnected to OCR server")
             cls.client = None
 
     def __init__(self, lang) -> None:
@@ -52,6 +52,7 @@ class ModelProxy:
             except:
                 self.online = False
         from module.ocr.models import OCR_MODEL
+
         return OCR_MODEL.__getattribute__(self.lang).ocr(img_fp)
 
     def ocr_for_single_line(self, img_fp):
@@ -69,6 +70,7 @@ class ModelProxy:
             except:
                 self.online = False
         from module.ocr.models import OCR_MODEL
+
         return OCR_MODEL.__getattribute__(self.lang).ocr_for_single_line(img_fp)
 
     def ocr_for_single_lines(self, img_list):
@@ -86,6 +88,7 @@ class ModelProxy:
             except:
                 self.online = False
         from module.ocr.models import OCR_MODEL
+
         return OCR_MODEL.__getattribute__(self.lang).ocr_for_single_lines(img_list)
 
     def set_cand_alphabet(self, cand_alphabet: str):
@@ -95,6 +98,7 @@ class ModelProxy:
             except:
                 self.online = False
         from module.ocr.models import OCR_MODEL
+
         return OCR_MODEL.__getattribute__(self.lang).set_cand_alphabet(cand_alphabet)
 
     def atomic_ocr(self, img_fp, cand_alphabet=None):
@@ -113,6 +117,7 @@ class ModelProxy:
             except:
                 self.online = False
         from module.ocr.models import OCR_MODEL
+
         return OCR_MODEL.__getattribute__(self.lang).atomic_ocr(img_fp, cand_alphabet)
 
     def atomic_ocr_for_single_line(self, img_fp, cand_alphabet=None):
@@ -131,6 +136,7 @@ class ModelProxy:
             except:
                 self.online = False
         from module.ocr.models import OCR_MODEL
+
         return OCR_MODEL.__getattribute__(self.lang).atomic_ocr_for_single_line(img_fp, cand_alphabet)
 
     def atomic_ocr_for_single_lines(self, img_list, cand_alphabet=None):
@@ -149,6 +155,7 @@ class ModelProxy:
             except:
                 self.online = False
         from module.ocr.models import OCR_MODEL
+
         return OCR_MODEL.__getattribute__(self.lang).atomic_ocr_for_single_lines(img_list, cand_alphabet)
 
     def debug(self, img_list):
@@ -166,6 +173,7 @@ class ModelProxy:
             except:
                 self.online = False
         from module.ocr.models import OCR_MODEL
+
         return OCR_MODEL.__getattribute__(self.lang).debug(img_list)
 
 
@@ -185,6 +193,7 @@ class ModelProxyFactory:
 def start_ocr_server(port=22268):
     import zerorpc
     import zmq
+
     from module.ocr.al_ocr import AlOcr
     from module.ocr.models import OcrModel
 

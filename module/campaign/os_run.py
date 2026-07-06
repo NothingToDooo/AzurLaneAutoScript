@@ -48,12 +48,14 @@ class OSCampaignRun(OSMapOperation):
         except ActionPointLimit:
             if get_os_reset_remain() > 0:
                 self.config.task_delay(server_update=True)
-                self.config.task_call('Reward')
-                if self.config.is_task_enabled('OpsiHazard1Leveling') \
-                        and self.get_yellow_coins() > self.config.OS_CL1_YELLOW_COINS_PRESERVE:
-                    self.config.task_call('OpsiHazard1Leveling')
+                self.config.task_call("Reward")
+                if (
+                    self.config.is_task_enabled("OpsiHazard1Leveling")
+                    and self.get_yellow_coins() > self.config.OS_CL1_YELLOW_COINS_PRESERVE
+                ):
+                    self.config.task_call("OpsiHazard1Leveling")
             else:
-                logger.info('Just less than 1 day to OpSi reset, delay 2.5 hours')
+                logger.info("Just less than 1 day to OpSi reset, delay 2.5 hours")
                 self.config.task_delay(minute=150, server_update=True)
 
     def opsi_hazard1_leveling(self):
@@ -71,9 +73,8 @@ class OSCampaignRun(OSMapOperation):
             self.config.opsi_task_delay(ap_limit=True)
 
     def opsi_month_boss(self):
-        if self.config.SERVER in ['tw']:
-            logger.info(f'OpsiMonthBoss is not supported in {self.config.SERVER},'
-                        ' please contact server maintainers')
+        if self.config.SERVER in ["tw"]:
+            logger.info(f"OpsiMonthBoss is not supported in {self.config.SERVER}, please contact server maintainers")
             self.config.task_delay(server_update=True)
             self.config.task_stop()
             return

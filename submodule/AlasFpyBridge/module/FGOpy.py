@@ -17,10 +17,12 @@ class FGOpy(HeadlessCliApplication):
         assert launch
         # If you filled in `/usr/sbin` as the path, and there happened to be an executable named `launch`, and Alas had root privileges...
         halt = shutil.which("halt", path=path)
-        os.environ["PATH"] = os.pathsep.join([
-            os.path.abspath(os.path.dirname(DeployConfig().AdbExecutable)),
-            os.environ["PATH"],
-        ])
+        os.environ["PATH"] = os.pathsep.join(
+            [
+                os.path.abspath(os.path.dirname(DeployConfig().AdbExecutable)),
+                os.environ["PATH"],
+            ]
+        )
         self.counter = counter
         self.mutex = Lock()
         self.success = True

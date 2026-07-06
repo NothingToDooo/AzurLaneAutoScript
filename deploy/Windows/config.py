@@ -91,7 +91,7 @@ class DeployConfig(ConfigModel):
                 continue
             logger.info(f"{k}: {v}")
 
-        logger.info(f"Rest of the configs are the same as default")
+        logger.info("Rest of the configs are the same as default")
 
     def read(self):
         self.config = poor_yaml_read(DEPLOY_TEMPLATE)
@@ -117,9 +117,9 @@ class DeployConfig(ConfigModel):
         """
         # Bypass webui.config.DeployConfig.__setattr__()
         # Don't write these into deploy.yaml
-        super().__setattr__('GitOverCdn', self.Repository in ['cn'])
-        if self.Repository in ['global', 'cn']:
-            super().__setattr__('Repository', 'https://github.com/LmeSzinc/StarRailCopilot')
+        super().__setattr__("GitOverCdn", self.Repository in ["cn"])
+        if self.Repository in ["global", "cn"]:
+            super().__setattr__("Repository", "https://github.com/LmeSzinc/StarRailCopilot")
 
     def filepath(self, path):
         """
@@ -132,19 +132,11 @@ class DeployConfig(ConfigModel):
         if os.path.isabs(path):
             return path
 
-        return (
-            os.path.abspath(os.path.join(self.root_filepath, path))
-            .replace(r"\\", "/")
-            .replace("\\", "/")
-        )
+        return os.path.abspath(os.path.join(self.root_filepath, path)).replace(r"\\", "/").replace("\\", "/")
 
     @cached_property
     def root_filepath(self):
-        return (
-            os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-            .replace(r"\\", "/")
-            .replace("\\", "/")
-        )
+        return os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")).replace(r"\\", "/").replace("\\", "/")
 
     @cached_property
     def adb(self) -> str:
@@ -152,8 +144,8 @@ class DeployConfig(ConfigModel):
         if os.path.exists(exe):
             return exe
 
-        logger.warning(f'AdbExecutable: {exe} does not exist, use `adb` instead')
-        return 'adb'
+        logger.warning(f"AdbExecutable: {exe} does not exist, use `adb` instead")
+        return "adb"
 
     @cached_property
     def git(self) -> str:
@@ -161,8 +153,8 @@ class DeployConfig(ConfigModel):
         if os.path.exists(exe):
             return exe
 
-        logger.warning(f'GitExecutable: {exe} does not exist, use `git` instead')
-        return 'git'
+        logger.warning(f"GitExecutable: {exe} does not exist, use `git` instead")
+        return "git"
 
     @cached_property
     def python(self) -> str:
@@ -171,7 +163,7 @@ class DeployConfig(ConfigModel):
             return exe
 
         current = sys.executable.replace("\\", "/")
-        logger.warning(f'PythonExecutable: {exe} does not exist, use current python instead: {current}')
+        logger.warning(f"PythonExecutable: {exe} does not exist, use current python instead: {current}")
         return current
 
     def execute(self, command, allow_failure=False, output=True):
@@ -187,7 +179,7 @@ class DeployConfig(ConfigModel):
         """
         command = command.replace(r"\\", "/").replace("\\", "/").replace('"', '"')
         if not output:
-            command = command + ' >nul 2>nul'
+            command = command + " >nul 2>nul"
         logger.info(command)
         error_code = os.system(command)
         if error_code:
@@ -199,7 +191,7 @@ class DeployConfig(ConfigModel):
                 self.show_error(command)
                 raise ExecutionError
         else:
-            logger.info(f"[ success ]")
+            logger.info("[ success ]")
             return True
 
     def subprocess_execute(self, cmd, timeout=10):
@@ -211,7 +203,7 @@ class DeployConfig(ConfigModel):
         Returns:
             str:
         """
-        logger.info(' '.join(cmd))
+        logger.info(" ".join(cmd))
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
         try:
             stdout, stderr = process.communicate(timeout=timeout)
@@ -219,7 +211,7 @@ class DeployConfig(ConfigModel):
         except subprocess.TimeoutExpired:
             process.kill()
             stdout, stderr = process.communicate()
-            logger.info(f'TimeoutExpired, stdout={stdout}, stderr={stderr}')
+            logger.info(f"TimeoutExpired, stdout={stdout}, stderr={stderr}")
         return stdout.decode()
 
     def show_error(self, command=None):
@@ -227,8 +219,5 @@ class DeployConfig(ConfigModel):
         self.show_config()
         logger.info("")
         logger.info(f"Last command: {command}")
-        logger.info(
-            "Please check your deploy settings in config/deploy.yaml "
-            "and re-open Alas.exe"
-        )
+        logger.info("Please check your deploy settings in config/deploy.yaml and re-open Alas.exe")
         logger.info("Take the screenshot of entire window if you need help")

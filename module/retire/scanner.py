@@ -11,18 +11,23 @@ from module.base.utils import color_similar, crop, extract_letters, get_color, l
 from module.combat.level import LevelOcr
 from module.logger import logger
 from module.ocr.ocr import Digit
-from module.retire.assets import (TEMPLATE_FLEET_1, TEMPLATE_FLEET_2,
-                                  TEMPLATE_FLEET_3, TEMPLATE_FLEET_4,
-                                  TEMPLATE_FLEET_5, TEMPLATE_FLEET_6,
-                                  TEMPLATE_IN_BATTLE, TEMPLATE_IN_COMMISSION,
-                                  TEMPLATE_IN_EVENT_FLEET)
-from module.retire.dock import (CARD_EMOTION_GRIDS, CARD_GRIDS,
-                                CARD_LEVEL_GRIDS, CARD_RARITY_GRIDS)
+from module.retire.assets import (
+    TEMPLATE_FLEET_1,
+    TEMPLATE_FLEET_2,
+    TEMPLATE_FLEET_3,
+    TEMPLATE_FLEET_4,
+    TEMPLATE_FLEET_5,
+    TEMPLATE_FLEET_6,
+    TEMPLATE_IN_BATTLE,
+    TEMPLATE_IN_COMMISSION,
+    TEMPLATE_IN_EVENT_FLEET,
+)
+from module.retire.dock import CARD_EMOTION_GRIDS, CARD_GRIDS, CARD_LEVEL_GRIDS, CARD_RARITY_GRIDS
 
 
 class EmotionDigit(Digit):
     def pre_process(self, image):
-        if server.server == 'jp':
+        if server.server == "jp":
             image_gray = extract_letters(image, letter=(255, 255, 255), threshold=self.threshold)
             right_side = np.nonzero(image_gray[0:16, :].max(axis=0) > 192)[-1]
             for i, col in enumerate(right_side):
@@ -35,19 +40,19 @@ class EmotionDigit(Digit):
     def after_process(self, result):
         # Random OCR error on Downes' hair
         # OCR DOCK_EMOTION_OCR: Result "044" is revised to "44"
-        if result == '044' or result == 'D44':
-            result = '0'
+        if result == "044" or result == "D44":
+            result = "0"
 
         return super().after_process(result)
 
 
 @dataclass(frozen=True)
 class Ship:
-    rarity: str = ''
+    rarity: str = ""
     level: int = 0
     emotion: int = 0
     fleet: int = 0
-    status: str = ''
+    status: str = ""
     button: Any = None
 
     def satisfy_limitation(self, limitaion) -> bool:
@@ -56,7 +61,7 @@ class Ship:
             if self.__dict__[key] is not None and value is not None:
                 # str and int should be exactly equal to
                 if isinstance(value, (str, int)):
-                    if value == 'any':
+                    if value == "any":
                         continue
                     if self.__dict__[key] != value:
                         return False
@@ -108,7 +113,7 @@ class Scanner(metaclass=ABCMeta):
 
         if output:
             for result in results:
-                logger.info(f'{result}')
+                logger.info(f"{result}")
 
         if cached:
             self._results.extend(results)
@@ -133,8 +138,7 @@ class LevelScanner(Scanner):
         super().__init__()
         self._results = []
         self.grids = CARD_LEVEL_GRIDS
-        self.ocr_model = LevelOcr(self.grids.buttons,
-                                  name='DOCK_LEVEL_OCR', threshold=64)
+        self.ocr_model = LevelOcr(self.grids.buttons, name="DOCK_LEVEL_OCR", threshold=64)
 
     def _scan(self, image) -> List:
         return self.ocr_model.ocr(image)
@@ -148,14 +152,12 @@ class EmotionScanner(Scanner):
         super().__init__()
         self._results = []
         self.grids = CARD_EMOTION_GRIDS
-        if server.server != 'jp':
-            self.ocr_model = EmotionDigit(self.grids.buttons,
-                                      name='DOCK_EMOTION_OCR', threshold=176)
+        if server.server != "jp":
+            self.ocr_model = EmotionDigit(self.grids.buttons, name="DOCK_EMOTION_OCR", threshold=176)
         else:
-            self.ocr_model = EmotionDigit(self.grids.buttons,
-                                      name='DOCK_EMOTION_OCR', 
-                                      letter=(201, 201, 201), 
-                                      threshold=176)
+            self.ocr_model = EmotionDigit(
+                self.grids.buttons, name="DOCK_EMOTION_OCR", letter=(201, 201, 201), threshold=176
+            )
 
     def _scan(self, image) -> List:
         return self.ocr_model.ocr(image)
@@ -169,7 +171,7 @@ class RarityScanner(Scanner):
         super().__init__()
         self._results = []
         self.grids = CARD_RARITY_GRIDS
-        self.value_list: List[str] = ['common', 'rare', 'elite', 'super_rare']
+        self.value_list: List[str] = ["common", "rare", "elite", "super_rare"]
 
     def color_to_rarity(self, color: Tuple[int, int, int]) -> str:
         """
@@ -185,37 +187,36 @@ class RarityScanner(Scanner):
             str: Rarity
         """
         if color_similar(color, (171, 174, 186)):
-            return 'common'
+            return "common"
         elif color_similar(color, (106, 194, 248)):
-            return 'rare'
+            return "rare"
         elif color_similar(color, (151, 134, 254)):
-            return 'elite'
+            return "elite"
         elif color_similar(color, (247, 221, 101)):
-            return 'super_rare'
+            return "super_rare"
         else:
             # Difference between ultra is too great
-            return 'unknown'
+            return "unknown"
 
     def _scan(self, image) -> List:
-        return [self.color_to_rarity(get_color(image, button.area))
-                for button in self.grids.buttons]
+        return [self.color_to_rarity(get_color(image, button.area)) for button in self.grids.buttons]
 
     def limit_value(self, value) -> str:
-        return value if value in self.value_list else 'any'
+        return value if value in self.value_list else "any"
 
 
 class FleetScanner(Scanner):
     def __init__(self) -> None:
         super().__init__()
         self._results = []
-        self.grids = CARD_GRIDS.crop(area=(0, 117, 35, 162), name='FLEET')
+        self.grids = CARD_GRIDS.crop(area=(0, 117, 35, 162), name="FLEET")
         self.templates = {
             TEMPLATE_FLEET_1: 1,
             TEMPLATE_FLEET_2: 2,
             TEMPLATE_FLEET_3: 3,
             TEMPLATE_FLEET_4: 4,
             TEMPLATE_FLEET_5: 5,
-            TEMPLATE_FLEET_6: 6
+            TEMPLATE_FLEET_6: 6,
         }
 
     def pre_process(self, image):
@@ -266,11 +267,11 @@ class StatusScanner(Scanner):
         super().__init__()
         self._results = []
         self.grids = CARD_GRIDS
-        self.value_list: List[str] = ['free', 'battle', 'commission']
+        self.value_list: List[str] = ["free", "battle", "commission"]
         self.templates = {
-            TEMPLATE_IN_BATTLE: 'battle',
-            TEMPLATE_IN_COMMISSION: 'commission',
-            TEMPLATE_IN_EVENT_FLEET: 'in_event_fleet',
+            TEMPLATE_IN_BATTLE: "battle",
+            TEMPLATE_IN_COMMISSION: "commission",
+            TEMPLATE_IN_EVENT_FLEET: "in_event_fleet",
         }
 
     def _match(self, image) -> str:
@@ -278,7 +279,7 @@ class StatusScanner(Scanner):
             if template.match(image, similarity=0.75):
                 return status
 
-        return 'free'
+        return "free"
 
     def _scan(self, image) -> List:
         image_list = [crop(image, button.area) for button in self.grids.buttons]
@@ -286,7 +287,7 @@ class StatusScanner(Scanner):
         return [self._match(image) for image in image_list]
 
     def limit_value(self, value) -> str:
-        return value if value in self.value_list else 'any'
+        return value if value in self.value_list else "any"
 
 
 class ShipScanner(Scanner):
@@ -308,57 +309,51 @@ class ShipScanner(Scanner):
         fleet (int): 0 means not in any fleet. Will be limited in range [0, 6]
         status (str, list): ['any', 'commission', 'battle']
     """
+
     def __init__(
         self,
-        rarity: str = 'any',
+        rarity: str = "any",
         level: Tuple[int, int] = (1, 125),
         emotion: Tuple[int, int] = (0, 150),
         fleet: int = 0,
-        status: str = 'any'
+        status: str = "any",
     ) -> None:
         super().__init__()
         self._results = []
         self.grids = CARD_GRIDS
         self.limitaion: Dict[str, Union[str, int, Tuple[int, int]]] = {
-            'level': (1, 125),
-            'emotion': (0, 150),
-            'rarity': 'any',
-            'fleet': 0,
-            'status': 'any',
+            "level": (1, 125),
+            "emotion": (0, 150),
+            "rarity": "any",
+            "fleet": 0,
+            "status": "any",
         }
 
         # Each property of a ship must be binded to a Scanner.
         self.sub_scanners: Dict[str, Scanner] = {
-            'level': LevelScanner(),
-            'emotion': EmotionScanner(),
-            'rarity': RarityScanner(),
-            'fleet': FleetScanner(),
-            'status': StatusScanner(),
+            "level": LevelScanner(),
+            "emotion": EmotionScanner(),
+            "rarity": RarityScanner(),
+            "fleet": FleetScanner(),
+            "status": StatusScanner(),
         }
 
-        self.set_limitation(
-            level=level, emotion=emotion, rarity=rarity, fleet=fleet, status=status)
+        self.set_limitation(level=level, emotion=emotion, rarity=rarity, fleet=fleet, status=status)
 
     def _scan(self, image) -> List:
         for scanner in self.sub_scanners.values():
             scanner.scan(image, cached=True)
 
         candidates: List[Ship] = [
-            Ship(
-                level=level,
-                emotion=emotion,
-                rarity=rarity,
-                fleet=fleet,
-                status=status,
-                button=button)
-            for level, emotion, rarity, fleet, status, button in
-            zip(
-                self.sub_scanners['level'].results,
-                self.sub_scanners['emotion'].results,
-                self.sub_scanners['rarity'].results,
-                self.sub_scanners['fleet'].results,
-                self.sub_scanners['status'].results,
-                self.grids.buttons)
+            Ship(level=level, emotion=emotion, rarity=rarity, fleet=fleet, status=status, button=button)
+            for level, emotion, rarity, fleet, status, button in zip(
+                self.sub_scanners["level"].results,
+                self.sub_scanners["emotion"].results,
+                self.sub_scanners["rarity"].results,
+                self.sub_scanners["fleet"].results,
+                self.sub_scanners["status"].results,
+                self.grids.buttons,
+            )
         ]
 
         for scanner in self.sub_scanners.values():
@@ -428,7 +423,7 @@ class ShipScanner(Scanner):
             value = kwargs.get(attr, self.limitaion[attr])
             self.limit_value(key=attr, value=value)
 
-        logger.info(f'Limitaions set to {self.limitaion}')
+        logger.info(f"Limitaions set to {self.limitaion}")
 
 
 class DockScanner(ShipScanner):
@@ -438,7 +433,15 @@ class DockScanner(ShipScanner):
     Same as ShipScanner, DockScanner must start at the initial page_dock.
     The scanning process can swipe the dock automatically and stop when finished.
     """
-    def __init__(self, rarity: str = 'any', level: Tuple[int, int] = (1, 125), emotion: Tuple[int, int] = (0, 150), fleet: int = 0, status: str = 'any') -> None:
+
+    def __init__(
+        self,
+        rarity: str = "any",
+        level: Tuple[int, int] = (1, 125),
+        emotion: Tuple[int, int] = (0, 150),
+        fleet: int = 0,
+        status: str = "any",
+    ) -> None:
         raise NotImplementedError
         super().__init__(rarity, level, emotion, fleet, status)
         self.scan_zone = (93, 76, 1218, 719)
@@ -470,7 +473,7 @@ class DockScanner(ShipScanner):
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             std = np.std(image, axis=1)
             gap_seq = [720] + list(np.nonzero(std < 10)[0])
-            logger.info(f'{gap_seq}')
+            logger.info(f"{gap_seq}")
             for pos in range(len(gap_seq) - 1, 0, -1):
                 if abs(gap_seq[pos - 1] - gap_seq[pos]) > 50:
                     bound.append(gap_seq[pos])

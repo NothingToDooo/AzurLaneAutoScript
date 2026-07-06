@@ -31,7 +31,7 @@ class cached_class_property(Generic[T]):
 
     def __init__(self, func: Callable[..., T]):
         self.__func__ = func
-        self.__cache_name__ = '_{}_'.format(func.__name__.strip('_'))
+        self.__cache_name__ = "_{}_".format(func.__name__.strip("_"))
         if self.__cache_name__ == func.__name__:
             raise self.AliasConflict(self.__cache_name__)
 
@@ -71,7 +71,7 @@ class State:
         cls._clearup = True
 
     @cached_class_property
-    def deploy_config(self) -> "DeployConfig":
+    def deploy_config(self) -> DeployConfig:
         """
         Returns:
             DeployConfig：
@@ -81,7 +81,7 @@ class State:
         return DeployConfig()
 
     @cached_class_property
-    def config_updater(self) -> "ConfigUpdater":
+    def config_updater(self) -> ConfigUpdater:
         """
         Returns:
             ConfigUpdater：

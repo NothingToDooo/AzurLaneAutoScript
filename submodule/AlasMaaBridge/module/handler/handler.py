@@ -1,23 +1,22 @@
+import datetime
+import json
 import os
 import re
-import json
 import time
-import requests
-import datetime
 from typing import Any
 
+import requests
 from cached_property import cached_property
 
 from deploy.config import DeployConfig
 from module.base.timer import Timer
 from module.config.deep import deep_get
-from module.config.utils import read_file, get_server_last_update
+from module.config.utils import get_server_last_update, read_file
 from module.device.connection_attr import ConnectionAttr
 from module.exception import RequestHumanTakeover
 from module.logger import logger
-
-from submodule.AlasMaaBridge.module.config.config import ArknightsConfig
 from submodule.AlasMaaBridge.module.asst import asst, utils
+from submodule.AlasMaaBridge.module.config.config import ArknightsConfig
 
 
 class AssistantHandler:
@@ -63,28 +62,28 @@ class AssistantHandler:
         self.callback_list = []
 
     @staticmethod
-    def split_filter(string, sep='>'):
-        return [f.strip(' \t\r\n') for f in string.split(sep)]
+    def split_filter(string, sep=">"):
+        return [f.strip(" \t\r\n") for f in string.split(sep)]
 
     def maa_stop(self):
         self.callback_list.append(self.task_end_callback)
         self.asst.stop()
         while 1:
             if self.callback_timer.reached():
-                logger.critical('MAA no respond, probably stuck')
+                logger.critical("MAA no respond, probably stuck")
                 raise RequestHumanTakeover
 
             if self.signal in [
                 self.Message.AllTasksCompleted,
                 self.Message.TaskChainCompleted,
                 self.Message.TaskChainStopped,
-                self.Message.TaskChainError
+                self.Message.TaskChainError,
             ]:
                 return
 
     def maa_start(self, task_name, params):
-        logger.hr('MAA start')
-        logger.info(f'Task name: {task_name}, params={params}')
+        logger.hr("MAA start")
+        logger.info(f"Task name: {task_name}, params={params}")
         self.task_id = self.asst.append_task(task_name, params)
         self.signal = None
         self.params = params
@@ -93,7 +92,7 @@ class AssistantHandler:
         self.asst.start()
         while 1:
             if self.callback_timer.reached():
-                logger.critical('MAA no respond, probably stuck')
+                logger.critical("MAA no respond, probably stuck")
                 raise RequestHumanTakeover
 
             if self.signal is not None:
@@ -119,57 +118,52 @@ class AssistantHandler:
             d (dict): 消息详情
         """
         self.callback_timer.reset()
-        if m in [
-            self.Message.AllTasksCompleted,
-            self.Message.TaskChainError,
-            self.Message.TaskChainStopped
-        ]:
+        if m in [self.Message.AllTasksCompleted, self.Message.TaskChainError, self.Message.TaskChainStopped]:
             self.signal = m
             self.callback_list.remove(self.task_end_callback)
 
     def penguin_id_callback(self, m, d):
-        if not self.config.MaaRecord_PenguinID \
-                and m == self.Message.SubTaskExtraInfo \
-                and deep_get(d, keys='what') == 'PenguinId':
-            self.config.MaaRecord_PenguinID = deep_get(d, keys='details.id')
+        if (
+            not self.config.MaaRecord_PenguinID
+            and m == self.Message.SubTaskExtraInfo
+            and deep_get(d, keys="what") == "PenguinId"
+        ):
+            self.config.MaaRecord_PenguinID = deep_get(d, keys="details.id")
             self.callback_list.remove(self.penguin_id_callback)
 
     def annihilation_callback(self, m, d):
         # Skip annihilation error task callback temporary
         # https://github.com/MaaAssistantArknights/MaaAssistantArknights/issues/10623
-        ignoreErrorKeywords = ["FightSeries-Indicator","FightSeries-Icon"]
-        if m == self.Message.SubTaskError \
-                and deep_get(d, keys='first') != ignoreErrorKeywords:
-            self.signal = m 
+        ignoreErrorKeywords = ["FightSeries-Indicator", "FightSeries-Icon"]
+        if m == self.Message.SubTaskError and deep_get(d, keys="first") != ignoreErrorKeywords:
+            self.signal = m
 
     def fight_stop_count_callback(self, m, d):
         if m == self.Message.SubTaskCompleted:
-            if deep_get(d, keys='details.task') == 'MedicineConfirm' \
-                    and self.config.MaaFight_Medicine is not None:
+            if deep_get(d, keys="details.task") == "MedicineConfirm" and self.config.MaaFight_Medicine is not None:
                 self.config.MaaFight_Medicine = self.config.MaaFight_Medicine - 1
-            elif deep_get(d, keys='details.task') == 'StoneConfirm' \
-                    and self.config.MaaFight_Stone is not None:
+            elif deep_get(d, keys="details.task") == "StoneConfirm" and self.config.MaaFight_Stone is not None:
                 self.config.MaaFight_Stone = self.config.MaaFight_Stone - 1
 
-        elif m == self.Message.SubTaskExtraInfo \
-                and deep_get(d, keys='what') == 'StageDrops':
+        elif m == self.Message.SubTaskExtraInfo and deep_get(d, keys="what") == "StageDrops":
             if self.config.MaaFight_Times is not None:
                 self.config.MaaFight_Times = self.config.MaaFight_Times - 1
 
             if self.config.MaaFight_Drops is not None:
-                drop_list = deep_get(d, keys='details.drops')
+                drop_list = deep_get(d, keys="details.drops")
                 if drop_list is not None:
+
                     def replace(matched):
-                        value = int(matched.group('value')) - drop['quantity']
+                        value = int(matched.group("value")) - drop["quantity"]
                         if value <= 0:
                             raise ValueError
-                        return re.sub(r':\d+', f':{value}', matched.group())
+                        return re.sub(r":\d+", f":{value}", matched.group())
 
                     drops_filter = self.config.MaaFight_Drops
                     try:
                         for drop in drop_list:
-                            drops_filter = re.sub(f'{drop["itemId"]}:(?P<value>\\d+)', replace, drops_filter)
-                            drops_filter = re.sub(f'{drop["itemName"]}:(?P<value>\\d+)', replace, drops_filter)
+                            drops_filter = re.sub(f"{drop['itemId']}:(?P<value>\\d+)", replace, drops_filter)
+                            drops_filter = re.sub(f"{drop['itemName']}:(?P<value>\\d+)", replace, drops_filter)
                     except ValueError:
                         drops_filter = None
                     self.config.MaaFight_Drops = drops_filter
@@ -178,7 +172,7 @@ class AssistantHandler:
         if self.task_switch_timer.reached():
             if self.config.task_switched():
                 self.task_switch_timer = None
-                self.params['starts_count'] = 0
+                self.params["starts_count"] = 0
                 self.asst.set_task_params(self.task_id, self.params)
                 self.callback_list.remove(self.roguelike_callback)
             else:
@@ -216,15 +210,10 @@ class AssistantHandler:
 
     def startup(self):
         self.connect()
-        if self.config.Scheduler_NextRun.strftime('%H:%M') == self.config.Scheduler_ServerUpdate:
-            self.maa_start('CloseDown', {
-                "client_type": self.config.MaaEmulator_PackageName
-            })
+        if self.config.Scheduler_NextRun.strftime("%H:%M") == self.config.Scheduler_ServerUpdate:
+            self.maa_start("CloseDown", {"client_type": self.config.MaaEmulator_PackageName})
 
-        self.maa_start('StartUp', {
-            "client_type": self.config.MaaEmulator_PackageName,
-            "start_game_enabled": True
-        })
+        self.maa_start("StartUp", {"client_type": self.config.MaaEmulator_PackageName, "start_game_enabled": True})
         self.config.task_delay(server_update=True)
 
     def fight(self):
@@ -233,30 +222,30 @@ class AssistantHandler:
             "report_to_yituliu": self.config.MaaRecord_ReportToYiTuLiu,
             "client_type": self.config.MaaEmulator_PackageName,
             "DrGrandet": self.config.MaaFight_DrGrandet,
-            "series": int(self.config.MaaFight_Series)
+            "series": int(self.config.MaaFight_Series),
         }
         # Set stage
-        if self.config.MaaFight_Stage == 'last':
-            args['stage'] = ''
-        elif self.config.MaaFight_Stage == 'custom':
-            args['stage'] = self.config.MaaFight_CustomStage
+        if self.config.MaaFight_Stage == "last":
+            args["stage"] = ""
+        elif self.config.MaaFight_Stage == "custom":
+            args["stage"] = self.config.MaaFight_CustomStage
         else:
-            args['stage'] = self.config.MaaFight_Stage
+            args["stage"] = self.config.MaaFight_Stage
 
         # Set weekly stage
         if self.config.MaaFightWeekly_Enable:
-            today = get_server_last_update('04:00').strftime('%A')
-            logger.attr('Weekday', today)
-            stage = self.config.__getattribute__(f'MaaFightWeekly_{today}')
-            if stage != 'default':
-                logger.info(f'Using stage setting from {today}: {stage}')
-                args['stage'] = stage
+            today = get_server_last_update("04:00").strftime("%A")
+            logger.attr("Weekday", today)
+            stage = self.config.__getattribute__(f"MaaFightWeekly_{today}")
+            if stage != "default":
+                logger.info(f"Using stage setting from {today}: {stage}")
+                args["stage"] = stage
 
         if self.config.MaaFight_Medicine is not None:
             args["medicine"] = self.config.MaaFight_Medicine
-        if self.config.MaaFight_MedicineTactics == 'run_out':
+        if self.config.MaaFight_MedicineTactics == "run_out":
             args["medicine"] = 999
-        if self.config.MaaFight_MedicineTactics == 'expiring':
+        if self.config.MaaFight_MedicineTactics == "expiring":
             args["expiring_medicine"] = 999
         if self.config.MaaFight_Stone is not None:
             args["stone"] = self.config.MaaFight_Stone
@@ -264,35 +253,35 @@ class AssistantHandler:
             args["times"] = self.config.MaaFight_Times
 
         if self.config.MaaFight_Drops:
-            old = read_file(os.path.join(self.config.MaaEmulator_MaaPath, './resource/item_index.json'))
+            old = read_file(os.path.join(self.config.MaaEmulator_MaaPath, "./resource/item_index.json"))
             new = {}
             for key, value in old.items():
-                new[value['name']] = key
+                new[value["name"]] = key
             drops = {}
             drops_filter = self.split_filter(self.config.MaaFight_Drops)
             for drop in drops_filter:
-                drop = self.split_filter(drop, sep=':')
+                drop = self.split_filter(drop, sep=":")
                 try:
                     drops[new[drop[0]]] = int(drop[1])
                 except KeyError:
                     drops[drop[0]] = int(drop[1])
-            args['drops'] = drops
+            args["drops"] = drops
 
         if self.config.MaaRecord_ReportToPenguin and self.config.MaaRecord_PenguinID:
             args["penguin_id"] = self.config.MaaRecord_PenguinID
         elif self.config.MaaRecord_ReportToPenguin and not self.config.MaaRecord_PenguinID:
             self.callback_list.append(self.penguin_id_callback)
 
-        if self.config.task.command == 'MaaMaterial':
+        if self.config.task.command == "MaaMaterial":
             self.callback_list.append(self.fight_stop_count_callback)
-        if self.config.task.command == 'MaaAnnihilation':
+        if self.config.task.command == "MaaAnnihilation":
             self.callback_list.append(self.annihilation_callback)
 
-        self.maa_start('Fight', args)
+        self.maa_start("Fight", args)
 
-        if self.config.task.command == 'MaaAnnihilation':
+        if self.config.task.command == "MaaAnnihilation":
             self.config.task_delay(server_update=True)
-        elif self.config.task.command == 'MaaMaterial':
+        elif self.config.task.command == "MaaMaterial":
             if self.signal == self.Message.AllTasksCompleted:
                 with self.config.multi_set():
                     self.config.MaaFight_Medicine = None
@@ -303,7 +292,7 @@ class AssistantHandler:
             else:
                 self.config.task_delay(success=False)
         else:
-            self.config.task_call('MaaAward', force_call=False)
+            self.config.task_call("MaaAward", force_call=False)
             self.config.task_delay(success=True)
 
     def recruit(self):
@@ -322,11 +311,11 @@ class AssistantHandler:
             "times": self.config.MaaRecruit_Times,
             "expedite": self.config.MaaRecruit_Expedite,
             "skip_robot": self.config.MaaRecruit_SkipRobot,
-            "extra_tags_mode": self.config.MaaRecruit_ExtraTagsMode
+            "extra_tags_mode": self.config.MaaRecruit_ExtraTagsMode,
         }
 
         if self.config.MaaRecruit_Level3ShortTime:
-            args['recruitment_time'] = {'3': 460}
+            args["recruitment_time"] = {"3": 460}
 
         if self.config.MaaRecord_ReportToPenguin and self.config.MaaRecord_PenguinID:
             args["penguin_id"] = self.config.MaaRecord_PenguinID
@@ -334,9 +323,9 @@ class AssistantHandler:
             self.callback_list.append(self.penguin_id_callback)
 
         if self.config.MaaRecruit_FirstTags:
-            args["first_tags"] = self.config.MaaRecruit_FirstTags.split(';')
+            args["first_tags"] = self.config.MaaRecruit_FirstTags.split(";")
 
-        self.maa_start('Recruit', args)
+        self.maa_start("Recruit", args)
         self.config.task_delay(success=True)
 
     def infrast(self):
@@ -347,64 +336,61 @@ class AssistantHandler:
             "replenish": self.config.MaaInfrast_Replenish,
             "dorm_notstationed_enabled": self.config.MaaInfrast_Notstationed,
             "dorm_trust_enabled": self.config.MaaInfrast_Trust,
-            "continue_training": self.config.MaaInfrast_ContinueTraining
+            "continue_training": self.config.MaaInfrast_ContinueTraining,
         }
 
         if self.config.MaaCustomInfrast_Enable:
             infrast_dict = {
-                '153-3': r'resource\custom_infrast\153_layout_3_times_a_day.json',
-                '243-3': r'resource\custom_infrast\243_layout_3_times_a_day.json',
-                '243-4': r'resource\custom_infrast\243_layout_4_times_a_day.json',
-                '252-3': r'resource\custom_infrast\252_layout_3_times_a_day.json',
-                '333-3': r'resource\custom_infrast\333_layout_for_Orundum_3_times_a_day.json'
+                "153-3": r"resource\custom_infrast\153_layout_3_times_a_day.json",
+                "243-3": r"resource\custom_infrast\243_layout_3_times_a_day.json",
+                "243-4": r"resource\custom_infrast\243_layout_4_times_a_day.json",
+                "252-3": r"resource\custom_infrast\252_layout_3_times_a_day.json",
+                "333-3": r"resource\custom_infrast\333_layout_for_Orundum_3_times_a_day.json",
             }
-            if self.config.MaaCustomInfrast_BuiltinConfig != 'custom':
+            if self.config.MaaCustomInfrast_BuiltinConfig != "custom":
                 self.config.MaaCustomInfrast_Filename = os.path.join(
-                    self.config.MaaEmulator_MaaPath,
-                    infrast_dict[self.config.MaaCustomInfrast_BuiltinConfig]
+                    self.config.MaaEmulator_MaaPath, infrast_dict[self.config.MaaCustomInfrast_BuiltinConfig]
                 )
-            args['mode'] = 10000
-            args['filename'] = self.config.MaaCustomInfrast_Filename
+            args["mode"] = 10000
+            args["filename"] = self.config.MaaCustomInfrast_Filename
 
             end_time = datetime.datetime.now() + datetime.timedelta(minutes=30)
-            plans = deep_get(read_file(self.config.MaaCustomInfrast_Filename), keys='plans')
-            periods = deep_get(plans[0], keys='period')
+            plans = deep_get(read_file(self.config.MaaCustomInfrast_Filename), keys="plans")
+            periods = deep_get(plans[0], keys="period")
 
             if periods is None:
-                if self.config.MaaCustomInfrast_CustomPeriod == 'null':
-                    logger.critical('无法找到配置文件中的排班周期，请检查文件是否有效')
+                if self.config.MaaCustomInfrast_CustomPeriod == "null":
+                    logger.critical("无法找到配置文件中的排班周期，请检查文件是否有效")
                     raise RequestHumanTakeover
                 else:
-                    args['plan_index'] = self.config.MaaCustomInfrast_PlanIndex
+                    args["plan_index"] = self.config.MaaCustomInfrast_PlanIndex
             else:
                 for i in range(len(plans)):
-                    periods = deep_get(plans[i], keys='period')
+                    periods = deep_get(plans[i], keys="period")
                     for j, period in enumerate(periods):
                         start_time = datetime.datetime.combine(
-                            datetime.date.today(),
-                            datetime.datetime.strptime(period[0], '%H:%M').time()
+                            datetime.date.today(), datetime.datetime.strptime(period[0], "%H:%M").time()
                         )
                         end_time = datetime.datetime.combine(
-                            datetime.date.today(),
-                            datetime.datetime.strptime(period[1], '%H:%M').time()
+                            datetime.date.today(), datetime.datetime.strptime(period[1], "%H:%M").time()
                         )
                         now_time = datetime.datetime.now()
                         if start_time <= now_time <= end_time:
-                            args['plan_index'] = i
+                            args["plan_index"] = i
                             # 处理跨天的情形
                             # 如："period": [["22:00", "23:59"], ["00:00","06:00"]]
-                            if j != len(periods) - 1 and period[1] == '23:59' and periods[j + 1][0] == '00:00':
+                            if j != len(periods) - 1 and period[1] == "23:59" and periods[j + 1][0] == "00:00":
                                 end_time = datetime.datetime.combine(
                                     datetime.date.today() + datetime.timedelta(days=1),
-                                    datetime.datetime.strptime(periods[j + 1][1], '%H:%M').time()
+                                    datetime.datetime.strptime(periods[j + 1][1], "%H:%M").time(),
                                 )
                             break
-                    if 'plan_index' in args:
+                    if "plan_index" in args:
                         break
 
-            self.maa_start('Infrast', args)
+            self.maa_start("Infrast", args)
             if periods is None:
-                custom_period = self.config.MaaCustomInfrast_CustomPeriod.replace('，', ',').split(',')
+                custom_period = self.config.MaaCustomInfrast_CustomPeriod.replace("，", ",").split(",")
                 custom_period = [int(x) for x in custom_period]
                 self.config.task_delay(minute=60 * custom_period[self.config.MaaCustomInfrast_PlanIndex])
                 self.config.MaaCustomInfrast_PlanIndex = (self.config.MaaCustomInfrast_PlanIndex + 1) % len(plans)
@@ -412,10 +398,10 @@ class AssistantHandler:
                 self.config.task_delay(target=end_time + datetime.timedelta(minutes=1))
         else:
             if self.config.MaaInfrast_WorkThreshold <= self.config.MaaInfrast_ShiftThreshold:
-                logger.warning('基建换班心情阈值必须小于基建工作心情阈值，请调整基建设置')
+                logger.warning("基建换班心情阈值必须小于基建工作心情阈值，请调整基建设置")
                 raise RequestHumanTakeover
 
-            self.maa_start('Infrast', args)
+            self.maa_start("Infrast", args)
             # 根据心情阈值计算下次换班时间
             # (基建工作心情阈值 - 基建换班心情阈值) / 0.75 * 60
             t = (self.config.MaaInfrast_WorkThreshold - self.config.MaaInfrast_ShiftThreshold) * 80
@@ -425,21 +411,24 @@ class AssistantHandler:
         buy_first = self.split_filter(self.config.MaaMall_BuyFirst)
         blacklist = self.split_filter(self.config.MaaMall_BlackList)
         credit_fight = self.config.MaaMall_CreditFight
-        if self.config.cross_get(keys='MaaMaterial.MaaFight.Stage') == 'last' \
-                and self.config.is_task_enabled('MaaMaterial'):
+        if self.config.cross_get(keys="MaaMaterial.MaaFight.Stage") == "last" and self.config.is_task_enabled(
+            "MaaMaterial"
+        ):
             credit_fight = False
-        if self.config.cross_get(keys='MaaFight.MaaFight.Stage') == 'last' \
-                and self.config.is_task_enabled('MaaFight'):
+        if self.config.cross_get(keys="MaaFight.MaaFight.Stage") == "last" and self.config.is_task_enabled("MaaFight"):
             credit_fight = False
-        self.maa_start('Mall', {
-            "credit_fight": credit_fight,
-            "shopping": self.config.MaaMall_Shopping,
-            "buy_first": buy_first,
-            "blacklist": blacklist,
-            "force_shopping_if_credit_full": self.config.MaaMall_ForceShoppingIfCreditFull,
-            "only_buy_discount": self.config.MaaMall_OnlyBuyDiscount,
-            "reserve_max_credit": self.config.MaaMall_ReserveMaxCredit,
-        })
+        self.maa_start(
+            "Mall",
+            {
+                "credit_fight": credit_fight,
+                "shopping": self.config.MaaMall_Shopping,
+                "buy_first": buy_first,
+                "blacklist": blacklist,
+                "force_shopping_if_credit_full": self.config.MaaMall_ForceShoppingIfCreditFull,
+                "only_buy_discount": self.config.MaaMall_OnlyBuyDiscount,
+                "reserve_max_credit": self.config.MaaMall_ReserveMaxCredit,
+            },
+        )
         self.config.task_delay(server_update=True)
 
     def award(self):
@@ -451,7 +440,7 @@ class AssistantHandler:
             "orundum": self.config.MaaAward_Orundum,
             "specialaccess": self.config.MaaAward_Specialaccess,
         }
-        self.maa_start('Award', args)
+        self.maa_start("Award", args)
         self.config.task_delay(server_update=True)
 
     def roguelike(self):
@@ -464,27 +453,32 @@ class AssistantHandler:
             "squad": self.config.MaaRoguelike_Squad,
             "roles": self.config.MaaRoguelike_Roles,
         }
-        if (self.config.MaaRoguelike_Theme != "Mizuki" and self.config.MaaRoguelike_Squad in ["心胜于物分队",
-                                                                                              "物尽其用分队",
-                                                                                              "以人为本分队"]) or (
-                self.config.MaaRoguelike_Theme != "Sami" and self.config.MaaRoguelike_Squad in ["永恒狩猎分队",
-                                                                                                "生活至上分队",
-                                                                                                "科学主义分队",
-                                                                                                "特训分队"]) or (
-                self.config.MaaRoguelike_Theme != "Sarkaz" and self.config.MaaRoguelike_Squad in ["魂灵护送分队",
-                                                                                                "博闻广记分队",
-                                                                                                "蓝图测绘分队",
-                                                                                                "因地制宜分队"]):
-
+        if (
+            (
+                self.config.MaaRoguelike_Theme != "Mizuki"
+                and self.config.MaaRoguelike_Squad in ["心胜于物分队", "物尽其用分队", "以人为本分队"]
+            )
+            or (
+                self.config.MaaRoguelike_Theme != "Sami"
+                and self.config.MaaRoguelike_Squad in ["永恒狩猎分队", "生活至上分队", "科学主义分队", "特训分队"]
+            )
+            or (
+                self.config.MaaRoguelike_Theme != "Sarkaz"
+                and self.config.MaaRoguelike_Squad in ["魂灵护送分队", "博闻广记分队", "蓝图测绘分队", "因地制宜分队"]
+            )
+        ):
             args["squad"] = "指挥分队"
         if self.config.MaaRoguelike_CoreChar:
             args["core_char"] = self.config.MaaRoguelike_CoreChar
-        if self.config.MaaRoguelike_Support != 'no_use':
+        if self.config.MaaRoguelike_Support != "no_use":
             args["use_support"] = True
-        if self.config.MaaRoguelike_Support == 'nonfriend_support':
+        if self.config.MaaRoguelike_Support == "nonfriend_support":
             args["use_nonfriend_support"] = True
-        if self.config.MaaRoguelike_Squad in ["突击战术分队", "堡垒战术分队", "远程战术分队",
-                                              "破坏战术分队"] and self.config.MaaRoguelike_Mode == 4 and self.config.MaaRoguelike_startWithEliteTwo != "no_use":
+        if (
+            self.config.MaaRoguelike_Squad in ["突击战术分队", "堡垒战术分队", "远程战术分队", "破坏战术分队"]
+            and self.config.MaaRoguelike_Mode == 4
+            and self.config.MaaRoguelike_startWithEliteTwo != "no_use"
+        ):
             args["start_with_elite_two"] = True
             args[self.config.MaaRoguelike_startWithEliteTwo] = True
         if self.config.MaaRoguelike_Theme == "Mizuki":
@@ -492,70 +486,64 @@ class AssistantHandler:
 
         self.task_switch_timer = Timer(30).start()
         self.callback_list.append(self.roguelike_callback)
-        self.maa_start('Roguelike', args)
+        self.maa_start("Roguelike", args)
 
         if self.task_switch_timer is not None:
             self.config.Scheduler_Enable = False
 
     def reclamation_algorithm(self):
-        self.maa_start('ReclamationAlgorithm', {
-            "enable": True
-        })
+        self.maa_start("ReclamationAlgorithm", {"enable": True})
         self.config.task_delay(server_update=True)
 
     def copilot(self):
         filename = self.config.MaaCopilot_FileName
-        if filename.startswith('maa://'):
-            logger.info('正在从神秘代码中下载作业')
+        if filename.startswith("maa://"):
+            logger.info("正在从神秘代码中下载作业")
             r = requests.get(f"https://prts.maa.plus/copilot/get/{filename.strip('maa://')}", timeout=30)
             if r.status_code != 200:
-                logger.critical('作业文件下载失败，请检查神秘代码或网络状况')
+                logger.critical("作业文件下载失败，请检查神秘代码或网络状况")
                 raise RequestHumanTakeover
-            logger.info('作业下载完毕')
+            logger.info("作业下载完毕")
 
-            r.encoding = 'utf-8'
-            buf = json.loads(r.text)['data']['content'].encode('utf-8')
-            filename = os.path.join(self.config.MaaEmulator_MaaPath, './resource/_temp_copilot.json')
-            filename = filename.replace('\\', '/').replace('./', '/').replace('//', '/')
-            with open(filename, 'wb') as f:
+            r.encoding = "utf-8"
+            buf = json.loads(r.text)["data"]["content"].encode("utf-8")
+            filename = os.path.join(self.config.MaaEmulator_MaaPath, "./resource/_temp_copilot.json")
+            filename = filename.replace("\\", "/").replace("./", "/").replace("//", "/")
+            with open(filename, "wb") as f:
                 f.write(buf)
 
         homework = read_file(filename)
-        stage = deep_get(homework, keys='stage_name')
+        stage = deep_get(homework, keys="stage_name")
         if not stage:
-            logger.critical('作业文件不存在或已经损坏')
+            logger.critical("作业文件不存在或已经损坏")
             raise RequestHumanTakeover
 
         if self.config.MaaCopilot_Identify:
-            logger.info(deep_get(homework, keys='doc.title', default='标题：无') + '\n')
-            logger.info('\n' + deep_get(homework, keys='doc.details', default='内容：无') + '\n')
-            if deep_get(homework, keys='type') == 'SSS':
-                out = '\n'
-                opers = deep_get(homework, keys='opers')
+            logger.info(deep_get(homework, keys="doc.title", default="标题：无") + "\n")
+            logger.info("\n" + deep_get(homework, keys="doc.details", default="内容：无") + "\n")
+            if deep_get(homework, keys="type") == "SSS":
+                out = "\n"
+                opers = deep_get(homework, keys="opers")
                 if opers:
-                    out += '核心干员：\n'
+                    out += "核心干员：\n"
                     for oper in opers:
-                        out += f'{oper["name"]}，{oper["skill"]}技能\n'
-                    out += '\n'
+                        out += f"{oper['name']}，{oper['skill']}技能\n"
+                    out += "\n"
 
-                tool_men = deep_get(homework, keys='tool_men')
+                tool_men = deep_get(homework, keys="tool_men")
                 if tool_men:
-                    out += f'工具人：{tool_men}\n\n'
+                    out += f"工具人：{tool_men}\n\n"
 
-                equipment = deep_get(homework, keys='equipment')
+                equipment = deep_get(homework, keys="equipment")
                 if equipment:
-                    out += f'战术装备（横向）：{equipment}\n\n'
+                    out += f"战术装备（横向）：{equipment}\n\n"
 
                 logger.info(out)
             return
 
-        args = {
-            "stage_name": stage,
-            "filename": filename,
-            "formation": self.config.MaaCopilot_Formation
-        }
+        args = {"stage_name": stage, "filename": filename, "formation": self.config.MaaCopilot_Formation}
         for i in range(self.config.MaaCopilot_Cycle):
-            if deep_get(homework, keys='type') == 'SSS':
-                self.maa_start('SSSCopilot', args)
+            if deep_get(homework, keys="type") == "SSS":
+                self.maa_start("SSSCopilot", args)
             else:
-                self.maa_start('Copilot', args)
+                self.maa_start("Copilot", args)

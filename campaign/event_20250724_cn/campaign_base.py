@@ -10,29 +10,29 @@ from module.ui.page import page_campaign_menu, page_event
 class CampaignBaseT(CampaignBase_):
     def ui_goto_event(self):
         if self.appear(EVENT_20250724_PT_ICON, offset=(20, 20)) and self.ui_page_appear(page_event):
-            logger.info('Already at EVENT_20250724')
+            logger.info("Already at EVENT_20250724")
             return True
         self.ui_ensure(page_campaign_menu)
         # Check event availability
         if self.is_event_entrance_available():
             self.ui_goto(page_event)
             return True
-    
+
     def campaign_extract_name_image(self, image):
-        if self.config.SERVER == 'en':
+        if self.config.SERVER == "en":
             # EN has small stage name
             digits = []
-            if 'half' in self.config.STAGE_ENTRANCE:
+            if "half" in self.config.STAGE_ENTRANCE:
                 digits += self.campaign_match_multi(
-                    TEMPLATE_STAGE_HALF_PERCENT,
-                    image, self._stage_image_gray,
-                    name_offset=(54, 3), name_size=(60, 10)
+                    TEMPLATE_STAGE_HALF_PERCENT, image, self._stage_image_gray, name_offset=(54, 3), name_size=(60, 10)
                 )
-            if '20240725' in self.config.STAGE_ENTRANCE:
+            if "20240725" in self.config.STAGE_ENTRANCE:
                 digits += self.campaign_match_multi(
                     TEMPLATE_STAGE_CLEAR_20240725,
-                    image, self._stage_image_gray,
-                    name_offset=(73, 2), name_size=(60, 10)
+                    image,
+                    self._stage_image_gray,
+                    name_offset=(73, 2),
+                    name_size=(60, 10),
                 )
             return digits
 
@@ -40,13 +40,13 @@ class CampaignBaseT(CampaignBase_):
 
 
 class CampaignBaseTS(CampaignBaseT):
-    def campaign_set_chapter_20241219(self, chapter, stage, mode='combat'):
+    def campaign_set_chapter_20241219(self, chapter, stage, mode="combat"):
         if self.config.MAP_CHAPTER_SWITCH_20241219:
             # TS is hard mode
-            if chapter in ['ts']:
+            if chapter in ["ts"]:
                 self.ui_goto_event()
-                self.campaign_ensure_mode_20241219('combat')
-                self.campaign_ensure_aside_20241219('part2')
+                self.campaign_ensure_mode_20241219("combat")
+                self.campaign_ensure_aside_20241219("part2")
                 self.campaign_ensure_chapter(chapter)
                 return True
         return super().campaign_set_chapter_20241219(chapter, stage, mode)

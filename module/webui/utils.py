@@ -11,7 +11,8 @@ from typing import Callable, Generator, List
 import pywebio
 from pywebio.input import PASSWORD, input
 from pywebio.output import PopupSize, popup, put_html, toast
-from pywebio.session import eval_js, info as session_info, register_thread, run_js
+from pywebio.session import eval_js, register_thread, run_js
+from pywebio.session import info as session_info
 from rich.console import Console
 from rich.terminal_theme import TerminalTheme
 
@@ -93,9 +94,7 @@ class QueueHandler:
 
 
 class Task:
-    def __init__(
-        self, g: Generator, delay: float, next_run: float = None, name: str = None
-    ) -> None:
+    def __init__(self, g: Generator, delay: float, next_run: float = None, name: str = None) -> None:
         self.g = g
         g.send(None)
         self.delay = delay
@@ -157,9 +156,7 @@ class TaskHandler:
             self.tasks.remove(task)
             logger.info(f"Task {task} removed.")
         else:
-            logger.warning(
-                f"Failed to remove task {task}. Current tasks list: {self.tasks}"
-            )
+            logger.warning(f"Failed to remove task {task}. Current tasks list: {self.tasks}")
 
     def remove_task(self, task: Task, nowait: bool = False) -> None:
         """
@@ -368,13 +365,13 @@ def filepath_icon(filename):
 
 
 def add_css(filepath):
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         css = f.read().replace("\n", "")
         run_js(f"""$('head').append('<style>{css}</style>')""")
 
 
 def _read(path):
-    with open(path, "r") as f:
+    with open(path) as f:
         return f.read()
 
 
@@ -476,11 +473,7 @@ def re_fullmatch(pattern, string):
 
 def get_next_time(t: datetime.time):
     now = datetime.datetime.today().time()
-    second = (
-        (t.hour - now.hour) * 3600
-        + (t.minute - now.minute) * 60
-        + (t.second - now.second)
-    )
+    second = (t.hour - now.hour) * 3600 + (t.minute - now.minute) * 60 + (t.second - now.second)
     if second < 0:
         second += 86400
     return second
@@ -489,31 +482,23 @@ def get_next_time(t: datetime.time):
 def on_task_exception(self):
     logger.exception("An internal error occurred in the application")
     toast_msg = (
-        "应用发生内部错误"
-        if "zh" in session_info.user_language
-        else "An internal error occurred in the application"
+        "应用发生内部错误" if "zh" in session_info.user_language else "An internal error occurred in the application"
     )
 
     e_type, e_value, e_tb = sys.exc_info()
     lines = traceback.format_exception(e_type, e_value, e_tb)
     traceback_msg = "".join(lines)
 
-    traceback_console = Console(
-        color_system="truecolor", tab_size=2, record=True, width=90
-    )
+    traceback_console = Console(color_system="truecolor", tab_size=2, record=True, width=90)
     with traceback_console.capture():  # prevent logging to stdout again
-        traceback_console.print_exception(
-            word_wrap=True, extra_lines=1, show_locals=True
-        )
+        traceback_console.print_exception(word_wrap=True, extra_lines=1, show_locals=True)
 
     if State.theme == "dark":
         theme = DARK_TERMINAL_THEME
     else:
         theme = LIGHT_TERMINAL_THEME
 
-    html = traceback_console.export_html(
-        theme=theme, code_format=TRACEBACK_CODE_FORMAT, inline_styles=True
-    )
+    html = traceback_console.export_html(theme=theme, code_format=TRACEBACK_CODE_FORMAT, inline_styles=True)
     try:
         popup(title=toast_msg, content=put_html(html), size=PopupSize.LARGE)
         run_js(

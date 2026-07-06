@@ -44,8 +44,9 @@ class FgoAutoScript(AzurLaneAutoScript):
         app = FGOpy(
             self.config.FpyEmulator_LaunchPath,
             {
-                "Special Drop": lambda:
-                    setattr(self.config, "FpyLimit_SpecialDrop", max(0, getattr(self.config, "FpyLimit_SpecialDrop") - 1)),
+                "Special Drop": lambda: setattr(
+                    self.config, "FpyLimit_SpecialDrop", max(0, getattr(self.config, "FpyLimit_SpecialDrop") - 1)
+                ),
             },
         )
         assert app.run("ping")
@@ -91,7 +92,9 @@ class FgoAutoScript(AzurLaneAutoScript):
         assert self.app.run("battle")
 
     def fpy_benchmark(self):
-        assert self.app.run(f"bench {dict([('touch','-i'),('screen','-o'),('all','')])[self.config.FpyBenchmark_BenchOption]}")
+        assert self.app.run(
+            f"bench {dict([('touch', '-i'), ('screen', '-o'), ('all', '')])[self.config.FpyBenchmark_BenchOption]}"
+        )
 
     def fpy_call(self):
         assert self.app.run(f"call {self.config.FpyCall_Function}")

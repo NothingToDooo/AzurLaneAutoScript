@@ -5,22 +5,24 @@ from module.ui.assets import WAR_ARCHIVES_CHECK
 from module.ui.page import page_archives
 from module.ui.scroll import Scroll
 from module.ui.switch import Switch
-from module.war_archives.assets import (WAR_ARCHIVES_CAMPAIGN_CHECK,
-                                        WAR_ARCHIVES_EX_ON,
-                                        WAR_ARCHIVES_SCROLL,
-                                        WAR_ARCHIVES_SP_ON)
+from module.war_archives.assets import (
+    WAR_ARCHIVES_CAMPAIGN_CHECK,
+    WAR_ARCHIVES_EX_ON,
+    WAR_ARCHIVES_SCROLL,
+    WAR_ARCHIVES_SP_ON,
+)
 from module.war_archives.dictionary import dic_archives_template
 
-WAR_ARCHIVES_SWITCH = Switch('War_Archives_switch', is_selector=True)
-WAR_ARCHIVES_SWITCH.add_state('ex', WAR_ARCHIVES_EX_ON)
-WAR_ARCHIVES_SWITCH.add_state('sp', WAR_ARCHIVES_SP_ON)
-WAR_ARCHIVES_SCROLL = Scroll(WAR_ARCHIVES_SCROLL, color=(247, 211, 66), name='WAR_ARCHIVES_SCROLL')
+WAR_ARCHIVES_SWITCH = Switch("War_Archives_switch", is_selector=True)
+WAR_ARCHIVES_SWITCH.add_state("ex", WAR_ARCHIVES_EX_ON)
+WAR_ARCHIVES_SWITCH.add_state("sp", WAR_ARCHIVES_SP_ON)
+WAR_ARCHIVES_SCROLL = Scroll(WAR_ARCHIVES_SCROLL, color=(247, 211, 66), name="WAR_ARCHIVES_SCROLL")
 
 
 class CampaignBase(CampaignBase_):
     # Helper variable to keep track of whether is the first runthrough
     first_run = True
-    ENEMY_FILTER = '1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M'
+    ENEMY_FILTER = "1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M"
 
     def _get_archives_entrance(self, name):
         """
@@ -65,7 +67,7 @@ class CampaignBase(CampaignBase_):
             else:
                 self.device.screenshot()
 
-            while self.device.click_record and self.device.click_record[-1] == 'WAR_ARCHIVES_SCROLL':
+            while self.device.click_record and self.device.click_record[-1] == "WAR_ARCHIVES_SCROLL":
                 self.device.click_record.pop()
 
             # Drag may result in accidental exit, recover
@@ -100,10 +102,10 @@ class CampaignBase(CampaignBase_):
             else:
                 break
 
-        logger.warning('Failed to find archives entrance')
+        logger.warning("Failed to find archives entrance")
         return None
 
-    def ui_goto_archives_campaign(self, mode='ex'):
+    def ui_goto_archives_campaign(self, mode="ex"):
         """
         Performs the operations needed to transition
         to target archive's campaign stage map
@@ -120,11 +122,17 @@ class CampaignBase(CampaignBase_):
 
             entrance = self._search_archives_entrance(self.config.Campaign_Event)
             if entrance is not None:
-                self.ui_click(entrance, appear_button=WAR_ARCHIVES_CHECK, check_button=WAR_ARCHIVES_CAMPAIGN_CHECK,
-                              skip_first_screenshot=True)
+                self.ui_click(
+                    entrance,
+                    appear_button=WAR_ARCHIVES_CHECK,
+                    check_button=WAR_ARCHIVES_CAMPAIGN_CHECK,
+                    skip_first_screenshot=True,
+                )
             else:
-                logger.critical('Respective server may not yet support the chosen War Archives campaign, '
-                                'check back in the next app update')
+                logger.critical(
+                    "Respective server may not yet support the chosen War Archives campaign, "
+                    "check back in the next app update"
+                )
                 raise RequestHumanTakeover
 
         # Subsequent runs all set False
@@ -138,11 +146,11 @@ class CampaignBase(CampaignBase_):
         Overridden to handle specifically transitions
         to target ex event in page_archives
         """
-        return self.ui_goto_archives_campaign(mode='ex')
+        return self.ui_goto_archives_campaign(mode="ex")
 
     def ui_goto_sp(self):
         """
         Overridden to handle specifically transitions
         to target sp event in page_archives
         """
-        return self.ui_goto_archives_campaign(mode='sp')
+        return self.ui_goto_archives_campaign(mode="sp")

@@ -14,12 +14,12 @@ class Config:
     # Ambushes can be avoid by having more DDs.
     MAP_WALK_TURNING_OPTIMIZE = False
     MAP_HAS_MYSTERY = False
-    MAP_ENEMY_TEMPLATE = ['Light', 'Main', 'Carrier', 'CarrierSpecial']
+    MAP_ENEMY_TEMPLATE = ["Light", "Main", "Carrier", "CarrierSpecial"]
     INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
-        'height': (80, 255 - 33),
-        'width': (0.9, 10),
-        'prominence': 10,
-        'distance': 35,
+        "height": (80, 255 - 33),
+        "width": (0.9, 10),
+        "prominence": 10,
+        "distance": 35,
     }
     HOMO_CANNY_THRESHOLD = (50, 100)
     MAP_SWIPE_MULTIPLY = (0.993, 1.011)
@@ -28,20 +28,20 @@ class Config:
 
 
 class W15GridInfo(GridInfo):
-    def merge(self, info, mode='normal'):
+    def merge(self, info, mode="normal"):
         # Consider boss as siren
         if info.is_boss:
             if not self.is_land and self.may_siren:
                 self.is_siren = True
                 self.enemy_scale = 0
-                self.enemy_genre = ''
+                self.enemy_genre = ""
                 return True
 
         return super().merge(info, mode=mode)
 
 
 class CampaignBase(CampaignBase_):
-    ENEMY_FILTER = '1L > 1M > 1E > 2L > 3L > 2M > 2E > 1C > 2C > 3M > 3E > 3C'
+    ENEMY_FILTER = "1L > 1M > 1E > 2L > 3L > 2M > 2E > 1C > 2C > 3M > 3E > 3C"
 
     map_has_mob_move = True
 
@@ -61,11 +61,11 @@ class CampaignBase(CampaignBase_):
             2. Manhattan distance between location and target is 1.
             3. location is a mob fleet
             4. target is a sea grid
-        
+
         Args:
             location (tuple): Location of mob.
             target (tuple): Destination.
-        
+
         Returns:
             bool: if movable.
         """
@@ -74,25 +74,25 @@ class CampaignBase(CampaignBase_):
         movable = True
 
         try:
-            logger.info(f'location: {self.map[location]}, target: {self.map[target]}')
+            logger.info(f"location: {self.map[location]}, target: {self.map[target]}")
         except KeyError as e:
-            logger.exception(f'Given coordinates are outside the map.')
+            logger.exception("Given coordinates are outside the map.")
             raise e
 
         if abs(location[0] - target[0]) + abs(location[1] - target[1]) != 1:
-            logger.error(f'{self.map[target]} is not adjacent from {self.map[location]}.')
+            logger.error(f"{self.map[target]} is not adjacent from {self.map[location]}.")
             movable = False
 
         if not self.map[location].is_enemy:
-            logger.error(f'{self.map[location]} is not a mob fleet.')
+            logger.error(f"{self.map[location]} is not a mob fleet.")
             movable = False
 
         if not self.map[target].is_sea:
-            logger.error(f'{self.map[target]} is not a sea grid.')
+            logger.error(f"{self.map[target]} is not a sea grid.")
             movable = False
 
         if not movable:
-            logger.error(f'Cannot move from {self.map[location]} to {self.map[target]}.')
+            logger.error(f"Cannot move from {self.map[location]} to {self.map[target]}.")
 
         return movable
 
@@ -100,13 +100,13 @@ class CampaignBase(CampaignBase_):
         """
         Move mob from location to target, and confirm if successfully moved.
 
-        Args: 
+        Args:
             location (tuple, str, GridInfo): Location of mob.
             target (tuple, str, GridInfo): Destination.
-        
+
         Returns:
             bool: If mob moved.
-        
+
         Pages:
             in: MOB_MOVE_CANCEL
             out: STRATEGY_OPENED
@@ -114,15 +114,14 @@ class CampaignBase(CampaignBase_):
         location = location_ensure(location)
         target = location_ensure(target)
 
-        view_target = SelectedGrids([self.map[location], self.map[target]]) \
-            .sort_by_camera_distance(self.camera)[1]
+        view_target = SelectedGrids([self.map[location], self.map[target]]).sort_by_camera_distance(self.camera)[1]
         self.in_sight(view_target)
         origin_grid = self.convert_global_to_local(location)
         origin_grid.__str__ = location
         target_grid = self.convert_global_to_local(target)
         target_grid.__str__ = target
 
-        logger.info('Select mob to move')
+        logger.info("Select mob to move")
         skip_first_screenshot = True
         interval = Timer(2, count=4)
         while 1:
@@ -142,7 +141,7 @@ class CampaignBase(CampaignBase_):
                 interval.reset()
                 continue
 
-        logger.info('Select target grid')
+        logger.info("Select target grid")
         skip_first_screenshot = True
         interval = Timer(2, count=4)
         while 1:
@@ -159,7 +158,7 @@ class CampaignBase(CampaignBase_):
                 self.device.click(target_grid)
                 interval.reset()
                 continue
-            if self.handle_popup_confirm('MOB_MOVE'):
+            if self.handle_popup_confirm("MOB_MOVE"):
                 continue
 
     def _mob_move_info_change(self, location, target):
@@ -182,7 +181,7 @@ class CampaignBase(CampaignBase_):
         Args:
             location (tuple, str, GridInfo): Location of mob.
             target (tuple, str, GridInfo): Destination.
-            
+
         Returns:
             bool: If mob moved
 
@@ -195,7 +194,7 @@ class CampaignBase(CampaignBase_):
 
         self.strategy_open()
         if not self.strategy_has_mob_move():
-            logger.warning(f'No remain mob move trials, will abandon moving')
+            logger.warning("No remain mob move trials, will abandon moving")
             self.strategy_close()
             return False
         self.strategy_mob_move_enter()

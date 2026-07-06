@@ -7,23 +7,23 @@ from PIL import Image
 from module.exception import RequestHumanTakeover
 from module.logger import logger
 
-logger.info('Loading OCR dependencies')
+logger.info("Loading OCR dependencies")
 from cnocr import CnOcr
-from cnocr.cn_ocr import (check_model_name, data_dir, gen_network, load_module,
-                          read_charset)
+from cnocr.cn_ocr import check_model_name, data_dir, gen_network, load_module, read_charset
 from cnocr.fit.ctc_metrics import CtcMetrics
 from cnocr.hyperparams.cn_hyperparams import CnHyperparams as Hyperparams
+
 from module.device.pkg_resources import PACKAGE_CACHE
 
 
 def get_mxnet_context():
     for dist in PACKAGE_CACHE.dict_installed_packages.values():
         # mxnet_cu101
-        if dist.dist.startswith('mxnet_cu'):
-            logger.info(f'MXNet gpu package: {dist.dist}=={dist.version} found, using it')
-            return 'gpu'
+        if dist.dist.startswith("mxnet_cu"):
+            logger.info(f"MXNet gpu package: {dist.dist}=={dist.version} found, using it")
+            return "gpu"
 
-    return 'cpu'
+    return "cpu"
 
 
 class AlOcr(CnOcr):
@@ -32,25 +32,26 @@ class AlOcr(CnOcr):
     CNOCR_CONTEXT = get_mxnet_context()
 
     def __init__(
-            self,
-            model_name='densenet-lite-gru',
-            model_epoch=None,
-            cand_alphabet=None,
-            root=data_dir(),
-            context='cpu',
-            name=None,
+        self,
+        model_name="densenet-lite-gru",
+        model_epoch=None,
+        cand_alphabet=None,
+        root=data_dir(),
+        context="cpu",
+        name=None,
     ):
         self._args = (model_name, model_epoch, cand_alphabet, root, context, name)
         self._model_loaded = False
 
-    def init(self,
-             model_name='densenet-lite-gru',
-             model_epoch=None,
-             cand_alphabet=None,
-             root=data_dir(),
-             context='cpu',
-             name=None,
-             ):
+    def init(
+        self,
+        model_name="densenet-lite-gru",
+        model_epoch=None,
+        cand_alphabet=None,
+        root=data_dir(),
+        context="cpu",
+        name=None,
+    ):
         """
 
         :param model_name: 模型名称
@@ -64,14 +65,12 @@ class AlOcr(CnOcr):
         """
         check_model_name(model_name)
         self._model_name = model_name
-        self._model_file_prefix = '{}-{}'.format(self.MODEL_FILE_PREFIX, model_name)
+        self._model_file_prefix = f"{self.MODEL_FILE_PREFIX}-{model_name}"
         self._model_epoch = model_epoch
 
         self._model_dir = root  # Change folder structure.
         self._assert_and_prepare_model_files()
-        self._alphabet, self._inv_alph_dict = read_charset(
-            os.path.join(self._model_dir, 'label_cn.txt')
-        )
+        self._alphabet, self._inv_alph_dict = read_charset(os.path.join(self._model_dir, "label_cn.txt"))
 
         self._cand_alph_idx = None
         # Alphabet will be set before calling ocr.
@@ -81,7 +80,7 @@ class AlOcr(CnOcr):
         self._hp._loss_type = None  # infer mode
         self._hp._num_classes = len(self._alphabet)
         # 传入''的话，也改成传入None
-        self._net_prefix = None if name == '' else name
+        self._net_prefix = None if name == "" else name
 
         self._mod = self._get_module(AlOcr.CNOCR_CONTEXT)
 
@@ -148,16 +147,16 @@ class AlOcr(CnOcr):
     def _assert_and_prepare_model_files(self):
         model_dir = self._model_dir
         model_files = [
-            'label_cn.txt',
-            '%s-%04d.params' % (self._model_file_prefix, self._model_epoch),
-            '%s-symbol.json' % self._model_file_prefix,
+            "label_cn.txt",
+            "%s-%04d.params" % (self._model_file_prefix, self._model_epoch),
+            "%s-symbol.json" % self._model_file_prefix,
         ]
         file_prepared = True
         for f in model_files:
             f = os.path.join(model_dir, f)
             if not os.path.exists(f):
                 file_prepared = False
-                logger.warning('can not find file %s', f)
+                logger.warning("can not find file %s", f)
                 break
 
         if file_prepared:
@@ -165,18 +164,18 @@ class AlOcr(CnOcr):
 
         # Disable auto downloading cnocr models when model not found.
         # get_model_file(model_dir)
-        logger.warning(f'Ocr model not prepared: {model_dir}')
-        logger.warning(f'Required files: {model_files}')
-        logger.critical('Please check if required files of pre-trained OCR model exist')
+        logger.warning(f"Ocr model not prepared: {model_dir}")
+        logger.warning(f"Required files: {model_files}")
+        logger.critical("Please check if required files of pre-trained OCR model exist")
         raise RequestHumanTakeover
 
     def _get_module(self, context):
         network, self._hp = gen_network(self._model_name, self._hp, self._net_prefix)
         hp = self._hp
         prefix = os.path.join(self._model_dir, self._model_file_prefix)
-        data_names = ['data']
+        data_names = ["data"]
         data_shapes = [(data_names[0], (hp.batch_size, 1, hp.img_height, hp.img_width))]
-        logger.info('Loading OCR model: %s' % self._model_dir)  # Change log appearance.
+        logger.info("Loading OCR model: %s" % self._model_dir)  # Change log appearance.
         mod = load_module(
             prefix,
             self._model_epoch,
@@ -199,7 +198,7 @@ class AlOcr(CnOcr):
         # Resize image using `cv2.resize` instead of `mxnet.image.imresize`
         new_width = int(round(self._hp.img_height / img.shape[0] * img.shape[1]))
         img = cv2.resize(img, (new_width, self._hp.img_height))
-        img = np.expand_dims(img, 0).astype('float32') / 255.0
+        img = np.expand_dims(img, 0).astype("float32") / 255.0
         return img
 
     def _gen_line_pred_chars(self, line_prob, img_width, max_img_width):
@@ -221,7 +220,7 @@ class AlOcr(CnOcr):
                 class_ids[end_idx:] = 0
         prediction, start_end_idx = CtcMetrics.ctc_label(class_ids.tolist())
         alphabet = self._alphabet
-        res = [alphabet[p] if alphabet[p] != '<space>' else ' ' for p in prediction]
+        res = [alphabet[p] if alphabet[p] != "<space>" else " " for p in prediction]
 
         return res
 

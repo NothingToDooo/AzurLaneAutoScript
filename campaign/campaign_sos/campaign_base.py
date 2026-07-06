@@ -10,7 +10,7 @@ class ConfigBase:
 
 
 class CampaignBase(CampaignBase_):
-    ENEMY_FILTER = '1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M'
+    ENEMY_FILTER = "1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M"
 
     def campaign_get_entrance(self, name):
         """
@@ -23,7 +23,7 @@ class CampaignBase(CampaignBase_):
         Returns:
             Button:
         """
-        if '-5' not in name:
+        if "-5" not in name:
             return super().campaign_get_entrance(name)
 
         sim, button = TEMPLATE_STAGE_SOS.match_result(self.device.image)

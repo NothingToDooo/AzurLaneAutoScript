@@ -1,15 +1,15 @@
 from module.logger import logger
 from module.map.map_base import CampaignMap
-from module.map.map_grids import SelectedGrids, RoadGrids
+from module.map.map_grids import RoadGrids, SelectedGrids
 
 from .campaign_15_base import CampaignBase, W15GridInfo
 from .campaign_15_base import Config as ConfigBase
 
-MAP = CampaignMap('15-4')
+MAP = CampaignMap("15-4")
 MAP.grid_class = W15GridInfo
-MAP.shape = 'K9'
-MAP.camera_data = ['C2', 'C5', 'C7', 'F2', 'F5', 'F7', 'H2', 'H5', 'H7']
-MAP.camera_data_spawn_point = ['H2']
+MAP.shape = "K9"
+MAP.camera_data = ["C2", "C5", "C7", "F2", "F5", "F7", "H2", "H5", "H7"]
+MAP.camera_data_spawn_point = ["H2"]
 MAP.camera_sight = (-2, -1, 3, 2)
 MAP.map_data = """
     Me -- ME ME Me -- ME ++ ++ ME ME
@@ -34,26 +34,117 @@ MAP.weight_data = """
     50 50 50 50 50 50 50 50 50 50 50
 """
 MAP.spawn_data = [
-    {'battle': 0, 'enemy': 8},
-    {'battle': 1, 'enemy': 1},
-    {'battle': 2, 'enemy': 1},
-    {'battle': 3, 'enemy': 1, 'siren': 1},
-    {'battle': 4, 'enemy': 2},
-    {'battle': 5},
-    {'battle': 6, 'siren': 1},
-    {'battle': 7, 'enemy': 1},
-    {'battle': 8, 'boss': 1},
+    {"battle": 0, "enemy": 8},
+    {"battle": 1, "enemy": 1},
+    {"battle": 2, "enemy": 1},
+    {"battle": 3, "enemy": 1, "siren": 1},
+    {"battle": 4, "enemy": 2},
+    {"battle": 5},
+    {"battle": 6, "siren": 1},
+    {"battle": 7, "enemy": 1},
+    {"battle": 8, "boss": 1},
 ]
-A1, B1, C1, D1, E1, F1, G1, H1, I1, J1, K1, \
-A2, B2, C2, D2, E2, F2, G2, H2, I2, J2, K2, \
-A3, B3, C3, D3, E3, F3, G3, H3, I3, J3, K3, \
-A4, B4, C4, D4, E4, F4, G4, H4, I4, J4, K4, \
-A5, B5, C5, D5, E5, F5, G5, H5, I5, J5, K5, \
-A6, B6, C6, D6, E6, F6, G6, H6, I6, J6, K6, \
-A7, B7, C7, D7, E7, F7, G7, H7, I7, J7, K7, \
-A8, B8, C8, D8, E8, F8, G8, H8, I8, J8, K8, \
-A9, B9, C9, D9, E9, F9, G9, H9, I9, J9, K9, \
-    = MAP.flatten()
+(
+    A1,
+    B1,
+    C1,
+    D1,
+    E1,
+    F1,
+    G1,
+    H1,
+    I1,
+    J1,
+    K1,
+    A2,
+    B2,
+    C2,
+    D2,
+    E2,
+    F2,
+    G2,
+    H2,
+    I2,
+    J2,
+    K2,
+    A3,
+    B3,
+    C3,
+    D3,
+    E3,
+    F3,
+    G3,
+    H3,
+    I3,
+    J3,
+    K3,
+    A4,
+    B4,
+    C4,
+    D4,
+    E4,
+    F4,
+    G4,
+    H4,
+    I4,
+    J4,
+    K4,
+    A5,
+    B5,
+    C5,
+    D5,
+    E5,
+    F5,
+    G5,
+    H5,
+    I5,
+    J5,
+    K5,
+    A6,
+    B6,
+    C6,
+    D6,
+    E6,
+    F6,
+    G6,
+    H6,
+    I6,
+    J6,
+    K6,
+    A7,
+    B7,
+    C7,
+    D7,
+    E7,
+    F7,
+    G7,
+    H7,
+    I7,
+    J7,
+    K7,
+    A8,
+    B8,
+    C8,
+    D8,
+    E8,
+    F8,
+    G8,
+    H8,
+    I8,
+    J8,
+    K8,
+    A9,
+    B9,
+    C9,
+    D9,
+    E9,
+    F9,
+    G9,
+    H9,
+    I9,
+    J9,
+    K9,
+) = MAP.flatten()
 
 
 class Config(ConfigBase):
@@ -80,10 +171,9 @@ class Campaign(CampaignBase):
         if not self.config.MAP_CLEAR_ALL_THIS_TIME:
             return super().battle_function()
 
-        if self.battle_count in [3, 6] \
-                or (self.battle_count in [0, 1] and not self.map_is_clear_mode):
+        if self.battle_count in [3, 6] or (self.battle_count in [0, 1] and not self.map_is_clear_mode):
             func = self.FUNCTION_NAME_BASE + str(self.battle_count)
-            logger.info(f'Using function: {func}')
+            logger.info(f"Using function: {func}")
             func = self.__getattribute__(func)
             result = func()
             return result
@@ -121,12 +211,12 @@ class Campaign(CampaignBase):
 
     def battle_3(self):
         if not self.map_is_clear_mode:
-            self.fleet_boss.clear_chosen_enemy(H5, expected='siren')
+            self.fleet_boss.clear_chosen_enemy(H5, expected="siren")
             self.fleet_1.switch_to()
             return True
         else:
             self.pick_up_ammo()
-            self.clear_chosen_enemy(H5, expected='siren')
+            self.clear_chosen_enemy(H5, expected="siren")
             return True
 
     def battle_4(self):
@@ -138,7 +228,7 @@ class Campaign(CampaignBase):
         return self.battle_default()
 
     def battle_6(self):
-        self.clear_chosen_enemy(D3, expected='siren')
+        self.clear_chosen_enemy(D3, expected="siren")
         return True
 
     def battle_7(self):

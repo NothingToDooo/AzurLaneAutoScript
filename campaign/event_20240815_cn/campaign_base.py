@@ -18,8 +18,8 @@ class CampaignBase(CampaignBase_):
         # 5 story stage after clearing A2
         # You can't go anywhere unless you clicked it
         button = self.image_color_button(
-            area=(66, 200, 1200, 690), color=(0, 0, 0),
-            color_threshold=240, encourage=10, name='STORY_ENTRANCE')
+            area=(66, 200, 1200, 690), color=(0, 0, 0), color_threshold=240, encourage=10, name="STORY_ENTRANCE"
+        )
         if button is None:
             return None
         # Blacklisted area
@@ -40,7 +40,7 @@ class CampaignBase(CampaignBase_):
         return True
 
     def ensure_no_stage_entrance(self, skip_first_screenshot=True):
-        logger.info('ensure_no_stage_entrance')
+        logger.info("ensure_no_stage_entrance")
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -52,7 +52,7 @@ class CampaignBase(CampaignBase_):
                 try:
                     self._get_stage_name(self.device.image)
                     return True
-                except (IndexError, CampaignNameError):
+                except IndexError, CampaignNameError:
                     pass
                 # Click
                 if self.handle_story_entrance():

@@ -53,5 +53,25 @@ dev = [
 line-length = 120
 target-version = "py314"
 
+[tool.ruff.lint]
+select = [
+    "E713",
+    "F541",
+    "I",
+    "RUF100",
+    "UP004",
+    "UP008",
+    "UP015",
+    "UP025",
+    "UP032",
+    "UP034",
+    "UP037",
+    "UP039",
+    "UP041",
+]
+ignore = [
+    "E501",
+]
+
 [tool.ty.environment]
 python-version = "3.14"

@@ -1,13 +1,13 @@
-from module.map.map_base import CampaignMap
-from module.map.map_grids import SelectedGrids, RoadGrids
 from module.logger import logger
+from module.map.map_base import CampaignMap
+from module.map.map_grids import RoadGrids, SelectedGrids
 
 from .campaign_base import CampaignBase
 
-MAP = CampaignMap('TSS1')
-MAP.shape = 'E7'
-MAP.camera_data = ['C3']
-MAP.camera_data_spawn_point = ['C3']
+MAP = CampaignMap("TSS1")
+MAP.shape = "E7"
+MAP.camera_data = ["C3"]
+MAP.camera_data_spawn_point = ["C3"]
 MAP.map_data = """
     -- ++ -- ++ --
     -- -- -- -- --
@@ -27,16 +27,45 @@ MAP.weight_data = """
     50 50 50 50 50
 """
 MAP.spawn_data = [
-    {'battle': 0, 'boss': 1},
+    {"battle": 0, "boss": 1},
 ]
-A1, B1, C1, D1, E1, \
-A2, B2, C2, D2, E2, \
-A3, B3, C3, D3, E3, \
-A4, B4, C4, D4, E4, \
-A5, B5, C5, D5, E5, \
-A6, B6, C6, D6, E6, \
-A7, B7, C7, D7, E7, \
-    = MAP.flatten()
+(
+    A1,
+    B1,
+    C1,
+    D1,
+    E1,
+    A2,
+    B2,
+    C2,
+    D2,
+    E2,
+    A3,
+    B3,
+    C3,
+    D3,
+    E3,
+    A4,
+    B4,
+    C4,
+    D4,
+    E4,
+    A5,
+    B5,
+    C5,
+    D5,
+    E5,
+    A6,
+    B6,
+    C6,
+    D6,
+    E6,
+    A7,
+    B7,
+    C7,
+    D7,
+    E7,
+) = MAP.flatten()
 
 
 class Config:
@@ -54,7 +83,7 @@ class Config:
 
 class Campaign(CampaignBase):
     MAP = MAP
-    ENEMY_FILTER = '1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C'
+    ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
     def battle_0(self):
         return self.clear_boss()

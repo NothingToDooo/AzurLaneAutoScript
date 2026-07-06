@@ -4,7 +4,7 @@ from module.logger import logger
 from module.map.assets import FLEET_SUPPORT_EMPTY
 from module.map_detection.utils_assets import ASSETS
 
-MASK_MAP_UI_SUPPORT = Mask(file='./assets/mask/MASK_MAP_UI_SUPPORT.png')
+MASK_MAP_UI_SUPPORT = Mask(file="./assets/mask/MASK_MAP_UI_SUPPORT.png")
 
 
 class CampaignBase(CampaignBase_):

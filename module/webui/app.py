@@ -135,10 +135,7 @@ class AlasGUI(Frame):
             buttons=[{"label": t("Gui.Aside.Home"), "value": "Home", "color": "aside"}],
             onclick=[self.ui_develop],
         )
-        put_scope("aside_instance", [
-            put_scope(f"alas-instance-{i}", [])
-            for i, _ in enumerate(alas_instance())
-        ])
+        put_scope("aside_instance", [put_scope(f"alas-instance-{i}", []) for i, _ in enumerate(alas_instance())])
         self.set_aside_status()
         put_icon_buttons(
             Icon.SETTING,
@@ -152,7 +149,6 @@ class AlasGUI(Frame):
             onclick=[lambda: go_app("manage", new_window=False)],
         )
 
-
     @use_scope("aside_instance")
     def set_aside_status(self) -> None:
         flag = True
@@ -162,7 +158,7 @@ class AlasGUI(Frame):
                 icon_html = Icon.RUN
                 rendered_state = ProcessManager.get_manager(inst).state
                 if rendered_state == 1 and self.af_flag:
-                    icon_html = icon_html[:31] + ' anim-rotate' + icon_html[31:]
+                    icon_html = icon_html[:31] + " anim-rotate" + icon_html[31:]
                 put_icon_buttons(
                     icon_html,
                     buttons=[{"label": name, "value": name, "color": "aside"}],
@@ -241,7 +237,7 @@ class AlasGUI(Frame):
                 }
             ],
             onclick=[self.alas_overview],
-        ).style(f"--menu-Overview--")
+        ).style("--menu-Overview--")
 
         for menu, task_data in self.ALAS_MENU.items():
             if task_data.get("page") == "tool":
@@ -271,7 +267,7 @@ class AlasGUI(Frame):
                     '<span class="hr-task-group-line"></span>'
                     f'<span class="hr-task-group-text">{title}</span>'
                     '<span class="hr-task-group-line"></span>'
-                    '</div>'
+                    "</div>"
                 )
                 for task in task_data.get("tasks", []):
                     put_buttons(
@@ -283,7 +279,7 @@ class AlasGUI(Frame):
                             }
                         ],
                         onclick=_onclick,
-                    ).style(f"--menu-{task}--").style(f"padding-left: 0.75rem")
+                    ).style(f"--menu-{task}--").style("padding-left: 0.75rem")
 
         self.alas_overview()
 
@@ -336,9 +332,7 @@ class AlasGUI(Frame):
             output_kwargs["title"] = t(f"{group_name}.{arg_name}.name")
 
             # Get value from config
-            value = deep_get(
-                config, [task, group_name, arg_name], output_kwargs["value"]
-            )
+            value = deep_get(config, [task, group_name, arg_name], output_kwargs["value"])
             # idk
             value = str(value) if isinstance(value, datetime) else value
             # Default value
@@ -411,7 +405,7 @@ class AlasGUI(Frame):
     @use_scope("content", clear=True)
     def alas_overview(self) -> None:
         self.init_menu(name="Overview")
-        self.set_title(t(f"Gui.MenuAlas.Overview"))
+        self.set_title(t("Gui.MenuAlas.Overview"))
 
         put_scope("overview", [put_scope("schedulers"), put_scope("logs")])
 
@@ -419,9 +413,7 @@ class AlasGUI(Frame):
             put_scope(
                 "scheduler-bar",
                 [
-                    put_text(t("Gui.Overview.Scheduler")).style(
-                        "font-size: 1.25rem; margin: auto .5rem auto;"
-                    ),
+                    put_text(t("Gui.Overview.Scheduler")).style("font-size: 1.25rem; margin: auto .5rem auto;"),
                     put_scope("scheduler_btn"),
                 ],
             )
@@ -467,9 +459,7 @@ class AlasGUI(Frame):
             put_scope(
                 "log-bar",
                 [
-                    put_text(t("Gui.Overview.Log")).style(
-                        "font-size: 1.25rem; margin: auto .5rem auto;"
-                    ),
+                    put_text(t("Gui.Overview.Log")).style("font-size: 1.25rem; margin: auto .5rem auto;"),
                     put_scope(
                         "log-bar-btns",
                         [
@@ -503,9 +493,7 @@ class AlasGUI(Frame):
             self.modified_config_queue.put({"name": path, "value": value})
 
         for path in get_alas_config_listen_path(self.ALAS_ARGS):
-            pin_on_change(
-                name="_".join(path), onchange=partial(put_queue, ".".join(path))
-            )
+            pin_on_change(name="_".join(path), onchange=partial(put_queue, ".".join(path)))
         logger.info("Init config watcher done.")
 
     def _alas_thread_update_config(self) -> None:
@@ -528,10 +516,10 @@ class AlasGUI(Frame):
                     break
 
     def _save_config(
-            self,
-            modified: Dict[str, str],
-            config_name: str,
-            config_updater: AzurLaneConfig = State.config_updater,
+        self,
+        modified: Dict[str, str],
+        config_name: str,
+        config_updater: AzurLaneConfig = State.config_updater,
     ) -> None:
         try:
             valid = []
@@ -539,9 +527,9 @@ class AlasGUI(Frame):
             config = config_updater.read_file(config_name)
             n = datetime.now()
             for p, v in deep_iter(config, depth=3):
-                if p[-1].endswith('un') and not isinstance(v, bool):
+                if p[-1].endswith("un") and not isinstance(v, bool):
                     if (v - n).days >= 31:
-                        deep_set(config, p, '')
+                        deep_set(config, p, "")
             for k, v in modified.copy().items():
                 valuetype = deep_get(self.ALAS_ARGS, k + ".valuetype")
                 v = parse_pin_value(v, valuetype)
@@ -575,9 +563,7 @@ class AlasGUI(Frame):
                     position="right",
                     color="success",
                 )
-                logger.info(
-                    f"Save config {filepath_config(config_name)}, {dict_to_kv(modified)}"
-                )
+                logger.info(f"Save config {filepath_config(config_name)}, {dict_to_kv(modified)}")
                 config_updater.write_file(config_name, config)
         except Exception as e:
             logger.exception(e)
@@ -677,9 +663,7 @@ class AlasGUI(Frame):
         log.console.width = log.get_width()
 
         with use_scope("scheduler-bar"):
-            put_text(t("Gui.Overview.Scheduler")).style(
-                "font-size: 1.25rem; margin: auto .5rem auto;"
-            )
+            put_text(t("Gui.Overview.Scheduler")).style("font-size: 1.25rem; margin: auto .5rem auto;")
             put_scope("scheduler_btn")
 
         switch_scheduler = BinarySwitchButton(
@@ -694,9 +678,7 @@ class AlasGUI(Frame):
         )
 
         with use_scope("log-bar"):
-            put_text(t("Gui.Overview.Log")).style(
-                "font-size: 1.25rem; margin: auto .5rem auto;"
-            )
+            put_text(t("Gui.Overview.Log")).style("font-size: 1.25rem; margin: auto .5rem auto;")
             put_scope(
                 "log-bar-btns",
                 [
@@ -750,7 +732,7 @@ class AlasGUI(Frame):
             label=t("Gui.MenuDevelop.HomePage"),
             onclick=self.show,
             color="menu",
-        ).style(f"--menu-HomePage--")
+        ).style("--menu-HomePage--")
 
         # put_button(
         #     label=t("Gui.MenuDevelop.Translate"),
@@ -762,19 +744,19 @@ class AlasGUI(Frame):
             label=t("Gui.MenuDevelop.Update"),
             onclick=self.dev_update,
             color="menu",
-        ).style(f"--menu-Update--")
+        ).style("--menu-Update--")
 
         put_button(
             label=t("Gui.MenuDevelop.Remote"),
             onclick=self.dev_remote,
             color="menu",
-        ).style(f"--menu-Remote--")
+        ).style("--menu-Remote--")
 
         put_button(
             label=t("Gui.MenuDevelop.Utils"),
             onclick=self.dev_utils,
             color="menu",
-        ).style(f"--menu-Utils--")
+        ).style("--menu-Utils--")
 
     def dev_translate(self) -> None:
         go_app("translate", new_window=True)
@@ -800,9 +782,7 @@ class AlasGUI(Frame):
         def update_table():
             with use_scope("updater_info", clear=True):
                 local_commit = updater.get_commit(short_sha1=True)
-                upstream_commit = updater.get_commit(
-                    f"origin/{updater.Branch}", short_sha1=True
-                )
+                upstream_commit = updater.get_commit(f"origin/{updater.Branch}", short_sha1=True)
                 put_table(
                     [
                         [t("Gui.Update.Local"), *local_commit],
@@ -818,9 +798,7 @@ class AlasGUI(Frame):
                 )
             with use_scope("updater_detail", clear=True):
                 put_text(t("Gui.Update.DetailedHistory"))
-                history = updater.get_commit(
-                    f"origin/{updater.Branch}", n=20, short_sha1=True
-                )
+                history = updater.get_commit(f"origin/{updater.Branch}", n=20, short_sha1=True)
                 put_table(
                     [commit for commit in history],
                     header=[
@@ -838,9 +816,7 @@ class AlasGUI(Frame):
             clear("updater_state")
             clear("updater_btn")
             if state == 0:
-                put_loading("border", "secondary", "updater_loading").style(
-                    "--loading-border-fill--"
-                )
+                put_loading("border", "secondary", "updater_loading").style("--loading-border-fill--")
                 put_text(t("Gui.Update.UpToDate"), scope="updater_state")
                 put_button(
                     t("Gui.Button.CheckUpdate"),
@@ -850,9 +826,7 @@ class AlasGUI(Frame):
                 )
                 update_table()
             elif state == 1:
-                put_loading("grow", "success", "updater_loading").style(
-                    "--loading-grow--"
-                )
+                put_loading("grow", "success", "updater_loading").style("--loading-grow--")
                 put_text(t("Gui.Update.HaveUpdate"), scope="updater_state")
                 put_button(
                     t("Gui.Button.ClickToUpdate"),
@@ -862,14 +836,10 @@ class AlasGUI(Frame):
                 )
                 update_table()
             elif state == "checking":
-                put_loading("border", "primary", "updater_loading").style(
-                    "--loading-border--"
-                )
+                put_loading("border", "primary", "updater_loading").style("--loading-border--")
                 put_text(t("Gui.Update.UpdateChecking"), scope="updater_state")
             elif state == "failed":
-                put_loading("grow", "danger", "updater_loading").style(
-                    "--loading-grow--"
-                )
+                put_loading("grow", "danger", "updater_loading").style("--loading-grow--")
                 put_text(t("Gui.Update.UpdateFailed"), scope="updater_state")
                 put_button(
                     t("Gui.Button.RetryUpdate"),
@@ -878,9 +848,7 @@ class AlasGUI(Frame):
                     scope="updater_btn",
                 )
             elif state == "start":
-                put_loading("border", "primary", "updater_loading").style(
-                    "--loading-border--"
-                )
+                put_loading("border", "primary", "updater_loading").style("--loading-border--")
                 put_text(t("Gui.Update.UpdateStart"), scope="updater_state")
                 put_button(
                     t("Gui.Button.CancelUpdate"),
@@ -889,9 +857,7 @@ class AlasGUI(Frame):
                     scope="updater_btn",
                 )
             elif state == "wait":
-                put_loading("border", "primary", "updater_loading").style(
-                    "--loading-border--"
-                )
+                put_loading("border", "primary", "updater_loading").style("--loading-border--")
                 put_text(t("Gui.Update.UpdateWait"), scope="updater_state")
                 put_button(
                     t("Gui.Button.CancelUpdate"),
@@ -900,9 +866,7 @@ class AlasGUI(Frame):
                     scope="updater_btn",
                 )
             elif state == "run update":
-                put_loading("border", "primary", "updater_loading").style(
-                    "--loading-border--"
-                )
+                put_loading("border", "primary", "updater_loading").style("--loading-border--")
                 put_text(t("Gui.Update.UpdateRun"), scope="updater_state")
                 put_button(
                     t("Gui.Button.CancelUpdate"),
@@ -912,21 +876,15 @@ class AlasGUI(Frame):
                     disabled=True,
                 )
             elif state == "reload":
-                put_loading("grow", "success", "updater_loading").style(
-                    "--loading-grow--"
-                )
+                put_loading("grow", "success", "updater_loading").style("--loading-grow--")
                 put_text(t("Gui.Update.UpdateSuccess"), scope="updater_state")
                 update_table()
             elif state == "finish":
-                put_loading("grow", "success", "updater_loading").style(
-                    "--loading-grow--"
-                )
+                put_loading("grow", "success", "updater_loading").style("--loading-grow--")
                 put_text(t("Gui.Update.UpdateFinish"), scope="updater_state")
                 update_table()
             elif state == "cancel":
-                put_loading("border", "danger", "updater_loading").style(
-                    "--loading-border--"
-                )
+                put_loading("border", "danger", "updater_loading").style("--loading-border--")
                 put_text(t("Gui.Update.UpdateCancel"), scope="updater_state")
                 put_button(
                     t("Gui.Button.CancelUpdate"),
@@ -942,9 +900,7 @@ class AlasGUI(Frame):
                 )
                 put_text(f"state: {state}", scope="updater_state")
 
-        updater_switch = Switch(
-            status=u, get_state=lambda: updater.state, name="updater"
-        )
+        updater_switch = Switch(status=u, get_state=lambda: updater.state, name="updater")
 
         update_table()
         self.task_handler.add(updater_switch.g(), delay=0.5, pending_delete=True)
@@ -984,29 +940,20 @@ class AlasGUI(Frame):
             clear("remote_state")
             clear("remote_info")
             if state in (1, 2):
-                put_loading("grow", "success", "remote_loading").style(
-                    "--loading-grow--"
-                )
+                put_loading("grow", "success", "remote_loading").style("--loading-grow--")
                 put_text(t("Gui.Remote.Running"), scope="remote_state")
                 put_text(t("Gui.Remote.EntryPoint"), scope="remote_info")
                 entrypoint = RemoteAccess.get_entry_point()
                 if entrypoint:
                     if State.electron:  # Prevent click into url in electron client
-                        put_text(entrypoint, scope="remote_info").style(
-                            "text-decoration-line: underline"
-                        )
+                        put_text(entrypoint, scope="remote_info").style("text-decoration-line: underline")
                     else:
                         put_link(name=entrypoint, url=entrypoint, scope="remote_info")
                 else:
                     put_text("Loading...", scope="remote_info")
             elif state in (0, 3):
-                put_loading("border", "secondary", "remote_loading").style(
-                    "--loading-border-fill--"
-                )
-                if (
-                        State.deploy_config.EnableRemoteAccess
-                        and State.deploy_config.Password
-                ):
+                put_loading("border", "secondary", "remote_loading").style("--loading-border-fill--")
+                if State.deploy_config.EnableRemoteAccess and State.deploy_config.Password:
                     put_text(t("Gui.Remote.NotRunning"), scope="remote_state")
                 else:
                     put_text(t("Gui.Remote.NotEnable"), scope="remote_state")
@@ -1014,9 +961,7 @@ class AlasGUI(Frame):
                 url = "http://app.azurlane.cloud" + (
                     "" if State.deploy_config.Language.startswith("zh") else "/en.html"
                 )
-                put_html(
-                    f'<a href="{url}" target="_blank">{url}</a>', scope="remote_info"
-                )
+                put_html(f'<a href="{url}" target="_blank">{url}</a>', scope="remote_info")
                 if state == 3:
                     put_warning(
                         t("Gui.Remote.SSHNotInstall"),
@@ -1024,9 +969,7 @@ class AlasGUI(Frame):
                         scope="remote_info",
                     )
 
-        remote_switch = Switch(
-            status=u, get_state=RemoteAccess.get_state, name="remote"
-        )
+        remote_switch = Switch(status=u, get_state=RemoteAccess.get_state, name="remote")
 
         self.task_handler.add(remote_switch.g(), delay=1, pending_delete=True)
 
@@ -1230,9 +1173,7 @@ class AlasGUI(Frame):
             status={
                 True: [
                     lambda: self.__setattr__("visible", True),
-                    lambda: self.alas_update_overview_task()
-                    if self.page == "Overview"
-                    else 0,
+                    lambda: self.alas_update_overview_task() if self.page == "Overview" else 0,
                     lambda: self.task_handler._task.__setattr__("delay", 15),
                 ],
                 False: [
@@ -1449,10 +1390,7 @@ def startup():
         init_discord_rpc()
     if State.deploy_config.StartOcrServer:
         start_ocr_server_process(State.deploy_config.OcrServerPort)
-    if (
-            State.deploy_config.EnableRemoteAccess
-            and State.deploy_config.Password is not None
-    ):
+    if State.deploy_config.EnableRemoteAccess and State.deploy_config.Password is not None:
         task_handler.add(RemoteAccess.keep_ssh_alive(), 60)
 
 
@@ -1474,9 +1412,7 @@ def clearup():
 
 def app():
     parser = argparse.ArgumentParser(description="Alas web service")
-    parser.add_argument(
-        "-k", "--key", type=str, help="Password of alas. No password by default"
-    )
+    parser.add_argument("-k", "--key", type=str, help="Password of alas. No password by default")
     parser.add_argument(
         "--cdn",
         action="store_true",
@@ -1512,7 +1448,8 @@ def app():
     logger.attr("IS_ON_PHONE_CLOUD", IS_ON_PHONE_CLOUD)
 
     from deploy.atomic import atomic_failure_cleanup
-    atomic_failure_cleanup('./config')
+
+    atomic_failure_cleanup("./config")
 
     def index():
         if key is not None and not login(key):
@@ -1539,9 +1476,7 @@ def app():
         debug=True,
         on_startup=[
             startup,
-            lambda: ProcessManager.restart_processes(
-                instances=instances, ev=updater.event
-            ),
+            lambda: ProcessManager.restart_processes(instances=instances, ev=updater.event),
         ],
         on_shutdown=[clearup],
     )

@@ -29,23 +29,15 @@ def func(ev: threading.Event):
         type=int,
         help="Port to listen. Default to WebuiPort in deploy setting",
     )
-    parser.add_argument(
-        "-k", "--key", type=str, help="Password of alas. No password by default"
-    )
+    parser.add_argument("-k", "--key", type=str, help="Password of alas. No password by default")
     parser.add_argument(
         "--cdn",
         action="store_true",
         help="Use jsdelivr cdn for pywebio static files (css, js). Self host cdn by default.",
     )
-    parser.add_argument(
-        "--electron", action="store_true", help="Runs by electron client."
-    )
-    parser.add_argument(
-        "--ssl-key", dest="ssl_key", type=str, help="SSL key file path for HTTPS support"
-    )
-    parser.add_argument(
-        "--ssl-cert", type=str, help="SSL certificate file path for HTTPS support"
-    )
+    parser.add_argument("--electron", action="store_true", help="Runs by electron client.")
+    parser.add_argument("--ssl-key", dest="ssl_key", type=str, help="SSL key file path for HTTPS support")
+    parser.add_argument("--ssl-cert", type=str, help="SSL certificate file path for HTTPS support")
     parser.add_argument(
         "--run",
         nargs="+",
@@ -72,6 +64,7 @@ def func(ev: threading.Event):
         # https://github.com/LmeSzinc/AzurLaneAutoScript/issues/2051
         logger.info("Electron detected, remove log output to stdout")
         from module.logger import console_hdlr
+
         logger.removeHandler(console_hdlr)
 
     if ssl_cert is None and ssl_key is not None:
@@ -80,7 +73,9 @@ def func(ev: threading.Event):
         logger.error("SSL certificate provided without key. Please provide both SSL key and certificate.")
 
     if ssl:
-        uvicorn.run("module.webui.app:app", host=host, port=port, factory=True, ssl_keyfile=ssl_key, ssl_certfile=ssl_cert)
+        uvicorn.run(
+            "module.webui.app:app", host=host, port=port, factory=True, ssl_keyfile=ssl_key, ssl_certfile=ssl_cert
+        )
     else:
         uvicorn.run("module.webui.app:app", host=host, port=port, factory=True)
 

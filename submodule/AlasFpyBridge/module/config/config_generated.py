@@ -12,33 +12,33 @@ class GeneratedConfig:
     # Group `Scheduler`
     Scheduler_Enable = False
     Scheduler_NextRun = datetime.datetime(2023, 1, 1, 5, 0)
-    Scheduler_Command = 'Fpy'
+    Scheduler_Command = "Fpy"
     Scheduler_SuccessInterval = 60
     Scheduler_FailureInterval = 120
-    Scheduler_ServerUpdate = '05:00'
+    Scheduler_ServerUpdate = "05:00"
 
     # Group `Emulator`
-    Emulator_ServerName = 'disabled'
+    Emulator_ServerName = "disabled"
 
     # Group `Error`
     Error_SaveError = False
-    Error_OnePushConfig = 'provider: null'
+    Error_OnePushConfig = "provider: null"
 
     # Group `Optimization`
-    Optimization_WhenTaskQueueEmpty = 'stay_there'
+    Optimization_WhenTaskQueueEmpty = "stay_there"
 
     # Group `FpyEmulator`
-    FpyEmulator_Serial = '127.0.0.1:5555'
-    FpyEmulator_LaunchPath = '/absolute_path_to_FGO-py/deploy/AzurLaneAutoScript'
+    FpyEmulator_Serial = "127.0.0.1:5555"
+    FpyEmulator_LaunchPath = "/absolute_path_to_FGO-py/deploy/AzurLaneAutoScript"
 
     # Group `FpyInterval`
-    FpyInterval_Interval = '07:00'
+    FpyInterval_Interval = "07:00"
 
     # Group `FpyTeam`
     FpyTeam_Index = 0
 
     # Group `FpyApple`
-    FpyApple_AppleKind = 'gold'  # gold, silver, bronze, copper, quartz
+    FpyApple_AppleKind = "gold"  # gold, silver, bronze, copper, quartz
     FpyApple_AppleCount = 0
     FpyApple_EatOnce = True
     FpyApple_AppleTotal = 999
@@ -49,10 +49,10 @@ class GeneratedConfig:
     FpyLimit_SpecialDrop = 999
 
     # Group `FpyBenchmark`
-    FpyBenchmark_BenchOption = 'all'  # touch, screen, all
+    FpyBenchmark_BenchOption = "all"  # touch, screen, all
 
     # Group `FpyCall`
-    FpyCall_Function = 'lottery'  # fpSummon, lottery, mail, synthesis, summonHistory
+    FpyCall_Function = "lottery"  # fpSummon, lottery, mail, synthesis, summonHistory
 
     # Group `Storage`
     Storage_Storage = {}

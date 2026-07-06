@@ -10,23 +10,23 @@ from module.ui.page import page_campaign_menu, page_event
 
 class CampaignBase(CampaignBase_):
     STAGE_INCREASE = [
-        'T1 > T2 > T3 > TS1 > T4 > T5',
-        'TH1 > TH2 > TH3 > TH4 > TH5',
+        "T1 > T2 > T3 > TS1 > T4 > T5",
+        "TH1 > TH2 > TH3 > TH4 > TH5",
     ]
 
     def ui_goto_event(self):
         if self.appear(EVENT_20221124_PT_ICON, offset=(20, 20)) and self.ui_page_appear(page_event):
-            logger.info('Already at EVENT_20221124')
+            logger.info("Already at EVENT_20221124")
             return True
         self.ui_ensure(page_campaign_menu)
         if self.is_event_entrance_available():
-            self.ui_click(EVENT_20221124_ENTRANCE,
-                      check_button=EVENT_20221124_PT_ICON,
-                      appear_button=EVENT_20221124_ENTRANCE)
+            self.ui_click(
+                EVENT_20221124_ENTRANCE, check_button=EVENT_20221124_PT_ICON, appear_button=EVENT_20221124_ENTRANCE
+            )
             return True
 
-    def campaign_set_chapter_event(self, chapter, mode='normal'):
-        if chapter.startswith('t'):
+    def campaign_set_chapter_event(self, chapter, mode="normal"):
+        if chapter.startswith("t"):
             self.ui_goto_event()
             self.campaign_ensure_chapter(chapter)
             return True
@@ -36,37 +36,37 @@ class CampaignBase(CampaignBase_):
     @staticmethod
     def _campaign_separate_name(name):
         # T, TH, ASP, EX
-        if name == 'ex':
-            return 't4', '1'
-        if name == 'asp':
-            return 't3', '1'
-        if name == 'sp':
-            return 't3', '1'
-        if name == 'ts1':
-            return 't1', name[-1]
-        if name.startswith('th'):
-            return 't2', name[-1]
-        if name.startswith('t'):
-            return 't1', name[-1]
+        if name == "ex":
+            return "t4", "1"
+        if name == "asp":
+            return "t3", "1"
+        if name == "sp":
+            return "t3", "1"
+        if name == "ts1":
+            return "t1", name[-1]
+        if name.startswith("th"):
+            return "t2", name[-1]
+        if name.startswith("t"):
+            return "t1", name[-1]
 
         return CampaignBase_._campaign_separate_name(name)
 
     @staticmethod
     def _campaign_get_chapter_index(name):
-        if name == 't4':
+        if name == "t4":
             return 4
-        if name == 't3':
+        if name == "t3":
             return 3
-        if name == 't2':
+        if name == "t2":
             return 2
-        if name == 't1':
+        if name == "t1":
             return 1
 
         return CampaignBase_._campaign_get_chapter_index(name)
 
     def campaign_get_entrance(self, name):
-        if name == 'sp':
-            name = 'asp'
+        if name == "sp":
+            name = "asp"
         return super().campaign_get_entrance(name)
 
     def map_get_info(self):
@@ -74,7 +74,7 @@ class CampaignBase(CampaignBase_):
         super().map_get_info()
 
         # Chapter TH has no map_percentage and no 3_stars
-        if name.startswith('th') or name.startswith('ht'):
+        if name.startswith("th") or name.startswith("ht"):
             appear = AUTO_SEARCH.appear(main=self)
             self.map_is_100_percent_clear = self.map_is_3_stars = self.map_is_threat_safe = appear
             self.map_has_clear_mode = appear
@@ -85,7 +85,7 @@ class CampaignBase(CampaignBase_):
         if super().handle_mystery_items(button, drop=drop):
             return True
         if self.appear(GET_ITEMS_1_RYZA, offset=(-20, -100, 20, 20)):
-            logger.attr('Mystery', 'Get item')
+            logger.attr("Mystery", "Get item")
             if drop:
                 drop.add(self.device.image)
             self.device.click(MYSTERY_ITEM)
@@ -106,8 +106,8 @@ class CampaignBase(CampaignBase_):
         """
         if not isinstance(grids, list):
             grids = [grids]
-        grids = SelectedGrids(grids).sort('cost')
+        grids = SelectedGrids(grids).sort("cost")
         for grid in grids:
-            logger.hr('Clear map item')
-            logger.info(f'Clear map item on {grid}')
+            logger.hr("Clear map item")
+            logger.info(f"Clear map item on {grid}")
             self.goto(grid)

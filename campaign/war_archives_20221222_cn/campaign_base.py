@@ -1,5 +1,6 @@
-from ..campaign_war_archives.campaign_base import CampaignBase as CampaignBase_
 from module.ui.page import page_event
+
+from ..campaign_war_archives.campaign_base import CampaignBase as CampaignBase_
 
 
 class CampaignBase(CampaignBase_):
@@ -11,4 +12,4 @@ class CampaignBase(CampaignBase_):
 
     def map_data_init(self, map_):
         super().map_data_init(map_)
-        self.config.override(EnemyPriority_EnemyScaleBalanceWeight='default_mode')
+        self.config.override(EnemyPriority_EnemyScaleBalanceWeight="default_mode")
