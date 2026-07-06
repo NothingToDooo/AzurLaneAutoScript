@@ -2,7 +2,7 @@ from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1
 from module.config.utils import get_os_reset_remain
-from module.exception import GameStuckError, ScriptError
+from module.exception import ScriptError
 from module.logger import logger
 from module.os_shop.akashi_shop import AkashiShop
 from module.os_shop.assets import PORT_SUPPLY_CHECK, SHOP_BUY_CONFIRM

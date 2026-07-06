@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 from module.config.utils import get_os_next_reset, get_os_reset_remain, get_server_next_update
 from module.logger import logger
 from module.os.map import OSMap
-from module.os_handler.assets import EXCHANGE_CHECK, EXCHANGE_ENTER
 from module.os_shop.assets import OS_SHOP_CHECK
 
 

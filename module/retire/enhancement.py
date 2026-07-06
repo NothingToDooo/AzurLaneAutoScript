@@ -7,7 +7,7 @@ from module.exception import GameStuckError, ScriptError
 from module.logger import logger
 from module.ocr.ocr import DigitCounter
 from module.retire.assets import *
-from module.retire.dock import CARD_GRIDS, Dock
+from module.retire.dock import Dock
 
 VALID_SHIP_TYPES = ["dd", "ss", "cl", "ca", "bb", "cv", "repair", "others"]
 if server.server != "jp":

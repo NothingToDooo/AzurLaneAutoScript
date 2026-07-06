@@ -8,7 +8,7 @@ from module.map_detection.utils import fit_points
 from module.os.assets import GLOBE_GOTO_MAP
 from module.os.globe_detection import GLOBE_MAP_SHAPE
 from module.os.globe_operation import GlobeOperation
-from module.os.globe_zone import Zone, ZoneManager
+from module.os.globe_zone import ZoneManager
 from module.os_handler.assets import *
 
 

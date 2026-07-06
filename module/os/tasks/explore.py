@@ -1,9 +1,6 @@
-from datetime import timedelta
-
-from module.config.utils import DEFAULT_TIME, get_os_next_reset, get_os_reset_remain
+from module.config.utils import DEFAULT_TIME, get_os_next_reset
 from module.exception import GameStuckError, ScriptError
 from module.logger import logger
-from module.map.map_grids import SelectedGrids
 from module.os.globe_operation import OSExploreError
 from module.os.map import OSMap
 

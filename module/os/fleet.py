@@ -3,7 +3,7 @@ import re
 import inflection
 import numpy as np
 
-from module.base.button import Button, ButtonGrid
+from module.base.button import Button
 from module.base.filter import Filter
 from module.base.timer import Timer
 from module.base.utils import point_limit

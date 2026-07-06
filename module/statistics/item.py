@@ -1,7 +1,6 @@
 import numpy as np
 
 import module.config.server as server
-from module.base.button import ButtonGrid
 from module.base.utils import *
 from module.logger import logger
 from module.ocr.ocr import Digit, DigitYuv

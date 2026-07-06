@@ -1,6 +1,6 @@
 from typing import List
 
-from module.base.button import Button, ButtonGrid
+from module.base.button import ButtonGrid
 from module.base.decorator import cached_property
 from module.logger import logger
 from module.os_handler.map_event import MapEventHandler

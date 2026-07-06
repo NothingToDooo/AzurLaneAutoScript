@@ -1,7 +1,6 @@
 import numpy as np
 
 from module.base.timer import Timer
-from module.base.utils import color_similar, get_color
 from module.combat.assets import *
 from module.combat.combat_auto import CombatAuto
 from module.combat.combat_manual import CombatManual

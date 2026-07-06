@@ -5,7 +5,7 @@ from module.logger import logger
 from module.os.assets import *
 from module.os.globe_detection import GLOBE_MAP_SHAPE, GlobeDetection
 from module.os.globe_operation import GlobeOperation
-from module.os.globe_zone import Zone, ZoneManager
+from module.os.globe_zone import ZoneManager
 from module.os_ash.assets import ASH_QUIT, ASH_SHOWDOWN
 from module.os_handler.assets import ACTION_POINT_CANCEL, ACTION_POINT_USE, AUTO_SEARCH_REWARD
 

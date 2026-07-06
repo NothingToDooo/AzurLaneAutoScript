@@ -7,7 +7,7 @@ import numpy as np
 
 import module.config.server as server
 from module.base.button import ButtonGrid
-from module.base.utils import color_similar, crop, extract_letters, get_color, limit_in, save_image
+from module.base.utils import color_similar, crop, extract_letters, get_color, limit_in
 from module.combat.level import LevelOcr
 from module.logger import logger
 from module.ocr.ocr import Digit

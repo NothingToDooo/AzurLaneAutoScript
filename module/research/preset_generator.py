@@ -214,6 +214,5 @@ if __name__ == "__main__":
             > 6 > 8 > 4 > S2-C12 > 12
         """),
         )
-    from module.logger import logger
 
     generator.write("./module/research/preset.py")
