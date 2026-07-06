@@ -182,7 +182,7 @@ class SettingExtractor:
                     yield f"    {line}"
 
     def generate(self, folder, output="./module/game_setting/setting_generated.py"):
-        lines = [l + "\n" for l in self.iter_generated_lines(folder)]
+        lines = [line + "\n" for line in self.iter_generated_lines(folder)]
         with open(output, mode="w", encoding="utf8") as f:
             f.writelines(lines)
 

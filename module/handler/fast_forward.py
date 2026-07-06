@@ -180,7 +180,10 @@ class FastForwardHandler(AutoSearchHandler):
         ]
         strip = ["map", "achieved", "is", "has"]
         log_names = ["_".join([x for x in name.split("_") if x not in strip]) for name in names]
-        text = ", ".join([l for l, n in zip(log_names, names, strict=True) if self.__getattribute__(n)])
+        enabled_log_names = [
+            log_name for log_name, attr_name in zip(log_names, names, strict=True) if self.__getattribute__(attr_name)
+        ]
+        text = ", ".join(enabled_log_names)
         text = f"{int(self.map_clear_percentage * 100)}%, " + text
         logger.attr("Map_info", text)
         logger.attr("StopCondition_MapAchievement", self.config.StopCondition_MapAchievement)

@@ -417,18 +417,19 @@ class Perspective:
         origin = lines.mid
         clean = self.mid_cleanse(origin, is_horizontal=lines.is_horizontal, threshold=threshold)
 
-        # Cleansing edge
+        # 清理边缘线。
         edge = edge.mid
         inner = inner.mid
-        inner_clean = [l for l in inner if np.any(np.abs(l - clean) < 5)]  # Use correct inner to delete wrong edge.
+        # 用正确的内部线删除错误边缘线。
+        inner_clean = [inner_mid for inner_mid in inner if np.any(np.abs(inner_mid - clean) < 5)]
         if len(inner_clean) > 0:
             edge = edge[(edge > np.max(inner_clean) - threshold) | (edge < np.min(inner_clean) + threshold)]
         edge = [c for c in clean if np.any(np.abs(c - edge) < 5)]
 
-        # Separate edges
+        # 拆分边缘线。
         lower, upper = separate_edges(edge, inner=self.map_inner[1] if lines.is_horizontal else self.map_inner[0])
 
-        # crop mid
+        # 裁剪中线。
         if lower:
             clean = clean[clean > lower - threshold]
         if upper:

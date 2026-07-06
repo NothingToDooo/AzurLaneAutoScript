@@ -260,7 +260,7 @@ class CampaignMap:
         """
         logger.info(f"grid_connection: wall={wall}, portal={portal}")
 
-        # Generate grid connection.
+        # 生成格子连接。
         total = set(self.grids.keys())
         for grid in self:
             connection = set()
@@ -270,10 +270,10 @@ class CampaignMap:
                     connection.add(arr)
             self.grid_connection[grid.location] = connection
 
-        # Use wall_data to delete connection.
+        # 使用 wall_data 删除连接。
         if wall and self._wall_data:
             wall = []
-            for y, line in enumerate([l for l in self._wall_data.split("\n") if l]):
+            for y, line in enumerate(filter(None, self._wall_data.splitlines())):
                 for x, letter in enumerate(line[4:-2]):
                     if letter != " ":
                         wall.append((x, y))

@@ -1138,9 +1138,9 @@ def app():
     if args.run:
         runs = args.run
     elif State.deploy_config.Run:
-        # TODO: refactor poor_yaml_read() to support list
+        # TODO: 重构 poor_yaml_read()，让它支持列表。
         tmp = State.deploy_config.Run.split(",")
-        runs = [l.strip(" ['\"]") for l in tmp if len(l)]
+        runs = [entry.strip(" ['\"]") for entry in tmp if entry]
     instances = runs
 
     logger.hr("Webui configs")
