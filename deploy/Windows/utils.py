@@ -1,7 +1,7 @@
 import os
 import re
 from dataclasses import dataclass
-from typing import Callable, Generic, Iterable, TypeVar
+from typing import Any, Callable, Generic, Iterable, TypeVar, overload
 
 T = TypeVar("T")
 
@@ -19,14 +19,20 @@ class cached_property(Generic[T]):
     Source: https://github.com/bottlepy/bottle/commit/fa7733e075da0d790d809aa3d2f53071897e6f76
     """
 
-    def __init__(self, func: Callable[..., T]):
+    def __init__(self, func: Callable[[Any], T]):
         self.func = func
 
-    def __get__(self, obj, cls) -> T:
+    @overload
+    def __get__(self, obj: None, cls: type[Any] | None = None) -> cached_property[T]: ...
+
+    @overload
+    def __get__(self, obj: object, cls: type[Any] | None = None) -> T: ...
+
+    def __get__(self, obj: Any | None, cls: type[Any] | None = None) -> T | cached_property[T]:
         if obj is None:
             return self
 
-        value = obj.__dict__[self.func.__name__] = self.func(obj)
+        value = obj.__dict__[getattr(self.func, "__name__")] = self.func(obj)
         return value
 
 
@@ -116,7 +122,7 @@ def poor_yaml_write(data, file, template_file=DEPLOY_TEMPLATE):
 
 @dataclass
 class DataProcessInfo:
-    proc: object  # psutil.Process or psutil._pswindows.Process
+    proc: Any  # psutil.Process 或 psutil._pswindows.Process
     pid: int
 
     @cached_property

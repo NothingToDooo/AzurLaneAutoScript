@@ -4,6 +4,7 @@ import string
 from datetime import datetime, timedelta, timezone
 
 import yaml
+from yaml.representer import SafeRepresenter
 
 import module.config.server as server_
 from deploy.atomic import atomic_read_bytes, atomic_read_text, atomic_write
@@ -34,7 +35,7 @@ def str_presenter(dumper, data):
 
 
 yaml.add_representer(str, str_presenter)
-yaml.representer.SafeRepresenter.add_representer(str, str_presenter)
+SafeRepresenter.add_representer(str, str_presenter)
 
 
 def filepath_args(filename="args", mod_name="alas"):
@@ -296,7 +297,8 @@ def server_time_offset() -> timedelta:
     To convert server time to local time:
         local_time = server_time - server_time_offset()
     """
-    return datetime.now(timezone.utc).astimezone().utcoffset() - server_timezone()
+    local_offset = datetime.now(timezone.utc).astimezone().utcoffset() or timedelta()
+    return local_offset - server_timezone()
 
 
 def random_normal_distribution_int(a, b, n=3):

@@ -32,7 +32,7 @@ def strip_code(string):
 @dataclass
 class Field:
     formatter: callable
-    default: ""
+    default: str
     regex: str
 
 

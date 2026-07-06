@@ -259,7 +259,7 @@ class BinarySwitchButton(Switch):
 def put_icon_buttons(
     icon_html: str,
     buttons: List[Dict[str, str]],
-    onclick: Union[List[Callable[[], None]], Callable[[], None]],
+    onclick: Union[List[Callable[..., None]], Callable[..., None]],
 ) -> Output:
     value = buttons[0]["value"]
     return put_column(

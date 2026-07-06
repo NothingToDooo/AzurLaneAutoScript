@@ -1,7 +1,8 @@
 import queue
 import threading
+from collections.abc import Sequence
 from multiprocessing import Process
-from typing import Dict, List, Union
+from typing import Dict, List, Union, cast
 
 import inflection
 from rich.console import Console, ConsoleRenderable
@@ -35,11 +36,11 @@ class ProcessManager:
         self.renderables: List[ConsoleRenderable] = []
         self.renderables_max_length = 400
         self.renderables_reduce_length = 80
-        self._process: Process = None
+        self._process: Process | None = None
         self._process_locks: Dict[str, threading.Lock] = {}
-        self.thd_log_queue_handler: threading.Thread = None
+        self.thd_log_queue_handler: threading.Thread | None = None
 
-    def start(self, func, ev: threading.Event = None) -> None:
+    def start(self, func, ev: threading.Event | None = None) -> None:
         if not self.alive:
             if func is None:
                 func = get_config_mod(self.config_name)
@@ -70,8 +71,10 @@ class ProcessManager:
 
         with lock:
             if self.alive:
-                self._process.kill()
-                self.renderables.append(f"[{self.config_name}] exited. Reason: Manual stop\n")
+                process = self._process
+                if process is not None:
+                    process.kill()
+                self.renderables.append(cast(ConsoleRenderable, f"[{self.config_name}] exited. Reason: Manual stop\n"))
             if self.thd_log_queue_handler is not None:
                 self.thd_log_queue_handler.join(timeout=1)
                 if self.thd_log_queue_handler.is_alive():
@@ -124,7 +127,7 @@ class ProcessManager:
         return cls._processes[config_name]
 
     @staticmethod
-    def run_process(config_name, func: str, q: queue.Queue, e: threading.Event = None) -> None:
+    def run_process(config_name, func: str, q: queue.Queue, stop_event: threading.Event | None = None) -> None:
         # Setup logger
         set_file_logger(name=config_name)
         set_func_logger(func=q.put)
@@ -134,14 +137,14 @@ class ProcessManager:
         # Remove fake PIL module, because subprocess will use it
         remove_fake_pil_module()
 
-        AzurLaneConfig.stop_event = e
+        AzurLaneConfig.stop_event = cast(threading.Event, stop_event)
         try:
             # Run alas
             if func == "alas":
                 from alas import AzurLaneAutoScript
 
-                if e is not None:
-                    AzurLaneAutoScript.stop_event = e
+                if stop_event is not None:
+                    AzurLaneAutoScript.stop_event = stop_event
                 AzurLaneAutoScript(config_name=config_name).loop()
             elif func in get_available_func():
                 from alas import AzurLaneAutoScript
@@ -150,16 +153,16 @@ class ProcessManager:
             elif func in get_available_mod():
                 mod = load_mod(func)
 
-                if e is not None:
-                    mod.set_stop_event(e)
+                if stop_event is not None:
+                    mod.set_stop_event(stop_event)
                 mod.loop(config_name)
             elif func in get_available_mod_func():
                 getattr(load_mod(get_func_mod(func)), inflection.underscore(func))(config_name)
             else:
                 logger.critical(f"No function matched: {func}")
             logger.info(f"[{config_name}] exited. Reason: Finish\n")
-        except Exception as e:
-            logger.exception(e)
+        except Exception as error:
+            logger.exception(error)
 
     @classmethod
     def running_instances(cls) -> List[ProcessManager]:
@@ -170,7 +173,10 @@ class ProcessManager:
         return l
 
     @staticmethod
-    def restart_processes(instances: List[Union[ProcessManager, str]] = None, ev: threading.Event = None):
+    def restart_processes(
+        instances: Sequence[Union[ProcessManager, str]] | None = None,
+        ev: threading.Event | None = None,
+    ) -> None:
         """
         Start configured alas instances when the web service starts.
         """

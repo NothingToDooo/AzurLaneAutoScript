@@ -1,6 +1,6 @@
 import multiprocessing
 from multiprocessing.managers import SyncManager
-from typing import TYPE_CHECKING, Callable, Generic, TypeVar
+from typing import TYPE_CHECKING, Callable, Generic, TypeVar, cast
 
 if TYPE_CHECKING:
     from module.config.config_updater import ConfigUpdater
@@ -30,8 +30,9 @@ class cached_class_property(Generic[T]):
 
     def __init__(self, func: Callable[..., T]):
         self.__func__ = func
-        self.__cache_name__ = "_{}_".format(func.__name__.strip("_"))
-        if self.__cache_name__ == func.__name__:
+        func_name: str = getattr(func, "__name__")
+        self.__cache_name__ = "_{}_".format(func_name.strip("_"))
+        if self.__cache_name__ == func_name:
             raise self.AliasConflict(self.__cache_name__)
 
     def __get__(self, instance, cls=None) -> T:
@@ -54,7 +55,7 @@ class State:
     _init = False
     _clearup = False
 
-    manager: SyncManager = None
+    manager: SyncManager = cast(SyncManager, None)
     theme: str = "default"
 
     @classmethod

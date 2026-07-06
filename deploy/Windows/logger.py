@@ -1,17 +1,25 @@
 import logging
 import os
 import sys
+from typing import cast
+
+
+class DeployLogger(logging.Logger):
+    def hr(self, title, level=3): ...
+
+    def attr(self, name, text): ...
+
 
 os.chdir(os.path.join(os.path.dirname(__file__), "../../"))
 
-logger = logging.getLogger("deploy")
-_logger = logger
+_logger = logging.getLogger("deploy")
+logger = cast(DeployLogger, _logger)
 
 formatter = logging.Formatter(fmt="%(message)s")
 hdlr = logging.StreamHandler(stream=sys.stdout)
 hdlr.setFormatter(formatter)
-logger.addHandler(hdlr)
-logger.setLevel(logging.INFO)
+_logger.addHandler(hdlr)
+_logger.setLevel(logging.INFO)
 
 
 def hr(title, level=3):
@@ -37,8 +45,8 @@ def attr(name, text):
     print(f"[{name}] {text}")
 
 
-logger.hr = hr
-logger.attr = attr
+setattr(_logger, "hr", hr)
+setattr(_logger, "attr", attr)
 
 
 class Percentage:

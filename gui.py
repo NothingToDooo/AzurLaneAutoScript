@@ -1,6 +1,4 @@
 import argparse
-import asyncio
-import sys
 
 import uvicorn
 
@@ -9,9 +7,6 @@ from module.webui.setting import State
 
 
 def func() -> None:
-    if sys.platform.startswith("win"):
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-
     parser = argparse.ArgumentParser(description="Alas web service")
     parser.add_argument(
         "--host",

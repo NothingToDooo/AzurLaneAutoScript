@@ -4,7 +4,7 @@ import numpy as np
 from scipy.signal import find_peaks
 from uiautomator2 import UiObject
 from uiautomator2.exceptions import XPathElementNotFoundError
-from uiautomator2.xpath import XPath, XPathSelector
+from uiautomator2.xpath import PageSource, XPath, XPathSelector
 
 import module.config.server as server
 from module.base.timer import Timer
@@ -319,4 +319,14 @@ class LoginHandler(UI):
 
 class XPS(XPathSelector):
     def __init__(self, xpath, parent, source):
-        super().__init__(parent, xpath, source)
+        super().__init__(xpath)
+        self.parent = parent
+        self.source = PageSource.parse(source)
+
+    @property
+    def exists(self):
+        return bool(self.all(self.source))
+
+    @property
+    def bounds(self):
+        return self.all(self.source)[0].bounds

@@ -238,7 +238,7 @@ class ConfigGenerator:
         """
         visited_group = set()
         visited_path = set()
-        lines = CONFIG_IMPORT
+        lines: list[str] = list(CONFIG_IMPORT)
         for path, data in deep_iter(self.argument, depth=2):
             group, arg = path
             if group not in visited_group:
@@ -729,9 +729,9 @@ class ConfigUpdater:
             any: Value to set, such as "2020-01-01 00:00:00"
         """
         if "Emotion" in key and "Value" in key:
-            key = key.split(".")
-            key[-1] = key[-1].replace("Value", "Record")
-            yield ".".join(key), datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            keys = key.split(".")
+            keys[-1] = keys[-1].replace("Value", "Record")
+            yield ".".join(keys), datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         # Oh no, dynamic dropdown update can only be used on pywebio > 1.8.0
         # elif key == 'Alas.Emulator.ScreenshotMethod' and value == 'nemu_ipc':
         #     yield 'Alas.Emulator.ControlMethod', 'nemu_ipc'
