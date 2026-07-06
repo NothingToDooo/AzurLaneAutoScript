@@ -1,6 +1,6 @@
 from module.equipment.equipment_change import EquipmentChange
-from module.hard.assets import *
-from module.map.assets import *
+from module.hard.assets import EQUIP_ENTER_1, EQUIP_ENTER_2
+from module.map.assets import FLEET_PREPARATION
 
 
 class HardEquipment(EquipmentChange):

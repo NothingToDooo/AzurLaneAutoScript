@@ -4,7 +4,7 @@ from module.base.button import Button
 from module.base.timer import Timer
 from module.base.utils import area_offset, color_similarity_2d
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2, GET_ITEMS_3
-from module.guild.assets import *
+from module.guild.assets import GUILD_REPORT_AVAILABLE, GUILD_REPORT_CLAIM, GUILD_REPORT_CLAIMED, GUILD_REPORT_CLOSE
 from module.guild.base import GuildBase
 from module.logger import logger
 from module.map_detection.utils import Points

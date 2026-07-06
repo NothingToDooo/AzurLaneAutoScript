@@ -1,7 +1,7 @@
 from module.base.timer import Timer
 from module.combat.assets import BATTLE_PREPARATION
 from module.equipment.equipment_change import EquipmentChange
-from module.exercise.assets import *
+from module.exercise.assets import EQUIP_EDIT_ACTIVE, EQUIP_EDIT_INACTIVE, EQUIP_ENTER
 
 
 class ExerciseEquipment(EquipmentChange):

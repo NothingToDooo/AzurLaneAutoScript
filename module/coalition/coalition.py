@@ -2,7 +2,7 @@ import re
 from contextlib import suppress
 
 from module.campaign.campaign_event import CampaignEvent
-from module.coalition.assets import *
+from module.coalition import assets as coalition_assets
 from module.coalition.combat import CoalitionCombat
 from module.exception import ScriptEnd, ScriptError
 from module.logger import logger
@@ -47,16 +47,18 @@ class Coalition(CoalitionCombat, CampaignEvent):
         """
         event = self.config.Campaign_Event
         if event == "coalition_20230323":
-            ocr = Digit(FROSTFALL_OCR_PT, name="OCR_PT", letter=(198, 158, 82), threshold=128)
+            ocr = Digit(coalition_assets.FROSTFALL_OCR_PT, name="OCR_PT", letter=(198, 158, 82), threshold=128)
         elif event == "coalition_20240627":
-            ocr = AcademyPtOcr(ACADEMY_PT_OCR, name="OCR_PT", letter=(255, 255, 255), threshold=128)
+            ocr = AcademyPtOcr(coalition_assets.ACADEMY_PT_OCR, name="OCR_PT", letter=(255, 255, 255), threshold=128)
         elif event == "coalition_20250626":
-            # use generic ocr model
-            ocr = Digit(NEONCITY_PT_OCR, name="OCR_PT", lang="cnocr", letter=(208, 208, 208), threshold=128)
+            # 使用通用 OCR 模型。
+            ocr = Digit(
+                coalition_assets.NEONCITY_PT_OCR, name="OCR_PT", lang="cnocr", letter=(208, 208, 208), threshold=128
+            )
         elif event == "coalition_20251120":
-            ocr = DALPtOcr(DAL_PT_OCR, name="OCR_PT", letter=(255, 213, 69), threshold=128)
+            ocr = DALPtOcr(coalition_assets.DAL_PT_OCR, name="OCR_PT", letter=(255, 213, 69), threshold=128)
         elif event == "coalition_20260122":
-            ocr = Digit(FASHION_PT_OCR, name="OCR_PT", letter=(41, 40, 40), threshold=128)
+            ocr = Digit(coalition_assets.FASHION_PT_OCR, name="OCR_PT", letter=(41, 40, 40), threshold=128)
         else:
             logger.error(f"ocr object is not defined in event {event}")
             raise ScriptError

@@ -1,7 +1,13 @@
 from module.base.button import ButtonGrid
 from module.base.decorator import cached_property
 from module.base.timer import Timer
-from module.gacha.assets import *
+from module.gacha.assets import (
+    BUILD_FINISH_ORDERS,
+    BUILD_SUBMIT_ORDERS,
+    BUILD_SUBMIT_WW_ORDERS,
+    BUILD_WW_CHECK,
+    SHOP_MEDAL_CHECK,
+)
 from module.logger import logger
 from module.ui.navbar import Navbar
 from module.ui.page import page_build
