@@ -1,7 +1,7 @@
 from module.base.timer import Timer
 from module.base.utils import random_rectangle_vector
 from module.config.config import TaskEnd
-from module.event_hospital.assets import *
+from module.event_hospital import assets as hospital_assets
 from module.event_hospital.clue import HospitalClue
 from module.event_hospital.combat import HospitalCombat
 from module.exception import OilExhausted, ScriptEnd
@@ -27,19 +27,21 @@ class HospitalSwitch(Switch):
 
 
 HOSPITAL_TAB = HospitalSwitch("HOSPITAL_ASIDE", is_selector=True)
-HOSPITAL_TAB.add_state("LOCATION", check_button=TAB_LOCATION)
-HOSPITAL_TAB.add_state("CHARACTER", check_button=TAB_CHARACTER)
+HOSPITAL_TAB.add_state("LOCATION", check_button=hospital_assets.TAB_LOCATION)
+HOSPITAL_TAB.add_state("CHARACTER", check_button=hospital_assets.TAB_CHARACTER)
 
 
 class Hospital(HospitalClue, HospitalCombat):
     def daily_red_dot_appear(self):
-        return self.image_color_count(DAILY_RED_DOT, color=(189, 69, 66), threshold=221, count=35)
+        return self.image_color_count(hospital_assets.DAILY_RED_DOT, color=(189, 69, 66), threshold=221, count=35)
 
     def daily_reward_receive_appear(self):
-        return self.image_color_count(DAILY_REWARD_RECEIVE, color=(41, 73, 198), threshold=221, count=200)
+        return self.image_color_count(
+            hospital_assets.DAILY_REWARD_RECEIVE, color=(41, 73, 198), threshold=221, count=200
+        )
 
     def is_in_daily_reward(self, interval=0):
-        return self.match_template_color(HOSIPITAL_CLUE_CHECK, offset=(30, 30), interval=interval)
+        return self.match_template_color(hospital_assets.HOSIPITAL_CLUE_CHECK, offset=(30, 30), interval=interval)
 
     def daily_reward_receive(self):
         """ "
@@ -56,7 +58,7 @@ class Hospital(HospitalClue, HospitalCombat):
             return False
 
         logger.hr("Daily reward receive", level=2)
-        # Enter reward
+        # 进入每日奖励。
         logger.info("Daily reward enter")
         skip_first_screenshot = True
         self.interval_clear(page_hospital.check_button)
@@ -68,14 +70,14 @@ class Hospital(HospitalClue, HospitalCombat):
             if self.is_in_daily_reward():
                 break
             if self.ui_page_appear(page_hospital, interval=2):
-                logger.info(f"{page_hospital} -> {HOSPITAL_GOTO_DAILY}")
-                self.device.click(HOSPITAL_GOTO_DAILY)
+                logger.info(f"{page_hospital} -> {hospital_assets.HOSPITAL_GOTO_DAILY}")
+                self.device.click(hospital_assets.HOSPITAL_GOTO_DAILY)
                 continue
 
-        # Claim reward
+        # 领取每日奖励。
         logger.info("Daily reward receive")
         skip_first_screenshot = True
-        self.interval_clear(HOSIPITAL_CLUE_CHECK)
+        self.interval_clear(hospital_assets.HOSIPITAL_CLUE_CHECK)
         timeout = Timer(1.5, count=6).start()
         clicked = False
         while 1:
@@ -91,17 +93,17 @@ class Hospital(HospitalClue, HospitalCombat):
                     break
             if self.is_in_daily_reward(interval=2):
                 if self.daily_reward_receive_appear():
-                    self.device.click(DAILY_REWARD_RECEIVE)
+                    self.device.click(hospital_assets.DAILY_REWARD_RECEIVE)
                     continue
             if self.handle_get_items():
                 timeout.reset()
                 clicked = True
                 continue
 
-        # Claim reward
+        # 退出每日奖励页。
         logger.info("Daily reward exit")
         skip_first_screenshot = True
-        self.interval_clear(HOSIPITAL_CLUE_CHECK)
+        self.interval_clear(hospital_assets.HOSIPITAL_CLUE_CHECK)
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -111,21 +113,20 @@ class Hospital(HospitalClue, HospitalCombat):
             if self.ui_page_appear(page_hospital):
                 break
             if self.is_in_daily_reward(interval=2):
-                self.device.click(HOSIPITAL_CLUE_CHECK)
-                logger.info(f"is_in_daily_reward -> {HOSIPITAL_CLUE_CHECK}")
+                self.device.click(hospital_assets.HOSIPITAL_CLUE_CHECK)
+                logger.info(f"is_in_daily_reward -> {hospital_assets.HOSIPITAL_CLUE_CHECK}")
                 continue
 
         return True
 
     def loop_invest(self):
         """
-        Do all invest in page
+        执行当前页面上的所有调查。
         """
         self.config.override(Fleet_FleetOrder="fleet1_all_fleet2_standby")
         while 1:
             logger.hr("Loop hospital invest", level=2)
-            # Scheduler
-            # May raise ScriptEnd
+            # 调度器可能抛出 ScriptEnd。
             self.emotion.check_reduce(battle=1)
 
             entered = self.invest_enter()
@@ -133,19 +134,20 @@ class Hospital(HospitalClue, HospitalCombat):
                 break
             self.hospital_combat()
 
-            # Scheduler
-            # May raise TaskEnd
+            # 调度器可能抛出 TaskEnd。
             if self.config.task_switched():
                 self.config.task_stop()
 
-            # Aside reset after combat, so we should loop in aside again
+            # 战斗后侧边栏会重置，需要重新从侧边栏循环。
             break
 
         self.claim_invest_reward()
         logger.info("Loop hospital invest end")
 
     def invest_reward_appear(self) -> bool:
-        return self.image_color_count(INVEST_REWARD_RECEIVE, color=(33, 77, 189), threshold=221, count=100)
+        return self.image_color_count(
+            hospital_assets.INVEST_REWARD_RECEIVE, color=(33, 77, 189), threshold=221, count=100
+        )
 
     def claim_invest_reward(self):
         if self.invest_reward_appear():
@@ -153,10 +155,10 @@ class Hospital(HospitalClue, HospitalCombat):
         else:
             logger.info("No invest reward")
             return False
-        # Get reward
+        # 领取调查奖励。
         skip_first_screenshot = True
         clicked = True
-        self.interval_clear(HOSIPITAL_CLUE_CHECK)
+        self.interval_clear(hospital_assets.HOSIPITAL_CLUE_CHECK)
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -171,12 +173,12 @@ class Hospital(HospitalClue, HospitalCombat):
                 continue
             if self.is_in_clue(interval=2):
                 if self.invest_reward_appear():
-                    self.device.click(INVEST_REWARD_RECEIVE)
+                    self.device.click(hospital_assets.INVEST_REWARD_RECEIVE)
                     continue
 
     def loop_aside(self):
         """
-        Do all aside in page
+        执行当前页面上的所有侧边栏任务。
         """
         while 1:
             logger.hr("Loop hospital aside", level=1)
@@ -207,7 +209,7 @@ class Hospital(HospitalClue, HospitalCombat):
 
     def aside_swipe_down(self, skip_first_screenshot=True):
         """
-        Swipe til no ASIDE_NEXT_PAGE
+        向下滑动直到没有下一页。
         """
         logger.info("Aside swipe down")
         swiped = False
@@ -218,32 +220,36 @@ class Hospital(HospitalClue, HospitalCombat):
             else:
                 self.device.screenshot()
 
-            if swiped and not self.appear(ASIDE_NEXT_PAGE, offset=(20, 20)):
+            if swiped and not self.appear(hospital_assets.ASIDE_NEXT_PAGE, offset=(20, 20)):
                 logger.info("Aside reached end")
                 break
             if interval.reached():
-                p1, p2 = random_rectangle_vector(vector=(0, -200), box=CLUE_LIST.area, random_range=(-20, -10, 20, 10))
+                p1, p2 = random_rectangle_vector(
+                    vector=(0, -200),
+                    box=hospital_assets.CLUE_LIST.area,
+                    random_range=(-20, -10, 20, 10),
+                )
                 self.device.swipe(p1, p2)
                 interval.reset()
                 swiped = True
                 continue
 
     def run(self):
-        # Check if event available
+        # 检查活动是否可用。
         if self.event_time_limit_triggered():
             self.config.task_stop()
         self.ui_ensure(page_campaign_menu)
         if self.is_event_entrance_available():
             self.ui_goto(page_hospital)
 
-        # Receive rewards
+        # 领取奖励。
         self.daily_reward_receive()
 
-        # Run
+        # 执行医院活动。
         self.clue_enter()
         try:
             self.loop_aside()
-            # Scheduler
+            # 调度下一次执行。
             self.config.task_delay(server_update=True)
         except OilExhausted:
             self.clue_exit()
