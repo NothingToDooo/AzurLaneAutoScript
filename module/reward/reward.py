@@ -1,9 +1,9 @@
 from module.base.button import ButtonGrid
 from module.base.decorator import cached_property
 from module.base.timer import Timer
-from module.combat.assets import *
+from module.combat import assets as combat_assets
 from module.logger import logger
-from module.reward.assets import *
+from module.reward import assets as reward_assets
 from module.ui.navbar import Navbar
 from module.ui.page import page_main, page_mission, page_reward
 from module.ui.ui import UI
@@ -31,23 +31,35 @@ class Reward(UI):
         logger.hr("Reward receive")
         logger.info(f"oil={oil}, coin={coin}, exp={exp}")
         confirm_timer = Timer(1, count=3).start()
-        # Set click interval to 0.3, because game can't respond that fast.
+        # 点击间隔设为 0.3 秒，避免游戏响应不过来。
         click_timer = Timer(0.3)
         for _ in self.loop():
-            if oil and click_timer.reached() and self.appear_then_click(OIL, offset=(20, 50), interval=60):
+            if (
+                oil
+                and click_timer.reached()
+                and self.appear_then_click(reward_assets.OIL, offset=(20, 50), interval=60)
+            ):
                 confirm_timer.reset()
                 click_timer.reset()
                 continue
-            if coin and click_timer.reached() and self.appear_then_click(COIN, offset=(25, 50), interval=60):
+            if (
+                coin
+                and click_timer.reached()
+                and self.appear_then_click(reward_assets.COIN, offset=(25, 50), interval=60)
+            ):
                 confirm_timer.reset()
                 click_timer.reset()
                 continue
-            if exp and click_timer.reached() and self.appear_then_click(EXP, offset=(30, 50), interval=60):
+            if (
+                exp
+                and click_timer.reached()
+                and self.appear_then_click(reward_assets.EXP, offset=(30, 50), interval=60)
+            ):
                 confirm_timer.reset()
                 click_timer.reset()
                 continue
 
-            # End
+            # 结束。
             if confirm_timer.reached():
                 break
 
@@ -55,14 +67,14 @@ class Reward(UI):
         return True
 
     def _reward_get_state(self):
-        if self.appear(MISSION_MULTI, offset=(20, 20)):
-            return MISSION_MULTI
-        if self.match_template_color(MISSION_SINGLE, offset=(50, 200)):
-            return MISSION_SINGLE
-        if self.appear(MISSION_EMPTY, offset=(20, 20)):
-            return MISSION_EMPTY
-        if self.appear(MISSION_UNFINISH, offset=(50, 200)):
-            return MISSION_UNFINISH
+        if self.appear(reward_assets.MISSION_MULTI, offset=(20, 20)):
+            return reward_assets.MISSION_MULTI
+        if self.match_template_color(reward_assets.MISSION_SINGLE, offset=(50, 200)):
+            return reward_assets.MISSION_SINGLE
+        if self.appear(reward_assets.MISSION_EMPTY, offset=(20, 20)):
+            return reward_assets.MISSION_EMPTY
+        if self.appear(reward_assets.MISSION_UNFINISH, offset=(50, 200)):
+            return reward_assets.MISSION_UNFINISH
         return None
 
     def _reward_mission_claim_click(self):
@@ -80,16 +92,16 @@ class Reward(UI):
             if clicked and not self.ui_page_appear(page_mission):
                 return clicked
             if click_interval.reached():
-                if self.appear_then_click(MISSION_MULTI, offset=(20, 20)):
+                if self.appear_then_click(reward_assets.MISSION_MULTI, offset=(20, 20)):
                     click_interval.reset()
                     clicked = True
                     continue
-                if self.match_template_color(MISSION_SINGLE, offset=(50, 200)):
-                    self.device.click(MISSION_SINGLE)
+                if self.match_template_color(reward_assets.MISSION_SINGLE, offset=(50, 200)):
+                    self.device.click(reward_assets.MISSION_SINGLE)
                     click_interval.reset()
                     clicked = True
                     continue
-                if self.appear(MISSION_UNFINISH, offset=(50, 200)):
+                if self.appear(reward_assets.MISSION_UNFINISH, offset=(50, 200)):
                     return clicked
 
     def _reward_mission_claim_receive(self):
@@ -114,12 +126,12 @@ class Reward(UI):
             else:
                 timeout.reset()
 
-            # click
-            if self.appear_then_click(GET_ITEMS_1, offset=(30, 30), interval=1):
+            # 点击领取弹窗。
+            if self.appear_then_click(combat_assets.GET_ITEMS_1, offset=(30, 30), interval=1):
                 continue
-            if self.appear_then_click(GET_ITEMS_2, offset=(30, 30), interval=1):
+            if self.appear_then_click(combat_assets.GET_ITEMS_2, offset=(30, 30), interval=1):
                 continue
-            if self.appear_then_click(GET_SHIP, interval=1):
+            if self.appear_then_click(combat_assets.GET_SHIP, interval=1):
                 continue
             if self.handle_mission_popup_ack():
                 continue
@@ -162,12 +174,20 @@ class Reward(UI):
             if state == "timeout":
                 logger.warning("Reward wait mission list timeout")
                 return state
-            if state in [MISSION_EMPTY, MISSION_UNFINISH]:
+            if state in [reward_assets.MISSION_EMPTY, reward_assets.MISSION_UNFINISH]:
                 logger.info("Mission collect finished")
                 break
-            elif state in [MISSION_MULTI, MISSION_SINGLE]:
-                # Clear any existing interval for the following assets
-                self.interval_clear([GET_ITEMS_1, GET_ITEMS_2, MISSION_MULTI, MISSION_SINGLE, GET_SHIP])
+            elif state in [reward_assets.MISSION_MULTI, reward_assets.MISSION_SINGLE]:
+                # 清理下列资产已有的点击间隔。
+                self.interval_clear(
+                    [
+                        combat_assets.GET_ITEMS_1,
+                        combat_assets.GET_ITEMS_2,
+                        reward_assets.MISSION_MULTI,
+                        reward_assets.MISSION_SINGLE,
+                        combat_assets.GET_SHIP,
+                    ]
+                )
                 self._reward_mission_claim_click()
                 state = self._reward_mission_claim_receive()
                 continue
@@ -193,7 +213,9 @@ class Reward(UI):
         Returns:
             bool, if handled
         """
-        if not self.image_color_count(MISSION_WEEKLY_RED_DOT, color=(206, 81, 66), threshold=221, count=20):
+        if not self.image_color_count(
+            reward_assets.MISSION_WEEKLY_RED_DOT, color=(206, 81, 66), threshold=221, count=20
+        ):
             logger.info("No MISSION_WEEKLY_RED_DOT")
             return False
 
@@ -208,7 +230,7 @@ class Reward(UI):
         Pages:
             in: page_main
         """
-        if self.appear(MISSION_NOTICE):
+        if self.appear(reward_assets.MISSION_NOTICE):
             logger.info("Found mission notice MISSION_NOTICE")
             return True
         if self.image_color_count(MISSION_NOTICE_WHITE, color=(214, 117, 99), threshold=221, count=20):
