@@ -54,7 +54,7 @@ class Filter:
             list: A list of objects and preset strings, such as [object, object, object, 'reset']
         """
         out = []
-        for raw, filter in zip(self.filter_raw, self.filter):
+        for raw, filter in zip(self.filter_raw, self.filter, strict=True):
             if self.is_preset(raw):
                 raw = raw.lower()
                 if raw not in out:
@@ -98,7 +98,7 @@ class Filter:
             bool: If an object satisfy a filter.
         """
 
-        for attr, value in zip(self.attr, filter):
+        for attr, value in zip(self.attr, filter, strict=True):
             if not value:
                 continue
             if str(obj.__getattribute__(attr)).lower() != str(value):

@@ -681,7 +681,7 @@ class CampaignMap:
 
         res.insert(0, 0)
         inserted = []
-        for left, right in zip(res[:-1], res[1:]):
+        for left, right in zip(res[:-1], res[1:], strict=True):
             for index in list(range(left, right, step))[1:]:
                 way_node = self[route[index]]
                 if way_node.is_fleet or way_node.is_portal or way_node.is_flare:
@@ -708,7 +708,7 @@ class CampaignMap:
 
         portal_path = []
         index = [0]
-        for i, loca in enumerate(zip(path[:-1], path[1:])):
+        for i, loca in enumerate(zip(path[:-1], path[1:], strict=True)):
             grid = self[loca[0]]
             if grid.is_portal and grid.portal_link == loca[1]:
                 index += [i, i + 1]
@@ -716,7 +716,7 @@ class CampaignMap:
                 index += [i]
         if len(path) not in index:
             index.append(len(path))
-        for start, end in zip(index[:-1], index[1:]):
+        for start, end in zip(index[:-1], index[1:], strict=True):
             if end - start == 1 and self[path[start]].is_portal and self[path[start]].portal_link == path[end]:
                 continue
             local_path = path[start : end + 1]

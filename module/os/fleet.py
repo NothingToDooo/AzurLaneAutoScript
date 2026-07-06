@@ -181,7 +181,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 " ".join(
                     [
                         str(int(data * 100)).rjust(3) + "%" if use else "____"
-                        for data, use in zip(self.hp, self.hp_has_ship)
+                        for data, use in zip(self.hp, self.hp_has_ship, strict=True)
                     ]
                 ),
             )

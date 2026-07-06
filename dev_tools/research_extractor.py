@@ -74,9 +74,9 @@ class TechnologyTemplate:
                 continue
             en_project = en_projects[key]
             set_translation(cn=project.task.name, en=en_project.task.name)
-            for item, en_item in zip(project.input, en_project.input):
+            for item, en_item in zip(project.input, en_project.input, strict=True):
                 set_translation(cn=item.name, en=en_item.name)
-            for item, en_item in zip(project.output, en_project.output):
+            for item, en_item in zip(project.output, en_project.output, strict=True):
                 set_translation(cn=item.name, en=en_item.name)
 
         for project in self.projects.values():

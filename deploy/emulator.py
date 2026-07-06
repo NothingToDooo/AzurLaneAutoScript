@@ -99,7 +99,7 @@ class VirtualBoxEmulator:
         Args:
             adb (str): Absolute path to adb.exe
         """
-        for ori, bak in zip(self.adb_binary, self.adb_backup):
+        for ori, bak in zip(self.adb_binary, self.adb_backup, strict=True):
             logger.info(f"Replacing {ori}")
             try:
                 if os.path.exists(ori):

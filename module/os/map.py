@@ -232,7 +232,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         self.hp_get()
         check = [
             round(data, 2) <= self.config.OpsiGeneral_RepairThreshold if use else False
-            for data, use in zip(self.hp, self.hp_has_ship)
+            for data, use in zip(self.hp, self.hp_has_ship, strict=True)
         ]
         if any(check):
             logger.info(

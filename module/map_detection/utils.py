@@ -171,7 +171,7 @@ class Lines:
         prev = 0
         regrouped = []
         group = []
-        for mid, line in zip(lines.mid, lines.lines):
+        for mid, line in zip(lines.mid, lines.lines, strict=True):
             line = line.tolist()
             if mid - prev > threshold:
                 if len(regrouped) == 0:
@@ -193,8 +193,8 @@ class Lines:
 
     @staticmethod
     def cross_two_lines(lines1, lines2):
-        for rho1, sin1, cos1 in zip(lines1.rho, lines1.sin, lines1.cos):
-            for rho2, sin2, cos2 in zip(lines2.rho, lines2.sin, lines2.cos):
+        for rho1, sin1, cos1 in zip(lines1.rho, lines1.sin, lines1.cos, strict=True):
+            for rho2, sin2, cos2 in zip(lines2.rho, lines2.sin, lines2.cos, strict=True):
                 a = np.array([[cos1, sin1], [cos2, sin2]])
                 b = np.array([rho1, rho2])
                 yield np.linalg.solve(a, b)
@@ -210,7 +210,7 @@ class Lines:
 
         other_mid = other.mid
         lines = []
-        for mid, line in zip(self.mid, self.lines):
+        for mid, line in zip(self.mid, self.lines, strict=True):
             if np.any(np.abs(other_mid - mid) < threshold):
                 continue
             lines.append(line)

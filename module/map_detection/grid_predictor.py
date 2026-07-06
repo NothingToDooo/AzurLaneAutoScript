@@ -305,7 +305,7 @@ class GridPredictor:
             (5, tile - corner, corner, tile),
             (tile - corner, tile - corner, tile, tile),
         ]
-        for area, template in zip(corner[::-1], ASSETS.tile_corner_image_list[::-1]):
+        for area, template in zip(corner[::-1], ASSETS.tile_corner_image_list[::-1], strict=True):
             res = cv2.matchTemplate(template, crop(self.image_homo, area=area, copy=False), cv2.TM_CCOEFF_NORMED)
             _, sim, _, _ = cv2.minMaxLoc(res)
             if sim > 0.8:

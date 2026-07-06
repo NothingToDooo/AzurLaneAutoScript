@@ -111,13 +111,12 @@ class MeowfficerEnhance(MeowfficerBase):
             MEOWFICER_FEED_LEVEL_GRID.buttons, letter=(49, 48, 49), name="FEED_MEOWFFICER_LEVEL"
         ).ocr(self.device.image)
 
-        for index, (button, level) in enumerate(zip(MEOWFFICER_FEED_GRID.buttons, feed_level_list)):
-            # Exit if 11th button; no need to validate as not
-            # possible to click beyond this point
+        for index, (button, level) in enumerate(zip(MEOWFFICER_FEED_GRID.buttons, feed_level_list, strict=False)):
+            # 到第 11 个按钮时退出；后续位置无法点击，不需要继续验证。
             if index >= 10:
                 break
 
-            # Exit if button is empty slot
+            # 遇到空槽位时退出。
             if self.image_color_count(button, color=(231, 223, 221), threshold=235, count=450):
                 break
 

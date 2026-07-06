@@ -271,7 +271,7 @@ class Perspective:
         draw = ImageDraw.Draw(image)
         if lines is None:
             lines = self.horizontal.add(self.vertical)
-        for rho, theta in zip(lines.rho, lines.theta):
+        for rho, theta in zip(lines.rho, lines.theta, strict=True):
             a = np.cos(theta)
             b = np.sin(theta)
             x0 = a * rho

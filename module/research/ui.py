@@ -104,7 +104,7 @@ class ResearchUI(UI):
             list[str]: List of project status
         """
         out = []
-        for _index, status, scaling in zip(range(5), RESEARCH_STATUS, RESEARCH_SCALING):
+        for _index, status, scaling in zip(range(5), RESEARCH_STATUS, RESEARCH_SCALING, strict=True):
             info = status.crop((0, -40, 200, 0))
             piece = rgb2gray(crop(image, info.area, copy=False))
             if TEMPLATE_WAITING.match(piece, scaling=scaling, similarity=0.75):

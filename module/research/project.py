@@ -378,7 +378,7 @@ def research_detect(image):
         list[ResearchProject]:
     """
     projects = []
-    for name, series in zip(get_research_name(image), get_research_series_3(image)):
+    for name, series in zip(get_research_name(image), get_research_series_3(image), strict=False):
         project = ResearchProject(name=name, series=series)
         logger.attr("Project", project)
         projects.append(project)

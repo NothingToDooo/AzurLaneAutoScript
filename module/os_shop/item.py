@@ -161,7 +161,7 @@ class OSShopItemGrid(ItemGrid):
         if counter and len(self.items):
             counter_list = [item.crop(self.counter_area) for item in self.items]
             counter_list = self.counter_ocr.ocr(counter_list, direct_ocr=True)
-            for i, t in zip(self.items, counter_list):
+            for i, t in zip(self.items, counter_list, strict=False):
                 i.count, i.total_count = t
 
         if isinstance(shop_index, int) and isinstance(scroll_pos, float) and len(self.items):

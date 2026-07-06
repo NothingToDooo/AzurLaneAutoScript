@@ -361,7 +361,7 @@ class Filter:
             list: A list of objects and preset strings, such as [object, object, object, 'reset']
         """
         out = []
-        for raw, filter in zip(self.filter_raw, self.filter):
+        for raw, filter in zip(self.filter_raw, self.filter, strict=True):
             if self.is_preset(raw):
                 raw = raw.lower()
                 if raw not in out:
@@ -391,7 +391,7 @@ class Filter:
         Returns:
             bool: If an object satisfy a filter.
         """
-        for attr, value in zip(self.attr, filter):
+        for attr, value in zip(self.attr, filter, strict=True):
             if not value:
                 continue
             if str(obj.__getattribute__(attr)).lower() != str(value):
@@ -804,7 +804,7 @@ class ResearchPool:
         """
         out = {}
         for condition in itertools.product([False, True], repeat=len(PROJECT_DROP[0])):
-            ships = [ship for ship, con in zip(cls.all_ships, condition) if con]
+            ships = [ship for ship, con in zip(cls.all_ships, condition, strict=True) if con]
             weight = np.array(projects.get("weight"))
             index = np.sum(np.array(condition) * [1, 2, 4, 8, 16, 32])
             remain = len(ships)
@@ -1102,7 +1102,7 @@ class BruteForceOptimizer:
         results = process_map(epoch_worker, tests_data, max_workers=BruteForceOptimizer.process)
 
         day_cost = np.ones((string_count, look_forward + 1)) * 1000
-        for data, result in zip(tests_data[1:], results[1:]):
+        for data, result in zip(tests_data[1:], results[1:], strict=True):
             day_cost[data[3]][data[4]] = result
         day_cost[:, 0] = results[0]
 
@@ -1113,7 +1113,7 @@ class BruteForceOptimizer:
         forward = np.argmin(day_cost, axis=1)
         if look_forward == 1:
             forward[np.min(day_cost, axis=1) != np.min(day_cost)] = 0
-        for index, selection, forward_index in zip(range(len(forward)), string_split, forward):
+        for index, selection, forward_index in zip(range(len(forward)), string_split, forward, strict=True):
             if index == 0:
                 selection = "[Original]"
             print(f"{selection.ljust(12, ' ')}forward: {forward_index}, day_cost: {day_cost[index][forward_index]}")

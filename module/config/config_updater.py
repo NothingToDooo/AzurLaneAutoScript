@@ -393,15 +393,18 @@ class ConfigGenerator:
                     data_lines.append(line_entries)
                     data_width = [calc_width(string) for string in line_entries]
                     data_widths.append(data_width)
-                    column_width = [max(l1, l2) for l1, l2 in zip(column_width, data_width)]
+                    column_width = [max(l1, l2) for l1, l2 in zip(column_width, data_width, strict=True)]
                     if re.search(r"\d{8}", text):
                         event = Event(text)
                         events.append(event)
-        for i, (line, old_width) in enumerate(zip(data_lines, data_widths)):
+        for i, (line, old_width) in enumerate(zip(data_lines, data_widths, strict=True)):
             lines.append(
                 "| "
                 + " | ".join(
-                    [cell + " " * (width - length) for cell, width, length in zip(line, column_width, old_width)]
+                    [
+                        cell + " " * (width - length)
+                        for cell, width, length in zip(line, column_width, old_width, strict=True)
+                    ]
                 )
                 + " |\n"
             )
@@ -680,7 +683,7 @@ class ConfigUpdater:
                 value = update_func(value)
 
             if isinstance(target, tuple):
-                for k, v in zip(target, value):
+                for k, v in zip(target, value, strict=True):
                     # 允许更新同一个键。
                     if (deep_get(old, keys=k) is None) or (source == target):
                         deep_set(new, keys=k, value=v)

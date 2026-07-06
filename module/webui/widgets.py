@@ -352,7 +352,9 @@ def put_arg_select(kwargs: T_Output_Kwargs) -> Output:
     if disabled:
         option = [
             {
-                "label": next((opt_label for opt, opt_label in zip(options, options_label) if opt == value), value),
+                "label": next(
+                    (opt_label for opt, opt_label in zip(options, options_label, strict=True) if opt == value), value
+                ),
                 "value": value,
                 "selected": True,
             }
@@ -364,7 +366,7 @@ def put_arg_select(kwargs: T_Output_Kwargs) -> Output:
                 "value": opt,
                 "select": opt == value,
             }
-            for opt, opt_label in zip(options, options_label)
+            for opt, opt_label in zip(options, options_label, strict=True)
         ]
     kwargs["options"] = option
 
@@ -388,7 +390,9 @@ def put_arg_state(kwargs: T_Output_Kwargs) -> Output:
 
     option = [
         {
-            "label": next((opt_label for opt, opt_label in zip(options, options_label) if opt == value), value),
+            "label": next(
+                (opt_label for opt, opt_label in zip(options, options_label, strict=True) if opt == value), value
+            ),
             "value": value,
             "selected": True,
         }

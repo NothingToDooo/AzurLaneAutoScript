@@ -330,7 +330,7 @@ class MapData:
             if data_loop is not None:
                 self.spawn_data_loop = self.parse_spawn_data(data_loop, self.event_enemy_data_loop)
                 if len(self.spawn_data) == len(self.spawn_data_loop) and all(
-                    s1 == s2 for s1, s2 in zip(self.spawn_data, self.spawn_data_loop)
+                    s1 == s2 for s1, s2 in zip(self.spawn_data, self.spawn_data_loop, strict=True)
                 ):
                     self.spawn_data_loop = None
             else:
@@ -342,7 +342,7 @@ class MapData:
             self.shape = tuple(np.max(list(self.map_data.keys()), axis=0))
             if self.data_loop is not None:
                 self.map_data_loop = self.parse_map_data(data_loop["grids"], self.event_enemy_data_loop)
-                if all(d1 == d2 for d1, d2 in zip(self.map_data.values(), self.map_data_loop.values())):
+                if all(d1 == d2 for d1, d2 in zip(self.map_data.values(), self.map_data_loop.values(), strict=True)):
                     self.map_data_loop = None
             else:
                 self.map_data_loop = None

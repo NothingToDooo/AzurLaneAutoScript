@@ -46,7 +46,7 @@ class Setting:
         """
         if isinstance(option_buttons, ButtonGrid):
             option_buttons = option_buttons.buttons
-        for option, option_name in zip(option_buttons, option_names):
+        for option, option_name in zip(option_buttons, option_names, strict=True):
             self.settings[(setting, option_name)] = option
 
         if option_default not in option_names:

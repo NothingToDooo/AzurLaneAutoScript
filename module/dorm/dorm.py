@@ -301,8 +301,8 @@ class RewardDorm(UI):
         """
         has_food = [self._dorm_has_food(button) for button in self._dorm_food.buttons]
         amount = self._dorm_food_ocr.ocr(self.device.image)
-        amount = [a if hf else 0 for a, hf in zip(amount, has_food)]
-        food = [Food(feed=f, amount=a) for f, a in zip(FOOD_FEED_AMOUNT, amount)]
+        amount = [a if hf else 0 for a, hf in zip(amount, has_food, strict=False)]
+        food = [Food(feed=f, amount=a) for f, a in zip(FOOD_FEED_AMOUNT, amount, strict=False)]
         _, fill, total = OCR_FILL.ocr(self.device.image)
         if total == 0:
             fill = -1

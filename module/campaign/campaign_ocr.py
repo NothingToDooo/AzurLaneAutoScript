@@ -274,13 +274,13 @@ class CampaignOcr(ModuleBase):
             # ['0F', 'F-IB', 'IGI']
             raise CampaignNameError
 
-        # After OCR, recover button attributes.
-        # These buttons are ready to be stage entrances for `MapOperation.enter_map()`
-        # button.area: Area of stage name, such as 'CLEAR' and '%'.
-        # button.color: Color of stage icon.
-        # button.button: Area of stage icon.
-        # button.name: Stage name, from OCR results.
-        for name, button in zip(result, buttons):
+        # OCR 后恢复按钮属性。
+        # 这些按钮会作为 `MapOperation.enter_map()` 使用的关卡入口。
+        # button.area：关卡名区域，例如 'CLEAR' 和 '%'。
+        # button.color：关卡图标颜色。
+        # button.button：关卡图标区域。
+        # button.name：OCR 识别出的关卡名。
+        for name, button in zip(result, buttons, strict=False):
             button.area = button.button
             button.name = name
             self.stage_entrance[name] = button

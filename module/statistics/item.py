@@ -357,26 +357,26 @@ class ItemGrid:
         if amount:
             amount_list = [item.crop(self.amount_area) for item in self.items]
             amount_list = self.amount_ocr.ocr(amount_list, direct_ocr=True)
-            for item, a in zip(self.items, amount_list):
+            for item, a in zip(self.items, amount_list, strict=True):
                 item.amount = a
         if name:
             name_list = [self.match_template(item.image) for item in self.items]
-            for item, n in zip(self.items, name_list):
+            for item, n in zip(self.items, name_list, strict=True):
                 item.name = n
         if cost:
             cost_list = [self.match_cost_template(item) for item in self.items]
-            self.items = [item for item, c in zip(self.items, cost_list) if c is not None]
+            self.items = [item for item, c in zip(self.items, cost_list, strict=True) if c is not None]
             cost_list = [c for c in cost_list if c is not None]
-            for item, c in zip(self.items, cost_list):
+            for item, c in zip(self.items, cost_list, strict=True):
                 item.cost = c
         if price and len(self.items):
             price_list = [item.crop(self.price_area) for item in self.items]
             price_list = self.price_ocr.ocr(price_list, direct_ocr=True)
-            for item, p in zip(self.items, price_list):
+            for item, p in zip(self.items, price_list, strict=True):
                 item.price = p
         if tag:
             tag_list = [self.predict_tag(item.crop(self.tag_area)) for item in self.items]
-            for item, t in zip(self.items, tag_list):
+            for item, t in zip(self.items, tag_list, strict=True):
                 item.tag = t
 
         # Delete wrong results

@@ -276,12 +276,12 @@ class GuildLogistics(GuildBase):
             in: GUILD_LOGISTICS
             out: GUILD_LOGISTICS
         """
-        # Scan the available exchange items that are selectable
+        # 扫描可选择的兑换物品。
         items = self.exchange_items.predict(self.device.image, name=True, amount=False)
 
-        # Loop EXCHANGE_GRIDS to detect for red text in bottom right area
-        # indicating player lacks inventory for that item
-        for item, button in zip(items, EXCHANGE_GRIDS.buttons):
+        # 遍历 EXCHANGE_GRIDS，检测右下角红色文本。
+        # 红色文本表示玩家缺少该物品库存。
+        for item, button in zip(items, EXCHANGE_GRIDS.buttons, strict=False):
             area = area_offset((35, 64, 83, 83), button.area[0:2])
             if self.image_color_count(area, color=(255, 93, 90), threshold=221, count=20):
                 item.enough = False

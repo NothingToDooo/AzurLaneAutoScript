@@ -358,7 +358,7 @@ class InfoHandler(ModuleBase):
         total = len(peaks)
         if not total:
             return []
-        for n, bases in enumerate(zip(properties["left_bases"], properties["right_bases"])):
+        for n, bases in enumerate(zip(properties["left_bases"], properties["right_bases"], strict=True)):
             area = (x_min, bases[0], x_max, bases[1])
             area = area_pad(area_offset(area, offset=story_option_area[:2]), pad=5)
             buttons.append(
@@ -400,7 +400,7 @@ class InfoHandler(ModuleBase):
         total = len(peaks)
         if not total:
             return []
-        for n, bases in enumerate(zip(properties["left_bases"], properties["right_bases"])):
+        for n, bases in enumerate(zip(properties["left_bases"], properties["right_bases"], strict=True)):
             area = (
                 story_option_area[0],
                 story_option_area[1] + bases[0],

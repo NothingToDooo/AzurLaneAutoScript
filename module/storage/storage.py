@@ -331,7 +331,7 @@ class StorageHandler(StorageUI):
             logger.warning("No items in storage to disassemble")
             return 0
         cumsum = np.cumsum([item.amount for item in items])
-        for item, total in zip(items, cumsum):
+        for item, total in zip(items, cumsum, strict=True):
             if item.amount <= 0:
                 continue
             self.device.click(item)

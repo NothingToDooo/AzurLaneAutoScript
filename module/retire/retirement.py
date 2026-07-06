@@ -70,7 +70,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         logger.info(" ".join([r.rjust(3) for r in rarity[7:]]))
 
         selected = 0
-        for card, r in zip(cards, rarity):
+        for card, r in zip(cards, rarity, strict=False):
             if r in target_rarity:
                 self.device.click(CARD_GRIDS[card])
                 self.device.sleep((0.1, 0.15))

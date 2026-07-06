@@ -353,6 +353,7 @@ class ShipScanner(Scanner):
                 self.sub_scanners["fleet"].results,
                 self.sub_scanners["status"].results,
                 self.grids.buttons,
+                strict=True,
             )
         ]
 

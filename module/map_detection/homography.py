@@ -435,7 +435,7 @@ class Homography:
         if expend:
             image = ImageOps.expand(image, border=expend, fill=0)
         draw = ImageDraw.Draw(image)
-        for rho, theta in zip(lines.rho, lines.theta):
+        for rho, theta in zip(lines.rho, lines.theta, strict=True):
             a = np.cos(theta)
             b = np.sin(theta)
             x0 = a * rho

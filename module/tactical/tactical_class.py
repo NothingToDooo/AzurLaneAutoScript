@@ -387,7 +387,7 @@ class RewardTacticalClass(Dock):
         is_running = [self.image_color_count(button, color=(148, 255, 99), count=50) for button in grids.buttons]
         logger.info(f"Tactical status: {['running' if s else 'empty' for s in is_running]}")
 
-        buttons = [b for b, s in zip(grids.buttons, is_running) if s]
+        buttons = [b for b, s in zip(grids.buttons, is_running, strict=True) if s]
         ocr = Duration(buttons, letter=(148, 255, 99), name="TACTICAL_REMAIN")
         remains = ocr.ocr(self.device.image)
         remains = [remains] if not isinstance(remains, list) else remains
@@ -664,8 +664,8 @@ class RewardTacticalClass(Dock):
         logger.attr("AddNewStudent_MinLevel", min_level)
 
         should_select_button = None
-        for button, level in list(zip(CARD_GRIDS.buttons, list_level))[self.dock_select_index :]:
-            # Select ship LV > 1 only
+        for button, level in list(zip(CARD_GRIDS.buttons, list_level, strict=True))[self.dock_select_index :]:
+            # 只选择等级大于 1 的舰船。
             if level >= min_level:
                 should_select_button = button
                 break
@@ -674,14 +674,14 @@ class RewardTacticalClass(Dock):
             logger.info(f"No ships with level >= {min_level} in dock")
             return False
 
-        # select a ship
+        # 选择舰船。
         self.dock_select_one(should_select_button, skip_first_screenshot=True)
-        # Confirm selected ship
-        # Clear interval if alas have just selected and exited from a meta skill
+        # 确认选中的舰船。
+        # 如果刚从 META 技能选择中退出，需要清理间隔计时。
         self.interval_clear(SHIP_CONFIRM)
 
-        # Removed the use of TACTICAL_SKILL_LIST, cause EN uses "Select skills"
-        # in normal skill list but "Choose skills" in META skill list
+        # 不再使用 TACTICAL_SKILL_LIST，因为英文服普通技能列表用 "Select skills"，
+        # META 技能列表用 "Choose skills"。
         def check_button():
             if self.appear(SKILL_CONFIRM, offset=(30, 30)):
                 return True
@@ -709,10 +709,10 @@ class RewardTacticalClass(Dock):
 
         skill_level_ocr = ExpOnSkillSelect(buttons=SKILL_LEVEL_GRIDS.buttons, lang="cnocr", name="SKILL_LEVEL")
         skill_level_list = skill_level_ocr.ocr(self.device.image)
-        for skill_button, skill_level in list(zip(SKILL_GRIDS.buttons, skill_level_list)):
+        for skill_button, skill_level in list(zip(SKILL_GRIDS.buttons, skill_level_list, strict=True)):
             level = skill_level.upper().replace(" ", "")
-            # Empty skill slot
-            # Probably because all favourite ships have their skill leveled max.
+            # 空技能槽。
+            # 可能是所有收藏舰船的技能都已满级。
             # '———l', '—l'
             if not level:
                 continue

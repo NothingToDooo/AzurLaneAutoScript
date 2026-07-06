@@ -93,7 +93,10 @@ class HPBalancer(ModuleBase):
         logger.attr(
             "HP",
             " ".join(
-                [str(int(data * 100)).rjust(3) + "%" if use else "____" for data, use in zip(hp, self.hp_has_ship)]
+                [
+                    str(int(data * 100)).rjust(3) + "%" if use else "____"
+                    for data, use in zip(hp, self.hp_has_ship, strict=True)
+                ]
             ),
         )
         if np.sum(np.abs(np.diff(weight))) > 0:

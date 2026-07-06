@@ -46,7 +46,7 @@ def get_research_series_3(image, series_button=RESEARCH_SERIES):
     """
     return [
         match_series(crop(image, area_pad(button.area, pad=-10), copy=False), scaling)
-        for scaling, button in zip(RESEARCH_SCALING, series_button)
+        for scaling, button in zip(RESEARCH_SCALING, series_button, strict=True)
     ]
 
 
