@@ -27,8 +27,13 @@ RichHandler.KEYWORDS = []
 
 
 class RichFileHandler(RichHandler):
-    # Rename
-    pass
+    def __init__(self, *args, file_handler: logging.FileHandler, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._file_handler = file_handler
+
+    def close(self) -> None:
+        self._file_handler.close()
+        super().close()
 
 
 class RichRenderableHandler(RichHandler):
@@ -167,20 +172,18 @@ pyw_name = os.path.splitext(os.path.basename(sys.argv[0]))[0]
 
 def set_file_logger(name=pyw_name):
     log_file = f"./log/{datetime.date.today()}_{name}.txt"
-    try:
-        file = open(log_file, mode="a", encoding="utf-8")
-    except FileNotFoundError:
-        os.mkdir("./log")
-        file = open(log_file, mode="a", encoding="utf-8")
+    os.makedirs("./log", exist_ok=True)
+    file_handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
 
     file_console = Console(
-        file=file,
+        file=file_handler.stream,
         no_color=True,
         highlight=False,
         width=119,
     )
 
     hdlr = RichFileHandler(
+        file_handler=file_handler,
         console=file_console,
         show_path=False,
         show_time=False,
@@ -192,7 +195,10 @@ def set_file_logger(name=pyw_name):
     )
     hdlr.setFormatter(file_formatter)
 
-    logger.handlers = [h for h in logger.handlers if not isinstance(h, (logging.FileHandler, RichFileHandler))]
+    for handler in logger.handlers[:]:
+        if isinstance(handler, (logging.FileHandler, RichFileHandler)):
+            logger.removeHandler(handler)
+            handler.close()
     logger.addHandler(hdlr)
     logger.log_file = log_file
 

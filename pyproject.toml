@@ -118,6 +118,7 @@ select = [
     "SIM110",
     "SIM113",
     "SIM114",
+    "SIM115",
     "SIM116",
     "SIM118",
     "SIM201",
