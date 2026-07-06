@@ -374,9 +374,7 @@ class Filter:
         if func is not None:
             objs, out = out, []
             for obj in objs:
-                if isinstance(obj, str):
-                    out.append(obj)
-                elif func(obj):
+                if isinstance(obj, str) or func(obj):
                     out.append(obj)
                 else:
                     # Drop this object

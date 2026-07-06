@@ -198,9 +198,7 @@ class Emotion:
 
     @property
     def reduce_per_battle_before_entering(self):
-        if self.map_is_2x_book:
-            return 4
-        elif self.config.Campaign_Use2xBook:
+        if self.map_is_2x_book or self.config.Campaign_Use2xBook:
             return 4
         else:
             return 2

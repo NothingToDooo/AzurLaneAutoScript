@@ -46,9 +46,7 @@ class Resource:
 
     @classmethod
     def is_loaded(cls, obj):
-        if hasattr(obj, "_image") and obj._image is None:
-            return False
-        elif hasattr(obj, "image") and obj.image is None:
+        if (hasattr(obj, "_image") and obj._image is None) or (hasattr(obj, "image") and obj.image is None):
             return False
         return True
 

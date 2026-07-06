@@ -122,13 +122,9 @@ class Command:
         """
         String that write into minitouch socket
         """
-        if self.operation == "c":
+        if self.operation == "c" or self.operation == "r":
             return f"{self.operation}\n"
-        elif self.operation == "r":
-            return f"{self.operation}\n"
-        elif self.operation == "d":
-            return f"{self.operation} {self.contact} {self.x} {self.y} {self.pressure}\n"
-        elif self.operation == "m":
+        elif self.operation == "d" or self.operation == "m":
             return f"{self.operation} {self.contact} {self.x} {self.y} {self.pressure}\n"
         elif self.operation == "u":
             return f"{self.operation} {self.contact}\n"

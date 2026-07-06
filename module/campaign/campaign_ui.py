@@ -359,13 +359,12 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         """
         chapter, stage = self._campaign_separate_name(name)
 
-        if self.campaign_set_chapter_main(chapter, mode):
-            pass
-        elif self.campaign_set_chapter_20241219(chapter, stage, mode):
-            pass
-        elif self.campaign_set_chapter_event(chapter, mode):
-            pass
-        elif self.campaign_set_chapter_sp(chapter, mode):
+        if (
+            self.campaign_set_chapter_main(chapter, mode)
+            or self.campaign_set_chapter_20241219(chapter, stage, mode)
+            or self.campaign_set_chapter_event(chapter, mode)
+            or self.campaign_set_chapter_sp(chapter, mode)
+        ):
             pass
         else:
             logger.warning(f"Unknown campaign chapter: {name}")

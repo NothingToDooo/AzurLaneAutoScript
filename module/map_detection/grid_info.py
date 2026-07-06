@@ -226,12 +226,7 @@ class GridInfo:
             else:
                 return False
         if info.is_siren:
-            if not self.is_land and self.may_siren:
-                self.is_siren = True
-                self.enemy_scale = 0
-                self.enemy_genre = info.enemy_genre
-                return True
-            elif (mode == "movable" or self.is_movable) and not self.is_land:
+            if (not self.is_land and self.may_siren) or ((mode == "movable" or self.is_movable) and not self.is_land):
                 self.is_siren = True
                 self.enemy_scale = 0
                 self.enemy_genre = info.enemy_genre

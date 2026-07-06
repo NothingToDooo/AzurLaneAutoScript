@@ -163,9 +163,7 @@ class Campaign(CampaignBase):
             remain = self.map.select(is_enemy=True)
             logger.info(f"Enemy remain: {remain}")
             if remain:
-                if self.fleet_2_protect():
-                    return True
-                elif self.clear_any_enemy(sort=("weight", "cost_2", "cost_1")):
+                if self.fleet_2_protect() or self.clear_any_enemy(sort=("weight", "cost_2", "cost_1")):
                     return True
         if not self.map_is_clear_mode:
             remain = self.map.select(is_enemy=True)
@@ -173,9 +171,7 @@ class Campaign(CampaignBase):
             boss = self.map.select(is_boss=True)
             logger.info(f"Boss appear: {boss}")
             if not boss:
-                if self.fleet_2_protect():
-                    return True
-                elif self.clear_any_enemy(sort=("weight", "cost_2", "cost_1")):
+                if self.fleet_2_protect() or self.clear_any_enemy(sort=("weight", "cost_2", "cost_1")):
                     return True
 
         return super().battle_function()

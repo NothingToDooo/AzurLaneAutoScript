@@ -178,15 +178,15 @@ class Homography:
         # Image.fromarray(image_edge, mode='L').show()
 
         # Find free tile
-        if self.search_tile_center(
-            image_edge,
-            threshold_good=self.config.HOMO_CENTER_GOOD_THRESHOLD,
-            threshold=self.config.HOMO_CENTER_THRESHOLD,
+        if (
+            self.search_tile_center(
+                image_edge,
+                threshold_good=self.config.HOMO_CENTER_GOOD_THRESHOLD,
+                threshold=self.config.HOMO_CENTER_THRESHOLD,
+            )
+            or self.search_tile_corner(image_edge, threshold=self.config.HOMO_CORNER_THRESHOLD)
+            or self.search_tile_rectangle(image_edge, threshold=self.config.HOMO_RECTANGLE_THRESHOLD)
         ):
-            pass
-        elif self.search_tile_corner(image_edge, threshold=self.config.HOMO_CORNER_THRESHOLD):
-            pass
-        elif self.search_tile_rectangle(image_edge, threshold=self.config.HOMO_RECTANGLE_THRESHOLD):
             pass
         else:
             raise MapDetectionError("Failed to find a free tile")

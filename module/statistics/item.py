@@ -84,9 +84,7 @@ class Item:
         self._cost = value
 
     def is_known_item(self):
-        if self.name == "DefaultItem":
-            return False
-        elif self.name.isdigit():
+        if self.name == "DefaultItem" or self.name.isdigit():
             return False
         else:
             return True

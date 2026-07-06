@@ -183,11 +183,8 @@ class ImageTruncated(Exception):
 
 
 def retry_sleep(trial):
-    # First trial
-    if trial == 0:
-        return 0
-    # Failed once, fast retry
-    elif trial == 1:
+    # 前两次尝试不等待。
+    if trial == 0 or trial == 1:
         return 0
     # Failed twice
     elif trial == 2:

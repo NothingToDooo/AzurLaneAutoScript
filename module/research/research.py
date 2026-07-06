@@ -152,9 +152,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             if slot < 4:
                 return True
             if slot == 4:
-                if self.end_time <= datetime.now():
-                    return True
-                elif self.end_time + timedelta(minutes=-10) > datetime.now():
+                if self.end_time <= datetime.now() or self.end_time + timedelta(minutes=-10) > datetime.now():
                     return True
 
         return False

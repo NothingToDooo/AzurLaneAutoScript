@@ -105,11 +105,7 @@ class OSShopItem(Item):
         self._scroll_pos = value
 
     def is_known_item(self) -> bool:
-        if self.name == "DefaultItem":
-            return False
-        elif "Empty" in self.name:
-            return False
-        elif self.name.isdigit():
+        if self.name == "DefaultItem" or "Empty" in self.name or self.name.isdigit():
             return False
         else:
             return True

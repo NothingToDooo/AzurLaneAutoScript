@@ -508,11 +508,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 died_timer.reset()
 
             if not unlock_checked:
-                if self.appear(AUTO_SEARCH_OS_MAP_OPTION_OFF, offset=(5, 120)):
-                    unlock_checked = True
-                elif self.appear(AUTO_SEARCH_OS_MAP_OPTION_OFF_DISABLED, offset=(5, 120)):
-                    unlock_checked = True
-                elif self.appear(AUTO_SEARCH_OS_MAP_OPTION_ON, offset=(5, 120)):
+                if (
+                    self.appear(AUTO_SEARCH_OS_MAP_OPTION_OFF, offset=(5, 120))
+                    or self.appear(AUTO_SEARCH_OS_MAP_OPTION_OFF_DISABLED, offset=(5, 120))
+                    or self.appear(AUTO_SEARCH_OS_MAP_OPTION_ON, offset=(5, 120))
+                ):
                     unlock_checked = True
 
             if self.handle_os_auto_search_map_option(drop=drop, enable=success):
