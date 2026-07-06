@@ -1,7 +1,6 @@
 import numpy as np
 from scipy import signal
 
-from module.base.base import ModuleBase
 from module.base.button import Button
 from module.base.timer import Timer
 from module.base.utils import color_similarity_2d, random_rectangle_point, rgb2gray

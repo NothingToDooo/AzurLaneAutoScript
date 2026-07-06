@@ -1,4 +1,3 @@
-from module.base.base import ModuleBase
 from module.base.timer import Timer
 from module.exception import ScriptError
 from module.logger import logger
