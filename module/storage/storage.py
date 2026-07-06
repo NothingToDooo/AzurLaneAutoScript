@@ -10,18 +10,18 @@ from module.ocr.ocr import Digit
 from module.retire.assets import EQUIP_CONFIRM, EQUIP_CONFIRM_2
 from module.shop.assets import AMOUNT_MINUS, AMOUNT_PLUS
 from module.statistics.item import ItemGrid
-from module.storage.assets import *
+from module.storage import assets as storage_assets
 from module.storage.ui import StorageUI
 from module.ui.assets import BACK_ARROW, STORAGE_CHECK
 from module.ui.scroll import Scroll
 
-MATERIAL_SCROLL = Scroll(METERIAL_SCROLL, color=(247, 211, 66))
+MATERIAL_SCROLL = Scroll(storage_assets.METERIAL_SCROLL, color=(247, 211, 66))
 
 EQUIPMENT_GRIDS = ButtonGrid(
     origin=(140, 88), delta=(159, 178), button_shape=(124, 124), grid_shape=(7, 3), name="EQUIPMENT"
 )
 EQUIPMENT_ITEMS = ItemGrid(EQUIPMENT_GRIDS, templates={}, amount_area=(90, 98, 123, 123))
-OCR_DISASSEMBLE_COUNT = Digit(DISASSEMBLE_COUNT_OCR, letter=(235, 235, 235))
+OCR_DISASSEMBLE_COUNT = Digit(storage_assets.DISASSEMBLE_COUNT_OCR, letter=(235, 235, 235))
 
 
 class StorageFull(Exception):
@@ -34,13 +34,13 @@ class StorageHandler(StorageUI):
     @staticmethod
     def _storage_box_template(rarity):
         if rarity == 1:
-            return TEMPLATE_BOX_T1
+            return storage_assets.TEMPLATE_BOX_T1
         if rarity == 2:
-            return TEMPLATE_BOX_T2
+            return storage_assets.TEMPLATE_BOX_T2
         if rarity == 3:
-            return TEMPLATE_BOX_T3
+            return storage_assets.TEMPLATE_BOX_T3
         if rarity == 4:
-            return TEMPLATE_BOX_T4
+            return storage_assets.TEMPLATE_BOX_T4
         else:
             raise ScriptError(f"Unknown box template rarity: {rarity}")
 
@@ -58,22 +58,21 @@ class StorageHandler(StorageUI):
         """
         logger.info("Set box amount")
 
-        # same code from shop clerk
-        ocr = Digit(BOX_AMOUNT_OCR, letter=(239, 239, 239), name="OCR_SHOP_AMOUNT")
+        # 复用商店数量选择的识别逻辑。
+        ocr = Digit(storage_assets.BOX_AMOUNT_OCR, letter=(239, 239, 239), name="OCR_SHOP_AMOUNT")
         index_offset = (40, 50)
 
-        # wait until amount buttons appear
+        # 等待数量按钮出现。
         timeout = Timer(1, count=3).start()
         for _ in self.loop():
-            # In case either -/+ shift position, use
-            # shipyard ocr trick to accurately parse
+            # -/+ 按钮可能偏移，这里沿用船坞 OCR 的定位方式提高识别稳定性。
             if self.appear(AMOUNT_MINUS, offset=index_offset) and self.appear(AMOUNT_PLUS, offset=index_offset):
                 break
             if timeout.reached():
                 logger.warning("Wait AMOUNT_MINUS AMOUNT_PLUS timeout")
                 break
 
-        # wait until a normal number
+        # 等到 OCR 读到正常数量。
         current = 0
         timeout = Timer(1, count=3).start()
         for _ in self.loop():
@@ -84,8 +83,7 @@ class StorageHandler(StorageUI):
                 logger.warning("Wait box amount timeout")
                 break
 
-        # set amount
-        # a ui_ensure_index
+        # 设置数量，相当于轻量版 ui_ensure_index。
         logger.info(f"Set box amount: {amount}")
         skip_first = True
         retry = Timer(1, count=2)
@@ -132,67 +130,65 @@ class StorageHandler(StorageUI):
         used = 0
         self.interval_clear(
             [
-                MATERIAL_CHECK,
-                BOX_USE,
+                storage_assets.MATERIAL_CHECK,
+                storage_assets.BOX_USE,
                 GET_ITEMS_1,
                 GET_ITEMS_2,
-                EQUIPMENT_FULL,
-                BOX_AMOUNT_CONFIRM,
+                storage_assets.EQUIPMENT_FULL,
+                storage_assets.BOX_AMOUNT_CONFIRM,
                 EQUIP_CONFIRM,
                 EQUIP_CONFIRM_2,
             ]
         )
 
         for _ in self.loop():
-            # End
+            # 结束。
             if success and self._storage_in_material() and not self.appear(EQUIP_CONFIRM_2, offset=(20, 20)):
                 break
 
-            # use
+            # 使用箱子。
             if self._storage_in_material(interval=5):
                 self.device.click(button)
                 continue
-            if self.appear_then_click(BOX_USE, offset=(-330, -20, 20, 20), interval=5):
-                self.interval_reset(MATERIAL_CHECK)
+            if self.appear_then_click(storage_assets.BOX_USE, offset=(-330, -20, 20, 20), interval=5):
+                self.interval_reset(storage_assets.MATERIAL_CHECK)
                 continue
             if self.appear(GET_ITEMS_1, offset=(5, 5), interval=5):
-                logger.info(f"{GET_ITEMS_1} -> {MATERIAL_ENTER}")
-                self.device.click(MATERIAL_ENTER)
-                self.interval_reset(MATERIAL_CHECK)
+                logger.info(f"{GET_ITEMS_1} -> {storage_assets.MATERIAL_ENTER}")
+                self.device.click(storage_assets.MATERIAL_ENTER)
+                self.interval_reset(storage_assets.MATERIAL_CHECK)
                 continue
             if self.appear(GET_ITEMS_2, offset=(5, 5), interval=5):
-                logger.info(f"{GET_ITEMS_2} -> {MATERIAL_ENTER}")
-                self.device.click(MATERIAL_ENTER)
-                self.interval_reset(MATERIAL_CHECK)
+                logger.info(f"{GET_ITEMS_2} -> {storage_assets.MATERIAL_ENTER}")
+                self.device.click(storage_assets.MATERIAL_ENTER)
+                self.interval_reset(storage_assets.MATERIAL_CHECK)
                 continue
-            # use match_template_color on BOX_AMOUNT_CONFIRM
-            # a long animation that opens a box, will be on the top of BOX_AMOUNT_CONFIRM
-            if self.match_template_color(BOX_AMOUNT_CONFIRM, offset=(20, 20), interval=5):
+            # 开箱动画会覆盖确认按钮，用颜色模板等待确认按钮真正露出。
+            if self.match_template_color(storage_assets.BOX_AMOUNT_CONFIRM, offset=(20, 20), interval=5):
                 actual = self._handle_use_box_amount(amount)
-                self.device.click(BOX_AMOUNT_CONFIRM)
-                self.interval_reset(BOX_AMOUNT_CONFIRM)
+                self.device.click(storage_assets.BOX_AMOUNT_CONFIRM)
+                self.interval_reset(storage_assets.BOX_AMOUNT_CONFIRM)
                 used = actual
                 continue
             if self.appear_then_click(EQUIP_CONFIRM, offset=(20, 20), interval=5):
-                self.interval_reset(MATERIAL_CHECK)
+                self.interval_reset(storage_assets.MATERIAL_CHECK)
                 continue
             if self.appear_then_click(EQUIP_CONFIRM_2, offset=(20, 20), interval=5):
-                # GET_ITEMS_* don't appear that fast
-                self.interval_reset(MATERIAL_CHECK)
+                # GET_ITEMS_* 不会这么快出现。
+                self.interval_reset(storage_assets.MATERIAL_CHECK)
                 self.interval_clear([GET_ITEMS_1, GET_ITEMS_2])
-                # EQUIP_CONFIRM_2 -> GET_ITEMS -> _storage_in_material
-                # mark EQUIP_CONFIRM_2 as the last
+                # EQUIP_CONFIRM_2 -> GET_ITEMS -> _storage_in_material，把 EQUIP_CONFIRM_2 视作最后一步。
                 success = True
                 continue
 
-            # Storage full
-            if self.appear(EQUIPMENT_FULL, offset=(20, 20)):
+            # 仓库已满。
+            if self.appear(storage_assets.EQUIPMENT_FULL, offset=(20, 20)):
                 logger.info("Storage full")
-                # Close popup
+                # 关闭弹窗。
                 self.ui_click(
-                    MATERIAL_ENTER,
+                    storage_assets.MATERIAL_ENTER,
                     check_button=self._storage_in_material,
-                    appear_button=EQUIPMENT_FULL,
+                    appear_button=storage_assets.EQUIPMENT_FULL,
                     retry_wait=3,
                     skip_first_screenshot=True,
                 )
@@ -296,27 +292,27 @@ class StorageHandler(StorageUI):
         amount = min(amount, 40)
         self.interval_clear(
             [
-                DISASSEMBLE_CONFIRM,
-                DISASSEMBLE_POPUP_CONFIRM,
+                storage_assets.DISASSEMBLE_CONFIRM,
+                storage_assets.DISASSEMBLE_POPUP_CONFIRM,
                 GET_ITEMS_1,
                 GET_ITEMS_2,
-                DISASSEMBLE_CANCEL,
+                storage_assets.DISASSEMBLE_CANCEL,
             ]
         )
         logger.info(f"Disassemble once, expected amount: {amount}")
 
         for _ in self.loop():
             if self.appear(GET_ITEMS_1, offset=(5, 5), interval=3):
-                logger.info(f"{GET_ITEMS_1} -> {DISASSEMBLE_CONFIRM}")
-                self.device.click(DISASSEMBLE_CONFIRM)
+                logger.info(f"{GET_ITEMS_1} -> {storage_assets.DISASSEMBLE_CONFIRM}")
+                self.device.click(storage_assets.DISASSEMBLE_CONFIRM)
                 continue
             if self.appear(GET_ITEMS_2, offset=(5, 5), interval=3):
-                logger.info(f"{GET_ITEMS_2} -> {DISASSEMBLE_CONFIRM}")
-                self.device.click(DISASSEMBLE_CONFIRM)
+                logger.info(f"{GET_ITEMS_2} -> {storage_assets.DISASSEMBLE_CONFIRM}")
+                self.device.click(storage_assets.DISASSEMBLE_CONFIRM)
                 continue
             if self.handle_info_bar():
                 continue
-            if self.appear(DISASSEMBLE_CANCEL, offset=(20, 20)):
+            if self.appear(storage_assets.DISASSEMBLE_CANCEL, offset=(20, 20)):
                 break
         self.interval_clear(
             [
@@ -324,7 +320,7 @@ class StorageHandler(StorageUI):
                 GET_ITEMS_2,
             ]
         )
-        self.wait_until_stable(MATERIAL_STABLE_CHECK)
+        self.wait_until_stable(storage_assets.MATERIAL_STABLE_CHECK)
 
         items = EQUIPMENT_ITEMS.predict(self.device.image, name=False, amount=True)
         if not len(items):
@@ -341,7 +337,7 @@ class StorageHandler(StorageUI):
                 break
         amount = min(cumsum[-1], amount)
 
-        # Wait items being selected
+        # 等待装备选中数量稳定。
         logger.info(f"Disassemble once, in_storage amount: {amount}")
         timeout = Timer(1, count=2).start()
         prev_disassemble = 0
@@ -372,32 +368,31 @@ class StorageHandler(StorageUI):
                 self.device.screenshot()
 
             if click_count >= 3:
-                # Probably because no item is selected,
-                # _storage_disassemble_equipment_execute() will retry selecting
+                # 可能没有选中任何装备，外层会重新尝试选择。
                 logger.warning("Failed to confirm disassemble after 3 trial")
                 disassembled = 0
                 break
-            if success and self.appear(DISASSEMBLE_CANCEL, offset=(20, 20)):
-                self.wait_until_stable(MATERIAL_STABLE_CHECK)
+            if success and self.appear(storage_assets.DISASSEMBLE_CANCEL, offset=(20, 20)):
+                self.wait_until_stable(storage_assets.MATERIAL_STABLE_CHECK)
                 break
 
-            if self.appear_then_click(DISASSEMBLE_CONFIRM, offset=(20, 20), interval=5):
+            if self.appear_then_click(storage_assets.DISASSEMBLE_CONFIRM, offset=(20, 20), interval=5):
                 click_count += 1
                 continue
-            if self.appear_then_click(DISASSEMBLE_POPUP_CONFIRM, offset=(-15, -5, 5, 70), interval=5):
-                # since 2025.05.20 disassemble no longer shows GET_ITEMS
+            if self.appear_then_click(storage_assets.DISASSEMBLE_POPUP_CONFIRM, offset=(-15, -5, 5, 70), interval=5):
+                # 2025.05.20 起，装备拆解不再弹出 GET_ITEMS。
                 success = True
                 continue
             if self.handle_popup_confirm("DISASSEMBLE"):
                 continue
             if self.appear(GET_ITEMS_1, offset=(5, 5), interval=3):
-                logger.info(f"{GET_ITEMS_1} -> {DISASSEMBLE_CONFIRM}")
-                self.device.click(DISASSEMBLE_CONFIRM)
+                logger.info(f"{GET_ITEMS_1} -> {storage_assets.DISASSEMBLE_CONFIRM}")
+                self.device.click(storage_assets.DISASSEMBLE_CONFIRM)
                 success = True
                 continue
             if self.appear(GET_ITEMS_2, offset=(5, 5), interval=3):
-                logger.info(f"{GET_ITEMS_2} -> {DISASSEMBLE_CONFIRM}")
-                self.device.click(DISASSEMBLE_CONFIRM)
+                logger.info(f"{GET_ITEMS_2} -> {storage_assets.DISASSEMBLE_CONFIRM}")
+                self.device.click(storage_assets.DISASSEMBLE_CONFIRM)
                 success = True
                 continue
 
@@ -425,7 +420,7 @@ class StorageHandler(StorageUI):
         while 1:
             logger.hr("Disassemble once")
             logger.attr("Disassembled", f"{disassembled}/{amount}")
-            if self.appear(EQUIPMENT_EMPTY, offset=(20, 20)):
+            if self.appear(storage_assets.EQUIPMENT_EMPTY, offset=(20, 20)):
                 logger.info("Equipment list empty, stop")
                 break
             if disassembled >= amount:
@@ -459,9 +454,9 @@ class StorageHandler(StorageUI):
         """
         logger.hr("Disassemble Equipment", level=2)
         self.ui_goto_storage()
-        # No need, equipping toggle does not effect disassemble
+        # 不需要切换装备中开关，它不影响拆解。
         # self.equipping_set()
-        # Also no need to call _wait_until_storage_stable(), filter confirm will do that
+        # 也不需要单独等待仓库稳定，筛选确认会处理。
         disassembled = 0
         while 1:
             logger.attr("Total_Disassemble", f"{disassembled}/{amount}")
@@ -476,13 +471,13 @@ class StorageHandler(StorageUI):
                     logger.warning("No more boxes to use, disassemble equipment end")
                     self.storage_has_boxes = False
                     break
-                # since 2025.05.20, equipments in boxes get disassembled automatically
+                # 2025.05.20 起，箱子里的装备会自动拆解。
                 disassembled += boxes
-                # use bos success, check total again
+                # 开箱成功后重新检查总数。
                 continue
             except StorageFull:
                 pass
-            # handle storage full
+            # 处理仓库已满。
             self._storage_enter_disassemble()
             equip = self._storage_disassemble_equipment_execute(rarity=rarity, amount=amount)
             disassembled += equip
@@ -566,12 +561,17 @@ class StorageHandler(StorageUI):
             in: Any, if EQUIPMENT_FULL appears, handle it
             out: the page before handling storage popup
         """
-        if not self.appear(EQUIPMENT_FULL, offset=(30, 30), interval=2):
+        if not self.appear(storage_assets.EQUIPMENT_FULL, offset=(30, 30), interval=2):
             return False
 
-        # EQUIPMENT_FULL
+        # 装备仓库已满弹窗。
         logger.info("handle_storage_full")
-        self.ui_click(EQUIPMENT_FULL, check_button=DISASSEMBLE_CANCEL, skip_first_screenshot=True, retry_wait=3)
+        self.ui_click(
+            storage_assets.EQUIPMENT_FULL,
+            check_button=storage_assets.DISASSEMBLE_CANCEL,
+            skip_first_screenshot=True,
+            retry_wait=3,
+        )
         disassembled = self._storage_disassemble_equipment_execute(rarity=rarity, amount=amount)
         if disassembled <= 0:
             logger.warning("Storage full but unable to disassemble any equipment")
@@ -584,9 +584,9 @@ class StorageHandler(StorageUI):
             else:
                 self.device.screenshot()
 
-            if self.appear_then_click(DISASSEMBLE_CANCEL, offset=(30, 30), interval=3):
+            if self.appear_then_click(storage_assets.DISASSEMBLE_CANCEL, offset=(30, 30), interval=3):
                 continue
-            if self.appear(DISASSEMBLE, offset=(30, 30), interval=3):
+            if self.appear(storage_assets.DISASSEMBLE, offset=(30, 30), interval=3):
                 self.device.click(BACK_ARROW)
                 continue
 
