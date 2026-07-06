@@ -473,7 +473,7 @@ def re_fullmatch(pattern, string):
 
 
 def get_next_time(t: datetime.time):
-    now = datetime.datetime.today().time()
+    now = datetime.datetime.now(tz=datetime.UTC).astimezone().time()
     second = (t.hour - now.hour) * 3600 + (t.minute - now.minute) * 60 + (t.second - now.second)
     if second < 0:
         second += 86400

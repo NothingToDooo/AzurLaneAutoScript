@@ -171,7 +171,8 @@ pyw_name = os.path.splitext(os.path.basename(sys.argv[0]))[0]
 
 
 def set_file_logger(name=pyw_name):
-    log_file = f"./log/{datetime.date.today()}_{name}.txt"
+    today = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+    log_file = f"./log/{today}_{name}.txt"
     os.makedirs("./log", exist_ok=True)
     file_handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
 
