@@ -331,8 +331,8 @@ class Switch:
                 if isinstance(d, Callable):
                     d = {"func": d}
                 func = d["func"]
-                args = d.get("args", tuple())
-                kwargs = d.get("kwargs", dict())
+                args = d.get("args", ())
+                kwargs = d.get("kwargs", {})
                 func(*args, **kwargs)
 
     def g(self) -> Generator:

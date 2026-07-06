@@ -481,7 +481,7 @@ class Uiautomator2(Connection):
         elif not isinstance(cmdline, str):
             raise TypeError("cmdargs type invalid", type(cmdline))
 
-        data = dict(command=cmdline, timeout=str(timeout))
+        data = {"command": cmdline, "timeout": str(timeout)}
         ret = self.u2.http.post("/shell/background", data=data, timeout=timeout + 10)
         ret.raise_for_status()
 

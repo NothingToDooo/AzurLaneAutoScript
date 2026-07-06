@@ -168,7 +168,7 @@ class Fleet(Camera, AmbushHandler):
             if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
                 return self.config.MOVABLE_NORMAL_ENEMY_TURN
             else:
-                return tuple()
+                return ()
 
     @property
     def round_is_new(self):

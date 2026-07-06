@@ -183,7 +183,7 @@ class SLPP:
                     if k is not None:
                         o[idx] = k
                     if len([key for key in o if isinstance(key, six.string_types + (int, float, bool, tuple))]) == 0:
-                        so = sorted([key for key in o])
+                        so = sorted(o)
                         if sequential(so):
                             ar = []
                             for key in o:

@@ -98,11 +98,11 @@ class PlatformBase(Connection, EmulatorManagerBase):
             EmulatorInstanceBase：模拟器实例；找不到时返回 None。
         """
         data = self.emulator_info
-        old_info = dict(
-            emulator=data.emulator,
-            path=data.path,
-            name=data.name,
-        )
+        old_info = {
+            "emulator": data.emulator,
+            "path": data.path,
+            "name": data.name,
+        }
         # 将 emulator-5554 重定向到 127.0.0.1:5555。
         serial = self.serial
         port_serial, _ = get_serial_pair(self.serial)
@@ -118,11 +118,11 @@ class PlatformBase(Connection, EmulatorManagerBase):
 
         # 写入完整模拟器信息。
         if instance is not None:
-            new_info = dict(
-                emulator=instance.type,
-                path=instance.path,
-                name=instance.name,
-            )
+            new_info = {
+                "emulator": instance.type,
+                "path": instance.path,
+                "name": instance.name,
+            }
             if new_info != old_info:
                 with self.config.multi_set():
                     self.config.EmulatorInfo_Emulator = instance.type
@@ -149,7 +149,7 @@ class PlatformBase(Connection, EmulatorManagerBase):
         instances = SelectedGrids(self.all_emulator_instances)
         for instance in instances:
             logger.info(instance)
-        search_args = dict(serial=serial)
+        search_args = {"serial": serial}
 
         # 按 serial 查找。
         select = instances.select(**search_args)

@@ -340,9 +340,9 @@ class RoadGrids:
         """
         grids = []
         for block in self.grids:
-            if any([grid.is_fleet for grid in block]):
+            if any(grid.is_fleet for grid in block):
                 continue
-            if any([grid.is_cleared for grid in block]):
+            if any(grid.is_cleared for grid in block):
                 continue
             if block.count - block.select(is_enemy=True).count == 1:
                 grids += block.select(is_enemy=True).grids
@@ -355,9 +355,9 @@ class RoadGrids:
         """
         grids = []
         for block in self.grids:
-            if any([grid.is_fleet for grid in block]):
+            if any(grid.is_fleet for grid in block):
                 continue
-            if any([grid.is_cleared for grid in block]):
+            if any(grid.is_cleared for grid in block):
                 continue
             if block.select(is_enemy=True).count >= 1:
                 grids += block.select(is_enemy=True).grids

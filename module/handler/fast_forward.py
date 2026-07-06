@@ -377,7 +377,7 @@ class FastForwardHandler(AutoSearchHandler):
                 or origin name if unable to increase.
         """
         # Copy STAGE_INCREASE to avoid potential duplicate inserting
-        stage_increase = [r for r in self.STAGE_INCREASE]
+        stage_increase = list(self.STAGE_INCREASE)
         # Insert custom increase logic
         if self.config.STAGE_INCREASE_AB:
             stage_increase = [

@@ -188,7 +188,7 @@ class Benchmark(DaemonBase, CampaignUI):
 
         self.TEST_TOTAL = 3
         self.TEST_BEST = 1
-        method, _ = self.benchmark(("nemu_ipc",), tuple())
+        method, _ = self.benchmark(("nemu_ipc",), ())
 
         return method
 

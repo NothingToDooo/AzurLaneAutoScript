@@ -33,7 +33,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             out: IN_MAP
         """
         logger.hr("OS init", level=1)
-        kwargs = dict()
+        kwargs = {}
         if self.config.task.command.__contains__("iM"):
             for key in self.config.bound.keys():
                 value = self.config.__getattribute__(key)
