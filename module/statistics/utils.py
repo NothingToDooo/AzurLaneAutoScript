@@ -1,7 +1,6 @@
 import os
 
 import cv2
-import numpy as np
 
 from module.base.utils import crop, image_size
 

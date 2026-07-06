@@ -7,7 +7,6 @@ from module.base.decorator import cached_property
 from module.base.resource import Resource
 from module.base.utils import *
 from module.config.server import VALID_SERVER
-from module.logger import logger
 
 
 class Button(Resource):
