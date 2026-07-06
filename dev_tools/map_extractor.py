@@ -2,10 +2,12 @@ import os
 import re
 from contextlib import suppress
 
+import numpy as np
+
 import module.logger
 from dev_tools.utils import LuaLoader
 from module.base.utils import location2node
-from module.map.utils import *
+from module.map.utils import camera_2d, camera_spawn_point, get_map_active_area
 
 # 导入 module.logger 会切换到项目根目录。
 _ = module.logger
