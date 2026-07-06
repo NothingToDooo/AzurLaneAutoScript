@@ -1,8 +1,9 @@
 from contextlib import suppress
 
+from module.base.button import Button
 from module.base.timer import Timer
 from module.base.utils import area_offset
-from module.campaign.assets import *
+from module.campaign import assets as campaign_assets
 from module.campaign.campaign_event import CampaignEvent
 from module.campaign.campaign_ocr import CampaignOcr
 from module.exception import CampaignEnd, CampaignNameError, ScriptEnd
@@ -21,24 +22,24 @@ class ModeSwitch(Switch):
 
 
 MODE_SWITCH_1 = ModeSwitch("Mode_switch_1", offset=(30, 10))
-MODE_SWITCH_1.add_state("normal", SWITCH_1_NORMAL)
-MODE_SWITCH_1.add_state("hard", SWITCH_1_HARD)
+MODE_SWITCH_1.add_state("normal", campaign_assets.SWITCH_1_NORMAL)
+MODE_SWITCH_1.add_state("hard", campaign_assets.SWITCH_1_HARD)
 MODE_SWITCH_2 = ModeSwitch("Mode_switch_2", offset=(30, 10))
-MODE_SWITCH_2.add_state("hard", SWITCH_2_HARD)
-MODE_SWITCH_2.add_state("ex", SWITCH_2_EX)
+MODE_SWITCH_2.add_state("hard", campaign_assets.SWITCH_2_HARD)
+MODE_SWITCH_2.add_state("ex", campaign_assets.SWITCH_2_EX)
 
-# Event mode switches changing from 20240725 to 20241219
-# I think it stable at 20241219, so give them names with date 20241219
+# 活动模式开关从 20240725 到 20241219 期间变化过。
+# 看起来从 20241219 开始稳定，所以使用 20241219 日期命名。
 MODE_SWITCH_20241219 = ModeSwitch("Mode_switch_20241219", is_selector=True, offset=(30, 30))
-MODE_SWITCH_20241219.add_state("combat", SWITCH_20241219_COMBAT)
-MODE_SWITCH_20241219.add_state("story", SWITCH_20241219_STORY)
+MODE_SWITCH_20241219.add_state("combat", campaign_assets.SWITCH_20241219_COMBAT)
+MODE_SWITCH_20241219.add_state("story", campaign_assets.SWITCH_20241219_STORY)
 ASIDE_SWITCH_20241219 = ModeSwitch("Aside_switch_20241219", is_selector=True, offset=(20, 20))
-ASIDE_SWITCH_20241219.add_state("part1", CHAPTER_20241219_PART1)
-ASIDE_SWITCH_20241219.add_state("part2", CHAPTER_20241219_PART2)
-ASIDE_SWITCH_20241219.add_state("sp", CHAPTER_20241219_SP)
-ASIDE_SWITCH_20241219.add_state("ex", CHAPTER_20241219_EX)
-# shorten unknown_timer for faster hanlding
-# because of game bug that aside indicator will be missing after campaign retreat or finish
+ASIDE_SWITCH_20241219.add_state("part1", campaign_assets.CHAPTER_20241219_PART1)
+ASIDE_SWITCH_20241219.add_state("part2", campaign_assets.CHAPTER_20241219_PART2)
+ASIDE_SWITCH_20241219.add_state("sp", campaign_assets.CHAPTER_20241219_SP)
+ASIDE_SWITCH_20241219.add_state("ex", campaign_assets.CHAPTER_20241219_EX)
+# 缩短 unknown_timer，加快异常状态处理。
+# 游戏 bug 可能导致关卡撤退或结束后侧边指示器消失。
 ASIDE_SWITCH_20241219.set_unknown_timer = Timer(0.6, count=2)
 
 
@@ -70,7 +71,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         index = self._campaign_get_chapter_index(chapter)
         isdigit = is_digit_chapter(chapter)
 
-        # A copy of use ui_ensure_index.
+        # 复用 ui_ensure_index 的索引切换逻辑。
         logger.hr("UI ensure index")
         retry = Timer(1, count=2)
         error_confirm = Timer(0.2, count=0)
@@ -91,11 +92,11 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
             if diff == 0:
                 break
 
-            # Getting 3-7 when looking for D3
+            # 查找 D3 时可能 OCR 到 3-7。
             if isdigit != current_isdigit:
                 continue
 
-            # 14-4 may be OCR as 4-1 due to slow animation, confirm if it is 4-1
+            # 动画较慢时 14-4 可能被 OCR 成 4-1，需要先确认。
             if index >= 11 and index % 10 == current:
                 error_confirm.start()
                 if not error_confirm.reached():
@@ -103,9 +104,9 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
             else:
                 error_confirm.reset()
 
-            # Switch
+            # 切换章节。
             if retry.reached():
-                button = CHAPTER_NEXT if diff > 0 else CHAPTER_PREV
+                button = campaign_assets.CHAPTER_NEXT if diff > 0 else campaign_assets.CHAPTER_PREV
                 self.device.multi_click(button, n=abs(diff), interval=(0.2, 0.3))
                 retry.reset()
 
@@ -245,8 +246,8 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
             self.campaign_ensure_chapter(chapter)
             if mode == "hard":
                 self.campaign_ensure_mode("hard")
-                # info_bar shows: Hard mode for this map is not available yet.
-                # There's also a game bug in EN, HM12 shows not available but it's actually available.
+                # info_bar 显示：该图的困难模式暂未开放。
+                # EN 服还有一个游戏 bug，HM12 显示未开放但实际可进入。
                 self.handle_info_bar()
                 self.campaign_ensure_chapter(chapter)
             return True
@@ -279,7 +280,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         if self.config.MAP_CHAPTER_SWITCH_20241219:
             if self._campaign_name_is_hard(f"{chapter}{stage}"):
                 self.config.override(Campaign_Mode="hard")
-            # part1, part2, sp, ex
+            # part1、part2、sp、ex。
             if mode == "story":
                 self.campaign_ensure_mode_20241219("story")
                 return True
@@ -310,11 +311,11 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         if self.config.MAP_CHAPTER_SWITCH_20241219_SP:
             if self._campaign_name_is_hard(f"{chapter}{stage}"):
                 self.config.override(Campaign_Mode="hard")
-            # (empty), normal, sp, (empty)
+            # 空、normal、sp、空。
             if chapter in ["sp", "t", "ht"]:
                 self.ui_goto_event()
                 self.campaign_ensure_mode_20241219("combat")
-                # normal is on the position of part2
+                # normal 位于 part2 的位置。
                 self.campaign_ensure_aside_20241219("part2")
                 self.campaign_ensure_chapter(chapter)
                 return True
@@ -327,13 +328,13 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         if self.config.MAP_CHAPTER_SWITCH_20241219_SPEX:
             if self._campaign_name_is_hard(f"{chapter}{stage}"):
                 self.config.override(Campaign_Mode="hard")
-            # normal, sp, ex
+            # normal、sp、ex。
             try:
                 ASIDE_SWITCH_20241219.offset = area_offset((-20, -20, 20, 20), (0, -37))
                 if chapter in ["sp", "t", "ht"]:
                     self.ui_goto_event()
                     self.campaign_ensure_mode_20241219("combat")
-                    # normal is on the position of part2
+                    # normal 位于 part2 的位置。
                     self.campaign_ensure_aside_20241219("part2")
                     self.campaign_ensure_chapter(chapter)
                     return True
@@ -377,7 +378,6 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
             bool: If handled
         """
         if self.appear(WITHDRAW, offset=(30, 30)):
-            # logger.info("WITHDRAW button found, wait until map loaded to prevent bugs in game client")
             self.ensure_no_info_bar(timeout=2)
             with suppress(CampaignEnd):
                 self.withdraw()
@@ -421,4 +421,6 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         Returns:
             bool: If any commission finished.
         """
-        return self.appear(CAMPAIGN_CHECK, offset=(20, 20)) and self.appear(COMMISSION_NOTICE_AT_CAMPAIGN)
+        return self.appear(CAMPAIGN_CHECK, offset=(20, 20)) and self.appear(
+            campaign_assets.COMMISSION_NOTICE_AT_CAMPAIGN
+        )
