@@ -1,15 +1,29 @@
 from module.base.timer import Timer
 from module.base.utils import area_pad
 from module.logger import logger
-from module.os.assets import *
+from module.os import assets as os_assets
 from module.os_handler.action_point import ActionPointHandler
 from module.os_handler.assets import AUTO_SEARCH_REWARD
 from module.os_handler.port import PORT_CHECK
 from module.ui.assets import BACK_ARROW
 
-ZONE_TYPES = [ZONE_DANGEROUS, ZONE_SAFE, ZONE_OBSCURE, ZONE_ABYSSAL, ZONE_STRONGHOLD, ZONE_ARCHIVE]
-ZONE_SELECT = [SELECT_DANGEROUS, SELECT_SAFE, SELECT_OBSCURE, SELECT_ABYSSAL, SELECT_STRONGHOLD, SELECT_ARCHIVE]
-ASSETS_PINNED_ZONE = ZONE_TYPES + [ZONE_ENTRANCE, ZONE_SWITCH, ZONE_PINNED]
+ZONE_TYPES = [
+    os_assets.ZONE_DANGEROUS,
+    os_assets.ZONE_SAFE,
+    os_assets.ZONE_OBSCURE,
+    os_assets.ZONE_ABYSSAL,
+    os_assets.ZONE_STRONGHOLD,
+    os_assets.ZONE_ARCHIVE,
+]
+ZONE_SELECT = [
+    os_assets.SELECT_DANGEROUS,
+    os_assets.SELECT_SAFE,
+    os_assets.SELECT_OBSCURE,
+    os_assets.SELECT_ABYSSAL,
+    os_assets.SELECT_STRONGHOLD,
+    os_assets.SELECT_ARCHIVE,
+]
+ASSETS_PINNED_ZONE = ZONE_TYPES + [os_assets.ZONE_ENTRANCE, os_assets.ZONE_SWITCH, os_assets.ZONE_PINNED]
 
 
 class OSExploreError(Exception):
@@ -24,7 +38,7 @@ class GlobeOperation(ActionPointHandler):
     _zone_unpin_interval = Timer(0.5)
 
     def is_in_globe(self):
-        return self.appear(GLOBE_GOTO_MAP, offset=(20, 20))
+        return self.appear(os_assets.GLOBE_GOTO_MAP, offset=(20, 20))
 
     def get_zone_pinned(self):
         """
@@ -80,10 +94,10 @@ class GlobeOperation(ActionPointHandler):
             return False
 
         if self.is_zone_pinned():
-            # A click does not disable pinned zone, a swipe does.
+            # 点击不会取消区域固定，滑动才会。
             self.device.swipe_vector(
                 (50, -50),
-                box=area_pad(ZONE_PINNED.area, pad=-80),
+                box=area_pad(os_assets.ZONE_PINNED.area, pad=-80),
                 random_range=(-10, -10, 10, 10),
                 padding=0,
                 name="PINNED_DISABLE",
@@ -131,7 +145,7 @@ class GlobeOperation(ActionPointHandler):
         # else:
         #     logger.warning(f'Unexpected zone switch, white block: {count}')
 
-        return self.appear(ZONE_SWITCH, offset=(5, 5))
+        return self.appear(os_assets.ZONE_SWITCH, offset=(5, 5))
 
     _zone_select_offset = (20, 200)
     _zone_select_similarity = 0.75
@@ -141,8 +155,8 @@ class GlobeOperation(ActionPointHandler):
         Returns:
             list[Button]:
         """
-        # Lower threshold to 0.75
-        # Don't know why buy but fonts are different sometimes
+        # 降低阈值到 0.75。
+        # 原因不明，但字体有时会不同。
         return [
             select
             for select in ZONE_SELECT
@@ -180,7 +194,7 @@ class GlobeOperation(ActionPointHandler):
             out: is_in_zone_select
         """
         self.ui_click(
-            ZONE_SWITCH,
+            os_assets.ZONE_SWITCH,
             appear_button=self.is_zone_pinned,
             check_button=self.is_in_zone_select,
             skip_first_screenshot=True,
@@ -197,7 +211,7 @@ class GlobeOperation(ActionPointHandler):
         """
         logger.info(f"Zone select: {button}")
         for _ in self.loop():
-            # End
+            # 结束。
             if self.is_zone_pinned():
                 break
             if self.appear_then_click(
@@ -274,12 +288,12 @@ class GlobeOperation(ActionPointHandler):
             return True
         elif self.zone_has_switch():
             self.zone_select_enter()
-            flag = SELECT_SAFE in self.ensure_zone_select_expanded()
-            button = SELECT_SAFE if flag else SELECT_DANGEROUS
+            flag = os_assets.SELECT_SAFE in self.ensure_zone_select_expanded()
+            button = os_assets.SELECT_SAFE if flag else os_assets.SELECT_DANGEROUS
             self.zone_select_execute(button)
             return flag
         else:
-            # No zone_switch, already on DANGEROUS
+            # 没有 zone_switch，已在 DANGEROUS。
             return False
 
     def os_globe_goto_map(self, skip_first_screenshot=True):
@@ -289,7 +303,7 @@ class GlobeOperation(ActionPointHandler):
             out: is_in_map
         """
         return self.ui_click(
-            GLOBE_GOTO_MAP,
+            os_assets.GLOBE_GOTO_MAP,
             check_button=self.is_in_map,
             offset=(20, 20),
             retry_wait=3,
@@ -307,40 +321,39 @@ class GlobeOperation(ActionPointHandler):
         """
         click_count = 0
         for _ in self.loop():
-            # End
+            # 结束。
             if self.is_in_globe():
                 break
 
-            if self.appear_then_click(MAP_GOTO_GLOBE, offset=(200, 5), interval=5):
-                # Just to initialize interval timer of MAP_GOTO_GLOBE_FOG
-                self.appear(MAP_GOTO_GLOBE_FOG, interval=5)
-                self.interval_reset(MAP_GOTO_GLOBE_FOG)
+            if self.appear_then_click(os_assets.MAP_GOTO_GLOBE, offset=(200, 5), interval=5):
+                # 只是为了初始化 MAP_GOTO_GLOBE_FOG 的间隔计时器。
+                self.appear(os_assets.MAP_GOTO_GLOBE_FOG, interval=5)
+                self.interval_reset(os_assets.MAP_GOTO_GLOBE_FOG)
                 click_count += 1
                 if click_count >= 5:
-                    # When there's zone exploration reward, AL just don't let you go.
+                    # 存在未领取区域探索奖励时，AL 不允许离开。
                     logger.warning(
                         "Unable to goto globe, there might be uncollected zone exploration rewards preventing exit"
                     )
                     raise RewardUncollectedError
                 continue
-            if self.appear_then_click(MAP_GOTO_GLOBE_FOG, interval=5):
-                # Encountered only in strongholds; AL will not prevent
-                # zone exit even with left over exploration rewards in map
-                self.interval_reset(MAP_GOTO_GLOBE)
+            if self.appear_then_click(os_assets.MAP_GOTO_GLOBE_FOG, interval=5):
+                # 只会在据点遇到；即使地图内仍有探索奖励，AL 也不会阻止区域退出。
+                self.interval_reset(os_assets.MAP_GOTO_GLOBE)
                 continue
             if self.handle_map_event():
                 continue
-            # Accidentally entered port
+            # 误入港口。
             if self.appear(PORT_CHECK, offset=(20, 20), interval=5):
                 logger.info(f"Page switch: {PORT_CHECK} -> {BACK_ARROW}")
                 self.device.click(BACK_ARROW)
                 continue
-            # Popup: AUTO_SEARCH_REWARD appears slowly
+            # 弹窗：AUTO_SEARCH_REWARD 出现较慢。
             if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=5):
                 continue
-            # Popup: Leaving current zone will terminate meowfficer searching.
-            # Popup: Leaving current zone will retreat submarines
-            # Searching reward will be shown after entering another zone.
+            # 弹窗：离开当前区域会终止指挥喵搜寻。
+            # 弹窗：离开当前区域会让潜艇撤退。
+            # 搜索奖励会在进入另一个区域后显示。
             if self.handle_popup_confirm("GOTO_GLOBE"):
                 continue
 
@@ -377,19 +390,19 @@ class GlobeOperation(ActionPointHandler):
             if pinned is None:
                 pinned = self.get_zone_pinned_name()
 
-            # End
+            # 结束。
             if self.is_in_map():
                 break
 
             if self.is_zone_pinned():
-                if self.appear(ZONE_LOCKED, offset=(20, 20)):
+                if self.appear(os_assets.ZONE_LOCKED, offset=(20, 20)):
                     logger.warning(f"Zone {zone} locked, neighbouring zones may not have been explored")
                     raise OSExploreError
                 if click_count > 5:
                     logger.warning(f"Unable to enter zone {zone}, neighbouring zones may not have been explored")
                     raise OSExploreError
                 if click_timer.reached():
-                    self.device.click(ZONE_ENTRANCE)
+                    self.device.click(os_assets.ZONE_ENTRANCE)
                     click_count += 1
                     click_timer.reset()
                     continue
@@ -400,6 +413,6 @@ class GlobeOperation(ActionPointHandler):
                 continue
             if self.handle_popup_confirm("GLOBE_ENTER"):
                 continue
-            # A game bug that AUTO_SEARCH_REWARD from the last cleared zone popups
+            # 游戏 bug：上一个已清理区域的 AUTO_SEARCH_REWARD 会弹出。
             if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
                 continue
