@@ -1,6 +1,9 @@
+import numpy as np
+
 from module.base.base import ModuleBase
-from module.base.button import *
+from module.base.button import ButtonGrid
 from module.base.decorator import Config
+from module.base.utils import color_bar_percentage
 from module.config.utils import to_list
 from module.logger import logger
 

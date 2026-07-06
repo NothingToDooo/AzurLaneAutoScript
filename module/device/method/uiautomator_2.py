@@ -5,11 +5,13 @@ from functools import wraps
 from json.decoder import JSONDecodeError
 from subprocess import list2cmdline
 
+import cv2
+import numpy as np
 import uiautomator2 as u2
 from adbutils.errors import AdbError
 from lxml import etree
 
-from module.base.utils import *
+from module.base.utils import point2str, random_line_segments, random_rectangle_point
 from module.config.server import DICT_PACKAGE_TO_ACTIVITY
 from module.device.connection import Connection
 from module.device.method.utils import (

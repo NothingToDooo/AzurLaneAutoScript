@@ -1,10 +1,13 @@
 import time
 
-from module.base.utils import *
+import cv2
+import numpy as np
+
+from module.base.utils import float2str, load_image
 from module.logger import logger
 from module.map_detection.homography import Homography
 from module.map_detection.perspective import Perspective
-from module.map_detection.utils import *
+from module.map_detection.utils import perspective_transform
 
 GLOBE_MAP = "./assets/map_detection/os_globe_map.png"
 GLOBE_MAP_SHAPE = (2570, 1696)
