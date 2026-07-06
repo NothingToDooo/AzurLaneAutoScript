@@ -4,11 +4,56 @@ from module.base.utils import area_pad
 from module.campaign.campaign_status import OCR_COIN
 from module.handler.assets import LOGIN_ANNOUNCE
 from module.logger import logger
-from module.shipyard.ui_globals import *
+from module.shipyard.assets import (
+    SHIPYARD_CONFIRM_DEV,
+    SHIPYARD_CONFIRM_FATE,
+    SHIPYARD_GO_FATE,
+    SHIPYARD_IN_DEV,
+    SHIPYARD_IN_FATE,
+    SHIPYARD_LEVEL_NOT_ENOUGH_DEV,
+    SHIPYARD_LEVEL_NOT_ENOUGH_FATE,
+    SHIPYARD_MINUS_DEV,
+    SHIPYARD_MINUS_FATE,
+    SHIPYARD_PLUS_DEV,
+    SHIPYARD_PLUS_FATE,
+    SHIPYARD_PROGRESS_DEV,
+    SHIPYARD_PROGRESS_FATE,
+    SHIPYARD_RESEARCH_COMPLETE,
+    SHIPYARD_RESEARCH_IN_PROGRESS,
+    SHIPYARD_RESEARCH_INCOMPLETE,
+    SHIPYARD_SERIES_SELECT_CHECK,
+    SHIPYARD_SERIES_SELECT_ENTER,
+)
+from module.shipyard.ui_globals import (
+    MAIN_OCR_COIN,
+    OCR_SHIPYARD_BP_COUNT_GRID,
+    OCR_SHIPYARD_TOTAL_DEV,
+    OCR_SHIPYARD_TOTAL_FATE,
+    SHIPYARD_BP_COUNT_GRID,
+    SHIPYARD_FACE_GRID,
+    SHIPYARD_SERIES_GRID,
+)
 from module.ui.assets import SHIPYARD_CHECK
 from module.ui.navbar import Navbar
 from module.ui.page import page_main_white
 from module.ui.ui import UI
+
+SHIPYARD_TOTAL_OCR = {
+    "DEV": OCR_SHIPYARD_TOTAL_DEV,
+    "FATE": OCR_SHIPYARD_TOTAL_FATE,
+}
+SHIPYARD_MINUS_BUTTONS = {
+    "DEV": SHIPYARD_MINUS_DEV,
+    "FATE": SHIPYARD_MINUS_FATE,
+}
+SHIPYARD_PLUS_BUTTONS = {
+    "DEV": SHIPYARD_PLUS_DEV,
+    "FATE": SHIPYARD_PLUS_FATE,
+}
+SHIPYARD_CONFIRM_BUTTONS = {
+    "DEV": SHIPYARD_CONFIRM_DEV,
+    "FATE": SHIPYARD_CONFIRM_FATE,
+}
 
 
 class ShipyardNavbar(Navbar):
@@ -62,16 +107,16 @@ class ShipyardUI(UI):
         Returns:
             Button, Button, int (ocr read value)
         """
-        # Game UI is messy here. Situation varies with DEV/FATE and MAX button.
-        # Having a MAX button is like:
+        # 这里的游戏 UI 很乱，DEV/FATE 和 MAX 按钮组合都会改变布局。
+        # 有 MAX 按钮时形态类似：
         # | - |   0   | + | | MAX |
-        # Not having a MAX button is like:
+        # 没有 MAX 按钮时形态类似：
         # | - |       0       | + |
-        # Here make a dynamic detection, and produce new ocr area.
+        # 因此先检测当前模式，再生成新的 OCR 区域。
         append = self._shipyard_get_append()
-        ocr = globals()[f"OCR_SHIPYARD_TOTAL_{append}"]
-        minus = globals()[f"SHIPYARD_MINUS_{append}"]
-        plus = globals()[f"SHIPYARD_PLUS_{append}"]
+        ocr = SHIPYARD_TOTAL_OCR[append]
+        minus = SHIPYARD_MINUS_BUTTONS[append]
+        plus = SHIPYARD_PLUS_BUTTONS[append]
         self.wait_until_appear(minus, offset=(20, 20), skip_first_screenshot=True)
         self.wait_until_appear(plus, offset=(150, 20), skip_first_screenshot=True)
         area = ocr.buttons[0]
@@ -299,7 +344,7 @@ class ShipyardUI(UI):
         """
         success = False
         append = self._shipyard_get_append()
-        button = globals()[f"SHIPYARD_CONFIRM_{append}"]
+        button = SHIPYARD_CONFIRM_BUTTONS[append]
         ocr_timer = Timer(10, count=10).start()
         confirm_timer = Timer(1, count=2).start()
         self.interval_clear(button)

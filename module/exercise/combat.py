@@ -1,8 +1,19 @@
-from module.combat.combat import *
-from module.exercise.assets import *
+from module.base.timer import Timer
+from module.combat.assets import (
+    BATTLE_PREPARATION,
+    BATTLE_STATUS_D,
+    BATTLE_STATUS_S,
+    EXP_INFO_D,
+    EXP_INFO_S,
+    GET_ITEMS_1,
+    OPTS_INFO_D,
+)
+from module.combat.combat import Combat
+from module.exercise.assets import CLICK_SAFE_AREA, EXERCISE_PREPARATION
 from module.exercise.equipment import ExerciseEquipment
 from module.exercise.hp_daemon import HpDaemon
 from module.exercise.opponent import OPPONENT, OpponentChoose
+from module.logger import logger
 from module.ui.assets import EXERCISE_CHECK
 
 

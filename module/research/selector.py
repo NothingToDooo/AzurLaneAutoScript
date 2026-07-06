@@ -5,8 +5,16 @@ from module.base.filter import Filter
 from module.base.timer import Timer
 from module.config.config_generated import GeneratedConfig
 from module.logger import logger
-from module.research.assets import *
-from module.research.preset import *
+from module.research.assets import (
+    DETAIL_NEXT,
+    ENTRANCE_1,
+    ENTRANCE_2,
+    ENTRANCE_3,
+    ENTRANCE_4,
+    ENTRANCE_5,
+    RESEARCH_COST_CHECKER,
+)
+from module.research.preset import DICT_FILTER_PRESET, FILTER_STRING_CHEAPEST, FILTER_STRING_SHORTEST
 from module.research.project import research_detect
 from module.research.ui import ResearchUI
 

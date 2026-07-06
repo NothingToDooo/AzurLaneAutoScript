@@ -6,11 +6,10 @@ import numpy as np
 
 from module.base.button import Button
 from module.base.filter import Filter
-from module.base.utils import area_offset, color_similar, crop, dictionary_cn, extract_letters, get_color
-from module.commission.project_data import *
+from module.base.utils import area_offset, color_similar, crop, extract_letters, get_color
+from module.commission.project_data import dictionary_cn
 from module.logger import logger
 from module.ocr.ocr import Duration, Ocr
-from module.reward.assets import *
 
 COMMISSION_FILTER = Filter(
     regex=re.compile(
