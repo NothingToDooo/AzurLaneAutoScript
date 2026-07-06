@@ -114,15 +114,6 @@ wheels = [
 ]
 
 [[package]]
-name = "alas-webapp"
-version = "0.3.7"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ed/96/7b67226553a5abe098259cfd5d4c9b3cb5bd69bb09097cff9c6874dd616e/alas_webapp-0.3.7-py3-none-any.whl", hash = "sha256:85864d47b30df25f0f84b703e2748bbd5397c5ea150de38d142518e5dd165e16", size = 5325391, upload-time = "2022-01-15T15:55:32.678Z" },
-    { url = "https://files.pythonhosted.org/packages/c1/45/9ff5de9d2c13a7668fb63ab2bab544a576611d3b0c4c202e495889b0bbf6/alas_webapp-0.3.7.0-py3-none-any.whl", hash = "sha256:a36df774cf757227a8a0cae254fd2778a048fcff0672fd1a062c0d65c488c53d", size = 5326359, upload-time = "2022-07-18T17:33:15.139Z" },
-]
-
-[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -191,7 +182,6 @@ source = { virtual = "." }
 dependencies = [
     { name = "adbutils" },
     { name = "aiofiles" },
-    { name = "alas-webapp" },
     { name = "anyio" },
     { name = "av" },
     { name = "cached-property" },
@@ -235,7 +225,6 @@ dev = [
 requires-dist = [
     { name = "adbutils" },
     { name = "aiofiles" },
-    { name = "alas-webapp" },
     { name = "anyio" },
     { name = "av" },
     { name = "cached-property", specifier = ">=2.0.1" },

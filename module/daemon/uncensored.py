@@ -55,8 +55,6 @@ class AzurLaneUncensored(LoginHandler):
         #     repo=repo,
         #     source='origin',
         #     branch='master',
-        #     proxy=manager.config['GitProxy'],
-        #     keep_changes=False
         # )
 
         logger.hr("Push Uncensored Files", level=1)

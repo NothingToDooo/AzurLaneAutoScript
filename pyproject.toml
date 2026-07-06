@@ -34,7 +34,6 @@ dependencies = [
     "pywebio",
     "starlette",
     "uvicorn[standard]",
-    "alas-webapp",
     "zerorpc",
     "pyzmq",
     "cached-property>=2.0.1",

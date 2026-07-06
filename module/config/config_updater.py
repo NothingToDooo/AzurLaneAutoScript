@@ -475,11 +475,6 @@ class ConfigGenerator:
     @staticmethod
     def generate_deploy_template():
         template = poor_yaml_read(DEPLOY_TEMPLATE)
-        cn = {
-            "Repository": "git://git.lyoko.io/AzurLaneAutoScript",
-            "PypiMirror": "https://mirrors.aliyun.com/pypi/simple",
-            "Language": "zh-CN",
-        }
 
         def update(suffix, *args):
             file = f"./config/deploy.{suffix}.yaml"
@@ -489,7 +484,7 @@ class ConfigGenerator:
             poor_yaml_write(data=new, file=file)
 
         update("template")
-        update("template-cn", cn)
+        update("template-cn")
 
     def insert_package(self):
         option = deep_get(self.argument, keys="Emulator.PackageName.option")
@@ -791,7 +786,7 @@ class ConfigUpdater:
 
 
 if __name__ == "__main__":
-    """
+    r"""
     Process the whole config generation.
 
                  task.yaml -+----------------> menu.json

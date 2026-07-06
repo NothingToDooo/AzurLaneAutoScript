@@ -99,7 +99,7 @@ class ConfigUpdater(config_updater.ConfigUpdater):
 
 
 if __name__ == "__main__":
-    """
+    r"""
     Process the whole config generation.
 
                  task.yaml -+----------------> menu.json

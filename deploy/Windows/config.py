@@ -14,18 +14,10 @@ class ExecutionError(Exception):
 
 class ConfigModel:
     # Git
-    Repository: str = "https://github.com/LmeSzinc/AzurLaneAutoScript"
-    Branch: str = "master"
     GitExecutable: str = "./toolkit/Git/mingw64/bin/git.exe"
-    GitProxy: Optional[str] = None
-    SSLVerify: bool = False
-    AutoUpdate: bool = True
 
     # Python
     PythonExecutable: str = "./.venv/Scripts/python.exe"
-    PythonVersion: str = "3.14.6"
-    PypiMirror: Optional[str] = None
-    InstallDependencies: bool = True
 
     # Adb
     AdbExecutable: str = "./.venv/Lib/site-packages/adbutils/binaries/adb.exe"
@@ -39,11 +31,6 @@ class ConfigModel:
     OcrServerPort: int = 22268
     OcrClientAddress: str = "127.0.0.1:22268"
 
-    # Update
-    EnableReload: bool = True
-    CheckUpdateInterval: int = 5
-    AutoRestartTime: str = "03:50"
-
     # Misc
     DiscordRichPresence: bool = False
 
@@ -56,17 +43,11 @@ class ConfigModel:
     # Webui
     WebuiHost: str = "0.0.0.0"
     WebuiPort: int = 22367
-    Language: str = "en-US"
     Theme: str = "default"
     DpiScaling: bool = True
     Password: Optional[str] = None
     CDN: Union[str, bool] = False
     Run: Optional[str] = None
-    AppAsarUpdate: bool = True
-    NoSandbox: bool = True
-
-    # Dynamic
-    GitOverCdn: bool = False
 
 
 class DeployConfig(ConfigModel):
@@ -96,30 +77,18 @@ class DeployConfig(ConfigModel):
     def read(self):
         self.config = poor_yaml_read(DEPLOY_TEMPLATE)
         self.config_template = copy.deepcopy(self.config)
-        origin = poor_yaml_read(self.file)
+        origin = {key: value for key, value in poor_yaml_read(self.file).items() if key in self.config}
         self.config.update(origin)
 
         for key, value in self.config.items():
             if hasattr(self, key):
                 super().__setattr__(key, value)
 
-        self.config_redirect()
-
         if self.config != origin:
             self.write()
 
     def write(self):
         poor_yaml_write(self.config, self.file)
-
-    def config_redirect(self):
-        """
-        Redirect deploy config, must be called after each `read()`
-        """
-        # Bypass webui.config.DeployConfig.__setattr__()
-        # Don't write these into deploy.yaml
-        super().__setattr__("GitOverCdn", self.Repository in ["cn"])
-        if self.Repository in ["global", "cn"]:
-            super().__setattr__("Repository", "https://github.com/LmeSzinc/StarRailCopilot")
 
     def filepath(self, path):
         """
@@ -215,9 +184,9 @@ class DeployConfig(ConfigModel):
         return stdout.decode()
 
     def show_error(self, command=None):
-        logger.hr("Update failed", 0)
+        logger.hr("Command failed", 0)
         self.show_config()
         logger.info("")
         logger.info(f"Last command: {command}")
-        logger.info("Please check your deploy settings in config/deploy.yaml and re-open Alas.exe")
+        logger.info("Please check your deploy settings in config/deploy.yaml")
         logger.info("Take the screenshot of entire window if you need help")

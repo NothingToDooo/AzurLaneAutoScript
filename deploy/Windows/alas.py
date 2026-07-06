@@ -1,9 +1,8 @@
 import os
-import time
 import typing as t
 
 from deploy.Windows.config import DeployConfig
-from deploy.Windows.logger import Progress, logger
+from deploy.Windows.logger import logger
 from deploy.Windows.utils import DataProcessInfo, cached_property, iter_process
 
 
@@ -25,7 +24,7 @@ class AlasManager(DeployConfig):
     def iter_process_by_names(self, names, in_alas=False) -> t.Iterable[DataProcessInfo]:
         """
         Args:
-            names (str, list[str]): process name, such as 'alas.exe'
+            names (str, list[str]): process names, such as 'python.exe'
             in_alas (bool): If the output process must in Alas
 
         Yields:
@@ -52,25 +51,3 @@ class AlasManager(DeployConfig):
 
     def kill_process(self, process: DataProcessInfo):
         self.execute(f"taskkill /f /t /pid {process.pid}", allow_failure=True, output=False)
-
-    def alas_kill(self):
-        for _ in range(10):
-            logger.hr("Kill existing Alas", 0)
-            proc_list = list(self.iter_process_by_names(["python.exe"], in_alas=True))
-            if not len(proc_list):
-                Progress.KillExisting()
-                return True
-            for proc in proc_list:
-                logger.info(proc)
-                self.kill_process(proc)
-
-        logger.warning("Unable to kill existing Alas, skip")
-        Progress.KillExisting()
-        return False
-
-
-if __name__ == "__main__":
-    self = AlasManager()
-    start = time.time()
-    self.alas_kill()
-    print(time.time() - start)

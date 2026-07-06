@@ -1,5 +1,3 @@
-import argparse
-import os
 import queue
 import threading
 from multiprocessing import Process
@@ -113,8 +111,6 @@ class ProcessManager:
                 return 2
             elif s.endswith("Reason: Finish"):
                 return 2
-            elif s.endswith("Reason: Update"):
-                return 4
             else:
                 return 3
 
@@ -129,19 +125,8 @@ class ProcessManager:
 
     @staticmethod
     def run_process(config_name, func: str, q: queue.Queue, e: threading.Event = None) -> None:
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--electron", action="store_true", help="Runs by electron client.")
-        args, _ = parser.parse_known_args()
-        State.electron = args.electron
-
         # Setup logger
         set_file_logger(name=config_name)
-        if State.electron:
-            # https://github.com/LmeSzinc/AzurLaneAutoScript/issues/2051
-            logger.info("Electron detected, remove log output to stdout")
-            from module.logger import console_hdlr
-
-            logger.removeHandler(console_hdlr)
         set_func_logger(func=q.put)
 
         from module.config.config import AzurLaneConfig
@@ -187,8 +172,7 @@ class ProcessManager:
     @staticmethod
     def restart_processes(instances: List[Union[ProcessManager, str]] = None, ev: threading.Event = None):
         """
-        After update and reload, or failed to perform an update,
-        restart all alas that running before update
+        Start configured alas instances when the web service starts.
         """
         logger.hr("Restart alas")
 
@@ -206,20 +190,8 @@ class ProcessManager:
             elif isinstance(instance, ProcessManager):
                 _instances.add(instance)
 
-        try:
-            with open("./config/reloadalas") as f:
-                for line in f.readlines():
-                    line = line.strip()
-                    _instances.add(ProcessManager.get_manager(line))
-        except FileNotFoundError:
-            pass
-
         for process in _instances:
             logger.info(f"Starting [{process.config_name}]")
             process.start(func=get_config_mod(process.config_name), ev=ev)
 
-        try:
-            os.remove("./config/reloadalas")
-        except:
-            pass
         logger.info("Start alas complete")

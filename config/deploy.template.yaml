@@ -1,43 +1,15 @@
 Deploy:
   Git:
-    # URL of AzurLaneAutoScript repository
-    # [CN user] Use 'git://git.lyoko.io/AzurLaneAutoScript' for faster and more stable download
-    # [Other] Use 'https://github.com/LmeSzinc/AzurLaneAutoScript'
-    Repository: https://github.com/LmeSzinc/AzurLaneAutoScript
-    # Branch of Alas
-    # [Developer] Use 'dev', 'app', etc, to try new features
-    # [Other] Use 'master', the stable branch
-    Branch: master
     # Filepath of git executable `git.exe`
     # [Easy installer] Use './toolkit/Git/mingw64/bin/git.exe'
     # [Other] Use you own git
     GitExecutable: ./toolkit/Git/mingw64/bin/git.exe
-    # Set git proxy
-    # [CN user] Use your local http proxy (http://127.0.0.1:{port}) or socks5 proxy (socks5://127.0.0.1:{port})
-    # [Other] Use null
-    GitProxy: null
-    # Set SSL Verify
-    # [In most cases] Use true
-    # [Other] Use false to when connected to an untrusted network
-    SSLVerify: true
-    # Update Alas at startup
-    # [In most cases] Use true
-    AutoUpdate: true
 
   Python:
     # Filepath of python executable `python.exe`
     # [uv] Use './.venv/Scripts/python.exe'
     # [Other] Use your own Python 3.14.6 executable
     PythonExecutable: ./.venv/Scripts/python.exe
-    # Python version managed by uv
-    PythonVersion: 3.14.6
-    # URL of pypi mirror
-    # [CN user] Use 'https://mirrors.aliyun.com/pypi/simple' for faster and more stable download
-    # [Other] Use null
-    PypiMirror: null
-    # Install dependencies at startup
-    # [In most cases] Use true
-    InstallDependencies: true
 
   Adb:
     # Filepath of ADB executable `adb.exe`
@@ -78,21 +50,6 @@ Deploy:
     # [Default] 127.0.0.1:22268
     OcrClientAddress: 127.0.0.1:22268
 
-  Update:
-    # Use auto update and builtin updater feature
-    # This may cause problem https://github.com/LmeSzinc/AzurLaneAutoScript/issues/876
-    EnableReload: true
-    # Check update every X minute
-    # [Disable] 0
-    # [Default] 5
-    CheckUpdateInterval: 5
-    # Scheduled restart time
-    # If there are updates, Alas will automatically restart and update at this time every day
-    # and run all alas instances that running before restarted
-    # [Disable] null
-    # [Default] 03:50
-    AutoRestartTime: 03:50
-
   Misc:
     # Enable discord rich presence
     DiscordRichPresence: false
@@ -123,12 +80,6 @@ Deploy:
     # You will be able to access webui via `http://{host}:{port}`
     # [In most cases] Default to 22267
     WebuiPort: 22267
-    # Language to use on web ui
-    # 'zh-CN' for Chinese simplified
-    # 'en-US' for English
-    # 'ja-JP' for Japanese
-    # 'zh-TW' for Chinese traditional
-    Language: en-US
     # Theme of web ui
     # 'default' for light theme
     # 'dark' for dark theme

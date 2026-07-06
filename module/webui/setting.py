@@ -1,5 +1,4 @@
 import multiprocessing
-import threading
 from multiprocessing.managers import SyncManager
 from typing import TYPE_CHECKING, Callable, Generic, TypeVar
 
@@ -55,9 +54,7 @@ class State:
     _init = False
     _clearup = False
 
-    restart_event: threading.Event = None
     manager: SyncManager = None
-    electron: bool = False
     theme: str = "default"
 
     @classmethod

@@ -53,21 +53,6 @@ class Progress:
     Start = Percentage(0)
     ShowDeployConfig = Percentage(10)
 
-    GitInit = Percentage(12)
-    GitSetConfig = Percentage(13)
-    GitSetRepo = Percentage(15)
-    GitFetch = Percentage(40)
-    GitReset = Percentage(45)
-    GitCheckout = Percentage(48)
-    GitShowVersion = Percentage(50)
-
-    GitLatestCommit = Percentage(25)
-    GitDownloadPack = Percentage(40)
-
-    KillExisting = Percentage(60)
-    UpdateDependency = Percentage(70)
-    UpdateAlasApp = Percentage(75)
-
     AdbReplace = Percentage(80)
     AdbConnect = Percentage(95)
 
