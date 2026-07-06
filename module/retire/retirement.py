@@ -1,11 +1,11 @@
-from module.base.button import ButtonGrid
+from module.base.button import Button, ButtonGrid
 from module.base.timer import Timer
 from module.base.utils import color_similar, get_color, resize
 from module.combat.assets import GET_ITEMS_1
 from module.exception import RequestHumanTakeover, ScriptError
 from module.handler.assets import AUTO_SEARCH_MAP_OPTION_OFF, AUTO_SEARCH_MAP_OPTION_ON
 from module.logger import logger
-from module.retire.assets import *
+from module.retire import assets as retire_assets
 from module.retire.enhancement import Enhancement
 from module.retire.scanner import ShipScanner
 from module.retire.setting import QuickRetireSettingHandler
@@ -26,10 +26,10 @@ CARD_RARITY_COLORS = {
     # Not support marriage cards.
 }
 
-RETIRE_CONFIRM_SCROLL = Scroll(RETIRE_CONFIRM_SCROLL_AREA, color=(74, 77, 110), name="STRATEGIC_SEARCH_SCROLL")
-RETIRE_CONFIRM_SCROLL.color_threshold = (
-    240  # Background color is (66, 72, 77), so default (256-221)=35 is not enough to dintinguish.
+RETIRE_CONFIRM_SCROLL = Scroll(
+    retire_assets.RETIRE_CONFIRM_SCROLL_AREA, color=(74, 77, 110), name="STRATEGIC_SEARCH_SCROLL"
 )
+RETIRE_CONFIRM_SCROLL.color_threshold = 240  # 背景色是 (66, 72, 77)，默认阈值 (256-221)=35 不够区分。
 
 
 class Retirement(Enhancement, QuickRetireSettingHandler):
@@ -89,7 +89,14 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         """
         logger.info("Retirement confirm")
         executed = False
-        for button in [SHIP_CONFIRM, SHIP_CONFIRM_2, EQUIP_CONFIRM, EQUIP_CONFIRM_2, GET_ITEMS_1, SR_SSR_CONFIRM]:
+        for button in [
+            retire_assets.SHIP_CONFIRM,
+            retire_assets.SHIP_CONFIRM_2,
+            retire_assets.EQUIP_CONFIRM,
+            retire_assets.EQUIP_CONFIRM_2,
+            GET_ITEMS_1,
+            retire_assets.SR_SSR_CONFIRM,
+        ]:
             self.interval_clear(button)
         self.popup_interval_clear()
         timeout = Timer(10, count=10).start()
@@ -99,23 +106,22 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
             else:
                 self.device.screenshot()
 
-            # End
+            # 等待退役确认流程完成。
             if timeout.reached():
-                # Ships being used by GemsFarming have no equipment to disassemble
-                # So `executed` is never set to True, causing infinite loop
-                # Handled with dirty timeout, a better fix is required
+                # GemsFarming 占用中的舰船没有装备可分解，executed 不会变成 True。
+                # 这里先用超时兜底，后续可以从状态源头继续收窄。
                 logger.warning("Wait _retirement_confirm timeout, assume finished")
                 break
-            # sometimes you have EQUIP_CONFIRM without black-blurred background
-            # EQUIP_CONFIRM and IN_RETIREMENT_CHECK appears
-            if self.appear(IN_RETIREMENT_CHECK, offset=(20, 20)) and not self.appear(EQUIP_CONFIRM, offset=(30, 30)):
+            # 有时装备确认弹窗没有黑色模糊背景，会和退役检查点同时出现。
+            if self.appear(retire_assets.IN_RETIREMENT_CHECK, offset=(20, 20)) and not self.appear(
+                retire_assets.EQUIP_CONFIRM, offset=(30, 30)
+            ):
                 if executed:
                     break
             else:
                 timeout.reset()
 
-            # Click
-            # Ship confirm, order by display hierarchy
+            # 按显示层级处理确认按钮。
             if (
                 self._unable_to_enhance
                 or self.config.OldRetire_SR
@@ -123,54 +129,54 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
                 or self.config.Retirement_RetireMode == "one_click_retire"
             ):
                 if self.handle_popup_confirm(name="RETIRE_SR_SSR", offset=(20, 50)):
-                    # Avoid clicking the undelying SHIP_CONFIRM again
-                    self.interval_reset([SHIP_CONFIRM, SHIP_CONFIRM_2])
-                    # EQUIP_CONFIRM_2 may be detected as popup confirm
-                    self.interval_reset([EQUIP_CONFIRM, EQUIP_CONFIRM_2])
+                    # 避免再次点到底层确认按钮。
+                    self.interval_reset([retire_assets.SHIP_CONFIRM, retire_assets.SHIP_CONFIRM_2])
+                    # EQUIP_CONFIRM_2 可能会被识别成弹窗确认。
+                    self.interval_reset([retire_assets.EQUIP_CONFIRM, retire_assets.EQUIP_CONFIRM_2])
                     continue
-                if self.appear_then_click(SR_SSR_CONFIRM, offset=(20, 50), interval=2):
-                    # Avoid clicking the undelying SHIP_CONFIRM again
-                    self.interval_reset([SHIP_CONFIRM, SHIP_CONFIRM_2])
-                    # EQUIP_CONFIRM_2 may be detected as popup confirm
-                    self.interval_reset([EQUIP_CONFIRM, EQUIP_CONFIRM_2])
+                if self.appear_then_click(retire_assets.SR_SSR_CONFIRM, offset=(20, 50), interval=2):
+                    # 避免再次点到底层确认按钮。
+                    self.interval_reset([retire_assets.SHIP_CONFIRM, retire_assets.SHIP_CONFIRM_2])
+                    # EQUIP_CONFIRM_2 可能会被识别成弹窗确认。
+                    self.interval_reset([retire_assets.EQUIP_CONFIRM, retire_assets.EQUIP_CONFIRM_2])
                     continue
-            if self.match_template_color(SHIP_CONFIRM_2, offset=(30, 30), interval=2):
+            if self.match_template_color(retire_assets.SHIP_CONFIRM_2, offset=(30, 30), interval=2):
                 if self.retire_keep_common_cv and not self._have_kept_cv:
                     self.keep_one_common_cv()
-                self.device.click(SHIP_CONFIRM_2)
-                # GET_ITEMS_1 is going to appear, avoid re-entering ship confirm
+                self.device.click(retire_assets.SHIP_CONFIRM_2)
+                # 即将出现获取物品弹窗，避免重新进入舰船确认。
                 self.interval_clear(GET_ITEMS_1)
-                self.interval_reset([SHIP_CONFIRM, SHIP_CONFIRM_2])
+                self.interval_reset([retire_assets.SHIP_CONFIRM, retire_assets.SHIP_CONFIRM_2])
                 continue
-            if self.match_template_color(SHIP_CONFIRM, offset=(30, 30), interval=2):
-                self.device.click(SHIP_CONFIRM)
+            if self.match_template_color(retire_assets.SHIP_CONFIRM, offset=(30, 30), interval=2):
+                self.device.click(retire_assets.SHIP_CONFIRM)
                 continue
-            # Equip confirm
-            if self.appear_then_click(EQUIP_CONFIRM, offset=(30, 30), interval=2):
+            # 装备确认。
+            if self.appear_then_click(retire_assets.EQUIP_CONFIRM, offset=(30, 30), interval=2):
                 continue
-            if self.appear_then_click(EQUIP_CONFIRM_2, offset=(30, 30), interval=2):
+            if self.appear_then_click(retire_assets.EQUIP_CONFIRM_2, offset=(30, 30), interval=2):
                 self.interval_clear(GET_ITEMS_1)
                 executed = True
                 continue
-            # Get items
+            # 获取物品。
             if self.appear(GET_ITEMS_1, offset=(30, 30), interval=2):
-                self.device.click(GET_ITEMS_1_RETIREMENT_SAVE)
-                self.interval_reset(SHIP_CONFIRM)
-                # equipment confirms are the next to appear
-                self.interval_clear([EQUIP_CONFIRM, EQUIP_CONFIRM_2])
+                self.device.click(retire_assets.GET_ITEMS_1_RETIREMENT_SAVE)
+                self.interval_reset(retire_assets.SHIP_CONFIRM)
+                # 接下来会出现装备确认。
+                self.interval_clear([retire_assets.EQUIP_CONFIRM, retire_assets.EQUIP_CONFIRM_2])
                 continue
 
     def retirement_appear(self):
         return (
-            self.appear(RETIRE_APPEAR_1, offset=30)
-            and self.appear(RETIRE_APPEAR_2, offset=30)
-            and self.appear(RETIRE_APPEAR_3, offset=30)
+            self.appear(retire_assets.RETIRE_APPEAR_1, offset=30)
+            and self.appear(retire_assets.RETIRE_APPEAR_2, offset=30)
+            and self.appear(retire_assets.RETIRE_APPEAR_3, offset=30)
         )
 
     def _retirement_quit(self):
         def check_func():
-            return not self.appear(IN_RETIREMENT_CHECK, offset=(20, 20)) and not self.appear(
-                DOCK_CHECK, offset=(20, 20)
+            return not self.appear(retire_assets.IN_RETIREMENT_CHECK, offset=(20, 20)) and not self.appear(
+                retire_assets.DOCK_CHECK, offset=(20, 20)
             )
 
         self.ui_back(check_button=check_func, skip_first_screenshot=True)
@@ -206,7 +212,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
                 self.device.screenshot()
 
             # End
-            if self.appear(SHIP_CONFIRM_2, offset=(30, 30)):
+            if self.appear(retire_assets.SHIP_CONFIRM_2, offset=(30, 30)):
                 return True
 
     def retire_ships_one_click(self):
@@ -224,7 +230,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         while 1:
             self.handle_info_bar()
 
-            # ONE_CLICK_RETIREMENT -> SHIP_CONFIRM_2 or info_bar_count
+            # 一键退役按钮会进入确认弹窗，或提示没有可退役舰船。
             skip_first_screenshot = True
             click_count = 0
             while 1:
@@ -232,8 +238,8 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
                     skip_first_screenshot = False
                 else:
                     self.device.screenshot()
-                # End
-                if self.appear(SHIP_CONFIRM_2, offset=(30, 30)):
+                # 已进入确认弹窗。
+                if self.appear(retire_assets.SHIP_CONFIRM_2, offset=(30, 30)):
                     break
                 if self.info_bar_count():
                     logger.info("No more ships to retire.")
@@ -244,23 +250,19 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
                 if click_count >= 5:
                     logger.warning("Failed to select ships using ONE_CLICK_RETIREMENT after 5 trial")
                     if self._retire_wait_slow_retire():
-                        # Waited, all good
-                        # Use pass to trigger ONE_CLICK_RETIREMENT on the same screenshot
+                        # 等到了，继续在同一张截图上触发一键退役判断。
                         pass
                     else:
-                        # probably because game bugged, a re-enter should fix it
-                        # Mark as retire finished, higher level will call retires
+                        # 可能是游戏状态异常；标记本轮完成，让上层重新进入。
                         end = True
                         total = 10
                         break
-                if self.appear_then_click(ONE_CLICK_RETIREMENT, offset=(20, 20), interval=2):
+                if self.appear_then_click(retire_assets.ONE_CLICK_RETIREMENT, offset=(20, 20), interval=2):
                     click_count += 1
                     continue
 
-            # info_bar_count
             if end:
                 break
-            # SHIP_CONFIRM_2 -> IN_RETIREMENT_CHECK
             self._retirement_confirm()
             total += 10
             # if total >= amount:
@@ -305,7 +307,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
             if selected == 0:
                 break
             self.device.screenshot()
-            if not self.match_template_color(SHIP_CONFIRM, offset=(30, 30)):
+            if not self.match_template_color(retire_assets.SHIP_CONFIRM, offset=(30, 30)):
                 logger.warning("No ship selected, retrying")
                 continue
 
@@ -393,24 +395,24 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         if self.handle_game_tips():
             return True
         if self._unable_to_enhance:
-            if self.appear_then_click(RETIRE_APPEAR_1, offset=(20, 20), interval=3):
-                self.interval_clear(IN_RETIREMENT_CHECK)
+            if self.appear_then_click(retire_assets.RETIRE_APPEAR_1, offset=(20, 20), interval=3):
+                self.interval_clear(retire_assets.IN_RETIREMENT_CHECK)
                 self.interval_reset([AUTO_SEARCH_MAP_OPTION_OFF, AUTO_SEARCH_MAP_OPTION_ON])
                 self.map_cat_attack_timer.reset()
                 return False
-            if self.appear(IN_RETIREMENT_CHECK, offset=(20, 20), interval=10):
+            if self.appear(retire_assets.IN_RETIREMENT_CHECK, offset=(20, 20), interval=10):
                 self._retire_handler(mode="one_click_retire")
                 self._unable_to_enhance = False
-                self.interval_reset(IN_RETIREMENT_CHECK)
+                self.interval_reset(retire_assets.IN_RETIREMENT_CHECK)
                 self.map_cat_attack_timer.reset()
                 return True
         elif self.config.Retirement_RetireMode == "enhance":
-            if self.appear_then_click(RETIRE_APPEAR_3, offset=(20, 20), interval=3):
-                self.interval_clear(DOCK_CHECK)
+            if self.appear_then_click(retire_assets.RETIRE_APPEAR_3, offset=(20, 20), interval=3):
+                self.interval_clear(retire_assets.DOCK_CHECK)
                 self.interval_reset([AUTO_SEARCH_MAP_OPTION_OFF, AUTO_SEARCH_MAP_OPTION_ON])
                 self.map_cat_attack_timer.reset()
                 return False
-            if self.appear(DOCK_CHECK, offset=(20, 20), interval=10):
+            if self.appear(retire_assets.DOCK_CHECK, offset=(20, 20), interval=10):
                 self.handle_dock_cards_loading()
                 total, remain = self._enhance_handler()
                 if not total:
@@ -420,19 +422,19 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
                 if remain < 3:
                     logger.info("Too few spare docks, retire next time")
                     self._unable_to_enhance = True
-                self.interval_reset(DOCK_CHECK)
+                self.interval_reset(retire_assets.DOCK_CHECK)
                 self.map_cat_attack_timer.reset()
                 return True
         else:
-            if self.appear_then_click(RETIRE_APPEAR_1, offset=(20, 20), interval=3):
-                self.interval_clear(IN_RETIREMENT_CHECK)
+            if self.appear_then_click(retire_assets.RETIRE_APPEAR_1, offset=(20, 20), interval=3):
+                self.interval_clear(retire_assets.IN_RETIREMENT_CHECK)
                 self.interval_reset([AUTO_SEARCH_MAP_OPTION_OFF, AUTO_SEARCH_MAP_OPTION_ON])
                 self.map_cat_attack_timer.reset()
                 return False
-            if self.appear(IN_RETIREMENT_CHECK, offset=(20, 20), interval=10):
+            if self.appear(retire_assets.IN_RETIREMENT_CHECK, offset=(20, 20), interval=10):
                 self._retire_handler()
                 self._unable_to_enhance = False
-                self.interval_reset(IN_RETIREMENT_CHECK)
+                self.interval_reset(retire_assets.IN_RETIREMENT_CHECK)
                 self.map_cat_attack_timer.reset()
                 return True
 
@@ -506,9 +508,9 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
             skip_first_screenshot:
         """
         count = 0
-        RETIRE_COIN.load_color(self.device.image)
-        RETIRE_COIN._match_init = True
-        self.interval_clear(SHIP_CONFIRM_2)
+        retire_assets.RETIRE_COIN.load_color(self.device.image)
+        retire_assets.RETIRE_COIN._match_init = True
+        self.interval_clear(retire_assets.SHIP_CONFIRM_2)
 
         while 1:
             if skip_first_screenshot:
@@ -516,14 +518,14 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
             else:
                 self.device.screenshot()
 
-            # End
-            if not RETIRE_COIN.match(self.device.image, offset=(20, 20), similarity=0.97):
+            # 退役硬币消失，表示选择完成。
+            if not retire_assets.RETIRE_COIN.match(self.device.image, offset=(20, 20), similarity=0.97):
                 return True
             if count > 3:
                 logger.warning("_retire_select_one failed after 3 trial")
                 return False
 
-            if self.appear(SHIP_CONFIRM_2, offset=(30, 30), interval=2):
+            if self.appear(retire_assets.SHIP_CONFIRM_2, offset=(30, 30), interval=2):
                 self.device.click(button)
                 count += 1
                 continue
@@ -535,7 +537,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         """
         if self.config.GemsFarming_CommonCV == "any":
             for common_cv_name in ["BOGUE", "HERMES", "LANGLEY", "RANGER"]:
-                template = globals()[f"TEMPLATE_{common_cv_name}"]
+                template = getattr(retire_assets, f"TEMPLATE_{common_cv_name}")
                 sim, button = template.match_result(resize(self.device.image, size=(1189, 669)))
 
                 if sim > self.config.COMMON_CV_THRESHOLD:
@@ -548,7 +550,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
 
             return None
         else:
-            template = globals()[f"TEMPLATE_{self.config.GemsFarming_CommonCV.upper()}"]
+            template = getattr(retire_assets, f"TEMPLATE_{self.config.GemsFarming_CommonCV.upper()}")
             sim, button = template.match_result(resize(self.device.image, size=(1189, 669)))
 
             if sim > self.config.COMMON_CV_THRESHOLD:

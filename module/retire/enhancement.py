@@ -6,14 +6,14 @@ from module.combat.assets import GET_ITEMS_1
 from module.exception import GameStuckError, ScriptError
 from module.logger import logger
 from module.ocr.ocr import DigitCounter
-from module.retire.assets import *
+from module.retire import assets as retire_assets
 from module.retire.dock import Dock
 
 VALID_SHIP_TYPES = ["dd", "ss", "cl", "ca", "bb", "cv", "repair", "others"]
 if server.server != "jp":
-    OCR_DOCK_AMOUNT = DigitCounter(DOCK_AMOUNT, letter=(255, 255, 255), threshold=192)
+    OCR_DOCK_AMOUNT = DigitCounter(retire_assets.DOCK_AMOUNT, letter=(255, 255, 255), threshold=192)
 else:
-    OCR_DOCK_AMOUNT = DigitCounter(DOCK_AMOUNT, letter=(201, 201, 201), threshold=192)
+    OCR_DOCK_AMOUNT = DigitCounter(retire_assets.DOCK_AMOUNT, letter=(201, 201, 201), threshold=192)
 
 
 class Enhancement(Dock):
@@ -49,7 +49,7 @@ class Enhancement(Dock):
         else:
             self.dock_filter_set(extra="enhanceable")
 
-        if self.appear(DOCK_EMPTY, offset=(30, 30)):
+        if self.appear(retire_assets.DOCK_EMPTY, offset=(30, 30)):
             return False
 
         return self.dock_enter_first()
@@ -60,7 +60,7 @@ class Enhancement(Dock):
             in: page_ship_enhance
             out: page_dock
         """
-        self.ui_back(DOCK_CHECK)
+        self.ui_back(retire_assets.DOCK_CHECK)
         self.dock_favourite_set(enable=False, wait_loading=False)
         self.dock_filter_set()
 
@@ -78,20 +78,20 @@ class Enhancement(Dock):
             else:
                 self.device.screenshot()
 
-            if self.appear_then_click(EQUIP_CONFIRM, offset=(30, 30), interval=3):
+            if self.appear_then_click(retire_assets.EQUIP_CONFIRM, offset=(30, 30), interval=3):
                 confirm_timer.reset()
                 continue
-            if self.appear_then_click(EQUIP_CONFIRM_2, offset=(30, 30), interval=3):
+            if self.appear_then_click(retire_assets.EQUIP_CONFIRM_2, offset=(30, 30), interval=3):
                 confirm_timer.reset()
                 continue
             if self.appear(GET_ITEMS_1, interval=2):
-                self.device.click(GET_ITEMS_1_RETIREMENT_SAVE)
-                self.interval_reset(ENHANCE_CONFIRM)
+                self.device.click(retire_assets.GET_ITEMS_1_RETIREMENT_SAVE)
+                self.interval_reset(retire_assets.ENHANCE_CONFIRM)
                 confirm_timer.reset()
                 continue
 
-            # End
-            if self.appear(ENHANCE_CONFIRM, offset=(30, 30)):
+            # 强化确认按钮稳定后结束。
+            if self.appear(retire_assets.ENHANCE_CONFIRM, offset=(30, 30)):
                 if confirm_timer.reached():
                     break
             else:
@@ -121,7 +121,7 @@ class Enhancement(Dock):
         need_to_skip: bool = False
 
         def state_enhance_check():
-            # Check the base case, switch to ready if enhancement can continue
+            # 检查基础条件，能继续强化时进入 ready。
             nonlocal need_to_skip
             need_to_skip = False
             if ship_count <= 0:
@@ -130,20 +130,20 @@ class Enhancement(Dock):
             if not self.ship_side_navbar_ensure(bottom=4):
                 return "state_enhance_check"
 
-            self.wait_until_appear(ENHANCE_RECOMMEND, offset=(5, 5), skip_first_screenshot=True)
+            self.wait_until_appear(retire_assets.ENHANCE_RECOMMEND, offset=(5, 5), skip_first_screenshot=True)
             return "state_enhance_ready"
 
         def state_enhance_ready():
-            # Wait until ENHANCE_RECOMMEND appears
-            if self.appear_then_click(ENHANCE_RECOMMEND, offset=(5, 5), interval=0.3):
+            # 等待推荐强化按钮出现。
+            if self.appear_then_click(retire_assets.ENHANCE_RECOMMEND, offset=(5, 5), interval=0.3):
                 logger.info("Set enhancement material by recommendation.")
                 return "state_enhance_recommend"
 
             return "state_enhance_ready"
 
         def state_enhance_recommend():
-            # Judge if enhance material appeared
-            if not EMPTY_ENHANCE_SLOT_PLUS.match(self.device.image):
+            # 判断强化素材是否已经放入槽位。
+            if not retire_assets.EMPTY_ENHANCE_SLOT_PLUS.match(self.device.image):
                 logger.info("Material found. Try enhancing...")
                 return "state_enhance_attempt"
             elif self.info_bar_count():
@@ -154,10 +154,10 @@ class Enhancement(Dock):
             return "state_enhance_ready"
 
         def state_enhance_attempt():
-            # Wait until ENHANCE_CONFIRM appears
+            # 等待强化确认按钮出现。
             if (
-                self.appear_then_click(ENHANCE_CONFIRM, offset=(5, 5), interval=0.3)
-                or self.appear(EQUIP_CONFIRM, offset=(30, 30))
+                self.appear_then_click(retire_assets.ENHANCE_CONFIRM, offset=(5, 5), interval=0.3)
+                or self.appear(retire_assets.EQUIP_CONFIRM, offset=(30, 30))
                 or self.info_bar_count()
                 or self.handle_popup_confirm("ENHANCE")
             ):
@@ -166,8 +166,8 @@ class Enhancement(Dock):
             return "state_enhance_attempt"
 
         def state_enhance_confirm():
-            # Succeeded if EQUIP_CONFIRM appeared, otherwise failed
-            if self.appear(EQUIP_CONFIRM, offset=(30, 30)):
+            # 出现确认弹窗表示强化成功，否则视为失败。
+            if self.appear(retire_assets.EQUIP_CONFIRM, offset=(30, 30)):
                 logger.info("Enhancement Successful")
                 self._enhance_confirm()
                 return "state_enhance_success"
@@ -183,19 +183,19 @@ class Enhancement(Dock):
             return "state_enhance_attempt"
 
         def state_enhance_fail():
-            # Avoid a misjudgement caused by broken network
-            if self.appear(EQUIP_CONFIRM, offset=(30, 30)):
+            # 避免断网导致误判。
+            if self.appear(retire_assets.EQUIP_CONFIRM, offset=(30, 30)):
                 return "state_enhance_confirm"
 
-            # Try to swipe to next
-            if self.ship_view_next(check_button=ENHANCE_RECOMMEND):
+            # 尝试滑到下一艘船。
+            if self.ship_view_next(check_button=retire_assets.ENHANCE_RECOMMEND):
                 if not need_to_skip:
                     nonlocal ship_count
                     ship_count -= 1
                 return "state_enhance_check"
             else:
-                # Avoid a misjudgement caused by broken network
-                if self.appear(EQUIP_CONFIRM, offset=(30, 30)):
+                # 避免断网导致误判。
+                if self.appear(retire_assets.EQUIP_CONFIRM, offset=(30, 30)):
                     return "state_enhance_confirm"
                 else:
                     logger.info("Swiped failed, exiting current category")
@@ -310,7 +310,7 @@ class Enhancement(Dock):
                 total += 10
                 if total >= self._retire_amount:
                     break
-            self.ui_back(DOCK_CHECK)
+            self.ui_back(retire_assets.DOCK_CHECK)
 
         self._enhance_quit()
         return total

@@ -6,18 +6,18 @@ from module.combat.assets import GET_ITEMS_1
 from module.equipment.equipment import Equipment
 from module.logger import logger
 from module.ocr.ocr import DigitCounter
-from module.retire.assets import *
+from module.retire import assets as retire_assets
 from module.ui.scroll import Scroll
 from module.ui.setting import Setting
 from module.ui.switch import Switch
 
 DOCK_SORTING = Switch("Dork_sorting")
-DOCK_SORTING.add_state("Ascending", check_button=SORT_ASC, click_button=SORTING_CLICK)
-DOCK_SORTING.add_state("Descending", check_button=SORT_DESC, click_button=SORTING_CLICK)
+DOCK_SORTING.add_state("Ascending", check_button=retire_assets.SORT_ASC, click_button=retire_assets.SORTING_CLICK)
+DOCK_SORTING.add_state("Descending", check_button=retire_assets.SORT_DESC, click_button=retire_assets.SORTING_CLICK)
 
 DOCK_FAVOURITE = Switch("Favourite_filter")
-DOCK_FAVOURITE.add_state("on", check_button=COMMON_SHIP_FILTER_ENABLE)
-DOCK_FAVOURITE.add_state("off", check_button=COMMON_SHIP_FILTER_DISABLE)
+DOCK_FAVOURITE.add_state("on", check_button=retire_assets.COMMON_SHIP_FILTER_ENABLE)
+DOCK_FAVOURITE.add_state("off", check_button=retire_assets.COMMON_SHIP_FILTER_DISABLE)
 
 CARD_GRIDS = ButtonGrid(
     origin=(93, 76), delta=(164 + 2 / 3, 227), button_shape=(138, 204), grid_shape=(7, 2), name="CARD"
@@ -30,15 +30,14 @@ else:
     CARD_LEVEL_GRIDS = CARD_GRIDS.crop(area=(74, 5, 136, 27), name="LEVEL")
     CARD_EMOTION_GRIDS = CARD_GRIDS.crop(area=(21, 29, 71, 48), name="EMOTION")
 
-DOCK_SCROLL = Scroll(DOCK_SCROLL, color=(247, 211, 66), name="DOCK_SCROLL")
+DOCK_SCROLL = Scroll(retire_assets.DOCK_SCROLL, color=(247, 211, 66), name="DOCK_SCROLL")
 
-OCR_DOCK_SELECTED = DigitCounter(DOCK_SELECTED, threshold=64, name="OCR_DOCK_SELECTED")
+OCR_DOCK_SELECTED = DigitCounter(retire_assets.DOCK_SELECTED, threshold=64, name="OCR_DOCK_SELECTED")
 
 
 class Dock(Equipment):
     def handle_dock_cards_loading(self, skip_first_screenshot=True):
-        # Poor implementation
-        # confirm_timer method cannot be used
+        # 这里不能用 confirm_timer，只能短暂等待卡片加载。
         timeout = Timer(1.2, count=1).start()
         while 1:
             if skip_first_screenshot:
@@ -46,11 +45,11 @@ class Dock(Equipment):
             else:
                 self.device.screenshot()
 
-            # Quick exit if dock is empty
-            if self.appear(DOCK_EMPTY):
+            # 船坞为空时可以立即退出。
+            if self.appear(retire_assets.DOCK_EMPTY):
                 logger.info("Dock empty")
                 break
-            # Otherwise we just wait 1.2s
+            # 否则固定等待 1.2 秒。
             if timeout.reached():
                 break
 
@@ -65,7 +64,7 @@ class Dock(Equipment):
                 self.handle_dock_cards_loading()
 
     def _dock_quit_check_func(self):
-        return not self.appear(DOCK_CHECK, offset=(20, 20))
+        return not self.appear(retire_assets.DOCK_CHECK, offset=(20, 20))
 
     def dock_quit(self):
         self.ui_back(check_button=self._dock_quit_check_func, skip_first_screenshot=True)
@@ -82,23 +81,22 @@ class Dock(Equipment):
 
     def dock_filter_enter(self):
         logger.info("Dock filter enter")
-        self.interval_clear(DOCK_CHECK)
+        self.interval_clear(retire_assets.DOCK_CHECK)
         for _ in self.loop():
-            if self.appear(DOCK_FILTER_CONFIRM, offset=(20, 20)):
+            if self.appear(retire_assets.DOCK_FILTER_CONFIRM, offset=(20, 20)):
                 break
-            if self.appear(DOCK_CHECK, offset=(20, 20), interval=5):
-                self.device.click(DOCK_FILTER)
+            if self.appear(retire_assets.DOCK_CHECK, offset=(20, 20), interval=5):
+                self.device.click(retire_assets.DOCK_FILTER)
                 continue
-            # slow popups from last retirement
-            # Equip confirm
-            if self.appear_then_click(EQUIP_CONFIRM, offset=(30, 30), interval=2):
+            # 上一次退役留下的慢弹窗。
+            if self.appear_then_click(retire_assets.EQUIP_CONFIRM, offset=(30, 30), interval=2):
                 continue
-            if self.appear_then_click(EQUIP_CONFIRM_2, offset=(30, 30), interval=2):
+            if self.appear_then_click(retire_assets.EQUIP_CONFIRM_2, offset=(30, 30), interval=2):
                 self.interval_clear(GET_ITEMS_1)
                 continue
-            # Get items
+            # 获取物品弹窗。
             if self.appear(GET_ITEMS_1, offset=(30, 30), interval=2):
-                self.device.click(GET_ITEMS_1_RETIREMENT_SAVE)
+                self.device.click(retire_assets.GET_ITEMS_1_RETIREMENT_SAVE)
                 continue
 
     def dock_filter_confirm(self, wait_loading=True, skip_first_screenshot=True):
@@ -113,13 +111,11 @@ class Dock(Equipment):
             else:
                 self.device.screenshot()
 
-            # End
-            # sometimes you have dock filter without black-blurred background
-            # DOCK_FILTER_CONFIRM and DOCK_CHECK appears
-            if not self.appear(DOCK_FILTER_CONFIRM, offset=(20, 20)):
-                if self.appear(DOCK_CHECK, offset=(20, 20)):
+            # 有时筛选弹窗没有黑色模糊背景，会同时出现确认按钮和船坞检查点。
+            if not self.appear(retire_assets.DOCK_FILTER_CONFIRM, offset=(20, 20)):
+                if self.appear(retire_assets.DOCK_CHECK, offset=(20, 20)):
                     break
-            if self.appear_then_click(DOCK_FILTER_CONFIRM, offset=(20, 20), interval=3):
+            if self.appear_then_click(retire_assets.DOCK_FILTER_CONFIRM, offset=(20, 20), interval=3):
                 continue
 
         if wait_loading:
@@ -222,7 +218,7 @@ class Dock(Equipment):
         self, sort="level", index="all", faction="all", rarity="all", extra="no_limit", wait_loading=True
     ):
         """
-        A faster filter set function.
+        更快的筛选设置入口。
 
         Args:
             sort (str, list):
@@ -236,8 +232,9 @@ class Dock(Equipment):
             rarity (str, list):
                 ['all', 'common', 'rare', 'elite', 'super_rare', 'ultra', 'not_available']
             extra (str, list):
-                ['no_limit', 'has_skin', 'can_retrofit', 'enhanceable', 'can_limit_break', 'not_level_max', 'can_awaken',
-                 'can_awaken_plus', 'special', 'oath_skin', 'unique_augment_module', 'not_available', 'not_available', 'not_available'],
+                ['no_limit', 'has_skin', 'can_retrofit', 'enhanceable', 'can_limit_break',
+                 'not_level_max', 'can_awaken', 'can_awaken_plus', 'special', 'oath_skin',
+                 'unique_augment_module', 'wear_skin', 'oathed', 'not_available']
 
         Pages:
             in: page_dock
@@ -266,7 +263,7 @@ class Dock(Equipment):
         #             continue
         #     return
 
-        self.interval_clear(DOCK_CHECK)
+        self.interval_clear(retire_assets.DOCK_CHECK)
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -276,7 +273,7 @@ class Dock(Equipment):
             if self.dock_selected():
                 break
 
-            if self.appear(DOCK_CHECK, offset=(20, 20), interval=5):
+            if self.appear(retire_assets.DOCK_CHECK, offset=(20, 20), interval=5):
                 self.device.click(button)
                 continue
             if self.handle_popup_confirm("DOCK_SELECT"):
@@ -328,7 +325,7 @@ class Dock(Equipment):
             if self.ui_process_check_button(check_button):
                 break
 
-            if self.appear_then_click(SHIP_CONFIRM, offset=(200, 50), interval=5):
+            if self.appear_then_click(retire_assets.SHIP_CONFIRM, offset=(200, 50), interval=5):
                 continue
             if self.handle_popup_confirm("DOCK_SELECT_CONFIRM"):
                 continue
@@ -351,7 +348,7 @@ class Dock(Equipment):
             out: SHIP_DETAIL_CHECK
         """
         logger.info("Dock enter first")
-        self.interval_clear(DOCK_CHECK, interval=3)
+        self.interval_clear(retire_assets.DOCK_CHECK, interval=3)
 
         while 1:
             if skip_first_screenshot:
@@ -359,21 +356,21 @@ class Dock(Equipment):
             else:
                 self.device.screenshot()
 
-            # End
-            if self.appear(SHIP_DETAIL_CHECK, offset=(20, 20)):
+            # 已进入舰船详情。
+            if self.appear(retire_assets.SHIP_DETAIL_CHECK, offset=(20, 20)):
                 return True
-            if self.appear(DOCK_EMPTY, offset=(20, 20)):
+            if self.appear(retire_assets.DOCK_EMPTY, offset=(20, 20)):
                 logger.info("Dock empty")
                 return False
 
-            # Click
-            if self.appear(DOCK_CHECK, offset=(20, 20), interval=3):
+            # 选择第一艘可用舰船。
+            if self.appear(retire_assets.DOCK_CHECK, offset=(20, 20), interval=3):
                 if non_npc:
-                    # Check NPC
-                    if DOCK_FIRST_NPC.match_luma(self.device.image, offset=(20, 20)):
+                    # NPC 舰船不能进入常规详情。
+                    if retire_assets.DOCK_FIRST_NPC.match_luma(self.device.image, offset=(20, 20)):
                         logger.info("First ship is NPC, select second")
                         button = CARD_GRIDS[(1, 0)]
-                        # Check if there's second ship
+                        # 检查第二格是否有舰船。
                         color = get_color(self.device.image, button.area)
                         if color_similar(color, (34, 34, 42)):
                             logger.info("Second ship empty, dock empty")
