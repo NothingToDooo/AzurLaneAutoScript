@@ -91,7 +91,7 @@ def fix_py37_subprocess_communicate():
     if sys.platform != "win32" or sys.version_info[:2] != (3, 7):
         return
 
-    def _communicate_fixed(self, input, endtime, orig_timeout):
+    def _communicate_fixed(self, input, endtime, orig_timeout):  # noqa: A002 - 匹配 subprocess 内部签名。
         # Start reader threads feeding into a list hanging off of this
         # object, unless they've already been started.
         if self.stdout and not hasattr(self, "_stdout_buff"):

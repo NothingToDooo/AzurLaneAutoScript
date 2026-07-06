@@ -10,7 +10,7 @@ from pywebio.pin import _pin_output, check_dom_name_value
 
 def put_input(
     name,
-    type="text",
+    type="text",  # noqa: A002 - 保持 pywebio.input.input() 兼容参数名。
     *,
     label="",
     value=None,
@@ -23,10 +23,10 @@ def put_input(
     **other_html_attrs,
 ) -> Output:
     """Output an input widget. Refer to: `pywebio.input.input()`"""
-    from pywebio.input import input
+    from pywebio.input import input as pywebio_input
 
     check_dom_name_value(name, "pin `name`")
-    single_input_return = input(
+    single_input_return = pywebio_input(
         name=name,
         label=label,
         value=value,

@@ -38,8 +38,8 @@ class Filter:
         self.filter_raw = string.split(">")
         self.filter = [self.parse_filter(f) for f in self.filter_raw]
 
-    def is_preset(self, filter):
-        return len(filter) and filter.lower() in self.preset
+    def is_preset(self, filter_value):
+        return len(filter_value) and filter_value.lower() in self.preset
 
     def apply(self, objs, func=None):
         """
@@ -53,14 +53,14 @@ class Filter:
             list: A list of objects and preset strings, such as [object, object, object, 'reset']
         """
         out = []
-        for raw, filter in zip(self.filter_raw, self.filter, strict=True):
+        for raw, parsed_filter in zip(self.filter_raw, self.filter, strict=True):
             if self.is_preset(raw):
                 raw = raw.lower()
                 if raw not in out:
                     out.append(raw)
             else:
                 for _index, obj in enumerate(objs):
-                    if self.apply_filter_to_obj(obj=obj, filter=filter) and obj not in out:
+                    if self.apply_filter_to_obj(obj=obj, filter_value=parsed_filter) and obj not in out:
                         out.append(obj)
 
         if func is not None:
@@ -87,17 +87,17 @@ class Filter:
         """
         return self.apply(objs, func=lambda x: all(func(x) for func in funcs))
 
-    def apply_filter_to_obj(self, obj, filter):
+    def apply_filter_to_obj(self, obj, filter_value):
         """
         Args:
             obj (object):
-            filter (list[str]):
+            filter_value (list[str]):
 
         Returns:
             bool: If an object satisfy a filter.
         """
 
-        for attr, value in zip(self.attr, filter, strict=True):
+        for attr, value in zip(self.attr, filter_value, strict=True):
             if not value:
                 continue
             if str(obj.__getattribute__(attr)).lower() != str(value):

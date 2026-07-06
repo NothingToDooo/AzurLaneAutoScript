@@ -9,7 +9,8 @@ from queue import Queue
 from typing import Callable, Generator, List
 
 import pywebio
-from pywebio.input import PASSWORD, input
+from pywebio.input import PASSWORD
+from pywebio.input import input as pywebio_input
 from pywebio.output import PopupSize, popup, put_html, toast
 from pywebio.session import eval_js, register_thread, run_js
 from pywebio.session import info as session_info
@@ -437,7 +438,7 @@ def to_pin_value(val):
 def login(password):
     if get_localstorage("password") == str(password):
         return True
-    pwd = input(label="Please login below.", type=PASSWORD, placeholder="PASSWORD")
+    pwd = pywebio_input(label="Please login below.", type=PASSWORD, placeholder="PASSWORD")
     if str(pwd) == str(password):
         set_localstorage("password", str(pwd))
         return True

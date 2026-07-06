@@ -262,7 +262,7 @@ def _get_renderables(
     return renderables
 
 
-def print(*objects: ConsoleRenderable, **kwargs):
+def print(*objects: ConsoleRenderable, **kwargs):  # noqa: A001 - 作为 logger.print 兼容 API 暴露。
     for hdlr in logger.handlers:
         if isinstance(hdlr, RichRenderableHandler):
             for renderable in _get_renderables(hdlr.console, *objects, **kwargs):

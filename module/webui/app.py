@@ -13,7 +13,8 @@ from module.webui.fake_pil_module import import_fake_pil_module
 import_fake_pil_module()
 
 from pywebio import config as webconfig
-from pywebio.input import file_upload, input, input_group, select
+from pywebio.input import file_upload, input_group, select
+from pywebio.input import input as pywebio_input
 from pywebio.output import (
     Output,
     clear,
@@ -995,7 +996,7 @@ def app_manage():
         resp = input_group(
             label=t("Gui.AppManage.TitleNew"),
             inputs=[
-                input(
+                pywebio_input(
                     label=t("Gui.AppManage.NewName"),
                     name="config_name",
                     value=get_unused_name(),
