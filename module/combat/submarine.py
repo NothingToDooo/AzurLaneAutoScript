@@ -1,6 +1,11 @@
 from module.base.base import ModuleBase
 from module.base.timer import Timer
-from module.combat.assets import *
+from module.combat.assets import (
+    SUBMARINE_AVAILABLE_CHECK_1,
+    SUBMARINE_AVAILABLE_CHECK_2,
+    SUBMARINE_CALLED,
+    SUBMARINE_READY,
+)
 from module.logger import logger
 
 

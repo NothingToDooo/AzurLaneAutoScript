@@ -1,11 +1,27 @@
 from module.base.timer import Timer
 from module.campaign.campaign_status import CampaignStatus
-from module.combat.assets import *
+from module.combat.assets import (
+    BATTLE_STATUS_A,
+    BATTLE_STATUS_B,
+    BATTLE_STATUS_S,
+    EXP_INFO_A,
+    EXP_INFO_B,
+    EXP_INFO_S,
+)
 from module.combat.combat import Combat
 from module.exception import CampaignEnd
 from module.handler.assets import AUTO_SEARCH_MAP_OPTION_ON
 from module.logger import logger
 from module.map.map_operation import MapOperation
+
+AUTO_SEARCH_COMBAT_END_CHECKS = (
+    BATTLE_STATUS_S,
+    BATTLE_STATUS_A,
+    BATTLE_STATUS_B,
+    EXP_INFO_S,
+    EXP_INFO_A,
+    EXP_INFO_B,
+)
 
 
 class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
@@ -276,15 +292,7 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
                 continue
             if self.handle_get_ship():
                 continue
-            if (
-                self.appear(BATTLE_STATUS_S)
-                or self.appear(BATTLE_STATUS_A)
-                or self.appear(BATTLE_STATUS_B)
-                or self.appear(EXP_INFO_S)
-                or self.appear(EXP_INFO_A)
-                or self.appear(EXP_INFO_B)
-                or self.is_auto_search_running()
-            ):
+            if any(self.appear(button) for button in AUTO_SEARCH_COMBAT_END_CHECKS) or self.is_auto_search_running():
                 self.device.screenshot_interval_set()
                 break
 

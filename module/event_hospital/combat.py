@@ -6,7 +6,14 @@ from module.event_hospital.assets import HOSPITAL_BATTLE_PREPARE
 from module.event_hospital.ui import HospitalUI
 from module.exception import OilExhausted, RequestHumanTakeover
 from module.logger import logger
-from module.map.assets import *
+from module.map.assets import (
+    FLEET_1_ADVICE,
+    FLEET_1_BAR,
+    FLEET_1_CHOOSE,
+    FLEET_1_CLEAR,
+    FLEET_1_HARD_SATIESFIED,
+    FLEET_1_IN_USE,
+)
 from module.map.map_fleet_preparation import FleetOperator
 from module.raid.assets import RAID_FLEET_PREPARATION
 

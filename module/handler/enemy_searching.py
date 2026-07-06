@@ -1,10 +1,10 @@
 from module.base.decorator import del_cached_property
 from module.base.timer import Timer
 from module.exception import CampaignEnd
-from module.handler.assets import *
+from module.handler.assets import MAP_ENEMY_SEARCHING
 from module.handler.info_handler import InfoHandler
 from module.logger import logger
-from module.map.assets import *
+from module.map.assets import FLEET_PREPARATION, IN_MAP, MAP_PREPARATION, MAP_PREPARATION_CANCEL
 from module.ui.assets import CAMPAIGN_CHECK, EVENT_CHECK, SP_CHECK
 
 

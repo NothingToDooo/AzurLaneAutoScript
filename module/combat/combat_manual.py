@@ -1,5 +1,5 @@
 from module.base.base import ModuleBase
-from module.combat.assets import *
+from module.combat.assets import MOVE_DOWN, MOVE_LEFT_DOWN, MOVE_LEFT_UP, READY_AIR_RAID, READY_TORPEDO
 
 
 class CombatManual(ModuleBase):
