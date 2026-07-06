@@ -548,8 +548,7 @@ class ConfigGenerator:
         option = deep_get(self.argument, keys="Emulator.ServerName.option")
         server_list = []
         for server, _list in VALID_SERVER_LIST.items():
-            for index in range(len(_list)):
-                server_list.append(f"{server}-{index}")
+            server_list.extend(f"{server}-{index}" for index in range(len(_list)))
         option += server_list
         deep_set(self.argument, keys="Emulator.ServerName.option", value=option)
         deep_set(self.args, keys="Alas.Emulator.ServerName.option", value=option)

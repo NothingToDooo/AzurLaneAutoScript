@@ -59,7 +59,7 @@ class SwipeSimulate:
 
     def cal_swipe_base(self):
         swipe_base = None
-        for _loca, grid in az.view.grids.items():
+        for grid in az.view.grids.values():
             offset = grid.screen2grid([az.config.SCREEN_CENTER])[0].astype(int)
             points = grid.grid2screen(np.add([[0.5, 0], [-0.5, 0], [0, 0.5], [0, -0.5]], offset))
             swipe_base = np.array([np.linalg.norm(points[0] - points[1]), np.linalg.norm(points[2] - points[3])])

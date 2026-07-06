@@ -229,12 +229,7 @@ class SelectedGrids:
         Returns:
             SelectedGrids:
         """
-        new = []
-        for grid in self.grids:
-            if grid in grids.grids:
-                new.append(grid)
-
-        return SelectedGrids(new)
+        return SelectedGrids([grid for grid in self.grids if grid in grids.grids])
 
     def delete(self, grids):
         """

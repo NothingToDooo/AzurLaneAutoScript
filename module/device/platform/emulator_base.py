@@ -267,6 +267,5 @@ class EmulatorManagerBase:
         """
         out = []
         for emulator in self.all_emulators:
-            for exe in emulator.iter_adb_binaries():
-                out.append(exe)
+            out.extend(emulator.iter_adb_binaries())
         return out

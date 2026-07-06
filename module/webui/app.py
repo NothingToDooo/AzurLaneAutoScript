@@ -350,9 +350,7 @@ class AlasGUI(Frame):
                 if only_option in output_kwargs.get("option_bold", []):
                     output_kwargs["widget_type"] = "state"
             # 可选项标签。
-            options_label = []
-            for opt in options:
-                options_label.append(t(f"{group_name}.{arg_name}.{opt}"))
+            options_label = [t(f"{group_name}.{arg_name}.{opt}") for opt in options]
             output_kwargs["options_label"] = options_label
             # 帮助文本。
             arg_help = t(f"{group_name}.{arg_name}.help")

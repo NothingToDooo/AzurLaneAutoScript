@@ -62,6 +62,7 @@ select = [
     "ICN",
     "PLE",
     "PIE808",
+    "PERF",
     "PLW0120",
     "PLW0127",
     "PLW3301",

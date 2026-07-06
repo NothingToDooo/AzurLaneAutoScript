@@ -472,9 +472,7 @@ class MapData:
         extracted_data = []
         for event_id in data.values():
             event = MAP_EVENT_TEMPLATE[event_id]
-            for effect in event["effect"].values():
-                if effect[0] == "enemy":
-                    extracted_data.append(effect[1])
+            extracted_data.extend(effect[1] for effect in event["effect"].values() if effect[0] == "enemy")
         return extracted_data
 
     def map_file_name(self):
@@ -519,31 +517,34 @@ class MapData:
         if self.MAP_HAS_PORTAL:
             lines.append(f"MAP.portal_data = {self.portal}")
         lines.append('MAP.map_data = """')
-        for y in range(self.shape[1] + 1):
-            lines.append("    " + " ".join([self.map_data.get((x, y), "??") for x in range(self.shape[0] + 1)]))
+        lines.extend(
+            "    " + " ".join([self.map_data.get((x, y), "??") for x in range(self.shape[0] + 1)])
+            for y in range(self.shape[1] + 1)
+        )
         lines.append('"""')
         if self.map_data_loop is not None:
             lines.append('MAP.map_data_loop = """')
-            for y in range(self.shape[1] + 1):
-                lines.append("    " + " ".join([self.map_data_loop[(x, y)] for x in range(self.shape[0] + 1)]))
+            lines.extend(
+                "    " + " ".join([self.map_data_loop[(x, y)] for x in range(self.shape[0] + 1)])
+                for y in range(self.shape[1] + 1)
+            )
             lines.append('"""')
         lines.append('MAP.weight_data = """')
-        for _y in range(self.shape[1] + 1):
-            lines.append("    " + " ".join(["50"] * (self.shape[0] + 1)))
+        lines.extend("    " + " ".join(["50"] * (self.shape[0] + 1)) for _y in range(self.shape[1] + 1))
         lines.append('"""')
         if self.MAP_HAS_LAND_BASED:
             lines.append(f"MAP.land_based_data = {self.land_based}")
         lines.append("MAP.spawn_data = [")
-        for battle in self.spawn_data:
-            lines.append("    " + str(battle) + ",")
+        lines.extend("    " + str(battle) + "," for battle in self.spawn_data)
         lines.append("]")
         if self.spawn_data_loop is not None:
             lines.append("MAP.spawn_data_loop = [")
-            for battle in self.spawn_data_loop:
-                lines.append("    " + str(battle) + ",")
+            lines.extend("    " + str(battle) + "," for battle in self.spawn_data_loop)
             lines.append("]")
-        for y in range(self.shape[1] + 1):
-            lines.append(", ".join([location2node((x, y)) for x in range(self.shape[0] + 1)]) + ", \\")
+        lines.extend(
+            ", ".join([location2node((x, y)) for x in range(self.shape[0] + 1)]) + ", \\"
+            for y in range(self.shape[1] + 1)
+        )
         lines.append("    = MAP.flatten()")
         lines.append("")
         lines.append("")
@@ -571,9 +572,9 @@ class MapData:
             lines.append(f"    MAP_HAS_PORTAL = {self.MAP_HAS_PORTAL}")
         if self.MAP_HAS_LAND_BASED:
             lines.append(f"    MAP_HAS_LAND_BASED = {self.MAP_HAS_LAND_BASED}")
-        for n in range(1, 4):
-            if self.__getattribute__(f"STAR_REQUIRE_{n}") != n:
-                lines.append(f"    STAR_REQUIRE_{n} = 0")
+        lines.extend(
+            f"    STAR_REQUIRE_{n} = 0" for n in range(1, 4) if self.__getattribute__(f"STAR_REQUIRE_{n}") != n
+        )
         lines.append("    # ===== End of generated config =====")
         lines.append("")
         lines.append("")

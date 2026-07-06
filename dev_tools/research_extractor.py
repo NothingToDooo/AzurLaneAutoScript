@@ -121,8 +121,7 @@ class TechnologyTemplate:
         lines.append("# Don't modify it manually.")
         lines.append("")
         lines.append("LIST_RESEARCH_PROJECT = [")
-        for project in self.projects.values():
-            lines.append("    " + project.encode() + ",")
+        lines.extend("    " + project.encode() + "," for project in self.projects.values())
         lines.append("]")
 
         return lines

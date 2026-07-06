@@ -163,11 +163,7 @@ class ProcessManager:
 
     @classmethod
     def running_instances(cls) -> List[ProcessManager]:
-        l = []
-        for process in cls._processes.values():
-            if process.alive:
-                l.append(process)
-        return l
+        return [process for process in cls._processes.values() if process.alive]
 
     @staticmethod
     def restart_processes(

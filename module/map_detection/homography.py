@@ -421,9 +421,7 @@ class Homography:
         Returns:
             (Lines, Lines): Horizontal lines, vertical lines.
         """
-        grids = {}
-        for loca, points in self.generate():
-            grids[loca] = points
+        grids = dict(self.generate())
         shape = np.max(list(grids.keys()), axis=0)
 
         hori = Points([640, grids[(0, 0)][1, 1]]).link(None, is_horizontal=True)

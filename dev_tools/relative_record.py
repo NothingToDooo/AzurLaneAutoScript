@@ -75,9 +75,7 @@ if __name__ == "__main__":
     image = rgb2gray(grid.relative_crop((-0.5, -1, 0.5, 0), shape=(60, 60)))
     image = Image.fromarray(image, mode="L").show()
 
-    images = []
-    for _n in tqdm(range(300)):
-        images.append(al.device.screenshot())
+    images = [al.device.screenshot() for _n in tqdm(range(300))]
     for n, image in enumerate(images):
         grid.image = np.array(image)
         image = rgb2gray(grid.relative_crop((-0.5, -1, 0.5, 0), shape=(60, 60)))

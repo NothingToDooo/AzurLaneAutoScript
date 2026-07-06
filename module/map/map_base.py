@@ -281,10 +281,8 @@ class CampaignMap:
             vert = wall[np.all([wall[:, 0] % 4 == 2, wall[:, 1] % 2 == 0], axis=0)]
             hori = wall[np.all([wall[:, 0] % 4 == 0, wall[:, 1] % 2 == 1], axis=0)]
             disconnect = []
-            for loca in (vert - (2, 0)) // (4, 2):
-                disconnect.append([loca, loca + (1, 0)])
-            for loca in (hori - (0, 1)) // (4, 2):
-                disconnect.append([loca, loca + (0, 1)])
+            disconnect.extend([loca, loca + (1, 0)] for loca in (vert - (2, 0)) // (4, 2))
+            disconnect.extend([loca, loca + (0, 1)] for loca in (hori - (0, 1)) // (4, 2))
             for g1, g2 in disconnect:
                 g1 = tuple(g1.tolist())
                 g2 = tuple(g2.tolist())

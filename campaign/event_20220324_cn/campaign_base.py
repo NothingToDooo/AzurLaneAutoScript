@@ -63,7 +63,7 @@ class CampaignBase(CampaignBase_):
             Button:
         """
         if name == "sp":
-            for stage_name, _stage_obj in self.stage_entrance.items():
+            for stage_name in self.stage_entrance:
                 if "esp" in stage_name.lower():
                     name = stage_name
 

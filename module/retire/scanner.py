@@ -470,14 +470,13 @@ class DockScanner(ShipScanner):
         scan_image = crop(image, self.scan_zone, copy=False)
 
         def find_bound(image):
-            bound = []
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             std = np.std(image, axis=1)
             gap_seq = [720] + list(np.nonzero(std < 10)[0])
             logger.info(f"{gap_seq}")
-            for pos in range(len(gap_seq) - 1, 0, -1):
-                if abs(gap_seq[pos - 1] - gap_seq[pos]) > 50:
-                    bound.append(gap_seq[pos])
+            bound = [
+                gap_seq[pos] for pos in range(len(gap_seq) - 1, 0, -1) if abs(gap_seq[pos - 1] - gap_seq[pos]) > 50
+            ]
             if len(bound) < 3:
                 bound = [0] + bound
             return bound

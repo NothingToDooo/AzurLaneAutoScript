@@ -18,14 +18,11 @@ from module.statistics.utils import load_folder
 class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
     @cached_property
     def TEMPLATES(self) -> List[Template]:
-        TEMPLATES = []
         coins = load_folder("./assets/shop/os_cost")
         coins_sold_out = load_folder("./assets/shop/os_cost_sold_out")
-        for c in coins.values():
-            TEMPLATES.append(Template(c))
-        for c in coins_sold_out.values():
-            TEMPLATES.append(Template(c))
-        return TEMPLATES
+        templates = [Template(c) for c in coins.values()]
+        templates.extend(Template(c) for c in coins_sold_out.values())
+        return templates
 
     def _get_os_shop_cost(self) -> list:
         """
