@@ -1,14 +1,17 @@
 import collections
 import time
 
-from module.base.utils import *
+import cv2
+import numpy as np
+
+from module.base.utils import area_in_area, float2str
 from module.exception import MapDetectionError
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
 from module.map_detection.detector import MapDetector
 from module.map_detection.grid import Grid
-from module.map_detection.utils import *
-from module.map_detection.utils_assets import *
+from module.map_detection.utils import corner2area
+from module.map_detection.utils_assets import ASSETS
 
 
 class View(MapDetector):
