@@ -7,7 +7,7 @@ from module.base.button import Button
 from module.base.timer import Timer
 from module.base.utils import area_offset, area_pad, color_similar, color_similarity_2d, get_color
 from module.exception import GameNotRunningError
-from module.handler.assets import *
+from module.handler import assets as handler_assets
 from module.logger import logger
 from module.os_handler.assets import CLICK_SAFE_AREA as OS_CLICK_SAFE_AREA
 from module.ui_white.assets import POPUP_CANCEL_WHITE, POPUP_CONFIRM_WHITE, POPUP_SINGLE_WHITE
@@ -45,7 +45,7 @@ class InfoHandler(ModuleBase):
         Returns:
             int:
         """
-        image = self.image_crop(INFO_BAR_AREA, copy=False)
+        image = self.image_crop(handler_assets.INFO_BAR_AREA, copy=False)
         line = cv2.reduce(image, 1, cv2.REDUCE_AVG)
         line = color_similarity_2d(line, color=(107, 158, 255))[:, 0]
 
@@ -83,7 +83,7 @@ class InfoHandler(ModuleBase):
             if self.handle_info_bar():
                 handled = True
 
-            # End
+            # 结束。
             if timeout.reached():
                 break
 
@@ -97,10 +97,12 @@ class InfoHandler(ModuleBase):
     def handle_popup_confirm(self, name="", offset=None, interval=2):
         if offset is None:
             offset = self._popup_offset
-        if self.appear(POPUP_CANCEL, offset=offset) and self.appear(POPUP_CONFIRM, offset=offset, interval=interval):
-            POPUP_CONFIRM.name = POPUP_CONFIRM.name + "_" + name
-            self.device.click(POPUP_CONFIRM)
-            POPUP_CONFIRM.name = POPUP_CONFIRM.name[: -len(name) - 1]
+        if self.appear(handler_assets.POPUP_CANCEL, offset=offset) and self.appear(
+            handler_assets.POPUP_CONFIRM, offset=offset, interval=interval
+        ):
+            handler_assets.POPUP_CONFIRM.name = handler_assets.POPUP_CONFIRM.name + "_" + name
+            self.device.click(handler_assets.POPUP_CONFIRM)
+            handler_assets.POPUP_CONFIRM.name = handler_assets.POPUP_CONFIRM.name[: -len(name) - 1]
             return True
         if self.appear(POPUP_CONFIRM_WHITE, offset=offset, interval=interval):
             POPUP_CONFIRM_WHITE.name = POPUP_CONFIRM_WHITE.name + "_" + name
@@ -112,10 +114,12 @@ class InfoHandler(ModuleBase):
     def handle_popup_cancel(self, name="", offset=None, interval=2):
         if offset is None:
             offset = self._popup_offset
-        if self.appear(POPUP_CONFIRM, offset=offset) and self.appear(POPUP_CANCEL, offset=offset, interval=interval):
-            POPUP_CANCEL.name = POPUP_CANCEL.name + "_" + name
-            self.device.click(POPUP_CANCEL)
-            POPUP_CANCEL.name = POPUP_CANCEL.name[: -len(name) - 1]
+        if self.appear(handler_assets.POPUP_CONFIRM, offset=offset) and self.appear(
+            handler_assets.POPUP_CANCEL, offset=offset, interval=interval
+        ):
+            handler_assets.POPUP_CANCEL.name = handler_assets.POPUP_CANCEL.name + "_" + name
+            self.device.click(handler_assets.POPUP_CANCEL)
+            handler_assets.POPUP_CANCEL.name = handler_assets.POPUP_CANCEL.name[: -len(name) - 1]
             return True
         if self.appear(POPUP_CANCEL_WHITE, offset=offset, interval=interval):
             POPUP_CANCEL_WHITE.name = POPUP_CANCEL_WHITE.name + "_" + name
@@ -127,11 +131,11 @@ class InfoHandler(ModuleBase):
     def handle_popup_single(self, name="", offset=None, interval=2):
         if offset is None:
             offset = self._popup_offset
-        if self.appear(GET_MISSION, offset=offset, interval=interval):
-            prev_name = GET_MISSION.name
-            GET_MISSION.name = POPUP_CONFIRM.name + "_" + name
-            self.device.click(GET_MISSION)
-            GET_MISSION.name = prev_name
+        if self.appear(handler_assets.GET_MISSION, offset=offset, interval=interval):
+            prev_name = handler_assets.GET_MISSION.name
+            handler_assets.GET_MISSION.name = handler_assets.POPUP_CONFIRM.name + "_" + name
+            self.device.click(handler_assets.GET_MISSION)
+            handler_assets.GET_MISSION.name = prev_name
             return True
 
         return False
@@ -144,8 +148,8 @@ class InfoHandler(ModuleBase):
     def popup_interval_clear(self):
         self.interval_clear(
             [
-                POPUP_CANCEL,
-                POPUP_CONFIRM,
+                handler_assets.POPUP_CANCEL,
+                handler_assets.POPUP_CONFIRM,
                 POPUP_CANCEL_WHITE,
                 POPUP_CONFIRM_WHITE,
             ]
@@ -161,13 +165,13 @@ class InfoHandler(ModuleBase):
         Returns:
             bool:
         """
-        appear = self.appear(GET_MISSION, offset=True, interval=2)
+        appear = self.appear(handler_assets.GET_MISSION, offset=True, interval=2)
         if appear:
             logger.info("Get urgent commission")
             if drop:
                 self.handle_info_bar()
                 drop.add(self.device.image)
-            self.device.click(GET_MISSION)
+            self.device.click(handler_assets.GET_MISSION)
             self._hot_fix_check_wait.reset()
 
         # Check game client existence after 3s to 6s
@@ -178,8 +182,8 @@ class InfoHandler(ModuleBase):
             if not self.device.app_is_running():
                 logger.error("Detected hot fixes from game server, game died")
                 raise GameNotRunningError
-            # Use template match without color match due to maintenance popup
-            if self.appear(LOGIN_CHECK, offset=(30, 30)):
+            # 维护弹窗会干扰颜色匹配，这里只用模板匹配。
+            if self.appear(handler_assets.LOGIN_CHECK, offset=(30, 30)):
                 logger.error(
                     "Account logged out, probably because account kicked by server maintenance or another log in"
                 )
@@ -196,40 +200,41 @@ class InfoHandler(ModuleBase):
 
         result = self.handle_popup_confirm("IGNORE_LOW_EMOTION")
         if result:
-            # Avoid clicking AUTO_SEARCH_MAP_OPTION_OFF
-            self.interval_reset(AUTO_SEARCH_MAP_OPTION_OFF)
+            # 避免点击 AUTO_SEARCH_MAP_OPTION_OFF。
+            self.interval_reset(handler_assets.AUTO_SEARCH_MAP_OPTION_OFF)
         return result
 
     def handle_use_data_key(self):
         if not self.config.USE_DATA_KEY:
             return False
 
-        if not self.appear(POPUP_CONFIRM, offset=self._popup_offset) and not self.appear(
-            POPUP_CANCEL, offset=self._popup_offset, interval=2
+        if not self.appear(handler_assets.POPUP_CONFIRM, offset=self._popup_offset) and not self.appear(
+            handler_assets.POPUP_CANCEL, offset=self._popup_offset, interval=2
         ):
             return False
 
-        if self.appear(USE_DATA_KEY, offset=(20, 20)):
-            # enable USE_DATA_KEY_NOTIFIED
+        if self.appear(handler_assets.USE_DATA_KEY, offset=(20, 20)):
+            # 启用 USE_DATA_KEY_NOTIFIED。
             for _ in self.loop():
-                enabled = self.image_color_count(USE_DATA_KEY_NOTIFIED, color=(140, 207, 66), threshold=180, count=10)
+                enabled = self.image_color_count(
+                    handler_assets.USE_DATA_KEY_NOTIFIED, color=(140, 207, 66), threshold=180, count=10
+                )
                 if enabled:
                     break
-                if self.appear(USE_DATA_KEY, offset=(20, 20), interval=5):
-                    self.device.click(USE_DATA_KEY_NOTIFIED)
+                if self.appear(handler_assets.USE_DATA_KEY, offset=(20, 20), interval=5):
+                    self.device.click(handler_assets.USE_DATA_KEY_NOTIFIED)
                     continue
 
             self.config.USE_DATA_KEY = False  # Reset on success as task can be stopped before can be recovered
 
-            # click confirm
-            # POPUP_CONFIRM from data key page has minor differece from the standard one
-            # so we just bind clicking it
-            self.interval_clear(USE_DATA_KEY, interval=5)
+            # 点击确认。
+            # 数据钥匙页面的 POPUP_CONFIRM 和标准按钮略有不同，因此这里直接绑定点击。
+            self.interval_clear(handler_assets.USE_DATA_KEY, interval=5)
             for _ in self.loop():
-                if not self.appear(USE_DATA_KEY, offset=(20, 20)):
+                if not self.appear(handler_assets.USE_DATA_KEY, offset=(20, 20)):
                     break
-                if self.appear(USE_DATA_KEY, offset=(20, 20), interval=5):
-                    self.device.click(POPUP_CONFIRM)
+                if self.appear(handler_assets.USE_DATA_KEY, offset=(20, 20), interval=5):
+                    self.device.click(handler_assets.POPUP_CONFIRM)
                     continue
 
             return True
@@ -252,7 +257,7 @@ class InfoHandler(ModuleBase):
         Returns:
             bool:
         """
-        return self.appear_then_click(GET_SKIN, offset=(20, 20), interval=2)
+        return self.appear_then_click(handler_assets.GET_SKIN, offset=(20, 20), interval=2)
 
     def handle_get_items_ship(self, drop=None):
         """
@@ -264,10 +269,10 @@ class InfoHandler(ModuleBase):
         Returns:
             bool:
         """
-        if self.appear(GET_ITEMS_SHIP_1, offset=5, interval=2):
+        if self.appear(handler_assets.GET_ITEMS_SHIP_1, offset=5, interval=2):
             if drop:
                 drop.handle_add(self)
-            self.device.click(GET_ITEMS_SHIP_1)
+            self.device.click(handler_assets.GET_ITEMS_SHIP_1)
             return True
 
         return False
@@ -277,19 +282,19 @@ class InfoHandler(ModuleBase):
     """
 
     def handle_guild_popup_confirm(self):
-        if self.appear(GUILD_POPUP_CANCEL, offset=self._popup_offset) and self.appear(
-            GUILD_POPUP_CONFIRM, offset=self._popup_offset, interval=2
+        if self.appear(handler_assets.GUILD_POPUP_CANCEL, offset=self._popup_offset) and self.appear(
+            handler_assets.GUILD_POPUP_CONFIRM, offset=self._popup_offset, interval=2
         ):
-            self.device.click(GUILD_POPUP_CONFIRM)
+            self.device.click(handler_assets.GUILD_POPUP_CONFIRM)
             return True
 
         return False
 
     def handle_guild_popup_cancel(self):
-        if self.appear(GUILD_POPUP_CONFIRM, offset=self._popup_offset) and self.appear(
-            GUILD_POPUP_CANCEL, offset=self._popup_offset, interval=2
+        if self.appear(handler_assets.GUILD_POPUP_CONFIRM, offset=self._popup_offset) and self.appear(
+            handler_assets.GUILD_POPUP_CANCEL, offset=self._popup_offset, interval=2
         ):
-            self.device.click(GUILD_POPUP_CANCEL)
+            self.device.click(handler_assets.GUILD_POPUP_CANCEL)
             return True
 
         return False
@@ -299,19 +304,19 @@ class InfoHandler(ModuleBase):
     """
 
     def handle_mission_popup_go(self):
-        if self.appear(MISSION_POPUP_ACK, offset=self._popup_offset) and self.appear(
-            MISSION_POPUP_GO, offset=self._popup_offset, interval=2
+        if self.appear(handler_assets.MISSION_POPUP_ACK, offset=self._popup_offset) and self.appear(
+            handler_assets.MISSION_POPUP_GO, offset=self._popup_offset, interval=2
         ):
-            self.device.click(MISSION_POPUP_GO)
+            self.device.click(handler_assets.MISSION_POPUP_GO)
             return True
 
         return False
 
     def handle_mission_popup_ack(self):
-        if self.appear(MISSION_POPUP_GO, offset=self._popup_offset) and self.appear(
-            MISSION_POPUP_ACK, offset=self._popup_offset, interval=2
+        if self.appear(handler_assets.MISSION_POPUP_GO, offset=self._popup_offset) and self.appear(
+            handler_assets.MISSION_POPUP_ACK, offset=self._popup_offset, interval=2
         ):
-            self.device.click(MISSION_POPUP_ACK)
+            self.device.click(handler_assets.MISSION_POPUP_ACK)
             return True
 
         return False
@@ -320,7 +325,7 @@ class InfoHandler(ModuleBase):
     Story
     """
     story_popup_timeout = Timer(10, count=20)
-    map_has_clear_mode = False  # Will be override in fast_forward.py
+    map_has_clear_mode = False  # 会在 fast_forward.py 中覆盖。
     map_is_threat_safe = False
 
     _story_confirm = Timer(0.5, count=1)
@@ -417,12 +422,12 @@ class InfoHandler(ModuleBase):
         return buttons
 
     def _is_story_black(self):
-        color = get_color(self.device.image, area=STORY_LETTER_BLACK.area)
-        # Story with dark background and a few rows of letters
-        # STORY_LETTER_BLACK.color is (16, 20, 16)
-        if color_similar(color, STORY_LETTER_BLACK.color, threshold=10):
+        color = get_color(self.device.image, area=handler_assets.STORY_LETTER_BLACK.area)
+        # 深色背景、少量文字的剧情。
+        # STORY_LETTER_BLACK.color 是 (16, 20, 16)。
+        if color_similar(color, handler_assets.STORY_LETTER_BLACK.color, threshold=10):
             return True
-        # Story with black and a few rows of letters
+        # 黑色背景、少量文字的剧情。
         if color_similar(color, (0, 0, 0), threshold=10):
             return True
 
@@ -436,14 +441,14 @@ class InfoHandler(ModuleBase):
         if self.story_popup_timeout.started() and not self.story_popup_timeout.reached():
             if self.handle_popup_confirm("STORY_SKIP"):
                 self.story_popup_timeout = Timer(10)
-                self.interval_reset(STORY_SKIP_3)
-                self.interval_reset(STORY_LETTERS_ONLY)
+                self.interval_reset(handler_assets.STORY_SKIP_3)
+                self.interval_reset(handler_assets.STORY_LETTERS_ONLY)
                 return True
         if self._is_story_black():
-            if self.appear_then_click(STORY_LETTERS_ONLY, offset=(20, 20), interval=2):
+            if self.appear_then_click(handler_assets.STORY_LETTERS_ONLY, offset=(20, 20), interval=2):
                 self.story_popup_timeout.reset()
                 return True
-        if self._story_option_timer.reached() and self.appear(STORY_SKIP_3, offset=(20, 20), interval=0):
+        if self._story_option_timer.reached() and self.appear(handler_assets.STORY_SKIP_3, offset=(20, 20), interval=0):
             options = self._story_option_buttons_2()
             options_count = len(options)
             logger.attr("Story_options", options_count)
@@ -459,50 +464,49 @@ class InfoHandler(ModuleBase):
                     self.device.click(select)
                     self._story_option_timer.reset()
                     self.story_popup_timeout.reset()
-                    self.interval_reset(STORY_SKIP_3)
-                    self.interval_reset(STORY_LETTERS_ONLY)
+                    self.interval_reset(handler_assets.STORY_SKIP_3)
+                    self.interval_reset(handler_assets.STORY_LETTERS_ONLY)
                     self._story_option_record = 0
                     self._story_option_confirm.reset()
                     return True
             else:
                 self._story_option_record = options_count
                 self._story_option_confirm.reset()
-        if self.appear(STORY_SKIP_3, offset=(20, 20), interval=2):
-            # Confirm it's story
-            # When story play speed is Very Fast, Alas clicked story skip but story disappeared
-            # This click will interrupt auto search
-            self.interval_reset([STORY_SKIP_3])
+        if self.appear(handler_assets.STORY_SKIP_3, offset=(20, 20), interval=2):
+            # 确认这是剧情。
+            # 剧情播放速度为 Very Fast 时，Alas 点击跳过时剧情可能刚好消失。
+            # 这次点击会中断自动搜索。
+            self.interval_reset([handler_assets.STORY_SKIP_3])
             if self._story_confirm.reached():
                 if drop:
                     drop.handle_add(self, before=2)
                 if self.config.STORY_ALLOW_SKIP:
-                    logger.info(f"{STORY_SKIP_3} -> {STORY_SKIP}")
-                    self.device.click(STORY_SKIP)
+                    logger.info(f"{handler_assets.STORY_SKIP_3} -> {handler_assets.STORY_SKIP}")
+                    self.device.click(handler_assets.STORY_SKIP)
                 else:
-                    logger.info(f"{STORY_SKIP_3} -> {OS_CLICK_SAFE_AREA}")
+                    logger.info(f"{handler_assets.STORY_SKIP_3} -> {OS_CLICK_SAFE_AREA}")
                     self.device.click(OS_CLICK_SAFE_AREA)
                 self._story_confirm.reset()
                 self.story_popup_timeout.reset()
                 return True
             else:
-                self.interval_clear(STORY_SKIP_3)
+                self.interval_clear(handler_assets.STORY_SKIP_3)
         else:
             self._story_confirm.reset()
-        if self.appear_then_click(STORY_CLOSE, offset=(10, 10), interval=2):
+        if self.appear_then_click(handler_assets.STORY_CLOSE, offset=(10, 10), interval=2):
             self.story_popup_timeout.reset()
             return True
 
         return False
 
     def story_skip_interval_clear(self):
-        self.interval_clear(STORY_SKIP_3)
-        self.interval_clear(STORY_LETTERS_ONLY)
+        self.interval_clear(handler_assets.STORY_SKIP_3)
+        self.interval_clear(handler_assets.STORY_LETTERS_ONLY)
 
     def handle_story_skip(self, drop=None):
-        # Rerun events in clear mode but still have stories.
-        # No stories in clear mode
-        # but B3/D3 still have stories til threat safe
-        # No more stories at threat safe
+        # 复刻活动在 clear mode 下仍可能有剧情。
+        # clear mode 通常没有剧情，但 B3/D3 在威胁安全前仍有剧情。
+        # 威胁安全后不再有剧情。
         if self.map_is_threat_safe and self.config.Campaign_Event != "event_20201012_cn":
             return False
 
@@ -538,20 +542,20 @@ class InfoHandler(ModuleBase):
         Returns:
             bool: If handled
         """
-        if self.appear(GAME_TIPS, offset=(20, 20), interval=2) and self.image_color_count(
-            GAME_TIPS.button, color=(40, 40, 40), threshold=240, count=50
+        if self.appear(handler_assets.GAME_TIPS, offset=(20, 20), interval=2) and self.image_color_count(
+            handler_assets.GAME_TIPS.button, color=(40, 40, 40), threshold=240, count=50
         ):
-            self.device.click(GAME_TIPS)
+            self.device.click(handler_assets.GAME_TIPS)
             return True
-        if self.appear(GAME_TIPS3, offset=(20, 20), interval=2) and self.image_color_count(
-            GAME_TIPS3.button, color=(40, 40, 40), threshold=240, count=50
+        if self.appear(handler_assets.GAME_TIPS3, offset=(20, 20), interval=2) and self.image_color_count(
+            handler_assets.GAME_TIPS3.button, color=(40, 40, 40), threshold=240, count=50
         ):
-            self.device.click(GAME_TIPS)
+            self.device.click(handler_assets.GAME_TIPS)
             return True
-        if self.appear(GAME_TIPS4, offset=(20, 20), interval=2) and self.image_color_count(
-            GAME_TIPS4.button, color=(40, 40, 40), threshold=240, count=50
+        if self.appear(handler_assets.GAME_TIPS4, offset=(20, 20), interval=2) and self.image_color_count(
+            handler_assets.GAME_TIPS4.button, color=(40, 40, 40), threshold=240, count=50
         ):
-            self.device.click(GAME_TIPS)
+            self.device.click(handler_assets.GAME_TIPS)
             return True
 
         return False
@@ -566,11 +570,10 @@ class InfoHandler(ModuleBase):
         Returns:
             int: Number of manjuu
         """
-        image = self.image_crop(MANJUU_AREA, copy=False)
-        # Default 0.85 will not work for manjuu, because the face will be stretched
-        # and shrinked, so the template will not match.
-        # Use 0.8 to match the deformed face.
-        buttons = TEMPLATE_MANJUU.match_multi(image, similarity=0.8, name="INFO_MANJUU")
+        image = self.image_crop(handler_assets.MANJUU_AREA, copy=False)
+        # Manjuu 表情会拉伸和缩小，默认 0.85 无法稳定匹配。
+        # 使用 0.8 匹配变形后的表情。
+        buttons = handler_assets.TEMPLATE_MANJUU.match_multi(image, similarity=0.8, name="INFO_MANJUU")
         return len(buttons)
 
     def wait_until_manjuu_disappear(self):

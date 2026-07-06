@@ -3,26 +3,26 @@ import re
 
 from module.base.timer import Timer
 from module.base.utils import color_bar_percentage
-from module.handler.assets import *
+from module.handler import assets as handler_assets
 from module.handler.auto_search import AutoSearchHandler
 from module.logger import logger
 from module.ui.switch import Switch
 
 FAST_FORWARD = Switch("Fast_Forward", offset=(5, 5))
-FAST_FORWARD.add_state("on", check_button=FAST_FORWARD_ON)
-FAST_FORWARD.add_state("off", check_button=FAST_FORWARD_OFF)
+FAST_FORWARD.add_state("on", check_button=handler_assets.FAST_FORWARD_ON)
+FAST_FORWARD.add_state("off", check_button=handler_assets.FAST_FORWARD_OFF)
 FLEET_LOCK = Switch("Fleet_Lock", offset=(5, 20))
-FLEET_LOCK.add_state("on", check_button=FLEET_LOCKED)
-FLEET_LOCK.add_state("off", check_button=FLEET_UNLOCKED)
+FLEET_LOCK.add_state("on", check_button=handler_assets.FLEET_LOCKED)
+FLEET_LOCK.add_state("off", check_button=handler_assets.FLEET_UNLOCKED)
 AUTO_SEARCH = Switch("Auto_Search", offset=(60, 20))
-AUTO_SEARCH.add_state("on", check_button=AUTO_SEARCH_ON)
-AUTO_SEARCH.add_state("on", check_button=AUTO_SEARCH_ON2)
-AUTO_SEARCH.add_state("on", check_button=AUTO_SEARCH_ON3)
-AUTO_SEARCH.add_state("on", check_button=AUTO_SEARCH_ON4)
-AUTO_SEARCH.add_state("off", check_button=AUTO_SEARCH_OFF)
-AUTO_SEARCH.add_state("off", check_button=AUTO_SEARCH_OFF2)
-AUTO_SEARCH.add_state("off", check_button=AUTO_SEARCH_OFF3)
-AUTO_SEARCH.add_state("off", check_button=AUTO_SEARCH_OFF4)
+AUTO_SEARCH.add_state("on", check_button=handler_assets.AUTO_SEARCH_ON)
+AUTO_SEARCH.add_state("on", check_button=handler_assets.AUTO_SEARCH_ON2)
+AUTO_SEARCH.add_state("on", check_button=handler_assets.AUTO_SEARCH_ON3)
+AUTO_SEARCH.add_state("on", check_button=handler_assets.AUTO_SEARCH_ON4)
+AUTO_SEARCH.add_state("off", check_button=handler_assets.AUTO_SEARCH_OFF)
+AUTO_SEARCH.add_state("off", check_button=handler_assets.AUTO_SEARCH_OFF2)
+AUTO_SEARCH.add_state("off", check_button=handler_assets.AUTO_SEARCH_OFF3)
+AUTO_SEARCH.add_state("off", check_button=handler_assets.AUTO_SEARCH_OFF4)
 
 
 def map_files(event):
@@ -140,12 +140,12 @@ class FastForwardHandler(AutoSearchHandler):
             | INFO | [Map_info] 98%, star_1, star_2, star_3, clear, 3_star, green, fast_forward
         """
         self.map_clear_percentage = self.get_map_clear_percentage()
-        self.map_achieved_star_1 = self._is_map_star_active(MAP_STAR_1)
-        self.map_achieved_star_2 = self._is_map_star_active(MAP_STAR_2)
-        self.map_achieved_star_3 = self._is_map_star_active(MAP_STAR_3)
+        self.map_achieved_star_1 = self._is_map_star_active(handler_assets.MAP_STAR_1)
+        self.map_achieved_star_2 = self._is_map_star_active(handler_assets.MAP_STAR_2)
+        self.map_achieved_star_3 = self._is_map_star_active(handler_assets.MAP_STAR_3)
         self.map_is_100_percent_clear = self.map_clear_percentage > 0.95
         self.map_is_3_stars = self.map_achieved_star_1 and self.map_achieved_star_2 and self.map_achieved_star_3
-        self.map_is_threat_safe = self.appear(MAP_GREEN, offset=(20, 20))
+        self.map_is_threat_safe = self.appear(handler_assets.MAP_GREEN, offset=(20, 20))
         if self.config.Campaign_Name.lower() == "sp":
             # Minor issue here
             # Using auto_search option because clear mode cannot be detected whether on SP
@@ -154,9 +154,9 @@ class FastForwardHandler(AutoSearchHandler):
         else:
             self.map_has_clear_mode = self.map_is_100_percent_clear and FAST_FORWARD.appear(main=self)
 
-        # Override config
+        # 覆盖配置。
         if self.map_achieved_star_1:
-            # Story before boss spawn, Attribute "story_refresh_boss" in chapter_template.lua
+            # Boss 刷新前剧情，对应 chapter_template.lua 中的 "story_refresh_boss"。
             self.config.MAP_HAS_MAP_STORY = False
         self.config.MAP_CLEAR_ALL_THIS_TIME = (
             self.config.STAR_REQUIRE_3
@@ -167,7 +167,7 @@ class FastForwardHandler(AutoSearchHandler):
         self.map_show_info()
 
     def map_show_info(self):
-        # Log
+        # 记录日志。
         logger.attr("MAP_CLEAR_ALL_THIS_TIME", self.config.MAP_CLEAR_ALL_THIS_TIME)
         names = [
             "map_achieved_star_1",
@@ -235,8 +235,8 @@ class FastForwardHandler(AutoSearchHandler):
         Returns:
             bool: If switched.
         """
-        # Fleet lock depends on if it appear on map, not depends on map status.
-        # Because if already in map, there's no map status,
+        # 舰队锁定依赖按钮是否出现在地图上，而不是地图状态。
+        # 已经在地图内时不会再显示地图状态。
         if not FLEET_LOCK.appear(main=self):
             logger.info("No fleet lock option.")
             return False
@@ -341,11 +341,11 @@ class FastForwardHandler(AutoSearchHandler):
         Override AutoSearchHandler definition
         for 2x book handling if needed
         """
-        if self.appear(AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset, interval=2):
+        if self.appear(handler_assets.AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset, interval=2):
             self.map_is_2x_book = self.config.Campaign_Use2xBook
             self.handle_2x_book_setting(mode="auto")
-            if self.appear_then_click(AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset):
-                self.interval_reset(AUTO_SEARCH_MENU_CONTINUE)
+            if self.appear_then_click(handler_assets.AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset):
+                self.interval_reset(handler_assets.AUTO_SEARCH_MENU_CONTINUE)
             else:
                 # AUTO_SEARCH_MENU_CONTINUE disappeared after handle_2x_book_setting()
                 pass
@@ -360,7 +360,9 @@ class FastForwardHandler(AutoSearchHandler):
         Pages:
             in: MAP_PREPARATION
         """
-        percent = color_bar_percentage(self.device.image, area=MAP_CLEAR_PERCENTAGE.area, prev_color=(231, 170, 82))
+        percent = color_bar_percentage(
+            self.device.image, area=handler_assets.MAP_CLEAR_PERCENTAGE.area, prev_color=(231, 170, 82)
+        )
         if self.config.MAP_CLEAR_PERCENTAGE_SHORT:
             percent *= 1.4
         return percent
@@ -529,11 +531,11 @@ class FastForwardHandler(AutoSearchHandler):
 
         logger.info(f"Handling 2x book setting, mode={mode}.")
         if mode == "prep":
-            book_check = BOOK_CHECK_PREP
-            book_box = BOOK_BOX_PREP
+            book_check = handler_assets.BOOK_CHECK_PREP
+            book_box = handler_assets.BOOK_BOX_PREP
         else:
-            book_check = BOOK_CHECK_AUTO
-            book_box = BOOK_BOX_AUTO
+            book_check = handler_assets.BOOK_CHECK_AUTO
+            book_box = handler_assets.BOOK_BOX_AUTO
 
         state = "on" if self.map_is_2x_book else "off"
         if self._set_2x_book_status(state, book_check, book_box):
@@ -546,7 +548,7 @@ class FastForwardHandler(AutoSearchHandler):
         return True
 
     def handle_2x_book_popup(self):
-        if self.appear(BOOK_POPUP_CHECK, offset=(20, 20)):
+        if self.appear(handler_assets.BOOK_POPUP_CHECK, offset=(20, 20)):
             if self.handle_popup_confirm("2X_BOOK"):
                 return True
 
@@ -573,7 +575,7 @@ class FastForwardHandler(AutoSearchHandler):
             else:
                 self.device.screenshot()
 
-            if self.image_color_count(MAP_WALK_SPEEDUP, color=(132, 255, 148), threshold=180, count=50):
+            if self.image_color_count(handler_assets.MAP_WALK_SPEEDUP, color=(132, 255, 148), threshold=180, count=50):
                 logger.attr("Walk_Speedup", "on")
                 return True
             if timeout.reached():
@@ -581,6 +583,6 @@ class FastForwardHandler(AutoSearchHandler):
                 return False
 
             if interval.reached():
-                self.device.click(MAP_WALK_SPEEDUP)
+                self.device.click(handler_assets.MAP_WALK_SPEEDUP)
                 interval.reset()
                 continue

@@ -1,10 +1,14 @@
 from module.base.timer import Timer
 from module.base.utils import get_color, red_overlay_transparency
 from module.combat.combat import Combat
-from module.handler.assets import *
+from module.handler import assets as handler_assets
 from module.handler.info_handler import info_letter_preprocess
 from module.logger import logger
-from module.template.assets import *
+from module.template.assets import (
+    TEMPLATE_AMBUSH_EVADE_FAILED,
+    TEMPLATE_AMBUSH_EVADE_SUCCESS,
+    TEMPLATE_MAP_WALK_OUT_OF_STEP,
+)
 
 TEMPLATE_AMBUSH_EVADE_SUCCESS.pre_process = info_letter_preprocess
 TEMPLATE_AMBUSH_EVADE_FAILED.pre_process = info_letter_preprocess
@@ -17,18 +21,24 @@ class AmbushHandler(Combat):
     MAP_AIR_RAID_CONFIRM_SECOND = 0.5
 
     def ambush_color_initial(self):
-        MAP_AMBUSH.load_color(self.device.image)
-        MAP_AIR_RAID.load_color(self.device.image)
+        handler_assets.MAP_AMBUSH.load_color(self.device.image)
+        handler_assets.MAP_AIR_RAID.load_color(self.device.image)
 
     def _ambush_appear(self):
         return (
-            red_overlay_transparency(MAP_AMBUSH.color, get_color(self.device.image, MAP_AMBUSH.area))
+            red_overlay_transparency(
+                handler_assets.MAP_AMBUSH.color,
+                get_color(self.device.image, handler_assets.MAP_AMBUSH.area),
+            )
             > self.MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD
         )
 
     def _air_raid_appear(self):
         return (
-            red_overlay_transparency(MAP_AIR_RAID.color, get_color(self.device.image, MAP_AIR_RAID.area))
+            red_overlay_transparency(
+                handler_assets.MAP_AIR_RAID.color,
+                get_color(self.device.image, handler_assets.MAP_AIR_RAID.area),
+            )
             > self.MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD
         )
 
@@ -55,11 +65,11 @@ class AmbushHandler(Combat):
 
     def _handle_ambush_evade(self):
         logger.info("Map ambushed")
-        # Wait MAP_AMBUSH_EVADE
-        self.wait_until_appear(MAP_AMBUSH_EVADE, offset=(30, 30))
+        # 等待 MAP_AMBUSH_EVADE。
+        self.wait_until_appear(handler_assets.MAP_AMBUSH_EVADE, offset=(30, 30))
         self.handle_info_bar()
 
-        # Click MAP_AMBUSH_EVADE
+        # 点击 MAP_AMBUSH_EVADE。
         skip_first_screenshot = True
         while 1:
             if skip_first_screenshot:
@@ -67,15 +77,15 @@ class AmbushHandler(Combat):
             else:
                 self.device.screenshot()
 
-            # End
+            # 结束。
             if self.info_bar_count():
                 break
 
-            if self.appear_then_click(MAP_AMBUSH_EVADE, offset=(30, 30), interval=3):
+            if self.appear_then_click(handler_assets.MAP_AMBUSH_EVADE, offset=(30, 30), interval=3):
                 continue
 
-        # Handle evade success and failures
-        image = info_letter_preprocess(self.image_crop(INFO_BAR_DETECT, copy=False))
+        # 处理回避成功和失败。
+        image = info_letter_preprocess(self.image_crop(handler_assets.INFO_BAR_DETECT, copy=False))
         if TEMPLATE_AMBUSH_EVADE_SUCCESS.match(image):
             logger.attr("Ambush_evade", "success")
         elif TEMPLATE_AMBUSH_EVADE_FAILED.match(image):
@@ -89,10 +99,10 @@ class AmbushHandler(Combat):
 
     def _handle_ambush_attack(self):
         logger.info("Map ambushed")
-        # Wait MAP_AMBUSH_ATTACK
-        self.wait_until_appear(MAP_AMBUSH_ATTACK, offset=(30, 30))
+        # 等待 MAP_AMBUSH_ATTACK。
+        self.wait_until_appear(handler_assets.MAP_AMBUSH_ATTACK, offset=(30, 30))
 
-        # Click MAP_AMBUSH_ATTACK
+        # 点击 MAP_AMBUSH_ATTACK。
         skip_first_screenshot = True
         while 1:
             if skip_first_screenshot:
@@ -100,18 +110,18 @@ class AmbushHandler(Combat):
             else:
                 self.device.screenshot()
 
-            # End
+            # 结束。
             if self.combat_appear():
                 break
 
-            if self.appear_then_click(MAP_AMBUSH_ATTACK, offset=(30, 30), interval=3):
+            if self.appear_then_click(handler_assets.MAP_AMBUSH_ATTACK, offset=(30, 30), interval=3):
                 continue
             if self.handle_combat_low_emotion():
                 continue
             if self.handle_retirement():
                 continue
 
-        # In battle
+        # 进入战斗。
         logger.attr("Ambush_evade", "attack")
         self.combat(expected_end="no_searching", fleet_index=self.fleet_show_index)
 
@@ -133,7 +143,7 @@ class AmbushHandler(Combat):
             self._handle_ambush()
             return True
 
-        if self.appear(MAP_AMBUSH_EVADE, offset=(30, 30)):
+        if self.appear(handler_assets.MAP_AMBUSH_EVADE, offset=(30, 30)):
             self._handle_ambush()
 
         return False
@@ -144,7 +154,7 @@ class AmbushHandler(Combat):
         if not self.info_bar_count():
             return False
 
-        image = info_letter_preprocess(self.image_crop(INFO_BAR_DETECT, copy=False))
+        image = info_letter_preprocess(self.image_crop(handler_assets.INFO_BAR_DETECT, copy=False))
         if TEMPLATE_MAP_WALK_OUT_OF_STEP.match(image):
             logger.warning("Map walk out of step.")
             self.handle_info_bar()

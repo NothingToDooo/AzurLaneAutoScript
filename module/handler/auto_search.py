@@ -2,18 +2,18 @@ import numpy as np
 
 from module.base.button import ButtonGrid
 from module.base.timer import Timer
-from module.handler.assets import *
+from module.handler import assets as handler_assets
 from module.handler.enemy_searching import EnemySearchingHandler
 from module.logger import logger
 from module.map.assets import FLEET_PREPARATION_CHECK
 
 AUTO_SEARCH_SETTINGS = [
-    AUTO_SEARCH_SET_MOB,
-    AUTO_SEARCH_SET_BOSS,
-    AUTO_SEARCH_SET_ALL,
-    AUTO_SEARCH_SET_STANDBY,
-    AUTO_SEARCH_SET_SUB_AUTO,
-    AUTO_SEARCH_SET_SUB_STANDBY,
+    handler_assets.AUTO_SEARCH_SET_MOB,
+    handler_assets.AUTO_SEARCH_SET_BOSS,
+    handler_assets.AUTO_SEARCH_SET_ALL,
+    handler_assets.AUTO_SEARCH_SET_STANDBY,
+    handler_assets.AUTO_SEARCH_SET_SUB_AUTO,
+    handler_assets.AUTO_SEARCH_SET_SUB_STANDBY,
 ]
 dic_setting_name_to_index = {
     "fleet1_mob_fleet2_boss": 0,
@@ -129,7 +129,9 @@ class AutoSearchHandler(EnemySearchingHandler):
         """
         Args:
             setting (str):
-                fleet1_mob_fleet2_boss, fleet1_boss_fleet2_mob, fleet1_all_fleet2_standby, fleet1_standby_fleet2_all, sub_auto_call, sub_standby
+                fleet1_mob_fleet2_boss, fleet1_boss_fleet2_mob,
+                fleet1_all_fleet2_standby, fleet1_standby_fleet2_all,
+                sub_auto_call, sub_standby
             skip_first_screenshot (bool):
 
             Returns:
@@ -154,7 +156,7 @@ class AutoSearchHandler(EnemySearchingHandler):
                 continue
 
     _auto_search_offset = (5, 5)
-    # Move 213px left when MULTIPLE_SORTIE appears
+    # MULTIPLE_SORTIE 出现时向左移动 213px。
     _auto_search_menu_offset = (250, 30)
 
     def is_auto_search_running(self):
@@ -162,8 +164,8 @@ class AutoSearchHandler(EnemySearchingHandler):
         Returns:
             bool:
         """
-        return self.appear(AUTO_SEARCH_MAP_OPTION_ON, offset=self._auto_search_offset) and self.appear(
-            AUTO_SEARCH_MAP_OPTION_ON
+        return self.appear(handler_assets.AUTO_SEARCH_MAP_OPTION_ON, offset=self._auto_search_offset) and self.appear(
+            handler_assets.AUTO_SEARCH_MAP_OPTION_ON
         )
 
     def handle_auto_search_map_option(self):
@@ -173,9 +175,9 @@ class AutoSearchHandler(EnemySearchingHandler):
         Returns:
             bool: If clicked
         """
-        if self.appear(AUTO_SEARCH_MAP_OPTION_OFF, offset=self._auto_search_offset) and self.appear_then_click(
-            AUTO_SEARCH_MAP_OPTION_OFF, interval=2
-        ):
+        if self.appear(
+            handler_assets.AUTO_SEARCH_MAP_OPTION_OFF, offset=self._auto_search_offset
+        ) and self.appear_then_click(handler_assets.AUTO_SEARCH_MAP_OPTION_OFF, interval=2):
             return True
 
         return False
@@ -185,10 +187,14 @@ class AutoSearchHandler(EnemySearchingHandler):
         Returns:
             bool:
         """
-        return AUTO_SEARCH_MENU_CONTINUE.match_luma(self.device.image, offset=self._auto_search_menu_offset)
+        return handler_assets.AUTO_SEARCH_MENU_CONTINUE.match_luma(
+            self.device.image, offset=self._auto_search_menu_offset
+        )
 
     def handle_auto_search_continue(self):
-        return self.appear_then_click(AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset, interval=2)
+        return self.appear_then_click(
+            handler_assets.AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset, interval=2
+        )
 
     def handle_auto_search_exit(self, drop=None):
         """
@@ -198,12 +204,12 @@ class AutoSearchHandler(EnemySearchingHandler):
         Returns:
             bool
         """
-        if self.appear(AUTO_SEARCH_MENU_EXIT, offset=self._auto_search_menu_offset, interval=2):
-            # Poor implementation here
+        if self.appear(handler_assets.AUTO_SEARCH_MENU_EXIT, offset=self._auto_search_menu_offset, interval=2):
+            # 这里仍是较粗糙的处理，先保留原行为。
             if drop:
                 drop.handle_add(main=self, before=4)
-            self.device.click(AUTO_SEARCH_MENU_EXIT)
-            self.interval_reset(AUTO_SEARCH_MENU_EXIT)
+            self.device.click(handler_assets.AUTO_SEARCH_MENU_EXIT)
+            self.interval_reset(handler_assets.AUTO_SEARCH_MENU_EXIT)
             return True
         else:
             return False
@@ -226,7 +232,7 @@ class AutoSearchHandler(EnemySearchingHandler):
             if self.handle_auto_search_exit():
                 continue
 
-            # End
+            # 结束。
             if self.is_in_stage():
                 break
 
