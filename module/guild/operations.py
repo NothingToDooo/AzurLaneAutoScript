@@ -3,13 +3,15 @@ from module.base.timer import Timer
 from module.base.utils import area_limit, area_pad, point_in_area, random_rectangle_vector
 from module.config.utils import get_server_monthday
 from module.exception import GameBugError
-from module.guild.assets import *
+from module.guild import assets as guild_assets
 from module.guild.base import GuildBase
 from module.logger import logger
 from module.ocr.ocr import DigitCounter
 from module.template.assets import TEMPLATE_OPERATIONS_RED_DOT
 
-GUILD_OPERATIONS_PROGRESS = DigitCounter(OCR_GUILD_OPERATIONS_PROGRESS, letter=(255, 247, 247), threshold=64)
+GUILD_OPERATIONS_PROGRESS = DigitCounter(
+    guild_assets.OCR_GUILD_OPERATIONS_PROGRESS, letter=(255, 247, 247), threshold=64
+)
 
 
 class GuildOperations(GuildBase):
@@ -31,11 +33,10 @@ class GuildOperations(GuildBase):
             else:
                 self.device.screenshot()
 
-            # End
+            # 结束。
             if click_count > 5:
-                # Info bar showing `none4302`.
-                # Probably because guild operation has been started by another guild officer already.
-                # Enter guild page again should fix the issue.
+                # 信息条显示 `none4302` 时，多半是其他公会管理已经开启了作战。
+                # 重新进入公会页通常可以恢复。
                 logger.warning(
                     "Unable to start/join guild operation, "
                     "probably because guild operation has been started by another guild officer already"
@@ -47,21 +48,26 @@ class GuildOperations(GuildBase):
             if self._handle_guild_operations_start():
                 confirm_timer.reset()
                 continue
-            if self.appear(GUILD_OPERATIONS_JOIN, interval=3):
-                if self.image_color_count(GUILD_OPERATIONS_MONTHLY_COUNT, color=(255, 93, 90), threshold=221, count=20):
+            if self.appear(guild_assets.GUILD_OPERATIONS_JOIN, interval=3):
+                if self.image_color_count(
+                    guild_assets.GUILD_OPERATIONS_MONTHLY_COUNT,
+                    color=(255, 93, 90),
+                    threshold=221,
+                    count=20,
+                ):
                     logger.info("Unable to join operation, no more monthly attempts left")
-                    self.device.click(GUILD_OPERATIONS_CLICK_SAFE_AREA)
+                    self.device.click(guild_assets.GUILD_OPERATIONS_CLICK_SAFE_AREA)
                 else:
                     current, remain, total = GUILD_OPERATIONS_PROGRESS.ocr(self.device.image)
                     threshold = total * self.config.GuildOperation_JoinThreshold
                     if current <= threshold:
                         logger.info(f"Joining Operation, current progress less than threshold ({threshold:.2f})")
-                        self.device.click(GUILD_OPERATIONS_JOIN)
+                        self.device.click(guild_assets.GUILD_OPERATIONS_JOIN)
                     else:
                         logger.info(
                             f"Refrain from joining operation, current progress exceeds threshold ({threshold:.2f})"
                         )
-                        self.device.click(GUILD_OPERATIONS_CLICK_SAFE_AREA)
+                        self.device.click(guild_assets.GUILD_OPERATIONS_CLICK_SAFE_AREA)
                 confirm_timer.reset()
                 continue
             if self.handle_popup_confirm("JOIN_OPERATION"):
@@ -77,8 +83,10 @@ class GuildOperations(GuildBase):
                 confirm_timer.reset()
                 continue
 
-            # End
-            if self.appear(GUILD_BOSS_ENTER) or self.appear(GUILD_OPERATIONS_ACTIVE_CHECK, offset=(20, 20)):
+            # 结束。
+            if self.appear(guild_assets.GUILD_BOSS_ENTER) or self.appear(
+                guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK, offset=(20, 20)
+            ):
                 if not self.info_bar_count() and confirm_timer.reached():
                     return True
 
@@ -103,17 +111,17 @@ class GuildOperations(GuildBase):
             logger.info(f"No new guild operations because, today's date {today} >= limit {limit}")
             return False
 
-        # Hard-coded to select The most rewarding operation Solomon Air-Sea Battle.
-        if self.appear_then_click(GUILD_OPERATIONS_SOLOMON, offset=(20, 20), interval=3):
+        # 固定选择收益最高的所罗门海空战。
+        if self.appear_then_click(guild_assets.GUILD_OPERATIONS_SOLOMON, offset=(20, 20), interval=3):
             return True
-        # Goto the new operation that just started
-        # Example page switches:
+        # 进入刚开启的新作战。
+        # 页面切换示例：
         # - GUILD_OPERATIONS_SOLOMON
         # - GUILD_OPERATIONS_NEW
-        # - handle_popup_confirm(), confirm to consume guild fund.
+        # - handle_popup_confirm()，确认消耗公会资金。
         # - GUILD_OPERATIONS_JOIN
         # - GUILD_OPERATIONS_ACTIVE_CHECK
-        if self.appear_then_click(GUILD_OPERATIONS_NEW, offset=(20, 20), interval=3):
+        if self.appear_then_click(guild_assets.GUILD_OPERATIONS_NEW, offset=(20, 20), interval=3):
             return True
 
         return False
@@ -126,9 +134,11 @@ class GuildOperations(GuildBase):
         Pages:
             in: GUILD_OPERATIONS_NEW
         """
-        if not self.appear(GUILD_OPERATIONS_NEW, offset=(20, 20)):
+        if not self.appear(guild_assets.GUILD_OPERATIONS_NEW, offset=(20, 20)):
             return False
-        if self.image_color_count(GUILD_OPERATION_FUND_CHECK, color=(255, 93, 91), threshold=180, count=30):
+        if self.image_color_count(
+            guild_assets.GUILD_OPERATION_FUND_CHECK, color=(255, 93, 91), threshold=180, count=30
+        ):
             logger.warning("Insufficient guild fund to start new operation")
             return True
         return False
@@ -146,19 +156,21 @@ class GuildOperations(GuildBase):
             in: GUILD_OPERATIONS
             out: GUILD_OPERATIONS
         """
-        if self.appear(GUILD_OPERATIONS_INACTIVE_CHECK) and self.appear(GUILD_OPERATIONS_ACTIVE_CHECK):
+        if self.appear(guild_assets.GUILD_OPERATIONS_INACTIVE_CHECK) and self.appear(
+            guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK
+        ):
             logger.info(
                 "Mode: Operations Inactive, please contact your Elite/Officer/Leader seniors to select "
                 "an operation difficulty"
             )
             return 0
-        elif self.appear(GUILD_OPERATIONS_ACTIVE_CHECK):
+        elif self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK):
             logger.info("Mode: Operations Active, may proceed to scan and dispatch fleets")
             return 1
-        elif self.appear(GUILD_BOSS_ENTER):
+        elif self.appear(guild_assets.GUILD_BOSS_ENTER):
             logger.info("Mode: Guild Raid Boss (GUILD_BOSS_ENTER)")
             return 2
-        elif self.appear(GUILD_OPERATIONS_NEW, offset=(20, 20)):
+        elif self.appear(guild_assets.GUILD_OPERATIONS_NEW, offset=(20, 20)):
             logger.info("Mode: Guild Raid Boss (GUILD_OPERATIONS_NEW)")
             return 2
         else:
@@ -177,9 +189,9 @@ class GuildOperations(GuildBase):
         Pages:
             in: page_guild, guild operation, operation map (GUILD_OPERATIONS_ACTIVE_CHECK)
         """
-        # Where whole operation mission chain is
+        # 整条作战任务链所在区域。
         detection_area = (152, 135, 1280, 630)
-        # Offset inside to avoid clicking on edge
+        # 向内收一点，避免点到边缘。
         pad = 5
 
         list_expand = []
@@ -212,7 +224,7 @@ class GuildOperations(GuildBase):
         Returns:
             bool: If found active dispatch.
         """
-        # Where whole operation mission chain is
+        # 整条作战任务链所在区域。
         detection_area = (152, 135, 1280, 630)
         direction_vector = (-600, 0) if forward else (600, 0)
 
@@ -254,7 +266,7 @@ class GuildOperations(GuildBase):
             else:
                 self.device.screenshot()
 
-            if self.appear(GUILD_OPERATIONS_ACTIVE_CHECK, offset=(20, 20)):
+            if self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK, offset=(20, 20)):
                 entrance_1, entrance_2 = self._guild_operations_get_entrance()
                 if not len(entrance_1):
                     return False
@@ -264,21 +276,21 @@ class GuildOperations(GuildBase):
                     continue
                 if timer_2.reached():
                     for button in entrance_2:
-                        # Enter button has a black area around Easy/Normal/Hard on the upper right
-                        # If operation not expanded, enter button is a background with Gaussian Blur
+                        # 进入按钮右上角的 Easy/Normal/Hard 周围有黑色区域。
+                        # 作战未展开时，这个位置只是高斯模糊背景。
                         if self.image_color_count(button, color=(0, 0, 0), threshold=235, count=50):
                             self.device.click(button)
                             timer_1.reset()
                             timer_2.reset()
                             break
 
-            if self.appear_then_click(GUILD_DISPATCH_QUICK, offset=(20, 20), interval=2):
+            if self.appear_then_click(guild_assets.GUILD_DISPATCH_QUICK, offset=(20, 20), interval=2):
                 timer_1.reset()
                 timer_2.reset()
                 continue
 
-            # End
-            if self.appear(GUILD_DISPATCH_RECOMMEND, offset=(20, 20)):
+            # 结束。
+            if self.appear(guild_assets.GUILD_DISPATCH_RECOMMEND, offset=(20, 20)):
                 break
 
         return True
@@ -295,16 +307,16 @@ class GuildOperations(GuildBase):
         Pages:
             in: page_guild, guild operation, operation dispatch preparation (GUILD_DISPATCH_RECOMMEND)
         """
-        # Fleet switch, for 4 situation
+        # 舰队切换点，最多有 4 种布局。
         #          | 1 |
         #       | 1 | | 2 |
         #    | 1 | | 2 | | 3 |
         # | 1 | | 2 | | 3 | | 4 |
-        #   0  1  2  3  4  5  6   buttons in switch_grid
+        #   0  1  2  3  4  5  6   switch_grid 中的按钮。
         switch_grid = ButtonGrid(origin=(573.5, 381), delta=(20.5, 0), button_shape=(11, 24), grid_shape=(7, 1))
-        # Color of inactive fleet switch
+        # 可点击舰队切换点颜色。
         color_active = (74, 117, 222)
-        # Color of current fleet
+        # 当前舰队颜色。
         color_inactive = (33, 48, 66)
 
         text = []
@@ -320,7 +332,7 @@ class GuildOperations(GuildBase):
                 text.append(f"[ {index} ]")
                 button = switch
 
-        # log example: | 1 | | 2 | [ 3 ]
+        # 日志示例：| 1 | | 2 | [ 3 ]
         text = " ".join(text)
         logger.attr("Dispatch_fleet", text)
         if text.endswith("]"):
@@ -350,7 +362,7 @@ class GuildOperations(GuildBase):
                 logger.info("Dispatching the first fleet, skip switching")
             else:
                 self.device.click(button)
-                # Wait for the click animation, which will mess up _guild_operations_get_dispatch()
+                # 等点击动画结束，否则会干扰 _guild_operations_get_dispatch()。
                 self.device.sleep((0.5, 0.6))
                 continue
 
@@ -369,37 +381,42 @@ class GuildOperations(GuildBase):
             else:
                 self.device.screenshot()
 
-            if self.appear(GUILD_DISPATCH_FLEET_UNFILLED, offset=(20, 20), interval=3):
-                # Don't use offset here, because GUILD_DISPATCH_FLEET_UNFILLED only has a difference in colors
-                # Use long interval because the game needs a few seconds to choose the ships
-                self.device.click(GUILD_DISPATCH_RECOMMEND)
+            if self.appear(guild_assets.GUILD_DISPATCH_FLEET_UNFILLED, offset=(20, 20), interval=3):
+                # 这里不用 offset，因为未满员按钮和满员按钮只差颜色。
+                # 选船需要几秒，所以保持较长 interval。
+                self.device.click(guild_assets.GUILD_DISPATCH_RECOMMEND)
                 continue
-            if not dispatched and self.appear(GUILD_DISPATCH_FLEET, offset=(20, 20), interval=3):
-                # GUILD_DISPATCH_FLEET and GUILD_DISPATCH_FLEET_UNFILLED has same feature but different colors
-                # check background blue for double check
-                if self.image_color_count(GUILD_DISPATCH_FLEET, color=(82, 93, 221), threshold=235, count=500):
-                    self.device.click(GUILD_DISPATCH_FLEET)
+            if not dispatched and self.appear(guild_assets.GUILD_DISPATCH_FLEET, offset=(20, 20), interval=3):
+                # 满员和未满员按钮特征相同，只能再用蓝色背景确认一次。
+                if self.image_color_count(
+                    guild_assets.GUILD_DISPATCH_FLEET,
+                    color=(82, 93, 221),
+                    threshold=235,
+                    count=500,
+                ):
+                    self.device.click(guild_assets.GUILD_DISPATCH_FLEET)
                 else:
-                    self.interval_clear(GUILD_DISPATCH_FLEET)
+                    self.interval_clear(guild_assets.GUILD_DISPATCH_FLEET)
                 continue
             if self.handle_popup_confirm("GUILD_DISPATCH"):
-                self.interval_clear(GUILD_DISPATCH_FLEET)
+                self.interval_clear(guild_assets.GUILD_DISPATCH_FLEET)
                 dispatched = True
                 continue
 
-            # End
-            if self.appear(GUILD_DISPATCH_IN_PROGRESS):
-                # In first dispatch, it will show GUILD_DISPATCH_IN_PROGRESS
+            # 结束。
+            if self.appear(guild_assets.GUILD_DISPATCH_IN_PROGRESS):
+                # 首次派遣会显示派遣中按钮。
                 logger.info("Fleet dispatched, dispatch in progress")
                 break
-            if dispatched and self.appear(GUILD_DISPATCH_FLEET, offset=(20, 20), interval=3):
-                # GUILD_DISPATCH_FLEET and GUILD_DISPATCH_FLEET_UNFILLED has same feature but different colors
-                # check background blue for double check
-                if self.image_color_count(GUILD_DISPATCH_FLEET, color=(82, 93, 221), threshold=235, count=500):
-                    # In the rest of the dispatch, it will show GUILD_DISPATCH_FLEET
-                    # We can't ensure that fleet has dispatched,
-                    # because GUILD_DISPATCH_FLEET still shows after clicking recommend before dispatching
-                    # _guild_operations_dispatch() will retry it if haven't dispatched
+            if dispatched and self.appear(guild_assets.GUILD_DISPATCH_FLEET, offset=(20, 20), interval=3):
+                # 满员和未满员按钮特征相同，只能再用蓝色背景确认一次。
+                if self.image_color_count(
+                    guild_assets.GUILD_DISPATCH_FLEET,
+                    color=(82, 93, 221),
+                    threshold=235,
+                    count=500,
+                ):
+                    # 后续派遣会继续显示满员按钮；如果实际没派出，外层会重试。
                     logger.info("Fleet dispatched")
                     break
 
@@ -417,19 +434,19 @@ class GuildOperations(GuildBase):
             else:
                 self.device.screenshot()
 
-            if self.appear(GUILD_DISPATCH_RECOMMEND, offset=(20, 20), interval=2):
-                self.device.click(GUILD_DISPATCH_CLOSE)
+            if self.appear(guild_assets.GUILD_DISPATCH_RECOMMEND, offset=(20, 20), interval=2):
+                self.device.click(guild_assets.GUILD_DISPATCH_CLOSE)
                 continue
-            if self.appear(GUILD_DISPATCH_QUICK, offset=(20, 20), interval=2):
-                self.device.click(GUILD_DISPATCH_CLOSE)
+            if self.appear(guild_assets.GUILD_DISPATCH_QUICK, offset=(20, 20), interval=2):
+                self.device.click(guild_assets.GUILD_DISPATCH_CLOSE)
                 continue
-            if self.appear(GUILD_DISPATCH_IN_PROGRESS, interval=2):
-                # No offset here, GUILD_DISPATCH_IN_PROGRESS is a colored button
-                self.device.click(GUILD_DISPATCH_CLOSE)
+            if self.appear(guild_assets.GUILD_DISPATCH_IN_PROGRESS, interval=2):
+                # 这里不用 offset，派遣中按钮本身靠颜色识别。
+                self.device.click(guild_assets.GUILD_DISPATCH_CLOSE)
                 continue
 
-            # End
-            if self.appear(GUILD_OPERATIONS_ACTIVE_CHECK):
+            # 结束。
+            if self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK):
                 break
 
     def _guild_operations_dispatch(self):
@@ -484,13 +501,13 @@ class GuildOperations(GuildBase):
             else:
                 self.device.screenshot()
 
-            if self.appear_then_click(GUILD_BOSS_ENTER, interval=3):
+            if self.appear_then_click(guild_assets.GUILD_BOSS_ENTER, interval=3):
                 continue
 
-            if self.appear(GUILD_DISPATCH_FLEET, offset=(20, 20), interval=3):
-                # Button does not appear greyed out even when empty fleet composition
+            if self.appear(guild_assets.GUILD_DISPATCH_FLEET, offset=(20, 20), interval=3):
+                # 即使舰队为空，按钮也不会显示成灰色。
                 if dispatch_count < 5:
-                    self.device.click(GUILD_DISPATCH_FLEET)
+                    self.device.click(guild_assets.GUILD_DISPATCH_FLEET)
                     dispatch_count += 1
                 else:
                     logger.warning(
@@ -501,10 +518,12 @@ class GuildOperations(GuildBase):
                 continue
 
             if self.config.GuildOperation_BossFleetRecommend:
-                if self.info_bar_count() and self.appear_then_click(GUILD_DISPATCH_RECOMMEND_2, interval=3):
+                if self.info_bar_count() and self.appear_then_click(
+                    guild_assets.GUILD_DISPATCH_RECOMMEND_2, interval=3
+                ):
                     continue
 
-            # Only print once when detected
+            # 只在首次检测到加载时打印。
             if not is_loading:
                 if az.is_combat_loading():
                     self.device.screenshot_interval_set("combat")
@@ -545,7 +564,9 @@ class GuildOperations(GuildBase):
         Returns:
             bool:
         """
-        appear = self.image_color_count(GUILD_BOSS_AVAILABLE, color=(140, 243, 99), threshold=221, count=10)
+        appear = self.image_color_count(
+            guild_assets.GUILD_BOSS_AVAILABLE, color=(140, 243, 99), threshold=221, count=10
+        )
         if appear:
             logger.info("Guild boss available")
         else:
@@ -559,10 +580,10 @@ class GuildOperations(GuildBase):
         if not entered:
             logger.info(f"Guild operation run success: {entered}")
             return False
-        # Determine the mode of operations, currently 3 are available
+        # 判断作战模式，目前有 3 种。
         operations_mode = self._guild_operations_get_mode()
 
-        # Execute actions based on the detected mode
+        # 按检测到的模式执行动作。
         result = True
         if operations_mode == 0:
             pass
