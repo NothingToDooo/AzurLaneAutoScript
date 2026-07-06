@@ -8,6 +8,8 @@ logger.info("Loading OCR dependencies")
 from cnocr import CnOcr
 from cnocr.utils import data_dir
 
+_DEFAULT_OCR_ROOT = data_dir()
+
 
 class AlOcr(CnOcr):
     CNOCR_CONTEXT = "cpu"
@@ -20,7 +22,7 @@ class AlOcr(CnOcr):
         model_name="densenet-lite-gru",
         model_epoch=None,
         cand_alphabet=None,
-        root=data_dir(),
+        root=_DEFAULT_OCR_ROOT,
         context="cpu",
         name=None,
     ):
@@ -42,13 +44,13 @@ class AlOcr(CnOcr):
         model_name="densenet-lite-gru",
         model_epoch=None,
         cand_alphabet=None,
-        root=data_dir(),
+        root=_DEFAULT_OCR_ROOT,
         context="cpu",
         name=None,
     ):
         model_name = self._normalize_model_name(model_name)
         logger.info(f"Loading OCR model: {model_name}")
-        if root != data_dir():
+        if root != _DEFAULT_OCR_ROOT:
             logger.warning(f"Custom MXNet OCR model root is ignored by CnOcr 2.x: {root}")
 
         super().__init__(

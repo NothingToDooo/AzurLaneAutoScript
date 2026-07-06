@@ -8,16 +8,17 @@ from module.ui.assets import BACK_ARROW
 from module.ui.scroll import Scroll
 from module.ui.switch import Switch
 
-# Button of 5 equipments
+# 5 个装备按钮。
 EQUIP_INFO_BAR = ButtonGrid(
     origin=(695, 127), delta=(86.25, 0), button_shape=(73, 73), grid_shape=(5, 1), name="EQUIP_INFO_BAR"
 )
-# Bottom-left corner of EQUIP_INFO_BAR, to detect whether the grid has an equipment
+# EQUIP_INFO_BAR 左下角，用于检测格子是否已有装备。
 EQUIPMENT_GRID = ButtonGrid(
     origin=(696, 170), delta=(86.25, 0), button_shape=(32, 32), grid_shape=(5, 1), name="EQUIPMENT_GRID"
 )
 EQUIPMENT_SCROLL = Scroll(EQUIP_SCROLL, color=(247, 211, 66), name="EQUIP_SCROLL")
 SIM_VALUE = 0.90
+EQUIPMENT_INDEXES = range(5)
 
 equipping_filter = Switch("Equipping_filter")
 equipping_filter.add_state("on", check_button=EQUIPPING_ON)
@@ -31,15 +32,16 @@ class EquipmentChange(Equipment):
         if equipping_filter.set("on" if enable else "off", main=self):
             self.wait_until_stable(SWIPE_AREA)
 
-    def ship_equipment_record_image(self, index_list=range(5)):
+    def ship_equipment_record_image(self, index_list=EQUIPMENT_INDEXES):
         """
-        Record equipment through upgrade page
-        Notice: The equipment icons in the upgrade page are the same size as the icons in the equipment status
+        通过强化页面记录装备。
+
+        注意：强化页面装备图标和装备状态页图标尺寸一致。
         """
         logger.info("RECORD EQUIPMENT")
         self.ship_side_navbar_ensure(bottom=1)
 
-        # Ensure EQUIPMENT_GRID in the right place
+        # 确保 EQUIPMENT_GRID 位于正确位置。
         skip_first_screenshot = True
         while True:
             if skip_first_screenshot:
@@ -56,22 +58,22 @@ class EquipmentChange(Equipment):
                 continue
             crop_image = self.image_crop(button, copy=False)
             edge_value = np.mean(np.abs(cv2.Sobel(crop_image, 3, 1, 1)))
-            # Nothing is 0.15~1
-            # +1 is 40
-            # +10 is 46
+            # 空位边缘值约为 0.15~1。
+            # +1 约为 40。
+            # +10 约为 46。
             if edge_value > 10:
-                # Enter equipment info
+                # 进入装备详情。
                 self.ui_click(
                     appear_button=EQUIPMENT_OPEN, click_button=EQUIP_INFO_BAR[(index, 0)], check_button=UPGRADE_ENTER
                 )
-                # Enter upgrade inform
+                # 进入强化信息。
                 self.ui_click(click_button=UPGRADE_ENTER, check_button=UPGRADE_ENTER_CHECK, skip_first_screenshot=True)
-                # Save equipment template
+                # 保存装备模板。
                 if not info_bar_disappeared:
                     self.handle_info_bar()
                     info_bar_disappeared = True
                 self.equipment_list[index] = self.image_crop(EQUIP_SAVE)
-                # Quit upgrade inform
+                # 退出强化信息。
                 self.ui_click(
                     click_button=UPGRADE_QUIT,
                     check_button=EQUIPMENT_OPEN,
@@ -83,9 +85,9 @@ class EquipmentChange(Equipment):
 
         logger.info(f"Recorded equipment index list: {list(self.equipment_list.keys())}")
 
-    def ship_equipment_take_on_image(self, index_list=range(5), skip_first_screenshot=True):
+    def ship_equipment_take_on_image(self, index_list=EQUIPMENT_INDEXES, skip_first_screenshot=True):
         """
-        Equip the equipment previously recorded
+        穿上之前记录的装备。
         """
         logger.info("Take on equipment")
         self.ship_side_navbar_ensure(bottom=2)
