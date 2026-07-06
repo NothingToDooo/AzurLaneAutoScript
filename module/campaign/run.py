@@ -43,7 +43,7 @@ class CampaignRun(CampaignEvent):
 
         if folder.startswith("campaign_"):
             self.stage = "-".join(name.split("_")[1:3])
-        if folder.startswith("event") or folder.startswith("war_archives"):
+        if folder.startswith(("event", "war_archives")):
             self.stage = name
 
         try:

@@ -145,12 +145,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         if func.startswith("Opsi"):
             if "OpsiGeneral" not in func_list:
                 func_list.insert(0, "OpsiGeneral")
-        if (
-            func.startswith("Event")
-            or func.startswith("Raid")
-            or func.startswith("Coalition")
-            or func in ["MaritimeEscort", "GemsFarming"]
-        ):
+        if func.startswith(("Event", "Raid", "Coalition")) or func in ["MaritimeEscort", "GemsFarming"]:
             if "EventGeneral" not in func_list:
                 func_list.insert(0, "EventGeneral")
             if "TaskBalancer" not in func_list:

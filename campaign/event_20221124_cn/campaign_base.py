@@ -74,7 +74,7 @@ class CampaignBase(CampaignBase_):
         super().map_get_info()
 
         # Chapter TH has no map_percentage and no 3_stars
-        if name.startswith("th") or name.startswith("ht"):
+        if name.startswith(("th", "ht")):
             appear = AUTO_SEARCH.appear(main=self)
             self.map_is_100_percent_clear = self.map_is_3_stars = self.map_is_threat_safe = appear
             self.map_has_clear_mode = appear

@@ -195,9 +195,9 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
             return [f"t{name[1:]}", f"ht{name[1:]}"]
         if name.startswith("ht"):
             return [f"t{name[2:]}", f"ht{name[2:]}"]
-        if name.startswith("a") or name.startswith("c"):
+        if name.startswith(("a", "c")):
             return [f"a{name[1:]}", f"c{name[1:]}"]
-        if name.startswith("b") or name.startswith("d"):
+        if name.startswith(("b", "d")):
             return [f"b{name[1:]}", f"d{name[1:]}"]
         return [name]
 

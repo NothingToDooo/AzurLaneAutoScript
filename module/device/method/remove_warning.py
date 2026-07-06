@@ -109,7 +109,7 @@ def remove_screenshot_warning(s):
             _, _, s = s.partition(b"\n")
         if s.startswith(b"[Warning] Multiple displays"):
             _, _, s = s.partition(b"\n")
-            if s.startswith(b"A display id") or s.startswith(b"A display ID"):
+            if s.startswith((b"A display id", b"A display ID")):
                 _, _, s = s.partition(b"\n")
                 if s.startswith(b'See "dumpsys'):
                     _, _, s = s.partition(b"\n")
@@ -125,7 +125,7 @@ def remove_screenshot_warning(s):
             _, _, s = s.partition("\n")
         if s.startswith("[Warning] Multiple displays"):
             _, _, s = s.partition("\n")
-            if s.startswith("A display id") or s.startswith("A display ID"):
+            if s.startswith(("A display id", "A display ID")):
                 _, _, s = s.partition("\n")
                 if s.startswith('See "dumpsys'):
                     _, _, s = s.partition("\n")

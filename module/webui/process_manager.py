@@ -109,7 +109,7 @@ class ProcessManager:
             with console.capture() as capture:
                 console.print(self.renderables[-1])
             s = capture.get().strip()
-            if s.endswith("Reason: Manual stop") or s.endswith("Reason: Finish"):
+            if s.endswith(("Reason: Manual stop", "Reason: Finish")):
                 return 2
             else:
                 return 3
