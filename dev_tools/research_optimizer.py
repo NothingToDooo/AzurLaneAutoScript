@@ -1059,9 +1059,8 @@ class BruteForceOptimizer:
             new, diff = self.epoch(string, diff=diff)
             if new == string:
                 break
-            else:
-                string = new
-                continue
+            string = new
+            continue
 
     def gen(self, string, look_forward):
         string = split_filter(string)

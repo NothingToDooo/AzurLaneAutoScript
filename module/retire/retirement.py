@@ -364,10 +364,9 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
             if keep_one:
                 if len(ships) < 2:
                     break
-                else:
-                    # Try to keep the one with the lowest level
-                    ships.sort(key=lambda s: -s.level)
-                    ships = ships[:-1]
+                # 尽量保留等级最低的一艘。
+                ships.sort(key=lambda s: -s.level)
+                ships = ships[:-1]
 
             for ship in ships:
                 self.device.click(ship.button)
@@ -593,8 +592,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
                 if disappear_confirm.reached():
                     logger.warning("Scroll bar disappeared, stop")
                     break
-                else:
-                    continue
+                continue
 
             if not top_checked:
                 top_checked = True

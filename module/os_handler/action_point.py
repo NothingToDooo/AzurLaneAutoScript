@@ -184,9 +184,8 @@ class ActionPointHandler(UI, MapEventHandler):
             if sum(boxes) > 0:
                 if oil > 100:
                     break
-                else:
-                    # [11, 0, 1, 0]
-                    continue
+                # [11, 0, 1, 0]
+                continue
             # 或者有石油。
             # 页面未完全加载时可能识别成 0 或 1。
             # [1, 0, 0, 0]

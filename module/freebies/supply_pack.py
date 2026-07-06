@@ -135,5 +135,5 @@ class SupplyPack_250814(SupplyPack):
                 logger.info("At supply pack")
                 break
 
-            elif self.appear_then_click(page_supply_pack.check_button, offset=(20, 20), interval=3):
+            if self.appear_then_click(page_supply_pack.check_button, offset=(20, 20), interval=3):
                 continue

@@ -212,8 +212,7 @@ class RewardGacha(GachaUI, Retirement):
             if self.appear(gacha_assets.BUILD_QUEUE_EMPTY, offset=(20, 20)) and queue_clean:
                 self.gacha_side_navbar_ensure(upper=1)
                 break
-            else:
-                queue_clean = False
+            queue_clean = False
 
             if self.appear_then_click(gacha_assets.BUILD_FINISH_ORDERS, interval=3):
                 confirm_timer.reset()

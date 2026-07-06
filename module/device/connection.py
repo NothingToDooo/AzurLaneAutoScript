@@ -972,28 +972,27 @@ class Connection(ConnectionAttr):
                     logger.warning(f"Redirect MuMu12 {self.serial} to {emu_serial}")
                     self.config.Emulator_Serial = self.serial = emu_serial
                     break
-                elif mumu12.count >= 2:
+                if mumu12.count >= 2:
                     logger.warning("Multiple MuMu12 serial found, cannot redirect")
                     break
+                # 只有 127.0.0.1:7555。
+                if self.is_mumu_over_version_356:
+                    # is_mumu_over_version_356 和 nemud_app_keep_alive 已被缓存。
+                    # 这里仍是同一个设备，可以接受。
+                    logger.warning(f"Device {self.serial} is MuMu12 but corresponding port not found")
+                    if IS_WINDOWS:
+                        brute_force_connect()
+                    devices = self.list_device()
+                    # 显示可用设备。
+                    available = devices.select(status="device")
+                    for device in available:
+                        logger.info(device.serial)
+                    if not len(available):
+                        logger.info("No available devices")
+                    continue
                 else:
-                    # Only 127.0.0.1:7555
-                    if self.is_mumu_over_version_356:
-                        # is_mumu_over_version_356 和 nemud_app_keep_alive 已被缓存。
-                        # 这里仍是同一个设备，可以接受。
-                        logger.warning(f"Device {self.serial} is MuMu12 but corresponding port not found")
-                        if IS_WINDOWS:
-                            brute_force_connect()
-                        devices = self.list_device()
-                        # 显示可用设备。
-                        available = devices.select(status="device")
-                        for device in available:
-                            logger.info(device.serial)
-                        if not len(available):
-                            logger.info("No available devices")
-                        continue
-                    else:
-                        # MuMu6
-                        break
+                    # MuMu6
+                    break
 
         # 如果 16384 被占用，MuMu12 会使用 16385，这里自动重定向。
         # 这是动态端口，不写回配置。

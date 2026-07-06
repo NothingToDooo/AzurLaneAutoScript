@@ -534,8 +534,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             if "waiting" in status:
                 if status.index("waiting") == 2:
                     break
-                else:
-                    continue
+                continue
             # No 6th research
             if sum([s == "detail" for s in status]) == 5:
                 break

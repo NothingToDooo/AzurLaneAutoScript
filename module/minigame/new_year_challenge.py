@@ -116,10 +116,9 @@ class NewYearChallenge(MinigameRun):
                 if started:
                     self.interval_clear(minigame_assets.NEW_YEAR_CHALLENGE_START)
                     break
-                else:
-                    started = True
-                    self.device.click(minigame_assets.NEW_YEAR_CHALLENGE_START)
-                    continue
+                started = True
+                self.device.click(minigame_assets.NEW_YEAR_CHALLENGE_START)
+                continue
 
     def exit_game(self, skip_first_screenshot=True):
         while 1:
@@ -132,9 +131,8 @@ class NewYearChallenge(MinigameRun):
             if self.appear(minigame_assets.BACK, offset=(5, 5)):
                 if self.appear(minigame_assets.GOTO_CHOOSE_GAME, offset=(5, 5)):
                     break
-                else:
-                    self.appear_then_click(minigame_assets.BACK, offset=(5, 5), interval=3)
-                    continue
+                self.appear_then_click(minigame_assets.BACK, offset=(5, 5), interval=3)
+                continue
             if self.appear_then_click(minigame_assets.NEW_YEAR_CHALLENGE_END, offset=(5, 5), interval=3):
                 continue
             if self.appear_then_click(minigame_assets.NEW_YEAR_CHALLENGE_EXIT, offset=(5, 5), interval=3):

@@ -108,8 +108,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
                 if self.battle_count > prev:
                     result = True
                     break
-                else:
-                    continue
+                continue
 
         if not result:
             logger.warning("ScriptError, No combat executed.")

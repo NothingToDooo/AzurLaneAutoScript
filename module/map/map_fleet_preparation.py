@@ -250,8 +250,7 @@ class FleetOperator:
                 # 结束。
                 if self.in_use():
                     break
-                else:
-                    self.open()
+                self.open()
 
             # 点击。
             if click_timer.reached():

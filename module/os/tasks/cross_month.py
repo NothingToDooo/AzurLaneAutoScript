@@ -40,9 +40,8 @@ class OpsiCrossMonth(OSMap):
             remain = (next_reset - now).total_seconds()
             if remain <= 0:
                 break
-            else:
-                self.device.sleep(min(remain, 60))
-                continue
+            self.device.sleep(min(remain, 60))
+            continue
 
         logger.hr("OpSi reset", level=3)
 

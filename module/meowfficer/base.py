@@ -75,12 +75,11 @@ class MeowfficerBase(UI):
             # 结束。
             if self.match_template_color(MEOWFFICER_CHECK, offset=(20, 20)):
                 break
-            else:
-                if click_timer.reached():
-                    # MEOWFFICER_CHECK is safe to click
-                    self.device.click(MEOWFFICER_CHECK)
-                    click_timer.reset()
-                    continue
+            if click_timer.reached():
+                # MEOWFFICER_CHECK 可以安全点击。
+                self.device.click(MEOWFFICER_CHECK)
+                click_timer.reset()
+                continue
 
             # 后宅事务。
             if self.appear(meow_assets.MEOWFFICER_FORT_CHECK, offset=(20, 20), interval=3):

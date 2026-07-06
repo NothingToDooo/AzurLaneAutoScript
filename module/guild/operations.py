@@ -358,7 +358,7 @@ class GuildOperations(GuildBase):
             button = self._guild_operations_get_dispatch()
             if button is None:
                 break
-            elif point_in_area((640, 393), button.area):
+            if point_in_area((640, 393), button.area):
                 logger.info("Dispatching the first fleet, skip switching")
             else:
                 self.device.click(button)

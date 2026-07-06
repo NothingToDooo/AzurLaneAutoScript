@@ -177,7 +177,7 @@ class Reward(UI):
             if state in [reward_assets.MISSION_EMPTY, reward_assets.MISSION_UNFINISH]:
                 logger.info("Mission collect finished")
                 break
-            elif state in [reward_assets.MISSION_MULTI, reward_assets.MISSION_SINGLE]:
+            if state in [reward_assets.MISSION_MULTI, reward_assets.MISSION_SINGLE]:
                 # 清理下列资产已有的点击间隔。
                 self.interval_clear(
                     [

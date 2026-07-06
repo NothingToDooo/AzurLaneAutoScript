@@ -643,7 +643,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             else:
                 if self.info_bar_count() >= 2:
                     break
-                elif self.ash_popup_canceled:
+                if self.ash_popup_canceled:
                     continue
                 else:
                     break

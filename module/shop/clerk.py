@@ -187,10 +187,9 @@ class ShopClerk(ShopBase, Retirement):
             self.device.screenshot()
             if self.appear(SELECT_MINUS, offset=select_offset) and self.appear(SELECT_PLUS, offset=select_offset):
                 break
-            else:
-                continue
+            continue
 
-        # Total number to purchase altogether
+        # 本次总购买数量。
         total = int(self._currency // item.price)
         diff = limit - total
         if diff > 0:

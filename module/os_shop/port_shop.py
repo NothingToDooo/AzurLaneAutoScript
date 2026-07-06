@@ -155,10 +155,9 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
                 if OS_SHOP_SCROLL.at_bottom(main=self):
                     logger.info("OS shop reach bottom, stop")
                     break
-                else:
-                    OS_SHOP_SCROLL.next_page(main=self, page=0.5, skip_first_screenshot=False)
-                    cur_pos = OS_SHOP_SCROLL.cal_position(main=self)
-                    continue
+                OS_SHOP_SCROLL.next_page(main=self, page=0.5, skip_first_screenshot=False)
+                cur_pos = OS_SHOP_SCROLL.cal_position(main=self)
+                continue
             self.device.click_record.clear()
 
         return items

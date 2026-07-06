@@ -89,7 +89,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
             logger.info(f"Fleet: {self.fleet_show_index}, fleet_current_index: {self.fleet_current_index}")
             if self.fleet_current_index == index:
                 break
-            elif self.appear_then_click(map_assets.SWITCH_OVER):
+            if self.appear_then_click(map_assets.SWITCH_OVER):
                 count += 1
                 self.device.sleep((1, 1.5))
                 timeout.reset()

@@ -154,8 +154,7 @@ class Scroll:
                 if self.drag_timeout.reached():
                     logger.warning("Scroll disappeared, assume scroll set")
                     break
-                else:
-                    continue
+                continue
 
             if self.drag_interval.reached():
                 p1 = random_rectangle_point(self.position_to_screen(current), n=1)

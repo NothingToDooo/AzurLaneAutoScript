@@ -271,8 +271,7 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
             if MEDAL_SHOP_SCROLL_250814.at_bottom(main=self):
                 logger.info("Medal shop reach bottom, stop")
                 break
-            else:
-                MEDAL_SHOP_SCROLL_250814.next_page(main=self, page=0.66)
-                del_cached_property(self, "shop_grid")
-                del_cached_property(self, "shop_medal_items")
-                continue
+            MEDAL_SHOP_SCROLL_250814.next_page(main=self, page=0.66)
+            del_cached_property(self, "shop_grid")
+            del_cached_property(self, "shop_medal_items")
+            continue

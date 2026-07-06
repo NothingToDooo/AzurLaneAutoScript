@@ -323,17 +323,15 @@ class Camera(MapOperation):
                 else:
                     if success:
                         break
-                    else:
-                        # MapDetectionError handled inside _update_view(), update again
-                        error_confirm.reset()
-                        continue
+                    # MapDetectionError 已在 _update_view() 内处理，这里重新更新。
+                    error_confirm.reset()
+                    continue
             except MapDetectionError:
                 if allow_error:
                     break
-                elif error_confirm.reached():
+                if error_confirm.reached():
                     raise
-                else:
-                    continue
+                continue
 
         # Calculate view data
         self._update_view_data()

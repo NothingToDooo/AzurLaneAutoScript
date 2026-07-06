@@ -589,10 +589,9 @@ class AshBeaconAssist(Meta):
             current = OCR_BEACON_TIER.ocr(self.device.image)
             if current >= tier:
                 break
-            else:
-                self.device.click(ash_assets.BEACON_NEXT)
-                self.device.sleep((0.3, 0.5))
-                self.device.screenshot()
+            self.device.click(ash_assets.BEACON_NEXT)
+            self.device.sleep((0.3, 0.5))
+            self.device.screenshot()
         if current < tier:
             logger.info(f"Tier {tier} beacon not found after 5 trial, use current beacon")
         logger.info("Find a beacon in level:" + str(current))

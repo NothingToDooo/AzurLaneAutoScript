@@ -154,8 +154,8 @@ class FleetSelector:
                 # End
                 if self.get() == index:
                     break
-                # Game can't response that fast
-                elif click_timer.reached():
+                # 游戏响应没有这么快。
+                if click_timer.reached():
                     self.open()
 
             # Click

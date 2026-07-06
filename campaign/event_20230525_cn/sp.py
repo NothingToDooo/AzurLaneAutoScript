@@ -211,8 +211,7 @@ class Campaign(CampaignBase):
                     )
                 if fleet_location == dst:
                     break
-                else:
-                    logger.warning(f"Fleet{fleet_index} did not move, retry")
+                logger.warning(f"Fleet{fleet_index} did not move, retry")
 
         return True
 

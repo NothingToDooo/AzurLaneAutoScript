@@ -60,8 +60,7 @@ class Screenshot(Adb, NemuIpc):
 
             if self.check_screen_size() and self.check_screen_black():
                 break
-            else:
-                continue
+            continue
 
         return self.image
 

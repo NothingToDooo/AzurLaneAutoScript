@@ -410,12 +410,11 @@ class Adb(Connection):
             if "hierchary" in response:
                 # UI hierchary dumped to: /data/local/tmp/hierarchy.xml
                 break
-            else:
-                # <None>
-                # 必须杀掉 uiautomator2。
-                self.app_stop_adb("com.github.uiautomator")
-                self.app_stop_adb("com.github.uiautomator.test")
-                continue
+            # <None>
+            # 必须杀掉 uiautomator2。
+            self.app_stop_adb("com.github.uiautomator")
+            self.app_stop_adb("com.github.uiautomator.test")
+            continue
 
         # 从设备读取。
         content = b""

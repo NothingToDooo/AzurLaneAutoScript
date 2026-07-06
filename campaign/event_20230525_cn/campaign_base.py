@@ -109,7 +109,7 @@ class CampaignBase(CampaignBase_):
             if self.is_in_stage():
                 self.device.click(BALL)
                 self.device.sleep(3)
-                # wait until is_in_stage
+                # 等待进入关卡。
                 while 1:
                     self.device.screenshot()
                     if self.is_in_stage():

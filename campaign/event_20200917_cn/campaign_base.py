@@ -120,12 +120,11 @@ class CampaignBase(CampaignBase_):
 
             if current == status:
                 break
-            else:
-                if self.is_in_stage():
-                    self.device.click(BALL)
-                    self.device.sleep(3)
-                    # wait until is_in_stage
-                    while 1:
-                        self.device.screenshot()
-                        if self.is_in_stage():
-                            break
+            if self.is_in_stage():
+                self.device.click(BALL)
+                self.device.sleep(3)
+                # 等待进入关卡。
+                while 1:
+                    self.device.screenshot()
+                    if self.is_in_stage():
+                        break

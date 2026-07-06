@@ -369,21 +369,18 @@ class MeowfficerEnhance(MeowfficerBase):
                 logger.info("Current meowfficer is already leveled max")
                 return "leveled_max"
 
-            # Transition to MEOWFFICER_FEED after
-            # selection; broken up due to significant
-            # delayed behavior of meow_additional
+            # 选择后进入 MEOWFFICER_FEED；由于 meow_additional 明显延迟，这里拆开处理。
             if self.meow_enhance_enter():
                 break
-            else:
-                # Retreat from an existing battle
-                self.ui_goto_campaign()
-                self.ui_goto(page_meowfficer)
-                continue
+            # 从已有战斗中撤回。
+            self.ui_goto_campaign()
+            self.ui_goto(page_meowfficer)
+            continue
 
-        # Initiate feed sequence; loop until exhaust all
-        # - Select Feed
-        # - Confirm/Cancel Feed
-        # - Confirm Enhancement
+        # 开始喂养流程，循环直到耗尽。
+        # - 选择喂养。
+        # - 确认/取消喂养。
+        # - 确认强化。
         # - Check remaining coins after enhancement
         while 1:
             logger.hr("Enhance once", level=2)

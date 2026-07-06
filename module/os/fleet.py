@@ -450,7 +450,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             if allow_port_arrive and port_arrive:
                 logger.info("Arrive port (port_arrive)")
                 break
-            elif allow_port_arrive and (not port_arrive and radar_arrive):
+            if allow_port_arrive and (not port_arrive and radar_arrive):
                 if confirm_timer.reached():
                     logger.warning("Arrive port on radar but port entrance not appear")
                     raise MapWalkError
@@ -858,9 +858,8 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             if self.radar.select(is_enemy=True).filter(is_at_front):
                 logger.info("Found boss at front")
                 break
-            else:
-                logger.info("No boss at front, retry question_goto")
-                continue
+            logger.info("No boss at front, retry question_goto")
+            continue
 
         result = self.boss_clear(has_fleet_step=True)
         return result

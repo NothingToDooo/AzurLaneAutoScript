@@ -255,11 +255,10 @@ class VoucherShop(ShopClerk, ShopStatus):
             if VOUCHER_SHOP_SCROLL.at_bottom(main=self):
                 logger.info("Voucher Shop reach bottom, stop")
                 break
-            else:
-                VOUCHER_SHOP_SCROLL.next_page(main=self)
-                del_cached_property(self, "shop_grid")
-                del_cached_property(self, "shop_voucher_items")
-                continue
+            VOUCHER_SHOP_SCROLL.next_page(main=self)
+            del_cached_property(self, "shop_grid")
+            del_cached_property(self, "shop_voucher_items")
+            continue
 
     def run_once(self):
         """
