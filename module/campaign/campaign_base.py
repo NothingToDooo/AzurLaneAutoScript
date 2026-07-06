@@ -47,8 +47,9 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
 
         return False
 
+    # Config.when 通过同名函数注册不同配置下的实现。
     @Config.when(MAP_CLEAR_ALL_THIS_TIME=True)
-    def battle_function(self):
+    def battle_function(self):  # noqa: F811
         logger.info("Using function: clear_all")
         if self.fleet_2_break_siren_caught():
             return True
@@ -81,7 +82,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
             return result
 
     @Config.when(MAP_CLEAR_ALL_THIS_TIME=False, POOR_MAP_DATA=False)
-    def battle_function(self):
+    def battle_function(self):  # noqa: F811
         func = self.FUNCTION_NAME_BASE + "default"
         for extra_battle in range(10):
             if hasattr(self, self.FUNCTION_NAME_BASE + str(self.battle_count - extra_battle)):
