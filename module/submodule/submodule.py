@@ -1,7 +1,7 @@
 import importlib
 
 from module.logger import logger
-from module.submodule.utils import *
+from module.submodule.utils import get_config_mod, get_mod_dir
 
 
 def load_mod(name):

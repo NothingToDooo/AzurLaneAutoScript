@@ -1,4 +1,5 @@
 import json
+import os
 import random
 import string
 from datetime import datetime, timedelta, timezone
@@ -8,7 +9,7 @@ from yaml.representer import SafeRepresenter
 
 import module.config.server as server_
 from deploy.atomic import atomic_read_bytes, atomic_read_text, atomic_write
-from module.submodule.utils import *
+from module.submodule.utils import get_mod_filepath, list_mod_instance, list_mod_template
 
 LANGUAGES = ["zh-CN"]
 SERVER_TO_LANG = {
