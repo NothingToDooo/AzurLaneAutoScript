@@ -10,25 +10,43 @@ from module.base.utils import color_similarity_2d, crop, extract_white_letters, 
 from module.device.method.utils import removesuffix
 from module.logger import logger
 from module.ocr.ocr import Duration, Ocr
-from module.research.assets import *
+from module.research import assets as research_assets
 from module.research.project_data import LIST_RESEARCH_PROJECT
 from module.research.series import get_detail_series, get_research_series_3
 from module.statistics.utils import load_folder
 
-RESEARCH_SERIES = (SERIES_1, SERIES_2, SERIES_3, SERIES_4, SERIES_5)
-RESEARCH_STATUS = [STATUS_1, STATUS_2, STATUS_3, STATUS_4, STATUS_5]
-OCR_RESEARCH = [OCR_RESEARCH_1, OCR_RESEARCH_2, OCR_RESEARCH_3, OCR_RESEARCH_4, OCR_RESEARCH_5]
+RESEARCH_SERIES = (
+    research_assets.SERIES_1,
+    research_assets.SERIES_2,
+    research_assets.SERIES_3,
+    research_assets.SERIES_4,
+    research_assets.SERIES_5,
+)
+RESEARCH_STATUS = [
+    research_assets.STATUS_1,
+    research_assets.STATUS_2,
+    research_assets.STATUS_3,
+    research_assets.STATUS_4,
+    research_assets.STATUS_5,
+]
+OCR_RESEARCH = [
+    research_assets.OCR_RESEARCH_1,
+    research_assets.OCR_RESEARCH_2,
+    research_assets.OCR_RESEARCH_3,
+    research_assets.OCR_RESEARCH_4,
+    research_assets.OCR_RESEARCH_5,
+]
 OCR_RESEARCH = Ocr(OCR_RESEARCH, name="RESEARCH", threshold=64, alphabet="0123456789BCDEGHQTMIULRF-")
 RESEARCH_DETAIL_GENRE = [
-    DETAIL_GENRE_B,
-    DETAIL_GENRE_C,
-    DETAIL_GENRE_D,
-    DETAIL_GENRE_E,
-    DETAIL_GENRE_G,
-    DETAIL_GENRE_H_0,
-    DETAIL_GENRE_H_1,
-    DETAIL_GENRE_Q,
-    DETAIL_GENRE_T,
+    research_assets.DETAIL_GENRE_B,
+    research_assets.DETAIL_GENRE_C,
+    research_assets.DETAIL_GENRE_D,
+    research_assets.DETAIL_GENRE_E,
+    research_assets.DETAIL_GENRE_G,
+    research_assets.DETAIL_GENRE_H_0,
+    research_assets.DETAIL_GENRE_H_1,
+    research_assets.DETAIL_GENRE_Q,
+    research_assets.DETAIL_GENRE_T,
 ]
 
 
@@ -214,7 +232,7 @@ def get_research_series_jp_old(image):
     # Set 'prominence = 50' to ignore possible noise.
     parameters = {"height": 160, "prominence": 50, "width": 1}
 
-    area = SERIES_DETAIL.area
+    area = research_assets.SERIES_DETAIL.area
     # Resize is not needed because only one area will be checked in JP server.
     im = color_similarity_2d(crop(image, area, copy=False), color=(255, 255, 255))
     peaks = [len(signal.find_peaks(row, **parameters)[0]) for row in im[5:-5]]
@@ -258,7 +276,7 @@ def get_research_duration_jp(image):
     Returns:
         duration (int): number of seconds
     """
-    ocr = Duration(DURATION_DETAIL)
+    ocr = Duration(research_assets.DURATION_DETAIL)
     duration = ocr.ocr(image).total_seconds()
     return duration
 
@@ -303,7 +321,13 @@ def get_research_cost_jp(image):
     for name, template in templates.items():
         template = load_image(template)
         template = crop(resize(template, size_template), area_template, copy=False)
-        sim = match_template(image=image, template=template, area=DETAIL_COST.area, offset=(10, 10), similarity=0.8)
+        sim = match_template(
+            image=image,
+            template=template,
+            area=research_assets.DETAIL_COST.area,
+            offset=(10, 10),
+            similarity=0.8,
+        )
         if not sim:
             continue
         for cost in costs:
@@ -335,7 +359,11 @@ def get_research_ship_jp(image):
     ship = ""
     for name, template in templates.items():
         sim = match_template(
-            image=image, template=load_image(template), area=DETAIL_BLUEPRINT.area, offset=(10, 10), similarity=0.9
+            image=image,
+            template=load_image(template),
+            area=research_assets.DETAIL_BLUEPRINT.area,
+            offset=(10, 10),
+            similarity=0.9,
         )
         if sim > similarity:
             similarity = sim

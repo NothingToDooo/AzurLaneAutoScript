@@ -1,7 +1,13 @@
 from module.base.utils import area_pad, crop, rgb2gray
-from module.research.assets import *
+from module.research import assets as research_assets
 
-RESEARCH_SERIES = (SERIES_1, SERIES_2, SERIES_3, SERIES_4, SERIES_5)
+RESEARCH_SERIES = (
+    research_assets.SERIES_1,
+    research_assets.SERIES_2,
+    research_assets.SERIES_3,
+    research_assets.SERIES_4,
+    research_assets.SERIES_5,
+)
 RESEARCH_SCALING = [
     424 / 558,
     491 / 558,
@@ -14,23 +20,23 @@ RESEARCH_SCALING = [
 def match_series(image, scaling):
     image = rgb2gray(image)
 
-    if TEMPLATE_S8.match(image, scaling=scaling):
+    if research_assets.TEMPLATE_S8.match(image, scaling=scaling):
         return 8
-    if TEMPLATE_S7.match(image, scaling=scaling):
+    if research_assets.TEMPLATE_S7.match(image, scaling=scaling):
         return 7
-    if TEMPLATE_S6.match(image, scaling=scaling):
+    if research_assets.TEMPLATE_S6.match(image, scaling=scaling):
         return 6
-    if TEMPLATE_S4_2.match(image, scaling=scaling):
+    if research_assets.TEMPLATE_S4_2.match(image, scaling=scaling):
         return 4
-    if TEMPLATE_S4.match(image, scaling=scaling):
+    if research_assets.TEMPLATE_S4.match(image, scaling=scaling):
         return 4
-    if TEMPLATE_S5.match(image, scaling=scaling):
+    if research_assets.TEMPLATE_S5.match(image, scaling=scaling):
         return 5
-    if TEMPLATE_S3.match(image, scaling=scaling):
+    if research_assets.TEMPLATE_S3.match(image, scaling=scaling):
         return 3
-    if TEMPLATE_S2.match(image, scaling=scaling):
+    if research_assets.TEMPLATE_S2.match(image, scaling=scaling):
         return 2
-    if TEMPLATE_S1.match(image, scaling=scaling):
+    if research_assets.TEMPLATE_S1.match(image, scaling=scaling):
         return 1
     return 0
 
@@ -58,4 +64,4 @@ def get_detail_series(image):
     Returns:
         int:
     """
-    return match_series(crop(image, area_pad(SERIES_DETAIL.area, pad=-30), copy=False), scaling=1.0)
+    return match_series(crop(image, area_pad(research_assets.SERIES_DETAIL.area, pad=-30), copy=False), scaling=1.0)

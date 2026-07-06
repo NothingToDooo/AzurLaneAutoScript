@@ -2,7 +2,7 @@ from module.base.timer import Timer
 from module.base.utils import crop, rgb2gray
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2, GET_ITEMS_3, GET_ITEMS_3_CHECK
 from module.logger import logger
-from module.research.assets import *
+from module.research import assets as research_assets
 from module.research.project import RESEARCH_STATUS
 from module.research.series import RESEARCH_SCALING
 from module.ui.assets import BACK_ARROW, RESEARCH_CHECK
@@ -14,13 +14,13 @@ class ResearchUI(UI):
         return self.appear(RESEARCH_CHECK, offset=(20, 20), interval=interval)
 
     def is_in_queue(self, interval=0):
-        return self.appear(QUEUE_CHECK, offset=(20, 20), interval=interval)
+        return self.appear(research_assets.QUEUE_CHECK, offset=(20, 20), interval=interval)
 
     def ensure_research_stable(self):
-        self.wait_until_stable(STABLE_CHECKER)
+        self.wait_until_stable(research_assets.STABLE_CHECKER)
 
     def ensure_research_center_stable(self):
-        self.wait_until_stable(STABLE_CHECKER_CENTER)
+        self.wait_until_stable(research_assets.STABLE_CHECKER_CENTER)
 
     def queue_enter(self, skip_first_screenshot=True):
         """
@@ -29,7 +29,7 @@ class ResearchUI(UI):
             out: is_in_queue
         """
         self.ui_click(
-            RESEARCH_GOTO_QUEUE,
+            research_assets.RESEARCH_GOTO_QUEUE,
             check_button=self.is_in_queue,
             appear_button=self.is_in_research,
             retry_wait=1,
@@ -49,15 +49,15 @@ class ResearchUI(UI):
             if self.is_in_queue(interval=3):
                 self.device.click(BACK_ARROW)
                 continue
-            # handle get_items
-            # get_items should be handled when receiving, but sometimes just slow network
+            # 处理掉落弹窗。
+            # 掉落应在领取时处理，但网络慢时可能延迟到这里。
             if self.appear(GET_ITEMS_1, offset=(20, 20), interval=3):
-                logger.info(f"{GET_ITEMS_1} -> {GET_ITEMS_RESEARCH_SAVE}")
-                self.device.click(GET_ITEMS_RESEARCH_SAVE)
+                logger.info(f"{GET_ITEMS_1} -> {research_assets.GET_ITEMS_RESEARCH_SAVE}")
+                self.device.click(research_assets.GET_ITEMS_RESEARCH_SAVE)
                 continue
             if self.appear(GET_ITEMS_2, offset=(20, 20), interval=3):
-                logger.info(f"{GET_ITEMS_1} -> {GET_ITEMS_RESEARCH_SAVE}")
-                self.device.click(GET_ITEMS_RESEARCH_SAVE)
+                logger.info(f"{GET_ITEMS_1} -> {research_assets.GET_ITEMS_RESEARCH_SAVE}")
+                self.device.click(research_assets.GET_ITEMS_RESEARCH_SAVE)
                 continue
 
         self.ensure_research_center_stable()
@@ -90,7 +90,9 @@ class ResearchUI(UI):
             self.device.sleep(1.5)
             self.device.screenshot()
             drop.add(self.device.image)
-            self.device.swipe_vector((0, 250), box=ITEMS_3_SWIPE.area, random_range=(-10, -10, 10, 10), padding=0)
+            self.device.swipe_vector(
+                (0, 250), box=research_assets.ITEMS_3_SWIPE.area, random_range=(-10, -10, 10, 10), padding=0
+            )
             self.device.sleep(2)
             self.device.screenshot()
             drop.add(self.device.image)
@@ -107,11 +109,11 @@ class ResearchUI(UI):
         for _index, status, scaling in zip(range(5), RESEARCH_STATUS, RESEARCH_SCALING, strict=True):
             info = status.crop((0, -40, 200, 0))
             piece = rgb2gray(crop(image, info.area, copy=False))
-            if TEMPLATE_WAITING.match(piece, scaling=scaling, similarity=0.75):
+            if research_assets.TEMPLATE_WAITING.match(piece, scaling=scaling, similarity=0.75):
                 out.append("waiting")
-            elif TEMPLATE_RUNNING.match(piece, scaling=scaling, similarity=0.75):
+            elif research_assets.TEMPLATE_RUNNING.match(piece, scaling=scaling, similarity=0.75):
                 out.append("running")
-            elif TEMPLATE_DETAIL.match(piece, scaling=scaling, similarity=0.75):
+            elif research_assets.TEMPLATE_DETAIL.match(piece, scaling=scaling, similarity=0.75):
                 out.append("detail")
             else:
                 out.append("unknown")
@@ -135,12 +137,12 @@ class ResearchUI(UI):
                 break
 
             if (
-                self.appear(RESEARCH_UNAVAILABLE, offset=(20, 20))
-                or self.appear(RESEARCH_START, offset=(20, 20))
-                or self.appear(RESEARCH_STOP, offset=(20, 20))
+                self.appear(research_assets.RESEARCH_UNAVAILABLE, offset=(20, 20))
+                or self.appear(research_assets.RESEARCH_START, offset=(20, 20))
+                or self.appear(research_assets.RESEARCH_STOP, offset=(20, 20))
             ):
                 if click_timer.reached():
-                    self.device.click(RESEARCH_DETAIL_QUIT)
+                    self.device.click(research_assets.RESEARCH_DETAIL_QUIT)
                     click_timer.reset()
 
     def research_detail_cancel(self, skip_first_screenshot=True):
@@ -154,10 +156,10 @@ class ResearchUI(UI):
             if self.is_research_stabled():
                 break
 
-            if self.appear_then_click(RESEARCH_STOP, offset=(20, 20), interval=5):
+            if self.appear_then_click(research_assets.RESEARCH_STOP, offset=(20, 20), interval=5):
                 continue
             if self.handle_popup_confirm("RESEARCH_CANCEL"):
                 continue
-            if self.appear(RESEARCH_START, offset=(20, 20), interval=5):
-                self.device.click(RESEARCH_DETAIL_QUIT)
+            if self.appear(research_assets.RESEARCH_START, offset=(20, 20), interval=5):
+                self.device.click(research_assets.RESEARCH_DETAIL_QUIT)
                 continue

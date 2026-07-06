@@ -7,7 +7,7 @@ from module.base.utils import rgb2gray
 from module.exception import GameTooManyClickError
 from module.logger import logger
 from module.ocr.ocr import Duration
-from module.research.assets import *
+from module.research import assets as research_assets
 from module.research.project import get_research_finished
 from module.research.rqueue import ResearchQueue
 from module.research.selector import RESEARCH_ENTRANCE, ResearchSelector
@@ -16,7 +16,10 @@ from module.ui.assets import RESEARCH_CHECK
 from module.ui.page import page_research
 
 OCR_DURATION = Duration(
-    RESEARCH_LAB_DURATION_REMAIN, letter=(255, 255, 255), threshold=64, name="RESEARCH_LAB_DURATION_REMAIN"
+    research_assets.RESEARCH_LAB_DURATION_REMAIN,
+    letter=(255, 255, 255),
+    threshold=64,
+    name="RESEARCH_LAB_DURATION_REMAIN",
 )
 
 
@@ -51,7 +54,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         Returns:
             bool: If reset success.
         """
-        if not self.appear(RESET_AVAILABLE, threshold=10):
+        if not self.appear(research_assets.RESET_AVAILABLE, threshold=10):
             logger.info("Research reset unavailable")
             return False
 
@@ -64,13 +67,13 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             else:
                 self.device.screenshot()
 
-            if self.appear_then_click(RESET_AVAILABLE, interval=10, threshold=10):
+            if self.appear_then_click(research_assets.RESET_AVAILABLE, interval=10, threshold=10):
                 continue
             if self.handle_popup_confirm("RESEARCH_RESET"):
                 executed = True
                 continue
 
-            # End
+            # 结束。
             if executed and self.is_in_research():
                 self.ensure_no_info_bar(timeout=3)  # Refresh success
                 self.ensure_research_stable()
@@ -185,7 +188,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             logger.warning(f"The project to start: {project} is not in known projects")
             return None
         logger.info(f"Research project: {index}")
-        self.interval_clear([RESEARCH_START])
+        self.interval_clear([research_assets.RESEARCH_START])
         self.popup_interval_clear()
         available = False
         click_timer = Timer(10)
@@ -196,9 +199,9 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             else:
                 self.device.screenshot()
 
-            max_rgb = np.max(rgb2gray(self.image_crop(RESEARCH_UNAVAILABLE, copy=False)))
+            max_rgb = np.max(rgb2gray(self.image_crop(research_assets.RESEARCH_UNAVAILABLE, copy=False)))
 
-            # Don't use interval here, RESEARCH_CHECK already appeared 5 seconds ago
+            # 这里不要用 interval，RESEARCH_CHECK 早在 5 秒前就出现了。
             if click_timer.reached() and self.is_in_research():
                 i = (index - self._research_project_offset) % 5
                 logger.info(f"Project offset: {self._research_project_offset}, project {index} is at {i}")
@@ -207,13 +210,13 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
                 click_count += 1
                 click_timer.reset()
                 continue
-            if max_rgb > 235 and self.appear_then_click(RESEARCH_START, offset=(5, 20), interval=10):
+            if max_rgb > 235 and self.appear_then_click(research_assets.RESEARCH_START, offset=(5, 20), interval=10):
                 available = True
                 continue
             if self.handle_popup_confirm("RESEARCH_START"):
                 continue
 
-            # End
+            # 结束。
             if click_count >= 3:
                 logger.error(
                     "Unable to start a research project after 3 trail, "
@@ -221,9 +224,8 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
                     "or a research finished"
                 )
                 raise GameTooManyClickError
-            if self.appear(RESEARCH_STOP, offset=(20, 20)):
-                # RESEARCH_STOP is a semi-transparent button,
-                # color will vary depending on the background.
+            if self.appear(research_assets.RESEARCH_STOP, offset=(20, 20)):
+                # RESEARCH_STOP 是半透明按钮，颜色会随背景变化。
                 if add_queue:
                     self.research_queue_add()
                 else:
@@ -232,7 +234,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
                 self.research_project_started = project
                 self._research_project_offset = (index - 2) % 5
                 return True
-            if not available and max_rgb <= 235 and self.appear(RESEARCH_UNAVAILABLE, offset=(5, 20)):
+            if not available and max_rgb <= 235 and self.appear(research_assets.RESEARCH_UNAVAILABLE, offset=(5, 20)):
                 logger.info("Not enough resources to start this project")
                 self.research_detail_quit()
                 self.research_project_started = None
@@ -310,14 +312,14 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
                     if self.research_has_finished():
                         self.device.click(RESEARCH_ENTRANCE[self._research_finished_index])
 
-                if self.appear(RESEARCH_STOP, offset=(20, 20)):
+                if self.appear(research_assets.RESEARCH_STOP, offset=(20, 20)):
                     logger.info("The research time is up, but requirements are not satisfied")
                     self.research_project_started = None
                     self.research_detail_quit()
                     return False
                 # Entered another project accidentally
-                if self.appear(RESEARCH_START, offset=(20, 20), interval=5):
-                    self.device.click(RESEARCH_DETAIL_QUIT)
+                if self.appear(research_assets.RESEARCH_START, offset=(20, 20), interval=5):
+                    self.device.click(research_assets.RESEARCH_DETAIL_QUIT)
                     continue
 
                 appear_button = self.get_items()
@@ -336,7 +338,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         # Close GET_ITEMS_*, to project list
         self.ui_click(
             appear_button=self.get_items,
-            click_button=GET_ITEMS_RESEARCH_SAVE,
+            click_button=research_assets.GET_ITEMS_RESEARCH_SAVE,
             check_button=self.is_in_research,
             skip_first_screenshot=True,
         )
@@ -370,9 +372,9 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
                 else:
                     self.device.screenshot()
 
-                # End
-                # No offset, color detection only
-                if self.is_in_queue() and not self.appear(QUEUE_CLAIM_REWARD, offset=None):
+                # 结束。
+                # 不加 offset，只做颜色检测。
+                if self.is_in_queue() and not self.appear(research_assets.QUEUE_CLAIM_REWARD, offset=None):
                     if end_confirm.reached():
                         break
                 else:
@@ -385,9 +387,9 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
                     if appear_button is not None:
                         if appear_button == record_button:
                             if item_confirm.reached():
-                                # Record drops and close get items
+                                # 记录掉落并关闭掉落弹窗。
                                 self.drop_record(drop=drop)
-                                self.device.click(GET_ITEMS_RESEARCH_SAVE)
+                                self.device.click(research_assets.GET_ITEMS_RESEARCH_SAVE)
                                 item_confirm.reset()
                                 record_button = None
                                 total += 1
@@ -400,17 +402,17 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
                         item_confirm.reset()
                         record_button = None
                 else:
-                    # no drop saving, just click it
+                    # 不保存掉落，直接点击。
                     if item_interval.reached():
                         appear_button = self.get_items()
                         if appear_button is not None:
-                            self.device.click(GET_ITEMS_RESEARCH_SAVE)
+                            self.device.click(research_assets.GET_ITEMS_RESEARCH_SAVE)
                             item_interval.reset()
                             total += 1
                             continue
 
-                # Claim rewards
-                if self.appear_then_click(QUEUE_CLAIM_REWARD, offset=None, interval=5):
+                # 领取奖励。
+                if self.appear_then_click(research_assets.QUEUE_CLAIM_REWARD, offset=None, interval=5):
                     continue
 
             if total <= 0:
