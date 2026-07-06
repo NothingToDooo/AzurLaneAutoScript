@@ -11,7 +11,7 @@ from module.base.filter import Filter
 from module.base.mask import Mask
 from module.base.timer import Timer
 from module.base.utils import color_similarity_2d, random_rectangle_point, rgb2gray
-from module.dorm.assets import *
+from module.dorm import assets as dorm_assets
 from module.dorm.buy_furniture import BuyFurniture
 from module.handler.assets import POPUP_CONFIRM
 from module.logger import logger
@@ -24,9 +24,9 @@ from module.ui.ui import UI
 MASK_DORM = Mask(file="./assets/mask/MASK_DORM.png")
 DORM_CAMERA_SWIPE = (300, 250)
 DORM_CAMERA_RANDOM = (-20, -20, 20, 20)
-OCR_SLOT = DigitCounter(OCR_DORM_SLOT, letter=(107, 89, 82), threshold=128, name="OCR_DORM_SLOT")
+OCR_SLOT = DigitCounter(dorm_assets.OCR_DORM_SLOT, letter=(107, 89, 82), threshold=128, name="OCR_DORM_SLOT")
 OCR_BUY_FOOD_AMOUNT = Digit(
-    OCR_DORM_BUY_FOOD_AMOUNT, letter=(96, 96, 100), threshold=128, name="OCR_DORM_BUY_FOOD_AMOUNT"
+    dorm_assets.OCR_DORM_BUY_FOOD_AMOUNT, letter=(96, 96, 100), threshold=128, name="OCR_DORM_BUY_FOOD_AMOUNT"
 )
 
 
@@ -54,7 +54,7 @@ class OcrDormFood(DigitCounter):
         return result
 
 
-OCR_FILL = OcrDormFood(OCR_DORM_FILL, name="OCR_DORM_FILL")
+OCR_FILL = OcrDormFood(dorm_assets.OCR_DORM_FILL, name="OCR_DORM_FILL")
 
 
 class Food:
@@ -192,7 +192,7 @@ class RewardDorm(UI):
 
     def dorm_view_reset(self):
         """
-        Use Dorm manage and Back to reset dorm view.
+        通过宿舍管理和返回按钮重置宿舍视角。
 
         Pages:
             in: page_dorm
@@ -201,28 +201,28 @@ class RewardDorm(UI):
         logger.info("Dorm view reset")
         for _ in self.loop():
             # End
-            if self.appear(DORM_MANAGE_CHECK, offset=(20, 20)):
+            if self.appear(dorm_assets.DORM_MANAGE_CHECK, offset=(20, 20)):
                 break
 
-            if self.appear_then_click(DORM_MANAGE, offset=(20, 20), interval=3):
+            if self.appear_then_click(dorm_assets.DORM_MANAGE, offset=(20, 20), interval=3):
                 continue
-            # Handle all popups
+            # 处理所有弹窗。
             if self.ui_additional(get_ship=False):
                 continue
-            if self.appear_then_click(DORM_FURNITURE_CONFIRM, offset=(30, 30), interval=3):
+            if self.appear_then_click(dorm_assets.DORM_FURNITURE_CONFIRM, offset=(30, 30), interval=3):
                 continue
 
         for _ in self.loop():
-            if self.appear(DORM_MANAGE, offset=(20, 20)):
+            if self.appear(dorm_assets.DORM_MANAGE, offset=(20, 20)):
                 break
 
-            if self.appear(DORM_MANAGE_CHECK, offset=(20, 20), interval=3):
-                self.device.click(DORM_FURNITURE_SHOP_QUIT)
+            if self.appear(dorm_assets.DORM_MANAGE_CHECK, offset=(20, 20), interval=3):
+                self.device.click(dorm_assets.DORM_FURNITURE_SHOP_QUIT)
                 continue
 
     def dorm_collect(self):
         """
-        Collect all the coins and loves in the dorm using the one-click collect button.
+        使用一键领取按钮收取宿舍里的所有金币和爱心。
 
         Pages:
             in: page_dorm
@@ -232,23 +232,23 @@ class RewardDorm(UI):
 
         self.ensure_no_info_bar()
 
-        # Set a timer to avoid Alas failing to detect the info_bar by accident.
+        # 设置超时，避免信息条漏检导致循环卡住。
         timeout = Timer(1.5, count=3).start()
 
         for _ in self.loop():
-            # Handle all popups
+            # 处理所有弹窗。
             if self.ui_additional(get_ship=False):
                 continue
 
-            # Collect coins and loves through the quick collect button
-            if self.appear_then_click(DORM_QUICK_COLLECT, offset=(20, 20), interval=1):
+            # 通过一键领取按钮收取金币和爱心。
+            if self.appear_then_click(dorm_assets.DORM_QUICK_COLLECT, offset=(20, 20), interval=1):
                 continue
 
-            # Normal end
+            # 正常结束。
             if self.info_bar_count() > 0:
                 break
 
-            # Timeout end
+            # 超时结束。
             if timeout.reached():
                 logger.warning("Dorm collect timeout, probably because Alas did not detect the info_bar")
                 break
@@ -287,10 +287,9 @@ class RewardDorm(UI):
 
         self.popup_interval_clear()
         for _ in self.loop(skip_first=skip_first_screenshot):
-            # End
-            if self.appear(DORM_FEED_CHECK, offset=(20, 20)):
+            # 已回到喂食页面。
+            if self.appear(dorm_assets.DORM_FEED_CHECK, offset=(20, 20)):
                 break
-            # Click
             if self.handle_popup_cancel("DORM_FEED"):
                 continue
 
@@ -378,27 +377,29 @@ class RewardDorm(UI):
         """
         self.interval_clear(DORM_CHECK)
         for _ in self.loop(skip_first=False):
-            # End
-            if self.appear(DORM_FEED_CHECK, offset=(20, 20)):
+            # 已进入喂食页面。
+            if self.appear(dorm_assets.DORM_FEED_CHECK, offset=(20, 20)):
                 break
 
             if self.ui_additional(get_ship=False):
                 self.interval_clear(DORM_CHECK)
                 continue
             if self.appear(DORM_CHECK, offset=(20, 20), interval=5):
-                self.device.click(DORM_FEED_ENTER)
+                self.device.click(dorm_assets.DORM_FEED_ENTER)
                 continue
-            if self.appear(DORM_MANAGE_CHECK, offset=(20, 20), interval=5):
-                self.device.click(DORM_FURNITURE_SHOP_QUIT)
-                logger.info(f"{DORM_MANAGE_CHECK} -> {DORM_FURNITURE_SHOP_QUIT}")
+            if self.appear(dorm_assets.DORM_MANAGE_CHECK, offset=(20, 20), interval=5):
+                self.device.click(dorm_assets.DORM_FURNITURE_SHOP_QUIT)
+                logger.info(f"{dorm_assets.DORM_MANAGE_CHECK} -> {dorm_assets.DORM_FURNITURE_SHOP_QUIT}")
                 continue
-            if self.appear(DORM_FURNITURE_SHOP_FIRST, offset=(20, 20), interval=5):
-                self.device.click(DORM_FURNITURE_SHOP_QUIT)
-                logger.info(f"{DORM_FURNITURE_SHOP_FIRST} -> {DORM_FURNITURE_SHOP_QUIT}")
+            if self.appear(dorm_assets.DORM_FURNITURE_SHOP_FIRST, offset=(20, 20), interval=5):
+                self.device.click(dorm_assets.DORM_FURNITURE_SHOP_QUIT)
+                logger.info(f"{dorm_assets.DORM_FURNITURE_SHOP_FIRST} -> {dorm_assets.DORM_FURNITURE_SHOP_QUIT}")
                 continue
-            if self.appear(DORM_FURNITURE_SHOP_FIRST_SELECTED, offset=(20, 20), interval=5):
-                self.device.click(DORM_FURNITURE_SHOP_QUIT)
-                logger.info(f"{DORM_FURNITURE_SHOP_FIRST_SELECTED} -> {DORM_FURNITURE_SHOP_QUIT}")
+            if self.appear(dorm_assets.DORM_FURNITURE_SHOP_FIRST_SELECTED, offset=(20, 20), interval=5):
+                self.device.click(dorm_assets.DORM_FURNITURE_SHOP_QUIT)
+                logger.info(
+                    f"{dorm_assets.DORM_FURNITURE_SHOP_FIRST_SELECTED} -> {dorm_assets.DORM_FURNITURE_SHOP_QUIT}"
+                )
                 continue
 
     def dorm_feed_quit(self):
@@ -407,14 +408,14 @@ class RewardDorm(UI):
             in: DORM_FEED_CHECK
             out: DORM_CHECK
         """
-        self.interval_clear(DORM_FEED_CHECK)
+        self.interval_clear(dorm_assets.DORM_FEED_CHECK)
         for _ in self.loop():
-            # End
+            # 已回到宿舍页。
             if self.appear(DORM_CHECK):
                 break
 
-            if self.appear(DORM_FEED_CHECK, offset=(20, 20), interval=5):
-                self.device.click(DORM_FEED_ENTER)
+            if self.appear(dorm_assets.DORM_FEED_CHECK, offset=(20, 20), interval=5):
+                self.device.click(dorm_assets.DORM_FEED_ENTER)
                 continue
             if self.handle_popup_cancel("DORM_FEED"):
                 self.interval_clear(DORM_CHECK)
@@ -429,14 +430,14 @@ class RewardDorm(UI):
             in: DORM_FEED_CHECK
             out: DORM_BUY_FOOD_CHECK
         """
-        self.interval_clear(DORM_FEED_CHECK)
+        self.interval_clear(dorm_assets.DORM_FEED_CHECK)
         for _ in self.loop():
-            # End
-            if self.appear(DORM_BUY_FOOD_CHECK, offset=(20, 20)):
+            # 已进入购买食物页面。
+            if self.appear(dorm_assets.DORM_BUY_FOOD_CHECK, offset=(20, 20)):
                 break
 
-            if self.match_template_color(DORM_FEED_CHECK, offset=(20, 20), interval=5):
-                self.device.click(DORM_BUY_FOOD_ENTER)
+            if self.match_template_color(dorm_assets.DORM_FEED_CHECK, offset=(20, 20), interval=5):
+                self.device.click(dorm_assets.DORM_BUY_FOOD_ENTER)
                 continue
 
     def dorm_buy_food(self, amount):
@@ -447,16 +448,15 @@ class RewardDorm(UI):
         """
         logger.hr("Dorm buy food")
         index_offset = (20, 20)
-        # In case either -/+ shift position, use
-        # shipyard ocr trick to accurately parse
-        self.appear(FOOD_PLUS, offset=index_offset)
-        self.appear(FOOD_MINUS, offset=index_offset)
+        # 防止加减按钮位置偏移，先用船坞索引 OCR 的方式定位真实按钮。
+        self.appear(dorm_assets.FOOD_PLUS, offset=index_offset)
+        self.appear(dorm_assets.FOOD_MINUS, offset=index_offset)
 
         self.ui_ensure_index(
             amount,
             letter=OCR_BUY_FOOD_AMOUNT,
-            prev_button=FOOD_MINUS,
-            next_button=FOOD_PLUS,
+            prev_button=dorm_assets.FOOD_MINUS,
+            next_button=dorm_assets.FOOD_PLUS,
             skip_first_screenshot=True,
         )
         return True
@@ -467,13 +467,13 @@ class RewardDorm(UI):
             in: DORM_BUY_FOOD_CHECK
             out: DORM_FEED_CHECK
         """
-        self.interval_clear(DORM_BUY_FOOD_CONFIRM)
+        self.interval_clear(dorm_assets.DORM_BUY_FOOD_CONFIRM)
         for _ in self.loop():
-            # End
-            if self.match_template_color(DORM_FEED_CHECK, offset=(20, 20)):
+            # 已回到喂食页面。
+            if self.match_template_color(dorm_assets.DORM_FEED_CHECK, offset=(20, 20)):
                 break
 
-            if self.appear_then_click(DORM_BUY_FOOD_CONFIRM, offset=(20, 20), interval=5):
+            if self.appear_then_click(dorm_assets.DORM_BUY_FOOD_CONFIRM, offset=(20, 20), interval=5):
                 continue
 
     def dorm_food_run(self, amount):
@@ -517,8 +517,7 @@ class RewardDorm(UI):
         #         return
         self.ui_goto(page_dorm, skip_first_screenshot=True)
 
-        # Feed first to handle DORM_INFO
-        # DORM_INFO may cover dorm coins and loves
+        # 先喂食以处理 DORM_INFO；它可能遮挡宿舍金币和爱心。
         if feed:
             logger.hr("Dorm feed", level=1)
             self.dorm_feed_enter()
@@ -544,8 +543,8 @@ class RewardDorm(UI):
         timeout = Timer(2, count=4).start()
         current = 0
         for _ in self.loop():
-            # Handle popups
-            if self.appear_then_click(DORM_FURNITURE_CONFIRM, offset=(30, 30), interval=3):
+            # 处理弹窗。
+            if self.appear_then_click(dorm_assets.DORM_FURNITURE_CONFIRM, offset=(30, 30), interval=3):
                 timeout.reset()
                 continue
             if self.ui_additional(get_ship=False):
