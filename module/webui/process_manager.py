@@ -7,10 +7,9 @@ from typing import Dict, List, Union, cast
 import inflection
 from rich.console import Console, ConsoleRenderable
 
-# Since this file does not run under the same process or subprocess of app.py
-# the following code needs to be repeated
-# Import fake module before import pywebio to avoid importing unnecessary module PIL
-from module.webui.fake_pil_module import *
+# 这个文件不会运行在 app.py 的同一进程或子进程中，下面的初始化需要重复执行。
+# 先导入伪 PIL 模块，避免 pywebio 拉起不需要的 PIL。
+from module.webui.fake_pil_module import import_fake_pil_module, remove_fake_pil_module
 
 import_fake_pil_module()
 

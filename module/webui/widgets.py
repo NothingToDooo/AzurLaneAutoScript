@@ -6,7 +6,18 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional
 
 from pywebio.exceptions import SessionException
 from pywebio.io_ctrl import Output
-from pywebio.output import *
+from pywebio.output import (
+    clear,
+    output,
+    put_button,
+    put_buttons,
+    put_column,
+    put_html,
+    put_loading,
+    put_row,
+    put_scope,
+    put_text,
+)
 from pywebio.session import eval_js, local, run_js
 from rich.console import ConsoleRenderable
 
