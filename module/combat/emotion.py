@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from time import sleep
 
 import numpy as np
@@ -142,7 +142,7 @@ class FleetEmotion:
 
         recover_count = (self.limit + expected_reduce - self.current) // self.speed
         recovered = (int(datetime.now().timestamp()) // 360 + recover_count + 1) * 360
-        return datetime.fromtimestamp(recovered)
+        return datetime.fromtimestamp(recovered, tz=UTC).astimezone().replace(tzinfo=None)
 
 
 class Emotion:

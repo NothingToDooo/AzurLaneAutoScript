@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 
 from module.config.utils import DEFAULT_TIME, filepath_config
 from module.logger import logger
@@ -17,7 +17,7 @@ class ConfigWatcher:
         Last modify time of the file
         """
         timestamp = os.stat(filepath_config(self.config_name)).st_mtime
-        mtime = datetime.fromtimestamp(timestamp).replace(microsecond=0)
+        mtime = datetime.fromtimestamp(timestamp, tz=UTC).astimezone().replace(tzinfo=None, microsecond=0)
         return mtime
 
     def should_reload(self) -> bool:
