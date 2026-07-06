@@ -6,10 +6,12 @@ from module.base.utils import get_color
 from module.exception import GameBugError
 from module.logger import logger
 from module.ocr.ocr import Duration
-from module.research.assets import *
+from module.research import assets as research_assets
 from module.research.ui import ResearchUI
 
-OCR_QUEUE_REMAIN = Duration(QUEUE_REMAIN, letter=(255, 255, 255), threshold=128, name="OCR_QUEUE_REMAIN")
+OCR_QUEUE_REMAIN = Duration(
+    research_assets.QUEUE_REMAIN, letter=(255, 255, 255), threshold=128, name="OCR_QUEUE_REMAIN"
+)
 
 
 class ResearchQueue(ResearchUI):
@@ -26,7 +28,7 @@ class ResearchQueue(ResearchUI):
         logger.hr("Research queue add")
         # POPUP_CONFIRM has just been clicked in research_project_start()
         self.popup_interval_clear()
-        self.interval_clear([RESEARCH_QUEUE_ADD])
+        self.interval_clear([research_assets.RESEARCH_QUEUE_ADD])
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -37,9 +39,9 @@ class ResearchQueue(ResearchUI):
             if self.is_research_stabled():
                 break
 
-            if self.appear(RESEARCH_QUEUE_ADD, offset=(20, 20), interval=5):
+            if self.appear(research_assets.RESEARCH_QUEUE_ADD, offset=(20, 20), interval=5):
                 if self._research_queue_add_available():
-                    self.device.click(RESEARCH_QUEUE_ADD)
+                    self.device.click(research_assets.RESEARCH_QUEUE_ADD)
                     continue
                 else:
                     logger.info("Project requirements not satisfied, cancel it")
@@ -47,7 +49,7 @@ class ResearchQueue(ResearchUI):
                     return False
 
             if self.handle_popup_confirm("RESEARCH_QUEUE"):
-                self.interval_reset(RESEARCH_QUEUE_ADD)
+                self.interval_reset(research_assets.RESEARCH_QUEUE_ADD)
                 continue
 
         self.ensure_research_center_stable()
@@ -59,11 +61,11 @@ class ResearchQueue(ResearchUI):
             bool: True if able add to queue,
                 False if project requirements not satisfied, can't be added to queue
         """
-        # RESEARCH_QUEUE_ADD.area is the letter `Queue`
-        # RESEARCH_QUEUE_ADD.button is the entire clickable area of button
+        # RESEARCH_QUEUE_ADD.area 是 `Queue` 文字区域。
+        # RESEARCH_QUEUE_ADD.button 是按钮的完整可点击区域。
         # Available: (90, 142, 203)
         # Unavailable: (153, 160, 170)
-        r, g, b = get_color(self.device.image, RESEARCH_QUEUE_ADD.button)
+        r, g, b = get_color(self.device.image, research_assets.RESEARCH_QUEUE_ADD.button)
         if b - min(r, g) > 60:
             return True
         else:
@@ -134,12 +136,12 @@ class ResearchQueue(ResearchUI):
         Raises:
             GameBugError:
         """
-        if self.image_color_count(QUEUE_REMAIN, color=(123, 125, 123), threshold=235, count=100):
+        if self.image_color_count(research_assets.QUEUE_REMAIN, color=(123, 125, 123), threshold=235, count=100):
             logger.error(
                 "The first research of queue is not running,probably a game bug from AL,restart the game should fix it."
             )
             raise GameBugError
-        if not self.image_color_count(QUEUE_REMAIN, color=(255, 255, 255), threshold=221, count=100):
+        if not self.image_color_count(research_assets.QUEUE_REMAIN, color=(255, 255, 255), threshold=221, count=100):
             logger.info("Research queue empty")
             return datetime.now()
 

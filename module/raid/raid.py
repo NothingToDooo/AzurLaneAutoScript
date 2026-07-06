@@ -4,12 +4,12 @@ import numpy as np
 import module.config.server as server
 from module.base.timer import Timer
 from module.campaign.campaign_event import CampaignEvent
-from module.combat.assets import *
+from module.combat.assets import BATTLE_PREPARATION
 from module.exception import ScriptError
 from module.logger import logger
 from module.map.map_operation import MapOperation
 from module.ocr.ocr import Digit, DigitCounter
-from module.raid.assets import *
+from module.raid import assets as raid_assets
 from module.raid.combat import RaidCombat
 from module.ui.assets import RAID_CHECK
 from module.ui.page import page_rpg_stage
@@ -108,10 +108,14 @@ def raid_entrance(raid, mode):
         Button:
     """
     key = f"{raid_name_shorten(raid)}_RAID_{mode.upper()}"
+    return _raid_asset(key)
+
+
+def _raid_asset(key):
     try:
-        return globals()[key]
-    except KeyError as e:
-        raise ScriptError(f"Raid entrance asset not exists: {key}") from e
+        return getattr(raid_assets, key)
+    except AttributeError as e:
+        raise ScriptError(f"Raid asset not exists: {key}") from e
 
 
 def raid_ocr(raid, mode):
@@ -125,10 +129,7 @@ def raid_ocr(raid, mode):
     """
     raid = raid_name_shorten(raid)
     key = f"{raid}_OCR_REMAIN_{mode.upper()}"
-    try:
-        button = globals()[key]
-    except KeyError as e:
-        raise ScriptError(f"Raid entrance asset not exists: {key}") from e
+    button = _raid_asset(key)
     # Old raids use RaidCounter to compatible with old OCR model and its assets
     # New raids use DigitCounter
     if raid == "ESSEX":
@@ -186,9 +187,8 @@ def pt_ocr(raid):
     """
     raid = raid_name_shorten(raid)
     key = f"{raid}_OCR_PT"
-    try:
-        button = globals()[key]
-    except KeyError:
+    button = getattr(raid_assets, key, None)
+    if button is None:
         # raise ScriptError(f'Raid pt ocr asset not exists: {key}')
         return None
     if raid == "IRIS":
@@ -290,11 +290,11 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
         Returns:
             bool: If clicked.
         """
-        if self.appear(TICKET_USE_CONFIRM, offset=(30, 30), interval=1):
+        if self.appear(raid_assets.TICKET_USE_CONFIRM, offset=(30, 30), interval=1):
             if self.config.Raid_UseTicket:
-                self.device.click(TICKET_USE_CONFIRM)
+                self.device.click(raid_assets.TICKET_USE_CONFIRM)
             else:
-                self.device.click(TICKET_USE_CANCEL)
+                self.device.click(raid_assets.TICKET_USE_CANCEL)
             return True
 
         return False
@@ -324,7 +324,7 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
                     self.config.task_stop()
                 self.device.click(entrance)
                 continue
-            if self.appear_then_click(RAID_FLEET_PREPARATION, offset=(20, 20), interval=5):
+            if self.appear_then_click(raid_assets.RAID_FLEET_PREPARATION, offset=(20, 20), interval=5):
                 continue
 
             # End
@@ -332,7 +332,7 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
                 break
 
     def raid_expected_end(self):
-        if self.appear_then_click(RAID_REWARDS, offset=(30, 30), interval=3):
+        if self.appear_then_click(raid_assets.RAID_REWARDS, offset=(30, 30), interval=3):
             return False
         if self.is_raid_rpg():
             return self.appear(page_rpg_stage.check_button, offset=(30, 30))
@@ -413,7 +413,7 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
                 self.device.screenshot()
 
             # End
-            if self.appear(RPG_RAID_EASY, offset=(10, 10)):
+            if self.appear(raid_assets.RPG_RAID_EASY, offset=(10, 10)):
                 logger.info("RPG raid already at rightmost")
                 break
 

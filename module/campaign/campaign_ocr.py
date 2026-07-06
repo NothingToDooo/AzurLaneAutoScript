@@ -11,7 +11,7 @@ from module.exception import CampaignNameError
 from module.logger import logger
 from module.map.assets import WITHDRAW
 from module.ocr.ocr import Ocr
-from module.template.assets import *
+from module.template import assets as template_assets
 
 
 class CampaignOcr(ModuleBase):
@@ -159,7 +159,11 @@ class CampaignOcr(ModuleBase):
 
         if "normal" in self.config.STAGE_ENTRANCE:
             digits += self.campaign_match_multi(
-                TEMPLATE_STAGE_CLEAR, image, self._stage_image_gray, name_offset=(75, 9), name_size=(60, 16)
+                template_assets.TEMPLATE_STAGE_CLEAR,
+                image,
+                self._stage_image_gray,
+                name_offset=(75, 9),
+                name_size=(60, 16),
             )
             # 2024.04.11 Game client bugged with random broken assets around TEMPLATE_STAGE_CLEAR
             # digits += self.campaign_match_multi(
@@ -173,22 +177,30 @@ class CampaignOcr(ModuleBase):
             #     name_offset=(48, 0), name_size=(60, 16)
             # )
             digits += self.campaign_match_multi(
-                TEMPLATE_STAGE_PERCENT, image, self._stage_image_gray, name_offset=(48, 0), name_size=(60, 16)
+                template_assets.TEMPLATE_STAGE_PERCENT,
+                image,
+                self._stage_image_gray,
+                name_offset=(48, 0),
+                name_size=(60, 16),
             )
         if "half" in self.config.STAGE_ENTRANCE:
             digits += self.campaign_match_multi(
-                TEMPLATE_STAGE_HALF_PERCENT, image, self._stage_image_gray, name_offset=(48, 0), name_size=(60, 16)
+                template_assets.TEMPLATE_STAGE_HALF_PERCENT,
+                image,
+                self._stage_image_gray,
+                name_offset=(48, 0),
+                name_size=(60, 16),
             )
         if "blue" in self.config.STAGE_ENTRANCE:
             digits += self.campaign_match_multi(
-                TEMPLATE_STAGE_BLUE_PERCENT,
+                template_assets.TEMPLATE_STAGE_BLUE_PERCENT,
                 image,
                 extract_letters(self._stage_image, letter=(255, 255, 255), threshold=153),
                 name_offset=(55, 0),
                 name_size=(60, 16),
             )
             digits += self.campaign_match_multi(
-                TEMPLATE_STAGE_BLUE_CLEAR,
+                template_assets.TEMPLATE_STAGE_BLUE_CLEAR,
                 image,
                 extract_letters(self._stage_image, letter=(99, 223, 239), threshold=153),
                 name_offset=(60, 12),
@@ -196,10 +208,14 @@ class CampaignOcr(ModuleBase):
             )
         if "green" in self.config.STAGE_ENTRANCE:
             digits += self.campaign_match_multi(
-                TEMPLATE_STAGE_GREEN_CLEAR, image, self._stage_image_gray, name_offset=(60, 0), name_size=(60, 22)
+                template_assets.TEMPLATE_STAGE_GREEN_CLEAR,
+                image,
+                self._stage_image_gray,
+                name_offset=(60, 0),
+                name_size=(60, 22),
             )
             digits += self.campaign_match_multi(
-                TEMPLATE_STAGE_PERCENT,
+                template_assets.TEMPLATE_STAGE_PERCENT,
                 image,
                 self._stage_image_gray,
                 similarity=0.6,
@@ -208,7 +224,11 @@ class CampaignOcr(ModuleBase):
             )
         if "20240725" in self.config.STAGE_ENTRANCE:
             digits += self.campaign_match_multi(
-                TEMPLATE_STAGE_CLEAR_20240725, image, self._stage_image_gray, name_offset=(73, -4), name_size=(60, 22)
+                template_assets.TEMPLATE_STAGE_CLEAR_20240725,
+                image,
+                self._stage_image_gray,
+                name_offset=(73, -4),
+                name_size=(60, 22),
             )
 
         return digits
