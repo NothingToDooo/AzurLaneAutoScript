@@ -1,7 +1,9 @@
 from datetime import timedelta
 
+import numpy as np
+
 from module.base.timer import Timer
-from module.base.utils import *
+from module.base.utils import color_similarity_2d
 from module.config.utils import DEFAULT_TIME, get_os_next_reset
 from module.logger import logger
 from module.map_detection.utils import fit_points

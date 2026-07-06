@@ -1,9 +1,12 @@
 import collections
+import re
+
+import numpy as np
 
 from module.base.base import ModuleBase
 from module.base.decorator import cached_property, del_cached_property
 from module.base.timer import Timer
-from module.base.utils import *
+from module.base.utils import crop, extract_letters, rgb2gray
 from module.exception import CampaignNameError
 from module.logger import logger
 from module.map.assets import WITHDRAW

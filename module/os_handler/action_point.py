@@ -1,9 +1,11 @@
 from datetime import datetime
 
+import numpy as np
+
 import module.config.server as server
 from module.base.button import ButtonGrid
 from module.base.timer import Timer
-from module.base.utils import *
+from module.base.utils import get_color
 from module.config.utils import get_server_next_update
 from module.logger import logger
 from module.ocr.ocr import Digit, DigitCounter
