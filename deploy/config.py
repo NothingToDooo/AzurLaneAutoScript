@@ -10,9 +10,6 @@ class ExecutionError(Exception):
 
 
 class ConfigModel:
-    # Git 配置
-    GitExecutable: str = "git"
-
     # Python 配置
     PythonExecutable: str = "./.venv/Scripts/python.exe"
 

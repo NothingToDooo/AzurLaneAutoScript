@@ -1943,9 +1943,6 @@
     }
   },
   "AzurLaneUncensored": {
-    "AzurLaneUncensored": {
-      "Repository": "https://gitee.com/LmeSzinc/AzurLaneUncensored"
-    },
     "Storage": {
       "Storage": {}
     }

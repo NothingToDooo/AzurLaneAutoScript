@@ -463,9 +463,6 @@ class GeneratedConfig:
     Benchmark_DeviceType = "emulator"  # emulator
     Benchmark_TestScene = "screenshot_click"  # screenshot_click, screenshot, click
 
-    # 配置组 `AzurLaneUncensored`
-    AzurLaneUncensored_Repository = "https://gitee.com/LmeSzinc/AzurLaneUncensored"
-
     # 配置组 `GameManager`
     GameManager_AutoRestart = True
 

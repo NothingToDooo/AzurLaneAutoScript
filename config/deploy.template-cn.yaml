@@ -1,9 +1,4 @@
 Deploy:
-  Git:
-    # git 可执行文件。
-    # 默认使用 PATH 中的 git。
-    GitExecutable: git
-
   Python:
     # Python 可执行文件。
     # uv 环境默认使用 './.venv/Scripts/python.exe'。

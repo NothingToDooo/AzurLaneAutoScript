@@ -13,9 +13,6 @@ class ExecutionError(Exception):
 
 
 class ConfigModel:
-    # Git 配置
-    GitExecutable: str = "git"
-
     # Python 配置
     PythonExecutable: str = "./.venv/Scripts/python.exe"
 
@@ -109,15 +106,6 @@ class DeployConfig(ConfigModel):
 
         logger.warning(f"AdbExecutable: {exe} 不存在，改用 `adb`")
         return "adb"
-
-    @cached_property
-    def git(self) -> str:
-        exe = self.filepath(self.GitExecutable)
-        if os.path.exists(exe):
-            return exe
-
-        logger.warning(f"GitExecutable: {exe} 不存在，改用 `git`")
-        return "git"
 
     @cached_property
     def python(self) -> str:

@@ -2597,11 +2597,7 @@
   "AzurLaneUncensored": {
     "_info": {
       "name": "反和谐",
-      "help": "仅国服使用。这个工具将执行：\n- 下载反和谐文件\n- 将文件推送至模拟器内\n- 重启游戏客户端"
-    },
-    "Repository": {
-      "name": "反和谐仓库",
-      "help": "一般不需要修改\n仓库 https://github.com/LmeSzinc/AzurLaneUncensored\n国内镜像（默认） https://e.coding.net/llop18870/alas/AzurLaneUncensored.git"
+      "help": "仅国服使用。这个工具将执行：\n- 生成本地反和谐文件\n- 将文件推送至模拟器内\n- 重启游戏客户端"
     }
   },
   "GameManager": {

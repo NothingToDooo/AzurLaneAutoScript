@@ -1,7 +1,6 @@
+import os
 import shutil
 
-from deploy.git import GitManager
-from deploy.utils import *
 from module.handler.login import LoginHandler
 from module.logger import logger
 
@@ -16,7 +15,7 @@ Localization_skin = true
 
 class AzurLaneUncensored(LoginHandler):
     def create_level1_uncensored(self):
-        logger.info("Create level 1 uncensored")
+        logger.info("创建本地反和谐文件")
         folder = "./files"
         try:
             shutil.rmtree(folder)
@@ -28,51 +27,37 @@ class AzurLaneUncensored(LoginHandler):
 
     def run(self):
         """
-        This will do:
-        1. Update AzurLaneUncensored repo
-        2. Adb push to emulator
-        3. Restart game
-        """
-        if self.config.AzurLaneUncensored_Repository == "https://gitee.com/LmeSzinc/AzurLaneUncensored":
-            self.config.AzurLaneUncensored_Repository = "https://e.coding.net/llop18870/alas/AzurLaneUncensored.git"
+        执行本地反和谐流程：
 
-        repo = self.config.AzurLaneUncensored_Repository
+        1. 生成本地反和谐文件。
+        2. 推送文件到模拟器。
+        3. 重启游戏。
+        """
         folder = "./toolkit/AzurLaneUncensored"
 
-        logger.hr("Update AzurLaneUncensored", level=1)
-        logger.info("This will take a while at first use")
-        manager = GitManager()
-        manager.config["GitExecutable"] = os.path.abspath(manager.config["GitExecutable"])
-        manager.config["AdbExecutable"] = os.path.abspath(manager.config["AdbExecutable"])
+        logger.hr("生成反和谐文件", level=1)
         os.makedirs(folder, exist_ok=True)
         prev = os.getcwd()
 
-        # Running in ./toolkit/AzurLaneUncensored
+        # 在 ./toolkit/AzurLaneUncensored 中生成推送目录。
         os.chdir(folder)
-        # Monkey patch `print()` build-in to show logs.
         self.create_level1_uncensored()
-        # manager.git_repository_init(
-        #     repo=repo,
-        #     source='origin',
-        #     branch='master',
-        # )
 
-        logger.hr("Push Uncensored Files", level=1)
-        logger.info("This will take a few seconds")
+        logger.hr("推送反和谐文件", level=1)
         command = ["push", "files", f"/sdcard/Android/data/{self.device.package}"]
-        logger.info(f"Command: {command}")
+        logger.info(f"命令: {command}")
         self.device.adb_command(command, timeout=30)
-        logger.info("Push success")
+        logger.info("推送完成")
 
-        # Back to root folder
+        # 回到项目根目录。
         os.chdir(prev)
-        logger.hr("Restart AzurLane", level=1)
+        logger.hr("重启碧蓝航线", level=1)
         self.config.override(Error_HandleError=True)
         self.device.app_stop()
         self.device.app_start()
         self.handle_app_login()
 
-        logger.info("Uncensored Finished")
+        logger.info("反和谐流程完成")
 
 
 if __name__ == "__main__":
