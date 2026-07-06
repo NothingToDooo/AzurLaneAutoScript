@@ -1,5 +1,5 @@
 from module.base.timer import Timer
-from module.coalition.assets import *
+from module.coalition import assets as coalition_assets
 from module.combat.assets import BATTLE_PREPARATION
 from module.combat.combat import Combat
 from module.exception import CampaignNameError, RequestHumanTakeover, ScriptError
@@ -25,7 +25,7 @@ class CoalitionUI(Combat):
         return self.ui_page_appear(page_coalition, offset=(20, 20))
 
     def in_coalition_20251120_difficulty_selection(self):
-        return self.appear(DAL_DIFFICULTY_EXIT, offset=(20, 20))
+        return self.appear(coalition_assets.DAL_DIFFICULTY_EXIT, offset=(20, 20))
 
     def coalition_ensure_mode(self, event, mode):
         """
@@ -38,23 +38,23 @@ class CoalitionUI(Combat):
         """
         if event == "coalition_20230323":
             mode_switch = Switch("CoalitionMode", offset=(20, 20))
-            mode_switch.add_state("story", FROSTFALL_MODE_STORY)
-            mode_switch.add_state("battle", FROSTFALL_MODE_BATTLE)
+            mode_switch.add_state("story", coalition_assets.FROSTFALL_MODE_STORY)
+            mode_switch.add_state("battle", coalition_assets.FROSTFALL_MODE_BATTLE)
         elif event == "coalition_20240627":
             mode_switch = Switch("CoalitionMode", offset=(20, 20))
-            mode_switch.add_state("story", ACADEMY_MODE_BATTLE)
-            mode_switch.add_state("battle", ACADEMY_MODE_STORY)
+            mode_switch.add_state("story", coalition_assets.ACADEMY_MODE_BATTLE)
+            mode_switch.add_state("battle", coalition_assets.ACADEMY_MODE_STORY)
         elif event == "coalition_20250626":
             mode_switch = NeoncitySwitch("CoalitionMode", offset=(20, 20))
-            mode_switch.add_state("story", NEONCITY_MODE_STORY)
-            mode_switch.add_state("battle", NEONCITY_MODE_BATTLE)
+            mode_switch.add_state("story", coalition_assets.NEONCITY_MODE_STORY)
+            mode_switch.add_state("battle", coalition_assets.NEONCITY_MODE_BATTLE)
         elif event == "coalition_20251120":
             logger.info("Coalition event coalition_20251120 has no mode switch")
             return
         elif event == "coalition_20260122":
             mode_switch = Switch("CoalitionMode", offset=(20, 20))
-            mode_switch.add_state("story", FASHION_MODE_STORY)
-            mode_switch.add_state("battle", FASHION_MODE_BATTLE)
+            mode_switch.add_state("story", coalition_assets.FASHION_MODE_STORY)
+            mode_switch.add_state("battle", coalition_assets.FASHION_MODE_BATTLE)
         else:
             logger.error(f"MODE_SWITCH is not defined in event {event}")
             raise ScriptError
@@ -80,20 +80,20 @@ class CoalitionUI(Combat):
         """
         fleet_switch = Switch("FleetMode", is_selector=True, offset=0)  # No offset for color match
         if event == "coalition_20230323":
-            fleet_switch.add_state("single", FROSTFALL_SWITCH_SINGLE)
-            fleet_switch.add_state("multi", FROSTFALL_SWITCH_MULTI)
+            fleet_switch.add_state("single", coalition_assets.FROSTFALL_SWITCH_SINGLE)
+            fleet_switch.add_state("multi", coalition_assets.FROSTFALL_SWITCH_MULTI)
         elif event == "coalition_20240627":
-            fleet_switch.add_state("single", ACADEMY_SWITCH_SINGLE)
-            fleet_switch.add_state("multi", ACADEMY_SWITCH_MULTI)
+            fleet_switch.add_state("single", coalition_assets.ACADEMY_SWITCH_SINGLE)
+            fleet_switch.add_state("multi", coalition_assets.ACADEMY_SWITCH_MULTI)
         elif event == "coalition_20250626":
-            fleet_switch.add_state("single", NEONCITY_SWITCH_SINGLE)
-            fleet_switch.add_state("multi", NEONCITY_SWITCH_MULTI)
+            fleet_switch.add_state("single", coalition_assets.NEONCITY_SWITCH_SINGLE)
+            fleet_switch.add_state("multi", coalition_assets.NEONCITY_SWITCH_MULTI)
         elif event == "coalition_20251120":
-            fleet_switch.add_state("single", DAL_SWITCH_SINGLE)
-            fleet_switch.add_state("multi", DAL_SWITCH_MULTI)
+            fleet_switch.add_state("single", coalition_assets.DAL_SWITCH_SINGLE)
+            fleet_switch.add_state("multi", coalition_assets.DAL_SWITCH_MULTI)
         elif event == "coalition_20260122":
-            fleet_switch.add_state("single", FASHION_SWITCH_SINGLE)
-            fleet_switch.add_state("multi", FASHION_SWITCH_MULTI)
+            fleet_switch.add_state("single", coalition_assets.FASHION_SWITCH_SINGLE)
+            fleet_switch.add_state("multi", coalition_assets.FASHION_SWITCH_MULTI)
         else:
             logger.error(f"FLEET_SWITCH is not defined in event {event}")
             raise ScriptError
@@ -122,42 +122,42 @@ class CoalitionUI(Combat):
         """
         dic = {
             # FROSTFALL
-            ("coalition_20230323", "tc1"): FROSTFALL_TC1,
-            ("coalition_20230323", "tc2"): FROSTFALL_TC2,
-            ("coalition_20230323", "tc3"): FROSTFALL_TC3,
-            ("coalition_20230323", "sp"): FROSTFALL_SP,
-            ("coalition_20230323", "ex"): FROSTFALL_EX,
+            ("coalition_20230323", "tc1"): coalition_assets.FROSTFALL_TC1,
+            ("coalition_20230323", "tc2"): coalition_assets.FROSTFALL_TC2,
+            ("coalition_20230323", "tc3"): coalition_assets.FROSTFALL_TC3,
+            ("coalition_20230323", "sp"): coalition_assets.FROSTFALL_SP,
+            ("coalition_20230323", "ex"): coalition_assets.FROSTFALL_EX,
             # ACADEMY
-            ("coalition_20240627", "easy"): ACADEMY_EASY,
-            ("coalition_20240627", "normal"): ACADEMY_NORMAL,
-            ("coalition_20240627", "hard"): ACADEMY_HARD,
-            ("coalition_20240627", "sp"): ACADEMY_SP,
-            ("coalition_20240627", "ex"): ACADEMY_EX,
+            ("coalition_20240627", "easy"): coalition_assets.ACADEMY_EASY,
+            ("coalition_20240627", "normal"): coalition_assets.ACADEMY_NORMAL,
+            ("coalition_20240627", "hard"): coalition_assets.ACADEMY_HARD,
+            ("coalition_20240627", "sp"): coalition_assets.ACADEMY_SP,
+            ("coalition_20240627", "ex"): coalition_assets.ACADEMY_EX,
             # NEONCITY
-            ("coalition_20250626", "easy"): NEONCITY_EASY,
-            ("coalition_20250626", "normal"): NEONCITY_NORMAL,
-            ("coalition_20250626", "hard"): NEONCITY_HARD,
-            ("coalition_20250626", "sp"): NEONCITY_SP,
-            ("coalition_20250626", "ex"): NEONCITY_EX,
+            ("coalition_20250626", "easy"): coalition_assets.NEONCITY_EASY,
+            ("coalition_20250626", "normal"): coalition_assets.NEONCITY_NORMAL,
+            ("coalition_20250626", "hard"): coalition_assets.NEONCITY_HARD,
+            ("coalition_20250626", "sp"): coalition_assets.NEONCITY_SP,
+            ("coalition_20250626", "ex"): coalition_assets.NEONCITY_EX,
             # DAL
-            ("coalition_20251120", "area1-normal"): DAL_AREA1,
-            ("coalition_20251120", "area2-normal"): DAL_AREA2,
-            ("coalition_20251120", "area3-normal"): DAL_AREA3,
-            ("coalition_20251120", "area4-normal"): DAL_AREA4,
-            ("coalition_20251120", "area5-normal"): DAL_AREA5,
-            ("coalition_20251120", "area6-normal"): DAL_AREA6,
-            ("coalition_20251120", "area1-hard"): DAL_AREA1,
-            ("coalition_20251120", "area2-hard"): DAL_AREA2,
-            ("coalition_20251120", "area3-hard"): DAL_AREA3,
-            ("coalition_20251120", "area4-hard"): DAL_AREA4,
-            ("coalition_20251120", "area5-hard"): DAL_AREA5,
-            ("coalition_20251120", "area6-hard"): DAL_AREA6,
+            ("coalition_20251120", "area1-normal"): coalition_assets.DAL_AREA1,
+            ("coalition_20251120", "area2-normal"): coalition_assets.DAL_AREA2,
+            ("coalition_20251120", "area3-normal"): coalition_assets.DAL_AREA3,
+            ("coalition_20251120", "area4-normal"): coalition_assets.DAL_AREA4,
+            ("coalition_20251120", "area5-normal"): coalition_assets.DAL_AREA5,
+            ("coalition_20251120", "area6-normal"): coalition_assets.DAL_AREA6,
+            ("coalition_20251120", "area1-hard"): coalition_assets.DAL_AREA1,
+            ("coalition_20251120", "area2-hard"): coalition_assets.DAL_AREA2,
+            ("coalition_20251120", "area3-hard"): coalition_assets.DAL_AREA3,
+            ("coalition_20251120", "area4-hard"): coalition_assets.DAL_AREA4,
+            ("coalition_20251120", "area5-hard"): coalition_assets.DAL_AREA5,
+            ("coalition_20251120", "area6-hard"): coalition_assets.DAL_AREA6,
             # FASHION
-            ("coalition_20260122", "easy"): FASHION_EASY,
-            ("coalition_20260122", "normal"): FASHION_NORMAL,
-            ("coalition_20260122", "hard"): FASHION_HARD,
-            ("coalition_20260122", "sp"): FASHION_SP,
-            ("coalition_20260122", "ex"): FASHION_EX,
+            ("coalition_20260122", "easy"): coalition_assets.FASHION_EASY,
+            ("coalition_20260122", "normal"): coalition_assets.FASHION_NORMAL,
+            ("coalition_20260122", "hard"): coalition_assets.FASHION_HARD,
+            ("coalition_20260122", "sp"): coalition_assets.FASHION_SP,
+            ("coalition_20260122", "ex"): coalition_assets.FASHION_EX,
         }
         stage = stage.lower()
         try:
@@ -178,18 +178,18 @@ class CoalitionUI(Combat):
         """
         dic = {
             # DAL
-            ("coalition_20251120", "area1-normal"): DAL_NORMAL,
-            ("coalition_20251120", "area2-normal"): DAL_NORMAL,
-            ("coalition_20251120", "area3-normal"): DAL_NORMAL,
-            ("coalition_20251120", "area4-normal"): DAL_NORMAL,
-            ("coalition_20251120", "area5-normal"): DAL_NORMAL,
-            ("coalition_20251120", "area6-normal"): DAL_NORMAL,
-            ("coalition_20251120", "area1-hard"): DAL_HARD,
-            ("coalition_20251120", "area2-hard"): DAL_HARD,
-            ("coalition_20251120", "area3-hard"): DAL_HARD,
-            ("coalition_20251120", "area4-hard"): DAL_HARD,
-            ("coalition_20251120", "area5-hard"): DAL_HARD,
-            ("coalition_20251120", "area6-hard"): DAL_HARD,
+            ("coalition_20251120", "area1-normal"): coalition_assets.DAL_NORMAL,
+            ("coalition_20251120", "area2-normal"): coalition_assets.DAL_NORMAL,
+            ("coalition_20251120", "area3-normal"): coalition_assets.DAL_NORMAL,
+            ("coalition_20251120", "area4-normal"): coalition_assets.DAL_NORMAL,
+            ("coalition_20251120", "area5-normal"): coalition_assets.DAL_NORMAL,
+            ("coalition_20251120", "area6-normal"): coalition_assets.DAL_NORMAL,
+            ("coalition_20251120", "area1-hard"): coalition_assets.DAL_HARD,
+            ("coalition_20251120", "area2-hard"): coalition_assets.DAL_HARD,
+            ("coalition_20251120", "area3-hard"): coalition_assets.DAL_HARD,
+            ("coalition_20251120", "area4-hard"): coalition_assets.DAL_HARD,
+            ("coalition_20251120", "area5-hard"): coalition_assets.DAL_HARD,
+            ("coalition_20251120", "area6-hard"): coalition_assets.DAL_HARD,
         }
         stage = stage.lower()
         try:
@@ -264,16 +264,16 @@ class CoalitionUI(Combat):
             Button:
         """
         if event == "coalition_20230323":
-            return FROSTFALL_FLEET_PREPARATION
+            return coalition_assets.FROSTFALL_FLEET_PREPARATION
         elif event == "coalition_20240627":
-            return ACEDEMY_FLEET_PREPARATION
+            return coalition_assets.ACEDEMY_FLEET_PREPARATION
         elif event == "coalition_20250626":
-            return NEONCITY_FLEET_PREPARATION
+            return coalition_assets.NEONCITY_FLEET_PREPARATION
         elif event == "coalition_20251120":
-            return DAL_FLEET_PREPARATION
+            return coalition_assets.DAL_FLEET_PREPARATION
         elif event == "coalition_20260122":
             # FASHION reuses NEONCITY, just (-12, -12) shifted
-            return NEONCITY_FLEET_PREPARATION
+            return coalition_assets.NEONCITY_FLEET_PREPARATION
         else:
             logger.error(f"FLEET_PREPARATION is not defined in event {event}")
             raise ScriptError
@@ -305,14 +305,14 @@ class CoalitionUI(Combat):
 
         clicked = self.coalition_set_fleet(event, mode)
 
-        if self.appear(FLEET_NOT_PREPARED, offset=(20, 20)):
+        if self.appear(coalition_assets.FLEET_NOT_PREPARED, offset=(20, 20)):
             logger.critical("FLEET_NOT_PREPARED")
             logger.critical("Please prepare you fleets before running coalition battles")
             raise RequestHumanTakeover
-        if self.appear(EMPTY_FLAGSHIP, offset=(20, 20)):
+        if self.appear(coalition_assets.EMPTY_FLAGSHIP, offset=(20, 20)):
             logger.critical("EMPTY_FLAGSHIP, Please prepare you fleets before running coalition battles")
             raise RequestHumanTakeover
-        if self.appear(EMPTY_VANGUARD, offset=(20, 20)):
+        if self.appear(coalition_assets.EMPTY_VANGUARD, offset=(20, 20)):
             logger.critical("EMPTY_VANGUARD, Please prepare you fleets before running coalition battles")
             raise RequestHumanTakeover
 
@@ -337,11 +337,11 @@ class CoalitionUI(Combat):
                 self.device.click(BACK_ARROW)
                 continue
             if self.appear(fleet_preparation, offset=(20, 20), interval=3):
-                logger.info(f"{fleet_preparation} -> {NEONCITY_PREPARATION_EXIT}")
-                self.device.click(NEONCITY_PREPARATION_EXIT)
+                logger.info(f"{fleet_preparation} -> {coalition_assets.NEONCITY_PREPARATION_EXIT}")
+                self.device.click(coalition_assets.NEONCITY_PREPARATION_EXIT)
                 continue
-            if self.appear_then_click(DAL_DIFFICULTY_EXIT, offset=(20, 20), interval=3):
-                logger.info(f"{DAL_DIFFICULTY_EXIT} -> {DAL_DIFFICULTY_EXIT}")
+            if self.appear_then_click(coalition_assets.DAL_DIFFICULTY_EXIT, offset=(20, 20), interval=3):
+                logger.info(f"{coalition_assets.DAL_DIFFICULTY_EXIT} -> {coalition_assets.DAL_DIFFICULTY_EXIT}")
                 continue
 
     def enter_map(self, event, stage, mode):

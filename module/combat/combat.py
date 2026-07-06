@@ -1,13 +1,14 @@
 import numpy as np
 
+from module.base.button import Button
 from module.base.timer import Timer
-from module.combat.assets import *
+from module.combat import assets as combat_assets
 from module.combat.combat_auto import CombatAuto
 from module.combat.combat_manual import CombatManual
 from module.combat.hp_balancer import HPBalancer
 from module.combat.level import Level
 from module.combat.submarine import SubmarineCall
-from module.combat_ui.assets import *
+from module.combat_ui import assets as combat_ui_assets
 from module.handler.auto_search import AutoSearchHandler
 from module.logger import logger
 from module.map.assets import MAP_OFFENSIVE
@@ -30,9 +31,12 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             if self.is_combat_loading():
                 return True
 
-        if self.appear(BATTLE_PREPARATION, offset=(30, 20)):
+        if self.appear(combat_assets.BATTLE_PREPARATION, offset=(30, 20)):
             return True
-        if self.appear(BATTLE_PREPARATION_WITH_OVERLAY, threshold=30) and self.handle_combat_automation_confirm():
+        if (
+            self.appear(combat_assets.BATTLE_PREPARATION_WITH_OVERLAY, threshold=30)
+            and self.handle_combat_automation_confirm()
+        ):
             return True
 
         return False
@@ -70,7 +74,9 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         # note that CN/EN/TW are the same, but JP character is smaller
         similarity, button = TEMPLATE_COMBAT_LOADING.match_luma_result(image)
         if similarity > 0.85:
-            loading = (button.area[0] + 38 - LOADING_BAR.area[0]) / (LOADING_BAR.area[2] - LOADING_BAR.area[0])
+            loading = (button.area[0] + 38 - combat_assets.LOADING_BAR.area[0]) / (
+                combat_assets.LOADING_BAR.area[2] - combat_assets.LOADING_BAR.area[0]
+            )
             logger.attr("Loading", f"{int(loading * 100)}%")
             return True
         else:
@@ -81,109 +87,109 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         Returns:
             Button: PAUSE button that appears
         """
-        self.device.stuck_record_add(PAUSE)
-        if PAUSE.match_luma(self.device.image, offset=(10, 10)):
-            return PAUSE
-        if PAUSE_New.match_template_color(self.device.image, offset=(10, 10)):
-            return PAUSE_New
-        if PAUSE_Iridescent_Fantasy.match_luma(self.device.image, offset=(10, 10)):
-            return PAUSE_Iridescent_Fantasy
-        if PAUSE_Christmas.match_luma(self.device.image, offset=(10, 10)):
-            return PAUSE_Christmas
+        self.device.stuck_record_add(combat_ui_assets.PAUSE)
+        if combat_ui_assets.PAUSE.match_luma(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE
+        if combat_ui_assets.PAUSE_New.match_template_color(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_New
+        if combat_ui_assets.PAUSE_Iridescent_Fantasy.match_luma(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_Iridescent_Fantasy
+        if combat_ui_assets.PAUSE_Christmas.match_luma(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_Christmas
         # PAUSE_New, PAUSE_Cyber, PAUSE_Neon look similar, check colors
-        if PAUSE_Neon.match_template_color(self.device.image, offset=(10, 10)):
-            return PAUSE_Neon
-        if PAUSE_Cyber.match_template_color(self.device.image, offset=(10, 10)):
-            return PAUSE_Cyber
-        if PAUSE_HolyLight.match_template_color(self.device.image, offset=(10, 10)):
-            return PAUSE_HolyLight
+        if combat_ui_assets.PAUSE_Neon.match_template_color(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_Neon
+        if combat_ui_assets.PAUSE_Cyber.match_template_color(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_Cyber
+        if combat_ui_assets.PAUSE_HolyLight.match_template_color(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_HolyLight
         # PAUSE_Pharaoh has random animation, assets should avoid the area in the middle and use match_luma
-        if PAUSE_Pharaoh.match_luma(self.device.image, offset=(10, 10)):
-            return PAUSE_Pharaoh
+        if combat_ui_assets.PAUSE_Pharaoh.match_luma(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_Pharaoh
         # PAUSE_Star may get detected as PAUSE_Nurse, should before it
-        if PAUSE_Star.match_luma(self.device.image, offset=(10, 10)):
-            return PAUSE_Star
-        if PAUSE_Nurse.match_luma(self.device.image, offset=(10, 10)):
-            return PAUSE_Nurse
+        if combat_ui_assets.PAUSE_Star.match_luma(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_Star
+        if combat_ui_assets.PAUSE_Nurse.match_luma(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_Nurse
         # PAUSE_Devil is in red
-        if PAUSE_Devil.match_template_color(self.device.image, offset=(10, 10)):
-            return PAUSE_Devil
+        if combat_ui_assets.PAUSE_Devil.match_template_color(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_Devil
         # PAUSE_Seaside is in light blue
-        if PAUSE_Seaside.match_template_color(self.device.image, offset=(10, 10)):
-            return PAUSE_Seaside
-        if PAUSE_Ninja.match_template_color(self.device.image, offset=(10, 10)):
-            return PAUSE_Ninja
-        if PAUSE_ShadowPuppetry.match_luma(self.device.image, offset=(10, 10)):
-            return PAUSE_ShadowPuppetry
-        if PAUSE_MaidCafe.match_template_color(self.device.image, offset=(10, 10)):
-            return PAUSE_MaidCafe
-        if PAUSE_Ancient.match_template_color(self.device.image, offset=(10, 10)):
-            return PAUSE_Ancient
-        if PAUSE_SpringInn.match_template_color(self.device.image, offset=(10, 10)):
-            return PAUSE_SpringInn
-        if PAUSE_ElvenVine.match_template_color(self.device.image, offset=(10, 10)):
-            return PAUSE_ElvenVine
-        if PAUSE_GildedReverie.match_template_color(self.device.image, offset=(10, 10)):
-            return PAUSE_GildedReverie
-        if PAUSE_AzureCore.match_template_color(self.device.image, offset=(10, 10)):
-            return PAUSE_AzureCore
+        if combat_ui_assets.PAUSE_Seaside.match_template_color(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_Seaside
+        if combat_ui_assets.PAUSE_Ninja.match_template_color(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_Ninja
+        if combat_ui_assets.PAUSE_ShadowPuppetry.match_luma(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_ShadowPuppetry
+        if combat_ui_assets.PAUSE_MaidCafe.match_template_color(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_MaidCafe
+        if combat_ui_assets.PAUSE_Ancient.match_template_color(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_Ancient
+        if combat_ui_assets.PAUSE_SpringInn.match_template_color(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_SpringInn
+        if combat_ui_assets.PAUSE_ElvenVine.match_template_color(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_ElvenVine
+        if combat_ui_assets.PAUSE_GildedReverie.match_template_color(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_GildedReverie
+        if combat_ui_assets.PAUSE_AzureCore.match_template_color(self.device.image, offset=(10, 10)):
+            return combat_ui_assets.PAUSE_AzureCore
         return False
 
     def handle_combat_quit(self, offset=(20, 20), interval=3):
-        timer = self.get_interval_timer(QUIT, interval=interval)
+        timer = self.get_interval_timer(combat_ui_assets.QUIT, interval=interval)
         if not timer.reached():
             return False
-        if QUIT.match_luma(self.device.image, offset=offset):
-            self.device.click(QUIT)
+        if combat_ui_assets.QUIT.match_luma(self.device.image, offset=offset):
+            self.device.click(combat_ui_assets.QUIT)
             timer.reset()
             return True
-        if QUIT_New.match_luma(self.device.image, offset=offset):
-            self.device.click(QUIT_New)
+        if combat_ui_assets.QUIT_New.match_luma(self.device.image, offset=offset):
+            self.device.click(combat_ui_assets.QUIT_New)
             timer.reset()
             return True
-        if QUIT_Iridescent_Fantasy.match_luma(self.device.image, offset=offset):
-            self.device.click(QUIT_Iridescent_Fantasy)
+        if combat_ui_assets.QUIT_Iridescent_Fantasy.match_luma(self.device.image, offset=offset):
+            self.device.click(combat_ui_assets.QUIT_Iridescent_Fantasy)
             timer.reset()
             return True
         # Battle UI PAUSE_Neon uses QUIT_New
         # Battle UI PAUSE_Cyber uses QUIT_New
         # [TW] QUIT_New is in bold and PAUSE_Cyber is regular weight
-        if QUIT_Cyber.match_luma(self.device.image, offset=offset):
-            self.device.click(QUIT_Cyber)
+        if combat_ui_assets.QUIT_Cyber.match_luma(self.device.image, offset=offset):
+            self.device.click(combat_ui_assets.QUIT_Cyber)
             timer.reset()
             return True
-        if QUIT_Christmas.match_luma(self.device.image, offset=offset):
-            self.device.click(QUIT_Christmas)
+        if combat_ui_assets.QUIT_Christmas.match_luma(self.device.image, offset=offset):
+            self.device.click(combat_ui_assets.QUIT_Christmas)
             timer.reset()
             return True
         # Battle UI PAUSE_HolyLight uses QUIT_New
-        if QUIT_Pharaoh.match_luma(self.device.image, offset=offset):
-            self.device.click(QUIT_Pharaoh)
+        if combat_ui_assets.QUIT_Pharaoh.match_luma(self.device.image, offset=offset):
+            self.device.click(combat_ui_assets.QUIT_Pharaoh)
             timer.reset()
             return True
-        if QUIT_Nurse.match_luma(self.device.image, offset=offset):
-            self.device.click(QUIT_Nurse)
+        if combat_ui_assets.QUIT_Nurse.match_luma(self.device.image, offset=offset):
+            self.device.click(combat_ui_assets.QUIT_Nurse)
             timer.reset()
             return True
         # Battle UI PAUSE_Devil uses QUIT_New
-        if QUIT_Seaside.match_luma(self.device.image, offset=offset):
-            self.device.click(QUIT_Seaside)
+        if combat_ui_assets.QUIT_Seaside.match_luma(self.device.image, offset=offset):
+            self.device.click(combat_ui_assets.QUIT_Seaside)
             timer.reset()
             return True
-        if QUIT_Ninja.match_luma(self.device.image, offset=offset):
-            self.device.click(QUIT_Ninja)
+        if combat_ui_assets.QUIT_Ninja.match_luma(self.device.image, offset=offset):
+            self.device.click(combat_ui_assets.QUIT_Ninja)
             timer.reset()
             return True
-        if QUIT_MaidCafe.match_luma(self.device.image, offset=offset):
-            self.device.click(QUIT_MaidCafe)
+        if combat_ui_assets.QUIT_MaidCafe.match_luma(self.device.image, offset=offset):
+            self.device.click(combat_ui_assets.QUIT_MaidCafe)
             timer.reset()
             return True
-        if QUIT_SpringInn.match_luma(self.device.image, offset=offset):
-            self.device.click(QUIT_SpringInn)
+        if combat_ui_assets.QUIT_SpringInn.match_luma(self.device.image, offset=offset):
+            self.device.click(combat_ui_assets.QUIT_SpringInn)
             timer.reset()
             return True
-        if QUIT_GildedReverie.match_luma(self.device.image, offset=offset):
-            self.device.click(QUIT_GildedReverie)
+        if combat_ui_assets.QUIT_GildedReverie.match_luma(self.device.image, offset=offset):
+            self.device.click(combat_ui_assets.QUIT_GildedReverie)
             timer.reset()
             return True
         return False
@@ -191,18 +197,18 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
     def handle_combat_quit_reconfirm(self, interval=2):
         # QUIT_RECONFIRM interval should shorter than QUIT,
         # so multiple retries can be made during the interval of QUIT
-        if self.appear_then_click(QUIT_RECONFIRM, offset=(20, 20), interval=interval):
+        if self.appear_then_click(combat_assets.QUIT_RECONFIRM, offset=(20, 20), interval=interval):
             # reset QUIT timer to avoid duplicate QUIT clicks canceling QUIT_RECONFIRM
-            self.interval_reset(QUIT)
+            self.interval_reset(combat_ui_assets.QUIT)
             return True
         return False
 
     def ensure_combat_oil_loaded(self):
-        self.wait_until_stable(COMBAT_OIL_LOADING)
+        self.wait_until_stable(combat_assets.COMBAT_OIL_LOADING)
 
     def handle_combat_automation_confirm(self):
-        if self.appear(AUTOMATION_CONFIRM_CHECK, threshold=30, interval=1):
-            self.appear_then_click(AUTOMATION_CONFIRM, offset=(20, 20))
+        if self.appear(combat_assets.AUTOMATION_CONFIRM_CHECK, threshold=30, interval=1):
+            self.appear_then_click(combat_assets.AUTOMATION_CONFIRM, offset=(20, 20))
             return True
 
         return False
@@ -226,7 +232,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             self.hp_balance()
 
         for _ in self.loop():
-            if self.appear(BATTLE_PREPARATION, offset=(20, 20)):
+            if self.appear(combat_assets.BATTLE_PREPARATION, offset=(20, 20)):
                 if self.handle_combat_automation_set(auto=auto == "combat_auto"):
                     continue
             if self.handle_retirement():
@@ -263,7 +269,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         Returns:
             bool:
         """
-        if self.appear_then_click(BATTLE_PREPARATION, offset=(20, 20), interval=2):
+        if self.appear_then_click(combat_assets.BATTLE_PREPARATION, offset=(20, 20), interval=2):
             return True
 
         return False
@@ -279,18 +285,18 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         if not self._automation_set_timer.reached():
             return False
 
-        if self.appear(AUTOMATION_ON):
+        if self.appear(combat_assets.AUTOMATION_ON):
             logger.info("[Automation] ON")
             if not auto:
-                self.device.click(AUTOMATION_SWITCH)
+                self.device.click(combat_assets.AUTOMATION_SWITCH)
                 self.device.sleep(1)
                 self._automation_set_timer.reset()
                 return True
 
-        if self.appear(AUTOMATION_OFF):
+        if self.appear(combat_assets.AUTOMATION_OFF):
             logger.info("[Automation] OFF")
             if auto:
-                self.device.click(AUTOMATION_SWITCH)
+                self.device.click(combat_assets.AUTOMATION_SWITCH)
                 self.device.sleep(1)
                 self._automation_set_timer.reset()
                 return True
@@ -305,20 +311,25 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         if not self.config.HpControl_UseEmergencyRepair:
             return False
 
-        if self.appear_then_click(EMERGENCY_REPAIR_CONFIRM, offset=True, interval=3):
+        if self.appear_then_click(combat_assets.EMERGENCY_REPAIR_CONFIRM, offset=True, interval=3):
             return True
-        if self.appear(BATTLE_PREPARATION, offset=(20, 20)) and self.appear(EMERGENCY_REPAIR_AVAILABLE):
+        if self.appear(combat_assets.BATTLE_PREPARATION, offset=(20, 20)) and self.appear(
+            combat_assets.EMERGENCY_REPAIR_AVAILABLE
+        ):
             # When entering battle_preparation page (or after emergency repairing),
             # the emergency icon is active by default, even if nothing to use.
             # After a short animation, everything shows as usual.
             # Using fleet power number as a stable checker.
             # First wait for it to be non-zero, then wait for it to be stable.
-            self.wait_until_disappear(MAIN_FLEET_POWER_ZERO, offset=(20, 20))
+            self.wait_until_disappear(combat_assets.MAIN_FLEET_POWER_ZERO, offset=(20, 20))
             stable_checker = Button(
-                area=MAIN_FLEET_POWER_ZERO.area, color=(), button=MAIN_FLEET_POWER_ZERO.button, name="STABLE_CHECKER"
+                area=combat_assets.MAIN_FLEET_POWER_ZERO.area,
+                color=(),
+                button=combat_assets.MAIN_FLEET_POWER_ZERO.button,
+                name="STABLE_CHECKER",
             )
             self.wait_until_stable(stable_checker)
-            if not self.appear(EMERGENCY_REPAIR_AVAILABLE):
+            if not self.appear(combat_assets.EMERGENCY_REPAIR_AVAILABLE):
                 return False
 
             logger.info("EMERGENCY_REPAIR_AVAILABLE")
@@ -336,8 +347,8 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
                 or max(self.hp[3:]) < self.config.HpControl_RepairUseMultiThreshold
             ):
                 logger.info("Use emergency repair")
-                self.device.click(EMERGENCY_REPAIR_AVAILABLE)
-                self.interval_clear(EMERGENCY_REPAIR_CONFIRM)
+                self.device.click(combat_assets.EMERGENCY_REPAIR_AVAILABLE)
+                self.interval_clear(combat_assets.EMERGENCY_REPAIR_CONFIRM)
                 return True
 
         return False
@@ -400,46 +411,46 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         """
         if self.is_combat_executing():
             return False
-        if self.appear(BATTLE_STATUS_S, interval=self.battle_status_click_interval):
+        if self.appear(combat_assets.BATTLE_STATUS_S, interval=self.battle_status_click_interval):
             if drop:
                 drop.handle_add(self)
             else:
                 self.device.sleep((0.25, 0.5))
-            self.device.click(BATTLE_STATUS_S)
+            self.device.click(combat_assets.BATTLE_STATUS_S)
             return True
-        if self.appear(BATTLE_STATUS_A, interval=self.battle_status_click_interval):
+        if self.appear(combat_assets.BATTLE_STATUS_A, interval=self.battle_status_click_interval):
             logger.warning("Battle status A")
             if drop:
                 drop.handle_add(self)
             else:
                 self.device.sleep((0.25, 0.5))
-            self.device.click(BATTLE_STATUS_A)
+            self.device.click(combat_assets.BATTLE_STATUS_A)
             return True
-        if self.appear(BATTLE_STATUS_B, interval=self.battle_status_click_interval):
+        if self.appear(combat_assets.BATTLE_STATUS_B, interval=self.battle_status_click_interval):
             logger.warning("Battle Status B")
             if drop:
                 drop.handle_add(self)
             else:
                 self.device.sleep((0.25, 0.5))
-            self.device.click(BATTLE_STATUS_B)
+            self.device.click(combat_assets.BATTLE_STATUS_B)
             return True
-        if self.appear(BATTLE_STATUS_C, interval=self.battle_status_click_interval):
+        if self.appear(combat_assets.BATTLE_STATUS_C, interval=self.battle_status_click_interval):
             logger.warning("Battle Status C")
             # raise GameStuckError('Battle status C')
             if drop:
                 drop.handle_add(self)
             else:
                 self.device.sleep((0.25, 0.5))
-            self.device.click(BATTLE_STATUS_C)
+            self.device.click(combat_assets.BATTLE_STATUS_C)
             return True
-        if self.appear(BATTLE_STATUS_D, interval=self.battle_status_click_interval):
+        if self.appear(combat_assets.BATTLE_STATUS_D, interval=self.battle_status_click_interval):
             logger.warning("Battle Status D")
             # raise GameStuckError('Battle Status D')
             if drop:
                 drop.handle_add(self)
             else:
                 self.device.sleep((0.25, 0.5))
-            self.device.click(BATTLE_STATUS_D)
+            self.device.click(combat_assets.BATTLE_STATUS_D)
             return True
 
         return False
@@ -452,29 +463,29 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         Returns:
             bool:
         """
-        if self.appear(GET_ITEMS_1, offset=5, interval=self.battle_status_click_interval):
+        if self.appear(combat_assets.GET_ITEMS_1, offset=5, interval=self.battle_status_click_interval):
             if drop:
                 drop.handle_add(self)
-            self.device.click(GET_ITEMS_1)
-            self.interval_reset(BATTLE_STATUS_S)
-            self.interval_reset(BATTLE_STATUS_A)
-            self.interval_reset(BATTLE_STATUS_B)
+            self.device.click(combat_assets.GET_ITEMS_1)
+            self.interval_reset(combat_assets.BATTLE_STATUS_S)
+            self.interval_reset(combat_assets.BATTLE_STATUS_A)
+            self.interval_reset(combat_assets.BATTLE_STATUS_B)
             return True
-        if self.appear(GET_ITEMS_2, offset=5, interval=self.battle_status_click_interval):
+        if self.appear(combat_assets.GET_ITEMS_2, offset=5, interval=self.battle_status_click_interval):
             if drop:
                 drop.handle_add(self)
-            self.device.click(GET_ITEMS_1)
-            self.interval_reset(BATTLE_STATUS_S)
-            self.interval_reset(BATTLE_STATUS_A)
-            self.interval_reset(BATTLE_STATUS_B)
+            self.device.click(combat_assets.GET_ITEMS_1)
+            self.interval_reset(combat_assets.BATTLE_STATUS_S)
+            self.interval_reset(combat_assets.BATTLE_STATUS_A)
+            self.interval_reset(combat_assets.BATTLE_STATUS_B)
             return True
-        if self.appear(GET_ITEMS_3, offset=5, interval=self.battle_status_click_interval):
+        if self.appear(combat_assets.GET_ITEMS_3, offset=5, interval=self.battle_status_click_interval):
             if drop:
                 drop.handle_add(self)
-            self.device.click(GET_ITEMS_1)
-            self.interval_reset(BATTLE_STATUS_S)
-            self.interval_reset(BATTLE_STATUS_A)
-            self.interval_reset(BATTLE_STATUS_B)
+            self.device.click(combat_assets.GET_ITEMS_1)
+            self.interval_reset(combat_assets.BATTLE_STATUS_S)
+            self.interval_reset(combat_assets.BATTLE_STATUS_A)
+            self.interval_reset(combat_assets.BATTLE_STATUS_B)
             return True
 
         return False
@@ -486,13 +497,13 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         """
         if self.is_combat_executing():
             return False
-        if self.appear_then_click(EXP_INFO_S):
+        if self.appear_then_click(combat_assets.EXP_INFO_S):
             self.device.sleep((0.25, 0.5))
             return True
-        if self.appear_then_click(EXP_INFO_A):
+        if self.appear_then_click(combat_assets.EXP_INFO_A):
             self.device.sleep((0.25, 0.5))
             return True
-        if self.appear_then_click(EXP_INFO_B):
+        if self.appear_then_click(combat_assets.EXP_INFO_B):
             self.device.sleep((0.25, 0.5))
             return True
 
@@ -506,8 +517,8 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         Returns:
             bool:
         """
-        if self.appear_then_click(GET_SHIP, interval=1):
-            if self.appear(NEW_SHIP):
+        if self.appear_then_click(combat_assets.GET_SHIP, interval=1):
+            if self.appear(combat_assets.NEW_SHIP):
                 logger.info("Get a new SHIP")
                 if drop:
                     drop.handle_add(self)

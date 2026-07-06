@@ -2,13 +2,14 @@ import re
 from enum import Enum
 
 import module.config.server as server
+from module.base.button import Button
 from module.base.timer import Timer
 from module.combat.combat import BATTLE_PREPARATION
 from module.logger import logger
 from module.meta_reward.meta_reward import MetaReward
 from module.ocr.ocr import Digit, DigitCounter
+from module.os_ash import assets as ash_assets
 from module.os_ash.ash import AshCombat
-from module.os_ash.assets import *
 from module.os_handler.map_event import MapEventHandler
 from module.ui.assets import BACK_ARROW
 from module.ui.page import page_reward
@@ -22,11 +23,11 @@ class MetaState(Enum):
     UNDEFINED = "a undefined page"
 
 
-OCR_BEACON_TIER = Digit(BEACON_TIER, name="OCR_ASH_TIER")
+OCR_BEACON_TIER = Digit(ash_assets.BEACON_TIER, name="OCR_ASH_TIER")
 if server.server != "jp":
-    OCR_META_DAMAGE = Digit(META_DAMAGE, name="OCR_META_DAMAGE")
+    OCR_META_DAMAGE = Digit(ash_assets.META_DAMAGE, name="OCR_META_DAMAGE")
 else:
-    OCR_META_DAMAGE = Digit(META_DAMAGE, letter=(201, 201, 201), name="OCR_META_DAMAGE")
+    OCR_META_DAMAGE = Digit(ash_assets.META_DAMAGE, letter=(201, 201, 201), name="OCR_META_DAMAGE")
 
 
 class MetaDigitCounter(DigitCounter):
@@ -62,10 +63,10 @@ class Meta(UI, MapEventHandler):
     def handle_map_event(self, drop=None):
         if super().handle_map_event(drop):
             return True
-        if self.appear_then_click(META_AUTO_CONFIRM, offset=(20, 20), interval=2):
+        if self.appear_then_click(ash_assets.META_AUTO_CONFIRM, offset=(20, 20), interval=2):
             logger.info("Find auto attack complete")
             return True
-        if self.appear(HELP_CONFIRM, offset=(30, 30), interval=2):
+        if self.appear(ash_assets.HELP_CONFIRM, offset=(30, 30), interval=2):
             logger.info("Accidentally click HELP_ENTER")
             self.device.click(BACK_ARROW)
             return True
@@ -75,7 +76,7 @@ class Meta(UI, MapEventHandler):
             return True
         if self.handle_popup_cancel("META"):
             return True
-        if self.appear_then_click(META_ENTRANCE, offset=(20, 300), interval=2):
+        if self.appear_then_click(ash_assets.META_ENTRANCE, offset=(20, 300), interval=2):
             return True
         return False
 
@@ -125,9 +126,9 @@ class OpsiAshBeacon(Meta):
                     self._make_an_attack()
                     continue
             if state == MetaState.COMPLETE:
-                if self.appear(BEACON_LIST, offset=(20, 20)):
+                if self.appear(ash_assets.BEACON_LIST, offset=(20, 20)):
                     self._meta_category = "beacon"
-                elif self.appear(DOSSIER_LIST, offset=(20, 20)):
+                elif self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20)):
                     self._meta_category = "dossier"
                 self._handle_ash_beacon_reward()
                 if self._meta_category not in self._meta_receive:
@@ -151,9 +152,9 @@ class OpsiAshBeacon(Meta):
                 logger.info("Wrong click into battle preparation page")
                 self.device.click(BACK_ARROW)
                 return False
-            if self.appear(HELP_CONFIRM, offset=(30, 30), interval=3):
+            if self.appear(ash_assets.HELP_CONFIRM, offset=(30, 30), interval=3):
                 logger.info("Wrong click into HELP_CONFIRM")
-                self.device.click(HELP_ENTER)
+                self.device.click(ash_assets.HELP_ENTER)
                 return False
             if self._in_meta_page():
                 logger.info("Meta combat finished and in correct page.")
@@ -180,11 +181,11 @@ class OpsiAshBeacon(Meta):
                 self.device.screenshot()
 
             # End
-            if not self.appear(BEACON_REWARD, offset=(30, 30)):
+            if not self.appear(ash_assets.BEACON_REWARD, offset=(30, 30)):
                 if self._in_meta_page():
                     break
 
-            if self.appear_then_click(BEACON_REWARD, offset=(30, 30), interval=2):
+            if self.appear_then_click(ash_assets.BEACON_REWARD, offset=(30, 30), interval=2):
                 logger.info("Reap meta rewards")
                 continue
             # Finish random events
@@ -193,7 +194,7 @@ class OpsiAshBeacon(Meta):
             # Accidentally goto main page
             if self.ui_main_appear_then_click(page_reward, interval=2):
                 continue
-            if self.appear(META_ENTRANCE, offset=(20, 300), interval=2):
+            if self.appear(ash_assets.META_ENTRANCE, offset=(20, 300), interval=2):
                 continue
 
     def _satisfy_attack_condition(self):
@@ -204,7 +205,7 @@ class OpsiAshBeacon(Meta):
         In Dossier:
             when enable autoAttack, not allow attack
         """
-        if self.appear(BEACON_LIST, offset=(20, 20)):
+        if self.appear(ash_assets.BEACON_LIST, offset=(20, 20)):
             # Enable OneHitMode and had attack this meta
             if _server_support() and self.config.OpsiAshBeacon_OneHitMode:
                 damage = self._get_meta_damage()
@@ -212,9 +213,9 @@ class OpsiAshBeacon(Meta):
                     logger.info("Enable OneHitMode and meta damage is " + str(damage) + ", check after 30 minutes")
                     self.config.task_delay(minute=30)
                     self.config.task_stop()
-        if self.appear(DOSSIER_LIST, offset=(20, 20)):
+        if self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20)):
             # Meta is Auto Attacking
-            if self.appear(META_AUTO_ATTACKING, offset=(20, 20)):
+            if self.appear(ash_assets.META_AUTO_ATTACKING, offset=(20, 20)):
                 logger.info("This meta is auto attacking, check after 15 minutes")
                 self.config.task_delay(minute=15)
                 self.config.task_stop()
@@ -241,12 +242,12 @@ class OpsiAshBeacon(Meta):
             else:
                 self.device.screenshot()
 
-            if self.match_template_color(META_INNER_PAGE_DAMAGE, offset=(20, 20)):
+            if self.match_template_color(ash_assets.META_INNER_PAGE_DAMAGE, offset=(20, 20)):
                 logger.info("Already in meta damage page")
                 break
-            if self.match_template_color(META_INNER_PAGE_NOT_DAMAGE, offset=(20, 20)):
+            if self.match_template_color(ash_assets.META_INNER_PAGE_NOT_DAMAGE, offset=(20, 20)):
                 logger.info("In meta details page, should switch to damage page")
-                self.appear_then_click(META_INNER_PAGE_NOT_DAMAGE, offset=(20, 20), interval=2)
+                self.appear_then_click(ash_assets.META_INNER_PAGE_NOT_DAMAGE, offset=(20, 20), interval=2)
                 continue
 
     def _pre_attack(self):
@@ -259,17 +260,17 @@ class OpsiAshBeacon(Meta):
             others: do nothing this version
         """
         # Page beacon or dossier
-        if self.appear(BEACON_LIST, offset=(20, 20)):
+        if self.appear(ash_assets.BEACON_LIST, offset=(20, 20)):
             if self.config.OpsiAshBeacon_OneHitMode or self.config.OpsiAshBeacon_RequestAssist:
                 if not self._ask_for_help():
                     return False
             return True
-        if self.appear(DOSSIER_LIST, offset=(20, 20)):
+        if self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20)):
             # can auto attack but not auto attacking
             if (
                 _server_support_dossier_auto_attack()
                 and self.config.OpsiAshBeacon_DossierAutoAttackMode
-                and self.appear(META_AUTO_ATTACK_START, offset=(5, 5))
+                and self.appear(ash_assets.META_AUTO_ATTACK_START, offset=(5, 5))
             ):
                 return self._dossier_auto_attack()
             return True
@@ -296,10 +297,10 @@ class OpsiAshBeacon(Meta):
                 self.device.screenshot()
 
             # End
-            if self.appear(HELP_CONFIRM, offset=(20, 20)):
+            if self.appear(ash_assets.HELP_CONFIRM, offset=(20, 20)):
                 break
             # Click
-            if self.appear_then_click(HELP_ENTER, offset=(20, 20), interval=3):
+            if self.appear_then_click(ash_assets.HELP_ENTER, offset=(20, 20), interval=3):
                 continue
             # Wrongly entered BATTLE_PREPARATION
             if self.appear(BATTLE_PREPARATION, offset=(30, 30), interval=2):
@@ -307,11 +308,11 @@ class OpsiAshBeacon(Meta):
                 continue
 
         # Here use simple clicks. Dropping some clicks is acceptable, no need to confirm they are selected.
-        self.device.click(HELP_3)
+        self.device.click(ash_assets.HELP_3)
         self.device.sleep((0.1, 0.3))
-        self.device.click(HELP_2)
+        self.device.click(ash_assets.HELP_2)
         self.device.sleep((0.1, 0.3))
-        self.device.click(HELP_1)
+        self.device.click(ash_assets.HELP_1)
 
         skip_first_screenshot = True
         while 1:
@@ -323,14 +324,14 @@ class OpsiAshBeacon(Meta):
             # End
             # sometimes you have help popup without black-blurred background
             # HELP_CONFIRM and HELP_ENTER appears
-            if not self.appear(HELP_CONFIRM, offset=(30, 30)):
-                if self.appear(HELP_ENTER, offset=(30, 30)):
+            if not self.appear(ash_assets.HELP_CONFIRM, offset=(30, 30)):
+                if self.appear(ash_assets.HELP_ENTER, offset=(30, 30)):
                     return True
-                if self.appear(BEACON_REWARD, offset=(30, 30)):
+                if self.appear(ash_assets.BEACON_REWARD, offset=(30, 30)):
                     logger.info("META finished just after calling assist, ignore meta assist")
                     return False
             # Click
-            if self.appear_then_click(HELP_CONFIRM, offset=(30, 30), interval=3):
+            if self.appear_then_click(ash_assets.HELP_CONFIRM, offset=(30, 30), interval=3):
                 continue
 
     def _dossier_auto_attack(self):
@@ -353,19 +354,19 @@ class OpsiAshBeacon(Meta):
                 self.device.screenshot()
 
             # End
-            if self.appear(META_AUTO_ATTACKING, offset=(5, 5)):
+            if self.appear(ash_assets.META_AUTO_ATTACKING, offset=(5, 5)):
                 return True
             if timeout.reached():
                 logger.warning("Run _dossier_auto_attack timeout, probably because META_AUTO_ATTACK_START was missing")
                 return False
             # Finished by others
-            if self.appear(BEACON_REWARD, offset=(30, 30)):
+            if self.appear(ash_assets.BEACON_REWARD, offset=(30, 30)):
                 return False
 
             # Click
-            if self.appear_then_click(META_AUTO_ATTACK_CONFIRM, offset=(5, 5), interval=3):
+            if self.appear_then_click(ash_assets.META_AUTO_ATTACK_CONFIRM, offset=(5, 5), interval=3):
                 continue
-            if self.appear_then_click(META_AUTO_ATTACK_START, offset=(5, 5), interval=3):
+            if self.appear_then_click(ash_assets.META_AUTO_ATTACK_START, offset=(5, 5), interval=3):
                 continue
             # Wrongly entered BATTLE_PREPARATION
             if self.appear(BATTLE_PREPARATION, offset=(30, 30), interval=2):
@@ -381,10 +382,10 @@ class OpsiAshBeacon(Meta):
             begin a new meta if needed, or back to meta main page
         """
         # Page meta main
-        if self.appear(ASH_SHOWDOWN, offset=(30, 30), interval=2):
+        if self.appear(ash_assets.ASH_SHOWDOWN, offset=(30, 30), interval=2):
             # Beacon
             if self._check_beacon_point():
-                self.device.click(META_MAIN_BEACON_ENTRANCE)
+                self.device.click(ash_assets.META_MAIN_BEACON_ENTRANCE)
                 logger.info("Select beacon entrance into")
                 return True
             # Dossier
@@ -393,42 +394,42 @@ class OpsiAshBeacon(Meta):
                 and self.config.OpsiAshBeacon_AttackMode == "current_dossier"
                 and self._check_dossier_point()
             ):
-                if self.appear_then_click(META_MAIN_DOSSIER_ENTRANCE, offset=(20, 20), interval=2):
+                if self.appear_then_click(ash_assets.META_MAIN_DOSSIER_ENTRANCE, offset=(20, 20), interval=2):
                     logger.info("Select dossier entrance into")
                     return True
                 else:
                     logger.info("None dossier has been selected")
             return False
         # Page beacon
-        elif self.appear(BEACON_LIST, offset=(20, 20), interval=2):
+        elif self.appear(ash_assets.BEACON_LIST, offset=(20, 20), interval=2):
             if self._check_beacon_point():
-                self.device.click(META_BEGIN_ENTRANCE)
+                self.device.click(ash_assets.META_BEGIN_ENTRANCE)
                 logger.info("Begin a beacon")
             return True
         # Page dossier
-        elif _server_support() and self.appear(DOSSIER_LIST, offset=(20, 20), interval=2):
+        elif _server_support() and self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20), interval=2):
             if self.config.OpsiAshBeacon_AttackMode == "current_dossier" and self._check_dossier_point():
-                if self.appear_then_click(META_BEGIN_ENTRANCE, offset=(20, 20), interval=2):
+                if self.appear_then_click(ash_assets.META_BEGIN_ENTRANCE, offset=(20, 20), interval=2):
                     logger.info("Begin a dossier")
                     return True
                 else:
                     logger.info("None dossier has been selected")
-            self.appear_then_click(ASH_QUIT, offset=(10, 10), interval=2)
+            self.appear_then_click(ash_assets.ASH_QUIT, offset=(10, 10), interval=2)
             return True
         # UnKnown Page
         else:
             return True
 
     def _check_beacon_point(self) -> bool:
-        if self.appear(META_BEACON_FLAG, offset=(180, 20)):
-            META_BEACON_DATA.load_offset(META_BEACON_FLAG)
-            return self.digit_ocr_point_and_check(META_BEACON_DATA.button, 100)
+        if self.appear(ash_assets.META_BEACON_FLAG, offset=(180, 20)):
+            ash_assets.META_BEACON_DATA.load_offset(ash_assets.META_BEACON_FLAG)
+            return self.digit_ocr_point_and_check(ash_assets.META_BEACON_DATA.button, 100)
         return False
 
     def _check_dossier_point(self) -> bool:
-        if self.appear(META_DOSSIER_FLAG, offset=(180, 20)):
-            META_DOSSIER_DATA.load_offset(META_DOSSIER_FLAG)
-            return self.digit_ocr_point_and_check(META_DOSSIER_DATA.button, 100)
+        if self.appear(ash_assets.META_DOSSIER_FLAG, offset=(180, 20)):
+            ash_assets.META_DOSSIER_DATA.load_offset(ash_assets.META_DOSSIER_FLAG)
+            return self.digit_ocr_point_and_check(ash_assets.META_DOSSIER_DATA.button, 100)
         return False
 
     def _get_state(self):
@@ -436,21 +437,23 @@ class OpsiAshBeacon(Meta):
         if not self._in_meta_page():
             return MetaState.UNDEFINED
         # Page beacon or dossier
-        elif self.appear(BEACON_LIST, offset=(20, 20)) or self.appear(DOSSIER_LIST, offset=(20, 20)):
-            if self.appear(HELP_ENTER, offset=(30, 30)):
+        elif self.appear(ash_assets.BEACON_LIST, offset=(20, 20)) or self.appear(
+            ash_assets.DOSSIER_LIST, offset=(20, 20)
+        ):
+            if self.appear(ash_assets.HELP_ENTER, offset=(30, 30)):
                 return MetaState.ATTACKING
-            elif self.appear(BEACON_REWARD, offset=(20, 20)):
+            elif self.appear(ash_assets.BEACON_REWARD, offset=(20, 20)):
                 return MetaState.COMPLETE
             return MetaState.INIT
-        elif self.appear(ASH_SHOWDOWN, offset=(30, 30)):
+        elif self.appear(ash_assets.ASH_SHOWDOWN, offset=(30, 30)):
             return MetaState.INIT
         return MetaState.UNDEFINED
 
     def _in_meta_page(self):
         return (
-            self.appear(ASH_SHOWDOWN, offset=(30, 30))
-            or self.appear(BEACON_LIST, offset=(20, 20))
-            or self.appear(DOSSIER_LIST, offset=(20, 20))
+            self.appear(ash_assets.ASH_SHOWDOWN, offset=(30, 30))
+            or self.appear(ash_assets.BEACON_LIST, offset=(20, 20))
+            or self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20))
         )
 
     def _ensure_meta_page(self, skip_first_screenshot=True):
@@ -466,7 +469,7 @@ class OpsiAshBeacon(Meta):
                 return True
             if self.handle_map_event():
                 continue
-            if self.appear_then_click(META_ENTRANCE, offset=(20, 300), interval=2):
+            if self.appear_then_click(ash_assets.META_ENTRANCE, offset=(20, 300), interval=2):
                 continue
 
     def ensure_dossier_page(self, skip_first_screenshot=True):
@@ -479,13 +482,13 @@ class OpsiAshBeacon(Meta):
             else:
                 self.device.screenshot()
 
-            if self.appear(DOSSIER_LIST, offset=(20, 20)):
+            if self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20)):
                 logger.info("In dossier page")
                 return True
             if self.handle_map_event():
                 continue
-            if self.appear(ASH_SHOWDOWN, offset=(30, 30)):
-                self.device.click(META_MAIN_DOSSIER_ENTRANCE)
+            if self.appear(ash_assets.ASH_SHOWDOWN, offset=(30, 30)):
+                self.device.click(ash_assets.META_MAIN_DOSSIER_ENTRANCE)
                 continue
 
     def _begin_beacon(self):
@@ -522,9 +525,9 @@ class AshBeaconAssist(Meta):
 
             if self.handle_map_event():
                 continue
-            if self.appear(ASH_START, offset=(20, 20)):
+            if self.appear(ash_assets.ASH_START, offset=(20, 20)):
                 appeared = True
-                remain_times = self.digit_ocr_point_and_check(BEACON_REMAIN, 1)
+                remain_times = self.digit_ocr_point_and_check(ash_assets.BEACON_REMAIN, 1)
                 if remain_times:
                     self._ensure_meta_level()
                     self._make_an_attack()
@@ -550,11 +553,11 @@ class AshBeaconAssist(Meta):
                 self.device.click(BACK_ARROW)
                 return False
             # AL redirects to unfinished self beacon after assist, so switch back
-            if self.appear_then_click(BEACON_LIST, offset=(-20, -5, 300, 5), interval=2):
+            if self.appear_then_click(ash_assets.BEACON_LIST, offset=(-20, -5, 300, 5), interval=2):
                 return False
-            if self.appear(ASH_SHOWDOWN, offset=(30, 30), interval=2):
+            if self.appear(ash_assets.ASH_SHOWDOWN, offset=(30, 30), interval=2):
                 logger.info("Meta combat finished at ASH_SHOWDOWN.")
-                self.device.click(META_MAIN_BEACON_ENTRANCE)
+                self.device.click(ash_assets.META_MAIN_BEACON_ENTRANCE)
             if self._in_meta_assist_page():
                 logger.info("Meta combat finished and in correct page.")
                 return True
@@ -574,7 +577,7 @@ class AshBeaconAssist(Meta):
         tier = self.config.OpsiAshAssist_Tier
         logger.info("Begin find a level " + str(tier) + " meta")
         for n in range(10):
-            if self.image_color_count(BEACON_TIER, color=(0, 0, 0), threshold=221, count=50):
+            if self.image_color_count(ash_assets.BEACON_TIER, color=(0, 0, 0), threshold=221, count=50):
                 break
 
             self.device.screenshot()
@@ -587,7 +590,7 @@ class AshBeaconAssist(Meta):
             if current >= tier:
                 break
             else:
-                self.device.click(BEACON_NEXT)
+                self.device.click(ash_assets.BEACON_NEXT)
                 self.device.sleep((0.3, 0.5))
                 self.device.screenshot()
         if current < tier:
@@ -595,7 +598,7 @@ class AshBeaconAssist(Meta):
         logger.info("Find a beacon in level:" + str(current))
 
     def _in_meta_assist_page(self):
-        return self.appear(BEACON_MY, offset=(20, 20))
+        return self.appear(ash_assets.BEACON_MY, offset=(20, 20))
 
     def _ensure_meta_assist_page(self, skip_first_screenshot=True):
         logger.info("Ensure beacon assist page")
@@ -610,15 +613,15 @@ class AshBeaconAssist(Meta):
                 return True
             if self.handle_map_event():
                 continue
-            if self.appear_then_click(META_ENTRANCE, offset=(20, 300), interval=2):
+            if self.appear_then_click(ash_assets.META_ENTRANCE, offset=(20, 300), interval=2):
                 continue
-            if self.appear(ASH_SHOWDOWN, offset=(20, 20), interval=2):
-                self.device.click(META_MAIN_BEACON_ENTRANCE)
+            if self.appear(ash_assets.ASH_SHOWDOWN, offset=(20, 20), interval=2):
+                self.device.click(ash_assets.META_MAIN_BEACON_ENTRANCE)
                 logger.info("In meta page main")
                 continue
-            if self.appear_then_click(BEACON_LIST, offset=(300, 20), interval=2):
+            if self.appear_then_click(ash_assets.BEACON_LIST, offset=(300, 20), interval=2):
                 continue
-            if self.appear_then_click(DOSSIER_LIST, offset=(20, 20), interval=2):
+            if self.appear_then_click(ash_assets.DOSSIER_LIST, offset=(20, 20), interval=2):
                 logger.info("In meta page dossier")
                 continue
 
