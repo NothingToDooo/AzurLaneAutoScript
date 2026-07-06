@@ -7,7 +7,12 @@ from module.handler.assets import POPUP_CANCEL, POPUP_CONFIRM
 from module.logger import logger
 from module.map_detection.utils import Points
 from module.ocr.ocr import DigitYuv
-from module.shop.assets import *
+from module.shop.assets import (
+    SHOP_BUY_CONFIRM,
+    SHOP_BUY_CONFIRM_AMOUNT,
+    SHOP_BUY_CONFIRM_SELECT,
+    VOUCHER_SHOP_SCROLL_AREA,
+)
 from module.shop.base import ShopItemGrid
 from module.shop.clerk import ShopClerk
 from module.shop.shop_status import ShopStatus

@@ -1,4 +1,4 @@
-from module.shop.assets import *
+from module.shop.assets import NAV_GENERAL, NAV_MONTHLY, TAB_CORE_MONTHLY, TAB_GENERAL, TAB_GUILD, TAB_MEDAL, TAB_MERIT
 from module.shop.shop_core import CoreShop_250814
 from module.shop.shop_general import GeneralShop_250814
 from module.shop.shop_guild import GuildShop_250814

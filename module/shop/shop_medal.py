@@ -11,7 +11,7 @@ from module.base.utils import rgb2gray
 from module.logger import logger
 from module.map_detection.utils import Points
 from module.ocr.ocr import Digit, DigitYuv, Ocr
-from module.shop.assets import *
+from module.shop.assets import MEDAL_SHOP_SCROLL_AREA_250814, SHOP_BUY_CONFIRM_AMOUNT, SHOP_BUY_CONFIRM_SELECT
 from module.shop.base import ShopItemGrid_250814
 from module.shop.clerk import ShopClerk
 from module.shop.shop_status import ShopStatus

@@ -7,7 +7,21 @@ from module.exception import ScriptError
 from module.logger import logger
 from module.ocr.ocr import Digit, DigitCounter
 from module.retire.retirement import Retirement
-from module.shop.assets import *
+from module.shop.assets import (
+    AMOUNT_MAX,
+    AMOUNT_MINUS,
+    AMOUNT_PLUS,
+    SELECT_MINUS,
+    SELECT_PLUS,
+    SHOP_AMOUNT,
+    SHOP_BUY_CONFIRM,
+    SHOP_BUY_CONFIRM_AMOUNT,
+    SHOP_BUY_CONFIRM_SELECT,
+    SHOP_SELECT_PR1,
+    SHOP_SELECT_PR2,
+    SHOP_SELECT_PR3,
+    SHOP_SELECT_STOCK,
+)
 from module.shop.base import ShopBase
 from module.shop.shop_select_globals import *
 from module.ui.assets import SHOP_BACK_ARROW

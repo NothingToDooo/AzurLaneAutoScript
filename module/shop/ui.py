@@ -2,7 +2,23 @@ from module.base.button import ButtonGrid
 from module.base.decorator import cached_property
 from module.handler.assets import POPUP_CONFIRM
 from module.logger import logger
-from module.shop.assets import *
+from module.shop.assets import (
+    NAV_GENERAL,
+    NAV_MONTHLY,
+    SHOP_BUY_CONFIRM_MISTAKE,
+    SHOP_CLICK_SAFE_AREA,
+    SHOP_REFRESH,
+    SHOP_REFRESH_CHECK,
+    TAB_CORE_LIMITED,
+    TAB_CORE_MONTHLY,
+    TAB_GENERAL,
+    TAB_GUILD,
+    TAB_MEDAL,
+    TAB_MERIT,
+    TAB_META,
+    TAB_PRIZE,
+    TAB_PROTOTYPE,
+)
 from module.ui.assets import ACADEMY_GOTO_MUNITIONS, SHOP_BACK_ARROW
 from module.ui.navbar import Navbar
 from module.ui.page import page_academy, page_munitions
