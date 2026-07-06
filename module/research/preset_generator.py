@@ -122,8 +122,8 @@ if __name__ == "__main__":
             new_filter(
                 series_4_tenrai_only_cube="""
                 S4-Q0.5 > S4-DR0.5 > S4-PRY0.5 > S4-Q4 > S4-Q2 > S4-Q1 > !4-0.5
-                > S4-A2 > S4-G1.5 > S4-G4 > !4-1 > reset > S4-H1 > S4-Z2 
-                > S4-DR2.5 > S4-PRY2.5 > S4-G2.5 > !4-1.5 > !4-2 > S4-H2 > !4-2.5 > S4-DR5 > S4-PRY5 
+                > S4-A2 > S4-G1.5 > S4-G4 > !4-1 > reset > S4-H1 > S4-Z2
+                > S4-DR2.5 > S4-PRY2.5 > S4-G2.5 > !4-1.5 > !4-2 > S4-H2 > !4-2.5 > S4-DR5 > S4-PRY5
                 > !4-4 > S4-H4 > S4-C6 > !4-5 > S4-DR8 > S4-PRY8 > S4-C8 > !4-C6 > S4-C12
                 > !4-C8 > !4-C12
             """

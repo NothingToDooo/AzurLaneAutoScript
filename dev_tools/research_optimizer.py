@@ -498,7 +498,7 @@ class SelectedGrids:
             flag = True
             for k, v in kwargs.items():
                 grid_v = grid.__getattribute__(k)
-                if type(grid_v) != type(v) or grid_v != v:
+                if type(grid_v) is not type(v) or grid_v != v:
                     flag = False
             if flag:
                 result.append(grid)
@@ -640,7 +640,7 @@ def hr3(title):
 
 
 FILTER_REGEX = re.compile(
-    "([s\!][1234])?"
+    r"([s\!][1234])?"
     "-?"
     "(neptune|monarch|ibuki|izumo|roon|saintlouis"
     "|seattle|georgia|kitakaze|azuma|friedrich"
@@ -649,7 +649,7 @@ FILTER_REGEX = re.compile(
     "(dr|pry)?"
     "([bcdeghqtaz])?"
     "-?"
-    "(\d.\d|\d\d?)?"
+    r"(\d.\d|\d\d?)?"
 )
 FILTER_ATTR = ("series", "ship", "ship_rarity", "genre", "duration")
 FILTER_PRESET = ("shortest", "cheapest", "reset")

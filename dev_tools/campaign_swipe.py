@@ -145,7 +145,7 @@ def get_multiplier(minitouch_x):
 if __name__ == "__main__":
     """
     To fit MAP_SWIPE_MULTIPLY.
-    
+
     Before running this, move your fleet on map to be like this:
     FL is current fleet, Fl is another fleet.
     Camera should focus on current fleet (Double click switch over to refocus)

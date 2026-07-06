@@ -22,7 +22,7 @@ class ModelProxy:
         try:
             cls.client.hello()
             logger.info("Successfully connected to OCR server")
-        except:
+        except Exception:
             cls.online = False
             logger.warning("Ocr server not running")
 
@@ -49,7 +49,7 @@ class ModelProxy:
             img_str = img_fp.dumps()
             try:
                 return self.client("ocr", self.lang, img_str)
-            except:
+            except Exception:
                 self.online = False
         from module.ocr.models import OCR_MODEL
 
@@ -67,7 +67,7 @@ class ModelProxy:
             img_str = img_fp.dumps()
             try:
                 return self.client("ocr_for_single_line", self.lang, img_str)
-            except:
+            except Exception:
                 self.online = False
         from module.ocr.models import OCR_MODEL
 
@@ -85,7 +85,7 @@ class ModelProxy:
             img_str_list = [img_fp.dumps() for img_fp in img_list]
             try:
                 return self.client("ocr_for_single_lines", self.lang, img_str_list)
-            except:
+            except Exception:
                 self.online = False
         from module.ocr.models import OCR_MODEL
 
@@ -95,7 +95,7 @@ class ModelProxy:
         if self.online:
             try:
                 return self.client("set_cand_alphabet", self.lang, cand_alphabet)
-            except:
+            except Exception:
                 self.online = False
         from module.ocr.models import OCR_MODEL
 
@@ -114,7 +114,7 @@ class ModelProxy:
             img_str = img_fp.dumps()
             try:
                 return self.client("atomic_ocr", self.lang, img_str, cand_alphabet)
-            except:
+            except Exception:
                 self.online = False
         from module.ocr.models import OCR_MODEL
 
@@ -133,7 +133,7 @@ class ModelProxy:
             img_str = img_fp.dumps()
             try:
                 return self.client("atomic_ocr_for_single_line", self.lang, img_str, cand_alphabet)
-            except:
+            except Exception:
                 self.online = False
         from module.ocr.models import OCR_MODEL
 
@@ -152,7 +152,7 @@ class ModelProxy:
             img_str_list = [img_fp.dumps() for img_fp in img_list]
             try:
                 return self.client("atomic_ocr_for_single_lines", self.lang, img_str_list, cand_alphabet)
-            except:
+            except Exception:
                 self.online = False
         from module.ocr.models import OCR_MODEL
 
@@ -170,7 +170,7 @@ class ModelProxy:
             img_str_list = [img_fp.dumps() for img_fp in img_list]
             try:
                 return self.client("debug", self.lang, img_str_list)
-            except:
+            except Exception:
                 self.online = False
         from module.ocr.models import OCR_MODEL
 

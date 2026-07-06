@@ -29,7 +29,7 @@ class Function:
 
     def __str__(self):
         enable = "Enable" if self.enable else "Disable"
-        return f"{self.command} ({enable}, {str(self.next_run)})"
+        return f"{self.command} ({enable}, {self.next_run!s})"
 
     __repr__ = __str__
 

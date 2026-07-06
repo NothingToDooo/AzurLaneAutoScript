@@ -49,8 +49,19 @@ target-version = "py314"
 [tool.ruff.lint]
 select = [
     "E713",
+    "E712",
+    "E721",
+    "E722",
+    "F821",
     "F541",
+    "F841",
     "I",
+    "RUF006",
+    "RUF010",
+    "RUF017",
+    "RUF019",
+    "RUF021",
+    "RUF046",
     "RUF100",
     "UP004",
     "UP008",
@@ -61,6 +72,9 @@ select = [
     "UP037",
     "UP039",
     "UP041",
+    "W291",
+    "W293",
+    "W605",
 ]
 ignore = [
     "E501",

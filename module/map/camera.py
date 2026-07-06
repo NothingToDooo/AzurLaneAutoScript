@@ -40,7 +40,7 @@ class Camera(MapOperation):
             bool: if camera moved.
         """
         vector = np.array(vector)
-        name = "MAP_SWIPE_" + "_".join([str(int(round(x))) for x in vector])
+        name = "MAP_SWIPE_" + "_".join([str(round(x)) for x in vector])
         if np.any(np.abs(vector) > self.config.MAP_SWIPE_DROP):
             # 地图格子滑动倍率按 minitouch 固定。
             distance = self.view.swipe_base * self.config.MAP_SWIPE_MULTIPLY_MINITOUCH

@@ -51,8 +51,8 @@ class SLPP:
         self.at = 0
         self.len = 0
         self.depth = 0
-        self.space = re.compile("\s", re.M)
-        self.alnum = re.compile("\w", re.M)
+        self.space = re.compile(r"\s", re.M)
+        self.alnum = re.compile(r"\w", re.M)
         self.newline = "\n"
         self.tab = "\t"
 
@@ -82,7 +82,7 @@ class SLPP:
 
         if isinstance(obj, str):
             s += '"%s"' % obj.replace(r'"', r"\"")
-        elif six.PY2 and isinstance(obj, unicode):
+        elif six.PY2 and isinstance(obj, six.text_type):
             s += '"%s"' % obj.encode("utf-8").replace(r'"', r"\"")
         elif six.PY3 and isinstance(obj, bytes):
             s += '"{}"'.format("".join(rf"\x{c:02x}" for c in obj))
@@ -257,7 +257,7 @@ class SLPP:
             return 0
         try:
             return int(n, 0)
-        except:
+        except Exception:
             pass
         return float(n)
 

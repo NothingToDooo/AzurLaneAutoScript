@@ -237,7 +237,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         if any(check):
             logger.info(
                 "At least one ship is below threshold "
-                f"{str(int(self.config.OpsiGeneral_RepairThreshold * 100))}%, "
+                f"{int(self.config.OpsiGeneral_RepairThreshold * 100)!s}%, "
                 "retreating to nearest azur port for repairs"
             )
             self.fleet_repair(revert=revert)
@@ -246,7 +246,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         else:
             logger.info(
                 "No ship found to be below threshold "
-                f"{str(int(self.config.OpsiGeneral_RepairThreshold * 100))}%, "
+                f"{int(self.config.OpsiGeneral_RepairThreshold * 100)!s}%, "
                 "continue OS exploration"
             )
             self.hp_reset()

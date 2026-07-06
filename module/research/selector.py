@@ -26,8 +26,8 @@ FILTER_REGEX = re.compile(
     "(dr|pry)?"
     "([bcdeghqt])?"
     "-?"
-    "(\d{3})?"
-    "(\d.\d|\d\d?)?"
+    r"(\d{3})?"
+    r"(\d.\d|\d\d?)?"
 )
 FILTER_ATTR = ("series", "ship", "ship_rarity", "genre", "number", "duration")
 FILTER_PRESET = ("shortest", "cheapest", "reset")

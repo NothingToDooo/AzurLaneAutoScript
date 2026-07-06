@@ -71,7 +71,7 @@ class RelativeRecord:
 
         while np.sum(mask) < self.images_amount and count < MAX_FRAME:
             count += 1
-            mask_inv = mask == False
+            mask_inv = ~mask
             m = [
                 np.max(cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)) > THRESHOLD
                 for image in self.images[mask_inv]

@@ -107,7 +107,7 @@ class OSChapter:
         lines.append("")
         lines.append("DIC_OS_MAP = {")
         for index, chapter in self.chapter.items():
-            lines.append(f"    {index}: {str(chapter)},")
+            lines.append(f"    {index}: {chapter!s},")
         lines.append("}")
         return lines
 

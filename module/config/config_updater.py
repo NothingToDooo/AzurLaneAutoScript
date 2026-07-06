@@ -180,7 +180,7 @@ class ConfigGenerator:
             old_value = old.get("value", None) if isinstance(old, dict) else old
             value = old.get("value", None) if isinstance(value, dict) else value
             if (
-                type(value) != type(old_value)
+                type(value) is not type(old_value)
                 and old_value is not None
                 and path[2] not in ["SuccessInterval", "FailureInterval"]
             ):
@@ -245,10 +245,10 @@ class ConfigGenerator:
                 visited_group.add(group)
 
             option = ""
-            if "option" in data and data["option"]:
+            if data.get("option"):
                 option = "  # " + ", ".join([str(opt) for opt in data["option"]])
             path = ".".join(path)
-            lines.append(f"    {path_to_arg(path)} = {repr(parse_value(data['value'], data=data))}{option}")
+            lines.append(f"    {path_to_arg(path)} = {parse_value(data['value'], data=data)!r}{option}")
             visited_path.add(path)
 
         with open(filepath_code(), "w", encoding="utf-8", newline="") as f:

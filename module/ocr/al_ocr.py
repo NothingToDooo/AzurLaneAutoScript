@@ -93,7 +93,7 @@ class AlOcr(CnOcr):
 
     def _preprocess_img_array(self, img):
         height, width = img.shape[:2]
-        new_width = int(round(32 / height * width))
+        new_width = round(32 / height * width)
         img = cv2.resize(img, (new_width, 32))
         img = np.expand_dims(img, 0).astype("float32") / 255.0
         return img

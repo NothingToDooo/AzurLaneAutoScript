@@ -77,7 +77,7 @@ class SelectedGrids:
             flag = True
             for k, v in kwargs.items():
                 obj_v = obj.__getattribute__(k)
-                if type(obj_v) != type(v) or obj_v != v:
+                if type(obj_v) is not type(v) or obj_v != v:
                     flag = False
             return flag
 

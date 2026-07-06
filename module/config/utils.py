@@ -242,7 +242,7 @@ def data_to_type(data, **kwargs):
     kwargs.update(data)
     if isinstance(kwargs["value"], bool):
         return "checkbox"
-    elif "option" in kwargs and kwargs["option"]:
+    elif kwargs.get("option"):
         return "select"
     elif "Filter" in kwargs["arg"]:
         return "textarea"
@@ -283,7 +283,7 @@ def dict_to_kv(dictionary, allow_none=True):
     Returns:
         str: Such as `path='Scheduler.ServerUpdate', value=True`
     """
-    return ", ".join([f"{k}={repr(v)}" for k, v in dictionary.items() if allow_none or v is not None])
+    return ", ".join([f"{k}={v!r}" for k, v in dictionary.items() if allow_none or v is not None])
 
 
 def server_timezone() -> timedelta:
@@ -320,7 +320,7 @@ def random_normal_distribution_int(a, b, n=3):
     """
     if a < b:
         output = sum([random.randint(a, b) for _ in range(n)]) / n
-        return int(round(output))
+        return round(output)
     else:
         return b
 

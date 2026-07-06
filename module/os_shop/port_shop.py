@@ -1,3 +1,4 @@
+from itertools import chain
 from typing import List
 
 from module.base.button import ButtonGrid
@@ -34,7 +35,7 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
             list:
         """
         image = self.image_crop((360, 320, 410, 700))
-        result = sum([template.match_multi(image) for template in self.TEMPLATES], [])
+        result = list(chain.from_iterable(template.match_multi(image) for template in self.TEMPLATES))
         logger.attr("Costs", f"{result}")
         return Points([(0.0, m.area[1]) for m in result]).group(threshold=5)
 

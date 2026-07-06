@@ -4,6 +4,7 @@ import time
 from pypresence import AioPresence
 
 RPC: AioPresence = None
+RPC_TASK: asyncio.Task | None = None
 
 
 async def run():
@@ -13,9 +14,9 @@ async def run():
 
 
 def init_discord_rpc():
-    global RPC
+    global RPC, RPC_TASK
     RPC = AioPresence("929437173764223057")
-    asyncio.create_task(run())
+    RPC_TASK = asyncio.create_task(run())
 
 
 def close_discord_rpc():

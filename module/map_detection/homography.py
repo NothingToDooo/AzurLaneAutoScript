@@ -356,7 +356,7 @@ class Homography:
             return None
 
         lines = lines[:, 0, :]
-        rho, theta = lines[:, 0], lines[:, 1]
+        theta = lines[:, 1]
         area = self.config.DETECTING_AREA
         area = area2corner([0, 0, *np.subtract(area[2:], area[:2])])
         area = np.mean(area.reshape((2, 2, 2)), axis=0)

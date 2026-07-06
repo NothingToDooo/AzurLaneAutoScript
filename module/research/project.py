@@ -30,7 +30,7 @@ RESEARCH_DETAIL_GENRE = [
 
 
 def get_research_series_old(image, series_button=RESEARCH_SERIES):
-    """
+    r"""
     Get research series using a simple color detection.
     Counting white lines to detect Roman numerals.
 
@@ -166,7 +166,7 @@ def parse_time(string):
     Returns:
         timedelta: datetime.timedelta instance.
     """
-    result = re.search("(\d+):(\d+):(\d+)", string)
+    result = re.search(r"(\d+):(\d+):(\d+)", string)
     if not result:
         logger.warning(f"Invalid time string: {string}")
         return None
