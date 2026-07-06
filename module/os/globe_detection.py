@@ -1,7 +1,6 @@
 import time
 
 from module.base.utils import *
-from module.config.config import AzurLaneConfig
 from module.logger import logger
 from module.map_detection.homography import Homography
 from module.map_detection.perspective import Perspective

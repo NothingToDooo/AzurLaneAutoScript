@@ -1,6 +1,5 @@
 from module.base.mask import Mask
 from module.base.utils import *
-from module.config.config import AzurLaneConfig
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
 from module.map_detection.utils import fit_points
