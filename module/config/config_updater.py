@@ -478,25 +478,6 @@ class ConfigGenerator:
             'PypiMirror': 'https://mirrors.aliyun.com/pypi/simple',
             'Language': 'zh-CN',
         }
-        aidlux = {
-            'GitExecutable': '/usr/bin/git',
-            'PythonExecutable': '/usr/bin/python',
-            'AdbExecutable': '/usr/bin/adb',
-        }
-
-        docker = {
-            'GitExecutable': '/usr/bin/git',
-            'PythonExecutable': '/usr/local/bin/python',
-            'AdbExecutable': '/usr/bin/adb',
-        }
-
-        linux = {
-            'GitExecutable': '/usr/bin/git',
-            'PythonExecutable': 'python',
-            'AdbExecutable': '/usr/bin/adb',
-            'SSHExecutable': '/usr/bin/ssh',
-            'ReplaceAdb': 'false'
-        }
 
         def update(suffix, *args):
             file = f'./config/deploy.{suffix}.yaml'
@@ -507,12 +488,6 @@ class ConfigGenerator:
 
         update('template')
         update('template-cn', cn)
-        update('template-AidLux', aidlux)
-        update('template-AidLux-cn', aidlux, cn)
-        update('template-docker', docker)
-        update('template-docker-cn', docker, cn)
-        update('template-linux', linux)
-        update('template-linux-cn', linux, cn)
 
     def insert_package(self):
         option = deep_get(self.argument, keys='Emulator.PackageName.option')

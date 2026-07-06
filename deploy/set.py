@@ -6,7 +6,7 @@ from deploy.utils import poor_yaml_read, poor_yaml_write, DEPLOY_TEMPLATE
 """
 Set config/deploy.yaml with commands like
 
-python -m deploy.set GitExecutable=/usr/bin/git PythonExecutable=/usr/bin/python3.8
+python -m deploy.set GitExecutable=git PythonExecutable=./.venv/Scripts/python.exe
 """
 
 

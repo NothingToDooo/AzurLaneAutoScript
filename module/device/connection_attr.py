@@ -21,7 +21,6 @@ class ConnectionAttr:
     adb_binary_list = [
         './bin/adb/adb.exe',
         './.venv/Lib/site-packages/adbutils/binaries/adb.exe',
-        '/usr/bin/adb'
     ]
 
     def __init__(self, config):
