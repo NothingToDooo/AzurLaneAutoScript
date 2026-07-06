@@ -6,7 +6,7 @@ from module.combat.combat import BATTLE_PREPARATION, Combat
 from module.config.utils import DEFAULT_TIME
 from module.logger import logger
 from module.ocr.ocr import DigitCounter
-from module.os_ash.assets import *
+from module.os_ash import assets as ash_assets
 from module.os_handler.map_event import MapEventHandler
 from module.ui.assets import BACK_ARROW
 from module.ui.ui import UI
@@ -34,12 +34,12 @@ class AshCombat(Combat):
         """
         if self.is_combat_executing():
             return False
-        if self.appear(BATTLE_STATUS, offset=(120, 20), interval=self.battle_status_click_interval):
+        if self.appear(ash_assets.BATTLE_STATUS, offset=(120, 20), interval=self.battle_status_click_interval):
             if drop:
                 drop.handle_add(self)
             else:
                 self.device.sleep((0.25, 0.5))
-            self.device.click(BATTLE_STATUS)
+            self.device.click(ash_assets.BATTLE_STATUS)
             return True
         if self.appear(BATTLE_PREPARATION, offset=(30, 30), interval=2):
             self.device.click(BACK_ARROW)
@@ -60,17 +60,17 @@ class AshCombat(Combat):
         if super().handle_battle_preparation():
             return True
 
-        if self.appear_then_click(ASH_START, offset=(30, 30), interval=2):
+        if self.appear_then_click(ash_assets.ASH_START, offset=(30, 30), interval=2):
             return True
         if self.handle_get_items():
             return True
-        if self.appear(BEACON_REWARD):
+        if self.appear(ash_assets.BEACON_REWARD):
             logger.info("Ash beacon already finished.")
             raise AshBeaconFinished
-        if self.appear(BEACON_EMPTY, offset=(20, 20)):
+        if self.appear(ash_assets.BEACON_EMPTY, offset=(20, 20)):
             logger.info("Ash beacon already empty.")
             raise AshBeaconFinished
-        if self.appear(ASH_SHOWDOWN, offset=(20, 20)):
+        if self.appear(ash_assets.ASH_SHOWDOWN, offset=(20, 20)):
             logger.info("Ash beacon already at ASH_SHOWDOWN.")
             raise AshBeaconFinished
 
@@ -91,24 +91,24 @@ class OSAsh(UI, MapEventHandler):
         """
         if self._ash_fully_collected:
             return 0
-        if self.image_color_count(ASH_COLLECT_STATUS, color=(235, 235, 235), threshold=221, count=20):
+        if self.image_color_count(ash_assets.ASH_COLLECT_STATUS, color=(235, 235, 235), threshold=221, count=20):
             logger.info("Ash beacon status: light")
             ocr_collect = DigitCounter(
-                ASH_COLLECT_STATUS, letter=(235, 235, 235), threshold=160, name="OCR_ASH_COLLECT_STATUS"
+                ash_assets.ASH_COLLECT_STATUS, letter=(235, 235, 235), threshold=160, name="OCR_ASH_COLLECT_STATUS"
             )
             ocr_daily = DailyDigitCounter(
-                ASH_DAILY_STATUS, letter=(235, 235, 235), threshold=160, name="OCR_ASH_DAILY_STATUS"
+                ash_assets.ASH_DAILY_STATUS, letter=(235, 235, 235), threshold=160, name="OCR_ASH_DAILY_STATUS"
             )
-        elif self.image_color_count(ASH_COLLECT_STATUS, color=(140, 142, 140), threshold=221, count=20):
+        elif self.image_color_count(ash_assets.ASH_COLLECT_STATUS, color=(140, 142, 140), threshold=221, count=20):
             logger.info("Ash beacon status: gray")
             ocr_collect = DigitCounter(
-                ASH_COLLECT_STATUS, letter=(140, 142, 140), threshold=160, name="OCR_ASH_COLLECT_STATUS"
+                ash_assets.ASH_COLLECT_STATUS, letter=(140, 142, 140), threshold=160, name="OCR_ASH_COLLECT_STATUS"
             )
             ocr_daily = DailyDigitCounter(
-                ASH_DAILY_STATUS, letter=(140, 142, 140), threshold=160, name="OCR_ASH_DAILY_STATUS"
+                ash_assets.ASH_DAILY_STATUS, letter=(140, 142, 140), threshold=160, name="OCR_ASH_DAILY_STATUS"
             )
         else:
-            # If OS daily mission received or finished, the popup will cover beacon status.
+            # 大世界每日任务领取或完成时，弹窗会遮住信标状态。
             logger.info("Ash beacon status is covered, will check next time")
             return 0
 
@@ -127,9 +127,9 @@ class OSAsh(UI, MapEventHandler):
         return status
 
     def _support_call_ash_beacon_task(self):
-        # AshBeacon next run
+        # AshBeacon 下次运行时间。
         next_run = self.config.cross_get(keys="OpsiAshBeacon.Scheduler.NextRun", default=DEFAULT_TIME)
-        # Between the next execution time and the present time is more than 30 minutes
+        # 距离下次执行还有 30 分钟以上时，可以支援调用。
         if next_run - datetime.now() > timedelta(minutes=30):
             return True
         return False

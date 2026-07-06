@@ -4,12 +4,12 @@ from module.base.utils import area_pad
 from module.campaign.run import CampaignRun
 from module.logger import logger
 from module.ocr.ocr import Digit
-from module.sos.assets import *
+from module.sos import assets as sos_assets
 from module.ui.assets import CAMPAIGN_CHECK
 from module.ui.page import page_campaign
 from module.ui.scroll import Scroll
 
-OCR_SOS_SIGNAL = Digit(OCR_SIGNAL, letter=(255, 255, 255), threshold=128, name="OCR_SOS_SIGNAL")
+OCR_SOS_SIGNAL = Digit(sos_assets.OCR_SIGNAL, letter=(255, 255, 255), threshold=128, name="OCR_SOS_SIGNAL")
 
 
 class CampaignSos(CampaignRun, CampaignBase):
@@ -19,7 +19,7 @@ class CampaignSos(CampaignRun, CampaignBase):
 
     @cached_property
     def _sos_scroll(self):
-        return Scroll(SOS_SCROLL_AREA, color=(164, 173, 189), name="SOS_SCROLL")
+        return Scroll(sos_assets.SOS_SCROLL_AREA, color=(164, 173, 189), name="SOS_SCROLL")
 
     @cached_property
     def _sos_chapter_ocr(self):
@@ -35,9 +35,9 @@ class CampaignSos(CampaignRun, CampaignBase):
         Returns:
             Button: signal search button or goto button of the target chapter
         """
-        signal_search_buttons = TEMPLATE_SIGNAL_SEARCH.match_multi(self.device.image)
-        sos_goto_buttons = TEMPLATE_SIGNAL_GOTO.match_multi(self.device.image)
-        sos_confirm_buttons = TEMPLATE_SIGNAL_CONFIRM.match_multi(self.device.image)
+        signal_search_buttons = sos_assets.TEMPLATE_SIGNAL_SEARCH.match_multi(self.device.image)
+        sos_goto_buttons = sos_assets.TEMPLATE_SIGNAL_GOTO.match_multi(self.device.image)
+        sos_confirm_buttons = sos_assets.TEMPLATE_SIGNAL_CONFIRM.match_multi(self.device.image)
         all_buttons = sos_goto_buttons + signal_search_buttons + sos_confirm_buttons
         if not len(all_buttons):
             logger.info("No SOS chapter found")
@@ -71,9 +71,9 @@ class CampaignSos(CampaignRun, CampaignBase):
         """
         logger.hr(f"Select chapter {chapter} signal ")
         self.ui_click(
-            SIGNAL_SEARCH_ENTER,
+            sos_assets.SIGNAL_SEARCH_ENTER,
             appear_button=CAMPAIGN_CHECK,
-            check_button=SIGNAL_LIST_CHECK,
+            check_button=sos_assets.SIGNAL_LIST_CHECK,
             skip_first_screenshot=True,
         )
         if chapter in [3, 4, 5]:
@@ -115,16 +115,16 @@ class CampaignSos(CampaignRun, CampaignBase):
             else:
                 self.device.screenshot()
 
-            if self.appear(SIGNAL_LIST_CHECK, offset=(20, 20), interval=2):
+            if self.appear(sos_assets.SIGNAL_LIST_CHECK, offset=(20, 20), interval=2):
                 image = self.image_crop(area_pad(entrance.area, pad=-30), copy=False)
-                if TEMPLATE_SIGNAL_SEARCH.match(image):
+                if sos_assets.TEMPLATE_SIGNAL_SEARCH.match(image):
                     self.device.click(entrance)
-                if TEMPLATE_SIGNAL_GOTO.match(image):
+                if sos_assets.TEMPLATE_SIGNAL_GOTO.match(image):
                     self.device.click(entrance)
-                if TEMPLATE_SIGNAL_CONFIRM.match(image):
+                if sos_assets.TEMPLATE_SIGNAL_CONFIRM.match(image):
                     self.device.click(entrance)
 
-            # End
+            # 结束。
             if self.appear(CAMPAIGN_CHECK, offset=(20, 20)):
                 break
 
@@ -148,14 +148,14 @@ class CampaignSos(CampaignRun, CampaignBase):
         self.ui_ensure(page_campaign)
 
         while 1:
-            # End
+            # 结束。
             remain = OCR_SOS_SIGNAL.ocr(self.device.image)
             logger.attr("SOS signal", remain)
             if remain <= 0:
                 logger.info("All SOS signals cleared")
                 break
 
-            # Run
+            # 执行。
             if self._sos_signal_select(self.config.Sos_Chapter):
                 name = f"campaign_{self.config.Sos_Chapter}_5"
                 self.config.override(Campaign_Name=name)
@@ -166,13 +166,13 @@ class CampaignSos(CampaignRun, CampaignBase):
                     self.config.task_stop()
             else:
                 self.ui_click(
-                    SIGNAL_SEARCH_CLOSE,
-                    appear_button=SIGNAL_LIST_CHECK,
+                    sos_assets.SIGNAL_SEARCH_CLOSE,
+                    appear_button=sos_assets.SIGNAL_LIST_CHECK,
                     check_button=CAMPAIGN_CHECK,
                     skip_first_screenshot=True,
                 )
                 logger.warning(f"Failed to clear SOS signals, cannot locate chapter {self.config.Sos_Chapter}")
                 break
 
-        # Scheduler
+        # 调度器。
         self.config.task_delay(server_update=True)

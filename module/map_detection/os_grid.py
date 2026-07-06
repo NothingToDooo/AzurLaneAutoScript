@@ -4,21 +4,21 @@ import numpy as np
 from module.base.utils import area_pad, color_similarity_2d, crop, rgb2gray
 from module.map_detection.grid import Grid, GridInfo, GridPredictor
 from module.map_detection.utils_assets import ASSETS
-from module.os.assets import *
+from module.os import assets as os_assets
 from module.os.radar import RadarGrid
-from module.template.assets import *
+from module.template import assets as template_assets
 
 
 class OSGridInfo(GridInfo):
     is_os = True
 
-    is_enemy = False  # Red gun
-    is_resource = False  # green box to get items
-    is_exclamation = False  # Yellow exclamation mark '!'
-    is_meowfficer = False  # Blue meowfficer
-    is_question = False  # White question mark '?'
-    is_ally = False  # Ally cargo ship in daily mission, yellow '!' on radar
-    is_akashi = False  # White question mark '?'
+    is_enemy = False  # 红色炮击图标。
+    is_resource = False  # 可拾取道具的绿色箱子。
+    is_exclamation = False  # 黄色感叹号“!”。
+    is_meowfficer = False  # 蓝色指挥喵。
+    is_question = False  # 白色问号“?”。
+    is_ally = False  # 每日任务友方运输船，雷达上显示黄色“!”。
+    is_akashi = False  # 白色问号“?”。
     is_scanning_device = False
     is_logging_tower = False
     is_exploration_reward = False
@@ -30,7 +30,7 @@ class OSGridInfo(GridInfo):
 
     @property
     def is_interactive_only(self):
-        # Fleet can't goto this grid, but can only interact next to it
+        # 舰队不能移动到这个格子，只能在相邻格交互。
         return self.is_ally or self.is_akashi
 
     def encode(self):
@@ -183,7 +183,7 @@ class OSGridPredictor(GridPredictor):
                 self.enemy_scale = 0
 
     def predict_fleet(self):
-        # OS don't have ammo icon
+        # 大世界没有弹药图标。
         return super().predict_current_fleet()
 
     def predict_sea(self):
@@ -212,14 +212,14 @@ class OSGridPredictor(GridPredictor):
         return False
 
     _os_template_enemy = {
-        "Akashi": TEMPLATE_SIREN_Akashi,
-        "ScanningDevice": TEMPLATE_ScanningDevice,
-        "LoggingTower": TEMPLATE_LoggingTower,
-        "ExplorationReward": TEMPLATE_ExplorationReward,
+        "Akashi": template_assets.TEMPLATE_SIREN_Akashi,
+        "ScanningDevice": os_assets.TEMPLATE_ScanningDevice,
+        "LoggingTower": os_assets.TEMPLATE_LoggingTower,
+        "ExplorationReward": os_assets.TEMPLATE_ExplorationReward,
     }
     _os_template_enemy_upper = {
-        "ScanningDevice": TEMPLATE_ScanningDeviceUpper,
-        "LoggingTower": TEMPLATE_LoggingTowerUpper,
+        "ScanningDevice": os_assets.TEMPLATE_ScanningDeviceUpper,
+        "LoggingTower": os_assets.TEMPLATE_LoggingTowerUpper,
     }
 
     def predict_enemy_genre(self):
@@ -248,12 +248,12 @@ class OSGridPredictor(GridPredictor):
         red = color_similarity_2d(image, (255, 130, 132))
         yellow = color_similarity_2d(image, (255, 235, 156))
 
-        if TEMPLATE_ENEMY_L.match(red):
+        if template_assets.TEMPLATE_ENEMY_L.match(red):
             scale = 3
-        elif TEMPLATE_ENEMY_M.match(yellow):
+        elif template_assets.TEMPLATE_ENEMY_M.match(yellow):
             scale = 2
-        # Disable the detection of 1 triangle enemies
-        # In OS, light tower on map will detect to be 1 triangle enemy
+        # 禁用 1 三角敌人识别。
+        # 大世界地图上的灯塔会被识别成 1 三角敌人。
         # elif TEMPLATE_ENEMY_S.match(yellow):
         #     scale = 1
         else:
@@ -263,32 +263,32 @@ class OSGridPredictor(GridPredictor):
 
     def predict_resource(self):
         image = rgb2gray(self.relative_crop((-0.5, -1, 0.5, 0), shape=(60, 60)))
-        return TEMPLATE_OS_Resource.match(image, similarity=0.85)
+        return template_assets.TEMPLATE_OS_Resource.match(image, similarity=0.85)
 
     def predict_meowfficer(self):
         image = rgb2gray(self.image_trans)
-        return TEMPLATE_OS_Meowfficer.match(image, similarity=0.85)
+        return template_assets.TEMPLATE_OS_Meowfficer.match(image, similarity=0.85)
 
     def predict_ally(self):
-        # Ally cargo ship in daily mission
+        # 每日任务友方运输船。
         image = rgb2gray(self.relative_crop((-0.5, -0.5, 0.5, 0.5), shape=(60, 60)))
-        return TEMPLATE_OS_AllyCargo.match(image, similarity=0.85)
+        return template_assets.TEMPLATE_OS_AllyCargo.match(image, similarity=0.85)
 
     def predict_akashi(self):
         image = rgb2gray(self.relative_crop((-0.5, -1, 0.5, 0), shape=(60, 60)))
-        return TEMPLATE_SIREN_Akashi.match(image, similarity=0.85)
+        return template_assets.TEMPLATE_SIREN_Akashi.match(image, similarity=0.85)
 
     def predict_caught_by_siren(self):
-        # Detect the red slash background of `In action`.
+        # 检测“In action”的红色斜线背景。
         return (
             self.relative_rgb_count(area=(-1, -0.5, 0, 0.5), color=(255, 109, 91), shape=(50, 50), threshold=221) > 120
         )
 
     def predict_fleet_mechanism(self):
-        # Get the upper border
+        # 取得上边框。
         area = self.grid2screen(np.array([(0, 0), (1, 0.2)]))
         area = np.rint(area.flatten()).astype(int).tolist()
-        # It should in cyan
+        # 颜色应该是青色。
         h = (185, 195)
         s = (15, 90)
         v = (60, 100)
@@ -296,21 +296,19 @@ class OSGridPredictor(GridPredictor):
         lower = (h[0] / 2, s[0] * 2.55, v[0] * 2.55)
         upper = (h[1] / 2 + 1, s[1] * 2.55 + 1, v[1] * 2.55 + 1)
         image = cv2.inRange(image, lower, upper)
-        # Flatten to a horizontal line
+        # 压平成水平线。
         line = np.max(image, axis=0)
-        # Line should be continuous
-        # If not, a fleet may stand on it
+        # 线条应该连续；如果不连续，可能有舰队站在上面。
         if np.mean(line) < 180:
             return False
-        # Should also have random white rectangles
+        # 还应该有随机白色矩形。
         area = self.grid2screen(np.array([(0.2, 0.2), (0.8, 0.8)]))
         area = np.rint(area.flatten()).astype(int).tolist()
         image = color_similarity_2d(crop(self.image, area, copy=False), color=(255, 255, 255))
         count = image[image > 221].shape[0]
         if count < 30:
             return False
-        # Shouldn't contain any thing green or yellow
-        # Green is island and yellow is belt
+        # 不应该包含绿色或黄色，绿色是岛，黄色是路径带。
         # image = cv2.cvtColor(crop(self.image, area), cv2.COLOR_RGB2HSV)
         # h = (0, 180)
         # s = (30, 90)
@@ -320,9 +318,9 @@ class OSGridPredictor(GridPredictor):
         # image_in_range = cv2.inRange(image, lower, upper)
         # if image_in_range[image_in_range > 0].shape[0] > 30:
         #     return False
-        # Should match the letter `2`
+        # 应该匹配数字“2”。
         image = rgb2gray(self.image_trans)
-        sim, button = TEMPLATE_FleetMechanism.match_result(image)
+        sim, button = os_assets.TEMPLATE_FleetMechanism.match_result(image)
         point = (53, 37)
         distance = np.linalg.norm(np.subtract(button.area[:2], point))
         if distance > 5 or sim < 0.3:
