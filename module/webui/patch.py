@@ -1,5 +1,6 @@
 import asyncio
 from functools import partial, wraps
+from importlib.util import find_spec
 
 from module.logger import logger
 from module.webui.setting import cached_class_property
@@ -42,9 +43,7 @@ def patch_executor():
     Limit pool size in loop.run_in_executor
     so starlette.staticfiles -> aiofiles won't create tons of threads
     """
-    try:
-        import aiofiles
-    except ImportError:
+    if find_spec("aiofiles") is None:
         return
 
     loop = get_or_create_event_loop()
