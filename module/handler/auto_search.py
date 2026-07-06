@@ -1,7 +1,6 @@
 import numpy as np
 
 from module.base.button import ButtonGrid
-from module.base.decorator import Config
 from module.base.timer import Timer
 from module.handler.assets import *
 from module.handler.enemy_searching import EnemySearchingHandler
@@ -28,18 +27,6 @@ dic_setting_index_to_name = {v: k for k, v in dic_setting_name_to_index.items()}
 
 
 class AutoSearchHandler(EnemySearchingHandler):
-    @Config.when(SERVER="en")
-    def _fleet_sidebar(self):
-        if FLEET_PREPARATION_CHECK.match(self.device.image, offset=(20, 80)):
-            offset = np.subtract(FLEET_PREPARATION_CHECK.button, FLEET_PREPARATION_CHECK._button)[1]
-        else:
-            offset = 0
-        logger.attr("_fleet_sidebar_offset", offset)
-        return ButtonGrid(
-            origin=(1178, 171 + offset), delta=(0, 53), button_shape=(98, 42), grid_shape=(1, 3), name="FLEET_SIDEBAR"
-        )
-
-    @Config.when(SERVER=None)
     def _fleet_sidebar(self):
         if FLEET_PREPARATION_CHECK.match(self.device.image, offset=(20, 80)):
             offset = np.subtract(FLEET_PREPARATION_CHECK.button, FLEET_PREPARATION_CHECK._button)[1]
