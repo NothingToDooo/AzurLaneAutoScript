@@ -1,7 +1,10 @@
+import module.logger
 from dev_tools.utils import LuaLoader
 from module.base.utils import location2node
-from module.logger import logger  # Change folder automatically
 from module.os.map_data import DIC_OS_MAP
+
+# 导入 module.logger 会切换到项目根目录。
+_ = module.logger
 
 
 class OSChapter:

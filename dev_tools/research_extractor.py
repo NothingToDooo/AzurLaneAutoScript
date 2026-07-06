@@ -1,5 +1,8 @@
+import module.logger
 from dev_tools.utils import LuaLoader
-from module.logger import logger  # Change folder automatically
+
+# 导入 module.logger 会切换到项目根目录。
+_ = module.logger
 
 
 class Item:

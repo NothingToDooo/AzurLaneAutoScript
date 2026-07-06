@@ -2,11 +2,13 @@ import os
 import re
 from contextlib import suppress
 
-from dev_tools.slpp import slpp
+import module.logger
 from dev_tools.utils import LuaLoader
 from module.base.utils import location2node
-from module.logger import logger
 from module.map.utils import *
+
+# 导入 module.logger 会切换到项目根目录。
+_ = module.logger
 
 """
 This an auto-tool to extract map files used in Alas.
