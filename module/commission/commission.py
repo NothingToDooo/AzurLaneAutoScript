@@ -6,8 +6,8 @@ from scipy import signal
 
 from module.base.timer import Timer
 from module.base.utils import crop, image_size, rgb2gray
-from module.combat.assets import *
-from module.commission.assets import *
+from module.combat import assets as combat_assets
+from module.commission import assets as commission_assets
 from module.commission.preset import DICT_FILTER_PRESET, SHORTEST_FILTER
 from module.commission.project import COMMISSION_FILTER, Commission
 from module.config.config_generated import GeneratedConfig
@@ -26,9 +26,9 @@ from module.ui.ui import UI
 from module.ui_white.assets import REWARD_1_WHITE, REWARD_GOTO_COMMISSION_WHITE
 
 COMMISSION_SWITCH = Switch("Commission_switch", is_selector=True)
-COMMISSION_SWITCH.add_state("daily", COMMISSION_DAILY)
-COMMISSION_SWITCH.add_state("urgent", COMMISSION_URGENT)
-COMMISSION_SCROLL = Scroll(COMMISSION_SCROLL_AREA, color=(247, 211, 66), name="COMMISSION_SCROLL")
+COMMISSION_SWITCH.add_state("daily", commission_assets.COMMISSION_DAILY)
+COMMISSION_SWITCH.add_state("urgent", commission_assets.COMMISSION_URGENT)
+COMMISSION_SCROLL = Scroll(commission_assets.COMMISSION_SCROLL_AREA, color=(247, 211, 66), name="COMMISSION_SCROLL")
 
 
 def lines_detect(image):
@@ -39,13 +39,13 @@ def lines_detect(image):
     Returns:
         np.ndarray: Coordinate Y of the white lines under each commission.
     """
-    # Find white lines under each commission to locate them.
-    # (597, 0, 619, 720) is somewhere with white lines only.
+    # 通过每个委托下方的白线定位委托条目。
+    # (597, 0, 619, 720) 是只包含白线的区域。
     color_height = np.mean(rgb2gray(crop(image, (597, 0, 619, 720), copy=False)), axis=1)
     parameters = {"height": 200, "distance": 100}
     peaks, _ = signal.find_peaks(color_height, **parameters)
-    # 67 is the height of commission list header
-    # 117 is the height of one commission card.
+    # 67 是委托列表头部高度。
+    # 117 是单个委托卡片高度。
     peaks = [y for y in peaks if y > 67 + 117]
     return np.array(peaks)
 
@@ -121,10 +121,9 @@ class RewardCommission(UI, InfoHandler):
             SelectedGrids, SelectedGrids: Chosen daily commission, Chosen urgent commission
         """
         self.comm_choose = SelectedGrids([])
-        # Count Commission
+        # 合并委托。
         total = daily.add_by_eq(urgent)
-        # Commissions with higher suffix are always below those with smaller suffix
-        # Reverse the commission list to choose commissions with higher suffix first
+        # 后缀更大的委托总是在后缀更小的委托下方，反转后优先选择高后缀委托。
         total = total[::-1]
         self.max_commission = 4
         for comm in total:
@@ -133,7 +132,7 @@ class RewardCommission(UI, InfoHandler):
         running_count = int(np.sum([1 for c in total if c.status == "running"]))
         logger.attr("Running", f"{running_count}/{self.max_commission}")
 
-        # Load filter string
+        # 加载筛选字符串。
         preset = self.config.Commission_PresetFilter
         if preset == "custom":
             string = self.config.Commission_CustomFilter
@@ -149,20 +148,20 @@ class RewardCommission(UI, InfoHandler):
             string = DICT_FILTER_PRESET[preset]
         logger.attr("Commission Filter", preset)
 
-        # Filter
+        # 执行筛选。
         COMMISSION_FILTER.load(string)
         run = COMMISSION_FILTER.apply(total.grids, func=self._commission_check)
         logger.attr("Filter_sort", " > ".join([str(c) for c in run]))
         run = SelectedGrids(run)
 
-        # Add shortest
+        # 不足时补最短委托。
         no_shortest = run.delete(SelectedGrids(["shortest"]))
         if no_shortest.count + running_count < self.max_commission:
             if daily.count:
                 logger.info("Not enough commissions to run, add shortest daily commissions")
                 COMMISSION_FILTER.load(SHORTEST_FILTER)
                 shortest = COMMISSION_FILTER.apply(daily[::-1], func=self._commission_check)
-                # Reverse the daily list to choose better commissions
+                # 反转日常委托列表，优先选择更好的委托。
                 run = no_shortest.add_by_eq(SelectedGrids(shortest))
                 logger.attr("Filter_sort", " > ".join([str(c) for c in run]))
             else:
@@ -172,7 +171,7 @@ class RewardCommission(UI, InfoHandler):
         if running_count >= self.max_commission:
             return SelectedGrids([]), SelectedGrids([])
 
-        # Separate daily and urgent
+        # 分离日常委托和紧急委托。
         run = run[: self.max_commission - running_count]
         daily_choose = run.intersect_by_eq(daily)
         urgent_choose = run.intersect_by_eq(urgent)
@@ -204,9 +203,8 @@ class RewardCommission(UI, InfoHandler):
 
     def _commission_ensure_mode(self, mode):
         if COMMISSION_SWITCH.set(mode, main=self):
-            # If daily list has commissions > 4, usually to be 5, and 1 <= urgent <= 4
-            # commission list will have an animation to scroll,
-            # which causes the topmost one undetected.
+            # 日常委托超过 4 个时通常会有 5 个，紧急委托则是 1 到 4 个。
+            # 委托列表的滚动动画会导致最上方条目漏检。
             if (
                 not COMMISSION_SCROLL.appear(main=self)
                 or COMMISSION_SCROLL.cal_position(main=self) < 0.05
@@ -231,9 +229,9 @@ class RewardCommission(UI, InfoHandler):
 
     def _commission_mode_reset(self):
         logger.hr("Commission mode reset")
-        if self.appear(COMMISSION_DAILY):
+        if self.appear(commission_assets.COMMISSION_DAILY):
             current, another = "daily", "urgent"
-        elif self.appear(COMMISSION_URGENT):
+        elif self.appear(commission_assets.COMMISSION_URGENT):
             current, another = "urgent", "daily"
         else:
             logger.warning("Unknown Commission mode")
@@ -271,7 +269,7 @@ class RewardCommission(UI, InfoHandler):
             new = self.commission_detect(trial=2)
             commission = commission.add_by_eq(new)
 
-            # End
+            # 结束。
             if not self._commission_swipe():
                 break
 
@@ -285,7 +283,7 @@ class RewardCommission(UI, InfoHandler):
             out: page_commission
         """
         logger.hr("Commission scan", level=1)
-        # Urgent list is lazy loaded. Check it first for a force update.
+        # 紧急委托列表是懒加载的，先切过去强制刷新。
         self._commission_ensure_mode("urgent")
 
         logger.hr("Scan daily", level=2)
@@ -299,11 +297,10 @@ class RewardCommission(UI, InfoHandler):
             self._commission_ensure_mode("urgent")
             self._commission_swipe_to_top()
             urgent = self._commission_scan_list()
-            # Convert extra commission to night
+            # 将额外委托转换为夜间委托。
             urgent.call("convert_to_night")
 
-            # Not in 21:00~03:00, but scanned night commissions
-            # Probably some outdated commissions, a refresh should solve it
+            # 不在 21:00~03:00，却扫到了夜间委托，多半是过期数据，刷新一次即可。
             if datetime.now() - get_server_next_update("21:00") > timedelta(hours=6):
                 night = urgent.select(category_str="night")
                 if night:
@@ -311,7 +308,7 @@ class RewardCommission(UI, InfoHandler):
                     for comm in night:
                         logger.attr("Commission", comm)
                     logger.info("Re-scan urgent commission list")
-                    # Poor sleep but acceptable in rare cases
+                    # 这里虽然是硬等待，但只在罕见刷新异常时触发，可以接受。
                     self.device.sleep(2)
                     self._commission_ensure_mode("daily")
                     continue
@@ -349,8 +346,8 @@ class RewardCommission(UI, InfoHandler):
             out: page_commission, info_bar, commission details unfold
         """
         logger.hr("Commission start")
-        self.interval_clear(COMMISSION_ADVICE)
-        self.interval_clear(COMMISSION_START)
+        self.interval_clear(commission_assets.COMMISSION_ADVICE)
+        self.interval_clear(commission_assets.COMMISSION_START)
         comm_timer = Timer(7)
         count = 0
         while 1:
@@ -359,38 +356,36 @@ class RewardCommission(UI, InfoHandler):
             else:
                 self.device.screenshot()
 
-            # End
+            # 结束。
             if self.info_bar_count():
                 break
             if count >= 3:
-                # Restart game and handle commission recommend bug.
-                # After you click "Recommend", your ships appear and then suddenly disappear.
-                # At the same time, the icon of commission is flashing.
+                # 重启游戏以处理委托推荐 bug：点击“推荐”后舰船短暂出现又消失，同时委托图标闪烁。
                 logger.warning("Triggered commission list flashing bug")
                 raise GameStuckError("Triggered commission list flashing bug")
 
-            # Click
-            if self.match_template_color(COMMISSION_START, offset=(5, 20), interval=7):
-                self.device.click(COMMISSION_START)
-                self.interval_reset(COMMISSION_ADVICE)
+            # 点击开始。
+            if self.match_template_color(commission_assets.COMMISSION_START, offset=(5, 20), interval=7):
+                self.device.click(commission_assets.COMMISSION_START)
+                self.interval_reset(commission_assets.COMMISSION_ADVICE)
                 comm_timer.reset()
                 continue
             if self.handle_popup_confirm("COMMISSION_START"):
-                self.interval_reset(COMMISSION_ADVICE)
+                self.interval_reset(commission_assets.COMMISSION_ADVICE)
                 comm_timer.reset()
                 continue
-            # Accidentally entered dock
+            # 意外进入船坞。
             if self.appear(DOCK_CHECK, offset=(20, 20), interval=3):
                 logger.info(f"equip_enter {DOCK_CHECK} -> {BACK_ARROW}")
                 self.device.click(BACK_ARROW)
                 comm_timer.reset()
                 continue
-            # Check if is the right commission
-            if self.appear(COMMISSION_ADVICE, offset=(5, 20), interval=7):
-                area = (0, 0, image_size(self.device.image)[0], COMMISSION_ADVICE.button[1])
+            # 检查是否选中了目标委托。
+            if self.appear(commission_assets.COMMISSION_ADVICE, offset=(5, 20), interval=7):
+                area = (0, 0, image_size(self.device.image)[0], commission_assets.COMMISSION_ADVICE.button[1])
                 current = self.commission_detect(area=area)
                 if is_urgent:
-                    current.call("convert_to_night")  # Convert extra commission to night
+                    current.call("convert_to_night")  # 将额外委托转换为夜间委托。
                 if current.count >= 1:
                     current = current[0]
                     if current == comm:
@@ -400,13 +395,13 @@ class RewardCommission(UI, InfoHandler):
                         return False
                 else:
                     logger.warning("No selected commission detected, assuming correct")
-                self.device.click(COMMISSION_ADVICE)
+                self.device.click(commission_assets.COMMISSION_ADVICE)
                 count += 1
-                self.interval_reset(COMMISSION_ADVICE)
-                self.interval_clear(COMMISSION_START)
+                self.interval_reset(commission_assets.COMMISSION_ADVICE)
+                self.interval_clear(commission_assets.COMMISSION_START)
                 comm_timer.reset()
                 continue
-            # Enter
+            # 进入委托。
             if comm_timer.reached():
                 self.device.click(comm.button)
                 self.device.sleep(0.3)
@@ -432,10 +427,9 @@ class RewardCommission(UI, InfoHandler):
             for _ in range(15):
                 new = self.commission_detect(trial=2)
                 if is_urgent:
-                    new.call("convert_to_night")  # Convert extra commission to night
+                    new.call("convert_to_night")  # 将额外委托转换为夜间委托。
 
-                # Update commission position.
-                # In different scans, they have the same information, but have different locations.
+                # 更新委托位置；不同扫描里的信息相同，但坐标可能不同。
                 current = None
                 for new_comm in new:
                     if new_comm == comm:
@@ -450,7 +444,7 @@ class RewardCommission(UI, InfoHandler):
                         failed = False
                         break
 
-                # End
+                # 结束。
                 if not self._commission_swipe():
                     break
 
@@ -522,58 +516,64 @@ class RewardCommission(UI, InfoHandler):
                 else:
                     self.device.screenshot()
 
-                # End
+                # 结束。
                 if self.ui_page_appear(page_commission, offset=(20, 20)):
-                    # Leaving at page_commission
-                    # Commission rewards may appear too slow, causing stuck in UI switching
+                    # 留在委托页时，委托奖励可能弹出过慢，导致 UI 切换卡住。
                     break
 
-                for button in [EXP_INFO_S_REWARD, GET_ITEMS_1, GET_ITEMS_2, GET_ITEMS_3]:
+                for button in [
+                    commission_assets.EXP_INFO_S_REWARD,
+                    combat_assets.GET_ITEMS_1,
+                    combat_assets.GET_ITEMS_2,
+                    combat_assets.GET_ITEMS_3,
+                ]:
                     if self.appear(button, interval=1):
                         if drop:
                             self.ensure_no_info_bar(timeout=1)
                             drop.add(self.device.image)
 
-                        REWARD_SAVE_CLICK.name = button.name
-                        self.device.click(REWARD_SAVE_CLICK)
+                        commission_assets.REWARD_SAVE_CLICK.name = button.name
+                        self.device.click(commission_assets.REWARD_SAVE_CLICK)
                         click_timer.reset()
                         reward = True
                         continue
-                if click_timer.reached() and self.appear_then_click(REWARD_1, offset=(20, 20), interval=1):
-                    self.interval_reset(GET_SHIP)
+                if click_timer.reached() and self.appear_then_click(
+                    commission_assets.REWARD_1, offset=(20, 20), interval=1
+                ):
+                    self.interval_reset(combat_assets.GET_SHIP)
                     click_timer.reset()
                     reward = True
                     continue
                 if click_timer.reached() and self.appear_then_click(REWARD_1_WHITE, offset=(20, 20), interval=1):
-                    self.interval_reset(GET_SHIP)
+                    self.interval_reset(combat_assets.GET_SHIP)
                     click_timer.reset()
                     reward = True
                     continue
                 if click_timer.reached() and self.appear_then_click(REWARD_GOTO_COMMISSION, offset=(20, 20)):
-                    self.interval_reset(GET_SHIP)
+                    self.interval_reset(combat_assets.GET_SHIP)
                     click_timer.reset()
                     continue
                 if click_timer.reached() and self.appear_then_click(REWARD_GOTO_COMMISSION_WHITE, offset=(20, 20)):
-                    self.interval_reset(GET_SHIP)
+                    self.interval_reset(combat_assets.GET_SHIP)
                     click_timer.reset()
                     continue
                 if self.ui_main_appear_then_click(page_reward, interval=3):
-                    self.interval_reset(GET_SHIP)
-                    # no need to reset click_timer, just instant click REWARD_1
+                    self.interval_reset(combat_assets.GET_SHIP)
+                    # 不需要重置 click_timer，直接立即点击 REWARD_1。
                     # click_timer.reset()
                     continue
-                # handle oil maxed
+                # 处理石油已满。
                 if self.config.SERVER in ["cn"]:
-                    if self.appear(OIL_MAXED, offset=(20, 20), interval=3):
+                    if self.appear(commission_assets.OIL_MAXED, offset=(20, 20), interval=3):
                         raise OilMaxed
-                # Check GET_SHIP at last to handle random white background at page_main
-                for button in [GET_SHIP]:
+                # 最后检查 GET_SHIP，以处理主界面随机白底。
+                for button in [combat_assets.GET_SHIP]:
                     if click_timer.reached() and self.appear(button, interval=1):
                         self.ensure_no_info_bar(timeout=1)
                         drop.add(self.device.image)
 
-                        REWARD_SAVE_CLICK.name = button.name
-                        self.device.click(REWARD_SAVE_CLICK)
+                        commission_assets.REWARD_SAVE_CLICK.name = button.name
+                        self.device.click(commission_assets.REWARD_SAVE_CLICK)
                         click_timer.reset()
                         reward = True
                         continue
@@ -613,12 +613,12 @@ class RewardCommission(UI, InfoHandler):
         self.ui_ensure(page_reward)
         self.commission_receive()
 
-        # info_bar appears when get ship in Launch Ceremony commissions
-        # This is a game bug, the info_bar shows get ship, will appear over and over again, until you click get_ship.
+        # 在“启航庆典”委托获得舰船时会出现信息条。
+        # 这是游戏 bug：信息条会反复显示获得舰船，直到点击 get_ship。
         self.handle_info_bar()
         self.commission_start()
 
-        # Scheduler
+        # 调度下一次委托。
         total = self.daily.add_by_eq(self.urgent)
         future_finish = sorted([f for f in total.get("finish_time") if f is not None])
         logger.info(f"Commission finish: {[str(f) for f in future_finish]}")
@@ -628,7 +628,7 @@ class RewardCommission(UI, InfoHandler):
             logger.info("No commission running")
             self.config.task_delay(success=False)
 
-        # Delay GemsFarming
+        # 必要时延后 GemsFarming。
         if self.config.cross_get(keys="GemsFarming.GemsFarming.CommissionLimit", default=False):
             daily = self.daily.select(category_str="daily", status="pending").count
             filtered_urgent = self.comm_choose.intersect_by_eq(self.urgent.select(status="pending")).count
