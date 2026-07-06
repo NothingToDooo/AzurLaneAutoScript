@@ -5,11 +5,10 @@ from collections import deque
 from functools import wraps
 from itertools import count
 from threading import Lock, Thread
-from typing import Generic, NoReturn, TypeVar
+from typing import NoReturn, TypeVar
 
 from module.logger import logger
 
-ValueT = TypeVar("ValueT", covariant=True)
 ResultT = TypeVar("ResultT")
 
 
@@ -29,7 +28,7 @@ def remove_tb_frames(exc, n: int):
     return exc.with_traceback(tb)
 
 
-class Outcome(abc.ABC, Generic[ValueT]):
+class Outcome[ValueT](abc.ABC):
     @abc.abstractmethod
     def unwrap(self) -> ValueT:
         """Return or raise the contained value or exception.
@@ -42,7 +41,7 @@ class Outcome(abc.ABC, Generic[ValueT]):
         """
 
 
-class Value(Outcome[ValueT], Generic[ValueT]):
+class Value[ValueT](Outcome[ValueT]):
     """Concrete :class:`Outcome` subclass representing a regular value."""
 
     __slots__ = ("value",)
@@ -119,7 +118,7 @@ class _JobKill(Exception):
     pass
 
 
-class Job(Generic[ResultT]):
+class Job[ResultT]:
     """
     A simple queue, copied from queue.Queue()
     Faster but can only put() once and get() once.

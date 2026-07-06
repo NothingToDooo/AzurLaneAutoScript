@@ -1,17 +1,15 @@
 import os
 import re
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar, overload
+from typing import Any, overload
 
 from deploy.atomic import atomic_read_text, atomic_write
-
-T = TypeVar("T")
 
 DEPLOY_CONFIG = "./config/deploy.yaml"
 DEPLOY_TEMPLATE = "./deploy/template"
 
 
-class cached_property(Generic[T]):
+class cached_property[T]:
     """
     cached-property from https://github.com/pydanny/cached-property
     Add typing support

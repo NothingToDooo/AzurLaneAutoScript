@@ -1,16 +1,14 @@
 import multiprocessing
 from collections.abc import Callable
 from multiprocessing.managers import SyncManager
-from typing import TYPE_CHECKING, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from module.config.config_updater import ConfigUpdater
     from module.webui.config import DeployConfig
 
-T = TypeVar("T")
 
-
-class cached_class_property(Generic[T]):
+class cached_class_property[T]:
     """
     Code from https://github.com/dssg/dickens
     Add typing support

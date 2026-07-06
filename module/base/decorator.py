@@ -3,9 +3,6 @@ import re
 from collections.abc import Callable
 from contextlib import suppress
 from functools import wraps
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
 
 
 class Config:
@@ -82,7 +79,7 @@ class Config:
         return decorate
 
 
-class cached_property(Generic[T]):
+class cached_property[T]:
     """
     cached-property from https://github.com/pydanny/cached-property
     Add typing support
