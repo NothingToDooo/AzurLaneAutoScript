@@ -1,15 +1,36 @@
 from module.base.base import ModuleBase
 from module.base.timer import Timer
 from module.base.utils import color_bar_percentage
-from module.combat_ui.assets import *
-from module.exercise.assets import *
+from module.combat_ui import assets as combat_ui_assets
+from module.exercise import assets as exercise_assets
 from module.logger import logger
+
+NEW_HP_BAR_PAUSES = (
+    combat_ui_assets.PAUSE_New,
+    combat_ui_assets.PAUSE_Iridescent_Fantasy,
+    combat_ui_assets.PAUSE_Neon,
+    combat_ui_assets.PAUSE_Christmas,
+    combat_ui_assets.PAUSE_Cyber,
+    combat_ui_assets.PAUSE_HolyLight,
+    combat_ui_assets.PAUSE_Pharaoh,
+    combat_ui_assets.PAUSE_Nurse,
+    combat_ui_assets.PAUSE_Devil,
+    combat_ui_assets.PAUSE_Seaside,
+    combat_ui_assets.PAUSE_Star,
+    combat_ui_assets.PAUSE_Ninja,
+    combat_ui_assets.PAUSE_ShadowPuppetry,
+    combat_ui_assets.PAUSE_MaidCafe,
+    combat_ui_assets.PAUSE_Ancient,
+    combat_ui_assets.PAUSE_SpringInn,
+    combat_ui_assets.PAUSE_ElvenVine,
+    combat_ui_assets.PAUSE_GildedReverie,
+    combat_ui_assets.PAUSE_AzureCore,
+)
 
 
 class HpDaemon(ModuleBase):
     attacker_hp = 1.0
     defender_hp = 1.0
-    # _last_secure_time = 0
     low_hp_confirm_timer: Timer
 
     @staticmethod
@@ -26,20 +47,6 @@ class HpDaemon(ModuleBase):
         Returns:
             float: HP. 0 to 1.
         """
-        # bar = crop(image, area)
-        # length = bar.shape[1]
-        # bar = np.swapaxes(bar, 0, 1)
-        # bar = bar[::-1, :, :] if reverse else bar
-        # prev_index = 0
-        # for index, color in enumerate(bar):
-        #     if index < starter:
-        #         continue
-        #     mask = color_similar_1d(color, prev_color, threshold=30)
-        #     if np.any(mask):
-        #         prev_color = color[mask].mean(axis=0)
-        #         prev_index = index
-        #
-        # return prev_index / length
         return color_bar_percentage(
             image, area, prev_color=prev_color, starter=starter, reverse=reverse, threshold=threshold
         )
@@ -59,39 +66,19 @@ class HpDaemon(ModuleBase):
             text += " - Low HP: %ss" % str(round(low_hp_time, 3)).ljust(5, "0")
         logger.info(text)
 
-    def _at_low_hp(self, image, pause=PAUSE):
-        if pause == PAUSE:
-            self.attacker_hp = self._calculate_hp(image, area=ATTACKER_HP_AREA.area, reverse=True)
-            self.defender_hp = self._calculate_hp(image, area=DEFENDER_HP_AREA.area, reverse=False)
-        elif pause in [
-            PAUSE_New,
-            PAUSE_Iridescent_Fantasy,
-            PAUSE_Neon,
-            PAUSE_Christmas,
-            PAUSE_Cyber,
-            PAUSE_HolyLight,
-            PAUSE_Pharaoh,
-            PAUSE_Nurse,
-            PAUSE_Devil,
-            PAUSE_Seaside,
-            PAUSE_Star,
-            PAUSE_Ninja,
-            PAUSE_ShadowPuppetry,
-            PAUSE_MaidCafe,
-            PAUSE_Ancient,
-            PAUSE_SpringInn,
-            PAUSE_ElvenVine,
-            PAUSE_GildedReverie,
-            PAUSE_AzureCore,
-        ]:
-            self.attacker_hp = self._calculate_hp(image, area=ATTACKER_HP_AREA_New.area, reverse=True)
-            self.defender_hp = self._calculate_hp(image, area=DEFENDER_HP_AREA_New.area, reverse=True)
+    def _at_low_hp(self, image, pause=combat_ui_assets.PAUSE):
+        if pause == combat_ui_assets.PAUSE:
+            self.attacker_hp = self._calculate_hp(image, area=exercise_assets.ATTACKER_HP_AREA.area, reverse=True)
+            self.defender_hp = self._calculate_hp(image, area=exercise_assets.DEFENDER_HP_AREA.area, reverse=False)
+        elif pause in NEW_HP_BAR_PAUSES:
+            self.attacker_hp = self._calculate_hp(image, area=exercise_assets.ATTACKER_HP_AREA_New.area, reverse=True)
+            self.defender_hp = self._calculate_hp(image, area=exercise_assets.DEFENDER_HP_AREA_New.area, reverse=True)
         else:
             logger.warning(f"_at_low_hp received unknown pause: {pause}")
-            self.attacker_hp = self._calculate_hp(image, area=ATTACKER_HP_AREA.area, reverse=True)
-            self.defender_hp = self._calculate_hp(image, area=DEFENDER_HP_AREA.area, reverse=False)
+            self.attacker_hp = self._calculate_hp(image, area=exercise_assets.ATTACKER_HP_AREA.area, reverse=True)
+            self.defender_hp = self._calculate_hp(image, area=exercise_assets.DEFENDER_HP_AREA.area, reverse=False)
 
-        # Opponent died or HP bar get covered
+        # 对手已被击败，或血条被遮挡。
         if self.defender_hp < 0.01:
             self.low_hp_confirm_timer.reset()
         if 0.01 < self.attacker_hp <= self.config.Exercise_LowHpThreshold:
