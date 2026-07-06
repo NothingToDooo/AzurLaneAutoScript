@@ -102,7 +102,8 @@ class SwipeSimulate:
             # (170, 65)
             multiply = np.round(np.abs(self.swipe) / (3, 3) / self.swipe_base, 3)
             logger.info(
-                f"[{n}/{self.simulate_count}] init_offset={init_offset}, offset={offset}, fit={fit}, multiply={multiply}"
+                f"[{n}/{self.simulate_count}] init_offset={init_offset}, offset={offset}, "
+                f"fit={fit}, multiply={multiply}"
             )
 
             fleet = az.get_fleet_show_index()

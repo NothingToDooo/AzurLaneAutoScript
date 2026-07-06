@@ -59,9 +59,10 @@ class SLPP:
     def decode(self, text):
         if not text or not isinstance(text, six.string_types):
             return
-        # Game scripts don't have comments
-        # Deleting comments may cause error. This will be treat as comment, for example.
-        # `profiles = "现世与梦境夹缝中的蝴蝶，狂风与巨浪蹂躏中的小舟。跨越虚无，驱散黑暗，为重樱带来希望和未来吧---------- ",`
+        # 游戏脚本没有注释。
+        # 删除注释可能导致错误，例如下面这类内容会被误认为注释：
+        # `profiles = "现世与梦境夹缝中的蝴蝶，狂风与巨浪蹂躏中的小舟。`
+        # `跨越虚无，驱散黑暗，为重樱带来希望和未来吧---------- ",`
         # reg = re.compile('--.*$', re.M)
         # text = reg.sub('', text, 0)
         self.text = text

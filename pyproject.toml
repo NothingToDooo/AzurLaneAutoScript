@@ -178,9 +178,6 @@ select = [
     "W293",
     "W605",
 ]
-ignore = [
-    "E501",
-]
 
 [tool.ty.environment]
 python-version = "3.14"

@@ -205,7 +205,8 @@ class Adb(Connection):
         # $ adb shell dumpsys window windows
         # 输出示例：
         #   mCurrentFocus=Window{41b37570 u0 com.incall.apps.launcher/com.incall.apps.launcher.Launcher}
-        #   mFocusedApp=AppWindowToken{422df168 token=Token{422def98 ActivityRecord{422dee38 u0 com.example/.UI.play.PlayActivity t14}}}
+        #   mFocusedApp=AppWindowToken{422df168 token=Token{422def98
+        #   ActivityRecord{422dee38 u0 com.example/.UI.play.PlayActivity t14}}}
         # 正则。
         #   r'mFocusedApp=.*ActivityRecord{\w+ \w+ (?P<package>.*)/(?P<activity>.*) .*'
         #   r'mCurrentFocus=Window{\w+ \w+ (?P<package>.*)/(?P<activity>.*)\}')
@@ -322,8 +323,12 @@ class Adb(Connection):
         if "Warning: Activity not started" in ret:
             logger.info("App activity is already started")
             return True
-        # Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.YoStarEN.AzurLane/com.manjuu.azurlane.MainActivity }
-        # java.lang.SecurityException: Permission Denial: starting Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 cmp=com.YoStarEN.AzurLane/com.manjuu.azurlane.MainActivity } from null (pid=5140, uid=2000) not exported from uid 10064
+        # Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER]
+        # cmp=com.YoStarEN.AzurLane/com.manjuu.azurlane.MainActivity }
+        # java.lang.SecurityException: Permission Denial: starting Intent { act=android.intent.action.MAIN
+        # cat=[android.intent.category.LAUNCHER] flg=0x10000000
+        # cmp=com.YoStarEN.AzurLane/com.manjuu.azurlane.MainActivity } from null (pid=5140, uid=2000)
+        # not exported from uid 10064
         #         at android.os.Parcel.readException(Parcel.java:1692)
         #         at android.os.Parcel.readException(Parcel.java:1645)
         #         at android.app.ActivityManagerProxy.startActivityAsUser(ActivityManagerNative.java:3152)

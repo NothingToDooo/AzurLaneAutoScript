@@ -331,8 +331,12 @@ class Uiautomator2(Connection):
         if "Warning: Activity not started" in ret.output:
             logger.info("App activity is already started")
             return True
-        # Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.YoStarEN.AzurLane/com.manjuu.azurlane.MainActivity }
-        # java.lang.SecurityException: Permission Denial: starting Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 cmp=com.YoStarEN.AzurLane/com.manjuu.azurlane.MainActivity } from null (pid=5140, uid=2000) not exported from uid 10064
+        # Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER]
+        # cmp=com.YoStarEN.AzurLane/com.manjuu.azurlane.MainActivity }
+        # java.lang.SecurityException: Permission Denial: starting Intent { act=android.intent.action.MAIN
+        # cat=[android.intent.category.LAUNCHER] flg=0x10000000
+        # cmp=com.YoStarEN.AzurLane/com.manjuu.azurlane.MainActivity } from null (pid=5140, uid=2000)
+        # not exported from uid 10064
         #         at android.os.Parcel.readException(Parcel.java:1692)
         #         at android.os.Parcel.readException(Parcel.java:1645)
         #         at android.app.ActivityManagerProxy.startActivityAsUser(ActivityManagerNative.java:3152)
