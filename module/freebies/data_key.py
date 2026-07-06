@@ -1,12 +1,12 @@
 from module.combat.assets import GET_ITEMS_1
-from module.freebies.assets import *
+from module.freebies import assets as freebies_assets
 from module.logger import logger
 from module.ocr.ocr import DigitCounter
 from module.ui.assets import CAMPAIGN_MENU_GOTO_WAR_ARCHIVES, WAR_ARCHIVES_CHECK
 from module.ui.page import page_archives, page_campaign_menu
 from module.ui.ui import UI
 
-DATA_KEY = DigitCounter(OCR_DATA_KEY, letter=(255, 247, 247), threshold=64)
+DATA_KEY = DigitCounter(freebies_assets.OCR_DATA_KEY, letter=(255, 247, 247), threshold=64)
 
 
 class DataKey(UI):
@@ -23,10 +23,10 @@ class DataKey(UI):
             else:
                 self.device.screenshot()
 
-            if self.appear_then_click(DATA_KEY_COLLECT, offset=(20, 20), interval=3):
+            if self.appear_then_click(freebies_assets.DATA_KEY_COLLECT, offset=(20, 20), interval=3):
                 continue
             if self.appear(GET_ITEMS_1, offset=20, interval=3):
-                self.device.click(DATA_KEY_COLLECT)
+                self.device.click(freebies_assets.DATA_KEY_COLLECT)
                 continue
             if self.handle_popup_confirm("DATA_KEY_LIMIT"):
                 # If it's in 29/30 means user is not doing war achieves frequently,
@@ -37,7 +37,9 @@ class DataKey(UI):
                 continue
 
             # End
-            if self.appear(WAR_ARCHIVES_CHECK, offset=(20, 20)) and self.appear(DATA_KEY_COLLECTED, offset=(20, 20)):
+            if self.appear(WAR_ARCHIVES_CHECK, offset=(20, 20)) and self.appear(
+                freebies_assets.DATA_KEY_COLLECTED, offset=(20, 20)
+            ):
                 logger.info("Data key collect finished")
                 break
 
@@ -51,7 +53,7 @@ class DataKey(UI):
         Pages:
             in: page_archives
         """
-        if self.appear(DATA_KEY_COLLECTED, offset=(20, 20)):
+        if self.appear(freebies_assets.DATA_KEY_COLLECTED, offset=(20, 20)):
             logger.info("Data key has been collected")
             return False
 
