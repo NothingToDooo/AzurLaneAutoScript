@@ -423,7 +423,7 @@ class ConfigGenerator:
             for event in self.event:
                 name = event.__getattribute__(server)
 
-                def insert(key):
+                def insert(key, server=server, event=event):
                     opts = deep_get(self.args, keys=f"{key}.Campaign.Event.option_{server}", default=[])
                     if event not in opts:
                         opts.append(event)

@@ -107,7 +107,7 @@ if __name__ == "__main__":
     with Dict("DICT_FILTER_PRESET"):
         for series in [8, 7, 6, 5, 4, 3, 2]:
 
-            def new_filter(**kwargs):
+            def new_filter(series=series, **kwargs):
                 for k, v in kwargs.items():
                     k = convert_name(k, series)
                     v = translate(v, target=k)
