@@ -1,9 +1,9 @@
 from module.base.timer import Timer
-from module.base.utils import *
+from module.base.utils import color_bar_percentage
 from module.exception import MapDetectionError, ScriptError
 from module.logger import logger
 from module.ocr.ocr import Ocr
-from module.os.assets import *
+from module.os.assets import MAP_EXIT, MAP_NAME, MEOWFFICER_SEARCHING, MEOWFFICER_SEARCHING_PERCENTAGE
 from module.os.globe_zone import Zone
 from module.os.map_fleet_selector import OSFleetSelector
 from module.os_handler.assets import AUTO_SEARCH_REWARD, EXCHANGE_CHECK
