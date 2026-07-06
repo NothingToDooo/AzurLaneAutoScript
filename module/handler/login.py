@@ -1,5 +1,3 @@
-from typing import Union
-
 import numpy as np
 from scipy.signal import find_peaks
 from uiautomator2 import UiObject
@@ -292,7 +290,7 @@ class LoginHandler(UI):
             return True
 
     @staticmethod
-    def get_for_any_ele(list_u2_path: list) -> Union[bool, tuple]:
+    def get_for_any_ele(list_u2_path: list) -> bool | tuple:
         """
         Args:
             list_u2_path (list): [UiObject or XPathSelector]  In this case, len(list_u2_path) >= 1

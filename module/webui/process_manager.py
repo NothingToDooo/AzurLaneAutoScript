@@ -2,7 +2,7 @@ import queue
 import threading
 from collections.abc import Sequence
 from multiprocessing import Process
-from typing import Dict, List, Union, cast
+from typing import cast
 
 import inflection
 from rich.console import Console, ConsoleRenderable
@@ -27,16 +27,16 @@ from module.webui.setting import State
 
 
 class ProcessManager:
-    _processes: Dict[str, ProcessManager] = {}
+    _processes: dict[str, ProcessManager] = {}
 
     def __init__(self, config_name: str = "alas") -> None:
         self.config_name = config_name
         self._renderable_queue: queue.Queue[ConsoleRenderable] = State.manager.Queue()
-        self.renderables: List[ConsoleRenderable] = []
+        self.renderables: list[ConsoleRenderable] = []
         self.renderables_max_length = 400
         self.renderables_reduce_length = 80
         self._process: Process | None = None
-        self._process_locks: Dict[str, threading.Lock] = {}
+        self._process_locks: dict[str, threading.Lock] = {}
         self.thd_log_queue_handler: threading.Thread | None = None
 
     def start(self, func, ev: threading.Event | None = None) -> None:
@@ -162,12 +162,12 @@ class ProcessManager:
             logger.exception(error)
 
     @classmethod
-    def running_instances(cls) -> List[ProcessManager]:
+    def running_instances(cls) -> list[ProcessManager]:
         return [process for process in cls._processes.values() if process.alive]
 
     @staticmethod
     def restart_processes(
-        instances: Sequence[Union[ProcessManager, str]] | None = None,
+        instances: Sequence[ProcessManager | str] | None = None,
         ev: threading.Event | None = None,
     ) -> None:
         """

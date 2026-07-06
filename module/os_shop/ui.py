@@ -1,5 +1,3 @@
-from typing import Tuple
-
 from module.base.button import ButtonGrid
 from module.base.decorator import cached_property
 from module.base.timer import Timer
@@ -104,7 +102,7 @@ class OSShopUI(UI):
         self.os_shop_load_ensure()
         self._os_shop_side_navbar.set(self, upper=upper, bottom=bottom)
 
-    def init_slider(self) -> Tuple[float, float]:
+    def init_slider(self) -> tuple[float, float]:
         """Initialize the slider
 
         Returns:

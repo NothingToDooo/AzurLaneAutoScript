@@ -15,7 +15,7 @@ class AlasManager(DeployConfig):
     def self_pid(self):
         return os.getpid()
 
-    def list_process(self) -> t.List[DataProcessInfo]:
+    def list_process(self) -> list[DataProcessInfo]:
         logger.info("List process")
         process = list(iter_process())
         logger.info(f"Found {len(process)} processes")

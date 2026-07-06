@@ -1,6 +1,7 @@
 import os
 import re
-from typing import Any, Callable, Generic, TypeVar, overload
+from collections.abc import Callable
+from typing import Any, Generic, TypeVar, overload
 
 from deploy.atomic import atomic_read_text, atomic_write
 

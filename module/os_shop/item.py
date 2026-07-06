@@ -1,5 +1,3 @@
-from typing import List
-
 import module.config.server as server
 from module.logger import logger
 from module.ocr.ocr import DigitYuv, Ocr
@@ -146,7 +144,7 @@ class OSShopItemGrid(ItemGrid):
         self.price_ocr = PRICE_OCR
         self.counter_area = counter_area
 
-    def predict(self, image, counter=False, shop_index=None, scroll_pos=None) -> List[OSShopItem]:
+    def predict(self, image, counter=False, shop_index=None, scroll_pos=None) -> list[OSShopItem]:
         """
         Args:
             image (np.ndarray):

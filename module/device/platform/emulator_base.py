@@ -229,21 +229,21 @@ class EmulatorManagerBase:
         return
 
     @cached_property
-    def all_emulators(self) -> t.List[EmulatorBase]:
+    def all_emulators(self) -> list[EmulatorBase]:
         """
         Get all emulators installed on current computer.
         """
         return []
 
     @cached_property
-    def all_emulator_instances(self) -> t.List[EmulatorInstanceBase]:
+    def all_emulator_instances(self) -> list[EmulatorInstanceBase]:
         """
         Get all emulator instances installed on current computer.
         """
         return []
 
     @cached_property
-    def all_emulator_serials(self) -> t.List[str]:
+    def all_emulator_serials(self) -> list[str]:
         """
         Returns:
             list[str]: All possible serials on current computer.
@@ -258,7 +258,7 @@ class EmulatorManagerBase:
         return out
 
     @cached_property
-    def all_adb_binaries(self) -> t.List[str]:
+    def all_adb_binaries(self) -> list[str]:
         """
         Returns:
             list[str]: All adb binaries of emulators on current computer.

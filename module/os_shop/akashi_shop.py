@@ -1,5 +1,3 @@
-from typing import List
-
 from module.base.button import ButtonGrid
 from module.base.decorator import cached_property
 from module.logger import logger
@@ -32,7 +30,7 @@ class AkashiShop(OSStatus, OSShopUI, Selector, MapEventHandler):
         shop_items.load_cost_template_folder("./assets/shop/os_cost")
         return shop_items
 
-    def os_shop_get_items_in_akashi(self) -> List[Item]:
+    def os_shop_get_items_in_akashi(self) -> list[Item]:
         """
         Args:
             name (bool): If detect item name. True if detect akashi shop, false if detect port shop.

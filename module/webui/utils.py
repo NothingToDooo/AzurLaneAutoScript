@@ -5,8 +5,8 @@ import sys
 import threading
 import time
 import traceback
+from collections.abc import Callable, Generator
 from queue import Queue
-from typing import Callable, Generator, List
 
 import pywebio
 from pywebio.input import PASSWORD
@@ -117,9 +117,9 @@ class Task:
 class TaskHandler:
     def __init__(self) -> None:
         # List of background running task
-        self.tasks: List[Task] = []
+        self.tasks: list[Task] = []
         # List of task name to be removed
-        self.pending_remove_tasks: List[Task] = []
+        self.pending_remove_tasks: list[Task] = []
         # Running task
         self._task = None
         # Task running thread

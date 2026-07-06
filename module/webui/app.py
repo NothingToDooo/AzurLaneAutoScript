@@ -5,7 +5,6 @@ import threading
 import time
 from datetime import datetime
 from functools import partial
-from typing import Dict, List, Optional
 
 # 先导入伪 PIL 模块，避免 pywebio 拉起不需要的 PIL。
 from module.webui.fake_pil_module import import_fake_pil_module
@@ -92,8 +91,8 @@ task_handler = TaskHandler()
 
 
 class AlasGUI(Frame):
-    ALAS_MENU: Dict[str, Dict[str, List[str]]]
-    ALAS_ARGS: Dict[str, Dict[str, Dict[str, Dict[str, str]]]]
+    ALAS_MENU: dict[str, dict[str, list[str]]]
+    ALAS_ARGS: dict[str, dict[str, dict[str, dict[str, str]]]]
     theme = "default"
 
     def initial(self) -> None:
@@ -305,12 +304,12 @@ class AlasGUI(Frame):
         group_name = group[0]
         server = to_server(deep_get(config, "Alas.Emulator.PackageName", "cn"))
 
-        output_list: List[Output] = []
+        output_list: list[Output] = []
         for arg, arg_config in deep_iter(arg_dict, depth=1):
             output_kwargs: T_Output_Kwargs = arg_config.copy()
 
             # 跳过隐藏项。
-            display: Optional[str] = output_kwargs.pop("display", None)
+            display: str | None = output_kwargs.pop("display", None)
             if display == "hide":
                 continue
             # 禁用项。
@@ -509,7 +508,7 @@ class AlasGUI(Frame):
 
     def _save_config(
         self,
-        modified: Dict[str, str],
+        modified: dict[str, str],
         config_name: str,
         config_updater: AzurLaneConfig = State.config_updater,
     ) -> None:

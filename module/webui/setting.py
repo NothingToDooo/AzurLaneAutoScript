@@ -1,6 +1,7 @@
 import multiprocessing
+from collections.abc import Callable
 from multiprocessing.managers import SyncManager
-from typing import TYPE_CHECKING, Callable, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, Generic, TypeVar, cast
 
 if TYPE_CHECKING:
     from module.config.config_updater import ConfigUpdater

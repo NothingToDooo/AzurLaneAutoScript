@@ -1,7 +1,8 @@
 import os
 import re
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Any, Callable, Generic, Iterable, TypeVar, overload
+from typing import Any, Generic, TypeVar, overload
 
 T = TypeVar("T")
 

@@ -1,5 +1,4 @@
 from itertools import chain
-from typing import List
 
 from module.base.button import ButtonGrid
 from module.base.decorator import cached_property
@@ -17,7 +16,7 @@ from module.statistics.utils import load_folder
 
 class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
     @cached_property
-    def TEMPLATES(self) -> List[Template]:
+    def TEMPLATES(self) -> list[Template]:
         coins = load_folder("./assets/shop/os_cost")
         coins_sold_out = load_folder("./assets/shop/os_cost_sold_out")
         templates = [Template(c) for c in coins.values()]
@@ -71,7 +70,7 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
             origin=(356, y), delta=(160, delta_y), button_shape=(98, 98), grid_shape=(5, row), name="OS_SHOP_GRID"
         )
 
-    def os_shop_get_items(self, shop_index=False, scroll_pos=False) -> List[Item]:
+    def os_shop_get_items(self, shop_index=False, scroll_pos=False) -> list[Item]:
         """
         Args:
             shop_index (Integer): Additional shop index.
@@ -122,7 +121,7 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
 
         return None
 
-    def scan_all(self) -> List[Item]:
+    def scan_all(self) -> list[Item]:
         """
         Returns:
             list[Item]:

@@ -1,4 +1,3 @@
-import typing as t
 from datetime import datetime, timedelta
 
 import module.config.server as server
@@ -40,7 +39,7 @@ class OSStatus(UI):
         return self.config.is_task_enabled("OpsiHazard1Leveling")
 
     @property
-    def nearest_task_cooling_down(self) -> t.Optional[Function]:
+    def nearest_task_cooling_down(self) -> Function | None:
         """
         If having any tasks cooling down,
         such as recon scan cooldown and submarine call cooldown.

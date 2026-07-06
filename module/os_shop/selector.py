@@ -1,5 +1,4 @@
 import re
-from typing import List
 
 from module.base.filter import Filter
 from module.config.config_generated import GeneratedConfig
@@ -22,7 +21,7 @@ FILTER = Filter(FILTER_REGEX, FILTER_ATTR)
 
 
 class Selector:
-    def pretreatment(self, items) -> List[Item]:
+    def pretreatment(self, items) -> list[Item]:
         """
         Pretreatment items.
 
@@ -86,7 +85,7 @@ class Selector:
         """
         return item.count >= 1 and item.total_count >= 1 and item.count <= item.total_count
 
-    def items_filter_in_akashi_shop(self, items) -> List[Item]:
+    def items_filter_in_akashi_shop(self, items) -> list[Item]:
         """
         Returns items that can be bought.
 
@@ -103,7 +102,7 @@ class Selector:
         FILTER.load(parser)
         return FILTER.applys(items, funcs=[self.check_cl1_purple_coins, self.enough_coins_in_akashi])
 
-    def items_filter_in_os_shop(self, items) -> List[Item]:
+    def items_filter_in_os_shop(self, items) -> list[Item]:
         """
         Returns items that can be bought.
 

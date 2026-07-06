@@ -2,7 +2,8 @@ import copy
 import json
 import random
 import string
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional, Union
+from collections.abc import Callable, Generator
+from typing import TYPE_CHECKING, Any
 
 from pywebio.exceptions import SessionException
 from pywebio.io_ctrl import Output
@@ -269,8 +270,8 @@ class BinarySwitchButton(Switch):
 
 def put_icon_buttons(
     icon_html: str,
-    buttons: List[Dict[str, str]],
-    onclick: Union[List[Callable[..., None]], Callable[..., None]],
+    buttons: list[dict[str, str]],
+    onclick: list[Callable[..., None]] | Callable[..., None],
 ) -> Output:
     value = buttons[0]["value"]
     return put_column(
@@ -286,7 +287,7 @@ def put_none() -> Output:
     return put_html("<div></div>")
 
 
-T_Output_Kwargs = Dict[str, Union[str, Dict[str, Any]]]
+T_Output_Kwargs = dict[str, str | dict[str, Any]]
 
 
 def get_title_help(kwargs: T_Output_Kwargs) -> Output:
@@ -310,7 +311,7 @@ def get_title_help(kwargs: T_Output_Kwargs) -> Output:
 # args input widget
 def put_arg_input(kwargs: T_Output_Kwargs) -> Output:
     name: str = kwargs["name"]
-    options: List = kwargs.get("options")
+    options: list = kwargs.get("options")
     if options is not None:
         kwargs.setdefault("datalist", options)
 
@@ -355,8 +356,8 @@ def put_arg_stored(kwargs: T_Output_Kwargs) -> Output:
 def put_arg_select(kwargs: T_Output_Kwargs) -> Output:
     name: str = kwargs["name"]
     value: str = kwargs["value"]
-    options: List[str] = kwargs["options"]
-    options_label: List[str] = kwargs.pop("options_label", [])
+    options: list[str] = kwargs["options"]
+    options_label: list[str] = kwargs.pop("options_label", [])
     disabled: bool = kwargs.pop("disabled", False)
     _: str = kwargs.pop("invalid_feedback", None)
 
@@ -393,8 +394,8 @@ def put_arg_select(kwargs: T_Output_Kwargs) -> Output:
 def put_arg_state(kwargs: T_Output_Kwargs) -> Output:
     name: str = kwargs["name"]
     value: str = kwargs["value"]
-    options: List[str] = kwargs["options"]
-    options_label: List[str] = kwargs.pop("options_label", [])
+    options: list[str] = kwargs["options"]
+    options_label: list[str] = kwargs.pop("options_label", [])
     _: str = kwargs.pop("invalid_feedback", None)
     bold: bool = value in kwargs.pop("option_bold", [])
     light: bool = value in kwargs.pop("option_light", [])
@@ -466,7 +467,7 @@ def put_arg_datetime(kwargs: T_Output_Kwargs) -> Output:
     )
 
 
-def put_arg_storage(kwargs: T_Output_Kwargs) -> Optional[Output]:
+def put_arg_storage(kwargs: T_Output_Kwargs) -> Output | None:
     name: str = kwargs["name"]
     if kwargs["value"] == {}:
         return None
@@ -491,7 +492,7 @@ def put_arg_storage(kwargs: T_Output_Kwargs) -> Optional[Output]:
     )
 
 
-_widget_type_to_func: Dict[str, Callable] = {
+_widget_type_to_func: dict[str, Callable] = {
     "input": put_arg_input,
     "lock": put_arg_state,
     "datetime": put_arg_input,  # TODO
@@ -504,7 +505,7 @@ _widget_type_to_func: Dict[str, Callable] = {
 }
 
 
-def put_output(output_kwargs: T_Output_Kwargs) -> Optional[Output]:
+def put_output(output_kwargs: T_Output_Kwargs) -> Output | None:
     return _widget_type_to_func[output_kwargs["widget_type"]](output_kwargs)
 
 

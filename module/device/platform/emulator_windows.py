@@ -24,7 +24,7 @@ class RegValue:
     typ: int
 
 
-def list_reg(reg) -> t.List[RegValue]:
+def list_reg(reg) -> list[RegValue]:
     """
     List all values in a reg key
     """
@@ -40,7 +40,7 @@ def list_reg(reg) -> t.List[RegValue]:
     return rows
 
 
-def list_key(reg) -> t.List[RegValue]:
+def list_key(reg) -> list[RegValue]:
     """
     List all values in a reg key
     """
@@ -347,7 +347,7 @@ class EmulatorManager(EmulatorManagerBase):
                 yield exe
 
     @cached_property
-    def all_emulators(self) -> t.List[Emulator]:
+    def all_emulators(self) -> list[Emulator]:
         """
         Get all emulators installed on current computer.
         """
@@ -389,7 +389,7 @@ class EmulatorManager(EmulatorManagerBase):
         return exe
 
     @cached_property
-    def all_emulator_instances(self) -> t.List[EmulatorInstance]:
+    def all_emulator_instances(self) -> list[EmulatorInstance]:
         """
         Get all emulator instances installed on current computer.
         """
@@ -397,7 +397,7 @@ class EmulatorManager(EmulatorManagerBase):
         for emulator in self.all_emulators:
             instances += list(emulator.iter_instances())
 
-        instances: t.List[EmulatorInstance] = sorted(instances, key=lambda x: str(x))
+        instances: list[EmulatorInstance] = sorted(instances, key=lambda x: str(x))
         return instances
 
 

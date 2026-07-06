@@ -2,7 +2,6 @@ import copy
 import os
 import subprocess
 import sys
-from typing import Optional, Union
 
 from deploy.Windows.logger import logger
 from deploy.Windows.utils import DEPLOY_CONFIG, DEPLOY_TEMPLATE, cached_property, poor_yaml_read, poor_yaml_write
@@ -36,9 +35,9 @@ class ConfigModel:
     WebuiPort: int = 22267
     Theme: str = "default"
     DpiScaling: bool = True
-    Password: Optional[str] = None
-    CDN: Union[str, bool] = False
-    Run: Optional[str] = None
+    Password: str | None = None
+    CDN: str | bool = False
+    Run: str | None = None
 
 
 class DeployConfig(ConfigModel):

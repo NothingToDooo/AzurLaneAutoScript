@@ -1,11 +1,10 @@
 import operator
-import typing as t
 
 
 class SelectedGrids:
     def __init__(self, grids):
         self.grids = grids
-        self.indexes: t.Dict[tuple, SelectedGrids] = {}
+        self.indexes: dict[tuple, SelectedGrids] = {}
 
     def __iter__(self):
         return iter(self.grids)

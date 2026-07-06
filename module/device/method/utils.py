@@ -30,8 +30,8 @@ except ImportError:
     # BaseDevice.shell() is missing a check_okay() call before reading output,
     # resulting in an `OKAY` prefix in output.
     def shell(
-        self, cmdargs: t.Union[str, list, tuple], stream: bool = False, timeout: t.Optional[float] = None, rstrip=True
-    ) -> t.Union[AdbConnection, str]:
+        self, cmdargs: str | list | tuple, stream: bool = False, timeout: float | None = None, rstrip=True
+    ) -> AdbConnection | str:
         if isinstance(cmdargs, (list, tuple)):
             cmdargs = subprocess.list2cmdline(cmdargs)
         if stream:

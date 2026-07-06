@@ -1,6 +1,5 @@
 import re
 import time
-import typing as t
 
 import cv2
 import numpy as np
@@ -321,7 +320,7 @@ class RewardDorm(UI):
             in: DORM_FEED_CHECK
         """
         timeout = Timer(1.5, count=3).start()
-        food: t.List[Food] = []
+        food: list[Food] = []
         fill: int = 0
         for _ in self.loop():
             # End

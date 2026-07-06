@@ -1,5 +1,4 @@
 from functools import reduce
-from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -14,7 +13,7 @@ from module.ui.page import page_hospital
 from module.ui.scroll import Scroll
 
 
-def merge_two_rects(r1: Tuple[int, int, int, int], r2: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+def merge_two_rects(r1: tuple[int, int, int, int], r2: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
     return (
         min(r1[0], r2[0]),  # 左
         min(r1[1], r2[1]),  # 上
@@ -49,7 +48,7 @@ def merge_rows(list_word, merge):
 
 
 class HospitalClue(HospitalUI):
-    def get_clue_list(self) -> List[Button]:
+    def get_clue_list(self) -> list[Button]:
         """
         获取侧边栏按钮列表。
         """
@@ -97,7 +96,7 @@ class HospitalClue(HospitalUI):
         ]
         return list_button
 
-    def get_invest_button(self) -> Optional[Button]:
+    def get_invest_button(self) -> Button | None:
         """
         从当前截图中找到未完成的调查按钮。
         """

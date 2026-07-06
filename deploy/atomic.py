@@ -2,8 +2,8 @@ import os
 import random
 import string
 import time
+from collections.abc import Iterable
 from contextlib import suppress
-from typing import Iterable, Union
 
 IS_WINDOWS = os.name == "nt"
 # Max attempt if another process is reading/writing, effective only on Windows
@@ -155,7 +155,7 @@ def atomic_replace(replace_from: str, replace_to: str):
         os.replace(replace_from, replace_to)
 
 
-def file_write(file: str, data: Union[str, bytes]):
+def file_write(file: str, data: str | bytes):
     """
     Write data into file, auto create directory
     Auto determines write mode based on the type of data.
@@ -261,7 +261,7 @@ def file_write_stream(file: str, data_generator):
 
 def atomic_write(
     file: str,
-    data: Union[str, bytes],
+    data: str | bytes,
 ):
     """
     Atomic file write with minimal IO operation

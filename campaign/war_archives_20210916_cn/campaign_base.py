@@ -1,12 +1,10 @@
-from typing import List
-
 from module.map_detection.grid import GridInfo
 
 from ..campaign_war_archives.campaign_base import CampaignBase as CampaignBase_
 
 
 class CampaignBase(CampaignBase_):
-    MACHINE_FORTRESS: List[GridInfo]
+    MACHINE_FORTRESS: list[GridInfo]
 
     # def handle_clear_mode_config_cover(self):
     #     if super().handle_clear_mode_config_cover():

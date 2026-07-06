@@ -1,5 +1,4 @@
 import time
-import typing as t
 from dataclasses import dataclass
 from functools import wraps
 from json.decoder import JSONDecodeError
@@ -418,7 +417,7 @@ class Uiautomator2(Connection):
             self.adb_shell(["rm", f"/data/local/tmp/{file}"])
 
     @retry
-    def resolution_uiautomator2(self, cal_rotation=True) -> t.Tuple[int, int]:
+    def resolution_uiautomator2(self, cal_rotation=True) -> tuple[int, int]:
         """
         Faster u2.window_size(), cause that calls `dumpsys display` twice.
 
@@ -456,7 +455,7 @@ class Uiautomator2(Connection):
         raise RequestHumanTakeover
 
     @retry
-    def proc_list_uiautomator2(self) -> t.List[ProcessInfo]:
+    def proc_list_uiautomator2(self) -> list[ProcessInfo]:
         """
         Get info about current processes.
         """
