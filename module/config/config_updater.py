@@ -105,12 +105,12 @@ class Event:
         self.is_war_archives = self.directory.startswith("war_archives")
         self.is_raid = self.directory.startswith("raid_")
         self.is_coalition = self.directory.startswith("coalition_")
-        for server in ARCHIVES_PREFIX:
+        for server, prefix in ARCHIVES_PREFIX.items():
             if self.__getattribute__(server) == "-":
                 self.__setattr__(server, None)
             else:
                 if self.is_war_archives:
-                    self.__setattr__(server, ARCHIVES_PREFIX[server] + self.__getattribute__(server))
+                    self.__setattr__(server, prefix + self.__getattribute__(server))
 
     def __str__(self):
         return self.directory

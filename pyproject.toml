@@ -64,6 +64,7 @@ select = [
     "PLE",
     "PERF",
     "PIE",
+    "PLC0206",
     "PLC1802",
     "PLW0120",
     "PLW0127",

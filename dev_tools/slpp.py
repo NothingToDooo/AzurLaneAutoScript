@@ -187,8 +187,8 @@ class SLPP:
                         so = sorted(o)
                         if sequential(so):
                             ar = []
-                            for key in o:
-                                ar.insert(key, o[key])
+                            for key, value in o.items():
+                                ar.insert(key, value)
                             o = ar
                     return o  # or here
                 else:
