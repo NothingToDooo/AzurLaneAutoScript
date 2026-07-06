@@ -6,15 +6,15 @@ from module.handler.assets import GET_MISSION
 from module.logger import logger
 from module.os.globe_operation import GlobeOperation
 from module.os.globe_zone import ZoneManager
-from module.os_handler.assets import *
+from module.os_handler import assets as os_assets
 from module.ui.scroll import Scroll
 
-SCROLL_STORAGE = Scroll(STORATE_SCROLL, color=(247, 211, 66))
+SCROLL_STORAGE = Scroll(os_assets.STORATE_SCROLL, color=(247, 211, 66))
 
 
 class StorageHandler(GlobeOperation, ZoneManager):
     def is_in_storage(self):
-        return self.appear(STORAGE_CHECK, offset=(20, 20))
+        return self.appear(os_assets.STORAGE_CHECK, offset=(20, 20))
 
     def storage_enter(self):
         """
@@ -28,10 +28,10 @@ class StorageHandler(GlobeOperation, ZoneManager):
             if self.is_in_storage():
                 break
 
-            if self.appear_then_click(STORAGE_ENTER, offset=(200, 5), interval=3):
+            if self.appear_then_click(os_assets.STORAGE_ENTER, offset=(200, 5), interval=3):
                 continue
             # A game bug that AUTO_SEARCH_REWARD from the last cleared zone popups
-            if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
+            if self.appear_then_click(os_assets.AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
                 continue
             if self.handle_map_event():
                 continue
@@ -45,7 +45,7 @@ class StorageHandler(GlobeOperation, ZoneManager):
             out: is_in_map
         """
         logger.info("Storage quit")
-        self.ui_back(STORAGE_ENTER, offset=(200, 5), skip_first_screenshot=True)
+        self.ui_back(os_assets.STORAGE_ENTER, offset=(200, 5), skip_first_screenshot=True)
 
     def _storage_item_use(self, button):
         """
@@ -58,11 +58,11 @@ class StorageHandler(GlobeOperation, ZoneManager):
         """
         success = False
         get_mission_counter = 0
-        self.interval_clear(STORAGE_CHECK)
-        self.interval_clear(STORAGE_USE)
+        self.interval_clear(os_assets.STORAGE_CHECK)
+        self.interval_clear(os_assets.STORAGE_USE)
         self.interval_clear(GET_ITEMS_1)
         self.interval_clear(GET_ITEMS_2)
-        self.interval_clear(GET_ADAPTABILITY)
+        self.interval_clear(os_assets.GET_ADAPTABILITY)
         self.interval_clear(GET_MISSION)
 
         for _ in self.loop():
@@ -70,35 +70,35 @@ class StorageHandler(GlobeOperation, ZoneManager):
             if self.appear(GET_MISSION, offset=True, interval=2):
                 logger.info(f"_storage_item_use item info -> {GET_MISSION}")
                 self.device.click(GET_MISSION)
-                self.interval_reset(STORAGE_CHECK)
+                self.interval_reset(os_assets.STORAGE_CHECK)
                 get_mission_counter += 1
                 if get_mission_counter >= 3:
                     logger.warning("Possibly stuck on energy storage device, redetecting logger items.")
                     break
                 continue
             # Item rewards
-            if self.appear_then_click(STORAGE_USE, offset=(180, 30), interval=5):
-                self.interval_reset(STORAGE_CHECK)
+            if self.appear_then_click(os_assets.STORAGE_USE, offset=(180, 30), interval=5):
+                self.interval_reset(os_assets.STORAGE_CHECK)
                 continue
             if self.appear_then_click(GET_ITEMS_1, interval=5):
-                self.interval_reset(STORAGE_CHECK)
+                self.interval_reset(os_assets.STORAGE_CHECK)
                 success = True
                 continue
             if self.appear_then_click(GET_ITEMS_2, interval=5):
-                self.interval_reset(STORAGE_CHECK)
+                self.interval_reset(os_assets.STORAGE_CHECK)
                 success = True
                 continue
-            if self.appear(GET_ADAPTABILITY, offset=5, interval=2):
-                self.device.click(CLICK_SAFE_AREA)
+            if self.appear(os_assets.GET_ADAPTABILITY, offset=5, interval=2):
+                self.device.click(os_assets.CLICK_SAFE_AREA)
                 success = True
                 continue
             # Use item
-            if self.appear(STORAGE_CHECK, offset=(20, 20), interval=5):
+            if self.appear(os_assets.STORAGE_CHECK, offset=(20, 20), interval=5):
                 self.device.click(button)
                 continue
 
             # End
-            if success and self.appear(STORAGE_CHECK, offset=(20, 20)):
+            if success and self.appear(os_assets.STORAGE_CHECK, offset=(20, 20)):
                 break
 
     def storage_logger_use_all(self):
@@ -113,7 +113,7 @@ class StorageHandler(GlobeOperation, ZoneManager):
                 SCROLL_STORAGE.set_bottom(main=self, skip_first_screenshot=True)
 
             image = rgb2gray(self.device.image)
-            items = TEMPLATE_STORAGE_LOGGER.match_multi(image, similarity=0.5)
+            items = os_assets.TEMPLATE_STORAGE_LOGGER.match_multi(image, similarity=0.5)
             logger.attr("Storage_logger", len(items))
 
             if len(items):
@@ -130,12 +130,12 @@ class StorageHandler(GlobeOperation, ZoneManager):
             out: STORAGE_CHECK, scroll to bottom
         """
         sample_types = [
-            TEMPLATE_STORAGE_OFFENSE,
-            TEMPLATE_STORAGE_SURVIVAL,
-            TEMPLATE_STORAGE_COMBAT,
-            TEMPLATE_STORAGE_QUALITY_OFFENSE,
-            TEMPLATE_STORAGE_QUALITY_SURVIVAL,
-            TEMPLATE_STORAGE_QUALITY_COMBAT,
+            os_assets.TEMPLATE_STORAGE_OFFENSE,
+            os_assets.TEMPLATE_STORAGE_SURVIVAL,
+            os_assets.TEMPLATE_STORAGE_COMBAT,
+            os_assets.TEMPLATE_STORAGE_QUALITY_OFFENSE,
+            os_assets.TEMPLATE_STORAGE_QUALITY_SURVIVAL,
+            os_assets.TEMPLATE_STORAGE_QUALITY_COMBAT,
         ]
         for sample_type in sample_types:
             for _ in self.loop():
@@ -165,14 +165,14 @@ class StorageHandler(GlobeOperation, ZoneManager):
             in: STORAGE_CHECK
             out: is_in_map, in an obscure zone.
         """
-        self.interval_clear([STORAGE_CHECK, STORAGE_COORDINATE_CHECKOUT])
+        self.interval_clear([os_assets.STORAGE_CHECK, os_assets.STORAGE_COORDINATE_CHECKOUT])
         self.popup_interval_clear()
         for _ in self.loop():
-            if self.appear(STORAGE_CHECK, offset=(30, 30), interval=5):
+            if self.appear(os_assets.STORAGE_CHECK, offset=(30, 30), interval=5):
                 self.device.click(button)
                 continue
-            if self.appear_then_click(STORAGE_COORDINATE_CHECKOUT, offset=(30, 30), interval=5):
-                self.interval_reset(STORAGE_CHECK)
+            if self.appear_then_click(os_assets.STORAGE_COORDINATE_CHECKOUT, offset=(30, 30), interval=5):
+                self.interval_reset(os_assets.STORAGE_CHECK)
                 continue
             if self.handle_popup_confirm("STORAGE_CHECKOUT"):
                 # Submarine popup
@@ -195,9 +195,9 @@ class StorageHandler(GlobeOperation, ZoneManager):
             Template:
         """
         if item == "OBSCURE":
-            return TEMPLATE_STORAGE_OBSCURE
+            return os_assets.TEMPLATE_STORAGE_OBSCURE
         elif item == "ABYSSAL":
-            return TEMPLATE_STORAGE_ABYSSAL
+            return os_assets.TEMPLATE_STORAGE_ABYSSAL
         else:
             raise ScriptError(f"Unknown storage item: {item}")
 

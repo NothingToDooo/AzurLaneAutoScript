@@ -6,14 +6,14 @@ from module.logger import logger
 from module.map.assets import MAP_CAT_ATTACK
 from module.map.map_operation import MapOperation
 from module.os.globe_zone import ZoneManager
+from module.os_handler import assets as os_assets
 from module.os_handler.action_point import ActionPointHandler
-from module.os_handler.assets import *
 from module.os_handler.map_event import MapEventHandler
 
 
 class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneManager):
     def is_in_map_order(self):
-        return self.appear(ORDER_CHECK, offset=(20, 20))
+        return self.appear(os_assets.ORDER_CHECK, offset=(20, 20))
 
     def order_enter(self):
         """
@@ -23,17 +23,17 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
         """
         logger.info("Order enter")
         for _ in self.loop():
-            # End
+            # 结束。
             if self.is_in_map_order():
                 break
 
             if self.is_in_map():
-                if self.appear_then_click(ORDER_ENTER, offset=(20, 20), interval=2):
+                if self.appear_then_click(os_assets.ORDER_ENTER, offset=(20, 20), interval=2):
                     continue
-            # A game bug that AUTO_SEARCH_REWARD from the last cleared zone popups
-            if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
+            # 上一个已清理海域的自动搜索奖励有时会延迟弹出。
+            if self.appear_then_click(os_assets.AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
                 continue
-            # Skip TB guidance if user didn't have their game settings correctly set
+            # 用户游戏设置不正确时，跳过 TB 引导。
             if self.handle_map_event():
                 continue
 
@@ -45,7 +45,10 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
         """
         logger.info("Order quit")
         self.ui_click(
-            ORDER_CHECK, appear_button=self.is_in_map_order, check_button=self.is_in_map, skip_first_screenshot=True
+            os_assets.ORDER_CHECK,
+            appear_button=self.is_in_map_order,
+            check_button=self.is_in_map,
+            skip_first_screenshot=True,
         )
 
     def order_execute(self, button):
@@ -68,7 +71,7 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
         assume_zone = self.name_to_zone(11)
 
         for _ in self.loop():
-            # End
+            # 结束。
             if self.is_in_map():
                 if confirm_timer.reached():
                     return True
@@ -92,8 +95,7 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
             if self.handle_map_cat_attack():
                 continue
             if self.handle_action_point(zone=assume_zone, pinned="OBSCURE"):
-                # After clicking action point cancel, Azur Lane closes map order, instead of staying there.
-                # So re-enter map order, and re-executing the order.
+                # 点击行动力取消后，游戏会关闭指令页面，需要重新进入并执行指令。
                 self.order_enter()
                 confirm_timer.reset()
                 missing_timer.reset()
@@ -101,8 +103,8 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
 
     def wait_until_order_finished(self):
         for _ in self.loop():
-            # End
-            if self.is_in_map() and self.appear(ORDER_ENTER, offset=(20, 20)):
+            # 结束。
+            if self.is_in_map() and self.appear(os_assets.ORDER_ENTER, offset=(20, 20)):
                 break
 
             if self.handle_map_event():
@@ -131,9 +133,9 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
         # backup = self.config.cover(OS_ACTION_POINT_PRESERVE=0, OS_ACTION_POINT_BOX_USE=True)
 
         if recon_scan:
-            recon_scan = self.order_execute(ORDER_SCAN)
+            recon_scan = self.order_execute(os_assets.ORDER_SCAN)
         if submarine_call:
-            submarine_call = self.order_execute(ORDER_SUBMARINE)
+            submarine_call = self.order_execute(os_assets.ORDER_SUBMARINE)
             if submarine_call:
                 self.wait_until_order_finished()
 
@@ -152,7 +154,7 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
             return False
         if np.sum(color_similarity_2d(self.image_crop(MAP_CAT_ATTACK, copy=False), (255, 231, 123)) > 221) > 100:
             logger.info("Skip map cat attack")
-            self.device.click(CLICK_SAFE_AREA)
+            self.device.click(os_assets.CLICK_SAFE_AREA)
             self.map_cat_attack_timer.reset()
             return True
 
