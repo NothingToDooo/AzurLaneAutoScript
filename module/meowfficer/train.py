@@ -3,13 +3,13 @@ from copy import deepcopy
 from module.base.button import ButtonGrid
 from module.base.timer import Timer
 from module.logger import logger
-from module.meowfficer.assets import *
+from module.meowfficer import assets as meow_assets
 from module.meowfficer.collect import MeowfficerCollect
 from module.meowfficer.enhance import MeowfficerEnhance
 from module.ocr.ocr import Digit, DigitCounter
 
-MEOWFFICER_CAPACITY = DigitCounter(OCR_MEOWFFICER_CAPACITY, letter=(131, 121, 123), threshold=64)
-MEOWFFICER_QUEUE = DigitCounter(OCR_MEOWFFICER_QUEUE, letter=(131, 121, 123), threshold=64)
+MEOWFFICER_CAPACITY = DigitCounter(meow_assets.OCR_MEOWFFICER_CAPACITY, letter=(131, 121, 123), threshold=64)
+MEOWFFICER_QUEUE = DigitCounter(meow_assets.OCR_MEOWFFICER_QUEUE, letter=(131, 121, 123), threshold=64)
 MEOWFFICER_BOX_GRID = ButtonGrid(
     origin=(460, 210), delta=(160, 0), button_shape=(30, 30), grid_shape=(3, 1), name="MEOWFFICER_BOX_GRID"
 )
@@ -46,17 +46,17 @@ class MeowfficerTrain(MeowfficerCollect, MeowfficerEnhance):
             else:
                 self.device.screenshot()
 
-            if not self.appear(MEOWFFICER_TRAIN_FILL_QUEUE, offset=(20, 20)) and self.appear(
-                MEOWFFICER_TRAIN_START, offset=(20, 20), interval=3
+            if not self.appear(meow_assets.MEOWFFICER_TRAIN_FILL_QUEUE, offset=(20, 20)) and self.appear(
+                meow_assets.MEOWFFICER_TRAIN_START, offset=(20, 20), interval=3
             ):
                 if timeout_count > 0:
-                    self.device.click(MEOWFFICER_TRAIN_START)
+                    self.device.click(meow_assets.MEOWFFICER_TRAIN_START)
                     timeout_count -= 1
                 else:
                     return False
 
-            # End
-            if self.appear(MEOWFFICER_TRAIN_FILL_QUEUE, offset=(20, 20)):
+            # 结束。
+            if self.appear(meow_assets.MEOWFFICER_TRAIN_FILL_QUEUE, offset=(20, 20)):
                 return True
             if self.info_bar_count():
                 logger.info("No more slots to train, exit")
@@ -72,8 +72,7 @@ class MeowfficerTrain(MeowfficerCollect, MeowfficerEnhance):
             in: MEOWFFICER_TRAIN
             out: MEOWFFICER_TRAIN
         """
-        # Loop through possible screen transitions
-        # as a result of the previous action
+        # 循环处理上一步操作可能引发的页面跳转。
         confirm_timer = Timer(1.5, count=3).start()
         while 1:
             if skip_first_screenshot:
@@ -84,17 +83,17 @@ class MeowfficerTrain(MeowfficerCollect, MeowfficerEnhance):
             if self.info_bar_count():
                 confirm_timer.reset()
                 continue
-            if self.appear_then_click(MEOWFFICER_TRAIN_FILL_QUEUE, offset=(20, 20), interval=5):
+            if self.appear_then_click(meow_assets.MEOWFFICER_TRAIN_FILL_QUEUE, offset=(20, 20), interval=5):
                 self.device.sleep(0.3)
-                self.device.click(MEOWFFICER_TRAIN_START)
+                self.device.click(meow_assets.MEOWFFICER_TRAIN_START)
                 confirm_timer.reset()
                 continue
             if self.handle_meow_popup_confirm():
                 confirm_timer.reset()
                 continue
 
-            # End
-            if self.appear(MEOWFFICER_TRAIN_START, offset=(20, 20)):
+            # 结束。
+            if self.appear(meow_assets.MEOWFFICER_TRAIN_START, offset=(20, 20)):
                 if confirm_timer.reached():
                     break
             else:
@@ -208,7 +207,7 @@ class MeowfficerTrain(MeowfficerCollect, MeowfficerEnhance):
         collected = False
         if self.config.MeowfficerTrain_Mode == "seamlessly":
             # Enter
-            self.meow_enter(MEOWFFICER_TRAIN_ENTER, check_button=MEOWFFICER_TRAIN_START)
+            self.meow_enter(meow_assets.MEOWFFICER_TRAIN_ENTER, check_button=meow_assets.MEOWFFICER_TRAIN_START)
             # Collect
             if remain > 0:
                 collected = self.meow_collect(collect_all=True)
@@ -218,7 +217,7 @@ class MeowfficerTrain(MeowfficerCollect, MeowfficerEnhance):
             self.meow_menu_close()
         else:
             # Enter
-            self.meow_enter(MEOWFFICER_TRAIN_ENTER, check_button=MEOWFFICER_TRAIN_START)
+            self.meow_enter(meow_assets.MEOWFFICER_TRAIN_ENTER, check_button=meow_assets.MEOWFFICER_TRAIN_START)
             # Collect
             if remain > 0:
                 collected = self.meow_collect(collect_all=self.meow_is_sunday())

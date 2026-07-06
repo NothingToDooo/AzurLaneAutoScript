@@ -1,7 +1,7 @@
-from module.base.button import ButtonGrid
+from module.base.button import Button, ButtonGrid
 from module.base.timer import Timer
 from module.logger import logger
-from module.meowfficer.assets import *
+from module.meowfficer import assets as meow_assets
 from module.meowfficer.base import MeowfficerBase
 from module.ui.switch import Switch
 
@@ -14,8 +14,12 @@ MEOWFFICER_SHIFT_DETECT = Button(
 )
 
 SWITCH_LOCK = Switch(name="Meowfficer_Lock", offset=(40, 40))
-SWITCH_LOCK.add_state("lock", check_button=MEOWFFICER_APPLY_UNLOCK, click_button=MEOWFFICER_APPLY_LOCK)
-SWITCH_LOCK.add_state("unlock", check_button=MEOWFFICER_APPLY_LOCK, click_button=MEOWFFICER_APPLY_UNLOCK)
+SWITCH_LOCK.add_state(
+    "lock", check_button=meow_assets.MEOWFFICER_APPLY_UNLOCK, click_button=meow_assets.MEOWFFICER_APPLY_LOCK
+)
+SWITCH_LOCK.add_state(
+    "unlock", check_button=meow_assets.MEOWFFICER_APPLY_LOCK, click_button=meow_assets.MEOWFFICER_APPLY_UNLOCK
+)
 
 
 class MeowfficerCollect(MeowfficerBase):
@@ -39,7 +43,7 @@ class MeowfficerCollect(MeowfficerBase):
             else:
                 self.device.screenshot()
 
-            # End - Random left shift
+            # 结束：随机左移。
             if self.image_color_count(
                 MEOWFFICER_SHIFT_DETECT, color=MEOWFFICER_SHIFT_DETECT.color, threshold=221, count=650
             ):
@@ -50,8 +54,8 @@ class MeowfficerCollect(MeowfficerBase):
                     break
                 continue
 
-            # End - No shift at all
-            if self.appear(MEOWFFICER_GET_CHECK, offset=(40, 40)):
+            # 结束：没有位移。
+            if self.appear(meow_assets.MEOWFFICER_GET_CHECK, offset=(40, 40)):
                 if flag:
                     confirm_timer.reset()
                     flag = False
@@ -67,10 +71,10 @@ class MeowfficerCollect(MeowfficerBase):
         Returns:
            bool
         """
-        if self.match_template_color(MEOWFFICER_GET_CHECK, offset=(40, 40)):
+        if self.match_template_color(meow_assets.MEOWFFICER_GET_CHECK, offset=(40, 40)):
             return True
 
-        if self.appear(MEOWFFICER_TRAIN_START, offset=(20, 20)):
+        if self.appear(meow_assets.MEOWFFICER_TRAIN_START, offset=(20, 20)):
             return True
 
         return False
@@ -85,16 +89,16 @@ class MeowfficerCollect(MeowfficerBase):
         """
         self.ui_click(
             btn,
-            check_button=MEOWFFICER_TALENT_CLOSE,
-            appear_button=MEOWFFICER_GET_CHECK,
+            check_button=meow_assets.MEOWFFICER_TALENT_CLOSE,
+            appear_button=meow_assets.MEOWFFICER_GET_CHECK,
             offset=(40, 40),
             skip_first_screenshot=True,
         )
         drop.add(self.device.image)
         self.ui_click(
-            MEOWFFICER_TALENT_CLOSE,
+            meow_assets.MEOWFFICER_TALENT_CLOSE,
             check_button=self._meow_check_popup_exit,
-            appear_button=MEOWFFICER_TALENT_CLOSE,
+            appear_button=meow_assets.MEOWFFICER_TALENT_CLOSE,
             skip_first_screenshot=True,
         )
         self.device.click_record.pop()
@@ -149,16 +153,16 @@ class MeowfficerCollect(MeowfficerBase):
         """
 
         def additional():
-            if self.appear(MEOWFFICER_TRAIN_EVALUATE, offset=(20, 20), interval=3):
-                self.device.click(MEOWFFICER_TRAIN_EVALUATE)
+            if self.appear(meow_assets.MEOWFFICER_TRAIN_EVALUATE, offset=(20, 20), interval=3):
+                self.device.click(meow_assets.MEOWFFICER_TRAIN_EVALUATE)
                 return True
             return False
 
         # Trigger lock popup appearance to initiate sequence
         self.ui_click(
-            MEOWFFICER_TRAIN_CLICK_SAFE_AREA,
-            appear_button=MEOWFFICER_GET_CHECK,
-            check_button=MEOWFFICER_CONFIRM,
+            meow_assets.MEOWFFICER_TRAIN_CLICK_SAFE_AREA,
+            appear_button=meow_assets.MEOWFFICER_GET_CHECK,
+            check_button=meow_assets.MEOWFFICER_CONFIRM,
             additional=additional,
             offset=(40, 40),
             retry_wait=3,
@@ -166,7 +170,7 @@ class MeowfficerCollect(MeowfficerBase):
         )
 
         self.ui_click(
-            MEOWFFICER_CANCEL,
+            meow_assets.MEOWFFICER_CANCEL,
             check_button=self._meow_check_popup_exit,
             additional=additional,
             offset=(40, 20),
@@ -204,31 +208,38 @@ class MeowfficerCollect(MeowfficerBase):
             else:
                 self.device.screenshot()
 
-            # Next meow MEOWFFICER_APPLY_LOCK load faster than MEOWFFICER_GET_CHECK,
-            # make sure exit with a full screenshot
-            if self.appear(MEOWFFICER_GET_CHECK, offset=(40, 40)):
-                if self.appear(MEOWFFICER_APPLY_LOCK, offset=(40, 40)):
+            # 下一个指挥喵的 MEOWFFICER_APPLY_LOCK 比 MEOWFFICER_GET_CHECK 加载更快，
+            # 退出前需要确保已有完整截图。
+            if self.appear(meow_assets.MEOWFFICER_GET_CHECK, offset=(40, 40)):
+                if self.appear(meow_assets.MEOWFFICER_APPLY_LOCK, offset=(40, 40)):
                     break
-            # accidentally exited get queue
-            if self.appear(MEOWFFICER_TRAIN_START, offset=(20, 20)):
+            # 意外退出领取队列。
+            if self.appear(meow_assets.MEOWFFICER_TRAIN_START, offset=(20, 20)):
                 logger.info("_meow_skip_popup_after_locking exits at MEOWFFICER_TRAIN_START")
                 break
 
-            if self.appear(MEOWFFICER_APPLY_UNLOCK, offset=(40, 40), interval=3):
-                self.device.click(MEOWFFICER_TRAIN_CLICK_SAFE_AREA)
+            if self.appear(meow_assets.MEOWFFICER_APPLY_UNLOCK, offset=(40, 40), interval=3):
+                self.device.click(meow_assets.MEOWFFICER_TRAIN_CLICK_SAFE_AREA)
                 continue
-            if self.appear(MEOWFFICER_CONFIRM, offset=(40, 20), interval=3) or self.appear(
-                MEOWFFICER_CANCEL, offset=(40, 20), interval=3
+            if self.appear(meow_assets.MEOWFFICER_CONFIRM, offset=(40, 20), interval=3) or self.appear(
+                meow_assets.MEOWFFICER_CANCEL, offset=(40, 20), interval=3
             ):
-                self.device.click(MEOWFFICER_CONFIRM)
+                self.device.click(meow_assets.MEOWFFICER_CONFIRM)
                 continue
-            if self.appear(MEOWFFICER_TRAIN_EVALUATE, offset=(20, 20), interval=3):
-                self.device.click(MEOWFFICER_TRAIN_EVALUATE)
+            if self.appear(meow_assets.MEOWFFICER_TRAIN_EVALUATE, offset=(20, 20), interval=3):
+                self.device.click(meow_assets.MEOWFFICER_TRAIN_EVALUATE)
                 continue
 
         self.device.click_record.pop()
         self.device.click_record.pop()
-        self.interval_reset((MEOWFFICER_GET_CHECK, MEOWFFICER_APPLY_LOCK, MEOWFFICER_CONFIRM, MEOWFFICER_CANCEL))
+        self.interval_reset(
+            (
+                meow_assets.MEOWFFICER_GET_CHECK,
+                meow_assets.MEOWFFICER_APPLY_LOCK,
+                meow_assets.MEOWFFICER_CONFIRM,
+                meow_assets.MEOWFFICER_CANCEL,
+            )
+        )
 
     def meow_get(self, skip_first_screenshot=True):
         """
@@ -255,8 +266,8 @@ class MeowfficerCollect(MeowfficerBase):
             else:
                 self.device.screenshot()
 
-            # End
-            if self.appear(MEOWFFICER_TRAIN_START, offset=(20, 20)):
+            # 结束。
+            if self.appear(meow_assets.MEOWFFICER_TRAIN_START, offset=(20, 20)):
                 if confirm_timer.reached():
                     break
             else:
@@ -265,19 +276,19 @@ class MeowfficerCollect(MeowfficerBase):
             if self.handle_meow_popup_dismiss():
                 confirm_timer.reset()
                 continue
-            if self.appear(MEOWFFICER_GET_CHECK, offset=(40, 40), interval=3):
-                if self.appear(MEOWFFICER_APPLY_UNLOCK, offset=(40, 40)):
+            if self.appear(meow_assets.MEOWFFICER_GET_CHECK, offset=(40, 40), interval=3):
+                if self.appear(meow_assets.MEOWFFICER_APPLY_UNLOCK, offset=(40, 40)):
                     self._meow_skip_popup_after_locking(skip_first_screenshot=True)
                     confirm_timer.reset()
-                    # accidentally exited get queue
-                    if self.appear(MEOWFFICER_TRAIN_START, offset=(20, 20)):
+                    # 意外退出领取队列。
+                    if self.appear(meow_assets.MEOWFFICER_TRAIN_START, offset=(20, 20)):
                         continue
 
                 count += 1
                 logger.attr("Meow_get", count)
                 with self.stat.new(genre="meowfficer_talent", method=self.config.DropRecord_MeowfficerTalent) as drop:
                     special_talent = self._meow_is_special_talented(drop=drop)
-                    if self.appear(MEOWFFICER_GOLD_CHECK, offset=(40, 40)):
+                    if self.appear(meow_assets.MEOWFFICER_GOLD_CHECK, offset=(40, 40)):
                         if not self.config.MeowfficerTrain_RetainTalentedGold or not special_talent:
                             self._meow_skip_lock()
                             skip_first_screenshot = True
@@ -285,21 +296,20 @@ class MeowfficerCollect(MeowfficerBase):
                             continue
                         self._meow_apply_lock()
 
-                    if self.appear(MEOWFFICER_PURPLE_CHECK, offset=(40, 40)):
+                    if self.appear(meow_assets.MEOWFFICER_PURPLE_CHECK, offset=(40, 40)):
                         if self.config.MeowfficerTrain_RetainTalentedPurple and special_talent:
                             self._meow_apply_lock()
 
-                    # Susceptible to exception when collecting multiple
-                    # Mitigate by popping click_record
-                    self.device.click(MEOWFFICER_TRAIN_CLICK_SAFE_AREA)
+                    # 多次领取时容易触发异常，通过弹出 click_record 缓解。
+                    self.device.click(meow_assets.MEOWFFICER_TRAIN_CLICK_SAFE_AREA)
                     self.device.click_record.pop()
                     confirm_timer.reset()
-                    self.interval_reset(MEOWFFICER_GET_CHECK)
+                    self.interval_reset(meow_assets.MEOWFFICER_GET_CHECK)
                     continue
 
-            # If click MEOWFFICER_TRAIN_FINISH_ALL, will enter evaluate page
-            if self.appear(MEOWFFICER_TRAIN_EVALUATE, offset=(20, 20), interval=3):
-                self.device.click(MEOWFFICER_TRAIN_EVALUATE)
+            # 点击 MEOWFFICER_TRAIN_FINISH_ALL 后会进入评价页面。
+            if self.appear(meow_assets.MEOWFFICER_TRAIN_EVALUATE, offset=(20, 20), interval=3):
+                self.device.click(meow_assets.MEOWFFICER_TRAIN_EVALUATE)
                 continue
 
     def meow_collect(self, collect_all=True):
@@ -321,17 +331,17 @@ class MeowfficerCollect(MeowfficerBase):
         """
         logger.hr("Meowfficer collect", level=2)
 
-        if self.appear(MEOWFFICER_TRAIN_COMPLETE, offset=(20, 20)):
-            # Today is Sunday, finish all else get just one
+        if self.appear(meow_assets.MEOWFFICER_TRAIN_COMPLETE, offset=(20, 20)):
+            # 周日领取全部，否则只领取一个。
             if collect_all:
                 logger.info("Collect all trained meowfficers")
-                button = MEOWFFICER_TRAIN_FINISH_ALL
+                button = meow_assets.MEOWFFICER_TRAIN_FINISH_ALL
             else:
                 logger.info("Collect single trained meowfficer")
-                button = MEOWFFICER_TRAIN_COMPLETE
+                button = meow_assets.MEOWFFICER_TRAIN_COMPLETE
             self.ui_click(
                 button,
-                check_button=MEOWFFICER_GET_CHECK,
+                check_button=meow_assets.MEOWFFICER_GET_CHECK,
                 additional=self.handle_meow_popup_dismiss,
                 offset=(40, 40),
                 skip_first_screenshot=True,

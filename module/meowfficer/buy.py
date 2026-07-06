@@ -1,15 +1,15 @@
 from module.combat.assets import GET_ITEMS_1
 from module.logger import logger
-from module.meowfficer.assets import *
+from module.meowfficer import assets as meow_assets
 from module.meowfficer.base import MeowfficerBase
 from module.ocr.ocr import Digit, DigitCounter
 from module.ui.assets import MEOWFFICER_GOTO_DORMMENU
 
 BUY_MAX = 15
 BUY_PRIZE = 1500
-MEOWFFICER = DigitCounter(OCR_MEOWFFICER, letter=(140, 113, 99), threshold=64)
-MEOWFFICER_CHOOSE = Digit(OCR_MEOWFFICER_CHOOSE, letter=(140, 113, 99), threshold=64)
-MEOWFFICER_COINS = Digit(OCR_MEOWFFICER_COINS, letter=(99, 69, 41), threshold=64)
+MEOWFFICER = DigitCounter(meow_assets.OCR_MEOWFFICER, letter=(140, 113, 99), threshold=64)
+MEOWFFICER_CHOOSE = Digit(meow_assets.OCR_MEOWFFICER_CHOOSE, letter=(140, 113, 99), threshold=64)
+MEOWFFICER_COINS = Digit(meow_assets.OCR_MEOWFFICER_COINS, letter=(99, 69, 41), threshold=64)
 
 
 class MeowfficerBuy(MeowfficerBase):
@@ -116,18 +116,18 @@ class MeowfficerBuy(MeowfficerBase):
         Args:
             count (int): 1 to BUY_MAX.
         """
-        self.meow_enter(MEOWFFICER_BUY_ENTER, check_button=MEOWFFICER_BUY)
+        self.meow_enter(meow_assets.MEOWFFICER_BUY_ENTER, check_button=meow_assets.MEOWFFICER_BUY)
 
-        # info_bar may covers OCR_MEOWFFICER_CHOOSE,
-        # and OCR_MEOWFFICER_CHOOSE may detected as 0 causing extra clickings
-        # info_bar is usually from the previous Dorm task or meowfficer fort
+        # info_bar 可能遮挡 OCR_MEOWFFICER_CHOOSE，
+        # 导致 OCR_MEOWFFICER_CHOOSE 被识别为 0 并触发额外点击。
+        # info_bar 通常来自上一个后宅任务或指挥喵后宅。
         self.handle_info_bar()
 
         self.ui_ensure_index(
             count,
             letter=MEOWFFICER_CHOOSE,
-            prev_button=MEOWFFICER_BUY_PREV,
-            next_button=MEOWFFICER_BUY_NEXT,
+            prev_button=meow_assets.MEOWFFICER_BUY_PREV,
+            next_button=meow_assets.MEOWFFICER_BUY_NEXT,
             skip_first_screenshot=True,
         )
 
@@ -137,7 +137,7 @@ class MeowfficerBuy(MeowfficerBase):
             in: MEOWFFICER_BUY
             out: page_meowfficer
         """
-        # Here uses a simple click, to avoid clicking MEOWFFICER_BUY multiple times.
+        # 这里用简单点击，避免重复点击 MEOWFFICER_BUY。
         logger.hr("Meow confirm")
         executed = False
         with self.stat.new(
@@ -150,31 +150,31 @@ class MeowfficerBuy(MeowfficerBase):
                 else:
                     self.device.screenshot()
 
-                if self.appear(MEOWFFICER_BUY, offset=(20, 20), interval=3):
+                if self.appear(meow_assets.MEOWFFICER_BUY, offset=(20, 20), interval=3):
                     if executed:
                         self.device.click(MEOWFFICER_GOTO_DORMMENU)
                     else:
-                        self.device.click(MEOWFFICER_BUY)
+                        self.device.click(meow_assets.MEOWFFICER_BUY)
                     continue
                 if self.handle_meow_popup_confirm():
                     executed = True
                     continue
-                if self.appear_then_click(MEOWFFICER_BUY_SKIP, interval=3):
+                if self.appear_then_click(meow_assets.MEOWFFICER_BUY_SKIP, interval=3):
                     executed = True
                     continue
                 if self.appear(GET_ITEMS_1, offset=5, interval=3):
                     if drop.save is True:
                         drop.handle_add(self, before=2)
-                    self.device.click(MEOWFFICER_BUY_SKIP)
-                    self.interval_clear(MEOWFFICER_BUY)
+                    self.device.click(meow_assets.MEOWFFICER_BUY_SKIP)
+                    self.interval_clear(meow_assets.MEOWFFICER_BUY)
                     executed = True
                     continue
-                # Rare case that MEOWFFICER_INFO popups here
+                # 少见情况下这里会弹出 MEOWFFICER_INFO。
                 if self.meow_additional():
                     continue
 
-                # End
-                if self.match_template_color(MEOWFFICER_BUY_ENTER, offset=(20, 20)):
+                # 结束。
+                if self.match_template_color(meow_assets.MEOWFFICER_BUY_ENTER, offset=(20, 20)):
                     break
 
     def meow_buy(self) -> None:

@@ -1,7 +1,7 @@
 from module.base.button import ButtonGrid
 from module.base.timer import Timer
 from module.logger import logger
-from module.meowfficer.assets import *
+from module.meowfficer import assets as meow_assets
 from module.meowfficer.base import MeowfficerBase
 from module.meowfficer.buy import MEOWFFICER_COINS
 from module.ocr.ocr import Digit, DigitCounter
@@ -17,7 +17,7 @@ MEOWFFICER_FEED_GRID = ButtonGrid(
 MEOWFICER_FEED_LEVEL_GRID = ButtonGrid(
     origin=(738, 211), delta=(130, 148), button_shape=(20, 22), grid_shape=(4, 3), name="MEOWFFICER_FEED_LEVEL_GRID"
 )
-MEOWFFICER_FEED = DigitCounter(OCR_MEOWFFICER_FEED, letter=(131, 121, 123), threshold=64)
+MEOWFFICER_FEED = DigitCounter(meow_assets.OCR_MEOWFFICER_FEED, letter=(131, 121, 123), threshold=64)
 
 
 class MeowfficerLevelOcr(Digit):
@@ -31,7 +31,9 @@ class MeowfficerLevelOcr(Digit):
         return super().after_process(result)
 
 
-OCR_MEOWFFICER_ENHANCE_LEVEL = MeowfficerLevelOcr(OCR_MEOWFFICER_ENHANCE_LEVEL, name="OCR_MEOWFFICER_ENHANCE_LEVEL")
+OCR_MEOWFFICER_ENHANCE_LEVEL = MeowfficerLevelOcr(
+    meow_assets.OCR_MEOWFFICER_ENHANCE_LEVEL, name="OCR_MEOWFFICER_ENHANCE_LEVEL"
+)
 
 
 class MeowfficerEnhance(MeowfficerBase):
@@ -151,7 +153,13 @@ class MeowfficerEnhance(MeowfficerBase):
             int: non-zero positive, some selected
                  zero, none selected
         """
-        self.interval_clear([MEOWFFICER_FEED_CONFIRM, MEOWFFICER_FEED_CANCEL, MEOWFFICER_ENHANCE_CONFIRM])
+        self.interval_clear(
+            [
+                meow_assets.MEOWFFICER_FEED_CONFIRM,
+                meow_assets.MEOWFFICER_FEED_CANCEL,
+                meow_assets.MEOWFFICER_ENHANCE_CONFIRM,
+            ]
+        )
         current = 0
         retry = Timer(1, count=2)
         skip_first_screenshot = True
@@ -185,16 +193,16 @@ class MeowfficerEnhance(MeowfficerBase):
         if current:
             logger.info(f"Confirm selected feed material, total: {current} / 10")
             self.ui_click(
-                MEOWFFICER_FEED_CONFIRM,
-                check_button=MEOWFFICER_ENHANCE_CONFIRM,
+                meow_assets.MEOWFFICER_FEED_CONFIRM,
+                check_button=meow_assets.MEOWFFICER_ENHANCE_CONFIRM,
                 offset=(20, 20),
                 skip_first_screenshot=True,
             )
         else:
             logger.info("Lack of feed material to complete enhancement, cancelling")
             self.ui_click(
-                MEOWFFICER_FEED_CANCEL,
-                check_button=MEOWFFICER_ENHANCE_CONFIRM,
+                meow_assets.MEOWFFICER_FEED_CANCEL,
+                check_button=meow_assets.MEOWFFICER_ENHANCE_CONFIRM,
                 offset=(10, 10),
                 skip_first_screenshot=True,
             )
@@ -223,12 +231,12 @@ class MeowfficerEnhance(MeowfficerBase):
             else:
                 self.device.screenshot()
 
-            if self.appear_then_click(MEOWFFICER_FEED_ENTER, offset=(20, 20), interval=3):
+            if self.appear_then_click(meow_assets.MEOWFFICER_FEED_ENTER, offset=(20, 20), interval=3):
                 click_count += 1
                 continue
 
-            # End
-            if self.appear(MEOWFFICER_FEED_CONFIRM, offset=(20, 20)):
+            # 结束。
+            if self.appear(meow_assets.MEOWFFICER_FEED_CONFIRM, offset=(20, 20)):
                 if confirm_timer.reached():
                     return True
             if click_count >= 3:
@@ -248,9 +256,9 @@ class MeowfficerEnhance(MeowfficerBase):
         """
         self.interval_clear(
             [
-                MEOWFFICER_FEED_ENTER,
-                MEOWFFICER_ENHANCE_CONFIRM,
-                MEOWFFICER_CONFIRM,
+                meow_assets.MEOWFFICER_FEED_ENTER,
+                meow_assets.MEOWFFICER_ENHANCE_CONFIRM,
+                meow_assets.MEOWFFICER_CONFIRM,
             ]
         )
         confirm_timer = Timer(3, count=6).start()
@@ -260,8 +268,8 @@ class MeowfficerEnhance(MeowfficerBase):
             else:
                 self.device.screenshot()
 
-            # End
-            if self.appear(MEOWFFICER_FEED_ENTER, offset=(20, 20)):
+            # 结束。
+            if self.appear(meow_assets.MEOWFFICER_FEED_ENTER, offset=(20, 20)):
                 if confirm_timer.reached():
                     break
                 continue
@@ -269,7 +277,7 @@ class MeowfficerEnhance(MeowfficerBase):
             if self.handle_meow_popup_confirm():
                 confirm_timer.reset()
                 continue
-            if self.appear_then_click(MEOWFFICER_ENHANCE_CONFIRM, offset=(20, 20), interval=3):
+            if self.appear_then_click(meow_assets.MEOWFFICER_ENHANCE_CONFIRM, offset=(20, 20), interval=3):
                 confirm_timer.reset()
                 continue
 
@@ -292,14 +300,14 @@ class MeowfficerEnhance(MeowfficerBase):
             else:
                 self.device.screenshot()
 
-            # End
-            if self.appear(MEOWFFICER_FEED_ENTER, offset=(20, 20)):
+            # 结束。
+            if self.appear(meow_assets.MEOWFFICER_FEED_ENTER, offset=(20, 20)):
                 return True
             if count > 3:
                 logger.warning("Too many click on MEOWFFICER_ENHANCE_ENTER, meowfficer may in battle")
                 return False
 
-            if self.appear_then_click(MEOWFFICER_ENHANCE_ENTER, offset=(20, 20), interval=3):
+            if self.appear_then_click(meow_assets.MEOWFFICER_ENHANCE_ENTER, offset=(20, 20), interval=3):
                 count += 1
                 continue
             if self.meow_additional():
@@ -383,8 +391,8 @@ class MeowfficerEnhance(MeowfficerBase):
                 # Exit back into page_meowfficer
                 self.ui_click(
                     MEOWFFICER_GOTO_DORMMENU,
-                    check_button=MEOWFFICER_ENHANCE_ENTER,
-                    appear_button=MEOWFFICER_ENHANCE_CONFIRM,
+                    check_button=meow_assets.MEOWFFICER_ENHANCE_ENTER,
+                    appear_button=meow_assets.MEOWFFICER_ENHANCE_CONFIRM,
                     offset=None,
                     skip_first_screenshot=True,
                 )
@@ -404,8 +412,8 @@ class MeowfficerEnhance(MeowfficerBase):
         # Exit back into page_meowfficer
         self.ui_click(
             MEOWFFICER_GOTO_DORMMENU,
-            check_button=MEOWFFICER_ENHANCE_ENTER,
-            appear_button=MEOWFFICER_ENHANCE_CONFIRM,
+            check_button=meow_assets.MEOWFFICER_ENHANCE_ENTER,
+            appear_button=meow_assets.MEOWFFICER_ENHANCE_CONFIRM,
             offset=None,
             skip_first_screenshot=True,
         )

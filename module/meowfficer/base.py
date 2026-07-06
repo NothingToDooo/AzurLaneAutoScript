@@ -2,7 +2,7 @@ from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1
 from module.config.utils import get_server_next_update
 from module.logger import logger
-from module.meowfficer.assets import *
+from module.meowfficer import assets as meow_assets
 from module.ui.assets import MEOWFFICER_CHECK, MEOWFFICER_INFO
 from module.ui.ui import UI
 
@@ -29,7 +29,11 @@ class MeowfficerBase(UI):
             in: page_meowfficer
             out: check_button
         """
-        accident_page = [MEOWFFICER_TRAIN_START, MEOWFFICER_BUY, MEOWFFICER_FORT_CHECK]
+        accident_page = [
+            meow_assets.MEOWFFICER_TRAIN_START,
+            meow_assets.MEOWFFICER_BUY,
+            meow_assets.MEOWFFICER_FORT_CHECK,
+        ]
         accident_page = [page for page in accident_page if page != check_button]
         while 1:
             if skip_first_screenshot:
@@ -37,13 +41,13 @@ class MeowfficerBase(UI):
             else:
                 self.device.screenshot()
 
-            # End
+            # 结束。
             if self.appear(check_button, offset=(20, 20)):
                 break
-            # Click
+            # 点击。
             if self.appear_then_click(click_button, offset=(20, 20), interval=3):
                 continue
-            # Accident click
+            # 误点击。
             if self.meow_additional():
                 continue
             for button in accident_page:
@@ -68,7 +72,7 @@ class MeowfficerBase(UI):
             else:
                 self.device.screenshot()
 
-            # End
+            # 结束。
             if self.match_template_color(MEOWFFICER_CHECK, offset=(20, 20)):
                 break
             else:
@@ -78,31 +82,31 @@ class MeowfficerBase(UI):
                     click_timer.reset()
                     continue
 
-            # Fort
-            if self.appear(MEOWFFICER_FORT_CHECK, offset=(20, 20), interval=3):
+            # 后宅事务。
+            if self.appear(meow_assets.MEOWFFICER_FORT_CHECK, offset=(20, 20), interval=3):
                 self.device.click(MEOWFFICER_CHECK)
                 click_timer.reset()
                 continue
-            # Buy
-            if self.appear(MEOWFFICER_BUY, offset=(20, 20), interval=3):
+            # 购买。
+            if self.appear(meow_assets.MEOWFFICER_BUY, offset=(20, 20), interval=3):
                 self.device.click(MEOWFFICER_CHECK)
                 click_timer.reset()
                 continue
-            # Train
-            if self.appear(MEOWFFICER_TRAIN_FILL_QUEUE, offset=(20, 20), interval=3):
+            # 训练。
+            if self.appear(meow_assets.MEOWFFICER_TRAIN_FILL_QUEUE, offset=(20, 20), interval=3):
                 self.device.click(MEOWFFICER_CHECK)
                 click_timer.reset()
                 continue
-            if self.appear(MEOWFFICER_TRAIN_FINISH_ALL, offset=(20, 20), interval=3):
+            if self.appear(meow_assets.MEOWFFICER_TRAIN_FINISH_ALL, offset=(20, 20), interval=3):
                 self.device.click(MEOWFFICER_CHECK)
                 click_timer.reset()
                 continue
-            # Popups
-            if self.appear(MEOWFFICER_CONFIRM, offset=(40, 20), interval=3):
+            # 弹窗。
+            if self.appear(meow_assets.MEOWFFICER_CONFIRM, offset=(40, 20), interval=3):
                 self.device.click(MEOWFFICER_CHECK)
                 click_timer.reset()
                 continue
-            if self.appear(MEOWFFICER_CANCEL, offset=(40, 20), interval=3):
+            if self.appear(meow_assets.MEOWFFICER_CANCEL, offset=(40, 20), interval=3):
                 self.device.click(MEOWFFICER_CHECK)
                 click_timer.reset()
                 continue
@@ -121,7 +125,7 @@ class MeowfficerBase(UI):
         Returns:
             bool:
         """
-        if self.appear_then_click(MEOWFFICER_CONFIRM, offset=(40, 20), interval=5):
+        if self.appear_then_click(meow_assets.MEOWFFICER_CONFIRM, offset=(40, 20), interval=5):
             return True
         else:
             return False
@@ -134,7 +138,7 @@ class MeowfficerBase(UI):
         Returns:
             bool:
         """
-        if self.appear_then_click(MEOWFFICER_CANCEL, offset=(40, 20), interval=5):
+        if self.appear_then_click(meow_assets.MEOWFFICER_CANCEL, offset=(40, 20), interval=5):
             return True
         else:
             return False
@@ -147,8 +151,8 @@ class MeowfficerBase(UI):
         Returns:
             bool:
         """
-        if self.appear(MEOWFFICER_CONFIRM, offset=(40, 20), interval=5) or self.appear(
-            MEOWFFICER_CANCEL, offset=(40, 20), interval=5
+        if self.appear(meow_assets.MEOWFFICER_CONFIRM, offset=(40, 20), interval=5) or self.appear(
+            meow_assets.MEOWFFICER_CANCEL, offset=(40, 20), interval=5
         ):
             self.device.click(MEOWFFICER_CHECK)
             return True
