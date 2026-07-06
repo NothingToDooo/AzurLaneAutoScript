@@ -1,4 +1,3 @@
-from module.base.decorator import Config
 from module.base.timer import Timer
 from module.base.utils import *
 from module.exception import MapDetectionError, ScriptError
@@ -15,7 +14,6 @@ from module.os_handler.storage import StorageHandler
 from module.ui.assets import BACK_ARROW, OS_CHECK
 
 ZONE_NAME_EDGE_CHARS = "\\/-—–－"
-ZONE_NAME_TW_SUFFIX_CHARS = "安全隱秘塞壬要塞深淵海域一"
 ZONE_NAME_CN_SUFFIX_CHARS = "安全隐秘塞壬要塞深渊海域-"
 
 
@@ -62,87 +60,7 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
             self.device.image, area=MEOWFFICER_SEARCHING_PERCENTAGE.area, prev_color=(74, 223, 255)
         )
 
-    @Config.when(SERVER="en")
     def get_zone_name(self):
-        # For EN only
-        ocr = Ocr(MAP_NAME, lang="cnocr", letter=(206, 223, 247), threshold=96, name="OCR_OS_MAP_NAME")
-        name = ocr.ocr(self.device.image)
-        name = "".join(name.split())
-        name = name.lower()
-        name = strip_zone_name_edges(name)
-        if "-" in name:
-            name = name.split("-")[0]
-        if "é" in name:  # Méditerranée name maps
-            name = name.replace("é", "e")
-        if "nvcity" in name:  # NY City Port read as 'V' rather than 'Y'
-            name = "nycity"
-        if "cibraltar" in name:
-            name = "gibraltar"
-        # Sate Zone
-        name = name.replace("sate", "safe")
-        self.is_zone_name_hidden = "safe" in name
-
-        # Occasional mis-read by OCR, hotfix
-        name = name.replace("pasage", "passage")
-        name = name.replace("shef", "shelf")
-        name = name.replace("nnocean", "naocean")
-        # A OceanwsectorB-Safe zone
-        name = re.sub("^aocean", "naocean", name)
-
-        # `-` is missing or read as '.'
-        # due to font size
-        name = name.replace("safe", "")
-        name = name.replace("zone", "")
-        if name.endswith("."):
-            name = name[0:-1]
-        return name
-
-    @Config.when(SERVER="jp")
-    def get_zone_name(self):
-        # For JP only
-        ocr = Ocr(MAP_NAME, lang="jp", letter=(157, 173, 192), threshold=127, name="OCR_OS_MAP_NAME")
-        name = ocr.ocr(self.device.image)
-        name = strip_zone_name_edges(name)
-        self.is_zone_name_hidden = "安全" in name
-        # Remove punctuations
-        for char in "・":
-            name = name.replace(char, "")
-        # Remove '異常海域' and 'セイレーン要塞海域'
-        if "異" in name:
-            name = name.split("異")[0]
-        if "セ" in name:
-            name = name.split("セ")[0]
-        # Remove '安全海域' or '秘密海域' at the end of jp ocr.
-        name = name.rstrip("安全秘密異常要塞海域")
-        # Kanji '一', '力' and '卜' are not used, while Katakana 'ー', 'カ' and 'ト' are misread as Kanji sometimes.
-        # Katakana 'ペ' may be misread as Hiragana 'ぺ'.
-        name = name.replace("一", "ー").replace("力", "カ").replace("卜", "ト").replace("ぺ", "ペ")
-        name = name.replace("ジブフルタル", "ジブラルタル")
-        name = name.replace("タント", "タラント").replace("タフント", "タラント")
-        name = name.replace("N海域", "NA海域")
-        # リバープル -> リバープール
-        name = name.replace("リバプル", "リバープール")
-        name = name.replace("リバープル", "リバープール")
-        name = name.replace("リバプール", "リバープール")
-        return name
-
-    @Config.when(SERVER="tw")
-    def get_zone_name(self):
-        # For TW only
-        ocr = Ocr(MAP_NAME, lang="tw", letter=(198, 215, 239), threshold=127, name="OCR_OS_MAP_NAME")
-        name = ocr.ocr(self.device.image)
-        name = strip_zone_name_edges(name)
-        self.is_zone_name_hidden = "安全" in name
-        # Remove '塞壬要塞海域'
-        if "塞" in name:
-            name = name.split("塞")[0]
-        # Remove '安全海域', '隱秘海域', '深淵海域' at the end of tw ocr.
-        name = rstrip_zone_name_chars(name, ZONE_NAME_TW_SUFFIX_CHARS)
-        return name
-
-    @Config.when(SERVER=None)
-    def get_zone_name(self):
-        # For CN only
         ocr = Ocr(MAP_NAME, lang="cnocr", letter=(214, 231, 255), threshold=127, name="OCR_OS_MAP_NAME")
         name = ocr.ocr(self.device.image)
         name = strip_zone_name_edges(name)

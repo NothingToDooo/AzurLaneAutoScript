@@ -16,7 +16,6 @@ dependencies = [
     "psutil",
     "rich",
     "tqdm",
-    "jellyfish",
     "pyyaml",
     "inflection",
     "pydantic",

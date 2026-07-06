@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from module.base.button import ButtonGrid
-from module.base.decorator import Config, cached_property
+from module.base.decorator import cached_property
 from module.base.utils import get_color
 from module.exception import GameBugError
 from module.logger import logger
@@ -70,37 +70,6 @@ class ResearchQueue(ResearchUI):
             return False
 
     @cached_property
-    @Config.when(SERVER="en")
-    def queue_status_grids(self):
-        """
-        Status icons on the left
-        """
-        return ButtonGrid(
-            origin=(8, 259), delta=(0, 40.5), button_shape=(25, 25), grid_shape=(1, 5), name="QUEUE_STATUS"
-        )
-
-    @cached_property
-    @Config.when(SERVER="jp")
-    def queue_status_grids(self):
-        """
-        Status icons on the left
-        """
-        return ButtonGrid(
-            origin=(18, 259), delta=(0, 40.5), button_shape=(25, 25), grid_shape=(1, 5), name="QUEUE_STATUS"
-        )
-
-    @cached_property
-    @Config.when(SERVER="tw")
-    def queue_status_grids(self):
-        """
-        Status icons on the left
-        """
-        return ButtonGrid(
-            origin=(8, 259), delta=(0, 40.5), button_shape=(25, 25), grid_shape=(1, 5), name="QUEUE_STATUS"
-        )
-
-    @cached_property
-    @Config.when(SERVER=None)
     def queue_status_grids(self):
         """
         Status icons on the left
