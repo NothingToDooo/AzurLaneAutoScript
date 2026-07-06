@@ -90,7 +90,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
                 break
 
             # Getting 3-7 when looking for D3
-            if not (isdigit == current_isdigit):
+            if isdigit != current_isdigit:
                 continue
 
             # 14-4 may be OCR as 4-1 due to slow animation, confirm if it is 4-1

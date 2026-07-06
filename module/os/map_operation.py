@@ -14,6 +14,27 @@ from module.os_handler.port import PortHandler
 from module.os_handler.storage import StorageHandler
 from module.ui.assets import BACK_ARROW, OS_CHECK
 
+ZONE_NAME_EDGE_CHARS = "\\/-—–－"
+ZONE_NAME_TW_SUFFIX_CHARS = "安全隱秘塞壬要塞深淵海域一"
+ZONE_NAME_CN_SUFFIX_CHARS = "安全隐秘塞壬要塞深渊海域-"
+
+
+def strip_zone_name_edges(name):
+    start = 0
+    end = len(name)
+    while start < end and name[start] in ZONE_NAME_EDGE_CHARS:
+        start += 1
+    while end > start and name[end - 1] in ZONE_NAME_EDGE_CHARS:
+        end -= 1
+    return name[start:end]
+
+
+def rstrip_zone_name_chars(name, chars):
+    end = len(name)
+    while end > 0 and name[end - 1] in chars:
+        end -= 1
+    return name[:end]
+
 
 class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandler, OSFleetSelector):
     zone: Zone
@@ -48,7 +69,7 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
         name = ocr.ocr(self.device.image)
         name = "".join(name.split())
         name = name.lower()
-        name = name.strip("\\/-—–－")
+        name = strip_zone_name_edges(name)
         if "-" in name:
             name = name.split("-")[0]
         if "é" in name:  # Méditerranée name maps
@@ -81,7 +102,7 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
         # For JP only
         ocr = Ocr(MAP_NAME, lang="jp", letter=(157, 173, 192), threshold=127, name="OCR_OS_MAP_NAME")
         name = ocr.ocr(self.device.image)
-        name = name.strip("\\/-—–－")
+        name = strip_zone_name_edges(name)
         self.is_zone_name_hidden = "安全" in name
         # Remove punctuations
         for char in "・":
@@ -110,13 +131,13 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
         # For TW only
         ocr = Ocr(MAP_NAME, lang="tw", letter=(198, 215, 239), threshold=127, name="OCR_OS_MAP_NAME")
         name = ocr.ocr(self.device.image)
-        name = name.strip("\\/-—–－")
+        name = strip_zone_name_edges(name)
         self.is_zone_name_hidden = "安全" in name
         # Remove '塞壬要塞海域'
         if "塞" in name:
             name = name.split("塞")[0]
         # Remove '安全海域', '隱秘海域', '深淵海域' at the end of tw ocr.
-        name = name.rstrip("安全隱秘塞壬要塞深淵海域一")
+        name = rstrip_zone_name_chars(name, ZONE_NAME_TW_SUFFIX_CHARS)
         return name
 
     @Config.when(SERVER=None)
@@ -124,12 +145,12 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
         # For CN only
         ocr = Ocr(MAP_NAME, lang="cnocr", letter=(214, 231, 255), threshold=127, name="OCR_OS_MAP_NAME")
         name = ocr.ocr(self.device.image)
-        name = name.strip("\\/-—–－")
+        name = strip_zone_name_edges(name)
         self.is_zone_name_hidden = "安全" in name
         if "-" in name:
             name = name.split("-")[0]
         else:
-            name = name.rstrip("安全隐秘塞壬要塞深渊海域-")
+            name = rstrip_zone_name_chars(name, ZONE_NAME_CN_SUFFIX_CHARS)
         return name
 
     def get_current_zone(self):

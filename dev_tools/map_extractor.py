@@ -430,7 +430,8 @@ class MapData:
     @staticmethod
     def parse_spawn_data(data, event_enemy_data=None):
         try:
-            battle_count = max(data["boss_refresh"], max(data["enemy_refresh"].keys()))
+            enemy_refresh_max = max(data["enemy_refresh"].keys())
+            battle_count = max(data["boss_refresh"], enemy_refresh_max)
         except ValueError:
             battle_count = 0
         spawn_data = [{"battle": index} for index in range(battle_count + 1)]

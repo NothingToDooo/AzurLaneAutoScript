@@ -448,7 +448,7 @@ def login(password):
 
 def get_window_visibility_state():
     ret = eval_js("document.visibilityState")
-    return False if ret == "hidden" else True
+    return ret != "hidden"
 
 
 # https://pywebio.readthedocs.io/zh_CN/latest/cookbook.html#cookie-and-localstorage-manipulation

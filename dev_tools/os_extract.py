@@ -64,7 +64,7 @@ class OSChapter:
         data = LOADER.load("sharecfgdata/world_chapter_template.lua")
         out = {}
         for full_index, chapter in data.items():
-            if not full_index // 1000000 == 1 or not chapter["map_sight"]:
+            if full_index // 1000000 != 1 or not chapter["map_sight"]:
                 continue
             index = (full_index % 1000000) // 1000
             if index < 10:

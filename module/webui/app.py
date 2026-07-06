@@ -307,8 +307,8 @@ class AlasGUI(Frame):
         server = to_server(deep_get(config, "Alas.Emulator.PackageName", "cn"))
 
         output_list: List[Output] = []
-        for arg, arg_dict in deep_iter(arg_dict, depth=1):
-            output_kwargs: T_Output_Kwargs = arg_dict.copy()
+        for arg, arg_config in deep_iter(arg_dict, depth=1):
+            output_kwargs: T_Output_Kwargs = arg_config.copy()
 
             # 跳过隐藏项。
             display: Optional[str] = output_kwargs.pop("display", None)
