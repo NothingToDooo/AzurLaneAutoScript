@@ -147,6 +147,8 @@ class EmulatorBase:
             str: Emulator type, such as Emulator.MuMuPlayer12,
                 or '' if this is not a emulator.
         """
+        # 基类只定义接口，具体识别由平台子类实现。
+        del path
         return ""
 
     def iter_instances(self) -> t.Iterable[EmulatorInstanceBase]:
