@@ -26,9 +26,11 @@ Deploy:
 
   Python:
     # Filepath of python executable `python.exe`
-    # [Easy installer] Use './toolkit/python.exe'
-    # [Other] Use you own python, and its version should be 3.7.6 64bit
+    # [uv] Use './.venv/Scripts/python.exe'
+    # [Other] Use your own Python 3.14.6 executable
     PythonExecutable: /usr/local/bin/python
+    # Python version managed by uv
+    PythonVersion: 3.14.6
     # URL of pypi mirror
     # [CN user] Use 'https://mirrors.aliyun.com/pypi/simple' for faster and more stable download
     # [Other] Use null
@@ -36,14 +38,10 @@ Deploy:
     # Install dependencies at startup
     # [In most cases] Use true
     InstallDependencies: true
-    # Path to requirements.txt
-    # [In most cases] Use 'requirements.txt'
-    # [In AidLux] Use './deploy/AidLux/{version}/requirements.txt', version is default to 0.92
-    RequirementsFile: ./deploy/docker/requirements.txt
 
   Adb:
     # Filepath of ADB executable `adb.exe`
-    # [Easy installer] Use './toolkit/Lib/site-packages/adbutils/binaries/adb.exe'
+    # [uv] Use './.venv/Lib/site-packages/adbutils/binaries/adb.exe'
     # [Other] Use you own latest ADB, but not the ADB in your emulator
     AdbExecutable: /usr/bin/adb
     # Whether to replace ADB

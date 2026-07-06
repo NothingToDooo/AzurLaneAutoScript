@@ -22,13 +22,13 @@ class ConfigModel:
     AutoUpdate: bool = True
 
     # Python
-    PythonExecutable: str = "./toolkit/python.exe"
+    PythonExecutable: str = "./.venv/Scripts/python.exe"
+    PythonVersion: str = "3.14.6"
     PypiMirror: Optional[str] = None
     InstallDependencies: bool = True
-    RequirementsFile: str = "requirements.txt"
 
     # Adb
-    AdbExecutable: str = "./toolkit/Lib/site-packages/adbutils/binaries/adb.exe"
+    AdbExecutable: str = "./.venv/Lib/site-packages/adbutils/binaries/adb.exe"
     ReplaceAdb: bool = True
     AutoConnect: bool = True
     InstallUiautomator2: bool = True
@@ -173,13 +173,6 @@ class DeployConfig(ConfigModel):
         current = sys.executable.replace("\\", "/")
         logger.warning(f'PythonExecutable: {exe} does not exist, use current python instead: {current}')
         return current
-
-    @cached_property
-    def requirements_file(self) -> str:
-        if self.RequirementsFile == 'requirements.txt':
-            return 'requirements.txt'
-        else:
-            return self.filepath(self.RequirementsFile)
 
     def execute(self, command, allow_failure=False, output=True):
         """

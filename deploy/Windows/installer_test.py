@@ -4,11 +4,11 @@ from deploy.Windows.logger import logger
 
 output = r"""
 Process: [ 0% ]
-./toolkit/Lib/site-packages/requests/sessions.py trust_env already patched
-./toolkit/Lib/site-packages/pip/_vendor/requests/sessions.py trust_env already patched
-./toolkit/Lib/site-packages/uiautomator2/init.py minicap_urls no need to patch
-./toolkit/Lib/site-packages/uiautomator2/init.py appdir already patched
-./toolkit/Lib/site-packages/adbutils/mixin.py apkutils2 no need to patch
+./.venv/Lib/site-packages/requests/sessions.py trust_env already patched
+./.venv/Lib/site-packages/pip/_vendor/requests/sessions.py trust_env already patched
+./.venv/Lib/site-packages/uiautomator2/init.py minicap_urls no need to patch
+./.venv/Lib/site-packages/uiautomator2/init.py appdir already patched
+./.venv/Lib/site-packages/adbutils/mixin.py apkutils2 no need to patch
 Process: [ 5% ]
 ==================== SHOW DEPLOY CONFIG ====================
 Repository: https://e.coding.net/llop18870/alas/AzurLaneAutoScript.git
@@ -85,7 +85,7 @@ No need to replace
 Process: [ 90% ]
 ==================== ADB CONNECT ====================
 -------------------- ADB DEIVCES --------------------
-D:/AlasRelease/AzurLaneAutoScript/toolkit/Lib/site-packages/adbutils/binaries/adb.exe devices
+D:/AlasRelease/AzurLaneAutoScript/.venv/Lib/site-packages/adbutils/binaries/adb.exe devices
 DataAdbDevice(serial='127.0.0.1:16384', status='device')
 DataAdbDevice(serial='127.0.0.1:16480', status='device')
 DataAdbDevice(serial='127.0.0.1:7555', status='device')
@@ -97,7 +97,7 @@ already connected to 127.0.0.1:16480
 already connected to 127.0.0.1:7555
 Process: [ 98% ]
 -------------------- ADB DEIVCES --------------------
-D:/AlasRelease/AzurLaneAutoScript/toolkit/Lib/site-packages/adbutils/binaries/adb.exe devices
+D:/AlasRelease/AzurLaneAutoScript/.venv/Lib/site-packages/adbutils/binaries/adb.exe devices
 DataAdbDevice(serial='127.0.0.1:16384', status='device')
 DataAdbDevice(serial='127.0.0.1:16480', status='device')
 DataAdbDevice(serial='127.0.0.1:7555', status='device')

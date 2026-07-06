@@ -19,13 +19,13 @@ class ConfigModel:
     AutoUpdate: bool = True
 
     # Python
-    PythonExecutable: str = "./toolkit/python.exe"
+    PythonExecutable: str = "./.venv/Scripts/python.exe"
+    PythonVersion: str = "3.14.6"
     PypiMirror: Optional[str] = None
     InstallDependencies: bool = True
-    RequirementsFile: str = "requirements.txt"
 
     # Adb
-    AdbExecutable: str = "./toolkit/Lib/site-packages/adbutils/binaries/adb.exe"
+    AdbExecutable: str = "./.venv/Lib/site-packages/adbutils/binaries/adb.exe"
     ReplaceAdb: bool = True
     AutoConnect: bool = True
     InstallUiautomator2: bool = True

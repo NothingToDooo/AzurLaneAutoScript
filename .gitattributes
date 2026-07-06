@@ -1,7 +1,7 @@
 * text=auto
 *.jpg -text
 *.png -text
-*.bat text eol=crlf
+*.bat text eol=lf
 *.txt text eol=lf
 *.sh text eol=lf
 *.js text eol=lf

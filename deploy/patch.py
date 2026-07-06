@@ -3,6 +3,8 @@ import re
 
 from deploy.logger import logger
 
+SITE_PACKAGES = './.venv/Lib/site-packages'
+
 
 def patch_trust_env(file):
     """
@@ -69,8 +71,8 @@ def patch_uiautomator2():
         for url in []:
             self.push_url(url)
     """
-    cache_dir = './toolkit/Lib/site-packages/uiautomator2cache/cache'
-    init_file = './toolkit/Lib/site-packages/uiautomator2/init.py'
+    cache_dir = f'{SITE_PACKAGES}/uiautomator2cache/cache'
+    init_file = f'{SITE_PACKAGES}/uiautomator2/init.py'
     appdir = "os.path.abspath(os.path.join(__file__, '../../uiautomator2cache'))"
 
     if not os.path.exists(init_file):
@@ -118,7 +120,7 @@ def patch_apkutils2():
     `adbutils/mixin.py` `ShellMixin.install` imports `apkutils2`, but `apkutils2` does not provide wheel files,
     it may failed to install for unknown reasons. Since we never used that method, we just remove the import.
     """
-    mixin = './toolkit/Lib/site-packages/adbutils/mixin.py'
+    mixin = f'{SITE_PACKAGES}/adbutils/mixin.py'
 
     try:
         with open(mixin, 'r', encoding='utf-8') as f:
@@ -141,8 +143,8 @@ def pre_checks():
     check_running_directory()
 
     # patch_trust_env
-    patch_trust_env('./toolkit/Lib/site-packages/requests/sessions.py')
-    patch_trust_env('./toolkit/Lib/site-packages/pip/_vendor/requests/sessions.py')
+    patch_trust_env(f'{SITE_PACKAGES}/requests/sessions.py')
+    patch_trust_env(f'{SITE_PACKAGES}/pip/_vendor/requests/sessions.py')
 
     patch_uiautomator2()
     patch_apkutils2()
