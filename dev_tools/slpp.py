@@ -57,7 +57,7 @@ class SLPP:
 
     def decode(self, text):
         if not text or not isinstance(text, six.string_types):
-            return
+            return None
         # 游戏脚本没有注释。
         # 删除注释可能导致错误，例如下面这类内容会被误认为注释：
         # `profiles = "现世与梦境夹缝中的蝴蝶，狂风与巨浪蹂躏中的小舟。`
@@ -130,7 +130,7 @@ class SLPP:
     def value(self):
         self.white()
         if not self.ch:
-            return
+            return None
         if self.ch == "{":
             return self.object()
         if self.ch == "[":

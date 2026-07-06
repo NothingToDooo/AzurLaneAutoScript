@@ -364,7 +364,7 @@ class Homography:
             self.lower_edge, self.upper_edge = separate_edges([], inner=self.map_inner[1])
             self.left_edge, self.right_edge = separate_edges([], inner=self.map_inner[0])
             self._map_edge_count = (0, 0)
-            return None
+            return
 
         lines = lines[:, 0, :]
         theta = lines[:, 1]

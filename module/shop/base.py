@@ -137,7 +137,7 @@ class ShopBase(UI):
             None, base default value
             ShopItemGrid, variant value
         """
-        return None
+        return
 
     def shop_currency(self):
         """

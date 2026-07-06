@@ -432,7 +432,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             cl1_preserve (bool): True to delay tasks requiring massive action points 360 min.
         """
         if not recon_scan and not submarine_call and not ap_limit and not cl1_preserve:
-            return None
+            return
         kv = dict_to_kv(
             {
                 "recon_scan": recon_scan,

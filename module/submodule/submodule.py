@@ -8,7 +8,7 @@ def load_mod(name):
     dir_name = get_mod_dir(name)
     if dir_name is None:
         logger.critical("No function matched")
-        return
+        return None
 
     return importlib.import_module("." + name, "submodule." + dir_name)
 
