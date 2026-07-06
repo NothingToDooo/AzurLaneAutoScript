@@ -1,7 +1,7 @@
 from module.base.timer import Timer
 from module.combat.combat import Combat
 from module.logger import logger
-from module.meta_reward.assets import *
+from module.meta_reward import assets as mr_assets
 from module.os_ash.assets import DOSSIER_LIST
 from module.ui.page import page_meta
 from module.ui.ui import UI
@@ -16,7 +16,7 @@ class BeaconReward(Combat, UI):
         Page:
             in: page_meta
         """
-        if self.appear(META_REWARD_NOTICE, threshold=30):
+        if self.appear(mr_assets.META_REWARD_NOTICE, threshold=30):
             return True
         else:
             return False
@@ -42,21 +42,20 @@ class BeaconReward(Combat, UI):
             else:
                 self.device.screenshot()
 
-            # End
-            # REWARD_CHECK appears and REWARD_RECEIVE gets gray
-            if self.appear(REWARD_CHECK, offset=(20, 20)) and self.image_color_count(
-                REWARD_RECEIVE, color=(49, 52, 49), threshold=221, count=400
+            # 结束：REWARD_CHECK 出现且 REWARD_RECEIVE 变灰。
+            if self.appear(mr_assets.REWARD_CHECK, offset=(20, 20)) and self.image_color_count(
+                mr_assets.REWARD_RECEIVE, color=(49, 52, 49), threshold=221, count=400
             ):
                 break
 
-            if self.appear_then_click(REWARD_ENTER, offset=(20, 20), interval=3):
+            if self.appear_then_click(mr_assets.REWARD_ENTER, offset=(20, 20), interval=3):
                 continue
-            if self.match_template_color(REWARD_RECEIVE, offset=(20, 20), interval=3):
-                self.device.click(REWARD_RECEIVE)
+            if self.match_template_color(mr_assets.REWARD_RECEIVE, offset=(20, 20), interval=3):
+                self.device.click(mr_assets.REWARD_RECEIVE)
                 confirm_timer.reset()
                 continue
             if self.handle_popup_confirm("META_REWARD"):
-                # Lock new META ships
+                # 锁定新的 META 舰船。
                 confirm_timer.reset()
                 continue
             if self.handle_get_items():
@@ -81,8 +80,8 @@ class BeaconReward(Combat, UI):
         Page:
             in: page_meta
         """
-        if self.appear(SYNC_REWARD_NOTICE, threshold=30, interval=interval) or self.appear(
-            SYNC_TAP, threshold=30, interval=interval
+        if self.appear(mr_assets.SYNC_REWARD_NOTICE, threshold=30, interval=interval) or self.appear(
+            mr_assets.SYNC_TAP, threshold=30, interval=interval
         ):
             return True
         else:
@@ -109,20 +108,19 @@ class BeaconReward(Combat, UI):
             else:
                 self.device.screenshot()
 
-            # End
-            # Sync progress >= 100%
-            if self.appear(REWARD_ENTER, offset=(20, 20)):
+            # 结束：同步进度达到 100%。
+            if self.appear(mr_assets.REWARD_ENTER, offset=(20, 20)):
                 logger.info("meta_sync_receive ends at REWARD_ENTER")
                 break
 
-            if self.appear(SYNC_ENTER, offset=(20, 20)):
+            if self.appear(mr_assets.SYNC_ENTER, offset=(20, 20)):
                 if not self.meta_sync_notice_appear():
                     logger.info("meta_sync_receive ends at SYNC_ENTER")
                     break
 
-            # Click
+            # 点击领取。
             if self.handle_popup_confirm("META_REWARD"):
-                # Lock new META ships
+                # 锁定新的 META 舰船。
                 continue
             if self.handle_get_items():
                 received = True
@@ -130,12 +128,12 @@ class BeaconReward(Combat, UI):
             if self.handle_get_ship():
                 received = True
                 continue
-            if self.appear(SYNC_REWARD_NOTICE, threshold=30, interval=3):
-                logger.info(f"sync reward notice appear -> {SYNC_ENTER}")
-                self.device.click(SYNC_ENTER)
+            if self.appear(mr_assets.SYNC_REWARD_NOTICE, threshold=30, interval=3):
+                logger.info(f"sync reward notice appear -> {mr_assets.SYNC_ENTER}")
+                self.device.click(mr_assets.SYNC_ENTER)
                 received = True
                 continue
-            if self.appear_then_click(SYNC_TAP, offset=(20, 20), interval=3):
+            if self.appear_then_click(mr_assets.SYNC_TAP, offset=(20, 20), interval=3):
                 received = True
                 continue
 
@@ -156,14 +154,14 @@ class BeaconReward(Combat, UI):
             if timeout.reached():
                 logger.warning("meta_wait_reward_page timeout")
                 break
-            if self.appear(REWARD_ENTER, offset=(20, 20)):
-                logger.info(f"meta_wait_reward_page ends at {REWARD_ENTER}")
+            if self.appear(mr_assets.REWARD_ENTER, offset=(20, 20)):
+                logger.info(f"meta_wait_reward_page ends at {mr_assets.REWARD_ENTER}")
                 break
-            if self.appear(SYNC_ENTER, offset=(20, 20)):
-                logger.info(f"meta_wait_reward_page ends at {SYNC_ENTER}")
+            if self.appear(mr_assets.SYNC_ENTER, offset=(20, 20)):
+                logger.info(f"meta_wait_reward_page ends at {mr_assets.SYNC_ENTER}")
                 break
-            if self.appear(SYNC_TAP, offset=(20, 20)):
-                logger.info(f"meta_wait_reward_page ends at {SYNC_TAP}")
+            if self.appear(mr_assets.SYNC_TAP, offset=(20, 20)):
+                logger.info(f"meta_wait_reward_page ends at {mr_assets.SYNC_TAP}")
                 break
             if self.meta_sync_notice_appear():
                 logger.info("meta_wait_reward_page ends at sync red dot")
@@ -176,15 +174,14 @@ class BeaconReward(Combat, UI):
         self.ui_ensure(page_meta)
         self.meta_wait_reward_page()
 
-        # Sync rewards
-        # "sync" is the period that you gather meta points to 100% and get a meta ship
+        # 同步奖励：sync 指 META 点数累计到 100% 并获得 META 舰船的阶段。
         if self.meta_sync_notice_appear():
             logger.info("Found meta sync red dot or sync tap")
             self.meta_sync_receive()
         else:
             logger.info("No meta sync red dot or sync tap")
 
-        # Meta rewards
+        # META 奖励。
         if self.meta_reward_notice_appear():
             logger.info("Found meta reward red dot")
             self.meta_reward_receive()
@@ -202,7 +199,7 @@ class DossierReward(Combat, UI):
             in: dossier meta page
         """
         self.device.screenshot()
-        if self.appear(DOSSIER_REWARD_RECEIVE, offset=(-40, 10, -10, 40), similarity=0.7):
+        if self.appear(mr_assets.DOSSIER_REWARD_RECEIVE, offset=(-40, 10, -10, 40), similarity=0.7):
             logger.info("Found dossier reward red dot")
             return True
         else:
@@ -223,11 +220,11 @@ class DossierReward(Combat, UI):
                 self.device.screenshot()
 
             if self.appear(DOSSIER_LIST, offset=(20, 20)):
-                self.device.click(DOSSIER_REWARD_ENTER)
+                self.device.click(mr_assets.DOSSIER_REWARD_ENTER)
                 continue
 
-            # End
-            if self.appear(DOSSIER_REWARD_CHECK, offset=(20, 20)):
+            # 结束。
+            if self.appear(mr_assets.DOSSIER_REWARD_CHECK, offset=(20, 20)):
                 break
 
     def meta_reward_receive(self, skip_first_screenshot=True):
@@ -251,12 +248,12 @@ class DossierReward(Combat, UI):
             else:
                 self.device.screenshot()
 
-            if self.match_template_color(DOSSIER_REWARD_RECEIVE, offset=(20, 20), interval=3):
-                self.device.click(DOSSIER_REWARD_RECEIVE)
+            if self.match_template_color(mr_assets.DOSSIER_REWARD_RECEIVE, offset=(20, 20), interval=3):
+                self.device.click(mr_assets.DOSSIER_REWARD_RECEIVE)
                 confirm_timer.reset()
                 continue
             if self.handle_popup_confirm("DOSSIER_REWARD"):
-                # Lock new META ships
+                # 锁定新的 META 舰船。
                 confirm_timer.reset()
                 continue
             if self.handle_get_items():
@@ -268,8 +265,8 @@ class DossierReward(Combat, UI):
                 confirm_timer.reset()
                 continue
 
-            # End
-            if not self.appear(DOSSIER_REWARD_RECEIVE, offset=(20, 20)):
+            # 结束。
+            if not self.appear(mr_assets.DOSSIER_REWARD_RECEIVE, offset=(20, 20)):
                 if confirm_timer.reached():
                     break
             else:
