@@ -1,14 +1,15 @@
 import os
 
+import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
 import module.config.server as server
 
-server.server = "cn"  # Don't need to edit, it's used to avoid error.
+server.server = "cn"  # 不需要修改，用来避免服务器相关错误。
 
 from module.base.base import ModuleBase
-from module.base.utils import *
+from module.base.utils import node2location, rgb2gray
 from module.config.config import AzurLaneConfig
 from module.map_detection.view import View
 

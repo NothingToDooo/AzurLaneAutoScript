@@ -1,15 +1,16 @@
 import os
 
+import cv2
 import imageio
+import numpy as np
 from PIL import Image
 
 import module.config.server as server
 
-server.server = "cn"  # Don't need to edit, it's used to avoid error.
+server.server = "cn"  # 不需要修改，用来避免服务器相关错误。
 
 from dev_tools.relative_record import FOLDER, NAME
-from module.base.utils import *
-from module.map_detection.utils import *
+from module.base.utils import area_offset, crop
 
 """
 Usage:

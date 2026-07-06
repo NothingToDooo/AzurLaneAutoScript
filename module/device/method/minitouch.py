@@ -3,11 +3,12 @@ import threading
 import time
 from functools import wraps
 
+import numpy as np
 from adbutils.errors import AdbError
 
 from module.base.decorator import cached_property, del_cached_property, has_cached_property
 from module.base.timer import Timer
-from module.base.utils import *
+from module.base.utils import random_rectangle_point
 from module.device.connection import Connection
 from module.device.method.utils import RETRY_TRIES, handle_adb_error, handle_unknown_host_service, retry_sleep
 from module.exception import RequestHumanTakeover, ScriptError
