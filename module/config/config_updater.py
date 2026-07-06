@@ -48,7 +48,7 @@ class Event:
         self.is_war_archives = self.directory.startswith("war_archives")
         self.is_raid = self.directory.startswith("raid_")
         self.is_coalition = self.directory.startswith("coalition_")
-        for server in ARCHIVES_PREFIX.keys():
+        for server in ARCHIVES_PREFIX:
             if self.__getattribute__(server) == "-":
                 self.__setattr__(server, None)
             else:
@@ -351,7 +351,7 @@ class ConfigGenerator:
 
         """
         data = {}
-        for task_group in self.task.keys():
+        for task_group in self.task:
             value = deep_get(self.task, keys=[task_group, "menu"])
             if value not in ["collapse", "list"]:
                 value = "collapse"
@@ -421,7 +421,7 @@ class ConfigGenerator:
                                   v
                    args.json -----+-----> args.json
         """
-        for server in ARCHIVES_PREFIX.keys():
+        for server in ARCHIVES_PREFIX:
             for event in self.event:
                 name = event.__getattribute__(server)
 
@@ -456,7 +456,7 @@ class ConfigGenerator:
 
         for task in EVENTS + GEMS_FARMINGS + WAR_ARCHIVES + RAIDS + COALITIONS:
             latest = {}
-            for server in ARCHIVES_PREFIX.keys():
+            for server in ARCHIVES_PREFIX:
                 latest[server] = deep_get(self.args, keys=f"{task}.Campaign.Event.option_{server}", default=[])
             options = set().union(*latest.values())
             options = sorted([option for option in options if option != "campaign_main"])

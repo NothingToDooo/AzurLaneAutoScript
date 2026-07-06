@@ -419,7 +419,7 @@ class ShipScanner(Scanner):
             fleet (int): 0 means not in any fleet. Will be limited in range [0, 6]
             status (str, list): ['any', 'commission', 'battle']
         """
-        for attr in self.limitaion.keys():
+        for attr in self.limitaion:
             value = kwargs.get(attr, self.limitaion[attr])
             self.limit_value(key=attr, value=value)
 

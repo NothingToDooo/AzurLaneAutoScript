@@ -98,7 +98,7 @@ class MeowfficerEnhance(MeowfficerBase):
         elif self.config.MeowfficerTrain_MaxFeedLevel > 30:
             reset_max_feed_level = 30
 
-        if -1 != reset_max_feed_level:
+        if reset_max_feed_level != -1:
             logger.warning(
                 f"Condition '1 <= MeowfficerTrain_MaxFeedLevel <= 30' needs to be satisfied, "
                 f"now MeowfficerTrain_MaxFeedLevel is {self.config.MeowfficerTrain_MaxFeedLevel}, "

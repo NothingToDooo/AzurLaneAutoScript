@@ -35,7 +35,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         logger.hr("OS init", level=1)
         kwargs = {}
         if self.config.task.command.__contains__("iM"):
-            for key in self.config.bound.keys():
+            for key in self.config.bound:
                 value = self.config.__getattribute__(key)
                 if key.__contains__("dL") and value.__le__(2):
                     logger.info([key, value])

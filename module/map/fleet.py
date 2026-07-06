@@ -185,7 +185,7 @@ class Fleet(Camera, AmbushHandler):
         """
         if not self.config.MAP_HAS_MOVABLE_ENEMY:
             return False
-        for enemy in self.enemy_round.keys():
+        for enemy in self.enemy_round:
             for turn in self.round_enemy_turn:
                 if self.round - enemy > 0 and (self.round - enemy) % turn == 0:
                     return True
@@ -321,7 +321,7 @@ class Fleet(Camera, AmbushHandler):
                     )
                     self.hp_get()
                     self.lv_get(after_battle=True)
-                    arrived = True if not self.config.MAP_HAS_MOVABLE_ENEMY else False
+                    arrived = not self.config.MAP_HAS_MOVABLE_ENEMY
                     result = "combat"
                     self.battle_count += 1
                     self.fleet_ammo -= 1

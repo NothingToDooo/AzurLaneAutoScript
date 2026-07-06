@@ -790,7 +790,7 @@ class CampaignMap:
 
         may, missing = self.missing_get(battle_count, mystery_count, siren_count, carrier_count, mode)
 
-        for key in may.keys():
+        for key in may:
             if missing[key] != 0:
                 return False
 

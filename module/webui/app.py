@@ -1149,7 +1149,7 @@ def app():
 
     logger.hr("Webui configs")
     logger.attr("Theme", State.deploy_config.Theme)
-    logger.attr("Password", True if key else False)
+    logger.attr("Password", bool(key))
     logger.attr("CDN", cdn)
 
     from deploy.atomic import atomic_failure_cleanup
