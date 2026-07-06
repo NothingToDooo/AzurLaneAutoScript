@@ -118,7 +118,7 @@ class RelativeRecord:
     def get_gif(self, area):
         templates = [crop(self.images[0], area=area)]
         sim_list = []
-        for n, image in enumerate(self.images):
+        for _n, image in enumerate(self.images):
             max_sim = 0
             max_loca = (0, 0)
             for template in templates:

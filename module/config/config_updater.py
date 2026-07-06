@@ -216,7 +216,7 @@ class ConfigGenerator:
                 deep_set(data, keys=p + ["value"], value=v)
                 deep_set(data, keys=p + ["display"], value="hide")
         # 写入任务命令。
-        for path, groups in deep_iter(self.task, depth=3):
+        for path, _groups in deep_iter(self.task, depth=3):
             if "tasks" not in path:
                 continue
             task = path[2]
@@ -275,7 +275,7 @@ class ConfigGenerator:
                 deep_set(new, keys=k, value=v)
 
         # 菜单。
-        for path, data in deep_iter(self.task, depth=3):
+        for path, _data in deep_iter(self.task, depth=3):
             if "tasks" not in path:
                 continue
             task_group, _, task = path

@@ -114,7 +114,7 @@ def release_resources(next_task=""):
     # module.ui has about 80 assets and takes about 3MB
     # Alas has about 800 assets, but they are not all loaded.
     # Template images take more, about 6MB each
-    for key, obj in Resource.instances.items():
+    for _key, obj in Resource.instances.items():
         # Preserve assets for ui switching
         if next_task and str(obj) in _preserved_assets.ui:
             continue

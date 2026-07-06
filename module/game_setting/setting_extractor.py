@@ -147,7 +147,7 @@ class SettingExtractor:
 
     @staticmethod
     def iter_file_from_folder(folder):
-        for path, folders, files in os.walk(folder):
+        for path, _folders, files in os.walk(folder):
             for file in files:
                 file = f"{path}/{file}"
                 yield file

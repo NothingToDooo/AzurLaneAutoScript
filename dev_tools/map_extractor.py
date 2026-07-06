@@ -531,7 +531,7 @@ class MapData:
                 lines.append("    " + " ".join([self.map_data_loop[(x, y)] for x in range(self.shape[0] + 1)]))
             lines.append('"""')
         lines.append('MAP.weight_data = """')
-        for y in range(self.shape[1] + 1):
+        for _y in range(self.shape[1] + 1):
             lines.append("    " + " ".join(["50"] * (self.shape[0] + 1)))
         lines.append('"""')
         if self.MAP_HAS_LAND_BASED:

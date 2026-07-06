@@ -108,7 +108,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
         prev = self.globe_camera
         interval = Timer(1)
         confirm = Timer(0.5, count=1).start()
-        for n in range(10):
+        for _n in range(10):
             if not interval.reached():
                 interval.wait()
             interval.reset()

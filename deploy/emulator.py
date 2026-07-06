@@ -74,7 +74,7 @@ class VirtualBoxEmulator:
             list[str]: Such as ['127.0.0.1:62001', '127.0.0.1:62025']
         """
         vbox = []
-        for path, folders, files in os.walk(os.path.join(self.root, self.vbox_path)):
+        for path, _folders, files in os.walk(os.path.join(self.root, self.vbox_path)):
             for file in files:
                 if re.match(self.vbox_name, file):
                     file = os.path.join(path, file)
