@@ -45,7 +45,7 @@ class OpsiCrossMonth(OSMap):
 
         logger.hr("OpSi reset", level=3)
 
-        def false_func(*args, **kwargs):
+        def false_func(*_args, **_kwargs):
             return False
 
         self.is_in_opsi_explore = false_func

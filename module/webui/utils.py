@@ -481,6 +481,7 @@ def get_next_time(t: datetime.time):
 
 
 def on_task_exception(self):
+    del self
     logger.exception("An internal error occurred in the application")
     toast_msg = (
         "应用发生内部错误" if "zh" in session_info.user_language else "An internal error occurred in the application"
@@ -491,7 +492,7 @@ def on_task_exception(self):
     traceback_msg = "".join(lines)
 
     traceback_console = Console(color_system="truecolor", tab_size=2, record=True, width=90)
-    with traceback_console.capture():  # prevent logging to stdout again
+    with traceback_console.capture():  # 避免再次输出到 stdout。
         traceback_console.print_exception(word_wrap=True, extra_lines=1, show_locals=True)
 
     if State.theme == "dark":
@@ -510,7 +511,7 @@ def on_task_exception(self):
         pass
 
 
-# Monkey patch
+# 猴子补丁。
 pywebio.session.base.Session.on_task_exception = on_task_exception
 
 

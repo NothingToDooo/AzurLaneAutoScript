@@ -273,7 +273,7 @@ class Device(Screenshot, Control, AppControl):
         """
         logger.info("Disable stuck detection")
 
-        def empty_function(*arg, **kwargs):
+        def empty_function(*_args, **_kwargs):
             return False
 
         self.click_record_check = empty_function

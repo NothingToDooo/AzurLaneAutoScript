@@ -64,7 +64,7 @@ u2_logger.error = logger.error
 u2_logger.critical = logger.critical
 
 
-def setup_logger(*args, **kwargs):
+def setup_logger(*_args, **_kwargs):
     return u2_logger
 
 

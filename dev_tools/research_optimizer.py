@@ -886,7 +886,7 @@ def sample(condition, project_select_index, reset_index):
 
 
 @jit(nopython=True, fastmath=True)
-def events_add(rewards, condition):
+def events_add(rewards, _condition):
     # 活动兑换蓝图给进度最慢的，有利于提高整体速度
     # 因为G系给的是随机的，早毕业的就溢出了，给进度最慢的不会溢出，就快了
     index = np.argmin(rewards[:2])
