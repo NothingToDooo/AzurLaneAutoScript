@@ -23,7 +23,7 @@ class GeneratedConfig:
     Auto generated configuration
     """
 '''.strip().split("\n")
-ARCHIVES_PREFIX = {"cn": "档案 ", "en": "archives ", "jp": "檔案 ", "tw": "檔案 "}
+ARCHIVES_PREFIX = {"cn": "档案 "}
 MAINS = ["Main", "Main2", "Main3"]
 EVENTS = ["Event", "Event2", "EventA", "EventB", "EventC", "EventD", "EventSp"]
 GEMS_FARMINGS = ["GemsFarming"]
@@ -291,18 +291,12 @@ class ConfigGenerator:
             if "option" in data:
                 deep_load(path, words=data["option"], default=False)
         # 活动名称。
-        # 名称优先级：同语言服务器 > 国际服 > 国服 > 日服 > 台服。
+        # 只保留国服名称，其他服务器分支不再参与生成。
         events = {}
         for event in self.event:
-            if lang in LANG_TO_SERVER:
-                name = event.__getattribute__(LANG_TO_SERVER[lang])
-                if name:
-                    deep_default(events, keys=event.directory, value=name)
-        for server in ["en", "cn", "jp", "tw"]:
-            for event in self.event:
-                name = event.__getattribute__(server)
-                if name:
-                    deep_default(events, keys=event.directory, value=name)
+            name = event.cn
+            if name:
+                deep_default(events, keys=event.directory, value=name)
         for event in sorted(self.event):
             name = events.get(event.directory, event.directory)
             deep_set(new, keys=f"Campaign.Event.{event.directory}", value=name)

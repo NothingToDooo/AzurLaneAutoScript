@@ -325,9 +325,6 @@
       "help": "",
       "auto": "自动检测",
       "com.bilibili.azurlane": "国服",
-      "com.YoStarEN.AzurLane": "国际服",
-      "com.YoStarJP.AzurLane": "日服",
-      "com.hkmanjuu.azurlane.gp": "台服",
       "com.bilibili.blhx.huawei": "国服 华为渠道服 com.bilibili.blhx.huawei",
       "com.bilibili.blhx.honor": "国服 荣耀渠道服 com.bilibili.blhx.honor",
       "com.bilibili.blhx.mi": "国服 小米渠道服 com.bilibili.blhx.mi",
@@ -343,8 +340,7 @@
       "com.bilibili.blhx.mzw": "国服 拇指玩渠道服 com.bilibili.blhx.mzw",
       "com.yiwu.blhx.yx15": "国服 一五游戏渠道服 com.yiwu.blhx.yx15",
       "com.bilibili.blhx.m4399": "国服 4399渠道服 com.bilibili.blhx.m4399",
-      "com.bilibili.blhx.bilibiliMove": "国服 迁移渠道服 com.bilibili.blhx.bilibiliMove",
-      "com.hkmanjuu.azurlane.gp.mc": "台服 com.hkmanjuu.azurlane.gp.mc"
+      "com.bilibili.blhx.bilibiliMove": "国服 迁移渠道服 com.bilibili.blhx.bilibiliMove"
     },
     "ServerName": {
       "name": "游戏内服务器",
@@ -395,31 +391,7 @@
       "cn_channel-2": "[国服] 十字军行动",
       "cn_channel-3": "[国服] 龙骑兵行动",
       "cn_channel-4": "[国服] 冥王星行动",
-      "cn_channel-5": "[国服] 群岛计划",
-      "en-0": "[EN] Avrora",
-      "en-1": "[EN] Lexington",
-      "en-2": "[EN] Sandy",
-      "en-3": "[EN] Washington",
-      "en-4": "[EN] Amagi",
-      "en-5": "[EN] Little Enterprise",
-      "jp-0": "[JP] ブレスト",
-      "jp-1": "[JP] 横須賀",
-      "jp-2": "[JP] 佐世保",
-      "jp-3": "[JP] 呉",
-      "jp-4": "[JP] 舞鶴",
-      "jp-5": "[JP] ルルイエ",
-      "jp-6": "[JP] サモア",
-      "jp-7": "[JP] 大湊",
-      "jp-8": "[JP] トラック",
-      "jp-9": "[JP] ラバウル",
-      "jp-10": "[JP] 鹿児島",
-      "jp-11": "[JP] マドラス",
-      "jp-12": "[JP] サンディエゴ",
-      "jp-13": "[JP] 竹敷",
-      "jp-14": "[JP] キール",
-      "jp-15": "[JP] 若松",
-      "jp-16": "[JP] オデッサ",
-      "jp-17": "[JP] スイートバン"
+      "cn_channel-5": "[国服] 群岛计划"
     },
     "ScreenshotMethod": {
       "name": "模拟器截图方案",
@@ -670,46 +642,46 @@
       "event_20200423_cn": "复刻苍红的回响",
       "event_20200507_cn": "夜幕下的归途",
       "event_20200521_cn": "穹顶下的圣咏曲",
-      "event_20200521_en": "Iris of Light and Dark Rerun",
+      "event_20200521_en": "event_20200521_en",
       "event_20200603_cn": "复刻峡湾间的反击",
-      "event_20200603_en": "Prelude under the Moon Rerun",
-      "event_20200611_en": "Skybound Oratorio",
-      "event_20200716_en": "Ink Stained Steel Sakura Rerun",
+      "event_20200603_en": "event_20200603_en",
+      "event_20200611_en": "event_20200611_en",
+      "event_20200716_en": "event_20200716_en",
       "event_20200723_cn": "永夜幻光",
       "event_20200806_cn": "复刻最重要的宝物",
       "event_20200820_cn": "复刻铁血音符誓言",
       "event_20200903_en": "复刻峡湾间的星辰",
       "event_20200917_cn": "复刻蝶海梦花",
-      "event_20201002_en": "Counterattack Within the Fjord",
+      "event_20201002_en": "event_20201002_en",
       "event_20201012_cn": "复刻划破海空之翼",
       "event_20201029_cn": "激唱的UNIVERSE",
       "event_20201126_cn": "复刻假日航线",
       "event_20201229_cn": "复刻负象限作战",
       "event_20210121_cn": "复刻神圣的悲喜剧",
       "event_20210225_cn": "复刻破晓冰华",
-      "event_20210225_tw": "北境序曲",
+      "event_20210225_tw": "event_20210225_tw",
       "event_20210325_cn": "复刻箱庭疗法",
-      "event_20210415_tw": "復刻圍剿施佩伯爵",
+      "event_20210415_tw": "event_20210415_tw",
       "event_20210422_cn": "复刻复兴的赞美诗",
-      "event_20210429_tw": "復刻墨染的鋼鐵之花",
+      "event_20210429_tw": "event_20210429_tw",
       "event_20210527_cn": "复刻镜位螺旋",
-      "event_20210527_tw": "微層混合",
-      "event_20210610_tw": "復刻夜幕下的歸途",
+      "event_20210527_tw": "event_20210527_tw",
+      "event_20210610_tw": "event_20210610_tw",
       "event_20210624_cn": "复刻浮樱影华",
-      "event_20210624_tw": "穹頂下的聖詠曲",
+      "event_20210624_tw": "event_20210624_tw",
       "event_20210722_cn": "响彻碧海的偶像歌",
       "event_20210819_cn": "复刻微层混合",
       "event_20210916_cn": "复刻碧海光粼",
       "event_20211028_cn": "复刻穹顶下的圣咏曲",
-      "event_20211028_tw": "復刻光與影的鳶尾之華",
+      "event_20211028_tw": "event_20211028_tw",
       "event_20211111_cn": "复刻杰诺瓦的焰火",
       "event_20211125_cn": "复刻交汇世界的弧光",
       "event_20211229_cn": "复刻逆转彩虹之塔",
       "event_20220210_cn": "复刻北境序曲",
       "event_20220224_cn": "复刻深度回音",
-      "event_20220310_tw": "復刻斯圖爾特的硝煙",
+      "event_20220310_tw": "event_20220310_tw",
       "event_20220324_cn": "复刻虚像构筑之塔",
-      "event_20220407_tw": "蒼紅的迴響(復刻)",
+      "event_20220407_tw": "event_20220407_tw",
       "event_20220414_cn": "复刻永夜幻光",
       "event_20220428_cn": "复刻虹彩的终幕曲",
       "event_20220526_cn": "复刻泠誓光庭",
@@ -2408,7 +2380,7 @@
     },
     "LastZone": {
       "name": "上一次完成的区域",
-      "help": "自动更新的数值，填0可重置进度，重置后自动跳过已开荒的海域\n支持海域ID、国服/国际服/日服/台服海域名称，例如 \"51\", \"NA海域东南E\", \"NA Ocean SE Sector E\""
+      "help": "自动更新的数值，填0可重置进度，重置后自动跳过已开荒的海域\n支持海域ID或国服海域名称，例如 \"51\", \"NA海域东南E\""
     }
   },
   "OpsiShop": {
@@ -2524,7 +2496,7 @@
     },
     "TargetZone": {
       "name": "指定海域",
-      "help": "仅出击指定的海域，可以用来获取大世界成就星星\n支持海域ID、国服/国际服/日服/台服海域名称，例如 \"51\", \"NA海域东南E\", \"NA Ocean SE Sector E\"\n填入默认值0，或者删除数值即可取消指定"
+      "help": "仅出击指定的海域，可以用来获取大世界成就星星\n支持海域ID或国服海域名称，例如 \"51\", \"NA海域东南E\"\n填入默认值0，或者删除数值即可取消指定"
     }
   },
   "OpsiHazard1Leveling": {
@@ -2592,12 +2564,6 @@
       "screenshot_click": "截图+点击速度测试",
       "screenshot": "截图速度测试",
       "click": "点击速度测试"
-    }
-  },
-  "AzurLaneUncensored": {
-    "_info": {
-      "name": "反和谐",
-      "help": "仅国服使用。这个工具将执行：\n- 生成本地反和谐文件\n- 将文件推送至模拟器内\n- 重启游戏客户端"
     }
   },
   "GameManager": {

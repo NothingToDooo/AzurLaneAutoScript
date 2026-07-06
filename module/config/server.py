@@ -1,16 +1,14 @@
 """
-This file stores server, such as 'cn', 'en'.
-Use 'import module.config.server as server' to import, don't use 'from xxx import xxx'.
+保存当前服务器。
+
+使用 `import module.config.server as server` 导入，不要使用 `from xxx import xxx`。
 """
 
 server = "cn"  # Setting default to cn, will avoid errors when using dev_tools
 
-VALID_SERVER = ["cn", "en", "jp", "tw"]
+VALID_SERVER = ["cn"]
 VALID_PACKAGE = {
     "com.bilibili.azurlane": "cn",
-    "com.YoStarEN.AzurLane": "en",
-    "com.YoStarJP.AzurLane": "jp",
-    "com.hkmanjuu.azurlane.gp": "tw",
 }
 VALID_CHANNEL_PACKAGE = {
     # App stores
@@ -33,16 +31,11 @@ VALID_CHANNEL_PACKAGE = {
     "com.yiwu.blhx.yx15": ("cn", "一五游戏"),
     "com.bilibili.blhx.m4399": ("cn", "4399"),
     "com.bilibili.blhx.bilibiliMove": ("cn", "迁移"),
-    # Tw
-    "com.hkmanjuu.azurlane.gp.mc": ("tw", "MyCard"),
 }
 DICT_PACKAGE_TO_ACTIVITY = {
     # com.manjuu.azurlane.MainActivity
     # VALID_PACKAGE
     "com.bilibili.azurlane": "com.manjuu.azurlane.MainActivity",
-    "com.YoStarEN.AzurLane": "com.manjuu.azurlane.PrePermissionActivity",
-    "com.YoStarJP.AzurLane": "com.manjuu.azurlane.PrePermissionActivity",
-    "com.hkmanjuu.azurlane.gp": "com.manjuu.azurlane.PrePermissionActivity",
     # App stores
     "com.bilibili.blhx.huawei": "com.manjuu.azurlane.SplashActivity",
     "com.bilibili.blhx.mi": "com.manjuu.azurlane.SplashActivity",
@@ -60,8 +53,6 @@ DICT_PACKAGE_TO_ACTIVITY = {
     "com.yiwu.blhx.yx15": "com.manjuu.azurlane.SplashActivity",
     "com.bilibili.blhx.m4399": "com.manjuu.azurlane.SplashActivity",
     "com.bilibili.blhx.bilibiliMove": "com.manjuu.azurlane.SplashActivity",
-    # Tw
-    "com.hkmanjuu.azurlane.gp.mc": "com.manjuu.azurlane.PrePermissionActivity",
 }
 VALID_SERVER_LIST = {
     "cn_android": [
@@ -116,34 +107,12 @@ VALID_SERVER_LIST = {
         "冥王星行动",
         "群岛计划",
     ],
-    "en": ["Avrora", "Lexington", "Sandy", "Washington", "Amagi", "Little Enterprise"],
-    "jp": [
-        "ブレスト",
-        "横須賀",
-        "佐世保",
-        "呉",
-        "舞鶴",
-        "ルルイエ",
-        "サモア",
-        "大湊",
-        "トラック",
-        "ラバウル",
-        "鹿児島",
-        "マドラス",
-        "サンディエゴ",
-        "竹敷",
-        "キール",
-        "若松",
-        "オデッサ",
-        "スイートバン",
-    ],
 }
 
 
 def set_server(package_or_server: str):
     """
-    Change server and this will effect globally,
-    including assets and server specific methods.
+    修改全局服务器，会影响资源和服务器分支方法。
 
     Args:
         package_or_server: package name or server.
@@ -158,8 +127,9 @@ def set_server(package_or_server: str):
 
 def to_server(package_or_server: str) -> str:
     """
-    Convert package/server to server.
-    To unknown packages, consider they are a CN channel servers.
+    转换包名或服务器名到服务器。
+
+    未知包名按国服渠道服处理。
     """
     if package_or_server in VALID_SERVER:
         return package_or_server
@@ -173,7 +143,7 @@ def to_server(package_or_server: str) -> str:
 
 def to_package(package_or_server: str) -> str:
     """
-    Convert package/server to package.
+    转换包名或服务器名到包名。
     """
     package_or_server = package_or_server.lower()
     if package_or_server in VALID_PACKAGE:
