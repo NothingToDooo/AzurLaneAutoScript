@@ -137,7 +137,6 @@ MAP.spawn_data = [
 
 class Config(ConfigBase):
     MAP_SIREN_TEMPLATE = ["ELpurple", "CVpurple", "BBpurple"]
-    DETECTION_BACKEND = "homography"
     HOMO_STORAGE = ((8, 5), [(200.097, 82.51), (1200.298, 82.51), (95.065, 506.098), (1335.813, 506.098)])
 
     INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
