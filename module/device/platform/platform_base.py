@@ -132,7 +132,7 @@ class PlatformBase(Connection, EmulatorManagerBase):
         return instance
 
     def find_emulator_instance(
-        self, serial: str, name: str = None, path: str = None, emulator: str = None
+        self, serial: str, name: str | None = None, path: str | None = None, emulator: str | None = None
     ) -> EmulatorInstanceBase | None:
         """
         参数：

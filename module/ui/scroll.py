@@ -199,14 +199,14 @@ class Scroll:
 
 
 class AdaptiveScroll(Scroll):
-    def __init__(self, area, parameters: dict = None, background=5, is_vertical=True, name="Scroll"):
+    def __init__(self, area, parameters: dict | None = None, background=5, is_vertical=True, name="Scroll"):
         """
-        Args:
-            area (Button, tuple): A button or area of the whole scroll.
-            parameters (dict): Parameters passing to scipy.find_peaks
-            background (int):
-            is_vertical (bool): True if vertical, false if horizontal.
-            name (str):
+        参数：
+            area (Button, tuple)：整个滚动条的按钮或区域。
+            parameters (dict)：传给 scipy.find_peaks 的参数。
+            background (int)：
+            is_vertical (bool)：True 表示纵向，False 表示横向。
+            name (str)：
         """
         if parameters is None:
             parameters = {}

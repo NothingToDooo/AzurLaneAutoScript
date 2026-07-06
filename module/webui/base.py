@@ -25,12 +25,12 @@ class Frame(Base):
         super().__init__()
         self.page = "Home"
 
-    def init_aside(self, expand_menu: bool = True, name: str = None) -> None:
+    def init_aside(self, expand_menu: bool = True, name: str | None = None) -> None:
         """
-        Call this in aside button callback function.
-        Args:
-            expand_menu: expand menu
-            name: button name(label) to be highlight
+        在侧边栏按钮回调中调用。
+        参数：
+            expand_menu：是否展开菜单。
+            name：需要高亮的按钮名称（标签）。
         """
         self.visible = True
         self.task_handler.remove_pending_task()
@@ -41,12 +41,12 @@ class Frame(Base):
             self.active_button("aside", name)
             set_localstorage("aside", name)
 
-    def init_menu(self, collapse_menu: bool = True, name: str = None) -> None:
+    def init_menu(self, collapse_menu: bool = True, name: str | None = None) -> None:
         """
-        Call this in menu button callback function.
-        Args:
-            collapse_menu: collapse menu
-            name: button name(label) to be highlight
+        在菜单按钮回调中调用。
+        参数：
+            collapse_menu：是否收起菜单。
+            name：需要高亮的按钮名称（标签）。
         """
         self.visible = True
         self.page = name

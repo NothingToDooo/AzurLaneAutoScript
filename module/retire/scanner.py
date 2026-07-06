@@ -501,10 +501,10 @@ class DockScanner(ShipScanner):
         offset = offset_rough
         self.move(offset)
 
-    def scan_one_fleet(self, fleet: int = None) -> list[Ship]:
+    def scan_one_fleet(self, fleet: int | None = None) -> list[Ship]:
         """
-        Scan all ships in a certain fleet.
-        It fleet is not specified, use self.fleet.
+        扫描指定舰队中的所有舰船。
+        如果未指定舰队，则使用 self.fleet。
         """
 
     def scan_whole_dock(self) -> list[Ship]:

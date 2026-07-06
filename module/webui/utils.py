@@ -95,11 +95,11 @@ class QueueHandler:
 
 
 class Task:
-    def __init__(self, g: Generator, delay: float, next_run: float = None, name: str = None) -> None:
+    def __init__(self, g: Generator, delay: float, next_run: float | None = None, name: str | None = None) -> None:
         self.g = g
         g.send(None)
         self.delay = delay
-        self.next_run = next_run if next_run else time.time()
+        self.next_run = next_run if next_run is not None else time.time()
         self.name = name if name is not None else self.g.__name__
 
     def __str__(self) -> str:
@@ -397,11 +397,11 @@ str2type = {
 }
 
 
-def parse_pin_value(val, valuetype: str = None):
+def parse_pin_value(val, valuetype: str | None = None):
     """
-    input, textarea return str
-    select return its option (str or int)
-    checkbox return [] or [True] (define in put_checkbox_)
+    input、textarea 返回 str。
+    select 返回选项值（str 或 int）。
+    checkbox 返回 [] 或 [True]（由 put_checkbox_ 定义）。
     """
     if isinstance(val, list):
         if len(val) == 0:

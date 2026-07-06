@@ -38,10 +38,10 @@ class RichFileHandler(RichHandler):
 
 class RichRenderableHandler(RichHandler):
     """
-    Pass renderable into a function
+    将 renderable 传入回调函数。
     """
 
-    def __init__(self, *args, func: Callable[[ConsoleRenderable], None] = None, **kwargs):
+    def __init__(self, *args, func: Callable[[ConsoleRenderable], None] | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self._func = func
 
