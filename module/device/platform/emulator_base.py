@@ -53,11 +53,11 @@ def remove_duplicated_path(paths):
 
 @dataclass
 class EmulatorInstanceBase:
-    # Serial for adb connection
+    # ADB 连接使用的 Serial
     serial: str
-    # Emulator instance name, used for start/stop emulator
+    # 启停模拟器时使用的实例名称
     name: str
-    # Path to emulator .exe
+    # 模拟器可执行文件路径
     path: str
 
     def __str__(self):
@@ -67,7 +67,7 @@ class EmulatorInstanceBase:
     def type(self) -> str:
         """
         Returns:
-            str: Emulator type, such as Emulator.NoxPlayer
+            str: Emulator type, such as Emulator.MuMuPlayer12
         """
         return self.emulator.type
 
@@ -129,44 +129,13 @@ class EmulatorInstanceBase:
         """
         return self.emulator.abspath(f"../vms/{self.name}/configs/{file}")
 
-    @cached_property
-    def LDPlayer_id(self):
-        """
-        Convert LDPlayer instance name to instance id.
-        Example names:
-            leidian0
-            leidian1
-
-        Returns:
-            int: Instance ID, or None if this is not a LDPlayer instance
-        """
-        res = re.search(r"leidian(\d+)", self.name)
-        if res:
-            return int(res.group(1))
-
-        return None
-
 
 class EmulatorBase:
-    # Values here must match those in argument.yaml EmulatorInfo.Emulator.option
-    NoxPlayer = "NoxPlayer"
-    NoxPlayer64 = "NoxPlayer64"
-    NoxPlayerFamily = [NoxPlayer, NoxPlayer64]
-    BlueStacks4 = "BlueStacks4"
-    BlueStacks5 = "BlueStacks5"
-    BlueStacks4HyperV = "BlueStacks4HyperV"
-    BlueStacks5HyperV = "BlueStacks5HyperV"
-    BlueStacksFamily = [BlueStacks4, BlueStacks5]
-    LDPlayer3 = "LDPlayer3"
-    LDPlayer4 = "LDPlayer4"
-    LDPlayer9 = "LDPlayer9"
-    LDPlayer14 = "LDPlayer14"
-    LDPlayerFamily = [LDPlayer3, LDPlayer4, LDPlayer9, LDPlayer14]
+    # 这里的值必须和 argument.yaml 里的 EmulatorInfo.Emulator.option 保持一致。
     MuMuPlayer = "MuMuPlayer"
     MuMuPlayerX = "MuMuPlayerX"
     MuMuPlayer12 = "MuMuPlayer12"
     MuMuPlayerFamily = [MuMuPlayer, MuMuPlayerX, MuMuPlayer12]
-    MEmuPlayer = "MEmuPlayer"
 
     @classmethod
     def path_to_type(cls, path: str) -> str:
@@ -175,7 +144,7 @@ class EmulatorBase:
             path: Path to .exe file
 
         Returns:
-            str: Emulator type, such as Emulator.NoxPlayer,
+            str: Emulator type, such as Emulator.MuMuPlayer12,
                 or '' if this is not a emulator.
         """
         return ""

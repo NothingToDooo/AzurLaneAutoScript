@@ -4,21 +4,18 @@ from module.base.timer import Timer
 from module.device.method.adb import Adb
 from module.device.method.uiautomator_2 import Uiautomator2
 from module.device.method.utils import HierarchyButton
-from module.device.method.wsa import WSA
 from module.exception import ScriptError
 from module.logger import logger
 
 
-class AppControl(Adb, WSA, Uiautomator2):
+class AppControl(Adb, Uiautomator2):
     hierarchy: etree._Element
     _app_u2_family = ["uiautomator2", "minitouch", "scrcpy", "MaaTouch", "nemu_ipc"]
     _hierarchy_interval = Timer(0.1)
 
     def app_current(self) -> str:
         method = self.config.Emulator_ControlMethod
-        if self.is_wsa:
-            package = self.app_current_wsa()
-        elif method in AppControl._app_u2_family:
+        if method in AppControl._app_u2_family:
             package = self.app_current_uiautomator2()
         else:
             package = self.app_current_adb()
@@ -33,9 +30,7 @@ class AppControl(Adb, WSA, Uiautomator2):
     def app_start(self):
         method = self.config.Emulator_ControlMethod
         logger.info(f"App start: {self.package}")
-        if self.config.Emulator_Serial == "wsa-0":
-            self.app_start_wsa(display=0)
-        elif method in AppControl._app_u2_family:
+        if method in AppControl._app_u2_family:
             self.app_start_uiautomator2()
         else:
             self.app_start_adb()

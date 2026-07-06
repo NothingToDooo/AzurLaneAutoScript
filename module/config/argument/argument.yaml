@@ -42,7 +42,6 @@ Emulator:
       DroidCast,
       DroidCast_raw,
       nemu_ipc,
-      ldopengl,
     ]
   ControlMethod:
     value: MaaTouch
@@ -60,20 +59,9 @@ EmulatorInfo:
     value: auto
     option: [
       auto,
-      NoxPlayer,
-      NoxPlayer64,
-      BlueStacks4,
-      BlueStacks5,
-      BlueStacks4HyperV,
-      BlueStacks5HyperV,
-      LDPlayer3,
-      LDPlayer4,
-      LDPlayer9,
-      LDPlayer14,
       MuMuPlayer,
       MuMuPlayerX,
       MuMuPlayer12,
-      MEmuPlayer,
     ]
   name:
     value: null

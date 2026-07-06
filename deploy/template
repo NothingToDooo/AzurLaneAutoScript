@@ -16,19 +16,9 @@ Deploy:
     # [uv] Use './.venv/Lib/site-packages/adbutils/binaries/adb.exe'
     # [Other] Use you own latest ADB, but not the ADB in your emulator
     AdbExecutable: './.venv/Lib/site-packages/adbutils/binaries/adb.exe'
-    # Whether to replace ADB
-    # Chinese emulators (NoxPlayer, LDPlayer, MemuPlayer, MuMuPlayer) use their own ADB, instead of the latest.
-    # Different ADB servers will terminate each other at startup, resulting in disconnection.
-    # For compatibility, we have to replace them all.
-    # This will do:
-    #   1. Terminate current ADB server
-    #   2. Rename ADB from all emulators to *.bak and replace them by the AdbExecutable set above
-    #   3. Brute-force connect to all available emulator instances
-    # [In most cases] Use true
-    # [In few cases] Use false, if you have other programs using ADB.
+    # 是否替换 MuMu 目录内的 ADB。
     ReplaceAdb: true
-    # Brute-force connect to all available emulator instances
-    # [In most cases] Use true
+    # 是否自动连接 MuMu 实例。
     AutoConnect: true
     # Re-install uiautomator2
     # [In most cases] Use true

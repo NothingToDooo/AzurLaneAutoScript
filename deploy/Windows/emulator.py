@@ -28,14 +28,10 @@ class EmulatorManager(AlasManager):
         logger.hr("Kill all known ADB", level=2)
         for proc in self.iter_process_by_names(
             [
-                # Most emulator use this
+                # 通用 ADB 进程。
                 "adb.exe",
-                # NoxPlayer 夜神模拟器
-                "nox_adb.exe",
-                # MumuPlayer MuMu模拟器
+                # MuMu 模拟器。
                 "adb_server.exe",
-                # Bluestacks 蓝叠模拟器
-                "HD-Adb.exe",
             ]
         ):
             logger.info(proc)

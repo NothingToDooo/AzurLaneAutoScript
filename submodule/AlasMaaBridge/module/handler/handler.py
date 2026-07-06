@@ -12,7 +12,6 @@ from deploy.config import DeployConfig
 from module.base.timer import Timer
 from module.config.deep import deep_get
 from module.config.utils import get_server_last_update, read_file
-from module.device.connection_attr import ConnectionAttr
 from module.exception import RequestHumanTakeover
 from module.logger import logger
 from submodule.AlasMaaBridge.module.asst import asst, utils
@@ -178,27 +177,9 @@ class AssistantHandler:
             else:
                 self.task_switch_timer.reset()
 
-    def serial_check(self):
-        """
-        serial check
-        """
-        if self.is_bluestacks4_hyperv:
-            self.serial = ConnectionAttr.find_bluestacks4_hyperv(self.serial)
-        if self.is_bluestacks5_hyperv:
-            self.serial = ConnectionAttr.find_bluestacks5_hyperv(self.serial)
-
-    @cached_property
-    def is_bluestacks4_hyperv(self):
-        return "bluestacks4-hyperv" in self.serial
-
-    @cached_property
-    def is_bluestacks5_hyperv(self):
-        return "bluestacks5-hyperv" in self.serial
-
     def connect(self):
         adb = os.path.abspath(DeployConfig().AdbExecutable)
         self.serial = self.config.MaaEmulator_Serial
-        self.serial_check()
 
         old_callback_list = self.callback_list
         self.callback_list = []

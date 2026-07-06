@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 # module/device/platform/emulator_base.py
 # module/device/platform/emulator_windows.py
-# Will be used in Alas Easy Install, they shouldn't import any Alas modules.
+# 会被独立安装流程使用，因此这里不要导入 Alas 业务模块。
 from module.device.platform.emulator_base import (
     EmulatorBase,
     EmulatorInstanceBase,
@@ -78,46 +78,13 @@ class Emulator(EmulatorBase):
             path: Path to .exe file, case insensitive
 
         Returns:
-            str: Emulator type, such as Emulator.NoxPlayer
+            str: Emulator type, such as Emulator.MuMuPlayer12
         """
         folder, exe = os.path.split(path)
         folder, dir1 = os.path.split(folder)
-        folder, dir2 = os.path.split(folder)
+        _, dir2 = os.path.split(folder)
         exe = exe.lower()
-        dir1 = dir1.lower()
         dir2 = dir2.lower()
-        if exe == "nox.exe":
-            if dir2 == "nox":
-                return cls.NoxPlayer
-            elif dir2 == "nox64":
-                return cls.NoxPlayer64
-            else:
-                return cls.NoxPlayer
-        if exe in ["bluestacks.exe", "bluestacksgp.exe"]:
-            if dir1 in ["bluestacks", "bluestacks_cn", "bluestackscn"]:
-                return cls.BlueStacks4
-            elif dir1 in ["bluestacks_nxt", "bluestacks_nxt_cn"]:
-                return cls.BlueStacks5
-            else:
-                return cls.BlueStacks4
-        if exe == "hd-player.exe":
-            if dir1 in ["bluestacks", "bluestacks_cn"]:
-                return cls.BlueStacks4
-            elif dir1 in ["bluestacks_nxt", "bluestacks_nxt_cn"]:
-                return cls.BlueStacks5
-            else:
-                return cls.BlueStacks5
-        if exe == "dnplayer.exe":
-            if dir1 == "ldplayer":
-                return cls.LDPlayer3
-            elif dir1 == "ldplayer4":
-                return cls.LDPlayer4
-            elif dir1 == "ldplayer9":
-                return cls.LDPlayer9
-            elif dir1 == "ldplayer14":
-                return cls.LDPlayer14
-            else:
-                return cls.LDPlayer3
         if exe == "nemuplayer.exe":
             if dir2 == "nemu":
                 return cls.MuMuPlayer
@@ -127,8 +94,6 @@ class Emulator(EmulatorBase):
                 return cls.MuMuPlayer
         if exe in ["mumuplayer.exe", "mumunxmain.exe"]:
             return cls.MuMuPlayer12
-        if exe == "memu.exe":
-            return cls.MEmuPlayer
 
         return ""
 
@@ -143,21 +108,12 @@ class Emulator(EmulatorBase):
         Yields:
             str: Path to emulator executable
         """
-        if "HD-MultiInstanceManager.exe" in exe:
-            yield exe.replace("HD-MultiInstanceManager.exe", "HD-Player.exe")
-            yield exe.replace("HD-MultiInstanceManager.exe", "Bluestacks.exe")
-        elif "MultiPlayerManager.exe" in exe:
-            yield exe.replace("MultiPlayerManager.exe", "Nox.exe")
-        elif "dnmultiplayer.exe" in exe:
-            yield exe.replace("dnmultiplayer.exe", "dnplayer.exe")
-        elif "NemuMultiPlayer.exe" in exe:
+        if "NemuMultiPlayer.exe" in exe:
             yield exe.replace("NemuMultiPlayer.exe", "NemuPlayer.exe")
         elif "MuMuMultiPlayer.exe" in exe:
             yield exe.replace("MuMuMultiPlayer.exe", "MuMuPlayer.exe")
         elif "MuMuManager.exe" in exe:
             yield exe.replace("MuMuManager.exe", "MuMuPlayer.exe")
-        elif "MEmuConsole.exe" in exe:
-            yield exe.replace("MEmuConsole.exe", "MEmu.exe")
         else:
             yield exe
 
@@ -177,14 +133,6 @@ class Emulator(EmulatorBase):
         # MuMuPlayer12 5.0
         elif "MuMuNxMain.exe" in exe:
             return exe.replace("MuMuNxMain.exe", "MuMuManager.exe")
-        elif "LDPlayer.exe" in exe:
-            return exe.replace("LDPlayer.exe", "ldconsole.exe")
-        elif "dnplayer.exe" in exe:
-            return exe.replace("dnplayer.exe", "ldconsole.exe")
-        elif "Bluestacks.exe" in exe:
-            return exe.replace("Bluestacks.exe", "bsconsole.exe")
-        elif "MEmu.exe" in exe:
-            return exe.replace("MEmu.exe", "memuc.exe")
         else:
             return exe
 
@@ -214,70 +162,7 @@ class Emulator(EmulatorBase):
         Yields:
             EmulatorInstance: Emulator instances found in this emulator
         """
-        if self == Emulator.NoxPlayerFamily:
-            # ./BignoxVMS/{name}/{name}.vbox
-            for folder in self.list_folder("./BignoxVMS", is_dir=True):
-                for file in iter_folder(folder, ext=".vbox"):
-                    serial = Emulator.vbox_file_to_serial(file)
-                    if serial:
-                        yield EmulatorInstance(
-                            serial=serial,
-                            name=os.path.basename(folder),
-                            path=self.path,
-                        )
-        elif self == Emulator.BlueStacks5:
-            # Get UserDefinedDir, where BlueStacks stores data
-            folder = None
-            try:
-                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\BlueStacks_nxt") as reg:
-                    folder = winreg.QueryValueEx(reg, "UserDefinedDir")[0]
-            except FileNotFoundError:
-                pass
-            try:
-                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\BlueStacks_nxt_cn") as reg:
-                    folder = winreg.QueryValueEx(reg, "UserDefinedDir")[0]
-            except FileNotFoundError:
-                pass
-            if not folder:
-                return
-            # Read {UserDefinedDir}/bluestacks.conf
-            try:
-                with open(self.abspath("./bluestacks.conf", folder), encoding="utf-8") as f:
-                    content = f.read()
-            except FileNotFoundError:
-                return
-            # bst.instance.Nougat64.adb_port="5555"
-            emulators = re.findall(r'bst.instance.(\w+).status.adb_port="(\d+)"', content)
-            for emulator in emulators:
-                yield EmulatorInstance(
-                    serial=f"127.0.0.1:{emulator[1]}",
-                    name=emulator[0],
-                    path=self.path,
-                )
-        elif self == Emulator.BlueStacks4:
-            # ../Engine/Android
-            regex = re.compile(r"^Android")
-            for folder in self.list_folder("./Engine/ProgramData/Engine", is_dir=True):
-                folder = os.path.basename(folder)
-                res = regex.match(folder)
-                if not res:
-                    continue
-                # Serial from BlueStacks4 are not static, they get increased on every emulator launch
-                # Assume all use 127.0.0.1:5555
-                yield EmulatorInstance(serial="127.0.0.1:5555", name=folder, path=self.path)
-        elif self == Emulator.LDPlayerFamily:
-            # ./vms/leidian0
-            regex = re.compile(r"^leidian(\d+)$")
-            for folder in self.list_folder("./vms", is_dir=True):
-                folder = os.path.basename(folder)
-                res = regex.match(folder)
-                if not res:
-                    continue
-                # LDPlayer has no forward port config in .vbox file
-                # Ports are auto increase, 5555, 5557, 5559, etc
-                port = int(res.group(1)) * 2 + 5555
-                yield EmulatorInstance(serial=f"127.0.0.1:{port}", name=folder, path=self.path)
-        elif self == Emulator.MuMuPlayer:
+        if self == Emulator.MuMuPlayer:
             # MuMu has no multi instances, on 7555 only
             yield EmulatorInstance(
                 serial="127.0.0.1:7555",
@@ -317,35 +202,21 @@ class Emulator(EmulatorBase):
                         if instance.MuMuPlayer12_id:
                             instance.serial = f"127.0.0.1:{16384 + 32 * instance.MuMuPlayer12_id}"
                             yield instance
-        elif self == Emulator.MEmuPlayer:
-            # ./MemuHyperv VMs/{name}/{name}.memu
-            for folder in self.list_folder("./MemuHyperv VMs", is_dir=True):
-                for file in iter_folder(folder, ext=".memu"):
-                    serial = Emulator.vbox_file_to_serial(file)
-                    if serial:
-                        yield EmulatorInstance(
-                            serial=serial,
-                            name=os.path.basename(folder),
-                            path=self.path,
-                        )
 
     def iter_adb_binaries(self) -> t.Iterable[str]:
         """
         Yields:
             str: Filepath to adb binaries found in this emulator
         """
-        if self == Emulator.NoxPlayerFamily:
-            exe = self.abspath("./nox_adb.exe")
-            if os.path.exists(exe):
-                yield exe
-        if self == Emulator.MuMuPlayerFamily:
-            # From MuMu9\emulator\nemu9\EmulatorShell
-            # to MuMu9\emulator\nemu9\vmonitor\bin\adb_server.exe
-            exe = self.abspath("../vmonitor/bin/adb_server.exe")
-            if os.path.exists(exe):
-                yield exe
+        if self != Emulator.MuMuPlayerFamily:
+            return
 
-        # All emulators have adb.exe
+        # MuMu9\emulator\nemu9\EmulatorShell -> MuMu9\emulator\nemu9\vmonitor\bin\adb_server.exe
+        exe = self.abspath("../vmonitor/bin/adb_server.exe")
+        if os.path.exists(exe):
+            yield exe
+
+        # MuMu 目录内可能有 adb.exe。
         exe = self.abspath("./adb.exe")
         if os.path.exists(exe):
             yield exe
@@ -411,31 +282,6 @@ class EmulatorManager(EmulatorManagerBase):
                 yield file
 
     @staticmethod
-    def get_install_dir_from_reg(path, key):
-        """
-        Args:
-            path (str): f'SOFTWARE\\leidian\\ldplayer'
-            key (str): 'InstallDir'
-
-        Returns:
-            str: Installation dir or None
-        """
-        try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path) as reg:
-                root = winreg.QueryValueEx(reg, key)[0]
-                return root
-        except FileNotFoundError:
-            pass
-        try:
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path) as reg:
-                root = winreg.QueryValueEx(reg, key)[0]
-                return root
-        except FileNotFoundError:
-            pass
-
-        return None
-
-    @staticmethod
     def iter_uninstall_registry():
         """
         Iter emulator uninstaller from registry.
@@ -448,24 +294,11 @@ class EmulatorManager(EmulatorManagerBase):
             r"Software\Microsoft\Windows\CurrentVersion\Uninstall",
         ]
         known_emulator_registry_name = [
-            "Nox",
-            "Nox64",
-            "BlueStacks",
-            "BlueStacks_nxt",
-            "BlueStacks_cn",
-            "BlueStacks_nxt_cn",
-            "LDPlayer",
-            "LDPlayer4",
-            "LDPlayer9",
-            "leidian",
-            "leidian4",
-            "leidian9",
             "Nemu",
             "Nemu9",
             "MuMuPlayer",
             "MuMuPlayer-12.0",
             "MuMu Player 12.0",
-            "MEmu",
         ]
         for path in known_uninstall_registry_path:
             try:
@@ -483,10 +316,7 @@ class EmulatorManager(EmulatorManagerBase):
                     continue
                 if not uninstall:
                     continue
-                # UninstallString is like:
-                # C:\Program Files\BlueStacks_nxt\BlueStacksUninstaller.exe -tmp
-                # "E:\ProgramFiles\Microvirt\MEmu\uninstall\uninstall.exe" -u
-                # Extract path in ""
+                # 从带引号的 UninstallString 中提取可执行文件路径。
                 res = re.search('"(.*?)"', uninstall)
                 uninstall = res.group(1) if res else uninstall
                 yield uninstall
@@ -534,18 +364,6 @@ class EmulatorManager(EmulatorManagerBase):
         for file in EmulatorManager.iter_user_assist():
             if Emulator.is_emulator(file) and os.path.exists(file):
                 exe.add(file)
-
-        # LDPlayer install path
-        for path in [
-            r"SOFTWARE\leidian\ldplayer",
-            r"SOFTWARE\leidian\ldplayer9",
-            r"SOFTWARE\leidian\ldplayer14",
-        ]:
-            ld = self.get_install_dir_from_reg(path, "InstallDir")
-            if ld:
-                ld = abspath(os.path.join(ld, "./dnplayer.exe"))
-                if Emulator.is_emulator(ld) and os.path.exists(ld):
-                    exe.add(ld)
 
         # Uninstall registry
         for uninstall in EmulatorManager.iter_uninstall_registry():

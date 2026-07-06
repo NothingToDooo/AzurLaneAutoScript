@@ -18,7 +18,6 @@ from module.device.method.utils import (
     PackageNotInstalled,
     handle_adb_error,
     handle_unknown_host_service,
-    possible_reasons,
     retry_sleep,
 )
 from module.exception import RequestHumanTakeover
@@ -80,10 +79,6 @@ def retry(func):
             # ADB on emulator not enabled
             except AssertionError as e:
                 logger.exception(e)
-                possible_reasons(
-                    "If you are using BlueStacks or LD player or WSA, "
-                    "please enable ADB in the settings of your emulator"
-                )
                 break
             # Package not installed
             except PackageNotInstalled as e:

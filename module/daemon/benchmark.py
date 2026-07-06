@@ -195,10 +195,6 @@ class Benchmark(DaemonBase, CampaignUI):
 
         if self.device.nemu_ipc_available():
             screenshot.append("nemu_ipc")
-        if self.device.ldopengl_available():
-            screenshot.append("ldopengl")
-        if self.device.is_bluestacks_air:
-            screenshot = [l for l in screenshot if "DroidCast" not in l]
 
         scene = self.config.Benchmark_TestScene
         if "screenshot" not in scene:
@@ -236,8 +232,6 @@ class Benchmark(DaemonBase, CampaignUI):
             screenshot = remove("ADB_nc", "aScreenCap_nc")
         if self.device.nemu_ipc_available():
             screenshot.append("nemu_ipc")
-        if self.device.ldopengl_available():
-            screenshot.append("ldopengl")
         screenshot = tuple(screenshot)
 
         self.TEST_TOTAL = 3

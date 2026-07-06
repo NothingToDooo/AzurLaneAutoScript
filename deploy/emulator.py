@@ -38,15 +38,6 @@ class VirtualBoxEmulator:
         Raises:
             FileNotFoundError: If emulator not installed.
         """
-        if self.name == "LDPlayer4":
-            root = self.get_install_dir_from_reg("SOFTWARE\\leidian\\ldplayer", "InstallDir")
-            if root is not None:
-                return root
-        if self.name == "LDPlayer9":
-            root = self.get_install_dir_from_reg("SOFTWARE\\leidian\\ldplayer9", "InstallDir")
-            if root is not None:
-                return root
-
         try:
             with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f"{self.UNINSTALL_REG}\\{self.name}", 0) as reg:
                 res = winreg.QueryValueEx(reg, "UninstallString")[0]
@@ -58,32 +49,6 @@ class VirtualBoxEmulator:
         file = file.group(1) if file else res
         root = os.path.abspath(os.path.join(os.path.dirname(file), self.root_path))
         return root
-
-    def get_install_dir_from_reg(self, path, key):
-        """
-        Args:
-            path (str): f'SOFTWARE\\leidian\\ldplayer'
-            key (str): 'InstallDir'
-
-        Returns:
-            str: Installation dir or None
-        """
-        try:
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path, 0) as reg:
-                root = winreg.QueryValueEx(reg, key)[0]
-                if os.path.exists(root):
-                    return root
-        except FileNotFoundError:
-            pass
-        try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path, 0) as reg:
-                root = winreg.QueryValueEx(reg, key)[0]
-                if os.path.exists(root):
-                    return root
-        except FileNotFoundError:
-            pass
-
-        return None
 
     @cached_property
     def adb_binary(self):
@@ -165,35 +130,13 @@ class VirtualBoxEmulator:
                 logger.info(f"Not exists {bak}, skip")
 
 
-# NoxPlayer 夜神模拟器
-nox_player = VirtualBoxEmulator(
-    name="Nox", root_path=".", adb_path=["./adb.exe", "./nox_adb.exe"], vbox_path="./BignoxVMS", vbox_name=".*.vbox$"
-)
-nox_player_64 = VirtualBoxEmulator(
-    name="Nox64", root_path=".", adb_path=["./adb.exe", "./nox_adb.exe"], vbox_path="./BignoxVMS", vbox_name=".*.vbox$"
-)
-# LDPlayer 雷电模拟器
-ld_player = VirtualBoxEmulator(
-    name="LDPlayer", root_path=".", adb_path="./adb.exe", vbox_path="./vms", vbox_name=".*.vbox$"
-)
-ld_player_4 = VirtualBoxEmulator(
-    name="LDPlayer4", root_path=".", adb_path="./adb.exe", vbox_path="./vms", vbox_name=".*.vbox$"
-)
-ld_player_9 = VirtualBoxEmulator(
-    name="LDPlayer9", root_path=".", adb_path="./adb.exe", vbox_path="./vms", vbox_name=".*.vbox$"
-)
-# MemuPlayer 逍遥模拟器
-memu_player = VirtualBoxEmulator(
-    name="MEmu", root_path="../", adb_path="./adb.exe", vbox_path="./MemuHyperv VMs", vbox_name=".*.memu$"
-)
-# MumuPlayer MuMu模拟器
 mumu_player = VirtualBoxEmulator(
     name="Nemu", root_path=".", adb_path="./vmonitor/bin/adb_server.exe", vbox_path="./vms", vbox_name=".*.nemu$"
 )
 
 
 class EmulatorConnect:
-    SUPPORTED_EMULATORS = [nox_player, nox_player_64, ld_player, ld_player_4, ld_player_9, memu_player, mumu_player]
+    SUPPORTED_EMULATORS = [mumu_player]
 
     def __init__(self, adb="adb.exe"):
         self.adb_binary = adb
@@ -263,14 +206,10 @@ class EmulatorConnect:
         # Just kill it, because some adb don't obey.
         logger.info("Kill all known ADB")
         for exe in [
-            # Most emulator use this
+            # 通用 ADB 进程。
             "adb.exe",
-            # NoxPlayer 夜神模拟器
-            "nox_adb.exe",
-            # MumuPlayer MuMu模拟器
+            # MuMu 模拟器。
             "adb_server.exe",
-            # Bluestacks 蓝叠模拟器
-            "HD-Adb.exe",
         ]:
             ret_code = self._execute(["taskkill", "/f", "/im", exe], output=False)
             if ret_code == 0:
@@ -312,10 +251,10 @@ class EmulatorConnect:
 
     def adb_replace(self, adb=None):
         """
-        Different version of ADB will kill each other when starting.
-        Chinese emulators (NoxPlayer, LDPlayer, MemuPlayer, MuMuPlayer) use their own adb,
-        instead of the one in system PATH, so when they start they kill the adb.exe Alas is using.
-        Replacing the ADB in emulator is the simplest way to solve this.
+        不同版本的 ADB 启动时会互相杀掉。
+        MuMu 使用自己的 ADB，而不是系统 PATH 里的 ADB。
+        因此 MuMu 启动时会杀掉 Alas 正在使用的 adb.exe。
+        替换模拟器目录里的 ADB 是最简单的处理方式。
 
         Args:
             adb (str): Absolute path to adb.exe

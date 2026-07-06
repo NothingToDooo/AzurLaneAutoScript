@@ -94,28 +94,10 @@ class PlatformWindows(PlatformBase, EmulatorManager):
             self.execute(f'"{exe}" -m {instance.name}')
         elif instance == Emulator.MuMuPlayer12:
             # MuMuManager.exe api -v 0 launch_player
-            # Launch via MuMuManager instead of MuMuPlayer.exe/MuMuNxMain.exe.
-            # MuMuNxMain.exe is a GUI singleton, if two instances get launched at the same time,
-            # the second launch request is handed over to a MuMuNxMain.exe that is still initializing
-            # and gets silently dropped, while MuMuManager queues requests in backend service.
+            # 通过 MuMuManager 启动，避免多个 MuMuNxMain.exe 同时启动时请求被吞掉。
             if instance.MuMuPlayer12_id is None:
                 logger.warning(f"Cannot get MuMu instance index from name {instance.name}")
             self.execute(f'"{Emulator.single_to_console(exe)}" api -v {instance.MuMuPlayer12_id} launch_player')
-        elif instance == Emulator.LDPlayerFamily:
-            # ldconsole.exe launch --index 0
-            self.execute(f'"{Emulator.single_to_console(exe)}" launch --index {instance.LDPlayer_id}')
-        elif instance == Emulator.NoxPlayerFamily:
-            # Nox.exe -clone:Nox_1
-            self.execute(f'"{exe}" -clone:{instance.name}')
-        elif instance == Emulator.BlueStacks5:
-            # HD-Player.exe --instance Pie64
-            self.execute(f'"{exe}" --instance {instance.name}')
-        elif instance == Emulator.BlueStacks4:
-            # Bluestacks.exe -vmname Android_1
-            self.execute(f'"{exe}" -vmname {instance.name}')
-        elif instance == Emulator.MEmuPlayer:
-            # MEmu.exe MEmu_0
-            self.execute(f'"{exe}" {instance.name}')
         else:
             raise EmulatorUnknown(f"Cannot start an unknown emulator instance: {instance}")
 
@@ -157,27 +139,6 @@ class PlatformWindows(PlatformBase, EmulatorManager):
             if instance.MuMuPlayer12_id is None:
                 logger.warning(f"Cannot get MuMu instance index from name {instance.name}")
             self.execute(f'"{Emulator.single_to_console(exe)}" api -v {instance.MuMuPlayer12_id} shutdown_player')
-        elif instance == Emulator.LDPlayerFamily:
-            # ldconsole.exe quit --index 0
-            self.execute(f'"{Emulator.single_to_console(exe)}" quit --index {instance.LDPlayer_id}')
-        elif instance == Emulator.NoxPlayerFamily:
-            # Nox.exe -clone:Nox_1 -quit
-            self.execute(f'"{exe}" -clone:{instance.name} -quit')
-        elif instance == Emulator.BlueStacks5:
-            # BlueStack has 2 processes
-            # C:\Program Files\BlueStacks_nxt_cn\HD-Player.exe --instance Pie64
-            # C:\Program Files\BlueStacks_nxt_cn\BstkSVC.exe -Embedding
-            self.kill_process_by_regex(
-                rf"("
-                rf'HD-Player.exe.*"--instance" "{instance.name}"'
-                rf")"
-            )
-        elif instance == Emulator.BlueStacks4:
-            # E:\Program Files (x86)\BluestacksCN\bsconsole.exe quit --name Android
-            self.execute(f'"{Emulator.single_to_console(exe)}" quit --name {instance.name}')
-        elif instance == Emulator.MEmuPlayer:
-            # F:\Program Files\Microvirt\MEmu\memuc.exe stop -n MEmu_0
-            self.execute(f'"{Emulator.single_to_console(exe)}" stop -n {instance.name}')
         else:
             raise EmulatorUnknown(f"Cannot stop an unknown emulator instance: {instance}")
 
@@ -196,7 +157,7 @@ class PlatformWindows(PlatformBase, EmulatorManager):
             msg = str(e)
             # OSError: [WinError 740] 请求的操作需要提升。
             if "WinError 740" in msg:
-                logger.error("To start/stop MumuAppPlayer, ALAS needs to be run as administrator")
+                logger.error("To start/stop MuMuPlayer, ALAS needs to be run as administrator")
         except EmulatorUnknown as e:
             logger.error(e)
         except Exception as e:

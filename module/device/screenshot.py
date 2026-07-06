@@ -13,15 +13,13 @@ from module.base.utils import get_color, image_size, limit_in, save_image
 from module.device.method.adb import Adb
 from module.device.method.ascreencap import AScreenCap
 from module.device.method.droidcast import DroidCast
-from module.device.method.ldopengl import LDOpenGL
 from module.device.method.nemu_ipc import NemuIpc
 from module.device.method.scrcpy import Scrcpy
-from module.device.method.wsa import WSA
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
 
 
-class Screenshot(Adb, WSA, DroidCast, AScreenCap, Scrcpy, NemuIpc, LDOpenGL):
+class Screenshot(Adb, DroidCast, AScreenCap, Scrcpy, NemuIpc):
     _screen_size_checked = False
     _screen_black_checked = False
     _minicap_uninstalled = False
@@ -41,7 +39,6 @@ class Screenshot(Adb, WSA, DroidCast, AScreenCap, Scrcpy, NemuIpc, LDOpenGL):
             "DroidCast_raw": self.screenshot_droidcast_raw,
             "scrcpy": self.screenshot_scrcpy,
             "nemu_ipc": self.screenshot_nemu_ipc,
-            "ldopengl": self.screenshot_ldopengl,
         }
 
     @cached_property
@@ -168,8 +165,8 @@ class Screenshot(Adb, WSA, DroidCast, AScreenCap, Scrcpy, NemuIpc, LDOpenGL):
             if interval != origin:
                 logger.warning(f"Optimization.ScreenshotInterval {origin} is revised to {interval}")
                 self.config.Optimization_ScreenshotInterval = interval
-            # Allow nemu_ipc to have a lower default
-            if self.config.Emulator_ScreenshotMethod in ["nemu_ipc", "ldopengl"]:
+            # nemu_ipc 可以使用更低的默认截图间隔。
+            if self.config.Emulator_ScreenshotMethod == "nemu_ipc":
                 interval = limit_in(origin, 0.1, 0.2)
         elif interval == "combat":
             origin = self.config.Optimization_CombatScreenshotInterval
@@ -229,9 +226,6 @@ class Screenshot(Adb, WSA, DroidCast, AScreenCap, Scrcpy, NemuIpc, LDOpenGL):
                     return True
                 else:
                     continue
-            elif self.config.Emulator_Serial == "wsa-0":
-                self.display_resize_wsa(0)
-                return False
             elif hasattr(self, "app_is_running") and not self.app_is_running():
                 logger.warning("Received orientated screenshot, game not running")
                 return True
@@ -247,16 +241,7 @@ class Screenshot(Adb, WSA, DroidCast, AScreenCap, Scrcpy, NemuIpc, LDOpenGL):
         # May get a pure black screenshot on some emulators.
         color = get_color(self.image, area=(0, 0, 1280, 720))
         if sum(color) < 1:
-            if self.config.Emulator_Serial == "wsa-0":
-                for _ in range(2):
-                    display = self.get_display_id()
-                    if display == 0:
-                        return True
-                logger.info(f"Game running on display {display}")
-                logger.warning("Game not running on display 0, will be restarted")
-                self.app_stop_uiautomator2()
-                return False
-            elif self.config.Emulator_ScreenshotMethod == "uiautomator2":
+            if self.config.Emulator_ScreenshotMethod == "uiautomator2":
                 logger.warning(f"Received pure black screenshots from emulator, color: {color}")
                 logger.warning("Uninstall minicap and retry")
                 self.uninstall_minicap()

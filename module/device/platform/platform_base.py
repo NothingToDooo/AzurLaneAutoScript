@@ -140,8 +140,8 @@ class PlatformBase(Connection, EmulatorManagerBase):
         Args:
             serial: Serial like "127.0.0.1:5555"
             name: Instance name like "Nougat64"
-            path: Emulator install path like "C:/Program Files/BlueStacks_nxt/HD-Player.exe"
-            emulator: Emulator type defined in Emulator class, like "BlueStacks5"
+            path: Emulator install path like "C:/Program Files/MuMuPlayer-12.0/shell/MuMuPlayer.exe"
+            emulator: Emulator type defined in Emulator class, like "MuMuPlayer12"
 
         Returns:
             EmulatorInstance: Emulator instance or None if no instances not found.

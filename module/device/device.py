@@ -146,20 +146,12 @@ class Device(Screenshot, Control, AppControl):
         if self.config.Emulator_ControlMethod == "Hermit" and not self.is_vmos:
             logger.warning("ControlMethod Hermit is allowed on VMOS only")
             self.config.Emulator_ControlMethod = "MaaTouch"
-        if self.config.Emulator_ScreenshotMethod == "ldopengl" and self.config.Emulator_ControlMethod == "minitouch":
-            logger.warning("Use MaaTouch on ldplayer")
-            self.config.Emulator_ControlMethod = "MaaTouch"
-
-        # Fallback to auto if nemu_ipc and ldopengl are selected on non-corresponding emulators
+        # 在非 MuMu 环境选择 nemu_ipc 时回退到自动截图。
         if self.config.Emulator_ScreenshotMethod == "nemu_ipc":
             if not (self.is_emulator and self.is_mumu_family):
                 logger.warning("ScreenshotMethod nemu_ipc is available on MuMu Player 12 only, fallback to auto")
                 self.config.Emulator_ScreenshotMethod = "auto"
-        if self.config.Emulator_ScreenshotMethod == "ldopengl":
-            if not (self.is_emulator and self.is_ldplayer_bluestacks_family):
-                logger.warning("ScreenshotMethod ldopengl is available on LD Player only, fallback to auto")
-                self.config.Emulator_ScreenshotMethod = "auto"
-        if not IS_WINDOWS and self.config.Emulator_ScreenshotMethod in ["nemu_ipc", "ldopengl"]:
+        if not IS_WINDOWS and self.config.Emulator_ScreenshotMethod == "nemu_ipc":
             logger.warning(
                 f"ScreenshotMethod {self.config.Emulator_ScreenshotMethod} is available on Windows only, "
                 f"fallback to auto"

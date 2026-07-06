@@ -324,24 +324,6 @@ class Connection(ConnectionAttr):
 
     @cached_property
     @retry
-    def is_bluestacks_air(self):
-        # BlueStacks Air is the Mac version of BlueStacks
-        if not IS_MACINTOSH:
-            return False
-        # 127.0.0.1:5555 + 10*n, assume 32 instances at max
-        if not (5555 <= self.port <= 5875):
-            return False
-        # [bst.installed_images]: [Tiramisu64]
-        # [bst.instance]: [Tiramisu64]
-        # Tiramisu64 is Android 13 and BlueStacks Air is the only BlueStacks version that uses Android 13
-        res = self.adb_getprop("bst.installed_images")
-        logger.attr("bst.installed_images", res)
-        if "Tiramisu64" in res:
-            return True
-        return False
-
-    @cached_property
-    @retry
     def is_mumu_pro(self):
         # MuMU Pro is the Mac version of MuMu
         if not IS_MACINTOSH:
@@ -428,16 +410,10 @@ class Connection(ConnectionAttr):
             str, int, str, int:
                 server_listen_host, server_listen_port, client_connect_host, client_connect_port
         """
-        # For BlueStacks hyper-v, use ADB reverse
-        if self.is_bluestacks_hyperv:
-            host = "127.0.0.1"
-            logger.info(f"Connecting to BlueStacks hyper-v, using host {host}")
-            port = self.adb_reverse(f"tcp:{self.config.REVERSE_SERVER_PORT}")
-            return host, port, host, self.config.REVERSE_SERVER_PORT
         # For emulators, listen on current host
         if self.is_emulator or self.is_over_http:
             # Mac emulators
-            if self.is_bluestacks_air or self.is_mumu_pro:
+            if self.is_mumu_pro:
                 logger.info("Connecting to local emulator, using host 127.0.0.1")
                 port = random_port(self.config.FORWARD_PORT_RANGE)
                 return "127.0.0.1", port, "10.0.2.2", port
@@ -501,8 +477,6 @@ class Connection(ConnectionAttr):
             sdk = self.sdk_ver
             logger.info(f"sdk_ver: {sdk}")
             if sdk >= 28:
-                # LD Player 9 does not have `nc`, try `busybox nc`
-                # BlueStacks Pie (Android 9) has `nc` but cannot send data, try `busybox nc` first
                 trial = [
                     ["busybox", "nc"],
                     ["nc"],
@@ -1124,37 +1098,6 @@ class Connection(ConnectionAttr):
                     "please copy one of the available devices listed above to Alas.Emulator.Serial"
                 )
                 raise RequestHumanTakeover
-
-        # Handle LDPlayer
-        # LDPlayer serial jumps between `127.0.0.1:5555+{X}` and `emulator-5554+{X}`
-        # No config write since it's dynamic
-        port_serial, emu_serial = get_serial_pair(self.serial)
-        if port_serial and emu_serial:
-            # Might be LDPlayer, check connected devices
-            port_device = devices.select(serial=port_serial).first_or_none()
-            emu_device = devices.select(serial=emu_serial).first_or_none()
-            if port_device and emu_device:
-                # Paired devices found, check status to get the correct one
-                if port_device.status == "device" and emu_device.status == "offline":
-                    self.serial = port_serial
-                    logger.info(f"LDPlayer device pair found: {port_device}, {emu_device}. Using serial: {self.serial}")
-                elif port_device.status == "offline" and emu_device.status == "device":
-                    self.serial = emu_serial
-                    logger.info(f"LDPlayer device pair found: {port_device}, {emu_device}. Using serial: {self.serial}")
-            elif not devices.select(serial=self.serial):
-                # Current serial not found
-                if port_device and not emu_device:
-                    logger.info(
-                        f"Current serial {self.serial} not found but paired device {port_serial} found. "
-                        f"Using serial: {port_serial}"
-                    )
-                    self.serial = port_serial
-                if not port_device and emu_device:
-                    logger.info(
-                        f"Current serial {self.serial} not found but paired device {emu_serial} found. "
-                        f"Using serial: {emu_serial}"
-                    )
-                    self.serial = emu_serial
 
         # Redirect MuMu12 from 127.0.0.1:7555 to 127.0.0.1:16xxx
         if self.serial == "127.0.0.1:7555":
