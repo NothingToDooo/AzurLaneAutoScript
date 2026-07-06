@@ -1,7 +1,14 @@
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1
 from module.logger import logger
-from module.meowfficer.assets import *
+from module.meowfficer.assets import (
+    MEOWFFICER_FORT_CHECK,
+    MEOWFFICER_FORT_CHORE,
+    MEOWFFICER_FORT_ENTER,
+    MEOWFFICER_FORT_GET_XP_1,
+    MEOWFFICER_FORT_GET_XP_2,
+    MEOWFFICER_FORT_RED_DOT,
+)
 from module.meowfficer.base import MeowfficerBase
 
 

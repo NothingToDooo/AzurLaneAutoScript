@@ -9,7 +9,14 @@ from module.base.timer import Timer
 from module.base.utils import area_offset, color_mapping, get_color, rgb2gray
 from module.combat.assets import GET_ITEMS_1
 from module.exception import GameBugError
-from module.guild.assets import *
+from module.guild.assets import (
+    GUILD_LOGISTICS_ENSURE_CHECK,
+    GUILD_MISSION,
+    GUILD_MISSION_NEW,
+    GUILD_MISSION_SELECT,
+    GUILD_SUPPLY,
+    OCR_GUILD_EXCHANGE_LIMIT,
+)
 from module.guild.base import GuildBase
 from module.logger import logger
 from module.ocr.ocr import Digit

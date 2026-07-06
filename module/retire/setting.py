@@ -1,5 +1,15 @@
+from module.base.button import Button
 from module.base.decorator import cached_property
-from module.retire.assets import *
+from module.retire.assets import (
+    RETIRE_SETTING_1,
+    RETIRE_SETTING_2,
+    RETIRE_SETTING_3,
+    RETIRE_SETTING_4,
+    RETIRE_SETTING_5_ALL,
+    RETIRE_SETTING_5_PRESERVE,
+    RETIRE_SETTING_ENTER,
+    RETIRE_SETTING_QUIT,
+)
 from module.ui.setting import Setting
 from module.ui.ui import UI
 

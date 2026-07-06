@@ -1,7 +1,13 @@
 from module.base.timer import Timer
 from module.base.utils import get_color
 from module.combat.combat import Combat
-from module.freebies.assets import *
+from module.freebies.assets import (
+    BATTLE_PASS_RED_DOT,
+    PURCHASE_POPUP,
+    REWARD_RECEIVE,
+    REWARD_RECEIVE_SP,
+    REWARD_RECEIVE_WHITE,
+)
 from module.logger import logger
 from module.ui.assets import BATTLE_PASS_CHECK, REWARD_GOTO_BATTLE_PASS
 from module.ui.page import page_reward
