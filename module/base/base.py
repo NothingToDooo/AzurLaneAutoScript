@@ -15,7 +15,6 @@ from module.combat.emotion import Emotion
 from module.config.config import AzurLaneConfig
 from module.config.server import to_package
 from module.device.device import Device
-from module.device.method.utils import HierarchyButton
 from module.logger import logger
 from module.map_detection.utils import fit_points
 from module.statistics.drop_record import DropRecorder
@@ -123,12 +122,6 @@ class ModuleBase:
         logger.hr("Creating worker")
         return ThreadPoolExecutor(1)
 
-    def ensure_button(self, button):
-        if isinstance(button, str):
-            button = HierarchyButton(self.device.hierarchy, button)
-
-        return button
-
     def loop(self, skip_first=True, timeout=None):
         """
         A syntactic sugar to start a state loop
@@ -178,45 +171,10 @@ class ModuleBase:
                 self.device.screenshot()
                 yield self.device.image
 
-    def loop_hierarchy(self, skip_first=True):
-        """
-        A syntactic sugar to start a hierarchy state loop
-
-        Args:
-            skip_first (bool): Usually to be True to reuse the previous hierarchy
-
-        Yields:
-            etree._Element: hierarchy
-        """
-        while 1:
-            if skip_first:
-                skip_first = False
-            else:
-                self.device.dump_hierarchy()
-            yield self.device.hierarchy
-
-    def loop_screenshot_hierarchy(self, skip_first=True):
-        """
-        A syntactic sugar to start a state loop that takes screenshots and dump hierarchy
-
-        Args:
-            skip_first (bool): Usually to be True to reuse the previous screenshot
-
-        Yields:
-            tuple[np.ndarray, etree._Element]: screenshot, hierarchy
-        """
-        while 1:
-            if skip_first:
-                skip_first = False
-            else:
-                self.device.screenshot()
-                self.device.dump_hierarchy()
-            yield self.device.image, self.device.hierarchy
-
     def appear(self, button, offset=0, interval=0, similarity=0.85, threshold=10):
         """
         Args:
-            button (Button, Template, HierarchyButton, str):
+            button (Button, Template):
             offset (bool, int):
             interval (int, float): interval between two active events.
             similarity (int, float): 0 to 1.
@@ -232,14 +190,7 @@ class ModuleBase:
             self.appear(Button(area=(...), color=(...), button=(...))
             self.appear(Template(file='...')
             ```
-
-            Hierarchy detection (detect elements with xpath):
-            ```
-            self.device.dump_hierarchy()
-            self.appear('//*[@resource-id="..."]')
-            ```
         """
-        button = self.ensure_button(button)
         self.device.stuck_record_add(button)
 
         if interval:
@@ -251,9 +202,7 @@ class ModuleBase:
             if not self.interval_timer[button.name].reached():
                 return False
 
-        if isinstance(button, HierarchyButton):
-            appear = bool(button)
-        elif offset:
+        if offset:
             if isinstance(offset, bool):
                 offset = self.config.BUTTON_OFFSET
             appear = button.match(self.device.image, offset=offset, similarity=similarity)
@@ -277,7 +226,6 @@ class ModuleBase:
         Returns:
             bool:
         """
-        button = self.ensure_button(button)
         self.device.stuck_record_add(button)
 
         if interval:
@@ -301,7 +249,6 @@ class ModuleBase:
     def appear_then_click(
         self, button, screenshot=False, genre="items", offset=0, interval=0, similarity=0.85, threshold=30
     ):
-        button = self.ensure_button(button)
         appear = self.appear(button, offset=offset, interval=interval, similarity=similarity, threshold=threshold)
         if appear:
             if screenshot:

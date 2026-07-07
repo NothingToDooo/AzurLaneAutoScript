@@ -1,25 +1,13 @@
 import re
-from typing import TYPE_CHECKING
 
-from module.base.timer import Timer
 from module.config.server import DICT_PACKAGE_TO_ACTIVITY
-from module.device.connection import retry
-from module.device.method.uiautomator_2 import Uiautomator2
-from module.device.method.utils import HierarchyButton, PackageNotInstalled
-from module.exception import ScriptError
+from module.device.connection import Connection, retry
+from module.device.method.utils import PackageNotInstalled
 from module.logger import logger
 
-if TYPE_CHECKING:
-    from lxml import etree
 
-
-class AppControl(Uiautomator2):
-    hierarchy: etree._Element
+class AppControl(Connection):
     _PACKAGE_RE = re.compile(r"(?P<package>[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)/")
-
-    def __init__(self, *args, **kwargs):
-        self._hierarchy_interval = Timer(0.1)
-        super().__init__(*args, **kwargs)
 
     def app_current(self) -> str:
         for command in (["dumpsys", "window"], ["dumpsys", "activity", "activities"]):
@@ -111,40 +99,3 @@ class AppControl(Uiautomator2):
         if not package_name:
             package_name = self.package
         self.adb_shell(["am", "force-stop", package_name])
-
-    def hierarchy_timer_set(self, interval=None):
-        if interval is None:
-            interval = 0.1
-        elif isinstance(interval, (int, float)):
-            # No limitation for manual set in code
-            pass
-        else:
-            logger.warning(f"Unknown hierarchy interval: {interval}")
-            raise ScriptError(f"Unknown hierarchy interval: {interval}")
-
-        if interval != self._hierarchy_interval.limit:
-            logger.info(f"Hierarchy interval set to {interval}s")
-            self._hierarchy_interval.limit = interval
-
-    def dump_hierarchy(self) -> etree._Element:
-        """
-        Returns:
-            etree._Element: 可用 `self.hierarchy.xpath('//*[@text="确定"]')` 这类表达式选择元素。
-        """
-        self._hierarchy_interval.wait()
-        self._hierarchy_interval.reset()
-
-        self.hierarchy = self.dump_hierarchy_uiautomator2()
-        return self.hierarchy
-
-    def xpath_to_button(self, xpath: str) -> HierarchyButton:
-        """
-        Args:
-            xpath (str):
-
-        Returns:
-            HierarchyButton:
-                An object with methods and properties similar to Button.
-                If element not found or multiple elements were found, return None.
-        """
-        return HierarchyButton(self.hierarchy, xpath)

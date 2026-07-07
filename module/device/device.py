@@ -2,17 +2,13 @@ import collections
 import traceback
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
-
-from module.device.env import IS_WINDOWS
-
-if TYPE_CHECKING:
-    from lxml import etree
+from typing import ClassVar
 
 from module.base.timer import Timer
 from module.config.utils import get_server_next_update
 from module.device.app_control import AppControl
 from module.device.control import Control
+from module.device.env import IS_WINDOWS
 from module.device.screenshot import Screenshot
 from module.exception import (
     EmulatorNotRunningError,
@@ -163,10 +159,6 @@ class Device(Screenshot, Control, AppControl):
             super().screenshot()
 
         return self.image
-
-    def dump_hierarchy(self) -> etree._Element:
-        self.stuck_record_check()
-        return super().dump_hierarchy()
 
     def release_during_wait(self):
         if self.config.Emulator_ScreenshotMethod == "nemu_ipc":
