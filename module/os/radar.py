@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import numpy as np
 
 from module.base.mask import Mask
@@ -25,7 +27,7 @@ class RadarGrid:
 
     is_fleet = False
 
-    dic_encode = {
+    dic_encode: ClassVar[dict[str, str]] = {
         "EN": "is_enemy",
         "RE": "is_resource",
         "AR": "is_archive",

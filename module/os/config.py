@@ -1,3 +1,6 @@
+from typing import ClassVar
+
+
 class OSConfig:
     """
     Configs for Operation Siren
@@ -18,13 +21,18 @@ class OSConfig:
     DETECTION_BACKEND = "perspective"
     MID_DIFF_RANGE_H = (103 - 3, 103 + 3)
     MID_DIFF_RANGE_V = (103 - 3, 103 + 3)
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (80, 255 - 40),
         "width": (1.5, 10),
         "prominence": 35,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {"height": (255 - 40, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
+        "height": (255 - 40, 255),
+        "prominence": 10,
+        "distance": 50,
+        "wlen": 1000,
+    }
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 75
     EDGE_LINES_HOUGHLINES_THRESHOLD = 75
 
@@ -32,7 +40,7 @@ class OSConfig:
     HOMO_CANNY_THRESHOLD = (40, 60)
     HOMO_EDGE_HOUGHLINES_THRESHOLD = 300
 
-    MAP_ENEMY_GENRE_DETECTION_SCALING = {
+    MAP_ENEMY_GENRE_DETECTION_SCALING: ClassVar[dict[str, float]] = {
         "DD": 0.8,
         "CL": 0.8,
         "CA": 0.8,

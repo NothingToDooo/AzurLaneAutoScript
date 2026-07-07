@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.base.timer import Timer
 from module.base.utils import random_rectangle_vector
 from module.handler.assets import POPUP_CANCEL
@@ -10,7 +12,7 @@ from module.ui.ui import UI
 class PQInteract(UI):
     # Key：目标舰船名称。
     # Value：按钮元组，格式为 (Room_Entrance, Page_Locale)。
-    available_targets = {
+    available_targets: ClassVar[dict[str, tuple[object, ...]]] = {
         "anchorage": (pq_assets.PRIVATE_QUARTERS_SHIP_ANCHORAGE, pq_assets.PRIVATE_QUARTERS_PAGE_LOCALE_BEACH),
         "noshiro": (pq_assets.PRIVATE_QUARTERS_SHIP_NOSHIRO, pq_assets.PRIVATE_QUARTERS_PAGE_LOCALE_BEACH),
         "sirius": (pq_assets.PRIVATE_QUARTERS_SHIP_SIRIUS, pq_assets.PRIVATE_QUARTERS_PAGE_LOCALE_BEACH),

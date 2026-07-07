@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from typing import ClassVar
 
 import cv2
 import numpy as np
@@ -133,23 +134,23 @@ BOOK_FILTER = Filter(
 
 
 class Book:
-    color_genre = {
-        1: (214, 69, 74),  # Offensive, red
-        2: (115, 178, 255),  # Defensive, blue
-        3: (247, 190, 99),  # Support, yellow
+    color_genre: ClassVar[dict[int, tuple[int, int, int]]] = {
+        1: (214, 69, 74),  # 攻击，红色。
+        2: (115, 178, 255),  # 防御，蓝色。
+        3: (247, 190, 99),  # 支援，黄色。
     }
-    genre_name = {
-        1: "Red",  # Offensive, red
-        2: "Blue",  # Defensive, blue
-        3: "Yellow",  # Support, yellow
+    genre_name: ClassVar[dict[int, str]] = {
+        1: "Red",  # 攻击，红色。
+        2: "Blue",  # 防御，蓝色。
+        3: "Yellow",  # 支援，黄色。
     }
-    color_tier = {
-        1: (104, 181, 238),  # T1, blue
-        2: (151, 129, 203),  # T2, purple
-        3: (235, 208, 120),  # T3, gold
-        4: (225, 181, 212),  # T4, rainbow
+    color_tier: ClassVar[dict[int, tuple[int, int, int]]] = {
+        1: (104, 181, 238),  # T1，蓝色。
+        2: (151, 129, 203),  # T2，紫色。
+        3: (235, 208, 120),  # T3，金色。
+        4: (225, 181, 212),  # T4，彩色。
     }
-    exp_tier = {
+    exp_tier: ClassVar[dict[int, int]] = {
         0: 0,
         1: 100,
         2: 300,

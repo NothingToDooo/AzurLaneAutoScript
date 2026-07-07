@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from pywebio.io_ctrl import Output
 
 from module.config import server
@@ -56,9 +58,10 @@ class ManualConfig:
     # blue: Blue stage icons in Dreamwaker's Butterfly (Shinano event, event_20200917_cn).
     # half: Left half of '%' in Vacation Lane (DOA collaboration, event_20201126_cn)
     #       DOA has smaller stage icon, right half of '%' is out of the original area.
-    STAGE_ENTRANCE = ["normal"]  # normal, blue, half
+    # 可选：normal、blue、half。
+    STAGE_ENTRANCE: ClassVar[tuple[str, ...]] = ("normal",)
     # Set stage='TH' and run_count=100, to run TH1~TH5 in cycle
-    STAGE_LOOP_ALIAS = {
+    STAGE_LOOP_ALIAS: ClassVar[dict[tuple[str, str], str]] = {
         ("event_20221124_cn", "TH"): "TH1 > TH2 > TH3 > TH4 > TH5",
         ("event_20250724_cn", "TS"): "TS1 > TS2 > TS3 > TS4 > TS5",
     }
@@ -128,9 +131,10 @@ class ManualConfig:
     MAP_HAS_BOUNCING_ENEMY = False  # event_20220224_cn, enemy is bouncing in a fixed route.
     MAP_HAS_DECOY_ENEMY = False  # event_20220428, decoy enemy on map, disappear when fleet reach there.
     MAP_FOCUS_ENEMY_AFTER_BATTLE = False  # Operation siren
-    MAP_ENEMY_TEMPLATE = ["Light", "Main", "Carrier", "Treasure"]
-    MAP_SIREN_TEMPLATE = ["DD", "CL", "CA", "BB", "CV"]
-    MAP_ENEMY_GENRE_DETECTION_SCALING = {}  # Key: str, Template name, Value: float, scaling factor
+    MAP_ENEMY_TEMPLATE: ClassVar[tuple[str, ...]] = ("Light", "Main", "Carrier", "Treasure")
+    MAP_SIREN_TEMPLATE: ClassVar[tuple[str, ...]] = ("DD", "CL", "CA", "BB", "CV")
+    # key 是模板名，value 是缩放系数。
+    MAP_ENEMY_GENRE_DETECTION_SCALING: ClassVar[dict[str, float]] = {}
     MAP_ENEMY_GENRE_SIMILARITY = 0.85
     MAP_SIREN_MOVE_WAIT = 1.5  # The enemy moving takes about 1.2 ~ 1.5s.
     MAP_SIREN_COUNT = 0
@@ -195,7 +199,12 @@ class ManualConfig:
     HOMO_TILE = (140, 140)
     HOMO_CENTER_OFFSET = (48, 48)
     # [upper-left, upper-right, bottom-left, bottom-right]
-    HOMO_CORNER_OFFSET_LIST = [(-42, -42), (68, -42), (-42, 69), (69, 69)]
+    HOMO_CORNER_OFFSET_LIST: ClassVar[tuple[tuple[int, int], ...]] = (
+        (-42, -42),
+        (68, -42),
+        (-42, 69),
+        (69, 69),
+    )
 
     HOMO_CANNY_THRESHOLD = (100, 150)
     HOMO_CENTER_GOOD_THRESHOLD = 0.9
@@ -214,13 +223,13 @@ class ManualConfig:
     """
     # Parameters for scipy.signal.find_peaks
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.find_peaks.html
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (150, 255 - 33),
         "width": (0.9, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (255 - 33, 255),
         "prominence": 10,
         "distance": 50,
@@ -325,14 +334,14 @@ class ManualConfig:
     OS_GLOBE_DETECTING_AREA = (0, 0, 1280, 720)
     OS_GLOBE_IMAGE_PAD = 700
     OS_GLOBE_IMAGE_RESIZE = 0.5
-    OS_GLOBE_FIND_PEAKS_PARAMETERS = {
+    OS_GLOBE_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": 100,
         # 'width': (0.9, 5),
         "prominence": 20,
         "distance": 35,
         "wlen": 500,
     }
-    OS_LOCAL_FIND_PEAKS_PARAMETERS = {
+    OS_LOCAL_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": 50,
         # 'width': (0.9, 5),
         "prominence": 20,

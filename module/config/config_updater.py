@@ -567,7 +567,7 @@ class ConfigGenerator:
 
 class ConfigUpdater:
     # source、target、可选转换函数。
-    redirection = [
+    redirection: t.ClassVar[tuple[tuple[object, ...], ...]] = (
         # ('OpsiDaily.OpsiDaily.BuySupply', 'OpsiShop.Scheduler.Enable'),
         # ('OpsiDaily.Scheduler.Enable', 'OpsiDaily.OpsiDaily.DoMission'),
         # ('OpsiShop.Scheduler.Enable', 'OpsiShop.OpsiShop.BuySupply'),
@@ -615,7 +615,7 @@ class ConfigUpdater:
         # ('Coalition.Coalition.Mode', 'Coalition.Coalition.Mode', coalition_to_frostfall),
         # 2025.06.26
         # ('Coalition.Coalition.Mode', 'Coalition.Coalition.Mode', coalition_to_little_academy),
-    ]
+    )
 
     # redirection += [
     #     (

@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.base.timer import Timer
 from module.logger import logger
 from module.minigame import assets as minigame_assets
@@ -23,14 +25,14 @@ class NewYearChallenge(MinigameRun):
     NEW_YEAR_BATTLE_RED = (255, 150, 123)
     NEW_YEAR_BATTLE_YELLOW = (247, 223, 115)
     NEW_YEAR_BATTLE_BLUE = (82, 134, 239)
-    NEW_YEAR_BATTLE_TMP_BUTTON = [
+    NEW_YEAR_BATTLE_TMP_BUTTON: ClassVar[tuple[object, ...]] = (
         minigame_assets.NEW_YEAR_CHALLENGE_TMP_1,
         minigame_assets.NEW_YEAR_CHALLENGE_TMP_2,
         minigame_assets.NEW_YEAR_CHALLENGE_TMP_3,
         minigame_assets.NEW_YEAR_CHALLENGE_TMP_4,
         minigame_assets.NEW_YEAR_CHALLENGE_TMP_5,
-    ]
-    NEW_YEAR_BATTLE_COLOR_BUTTON_DICT = {
+    )
+    NEW_YEAR_BATTLE_COLOR_BUTTON_DICT: ClassVar[dict[tuple[int, int, int], object]] = {
         NEW_YEAR_BATTLE_RED: minigame_assets.NEW_YEAR_CHALLENGE_RED_BUTTON,
         NEW_YEAR_BATTLE_YELLOW: minigame_assets.NEW_YEAR_CHALLENGE_YELLOW_BUTTON,
         NEW_YEAR_BATTLE_BLUE: minigame_assets.NEW_YEAR_CHALLENGE_BLUE_BUTTON,

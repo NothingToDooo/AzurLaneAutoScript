@@ -1,5 +1,6 @@
 import re
 from datetime import timedelta
+from typing import ClassVar
 
 import cv2
 import numpy as np
@@ -439,8 +440,8 @@ class ResearchProject:
             out.append(number)
     print(out)
     """
-    C_PROJECT_NUMBERS = ["153", "185", "038"]
-    D_PROJECT_NUMBERS = [
+    C_PROJECT_NUMBERS: ClassVar[tuple[str, ...]] = ("153", "185", "038")
+    D_PROJECT_NUMBERS: ClassVar[tuple[str, ...]] = (
         "718",
         "731",
         "744",
@@ -609,7 +610,7 @@ class ResearchProject:
         "087",
         "011",
         "064",
-    ]
+    )
 
     def __init__(self, name, series):
         """
@@ -790,18 +791,18 @@ class ResearchProject:
 
 
 class ResearchProjectJp:
-    GENRE = ["b", "c", "d", "e", "g", "h", "q", "t"]
-    DURATION = ["0.5", "1", "1.5", "2", "2.5", "3", "4", "5", "6", "8", "12"]
-    SHIP_S1 = ["neptune", "monarch", "ibuki", "izumo", "roon", "saintlouis"]
-    SHIP_S2 = ["seattle", "georgia", "kitakaze", "azuma", "friedrich", "gascogne"]
-    SHIP_S3 = ["champagne", "cheshire", "drake", "mainz", "odin"]
-    SHIP_S4 = ["anchorage", "hakuryu", "agir", "august", "marcopolo"]
-    SHIP_S5 = ["plymouth", "rupprecht", "harbin", "chkalov", "brest"]
-    SHIP_S6 = ["kearsarge", "hindenburg", "shimanto", "schultz", "flandre"]
-    SHIP_S7 = ["napoli", "nakhimov", "halford", "bayard", "daisen"]
-    SHIP_S8 = ["goudenleeuw", "mecklenburg", "dmitri", "kansas", "vittorio"]
-    SHIP_ALL = SHIP_S1 + SHIP_S2 + SHIP_S3 + SHIP_S4 + SHIP_S5 + SHIP_S6 + SHIP_S7 + SHIP_S8
-    DR_SHIP = [
+    GENRE: ClassVar[tuple[str, ...]] = ("b", "c", "d", "e", "g", "h", "q", "t")
+    DURATION: ClassVar[tuple[str, ...]] = ("0.5", "1", "1.5", "2", "2.5", "3", "4", "5", "6", "8", "12")
+    SHIP_S1: ClassVar[tuple[str, ...]] = ("neptune", "monarch", "ibuki", "izumo", "roon", "saintlouis")
+    SHIP_S2: ClassVar[tuple[str, ...]] = ("seattle", "georgia", "kitakaze", "azuma", "friedrich", "gascogne")
+    SHIP_S3: ClassVar[tuple[str, ...]] = ("champagne", "cheshire", "drake", "mainz", "odin")
+    SHIP_S4: ClassVar[tuple[str, ...]] = ("anchorage", "hakuryu", "agir", "august", "marcopolo")
+    SHIP_S5: ClassVar[tuple[str, ...]] = ("plymouth", "rupprecht", "harbin", "chkalov", "brest")
+    SHIP_S6: ClassVar[tuple[str, ...]] = ("kearsarge", "hindenburg", "shimanto", "schultz", "flandre")
+    SHIP_S7: ClassVar[tuple[str, ...]] = ("napoli", "nakhimov", "halford", "bayard", "daisen")
+    SHIP_S8: ClassVar[tuple[str, ...]] = ("goudenleeuw", "mecklenburg", "dmitri", "kansas", "vittorio")
+    SHIP_ALL: ClassVar[tuple[str, ...]] = SHIP_S1 + SHIP_S2 + SHIP_S3 + SHIP_S4 + SHIP_S5 + SHIP_S6 + SHIP_S7 + SHIP_S8
+    DR_SHIP: ClassVar[tuple[str, ...]] = (
         "azuma",
         "friedrich",
         "drake",
@@ -815,7 +816,7 @@ class ResearchProjectJp:
         "nakhimov",
         "goudenleeuw",
         "mecklenburg",
-    ]
+    )
 
     def __init__(self):
         self.valid = True

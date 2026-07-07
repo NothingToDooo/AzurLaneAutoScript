@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.base.timer import Timer
 from module.config import server
 from module.logger import logger
@@ -12,12 +14,11 @@ from module.ui.page import page_dormmenu, page_private_quarters
 
 
 class PrivateQuarters(PQInteract, PQShop):
-    # Key: str, server name
-    # Value: list[str]
-    not_supported_filter = {
-        "cn": ("nakhimov"),
+    # key 是服务器名，value 是尚未支持的舰船名称。
+    not_supported_filter: ClassVar[dict[str, tuple[str, ...]]] = {
+        "cn": ("nakhimov",),
         "en": (),
-        "jp": ("nakhimov"),
+        "jp": ("nakhimov",),
         "tw": ("taihou", "nakhimov"),
     }
 

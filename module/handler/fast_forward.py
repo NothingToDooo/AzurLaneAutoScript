@@ -1,5 +1,6 @@
 import re
 from pathlib import Path
+from typing import ClassVar
 
 from module.base.timer import Timer
 from module.base.utils import color_bar_percentage
@@ -104,7 +105,7 @@ class FastForwardHandler(AutoSearchHandler):
     map_is_auto_search = False
     map_is_2x_book = False
 
-    STAGE_INCREASE = [
+    STAGE_INCREASE: ClassVar[tuple[str, ...]] = (
         """
         1-1 > 1-2 > 1-3 > 1-4
         > 2-1 > 2-2 > 2-3 > 2-4
@@ -130,7 +131,7 @@ class FastForwardHandler(AutoSearchHandler):
         "SP1 > SP2 > SP3 > SP4 > SP5",
         "T1 > T2 > T3 > T4 > T5 > T6",
         "HT1 > HT2 > HT3 > HT4 > HT5 > HT6",
-    ]
+    )
     map_fleet_checked = False
 
     def map_get_info(self):

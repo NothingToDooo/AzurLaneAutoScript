@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import cv2
 import numpy as np
 from PIL import Image
@@ -13,7 +15,7 @@ _DEFAULT_OCR_ROOT = data_dir()
 
 class AlOcr(CnOcr):
     CNOCR_CONTEXT = "cpu"
-    MODEL_NAME_ALIASES = {
+    MODEL_NAME_ALIASES: ClassVar[dict[str, str]] = {
         "densenet-lite-gru": "densenet_lite_136-gru",
     }
 
