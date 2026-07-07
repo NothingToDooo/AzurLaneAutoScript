@@ -2,6 +2,7 @@ import re
 import sys
 import time
 from datetime import datetime, timedelta
+from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -26,6 +27,12 @@ from module.task_registry import get_task_spec
 
 if TYPE_CHECKING:
     import threading
+
+
+def _load_attr(module_name: str, attr_name: str):
+    """按需加载重模块里的对象。"""
+    module = import_module(module_name)
+    return getattr(module, attr_name)
 
 
 class AzurLaneAutoScript:
@@ -54,8 +61,7 @@ class AzurLaneAutoScript:
     @cached_property
     def device(self):
         try:
-            from module.device.device import Device
-
+            Device = _load_attr("module.device.device", "Device")
             return Device(config=self.config)
         except RequestHumanTakeover:
             logger.critical("Request human takeover")
@@ -67,8 +73,7 @@ class AzurLaneAutoScript:
     @cached_property
     def checker(self):
         try:
-            from module.server_checker import ServerChecker
-
+            ServerChecker = _load_attr("module.server_checker", "ServerChecker")
             return ServerChecker(server=self.config.Emulator_ServerName)
         except Exception as e:
             logger.exception(e)
@@ -151,8 +156,9 @@ class AzurLaneAutoScript:
 
     def save_error_log(self) -> None:
         """保存最近 60 张截图，并把当前日志写入错误目录。"""
-        from module.base.utils import save_image
-        from module.handler.sensitive_info import handle_sensitive_image, handle_sensitive_logs
+        save_image = _load_attr("module.base.utils", "save_image")
+        handle_sensitive_image = _load_attr("module.handler.sensitive_info", "handle_sensitive_image")
+        handle_sensitive_logs = _load_attr("module.handler.sensitive_info", "handle_sensitive_logs")
 
         if self.config.Error_SaveError:
             error_dir = Path("./log/error")
@@ -177,18 +183,16 @@ class AzurLaneAutoScript:
                 f.writelines(lines)
 
     def restart(self) -> None:
-        from module.handler.login import LoginHandler
-
+        LoginHandler = _load_attr("module.handler.login", "LoginHandler")
         LoginHandler(self.config, device=self.device).app_restart()
 
     def start(self) -> None:
-        from module.handler.login import LoginHandler
-
+        LoginHandler = _load_attr("module.handler.login", "LoginHandler")
         LoginHandler(self.config, device=self.device).app_start()
 
     def goto_main(self) -> None:
-        from module.handler.login import LoginHandler
-        from module.ui.ui import UI
+        LoginHandler = _load_attr("module.handler.login", "LoginHandler")
+        UI = _load_attr("module.ui.ui", "UI")
 
         if self.device.app_is_running():
             logger.info("App is already running, goto main page")
