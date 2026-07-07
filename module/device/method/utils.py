@@ -2,12 +2,15 @@ import random
 import re
 import socket
 import time
+from typing import TYPE_CHECKING
 
 import uiautomator2 as u2
 from adbutils import AdbTimeout
-from lxml import etree
 
 from module.device.method.remove_warning import remove_shell_warning
+
+if TYPE_CHECKING:
+    from lxml import etree
 
 try:
     # adbutils 0.x

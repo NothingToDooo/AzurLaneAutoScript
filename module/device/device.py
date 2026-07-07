@@ -1,9 +1,11 @@
 import collections
 from datetime import datetime
-
-from lxml import etree
+from typing import TYPE_CHECKING
 
 from module.device.env import IS_WINDOWS
+
+if TYPE_CHECKING:
+    from lxml import etree
 
 # 在导入 adbutils 和 uiautomator2 之前先修补 pkg_resources。
 from module.device.pkg_resources import get_distribution

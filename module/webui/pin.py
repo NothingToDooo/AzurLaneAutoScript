@@ -3,9 +3,13 @@ Copy from pywebio.pin
 Add **other_html_attrs to put_xxx()
 """
 
-from pywebio.io_ctrl import Output
+from typing import TYPE_CHECKING
+
 from pywebio.output import OutputPosition
 from pywebio.pin import _pin_output, check_dom_name_value
+
+if TYPE_CHECKING:
+    from pywebio.io_ctrl import Output
 
 
 def put_input(

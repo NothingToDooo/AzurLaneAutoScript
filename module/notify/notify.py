@@ -1,12 +1,16 @@
+from typing import TYPE_CHECKING
+
 import onepush.core
 import yaml
 from onepush import get_notifier
-from onepush.core import Provider
 from onepush.exceptions import OnePushException
 from onepush.providers.custom import Custom
 from requests import Response
 
 from module.logger import logger
+
+if TYPE_CHECKING:
+    from onepush.core import Provider
 
 onepush.core.log = logger
 

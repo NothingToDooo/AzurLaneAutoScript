@@ -5,7 +5,6 @@ import string
 from typing import TYPE_CHECKING, Any
 
 from pywebio.exceptions import SessionException
-from pywebio.io_ctrl import Output
 from pywebio.output import (
     clear,
     output,
@@ -19,7 +18,6 @@ from pywebio.output import (
     put_text,
 )
 from pywebio.session import eval_js, local, run_js
-from rich.console import ConsoleRenderable
 
 from module.logger import WEB_THEME, Highlighter, HTMLConsole
 from module.webui.lang import t
@@ -35,6 +33,9 @@ from module.webui.utils import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
+
+    from pywebio.io_ctrl import Output
+    from rich.console import ConsoleRenderable
 
     from module.webui.app import AlasGUI
 

@@ -1,4 +1,4 @@
-from lxml import etree
+from typing import TYPE_CHECKING
 
 from module.base.timer import Timer
 from module.device.method.adb import Adb
@@ -6,6 +6,9 @@ from module.device.method.uiautomator_2 import Uiautomator2
 from module.device.method.utils import HierarchyButton
 from module.exception import ScriptError
 from module.logger import logger
+
+if TYPE_CHECKING:
+    from lxml import etree
 
 
 class AppControl(Adb, Uiautomator2):

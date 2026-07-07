@@ -2,9 +2,9 @@ import os
 import time
 from collections import deque
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 import cv2
-import numpy as np
 from PIL import Image
 
 from module.base.decorator import cached_property
@@ -14,6 +14,9 @@ from module.device.method.adb import Adb
 from module.device.method.nemu_ipc import NemuIpc
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 class Screenshot(Adb, NemuIpc):
