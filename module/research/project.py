@@ -737,7 +737,7 @@ class ResearchProject:
             # L-153-MI -> C-153-MI
             if prefix == "L" and number in ResearchProject.C_PROJECT_NUMBERS:
                 prefix = "C"
-            return "-".join([prefix, number, suffix])
+            return f"{prefix}-{number}-{suffix}"
         # 尝试插入 '-'，处理 H339-MI 这类结果。
         if len(parts) == 2 and name[0].isalpha() and name[1].isdigit():
             return self.check_name(f"{name[0]}-{name[1:]}")
