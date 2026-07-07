@@ -144,9 +144,8 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             func_list = []
         if func not in func_list:
             func_list.insert(0, func)
-        if func.startswith("Opsi"):
-            if "OpsiGeneral" not in func_list:
-                func_list.insert(0, "OpsiGeneral")
+        if func.startswith("Opsi") and "OpsiGeneral" not in func_list:
+            func_list.insert(0, "OpsiGeneral")
         if func.startswith(("Event", "Raid", "Coalition")) or func in ["MaritimeEscort", "GemsFarming"]:
             if "EventGeneral" not in func_list:
                 func_list.insert(0, "EventGeneral")
@@ -568,10 +567,9 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         Raises:
             bool: If task switched
         """
-        # Update event
-        if self.stop_event is not None:
-            if self.stop_event.is_set():
-                return True
+        # 更新停止事件。
+        if self.stop_event is not None and self.stop_event.is_set():
+            return True
         prev = self.task
         self.load()
         new = self.get_next()

@@ -73,11 +73,12 @@ class RewardGacha(GachaUI, Retirement):
                 continue
 
             # 结束。
-            if self.appear(gacha_assets.BUILD_PLUS, offset=index_offset) and self.appear(
-                gacha_assets.BUILD_MINUS, offset=index_offset
+            if (
+                self.appear(gacha_assets.BUILD_PLUS, offset=index_offset)
+                and self.appear(gacha_assets.BUILD_MINUS, offset=index_offset)
+                and confirm_timer.reached()
             ):
-                if confirm_timer.reached():
-                    break
+                break
 
         # 检查是否提前退出，并套用正确的提交数量 OCR。
         if ocr_submit is None:
@@ -243,9 +244,11 @@ class RewardGacha(GachaUI, Retirement):
                 continue
 
             # 结束：队列清空后点击会回到池子页面。
-            if self.appear(gacha_assets.BUILD_SUBMIT_ORDERS) or self.appear(gacha_assets.BUILD_SUBMIT_WW_ORDERS):
-                if confirm_timer.reached():
-                    break
+            if (
+                self.appear(gacha_assets.BUILD_SUBMIT_ORDERS)
+                or self.appear(gacha_assets.BUILD_SUBMIT_WW_ORDERS)
+            ) and confirm_timer.reached():
+                break
 
         # 许愿池不再显示金币，回到普通池。
         if self.appear(gacha_assets.BUILD_SUBMIT_WW_ORDERS):

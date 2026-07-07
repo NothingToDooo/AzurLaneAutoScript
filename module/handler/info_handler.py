@@ -428,19 +428,23 @@ class InfoHandler(ModuleBase):
 
     def story_skip(self, drop=None):
         """
-        2023.09.14 Story options changed with big white options in the middle,
-            Check STORY_SKIP_3 but click the original STORY_SKIP.
+        2023.09.14 剧情选项改为屏幕中部的大块白色选项，
+        需要检查 STORY_SKIP_3，但实际点击旧的 STORY_SKIP。
         """
-        if self.story_popup_timeout.started() and not self.story_popup_timeout.reached():
-            if self.handle_popup_confirm("STORY_SKIP"):
-                self.story_popup_timeout = Timer(10)
-                self.interval_reset(handler_assets.STORY_SKIP_3)
-                self.interval_reset(handler_assets.STORY_LETTERS_ONLY)
-                return True
-        if self._is_story_black():
-            if self.appear_then_click(handler_assets.STORY_LETTERS_ONLY, offset=(20, 20), interval=2):
-                self.story_popup_timeout.reset()
-                return True
+        if (
+            self.story_popup_timeout.started()
+            and not self.story_popup_timeout.reached()
+            and self.handle_popup_confirm("STORY_SKIP")
+        ):
+            self.story_popup_timeout = Timer(10)
+            self.interval_reset(handler_assets.STORY_SKIP_3)
+            self.interval_reset(handler_assets.STORY_LETTERS_ONLY)
+            return True
+        if self._is_story_black() and self.appear_then_click(
+            handler_assets.STORY_LETTERS_ONLY, offset=(20, 20), interval=2
+        ):
+            self.story_popup_timeout.reset()
+            return True
         if self._story_option_timer.reached() and self.appear(handler_assets.STORY_SKIP_3, offset=(20, 20), interval=0):
             options = self._story_option_buttons_2()
             options_count = len(options)
