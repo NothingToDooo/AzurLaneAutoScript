@@ -15,10 +15,13 @@ from module.template import assets as template_assets
 
 
 class CampaignOcr(ModuleBase):
-    stage_entrance = {}
     campaign_chapter: str = "0"
     # An approximate area where stages will appear for faster template matching
     _stage_detect_area = (87, 117, 1151, 636)
+
+    def __init__(self, *args, **kwargs):
+        self.stage_entrance = {}
+        super().__init__(*args, **kwargs)
 
     @staticmethod
     def _campaign_get_chapter_index(name):

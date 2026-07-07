@@ -29,6 +29,7 @@ from module.logger import logger
 
 CONFIG_IMPORT = '''
 import datetime
+from typing import ClassVar
 
 # 本文件由 module/config/config_updater.py 自动生成。
 # 不要手动修改。
@@ -88,6 +89,12 @@ def _generated_value(name: str, value) -> list[str]:
         lines.extend(f"{GENERATED_INDENT * 2}{segment!r}" for segment in _generated_string_segments(value))
         lines.append(f"{GENERATED_INDENT})")
         return lines
+    if isinstance(value, dict):
+        return [f"{GENERATED_INDENT}{name}: ClassVar[dict[str, object]] = {value!r}"]
+    if isinstance(value, list):
+        return [f"{GENERATED_INDENT}{name}: ClassVar[list[object]] = {value!r}"]
+    if isinstance(value, set):
+        return [f"{GENERATED_INDENT}{name}: ClassVar[set[object]] = {value!r}"]
     return [f"{GENERATED_INDENT}{name} = {value!r}"]
 
 

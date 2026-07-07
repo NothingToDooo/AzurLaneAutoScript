@@ -156,7 +156,9 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
     def hp_retreat_triggered(self):
         return False
 
-    need_repair = [False, False, False, False, False, False]
+    def __init__(self, *args, **kwargs):
+        self.need_repair = [False] * 6
+        super().__init__(*args, **kwargs)
 
     def hp_get(self):
         """

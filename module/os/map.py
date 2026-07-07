@@ -751,8 +751,10 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
         return finished_combat
 
-    _solved_map_event = set()
-    _solved_fleet_mechanism = 0
+    def __init__(self, *args, **kwargs):
+        self._solved_map_event = set()
+        self._solved_fleet_mechanism = False
+        super().__init__(*args, **kwargs)
 
     def run_strategic_search(self):
         self.handle_ash_beacon_attack()

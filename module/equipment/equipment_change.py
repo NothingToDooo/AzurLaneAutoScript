@@ -29,7 +29,9 @@ equipping_filter.add_state("off", check_button=equipment_assets.EQUIPPING_OFF)
 
 
 class EquipmentChange(Equipment):
-    equipment_list = {}
+    def __init__(self, *args, **kwargs):
+        self.equipment_list = {}
+        super().__init__(*args, **kwargs)
 
     def equipping_set(self, enable=False):
         if equipping_filter.set("on" if enable else "off", main=self):

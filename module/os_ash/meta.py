@@ -89,8 +89,10 @@ def _server_support_dossier_auto_attack():
 
 
 class OpsiAshBeacon(Meta):
-    _meta_receive = []
-    _meta_category = "undefined"
+    def __init__(self, *args, **kwargs):
+        self._meta_receive = []
+        self._meta_category = "undefined"
+        super().__init__(*args, **kwargs)
 
     def _attack_meta(self, skip_first_screenshot=True):
         """

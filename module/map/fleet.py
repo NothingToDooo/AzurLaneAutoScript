@@ -102,8 +102,10 @@ class Fleet(Camera, AmbushHandler):
     def switch_to(self):
         pass
 
-    round = 0
-    enemy_round = {}
+    def __init__(self, *args, **kwargs):
+        self.round = 0
+        self.enemy_round = {}
+        super().__init__(*args, **kwargs)
 
     def round_next(self):
         """

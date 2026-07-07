@@ -6,8 +6,9 @@ from module.os.map import OSMap
 
 
 class OpsiExplore(OSMap):
-    # List of failed zone id
-    _os_explore_failed_zone = []
+    def __init__(self, *args, **kwargs):
+        self._os_explore_failed_zone = []
+        super().__init__(*args, **kwargs)
 
     def _os_explore_task_delay(self):
         """

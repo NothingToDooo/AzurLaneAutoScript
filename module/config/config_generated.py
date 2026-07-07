@@ -1,4 +1,5 @@
 import datetime
+from typing import ClassVar
 
 # 本文件由 module/config/config_updater.py 自动生成。
 # 不要手动修改。
@@ -633,4 +634,4 @@ class GeneratedConfig:
     GameManager_AutoRestart = True
 
     # 配置组 `Storage`
-    Storage_Storage = {}
+    Storage_Storage: ClassVar[dict[str, object]] = {}

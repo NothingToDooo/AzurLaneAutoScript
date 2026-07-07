@@ -11,8 +11,10 @@ COLOR_MASKED = (107, 105, 107)
 
 
 class Level(ModuleBase):
-    _lv = [-1, -1, -1, -1, -1, -1]
-    _lv_before_battle = [-1, -1, -1, -1, -1, -1]
+    def __init__(self, *args, **kwargs):
+        self._lv = [-1] * 6
+        self._lv_before_battle = [-1] * 6
+        super().__init__(*args, **kwargs)
 
     @property
     def lv(self):

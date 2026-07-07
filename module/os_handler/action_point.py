@@ -97,9 +97,11 @@ class ActionPointLimit(Exception):
 
 
 class ActionPointHandler(UI, MapEventHandler):
-    _action_point_box = [0, 0, 0, 0]
-    _action_point_current = 0
-    _action_point_total = 0
+    def __init__(self, *args, **kwargs):
+        self._action_point_box = [0, 0, 0, 0]
+        self._action_point_current = 0
+        self._action_point_total = 0
+        super().__init__(*args, **kwargs)
 
     def _is_in_action_point(self):
         return self.appear(os_assets.ACTION_POINT_USE, offset=(20, 20))

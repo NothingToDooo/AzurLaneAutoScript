@@ -1,4 +1,5 @@
 import traceback
+from typing import ClassVar
 
 from module.coalition import assets as coalition_assets
 from module.event_hospital.assets import HOSIPITAL_CHECK
@@ -10,9 +11,8 @@ from module.ui_white import assets as ui_white_assets
 
 
 class Page:
-    # Key: str, page name like "page_main"
-    # Value: Page, page instance
-    all_pages = {}
+    # key 是 page_main 这类页面名，value 是页面实例。
+    all_pages: ClassVar[dict[str, Page]] = {}
 
     @classmethod
     def clear_connection(cls):

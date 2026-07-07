@@ -91,8 +91,10 @@ class Opponent:
 
 
 class OpponentChoose(UI):
-    main_image = None
-    opponents = []
+    def __init__(self, *args, **kwargs):
+        self.main_image = None
+        self.opponents = []
+        super().__init__(*args, **kwargs)
 
     def _opponent_fleet_check_all(self):
         self.opponents = []

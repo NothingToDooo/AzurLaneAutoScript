@@ -70,14 +70,14 @@ def name_to_function(name):
 
 class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher):
     stop_event: threading.Event = None
-    bound = {}
 
-    # Class property
+    # 类级开关。
     is_hoarding_task = True
 
     def __setattr__(self, key, value):
-        if key in self.bound:
-            path = self.bound[key]
+        bound = self.__dict__.get("bound")
+        if bound is not None and key in bound:
+            path = bound[key]
             self.modified[path] = value
             if self.auto_update:
                 self.update()

@@ -16,8 +16,11 @@ SCOUT_POSITION = [(403, 421), (625, 369), (821, 326)]
 class HPBalancer(ModuleBase):
     fleet_current_index = 1
     fleet_show_index = 1
-    _hp = {}
-    _hp_has_ship = {}
+
+    def __init__(self, *args, **kwargs):
+        self._hp: dict[int, list[float]] = {}
+        self._hp_has_ship: dict[int, list[bool]] = {}
+        super().__init__(*args, **kwargs)
 
     @property
     def hp(self):

@@ -22,7 +22,9 @@ MEOWFFICER_BOX_COUNT = Digit(
 
 
 class MeowfficerTrain(MeowfficerCollect, MeowfficerEnhance):
-    _box_count = [0, 0, 0]
+    def __init__(self, *args, **kwargs):
+        self._box_count = [0, 0, 0]
+        super().__init__(*args, **kwargs)
 
     def _meow_queue_enter(self, skip_first_screenshot=True):
         """

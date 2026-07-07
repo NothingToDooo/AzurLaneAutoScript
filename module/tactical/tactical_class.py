@@ -217,8 +217,11 @@ class Book:
 
 class RewardTacticalClass(Dock):
     books: SelectedGrids
-    tactical_finish = []
     dock_select_index = 0
+
+    def __init__(self, *args, **kwargs):
+        self.tactical_finish = []
+        super().__init__(*args, **kwargs)
 
     def _tactical_books_get(self, skip_first_screenshot=True):
         """
