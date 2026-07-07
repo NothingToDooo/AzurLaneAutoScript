@@ -77,7 +77,6 @@ class AzurLaneAutoScript:
             if not skip_first_screenshot:
                 self.device.screenshot()
             self.__getattribute__(command)()
-            return True
         except TaskEnd:
             return True
         except GameNotRunningError as e:
@@ -141,6 +140,8 @@ class AzurLaneAutoScript:
                 content=f"<{self.config_name}> Exception occured",
             )
             sys.exit(1)
+        else:
+            return True
 
     def save_error_log(self) -> None:
         """保存最近 60 张截图，并把当前日志写入错误目录。"""

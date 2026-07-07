@@ -33,7 +33,6 @@ def deep_get(d, keys, default=None):
     try:
         for k in keys:
             d = d[k]
-        return d
     # No such key
     except KeyError:
         return default
@@ -44,6 +43,8 @@ def deep_get(d, keys, default=None):
     # list indices must be integers or slices, not str
     except TypeError:
         return default
+    else:
+        return d
 
 
 def deep_get_with_error(d, keys):
@@ -67,7 +68,6 @@ def deep_get_with_error(d, keys):
     try:
         for k in keys:
             d = d[k]
-        return d
     # 没有这个键。
     # except KeyError:
     #     raise
@@ -78,6 +78,8 @@ def deep_get_with_error(d, keys):
     # 例如：list indices must be integers or slices, not str。
     except TypeError as e:
         raise KeyError from e
+    else:
+        return d
 
 
 def deep_exist(d, keys):
@@ -98,7 +100,6 @@ def deep_exist(d, keys):
     try:
         for k in keys:
             d = d[k]
-        return True
     # No such key
     except KeyError:
         return False
@@ -109,6 +110,8 @@ def deep_exist(d, keys):
     # list indices must be integers or slices, not str
     except TypeError:
         return False
+    else:
+        return True
 
 
 def deep_set(d, keys, value):
@@ -158,10 +161,11 @@ def deep_set(d, keys, value):
     # Last key, set value
     try:
         d[prev_k] = value
-        return
     # Last value `d` is not dict
     except TypeError:
         prev_d[prev_k2] = {prev_k: value}
+        return
+    else:
         return
 
 
@@ -212,10 +216,11 @@ def deep_default(d, keys, value):
     # Last key, set value
     try:
         d.setdefault(prev_k, value)
-        return
     # Last value `d` is not dict
     except AttributeError:
         prev_d[prev_k2] = {prev_k: value}
+        return
+    else:
         return
 
 
@@ -259,9 +264,10 @@ def deep_iter_depth1(data):
     """
     try:
         yield from data.items()
-        return
     except AttributeError:
         # `data` is not dict
+        return
+    else:
         return
 
 

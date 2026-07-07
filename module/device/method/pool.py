@@ -324,9 +324,10 @@ class WorkerPool:
     def _get_thread_worker(self) -> WorkerThread:
         try:
             worker, _ = self.idle_workers.popitem()
-            return worker
         except KeyError:
             pass
+        else:
+            return worker
 
         # Wait if reached max thread
         if len(self.all_workers) >= self.pool_size:
@@ -336,9 +337,10 @@ class WorkerPool:
             # A worker just idle
             try:
                 worker, _ = self.idle_workers.popitem()
-                return worker
             except KeyError:
                 pass
+            else:
+                return worker
             # A worker just exited
             # if len(self.all_workers) < WorkerPool.MAX_WORKER:
             #     break

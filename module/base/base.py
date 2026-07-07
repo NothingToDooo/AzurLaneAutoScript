@@ -427,10 +427,11 @@ class ModuleBase:
             if renew and timer.limit != interval:
                 timer = Timer(interval)
                 self.interval_timer[name] = timer
-            return timer
         except KeyError:
             timer = Timer(interval)
             self.interval_timer[name] = timer
+            return timer
+        else:
             return timer
 
     def interval_reset(self, button, interval=3):

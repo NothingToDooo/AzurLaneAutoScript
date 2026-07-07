@@ -499,11 +499,12 @@ class NemuIpc(Platform):
                 display_id=0,
             )
             impl.connect_with_retry()
-            return impl
         except (NemuIpcIncompatible, NemuIpcError, JobTimeout) as e:
             logger.error(e)
             logger.error("Unable to initialize NemuIpc")
             raise RequestHumanTakeover from e
+        else:
+            return impl
 
     def nemu_ipc_available(self) -> bool:
         if not IS_WINDOWS:

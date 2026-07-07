@@ -88,7 +88,6 @@ def replace_tmp(tmp: str, file: str):
                 # Atomic operation
                 Path(tmp).replace(file)
                 # success
-                return
             except PermissionError as e:
                 last_error = e
                 delay = windows_attempt_delay(attempt)
@@ -100,17 +99,20 @@ def replace_tmp(tmp: str, file: str):
             except Exception as e:
                 last_error = e
                 break
+            else:
+                return
     else:
         # Linux and Mac allow existing reading
         try:
             # Atomic operation
             Path(tmp).replace(file)
             # success
-            return
         except FileNotFoundError:
             raise
         except Exception as e:
             last_error = e
+        else:
+            return
 
     # 写入失败时尽力清理临时文件；清理失败仍然抛出原始写入错误。
     with suppress(Exception):
@@ -135,7 +137,6 @@ def atomic_replace(replace_from: str, replace_to: str):
                 # Atomic operation
                 Path(replace_from).replace(replace_to)
                 # success
-                return
             except PermissionError as e:
                 last_error = e
                 delay = windows_attempt_delay(attempt)
@@ -146,6 +147,8 @@ def atomic_replace(replace_from: str, replace_to: str):
             except Exception as e:
                 last_error = e
                 break
+            else:
+                return
         if last_error is not None:
             raise last_error from None
     else:
@@ -407,12 +410,13 @@ def atomic_read_text_stream(
         for attempt in range(WINDOWS_MAX_ATTEMPT):
             try:
                 yield from file_read_text_stream(file, encoding=encoding, errors=errors, chunk_size=chunk_size)
-                return
             except PermissionError as e:
                 last_error = e
                 delay = windows_attempt_delay(attempt)
                 time.sleep(delay)
                 continue
+            else:
+                return
         if last_error is not None:
             raise last_error from None
     else:
@@ -456,12 +460,13 @@ def atomic_read_bytes_stream(file: str, chunk_size: int = 8192) -> Iterable[byte
         for attempt in range(WINDOWS_MAX_ATTEMPT):
             try:
                 yield from file_read_bytes_stream(file, chunk_size=chunk_size)
-                return
             except PermissionError as e:
                 last_error = e
                 delay = windows_attempt_delay(attempt)
                 time.sleep(delay)
                 continue
+            else:
+                return
         if last_error is not None:
             raise last_error from None
     else:
@@ -543,7 +548,6 @@ def folder_rmtree(folder, may_symlinks=True):
     # 删除空文件夹；如果仍非空，可能抛出 OSError。
     try:
         Path(folder).rmdir()
-        return True
     except FileNotFoundError:
         return True
     except NotADirectoryError:
@@ -551,6 +555,8 @@ def folder_rmtree(folder, may_symlinks=True):
         return True
     except OSError:
         return False
+    else:
+        return True
 
 
 def atomic_rmtree(folder: str):

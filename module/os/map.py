@@ -156,12 +156,13 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         for _ in range(3):
             try:
                 super().os_map_goto_globe(*args, **kwargs)
-                return
             except RewardUncollectedError:
                 # Disable after_auto_search since it will exit current zone.
                 # Or will cause RecursionError: maximum recursion depth exceeded
                 self.run_auto_search(rescan=True, after_auto_search=False)
                 continue
+            else:
+                return
 
         logger.error("Failed to solve uncollected rewards")
         raise GameTooManyClickError
@@ -176,9 +177,10 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         for _ in range(3):
             try:
                 super().port_goto(allow_port_arrive=allow_port_arrive)
-                return True
             except MapWalkError:
                 pass
+            else:
+                return True
 
             logger.info("Goto another port then re-enter")
             prev = self.zone

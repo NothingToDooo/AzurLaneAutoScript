@@ -75,10 +75,11 @@ def is_port_using(port_num):
 
     try:
         s.bind(("127.0.0.1", port_num))
-        return False
     except OSError:
         # Address already bind
         return True
+    else:
+        return False
     finally:
         s.close()
 

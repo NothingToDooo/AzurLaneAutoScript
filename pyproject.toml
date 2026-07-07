@@ -142,6 +142,7 @@ select = [
     "TCH",
     "TRY002",
     "TRY201",
+    "TRY300",
     "TRY301",
     "TRY401",
     "UP",

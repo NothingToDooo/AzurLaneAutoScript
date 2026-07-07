@@ -459,9 +459,10 @@ def re_fullmatch(pattern, string):
     if pattern == "datetime":
         try:
             datetime.datetime.fromisoformat(string)
-            return True
         except ValueError:
             return False
+        else:
+            return True
     # elif:
     return re.fullmatch(pattern=pattern, string=string)
 

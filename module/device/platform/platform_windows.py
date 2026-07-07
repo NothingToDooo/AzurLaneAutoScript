@@ -155,7 +155,6 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         """
         try:
             func(self.emulator_instance)
-            return True
         except OSError as e:
             msg = str(e)
             # OSError: [WinError 740] 请求的操作需要提升。
@@ -165,6 +164,8 @@ class PlatformWindows(PlatformBase, EmulatorManager):
             logger.error(e)
         except Exception as e:
             logger.exception(e)
+        else:
+            return True
 
         logger.error(f"Emulator function {func.__name__}() failed")
         return False

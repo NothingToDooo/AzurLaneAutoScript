@@ -193,7 +193,8 @@ class Benchmark(DaemonBase, CampaignUI):
 def run_benchmark(config):
     try:
         Benchmark(config, task="Benchmark").run()
-        return True
     except RequestHumanTakeover:
         logger.critical("Request human takeover")
         return False
+    else:
+        return True

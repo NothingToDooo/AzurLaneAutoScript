@@ -51,9 +51,10 @@ class CampaignBase(CampaignBase_):
                 # End
                 try:
                     self._get_stage_name(self.device.image)
-                    return True
                 except IndexError, CampaignNameError:
                     pass
+                else:
+                    return True
                 # Click
                 if self.handle_story_entrance():
                     continue
