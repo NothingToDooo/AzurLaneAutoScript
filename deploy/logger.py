@@ -13,7 +13,7 @@ class DeployLogger(logging.Logger):
 os.chdir(os.path.join(os.path.dirname(__file__), "../"))
 
 _logger = logging.getLogger("deploy")
-logger = cast(DeployLogger, _logger)
+logger = cast("DeployLogger", _logger)
 
 formatter = logging.Formatter(fmt="%(message)s")
 hdlr = logging.StreamHandler(stream=sys.stdout)

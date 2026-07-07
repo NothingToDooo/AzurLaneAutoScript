@@ -54,7 +54,7 @@ class State:
     _init = False
     _clearup = False
 
-    manager: SyncManager = cast(SyncManager, None)
+    manager: SyncManager = cast("SyncManager", None)
     theme: str = "default"
 
     @classmethod
