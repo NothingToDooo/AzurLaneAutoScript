@@ -1,8 +1,12 @@
-from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
+from module.base.time import beijing_from_timestamp
 from module.config.utils import DEFAULT_TIME, filepath_config
 from module.logger import logger
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class ConfigWatcher:
@@ -17,7 +21,7 @@ class ConfigWatcher:
         Last modify time of the file
         """
         timestamp = Path(filepath_config(self.config_name)).stat().st_mtime
-        return datetime.fromtimestamp(timestamp, tz=UTC).astimezone().replace(tzinfo=None, microsecond=0)
+        return beijing_from_timestamp(timestamp).replace(microsecond=0)
 
     def should_reload(self) -> bool:
         """

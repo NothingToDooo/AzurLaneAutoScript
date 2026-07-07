@@ -1,6 +1,5 @@
 import time
 from collections import deque
-from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -8,6 +7,7 @@ import cv2
 from PIL import Image
 
 from module.base.decorator import cached_property
+from module.base.time import beijing_now
 from module.base.timer import Timer
 from module.base.utils import get_color, image_size, limit_in, save_image
 from module.device.method.adb import Adb
@@ -59,7 +59,7 @@ class Screenshot(Adb, NemuIpc):
             self.image = self._handle_orientated_image(self.image)
 
             if self.config.Error_SaveError:
-                self.screenshot_deque.append({"time": datetime.now(), "image": self.image})
+                self.screenshot_deque.append({"time": beijing_now(), "image": self.image})
 
             if self.check_screen_size() and self.check_screen_black():
                 break

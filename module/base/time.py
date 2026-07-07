@@ -17,6 +17,13 @@ def beijing_now() -> datetime:
     return _drop_timezone(datetime.now(tz=BEIJING_TIMEZONE))
 
 
+def beijing_from_timestamp(timestamp: float) -> datetime:
+    """
+    将 POSIX 时间戳转换为项目内部使用的 naive 北京时间。
+    """
+    return _drop_timezone(datetime.fromtimestamp(timestamp, tz=BEIJING_TIMEZONE))
+
+
 def beijing_datetime(
     year: int,
     month: int,

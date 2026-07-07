@@ -7,6 +7,8 @@ from datetime import datetime
 from functools import partial
 from pathlib import Path
 
+from module.base.time import beijing_now
+
 # 先导入伪 PIL 模块，避免 pywebio 拉起不需要的 PIL。
 from module.webui.fake_pil_module import import_fake_pil_module
 
@@ -117,7 +119,7 @@ class AlasGUI(Frame):
 
     @use_scope("aside", clear=True)
     def set_aside(self) -> None:
-        current_date = datetime.now().date()
+        current_date = beijing_now().date()
         if current_date.month == 4 and current_date.day == 1:
             self.af_flag = True
 
@@ -509,7 +511,7 @@ class AlasGUI(Frame):
             valid = []
             invalid = []
             config = config_updater.read_file(config_name)
-            n = datetime.now()
+            n = beijing_now()
             for p, v in deep_iter(config, depth=3):
                 if p[-1].endswith("un") and not isinstance(v, bool) and (v - n).days >= 31:
                     deep_set(config, p, "")

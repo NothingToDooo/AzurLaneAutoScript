@@ -1,4 +1,3 @@
-import datetime
 import logging
 import os
 import sys
@@ -12,6 +11,8 @@ from rich.rule import Rule
 from rich.style import Style
 from rich.theme import Theme
 from rich.traceback import Traceback
+
+from module.base.time import beijing_now
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -174,7 +175,7 @@ pyw_name = Path(sys.argv[0]).stem
 
 
 def set_file_logger(name=pyw_name):
-    today = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
+    today = beijing_now().date()
     log_file = f"./log/{today}_{name}.txt"
     Path("./log").mkdir(parents=True, exist_ok=True)
     file_handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")

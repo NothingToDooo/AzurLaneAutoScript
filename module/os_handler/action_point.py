@@ -1,8 +1,7 @@
-from datetime import datetime
-
 import numpy as np
 
 from module.base.button import ButtonGrid
+from module.base.time import beijing_now
 from module.base.timer import Timer
 from module.base.utils import get_color
 from module.config.utils import get_server_next_update
@@ -359,7 +358,7 @@ class ActionPointHandler(UI, MapEventHandler):
 
         # 检查今天剩余可恢复行动力。
         if check_rest_ap:
-            diff = get_server_next_update("00:00") - datetime.now()
+            diff = get_server_next_update("00:00") - beijing_now()
             today_rest = int(diff.total_seconds() // 600)
             if self._action_point_current + today_rest >= 200:
                 logger.info(

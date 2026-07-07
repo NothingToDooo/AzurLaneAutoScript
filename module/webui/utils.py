@@ -20,6 +20,7 @@ from pywebio.session import info as session_info
 from rich.console import Console
 from rich.terminal_theme import TerminalTheme
 
+from module.base.time import beijing_now
 from module.config.deep import deep_iter
 from module.logger import logger
 from module.webui.setting import State
@@ -473,7 +474,7 @@ def re_fullmatch(pattern, string):
 
 
 def get_next_time(t: datetime.time):
-    now = datetime.datetime.now(tz=datetime.UTC).astimezone().time()
+    now = beijing_now().time()
     second = (t.hour - now.hour) * 3600 + (t.minute - now.minute) * 60 + (t.second - now.second)
     if second < 0:
         second += 86400

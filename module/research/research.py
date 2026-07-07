@@ -1,7 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import numpy as np
 
+from module.base.time import beijing_now
 from module.base.timer import Timer
 from module.base.utils import rgb2gray
 from module.exception import GameTooManyClickError
@@ -152,7 +153,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             if slot < 4:
                 return True
             if slot == 4:
-                now = datetime.now()
+                now = beijing_now()
                 if self.end_time <= now or self.end_time + timedelta(minutes=-10) > now:
                     return True
 
@@ -587,7 +588,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             # 队列为空，无法启动任何科研。
             self.config.task_delay(server_update=True)
             return
-        if self.end_time <= datetime.now():
+        if self.end_time <= beijing_now():
             # 获取刚启动项目的剩余时间。
             self.queue_enter()
             self.end_time = self.get_research_ended()

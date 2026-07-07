@@ -1,5 +1,6 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
+from module.base.time import beijing_now
 from module.config.utils import get_os_next_reset
 from module.exception import ScriptError
 from module.logger import logger
@@ -14,7 +15,7 @@ class OpsiCrossMonth(OSMap):
 
     def os_cross_month(self):
         next_reset = get_os_next_reset()
-        now = datetime.now()
+        now = beijing_now()
         logger.attr("OpsiNextReset", next_reset)
 
         # Check start time
@@ -36,7 +37,7 @@ class OpsiCrossMonth(OSMap):
         logger.warning("ALAS is now waiting for next OpSi reset, please DO NOT touch the game during wait")
         while True:
             logger.info(f"Wait until {next_reset}")
-            now = datetime.now()
+            now = beijing_now()
             remain = (next_reset - now).total_seconds()
             if remain <= 0:
                 break

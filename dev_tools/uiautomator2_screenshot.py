@@ -1,8 +1,8 @@
-from datetime import datetime
 from pathlib import Path
 
 from deploy.atomic import atomic_write
 from module.base.base import ModuleBase, cv2, image_channel
+from module.base.time import beijing_now
 from module.logger import logger
 
 
@@ -85,7 +85,7 @@ def image_save(image, file, encode=None):
 
 
 def now():
-    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
+    return beijing_now().strftime("%Y-%m-%d_%H-%M-%S-%f")
 
 
 class WatchScreen(ModuleBase):

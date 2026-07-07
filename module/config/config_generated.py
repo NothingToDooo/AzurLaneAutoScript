@@ -1,5 +1,6 @@
-import datetime
 from typing import ClassVar
+
+from module.base.time import beijing_datetime
 
 # 本文件由 module/config/config_updater.py 自动生成。
 # 不要手动修改。
@@ -13,7 +14,7 @@ class GeneratedConfig:
     # 配置组 `Scheduler`
     # 可选项：True, False
     Scheduler_Enable = False
-    Scheduler_NextRun = datetime.datetime(2020, 1, 1, 0, 0)
+    Scheduler_NextRun = beijing_datetime(2020, 1, 1, 0, 0, 0, 0)
     Scheduler_Command = "Alas"
     Scheduler_SuccessInterval = 0
     Scheduler_FailureInterval = 120
@@ -21,19 +22,9 @@ class GeneratedConfig:
 
     # 配置组 `Emulator`
     Emulator_Serial = "auto"
-    # 可选项：auto, com.bilibili.azurlane, com.bilibili.blhx.huawei, com.bilibili.blhx.honor, com.bilibili.blhx.mi,
-    # com.tencent.tmgp.bilibili.blhx, com.bilibili.blhx.baidu, com.bilibili.blhx.qihoo,
-    # com.bilibili.blhx.nearme.gamecenter, com.bilibili.blhx.vivo, com.bilibili.blhx.mz, com.bilibili.blhx.dl,
-    # com.bilibili.blhx.lenovo, com.bilibili.blhx.uc, com.bilibili.blhx.mzw, com.yiwu.blhx.yx15,
-    # com.bilibili.blhx.m4399, com.bilibili.blhx.bilibiliMove
+    # 可选项：auto
     Emulator_PackageName = "auto"
-    # 可选项：disabled, cn_android-0, cn_android-1, cn_android-2, cn_android-3, cn_android-4, cn_android-5,
-    # cn_android-6, cn_android-7, cn_android-8, cn_android-9, cn_android-10, cn_android-11, cn_android-12,
-    # cn_android-13, cn_android-14, cn_android-15, cn_android-16, cn_android-17, cn_android-18, cn_android-19,
-    # cn_android-20, cn_android-21, cn_android-22, cn_android-23, cn_android-24, cn_android-25, cn_android-26,
-    # cn_android-27, cn_android-28, cn_ios-0, cn_ios-1, cn_ios-2, cn_ios-3, cn_ios-4, cn_ios-5, cn_ios-6, cn_ios-7,
-    # cn_ios-8, cn_ios-9, cn_ios-10, cn_channel-0, cn_channel-1, cn_channel-2, cn_channel-3, cn_channel-4,
-    # cn_channel-5
+    # 可选项：disabled
     Emulator_ServerName = "disabled"
     # 可选项：nemu_ipc
     Emulator_ScreenshotMethod = "nemu_ipc"
@@ -156,14 +147,14 @@ class GeneratedConfig:
     # 可选项：calculate, ignore, calculate_ignore
     Emotion_Mode = "calculate"
     Emotion_Fleet1Value = 119
-    Emotion_Fleet1Record = datetime.datetime(2020, 1, 1, 0, 0)
+    Emotion_Fleet1Record = beijing_datetime(2020, 1, 1, 0, 0, 0, 0)
     # 可选项：keep_exp_bonus, prevent_green_face, prevent_yellow_face, prevent_red_face
     Emotion_Fleet1Control = "prevent_green_face"
     # 可选项：not_in_dormitory, dormitory_floor_1, dormitory_floor_2
     Emotion_Fleet1Recover = "not_in_dormitory"
     Emotion_Fleet1Oath = False
     Emotion_Fleet2Value = 119
-    Emotion_Fleet2Record = datetime.datetime(2020, 1, 1, 0, 0)
+    Emotion_Fleet2Record = beijing_datetime(2020, 1, 1, 0, 0, 0, 0)
     # 可选项：keep_exp_bonus, prevent_green_face, prevent_yellow_face, prevent_red_face
     Emotion_Fleet2Control = "prevent_green_face"
     # 可选项：not_in_dormitory, dormitory_floor_1, dormitory_floor_2
@@ -213,7 +204,7 @@ class GeneratedConfig:
 
     # 配置组 `EventGeneral`
     EventGeneral_PtLimit = 0
-    EventGeneral_TimeLimit = datetime.datetime(2020, 1, 1, 0, 0)
+    EventGeneral_TimeLimit = beijing_datetime(2020, 1, 1, 0, 0, 0, 0)
 
     # 配置组 `TaskBalancer`
     TaskBalancer_Enable = False
@@ -325,7 +316,7 @@ class GeneratedConfig:
     BuyFurniture_Enable = False
     # 可选项：set, all
     BuyFurniture_BuyOption = "all"
-    BuyFurniture_LastRun = datetime.datetime(2020, 1, 1, 0, 0)
+    BuyFurniture_LastRun = beijing_datetime(2020, 1, 1, 0, 0, 0, 0)
 
     # 配置组 `Meowfficer`
     Meowfficer_BuyAmount = 1
@@ -376,7 +367,11 @@ class GeneratedConfig:
     GeneralShop_Refresh = False
     GeneralShop_BuySkinBox = False
     GeneralShop_ConsumeCoins = False
-    GeneralShop_Filter = "BookRedT3 > BookYellowT3 > BookBlueT3 > BookRedT2\n> Cube\n> FoodT6 > FoodT5"
+    GeneralShop_Filter = (
+        "BookRedT3 > BookYellowT3 > BookBlueT3 > BookRedT2\n"
+        "> Cube\n"
+        "> FoodT6 > FoodT5"
+    )
 
     # 配置组 `GuildShop`
     GuildShop_Refresh = True
@@ -441,7 +436,7 @@ class GeneratedConfig:
     # 可选项：0, 1, 2, 3, 4, 5, 6
     ShipyardDr_ShipIndex = 0
     ShipyardDr_BuyAmount = 2
-    ShipyardDr_LastRun = datetime.datetime(2020, 1, 1, 0, 0)
+    ShipyardDr_LastRun = beijing_datetime(2020, 1, 1, 0, 0, 0, 0)
 
     # 配置组 `Shipyard`
     # 可选项：1, 2, 3, 4, 5, 6
@@ -449,7 +444,7 @@ class GeneratedConfig:
     # 可选项：0, 1, 2, 3, 4, 5, 6
     Shipyard_ShipIndex = 0
     Shipyard_BuyAmount = 2
-    Shipyard_LastRun = datetime.datetime(2020, 1, 1, 0, 0)
+    Shipyard_LastRun = beijing_datetime(2020, 1, 1, 0, 0, 0, 0)
 
     # 配置组 `Gacha`
     # 可选项：light, heavy, special, event, wishing_well
@@ -530,7 +525,7 @@ class GeneratedConfig:
     Exercise_LowHpThreshold = 0.4
     Exercise_LowHpConfirmWait = 0.1
     Exercise_OpponentRefreshValue = 0
-    Exercise_OpponentRefreshRecord = datetime.datetime(2020, 1, 1, 0, 0)
+    Exercise_OpponentRefreshRecord = beijing_datetime(2020, 1, 1, 0, 0, 0, 0)
 
     # 配置组 `Sos`
     # 可选项：3, 4, 5, 6, 7, 8, 9, 10

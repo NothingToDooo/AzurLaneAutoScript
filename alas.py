@@ -10,6 +10,7 @@ import inflection
 
 from module.base.decorator import cached_property, del_cached_property
 from module.base.resource import release_resources
+from module.base.time import beijing_now
 from module.config.config import AzurLaneConfig, TaskEnd
 from module.config.deep import deep_get, deep_set
 from module.exception import (
@@ -198,7 +199,7 @@ class AzurLaneAutoScript:
         future += timedelta(seconds=1)
         self.config.start_watching()
         while 1:
-            if datetime.now() > future:
+            if beijing_now() > future:
                 return True
             if self.stop_event is not None and self.stop_event.is_set():
                 logger.info("Update event detected")
@@ -221,7 +222,7 @@ class AzurLaneAutoScript:
             if self.config.task.command != "Alas":
                 release_resources(next_task=task.command)
 
-            if task.next_run > datetime.now():
+            if task.next_run > beijing_now():
                 logger.info(f"Wait until {task.next_run} for task `{task.command}`")
                 self.is_first_task = False
                 method = self.config.Optimization_WhenTaskQueueEmpty

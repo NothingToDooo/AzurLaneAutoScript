@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from module.base.time import BEIJING_TIMEZONE, beijing_datetime, beijing_now
+from module.base.time import BEIJING_TIMEZONE, beijing_datetime, beijing_from_timestamp, beijing_now
 from module.config.utils import DEFAULT_TIME, get_server_next_update, server_time_offset
 
 
@@ -11,8 +11,13 @@ def test_beijing_timezone_is_fixed_utc_plus_8() -> None:
 def test_beijing_helpers_keep_existing_naive_datetime_contract() -> None:
     assert beijing_now().tzinfo is None
     assert beijing_datetime(2020, 1, 1).tzinfo is None
+    assert beijing_from_timestamp(0).tzinfo is None
     assert beijing_datetime(2020, 1, 1) == DEFAULT_TIME
     assert get_server_next_update("00:00").tzinfo is None
+
+
+def test_timestamp_is_converted_to_beijing_time() -> None:
+    assert beijing_from_timestamp(0) == beijing_datetime(1970, 1, 1, 8)
 
 
 def test_cn_server_time_has_no_internal_offset() -> None:

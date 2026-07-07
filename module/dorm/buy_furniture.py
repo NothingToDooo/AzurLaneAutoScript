@@ -1,6 +1,7 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
+from module.base.time import beijing_now
 from module.combat.assets import GET_SHIP
 from module.dorm import assets as dorm_assets
 from module.exercise.assets import EXERCISE_PREPARATION
@@ -224,7 +225,7 @@ class BuyFurniture(UI):
         logger.info("Fallback to dorm_page")
         self.furniture_details_page_quit(skip_first_screenshot=True)
         self.furniture_shop_quit(skip_first_screenshot=True)
-        self.config.BuyFurniture_LastRun = datetime.now().replace(microsecond=0)
+        self.config.BuyFurniture_LastRun = beijing_now().replace(microsecond=0)
 
     def run(self):
         """
@@ -236,7 +237,7 @@ class BuyFurniture(UI):
         time_run = self.config.BuyFurniture_LastRun + timedelta(days=CHECK_INTERVAL)
         logger.info(f"Task BuyFurniture run time is {time_run}")
 
-        if datetime.now().replace(microsecond=0) < time_run:
+        if beijing_now().replace(microsecond=0) < time_run:
             logger.info("Not running time, skip")
             return
 
