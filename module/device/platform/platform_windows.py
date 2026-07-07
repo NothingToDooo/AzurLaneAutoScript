@@ -180,14 +180,11 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         def adb_connect():
             m = self.adb_client.connect(self.serial)
             if "connected" in m:
-                # Connected to 127.0.0.1:59865
-                # Already connected to 127.0.0.1:59865
+                # 已连接时会输出：Connected to 127.0.0.1:59865。
+                # 重复连接会输出：Already connected to 127.0.0.1:59865。
                 return False
-            if "(10061)" in m:
-                # cannot connect to 127.0.0.1:55555:
-                # No connection could be made because the target machine actively refused it. (10061)
-                return False
-            return True
+            # 10061 表示本机端口拒绝连接，不算成功连接。
+            return "(10061)" not in m
 
         @run_once
         def show_online(m):

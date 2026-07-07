@@ -574,10 +574,7 @@ class NemuIpc(Platform):
             logger.warning("Failed to check check_mumu_app_keep_alive as emulator_instance is None")
             return False
         file = self.emulator_instance.mumu_vms_config("customer_config.json")
-        if self.check_mumu_app_keep_alive_400(file):
-            return True
-
-        return False
+        return bool(self.check_mumu_app_keep_alive_400(file))
 
     def nemu_ipc_release(self):
         if has_cached_property(self, "nemu_ipc"):

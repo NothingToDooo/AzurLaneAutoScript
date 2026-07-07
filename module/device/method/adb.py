@@ -245,17 +245,14 @@ class Adb(Connection):
             ["monkey", "-p", package_name, "-c", "android.intent.category.LAUNCHER", "--pct-syskeys", "0", "1"]
         )
         if "No activities found" in result:
-            # ** No activities found to run, monkey aborted.
+            # 没有可启动 Activity 时，monkey 会输出：** No activities found to run, monkey aborted。
             if allow_failure:
                 return False
             logger.error(result)
             raise PackageNotInstalled(package_name)
-        if "inaccessible" in result:
-            # /system/bin/sh: monkey: inaccessible or not found
-            return False
-        # Events injected: 1
-        # ## Network stats: elapsed time=4ms (0ms mobile, 0ms wifi, 4ms not connected)
-        return True
+        # monkey 不可用时会输出：/system/bin/sh: monkey: inaccessible or not found。
+        # 成功时通常输出：Events injected: 1。
+        return "inaccessible" not in result
 
     @retry
     def _app_start_adb_am(self, package_name=None, activity_name=None, allow_failure=False):
