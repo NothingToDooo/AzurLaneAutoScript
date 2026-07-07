@@ -76,8 +76,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
                 return True
             self.clear_mechanism()
             return self.battle_default()
-        result = self.battle_boss()
-        return result
+        return self.battle_boss()
 
     @Config.when(MAP_CLEAR_ALL_THIS_TIME=False, POOR_MAP_DATA=False)
     def battle_function(self):  # noqa: F811
@@ -90,9 +89,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
         logger.info(f"Using function: {func}")
         func = self.__getattribute__(func)
 
-        result = func()
-
-        return result
+        return func()
 
     def execute_a_battle(self):
         logger.hr(f"{self.FUNCTION_NAME_BASE}{self.battle_count}", level=2)

@@ -259,11 +259,10 @@ class FleetOperator:
 
     def selected(self):
         """
-        Returns:
-            list: List of int. Currently selected fleet ranges from 1 to 6.
+        返回：
+            list：当前选择的舰队编号，范围为 1 到 6。
         """
-        data = self.parse_fleet_bar(self.main.image_crop(self._bar.button, copy=False))
-        return data
+        return self.parse_fleet_bar(self.main.image_crop(self._bar.button, copy=False))
 
     def in_use(self):
         """

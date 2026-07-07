@@ -95,27 +95,24 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         return self.config.Fleet_Fleet1
 
     def flagship_change(self):
-        """
-        Change flagship and flagship's equipment
-        If config.GemsFarming_CommonCV == 'any', only change auxiliary equipment
+        """更换旗舰及其装备。
 
-        Returns:
-            bool: True if flagship changed.
+        当 GemsFarming_CommonCV 为 'any' 时，只更换装备。
+
+        返回：
+            bool：是否完成更换。
         """
         logger.hr("Change flagship", level=1)
         self.fleet_enter(self.fleet_to_attack)
 
         logger.hr("Change flagship", level=2)
-        success = self.flagship_change_execute()
-
-        return success
+        return self.flagship_change_execute()
 
     def vanguard_change(self):
-        """
-        Change vanguard and vanguard's equipment
+        """更换前排及其装备。
 
-        Returns:
-            bool: True if vanguard changed
+        返回：
+            bool：是否完成更换。
         """
 
         logger.hr("Change vanguard", level=1)
@@ -123,9 +120,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         self.fleet_enter(self.fleet_to_attack)
 
         logger.hr("Change vanguard", level=2)
-        success = self.vanguard_change_execute()
-
-        return success
+        return self.vanguard_change_execute()
 
     def _dock_reset(self):
         self.dock_favourite_set(False, wait_loading=False)
@@ -192,13 +187,12 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         logger.info("No specific CV was found, try reversed order.")
         self.dock_sort_method_dsc_set(True)
 
-        candidates = [
+        return [
             ship
             for ship in scanner.scan(self.device.image)
             if template.match(self.image_crop(ship.button, copy=False), similarity=SIM_VALUE)
         ]
 
-        return candidates
 
     def get_common_rarity_dd(self):
         """
@@ -251,8 +245,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         self.dock_sort_method_dsc_set(False)
 
         # Change specific ship
-        candidates = self.find_candidates(self.get_templates(self.config.GemsFarming_CommonDD), scanner)
-        return candidates
+        return self.find_candidates(self.get_templates(self.config.GemsFarming_CommonDD), scanner)
 
     def find_candidates(self, template, scanner):
         """

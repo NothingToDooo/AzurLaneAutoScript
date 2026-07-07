@@ -722,9 +722,7 @@ class CampaignMap:
             portal_path += local_path
             route = ", ".join(location2node(grid) for grid in local_path)
             logger.info(f"Path: [{route}]")
-        path = portal_path
-
-        return path
+        return portal_path
 
     def grid_covered(self, grid, location=None):
         """

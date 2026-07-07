@@ -56,8 +56,7 @@ class CampaignOcr(ModuleBase):
         if len(result) == 2 and result[0].isdigit():
             result = "-".join(result)
 
-        result = result.lower()
-        return result
+        return result.lower()
 
     @staticmethod
     def _campaign_separate_name(name):
