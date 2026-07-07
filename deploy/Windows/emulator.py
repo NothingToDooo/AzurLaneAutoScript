@@ -4,6 +4,7 @@ import os
 import shutil
 import typing as t
 from dataclasses import dataclass
+from importlib import import_module
 from pathlib import Path
 
 from deploy.Windows.alas import AlasManager
@@ -20,8 +21,7 @@ class DataAdbDevice:
 class EmulatorManager(AlasManager):
     @cached_property
     def emulator_manager(self):
-        from module.device.platform.emulator_windows import EmulatorManager
-
+        EmulatorManager = import_module("module.device.platform.emulator_windows").EmulatorManager
         return EmulatorManager()
 
     def adb_kill(self):

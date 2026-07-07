@@ -1,3 +1,5 @@
+from importlib import import_module
+
 from module.base.timer import Timer
 from module.combat.combat import Combat
 from module.logger import logger
@@ -254,8 +256,7 @@ class DossierReward(Combat, UI):
         return received
 
     def run(self):
-        from module.os_ash.meta import OpsiAshBeacon
-
+        OpsiAshBeacon = import_module("module.os_ash.meta").OpsiAshBeacon
         OpsiAshBeacon(self.config, self.device).ensure_dossier_page()
         if self.meta_reward_notice_appear():
             self.meta_reward_enter()

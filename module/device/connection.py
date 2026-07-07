@@ -3,6 +3,7 @@ import re
 import socket
 import time
 from functools import wraps
+from importlib import import_module
 from pathlib import Path
 
 from adbutils import AdbClient, AdbDevice, AdbTimeout, ForwardItem, ReverseItem
@@ -818,8 +819,7 @@ class Connection(ConnectionAttr):
         @run_once
         def brute_force_connect():
             logger.info("Brute force connect")
-            from deploy.Windows.emulator import EmulatorManager
-
+            EmulatorManager = import_module("deploy.Windows.emulator").EmulatorManager
             manager = EmulatorManager()
             manager.brute_force_connect()
 

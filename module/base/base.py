@@ -1,6 +1,7 @@
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from importlib import import_module
 
 import cv2
 import numpy as np
@@ -95,8 +96,7 @@ class ModuleBase:
                 time.sleep(0.01)
 
             logger.info("early_ocr_import start")
-            from module.ocr.al_ocr import AlOcr
-
+            AlOcr = import_module("module.ocr.al_ocr").AlOcr
             _ = AlOcr
             logger.info("early_ocr_import finish")
 

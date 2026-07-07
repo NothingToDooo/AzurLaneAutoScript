@@ -5,6 +5,7 @@ from module.config.utils import get_server_monthday
 from module.exception import GameBugError
 from module.guild import assets as guild_assets
 from module.guild.base import GuildBase
+from module.guild.guild_combat import GuildCombat
 from module.logger import logger
 from module.ocr.ocr import DigitCounter
 from module.template.assets import TEMPLATE_OPERATIONS_RED_DOT
@@ -543,8 +544,6 @@ class GuildOperations(GuildBase):
             in: GUILD_OPERATIONS_BOSS
             out: GUILD_OPERATIONS_BOSS
         """
-        from module.guild.guild_combat import GuildCombat
-
         az = GuildCombat(self.config, device=self.device)
 
         if not self._guild_operations_boss_preparation(az):

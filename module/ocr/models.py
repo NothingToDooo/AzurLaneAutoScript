@@ -1,4 +1,11 @@
+from importlib import import_module
+
 from module.base.decorator import cached_property
+
+
+def _al_ocr_class():
+    """按需加载重 OCR 依赖。"""
+    return import_module("module.ocr.al_ocr").AlOcr
 
 
 class OcrModel:
@@ -12,8 +19,7 @@ class OcrModel:
         # Font: Impact, AgencyFB-Regular, MStiffHeiHK-UltraBold
         # Charset: 0123456789ABCDEFGHIJKLMNPQRSTUVWXYZ:/- (Letter 'O' and <space> is not included)
         # _num_classes: 39
-        from module.ocr.al_ocr import AlOcr
-
+        AlOcr = _al_ocr_class()
         return AlOcr(
             model_name="densenet-lite-gru", model_epoch=15, root="./bin/cnocr_models/azur_lane", name="azur_lane"
         )
@@ -28,8 +34,7 @@ class OcrModel:
         # Font: Impact, VibeMO Compressed Pro Thin, Folk R, Source Han Serif JP
         # Charset: 0123456789ABCDEFGHIJKLMNPQRSTUVWXYZ:/- (Letter 'O' and <space> is not included)
         # _num_classes: 39
-        from module.ocr.al_ocr import AlOcr
-
+        AlOcr = _al_ocr_class()
         return AlOcr(
             model_name="densenet-lite-gru", model_epoch=20, root="./bin/cnocr_models/azur_lane_jp", name="azur_lane_jp"
         )
@@ -44,14 +49,12 @@ class OcrModel:
         # Font: Various
         # Charset: Number, English character, Chinese character, symbols, <space>
         # _num_classes: 6426
-        from module.ocr.al_ocr import AlOcr
-
+        AlOcr = _al_ocr_class()
         return AlOcr(model_name="densenet-lite-gru", model_epoch=39, root="./bin/cnocr_models/cnocr", name="cnocr")
 
     @cached_property
     def jp(self):
-        from module.ocr.al_ocr import AlOcr
-
+        AlOcr = _al_ocr_class()
         return AlOcr(model_name="densenet-lite-gru", model_epoch=125, root="./bin/cnocr_models/jp", name="jp")
 
     @cached_property
@@ -64,8 +67,7 @@ class OcrModel:
         # Font: Various, 6 kinds
         # Charset: Numbers, Upper english characters, Chinese traditional characters
         # _num_classes: 5322
-        from module.ocr.al_ocr import AlOcr
-
+        AlOcr = _al_ocr_class()
         return AlOcr(model_name="densenet-lite-gru", model_epoch=63, root="./bin/cnocr_models/tw", name="tw")
 
 

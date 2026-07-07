@@ -2,6 +2,7 @@ from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.base.utils import area_pad
 from module.campaign.campaign_status import OCR_COIN
+from module.combat.assets import GET_SHIP
 from module.handler.assets import LOGIN_ANNOUNCE
 from module.logger import logger
 from module.shipyard.assets import (
@@ -292,8 +293,6 @@ class ShipyardUI(UI):
         Args:
             skip_first_screenshot (bool):
         """
-        from module.combat.assets import GET_SHIP
-
         confirm_timer = Timer(1, count=2).start()
         while 1:
             if skip_first_screenshot:

@@ -1,3 +1,5 @@
+from importlib import import_module
+
 import module.config.server as server
 from module.combat.assets import GET_ITEMS_1
 from module.logger import logger
@@ -200,8 +202,7 @@ class Minigame(UI):
         specific_game_name = "new_year_challenge"
         minigame_instance = None
         if specific_game_name == "new_year_challenge":
-            from module.minigame.new_year_challenge import NewYearChallenge
-
+            NewYearChallenge = import_module("module.minigame.new_year_challenge").NewYearChallenge
             minigame_instance = NewYearChallenge(config=self.config, device=self.device)
 
         while 1:
