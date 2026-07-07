@@ -156,21 +156,19 @@ class Campaign(CampaignBase):
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
     def battle_function(self):
-        # soo many enemies coming from 3 sides
+        # 三路敌人太多。
         if self.config.MAP_CLEAR_ALL_THIS_TIME:
             remain = self.map.select(is_enemy=True)
             logger.info(f"Enemy remain: {remain}")
-            if remain:
-                if self.fleet_2_protect():
-                    return True
+            if remain and self.fleet_2_protect():
+                return True
         if not self.map_is_clear_mode:
             remain = self.map.select(is_enemy=True)
             logger.info(f"Enemy remain: {remain}")
             boss = self.map.select(is_boss=True)
             logger.info(f"Boss appear: {boss}")
-            if not boss:
-                if self.fleet_2_protect():
-                    return True
+            if not boss and self.fleet_2_protect():
+                return True
 
         return super().battle_function()
 
