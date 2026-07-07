@@ -293,8 +293,8 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         # transfer N R SR SSR to filter name
         correspond_name = {"N": "common", "R": "rare", "SR": "elite", "SSR": "super_rare"}
         _rarity = [correspond_name[i] for i in rarity]
-        self.dock_sort_method_dsc_set(False, wait_loading=False)
-        self.dock_favourite_set(False, wait_loading=False)
+        self.dock_sort_method_dsc_set(enable=False, wait_loading=False)
+        self.dock_favourite_set(enable=False, wait_loading=False)
         self.dock_filter_set(sort="level", index="all", faction="all", rarity=_rarity, extra="no_limit")
 
         total = 0
@@ -321,7 +321,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
             self.handle_dock_cards_loading()
             continue
 
-        self.dock_sort_method_dsc_set(True, wait_loading=False)
+        self.dock_sort_method_dsc_set(enable=True, wait_loading=False)
         self.dock_filter_set()
         logger.info(f"Total retired: {total}")
         return total
@@ -459,7 +459,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
             total = self.retire_ships_one_click()
             if not total:
                 logger.warning("No ship retired, trying to reset dock filter and disable favourite, then retire again")
-                self.dock_favourite_set(False, wait_loading=False)
+                self.dock_favourite_set(enable=False, wait_loading=False)
                 self.dock_filter_set()
                 total = self.retire_ships_one_click()
             if self.server_support_quick_retire_setting_fallback():

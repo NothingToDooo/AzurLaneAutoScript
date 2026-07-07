@@ -123,7 +123,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         return self.vanguard_change_execute()
 
     def _dock_reset(self):
-        self.dock_favourite_set(False, wait_loading=False)
+        self.dock_favourite_set(enable=False, wait_loading=False)
         self.dock_sort_method_dsc_set(wait_loading=False)
         self.dock_filter_set()
 
@@ -142,8 +142,8 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         Returns:
             Ship:
         """
-        self.dock_favourite_set(False, wait_loading=False)
-        self.dock_sort_method_dsc_set(False, wait_loading=False)
+        self.dock_favourite_set(enable=False, wait_loading=False)
+        self.dock_sort_method_dsc_set(enable=False, wait_loading=False)
         self.dock_filter_set(index="cv", rarity="common", extra="enhanceable", sort="total")
 
         logger.hr("FINDING FLAGSHIP")
@@ -185,7 +185,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
             return candidates
 
         logger.info("No specific CV was found, try reversed order.")
-        self.dock_sort_method_dsc_set(True)
+        self.dock_sort_method_dsc_set(enable=True)
 
         return [
             ship
@@ -217,7 +217,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
 
         favourite = self.config.GemsFarming_CommonDD == "favourite"
         self.dock_favourite_set(favourite, wait_loading=False)
-        self.dock_sort_method_dsc_set(True, wait_loading=False)
+        self.dock_sort_method_dsc_set(enable=True, wait_loading=False)
         self.dock_filter_set(index="dd", rarity="common", faction=faction, extra="can_limit_break")
 
         logger.hr("FINDING VANGUARD")
@@ -235,7 +235,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
             return candidates
 
         logger.info("No specific DD was found, try reversed order.")
-        self.dock_sort_method_dsc_set(False)
+        self.dock_sort_method_dsc_set(enable=False)
 
         # Change specific ship
         return self.find_candidates(self.get_templates(self.config.GemsFarming_CommonDD), scanner)

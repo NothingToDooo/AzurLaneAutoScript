@@ -467,10 +467,10 @@ class AlasGUI(Frame):
             scope="log_scroll_btn",
         )
 
-        self.task_handler.add(switch_scheduler.g(), 1, True)
-        self.task_handler.add(switch_log_scroll.g(), 1, True)
-        self.task_handler.add(self.alas_update_overview_task, 10, True)
-        self.task_handler.add(log.put_log(self.alas), 0.25, True)
+        self.task_handler.add(switch_scheduler.g(), 1, pending_delete=True)
+        self.task_handler.add(switch_log_scroll.g(), 1, pending_delete=True)
+        self.task_handler.add(self.alas_update_overview_task, 10, pending_delete=True)
+        self.task_handler.add(log.put_log(self.alas), 0.25, pending_delete=True)
 
     def _init_alas_config_watcher(self) -> None:
         def put_queue(path, value):
@@ -704,9 +704,9 @@ class AlasGUI(Frame):
         """
         )
 
-        self.task_handler.add(switch_scheduler.g(), 1, True)
-        self.task_handler.add(switch_log_scroll.g(), 1, True)
-        self.task_handler.add(log.put_log(self.alas), 0.25, True)
+        self.task_handler.add(switch_scheduler.g(), 1, pending_delete=True)
+        self.task_handler.add(switch_log_scroll.g(), 1, pending_delete=True)
+        self.task_handler.add(log.put_log(self.alas), 0.25, pending_delete=True)
 
     @use_scope("menu", clear=True)
     def dev_set_menu(self) -> None:

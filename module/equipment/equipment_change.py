@@ -166,7 +166,7 @@ class EquipmentChange(Equipment):
         """
         enter_button = getattr(equipment_assets, f"EQUIP_TAKE_ON_{index}")
 
-        self.equipping_set(False)
+        self.equipping_set(enable=False)
 
         res = cv2.matchTemplate(self.device.screenshot(), np.array(self.equipment_list[index]), cv2.TM_CCOEFF_NORMED)
         _, sim, _, point = cv2.minMaxLoc(res)

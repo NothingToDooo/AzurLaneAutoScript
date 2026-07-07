@@ -65,7 +65,7 @@ class RelativeRecord:
             Path(self.folder).mkdir()
 
     def count(self, area):
-        mask = np.full(self.images_amount, False, dtype=bool)
+        mask = np.zeros(self.images_amount, dtype=bool)
 
         template = crop(self.images[0], area=area)
         template_0 = template
