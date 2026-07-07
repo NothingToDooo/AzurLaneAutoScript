@@ -111,9 +111,8 @@ class Setting:
             active = self.is_option_active(option_button)
             if enable and not active:
                 click.append(option_button)
-            if self.need_deselect:
-                if not enable and active:
-                    click.append(option_button)
+            if self.need_deselect and not enable and active:
+                click.append(option_button)
         return click
 
     def _set_execute(self, **kwargs):

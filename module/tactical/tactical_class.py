@@ -444,17 +444,19 @@ class RewardTacticalClass(Dock):
             else:
                 self.device.screenshot()
 
-            # End
+            # 结束。
             if received and self.appear(REWARD_CHECK, offset=(20, 20)):
                 break
 
-            # Learn new skills
-            if not study_finished and self.appear(TACTICAL_CHECK, offset=(20, 20)):
-                # Tactical page, has empty position
-                if self.appear_then_click(ADD_NEW_STUDENT, offset=(800, 20), interval=1):
-                    self.interval_reset([TACTICAL_CHECK, RAPID_TRAINING])
-                    self.interval_clear([POPUP_CONFIRM, POPUP_CANCEL, GET_MISSION, DOCK_CHECK, SKILL_CONFIRM])
-                    continue
+            # 学习新技能。
+            if (
+                not study_finished
+                and self.appear(TACTICAL_CHECK, offset=(20, 20))
+                and self.appear_then_click(ADD_NEW_STUDENT, offset=(800, 20), interval=1)
+            ):
+                self.interval_reset([TACTICAL_CHECK, RAPID_TRAINING])
+                self.interval_clear([POPUP_CONFIRM, POPUP_CANCEL, GET_MISSION, DOCK_CHECK, SKILL_CONFIRM])
+                continue
             if self.handle_rapid_training():
                 self.interval_reset(TACTICAL_CHECK)
                 self.interval_clear([POPUP_CONFIRM, POPUP_CANCEL, GET_MISSION, DOCK_CHECK, SKILL_CONFIRM])

@@ -139,10 +139,9 @@ class ResearchUI(UI):
                 self.appear(research_assets.RESEARCH_UNAVAILABLE, offset=(20, 20))
                 or self.appear(research_assets.RESEARCH_START, offset=(20, 20))
                 or self.appear(research_assets.RESEARCH_STOP, offset=(20, 20))
-            ):
-                if click_timer.reached():
-                    self.device.click(research_assets.RESEARCH_DETAIL_QUIT)
-                    click_timer.reset()
+            ) and click_timer.reached():
+                self.device.click(research_assets.RESEARCH_DETAIL_QUIT)
+                click_timer.reset()
 
     def research_detail_cancel(self, skip_first_screenshot=True):
         logger.info("Research detail cancel")

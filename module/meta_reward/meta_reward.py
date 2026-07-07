@@ -93,10 +93,9 @@ class BeaconReward(Combat, UI):
                 logger.info("meta_sync_receive ends at REWARD_ENTER")
                 break
 
-            if self.appear(mr_assets.SYNC_ENTER, offset=(20, 20)):
-                if not self.meta_sync_notice_appear():
-                    logger.info("meta_sync_receive ends at SYNC_ENTER")
-                    break
+            if self.appear(mr_assets.SYNC_ENTER, offset=(20, 20)) and not self.meta_sync_notice_appear():
+                logger.info("meta_sync_receive ends at SYNC_ENTER")
+                break
 
             # 点击领取。
             if self.handle_popup_confirm("META_REWARD"):

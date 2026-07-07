@@ -236,9 +236,8 @@ class MeowfficerEnhance(MeowfficerBase):
                 continue
 
             # 结束。
-            if self.appear(meow_assets.MEOWFFICER_FEED_CONFIRM, offset=(20, 20)):
-                if confirm_timer.reached():
-                    return True
+            if self.appear(meow_assets.MEOWFFICER_FEED_CONFIRM, offset=(20, 20)) and confirm_timer.reached():
+                return True
             if click_count >= 3:
                 logger.warning(
                     "Unable to enter meowfficer feed, probably because the meowfficer to enhance has reached LV.30"

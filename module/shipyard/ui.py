@@ -236,15 +236,14 @@ class ShipyardUI(UI):
             skip_first_screenshot (bool):
 
         Returns:
-            bool, whether Navbar was successfully set
+            bool: 是否成功设置导航栏。
         """
         if left is None and right is not None:
             left = right
             right = None
-        if left is not None:
-            if left <= 0 or left > len(SHIPYARD_FACE_GRID.buttons):
-                logger.warning(f"Index for bottom Navbar {left} is not selectable")
-                return False
+        if left is not None and (left <= 0 or left > len(SHIPYARD_FACE_GRID.buttons)):
+            logger.warning(f"Index for bottom Navbar {left} is not selectable")
+            return False
 
         ensured = False
         if self._shipyard_bottom_navbar.set(self, left=left, right=right, skip_first_screenshot=skip_first_screenshot):

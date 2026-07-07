@@ -550,9 +550,10 @@ class RewardCommission(UI, InfoHandler):
                     # click_timer.reset()
                     continue
                 # 处理石油已满。
-                if self.config.SERVER in ["cn"]:
-                    if self.appear(commission_assets.OIL_MAXED, offset=(20, 20), interval=3):
-                        raise OilMaxed
+                if self.config.SERVER in ["cn"] and self.appear(
+                    commission_assets.OIL_MAXED, offset=(20, 20), interval=3
+                ):
+                    raise OilMaxed
                 # 最后检查 GET_SHIP，以处理主界面随机白底。
                 for button in [combat_assets.GET_SHIP]:
                     if click_timer.reached() and self.appear(button, interval=1):

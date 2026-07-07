@@ -735,10 +735,9 @@ class ResearchProject:
             if prefix == "L" and number in ResearchProject.C_PROJECT_NUMBERS:
                 prefix = "C"
             return "-".join([prefix, number, suffix])
-        if len(parts) == 2:
-            # 尝试插入 '-'，处理 H339-MI 这类结果。
-            if name[0].isalpha() and name[1].isdigit():
-                return self.check_name(f"{name[0]}-{name[1:]}")
+        # 尝试插入 '-'，处理 H339-MI 这类结果。
+        if len(parts) == 2 and name[0].isalpha() and name[1].isdigit():
+            return self.check_name(f"{name[0]}-{name[1:]}")
         return name
 
     def get_data(self, name, series):

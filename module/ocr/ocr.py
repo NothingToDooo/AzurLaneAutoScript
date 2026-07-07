@@ -155,9 +155,8 @@ class Digit(Ocr):
 
         prev = result
         result = int(result) if result else 0
-        if self.SHOW_REVISE_WARNING:
-            if str(result) != prev:
-                logger.warning(f'OCR {self.name}: Result "{prev}" is revised to "{result}"')
+        if self.SHOW_REVISE_WARNING and str(result) != prev:
+            logger.warning(f'OCR {self.name}: Result "{prev}" is revised to "{result}"')
 
         return result
 

@@ -34,11 +34,12 @@ class MinigameRun(UI):
             else:
                 self.device.screenshot()
             # 小游戏主页和小游戏列表都有 GOTO_CHOOSE_GAME。
-            if self.appear(GAME_ROOM_CHECK, offset=(5, 5)) and not self.appear(
-                minigame_assets.GOTO_CHOOSE_GAME, offset=(20, 20)
+            if (
+                self.appear(GAME_ROOM_CHECK, offset=(5, 5))
+                and not self.appear(minigame_assets.GOTO_CHOOSE_GAME, offset=(20, 20))
+                and MINIGAME_SCROLL.appear(main=self)
             ):
-                if MINIGAME_SCROLL.appear(main=self):
-                    break
+                break
             # 无法获得更多游戏券的弹窗。
             if self.deal_popup():
                 continue

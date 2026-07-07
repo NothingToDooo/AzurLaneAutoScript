@@ -175,18 +175,14 @@ class ResearchSelector(ResearchUI):
             return False
         # T series require commission
         # 2022.05.08 Allow T series researches because commission is now force to enable
-        # 2022.07.17 Disallow T again cause they can't be queued unless pre-conditions satisfied
-        if project.genre.upper() == "T":
+        # 2022.07.17 再次禁用 T 类，因为前置条件不满足时无法入队。
+        genre = project.genre.upper()
+        if genre == "T":
             return False
-        # 2021.08.19 Allow E-2 to disassemble tech boxes, but JP still remains the same.
-        # 2022.08.23 Allow all E-2, disassemble equipment is now supported
-        #   Ignore E-2 if don't have any boxes in storage to disassemble,
-        #   Or will enter a loop of starting research, trying to disassemble, cancel research
-        if not self.storage_has_boxes:
-            if project.genre.upper() == "E" and project.task != "":
-                return False
-
-        return True
+        # 2021.08.19 允许 E-2 拆科技箱，但日服仍保持原逻辑。
+        # 2022.08.23 允许全部 E-2，拆装备已经支持。
+        # 没有可拆箱子时忽略 E-2，避免开始科研、尝试拆箱、取消科研的循环。
+        return self.storage_has_boxes or genre != "E" or project.task == ""
 
     def research_sort_shortest(self, enforce):
         """

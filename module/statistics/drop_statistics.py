@@ -50,12 +50,11 @@ class DropStatistics:
     @cached_property
     def csv_overwrite_check(self):
         """
-        Remove existing csv file. This method only run once.
+        删除已有 csv 文件。该方法只运行一次。
         """
-        if DropStatistics.CSV_OVERWRITE:
-            if os.path.exists(self.csv_file):
-                logger.info(f"Remove existing csv file: {self.csv_file}")
-                os.remove(self.csv_file)
+        if DropStatistics.CSV_OVERWRITE and os.path.exists(self.csv_file):
+            logger.info(f"Remove existing csv file: {self.csv_file}")
+            os.remove(self.csv_file)
         return True
 
     def parse_template(self, file):
