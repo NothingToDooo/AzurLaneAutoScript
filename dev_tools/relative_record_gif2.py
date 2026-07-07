@@ -62,7 +62,7 @@ class RelativeRecord:
         self.images = np.array(self.images)
         self.images_amount = len(self.images)
         self.folder = os.path.join(FOLDER, f"{NAME}_gif")
-        if not os.path.exists(self.folder):
+        if not Path(self.folder).exists():
             Path(self.folder).mkdir()
 
     def count(self, area):

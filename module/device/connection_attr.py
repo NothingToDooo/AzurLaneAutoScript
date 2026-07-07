@@ -151,19 +151,19 @@ class ConnectionAttr:
 
         file = State.deploy_config.AdbExecutable
         file = file.replace("\\", "/")
-        if os.path.exists(file):
+        if Path(file).exists():
             return str(Path(file).resolve())
 
         # 再尝试项目内已有的 adb.exe。
         for file in self.adb_binary_list:
-            if os.path.exists(file):
+            if Path(file).exists():
                 return str(Path(file).resolve())
 
         # 再尝试 Python 环境里的 ADB。
         import sys
 
         file = (Path(sys.executable) / "../Lib/site-packages/adbutils/binaries/adb.exe").resolve().as_posix()
-        if os.path.exists(file):
+        if Path(file).exists():
             return file
 
         # 最后使用系统 PATH 里的 ADB。

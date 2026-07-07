@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from pathlib import Path
 
 from deploy.config import DeployConfig
 from deploy.emulator import EmulatorConnect
@@ -30,7 +31,7 @@ class AdbManager(DeployConfig):
     @cached_property
     def adb(self):
         exe = self.filepath("AdbExecutable")
-        if os.path.exists(exe):
+        if Path(exe).exists():
             return exe
 
         logger.warning(f"AdbExecutable: {exe} does not exist, use `adb` instead")

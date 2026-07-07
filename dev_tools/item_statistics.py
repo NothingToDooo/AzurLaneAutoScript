@@ -1,5 +1,6 @@
 import os
 import shutil
+from pathlib import Path
 
 import numpy as np
 from tqdm import tqdm
@@ -25,7 +26,7 @@ class DropStatistics(BattleStatusStatistics, GetItemsStatistics):
         """
         self.folder = folder
         self.template_folder = os.path.join(self.folder, "item_template")
-        if not os.path.exists(self.template_folder):
+        if not Path(self.template_folder).exists():
             shutil.copytree("./assets/stats_basic", self.template_folder)
         self.load_template_folder(self.template_folder)
         self.battle_status = load_folder(os.path.join(folder, "status"))

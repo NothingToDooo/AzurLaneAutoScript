@@ -1,5 +1,4 @@
 import codecs
-import os
 import re
 import typing as t
 import winreg
@@ -210,12 +209,12 @@ class Emulator(EmulatorBase):
 
         # MuMu9\emulator\nemu9\EmulatorShell -> MuMu9\emulator\nemu9\vmonitor\bin\adb_server.exe
         exe = self.abspath("../vmonitor/bin/adb_server.exe")
-        if os.path.exists(exe):
+        if Path(exe).exists():
             yield exe
 
         # MuMu 目录内可能有 adb.exe。
         exe = self.abspath("./adb.exe")
-        if os.path.exists(exe):
+        if Path(exe).exists():
             yield exe
 
 
@@ -352,12 +351,12 @@ class EmulatorManager(EmulatorManagerBase):
 
         # MuiCache
         for file in EmulatorManager.iter_mui_cache():
-            if Emulator.is_emulator(file) and os.path.exists(file):
+            if Emulator.is_emulator(file) and Path(file).exists():
                 exe.add(file)
 
         # UserAssist
         for file in EmulatorManager.iter_user_assist():
-            if Emulator.is_emulator(file) and os.path.exists(file):
+            if Emulator.is_emulator(file) and Path(file).exists():
                 exe.add(file)
 
         # Uninstall registry
@@ -365,20 +364,20 @@ class EmulatorManager(EmulatorManagerBase):
             folder = Path(uninstall).parent
             # Find emulator executable from uninstaller
             for file in iter_folder(abspath(folder), ext=".exe"):
-                if Emulator.is_emulator(file) and os.path.exists(file):
+                if Emulator.is_emulator(file) and Path(file).exists():
                     exe.add(file)
             # Find from parent directory
             for file in iter_folder(abspath(folder.parent), ext=".exe"):
-                if Emulator.is_emulator(file) and os.path.exists(file):
+                if Emulator.is_emulator(file) and Path(file).exists():
                     exe.add(file)
             # MuMu specific directory
             for file in iter_folder(abspath(folder / "EmulatorShell"), ext=".exe"):
-                if Emulator.is_emulator(file) and os.path.exists(file):
+                if Emulator.is_emulator(file) and Path(file).exists():
                     exe.add(file)
 
         # Running
         for file in EmulatorManager.iter_running_emulator():
-            if os.path.exists(file):
+            if Path(file).exists():
                 exe.add(file)
 
         # 去重。

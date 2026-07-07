@@ -1,8 +1,8 @@
 import copy
 import importlib
-import os
 import random
 from contextlib import suppress
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from module.campaign.campaign_event import CampaignEvent
@@ -53,7 +53,7 @@ class CampaignRun(CampaignEvent):
             self.module = importlib.import_module("." + name, f"campaign.{folder}")
         except ModuleNotFoundError as e:
             logger.warning(f"Map file not found: campaign.{folder}.{name}")
-            if not os.path.exists(f"./campaign/{folder}"):
+            if not Path(f"./campaign/{folder}").exists():
                 logger.warning(f"Folder not exists: ./campaign/{folder}")
             else:
                 files = map_files(folder)

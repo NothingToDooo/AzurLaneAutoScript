@@ -101,7 +101,7 @@ class DeployConfig(ConfigModel):
     @cached_property
     def adb(self) -> str:
         exe = self.filepath(self.AdbExecutable)
-        if os.path.exists(exe):
+        if Path(exe).exists():
             return exe
 
         logger.warning(f"AdbExecutable: {exe} 不存在，改用 `adb`")
@@ -110,7 +110,7 @@ class DeployConfig(ConfigModel):
     @cached_property
     def python(self) -> str:
         exe = self.filepath(self.PythonExecutable)
-        if os.path.exists(exe):
+        if Path(exe).exists():
             return exe
 
         current = sys.executable.replace("\\", "/")

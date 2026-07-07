@@ -230,7 +230,7 @@ class NemuIpcImpl:
         ]
         self.lib = None
         for ipc_dll in list_dll:
-            if not os.path.exists(ipc_dll):
+            if not Path(ipc_dll).exists():
                 continue
             try:
                 self.lib = ctypes.CDLL(ipc_dll)

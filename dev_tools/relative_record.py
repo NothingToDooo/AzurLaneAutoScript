@@ -58,7 +58,7 @@ NODE = "D5"
 
 if __name__ == "__main__":
     for folder in [FOLDER, os.path.join(FOLDER, NAME)]:
-        if not os.path.exists(folder):
+        if not Path(folder).exists():
             Path(folder).mkdir()
 
     cfg = AzurLaneConfig(CONFIG).merge(Config())

@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import cv2
@@ -26,7 +25,7 @@ def load_folder(folder, ext=".png"):
     Returns:
         dict: Key: str, image file base name. Value: full filepath.
     """
-    if not os.path.exists(folder):
+    if not Path(folder).exists():
         return {}
 
     out = {}

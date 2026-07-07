@@ -28,7 +28,7 @@ class DropStatistics:
     def __init__(self):
         AlOcr.CNOCR_CONTEXT = DropStatistics.CNOCR_CONTEXT
         Ocr.SHOW_LOG = False
-        if not os.path.exists(self.template_folder):
+        if not Path(self.template_folder).exists():
             shutil.copytree(DropStatistics.TEMPLATE_BASIC, self.template_folder)
 
         self.battle_status = BattleStatusStatistics()
@@ -53,7 +53,7 @@ class DropStatistics:
         """
         删除已有 csv 文件。该方法只运行一次。
         """
-        if DropStatistics.CSV_OVERWRITE and os.path.exists(self.csv_file):
+        if DropStatistics.CSV_OVERWRITE and Path(self.csv_file).exists():
             logger.info(f"Remove existing csv file: {self.csv_file}")
             Path(self.csv_file).unlink()
         return True

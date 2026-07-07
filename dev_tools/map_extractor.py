@@ -614,10 +614,10 @@ class MapData:
 
     def write(self, path):
         file = os.path.join(path, self.map_file_name())
-        has_modified_campaign_base = os.path.exists(os.path.join(path, "campaign_base.py"))
+        has_modified_campaign_base = Path(path, "campaign_base.py").exists()
         if has_modified_campaign_base:
             print("Using existing campaign_base.py")
-        if os.path.exists(file):
+        if Path(file).exists():
             if OVERWRITE:
                 print(f"Delete file: {file}")
                 Path(file).unlink()
@@ -718,7 +718,7 @@ class ChapterTemplate:
         print("Please confirm selected the correct maps before extracting.\nInput any key and press ENTER to continue")
         input()
 
-        if not os.path.exists(folder):
+        if not Path(folder).exists():
             Path(folder).mkdir()
         for data in maps:
             data.write(folder)

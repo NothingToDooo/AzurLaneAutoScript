@@ -100,7 +100,7 @@ class EmulatorManager(AlasManager):
         """
         for n in range(10):
             backup = f"{adb}.bak{n}" if n else f"{adb}.bak"
-            if os.path.exists(backup):
+            if Path(backup).exists():
                 if new_backup:
                     continue
                 return backup
@@ -148,9 +148,9 @@ class EmulatorManager(AlasManager):
         for adb in self.emulator_manager.all_adb_binaries:
             logger.info(f"Recovering {adb}")
             bak = self.adb_path_to_backup(adb, new_backup=False)
-            if os.path.exists(bak):
+            if Path(bak).exists():
                 logger.info(f"Delete {adb}")
-                if os.path.exists(adb):
+                if Path(adb).exists():
                     Path(adb).unlink()
                 logger.info(f"{bak} -----> {adb}")
                 shutil.move(bak, adb)

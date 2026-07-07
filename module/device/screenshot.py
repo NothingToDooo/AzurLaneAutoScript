@@ -127,7 +127,7 @@ class Screenshot(Adb, NemuIpc):
 
             folder = self.config.SCREEN_SHOT_SAVE_FOLDER_BASE if to_base_folder else self.config.SCREEN_SHOT_SAVE_FOLDER
             folder = os.path.join(folder, genre)
-            if not os.path.exists(folder):
+            if not Path(folder).exists():
                 Path(folder).mkdir()
 
             file = os.path.join(folder, file)

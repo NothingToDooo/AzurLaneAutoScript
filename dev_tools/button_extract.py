@@ -38,7 +38,7 @@ class ImageExtractor:
         for ext in [".png", ".gif"]:
             file = f"{self.name}.{genre}{ext}" if genre else f"{self.name}{ext}"
             file = os.path.join(AzurLaneConfig.ASSETS_FOLDER, server, self.module, file).replace("\\", "/")
-            if os.path.exists(file):
+            if Path(file).exists():
                 return file
 
         ext = ".png"
@@ -75,17 +75,17 @@ class ImageExtractor:
 
     def load(self, server="cn"):
         file = self.get_file(server=server)
-        if os.path.exists(file):
+        if Path(file).exists():
             area, color = self.extract(file)
             button = area
             override = self.get_file("AREA", server=server)
-            if os.path.exists(override):
+            if Path(override).exists():
                 area, _ = self.extract(override)
             override = self.get_file("COLOR", server=server)
-            if os.path.exists(override):
+            if Path(override).exists():
                 _, color = self.extract(override)
             override = self.get_file("BUTTON", server=server)
-            if os.path.exists(override):
+            if Path(override).exists():
                 button, _ = self.extract(override)
 
             self.area[server] = area
@@ -183,7 +183,7 @@ class ModuleExtractor:
 
     def write(self):
         folder = os.path.join(MODULE_FOLDER, self.name)
-        if not os.path.exists(folder):
+        if not Path(folder).exists():
             Path(folder).mkdir()
         with open(os.path.join(folder, BUTTON_FILE), "w", newline="") as f:
             f.writelines(f"{text}\n" for text in self.expression)

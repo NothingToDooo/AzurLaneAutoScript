@@ -1,4 +1,3 @@
-import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -69,7 +68,7 @@ def poor_yaml_read(file):
     Returns:
         dict:
     """
-    if not os.path.exists(file):
+    if not Path(file).exists():
         return {}
 
     data = {}

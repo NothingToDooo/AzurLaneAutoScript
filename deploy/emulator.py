@@ -60,7 +60,7 @@ class VirtualBoxEmulator:
         for adb in self.adb_binary:
             for n in range(10):
                 backup = f"{adb}.bak{n}" if n else f"{adb}.bak"
-                if os.path.exists(backup):
+                if Path(backup).exists():
                     continue
                 files.append(backup)
                 break
@@ -101,7 +101,7 @@ class VirtualBoxEmulator:
         for ori, bak in zip(self.adb_binary, self.adb_backup, strict=True):
             logger.info(f"Replacing {ori}")
             try:
-                if os.path.exists(ori):
+                if Path(ori).exists():
                     if filecmp.cmp(adb, ori, shallow=True):
                         logger.info(f"{adb} is same as {ori}, skip")
                     else:
@@ -119,9 +119,9 @@ class VirtualBoxEmulator:
         for ori in self.adb_binary:
             logger.info(f"Recovering {ori}")
             bak = f"{ori}.bak"
-            if os.path.exists(bak):
+            if Path(bak).exists():
                 logger.info(f"Delete {ori}")
-                if os.path.exists(ori):
+                if Path(ori).exists():
                     Path(ori).unlink()
                 logger.info(f"{bak} -----> {ori}")
                 shutil.move(bak, ori)

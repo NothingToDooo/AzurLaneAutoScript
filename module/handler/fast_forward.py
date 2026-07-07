@@ -1,4 +1,3 @@
-import os
 import re
 from pathlib import Path
 
@@ -36,7 +35,7 @@ def map_files(event):
     """
     folder = f"./campaign/{event}"
 
-    if not os.path.exists(folder):
+    if not Path(folder).exists():
         logger.warning(f"Map file folder: {folder} does not exist, can not get map files")
         return []
 
