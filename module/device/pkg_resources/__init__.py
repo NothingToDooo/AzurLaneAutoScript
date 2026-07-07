@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+from pathlib import Path
 
 from module.base.decorator import cached_property
 from module.logger import logger
@@ -40,7 +41,7 @@ class PackageCache:
         # 借用已安装依赖定位当前环境的 site-packages。
         import requests
 
-        return os.path.abspath(os.path.join(requests.__file__, "../../"))
+        return str((Path(requests.__file__) / "../../").resolve())
 
     @cached_property
     def dict_installed_packages(self):
@@ -70,7 +71,7 @@ PACKAGE_CACHE = PackageCache()
 
 def resource_filename(*args):
     if args == ("adbutils", "binaries"):
-        return os.path.abspath(os.path.join(PACKAGE_CACHE.site_packages, *args))
+        return str(Path(PACKAGE_CACHE.site_packages, *args).resolve())
     return None
 
 

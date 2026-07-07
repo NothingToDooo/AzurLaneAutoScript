@@ -58,7 +58,7 @@ def list_key(reg) -> list[RegValue]:
 
 
 def abspath(path):
-    return os.path.abspath(path).replace("\\", "/")
+    return Path(path).resolve().as_posix()
 
 
 class EmulatorInstance(EmulatorInstanceBase):

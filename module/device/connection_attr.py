@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import adbutils
 import uiautomator2 as u2
@@ -151,18 +152,17 @@ class ConnectionAttr:
         file = State.deploy_config.AdbExecutable
         file = file.replace("\\", "/")
         if os.path.exists(file):
-            return os.path.abspath(file)
+            return str(Path(file).resolve())
 
         # 再尝试项目内已有的 adb.exe。
         for file in self.adb_binary_list:
             if os.path.exists(file):
-                return os.path.abspath(file)
+                return str(Path(file).resolve())
 
         # 再尝试 Python 环境里的 ADB。
         import sys
 
-        file = os.path.join(sys.executable, "../Lib/site-packages/adbutils/binaries/adb.exe")
-        file = os.path.abspath(file).replace("\\", "/")
+        file = (Path(sys.executable) / "../Lib/site-packages/adbutils/binaries/adb.exe").resolve().as_posix()
         if os.path.exists(file):
             return file
 

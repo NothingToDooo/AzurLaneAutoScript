@@ -92,7 +92,7 @@ class DeployConfig(ConfigModel):
         if Path(path).is_absolute():
             return path
 
-        return os.path.abspath(os.path.join(self.root_filepath, path)).replace(r"\\", "/").replace("\\", "/")
+        return (Path(self.root_filepath) / path).resolve().as_posix()
 
     @cached_property
     def root_filepath(self):

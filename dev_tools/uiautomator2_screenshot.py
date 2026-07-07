@@ -1,5 +1,5 @@
-import os
 from datetime import datetime
+from pathlib import Path
 
 from deploy.atomic import atomic_write
 from module.base.base import ModuleBase, cv2, image_channel
@@ -92,7 +92,7 @@ class WatchScreen(ModuleBase):
     def watch(self, similarity=0.98):
         start = now()
         before = self.device.screenshot()
-        file = os.path.abspath(f"screenshots/{start}/{start}.png")
+        file = str(Path(f"screenshots/{start}/{start}.png").resolve())
         image_save(before, file)
         for image in self.loop():
             res = cv2.matchTemplate(image, before, cv2.TM_CCOEFF_NORMED)
@@ -100,7 +100,7 @@ class WatchScreen(ModuleBase):
 
             if sim < similarity:
                 name = now()
-                file = os.path.abspath(f"screenshots/{start}/{name}.png")
+                file = str(Path(f"screenshots/{start}/{name}.png").resolve())
                 logger.info(f"Save file: {file}")
                 image_save(image, file)
                 before = image

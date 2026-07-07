@@ -52,7 +52,7 @@ class VirtualBoxEmulator:
 
     @cached_property
     def adb_binary(self):
-        return [os.path.abspath(os.path.join(self.root, a)) for a in self.adb_path]
+        return [str((Path(self.root) / a).resolve()) for a in self.adb_path]
 
     @cached_property
     def adb_backup(self):

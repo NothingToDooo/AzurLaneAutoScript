@@ -4,6 +4,7 @@ import os
 import sys
 import time
 from functools import wraps
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -218,13 +219,14 @@ class NemuIpcImpl:
         self.display_id: int = display_id
 
         # try to load dll from various path
+        nemu_path = Path(nemu_folder)
         list_dll = [
             # MuMuPlayer12
-            os.path.abspath(os.path.join(nemu_folder, "./shell/sdk/external_renderer_ipc.dll")),
+            str((nemu_path / "shell/sdk/external_renderer_ipc.dll").resolve()),
             # MuMuPlayer12 5.0
-            os.path.abspath(os.path.join(nemu_folder, "./nx_device/12.0/shell/sdk/external_renderer_ipc.dll")),
+            str((nemu_path / "nx_device/12.0/shell/sdk/external_renderer_ipc.dll").resolve()),
             # MuMuPlayer12 6.0
-            os.path.abspath(os.path.join(nemu_folder, "./nx_main/sdk/external_renderer_ipc.dll")),
+            str((nemu_path / "nx_main/sdk/external_renderer_ipc.dll").resolve()),
         ]
         self.lib = None
         for ipc_dll in list_dll:
@@ -473,7 +475,7 @@ class NemuIpc(Platform):
         """
         # Try existing settings first
         if self.config.EmulatorInfo_path:
-            folder = os.path.abspath(os.path.join(self.config.EmulatorInfo_path, "../../"))
+            folder = str((Path(self.config.EmulatorInfo_path) / "../../").resolve())
             index = NemuIpcImpl.serial_to_id(self.serial)
             if index is not None:
                 try:
@@ -561,10 +563,11 @@ class NemuIpc(Platform):
         if self.config.EmulatorInfo_path:
             index = NemuIpcImpl.serial_to_id(self.serial)
             if index is not None:
-                file = os.path.abspath(
-                    os.path.join(
-                        self.config.EmulatorInfo_path, f"../../vms/MuMuPlayer-12.0-{index}/configs/customer_config.json"
-                    )
+                file = str(
+                    (
+                        Path(self.config.EmulatorInfo_path)
+                        / f"../../vms/MuMuPlayer-12.0-{index}/configs/customer_config.json"
+                    ).resolve()
                 )
                 if self.check_mumu_app_keep_alive_400(file):
                     return True

@@ -8,7 +8,7 @@ from module.device.platform.utils import cached_property, iter_folder
 
 
 def abspath(path):
-    return os.path.abspath(path).replace("\\", "/")
+    return Path(path).resolve().as_posix()
 
 
 def get_serial_pair(serial):

@@ -91,9 +91,9 @@ class DeployConfig(ConfigModel):
             str：绝对路径。
         """
         return (
-            os.path.abspath(os.path.join(self.root_filepath, self.config[key]))
-            .replace(r"\\", "/")
-            .replace("\\", "/")
+            (Path(self.root_filepath) / self.config[key])
+            .resolve()
+            .as_posix()
             .replace('"', '"')
         )
 
