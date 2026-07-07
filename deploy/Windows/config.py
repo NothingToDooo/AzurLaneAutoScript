@@ -2,6 +2,7 @@ import copy
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 from deploy.Windows.logger import logger
 from deploy.Windows.utils import DEPLOY_CONFIG, DEPLOY_TEMPLATE, cached_property, poor_yaml_read, poor_yaml_write
@@ -88,7 +89,7 @@ class DeployConfig(ConfigModel):
         返回：
             str：绝对路径。
         """
-        if os.path.isabs(path):
+        if Path(path).is_absolute():
             return path
 
         return os.path.abspath(os.path.join(self.root_filepath, path)).replace(r"\\", "/").replace("\\", "/")

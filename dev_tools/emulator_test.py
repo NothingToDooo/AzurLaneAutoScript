@@ -1,10 +1,10 @@
-import os
 import time
+from pathlib import Path
 
 import numpy as np
 
 # os.chdir('../')
-print(os.getcwd())
+print(Path.cwd())
 import module.config.server as server
 
 server.server = "cn"  # Don't need to edit, it's used to avoid error.

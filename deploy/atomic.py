@@ -3,6 +3,7 @@ import random
 import string
 import time
 from contextlib import suppress
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -113,7 +114,7 @@ def replace_tmp(tmp: str, file: str):
 
     # 写入失败时尽力清理临时文件；清理失败仍然抛出原始写入错误。
     with suppress(Exception):
-        os.unlink(tmp)
+        Path(tmp).unlink()
     if last_error is not None:
         raise last_error from None
 
@@ -472,7 +473,7 @@ def file_remove(file: str):
     非原子地删除文件。
     """
     with suppress(FileNotFoundError):
-        os.unlink(file)
+        Path(file).unlink()
 
 
 def atomic_remove(file: str):
@@ -517,7 +518,7 @@ def folder_rmtree(folder, may_symlinks=True):
     """
     try:
         # 如果是符号链接，只删除链接本身。
-        if may_symlinks and os.path.islink(folder):
+        if may_symlinks and Path(folder).is_symlink():
             file_remove(folder)
             return True
         # 遍历文件夹。
@@ -539,7 +540,7 @@ def folder_rmtree(folder, may_symlinks=True):
 
     # 删除空文件夹；如果仍非空，可能抛出 OSError。
     try:
-        os.rmdir(folder)
+        Path(folder).rmdir()
         return True
     except FileNotFoundError:
         return True

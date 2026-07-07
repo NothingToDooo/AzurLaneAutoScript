@@ -1,6 +1,7 @@
 import os
 import shutil
 from contextlib import suppress
+from pathlib import Path
 
 from module.handler.login import LoginHandler
 from module.logger import logger
@@ -36,7 +37,7 @@ class AzurLaneUncensored(LoginHandler):
 
         logger.hr("生成反和谐文件", level=1)
         os.makedirs(folder, exist_ok=True)
-        prev = os.getcwd()
+        prev = Path.cwd()
 
         # 在 ./toolkit/AzurLaneUncensored 中生成推送目录。
         os.chdir(folder)
