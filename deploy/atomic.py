@@ -189,7 +189,7 @@ def file_write(file: str, data: str | bytes):
     except FileNotFoundError:
         # Create parent directory
         directory = Path(file).parent
-        if directory != Path("."):
+        if directory != Path():
             directory.mkdir(parents=True, exist_ok=True)
         # Write again
         with open(file, mode=mode, encoding=encoding, newline=newline) as f:
@@ -244,7 +244,7 @@ def file_write_stream(file: str, data_generator):
     except FileNotFoundError:
         # Create parent directory
         directory = Path(file).parent
-        if directory != Path("."):
+        if directory != Path():
             directory.mkdir(parents=True, exist_ok=True)
         # Write again
         with open(file, mode=mode, encoding=encoding, newline=newline) as f:

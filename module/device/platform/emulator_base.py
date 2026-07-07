@@ -169,7 +169,7 @@ class EmulatorBase:
         self.path = path.replace("\\", "/")
         # Path to emulator folder
         parent = Path(path).parent
-        self.dir = "" if parent == Path(".") else str(parent).replace("\\", "/")
+        self.dir = "" if parent == Path() else str(parent).replace("\\", "/")
         # str: Emulator type, or '' if this is not a emulator.
         self.type = self.__class__.path_to_type(path)
 
