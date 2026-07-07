@@ -177,8 +177,8 @@ class AzurStats:
             file = folder / filename
             save_image(image, str(file))
             logger.info(f"Image save success, file: {file}")
-        except Exception as e:
-            logger.exception(e)
+        except (OSError, TypeError, ValueError) as e:
+            logger.warning(f"Image save failed, {e}")
         else:
             return True
 

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pywebio
+from pywebio.exceptions import SessionException
 from pywebio.input import PASSWORD
 from pywebio.input import input as pywebio_input
 from pywebio.output import PopupSize, popup, put_html, toast
@@ -199,8 +200,9 @@ class TaskHandler:
 
     def loop(self) -> None:
         """
-        Start task loop.
-        You **should** run this function in an individual thread.
+        启动后台任务循环。
+
+        这个方法应该在独立线程里运行。
         """
         self._alive = True
         while self._alive:
@@ -215,8 +217,11 @@ class TaskHandler:
                         # logger.debug(f'Start task {task.g.__name__}')
                         task.send(self)
                         # logger.debug(f'End task {task.g.__name__}')
-                    except Exception as e:
-                        logger.exception(e)
+                    except StopIteration:
+                        logger.info(f"Task {task} finished")
+                        self.remove_task(task, nowait=True)
+                    except SessionException as e:
+                        logger.warning(e)
                         self.remove_task(task, nowait=True)
                     finally:
                         self._task = None

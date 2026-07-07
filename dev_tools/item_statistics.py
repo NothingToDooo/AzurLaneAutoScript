@@ -1,6 +1,9 @@
+import argparse
+import csv
 import shutil
 from pathlib import Path
 
+import cv2
 import numpy as np
 from tqdm import tqdm
 
@@ -53,8 +56,8 @@ class DropStatistics(BattleStatusStatistics, GetItemsStatistics):
             try:
                 image = load_image(file)
                 super().extract_template(image, folder=self.template_folder)
-            except Exception:
-                logger.warning(f"Error image: {ts}")
+            except (ImageError, OSError, ValueError, cv2.error) as e:
+                logger.warning(f"Error image: {ts}, {e}")
 
     def stat_drop(self, timestamp):
         """
@@ -81,35 +84,41 @@ class DropStatistics(BattleStatusStatistics, GetItemsStatistics):
             try:
                 data = self.stat_drop(ts)
                 yield data
-            except Exception:
-                logger.warning(f"Error image: {ts}")
+            except (ImageError, OSError, ValueError, cv2.error) as e:
+                logger.warning(f"Error image: {ts}, {e}")
 
 
-"""
-Args:
-    FOLDER:   Alas drop screenshot folder.
-              Examples: '<your_drop_screenshot_folder>/campaign_7_2'
-    CSV_FILE: Csv file to save.
-              Examples: 'c72.csv'
-"""
+# FOLDER：Alas 掉落截图目录，例如 '<your_drop_screenshot_folder>/campaign_7_2'。
 FOLDER = ""
+# CSV_FILE：统计结果保存路径，例如 'c72.csv'。
 CSV_FILE = ""
-drop = DropStatistics(FOLDER)
 
-"""
-First run:
-    1. Uncomment this, and run.
-    2. Rename templates in <your_drop_screenshot_folder>/campaign_7_2/item_template, for example.
-"""
-# drop.extract_template()
 
-"""
-Second Run:
-    1. Comment the code in first run.
-    2. Uncomment this, and run.
-"""
-# import csv
-# with open(CSV_FILE, 'a', newline='', encoding='utf-8') as csv_file:
-#     writer = csv.writer(csv_file)
-#     for d in drop.generate_data():
-#         writer.writerows(d)
+def main(argv: list[str] | None = None) -> None:
+    """运行离线掉落统计工具。"""
+    parser = argparse.ArgumentParser(description="离线统计掉落截图")
+    parser.add_argument("folder", nargs="?", default=FOLDER, help="Alas 掉落截图目录")
+    parser.add_argument("--csv", default=CSV_FILE, help="CSV 输出路径")
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--extract-template", action="store_true", help="提取物品模板，之后需要手动重命名")
+    mode.add_argument("--export-csv", action="store_true", help="导出掉落统计 CSV")
+    args = parser.parse_args(argv)
+
+    if not args.folder:
+        parser.error("请设置掉落截图目录")
+
+    stats = DropStatistics(args.folder)
+    if args.extract_template:
+        stats.extract_template()
+        return
+
+    if not args.csv:
+        parser.error("导出 CSV 时必须设置 --csv")
+    with Path(args.csv).open("a", newline="", encoding="utf-8") as csv_file:
+        writer = csv.writer(csv_file)
+        for data in stats.generate_data():
+            writer.writerows(data)
+
+
+if __name__ == "__main__":
+    main()

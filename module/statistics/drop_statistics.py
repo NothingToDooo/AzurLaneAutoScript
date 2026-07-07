@@ -2,6 +2,7 @@ import csv
 import shutil
 from pathlib import Path
 
+import cv2
 from tqdm import tqdm
 
 from module.base.decorator import cached_property
@@ -108,9 +109,8 @@ class DropStatistics:
             except ImageError as e:
                 logger.warning(e)
                 continue
-            except Exception as e:
-                logger.exception(e)
-                logger.warning(f"Error on image {ts}")
+            except (OSError, ValueError, cv2.error) as e:
+                logger.warning(f"Error on image {ts}, {e}")
                 continue
 
     def extract_drop(self, campaign):
@@ -132,9 +132,8 @@ class DropStatistics:
                 except ImageError as e:
                     logger.warning(e)
                     continue
-                except Exception as e:
-                    logger.exception(e)
-                    logger.warning(f"Error on image {ts}")
+                except (OSError, ValueError, cv2.error) as e:
+                    logger.warning(f"Error on image {ts}, {e}")
                     continue
 
 
