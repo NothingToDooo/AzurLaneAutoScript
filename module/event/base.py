@@ -19,6 +19,8 @@ class EventStage:
     def __eq__(self, other):
         return str(self) == str(other)
 
+    __hash__ = None
+
 
 class EventBase(CampaignRun):
     def load_campaign(self, *args, **kwargs):

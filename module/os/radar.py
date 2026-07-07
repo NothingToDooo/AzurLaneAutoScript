@@ -352,9 +352,8 @@ class Radar:
             if in_port:
                 if grid.is_question and not grid.is_port:
                     return location
-            else:
-                if grid.is_question or grid.is_port:
-                    return location
+            elif grid.is_question or grid.is_port:
+                return location
 
         return None
 

@@ -51,6 +51,8 @@ class Function:
 
         return self.command == other.command and self.next_run == other.next_run
 
+    __hash__ = None
+
 
 def name_to_function(name):
     """

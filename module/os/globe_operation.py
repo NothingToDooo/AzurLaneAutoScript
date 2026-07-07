@@ -111,9 +111,8 @@ class GlobeOperation(ActionPointHandler):
         for _ in self.loop():
             if self.handle_zone_pinned():
                 confirm_timer.reset()
-            else:
-                if confirm_timer.reached():
-                    break
+            elif confirm_timer.reached():
+                break
 
     def zone_has_switch(self):
         """
@@ -362,12 +361,10 @@ class GlobeOperation(ActionPointHandler):
                 if self.handle_zone_pinned():
                     unpinned += 1
                     confirm_timer.reset()
-                else:
-                    if unpinned and confirm_timer.reached():
-                        break
-            else:
-                if self.is_zone_pinned():
+                elif unpinned and confirm_timer.reached():
                     break
+            elif self.is_zone_pinned():
+                break
 
     def globe_enter(self, zone):
         """

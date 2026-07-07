@@ -234,10 +234,9 @@ class MapEventHandler(EnemySearchingHandler):
                 self.device.click(os_assets.AUTO_SEARCH_OS_MAP_OPTION_OFF_DISABLED)
                 self.interval_reset(os_assets.AUTO_SEARCH_OS_MAP_OPTION_OFF)
                 return True
-        else:
-            if self.match_template_color(os_assets.AUTO_SEARCH_OS_MAP_OPTION_ON, offset=(5, 120), interval=3):
-                self.device.click(os_assets.AUTO_SEARCH_OS_MAP_OPTION_ON)
-                return True
+        elif self.match_template_color(os_assets.AUTO_SEARCH_OS_MAP_OPTION_ON, offset=(5, 120), interval=3):
+            self.device.click(os_assets.AUTO_SEARCH_OS_MAP_OPTION_ON)
+            return True
 
         return False
 

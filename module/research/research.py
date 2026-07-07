@@ -400,15 +400,14 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
                     else:
                         item_confirm.reset()
                         record_button = None
-                else:
-                    # 不保存掉落，直接点击。
-                    if item_interval.reached():
-                        appear_button = self.get_items()
-                        if appear_button is not None:
-                            self.device.click(research_assets.GET_ITEMS_RESEARCH_SAVE)
-                            item_interval.reset()
-                            total += 1
-                            continue
+                # 不保存掉落，直接点击。
+                elif item_interval.reached():
+                    appear_button = self.get_items()
+                    if appear_button is not None:
+                        self.device.click(research_assets.GET_ITEMS_RESEARCH_SAVE)
+                        item_interval.reset()
+                        total += 1
+                        continue
 
                 # 领取奖励。
                 if self.appear_then_click(research_assets.QUEUE_CLAIM_REWARD, offset=None, interval=5):

@@ -66,6 +66,8 @@ class Food:
     def __eq__(self, other):
         return str(self) == str(other)
 
+    __hash__ = None
+
 
 FOOD_FEED_AMOUNT = [1000, 2000, 3000, 5000, 10000, 20000]
 FOOD_FILTER = Filter(regex=re.compile(r"(\d+)"), attr=["feed"])

@@ -247,9 +247,8 @@ class Daily(Combat, DailyEquipment):
             if self.config.Daily_UseDailySkip:
                 if self.appear_then_click(daily_assets.DAILY_SKIP, offset=(20, 20), interval=5):
                     continue
-            else:
-                if self.appear_then_click(daily_assets.DAILY_NORMAL_RUN, offset=(20, 20), interval=5):
-                    continue
+            elif self.appear_then_click(daily_assets.DAILY_NORMAL_RUN, offset=(20, 20), interval=5):
+                continue
             if self.handle_combat_automation_confirm():
                 continue
             if self.handle_daily_additional():

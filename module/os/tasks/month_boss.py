@@ -93,13 +93,12 @@ class OpsiMonthBoss(OSMap):
                 logger.info("Unable to clear the normal monthly boss, will try later")
                 self.config.opsi_task_delay(recon_scan=False, submarine_call=True, ap_limit=False)
                 self.config.task_stop()
+        elif result:
+            logger.info("Monthly boss hard cleared, task stop")
+            next_reset = get_os_next_reset()
+            self.config.task_delay(target=next_reset)
+            self.config.task_stop()
         else:
-            if result:
-                logger.info("Monthly boss hard cleared, task stop")
-                next_reset = get_os_next_reset()
-                self.config.task_delay(target=next_reset)
-                self.config.task_stop()
-            else:
-                logger.info("Unable to clear the hard monthly boss, try again on tomorrow")
-                self.config.task_delay(server_update=True)
-                self.config.task_stop()
+            logger.info("Unable to clear the hard monthly boss, try again on tomorrow")
+            self.config.task_delay(server_update=True)
+            self.config.task_stop()

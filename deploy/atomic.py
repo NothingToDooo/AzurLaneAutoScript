@@ -586,12 +586,11 @@ def atomic_failure_cleanup(folder: str, recursive: bool = False):
                             folder_rmtree(entry.path, may_symlinks=False)
                         else:
                             file_remove(entry.path)
-                else:
-                    if recursive:
-                        # 递归清理是附带动作，单个目录失败不应中断启动。
-                        with suppress(Exception):
-                            if entry.is_dir(follow_symlinks=False):
-                                atomic_failure_cleanup(entry.path, recursive=True)
+                elif recursive:
+                    # 递归清理是附带动作，单个目录失败不应中断启动。
+                    with suppress(Exception):
+                        if entry.is_dir(follow_symlinks=False):
+                            atomic_failure_cleanup(entry.path, recursive=True)
 
     except FileNotFoundError:
         # 需要清理的目录不存在。

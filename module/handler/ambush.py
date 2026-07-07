@@ -59,9 +59,8 @@ class AmbushHandler(Combat):
             # Disappeared
             if self._air_raid_appear():
                 disappear.reset()
-            else:
-                if disappear.reached():
-                    break
+            elif disappear.reached():
+                break
 
     def _handle_ambush_evade(self):
         logger.info("Map ambushed")

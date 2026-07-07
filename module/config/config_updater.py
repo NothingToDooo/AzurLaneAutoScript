@@ -109,9 +109,8 @@ class Event:
         for server, prefix in ARCHIVES_PREFIX.items():
             if self.__getattribute__(server) == "-":
                 self.__setattr__(server, None)
-            else:
-                if self.is_war_archives:
-                    self.__setattr__(server, prefix + self.__getattribute__(server))
+            elif self.is_war_archives:
+                self.__setattr__(server, prefix + self.__getattribute__(server))
 
     def __str__(self):
         return self.directory

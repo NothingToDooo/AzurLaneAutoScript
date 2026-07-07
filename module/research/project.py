@@ -677,6 +677,8 @@ class ResearchProject:
     def __eq__(self, other):
         return str(self) == str(other)
 
+    __hash__ = None
+
     def check_name(self, name):
         """
         Args:
@@ -851,6 +853,8 @@ class ResearchProjectJp:
 
     def __eq__(self, other):
         return str(self) == str(other)
+
+    __hash__ = None
 
     @cached_property
     def equipment_amount(self):

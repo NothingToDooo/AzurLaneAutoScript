@@ -152,9 +152,8 @@ class Campaign(CampaignBase):
                 return True
             if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=1):
                 return True
-        else:
-            if self.clear_siren():
-                return True
+        elif self.clear_siren():
+            return True
 
         return self.battle_default()
 
@@ -164,9 +163,8 @@ class Campaign(CampaignBase):
                 return True
             if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
                 return True
-        else:
-            if self.clear_siren():
-                return True
+        elif self.clear_siren():
+            return True
 
         return self.battle_default()
 

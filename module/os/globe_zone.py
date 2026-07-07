@@ -55,6 +55,8 @@ class Zone:
     def __eq__(self, other):
         return self.zone_id == other.zone_id
 
+    __hash__ = None
+
 
 class ZoneManager:
     zone: Zone

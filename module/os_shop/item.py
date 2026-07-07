@@ -118,6 +118,8 @@ class OSShopItem(Item):
     def __eq__(self, other):
         return id(self) == id(other)
 
+    __hash__ = None
+
 
 class OSShopItemGrid(ItemGrid):
     item_class = OSShopItem

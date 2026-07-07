@@ -127,10 +127,9 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
                         self.device.click(p)
                         pause_interval.reset()
                         continue
-                else:
-                    if show_hp_timer.reached():
-                        show_hp_timer.reset()
-                        self._show_hp()
+                elif show_hp_timer.reached():
+                    show_hp_timer.reset()
+                    self._show_hp()
             # bunch of popup handlers
             if self.handle_popup_confirm("EXERCISE_COMBAT_EXECUTE"):
                 continue

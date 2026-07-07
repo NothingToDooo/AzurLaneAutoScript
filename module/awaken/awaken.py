@@ -77,17 +77,16 @@ class Awaken(Dock):
                 result = coin and chip and array
                 logger.attr("AwakenSufficient", result)
                 return result
-        else:
-            # 如果不需要心智单元 II，金币和心智单元应同时存在且右移。
-            if (
-                coin is not None
-                and is_right_moved(awaken_assets.COST_COIN)
-                and chip is not None
-                and is_right_moved(awaken_assets.COST_CHIP)
-            ):
-                result = coin and chip
-                logger.attr("AwakenSufficient", result)
-                return result
+        # 如果不需要心智单元 II，金币和心智单元应同时存在且右移。
+        elif (
+            coin is not None
+            and is_right_moved(awaken_assets.COST_COIN)
+            and chip is not None
+            and is_right_moved(awaken_assets.COST_CHIP)
+        ):
+            result = coin and chip
+            logger.attr("AwakenSufficient", result)
+            return result
 
         logger.warning("Invalid awaken cost")
         return "invalid"

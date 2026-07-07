@@ -322,9 +322,8 @@ class NemuIpcImpl:
         elif func.__name__ == "nemu_connect":
             if result == 0:
                 err = True
-        else:
-            if result > 0:
-                err = True
+        elif result > 0:
+            err = True
         # Get to actual error message printed in std
         if err:
             logger.warning(f"Failed to call {func.__name__}, result={result}")
@@ -515,11 +514,10 @@ class NemuIpc(Platform):
             # >= 4.0 has no info in getprop
             # Try initializing nemu_ipc for final check
             pass
-        else:
-            # Having version, probably MuMu6 or MuMu12 version 3.x
-            if self.nemud_app_keep_alive == "":
-                # Empty property, probably MuMu6 or MuMu12 version < 3.5.6
-                return False
+        # Having version, probably MuMu6 or MuMu12 version 3.x
+        elif self.nemud_app_keep_alive == "":
+            # Empty property, probably MuMu6 or MuMu12 version < 3.5.6
+            return False
         try:
             _ = self.nemu_ipc
         except RequestHumanTakeover:

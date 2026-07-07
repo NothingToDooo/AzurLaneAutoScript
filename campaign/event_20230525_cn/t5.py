@@ -145,9 +145,8 @@ class Campaign(CampaignBase):
                 return True
             if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
                 return True
-        else:
-            if self.clear_any_enemy(sort=("cost_2",)):
-                return True
+        elif self.clear_any_enemy(sort=("cost_2",)):
+            return True
 
         return self.battle_default()
 

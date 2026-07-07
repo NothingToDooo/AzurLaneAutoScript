@@ -58,15 +58,14 @@ class LuaLoader:
                     escape = True
                 elif ch == in_string:
                     in_string = None
-            else:
-                if ch in ('"', "'"):
-                    in_string = ch
-                elif ch == "{":
-                    depth += 1
-                elif ch == "}":
-                    depth -= 1
-                    if depth == 0:
-                        return i
+            elif ch in ('"', "'"):
+                in_string = ch
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return i
         return -1
 
     def _infer_base_name(self, file, keyword):

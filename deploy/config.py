@@ -114,7 +114,13 @@ class DeployConfig(ConfigModel):
         command = command.replace(r"\\", "/").replace("\\", "/").replace('"', '"')
         logger.info(command)
         output_target = None if output else subprocess.DEVNULL
-        error_code = subprocess.run(command, stdout=output_target, stderr=output_target, shell=False).returncode
+        error_code = subprocess.run(
+            command,
+            stdout=output_target,
+            stderr=output_target,
+            shell=False,
+            check=False,
+        ).returncode
         if error_code:
             if allow_failure:
                 logger.info(f"[允许失败]，error_code: {error_code}")

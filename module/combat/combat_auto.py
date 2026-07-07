@@ -51,11 +51,10 @@ class CombatAuto(ModuleBase):
                 self.auto_click_interval_timer.reset()
                 self.auto_mode_switched = True
                 return True
-        else:
-            if not auto:
-                self.device.click(COMBAT_AUTO_SWITCH)
-                self.auto_click_interval_timer.reset()
-                self.auto_mode_switched = True
-                return True
+        elif not auto:
+            self.device.click(COMBAT_AUTO_SWITCH)
+            self.auto_click_interval_timer.reset()
+            self.auto_mode_switched = True
+            return True
 
         return False
