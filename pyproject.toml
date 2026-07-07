@@ -26,7 +26,6 @@ dependencies = [
     "starlette",
     "zerorpc",
     "pyzmq",
-    "cached-property>=2.0.1",
     "onnxruntime>=1.27.0",
     "uvicorn>=0.50.2",
 ]

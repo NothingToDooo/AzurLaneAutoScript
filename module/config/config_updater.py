@@ -4,9 +4,8 @@ import typing as t
 from copy import deepcopy
 from datetime import datetime
 
-from cached_property import cached_property
-
 from deploy.utils import DEPLOY_TEMPLATE, poor_yaml_read, poor_yaml_write
+from module.base.decorator import cached_property
 from module.base.timer import timer
 from module.config.deep import deep_default, deep_get, deep_iter, deep_set
 from module.config.server import VALID_CHANNEL_PACKAGE, VALID_PACKAGE, VALID_SERVER_LIST, to_package, to_server
