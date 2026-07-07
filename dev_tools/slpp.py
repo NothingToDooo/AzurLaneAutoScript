@@ -30,14 +30,7 @@ SORTABLE_KEY_TYPES = (*six.string_types, int, float, bool, tuple)
 
 
 def sequential(lst):
-    length = len(lst)
-    if length == 0 or lst[0] != 0:
-        return False
-    for i in range(length):
-        if i + 1 < length:
-            if lst[i] + 1 != lst[i + 1]:
-                return False
-    return True
+    return bool(lst) and lst == list(range(len(lst)))
 
 
 class ParseError(Exception):

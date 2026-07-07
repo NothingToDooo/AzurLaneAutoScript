@@ -62,9 +62,8 @@ DIC_TRANSLATION = {
 
 
 def set_translation(cn, en):
-    if len(cn) and len(en):
-        if cn not in DIC_TRANSLATION:
-            DIC_TRANSLATION[cn] = en
+    if cn and en and cn not in DIC_TRANSLATION:
+        DIC_TRANSLATION[cn] = en
 
 
 class TechnologyTemplate:

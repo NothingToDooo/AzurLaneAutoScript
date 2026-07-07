@@ -27,13 +27,12 @@ class Config:
 
 class W15GridInfo(GridInfo):
     def merge(self, info, mode="normal"):
-        # Consider boss as siren
-        if info.is_boss:
-            if not self.is_land and self.may_siren:
-                self.is_siren = True
-                self.enemy_scale = 0
-                self.enemy_genre = ""
-                return True
+        # 将 Boss 视作 Siren。
+        if info.is_boss and not self.is_land and self.may_siren:
+            self.is_siren = True
+            self.enemy_scale = 0
+            self.enemy_genre = ""
+            return True
 
         return super().merge(info, mode=mode)
 

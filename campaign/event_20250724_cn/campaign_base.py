@@ -42,14 +42,13 @@ class CampaignBaseT(CampaignBase_):
 
 class CampaignBaseTS(CampaignBaseT):
     def campaign_set_chapter_20241219(self, chapter, stage, mode="combat"):
-        if self.config.MAP_CHAPTER_SWITCH_20241219:
-            # TS is hard mode
-            if chapter in ["ts"]:
-                self.ui_goto_event()
-                self.campaign_ensure_mode_20241219("combat")
-                self.campaign_ensure_aside_20241219("part2")
-                self.campaign_ensure_chapter(chapter)
-                return True
+        # TS 是困难模式。
+        if self.config.MAP_CHAPTER_SWITCH_20241219 and chapter in ["ts"]:
+            self.ui_goto_event()
+            self.campaign_ensure_mode_20241219("combat")
+            self.campaign_ensure_aside_20241219("part2")
+            self.campaign_ensure_chapter(chapter)
+            return True
         return super().campaign_set_chapter_20241219(chapter, stage, mode)
 
     def handle_exp_info(self):

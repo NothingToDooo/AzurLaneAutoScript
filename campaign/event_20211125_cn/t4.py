@@ -150,9 +150,8 @@ class Campaign(CampaignBase):
         return self.battle_default()
 
     def battle_5(self):
-        if not self.map_is_clear_mode:
-            if self.clear_siren():
-                return True
+        if not self.map_is_clear_mode and self.clear_siren():
+            return True
 
         return self.fleet_boss.clear_boss()
 

@@ -67,10 +67,9 @@ class CampaignBase(CampaignBase_):
         return False
 
     def handle_in_stage(self):
-        # Click after stage ended
-        if self.is_in_stage_page():
-            if self.handle_story_entrance():
-                return False
+        # 关卡结束后处理剧情入口。
+        if self.is_in_stage_page() and self.handle_story_entrance():
+            return False
         return super().handle_in_stage()
 
     def handle_get_chapter_additional(self):
