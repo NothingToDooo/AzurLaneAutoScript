@@ -146,12 +146,7 @@ class HPBalancer(ModuleBase):
                 # 95% 80% 65%
                 order = [sort[0], sort[2], sort[1]]
         elif count == 2:
-            if hp[1] - hp[0] > threshold:
-                # 70% 100% 0%
-                order = [1, 0, 2]
-            else:
-                # 100% 70% 0%
-                order = [0, 1, 2]
+            order = [1, 0, 2] if hp[1] - hp[0] > threshold else [0, 1, 2]
         elif count == 1:
             # 80% 0% 0%
             order = [0, 1, 2]

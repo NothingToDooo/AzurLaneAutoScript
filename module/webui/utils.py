@@ -337,10 +337,7 @@ class Switch:
 
     def g(self) -> Generator:
         g = get_generator(self.switch)
-        if self.name:
-            name = self.name
-        else:
-            name = self.get_state.__name__
+        name = self.name or self.get_state.__name__
         g.__name__ = f"Switch_{name}_refresh"
         return g
 
@@ -487,10 +484,7 @@ def on_task_exception(self):
     with traceback_console.capture():  # 避免再次输出到 stdout。
         traceback_console.print_exception(word_wrap=True, extra_lines=1, show_locals=True)
 
-    if State.theme == "dark":
-        theme = DARK_TERMINAL_THEME
-    else:
-        theme = LIGHT_TERMINAL_THEME
+    theme = DARK_TERMINAL_THEME if State.theme == "dark" else LIGHT_TERMINAL_THEME
 
     html = traceback_console.export_html(theme=theme, code_format=TRACEBACK_CODE_FORMAT, inline_styles=True)
     try:

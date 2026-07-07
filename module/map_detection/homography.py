@@ -77,10 +77,7 @@ class Homography:
 
     @cached_property
     def ui_mask_homo_stroke(self):
-        if self.config.Scheduler_Command.startswith("Opsi"):
-            mask = ASSETS.ui_mask_os
-        else:
-            mask = ASSETS.ui_mask
+        mask = ASSETS.ui_mask_os if self.config.Scheduler_Command.startswith("Opsi") else ASSETS.ui_mask
         image = cv2.warpPerspective(mask, self.homo_data, self.homo_size)
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
         image = cv2.erode(image, kernel).astype("uint8")
@@ -431,10 +428,7 @@ class Homography:
         if lines is None:
             hori, vert = self.to_perspective()
             lines = hori.add(vert)
-        if bg is None:
-            image = self.image.copy()
-        else:
-            image = bg.copy()
+        image = (self.image if bg is None else bg).copy()
         image = Image.fromarray(image)
         if expend:
             image = ImageOps.expand(image, border=expend, fill=0)

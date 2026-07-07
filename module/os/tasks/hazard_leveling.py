@@ -47,10 +47,7 @@ class OpsiHazard1Leveling(OSMap):
                         self.config.task_call("OpsiMeowfficerFarming")
                 self.config.task_stop()
 
-            if self.config.OpsiHazard1Leveling_TargetZone != 0:
-                zone = self.config.OpsiHazard1Leveling_TargetZone
-            else:
-                zone = 22
+            zone = self.config.OpsiHazard1Leveling_TargetZone if self.config.OpsiHazard1Leveling_TargetZone != 0 else 22
             logger.hr(f"OS hazard 1 leveling, zone_id={zone}", level=1)
             if self.zone.zone_id != zone or not self.is_zone_name_hidden:
                 self.globe_goto(self.name_to_zone(zone), types="SAFE", refresh=True)

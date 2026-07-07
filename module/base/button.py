@@ -11,6 +11,14 @@ from module.base.utils import area_offset, color_similar, crop, get_color, load_
 from module.config.server import VALID_SERVER
 
 
+def _match_offset(offset):
+    if not isinstance(offset, tuple):
+        return np.array((-3, -offset, 3, offset))
+    if len(offset) == 2:
+        return np.array((-offset[0], -offset[1], offset[0], offset[1]))
+    return np.array(offset)
+
+
 class Button(Resource):
     def __init__(self, area, color, button, file=None, name=None):
         """Initialize a Button instance.
@@ -207,13 +215,7 @@ class Button(Resource):
         """
         self.ensure_template()
 
-        if isinstance(offset, tuple):
-            if len(offset) == 2:
-                offset = np.array((-offset[0], -offset[1], offset[0], offset[1]))
-            else:
-                offset = np.array(offset)
-        else:
-            offset = np.array((-3, -offset, 3, offset))
+        offset = _match_offset(offset)
         image = crop(image, offset + self.area, copy=False)
 
         if self.is_gif:
@@ -244,13 +246,7 @@ class Button(Resource):
         self.ensure_template()
         self.ensure_binary_template()
 
-        if isinstance(offset, tuple):
-            if len(offset) == 2:
-                offset = np.array((-offset[0], -offset[1], offset[0], offset[1]))
-            else:
-                offset = np.array(offset)
-        else:
-            offset = np.array((-3, -offset, 3, offset))
+        offset = _match_offset(offset)
         image = crop(image, offset + self.area, copy=False)
 
         if self.is_gif:
@@ -291,13 +287,7 @@ class Button(Resource):
         self.ensure_template()
         self.ensure_luma_template()
 
-        if isinstance(offset, tuple):
-            if len(offset) == 2:
-                offset = np.array((-offset[0], -offset[1], offset[0], offset[1]))
-            else:
-                offset = np.array(offset)
-        else:
-            offset = np.array((-3, -offset, 3, offset))
+        offset = _match_offset(offset)
         image = crop(image, offset + self.area, copy=False)
 
         if self.is_gif:

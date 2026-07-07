@@ -43,10 +43,7 @@ class Screenshot(Adb, NemuIpc):
         self._screenshot_interval.reset()
 
         for _ in range(2):
-            if self.screenshot_method_override:
-                method = self.screenshot_method_override
-            else:
-                method = self.config.Emulator_ScreenshotMethod
+            method = self.screenshot_method_override or self.config.Emulator_ScreenshotMethod
             method = self.screenshot_methods.get(method, self.screenshot_nemu_ipc)
             self.image = method()
 

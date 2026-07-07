@@ -15,10 +15,7 @@ class AppControl(Adb, Uiautomator2):
 
     def app_current(self) -> str:
         method = self.config.Emulator_ControlMethod
-        if method in AppControl._app_u2_family:
-            package = self.app_current_uiautomator2()
-        else:
-            package = self.app_current_adb()
+        package = self.app_current_uiautomator2() if method in AppControl._app_u2_family else self.app_current_adb()
         return package.strip(" \t\r\n")
 
     def app_is_running(self) -> bool:

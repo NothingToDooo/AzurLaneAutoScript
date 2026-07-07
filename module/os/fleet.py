@@ -210,10 +210,8 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                 continue
             sea.append(self.map[location])
 
-        if len(self.fleet_current):
-            center = self.fleet_current
-        else:
-            center = self.camera
+        fleet_current = self.fleet_current
+        center = fleet_current if len(fleet_current) else self.camera
         return SelectedGrids(sea).sort_by_camera_distance(center)
 
     def wait_until_camera_stable(self, skip_first_screenshot=True):
@@ -880,10 +878,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             int:
         """
         current = self.fleet_selector.get()
-        if current == 1:
-            second = 2
-        else:
-            second = 1
+        second = 2 if current == 1 else 1
         logger.attr("Second_fleet", second)
         return second
 

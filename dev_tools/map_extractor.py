@@ -417,10 +417,7 @@ class MapData:
         offset_x = min([grid[1] for grid in grids.values()])
         for grid in grids.values():
             loca = (grid[1] - offset_x, grid[0] - offset_y)
-            if not grid[2]:
-                info = "++"
-            else:
-                info = self.dic_grid_info.get(grid[3], "??")
+            info = "++" if not grid[2] else self.dic_grid_info.get(grid[3], "??")
             if info == "??":
                 print(f"Unknown grid info. grid={location2node(loca)}, info={grid[3]}")
             map_data[loca] = info

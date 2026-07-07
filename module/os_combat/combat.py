@@ -68,10 +68,7 @@ class Combat(Combat_, MapEventHandler):
     def handle_exp_info(self):
         if self.is_combat_executing():
             return False
-        if self.__os_combat_drop:
-            sleep = (1.5, 2)
-        else:
-            sleep = (0.25, 0.5)
+        sleep = (1.5, 2) if self.__os_combat_drop else (0.25, 0.5)
         if self.appear_then_click(combat_assets.EXP_INFO_S):
             self.device.sleep(sleep)
             return True

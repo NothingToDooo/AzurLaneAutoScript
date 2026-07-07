@@ -223,14 +223,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
 
         logger.hr("FINDING VANGUARD")
 
-        if self.config.SERVER in ["cn"]:
-            max_level = 100
-        else:
-            max_level = 70
-
-        scanner = ShipScanner(
-            level=(max_level, max_level), emotion=(10, 150), fleet=[0, self.fleet_to_attack], status="free"
-        )
+        scanner = ShipScanner(level=(100, 100), emotion=(10, 150), fleet=[0, self.fleet_to_attack], status="free")
         scanner.disable("rarity")
 
         if self.config.GemsFarming_CommonDD in ["any", "favourite", "z20_or_z21"]:

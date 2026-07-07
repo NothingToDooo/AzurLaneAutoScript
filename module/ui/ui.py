@@ -330,10 +330,7 @@ class UI(InfoHandler):
             else:
                 self.device.screenshot()
 
-            if isinstance(letter, Ocr):
-                current = letter.ocr(self.device.image)
-            else:
-                current = letter(self.device.image)
+            current = letter.ocr(self.device.image) if isinstance(letter, Ocr) else letter(self.device.image)
 
             logger.attr("Index", current)
             diff = index - current

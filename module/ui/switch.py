@@ -177,17 +177,8 @@ class Switch:
 
             # Click
             if click_timer.reached():
-                if self.is_selector:
-                    # Click target state to switch
-                    click_state = state
-                else:
-                    # If this is a selector, click on current state to switch to another
-                    # But 'unknown' is not clickable, if it is, click target state instead
-                    # assuming all selector states share the same position.
-                    if current == "unknown":
-                        click_state = state
-                    else:
-                        click_state = current
+                # 选择器点击目标；普通开关点击当前状态，unknown 没有可点位置时退回目标状态。
+                click_state = state if self.is_selector or current == "unknown" else current
                 self.click(click_state, main=main)
                 changed = True
                 click_timer.reset()

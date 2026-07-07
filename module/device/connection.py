@@ -347,16 +347,7 @@ class Connection(ConnectionAttr):
         if self.is_emulator:
             sdk = self.sdk_ver
             logger.info(f"sdk_ver: {sdk}")
-            if sdk >= 28:
-                trial = [
-                    ["busybox", "nc"],
-                    ["nc"],
-                ]
-            else:
-                trial = [
-                    ["nc"],
-                    ["busybox", "nc"],
-                ]
+            trial = [["busybox", "nc"], ["nc"]] if sdk >= 28 else [["nc"], ["busybox", "nc"]]
         else:
             trial = [
                 ["nc"],

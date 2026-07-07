@@ -118,12 +118,8 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             return
 
         self.load()
-        if task is None:
-            # Bind `Alas` by default which includes emulator settings.
-            task = name_to_function("Alas")
-        else:
-            # Bind a specific task for debug purpose.
-            task = name_to_function(task)
+        task_name = "Alas" if task is None else task
+        task = name_to_function(task_name)
         self.bind(task)
         self.task = task
         self.save()

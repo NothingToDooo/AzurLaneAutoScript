@@ -384,10 +384,7 @@ def col2name(col):
     """
 
     col_neg = col < 0
-    if col_neg:
-        col_num = -col
-    else:
-        col_num = col + 1  # Change to 1-index.
+    col_num = -col if col_neg else col + 1
     col_str = ""
 
     while col_num:
@@ -615,10 +612,7 @@ def crop(image, area, copy=True):
             overflow = True
     # If overflowed, return empty image
     if overflow:
-        if len(shape) == 2:
-            size = (y2 - y1, x2 - x1)
-        else:
-            size = (y2 - y1, x2 - x1, shape[2])
+        size = (y2 - y1, x2 - x1) if len(shape) == 2 else (y2 - y1, x2 - x1, shape[2])
         return np.zeros(size, dtype=image.dtype)
     # x1, y1, x2, y2 = np.maximum((x1, y1, x2, y2), 0)
     if x1 < 0:
@@ -633,10 +627,7 @@ def crop(image, area, copy=True):
     image = image[y1:y2, x1:x2]
     # if border
     if top or bottom or left or right:
-        if len(shape) == 2:
-            value = 0
-        else:
-            value = tuple(0 for _ in range(image.shape[2]))
+        value = 0 if len(shape) == 2 else tuple(0 for _ in range(image.shape[2]))
         return cv2.copyMakeBorder(image, top, bottom, left, right, borderType=cv2.BORDER_CONSTANT, value=value)
     if copy:
         return copy_image(image)

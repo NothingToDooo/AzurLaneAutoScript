@@ -388,10 +388,7 @@ class Map(Fleet):
         logger.info(f"May boss: {grids}")
         battle_count = self.battle_count
         is_single_boss = self.map.select(may_boss=True).count == 1
-        if is_single_boss:
-            expected = "boss"
-        else:
-            expected = ""
+        expected = "boss" if is_single_boss else ""
 
         for grid in grids:
             logger.hr("Clear potential BOSS")
@@ -474,10 +471,7 @@ class Map(Fleet):
         if grids:
             logger.hr("Clear siren")
             self.show_select_grids(grids, **kwargs)
-            if grids[0].is_fortress:
-                expected = "fortress"
-            else:
-                expected = "siren"
+            expected = "fortress" if grids[0].is_fortress else "siren"
             self.clear_chosen_enemy(grids[0], expected=expected)
             return True
 

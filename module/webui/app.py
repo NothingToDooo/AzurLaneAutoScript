@@ -233,10 +233,7 @@ class AlasGUI(Frame):
         ).style("--menu-Overview--")
 
         for menu, task_data in self.ALAS_MENU.items():
-            if task_data.get("page") == "tool":
-                _onclick = self.alas_daemon_overview
-            else:
-                _onclick = self.alas_set_group
+            _onclick = self.alas_daemon_overview if task_data.get("page") == "tool" else self.alas_set_group
 
             if task_data.get("menu") == "collapse":
                 task_btn_list = [
@@ -966,10 +963,8 @@ def app_manage():
 
     def _export(config_name: str):
         mod_name = get_config_mod(config_name)
-        if mod_name == "alas":
-            filename = f"{config_name}.json"
-        else:
-            filename = f"{config_name}.{mod_name}.json"
+        suffix = "" if mod_name == "alas" else f".{mod_name}"
+        filename = f"{config_name}{suffix}.json"
         with open(filepath_config(config_name, mod_name), "rb") as f:
             download(filename, f.read())
 

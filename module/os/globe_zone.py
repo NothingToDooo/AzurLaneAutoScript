@@ -76,10 +76,7 @@ class ZoneManager:
         Returns:
             Zone:
         """
-        if region is None:
-            zones = self.zones
-        else:
-            zones = self.zones.select(region=region)
+        zones = self.zones if region is None else self.zones.select(region=region)
         zones = zones.sort_by_camera_distance(camera=camera)
         return zones[0]
 

@@ -251,10 +251,7 @@ class Awaken(Dock):
         logger.hr("Awaken ship", level=1)
         logger.info(f"Awaken ship, use_array={use_array}")
 
-        if use_array:
-            stop_level = 125
-        else:
-            stop_level = 120
+        stop_level = 125 if use_array else 120
 
         if not skip_first_screenshot:
             self.device.screenshot()
@@ -335,10 +332,7 @@ class Awaken(Dock):
         self.ui_ensure(page_dock)
         self.dock_favourite_set(enable=favourite, wait_loading=False)
         self.dock_sort_method_dsc_set(wait_loading=False)
-        if use_array:
-            extra = ["can_awaken_plus"]
-        else:
-            extra = ["can_awaken"]
+        extra = ["can_awaken_plus"] if use_array else ["can_awaken"]
         self.dock_filter_set(extra=extra)
 
         while 1:

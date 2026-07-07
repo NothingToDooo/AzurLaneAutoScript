@@ -246,10 +246,7 @@ class Perspective:
         image.show()
 
     def draw(self, lines=None, bg=None, expend=0):
-        if bg is None:
-            image = self.image.copy()
-        else:
-            image = bg.copy()
+        image = (self.image if bg is None else bg).copy()
         if isinstance(image, np.ndarray):
             image = Image.fromarray(image)
         if expend:

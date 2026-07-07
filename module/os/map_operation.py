@@ -65,11 +65,7 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
         name = ocr.ocr(self.device.image)
         name = strip_zone_name_edges(name)
         self.is_zone_name_hidden = "安全" in name
-        if "-" in name:
-            name = name.split("-")[0]
-        else:
-            name = rstrip_zone_name_chars(name, ZONE_NAME_CN_SUFFIX_CHARS)
-        return name
+        return name.split("-", 1)[0] if "-" in name else rstrip_zone_name_chars(name, ZONE_NAME_CN_SUFFIX_CHARS)
 
     def get_current_zone(self):
         """

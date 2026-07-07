@@ -383,10 +383,7 @@ class ModuleBase:
         Returns:
             bool:
         """
-        if isinstance(button, np.ndarray):
-            image = button
-        else:
-            image = self.image_crop(button, copy=False)
+        image = button if isinstance(button, np.ndarray) else self.image_crop(button, copy=False)
         mask = color_similarity_2d(image, color=color)
         cv2.inRange(mask, threshold, 255, dst=mask)
         sum_ = cv2.countNonZero(mask)

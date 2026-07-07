@@ -203,10 +203,7 @@ class AzurStats:
         image = pack(images)
         now = int(time.time() * 1000)
 
-        if info:
-            filename = f"{now}_{info}.png"
-        else:
-            filename = f"{now}.png"
+        filename = f"{now}_{info}.png" if info else f"{now}.png"
 
         if save:
             save_thread = threading.Thread(target=self._save, args=(image, genre, filename))

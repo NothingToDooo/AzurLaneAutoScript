@@ -52,6 +52,10 @@ class LuaSetting:
     duplicate = False
 
     @cached_property
+    def setting_code(self):
+        return self.code.rsplit(",", 1)[0].strip(" ") if "," in self.code else self.code.strip(" ")
+
+    @cached_property
     def default(self):
         if "," in self.code:
             _name, default = self.code.split(",", 1)
@@ -79,14 +83,8 @@ class LuaSetting:
 
     @cached_property
     def key(self):
-        # "autoBotIsAcitve" .. AutoBotCommand.GetAutoBotMark(slot0)
-        # "world_help_progress"
-        if "," in self.code:
-            code = self.code.rsplit(",", 1)[0].strip(" ")
-        else:
-            code = self.code.strip(" ")
-
-        res = REGEX_SETTING_KEY.search(code)
+        # 形如 `"autoBotIsAcitve" .. AutoBotCommand.GetAutoBotMark(slot0)` 或 `"world_help_progress"`。
+        res = REGEX_SETTING_KEY.search(self.setting_code)
         if res:
             return res.group(1).replace(".", "_").replace("%", "_").replace("-", "_").replace(":", "_").strip("_")
         return ""
@@ -103,12 +101,7 @@ class LuaSetting:
 
     @cached_property
     def regex(self):
-        if "," in self.code:
-            code = self.code.rsplit(",", 1)[0].strip(" ")
-        else:
-            code = self.code.strip(" ")
-
-        pieces = code.split("..")
+        pieces = self.setting_code.split("..")
 
         def iter_piece():
             for piece in pieces:
