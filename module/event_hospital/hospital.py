@@ -88,13 +88,11 @@ class Hospital(HospitalClue, HospitalCombat):
             if timeout.reached():
                 logger.warning("Daily reward receive timeout")
                 break
-            if clicked and self.is_in_daily_reward():
-                if not self.daily_reward_receive_appear():
-                    break
-            if self.is_in_daily_reward(interval=2):
-                if self.daily_reward_receive_appear():
-                    self.device.click(hospital_assets.DAILY_REWARD_RECEIVE)
-                    continue
+            if clicked and self.is_in_daily_reward() and not self.daily_reward_receive_appear():
+                break
+            if self.is_in_daily_reward(interval=2) and self.daily_reward_receive_appear():
+                self.device.click(hospital_assets.DAILY_REWARD_RECEIVE)
+                continue
             if self.handle_get_items():
                 timeout.reset()
                 clicked = True
@@ -165,16 +163,14 @@ class Hospital(HospitalClue, HospitalCombat):
             else:
                 self.device.screenshot()
 
-            if clicked:
-                if self.is_in_clue() and not self.invest_reward_appear():
-                    return True
+            if clicked and self.is_in_clue() and not self.invest_reward_appear():
+                return True
             if self.handle_get_items():
                 clicked = True
                 continue
-            if self.is_in_clue(interval=2):
-                if self.invest_reward_appear():
-                    self.device.click(hospital_assets.INVEST_REWARD_RECEIVE)
-                    continue
+            if self.is_in_clue(interval=2) and self.invest_reward_appear():
+                self.device.click(hospital_assets.INVEST_REWARD_RECEIVE)
+                continue
         return False
 
     def loop_aside(self):
