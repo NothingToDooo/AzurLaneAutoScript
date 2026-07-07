@@ -198,18 +198,22 @@ class MapEventHandler(EnemySearchingHandler):
             enable (bool): True/False, or None for doing nothing.
 
         Returns:
-            bool: If clicked.
+            bool: 是否点击。
         """
-        if self.match_template_color(os_assets.AUTO_SEARCH_OS_MAP_OPTION_OFF, offset=(5, 120)):
-            if self.info_bar_count() >= 2:
-                self.device.screenshot_interval_set()
-                self.os_auto_search_quit(drop=drop)
-                raise CampaignEnd
-        if self.match_template_color(os_assets.AUTO_SEARCH_OS_MAP_OPTION_OFF_DISABLED, offset=(5, 120)):
-            if self.info_bar_count() >= 2:
-                self.device.screenshot_interval_set()
-                self.os_auto_search_quit(drop=drop)
-                raise CampaignEnd
+        if (
+            self.match_template_color(os_assets.AUTO_SEARCH_OS_MAP_OPTION_OFF, offset=(5, 120))
+            and self.info_bar_count() >= 2
+        ):
+            self.device.screenshot_interval_set()
+            self.os_auto_search_quit(drop=drop)
+            raise CampaignEnd
+        if (
+            self.match_template_color(os_assets.AUTO_SEARCH_OS_MAP_OPTION_OFF_DISABLED, offset=(5, 120))
+            and self.info_bar_count() >= 2
+        ):
+            self.device.screenshot_interval_set()
+            self.os_auto_search_quit(drop=drop)
+            raise CampaignEnd
         if self.appear(os_assets.AUTO_SEARCH_REWARD, offset=(50, 50)):
             self.device.screenshot_interval_set()
             if self.os_auto_search_quit(drop=drop):

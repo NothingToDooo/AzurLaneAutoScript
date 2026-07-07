@@ -314,9 +314,11 @@ class ActionPointHandler(UI, MapEventHandler):
         for _ in self.loop():
             # 结束。
             # 行动力弹窗有时没有黑色模糊背景，此时 ACTION_POINT_CANCEL 和 OS_CHECK 会同时出现。
-            if not self.appear(os_assets.ACTION_POINT_CANCEL, offset=(20, 20)):
-                if self.appear(OS_CHECK, offset=(20, 20)):
-                    break
+            if (
+                not self.appear(os_assets.ACTION_POINT_CANCEL, offset=(20, 20))
+                and self.appear(OS_CHECK, offset=(20, 20))
+            ):
+                break
             # 点击。
             if self.appear_then_click(os_assets.ACTION_POINT_CANCEL, offset=(20, 20), interval=3):
                 continue
@@ -366,11 +368,10 @@ class ActionPointHandler(UI, MapEventHandler):
                 keep_current_ap = False
 
         # 先检查行动力。
-        if keep_current_ap:
-            if self._action_point_total <= self.config.OS_ACTION_POINT_PRESERVE:
-                logger.info(f"Reach the limit of action points, preserve={self.config.OS_ACTION_POINT_PRESERVE}")
-                self.action_point_quit()
-                raise ActionPointLimit
+        if keep_current_ap and self._action_point_total <= self.config.OS_ACTION_POINT_PRESERVE:
+            logger.info(f"Reach the limit of action points, preserve={self.config.OS_ACTION_POINT_PRESERVE}")
+            self.action_point_quit()
+            raise ActionPointLimit
 
         for _ in range(12):
             # 行动力足够。
