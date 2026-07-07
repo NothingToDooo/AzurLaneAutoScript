@@ -163,9 +163,9 @@ class OpsiAshBeacon(Meta):
 
     def _handle_ash_beacon_reward(self, skip_first_screenshot=True):
         """
-        Reward meta.
+        领取 META 奖励。
 
-        Pages:
+        页面：
             in: in_meta, BEACON_REWARD
             out: in_meta
         """
@@ -175,10 +175,9 @@ class OpsiAshBeacon(Meta):
             else:
                 self.device.screenshot()
 
-            # End
-            if not self.appear(ash_assets.BEACON_REWARD, offset=(30, 30)):
-                if self._in_meta_page():
-                    break
+            # 结束。
+            if not self.appear(ash_assets.BEACON_REWARD, offset=(30, 30)) and self._in_meta_page():
+                break
 
             if self.appear_then_click(ash_assets.BEACON_REWARD, offset=(30, 30), interval=2):
                 logger.info("Reap meta rewards")
@@ -194,26 +193,31 @@ class OpsiAshBeacon(Meta):
 
     def _satisfy_attack_condition(self):
         """
-        Check whether this meta can be attacked.
-        In beacon:
-            when enable OneHitMode and has attacked, not allow attack.
-        In Dossier:
-            when enable autoAttack, not allow attack
+        检查当前 META 是否可以攻击。
+
+        信标：
+            启用 OneHitMode 且已经攻击过时，不允许继续攻击。
+        档案：
+            启用自动攻击且正在自动攻击时，不允许手动攻击。
         """
-        if self.appear(ash_assets.BEACON_LIST, offset=(20, 20)):
-            # Enable OneHitMode and had attack this meta
-            if _server_support() and self.config.OpsiAshBeacon_OneHitMode:
-                damage = self._get_meta_damage()
-                if damage > 0:
-                    logger.info("Enable OneHitMode and meta damage is " + str(damage) + ", check after 30 minutes")
-                    self.config.task_delay(minute=30)
-                    self.config.task_stop()
-        if self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20)):
-            # Meta is Auto Attacking
-            if self.appear(ash_assets.META_AUTO_ATTACKING, offset=(20, 20)):
-                logger.info("This meta is auto attacking, check after 15 minutes")
-                self.config.task_delay(minute=15)
+        if (
+            self.appear(ash_assets.BEACON_LIST, offset=(20, 20))
+            and _server_support()
+            and self.config.OpsiAshBeacon_OneHitMode
+        ):
+            # 开启 OneHitMode 且已经攻击过当前 META。
+            damage = self._get_meta_damage()
+            if damage > 0:
+                logger.info("Enable OneHitMode and meta damage is " + str(damage) + ", check after 30 minutes")
+                self.config.task_delay(minute=30)
                 self.config.task_stop()
+        if self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20)) and self.appear(
+            ash_assets.META_AUTO_ATTACKING, offset=(20, 20)
+        ):
+            # META 正在自动攻击。
+            logger.info("This meta is auto attacking, check after 15 minutes")
+            self.config.task_delay(minute=15)
+            self.config.task_stop()
         return True
 
     def _get_meta_damage(self):
@@ -247,21 +251,19 @@ class OpsiAshBeacon(Meta):
 
     def _pre_attack(self):
         """
-        Some pre_attack preparations
-        In beacon:
-            ask for help if needed
-        In dossier:
-            ['cn', 'en']: auto attack if needed
-            others: do nothing this version
+        执行 META 攻击前检查。
+
+        信标：
+            需要时请求支援。
+        档案：
+            cn/en 需要时自动攻击；其他服务器当前版本不处理。
         """
-        # Page beacon or dossier
+        # 信标或档案页面。
         if self.appear(ash_assets.BEACON_LIST, offset=(20, 20)):
-            if self.config.OpsiAshBeacon_OneHitMode or self.config.OpsiAshBeacon_RequestAssist:
-                if not self._ask_for_help():
-                    return False
-            return True
+            needs_assist = self.config.OpsiAshBeacon_OneHitMode or self.config.OpsiAshBeacon_RequestAssist
+            return not needs_assist or self._ask_for_help()
         if self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20)):
-            # can auto attack but not auto attacking
+            # 可自动攻击但尚未自动攻击。
             if (
                 _server_support_dossier_auto_attack()
                 and self.config.OpsiAshBeacon_DossierAutoAttackMode
