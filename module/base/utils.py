@@ -382,7 +382,6 @@ def col2name(col):
     Examples:
         0 -> A, 3 -> D, 35 -> AJ, -1 -> -A
     """
-
     col_neg = col < 0
     col_num = -col if col_neg else col + 1
     col_str = ""

@@ -96,7 +96,6 @@ class Filter:
         Returns:
             bool: If an object satisfy a filter.
         """
-
         for attr, value in zip(self.attr, filter_value, strict=True):
             if not value:
                 continue

@@ -727,7 +727,6 @@ class RewardTacticalClass(Dock):
             in: SKILL_CONFIRM
             out: SKILL_CONFIRM
         """
-
         if not skip_first_screenshot:
             self.device.screenshot()
 

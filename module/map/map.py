@@ -319,7 +319,6 @@ class Map(Fleet):
         Returns:
             bool: True if clear an enemy.
         """
-
         grids = grids.select(is_enemy=True)
         grids = self.select_grids(grids, **kwargs)
 
@@ -365,7 +364,6 @@ class Map(Fleet):
         Returns:
             bool:
         """
-
         grids = self.map.select(is_boss=True, is_accessible=True)
         grids = grids.add(self.map.select(may_boss=True, is_caught_by_siren=True))
         logger.info(f"Is boss: {grids}")

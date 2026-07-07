@@ -115,7 +115,6 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         返回：
             bool：是否完成更换。
         """
-
         logger.hr("Change vanguard", level=1)
         logger.attr("ChangeVanguard", self.config.GemsFarming_ChangeVanguard)
         self.fleet_enter(self.fleet_to_attack)

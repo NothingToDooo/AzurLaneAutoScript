@@ -224,7 +224,6 @@ class LoginHandler(UI):
         Returns:
             bool: If handled.
         """
-
         area_wait_results = self.get_for_any_ele(
             [XPS('//*[@text="sdk协议"]', xp, hierarchy), XPS('//*[@content-desc="sdk协议"]', xp, hierarchy)]
         )

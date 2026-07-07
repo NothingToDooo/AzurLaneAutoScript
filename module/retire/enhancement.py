@@ -70,7 +70,6 @@ class Enhancement(Dock):
             in: EQUIP_CONFIRM
             out: page_ship_enhance, without info_bar
         """
-
         confirm_timer = Timer(1.5, count=3).start()
         while 1:
             if skip_first_screenshot:
