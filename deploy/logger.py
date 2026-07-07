@@ -34,11 +34,11 @@ def hr(title, level=3):
         logger.info(middle)
         logger.info(border)
     if level == 1:
-        logger.info("=" * 20 + " " + title + " " + "=" * 20)
+        logger.info("%s %s %s", "=" * 20, title, "=" * 20)
     if level == 2:
-        logger.info("-" * 20 + " " + title + " " + "-" * 20)
+        logger.info("%s %s %s", "-" * 20, title, "-" * 20)
     if level == 3:
-        logger.info(f"<<< {title} >>>")
+        logger.info("<<< %s >>>", title)
     return None
 
 

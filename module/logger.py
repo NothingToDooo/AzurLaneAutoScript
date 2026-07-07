@@ -286,7 +286,7 @@ def hr(title, level=3):
         logger.rule(title, characters="─")
         logger.info(title)
     if level == 3:
-        logger.info(f"[bold]<<< {title} >>>[/bold]", extra={"markup": True})
+        logger.info("[bold]<<< %s >>>[/bold]", title, extra={"markup": True})
     if level == 0:
         logger.rule(characters="═")
         logger.rule(title, characters=" ")
@@ -294,14 +294,14 @@ def hr(title, level=3):
 
 
 def attr(name, text):
-    logger.info(f"[{name}] {text}")
+    logger.info("[%s] %s", name, text)
 
 
 def attr_align(name, text, front="", align=22):
     name = str(name).rjust(align)
     if front:
         name = front + name[len(front) :]
-    logger.info(f"{name}: {text}")
+    logger.info("%s: %s", name, text)
 
 
 def show():
