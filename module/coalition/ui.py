@@ -288,18 +288,19 @@ class CoalitionUI(Combat):
         """
         stage = stage.lower()
 
-        if event == "coalition_20230323":
-            # No fleet switch in TC1
-            if stage in ["tc1", "sp"]:
-                return False
-        if event in [
-            "coalition_20240627",
-            "coalition_20250626",
-            "coalition_20260122",
-        ]:
-            # easy is single fleet, SP and EX must must multiple fleets
-            if stage in ["easy", "sp", "ex"]:
-                return False
+        # TC1 和 SP 没有舰队切换。
+        if event == "coalition_20230323" and stage in ["tc1", "sp"]:
+            return False
+        # easy 是单舰队，SP 和 EX 必须使用多舰队。
+        if (
+            event in [
+                "coalition_20240627",
+                "coalition_20250626",
+                "coalition_20260122",
+            ]
+            and stage in ["easy", "sp", "ex"]
+        ):
+            return False
 
         clicked = self.coalition_set_fleet(event, mode)
 
@@ -401,16 +402,16 @@ class CoalitionUI(Combat):
                 campaign_click += 1
                 campaign_timer.reset()
                 continue
-            if event in ["coalition_20251120"]:
-                if (
-                    campaign_difficulty_timer.reached()
-                    and self.in_coalition_20251120_difficulty_selection()
-                    and button_difficulty
-                ):
-                    self.device.click(button_difficulty)
-                    campaign_difficulty_click += 1
-                    campaign_difficulty_timer.reset()
-                    continue
+            if (
+                event == "coalition_20251120"
+                and campaign_difficulty_timer.reached()
+                and self.in_coalition_20251120_difficulty_selection()
+                and button_difficulty
+            ):
+                self.device.click(button_difficulty)
+                campaign_difficulty_click += 1
+                campaign_difficulty_timer.reset()
+                continue
 
             # Fleet preparation
             if fleet_timer.reached() and self.appear(fleet_preparation, offset=(20, 50)):

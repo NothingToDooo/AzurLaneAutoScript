@@ -82,31 +82,28 @@ class Coalition(CoalitionCombat, CampaignEvent):
     def triggered_stop_condition(self, oil_check=False, pt_check=False):
         """
         Returns:
-            bool: If triggered a stop condition.
+            bool: 是否触发停止条件。
         """
-        # Run count limit
+        # 运行次数限制。
         if self.run_limit and self.config.StopCondition_RunCount <= 0:
             logger.hr("Triggered stop condition: Run count")
             self.config.StopCondition_RunCount = 0
             self.config.Scheduler_Enable = False
             return True
-        # Oil limit in current page
-        if oil_check:
-            if self.get_oil() < max(500, self.config.StopCondition_OilLimit):
-                logger.hr("Triggered stop condition: Oil limit")
-                self.config.task_delay(minute=(120, 240))
-                return True
-        # Event limit
-        if pt_check:
-            if self.event_pt_limit_triggered():
-                logger.hr("Triggered stop condition: Event PT limit")
-                return True
-        # TaskBalancer
-        if self.run_count >= 1:
-            if self.config.TaskBalancer_Enable and self.triggered_task_balancer():
-                logger.hr("Triggered stop condition: Coin limit")
-                self.handle_task_balancer()
-                return True
+        # 当前页面油量限制。
+        if oil_check and self.get_oil() < max(500, self.config.StopCondition_OilLimit):
+            logger.hr("Triggered stop condition: Oil limit")
+            self.config.task_delay(minute=(120, 240))
+            return True
+        # 活动 PT 限制。
+        if pt_check and self.event_pt_limit_triggered():
+            logger.hr("Triggered stop condition: Event PT limit")
+            return True
+        # 任务平衡器。
+        if self.run_count >= 1 and self.config.TaskBalancer_Enable and self.triggered_task_balancer():
+            logger.hr("Triggered stop condition: Coin limit")
+            self.handle_task_balancer()
+            return True
 
         return False
 
