@@ -133,7 +133,7 @@ class AutoSearchHandler(EnemySearchingHandler):
                 sub_auto_call, sub_standby
             skip_first_screenshot (bool):
 
-            Returns:
+        Returns:
                 bool: whether sidebar could be ensured
                       at most 3 attempts are made before
                       return False otherwise True

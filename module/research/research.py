@@ -34,6 +34,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         """
         Finished research should be auto-focused to the center, but sometimes didn't, due to an unknown game bug.
         This method will handle that.
+
         Returns:
             bool: True if a research finished
         """

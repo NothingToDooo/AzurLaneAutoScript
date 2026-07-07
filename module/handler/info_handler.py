@@ -585,6 +585,7 @@ class InfoHandler(ModuleBase):
     def handle_manjuu(self):
         """
         Handle manjuu loading.
+
         Returns:
             bool: If handled
         """

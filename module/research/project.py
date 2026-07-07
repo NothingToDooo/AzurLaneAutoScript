@@ -122,7 +122,7 @@ def _get_research_series(img):
 
 def get_research_series(image, series_button=RESEARCH_SERIES):
     """
-        Args:
+    Args:
         image (np.ndarray):
         series_button:
 
@@ -183,6 +183,7 @@ def parse_time(string):
     """
     Args:
         string (str): Such as 01:00:00, 05:47:10, 17:50:51.
+
     Returns:
         timedelta: datetime.timedelta instance.
     """
@@ -202,6 +203,7 @@ def match_template(image, template, area, offset=30, similarity=0.85):
         area (tuple): Crop area of image.
         offset (int, tuple): Detection area offset.
         similarity (float): 0-1. Similarity. Lower than this value will return float(0).
+
     Returns:
         similarity (float):
     """

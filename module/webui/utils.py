@@ -168,6 +168,7 @@ class TaskHandler:
     def remove_task(self, task: Task, nowait: bool = False) -> None:
         """
         Remove a task in `self.tasks`.
+
         Args:
             task:
             nowait: if True, remove it right now,

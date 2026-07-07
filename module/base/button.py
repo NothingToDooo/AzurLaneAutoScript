@@ -33,6 +33,7 @@ class Button(Resource):
             button (dict[tuple], tuple): Area to be click if button appears on the image.
                             (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y)
                             If tuple is empty, this object can be use as a checker.
+
         Examples:
             BATTLE_PREPARATION = Button(
                 area=(1562, 908, 1864, 1003),
