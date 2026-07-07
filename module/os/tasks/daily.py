@@ -1,5 +1,4 @@
-import numpy as np
-
+from module.base.runtime_random import runtime_random
 from module.logger import logger
 from module.os.map import OSMap
 
@@ -11,7 +10,7 @@ class OpsiDaily(OSMap):
         """
         logger.hr("OS port mission", level=1)
         ports = ["NY City", "Dakar", "Taranto", "Gibraltar", "Brest", "Liverpool", "Kiel", "St. Petersburg"]
-        if np.random.uniform() > 0.5:
+        if runtime_random.chance():
             ports.reverse()
 
         for port in ports:

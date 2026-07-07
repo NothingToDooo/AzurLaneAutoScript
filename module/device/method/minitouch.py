@@ -7,6 +7,7 @@ import numpy as np
 from adbutils.errors import AdbError
 
 from module.base.decorator import cached_property, del_cached_property, has_cached_property
+from module.base.runtime_random import runtime_random
 from module.base.timer import Timer
 from module.base.utils import random_rectangle_point
 from module.device.connection import Connection
@@ -16,12 +17,12 @@ from module.logger import logger
 
 
 def random_normal_distribution(a, b, n=5):
-    output = np.mean(np.random.uniform(a, b, size=n))
+    output = np.mean(runtime_random.uniform(a, b, size=n))
     return output
 
 
 def random_theta():
-    theta = np.random.uniform(0, 2 * np.pi)
+    theta = runtime_random.uniform(0, 2 * np.pi)
     return np.array([np.sin(theta), np.cos(theta)])
 
 

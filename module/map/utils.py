@@ -1,5 +1,6 @@
 import numpy as np
 
+from module.base.runtime_random import runtime_random
 from module.base.utils import node2location
 from module.map_detection.grid_info import GridInfo
 
@@ -97,8 +98,8 @@ def random_direction(direction):
         tuple(int): Such as (-1, 1) for bottom-left
     """
     direction = direction.lower()
-    x = 1 if np.random.uniform() > 0.5 else -1
-    y = 1 if np.random.uniform() > 0.5 else -1
+    x = 1 if runtime_random.chance() else -1
+    y = 1 if runtime_random.chance() else -1
     if "left" in direction:
         x = -1
     elif "right" in direction:

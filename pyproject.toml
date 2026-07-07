@@ -37,9 +37,13 @@ package = false
 
 [dependency-groups]
 dev = [
+    "pytest>=9.1.1",
     "ruff",
     "ty",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 120
@@ -66,6 +70,7 @@ select = [
     "F",
     "I",
     "ICN",
+    "NPY002",
     "PLE",
     "PERF",
     "PIE",
