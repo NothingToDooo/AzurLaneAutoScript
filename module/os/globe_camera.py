@@ -200,10 +200,9 @@ class GlobeCamera(GlobeOperation, ZoneManager):
                 self.device.screenshot()
                 self.globe_update()
 
-            if self.is_zone_pinned():
-                if self.get_globe_pinned_zone() == zone:
-                    logger.attr("Globe_pinned", zone)
-                    return True
+            if self.is_zone_pinned() and self.get_globe_pinned_zone() == zone:
+                logger.attr("Globe_pinned", zone)
+                return True
             if timeout.reached():
                 logger.warning("Wait until zone pinned timeout")
                 return False

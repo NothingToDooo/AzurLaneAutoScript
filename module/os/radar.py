@@ -101,10 +101,13 @@ class RadarGrid:
         #     self.is_enemy = self.predict_static_red_border()
         if self.is_enemy and not self.enemy_genre:
             self.enemy_genre = "Enemy"
-        if self.config.MAP_HAS_SIREN:
-            if self.enemy_genre is not None and self.enemy_genre.startswith("Siren"):
-                self.is_siren = True
-                self.enemy_scale = 0
+        if (
+            self.config.MAP_HAS_SIREN
+            and self.enemy_genre is not None
+            and self.enemy_genre.startswith("Siren")
+        ):
+            self.is_siren = True
+            self.enemy_scale = 0
 
     def image_color_count(self, area, color, threshold=221, count=50):
         """

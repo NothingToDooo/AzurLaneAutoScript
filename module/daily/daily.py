@@ -263,9 +263,8 @@ class Daily(Combat, DailyEquipment):
                     return False
                 if self.info_bar_count():
                     return False
-            if self.appear(daily_assets.DAILY_ENTER_CHECK, threshold=30):
-                if self.info_bar_count():
-                    return False
+            if self.appear(daily_assets.DAILY_ENTER_CHECK, threshold=30) and self.info_bar_count():
+                return False
             if self.combat_appear():
                 return True
         return False

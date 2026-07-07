@@ -54,11 +54,12 @@ class OSStatus(UI):
         ]
 
         def func(task: Function):
-            if task.command in cd_tasks and task.enable:
-                if task.next_run != update and task.next_run - now <= timedelta(minutes=60):
-                    return True
-
-            return False
+            return (
+                task.command in cd_tasks
+                and task.enable
+                and task.next_run != update
+                and task.next_run - now <= timedelta(minutes=60)
+            )
 
         tasks = SelectedGrids(self.config.pending_task + self.config.waiting_task).filter(func).sort("next_run")
         return tasks.first_or_none()

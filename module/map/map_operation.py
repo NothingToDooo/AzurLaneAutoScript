@@ -400,15 +400,14 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
             self.device.click(map_assets.MAP_CAT_ATTACK)
             self.map_cat_attack_timer.reset()
             return True
-        if not self.map_is_clear_mode:
-            # 威胁等级 Med 有 106 个像素，MAP_CAT_ATTACK_MIRROR 有 290 个像素。
-            if self.image_color_count(
-                map_assets.MAP_CAT_ATTACK_MIRROR, color=(255, 231, 123), threshold=221, count=200
-            ):
-                logger.info("Skip map being attack")
-                self.device.click(map_assets.MAP_CAT_ATTACK)
-                self.map_cat_attack_timer.reset()
-                return True
+        # 威胁等级 Med 有 106 个像素，MAP_CAT_ATTACK_MIRROR 有 290 个像素。
+        if not self.map_is_clear_mode and self.image_color_count(
+            map_assets.MAP_CAT_ATTACK_MIRROR, color=(255, 231, 123), threshold=221, count=200
+        ):
+            logger.info("Skip map being attack")
+            self.device.click(map_assets.MAP_CAT_ATTACK)
+            self.map_cat_attack_timer.reset()
+            return True
 
         return False
 

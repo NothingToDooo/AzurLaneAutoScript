@@ -47,10 +47,9 @@ class CoalitionCombat(CoalitionUI, CampaignBase):
                 click_last.reset()
                 continue
             # Keep clicking BATTLE_STATUS to skip animations
-            if status_clicked:
-                if click_timer.reached() and not click_last.reached():
-                    self.device.click(BATTLE_STATUS)
-                    click_timer.reset()
+            if status_clicked and click_timer.reached() and not click_last.reached():
+                self.device.click(BATTLE_STATUS)
+                click_timer.reset()
 
     def coalition_combat(self):
         """

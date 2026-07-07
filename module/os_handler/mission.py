@@ -95,13 +95,11 @@ class MissionHandler(GlobeOperation, ZoneManager):
     def os_mission_quit(self):
         logger.info("OS mission quit")
         for _ in self.loop():
-            # End
-            # sometimes you have os mission popup without black-blurred background
-            # MISSION_QUIT and is_in_map appears
-            if not self.appear(os_assets.MISSION_QUIT, offset=(20, 20)):
-                if self.is_in_map():
-                    break
-            # Click
+            # 结束。
+            # 部分任务弹窗没有黑色模糊背景，此时 MISSION_QUIT 和地图会同时出现。
+            if not self.appear(os_assets.MISSION_QUIT, offset=(20, 20)) and self.is_in_map():
+                break
+            # 点击。
             if self.appear_then_click(os_assets.MISSION_QUIT, offset=(20, 20), interval=3):
                 continue
 

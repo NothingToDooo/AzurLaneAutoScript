@@ -42,9 +42,10 @@ class Combat(Combat_, MapEventHandler):
         # OS 战斗保留基类调用签名，但不执行普通战斗的心情等待和血量平衡。
 
         for _ in self.loop():
-            if self.appear(os_combat_assets.BATTLE_PREPARATION):
-                if self.handle_combat_automation_set(auto=auto == "combat_auto"):
-                    continue
+            if self.appear(os_combat_assets.BATTLE_PREPARATION) and self.handle_combat_automation_set(
+                auto=auto == "combat_auto"
+            ):
+                continue
             if self.handle_retirement():
                 continue
             # OS 战斗不处理低心情和紧急维修弹窗。

@@ -27,9 +27,10 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
             if self.is_in_map_order():
                 break
 
-            if self.is_in_map():
-                if self.appear_then_click(os_assets.ORDER_ENTER, offset=(20, 20), interval=2):
-                    continue
+            if self.is_in_map() and self.appear_then_click(
+                os_assets.ORDER_ENTER, offset=(20, 20), interval=2
+            ):
+                continue
             # 上一个已清理海域的自动搜索奖励有时会延迟弹出。
             if self.appear_then_click(os_assets.AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
                 continue

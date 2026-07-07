@@ -267,9 +267,13 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
                 continue
             if self.handle_combat_manual(auto):
                 continue
-            if auto != "combat_auto" and self.auto_mode_checked and self.is_combat_executing():
-                if self.handle_combat_weapon_release():
-                    continue
+            if (
+                auto != "combat_auto"
+                and self.auto_mode_checked
+                and self.is_combat_executing()
+                and self.handle_combat_weapon_release()
+            ):
+                continue
             # bunch of popup handlers
             if self.handle_popup_confirm("AUTO_SEARCH_COMBAT_EXECUTE"):
                 continue
