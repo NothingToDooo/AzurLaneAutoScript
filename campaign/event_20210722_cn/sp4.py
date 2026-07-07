@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.map.map_base import CampaignMap
 
 from .campaign_base import CampaignBase
@@ -113,7 +115,7 @@ MAP.spawn_data = [
 
 class Config(ConfigBase):
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = ["AzusaMiura", "ChihayaKisaragi", "IoriMinase"]
+    MAP_SIREN_TEMPLATE = ("AzusaMiura", "ChihayaKisaragi", "IoriMinase")
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -131,13 +133,13 @@ class Config(ConfigBase):
     TRUST_EDGE_LINES = False
     TRUST_EDGE_LINES_THRESHOLD = 7
 
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (80, 255 - 24),
         "width": (1.5, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (255 - 10, 255),
         "width": (1.5, 10),
         "prominence": 10,

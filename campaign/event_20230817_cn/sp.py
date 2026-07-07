@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.map.map_base import CampaignMap
 
 from .campaign_base import CampaignBase
@@ -145,7 +147,7 @@ MAP.ignore_prediction(H1, is_siren=True)
 class Config:
     # ===== Start of generated config =====
     # Actually there's a pink dog at D2 and one red at G2
-    MAP_SIREN_TEMPLATE = ["Gascogne", "Champagne", "DogPink"]
+    MAP_SIREN_TEMPLATE = ("Gascogne", "Champagne", "DogPink")
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -161,13 +163,13 @@ class Config:
     MAP_IS_ONE_TIME_STAGE = True
     MAP_HAS_WALL = True
 
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (150, 255 - 17),
         "width": (0.9, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (255 - 17, 255),
         "prominence": 10,
         "distance": 50,

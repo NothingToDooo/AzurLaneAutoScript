@@ -32,7 +32,7 @@ MAP.wall_data = """
 
 class Config(ConfigBase):
     MAP_HAS_WALL = True
-    MAP_SIREN_TEMPLATE = ["Algerie", "Vauquelin"]
+    MAP_SIREN_TEMPLATE = ("Algerie", "Vauquelin")
 
 
 class Campaign(CampaignBase):

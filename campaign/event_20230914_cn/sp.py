@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap
 
@@ -84,13 +86,13 @@ class Config:
     STAR_REQUIRE_3 = 0
     # ===== End of generated config =====
 
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (80, 255 - 17),
         "width": (0.9, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {"height": (255 - 17, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 17, 255), "prominence": 10, "distance": 50, "wlen": 1000}
     HOMO_STORAGE = ((9, 7), [(158.102, 59.806), (1142.124, 59.806), (-34.052, 695.951), (1324.267, 695.951)])
     HOMO_EDGE_COLOR_RANGE = (0, 17)
     HOMO_EDGE_HOUGHLINES_THRESHOLD = 210

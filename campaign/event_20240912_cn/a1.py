@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.map.map_base import CampaignMap
 
 from .campaign_base import CampaignBase
@@ -100,7 +102,7 @@ MAP.spawn_data = [
 
 class Config:
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = ["AmagiMasked"]
+    MAP_SIREN_TEMPLATE = ("AmagiMasked",)
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -112,15 +114,15 @@ class Config:
 
     MAP_CHAPTER_SWITCH_20241219 = True
     MAP_HAS_MODE_SWITCH = True
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (120, 255 - 49),
         "width": (1.5, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {"height": (255 - 49, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 49, 255), "prominence": 10, "distance": 50, "wlen": 1000}
     HOMO_CANNY_THRESHOLD = (75, 100)
-    STAGE_ENTRANCE = ["half", "20240725"]
+    STAGE_ENTRANCE = ("half", "20240725")
     MAP_SWIPE_MULTIPLY = (1.234, 1.257)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.193, 1.215)
 

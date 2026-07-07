@@ -131,7 +131,7 @@ class Config(ConfigBase):
     MAP_HAS_MYSTERY = False
     # ===== End of generated config =====
 
-    MAP_SIREN_TEMPLATE = ["Lover"]
+    MAP_SIREN_TEMPLATE = ("Lover",)
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_SWIPE_MULTIPLY = (1.123, 1.144)

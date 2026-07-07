@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.map.map_base import CampaignMap
 
 from ..campaign_war_archives.campaign_base import CampaignBase
@@ -111,7 +113,7 @@ MAP.spawn_data = [
 
 class Config(ConfigBase):
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = ["CAlightning", "SS"]
+    MAP_SIREN_TEMPLATE = ("CAlightning", "SS")
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -121,7 +123,7 @@ class Config(ConfigBase):
     MAP_HAS_MYSTERY = False
     # ===== End of generated config =====
 
-    MAP_ENEMY_GENRE_DETECTION_SCALING = {
+    MAP_ENEMY_GENRE_DETECTION_SCALING: ClassVar[dict[str, object]] = {
         "CAlightning": 1.111,
         "BBlightning": 1.111,
         "SS": 1.111,

@@ -51,7 +51,7 @@ MAP.spawn_data = [
 class Config(ConfigBase):
     MAP_SIREN_COUNT = 2
     MAP_HAS_WALL = True
-    MAP_SIREN_TEMPLATE = ["LaGalissonniere", "Vauquelin"]
+    MAP_SIREN_TEMPLATE = ("LaGalissonniere", "Vauquelin")
 
     EDGE_LINES_HOUGHLINES_THRESHOLD = 40
 

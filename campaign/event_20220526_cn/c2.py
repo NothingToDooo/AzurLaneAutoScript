@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap
 
@@ -104,7 +106,7 @@ MAP.spawn_data = [
 
 class Config(ConfigBase):
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = ["CL", "CAred"]
+    MAP_SIREN_TEMPLATE = ("CL", "CAred")
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -116,17 +118,17 @@ class Config(ConfigBase):
 
     MAP_SIREN_HAS_BOSS_ICON = False
     MAP_SIREN_HAS_BOSS_ICON_SMALL = False
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (120, 255 - 17),
         "width": (1.5, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {"height": (255 - 17, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 17, 255), "prominence": 10, "distance": 50, "wlen": 1000}
     HOMO_EDGE_COLOR_RANGE = (0, 17)
     HOMO_EDGE_HOUGHLINES_THRESHOLD = 210
     MAP_ENSURE_EDGE_INSIGHT_CORNER = "bottom"
-    MAP_ENEMY_GENRE_DETECTION_SCALING = {
+    MAP_ENEMY_GENRE_DETECTION_SCALING: ClassVar[dict[str, object]] = {
         "DD": 1.111,
         "CL": 1.111,
         "CA": 1.111,

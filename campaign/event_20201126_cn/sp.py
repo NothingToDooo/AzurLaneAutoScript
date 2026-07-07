@@ -102,7 +102,7 @@ class Config:
     # ===== End of generated config =====
 
     MAP_HAS_SIREN = True
-    MAP_SIREN_TEMPLATE = ["KasumiDOA", "NagisaDOA", "NyotenguDOA"]
+    MAP_SIREN_TEMPLATE = ("KasumiDOA", "NagisaDOA", "NyotenguDOA")
 
 
 class Campaign(CampaignBase):

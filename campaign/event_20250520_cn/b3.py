@@ -136,7 +136,7 @@ MAP.spawn_data = [
 
 class Config(ConfigBase):
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = []
+    MAP_SIREN_TEMPLATE = ()
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -146,7 +146,7 @@ class Config(ConfigBase):
     MAP_HAS_MYSTERY = False
     # ===== End of generated config =====
 
-    MAP_ENEMY_TEMPLATE = []
+    MAP_ENEMY_TEMPLATE = ()
     MAP_SWIPE_MULTIPLY = (1.100, 1.121)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.064, 1.084)
 

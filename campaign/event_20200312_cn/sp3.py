@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.campaign.assets import EVENT_20200312CN_SP3 as ENTRANCE
 from module.campaign.campaign_base import CampaignBase
 from module.logger import logger
@@ -97,7 +99,7 @@ ROAD_MAIN = RoadGrids([[B6, C5]])
 class Config:
     MAP_HAS_AMBUSH = False
     CAMPAIGN_MODE = "normal"  # A sp map can treat as normal map.
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (120, 255 - 40),
         "width": 2,
         "prominence": 10,

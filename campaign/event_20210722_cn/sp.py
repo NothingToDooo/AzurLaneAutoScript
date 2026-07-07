@@ -107,7 +107,7 @@ class Config:
     # ===== End of generated config =====
 
     MAP_HAS_SIREN = True
-    MAP_SIREN_TEMPLATE = ["AzusaMiura", "ChihayaKisaragi", "IoriMinase"]
+    MAP_SIREN_TEMPLATE = ("AzusaMiura", "ChihayaKisaragi", "IoriMinase")
     MAP_ENSURE_EDGE_INSIGHT_CORNER = "bottom"
     HOMO_EDGE_COLOR_RANGE = (0, 12)
 

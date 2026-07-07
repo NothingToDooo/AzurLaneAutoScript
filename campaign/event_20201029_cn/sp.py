@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.map.map_base import CampaignMap
 
 from .campaign_base import CampaignBase
@@ -108,17 +110,17 @@ class Config:
     # ===== End of generated config =====
 
     MAP_HAS_SIREN = True
-    MAP_SIREN_TEMPLATE = ["BaltimoreIdol", "RoonIdol", "IllustriousIdol"]
+    MAP_SIREN_TEMPLATE = ("BaltimoreIdol", "RoonIdol", "IllustriousIdol")
     DETECTION_BACKEND = "perspective"
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 40
     EDGE_LINES_HOUGHLINES_THRESHOLD = 40
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (150, 255 - 12),
         "width": (0.9, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (255 - 9, 255),
         "prominence": 10,
         "distance": 50,

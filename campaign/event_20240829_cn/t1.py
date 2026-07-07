@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.map.map_base import CampaignMap
 
 from .campaign_base import CampaignBase
@@ -100,7 +102,7 @@ MAP.spawn_data = [
 
 class Config:
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = []
+    MAP_SIREN_TEMPLATE = ()
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -110,13 +112,13 @@ class Config:
     MAP_HAS_MYSTERY = False
     # ===== End of generated config =====
 
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (80, 255 - 17),
         "width": (0.9, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (255 - 17, 255),
         "prominence": 10,
         "distance": 50,
@@ -125,7 +127,7 @@ class Config:
     }
     HOMO_EDGE_COLOR_RANGE = (0, 17)
 
-    STAGE_ENTRANCE = ["half", "20240725"]
+    STAGE_ENTRANCE = ("half", "20240725")
     MAP_SIREN_HAS_BOSS_ICON_SMALL = True
     MAP_SWIPE_MULTIPLY = (1.237, 1.260)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.196, 1.218)

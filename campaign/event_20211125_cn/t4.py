@@ -121,7 +121,7 @@ MAP.ignore_prediction(H3, enemy_scale=1, enemy_genre="Enemy")
 
 class Config(ConfigBase):
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = ["GridmanCL", "GridmanCA"]
+    MAP_SIREN_TEMPLATE = ("GridmanCL", "GridmanCA")
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True

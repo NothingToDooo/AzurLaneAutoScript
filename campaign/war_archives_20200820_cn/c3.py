@@ -101,7 +101,7 @@ MAP.spawn_data = [
 
 
 class Config(ConfigBase):
-    MAP_SIREN_TEMPLATE = ["Sheffield", "Dorsetshire", "Renown", "PrinceOfWales"]
+    MAP_SIREN_TEMPLATE = ("Sheffield", "Dorsetshire", "Renown", "PrinceOfWales")
     MOVABLE_ENEMY_TURN = (3,)
     MAP_HAS_SIREN = True
     MAP_HAS_MAP_STORY = False

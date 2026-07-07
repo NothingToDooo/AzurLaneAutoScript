@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.map.map_base import CampaignMap
 
 from ..campaign_war_archives.campaign_base import CampaignBase
@@ -79,7 +81,7 @@ MAP.spawn_data = [
 
 class Config:
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = ["DD"]
+    MAP_SIREN_TEMPLATE = ("DD",)
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -90,13 +92,13 @@ class Config:
 
     DETECTION_BACKEND = "perspective"
     COINCIDENT_POINT_ENCOURAGE_DISTANCE = 5
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (50, 255 - 80),
         "width": (0, 7),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (255 - 80, 255),
         "prominence": 10,
         "distance": 50,

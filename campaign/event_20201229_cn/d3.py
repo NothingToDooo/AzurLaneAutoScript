@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap
 
@@ -155,7 +157,7 @@ MAP.spawn_data_loop = [
 
 class Config(ConfigBase):
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = ["BBpurple", "CVpurple", "Intruder"]
+    MAP_SIREN_TEMPLATE = ("BBpurple", "CVpurple", "Intruder")
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -166,11 +168,11 @@ class Config(ConfigBase):
 
     MAP_SWIPE_MULTIPLY = (0.946, 0.963)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (0.914, 0.931)
-    MAP_ENEMY_GENRE_DETECTION_SCALING = {
+    MAP_ENEMY_GENRE_DETECTION_SCALING: ClassVar[dict[str, object]] = {
         "BBpurple": 1.111,
         "CVpurple": 1.111,
     }
-    MAP_ENEMY_TEMPLATE = ["MainPurple", "CarrierPurple"]
+    MAP_ENEMY_TEMPLATE = ("MainPurple", "CarrierPurple")
 
 
 class Campaign(CampaignBase):

@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.map.map_base import CampaignMap
 
 from ..campaign_war_archives.campaign_base import CampaignBase
@@ -120,7 +122,7 @@ MAP.spawn_data_loop = [
 
 class Config:
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = ["Z24", "Nuremberg", "Carabiniere"]
+    MAP_SIREN_TEMPLATE = ("Z24", "Nuremberg", "Carabiniere")
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -129,19 +131,19 @@ class Config:
     MAP_HAS_AMBUSH = False
     # ===== End of generated config =====
 
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (150, 255 - 17),
         "width": (0.9, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {"height": (255 - 17, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 17, 255), "prominence": 10, "distance": 50, "wlen": 1000}
     HOMO_EDGE_COLOR_RANGE = (0, 17)
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 40
     EDGE_LINES_HOUGHLINES_THRESHOLD = 40
     COINCIDENT_POINT_ENCOURAGE_DISTANCE = 1.5
     HOMO_EDGE_HOUGHLINES_THRESHOLD = 180
-    MAP_ENEMY_GENRE_DETECTION_SCALING = {
+    MAP_ENEMY_GENRE_DETECTION_SCALING: ClassVar[dict[str, object]] = {
         "DD": 1.111,
         "CL": 1.111,
         "CA": 1.111,
@@ -150,7 +152,7 @@ class Config:
     }
     MAP_SWIPE_MULTIPLY = (1.033, 1.053)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (0.999, 1.018)
-    MAP_ENEMY_TEMPLATE = ["LightInvertedOrthant", "MainInvertedOrthant", "CarrierInvertedOrthant"]
+    MAP_ENEMY_TEMPLATE = ("LightInvertedOrthant", "MainInvertedOrthant", "CarrierInvertedOrthant")
     MAP_ENSURE_EDGE_INSIGHT_CORNER = "bottom"
 
 

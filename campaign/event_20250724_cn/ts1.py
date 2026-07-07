@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.map.map_base import CampaignMap
 
 from .campaign_base import CampaignBaseTS as CampaignBase
@@ -113,7 +115,7 @@ MAP.spawn_data = [
 
 class Config:
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = ["CAalchemist2"]
+    MAP_SIREN_TEMPLATE = ("CAalchemist2",)
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -127,20 +129,18 @@ class Config:
     # ===== End of generated config =====
 
     MAP_CHAPTER_SWITCH_20241219 = True
-    STAGE_ENTRANCE = ["half", "20240725"]
+    STAGE_ENTRANCE = ("half", "20240725")
 
     # Additional settings for chapter TS
-    STAGE_INCREASE_CUSTOM = [
-        "TS1 > TS2 > TS3 > TS4 > TS5 > TS6",
-    ]
+    STAGE_INCREASE_CUSTOM = ("TS1 > TS2 > TS3 > TS4 > TS5 > TS6",)
 
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (80, 255 - 33),
         "width": (0.9, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {"height": (255 - 33, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 33, 255), "prominence": 10, "distance": 50, "wlen": 1000}
     MAP_SWIPE_MULTIPLY = (1.068, 1.088)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.033, 1.052)
 

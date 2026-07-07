@@ -114,7 +114,7 @@ MAP.spawn_data = [
 
 class Config(ConfigBase):
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = ["PompeoMagno", "AlfredoOriani"]
+    MAP_SIREN_TEMPLATE = ("PompeoMagno", "AlfredoOriani")
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -124,7 +124,7 @@ class Config(ConfigBase):
     MAP_HAS_MYSTERY = False
     # ===== End of generated config =====
 
-    STAGE_ENTRANCE = ["half", "20240725"]
+    STAGE_ENTRANCE = ("half", "20240725")
     MAP_HAS_MODE_SWITCH = True
     MAP_SWIPE_MULTIPLY = (1.089, 1.109)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.053, 1.072)

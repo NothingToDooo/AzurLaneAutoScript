@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap
 
@@ -117,7 +119,7 @@ class Config:
     MAP_SIREN_COUNT = 2
     MAP_HAS_DYNAMIC_RED_BORDER = True
     MAP_GRID_CENTER_TOLERANCE = 0.3
-    MAP_SIREN_TEMPLATE = ["1", "2", "3", "DD"]
+    MAP_SIREN_TEMPLATE = ("1", "2", "3", "DD")
 
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 50
     MID_DIFF_RANGE_H = (45, 70)
@@ -126,14 +128,14 @@ class Config:
 
     VANISH_POINT_RANGE = ((540, 740), (-4000, -2000))
     DISTANCE_POINT_X_RANGE = ((-2000, -1000),)
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (80, 255 - 40),
         "width": (0.9, 10),
         "prominence": 10,
         "distance": 35,
         "wlen": 100,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {"height": (255 - 40, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 40, 255), "prominence": 10, "distance": 50, "wlen": 1000}
 
 
 class Campaign(CampaignBase):

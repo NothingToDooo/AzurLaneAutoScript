@@ -101,7 +101,7 @@ MAP.spawn_data = [
 
 
 class Config(ConfigBase):
-    MAP_SIREN_TEMPLATE = ["CL", "CA", "BB"]
+    MAP_SIREN_TEMPLATE = ("CL", "CA", "BB")
     MOVABLE_ENEMY_TURN = (2, 3)
     MAP_HAS_SIREN = True
     MAP_HAS_MAP_STORY = False

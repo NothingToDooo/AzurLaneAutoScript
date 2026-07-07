@@ -103,7 +103,7 @@ MAP.spawn_data = [
 
 class Config(ConfigBase):
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = ["Jintsuu", "Choukai", "Kirishima", "Souryuu"]
+    MAP_SIREN_TEMPLATE = ("Jintsuu", "Choukai", "Kirishima", "Souryuu")
     MOVABLE_ENEMY_TURN = (3,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True

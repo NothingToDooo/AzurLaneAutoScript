@@ -95,7 +95,7 @@ MAP.spawn_data = [
 
 class Config(ConfigBase):
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = ["SanDiego", "Wichita", "Arizona", "Dace"]
+    MAP_SIREN_TEMPLATE = ("SanDiego", "Wichita", "Arizona", "Dace")
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
     MAP_HAS_MAP_STORY = True

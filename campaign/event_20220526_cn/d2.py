@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap
 
@@ -104,7 +106,7 @@ MAP.ignore_prediction(H1, enemy_scale=1, enemy_genre="Enemy")
 
 class Config(ConfigBase):
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = []
+    MAP_SIREN_TEMPLATE = ()
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -116,13 +118,13 @@ class Config(ConfigBase):
 
     MAP_SIREN_HAS_BOSS_ICON = True
     MAP_SIREN_HAS_BOSS_ICON_SMALL = True
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (120, 255 - 33),
         "width": (1.5, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {"height": (255 - 33, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 33, 255), "prominence": 10, "distance": 50, "wlen": 1000}
     HOMO_EDGE_COLOR_RANGE = (0, 33)
     HOMO_EDGE_HOUGHLINES_THRESHOLD = 210
     MAP_SWIPE_MULTIPLY = (1.084, 1.105)

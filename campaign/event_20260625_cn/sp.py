@@ -115,7 +115,7 @@ MAP.spawn_data = [
 
 class Config:
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = ["MeowfficerBust_Studying", "MeowfficerBust_Playtime"]
+    MAP_SIREN_TEMPLATE = ("MeowfficerBust_Studying", "MeowfficerBust_Playtime")
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -130,7 +130,7 @@ class Config:
 
     MAP_IS_ONE_TIME_STAGE = True
     MAP_CHAPTER_SWITCH_20241219_SP = True
-    STAGE_ENTRANCE = ["half", "20240725"]
+    STAGE_ENTRANCE = ("half", "20240725")
     MAP_HAS_MODE_SWITCH = False
     HOMO_STORAGE = ((8, 6), [(137.405, 104.804), (1046.044, 104.804), (-12.171, 652.093), (1166.717, 652.093)])
     MAP_ENSURE_EDGE_INSIGHT_CORNER = "bottom"

@@ -189,7 +189,7 @@ class Config:
     HOMO_STORAGE = ((10, 6), [(172.714, 96.467), (1291.455, 96.467), (27.369, 639.803), (1491.921, 639.803)])
 
     HOMO_EDGE_HOUGHLINES_THRESHOLD = 280
-    MAP_SIREN_TEMPLATE = ["Deutschland", "Tirpitz", "Gneisenau", "Scharnhorst", "Spee"]
+    MAP_SIREN_TEMPLATE = ("Deutschland", "Tirpitz", "Gneisenau", "Scharnhorst", "Spee")
     MAP_SWIPE_MULTIPLY = (1.006, 1.025)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (0.973, 0.991)
 

@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.map.map_base import CampaignMap
 
 from .campaign_base import CampaignBase
@@ -99,16 +101,16 @@ class Config:
     MAP_HAS_MYSTERY = False
     # ===== End of generated config =====
 
-    STAGE_ENTRANCE = ["normal", "half"]  # normal, blue, half
+    STAGE_ENTRANCE = ("normal", "half")  # normal, blue, half
     MAP_SWIPE_MULTIPLY = (1.221, 1.244)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.181, 1.203)
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (80, 255 - 40),
         "width": (0.9, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (255 - 24, 255),
         "prominence": 10,
         "distance": 50,

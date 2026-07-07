@@ -115,7 +115,7 @@ MAP.spawn_data = [
 
 
 class Config(ConfigBase):
-    MAP_SIREN_TEMPLATE = ["Deutschland", "Tirpitz", "Gneisenau", "Scharnhorst", "Spee"]
+    MAP_SIREN_TEMPLATE = ("Deutschland", "Tirpitz", "Gneisenau", "Scharnhorst", "Spee")
 
 
 class Campaign(CampaignBase):

@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap
 
@@ -119,7 +121,7 @@ MAP.spawn_data = [
 
 class Config:
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = ["Neptune_ghost", "LeMars_ghost"]
+    MAP_SIREN_TEMPLATE = ("Neptune_ghost", "LeMars_ghost")
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -129,23 +131,23 @@ class Config:
     MAP_HAS_MYSTERY = False
     # ===== End of generated config =====
 
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (120, 255 - 17),
         "width": (1.5, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {"height": (255 - 17, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 17, 255), "prominence": 10, "distance": 50, "wlen": 1000}
     HOMO_EDGE_COLOR_RANGE = (0, 17)
     MAP_ENSURE_EDGE_INSIGHT_CORNER = "bottom"
-    MAP_ENEMY_GENRE_DETECTION_SCALING = {
+    MAP_ENEMY_GENRE_DETECTION_SCALING: ClassVar[dict[str, object]] = {
         "DD": 1.111,
         "CL": 1.111,
         "CA": 1.111,
         "CV": 1.111,
         "BB": 1.111,
     }
-    MAP_ENEMY_TEMPLATE = ["Light", "Main", "Carrier", "Treasure", "Vestal_ghost"]
+    MAP_ENEMY_TEMPLATE = ("Light", "Main", "Carrier", "Treasure", "Vestal_ghost")
     MAP_SWIPE_MULTIPLY = (1.141, 1.163)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.104, 1.124)
 

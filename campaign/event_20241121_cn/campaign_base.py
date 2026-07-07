@@ -3,10 +3,8 @@ from module.campaign.campaign_ui import ASIDE_SWITCH_20241219, MODE_SWITCH_20241
 
 
 class CampaignBase(CampaignBase_):
-    STAGE_INCREASE = [
-        "T1 > T2 > T3 > T4 > T5 > T6",
-        "TTL1 > TTL2 > TTL3 > TTL4 > TTL5",
-    ]
+    STAGE_INCREASE = ("T1 > T2 > T3 > T4 > T5 > T6",
+        "TTL1 > TTL2 > TTL3 > TTL4 > TTL5",)
 
     @staticmethod
     def _campaign_get_chapter_index(name):

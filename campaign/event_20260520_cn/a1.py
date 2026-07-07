@@ -110,7 +110,7 @@ MAP.spawn_data = [
 
 class Config:
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = []
+    MAP_SIREN_TEMPLATE = ()
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -119,7 +119,7 @@ class Config:
     MAP_HAS_AMBUSH = False
     MAP_HAS_MYSTERY = False
     MAP_CHAPTER_SWITCH_20241219 = True
-    STAGE_ENTRANCE = ["half", "20240725"]
+    STAGE_ENTRANCE = ("half", "20240725")
     MAP_HAS_MODE_SWITCH = True
     STAGE_INCREASE_AB = True
     MAP_WALK_USE_CURRENT_FLEET = True

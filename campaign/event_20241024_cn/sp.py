@@ -92,7 +92,7 @@ MAP.spawn_data = [
 
 class Config:
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = []
+    MAP_SIREN_TEMPLATE = ()
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = False
@@ -105,7 +105,7 @@ class Config:
     STAR_REQUIRE_3 = 0
     # ===== End of generated config =====
 
-    STAGE_ENTRANCE = ["half", "20240725"]
+    STAGE_ENTRANCE = ("half", "20240725")
     MAP_CHAPTER_SWITCH_20241219 = True
     HOMO_STORAGE = ((10, 5), [(152.845, 95.044), (1264.11, 95.044), (28.172, 525.208), (1419.191, 525.208)])
     HOMO_EDGE_COLOR_RANGE = (0, 33)

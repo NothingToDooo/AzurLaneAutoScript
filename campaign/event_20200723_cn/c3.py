@@ -104,7 +104,7 @@ MAP.spawn_data = [
 
 
 class Config(ConfigBase):
-    MAP_SIREN_TEMPLATE = ["CLpurple", "BBpurple"]
+    MAP_SIREN_TEMPLATE = ("CLpurple", "BBpurple")
 
 
 class Campaign(CampaignBase):

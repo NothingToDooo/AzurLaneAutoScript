@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.campaign.assets import C2 as ENTRANCE
 from module.campaign.campaign_base import CampaignBase
 from module.logger import logger
@@ -93,7 +95,7 @@ class Config:
     MAP_HAS_AMBUSH = False
     CAMPAIGN_MODE = "cd"
     # INTERNAL_LINES_HOUGHLINES_THRESHOLD = 60
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (150, 255 - 25),
         "width": 1,
         "prominence": 10,

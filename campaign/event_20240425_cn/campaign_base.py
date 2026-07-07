@@ -3,14 +3,12 @@ from module.logger import logger
 
 
 class CampaignBase(CampaignBase_):
-    STAGE_INCREASE = [
-        """
+    STAGE_INCREASE = ("""
         SP1 > SP2 > SP3 > SP4 > SP5
         """,
         """
         ISP1 > ISP2 > ISP3 > ISP4 > ISP5 > ISP6
-        """,
-    ]
+        """,)
 
     def campaign_set_chapter_event(self, chapter, mode="normal"):
         self.ui_goto_event()

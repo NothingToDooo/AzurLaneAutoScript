@@ -128,7 +128,7 @@ MAP.ignore_prediction(G4, is_siren=True)
 
 class Config(ConfigBase):
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = ["SirenBoss15", "SirenBoss16"]
+    MAP_SIREN_TEMPLATE = ("SirenBoss15", "SirenBoss16")
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True

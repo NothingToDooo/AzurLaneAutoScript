@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap
 
@@ -136,16 +138,16 @@ MAP.spawn_data = [
 
 
 class Config(ConfigBase):
-    MAP_SIREN_TEMPLATE = ["ELpurple", "CVpurple", "BBpurple"]
+    MAP_SIREN_TEMPLATE = ("ELpurple", "CVpurple", "BBpurple")
     HOMO_STORAGE = ((8, 5), [(200.097, 82.51), (1200.298, 82.51), (95.065, 506.098), (1335.813, 506.098)])
 
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (80, 255 - 40),
         "width": (0.9, 50),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {"height": (255 - 24, 255), "prominence": 2, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 24, 255), "prominence": 2, "distance": 50, "wlen": 1000}
     MID_DIFF_RANGE_H = (144 - 3, 144 + 3)
     MID_DIFF_RANGE_V = (144 - 3, 144 + 3)
     # Grid have 1.2x width, images on the grid still remain the same.

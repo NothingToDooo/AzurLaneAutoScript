@@ -100,7 +100,7 @@ MAP.spawn_data = [
 
 class Config:
     # ===== Start of generated config =====
-    MAP_SIREN_TEMPLATE = ["MeowfficerBust_Studying", "MeowfficerBust_Playtime"]
+    MAP_SIREN_TEMPLATE = ("MeowfficerBust_Studying", "MeowfficerBust_Playtime")
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = True
@@ -111,7 +111,7 @@ class Config:
     # ===== End of generated config =====
 
     MAP_CHAPTER_SWITCH_20241219_SP = True
-    STAGE_ENTRANCE = ["half", "20240725"]
+    STAGE_ENTRANCE = ("half", "20240725")
     MAP_HAS_MODE_SWITCH = True
     MAP_SWIPE_MULTIPLY = (1.144, 1.165)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.106, 1.126)
