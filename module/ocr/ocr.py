@@ -54,8 +54,7 @@ class Ocr:
     def buttons(self):
         buttons = self._buttons
         buttons = buttons if isinstance(buttons, list) else [buttons]
-        buttons = [button.area if isinstance(button, Button) else button for button in buttons]
-        return buttons
+        return [button.area if isinstance(button, Button) else button for button in buttons]
 
     @buttons.setter
     def buttons(self, value):
@@ -122,8 +121,7 @@ class OcrYuv(Ocr):
     @cached_property
     def letter_y(self):
         arr = np.array([[self.letter]], dtype=np.uint8)
-        y = rgb2luma(arr)[0][0]
-        return y
+        return rgb2luma(arr)[0][0]
 
     def pre_process(self, image):
         """
@@ -136,8 +134,7 @@ class OcrYuv(Ocr):
         y = rgb2luma(image)
         letter_y = (np.ones(y.shape) * self.letter_y).astype(np.uint8)
         diff = cv2.absdiff(y, letter_y)
-        diff = cv2.multiply(diff, 255.0 / self.threshold)
-        return diff
+        return cv2.multiply(diff, 255.0 / self.threshold)
 
 
 class Digit(Ocr):
@@ -178,8 +175,7 @@ class DigitCounter(Ocr):
     def after_process(self, result):
         result = super().after_process(result)
         result = result.replace("I", "1").replace("D", "0").replace("S", "5")
-        result = result.replace("B", "8")
-        return result
+        return result.replace("B", "8")
 
     def ocr(self, image, direct_ocr=False):
         """
@@ -220,8 +216,7 @@ class Duration(Ocr):
     def after_process(self, result):
         result = super().after_process(result)
         result = result.replace("I", "1").replace("D", "0").replace("S", "5")
-        result = result.replace("B", "8")
-        return result
+        return result.replace("B", "8")
 
     def ocr(self, image, direct_ocr=False):
         """

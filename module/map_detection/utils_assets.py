@@ -24,8 +24,7 @@ class Assets:
     @cached_property
     def ui_mask_stroke(self):
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-        image = cv2.erode(self.ui_mask, kernel).astype("uint8")
-        return image
+        return cv2.erode(self.ui_mask, kernel).astype("uint8")
 
     @cached_property
     def ui_mask_in_map(self):

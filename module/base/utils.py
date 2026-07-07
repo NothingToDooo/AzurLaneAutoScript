@@ -749,8 +749,7 @@ def rgb2yuv(image):
     Returns:
         np.ndarray: Shape (height, width)
     """
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2YUV)
-    return image
+    return cv2.cvtColor(image, cv2.COLOR_RGB2YUV)
 
 
 def rgb2luma(image):
@@ -940,8 +939,7 @@ def color_similarity(color1, color2):
     elif diff_b < max_negative:
         max_negative = diff_b
 
-    diff = max_positive - max_negative
-    return diff
+    return max_positive - max_negative
 
 
 def color_similar(color1, color2, threshold=10):

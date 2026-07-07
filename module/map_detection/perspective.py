@@ -236,14 +236,9 @@ class Perspective:
         return Lines(lines, is_horizontal=is_horizontal)
 
     def detect_lines(self, image, is_horizontal, param, threshold, theta, pad=0):
-        """
-        Method that wraps find_peaks and hough_lines
-        """
+        """包装 find_peaks 和 hough_lines。"""
         peaks = self.find_peaks(image, is_horizontal=is_horizontal, param=param, pad=pad, mask=ASSETS.ui_mask_stroke)
-        # self.show_array(peaks)
-        lines = self.hough_lines(peaks, is_horizontal=is_horizontal, threshold=threshold, theta=theta)
-        # self.draw(lines, Image.fromarray(peaks.astype(np.uint8), mode='L'))
-        return lines
+        return self.hough_lines(peaks, is_horizontal=is_horizontal, threshold=threshold, theta=theta)
 
     @staticmethod
     def show_array(arr):
@@ -277,33 +272,16 @@ class Perspective:
         # image.save('123.png')
 
     def _vanish_point_value(self, point):
-        """Value that measures how close a point to the perspective vanish point. The smaller the better.
-        Use log10 to encourage a group of coincident lines and discourage wrong lines.
-
-        Args:
-            point(np.ndarray): np.array([x, y])
-
-        Returns:
-            float: value.
-        """
-        # Add 0.001 to avoid log10(0).
-        distance = np.sum(np.log10(np.abs(self.vertical.distance_to_point(point)) + 0.001))
-        return distance
+        """衡量候选点接近透视消失点的程度，值越小越好。"""
+        # 加 0.001 避免 log10(0)。
+        return np.sum(np.log10(np.abs(self.vertical.distance_to_point(point)) + 0.001))
 
     def _distant_point_value(self, x):
-        """Value that measures how close a point to the perspective distant point. The smaller the better.
-        Use log10 to encourage a group of coincident lines and discourage wrong lines.
-
-        Args:
-            x(np.ndarray): np.array([x])
-
-        Returns:
-            float: value
-        """
+        """衡量候选点接近透视远点的程度，值越小越好。"""
         links = self.crossings.link((x[0], self.vanish_point[1]))
         mid = np.sort(links.mid)
-        distance = np.sum(np.log10(np.diff(mid) + 0.001))  # Add 0.001 to avoid log10(0).
-        return distance
+        # 加 0.001 避免 log10(0)。
+        return np.sum(np.log10(np.diff(mid) + 0.001))
 
     def mid_cleanse(self, mids, is_horizontal, threshold=3):
         """
@@ -331,21 +309,17 @@ class Perspective:
             )
 
         def coincident_point_value(point):
-            """Value that measures how close a point to the coincident point. The smaller the better.
-            Coincident point may be many.
-            Use an activation function to encourage a group of coincident lines and ignore wrong lines.
-            """
+            """衡量候选点接近重合点的程度，值越小越好。"""
             x, y = point
-            # Do not use:
+            # 不要直接使用到点距离。
             # distance = coincident.distance_to_point(point)
             distance = np.abs(x - coincident.get_x(y))
             # print((distance * 1).astype(int).reshape(len(mids), np.diff(self.config.ERROR_LINES_TOLERANCE)[0]+1))
 
-            # Activation function
+            # 激活函数。
             # distance = 1 / (1 + np.exp(16 / distance - distance))
             distance = 1 / (1 + np.exp(encourage / distance) / distance)
-            distance = np.sum(distance)
-            return distance
+            return np.sum(distance)
 
         if is_horizontal:
             mids = convert_to_x(mids)

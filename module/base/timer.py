@@ -22,30 +22,22 @@ def timer(function):
 
 
 def future_time(string):
-    """
-    Args:
-        string (str): Such as 14:59.
-
-    Returns:
-        datetime.datetime: Time with given hour, minute in the future.
-    """
+    """返回指定时分对应的未来时间。"""
     hour, minute = [int(x) for x in string.split(":")]
-    future = datetime.now().replace(hour=hour, minute=minute, second=0, microsecond=0)
-    future = future + timedelta(days=1) if future < datetime.now() else future
+    now = datetime.now()
+    future = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if future < now:
+        return future + timedelta(days=1)
     return future
 
 
 def past_time(string):
-    """
-    Args:
-        string (str): Such as 14:59.
-
-    Returns:
-        datetime.datetime: Time with given hour, minute in the past.
-    """
+    """返回指定时分对应的过去时间。"""
     hour, minute = [int(x) for x in string.split(":")]
-    past = datetime.now().replace(hour=hour, minute=minute, second=0, microsecond=0)
-    past = past - timedelta(days=1) if past > datetime.now() else past
+    now = datetime.now()
+    past = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if past > now:
+        return past - timedelta(days=1)
     return past
 
 

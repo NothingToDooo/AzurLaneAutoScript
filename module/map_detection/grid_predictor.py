@@ -143,8 +143,7 @@ class GridPredictor:
         """
         mask = color_similarity_2d(self.relative_crop(area, shape=shape), color=color)
         cv2.inRange(mask, threshold, 255, dst=mask)
-        count = cv2.countNonZero(mask)
-        return count
+        return cv2.countNonZero(mask)
 
     def relative_hsv_count(self, area, h=(0, 360), s=(0, 100), v=(0, 100), shape=(50, 50)):
         """
@@ -162,10 +161,9 @@ class GridPredictor:
         cv2.cvtColor(image, cv2.COLOR_RGB2HSV, dst=image)
         lower = (h[0] / 2, s[0] * 2.55, v[0] * 2.55)
         upper = (h[1] / 2 + 1, s[1] * 2.55 + 1, v[1] * 2.55 + 1)
-        # Don't set `dst`, output image is (50, 50) but `image` is (50, 50, 3)
+        # 这里不能设置 dst，输出是二维掩码，原图是三通道图像。
         image = cv2.inRange(image, lower, upper)
-        count = cv2.countNonZero(image)
-        return count
+        return cv2.countNonZero(image)
 
     def predict_enemy_scale(self):
         """

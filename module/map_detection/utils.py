@@ -196,8 +196,7 @@ class Lines:
 
     def cross(self, other):
         points = np.vstack(self.cross_two_lines(self, other))
-        points = Points(points)
-        return points
+        return Points(points)
 
     def delete(self, other, threshold=3):
         if not self:
@@ -247,8 +246,7 @@ def corner2inner(corner):
         tuple[int]: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
     """
     x0, y0, x1, y1, x2, y2, x3, y3 = np.array(corner).flatten()
-    area = tuple(np.rint((max(x0, x2), max(y0, y1), min(x1, x3), min(y2, y3))).astype(int))
-    return area
+    return tuple(np.rint((max(x0, x2), max(y0, y1), min(x1, x3), min(y2, y3))).astype(int))
 
 
 def corner2outer(corner):
@@ -262,8 +260,7 @@ def corner2outer(corner):
         tuple[int]: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
     """
     x0, y0, x1, y1, x2, y2, x3, y3 = np.array(corner).flatten()
-    area = tuple(np.rint((min(x0, x2), min(y0, y1), max(x1, x3), max(y2, y3))).astype(int))
-    return area
+    return tuple(np.rint((min(x0, x2), min(y0, y1), max(x1, x3), max(y2, y3))).astype(int))
 
 
 def trapezoid2area(corner, pad=0):
@@ -351,8 +348,7 @@ def perspective_transform(points, data):
     points = np.pad(np.array(points), ((0, 0), (0, 1)), mode="constant", constant_values=1)
     matrix = data.dot(points.T)
     x, y = matrix[0] / matrix[2], matrix[1] / matrix[2]
-    points = np.array([x, y]).T
-    return points
+    return np.array([x, y]).T
 
 
 def fit_points(points, mod, encourage=1):

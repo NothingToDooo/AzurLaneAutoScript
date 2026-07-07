@@ -227,8 +227,7 @@ class TaskHandler:
         logger.info("End of task handler loop")
 
     def _get_thread(self) -> threading.Thread:
-        thread = threading.Thread(target=self.loop, daemon=True)
-        return thread
+        return threading.Thread(target=self.loop, daemon=True)
 
     def start(self) -> None:
         """

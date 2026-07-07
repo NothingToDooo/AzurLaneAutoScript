@@ -109,14 +109,12 @@ class RichLog:
         with self.console.capture():
             self.console.print(renderable)
 
-        html = self.console.export_html(
+        return self.console.export_html(
             theme=self.terminal_theme,
             clear=True,
             code_format=LOG_CODE_FORMAT,
             inline_styles=True,
         )
-        # print(html)
-        return html
 
     def extend(self, text):
         if text:

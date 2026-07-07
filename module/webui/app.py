@@ -1170,7 +1170,7 @@ def app():
             return
         app_manage()
 
-    app = asgi_app(
+    return asgi_app(
         applications=[index, manage],
         cdn=cdn,
         static_dir=None,
@@ -1181,5 +1181,3 @@ def app():
         ],
         on_shutdown=[clearup],
     )
-
-    return app

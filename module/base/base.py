@@ -123,8 +123,7 @@ class ModuleBase:
         logger.hr("Creating worker")
         from concurrent.futures import ThreadPoolExecutor
 
-        pool = ThreadPoolExecutor(1)
-        return pool
+        return ThreadPoolExecutor(1)
 
     def ensure_button(self, button):
         if isinstance(button, str):
