@@ -149,7 +149,7 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
         Args:
             index (int): From left to right. 0 to 3.
         """
-        logger.hr("Opponent: %s" % str(index))
+        logger.hr(f"Opponent: {index}")
         opponent_timer = Timer(5)
         preparation_timer = Timer(5)
 
@@ -193,7 +193,7 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
             self.config.Exercise_OpponentTrial = 1
 
         for n in range(1, self.config.Exercise_OpponentTrial + 1):
-            logger.hr("Try: %s" % n)
+            logger.hr(f"Try: {n}")
             self._combat_preparation()
             success = self._combat_execute()
             if success:

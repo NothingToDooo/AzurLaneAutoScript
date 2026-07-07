@@ -100,13 +100,7 @@ class ImageExtractor:
 
     @property
     def expression(self):
-        return "%s = Button(area=%s, color=%s, button=%s, file=%s)" % (
-            self.name,
-            self.area,
-            self.color,
-            self.button,
-            self.file,
-        )
+        return f"{self.name} = Button(area={self.area}, color={self.color}, button={self.button}, file={self.file})"
 
 
 class TemplateExtractor(ImageExtractor):
@@ -130,7 +124,7 @@ class TemplateExtractor(ImageExtractor):
 
     @property
     def expression(self):
-        return "%s = Template(file=%s)" % (self.name, self.file)
+        return f"{self.name} = Template(file={self.file})"
         # return '%s = Template(area=%s, color=%s, button=%s, file=\'%s\')' % (
         #     self.name, self.area, self.color, self.button,
         #     self.config.ASSETS_FOLDER + '/' + self.module + '/' + self.name + '.png')
@@ -177,7 +171,7 @@ class ModuleExtractor:
 
         exp.sort()
 
-        logger.info("Module: %s(%s)" % (self.name, len(exp)))
+        logger.info(f"Module: {self.name}({len(exp)})")
         imports = []
         if any("Button(" in row for row in exp):
             imports.append("from module.base.button import Button")

@@ -268,7 +268,7 @@ class LoginHandler(UI):
             peaks = (peaks[0] + peaks[1]) / 2
         start_pos = [(start_padding_results[2] + start_margin_results[2]) / 2, float(peaks)]
         end_pos = [(start_padding_results[2] + start_margin_results[2]) / 2, area_wait_results[3]]
-        logger.info("user agreement position find result: " + ", ".join("%.2f" % _ for _ in start_pos))
+        logger.info("user agreement position find result: " + ", ".join(f"{_:.2f}" for _ in start_pos))
         logger.info("user agreement area expect:          " + "x:963-973, y:259-279")
 
         self.device.drag(

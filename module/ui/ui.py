@@ -282,10 +282,10 @@ class UI(InfoHandler):
         logger.hr("UI ensure")
         self.ui_get_current_page(skip_first_screenshot=skip_first_screenshot)
         if self.ui_current == destination:
-            logger.info("Already at %s" % destination)
+            logger.info(f"Already at {destination}")
             return False
         else:
-            logger.info("Goto %s" % destination)
+            logger.info(f"Goto {destination}")
             self.ui_goto(destination, skip_first_screenshot=True)
             return True
 

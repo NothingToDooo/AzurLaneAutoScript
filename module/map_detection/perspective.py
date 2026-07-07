@@ -153,26 +153,17 @@ class Perspective:
 
         # Log
         time_cost = round(time.time() - start_time, 3)
+        lower_edge = "_" if self.lower_edge else " "
+        left_edge = "/" if self.left_edge else " "
+        upper_edge = "_" if self.upper_edge else " "
+        right_edge = "\\" if self.right_edge else " "
         logger.info(
-            "%ss  %s   Horizontal: %s (%s inner, %s edge)"
-            % (
-                float2str(time_cost),
-                "_" if self.lower_edge else " ",
-                len(self.horizontal),
-                len(horizontal),
-                len(edge_h),
-            )
+            f"{float2str(time_cost)}s  {lower_edge}   "
+            f"Horizontal: {len(self.horizontal)} ({len(horizontal)} inner, {len(edge_h)} edge)"
         )
         logger.info(
-            "Edges: %s%s%s    Vertical: %s (%s inner, %s edge)"
-            % (
-                "/" if self.left_edge else " ",
-                "_" if self.upper_edge else " ",
-                "\\" if self.right_edge else " ",
-                len(self.vertical),
-                len(vertical),
-                len(edge_v),
-            )
+            f"Edges: {left_edge}{upper_edge}{right_edge}    "
+            f"Vertical: {len(self.vertical)} ({len(vertical)} inner, {len(edge_v)} edge)"
         )
 
     def load_image(self, image):
@@ -377,10 +368,8 @@ class Perspective:
 
         diff = np.max([mid_diff_range[0] - coincident_point[1], coincident_point[1] - mid_diff_range[1]])
         if diff > 0:
-            logger.info(
-                "%s coincident point unexpected: %s"
-                % ("Horizontal" if is_horizontal else "Vertical", str(coincident_point))
-            )
+            direction = "Horizontal" if is_horizontal else "Vertical"
+            logger.info(f"{direction} coincident point unexpected: {coincident_point}")
 
         # The limits of detecting area
         if is_horizontal:

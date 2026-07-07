@@ -46,14 +46,14 @@ class Daily(Combat, DailyEquipment):
 
     def next(self):
         self.daily_current += 1
-        logger.info("Switch to %s" % str(self.daily_current))
+        logger.info(f"Switch to {self.daily_current}")
         self.device.click(daily_assets.DAILY_NEXT)
         self._wait_daily_switch()
         self.device.screenshot()
 
     def prev(self):
         self.daily_current -= 1
-        logger.info("Switch to %s" % str(self.daily_current))
+        logger.info(f"Switch to {self.daily_current}")
         self.device.click(daily_assets.DAILY_PREV)
         self._wait_daily_switch()
         self.device.screenshot()

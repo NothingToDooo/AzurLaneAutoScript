@@ -73,7 +73,7 @@ class Camera(MapOperation):
         Returns:
             bool: if camera moved.
         """
-        logger.info("Map swipe: %s" % str(vector))
+        logger.info(f"Map swipe: {vector}")
         self._prev_view = copy.copy(self.view)
         self._prev_swipe = vector
         vector = np.array(vector)
@@ -397,7 +397,7 @@ class Camera(MapOperation):
             swipe_limit(tuple): (x, y). Limit swipe in (-x, -y, x, y).
         """
         location = location_ensure(location)
-        logger.info("Focus to: %s" % location2node(location))
+        logger.info(f"Focus to: {location2node(location)}")
 
         while 1:
             vector = np.array(location) - self.camera
@@ -458,7 +458,7 @@ class Camera(MapOperation):
             sight (tuple): Such as (-3, -1, 3, 2).
         """
         location = location_ensure(location)
-        logger.info("In sight: %s" % location2node(location))
+        logger.info(f"In sight: {location2node(location)}")
         if sight is None:
             sight = self.map.camera_sight
 
@@ -491,13 +491,8 @@ class Camera(MapOperation):
 
         local = np.array(location) - self.camera + self.view.center_loca
         logger.info(
-            "Global %s (camera=%s) -> Local %s (center=%s)"
-            % (
-                location2node(location),
-                location2node(self.camera),
-                location2node(local),
-                location2node(self.view.center_loca),
-            )
+            f"Global {location2node(location)} (camera={location2node(self.camera)}) "
+            f"-> Local {location2node(local)} (center={location2node(self.view.center_loca)})"
         )
         if local in self.view:
             return self.view[local]
@@ -521,13 +516,8 @@ class Camera(MapOperation):
 
         global_ = np.array(location) + self.camera - self.view.center_loca
         logger.info(
-            "Global %s (camera=%s) <- Local %s (center=%s)"
-            % (
-                location2node(global_),
-                location2node(self.camera),
-                location2node(location),
-                location2node(self.view.center_loca),
-            )
+            f"Global {location2node(global_)} (camera={location2node(self.camera)}) "
+            f"<- Local {location2node(location)} (center={location2node(self.view.center_loca)})"
         )
 
         if global_ in self.map:

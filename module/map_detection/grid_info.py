@@ -122,10 +122,9 @@ class GridInfo:
             return "SU"
 
         if self.is_enemy:
-            return "%s%s" % (
-                self.enemy_scale if self.enemy_scale else 0,
-                self.enemy_genre[0].upper() if self.enemy_genre else "E",
-            )
+            scale = self.enemy_scale if self.enemy_scale else 0
+            genre = self.enemy_genre[0].upper() if self.enemy_genre else "E"
+            return f"{scale}{genre}"
 
         dic = {
             "FL": "is_current_fleet",

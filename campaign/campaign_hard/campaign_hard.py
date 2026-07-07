@@ -45,14 +45,14 @@ class Campaign(CampaignBase, HardEquipment):
     def clear_boss(self):
         grids = self.map.select(is_boss=True)
         grids = grids.add(self.map.select(may_boss=True, is_enemy=True))
-        logger.info("May boss: %s" % self.map.select(may_boss=True))
-        logger.info("May boss and is enemy: %s" % self.map.select(may_boss=True, is_enemy=True))
-        logger.info("Is boss: %s" % self.map.select(is_boss=True))
+        logger.info(f"May boss: {self.map.select(may_boss=True)}")
+        logger.info(f"May boss and is enemy: {self.map.select(may_boss=True, is_enemy=True)}")
+        logger.info(f"Is boss: {self.map.select(is_boss=True)}")
         # logger.info('Grids: %s' % grids)
         if grids:
             logger.hr("Clear BOSS")
             grids = grids.sort("weight", "cost")
-            logger.info("Grids: %s" % str(grids))
+            logger.info(f"Grids: {grids}")
             self._goto(grids[0], expected="boss")
             raise CampaignEnd("BOSS Clear.")
 

@@ -369,7 +369,7 @@ def point2str(x, y, length=4):
     Returns:
         str: String with numbers right aligned, such as '( 100,  80)'.
     """
-    return "(%s, %s)" % (str(int(x)).rjust(length), str(int(y)).rjust(length))
+    return f"({str(int(x)).rjust(length)}, {str(int(y)).rjust(length)})"
 
 
 def col2name(col):

@@ -70,7 +70,7 @@ class FleetOperator:
             mean = get_color(image, area)
             if np.std(mean, ddof=1) > self.FLEET_BAR_ACTIVE_STD:
                 result.append(index + 1)
-        logger.info("Current selected: %s" % str(result))
+        logger.info(f"Current selected: {result}")
         return result
 
     def get_button(self, index):
@@ -93,7 +93,7 @@ class FleetOperator:
             ),
             offset=(bar[0:2]),
         )
-        return Button(area=(), color=(), button=area, name="%s_INDEX_%s" % (str(self._bar), str(index)))
+        return Button(area=(), color=(), button=area, name=f"{self._bar}_INDEX_{index}")
 
     def allow(self):
         """

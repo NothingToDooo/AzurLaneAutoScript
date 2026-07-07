@@ -122,7 +122,7 @@ class Screenshot(Adb, NemuIpc):
 
         if now - self._last_save_time.get(genre, 0) > interval:
             fmt = "png"
-            file = "%s.%s" % (int(now * 1000), fmt)
+            file = f"{int(now * 1000)}.{fmt}"
 
             folder = self.config.SCREEN_SHOT_SAVE_FOLDER_BASE if to_base_folder else self.config.SCREEN_SHOT_SAVE_FOLDER
             folder = os.path.join(folder, genre)

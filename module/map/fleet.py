@@ -447,7 +447,7 @@ class Fleet(Camera, AmbushHandler):
         self.map[self.fleet_current].is_fleet = False
         self.map[location].wipe_out()
         self.map[location].is_fleet = True
-        self.__setattr__("fleet_%s_location" % self.fleet_current_index, location)
+        self.__setattr__(f"fleet_{self.fleet_current_index}_location", location)
         if result_mystery == "get_carrier":
             self.full_scan_carrier()
         if result == "combat":
@@ -533,11 +533,11 @@ class Fleet(Camera, AmbushHandler):
     def show_fleet(self):
         fleets = []
         for n in [1, 2]:
-            fleet = self.__getattribute__("fleet_%s_location" % n)
+            fleet = self.__getattribute__(f"fleet_{n}_location")
             if len(fleet):
-                text = "Fleet_%s: %s" % (n, location2node(fleet))
+                text = f"Fleet_{n}: {location2node(fleet)}"
                 if self.fleet_current_index == n:
-                    text = "[%s]" % text
+                    text = f"[{text}]"
                 fleets.append(text)
         logger.info(" ".join(fleets))
 
@@ -734,7 +734,7 @@ class Fleet(Camera, AmbushHandler):
             fleets = self.map.select(is_fleet=True, is_spawn_point=True)
         else:
             fleets = self.map.select(is_fleet=True)
-        logger.info("Fleets: %s" % str(fleets))
+        logger.info(f"Fleets: {fleets}")
         count = fleets.count
         if count == 1:
             if not self.config.FLEET_2:
@@ -786,7 +786,7 @@ class Fleet(Camera, AmbushHandler):
                 if fleets.count:
                     self.fleet_1 = fleets[0].location
             if count > 2:
-                logger.warning("Too many fleets: %s." % str(fleets))
+                logger.warning(f"Too many fleets: {fleets}.")
             self.find_all_fleets()
 
         self.show_fleet()
@@ -835,7 +835,7 @@ class Fleet(Camera, AmbushHandler):
                     # Give up
                     self.find_all_submarines()
         else:
-            logger.warning("Too many submarines: %s." % str(fleets))
+            logger.warning(f"Too many submarines: {fleets}.")
             self.find_all_submarines()
 
         if not len(self.fleet_submarine_location):

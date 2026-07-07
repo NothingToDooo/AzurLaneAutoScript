@@ -41,6 +41,6 @@ for grid in grids:
     # This one is for `predict_enemy_genre`
     piece = rgb2gray(grid.relative_crop((-0.5, -1, 0.5, 0), shape=(60, 60)))
 
-    file = "%s_%s_%s.png" % (int(time.time()), grid.location[0], grid.location[1])
+    file = f"{int(time.time())}_{grid.location[0]}_{grid.location[1]}.png"
     file = os.path.join(folder, file)
     Image.fromarray(piece).save(file)

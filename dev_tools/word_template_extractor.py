@@ -40,7 +40,7 @@ for result in re.findall("word_template = (.*?)return", text, re.DOTALL):
     extract(pg, word_list=[])
 # Other server
 for result in re.findall(r"uv0\.{0,1}(.*?)end", text, re.DOTALL):
-    pg = slpp.decode("{%s}" % result)
+    pg = slpp.decode(f"{{{result}}}")
     extract(pg, word_list=[])
 
 print(f"Total count: {count}")

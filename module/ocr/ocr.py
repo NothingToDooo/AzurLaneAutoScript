@@ -109,7 +109,7 @@ class Ocr:
         if len(self.buttons) == 1:
             result_list = result_list[0]
         if self.SHOW_LOG:
-            logger.attr(name="%s %ss" % (self.name, float2str(time.time() - start_time)), text=str(result_list))
+            logger.attr(name=f"{self.name} {float2str(time.time() - start_time)}s", text=str(result_list))
 
         return result_list
 

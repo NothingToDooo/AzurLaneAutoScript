@@ -37,7 +37,7 @@ class Control(Minitouch, NemuIpc):
             self.handle_control_check(button)
         x, y = random_rectangle_point(button.button)
         x, y = ensure_int(x, y)
-        logger.info("Click %s @ %s" % (point2str(x, y), button))
+        logger.info(f"Click {point2str(x, y)} @ {button}")
         method = self.click_methods.get(self.config.Emulator_ControlMethod, self.click_minitouch)
         method(x, y)
 
@@ -63,7 +63,7 @@ class Control(Minitouch, NemuIpc):
         x, y = random_rectangle_point(button.button)
         x, y = ensure_int(x, y)
         duration = ensure_time(duration)
-        logger.info("Click %s @ %s, %s" % (point2str(x, y), button, duration))
+        logger.info(f"Click {point2str(x, y)} @ {button}, {duration}")
         method = self.config.Emulator_ControlMethod
         if method == "nemu_ipc":
             self.long_click_nemu_ipc(x, y, duration)
@@ -76,9 +76,9 @@ class Control(Minitouch, NemuIpc):
         duration = ensure_time(duration)
         method = self.config.Emulator_ControlMethod
         if method in ["minitouch", "nemu_ipc"]:
-            logger.info("Swipe %s -> %s" % (point2str(*p1), point2str(*p2)))
+            logger.info(f"Swipe {point2str(*p1)} -> {point2str(*p2)}")
         else:
-            logger.info("Swipe %s -> %s" % (point2str(*p1), point2str(*p2)))
+            logger.info(f"Swipe {point2str(*p1)} -> {point2str(*p2)}")
 
         if distance_check:
             if np.linalg.norm(np.subtract(p1, p2)) < 10:
@@ -143,7 +143,7 @@ class Control(Minitouch, NemuIpc):
     ):
         self.handle_control_check(name)
         p1, p2 = ensure_int(p1, p2)
-        logger.info("Drag %s -> %s" % (point2str(*p1), point2str(*p2)))
+        logger.info(f"Drag {point2str(*p1)} -> {point2str(*p2)}")
         method = self.config.Emulator_ControlMethod
         if method == "nemu_ipc":
             self.drag_nemu_ipc(p1, p2, point_random=point_random)

@@ -636,7 +636,7 @@ class CampaignMap:
         res.reverse()
 
         if len(res) == 0:
-            logger.warning("No path found. Destination: %s" % str(location))
+            logger.warning(f"No path found. Destination: {location}")
             return [location, location]
 
         return res
@@ -705,7 +705,8 @@ class CampaignMap:
         if path is None or not len(path):
             logger.warning("No path found. Return destination.")
             return [location]
-        logger.info("Full path: %s" % "[" + ", ".join([location2node(grid) for grid in path]) + "]")
+        full_path = ", ".join(location2node(grid) for grid in path)
+        logger.info(f"Full path: [{full_path}]")
 
         portal_path = []
         index = [0]
@@ -723,7 +724,8 @@ class CampaignMap:
             local_path = path[start : end + 1]
             local_path = self._find_route_node(local_path, step=step, turning_optimize=turning_optimize)
             portal_path += local_path
-            logger.info("Path: %s" % "[" + ", ".join([location2node(grid) for grid in local_path]) + "]")
+            route = ", ".join(location2node(grid) for grid in local_path)
+            logger.info(f"Path: [{route}]")
         path = portal_path
 
         return path
@@ -803,11 +805,11 @@ class CampaignMap:
         for upper in self.map_covered:
             for attr in ["enemy", "mystery", "siren", "boss"]:
                 if upper.__getattribute__("may_" + attr) and missing[attr] > 0 and missing[attr] == may[attr]:
-                    logger.info("Predict %s to be %s" % (location2node(upper.location), attr))
+                    logger.info(f"Predict {location2node(upper.location)} to be {attr}")
                     upper.__setattr__("is_" + attr, True)
             if carrier_count:
                 if upper.may_carrier and missing["carrier"] > 0 and missing["carrier"] == may["carrier"]:
-                    logger.info("Predict %s to be enemy" % location2node(upper.location))
+                    logger.info(f"Predict {location2node(upper.location)} to be enemy")
                     upper.__setattr__("is_enemy", True)
 
     def select(self, **kwargs):

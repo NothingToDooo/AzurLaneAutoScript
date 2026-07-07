@@ -82,11 +82,14 @@ class SLPP:
         newline = self.newline
 
         if isinstance(obj, str):
-            s += '"%s"' % obj.replace(r'"', r"\"")
+            escaped = obj.replace(r'"', r"\"")
+            s += f'"{escaped}"'
         elif six.PY2 and isinstance(obj, six.text_type):
-            s += '"%s"' % obj.encode("utf-8").replace(r'"', r"\"")
+            escaped = obj.encode("utf-8").replace(r'"', r"\"")
+            s += f'"{escaped}"'
         elif six.PY3 and isinstance(obj, bytes):
-            s += '"{}"'.format("".join(rf"\x{c:02x}" for c in obj))
+            escaped = "".join(rf"\x{c:02x}" for c in obj)
+            s += f'"{escaped}"'
         elif isinstance(obj, bool):
             s += str(obj).lower()
         elif obj is None:
@@ -102,15 +105,18 @@ class SLPP:
             ):
                 newline = tab = ""
             dp = tab * self.depth
-            s += "%s{%s" % (tab * (self.depth - 2), newline)
+            s += f"{tab * (self.depth - 2)}{{{newline}"
+            separator = f",{newline}"
             if isinstance(obj, dict):
-                key = "[%s]" if all(isinstance(k, int) for k in obj) else "%s"
-                contents = [dp + (key + " = %s") % (k, self.__encode(v)) for k, v in obj.items()]
-                s += (",%s" % newline).join(contents)
+                if all(isinstance(k, int) for k in obj):
+                    contents = [f"{dp}[{k}] = {self.__encode(v)}" for k, v in obj.items()]
+                else:
+                    contents = [f"{dp}{k} = {self.__encode(v)}" for k, v in obj.items()]
+                s += separator.join(contents)
             else:
-                s += (",%s" % newline).join([dp + self.__encode(el) for el in obj])
+                s += separator.join([dp + self.__encode(el) for el in obj])
             self.depth -= 1
-            s += "%s%s}" % (newline, tab * self.depth)
+            s += f"{newline}{tab * self.depth}}}"
         return s
 
     def white(self):

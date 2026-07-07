@@ -417,7 +417,7 @@ class ButtonGrid:
     def __getitem__(self, item):
         base = np.round(np.array(item) * self.delta + self.origin).astype(int)
         area = tuple(np.append(base, base + self.button_shape))
-        return Button(area=area, color=(), button=area, name="%s_%s_%s" % (self._name, item[0], item[1]))
+        return Button(area=area, color=(), button=area, name=f"{self._name}_{item[0]}_{item[1]}")
 
     def generate(self):
         for y in range(self.grid_shape[1]):

@@ -219,19 +219,15 @@ class Homography:
 
         # Log
         time_cost = round(time.time() - start_time, 3)
+        lower_edge = "_" if self.lower_edge else " "
+        left_edge = "/" if self.left_edge else " "
+        upper_edge = "_" if self.upper_edge else " "
+        right_edge = "\\" if self.right_edge else " "
         logger.info(
-            "%ss  %s   edge_lines: %s hori, %s vert"
-            % (float2str(time_cost), "_" if self.lower_edge else " ", self._map_edge_count[1], self._map_edge_count[0])
+            f"{float2str(time_cost)}s  {lower_edge}   "
+            f"edge_lines: {self._map_edge_count[1]} hori, {self._map_edge_count[0]} vert"
         )
-        logger.info(
-            "Edges: %s%s%s   homo_loca: %s"
-            % (
-                "/" if self.left_edge else " ",
-                "_" if self.upper_edge else " ",
-                "\\" if self.right_edge else " ",
-                point2str(*self.homo_loca, length=3),
-            )
-        )
+        logger.info(f"Edges: {left_edge}{upper_edge}{right_edge}   homo_loca: {point2str(*self.homo_loca, length=3)}")
 
     def search_tile_center(self, image, threshold_good=0.9, threshold=0.8, encourage=1.0):
         """

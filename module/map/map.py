@@ -20,8 +20,8 @@ class Map(Fleet):
         Returns:
             int: If cleared an enemy.
         """
-        logger.info("targetEnemyScale:%s" % (self.config.EnemyPriority_EnemyScaleBalanceWeight))
-        logger.info("Clear enemy: %s" % grid)
+        logger.info(f"targetEnemyScale:{self.config.EnemyPriority_EnemyScaleBalanceWeight}")
+        logger.info(f"Clear enemy: {grid}")
         expected = f"combat_{expected}" if expected else "combat"
         battle_count = self.battle_count
         self.show_fleet()
@@ -39,7 +39,7 @@ class Map(Fleet):
         Args:
             grid (GridInfo):
         """
-        logger.info("Clear mystery: %s" % grid)
+        logger.info(f"Clear mystery: {grid}")
         self.show_fleet()
         self.goto(grid, expected="mystery")
         # self.mystery_count += 1
@@ -58,7 +58,7 @@ class Map(Fleet):
             grid = grid[0]
 
         if self.ammo_count > 0 and grid.is_accessible:
-            logger.info("Pick up ammo: %s" % grid)
+            logger.info(f"Pick up ammo: {grid}")
             self.goto(grid, expected="")
             self.ensure_no_info_bar()
 
@@ -334,18 +334,18 @@ class Map(Fleet):
         """
         grids = self.map.select(is_boss=True, is_accessible=True)
         grids = grids.add(self.map.select(may_boss=True, is_caught_by_siren=True))
-        logger.info("Is boss: %s" % grids)
+        logger.info(f"Is boss: {grids}")
         if not grids.count:
             grids = grids.add(self.map.select(may_boss=True, is_enemy=True, is_accessible=True))
             logger.warning("Boss not detected, using may_boss grids.")
-            logger.info("May boss: %s" % self.map.select(may_boss=True))
-            logger.info("May boss and is enemy: %s" % self.map.select(may_boss=True, is_enemy=True))
+            logger.info(f"May boss: {self.map.select(may_boss=True)}")
+            logger.info(f"May boss and is enemy: {self.map.select(may_boss=True, is_enemy=True)}")
 
         if grids:
             self.submarine_move_near_boss(grids[0])
             logger.hr("Clear BOSS")
             grids = grids.sort("weight", "cost")
-            logger.info("Grids: %s" % str(grids))
+            logger.info(f"Grids: {grids}")
             self.clear_chosen_enemy(grids[0], expected="boss")
 
         logger.warning("BOSS not detected, trying all boss spawn point.")
@@ -362,17 +362,17 @@ class Map(Fleet):
 
         grids = self.map.select(is_boss=True, is_accessible=True)
         grids = grids.add(self.map.select(may_boss=True, is_caught_by_siren=True))
-        logger.info("Is boss: %s" % grids)
+        logger.info(f"Is boss: {grids}")
         if not grids.count:
             grids = grids.add(self.map.select(may_boss=True, is_enemy=True, is_accessible=True))
             logger.warning("Boss not detected, using may_boss grids.")
-            logger.info("May boss: %s" % self.map.select(may_boss=True))
-            logger.info("May boss and is enemy: %s" % self.map.select(may_boss=True, is_enemy=True))
+            logger.info(f"May boss: {self.map.select(may_boss=True)}")
+            logger.info(f"May boss and is enemy: {self.map.select(may_boss=True, is_enemy=True)}")
 
         if grids:
             logger.hr("Clear BOSS")
             grids = grids.sort("weight", "cost")
-            logger.info("Grids: %s" % str(grids))
+            logger.info(f"Grids: {grids}")
             self.clear_chosen_enemy(grids[0])
 
         logger.warning("Grand Capture detected, Withdrawing.")
@@ -383,7 +383,7 @@ class Map(Fleet):
         Method to step on all boss spawn point when boss not detected.
         """
         grids = self.map.select(may_boss=True, is_accessible=True).sort("weight", "cost")
-        logger.info("May boss: %s" % grids)
+        logger.info(f"May boss: {grids}")
         battle_count = self.battle_count
         is_single_boss = self.map.select(may_boss=True).count == 1
         if is_single_boss:
@@ -394,7 +394,7 @@ class Map(Fleet):
         for grid in grids:
             logger.hr("Clear potential BOSS")
             grids = grids.sort("weight", "cost")
-            logger.info("Grid: %s" % str(grid))
+            logger.info(f"Grid: {grid}")
             self.fleet_boss.clear_chosen_enemy(grid, expected=expected)
             if self.battle_count > battle_count:
                 logger.info("Boss guessing correct.")
@@ -403,13 +403,13 @@ class Map(Fleet):
                 logger.info("Boss guessing incorrect.")
 
         grids = self.map.select(may_boss=True, is_accessible=False).sort("weight", "cost")
-        logger.info("May boss: %s" % grids)
+        logger.info(f"May boss: {grids}")
 
         for grid in grids:
             logger.hr("Clear potential BOSS roadblocks")
             roadblocks = self.brute_find_roadblocks(grid, fleet=self.fleet_boss_index)
             roadblocks = roadblocks.sort("weight", "cost")
-            logger.info("Grids: %s" % str(roadblocks))
+            logger.info(f"Grids: {roadblocks}")
             self.fleet_1.clear_chosen_enemy(roadblocks[0], expected=expected)
             return True
 
@@ -429,7 +429,7 @@ class Map(Fleet):
                     return True
                 logger.info("Brute clear BOSS roadblocks")
                 grids = grids.sort("weight", "cost")
-                logger.info("Grids: %s" % str(grids))
+                logger.info(f"Grids: {grids}")
                 self.clear_chosen_enemy(grids[0])
                 return True
             else:
@@ -452,7 +452,7 @@ class Map(Fleet):
         if grids:
             logger.info("Brute clear roadblocks between fleets.")
             grids = grids.sort("weight", "cost")
-            logger.info("Grids: %s" % str(grids))
+            logger.info(f"Grids: {grids}")
             self.clear_chosen_enemy(grids[0])
             return True
         else:
@@ -541,7 +541,7 @@ class Map(Fleet):
             if grid.is_enemy or (not all_cleared and grid.is_cleared):
                 continue
             if self.check_accessibility(grid=grid, fleet=2):
-                logger.info("Fleet_2 step on %s" % grid)
+                logger.info(f"Fleet_2 step on {grid}")
                 self.fleet_2.goto(grid)
                 self.fleet_1.switch_to()
                 return False

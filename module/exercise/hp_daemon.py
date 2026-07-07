@@ -58,12 +58,11 @@ class HpDaemon(ModuleBase):
             [ 80% - 70%]
             [ 80% - 70%] - Low HP: 3.154s
         """
-        text = "[%s - %s]" % (
-            str(int(self.attacker_hp * 100)).rjust(2, "0") + "%",
-            str(int(self.defender_hp * 100)).rjust(2, "0") + "%",
-        )
+        attacker_hp = str(int(self.attacker_hp * 100)).rjust(2, "0") + "%"
+        defender_hp = str(int(self.defender_hp * 100)).rjust(2, "0") + "%"
+        text = f"[{attacker_hp} - {defender_hp}]"
         if low_hp_time:
-            text += " - Low HP: %ss" % str(round(low_hp_time, 3)).ljust(5, "0")
+            text += f" - Low HP: {str(round(low_hp_time, 3)).ljust(5, '0')}s"
         logger.info(text)
 
     def _at_low_hp(self, image, pause=combat_ui_assets.PAUSE):
