@@ -262,7 +262,7 @@ class ConfigGenerator:
                 continue
             if isinstance(v, dict):
                 typ = v.get("type")
-                if typ == "state" or typ == "lock":
+                if typ in {"state", "lock"}:
                     pass
                 elif deep_get(v, keys="value") is not None:
                     deep_default(v, keys="display", value="hide")

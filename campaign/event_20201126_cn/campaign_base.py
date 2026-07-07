@@ -65,7 +65,7 @@ class CampaignBase(CampaignBase_):
         Returns:
             tuple[str]: Campaign_name and stage index in lowercase, Such as ['7', '2'], ['d', '3'], ['sp', '3'].
         """
-        if name == "vsp" or name == "sp":  # 活动差异。
+        if name in {"vsp", "sp"}:  # 活动差异。
             return "ex_sp", "1"
         return CampaignBase_._campaign_separate_name(name)
 

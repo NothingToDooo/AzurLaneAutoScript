@@ -678,8 +678,7 @@ class RewardTacticalClass(Dock):
 
         try:
             min_level = int(self.config.AddNewStudent_MinLevel)
-            if min_level < 1:
-                min_level = 1
+            min_level = max(min_level, 1)
         except (ValueError, TypeError) as e:
             logger.warning(f"Invalid AddNewStudent_MinLevel: {self.config.AddNewStudent_MinLevel}, {e}")
             min_level = 1

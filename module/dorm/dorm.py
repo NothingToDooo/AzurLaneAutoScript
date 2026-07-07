@@ -336,8 +336,7 @@ class RewardDorm(UI):
                 continue
             if sum([f.amount for f in food]) > 0:
                 break
-        if fill < 0:
-            fill = 0
+        fill = max(fill, 0)
 
         FOOD_FILTER.load(self.config.Dorm_FeedFilter)
         for selected in FOOD_FILTER.apply(food):

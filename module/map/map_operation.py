@@ -171,7 +171,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
 
                 # 舰队准备。
                 if fleet_timer.reached() and self.appear(map_assets.FLEET_PREPARATION, offset=(20, 50)):
-                    if mode == "normal" or mode == "hard":
+                    if mode in {"normal", "hard"}:
                         self.handle_2x_book_setting(mode="prep")
                         self.fleet_preparation()
                         self.handle_auto_submarine_call_disable()

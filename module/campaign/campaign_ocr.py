@@ -290,7 +290,7 @@ class CampaignOcr(ModuleBase):
         counter = collections.Counter(chapter)
         self.campaign_chapter = counter.most_common()[0][0]
 
-        if self.campaign_chapter == 0 or self.campaign_chapter == "0":
+        if self.campaign_chapter in {0, "0"}:
             # ['0F', 'F-IB', 'IGI']
             raise CampaignNameError
 

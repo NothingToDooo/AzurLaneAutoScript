@@ -118,9 +118,7 @@ class OSAsh(UI, MapEventHandler):
             logger.info("Ash beacon data reached the holding limit")
             self._ash_fully_collected = True
 
-        if status < 0:
-            status = 0
-        return status
+        return max(status, 0)
 
     def _support_call_ash_beacon_task(self):
         # AshBeacon 下次运行时间。

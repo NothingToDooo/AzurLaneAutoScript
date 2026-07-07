@@ -615,14 +615,10 @@ def crop(image, area, copy=True):
         size = (y2 - y1, x2 - x1) if len(shape) == 2 else (y2 - y1, x2 - x1, shape[2])
         return np.zeros(size, dtype=image.dtype)
     # x1, y1, x2, y2 = np.maximum((x1, y1, x2, y2), 0)
-    if x1 < 0:
-        x1 = 0
-    if y1 < 0:
-        y1 = 0
-    if x2 < 0:
-        x2 = 0
-    if y2 < 0:
-        y2 = 0
+    x1 = max(x1, 0)
+    y1 = max(y1, 0)
+    x2 = max(x2, 0)
+    y2 = max(y2, 0)
     # crop image
     image = image[y1:y2, x1:x2]
     # if border
@@ -825,14 +821,10 @@ def get_bbox(image, threshold=0):
         x1, y1, x2, y2 = cv2.boundingRect(contour)
         x2 += x1
         y2 += y1
-        if x1 < min_x:
-            min_x = x1
-        if y1 < min_y:
-            min_y = y1
-        if x2 > max_x:
-            max_x = x2
-        if y2 > max_y:
-            max_y = y2
+        min_x = min(min_x, x1)
+        min_y = min(min_y, y1)
+        max_x = max(max_x, x2)
+        max_y = max(max_y, y2)
     if min_x < max_x and min_y < max_y:
         return min_x, min_y, max_x, max_y
     # This shouldn't happen
@@ -885,14 +877,10 @@ def get_bbox_reversed(image, threshold=255):
         x1, y1, x2, y2 = cv2.boundingRect(contour)
         x2 += x1
         y2 += y1
-        if x1 < min_x:
-            min_x = x1
-        if y1 < min_y:
-            min_y = y1
-        if x2 > max_x:
-            max_x = x2
-        if y2 > max_y:
-            max_y = y2
+        min_x = min(min_x, x1)
+        min_y = min(min_y, y1)
+        max_x = max(max_x, x2)
+        max_y = max(max_y, y2)
     if min_x < max_x and min_y < max_y:
         return min_x, min_y, max_x, max_y
     # This shouldn't happen

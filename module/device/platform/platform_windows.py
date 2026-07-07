@@ -258,7 +258,7 @@ class PlatformWindows(PlatformBase, EmulatorManager):
             # All check passed
             break
 
-        if new_window != 0 and new_window != current_window:
+        if new_window not in (0, current_window):
             logger.info(f"Minimize new window: {new_window}")
             minimize_window(new_window)
         if current_window:

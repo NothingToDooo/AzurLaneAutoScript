@@ -59,7 +59,7 @@ def get_map_active_area(grids):
 
     def is_active(g):
         g = g.str if isinstance(g, GridInfo) else str(g)
-        return g != "--" and g != "++"
+        return g not in {"--", "++"}
 
     locations = [loca for loca, grid in grids.items() if is_active(grid)]
     bottom_right = np.max(locations, axis=0)

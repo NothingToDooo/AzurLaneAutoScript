@@ -112,9 +112,7 @@ class Minigame(UI):
         if not skip_first_screenshot:
             self.device.screenshot()
         amount = OCR_COIN.ocr(self.device.image)
-        if amount >= 40:
-            amount = 40
-        return amount
+        return min(40, amount)
 
     def go_to_main_page(self, skip_first_screenshot=True):
         """

@@ -41,7 +41,7 @@ class EmotionDigit(Digit):
     def after_process(self, result):
         # 唐斯头发容易造成随机 OCR 错误。
         # OCR DOCK_EMOTION_OCR 会把 "044" 修正为 "44"。
-        if result == "044" or result == "D44":
+        if result in {"044", "D44"}:
             result = "0"
 
         return super().after_process(result)

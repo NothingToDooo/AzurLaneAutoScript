@@ -198,9 +198,9 @@ def parse_value(value, data):
     if isinstance(value, str):
         if value == "":
             return None
-        if value == "true" or value == "True":
+        if value in {"true", "True"}:
             return True
-        if value == "false" or value == "False":
+        if value in {"false", "False"}:
             return False
         if "." in value:
             try:
