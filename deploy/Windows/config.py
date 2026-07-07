@@ -1,5 +1,4 @@
 import copy
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -128,10 +127,9 @@ class DeployConfig(ConfigModel):
             bool：是否成功。
         """
         command = command.replace(r"\\", "/").replace("\\", "/").replace('"', '"')
-        if not output:
-            command = command + " >nul 2>nul"
         logger.info(command)
-        error_code = os.system(command)
+        output_target = None if output else subprocess.DEVNULL
+        error_code = subprocess.run(command, stdout=output_target, stderr=output_target, shell=False).returncode
         if error_code:
             if allow_failure:
                 logger.info(f"[允许失败]，error_code: {error_code}")
@@ -152,7 +150,7 @@ class DeployConfig(ConfigModel):
             str:
         """
         logger.info(" ".join(cmd))
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         try:
             stdout, stderr = process.communicate(timeout=timeout)
             process.kill()
