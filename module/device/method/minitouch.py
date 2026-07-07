@@ -202,34 +202,34 @@ class CommandBuilder:
         return x, y
 
     def commit(self):
-        """添加 minitouch 命令：'c\n'。"""
+        r"""添加 minitouch 命令：'c\n'。"""
         self.commands.append(Command("c"))
         return self
 
     def reset(self):
-        """添加 minitouch 命令：'r\n'。"""
+        r"""添加 minitouch 命令：'r\n'。"""
         self.commands.append(Command("r"))
         return self
 
     def wait(self, ms=10):
-        """添加 minitouch 命令：'w <ms>\n'。"""
+        r"""添加 minitouch 命令：'w <ms>\n'。"""
         self.commands.append(Command("w", ms=ms))
         self.delay += ms
         return self
 
     def up(self):
-        """添加 minitouch 命令：'u <contact>\n'。"""
+        r"""添加 minitouch 命令：'u <contact>\n'。"""
         self.commands.append(Command("u", contact=self.contact))
         return self
 
     def down(self, x, y, pressure=100):
-        """添加 minitouch 命令：'d <contact> <x> <y> <pressure>\n'。"""
+        r"""添加 minitouch 命令：'d <contact> <x> <y> <pressure>\n'。"""
         x, y = self.convert(x, y)
         self.commands.append(Command("d", x=x, y=y, contact=self.contact, pressure=pressure))
         return self
 
     def move(self, x, y, pressure=100):
-        """添加 minitouch 命令：'m <contact> <x> <y> <pressure>\n'。"""
+        r"""添加 minitouch 命令：'m <contact> <x> <y> <pressure>\n'。"""
         x, y = self.convert(x, y)
         self.commands.append(Command("m", x=x, y=y, contact=self.contact, pressure=pressure))
         return self

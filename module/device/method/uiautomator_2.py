@@ -211,7 +211,7 @@ class Uiautomator2(Connection):
         swipe_duration=0.25,
         shake_duration=0.1,
     ):
-        """拖拽并在终点附近轻微晃动，例如:
+        r"""拖拽并在终点附近轻微晃动，例如:
                      /\\
         +-----------+  +  +
                         \\/
