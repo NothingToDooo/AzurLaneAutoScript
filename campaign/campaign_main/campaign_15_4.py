@@ -212,10 +212,9 @@ class Campaign(CampaignBase):
             self.fleet_boss.clear_chosen_enemy(H5, expected="siren")
             self.fleet_1.switch_to()
             return True
-        else:
-            self.pick_up_ammo()
-            self.clear_chosen_enemy(H5, expected="siren")
-            return True
+        self.pick_up_ammo()
+        self.clear_chosen_enemy(H5, expected="siren")
+        return True
 
     def battle_4(self):
         self.pick_up_ammo()

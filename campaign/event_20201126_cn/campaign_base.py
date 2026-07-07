@@ -64,7 +64,7 @@ class CampaignBase(CampaignBase_):
         Returns:
             tuple[str]: Campaign_name and stage index in lowercase, Such as ['7', '2'], ['d', '3'], ['sp', '3'].
         """
-        if name == "vsp" or name == "sp":  # Difference
+        if name == "vsp" or name == "sp":  # 活动差异。
             return "ex_sp", "1"
         return CampaignBase_._campaign_separate_name(name)
 
@@ -79,17 +79,15 @@ class CampaignBase(CampaignBase_):
         """
         if isinstance(name, int):
             return name
-        else:
-            if name.isdigit():
-                return int(name)
-            elif name in ["a", "c", "sp"]:
-                return 1
-            elif name in ["b", "d", "ex_sp"]:  # Difference
-                return 2
-            elif name in ["ex_ex"]:  # Difference
-                return 3
-            else:
-                raise CampaignNameError
+        if name.isdigit():
+            return int(name)
+        if name in ["a", "c", "sp"]:
+            return 1
+        if name in ["b", "d", "ex_sp"]:  # 活动差异。
+            return 2
+        if name in ["ex_ex"]:  # 活动差异。
+            return 3
+        raise CampaignNameError
 
     def campaign_set_chapter_event(self, chapter, mode="normal"):
         self.ui_goto_event()

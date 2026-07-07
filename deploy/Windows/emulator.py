@@ -103,11 +103,9 @@ class EmulatorManager(AlasManager):
                 if new_backup:
                     continue
                 return backup
-            else:
-                if new_backup:
-                    return backup
-                else:
-                    continue
+            if new_backup:
+                return backup
+            continue
 
         # Too many backups, override the first one
         return f"{adb}.bak"

@@ -24,11 +24,8 @@ class EventGrid(Grid):
 
     def predict_current_fleet(self):
         count = self.relative_hsv_count(area=(-0.5, -3.5, 0.5, -2.5), h=(141 - 3, 141 + 10), shape=(50, 50))
-        if count < 200:
-            return False
-
-        # No TEMPLATE_FLEET_CURRENT check as giant boss on B1 covers fleet
-        return True
+        # B1 的大型首领会遮住舰队模板，这里只用颜色阈值判断。
+        return count >= 200
 
 
 class CampaignBase(CampaignBase_):

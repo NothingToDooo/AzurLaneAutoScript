@@ -58,9 +58,8 @@ class ImageExtractor:
                 if mean is None:
                     mean = new_mean
             return bbox, mean
-        else:
-            image = load_image(file)
-            return self._extract(image, file)
+        image = load_image(file)
+        return self._extract(image, file)
 
     @staticmethod
     def _extract(image, file):

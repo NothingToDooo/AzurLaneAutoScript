@@ -22,6 +22,4 @@ class CampaignBase(CampaignBase_):
         super().map_init(map_)
 
     def handle_submarine_support_popup(self):
-        if self.use_support_fleet and self.handle_popup_confirm("SUBMARINE_SUPPORT"):
-            return True
-        return False
+        return self.use_support_fleet and self.handle_popup_confirm("SUBMARINE_SUPPORT")

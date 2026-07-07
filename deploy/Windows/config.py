@@ -135,13 +135,11 @@ class DeployConfig(ConfigModel):
             if allow_failure:
                 logger.info(f"[允许失败]，error_code: {error_code}")
                 return False
-            else:
-                logger.info(f"[失败]，error_code: {error_code}")
-                self.show_error(command)
-                raise ExecutionError
-        else:
-            logger.info("[成功]")
-            return True
+            logger.info(f"[失败]，error_code: {error_code}")
+            self.show_error(command)
+            raise ExecutionError
+        logger.info("[成功]")
+        return True
 
     def subprocess_execute(self, cmd, timeout=10):
         """

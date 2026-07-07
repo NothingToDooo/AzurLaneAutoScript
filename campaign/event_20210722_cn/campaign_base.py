@@ -30,15 +30,15 @@ class CampaignBase(CampaignBase_):
         Returns:
             tuple[str]: Campaign_name and stage index in lowercase, Such as ['7', '2'], ['d', '3'], ['sp', '3'].
         """
-        if name == "vsp" or name == "sp":  # Difference
+        if name == "vsp" or name == "sp":  # 活动差异。
             return "ex_sp", "1"
-        elif name.startswith("extra"):
+        if name.startswith("extra"):
             return "ex_ex", "1"
-        elif "-" in name:
+        if "-" in name:
             return name.split("-")
-        elif name.startswith("sp"):
+        if name.startswith("sp"):
             return "sp", name[-1]
-        elif name[-1].isdigit():
+        if name[-1].isdigit():
             return name[:-1], name[-1]
 
         return CampaignBase_._campaign_separate_name(name)
@@ -54,15 +54,13 @@ class CampaignBase(CampaignBase_):
         """
         if isinstance(name, int):
             return name
-        else:
-            if name.isdigit():
-                return int(name)
-            elif name in ["a", "c", "as", "cs", "sp"]:
-                return 1
-            elif name in ["b", "d", "bs", "ds", "ex_ex", "ex_sp"]:  # Difference
-                return 2
-            else:
-                raise CampaignNameError
+        if name.isdigit():
+            return int(name)
+        if name in ["a", "c", "as", "cs", "sp"]:
+            return 1
+        if name in ["b", "d", "bs", "ds", "ex_ex", "ex_sp"]:  # 活动差异。
+            return 2
+        raise CampaignNameError
 
     def campaign_set_chapter(self, name, mode="normal"):
         """
@@ -88,12 +86,12 @@ class CampaignBase(CampaignBase_):
                 self.campaign_ensure_mode("hard")
             elif chapter == "ex_sp":
                 # self.campaign_ensure_mode('ex')
-                pass  # Difference
+                pass  # 活动差异。
             self.campaign_ensure_chapter(chapter)
 
         elif chapter == "sp":
             # self.ui_goto_sp()
-            self.ui_goto_event()  # Difference
+            self.ui_goto_event()  # 活动差异。
             self.campaign_ensure_chapter(chapter)
 
         else:

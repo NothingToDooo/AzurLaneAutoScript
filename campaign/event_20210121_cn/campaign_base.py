@@ -48,12 +48,10 @@ class CampaignBase(CampaignBase_):
         """
         if isinstance(name, int):
             return name
-        else:
-            if name.isdigit():
-                return int(name)
-            elif name in ["a", "c", "sp", "ex_sp", "as", "cs"]:
-                return 1
-            elif name in ["b", "d", "ex_ex"]:
-                return 2
-            else:
-                raise CampaignNameError
+        if name.isdigit():
+            return int(name)
+        if name in ["a", "c", "sp", "ex_sp", "as", "cs"]:
+            return 1
+        if name in ["b", "d", "ex_ex"]:
+            return 2
+        raise CampaignNameError

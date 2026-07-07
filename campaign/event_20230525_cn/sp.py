@@ -225,9 +225,8 @@ class Campaign(CampaignBase):
             if self.siren_list:
                 self.fleet_1.clear_chosen_enemy(self.siren_list.pop())
                 return True
-            else:
-                if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
-                    return True
+            if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
+                return True
         else:
             if not self.action:
                 self.action = actions[self.fleet_1_location[0]]

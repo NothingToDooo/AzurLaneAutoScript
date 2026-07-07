@@ -23,15 +23,13 @@ class CampaignBase(CampaignBase_):
         """
         if isinstance(name, int):
             return name
-        else:
-            if name.isdigit():
-                return int(name)
-            elif name in ["a", "c", "sp"]:
-                return 1
-            elif name in ["b", "d", "ex_sp"]:  # Difference
-                return 2
-            else:
-                raise CampaignNameError
+        if name.isdigit():
+            return int(name)
+        if name in ["a", "c", "sp"]:
+            return 1
+        if name in ["b", "d", "ex_sp"]:  # 活动差异。
+            return 2
+        raise CampaignNameError
 
     def campaign_set_chapter(self, name, mode="normal"):
         """
@@ -56,11 +54,11 @@ class CampaignBase(CampaignBase_):
             elif chapter in "cd":
                 self.campaign_ensure_mode("hard")
             elif chapter == "ex_sp":
-                pass  # Difference
+                pass  # 活动差异。
             self.campaign_ensure_chapter(chapter)
 
         elif chapter == "sp":
-            self.ui_goto_event()  # Difference
+            self.ui_goto_event()  # 活动差异。
             self.campaign_ensure_chapter(chapter)
 
         else:

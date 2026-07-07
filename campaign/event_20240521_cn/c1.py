@@ -207,13 +207,11 @@ class Campaign(CampaignBase):
                     return True
                 self.clear_mechanism()
                 return self.battle_default()
-            else:
-                if self.bored_visit():
-                    return True
-                result = self.battle_boss()
-                return result
-        else:
-            return super().battle_function()
+            if self.bored_visit():
+                return True
+            result = self.battle_boss()
+            return result
+        return super().battle_function()
 
     def battle_0(self):
         if self.fleet_step >= 3:

@@ -160,8 +160,7 @@ class EmulatorConnect:
             logger.info(f"TimeoutExpired, stdout={stdout}, stderr={stderr}")
         if output:
             return stdout
-        else:
-            return ret_code
+        return ret_code
 
     @cached_property
     def emulators(self):

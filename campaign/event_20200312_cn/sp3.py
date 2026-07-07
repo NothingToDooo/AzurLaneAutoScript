@@ -139,5 +139,4 @@ class Campaign(CampaignBase):
             logger.info("In stage.")
             self.ensure_no_info_bar(timeout=0.6)
             return True
-        else:
-            return False
+        return False

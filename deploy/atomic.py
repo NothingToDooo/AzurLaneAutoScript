@@ -52,8 +52,7 @@ def to_nontmp_file(file: str) -> str:
     """
     if is_tmp_file(file):
         return file[:-11]
-    else:
-        return file
+    return file
 
 
 def windows_attempt_delay(attempt: int) -> float:

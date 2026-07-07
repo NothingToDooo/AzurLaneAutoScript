@@ -78,15 +78,13 @@ class CampaignBase(CampaignBase_):
         """
         if isinstance(name, int):
             return name
-        else:
-            if name.isdigit():
-                return int(name)
-            elif name in ["a", "c", "sp", "ex_sp", "ts", "t", "ht", "hts"]:
-                return 1
-            elif name in ["b", "d", "ex_ex"]:
-                return 2
-            else:
-                raise CampaignNameError
+        if name.isdigit():
+            return int(name)
+        if name in ["a", "c", "sp", "ex_sp", "ts", "t", "ht", "hts"]:
+            return 1
+        if name in ["b", "d", "ex_ex"]:
+            return 2
+        raise CampaignNameError
 
     def _campaign_ball_get(self):
         """
@@ -98,11 +96,10 @@ class CampaignBase(CampaignBase_):
         index = np.argmax(color)
         if index == 0:
             return "red"
-        elif index == 2:
+        if index == 2:
             return "blue"
-        else:
-            logger.warning(f"Unknown campaign ball color: {color}")
-            return "unknown"
+        logger.warning(f"Unknown campaign ball color: {color}")
+        return "unknown"
 
     def _campaign_ball_set(self, status):
         """

@@ -150,17 +150,15 @@ class Campaign(CampaignBase):
         if self.is_left:
             self.clear_chosen_enemy(D9, expected="siren")
             return True
-        else:
-            self.clear_chosen_enemy(B9, expected="siren")
-            return True
+        self.clear_chosen_enemy(B9, expected="siren")
+        return True
 
     def battle_2(self):
         if self.is_left:
             self.clear_chosen_enemy(B9, expected="siren")
             return True
-        else:
-            self.clear_chosen_enemy(D9, expected="siren")
-            return True
+        self.clear_chosen_enemy(D9, expected="siren")
+        return True
 
     def battle_3(self):
         if self.clear_siren():

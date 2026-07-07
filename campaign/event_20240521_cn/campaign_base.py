@@ -6,10 +6,8 @@ from module.template.assets import TEMPLATE_ENEMY_BOSS
 class CurrentFleetGrid(Grid):
     def predict_current_fleet(self):
         count = self.relative_hsv_count(area=(-0.5, -3.5, 0.5, -2.5), h=(141 - 3, 141 + 10), shape=(50, 50))
-        if count < 600:
-            return False
-        # No template matching
-        return True
+        # 该活动不做模板匹配，只用当前舰队颜色阈值判断。
+        return count >= 600
 
 
 class SirenIconGrid(Grid):

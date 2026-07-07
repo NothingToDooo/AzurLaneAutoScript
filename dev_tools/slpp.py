@@ -176,46 +176,44 @@ class SLPP:
         if self.ch and self.ch == "}":
             self.depth -= 1
             self.next_chr()
-            return o  # Exit here
-        else:
-            while self.ch:
+            return o  # 空表直接结束。
+        while self.ch:
+            self.white()
+            if self.ch == "{":
+                o[idx] = self.object()
+                idx += 1
+                continue
+            if self.ch == "}":
+                self.depth -= 1
+                self.next_chr()
+                if k is not None:
+                    o[idx] = k
+                if not any(isinstance(key, SORTABLE_KEY_TYPES) for key in o):
+                    so = sorted(o)
+                    if sequential(so):
+                        ar = []
+                        for key, value in o.items():
+                            ar.insert(key, value)
+                        o = ar
+                return o  # 表对象解析完成。
+            if self.ch == ",":
+                self.next_chr()
+                continue
+            k = self.value()
+            if self.ch == "]":
+                self.next_chr()
+            self.white()
+            ch = self.ch
+            if ch in ("=", ","):
+                self.next_chr()
                 self.white()
-                if self.ch == "{":
-                    o[idx] = self.object()
-                    idx += 1
-                    continue
-                if self.ch == "}":
-                    self.depth -= 1
-                    self.next_chr()
-                    if k is not None:
-                        o[idx] = k
-                    if not any(isinstance(key, SORTABLE_KEY_TYPES) for key in o):
-                        so = sorted(o)
-                        if sequential(so):
-                            ar = []
-                            for key, value in o.items():
-                                ar.insert(key, value)
-                            o = ar
-                    return o  # or here
+                if ch == "=":
+                    o[k] = self.value()
                 else:
-                    if self.ch == ",":
-                        self.next_chr()
-                        continue
-                    k = self.value()
-                    if self.ch == "]":
-                        self.next_chr()
-                    self.white()
-                    ch = self.ch
-                    if ch in ("=", ","):
-                        self.next_chr()
-                        self.white()
-                        if ch == "=":
-                            o[k] = self.value()
-                        else:
-                            o[idx] = k
-                        idx += 1
-                        k = None
-        raise ParseError(ERRORS["unexp_end_table"])  # Bad exit here
+                    o[idx] = k
+                idx += 1
+                k = None
+        raise ParseError(ERRORS["unexp_end_table"])  # 表未正常结束。
 
     words = {"true": True, "false": False, "nil": None}
 

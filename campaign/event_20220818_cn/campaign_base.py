@@ -11,8 +11,7 @@ class CampaignBase(CampaignBase_):
             self.ui_goto_event()
             self.campaign_ensure_chapter(chapter)
             return True
-        else:
-            return False
+        return False
 
     @staticmethod
     def _campaign_separate_name(name):

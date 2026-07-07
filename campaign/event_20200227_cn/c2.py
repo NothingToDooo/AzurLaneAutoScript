@@ -138,5 +138,4 @@ class Campaign(CampaignBase):
             # self.device.sleep(0.5)
             self.ensure_no_info_bar(timeout=0.6)
             return True
-        else:
-            return False
+        return False

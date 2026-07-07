@@ -83,11 +83,10 @@ class CampaignBase(CampaignBase_):
         index = np.argmax(color)
         if index == 0:
             return "red"
-        elif index == 2:
+        if index == 2:
             return "blue"
-        else:
-            logger.warning(f"Unknown campaign ball color: {color}")
-            return "unknown"
+        logger.warning(f"Unknown campaign ball color: {color}")
+        return "unknown"
 
     def _campaign_ball_set(self, status):
         """
