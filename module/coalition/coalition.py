@@ -155,9 +155,9 @@ class Coalition(CoalitionCombat, CampaignEvent):
         return event, stage
 
     def run(self, event="", mode="", fleet="", total=0):
-        event = event if event else self.config.Campaign_Event
-        mode = mode if mode else self.config.Coalition_Mode
-        fleet = fleet if fleet else self.config.Coalition_Fleet
+        event = event or self.config.Campaign_Event
+        mode = mode or self.config.Coalition_Mode
+        fleet = fleet or self.config.Coalition_Fleet
         if not event or not mode or not fleet:
             raise ScriptError(f"Coalition arguments unfilled. name={event}, mode={mode}, fleet={fleet}")
 

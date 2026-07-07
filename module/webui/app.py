@@ -1127,7 +1127,7 @@ def app():
     # 应用配置。
     AlasGUI.set_theme(theme=State.deploy_config.Theme)
     key = args.key or State.deploy_config.Password
-    cdn = args.cdn if args.cdn else State.deploy_config.CDN
+    cdn = args.cdn or State.deploy_config.CDN
     runs: list[str] = []
     if args.run:
         runs = args.run

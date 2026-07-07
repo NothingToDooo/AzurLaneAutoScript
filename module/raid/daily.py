@@ -30,7 +30,7 @@ class RaidDaily(RaidRun):
             self.config.Scheduler_Enable = False
             self.config.task_stop()
 
-        name = name if name else self.config.Campaign_Event
+        name = name or self.config.Campaign_Event
         stages = [RaidStage(name) for name in STAGES]
         STAGE_FILTER.load(self.config.RaidDaily_StageFilter)
         stages = STAGE_FILTER.apply(stages)

@@ -622,7 +622,7 @@ class RewardCommission(UI, InfoHandler):
             logger.info(f"Daily commission: {daily}, filtered_urgent: {filtered_urgent}")
             if daily > 0 and filtered_urgent >= 1:
                 logger.info("Having daily commissions to do, delay task `GemsFarming`")
-                self.config.task_delay(minute=120, target=future_finish if future_finish else None, task="GemsFarming")
+                self.config.task_delay(minute=120, target=future_finish or None, task="GemsFarming")
             elif filtered_urgent >= 4:
                 logger.info("Having too many urgent commissions, delay task `GemsFarming`")
-                self.config.task_delay(minute=120, target=future_finish if future_finish else None, task="GemsFarming")
+                self.config.task_delay(minute=120, target=future_finish or None, task="GemsFarming")

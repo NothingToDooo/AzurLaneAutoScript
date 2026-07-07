@@ -72,8 +72,8 @@ class RaidRun(Raid, CampaignEvent):
             mode (str): Raid mode, such as 'hard', 'normal', 'easy'
             total (int): Total run count
         """
-        name = name if name else self.config.Campaign_Event
-        mode = mode if mode else self.config.Raid_Mode
+        name = name or self.config.Campaign_Event
+        mode = mode or self.config.Raid_Mode
         if not name or not mode:
             raise ScriptError(f"RaidRun arguments unfilled. name={name}, mode={mode}")
 

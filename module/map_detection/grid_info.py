@@ -122,7 +122,7 @@ class GridInfo:
             return "SU"
 
         if self.is_enemy:
-            scale = self.enemy_scale if self.enemy_scale else 0
+            scale = self.enemy_scale or 0
             genre = self.enemy_genre[0].upper() if self.enemy_genre else "E"
             return f"{scale}{genre}"
 

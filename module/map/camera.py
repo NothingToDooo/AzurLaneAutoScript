@@ -421,7 +421,7 @@ class Camera(MapOperation):
         logger.info(f"Full scan start, mode={mode}")
         self.map.reset_fleet()
 
-        queue = queue if queue else self.map.camera_data
+        queue = queue or self.map.camera_data
         if must_scan:
             queue = queue.add(must_scan)
 

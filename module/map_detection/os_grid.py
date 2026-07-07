@@ -48,10 +48,10 @@ class OSGridInfo(GridInfo):
 
         if self.is_siren:
             name = self.enemy_genre[6:8].upper() if self.enemy_genre else "SU"
-            return name if name else "SU"
+            return name or "SU"
 
         if self.is_enemy:
-            scale = self.enemy_scale if self.enemy_scale else 0
+            scale = self.enemy_scale or 0
             genre = self.enemy_genre[0].upper() if self.enemy_genre else "E"
             return f"{scale}{genre}"
 

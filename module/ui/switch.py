@@ -49,7 +49,7 @@ class Switch:
                 "state": state,
                 "check_button": check_button,
                 "click_button": click_button if click_button is not None else check_button,
-                "offset": offset if offset else self._offset,
+                "offset": offset or self._offset,
             }
         )
 
