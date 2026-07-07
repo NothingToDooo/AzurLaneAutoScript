@@ -90,6 +90,7 @@ class PQInteract(UI):
                 # 检查点不存在通常表示仍在对话中。
                 self._pq_handle_dialogue()
                 settle_timer.reset()
+        return False
 
     def _pq_goto_room_seek(self, target_ship):
         """

@@ -89,6 +89,7 @@ class GuildOperations(GuildBase):
             ):
                 if not self.info_bar_count() and confirm_timer.reached():
                     return True
+        return False
 
     def _handle_guild_operations_start(self):
         """
@@ -531,6 +532,7 @@ class GuildOperations(GuildBase):
             if pause:
                 logger.attr("BattleUI", pause)
                 return True
+        return False
 
     def _guild_operations_boss_combat(self):
         """

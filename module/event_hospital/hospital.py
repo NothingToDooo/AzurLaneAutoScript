@@ -175,6 +175,7 @@ class Hospital(HospitalClue, HospitalCombat):
                 if self.invest_reward_appear():
                     self.device.click(hospital_assets.INVEST_REWARD_RECEIVE)
                     continue
+        return False
 
     def loop_aside(self):
         """

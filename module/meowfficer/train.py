@@ -61,6 +61,7 @@ class MeowfficerTrain(MeowfficerCollect, MeowfficerEnhance):
             if self.info_bar_count():
                 logger.info("No more slots to train, exit")
                 return False
+        return False
 
     def _meow_nqueue(self, skip_first_screenshot=True):
         """

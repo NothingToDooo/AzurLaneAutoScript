@@ -383,3 +383,4 @@ class Dock(Equipment):
                 continue
             if self.handle_game_tips():
                 continue
+        return False

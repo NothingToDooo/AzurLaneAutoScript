@@ -244,6 +244,7 @@ class MeowfficerEnhance(MeowfficerBase):
                     "Unable to enter meowfficer feed, probably because the meowfficer to enhance has reached LV.30"
                 )
                 return False
+        return False
 
     def meow_enhance_confirm(self, skip_first_screenshot=True):
         """
@@ -315,6 +316,7 @@ class MeowfficerEnhance(MeowfficerBase):
             # Meowfficer enhance tips
             if self.handle_game_tips():
                 continue
+        return False
 
     def _meow_get_level(self):
         """

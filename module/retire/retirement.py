@@ -214,6 +214,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
             # End
             if self.appear(retire_assets.SHIP_CONFIRM_2, offset=(30, 30)):
                 return True
+        return False
 
     def retire_ships_one_click(self):
         logger.hr("Retirement")
@@ -528,6 +529,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
                 self.device.click(button)
                 count += 1
                 continue
+        return False
 
     def retirement_get_common_rarity_cv_in_page(self):
         """

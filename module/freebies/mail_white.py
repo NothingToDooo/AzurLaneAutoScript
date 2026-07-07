@@ -86,6 +86,7 @@ class MailWhite(UI):
                 continue
             if self._handle_mail_reward():
                 continue
+        return False
 
     def _mail_quit(self, skip_first_screenshot=True):
         """

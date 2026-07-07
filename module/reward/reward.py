@@ -103,6 +103,7 @@ class Reward(UI):
                     continue
                 if self.appear(reward_assets.MISSION_UNFINISH, offset=(50, 200)):
                     return clicked
+        return clicked
 
     def _reward_mission_claim_receive(self):
         """
@@ -141,6 +142,7 @@ class Reward(UI):
                 continue
             if self.handle_popup_confirm("MISSION_REWARD"):
                 continue
+        return "timeout"
 
     def _reward_wait_mission_list(self):
         """
@@ -157,6 +159,7 @@ class Reward(UI):
                 return state
             if timeout.reached():
                 return "timeout"
+        return "timeout"
 
     def _reward_mission_collect(self):
         """
@@ -265,6 +268,7 @@ class Reward(UI):
             self._reward_mission_all()
         if weekly:
             self._reward_mission_weekly()
+        return False
 
     @cached_property
     def _reward_side_navbar(self):

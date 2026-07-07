@@ -167,6 +167,7 @@ def raid_ocr(raid, mode):
         if mode == "ex":
             return Digit(button, letter=(255, 239, 215), threshold=128)
         return RaidCounterPostMixin(button, lang="cnocr", letter=(154, 148, 133), threshold=128)
+    raise ScriptError(f"Raid OCR is not configured: {raid}, mode={mode}")
 
 
 def pt_ocr(raid):
@@ -197,6 +198,7 @@ def pt_ocr(raid):
         return Digit(button, letter=(255, 231, 231), threshold=128)
     if raid == "CHANGWU":
         return Digit(button, letter=(255, 239, 215), threshold=128)
+    raise ScriptError(f"Raid PT OCR is not configured: {raid}")
 
 
 class Raid(MapOperation, RaidCombat, CampaignEvent):
@@ -387,6 +389,7 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
         else:
             logger.info(f"Raid {self.config.Campaign_Event} does not support PT ocr, skip")
             return 0
+        return 0
 
     def is_raid_rpg(self):
         return self.config.Campaign_Event == "raid_20240328"

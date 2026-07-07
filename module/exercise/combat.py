@@ -211,6 +211,7 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
         self._choose_opponent(0)
         self.equipment_take_off()
         self._preparation_quit()
+        return True
 
     def equipment_take_on(self):
         if self.config.EXERCISE_FLEET_EQUIPMENT is None:
@@ -221,3 +222,4 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
         self._choose_opponent(0)
         super().equipment_take_on()
         self._preparation_quit()
+        return True

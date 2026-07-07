@@ -115,6 +115,7 @@ class Exercise(ExerciseCombat):
 
             self._new_opponent()
             self._opponent_fleet_check_all()
+        return False
 
     def _exercise_easiest_else_exp(self):
         """Try easiest first, if unable to beat easiest opponent then switch to max exp opponent and accept the loss.
@@ -144,6 +145,7 @@ class Exercise(ExerciseCombat):
             logger.info("Cannot beat calculated easiest opponent, MAX EXP then")
             method = "max_exp"
             threshold = 0
+        return False
 
     def _get_opponent_change_count(self):
         """

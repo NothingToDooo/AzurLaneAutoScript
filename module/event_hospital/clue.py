@@ -208,6 +208,7 @@ class HospitalClue(HospitalUI):
                 continue
             if self.handle_get_clue():
                 continue
+        return False
 
     def iter_invest(self):
         """
@@ -304,3 +305,4 @@ class HospitalClue(HospitalUI):
                 continue
             if self.handle_clue_exit():
                 continue
+        return False

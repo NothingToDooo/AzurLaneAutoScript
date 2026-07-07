@@ -51,6 +51,7 @@ class GachaUI(UI):
             if ensure_timeout.reached():
                 logger.warning("Wait for loaded assets is incomplete, ensure not guaranteed")
                 return False
+        return False
 
     @cached_property
     def _gacha_side_navbar(self):

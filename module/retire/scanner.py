@@ -118,6 +118,7 @@ class Scanner(metaclass=ABCMeta):
             self._results.extend(results)
         else:
             return results
+        return None
 
     def move(self, vector) -> None:
         """
@@ -362,6 +363,7 @@ class ShipScanner(Scanner):
         ships = super().scan(image, cached, output)
         if not cached:
             return [ship for ship in ships if ship.satisfy_limitation(self.limitaion)]
+        return None
 
     def move(self, vector) -> None:
         """

@@ -231,6 +231,7 @@ class Awaken(Dock):
             if timeout.reached():
                 logger.warning("get_ship_level timeout")
                 return level
+        return level
 
     def awaken_ship(self, use_array=False, skip_first_screenshot=True):
         """

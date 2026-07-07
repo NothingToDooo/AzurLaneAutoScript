@@ -705,8 +705,7 @@ class RewardTacticalClass(Dock):
         def check_button():
             if self.appear(SKILL_CONFIRM, offset=(30, 30)):
                 return True
-            if self.appear(TACTICAL_META, offset=(200, 30)):
-                return True
+            return bool(self.appear(TACTICAL_META, offset=(200, 30)))
 
         self.dock_select_confirm(check_button=check_button)
 

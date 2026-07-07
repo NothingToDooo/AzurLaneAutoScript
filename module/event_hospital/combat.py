@@ -73,6 +73,7 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
                 logger.hr("Triggered stop condition: Coin limit")
                 self.handle_task_balancer()
                 return True
+            return False
 
         for _ in self.loop():
             if self.appear(BATTLE_PREPARATION, offset=(30, 20)):

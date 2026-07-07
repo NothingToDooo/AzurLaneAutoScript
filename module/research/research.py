@@ -236,6 +236,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
                 self.research_project_started = None
                 self._research_project_offset = (index - 2) % 5
                 return False
+        return False
 
     def research_project_start_with_requirements(self, project, add_queue=True):
         """

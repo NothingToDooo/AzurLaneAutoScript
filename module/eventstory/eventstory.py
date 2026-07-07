@@ -146,6 +146,7 @@ class EventStory(CampaignUI, Combat, LoginHandler):
             # 深渊秘境（event_20250814_cn）全部剧情结束后会弹出状态窗口。
             if self.appear_then_click(eventstory_assets.POPUP_RPG_STATUS, offset=(20, 20), interval=3):
                 continue
+        return "finish"
 
     def run_event_story(self):
         """

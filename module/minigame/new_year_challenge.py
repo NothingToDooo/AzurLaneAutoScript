@@ -160,6 +160,7 @@ class NewYearChallenge(MinigameRun):
                 logger.info(f"coin cost after add : {coin_cost_after_add}")
                 # 月度奖励已领取完或剩余代币为 0 时无法添加代币。
                 return count < 1 or coin_cost_after_add > 0
+        return False
 
     def new_year_challenge_turn(self, skip_first_screenshot=True):
         if not skip_first_screenshot:

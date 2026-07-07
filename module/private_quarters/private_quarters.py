@@ -56,6 +56,7 @@ class PrivateQuarters(PQInteract, PQShop):
                 count = self.status_get_daily_count()
                 get_timer.reset()
                 retry -= 1
+        return count
 
     def _pq_shop_enter(self):
         """
