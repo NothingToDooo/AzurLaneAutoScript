@@ -1,6 +1,8 @@
+from typing import ClassVar
+
 from module.config import server
 
-server.server = "cn"  # Don't need to edit, it's used to avoid error.
+server.server = "cn"  # 不需要修改，用来避免服务器相关错误。
 
 import numpy as np
 from PIL import Image
@@ -21,13 +23,13 @@ class Config:
 
     # Parameters for scipy.signal.find_peaks
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.find_peaks.html
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (150, 255 - 40),
         "width": (0.9, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (255 - 24, 255),
         "prominence": 10,
         "distance": 50,

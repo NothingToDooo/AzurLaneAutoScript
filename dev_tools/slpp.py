@@ -1,6 +1,7 @@
 import re
 from contextlib import suppress
 from numbers import Number
+from typing import ClassVar
 
 """
 SLPP is a simple lua-python data structures parser.
@@ -203,7 +204,7 @@ class SLPP:
                 k = None
         raise ParseError(ERRORS["unexp_end_table"])  # 表未正常结束。
 
-    words = {"true": True, "false": False, "nil": None}
+    words: ClassVar[dict[str, object]] = {"true": True, "false": False, "nil": None}
 
     def word(self):
         s = ""

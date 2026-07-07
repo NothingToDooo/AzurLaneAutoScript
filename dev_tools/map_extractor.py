@@ -1,6 +1,7 @@
 import re
 from contextlib import suppress
 from pathlib import Path
+from typing import ClassVar
 
 import numpy as np
 
@@ -298,7 +299,7 @@ DIC_SIREN_NAME_CHI_TO_ENG = {
 
 
 class MapData:
-    dic_grid_info = {
+    dic_grid_info: ClassVar[dict[int, str]] = {
         0: "--",
         1: "SP",
         2: "MM",

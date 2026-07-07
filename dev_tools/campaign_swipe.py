@@ -1,4 +1,5 @@
 import sys
+from typing import ClassVar
 
 import numpy as np
 
@@ -15,13 +16,18 @@ class Config:
     EDGE_LINES_HOUGHLINES_THRESHOLD = 40
     DETECTION_BACKEND = "perspective"
 
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (80, 255 - 24),
         "width": (1.5, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {"height": (255 - 40, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
+        "height": (255 - 40, 255),
+        "prominence": 10,
+        "distance": 50,
+        "wlen": 1000,
+    }
 
     STORY_OPTION = -2
 

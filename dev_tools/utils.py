@@ -11,13 +11,13 @@ class LuaLoader:
     Load decrypted scripts
     """
 
-    server_alias = [
-        ["zh-CN", "zh-cn", "cn", "CN"],
-        ["en-US", "en-us", "en", "EN"],
-        ["ja-JP", "ja-jp", "jp", "JP"],
-        ["zh-TW", "zh-tw", "tw", "TW"],
-        ["ko-KR", "ko-kr", "kr", "KR"],
-    ]
+    server_alias = (
+        ("zh-CN", "zh-cn", "cn", "CN"),
+        ("en-US", "en-us", "en", "EN"),
+        ("ja-JP", "ja-jp", "jp", "JP"),
+        ("zh-TW", "zh-tw", "tw", "TW"),
+        ("ko-KR", "ko-kr", "kr", "KR"),
+    )
 
     def __init__(self, folder, server="zh-CN"):
         self.folder = folder
