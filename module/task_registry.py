@@ -12,13 +12,31 @@ class TaskSpec:
     class_name: str
     method_name: str = "run"
     args_factory: TaskArgsFactory | None = None
+    task_name: str | None = None
 
     def execute(self, runner: Any) -> None:
         module = import_module(self.module_name)
         task_class = getattr(module, self.class_name)
-        task = task_class(config=runner.config, device=runner.device)
+        init_kwargs = {
+            "config": runner.config,
+            "device": runner.device,
+        }
+        if self.task_name is not None:
+            init_kwargs["task"] = self.task_name
+        task = task_class(**init_kwargs)
         args, kwargs = self.args_factory(runner) if self.args_factory is not None else ((), {})
         getattr(task, self.method_name)(*args, **kwargs)
+
+
+@dataclass(frozen=True, slots=True)
+class FunctionTaskSpec:
+    module_name: str
+    function_name: str
+
+    def execute(self, runner: Any) -> None:
+        module = import_module(self.module_name)
+        function = getattr(module, self.function_name)
+        function(config=runner.config)
 
 
 def _campaign_args(runner: Any) -> tuple[tuple[Any, ...], dict[str, Any]]:
@@ -33,15 +51,15 @@ def _campaign_args(runner: Any) -> tuple[tuple[Any, ...], dict[str, Any]]:
     )
 
 
-def _task(module_name: str, class_name: str, method_name: str = "run") -> TaskSpec:
-    return TaskSpec(module_name=module_name, class_name=class_name, method_name=method_name)
+def _task(module_name: str, class_name: str, method_name: str = "run", task_name: str | None = None) -> TaskSpec:
+    return TaskSpec(module_name=module_name, class_name=class_name, method_name=method_name, task_name=task_name)
 
 
 def _campaign_args_task(module_name: str, class_name: str) -> TaskSpec:
     return TaskSpec(module_name=module_name, class_name=class_name, args_factory=_campaign_args)
 
 
-TASK_REGISTRY: dict[str, TaskSpec] = {
+TASK_REGISTRY: dict[str, TaskSpec | FunctionTaskSpec] = {
     # 普通任务：构造任务类后直接调用 run()。
     "research": _task("module.research.research", "RewardResearch"),
     "commission": _task("module.commission.commission", "RewardCommission"),
@@ -101,8 +119,17 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
     "c124_large_leveling": _campaign_args_task("module.campaign.run", "CampaignRun"),
     "war_archives": _campaign_args_task("module.war_archives.war_archives", "CampaignWarArchives"),
     "gems_farming": _campaign_args_task("module.campaign.gems_farming", "GemsFarming"),
+    # 常驻/工具入口需要保留原始任务名绑定。
+    "daemon": _task("module.daemon.daemon", "AzurLaneDaemon", task_name="Daemon"),
+    "opsi_daemon": _task("module.daemon.os_daemon", "AzurLaneDaemon", task_name="OpsiDaemon"),
+    "event_story": _task("module.eventstory.eventstory", "EventStory", task_name="EventStory"),
+    "azur_lane_uncensored": _task(
+        "module.daemon.uncensored", "AzurLaneUncensored", task_name="AzurLaneUncensored"
+    ),
+    "game_manager": _task("module.daemon.game_manager", "GameManager", task_name="GameManager"),
+    "benchmark": FunctionTaskSpec(module_name="module.daemon.benchmark", function_name="run_benchmark"),
 }
 
 
-def get_task_spec(command: str) -> TaskSpec | None:
+def get_task_spec(command: str) -> TaskSpec | FunctionTaskSpec | None:
     return TASK_REGISTRY.get(command)

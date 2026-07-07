@@ -3,13 +3,17 @@ from types import SimpleNamespace
 
 import pytest
 
-from module.task_registry import TASK_REGISTRY
+from module.task_registry import TASK_REGISTRY, FunctionTaskSpec
 
 
 @pytest.mark.parametrize("command", sorted(TASK_REGISTRY))
 def test_task_registry_target_exists(command: str) -> None:
     spec = TASK_REGISTRY[command]
     module = importlib.import_module(spec.module_name)
+    if isinstance(spec, FunctionTaskSpec):
+        assert callable(getattr(module, spec.function_name))
+        return
+
     task_class = getattr(module, spec.class_name)
 
     assert callable(getattr(task_class, spec.method_name))

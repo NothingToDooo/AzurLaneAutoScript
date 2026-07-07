@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import inflection
 
 from module.base.decorator import cached_property, del_cached_property
+from module.base.resource import release_resources
 from module.config.config import AzurLaneConfig, TaskEnd
 from module.config.deep import deep_get, deep_set
 from module.exception import (
@@ -197,36 +198,6 @@ class AzurLaneAutoScript:
             LoginHandler(self.config, device=self.device).app_start()
             UI(self.config, device=self.device).ui_goto_main()
 
-    def daemon(self) -> None:
-        from module.daemon.daemon import AzurLaneDaemon
-
-        AzurLaneDaemon(config=self.config, device=self.device, task="Daemon").run()
-
-    def opsi_daemon(self) -> None:
-        from module.daemon.os_daemon import AzurLaneDaemon
-
-        AzurLaneDaemon(config=self.config, device=self.device, task="OpsiDaemon").run()
-
-    def event_story(self) -> None:
-        from module.eventstory.eventstory import EventStory
-
-        EventStory(config=self.config, device=self.device, task="EventStory").run()
-
-    def azur_lane_uncensored(self) -> None:
-        from module.daemon.uncensored import AzurLaneUncensored
-
-        AzurLaneUncensored(config=self.config, device=self.device, task="AzurLaneUncensored").run()
-
-    def benchmark(self) -> None:
-        from module.daemon.benchmark import run_benchmark
-
-        run_benchmark(config=self.config)
-
-    def game_manager(self) -> None:
-        from module.daemon.game_manager import GameManager
-
-        GameManager(config=self.config, device=self.device, task="GameManager").run()
-
     def wait_until(self, future: datetime) -> bool:
         """等待到指定时间；如果配置变化则提前返回。"""
         future += timedelta(seconds=1)
@@ -251,8 +222,6 @@ class AzurLaneAutoScript:
             task = self.config.get_next()
             self.config.task = task
             self.config.bind(task)
-
-            from module.base.resource import release_resources
 
             if self.config.task.command != "Alas":
                 release_resources(next_task=task.command)
