@@ -4,25 +4,22 @@ from pathlib import Path
 from dev_tools.slpp import slpp
 
 """
-This file is used to extract `word_template.lua`, aka, the blacklist words file.
+提取 `word_template.lua`，也就是敏感词黑名单。
 
-Git clone the repository here, https://github.com/Dimbreath/AzurLaneData, to get the decrypted scripts.
-Then put your filepath here, like `<your_folder>/<server>/sharecfg/word_template.lua`
-Server list: en-US, ja-JP, ko-KR, zh-CN, zh-TW
+先克隆 https://github.com/Dimbreath/AzurLaneData 获取解密后的脚本。
+然后把文件路径填到这里，例如 `<your_folder>/<server>/sharecfg/word_template.lua`。
+服务器列表：en-US、ja-JP、ko-KR、zh-CN、zh-TW。
 """
 file = ""
-count = 0
 with Path(file).open(encoding="utf-8") as f:
     text = f.read()
 
 
-def extract(dic, word_list):
+def extract(dic: dict, word_list: list[str]) -> int:
     """
-    Args:
-        dic (dict):
-        word_list (list[str]):
+    提取敏感词，并返回当前分支的词条数量。
     """
-    global count
+    count = 0
     for raw_word, data in dic.items():
         word = str(raw_word)
         if data.get("this", False):
@@ -32,16 +29,18 @@ def extract(dic, word_list):
             print(new)
         else:
             new = [*word_list, word]
-            extract(data, word_list=new)
+            count += extract(data, word_list=new)
+    return count
 
 
 # CN server
+count = 0
 for result in re.findall("word_template = (.*?)return", text, re.DOTALL):
     pg = slpp.decode(result)
-    extract(pg, word_list=[])
+    count += extract(pg, word_list=[])
 # Other server
 for result in re.findall(r"uv0\.{0,1}(.*?)end", text, re.DOTALL):
     pg = slpp.decode(f"{{{result}}}")
-    extract(pg, word_list=[])
+    count += extract(pg, word_list=[])
 
 print(f"Total count: {count}")

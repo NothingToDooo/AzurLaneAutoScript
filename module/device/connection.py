@@ -13,7 +13,7 @@ from module.base.decorator import cached_property, del_cached_property, run_once
 from module.base.timer import Timer
 from module.base.utils import ensure_time
 from module.config.deep import deep_get
-from module.config.server import VALID_CHANNEL_PACKAGE, VALID_PACKAGE, set_server
+from module.config.server import VALID_CHANNEL_PACKAGE, VALID_PACKAGE
 from module.device.connection_attr import ConnectionAttr
 from module.device.env import IS_WINDOWS
 from module.device.method.pool import WORKER_POOL
@@ -131,8 +131,6 @@ class Connection(ConnectionAttr):
         self.package = self.config.Emulator_PackageName
         if self.package == "auto":
             self.detect_package()
-        else:
-            set_server(self.package)
         logger.attr("PackageName", self.package)
         logger.attr("Server", self.config.SERVER)
 
@@ -1037,9 +1035,6 @@ class Connection(ConnectionAttr):
             # 写入配置。
             if set_config:
                 self.config.Emulator_PackageName = self.package
-            # 写入服务器。
-            logger.info("Server changed, release resources")
-            set_server(self.package)
         else:
             logger.critical(
                 "Multiple AzurLane packages found, auto package detection cannot decide which to choose, "

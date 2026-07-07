@@ -1,10 +1,10 @@
 """
-保存当前服务器。
+保存固定的国服服务器标识和包名映射。
 
 使用 `import module.config.server as server` 导入，不要使用 `from xxx import xxx`。
 """
 
-server = "cn"  # Setting default to cn, will avoid errors when using dev_tools
+server = "cn"
 
 VALID_SERVER = ["cn"]
 VALID_PACKAGE = {
@@ -108,21 +108,6 @@ VALID_SERVER_LIST = {
         "群岛计划",
     ],
 }
-
-
-def set_server(package_or_server: str):
-    """
-    修改全局服务器，会影响资源和服务器分支方法。
-
-    Args:
-        package_or_server: package name or server.
-    """
-    global server
-    server = to_server(package_or_server)
-
-    from module.base.resource import release_resources
-
-    release_resources()
 
 
 def to_server(package_or_server: str) -> str:

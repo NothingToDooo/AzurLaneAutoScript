@@ -8,7 +8,7 @@ from module.base.timer import Timer
 from module.base.utils import area_offset, color_similarity_2d, crop, ensure_int, get_color, image_size, load_image
 from module.combat.emotion import Emotion
 from module.config.config import AzurLaneConfig
-from module.config.server import set_server, to_package
+from module.config.server import to_package
 from module.device.device import Device
 from module.device.method.utils import HierarchyButton
 from module.logger import logger
@@ -480,11 +480,10 @@ class ModuleBase:
 
     def set_server(self, server):
         """
-        For development.
-        Change server and this will effect globally,
-        including assets and server specific methods.
+        开发调试时切换包名。
+
+        个人分支固定国服，不再修改全局服务器状态。
         """
         package = to_package(server)
         self.device.package = package
-        set_server(server)
         logger.attr("Server", self.config.SERVER)
