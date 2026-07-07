@@ -41,13 +41,12 @@ class OSShopUI(UI):
             else:
                 self.device.screenshot()
 
-            # End
+            # 已进入商店。
             if self.appear(OS_SHOP_CHECK):
                 return True
-            else:
-                logger.warning("OpsiShop is not appear, retrying.")
+            logger.warning("OpsiShop is not appear, retrying.")
 
-            # Exception
+            # 异常处理。
             if ensure_timeout.reached():
                 raise GameStuckError("Waiting too long for OpsiShop to appear.")
 

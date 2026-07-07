@@ -50,9 +50,8 @@ class AkashiShop(OSStatus, OSShopUI, Selector, MapEventHandler):
             row = [str(item) for item in items if item.button[1] != min_row]
             logger.info(f"Shop row 2: {row}")
             return items
-        else:
-            logger.info("No shop items found")
-            return []
+        logger.info("No shop items found")
+        return []
 
     def os_shop_get_item_to_buy_in_akashi(self) -> Item:
         """
@@ -72,7 +71,6 @@ class AkashiShop(OSStatus, OSShopUI, Selector, MapEventHandler):
             items = self.items_filter_in_akashi_shop(items)
             if not len(items):
                 return None
-            else:
-                return items.pop()
+            return items.pop()
 
         return None

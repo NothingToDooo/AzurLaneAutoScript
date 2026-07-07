@@ -195,10 +195,9 @@ class StorageHandler(GlobeOperation, ZoneManager):
         """
         if item == "OBSCURE":
             return os_assets.TEMPLATE_STORAGE_OBSCURE
-        elif item == "ABYSSAL":
+        if item == "ABYSSAL":
             return os_assets.TEMPLATE_STORAGE_ABYSSAL
-        else:
-            raise ScriptError(f"Unknown storage item: {item}")
+        raise ScriptError(f"Unknown storage item: {item}")
 
     def storage_checkout_item(self, item):
         """

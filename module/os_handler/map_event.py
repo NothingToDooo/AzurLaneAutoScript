@@ -13,9 +13,7 @@ from module.ui.switch import Switch
 class FleetLockSwitch(Switch):
     def handle_additional(self, main):
         # 上一个已清理海域的自动搜索奖励有时会延迟弹出。
-        if main.appear_then_click(os_assets.AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
-            return True
-        return False
+        return main.appear_then_click(os_assets.AUTO_SEARCH_REWARD, offset=(50, 50), interval=3)
 
 
 fleet_lock = FleetLockSwitch("Fleet_Lock", offset=(10, 120))
@@ -76,17 +74,11 @@ class MapEventHandler(EnemySearchingHandler):
             logger.info(f"{os_assets.MAP_ARCHIVES} -> {os_assets.CLICK_SAFE_AREA}")
             self.device.click(os_assets.CLICK_SAFE_AREA)
             return True
-        if self.appear_then_click(os_assets.MAP_WORLD, offset=(20, 20), interval=5):
-            return True
-
-        return False
+        return self.appear_then_click(os_assets.MAP_WORLD, offset=(20, 20), interval=5)
 
     def handle_os_game_tips(self):
         # 首次开启自动搜索时关闭游戏提示。
-        if self.appear_then_click(os_assets.OS_GAME_TIPS, offset=(20, 20), interval=3):
-            return True
-
-        return False
+        return self.appear_then_click(os_assets.OS_GAME_TIPS, offset=(20, 20), interval=3)
 
     def handle_ash_popup(self):
         name = "ASH"
@@ -102,8 +94,7 @@ class MapEventHandler(EnemySearchingHandler):
             POPUP_CANCEL.name = POPUP_CANCEL.name[: -len(name) - 1]
             self.ash_popup_canceled = True
             return True
-        else:
-            return False
+        return False
 
     def handle_map_event(self, drop=None):
         """
@@ -133,18 +124,11 @@ class MapEventHandler(EnemySearchingHandler):
     _os_in_map_confirm_timer = Timer(1.5, count=3)
 
     def handle_os_in_map(self):
-        """
-        Returns:
-            bool: If is in map and confirmed.
-        """
+        """返回当前是否在大世界地图内且已稳定确认。"""
         if self.is_in_map():
-            if self._os_in_map_confirm_timer.reached():
-                return True
-            else:
-                return False
-        else:
-            self._os_in_map_confirm_timer.reset()
-            return False
+            return bool(self._os_in_map_confirm_timer.reached())
+        self._os_in_map_confirm_timer.reset()
+        return False
 
     def ensure_no_map_event(self):
         self._os_in_map_confirm_timer.reset()

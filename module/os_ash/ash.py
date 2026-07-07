@@ -44,10 +44,7 @@ class AshCombat(Combat):
         if self.appear(BATTLE_PREPARATION, offset=(30, 30), interval=2):
             self.device.click(BACK_ARROW)
             return True
-        if super().handle_battle_status(drop=drop):
-            return True
-
-        return False
+        return bool(super().handle_battle_status(drop=drop))
 
     def handle_exp_info(self):
         """
@@ -130,9 +127,7 @@ class OSAsh(UI, MapEventHandler):
         # AshBeacon 下次运行时间。
         next_run = self.config.cross_get(keys="OpsiAshBeacon.Scheduler.NextRun", default=DEFAULT_TIME)
         # 距离下次执行还有 30 分钟以上时，可以支援调用。
-        if next_run - datetime.now() > timedelta(minutes=30):
-            return True
-        return False
+        return next_run - datetime.now() > timedelta(minutes=30)
 
     def handle_ash_beacon_attack(self):
         """

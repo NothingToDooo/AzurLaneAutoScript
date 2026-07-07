@@ -44,21 +44,10 @@ class Selector:
         return _items
 
     def enough_coins_in_akashi(self, item) -> bool:
-        """
-        Check if there are enough coins to buy the item.
-
-        Args:
-            item:
-
-        Returns:
-            bool: True if there are enough coins.
-        """
-        if item.cost == "YellowCoins" and item.price <= self._shop_yellow_coins:
-            return True
-        if item.cost == "PurpleCoins" and item.price <= self._shop_purple_coins:
-            return True
-
-        return False
+        """返回明石商店货币是否足够购买物品。"""
+        return (item.cost == "YellowCoins" and item.price <= self._shop_yellow_coins) or (
+            item.cost == "PurpleCoins" and item.price <= self._shop_purple_coins
+        )
 
     def check_cl1_purple_coins(self, item) -> bool:
         """

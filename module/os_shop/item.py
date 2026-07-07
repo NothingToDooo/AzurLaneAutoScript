@@ -58,17 +58,16 @@ class CounterOcr(Ocr):
                 parsed.append([int(j) for j in parts])
 
             return parsed
-        else:
-            if not result_list or "/" not in result_list:
-                logger.warning(f"Invalid OCR result: {result_list}")
-                return [0, 0]
+        if not result_list or "/" not in result_list:
+            logger.warning(f"Invalid OCR result: {result_list}")
+            return [0, 0]
 
-            parts = result_list.split("/")
-            if len(parts) != 2:
-                logger.warning(f"Invalid counter format: {result_list}")
-                return [0, 0]
+        parts = result_list.split("/")
+        if len(parts) != 2:
+            logger.warning(f"Invalid counter format: {result_list}")
+            return [0, 0]
 
-            return [int(i) for i in parts]
+        return [int(i) for i in parts]
 
 
 COUNTER_OCR = CounterOcr([], threshold=96, name="Counter_ocr")
@@ -103,10 +102,7 @@ class OSShopItem(Item):
         self._scroll_pos = value
 
     def is_known_item(self) -> bool:
-        if self.name == "DefaultItem" or "Empty" in self.name or self.name.isdigit():
-            return False
-        else:
-            return True
+        return self.name != "DefaultItem" and "Empty" not in self.name and not self.name.isdigit()
 
     def __str__(self):
         if self.name != "DefaultItem" and self.cost == "DefaultCost":

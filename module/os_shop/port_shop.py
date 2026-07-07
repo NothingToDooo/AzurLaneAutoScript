@@ -92,8 +92,7 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
             row = [str(item) for item in shop_items if item.button[1] != min_row]
             logger.info(f"Shop row 2: {row}")
             return shop_items
-        else:
-            logger.info("No shop items found")
+        logger.info("No shop items found")
 
         return []
 

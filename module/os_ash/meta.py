@@ -56,9 +56,7 @@ class Meta(UI, MapEventHandler):
     def digit_ocr_point_and_check(self, button: Button, check_number: int):
         point_ocr = MetaDigitCounter(button, letter=(235, 235, 235), threshold=160, name="POINT_OCR")
         point, _, _ = point_ocr.ocr(self.device.image)
-        if point >= check_number:
-            return True
-        return False
+        return point >= check_number
 
     def handle_map_event(self, drop=None):
         if super().handle_map_event(drop):
@@ -76,9 +74,7 @@ class Meta(UI, MapEventHandler):
             return True
         if self.handle_popup_cancel("META"):
             return True
-        if self.appear_then_click(ash_assets.META_ENTRANCE, offset=(20, 300), interval=2):
-            return True
-        return False
+        return self.appear_then_click(ash_assets.META_ENTRANCE, offset=(20, 300), interval=2)
 
 
 def _server_support():
@@ -396,28 +392,25 @@ class OpsiAshBeacon(Meta):
                 if self.appear_then_click(ash_assets.META_MAIN_DOSSIER_ENTRANCE, offset=(20, 20), interval=2):
                     logger.info("Select dossier entrance into")
                     return True
-                else:
-                    logger.info("None dossier has been selected")
+                logger.info("None dossier has been selected")
             return False
-        # Page beacon
-        elif self.appear(ash_assets.BEACON_LIST, offset=(20, 20), interval=2):
+        # 信标页。
+        if self.appear(ash_assets.BEACON_LIST, offset=(20, 20), interval=2):
             if self._check_beacon_point():
                 self.device.click(ash_assets.META_BEGIN_ENTRANCE)
                 logger.info("Begin a beacon")
             return True
-        # Page dossier
-        elif _server_support() and self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20), interval=2):
+        # 档案页。
+        if _server_support() and self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20), interval=2):
             if self.config.OpsiAshBeacon_AttackMode == "current_dossier" and self._check_dossier_point():
                 if self.appear_then_click(ash_assets.META_BEGIN_ENTRANCE, offset=(20, 20), interval=2):
                     logger.info("Begin a dossier")
                     return True
-                else:
-                    logger.info("None dossier has been selected")
+                logger.info("None dossier has been selected")
             self.appear_then_click(ash_assets.ASH_QUIT, offset=(10, 10), interval=2)
             return True
-        # UnKnown Page
-        else:
-            return True
+        # 未知页面。
+        return True
 
     def _check_beacon_point(self) -> bool:
         if self.appear(ash_assets.META_BEACON_FLAG, offset=(180, 20)):
@@ -435,16 +428,16 @@ class OpsiAshBeacon(Meta):
         # Page UnKnown
         if not self._in_meta_page():
             return MetaState.UNDEFINED
-        # Page beacon or dossier
-        elif self.appear(ash_assets.BEACON_LIST, offset=(20, 20)) or self.appear(
+        # 信标页或档案页。
+        if self.appear(ash_assets.BEACON_LIST, offset=(20, 20)) or self.appear(
             ash_assets.DOSSIER_LIST, offset=(20, 20)
         ):
             if self.appear(ash_assets.HELP_ENTER, offset=(30, 30)):
                 return MetaState.ATTACKING
-            elif self.appear(ash_assets.BEACON_REWARD, offset=(20, 20)):
+            if self.appear(ash_assets.BEACON_REWARD, offset=(20, 20)):
                 return MetaState.COMPLETE
             return MetaState.INIT
-        elif self.appear(ash_assets.ASH_SHOWDOWN, offset=(30, 30)):
+        if self.appear(ash_assets.ASH_SHOWDOWN, offset=(30, 30)):
             return MetaState.INIT
         return MetaState.UNDEFINED
 

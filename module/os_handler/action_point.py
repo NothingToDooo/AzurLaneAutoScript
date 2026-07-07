@@ -248,9 +248,8 @@ class ActionPointHandler(UI, MapEventHandler):
         for _ in self.loop(timeout=2):
             if self.action_point_get_active_button() == index:
                 return True
-            else:
-                self.device.click(ACTION_POINT_GRID[index, 0])
-                self.device.sleep(0.3)
+            self.device.click(ACTION_POINT_GRID[index, 0])
+            self.device.sleep(0.3)
         logger.warning("FSet action point button timeout")
         return False
 
@@ -303,9 +302,8 @@ class ActionPointHandler(UI, MapEventHandler):
         if oil >= cost + preserve:
             self.action_point_use()
             return True
-        else:
-            logger.info("Not enough oil to buy")
-            return False
+        logger.info("Not enough oil to buy")
+        return False
 
     def action_point_quit(self):
         """

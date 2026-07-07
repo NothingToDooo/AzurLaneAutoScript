@@ -145,10 +145,9 @@ class MissionHandler(GlobeOperation, ZoneManager):
                     logger.info("Pinned at archive zone")
                     self.globe_enter(zone=self.name_to_zone(72))
                     return "pinned_at_archive_zone"
-                else:
-                    logger.info("Pinned at mission zone")
-                    self.globe_enter(zone=self.name_to_zone(72))
-                    return "pinned_at_mission_zone"
+                logger.info("Pinned at mission zone")
+                self.globe_enter(zone=self.name_to_zone(72))
+                return "pinned_at_mission_zone"
             if self.is_in_map() and self.info_bar_count():
                 logger.info("Already at mission zone")
                 return "already_at_mission_zone"
@@ -238,6 +237,5 @@ class MissionHandler(GlobeOperation, ZoneManager):
                 "no need to worry they are left behind."
             )
             return True
-        else:
-            logger.info("Not in OpsiExplore, able to do OpsiDaily")
-            return False
+        logger.info("Not in OpsiExplore, able to do OpsiDaily")
+        return False

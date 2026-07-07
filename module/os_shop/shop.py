@@ -97,10 +97,9 @@ class OSShop(PortShop, AkashiShop):
             if button is None:
                 logger.info("Shop buy finished")
                 return count
-            else:
-                self.os_shop_buy_execute(button)
-                count += 1
-                continue
+            self.os_shop_buy_execute(button)
+            count += 1
+            continue
 
         logger.warning("Too many items to buy, stopped")
         return count
@@ -281,32 +280,28 @@ class OSShop(PortShop, AkashiShop):
     def yellow_coins_preserve(self):
         if self.is_cl1_enabled:
             return 100000
-        else:
-            return 35000
+        return 35000
 
     def get_currency_coins(self, item):
         if item.cost == "YellowCoins":
             if get_os_reset_remain() == 0:
                 return self._shop_yellow_coins - 100
-            else:
-                return self._shop_yellow_coins - self.yellow_coins_preserve
+            return self._shop_yellow_coins - self.yellow_coins_preserve
 
-        elif item.cost == "PurpleCoins":
+        if item.cost == "PurpleCoins":
             if get_os_reset_remain() == 0:
                 return self._shop_purple_coins
-            else:
-                return self._shop_purple_coins - self.config.OS_NORMAL_PURPLE_COINS_PRESERVE
+            return self._shop_purple_coins - self.config.OS_NORMAL_PURPLE_COINS_PRESERVE
 
     def get_coins_no_limit(self, item):
         if item.cost == "YellowCoins":
             return self._shop_yellow_coins
-        elif item.cost == "PurpleCoins":
+        if item.cost == "PurpleCoins":
             return self._shop_purple_coins
 
     def is_coins_both_not_enough(self):
         if get_os_reset_remain() == 0:
             return False
-        else:
-            yellow = self._shop_yellow_coins < self._shop_purple_coins
-            purple = self._shop_purple_coins < self.config.OS_NORMAL_PURPLE_COINS_PRESERVE
-            return yellow and purple
+        yellow = self._shop_yellow_coins < self._shop_purple_coins
+        purple = self._shop_purple_coins < self.config.OS_NORMAL_PURPLE_COINS_PRESERVE
+        return yellow and purple

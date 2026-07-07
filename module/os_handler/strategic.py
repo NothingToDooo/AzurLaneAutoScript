@@ -44,8 +44,7 @@ class StrategicSearchHandler(MapEventHandler):
         for _ in self.loop(timeout=2):
             if STRATEGIC_SEARCH_SCROLL.appear(main=self):
                 return True
-            else:
-                logger.warning("STRATEGIC_SEARCH_SCROLL disappeared")
+            logger.warning("STRATEGIC_SEARCH_SCROLL disappeared")
         logger.warning("STRATEGIC_SEARCH_SCROLL disappeared confirm")
         return False
 
