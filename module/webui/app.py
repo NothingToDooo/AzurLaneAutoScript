@@ -26,7 +26,6 @@ from pywebio.output import (
     put_column,
     put_error,
     put_html,
-    put_markdown,
     put_scope,
     put_table,
     put_text,
@@ -833,14 +832,6 @@ class AlasGUI(Frame):
                     {"label": "暗色", "value": "dark", "color": "dark"},
                 ],
                 onclick=set_theme,
-            ).style("text-align: center")
-
-            # 显示项目提示。
-            put_markdown(
-                """
-            Alas 是一款免费开源软件，如果你在任何渠道付费购买了 Alas，请退款。
-            项目地址：`https://github.com/LmeSzinc/AzurLaneAutoScript`
-            """
             ).style("text-align: center")
 
     def run(self) -> None:
