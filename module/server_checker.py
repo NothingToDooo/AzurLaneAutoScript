@@ -194,7 +194,6 @@ class ServerChecker:
             self._retry = False
             self._state.extend(last)
             return False
-        else:
-            self._retry = False
-            logger.error("Network is unavailable. Please check your network status.")
-            return False
+        self._retry = False
+        logger.error("Network is unavailable. Please check your network status.")
+        return False

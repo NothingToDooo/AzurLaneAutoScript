@@ -202,11 +202,9 @@ class BuyFurniture(UI):
             if self.buy_furniture_once(self.config.BuyFurniture_BuyOption):
                 logger.info("Find next time-limited furniture")
                 return True  # continue
-            else:
-                return False  # break
-        else:
-            logger.info("No time-limited furniture found")
             return False  # break
+        logger.info("No time-limited furniture found")
+        return False  # break
 
     def buy_furniture_run(self):
         """

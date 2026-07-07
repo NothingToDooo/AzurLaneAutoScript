@@ -252,11 +252,10 @@ class RewardTacticalClass(Dock):
             # End
             if books and books.count == prev.count:
                 return books
-            else:
-                prev = books
-                if n % 3 == 0:
-                    self.device.sleep(3)
-                continue
+            prev = books
+            if n % 3 == 0:
+                self.device.sleep(3)
+            continue
 
         logger.warning("No book found.")
         raise ScriptError("No book found, after 15 attempts.")
@@ -307,19 +306,17 @@ class RewardTacticalClass(Dock):
             )
 
             def filter_exp_func(book):
-                # Retain at least non-T1 bonus books if nothing else
+                # 没有其他选择时，至少保留非 T1 经验加成教材。
                 if book.exp_value == 100:
                     return True
 
-                # Acquire 'overflow' for respective tier book if enabled
+                # 启用溢出控制时，读取对应等级教材允许的溢出值。
                 overflow = 0
                 if self.config.ControlExpOverflow_Enable:
                     overflow = getattr(self.config, f"ControlExpOverflow_T{book.tier}Allow")
 
-                # Remove book if sum to be gained exceeds total (+ overflow)
-                if (current + book.exp_value) > (total + overflow):
-                    return False
-                return True
+                # 超过总经验和允许溢出时过滤掉该教材。
+                return current + book.exp_value <= total + overflow
 
             before = self.books.count
             self.books = SelectedGrids([book for book in self.books if filter_exp_func(book)])

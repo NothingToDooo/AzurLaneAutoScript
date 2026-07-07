@@ -158,10 +158,8 @@ class NewYearChallenge(MinigameRun):
                     self.device.screenshot()
                 coin_cost_after_add = OCR_GAME_NEW_YEAR_COIN_COST.ocr(self.device.image)
                 logger.info(f"coin cost after add : {coin_cost_after_add}")
-                if count >= 1 and coin_cost_after_add <= 0:
-                    # 月度奖励已领取完或剩余代币为 0 时无法添加代币。
-                    return False
-                return True
+                # 月度奖励已领取完或剩余代币为 0 时无法添加代币。
+                return count < 1 or coin_cost_after_add > 0
 
     def new_year_challenge_turn(self, skip_first_screenshot=True):
         if not skip_first_screenshot:

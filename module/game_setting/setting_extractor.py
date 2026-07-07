@@ -89,8 +89,7 @@ class LuaSetting:
         res = REGEX_SETTING_KEY.search(code)
         if res:
             return res.group(1).replace(".", "_").replace("%", "_").replace("-", "_").replace(":", "_").strip("_")
-        else:
-            return ""
+        return ""
 
     @cached_property
     def formatter(self):

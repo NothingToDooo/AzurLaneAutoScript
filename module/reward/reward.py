@@ -285,9 +285,9 @@ class Reward(UI):
 
     def reward_side_navbar_ensure(self, upper=None, bottom=None):
         """
-        Ensure able to transition to page
-        Whether page has completely loaded is handled
-        separately and optionally
+        确保奖励侧边栏能切换到目标页面。
+
+        页面是否完全加载由调用方根据需要另行确认。
 
         Args:
             upper (int):
@@ -306,11 +306,9 @@ class Reward(UI):
                 1  for event.
 
         Returns:
-            bool: if side_navbar set ensured
+            bool: 是否已经确保侧边栏目标项。
         """
-        if self._reward_side_navbar.set(self, upper=upper, bottom=bottom):
-            return True
-        return False
+        return self._reward_side_navbar.set(self, upper=upper, bottom=bottom)
 
     def run(self):
         """

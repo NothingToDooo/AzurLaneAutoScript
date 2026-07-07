@@ -26,10 +26,7 @@ class Combat(Combat_, MapEventHandler):
             return True
         if self.appear(os_combat_assets.SIREN_PREPARATION, offset=(20, 20)):
             return True
-        if self.appear(combat_assets.BATTLE_PREPARATION_WITH_OVERLAY) and self.handle_combat_automation_confirm():
-            return True
-
-        return False
+        return self.appear(combat_assets.BATTLE_PREPARATION_WITH_OVERLAY) and self.handle_combat_automation_confirm()
 
     def combat_preparation(self, balance_hp=False, emotion_reduce=False, auto="combat_auto", fleet_index=1):
         """

@@ -41,8 +41,7 @@ class StorageHandler(StorageUI):
             return storage_assets.TEMPLATE_BOX_T3
         if rarity == 4:
             return storage_assets.TEMPLATE_BOX_T4
-        else:
-            raise ScriptError(f"Unknown box template rarity: {rarity}")
+        raise ScriptError(f"Unknown box template rarity: {rarity}")
 
     def _handle_use_box_amount(self, amount):
         """

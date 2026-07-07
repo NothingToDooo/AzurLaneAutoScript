@@ -166,9 +166,7 @@ class Equipment(StorageHandler):
                 logger.warning('Transitions to "research" is not supported')
                 return False
 
-        if self._ship_side_navbar.set(self, upper=upper, bottom=bottom):
-            return True
-        return False
+        return self._ship_side_navbar.set(self, upper=upper, bottom=bottom)
 
     def ship_equipment_take_off(self, skip_first_screenshot=True):
         logger.info("Equipment take off")

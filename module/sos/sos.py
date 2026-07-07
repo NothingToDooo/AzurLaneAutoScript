@@ -51,9 +51,8 @@ class CampaignSos(CampaignRun, CampaignBase):
         if chapter in chapter_list:
             logger.info("Target SOS chapter found")
             return all_buttons[chapter_list.index(chapter)]
-        else:
-            logger.info("Target SOS chapter not found")
-            return None
+        logger.info("Target SOS chapter not found")
+        return None
 
     def _sos_signal_select(self, chapter):
         """

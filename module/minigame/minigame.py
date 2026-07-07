@@ -73,9 +73,7 @@ class MinigameRun(UI):
         if self.appear_then_click(minigame_assets.COIN_POPUP, offset=(5, 5), interval=3):
             return True
         # 领取代币或游戏券。
-        if self.appear_then_click(GET_ITEMS_1, offset=(5, 5), interval=3):
-            return True
-        return False
+        return bool(self.appear_then_click(GET_ITEMS_1, offset=(5, 5), interval=3))
 
     def deal_specific_popup(self):
         return False

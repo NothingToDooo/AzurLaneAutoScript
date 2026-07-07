@@ -15,8 +15,7 @@ from module.logger import logger
 def float2str(n, decimal=3):
     if not isinstance(n, (float, int)):
         return str(n)
-    else:
-        return float2str_(n, decimal=decimal) + "s"
+    return float2str_(n, decimal=decimal) + "s"
 
 
 class Benchmark(DaemonBase, CampaignUI):
@@ -136,8 +135,7 @@ class Benchmark(DaemonBase, CampaignUI):
             res = res[1]
             if not isinstance(res, (int, float)):
                 return 100
-            else:
-                return res
+            return res
 
         logger.hr("Benchmark Results", level=1)
         fastest_screenshot = "nemu_ipc"
