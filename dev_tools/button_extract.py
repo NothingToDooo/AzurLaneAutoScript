@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import imageio
 import numpy as np
@@ -180,7 +181,7 @@ class ModuleExtractor:
     def write(self):
         folder = os.path.join(MODULE_FOLDER, self.name)
         if not os.path.exists(folder):
-            os.mkdir(folder)
+            Path(folder).mkdir()
         with open(os.path.join(folder, BUTTON_FILE), "w", newline="") as f:
             f.writelines(f"{text}\n" for text in self.expression)
 

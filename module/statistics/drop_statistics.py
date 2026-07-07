@@ -1,6 +1,7 @@
 import csv
 import os
 import shutil
+from pathlib import Path
 
 from tqdm import tqdm
 
@@ -54,7 +55,7 @@ class DropStatistics:
         """
         if DropStatistics.CSV_OVERWRITE and os.path.exists(self.csv_file):
             logger.info(f"Remove existing csv file: {self.csv_file}")
-            os.remove(self.csv_file)
+            Path(self.csv_file).unlink()
         return True
 
     def parse_template(self, file):

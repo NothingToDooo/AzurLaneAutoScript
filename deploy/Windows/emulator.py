@@ -4,6 +4,7 @@ import os
 import shutil
 import typing as t
 from dataclasses import dataclass
+from pathlib import Path
 
 from deploy.Windows.alas import AlasManager
 from deploy.Windows.logger import logger
@@ -150,7 +151,7 @@ class EmulatorManager(AlasManager):
             if os.path.exists(bak):
                 logger.info(f"Delete {adb}")
                 if os.path.exists(adb):
-                    os.remove(adb)
+                    Path(adb).unlink()
                 logger.info(f"{bak} -----> {adb}")
                 shutil.move(bak, adb)
             else:

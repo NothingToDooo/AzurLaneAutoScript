@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from rich.console import Console, ConsoleOptions, ConsoleRenderable, NewLine
@@ -176,7 +177,7 @@ pyw_name = os.path.splitext(os.path.basename(sys.argv[0]))[0]
 def set_file_logger(name=pyw_name):
     today = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
     log_file = f"./log/{today}_{name}.txt"
-    os.makedirs("./log", exist_ok=True)
+    Path("./log").mkdir(parents=True, exist_ok=True)
     file_handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
 
     file_console = Console(

@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import cv2
 import imageio
@@ -61,7 +62,7 @@ class RelativeRecord:
         self.images_amount = len(self.images)
         self.folder = os.path.join(FOLDER, f"{NAME}_gif")
         if not os.path.exists(self.folder):
-            os.mkdir(self.folder)
+            Path(self.folder).mkdir()
 
     def count(self, area):
         mask = np.full(self.images_amount, False, dtype=bool)

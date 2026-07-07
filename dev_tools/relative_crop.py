@@ -1,5 +1,6 @@
 import os
 import time
+from pathlib import Path
 
 import numpy as np
 from PIL import Image
@@ -35,7 +36,7 @@ grids.predict()
 grids.show()
 
 
-os.makedirs(folder, exist_ok=True)
+Path(folder).mkdir(parents=True, exist_ok=True)
 for grid in grids:
     # Find more relative_crop area in module/map/grid_predictor.py
     # This one is for `predict_enemy_genre`

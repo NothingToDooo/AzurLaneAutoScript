@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import numpy as np
 from PIL import Image
@@ -58,7 +59,7 @@ NODE = "D5"
 if __name__ == "__main__":
     for folder in [FOLDER, os.path.join(FOLDER, NAME)]:
         if not os.path.exists(folder):
-            os.mkdir(folder)
+            Path(folder).mkdir()
 
     cfg = AzurLaneConfig(CONFIG).merge(Config())
     al = ModuleBase(cfg)

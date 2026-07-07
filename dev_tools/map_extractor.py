@@ -1,6 +1,7 @@
 import os
 import re
 from contextlib import suppress
+from pathlib import Path
 
 import numpy as np
 
@@ -619,7 +620,7 @@ class MapData:
         if os.path.exists(file):
             if OVERWRITE:
                 print(f"Delete file: {file}")
-                os.remove(file)
+                Path(file).unlink()
             else:
                 print(f"File exists: {file}")
                 return False
@@ -718,7 +719,7 @@ class ChapterTemplate:
         input()
 
         if not os.path.exists(folder):
-            os.mkdir(folder)
+            Path(folder).mkdir()
         for data in maps:
             data.write(folder)
 

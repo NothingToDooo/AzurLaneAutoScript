@@ -3,6 +3,7 @@ import json
 import os
 import threading
 import time
+from pathlib import Path
 
 import requests
 from PIL import Image
@@ -173,7 +174,7 @@ class AzurStats:
         """
         try:
             folder = os.path.join(str(self.config.DropRecord_SaveFolder), genre)
-            os.makedirs(folder, exist_ok=True)
+            Path(folder).mkdir(parents=True, exist_ok=True)
             file = os.path.join(folder, filename)
             save_image(image, file)
             logger.info(f"Image save success, file: {file}")

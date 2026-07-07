@@ -21,7 +21,7 @@ class AzurLaneUncensored(LoginHandler):
         folder = "./files"
         with suppress(FileNotFoundError):
             shutil.rmtree(folder)
-        os.makedirs(folder, exist_ok=True)
+        Path(folder).mkdir(parents=True, exist_ok=True)
         with open(os.path.join(folder, "localization.txt"), "w", encoding="utf-8") as f:
             f.write(localization_txt)
 
@@ -36,7 +36,7 @@ class AzurLaneUncensored(LoginHandler):
         folder = "./toolkit/AzurLaneUncensored"
 
         logger.hr("生成反和谐文件", level=1)
-        os.makedirs(folder, exist_ok=True)
+        Path(folder).mkdir(parents=True, exist_ok=True)
         prev = Path.cwd()
 
         # 在 ./toolkit/AzurLaneUncensored 中生成推送目录。

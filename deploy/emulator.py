@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 import winreg
+from pathlib import Path
 
 from deploy.logger import logger
 from deploy.utils import cached_property
@@ -121,7 +122,7 @@ class VirtualBoxEmulator:
             if os.path.exists(bak):
                 logger.info(f"Delete {ori}")
                 if os.path.exists(ori):
-                    os.remove(ori)
+                    Path(ori).unlink()
                 logger.info(f"{bak} -----> {ori}")
                 shutil.move(bak, ori)
             else:

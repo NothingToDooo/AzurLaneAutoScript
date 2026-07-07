@@ -2,6 +2,7 @@ import os
 import time
 from collections import deque
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import cv2
@@ -127,7 +128,7 @@ class Screenshot(Adb, NemuIpc):
             folder = self.config.SCREEN_SHOT_SAVE_FOLDER_BASE if to_base_folder else self.config.SCREEN_SHOT_SAVE_FOLDER
             folder = os.path.join(folder, genre)
             if not os.path.exists(folder):
-                os.mkdir(folder)
+                Path(folder).mkdir()
 
             file = os.path.join(folder, file)
             self.image_save(file)

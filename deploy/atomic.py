@@ -86,7 +86,7 @@ def replace_tmp(tmp: str, file: str):
         for attempt in range(WINDOWS_MAX_ATTEMPT):
             try:
                 # Atomic operation
-                os.replace(tmp, file)
+                Path(tmp).replace(file)
                 # success
                 return
             except PermissionError as e:
@@ -104,7 +104,7 @@ def replace_tmp(tmp: str, file: str):
         # Linux and Mac allow existing reading
         try:
             # Atomic operation
-            os.replace(tmp, file)
+            Path(tmp).replace(file)
             # success
             return
         except FileNotFoundError:
@@ -133,7 +133,7 @@ def atomic_replace(replace_from: str, replace_to: str):
         for attempt in range(WINDOWS_MAX_ATTEMPT):
             try:
                 # Atomic operation
-                os.replace(replace_from, replace_to)
+                Path(replace_from).replace(replace_to)
                 # success
                 return
             except PermissionError as e:
@@ -150,7 +150,7 @@ def atomic_replace(replace_from: str, replace_to: str):
             raise last_error from None
     else:
         # Linux and Mac
-        os.replace(replace_from, replace_to)
+        Path(replace_from).replace(replace_to)
 
 
 def file_write(file: str, data: str | bytes):
@@ -190,7 +190,7 @@ def file_write(file: str, data: str | bytes):
         # Create parent directory
         directory = os.path.dirname(file)
         if directory:
-            os.makedirs(directory, exist_ok=True)
+            Path(directory).mkdir(parents=True, exist_ok=True)
         # Write again
         with open(file, mode=mode, encoding=encoding, newline=newline) as f:
             f.write(data)
@@ -245,7 +245,7 @@ def file_write_stream(file: str, data_generator):
         # Create parent directory
         directory = os.path.dirname(file)
         if directory:
-            os.makedirs(directory, exist_ok=True)
+            Path(directory).mkdir(parents=True, exist_ok=True)
         # Write again
         with open(file, mode=mode, encoding=encoding, newline=newline) as f:
             f.write(first_chunk)
