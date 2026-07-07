@@ -22,8 +22,8 @@ def test_chance_has_clear_probability_boundaries():
 def test_chance_rejects_invalid_probability():
     runtime_random = RuntimeRandom(seed=1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="probability must be between 0 and 1"):
         runtime_random.chance(-0.01)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="probability must be between 0 and 1"):
         runtime_random.chance(1.01)

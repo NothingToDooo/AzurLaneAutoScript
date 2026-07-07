@@ -73,6 +73,7 @@ select = [
     "PLE",
     "PERF",
     "PIE",
+    "PT",
     "PLC0206",
     "PLC1802",
     "PLW0120",
@@ -90,6 +91,7 @@ select = [
     "RUF046",
     "RUF059",
     "RUF100",
+    "RSE",
     "RET501",
     "RET502",
     "RET503",
@@ -102,6 +104,7 @@ select = [
     "SLOT",
     "UP",
     "W",
+    "YTT",
 ]
 
 [tool.ty.environment]

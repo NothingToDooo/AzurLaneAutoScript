@@ -129,4 +129,4 @@ class Campaign(CampaignBase):
         self.goto(B1, expected="story")
         self.goto(G8, expected="story")
 
-        raise CampaignEnd()
+        raise CampaignEnd

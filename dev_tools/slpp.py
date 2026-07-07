@@ -1,8 +1,6 @@
 import re
 from numbers import Number
 
-import six
-
 """
 SLPP is a simple lua-python data structures parser.
 
@@ -26,7 +24,7 @@ ERRORS = {
     "mfnumber_dec_point": "Malformed number (no digits after decimal point).",
     "mfnumber_sci": "Malformed number (bad scientific format).",
 }
-SORTABLE_KEY_TYPES = (*six.string_types, int, float, bool, tuple)
+SORTABLE_KEY_TYPES = (str, int, float, bool, tuple)
 
 
 def sequential(lst):
@@ -50,7 +48,7 @@ class SLPP:
         self.tab = "\t"
 
     def decode(self, text):
-        if not text or not isinstance(text, six.string_types):
+        if not text or not isinstance(text, str):
             return None
         # 游戏脚本没有注释。
         # 删除注释可能导致错误，例如下面这类内容会被误认为注释：
@@ -76,10 +74,7 @@ class SLPP:
         if isinstance(obj, str):
             escaped = obj.replace(r'"', r"\"")
             s += f'"{escaped}"'
-        elif six.PY2 and isinstance(obj, six.text_type):
-            escaped = obj.encode("utf-8").replace(r'"', r"\"")
-            s += f'"{escaped}"'
-        elif six.PY3 and isinstance(obj, bytes):
+        elif isinstance(obj, bytes):
             escaped = "".join(rf"\x{c:02x}" for c in obj)
             s += f'"{escaped}"'
         elif isinstance(obj, bool):
@@ -92,7 +87,7 @@ class SLPP:
             self.depth += 1
             if len(obj) == 0 or (
                 not isinstance(obj, dict)
-                and len([x for x in obj if isinstance(x, Number) or (isinstance(x, six.string_types) and len(x) < 10)])
+                and len([x for x in obj if isinstance(x, Number) or (isinstance(x, str) and len(x) < 10)])
                 == len(obj)
             ):
                 newline = tab = ""
