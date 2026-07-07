@@ -59,9 +59,8 @@ class Dock(Equipment):
             enable: True to filter favourite ships only
             wait_loading: Default to True, use False on continuous operation
         """
-        if DOCK_FAVOURITE.set("on" if enable else "off", main=self):
-            if wait_loading:
-                self.handle_dock_cards_loading()
+        if DOCK_FAVOURITE.set("on" if enable else "off", main=self) and wait_loading:
+            self.handle_dock_cards_loading()
 
     def _dock_quit_check_func(self):
         return not self.appear(retire_assets.DOCK_CHECK, offset=(20, 20))
@@ -75,9 +74,8 @@ class Dock(Equipment):
             enable: True to set descending sorting
             wait_loading: Default to True, use False on continuous operation
         """
-        if DOCK_SORTING.set("Descending" if enable else "Ascending", main=self):
-            if wait_loading:
-                self.handle_dock_cards_loading()
+        if DOCK_SORTING.set("Descending" if enable else "Ascending", main=self) and wait_loading:
+            self.handle_dock_cards_loading()
 
     def dock_filter_enter(self):
         logger.info("Dock filter enter")
@@ -112,9 +110,10 @@ class Dock(Equipment):
                 self.device.screenshot()
 
             # 有时筛选弹窗没有黑色模糊背景，会同时出现确认按钮和船坞检查点。
-            if not self.appear(retire_assets.DOCK_FILTER_CONFIRM, offset=(20, 20)):
-                if self.appear(retire_assets.DOCK_CHECK, offset=(20, 20)):
-                    break
+            if not self.appear(retire_assets.DOCK_FILTER_CONFIRM, offset=(20, 20)) and self.appear(
+                retire_assets.DOCK_CHECK, offset=(20, 20)
+            ):
+                break
             if self.appear_then_click(retire_assets.DOCK_FILTER_CONFIRM, offset=(20, 20), interval=3):
                 continue
 
