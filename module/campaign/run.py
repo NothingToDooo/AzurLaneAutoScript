@@ -96,11 +96,10 @@ class CampaignRun(CampaignEvent):
             )
             return True
         # Oil limit
-        if oil_check:
-            if self.get_oil() < max(500, self.config.StopCondition_OilLimit):
-                logger.hr("Triggered stop condition: Oil limit")
-                self.config.task_delay(minute=(120, 240))
-                return True
+        if oil_check and self.get_oil() < max(500, self.config.StopCondition_OilLimit):
+            logger.hr("Triggered stop condition: Oil limit")
+            self.config.task_delay(minute=(120, 240))
+            return True
         # Auto search oil limit
         if self.campaign.auto_search_oil_limit_triggered:
             logger.hr("Triggered stop condition: Auto search oil limit")
@@ -126,11 +125,10 @@ class CampaignRun(CampaignEvent):
             self.handle_task_balancer()
             return True
         # TaskBalancer
-        if oil_check and self.run_count >= 1:
-            if self.config.TaskBalancer_Enable and self.triggered_task_balancer():
-                logger.hr("Triggered stop condition: Coin limit")
-                self.handle_task_balancer()
-                return True
+        if oil_check and self.run_count >= 1 and self.config.TaskBalancer_Enable and self.triggered_task_balancer():
+            logger.hr("Triggered stop condition: Coin limit")
+            self.handle_task_balancer()
+            return True
 
         return False
 
@@ -139,10 +137,9 @@ class CampaignRun(CampaignEvent):
         Returns:
             bool: If triggered a restart condition.
         """
-        if not self.campaign.emotion.is_ignore:
-            if self.campaign.emotion.triggered_bug():
-                logger.info("Triggered restart avoid emotion bug")
-                return True
+        if not self.campaign.emotion.is_ignore and self.campaign.emotion.triggered_bug():
+            logger.info("Triggered restart avoid emotion bug")
+            return True
 
         return False
 
@@ -196,9 +193,8 @@ class CampaignRun(CampaignEvent):
             name = name.replace("lsp", "isp").replace("1sp", "isp")
             if name == "isp":
                 name = "isp1"
-        if folder == "event_20240724_cn":
-            if name in ["ysp", "y.sp"]:
-                name = "sp"
+        if folder == "event_20240724_cn" and name in ["ysp", "y.sp"]:
+            name = "sp"
         # Convert to chapter T
         convert = {
             "a1": "t1",
@@ -276,20 +272,26 @@ class CampaignRun(CampaignEvent):
         if folder == "event_20221124_cn":
             name = name.replace("ht", "th")
         # Chapter TH has no map_percentage and no 3_stars
-        if folder == "event_20221124_cn" and name.startswith("th"):
-            if self.config.StopCondition_MapAchievement != "non_stop":
-                logger.info(
-                    "When running chapter TH of event_20221124_cn, "
-                    "StopCondition.MapAchievement is forced set to threat_safe"
-                )
-                self.config.override(StopCondition_MapAchievement="threat_safe")
-        if folder == "event_20250724_cn" and name.startswith("ts"):
-            if self.config.StopCondition_MapAchievement != "non_stop":
-                logger.info(
-                    "When running chapter TS of event_20250724_cn, "
-                    "StopCondition.MapAchievement is forced set to threat_safe"
-                )
-                self.config.override(StopCondition_MapAchievement="threat_safe")
+        if (
+            folder == "event_20221124_cn"
+            and name.startswith("th")
+            and self.config.StopCondition_MapAchievement != "non_stop"
+        ):
+            logger.info(
+                "When running chapter TH of event_20221124_cn, "
+                "StopCondition.MapAchievement is forced set to threat_safe"
+            )
+            self.config.override(StopCondition_MapAchievement="threat_safe")
+        if (
+            folder == "event_20250724_cn"
+            and name.startswith("ts")
+            and self.config.StopCondition_MapAchievement != "non_stop"
+        ):
+            logger.info(
+                "When running chapter TS of event_20250724_cn, "
+                "StopCondition.MapAchievement is forced set to threat_safe"
+            )
+            self.config.override(StopCondition_MapAchievement="threat_safe")
         # event_20211125_cn, TSS maps are on time maps
         if folder == "event_20211125_cn" and "tss" in name:
             self.config.override(
@@ -301,13 +303,11 @@ class CampaignRun(CampaignEvent):
                 Submarine_Fleet=0,  # No submarine
             )
         # event_20230817_cn story states
-        if folder == "event_20230817_cn":
-            if name.startswith("e0"):
-                name = "a1"
+        if folder == "event_20230817_cn" and name.startswith("e0"):
+            name = "a1"
         # event_20240829_cn, TP -> SP
-        if folder == "event_20240829_cn":
-            if name == "tp":
-                name = "sp"
+        if folder == "event_20240829_cn" and name == "tp":
+            name = "sp"
         # Stage loop
         for alias, stages in self.config.STAGE_LOOP_ALIAS.items():
             alias_folder, alias = alias
@@ -344,11 +344,8 @@ class CampaignRun(CampaignEvent):
                     "In event_20240912_cn, MapAchievement=threat_safe_without_3_stars fallback to 100_percent_clear"
                 )
                 self.config.override(StopCondition_MapAchievement="100_percent_clear")
-        if folder == "event_20260417_cn":
-            if name in [
-                "vsp",
-            ]:
-                name = "sp"
+        if folder == "event_20260417_cn" and name == "vsp":
+            name = "sp"
         return name, folder
 
     def can_use_auto_search_continue(self):
@@ -457,16 +454,14 @@ class CampaignRun(CampaignEvent):
             if self.triggered_stop_condition(oil_check=False):
                 break
             # One-time stage limit
-            if self.campaign.config.MAP_IS_ONE_TIME_STAGE:
-                if self.run_count >= 1:
-                    logger.hr("Triggered one-time stage limit")
-                    self.campaign.handle_map_stop()
-                    break
+            if self.campaign.config.MAP_IS_ONE_TIME_STAGE and self.run_count >= 1:
+                logger.hr("Triggered one-time stage limit")
+                self.campaign.handle_map_stop()
+                break
             # Loop stages
-            if self.is_stage_loop:
-                if self.run_count >= 1:
-                    logger.hr("Triggered loop stage switch")
-                    break
+            if self.is_stage_loop and self.run_count >= 1:
+                logger.hr("Triggered loop stage switch")
+                break
             # Scheduler
             if self.config.task_switched():
                 self.campaign.ensure_auto_search_exit()
