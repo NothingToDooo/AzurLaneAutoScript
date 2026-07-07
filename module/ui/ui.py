@@ -33,17 +33,17 @@ class UI(InfoHandler):
 
     def ui_page_appear(self, page, offset=(30, 30), interval=0):
         """
+        判断指定页面是否出现在当前截图中。
+
         Args:
             page (Page):
             offset:
             interval:
         """
         if page == page_main:
-            if self.appear(page_main_white.check_button, offset=offset, interval=interval):
-                return True
-            if self.appear(page_main.check_button, offset=(5, 5), interval=interval):
-                return True
-            return False
+            return self.appear(page_main_white.check_button, offset=offset, interval=interval) or self.appear(
+                page_main.check_button, offset=(5, 5), interval=interval
+            )
         return self.appear(page.check_button, offset=offset, interval=interval)
 
     def is_in_main(self, offset=(30, 30), interval=0):
@@ -70,10 +70,9 @@ class UI(InfoHandler):
         return False
 
     def ensure_button_execute(self, button, offset=0):
-        if (isinstance(button, Button) and self.appear(button, offset=offset)) or (callable(button) and button()):
-            return True
-        else:
-            return False
+        return bool(
+            (isinstance(button, Button) and self.appear(button, offset=offset)) or (callable(button) and button())
+        )
 
     def ui_click(
         self,
@@ -130,6 +129,8 @@ class UI(InfoHandler):
 
     def ui_process_check_button(self, check_button, offset=(30, 30)):
         """
+        执行 UI 等待用的检查按钮判断。
+
         Args:
             check_button (Button, callable, list[Button], tuple[Button]):
             offset:
@@ -139,12 +140,11 @@ class UI(InfoHandler):
         """
         if isinstance(check_button, Button):
             return self.appear(check_button, offset=offset)
-        elif callable(check_button):
+        if callable(check_button):
             return check_button()
-        elif isinstance(check_button, (list, tuple)):
+        if isinstance(check_button, (list, tuple)):
             return any(self.appear(button, offset=offset) for button in check_button)
-        else:
-            return self.appear(check_button, offset=offset)
+        return self.appear(check_button, offset=offset)
 
     def ui_get_current_page(self, skip_first_screenshot=True):
         """
@@ -272,22 +272,23 @@ class UI(InfoHandler):
 
     def ui_ensure(self, destination, skip_first_screenshot=True):
         """
+        确保 UI 已切换到目标页面。
+
         Args:
             destination (Page):
             skip_first_screenshot:
 
         Returns:
-            bool: If UI switched.
+            bool: 是否发生页面切换。
         """
         logger.hr("UI ensure")
         self.ui_get_current_page(skip_first_screenshot=skip_first_screenshot)
         if self.ui_current == destination:
             logger.info(f"Already at {destination}")
             return False
-        else:
-            logger.info(f"Goto {destination}")
-            self.ui_goto(destination, skip_first_screenshot=True)
-            return True
+        logger.info(f"Goto {destination}")
+        self.ui_goto(destination, skip_first_screenshot=True)
+        return True
 
     def ui_goto_main(self):
         return self.ui_ensure(destination=page_main)
@@ -458,7 +459,7 @@ class UI(InfoHandler):
 
     def ui_additional(self, get_ship=True):
         """
-        Handle all annoying popups during UI switching.
+        处理 UI 切换期间可能出现的干扰弹窗。
 
         Args:
             get_ship:
@@ -523,23 +524,22 @@ class UI(InfoHandler):
         if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
             return True
         if self.appear(WITHDRAW, offset=(30, 30), interval=3):
-            # Poor wait here, to handle a game client bug after the game patch in 2022-04-07
-            # To re-produce this game bug (100% success):
-            # - Enter any stage, 12-4 for example
-            # - Stop and restart game
-            # - Run task `Main` in Alas
-            # - Alas switches to page_campaign and retreat from an existing stage
-            # - Game client freezes at page_campaign W12, clicking anywhere on the screen doesn't get responses
-            # - Restart game client again fix the issue
+            # 这里故意等待，用来规避 2022-04-07 更新后的客户端卡死问题。
+            # 复现方式（基本稳定）：
+            # - 进入任意关卡，例如 12-4。
+            # - 停止并重启游戏。
+            # - 运行 Alas 的 `Main` 任务。
+            # - Alas 切换到 page_campaign，并从已进入的关卡撤退。
+            # - 客户端卡在 page_campaign W12，点击屏幕任意位置都没有响应。
+            # - 再次重启客户端即可恢复。
             logger.info("WITHDRAW button found, wait until map loaded to prevent bugs in game client")
             self.device.sleep(2)
             self.device.screenshot()
             if self.appear_then_click(WITHDRAW, offset=(30, 30)):
                 self.interval_reset(WITHDRAW)
                 return True
-            else:
-                logger.warning("WITHDRAW button does not exist anymore")
-                self.interval_reset(WITHDRAW)
+            logger.warning("WITHDRAW button does not exist anymore")
+            self.interval_reset(WITHDRAW)
 
         # Login
         if self.appear_then_click(LOGIN_CHECK, offset=(30, 30), interval=3):
