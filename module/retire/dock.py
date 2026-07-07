@@ -1,8 +1,8 @@
-import module.config.server as server
 from module.base.button import ButtonGrid, color_similar, get_color
 from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1
+from module.config import server
 from module.equipment.equipment import Equipment
 from module.logger import logger
 from module.ocr.ocr import DigitCounter

@@ -5,7 +5,7 @@ import numpy as np
 
 # os.chdir('../')
 print(Path.cwd())
-import module.config.server as server
+from module.config import server
 
 server.server = "cn"  # Don't need to edit, it's used to avoid error.
 

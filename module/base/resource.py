@@ -2,8 +2,8 @@ import re
 import sys
 from pathlib import Path
 
-import module.config.server as server
 from module.base.decorator import cached_property, del_cached_property
+from module.config import server
 from module.logger import logger
 from module.ocr.models import OCR_MODEL
 

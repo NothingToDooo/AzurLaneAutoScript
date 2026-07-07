@@ -1,8 +1,8 @@
 from random import choice
 
-import module.config.server as server
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1
+from module.config import server
 from module.exception import GameStuckError, ScriptError
 from module.logger import logger
 from module.ocr.ocr import DigitCounter

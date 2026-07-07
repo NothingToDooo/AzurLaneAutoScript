@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 import cv2
 import numpy as np
 
-import module.config.server as server
 from module.base.button import Button
 from module.base.decorator import cached_property
 from module.base.utils import crop, extract_letters, float2str, rgb2luma
+from module.config import server
 from module.logger import logger
 from module.ocr.models import OCR_MODEL
 

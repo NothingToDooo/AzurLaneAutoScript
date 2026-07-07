@@ -1,4 +1,4 @@
-import module.config.server as server
+from module.config import server
 from module.ocr.ocr import Digit, DigitCounter
 from module.private_quarters import assets as pq_assets
 from module.shop.shop_status import ShopStatus

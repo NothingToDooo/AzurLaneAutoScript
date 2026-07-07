@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 from tqdm import tqdm
 
-import module.config.server as server
+from module.config import server
 
 server.server = "cn"  # 在这里修改服务器。
 

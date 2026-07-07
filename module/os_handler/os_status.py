@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
-import module.config.server as server
 from module.base.timer import Timer
+from module.config import server
 from module.config.utils import get_server_next_update
 from module.logger import logger
 from module.map.map_grids import SelectedGrids

@@ -1,4 +1,4 @@
-import module.config.server as server
+from module.config import server
 from module.ocr.ocr import Digit
 from module.shop.assets import SHOP_GEMS, SHOP_OCR_BALANCE, SHOP_VOUCHER
 from module.ui.ui import UI

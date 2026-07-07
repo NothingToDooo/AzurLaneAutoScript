@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-import module.config.server as server
+from module.config import server
 
 server.server = "cn"  # 不需要修改，用来避免服务器相关错误。
 

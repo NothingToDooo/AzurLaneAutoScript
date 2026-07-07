@@ -36,7 +36,6 @@ from pywebio.output import (
 from pywebio.pin import pin, pin_on_change
 from pywebio.session import download, go_app, info, local, register_thread, run_js, set_env
 
-import module.webui.lang as lang
 from deploy.atomic import atomic_failure_cleanup
 from module.config.config import AzurLaneConfig, Function
 from module.config.deep import deep_get, deep_iter, deep_set
@@ -52,6 +51,7 @@ from module.config.utils import (
 from module.logger import logger
 from module.submodule.submodule import load_config
 from module.submodule.utils import get_config_mod
+from module.webui import lang
 from module.webui.base import Frame
 from module.webui.discord_presence import close_discord_rpc, init_discord_rpc
 from module.webui.fastapi import asgi_app

@@ -1,7 +1,7 @@
 from importlib import import_module
 
-import module.config.server as server
 from module.combat.assets import GET_ITEMS_1
+from module.config import server
 from module.logger import logger
 from module.minigame import assets as minigame_assets
 from module.ocr.ocr import Digit

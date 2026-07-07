@@ -2,9 +2,9 @@ import re
 from enum import Enum
 from typing import TYPE_CHECKING
 
-import module.config.server as server
 from module.base.timer import Timer
 from module.combat.assets import BATTLE_PREPARATION
+from module.config import server
 from module.logger import logger
 from module.meta_reward.meta_reward import MetaReward
 from module.ocr.ocr import Digit, DigitCounter

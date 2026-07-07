@@ -1,5 +1,5 @@
-import module.config.server as server
 from module.base.timer import Timer
+from module.config import server
 from module.logger import logger
 from module.private_quarters.assets import (
     PRIVATE_QUARTERS_SHOP_BACK,

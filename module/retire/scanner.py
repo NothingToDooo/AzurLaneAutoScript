@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING, Any
 import cv2
 import numpy as np
 
-import module.config.server as server
 from module.base.utils import color_similar, crop, extract_letters, get_color, limit_in
 from module.combat.level import LevelOcr
+from module.config import server
 from module.logger import logger
 from module.ocr.ocr import Digit
 from module.retire.assets import (

@@ -4,7 +4,6 @@ from datetime import datetime
 import cv2
 import numpy as np
 
-import module.config.server as server
 from module.base.button import ButtonGrid
 from module.base.filter import Filter
 from module.base.timer import Timer
@@ -20,6 +19,7 @@ from module.base.utils import (
     rgb2hsv,
 )
 from module.combat.level import LevelOcr
+from module.config import server
 from module.config.utils import get_server_next_update
 from module.exception import ScriptError
 from module.handler.assets import GET_MISSION, MISSION_POPUP_ACK, MISSION_POPUP_GO, POPUP_CANCEL, POPUP_CONFIRM

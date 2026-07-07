@@ -1,9 +1,9 @@
 import numpy as np
 
-import module.config.server as server
 from module.base.utils import get_color
 from module.combat.assets import BATTLE_PREPARATION
 from module.combat.combat import Combat
+from module.config import server
 from module.daily import assets as daily_assets
 from module.daily.equipment import DailyEquipment
 from module.logger import logger

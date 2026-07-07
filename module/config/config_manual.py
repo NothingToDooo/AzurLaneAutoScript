@@ -1,6 +1,6 @@
 from pywebio.io_ctrl import Output
 
-import module.config.server as server
+from module.config import server
 
 
 class ManualConfig:

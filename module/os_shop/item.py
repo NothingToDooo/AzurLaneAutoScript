@@ -1,4 +1,4 @@
-import module.config.server as server
+from module.config import server
 from module.logger import logger
 from module.ocr.ocr import DigitYuv, Ocr
 from module.statistics.item import Item, ItemGrid
