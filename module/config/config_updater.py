@@ -256,7 +256,7 @@ class ConfigGenerator:
         for p, v in deep_iter(self.default, depth=3):
             if not check_override(p, v):
                 continue
-            deep_set(data, keys=p + ["value"], value=v)
+            deep_set(data, keys=[*p, "value"], value=v)
         # 覆盖不可直接修改的参数。
         for p, v in deep_iter(self.override, depth=3):
             if not check_override(p, v):
@@ -268,10 +268,10 @@ class ConfigGenerator:
                 elif deep_get(v, keys="value") is not None:
                     deep_default(v, keys="display", value="hide")
                 for arg_k, arg_v in v.items():
-                    deep_set(data, keys=p + [arg_k], value=arg_v)
+                    deep_set(data, keys=[*p, arg_k], value=arg_v)
             else:
-                deep_set(data, keys=p + ["value"], value=v)
-                deep_set(data, keys=p + ["display"], value="hide")
+                deep_set(data, keys=[*p, "value"], value=v)
+                deep_set(data, keys=[*p, "display"], value="hide")
         # 写入任务命令。
         for path, _groups in deep_iter(self.task, depth=3):
             if "tasks" not in path:
@@ -327,7 +327,7 @@ class ConfigGenerator:
 
         def deep_load(keys, default=True, words=("name", "help")):
             for word in words:
-                k = keys + [str(word)]
+                k = [*keys, str(word)]
                 d = ".".join(k) if default else str(word)
                 v = deep_get(old, keys=k, default=d)
                 deep_set(new, keys=k, value=v)

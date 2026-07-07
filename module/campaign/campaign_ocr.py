@@ -251,7 +251,7 @@ class CampaignOcr(ModuleBase):
             area = (0, 0, image.shape[1], image.shape[0])
         else:
             area = (0, 0, x_list[0] + 1 + x_skip, image.shape[0])
-        return np.array(area) + (-3, -7, 3, 7)
+        return np.add(area, (-3, -7, 3, 7))
 
     def _get_stage_name(self, image):
         """

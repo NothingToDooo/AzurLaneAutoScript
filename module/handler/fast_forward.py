@@ -384,9 +384,7 @@ class FastForwardHandler(AutoSearchHandler):
         stage_increase = list(self.STAGE_INCREASE)
         # Insert custom increase logic
         if self.config.STAGE_INCREASE_AB:
-            stage_increase = [
-                "A1 > A2 > A3 > B1 > B2 > B3",
-            ] + stage_increase
+            stage_increase = ["A1 > A2 > A3 > B1 > B2 > B3", *stage_increase]
         custom = self.config.STAGE_INCREASE_CUSTOM
         if custom:
             if isinstance(custom, str):

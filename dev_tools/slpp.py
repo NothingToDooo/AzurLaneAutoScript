@@ -26,6 +26,7 @@ ERRORS = {
     "mfnumber_dec_point": "Malformed number (no digits after decimal point).",
     "mfnumber_sci": "Malformed number (bad scientific format).",
 }
+SORTABLE_KEY_TYPES = (*six.string_types, int, float, bool, tuple)
 
 
 def sequential(lst):
@@ -182,7 +183,7 @@ class SLPP:
                     self.next_chr()
                     if k is not None:
                         o[idx] = k
-                    if len([key for key in o if isinstance(key, six.string_types + (int, float, bool, tuple))]) == 0:
+                    if not any(isinstance(key, SORTABLE_KEY_TYPES) for key in o):
                         so = sorted(o)
                         if sequential(so):
                             ar = []

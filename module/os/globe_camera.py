@@ -251,9 +251,9 @@ class GlobeCamera(GlobeOperation, ZoneManager):
         """
         zone = self.name_to_zone(zone)
         # The center of red whirlpool, on 2D map.
-        location = zone.location + (-9.5, -12.5)
+        location = np.add(zone.location, (-9.5, -12.5))
         # Area around the center, on 2D map.
-        location = [location - (4, 4), location + (4, 4)]
+        location = [np.subtract(location, (4, 4)), np.add(location, (4, 4))]
         # Area around the center, on screen.
         screen = self.globe2screen(location).flatten().round()
         screen = np.round(screen).astype(int).tolist()

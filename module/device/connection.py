@@ -149,7 +149,7 @@ class Connection(ConnectionAttr):
             str:
         """
         cmd = list(map(str, cmd))
-        cmd = [self.adb_binary, "-s", self.serial] + cmd
+        cmd = [self.adb_binary, "-s", self.serial, *cmd]
         return self.subprocess_run(cmd, timeout=timeout)
 
     def subprocess_run(self, cmd, timeout=10):

@@ -23,7 +23,7 @@ ZONE_SELECT = [
     os_assets.SELECT_STRONGHOLD,
     os_assets.SELECT_ARCHIVE,
 ]
-ASSETS_PINNED_ZONE = ZONE_TYPES + [os_assets.ZONE_ENTRANCE, os_assets.ZONE_SWITCH, os_assets.ZONE_PINNED]
+ASSETS_PINNED_ZONE = [*ZONE_TYPES, os_assets.ZONE_ENTRANCE, os_assets.ZONE_SWITCH, os_assets.ZONE_PINNED]
 
 
 class OSExploreError(Exception):
