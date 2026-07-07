@@ -179,7 +179,7 @@ class ServerChecker:
             session.trust_env = False
             _ = session.get("https://www.baidu.com", timeout=5)
             network_available = True
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             logger.error(e)
             network_available = False
 

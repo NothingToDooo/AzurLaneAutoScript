@@ -3,6 +3,7 @@ import re
 from typing import TYPE_CHECKING
 
 import psutil
+from adbutils.errors import AdbError
 
 from deploy.Windows.utils import DataProcessInfo
 from module.base.decorator import run_once
@@ -240,7 +241,7 @@ class PlatformWindows(PlatformBase, EmulatorManager):
             # Check command availability
             try:
                 pong = self.adb_shell(["echo", "pong"])
-            except Exception as e:
+            except (AdbError, ConnectionResetError, OSError) as e:
                 logger.info(e)
                 continue
             show_ping(pong)

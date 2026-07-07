@@ -1,6 +1,8 @@
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 import onepush.core
+import requests
 import yaml
 from onepush import get_notifier
 from onepush.exceptions import OnePushException
@@ -15,13 +17,22 @@ if TYPE_CHECKING:
 onepush.core.log = logger
 
 
+def _load_notify_config(raw_config: str) -> dict:
+    config = {}
+    for item in yaml.safe_load_all(raw_config):
+        if item is None:
+            continue
+        if not isinstance(item, Mapping):
+            raise TypeError(f"OnePush config item must be a mapping, got {type(item).__name__}")
+        config.update(item)
+    return config
+
+
 def handle_notify(_config: str, **kwargs) -> bool:
     try:
-        config = {}
-        for item in yaml.safe_load_all(_config):
-            config.update(item)
-    except Exception:
-        logger.error("Fail to load onepush config, skip sending")
+        config = _load_notify_config(_config)
+    except (TypeError, yaml.YAMLError) as e:
+        logger.error(f"Fail to load onepush config, skip sending: {e}")
         return False
     try:
         provider_name: str = config.pop("provider", None)
@@ -40,7 +51,7 @@ def handle_notify(_config: str, **kwargs) -> bool:
         if isinstance(notifier, Custom):
             if "method" not in config or config["method"] == "post":
                 config["datatype"] = "json"
-            if not ("data" in config or isinstance(config["data"], dict)):
+            if "data" not in config or not isinstance(config["data"], dict):
                 config["data"] = {}
             if "title" in kwargs:
                 config["data"]["title"] = kwargs["title"]
@@ -67,7 +78,7 @@ def handle_notify(_config: str, **kwargs) -> bool:
     except OnePushException:
         logger.error("Push notify failed")
         return False
-    except Exception as e:
+    except (KeyError, TypeError, ValueError, requests.exceptions.RequestException) as e:
         # don't show any exceptions because exceptions contain variable traceback
         logger.error(e)
         return False

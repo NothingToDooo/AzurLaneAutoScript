@@ -96,7 +96,7 @@ def replace_tmp(tmp: str, file: str):
             except FileNotFoundError:
                 # tmp file gets deleted unexpectedly
                 raise
-            except Exception as e:
+            except OSError as e:
                 last_error = e
                 break
             else:
@@ -109,13 +109,13 @@ def replace_tmp(tmp: str, file: str):
             # success
         except FileNotFoundError:
             raise
-        except Exception as e:
+        except OSError as e:
             last_error = e
         else:
             return
 
     # 写入失败时尽力清理临时文件；清理失败仍然抛出原始写入错误。
-    with suppress(Exception):
+    with suppress(OSError):
         Path(tmp).unlink()
     if last_error is not None:
         raise last_error from None
@@ -144,7 +144,7 @@ def atomic_replace(replace_from: str, replace_to: str):
                 continue
             except FileNotFoundError:
                 raise
-            except Exception as e:
+            except OSError as e:
                 last_error = e
                 break
             else:
@@ -587,14 +587,14 @@ def atomic_failure_cleanup(folder: str, recursive: bool = False):
             for entry in entries:
                 if is_tmp_file(entry.name):
                     # 临时文件可能仍被其他进程占用；失败时留到下次启动再清理。
-                    with suppress(Exception):
+                    with suppress(OSError):
                         if entry.is_dir(follow_symlinks=False):
                             folder_rmtree(entry.path, may_symlinks=False)
                         else:
                             file_remove(entry.path)
                 elif recursive:
                     # 递归清理是附带动作，单个目录失败不应中断启动。
-                    with suppress(Exception):
+                    with suppress(OSError):
                         if entry.is_dir(follow_symlinks=False):
                             atomic_failure_cleanup(entry.path, recursive=True)
 
@@ -603,6 +603,6 @@ def atomic_failure_cleanup(folder: str, recursive: bool = False):
         return
     except NotADirectoryError:
         file_remove(folder)
-    except Exception:
+    except OSError:
         # 清理失败不影响启动；残留临时文件可下次再处理。
         return

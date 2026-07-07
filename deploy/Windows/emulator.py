@@ -77,7 +77,7 @@ class EmulatorManager(AlasManager):
         async def _connect(serial):
             try:
                 await asyncio.create_subprocess_exec(self.adb, "connect", serial)
-            except Exception as e:
+            except OSError as e:
                 logger.info(e)
 
         async def connect():

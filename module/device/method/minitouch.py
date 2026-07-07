@@ -413,7 +413,7 @@ class Minitouch(Connection):
         if self._minitouch_client is not None:
             try:
                 self._minitouch_client.close()
-            except Exception as e:
+            except OSError as e:
                 logger.error(e)
             del self._minitouch_client
 

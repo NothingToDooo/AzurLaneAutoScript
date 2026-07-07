@@ -124,7 +124,7 @@ class AzurStats:
         session.mount("https://", HTTPAdapter(max_retries=5))
         try:
             resp = session.post(self._api, files=data, headers=headers, timeout=self.TIMEOUT)
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             logger.warning(f"Image upload failed, {e}")
             return False
 

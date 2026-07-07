@@ -542,16 +542,17 @@ class AlasGUI(Frame):
             self.pin_remove_invalid_mark(valid)
             self.pin_set_invalid_mark(invalid)
             if modified:
+                logger.info(f"Save config {filepath_config(config_name)}, {dict_to_kv(modified)}")
+                config_updater.write_file(config_name, config)
                 toast(
                     t("Gui.Toast.ConfigSaved"),
                     duration=1,
                     position="right",
                     color="success",
                 )
-                logger.info(f"Save config {filepath_config(config_name)}, {dict_to_kv(modified)}")
-                config_updater.write_file(config_name, config)
         except Exception as e:
             logger.exception(e)
+            toast("设置保存失败", duration=3, position="right", color="error")
 
     def alas_update_overview_task(self) -> None:
         if not self.visible:

@@ -34,22 +34,18 @@ class AlasManager(DeployConfig):
         """
         if not isinstance(names, list):
             names = [names]
-        try:
-            for proc in self.list_process():
-                if not (proc.name and proc.name in names):
-                    continue
-                if proc.pid == self.self_pid:
-                    continue
-                if in_alas:
-                    cmdline = proc.cmdline.replace(r"\\", "/").replace("\\", "/")
-                    for folder in self.alas_folder:
-                        if folder in cmdline:
-                            yield proc
-                else:
-                    yield proc
-        except Exception as e:
-            logger.info(str(e))
-            return False
+        for proc in self.list_process():
+            if not (proc.name and proc.name in names):
+                continue
+            if proc.pid == self.self_pid:
+                continue
+            if in_alas:
+                cmdline = proc.cmdline.replace(r"\\", "/").replace("\\", "/")
+                for folder in self.alas_folder:
+                    if folder in cmdline:
+                        yield proc
+            else:
+                yield proc
 
     def kill_process(self, process: DataProcessInfo):
         try:
