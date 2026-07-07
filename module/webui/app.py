@@ -117,8 +117,6 @@ class AlasGUI(Frame):
 
     @use_scope("aside", clear=True)
     def set_aside(self) -> None:
-        # TODO: update put_icon_buttons()
-
         current_date = datetime.now().date()
         if current_date.month == 4 and current_date.day == 1:
             self.af_flag = True
@@ -1128,7 +1126,7 @@ def app():
     if args.run:
         runs = args.run
     elif State.deploy_config.Run:
-        # TODO: 重构 poor_yaml_read()，让它支持列表。
+        # deploy.yaml 的 Run 仍按逗号分隔字符串读取。
         tmp = State.deploy_config.Run.split(",")
         runs = [entry.strip(" ['\"]") for entry in tmp if entry]
     instances = runs

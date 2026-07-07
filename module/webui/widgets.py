@@ -495,7 +495,7 @@ def put_arg_storage(kwargs: T_Output_Kwargs) -> Output | None:
 _widget_type_to_func: dict[str, Callable] = {
     "input": put_arg_input,
     "lock": put_arg_state,
-    "datetime": put_arg_input,  # TODO
+    "datetime": put_arg_datetime,
     "select": put_arg_select,
     "textarea": put_arg_textarea,
     "checkbox": put_arg_checkbox,
