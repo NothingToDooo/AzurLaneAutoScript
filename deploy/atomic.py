@@ -386,9 +386,10 @@ def atomic_read_text(file: str, encoding: str = "utf-8", errors: str = "strict")
                 continue
         if last_error is not None:
             raise last_error from None
-    else:
-        # Linux and Mac allow reading while replacing
-        return file_read_text(file, encoding=encoding, errors=errors)
+        raise PermissionError(f"Unable to read {file!r} after {WINDOWS_MAX_ATTEMPT} attempts")
+
+    # Linux 和 Mac 允许边替换边读取。
+    return file_read_text(file, encoding=encoding, errors=errors)
 
 
 def atomic_read_text_stream(
@@ -438,9 +439,10 @@ def atomic_read_bytes(file: str) -> bytes:
                 continue
         if last_error is not None:
             raise last_error from None
-    else:
-        # Linux and Mac allow reading while replacing
-        return file_read_bytes(file)
+        raise PermissionError(f"Unable to read {file!r} after {WINDOWS_MAX_ATTEMPT} attempts")
+
+    # Linux 和 Mac 允许边替换边读取。
+    return file_read_bytes(file)
 
 
 def atomic_read_bytes_stream(file: str, chunk_size: int = 8192) -> Iterable[bytes]:
@@ -497,11 +499,12 @@ def atomic_remove(file: str):
                 continue
         if last_error is not None:
             raise last_error from None
-    else:
-        # Linux and Mac allow deleting while another process is reading
-        # The directory entry is removed but the storage allocated to the file is not made available
-        # until the original file is no longer in use.
-        return file_remove(file)
+        return None
+
+    # Linux 和 Mac 允许在其他进程读取时删除。
+    # 目录项会被移除，但文件占用的存储空间会在原文件不再使用后才释放。
+    file_remove(file)
+    return None
 
 
 def folder_rmtree(folder, may_symlinks=True):

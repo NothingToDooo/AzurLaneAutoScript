@@ -630,6 +630,7 @@ class MapData:
         with open(file, "w") as f:
             for text in self.get_file_lines(has_modified_campaign_base=has_modified_campaign_base):
                 f.write(text + "\n")
+        return True
 
 
 class ChapterTemplate:

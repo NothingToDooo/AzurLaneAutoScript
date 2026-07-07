@@ -39,6 +39,7 @@ def hr(title, level=3):
         logger.info("-" * 20 + " " + title + " " + "-" * 20)
     if level == 3:
         logger.info(f"<<< {title} >>>")
+    return None
 
 
 def attr(name, text):
