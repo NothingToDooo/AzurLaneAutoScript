@@ -1,23 +1,17 @@
 import time
-from dataclasses import dataclass
 from functools import wraps
 from json.decoder import JSONDecodeError
-from subprocess import list2cmdline
 
-import cv2
-import numpy as np
 import requests
 import uiautomator2 as u2
 import uiautomator2.exceptions as u2_exc
 from adbutils.errors import AdbError
 from lxml import etree
 
-from module.base.utils import point2str, random_line_segments, random_rectangle_point
 from module.config.server import DICT_PACKAGE_TO_ACTIVITY
 from module.device.connection import Connection
 from module.device.method.utils import (
     RETRY_TRIES,
-    ImageTruncated,
     PackageNotInstalled,
     handle_adb_error,
     handle_unknown_host_service,
@@ -89,17 +83,10 @@ def retry(func):
 
                 def init():
                     self.detect_package()
-            # 图片数据损坏。
-            except ImageTruncated as e:
-                logger.error(e)
-
-                def init():
-                    pass
             # uiautomator2/RPC/HTTP 或本地图像/XML 解析失败时重试。
             except (
                 u2_exc.BaseException,
                 requests.exceptions.RequestException,
-                cv2.error,
                 etree.XMLSyntaxError,
                 OSError,
             ) as e:
@@ -114,131 +101,7 @@ def retry(func):
     return retry_wrapper
 
 
-@dataclass
-class ProcessInfo:
-    pid: int
-    ppid: int
-    thread_count: int
-    cmdline: str
-    name: str
-
-
-@dataclass
-class ShellBackgroundResponse:
-    success: bool
-    pid: int
-    description: str
-
-
 class Uiautomator2(Connection):
-    @retry
-    def screenshot_uiautomator2(self):
-        image = self.u2.screenshot(format="raw")
-        image = np.frombuffer(image, np.uint8)
-        if image is None:
-            raise ImageTruncated("Empty image after reading from buffer")
-
-        image = cv2.imdecode(image, cv2.IMREAD_COLOR)
-        if image is None:
-            raise ImageTruncated("Empty image after cv2.imdecode")
-
-        cv2.cvtColor(image, cv2.COLOR_BGR2RGB, dst=image)
-        if image is None:
-            raise ImageTruncated("Empty image after cv2.cvtColor")
-
-        return image
-
-    @retry
-    def click_uiautomator2(self, x, y):
-        self.u2.click(x, y)
-
-    @retry
-    def long_click_uiautomator2(self, x, y, duration=(1, 1.2)):
-        self.u2.long_click(x, y, duration=duration)
-
-    @retry
-    def swipe_uiautomator2(self, p1, p2, duration=0.1):
-        self.u2.swipe(*p1, *p2, duration=duration)
-
-    @retry
-    def _drag_along(self, path):
-        """按路径滑动。
-
-        Args:
-            path (list)：(x, y, sleep)。
-
-        示例：
-            al.drag_along([
-                (403, 421, 0.2),
-                (821, 326, 0.1),
-                (821, 326-10, 0.1),
-                (821, 326+10, 0.1),
-                (821, 326, 0),
-            ])
-            等价于：
-            al.device.touch.down(403, 421)
-            time.sleep(0.2)
-            al.device.touch.move(821, 326)
-            time.sleep(0.1)
-            al.device.touch.move(821, 326-10)
-            time.sleep(0.1)
-            al.device.touch.move(821, 326+10)
-            time.sleep(0.1)
-            al.device.touch.up(821, 326)
-        """
-        length = len(path)
-        for index, data in enumerate(path):
-            x, y, second = data
-            if index == 0:
-                self.u2.touch.down(x, y)
-                logger.info(point2str(x, y) + " down")
-            elif index - length == -1:
-                self.u2.touch.up(x, y)
-                logger.info(point2str(x, y) + " up")
-            else:
-                self.u2.touch.move(x, y)
-                logger.info(point2str(x, y) + " move")
-            self.sleep(second)
-
-    def drag_uiautomator2(
-        self,
-        p1,
-        p2,
-        segments=1,
-        shake=(0, 15),
-        point_random=(-10, -10, 10, 10),
-        shake_random=(-5, -5, 5, 5),
-        swipe_duration=0.25,
-        shake_duration=0.1,
-    ):
-        r"""拖拽并在终点附近轻微晃动，例如:
-                     /\\
-        +-----------+  +  +
-                        \\/
-        普通滑动或拖拽只有两个点，效果不够稳定。
-        增加一些路径点，让它更接近真实滑动。
-
-        Args:
-            p1 (tuple)：起点 (x, y)。
-            p2 (tuple)：终点 (x, y)。
-            segments (int):
-            shake (tuple)：到达终点后的晃动幅度。
-            point_random：给起点和终点增加随机偏移。
-            shake_random：给晃动点增加随机偏移。
-            swipe_duration：路径点之间的间隔。
-            shake_duration：晃动点之间的间隔。
-        """
-        p1 = np.array(p1) - random_rectangle_point(point_random)
-        p2 = np.array(p2) - random_rectangle_point(point_random)
-        path = [(x, y, swipe_duration) for x, y in random_line_segments(p1, p2, n=segments, random_range=point_random)]
-        path += [
-            (*p2 + shake + random_rectangle_point(shake_random), shake_duration),
-            (*p2 - shake - random_rectangle_point(shake_random), shake_duration),
-            (*p2, shake_duration),
-        ]
-        path = [(int(x), int(y), d) for x, y, d in path]
-        self._drag_along(path)
-
     @retry
     def app_current_uiautomator2(self):
         """
@@ -356,7 +219,7 @@ class Uiautomator2(Connection):
         # Starting: Intent...
         return True
 
-    # _app_start_adb_am 和 _app_start_adb_monkey 已有 @retry，这里不再添加。
+    # 内部启动方法已有 @retry，这里不再添加。
     # @retry
     def app_start_uiautomator2(self, package_name=None, activity_name=None, allow_failure=False):
         """
@@ -451,43 +314,3 @@ class Uiautomator2(Connection):
         logger.critical(f"Resolution not supported: {width}x{height}")
         logger.critical("Please set emulator resolution to 1280x720")
         raise RequestHumanTakeover
-
-    @retry
-    def proc_list_uiautomator2(self) -> list[ProcessInfo]:
-        """
-        Get info about current processes.
-        """
-        resp = self.u2.http.get("/proc/list", timeout=10)
-        resp.raise_for_status()
-        return [
-            ProcessInfo(
-                pid=proc["pid"],
-                ppid=proc["ppid"],
-                thread_count=proc["threadCount"],
-                cmdline=" ".join(proc["cmdline"]) if proc["cmdline"] is not None else "",
-                name=proc["name"],
-            )
-            for proc in resp.json()
-        ]
-
-    @retry
-    def u2_shell_background(self, cmdline, timeout=10) -> ShellBackgroundResponse:
-        """
-        Run at background.
-
-        Note that this function will always return a success response,
-        as this is a untested and hidden method in ATX.
-        """
-        if isinstance(cmdline, (list, tuple)):
-            cmdline = list2cmdline(cmdline)
-        elif not isinstance(cmdline, str):
-            raise TypeError("cmdargs type invalid", type(cmdline))
-
-        data = {"command": cmdline, "timeout": str(timeout)}
-        ret = self.u2.http.post("/shell/background", data=data, timeout=timeout + 10)
-        ret.raise_for_status()
-
-        resp = ret.json()
-        return ShellBackgroundResponse(
-            success=bool(resp.get("success", False)), pid=resp.get("pid", 0), description=resp.get("description", "")
-        )

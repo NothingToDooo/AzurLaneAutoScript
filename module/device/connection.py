@@ -1,13 +1,12 @@
 import json
 import re
-import socket
 import time
 from functools import wraps
 from importlib import import_module
 from pathlib import Path
 from typing import ClassVar
 
-from adbutils import AdbClient, AdbDevice, AdbTimeout, ForwardItem, ReverseItem
+from adbutils import AdbClient, AdbDevice, ForwardItem
 from adbutils.errors import AdbError
 
 from module.base.decorator import cached_property, del_cached_property, run_once
@@ -264,107 +263,6 @@ class Connection(ConnectionAttr):
             return True
         return self.nemud_app_keep_alive != ""
 
-    @cached_property
-    def _nc_server_host_port(self):
-        """
-        返回：
-            tuple[str, int, str, int]：
-                server_listen_host, server_listen_port, client_connect_host, client_connect_port
-        """
-        try:
-            host = socket.gethostbyname(socket.gethostname())
-        except socket.gaierror as e:
-            logger.error(e)
-            logger.error(f"无法解析主机名: {socket.gethostname()}")
-            host = "127.0.0.1"
-
-        logger.info(f"连接 MuMu 模拟器，使用主机地址 {host}")
-        port = random_port(self.config.FORWARD_PORT_RANGE)
-        return host, port, host, port
-
-    @cached_property
-    def reverse_server(self):
-        """
-        在 Alas 侧启动服务供模拟器访问。
-
-        这会绕过 adb shell，速度更快。
-        """
-        del_cached_property(self, "_nc_server_host_port")
-        host_port = self._nc_server_host_port
-        logger.info(
-            f"Reverse server listening on {host_port[0]}:{host_port[1]}, "
-            f"client can send data to {host_port[2]}:{host_port[3]}"
-        )
-        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server.bind(host_port[:2])
-        server.settimeout(5)
-        server.listen(5)
-        return server
-
-    @cached_property
-    def nc_command(self):
-        """
-        返回：
-            list[str]：['nc'] 或 ['busybox', 'nc']。
-        """
-        if self.is_emulator:
-            sdk = self.sdk_ver
-            logger.info(f"sdk_ver: {sdk}")
-            trial = [["busybox", "nc"], ["nc"]] if sdk >= 28 else [["nc"], ["busybox", "nc"]]
-        else:
-            trial = [
-                ["nc"],
-                ["busybox", "nc"],
-            ]
-        for command in trial:
-            # 大约 3ms。
-            # 成功时结果应该是命令帮助。
-            # nc: bad argument count (see "nc --help")
-            result = self.adb_shell(command)
-            # `/system/bin/sh: nc: not found`
-            if "not found" in result:
-                continue
-            # `/system/bin/sh: busybox: inaccessible or not found\n`
-            if "inaccessible" in result:
-                continue
-            logger.attr("nc command", command)
-            return command
-
-        logger.error("No `netcat` command available, please use screenshot methods without `_nc` suffix")
-        raise RequestHumanTakeover
-
-    def adb_shell_nc(self, cmd, timeout=5, chunk_size=262144):
-        """
-        参数：
-            cmd (list):
-            timeout (int):
-            chunk_size (int)：默认 262144。
-
-        返回：
-            bytes:
-        """
-        # 服务端开始监听。
-        server = self.reverse_server
-        server.settimeout(timeout)
-        # 客户端发送数据，等待服务端接受连接。
-        # <command> | nc 127.0.0.1 {port}
-        cmd += ["|", *self.nc_command, *self._nc_server_host_port[2:]]
-        stream = self.adb_shell(cmd, stream=True, recvall=False)
-        try:
-            # 服务端接受连接。
-            conn, _conn_port = server.accept()
-        except TimeoutError as e:
-            output = recv_all(stream, chunk_size=chunk_size)
-            logger.warning(str(output))
-            raise AdbTimeout("reverse server accept timeout") from e
-
-        # 服务端接收数据。
-        data = recv_all(conn, chunk_size=chunk_size, recv_interval=0.001)
-
-        # 服务端关闭连接。
-        conn.close()
-        return data
-
     def adb_forward(self, remote):
         """
         执行 `adb forward <local> <remote>`。
@@ -402,43 +300,6 @@ class Connection(ConnectionAttr):
         self.adb.forward(forward.local, forward.remote)
         return port
 
-    def _adb_reverse_transport(self, remote: str, local: str, norebind: bool = False):
-        """
-        从 https://github.com/openatx/adbutils/pull/116 回迁修复。
-
-        不使用 self.adb.reverse()，而是走这个方法。
-        """
-        args = ["reverse:forward"]
-        if norebind:
-            args.append("norebind")
-        args.append(remote + ";" + local)
-        cmd = ":".join(args)
-        with self.adb_client._connect() as c:
-            c.send_command(f"host:transport:{self.serial}")
-            c.check_okay()
-            c.send_command(cmd)
-            c.check_okay()
-
-    def adb_reverse(self, remote):
-        port = 0
-        for reverse in self.adb.reverse_list():
-            if reverse.remote == remote and reverse.local.startswith("tcp:"):
-                if not port:
-                    logger.info(f"Reuse reverse: {reverse}")
-                    port = int(reverse.local[4:])
-                else:
-                    logger.info(f"Remove redundant forward: {reverse}")
-                    self.adb_reverse_remove(reverse.remote)
-
-        if port:
-            return port
-        # 创建新的 reverse。
-        port = random_port(self.config.FORWARD_PORT_RANGE)
-        reverse = ReverseItem(remote, f"tcp:{port}")
-        logger.info(f"Create reverse: {reverse}")
-        self._adb_reverse_transport(reverse.remote, reverse.local)
-        return port
-
     def adb_forward_remove(self, local):
         """
         等价于 `adb -s <serial> forward --remove <local>`。
@@ -458,31 +319,6 @@ class Connection(ConnectionAttr):
                 c.check_okay()
         except AdbError as e:
             # 移除不存在的 forward 时不抛错。
-            # adbutils.errors.AdbError: listener 'tcp:8888' not found
-            msg = str(e)
-            if re.search(r"listener .*? not found", msg):
-                logger.warning(f"{type(e).__name__}: {msg}")
-            else:
-                raise
-
-    def adb_reverse_remove(self, local):
-        """
-        等价于 `adb -s <serial> reverse --remove <local>`。
-
-        移除不存在的 reverse 时不抛错。
-
-        参数：
-            local (str)：例如 'tcp:2437'。
-        """
-        try:
-            with self.adb_client._connect() as c:
-                c.send_command(f"host:transport:{self.serial}")
-                c.check_okay()
-                list_cmd = f"reverse:killforward:{local}"
-                c.send_command(list_cmd)
-                c.check_okay()
-        except AdbError as e:
-            # 移除不存在的 reverse 时不抛错。
             # adbutils.errors.AdbError: listener 'tcp:8888' not found
             msg = str(e)
             if re.search(r"listener .*? not found", msg):
@@ -669,7 +505,6 @@ class Connection(ConnectionAttr):
 
     def release_resource(self):
         del_cached_property(self, "_minitouch_builder")
-        del_cached_property(self, "reverse_server")
 
     def adb_disconnect(self):
         msg = self.adb_client.disconnect(self.serial)

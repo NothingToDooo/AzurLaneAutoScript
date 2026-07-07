@@ -159,11 +159,6 @@ class UI(InfoHandler):
             if not self.device.app_is_running():
                 raise GameNotRunningError("Game not running")
 
-        @run_once
-        def minicap_check():
-            if self.config.Emulator_ControlMethod == "uiautomator2":
-                self.device.uninstall_minicap()
-
         orientation_timer = Timer(5)
 
         timeout = Timer(10, count=20).start()
@@ -204,7 +199,6 @@ class UI(InfoHandler):
                 continue
 
             app_check()
-            minicap_check()
             # continuously check rotation
             if orientation_timer.reached():
                 self.device.get_orientation()

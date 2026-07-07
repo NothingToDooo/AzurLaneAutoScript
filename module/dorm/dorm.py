@@ -1,11 +1,10 @@
 import re
-import time
 
 import cv2
 import numpy as np
 
 from module.base.button import ButtonGrid
-from module.base.decorator import Config, cached_property
+from module.base.decorator import cached_property
 from module.base.filter import Filter
 from module.base.mask import Mask
 from module.base.timer import Timer
@@ -110,9 +109,8 @@ class RewardDorm(UI):
 
         return count
 
-    @Config.when(DEVICE_CONTROL_METHOD="minitouch")
     def _dorm_feed_long_tap(self, button, count):
-        # Long tap to feed. This requires minitouch.
+        # 长按喂食依赖 minitouch 的 DOWN/UP 事件。
         timeout = Timer(count // 5 + 5).start()
         x, y = random_rectangle_point(button.button)
         builder = self.device.minitouch_builder
@@ -136,59 +134,6 @@ class RewardDorm(UI):
 
         builder.up().commit()
         builder.send()
-
-    @Config.when(DEVICE_CONTROL_METHOD="uiautomator2")
-    def _dorm_feed_long_tap(self, button, count):
-        timeout = Timer(count // 5 + 5).start()
-        x, y = random_rectangle_point(button.button)
-        self.device.u2.touch.down(x, y)
-
-        while 1:
-            self.device.u2.touch.move(x, y)
-            time.sleep(0.01)
-            self.device.screenshot()
-
-            if (
-                not self._dorm_has_food(button)
-                or self.handle_info_bar()
-                or self.appear(POPUP_CONFIRM, offset=self._popup_offset)
-            ):
-                break
-            if timeout.reached():
-                logger.warning("Wait dorm feed timeout")
-                break
-
-        self.device.u2.touch.up(x, y)
-
-    @Config.when(DEVICE_CONTROL_METHOD="nemu_ipc")
-    def _dorm_feed_long_tap(self, button, count):
-        timeout = Timer(count // 5 + 5).start()
-        x, y = random_rectangle_point(button.button)
-
-        while 1:
-            self.device.nemu_ipc.down(x, y)
-            time.sleep(0.01)
-            self.device.screenshot()
-
-            if (
-                not self._dorm_has_food(button)
-                or self.handle_info_bar()
-                or self.appear(POPUP_CONFIRM, offset=self._popup_offset)
-            ):
-                break
-            if timeout.reached():
-                logger.warning("Wait dorm feed timeout")
-                break
-
-        self.device.nemu_ipc.up()
-
-    @Config.when(DEVICE_CONTROL_METHOD=None)
-    def _dorm_feed_long_tap(self, button, count):
-        logger.warning(
-            f"Current control method {self.config.Emulator_ControlMethod} "
-            f"does not support DOWN/UP events, use multi-click instead"
-        )
-        self.device.multi_click(button, count)
 
     def dorm_view_reset(self):
         """
