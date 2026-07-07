@@ -179,10 +179,10 @@ class ResearchSelector(ResearchUI):
         genre = project.genre.upper()
         if genre == "T":
             return False
-        # 2021.08.19 允许 E-2 拆科技箱，但日服仍保持原逻辑。
+        # 2021.08.19 允许 E-2 拆科技箱。
         # 2022.08.23 允许全部 E-2，拆装备已经支持。
         # 没有可拆箱子时忽略 E-2，避免开始科研、尝试拆箱、取消科研的循环。
-        return self.storage_has_boxes or genre != "E" or project.task == ""
+        return self.storage_has_boxes or genre != "E" or project.equipment_amount == 0
 
     def research_sort_shortest(self, enforce):
         """

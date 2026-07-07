@@ -1,3 +1,5 @@
+import json
+import re
 from pathlib import Path
 
 import module.logger
@@ -16,16 +18,166 @@ class Item:
         self.name = ""
         _, self.id, self.amount = data.values()
         if self.id == 1:
-            self.id = 59001  # The id of coins is 1 in technology_data_template, but 59001 in item_data_statistics
+            self.id = 59001  # 物资在 technology_data_template 里是 1，在 item_data_statistics 里是 59001。
 
     def __str__(self):
         return f"{self.name}({self.id}) x {self.amount}"
 
 
-class Task:
-    def __init__(self, data):
-        self.name = ""
-        self.id = data
+INPUT_KEYWORDS = {
+    "need_coin": ("物资", "coin"),
+    "need_cube": ("心智魔方", "cube"),
+    "need_part": ("部件", "part"),
+}
+
+DR_SHIP = {
+    "azuma",
+    "friedrich",
+    "drake",
+    "hakuryu",
+    "agir",
+    "plymouth",
+    "brest",
+    "kearsarge",
+    "hindenburg",
+    "napoli",
+    "nakhimov",
+    "goudenleeuw",
+    "mecklenburg",
+}
+
+SHIP_KEYWORDS = {
+    "海王星": "neptune",
+    "neptune": "neptune",
+    "君主": "monarch",
+    "monarch": "monarch",
+    "伊吹": "ibuki",
+    "ibuki": "ibuki",
+    "出云": "izumo",
+    "izumo": "izumo",
+    "罗恩": "roon",
+    "roon": "roon",
+    "路易九世": "saintlouis",
+    "圣路易斯": "saintlouis",
+    "saintlouis": "saintlouis",
+    "西雅图": "seattle",
+    "seattle": "seattle",
+    "佐治亚": "georgia",
+    "georgia": "georgia",
+    "北风": "kitakaze",
+    "kitakaze": "kitakaze",
+    "吾妻": "azuma",
+    "azuma": "azuma",
+    "腓特烈大帝": "friedrich",
+    "friedrich": "friedrich",
+    "加斯科涅": "gascogne",
+    "gascogne": "gascogne",
+    "香槟": "champagne",
+    "champagne": "champagne",
+    "柴郡": "cheshire",
+    "cheshire": "cheshire",
+    "德雷克": "drake",
+    "drake": "drake",
+    "美因茨": "mainz",
+    "mainz": "mainz",
+    "奥丁": "odin",
+    "odin": "odin",
+    "安克雷奇": "anchorage",
+    "anchorage": "anchorage",
+    "{namecode:204}": "hakuryu",
+    "白龙": "hakuryu",
+    "hakuryu": "hakuryu",
+    "埃吉尔": "agir",
+    "agir": "agir",
+    "奥古斯特·冯·帕塞瓦尔": "august",
+    "august": "august",
+    "马可波罗": "marcopolo",
+    "marcopolo": "marcopolo",
+    "普利茅斯": "plymouth",
+    "plymouth": "plymouth",
+    "鲁普雷希特": "rupprecht",
+    "rupprecht": "rupprecht",
+    "哈尔滨": "harbin",
+    "harbin": "harbin",
+    "契卡洛夫": "chkalov",
+    "chkalov": "chkalov",
+    "布雷斯特": "brest",
+    "brest": "brest",
+    "奇尔沙治": "kearsarge",
+    "kearsarge": "kearsarge",
+    "兴登堡": "hindenburg",
+    "hindenburg": "hindenburg",
+    "四万十": "shimanto",
+    "shimanto": "shimanto",
+    "舒尔茨": "schultz",
+    "schultz": "schultz",
+    "弗兰德尔": "flandre",
+    "flandre": "flandre",
+    "那不勒斯": "napoli",
+    "napoli": "napoli",
+    "纳希莫夫": "nakhimov",
+    "nakhimov": "nakhimov",
+    "哈尔福德": "halford",
+    "halford": "halford",
+    "巴亚德": "bayard",
+    "bayard": "bayard",
+    "大山": "daisen",
+    "daisen": "daisen",
+    "金狮": "goudenleeuw",
+    "goudenleeuw": "goudenleeuw",
+    "梅克伦堡": "mecklenburg",
+    "mecklenburg": "mecklenburg",
+    "德米特里": "dmitri",
+    "dmitri": "dmitri",
+    "堪萨斯": "kansas",
+    "kansas": "kansas",
+    "维托里奥": "vittorio",
+    "vittorio": "vittorio",
+}
+
+EQUIPMENT_AMOUNT = re.compile(r"(?:拆解|分解|Scrap)\D*(8|15)\D*(?:件装备|pieces? of gear)", re.IGNORECASE)
+
+
+def normalize_name(name):
+    return str(name).replace(" ", "").lower()
+
+
+def project_consumption(items):
+    data = {}
+    for item in items:
+        name = normalize_name(item.name)
+        for key, keywords in INPUT_KEYWORDS.items():
+            if any(normalize_name(keyword) in name for keyword in keywords):
+                data[key] = True
+    return data
+
+
+def project_ship(items):
+    for item in items:
+        name = normalize_name(item.name)
+        for keyword, ship in SHIP_KEYWORDS.items():
+            if normalize_name(keyword) in name:
+                return ship
+    return ""
+
+
+def equipment_amount(task):
+    result = EQUIPMENT_AMOUNT.search(task)
+    return int(result.group(1)) if result else 0
+
+
+def encode_value(value):
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    return str(value)
+
+
+def encode_project(data):
+    lines = ["    {"]
+    for key, value in data.items():
+        lines.append(f"        {encode_value(key)}: {encode_value(value)},")
+    lines.append("    },")
+    return lines
 
 
 class Project:
@@ -39,57 +191,29 @@ class Project:
         self.time = int(data["time"])
         self.input = [Item(item) for item in data["consume"].values()]
         self.output = [Item(item) for item in data["drop_client"].values()]
-        self.task = Task(int(data["condition"]))
+        self.task_id = int(data["condition"])
+        self.task = ""
 
     def encode(self):
         data = {
             "name": self.name,
             "series": self.series,
             "time": self.time,
-            "task": self.task.name,
-            "input": [{"name": item.name, "amount": item.amount} for item in self.input],
-            "output": [{"name": item.name} for item in self.output],
         }
-        return str(data)
-
-
-# Key: chinese, value: english
-DIC_TRANSLATION = {
-    "蓝图：安克雷奇": "Blueprint - Anchorage",
-    "蓝图：{namecode:204}": "Blueprint - Hakuryuu",
-    "蓝图：埃吉尔": "Blueprint - Ägir",
-    "蓝图：奥古斯特·冯·帕塞瓦尔": "Blueprint - August von Parseval",
-    "蓝图：马可波罗": "Blueprint - Marco Polo",
-}
-
-
-def set_translation(cn, en):
-    if cn and en and cn not in DIC_TRANSLATION:
-        DIC_TRANSLATION[cn] = en
+        data.update(project_consumption(self.input))
+        ship = project_ship(self.output)
+        if ship:
+            data["ship"] = ship
+            data["ship_rarity"] = "dr" if ship in DR_SHIP else "pry"
+        amount = equipment_amount(self.task)
+        if amount:
+            data["equipment_amount"] = amount
+        return data
 
 
 class TechnologyTemplate:
     def __init__(self):
         self.projects = self.load_projects(LuaLoader(FOLDER, server="zh-CN"))
-        en_projects = self.load_projects(LuaLoader(FOLDER, server="en-US"))
-
-        for key, project in self.projects.items():
-            if key not in en_projects:
-                continue
-            en_project = en_projects[key]
-            set_translation(cn=project.task.name, en=en_project.task.name)
-            for item, en_item in zip(project.input, en_project.input, strict=True):
-                set_translation(cn=item.name, en=en_item.name)
-            for item, en_item in zip(project.output, en_project.output, strict=True):
-                set_translation(cn=item.name, en=en_item.name)
-
-        for project in self.projects.values():
-            project.task.name = DIC_TRANSLATION.get(project.task.name, project.task.name)
-            for item in project.input:
-                # Change Ägir to Agir
-                item.name = DIC_TRANSLATION.get(item.name, item.name).replace("Ä", "A")
-            for item in project.output:
-                item.name = DIC_TRANSLATION.get(item.name, item.name).replace("Ä", "A")
 
     def load_projects(self, loader):
         tech = loader.load("sharecfg/technology_data_template.lua")
@@ -103,8 +227,8 @@ class TechnologyTemplate:
             if tech_key == "all":
                 continue
             project = Project(value)
-            if project.task.id:
-                project.task.name = task[project.task.id]["desc"].replace("\\n", "")
+            if project.task_id:
+                project.task = task[project.task_id]["desc"].replace("\\n", "")
             for i in project.input:
                 i.name = item[i.id]["name"].strip()
             for i in project.output:
@@ -118,11 +242,12 @@ class TechnologyTemplate:
 
     def encode(self):
         lines = []
-        lines.append("# This file was automatically generated by dev_tools/research_extractor.py.")
-        lines.append("# Don't modify it manually.")
+        lines.append("# 此文件由 dev_tools/research_extractor.py 自动生成。")
+        lines.append("# 不要手动修改。")
         lines.append("")
         lines.append("LIST_RESEARCH_PROJECT = [")
-        lines.extend("    " + project.encode() + "," for project in self.projects.values())
+        for project in self.projects.values():
+            lines.extend(encode_project(project.encode()))
         lines.append("]")
 
         return lines
@@ -134,12 +259,12 @@ class TechnologyTemplate:
 
 
 """
-This an auto-tool to extract research projects used in Alas.
+这是用于抽取科研项目数据的开发工具。
 
-Git clone https://github.com/AzurLaneTools/AzurLaneLuaScripts, to get the decrypted scripts.
+先克隆 https://github.com/AzurLaneTools/AzurLaneLuaScripts 获取解密后的 Lua 脚本。
 Arguments:
-    FILE:  Path to AzurLaneData, '<your_folder>/AzurLaneData'
-    SAVE:  File to save, 'module/research/project_data.py'
+    FILE: Lua 脚本仓库路径，例如 '<your_folder>/AzurLaneData'
+    SAVE: 保存目标，例如 'module/research/project_data.py'
 """
 FOLDER = ""
 SAVE = "module/research/project_data.py"

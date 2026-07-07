@@ -7,13 +7,12 @@ import numpy as np
 from scipy import signal
 
 from module.base.decorator import cached_property
-from module.base.utils import color_similarity_2d, crop, extract_white_letters, get_color, load_image, resize
+from module.base.utils import color_similarity_2d, crop, extract_white_letters, get_color, resize
 from module.logger import logger
-from module.ocr.ocr import Duration, Ocr
+from module.ocr.ocr import Ocr
 from module.research import assets as research_assets
 from module.research.project_data import LIST_RESEARCH_PROJECT
-from module.research.series import get_detail_series, get_research_series_3
-from module.statistics.utils import load_folder
+from module.research.series import get_research_series_3
 
 RESEARCH_SERIES = (
     research_assets.SERIES_1,
@@ -37,17 +36,6 @@ OCR_RESEARCH = [
     research_assets.OCR_RESEARCH_5,
 ]
 OCR_RESEARCH = Ocr(OCR_RESEARCH, name="RESEARCH", threshold=64, alphabet="0123456789BCDEGHQTMIULRF-")
-RESEARCH_DETAIL_GENRE = [
-    research_assets.DETAIL_GENRE_B,
-    research_assets.DETAIL_GENRE_C,
-    research_assets.DETAIL_GENRE_D,
-    research_assets.DETAIL_GENRE_E,
-    research_assets.DETAIL_GENRE_G,
-    research_assets.DETAIL_GENRE_H_0,
-    research_assets.DETAIL_GENRE_H_1,
-    research_assets.DETAIL_GENRE_Q,
-    research_assets.DETAIL_GENRE_T,
-]
 
 
 def get_research_series_old(image, series_button=RESEARCH_SERIES):
@@ -195,210 +183,6 @@ def parse_time(string):
     return timedelta(hours=result[0], minutes=result[1], seconds=result[2])
 
 
-def match_template(image, template, area, offset=30, similarity=0.85):
-    """
-    Args:
-        image (np.ndarray): Screenshot
-        template (np.ndarray):
-        area (tuple): Crop area of image.
-        offset (int, tuple): Detection area offset.
-        similarity (float): 0-1. Similarity. Lower than this value will return float(0).
-
-    Returns:
-        similarity (float):
-    """
-    if isinstance(offset, tuple):
-        offset = np.array((-offset[0], -offset[1], offset[0], offset[1]))
-    else:
-        offset = np.array((0, -offset, 0, offset))
-    image = crop(image, offset + area, copy=False)
-    res = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
-    sim = cv2.minMaxLoc(res)[1]
-    if sim < similarity:
-        sim = 0.0
-    return sim
-
-
-def get_research_series_jp_old(image):
-    """
-    Almost the same as get_research_series except the button area.
-
-    Args:
-        image (np.ndarray): Screenshot
-
-    Returns:
-        str: Series like "S4"
-    """
-    # Set 'prominence = 50' to ignore possible noise.
-    parameters = {"height": 160, "prominence": 50, "width": 1}
-
-    area = research_assets.SERIES_DETAIL.area
-    # Resize is not needed because only one area will be checked in JP server.
-    im = color_similarity_2d(crop(image, area, copy=False), color=(255, 255, 255))
-    peaks = [len(signal.find_peaks(row, **parameters)[0]) for row in im[5:-5]]
-    upper, lower = max(peaks), min(peaks)
-    # print(upper, lower)
-
-    # Remove noise like [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 2]
-    if upper == 3 and lower == 2 and peaks.count(3) <= 2:
-        upper = 2
-
-    if upper == lower and 1 <= upper <= 3:
-        series = upper
-    elif upper == 3 and lower == 2:
-        series = 4
-    elif upper == 2 and lower == 1:
-        series = 5
-    else:
-        series = 0
-        logger.warning(f"Unknown research series: upper={upper}, lower={lower}")
-
-    return f"S{series}"
-
-
-def get_research_series_jp(image):
-    """
-    Args:
-        image:
-
-    Returns:
-        str: Series like "S4"
-    """
-    series = get_detail_series(image)
-    return f"S{series}"
-
-
-def get_research_duration_jp(image):
-    """
-    Args:
-        image (np.ndarray): Screenshot
-
-    Returns:
-        duration (int): number of seconds
-    """
-    ocr = Duration(research_assets.DURATION_DETAIL)
-    return ocr.ocr(image).total_seconds()
-
-
-def get_research_genre_jp(image):
-    """
-    Args:
-        image (np.ndarray): Screenshot
-
-    Returns:
-        genre (string):
-    """
-    genre = ""
-    for button in RESEARCH_DETAIL_GENRE:
-        if button.match(image, offset=(30, 20), similarity=0.9):
-            # DETAIL_GENRE_H_0.name.split("_")[2] == 'H'
-            genre = button.name.split("_")[2]
-            break
-    if not genre:
-        logger.warning("Not able to recognize research genre!")
-    return genre
-
-
-def get_research_cost_jp(image):
-    """
-    When the research has 1 cost item, the size of it is 78*78.
-    When the research has 2 cost items, the size of each is 77*77.
-    However, templates of coins, cubes, and plates differ a lot with each other,
-    so simply setting a lower threshold while matching can do the job.
-
-    Args:
-        image (np.ndarray): Screenshot
-
-    Returns:
-        costs (string): dict
-    """
-    size_template = (78, 78)
-    area_template = (0, 0, 78, 57)
-    folder = "./assets/stats_basic"
-    templates = load_folder(folder)
-    costs = {"coin": False, "cube": False, "plate": False}
-    for name, template_path in templates.items():
-        template = load_image(template_path)
-        template = crop(resize(template, size_template), area_template, copy=False)
-        sim = match_template(
-            image=image,
-            template=template,
-            area=research_assets.DETAIL_COST.area,
-            offset=(10, 10),
-            similarity=0.8,
-        )
-        if not sim:
-            continue
-        for cost in costs:
-            if re.compile(cost).match(name.lower()):
-                costs[cost] = True
-                continue
-
-    # Rename keys to be the same as attrs of ResearchProjectJp.
-    costs["need_coin"] = costs.pop("coin")
-    costs["need_cube"] = costs.pop("cube")
-    costs["need_part"] = costs.pop("plate")
-    return costs
-
-
-def get_research_ship_jp(image):
-    """
-    Notice that 2.5, 5, and 8 hours' D research have 4 items, while 0.5 hours' one has 3,
-    so the button DETAIL_BLUEPRINT should not cover only the first one of 4 items.
-
-    Args:
-        image (np.ndarray): Screenshot
-
-    Returns:
-        ship (string):
-    """
-    folder = "./assets/research_blueprint"
-    templates = load_folder(folder)
-    similarity = 0.0
-    ship = ""
-    for name, template in templates.items():
-        sim = match_template(
-            image=image,
-            template=load_image(template),
-            area=research_assets.DETAIL_BLUEPRINT.area,
-            offset=(10, 10),
-            similarity=0.9,
-        )
-        if sim > similarity:
-            similarity = sim
-            ship = name
-    if ship == "":
-        logger.warning("Ship recognition failed")
-    return ship
-
-
-def research_jp_detect(image):
-    """
-    Args:
-        image (np.ndarray): Screenshot
-
-    Return:
-        project (ResearchProjectJp):
-    """
-    project = ResearchProjectJp()
-    project.series = get_research_series_jp(image)
-    project.duration = str(get_research_duration_jp(image) / 3600).removesuffix(".0")
-    if project.duration == "":
-        project.duration = "0"
-    project.genre = get_research_genre_jp(image)
-    costs = get_research_cost_jp(image)
-    for cost in costs:
-        project.__setattr__(cost, costs[cost])
-    if project.genre.lower() == "d":
-        project.ship = get_research_ship_jp(image).lower()
-    if project.ship:
-        project.ship_rarity = "dr" if project.ship in project.DR_SHIP else "pry"
-    project.name = f"{project.series}-{project.genre}-{project.duration}{project.ship}"
-    if not project.check_valid():
-        logger.warning(f"Invalid research {project}")
-    return project
-
-
 def research_detect(image):
     """
     Args:
@@ -416,23 +200,7 @@ def research_detect(image):
 
 
 class ResearchProject:
-    REGEX_SHIP = re.compile(
-        "("
-        "neptune|monarch|ibuki|izumo|roon|saintlouis"
-        "|seattle|georgia|kitakaze|azuma|friedrich"
-        "|gascogne|champagne|cheshire|drake|mainz|odin"
-        "|anchorage|hakuryu|agir|august|marcopolo"
-        "|plymouth|rupprecht|harbin|chkalov|brest"
-        "|kearsarge|hindenburg|shimanto|schultz|flandre"
-        "|napoli|nakhimov|halford|bayard|daisen"
-        "|goudenleeuw|mecklenburg|dmitri|kansas|vittorio"
-        ")"
-    )
-    REGEX_INPUT = re.compile("(coin|cube|part)")
-    REGEX_DR_SHIP = re.compile(
-        "azuma|friedrich|drake|hakuryu|agir|plymouth|brest|kearsarge|hindenburg|napoli|nakhimov|goudenleeuw|mecklenburg"
-    )
-    # Generate with:
+    # 生成方式：
     """
     out = []
     for row in LIST_RESEARCH_PROJECT:
@@ -442,6 +210,7 @@ class ResearchProject:
             out.append(number)
     print(out)
     """
+
     C_PROJECT_NUMBERS: ClassVar[tuple[str, ...]] = ("153", "185", "038")
     D_PROJECT_NUMBERS: ClassVar[tuple[str, ...]] = (
         "718",
@@ -642,9 +411,7 @@ class ResearchProject:
         self.need_coin = False
         self.need_cube = False
         self.need_part = False
-        # Project requirements, like:
-        # 'Scrap 8 pieces of gear.'
-        self.task = ""
+        self._equipment_amount = 0
 
         matched = False
         for data in self.get_data(name=self.name, series=series):
@@ -653,19 +420,12 @@ class ResearchProject:
             self.genre = data["name"][0]
             self.number = data["name"][2:5]
             self.duration = str(data["time"] / 3600).rstrip(".0")
-            self.task = data["task"]
-            for item in data["input"]:
-                item_name = item["name"].replace(" ", "").lower()
-                result = re.search(ResearchProject.REGEX_INPUT, item_name)
-                if result:
-                    self.__setattr__(f"need_{result.group(1)}", True)
-            for item in data["output"]:
-                item_name = item["name"].replace(" ", "").lower()
-                result = re.search(ResearchProject.REGEX_SHIP, item_name)
-                if not self.ship:
-                    self.ship = result.group(1) if result else ""
-                if self.ship:
-                    self.ship_rarity = "dr" if re.search(ResearchProject.REGEX_DR_SHIP, self.ship) else "pry"
+            self.need_coin = data.get("need_coin", False)
+            self.need_cube = data.get("need_cube", False)
+            self.need_part = data.get("need_part", False)
+            self.ship = data.get("ship", "")
+            self.ship_rarity = data.get("ship_rarity", "")
+            self._equipment_amount = data.get("equipment_amount", 0)
             break
 
         if not matched:
@@ -783,86 +543,4 @@ class ResearchProject:
 
     @cached_property
     def equipment_amount(self):
-        # 拆解 8 件装备。
-        # 拆解 15 件装备。
-        if "8 piece" in self.task:
-            return 8
-        if "15 piece" in self.task:
-            return 15
-        return 0
-
-
-class ResearchProjectJp:
-    GENRE: ClassVar[tuple[str, ...]] = ("b", "c", "d", "e", "g", "h", "q", "t")
-    DURATION: ClassVar[tuple[str, ...]] = ("0.5", "1", "1.5", "2", "2.5", "3", "4", "5", "6", "8", "12")
-    SHIP_S1: ClassVar[tuple[str, ...]] = ("neptune", "monarch", "ibuki", "izumo", "roon", "saintlouis")
-    SHIP_S2: ClassVar[tuple[str, ...]] = ("seattle", "georgia", "kitakaze", "azuma", "friedrich", "gascogne")
-    SHIP_S3: ClassVar[tuple[str, ...]] = ("champagne", "cheshire", "drake", "mainz", "odin")
-    SHIP_S4: ClassVar[tuple[str, ...]] = ("anchorage", "hakuryu", "agir", "august", "marcopolo")
-    SHIP_S5: ClassVar[tuple[str, ...]] = ("plymouth", "rupprecht", "harbin", "chkalov", "brest")
-    SHIP_S6: ClassVar[tuple[str, ...]] = ("kearsarge", "hindenburg", "shimanto", "schultz", "flandre")
-    SHIP_S7: ClassVar[tuple[str, ...]] = ("napoli", "nakhimov", "halford", "bayard", "daisen")
-    SHIP_S8: ClassVar[tuple[str, ...]] = ("goudenleeuw", "mecklenburg", "dmitri", "kansas", "vittorio")
-    SHIP_ALL: ClassVar[tuple[str, ...]] = SHIP_S1 + SHIP_S2 + SHIP_S3 + SHIP_S4 + SHIP_S5 + SHIP_S6 + SHIP_S7 + SHIP_S8
-    DR_SHIP: ClassVar[tuple[str, ...]] = (
-        "azuma",
-        "friedrich",
-        "drake",
-        "hakuryu",
-        "agir",
-        "plymouth",
-        "brest",
-        "kearsarge",
-        "hindenburg",
-        "napoli",
-        "nakhimov",
-        "goudenleeuw",
-        "mecklenburg",
-    )
-
-    def __init__(self):
-        self.valid = True
-        self.name = ""
-        self.series = ""
-        self.genre = ""
-        self.number = ""
-        self.duration = "24"
-        self.ship = ""
-        self.ship_rarity = ""
-        self.need_coin = False
-        self.need_cube = False
-        self.need_part = False
-        self.task = ""
-
-    def check_valid(self):
-        self.valid = False
-        if self.series.lower() == "s0":
-            return False
-        if self.genre.lower() not in self.GENRE:
-            return False
-        if self.duration not in self.DURATION:
-            return False
-        if self.ship not in self.SHIP_ALL:
-            self.ship = ""
-        if self.genre.lower() == "d" and not self.ship:
-            return False
-        self.valid = True
-        return True
-
-    def __str__(self):
-        if self.valid:
-            return f"{self.name}"
-        return f"{self.name} (Invalid)"
-
-    def __eq__(self, other):
-        return str(self) == str(other)
-
-    __hash__ = None
-
-    @cached_property
-    def equipment_amount(self):
-        if self.genre == "E" and self.duration == "2":
-            # 日服没有科研名称，无法区分 E-031-MI 和 E-315-MI。
-            # 返回最大值 15。
-            return 15
-        return 0
+        return self._equipment_amount
