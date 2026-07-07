@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 
 from deploy.config import DeployConfig
 from deploy.emulator import EmulatorConnect
@@ -58,7 +59,7 @@ class AdbManager(DeployConfig):
                     # ModuleNotFoundError: No module named 'progress.bar'
                     if module in message:
                         show_fix_tip(module)
-                        exit(1)
+                        sys.exit(1)
                 raise
 
             # Remove global proxies, or uiautomator2 will go through it
@@ -86,7 +87,7 @@ class AdbManager(DeployConfig):
                         break
                     except AssertionError:
                         logger.info(f"AssertionError when installing uiautomator2 on device {device.serial}")
-                        exit(1)
+                        sys.exit(1)
                     except ConnectionError:
                         if _ == 1:
                             raise

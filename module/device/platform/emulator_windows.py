@@ -394,5 +394,5 @@ class EmulatorManager(EmulatorManagerBase):
         for emulator in self.all_emulators:
             instances += list(emulator.iter_instances())
 
-        instances: list[EmulatorInstance] = sorted(instances, key=lambda x: str(x))
+        instances: list[EmulatorInstance] = sorted(instances, key=str)
         return instances

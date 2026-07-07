@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 
 from campaign.campaign_main.campaign_7_2 import MAP
@@ -66,9 +68,8 @@ class SwipeSimulate:
 
         if swipe_base is None:
             logger.critical("Unable to get swipe_base")
-            exit(1)
-        else:
-            return swipe_base
+            sys.exit(1)
+        return swipe_base
 
     @staticmethod
     def normalise_offset(offset):

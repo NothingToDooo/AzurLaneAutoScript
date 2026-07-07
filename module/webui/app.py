@@ -182,8 +182,6 @@ class AlasGUI(Frame):
             aside_name = get_localstorage("aside")
             self.active_button("aside", aside_name)
 
-        return
-
     @use_scope("header_status")
     def set_status(self, state: int) -> None:
         """
@@ -433,7 +431,7 @@ class AlasGUI(Frame):
         switch_scheduler = BinarySwitchButton(
             label_on=t("Gui.Button.Stop"),
             label_off=t("Gui.Button.Start"),
-            onclick_on=lambda: self.alas.stop(),
+            onclick_on=self.alas.stop,
             onclick_off=lambda: self.alas.start(None),
             get_state=lambda: self.alas.alive,
             color_on="off",
@@ -656,7 +654,7 @@ class AlasGUI(Frame):
         switch_scheduler = BinarySwitchButton(
             label_on=t("Gui.Button.Stop"),
             label_off=t("Gui.Button.Start"),
-            onclick_on=lambda: self.alas.stop(),
+            onclick_on=self.alas.stop,
             onclick_off=lambda: self.alas.start(task),
             get_state=lambda: self.alas.alive,
             color_on="off",
@@ -844,7 +842,7 @@ class AlasGUI(Frame):
                     {"label": "亮色", "value": "default", "color": "light"},
                     {"label": "暗色", "value": "dark", "color": "dark"},
                 ],
-                onclick=lambda t: set_theme(t),
+                onclick=set_theme,
             ).style("text-align: center")
 
             # 显示项目提示。

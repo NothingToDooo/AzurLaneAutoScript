@@ -142,12 +142,12 @@ class Benchmark(DaemonBase, CampaignUI):
         fastest_click = "minitouch"
         if screenshot_result:
             self.show(test="Screenshot", data=screenshot_result, evaluate_func=self.evaluate_screenshot)
-            fastest = sorted(screenshot_result, key=lambda item: compare(item))[0]
+            fastest = sorted(screenshot_result, key=compare)[0]
             logger.info(f"Recommend screenshot method: {fastest[0]} ({float2str(fastest[1])})")
             fastest_screenshot = fastest[0]
         if click_result:
             self.show(test="Control", data=click_result, evaluate_func=self.evaluate_click)
-            fastest = sorted(click_result, key=lambda item: compare(item))[0]
+            fastest = sorted(click_result, key=compare)[0]
             logger.info(f"Recommend control method: {fastest[0]} ({float2str(fastest[1])})")
             fastest_click = fastest[0]
 
