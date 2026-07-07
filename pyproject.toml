@@ -24,8 +24,6 @@ dependencies = [
     "cnocr",
     "pywebio",
     "starlette",
-    "zerorpc",
-    "pyzmq",
     "onnxruntime>=1.27.0",
     "uvicorn>=0.50.2",
 ]

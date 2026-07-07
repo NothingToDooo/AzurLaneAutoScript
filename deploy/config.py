@@ -20,12 +20,6 @@ class ConfigModel:
     AutoConnect: bool = True
     InstallUiautomator2: bool = True
 
-    # OCR 配置
-    UseOcrServer: bool = False
-    StartOcrServer: bool = False
-    OcrServerPort: int = 22268
-    OcrClientAddress: str = "127.0.0.1:22268"
-
     # 其他配置
     DiscordRichPresence: bool = False
 

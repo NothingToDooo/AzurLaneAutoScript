@@ -1,5 +1,4 @@
 import re
-from contextlib import suppress
 from pathlib import Path
 
 import module.config.server as server
@@ -79,32 +78,19 @@ class Resource:
 
 
 def release_resources(next_task=""):
-    # Release all OCR models
-    # Usually to have 2 models loaded and each model takes about 20MB
-    # This will release 20-40MB
-    from module.webui.setting import State
+    # 释放 OCR 模型。通常会加载 2 个模型，每个约 20MB。
+    from module.ocr.ocr import OCR_MODEL
 
-    if State.deploy_config.UseOcrServer:
-        if not next_task:
-            # Disconnect OCR server on idle
-            from module.ocr.ocr import OCR_MODEL
-
-            with suppress(AttributeError):
-                OCR_MODEL.close()
+    if "Opsi" in next_task or "commission" in next_task:
+        # 马上会用到 OCR，不释放。
+        models = []
+    elif next_task:
+        # 保留常用的 azur_lane 模型。
+        models = ["cnocr", "jp", "tw"]
     else:
-        # Release only when using per-instance OCR
-        from module.ocr.ocr import OCR_MODEL
-
-        if "Opsi" in next_task or "commission" in next_task:
-            # OCR models will be used soon, don't release
-            models = []
-        elif next_task:
-            # Release OCR models except 'azur_lane'
-            models = ["cnocr", "jp", "tw"]
-        else:
-            models = ["azur_lane", "cnocr", "jp", "tw"]
-        for model in models:
-            del_cached_property(OCR_MODEL, model)
+        models = ["azur_lane", "cnocr", "jp", "tw"]
+    for model in models:
+        del_cached_property(OCR_MODEL, model)
 
     # Release assets cache
     # module.ui has about 80 assets and takes about 3MB

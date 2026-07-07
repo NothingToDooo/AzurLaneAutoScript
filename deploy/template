@@ -15,18 +15,6 @@ Deploy:
     # 是否重新安装 uiautomator2。
     InstallUiautomator2: true
 
-  Ocr:
-    # 是否把 OCR 作为服务运行，减少多实例重复加载 OCR 的内存占用。
-
-    # 是否使用 OCR 服务。
-    UseOcrServer: false
-    # 是否在启动 WebUI 时启动 OCR 服务。
-    StartOcrServer: false
-    # WebUI 启动的 OCR 服务端口。
-    OcrServerPort: 22268
-    # Alas 实例连接 OCR 服务的地址。
-    OcrClientAddress: 127.0.0.1:22268
-
   Misc:
     # 是否启用 Discord 状态展示。
     DiscordRichPresence: false
