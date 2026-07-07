@@ -29,16 +29,6 @@ class Screenshot(NemuIpc):
         self._last_save_time: dict[str, float] = {}
         super().__init__(*args, **kwargs)
 
-    @cached_property
-    def screenshot_methods(self):
-        return {
-            "nemu_ipc": self.screenshot_nemu_ipc,
-        }
-
-    @cached_property
-    def screenshot_method_override(self) -> str:
-        return ""
-
     def screenshot(self):
         """
         Returns:
@@ -48,9 +38,7 @@ class Screenshot(NemuIpc):
         self._screenshot_interval.reset()
 
         for _ in range(2):
-            method = self.screenshot_method_override or self.config.Emulator_ScreenshotMethod
-            method = self.screenshot_methods.get(method, self.screenshot_nemu_ipc)
-            self.image = method()
+            self.image = self.screenshot_nemu_ipc()
 
             if self.config.Emulator_ScreenshotDedithering:
                 # 这里通常会额外花费 40-60ms。

@@ -115,16 +115,23 @@ class Benchmark(DaemonBase, CampaignUI):
         logger.info(f"Testing screenshot methods: {screenshot}")
         logger.info(f"Testing click methods: {click}")
 
+        screenshot_methods = {
+            "nemu_ipc": self.device.screenshot_nemu_ipc,
+        }
+        click_methods = {
+            "minitouch": self.device.click_minitouch,
+        }
+
         screenshot_result = []
         for method in screenshot:
-            result = self.benchmark_test(self.device.screenshot_methods[method])
+            result = self.benchmark_test(screenshot_methods[method])
             screenshot_result.append([method, result])
 
         area = (124, 4, 649, 106)  # Somewhere safe to click.
         click_result = []
         for method in click:
             x, y = random_rectangle_point(area)
-            result = self.benchmark_test(self.device.click_methods[method], x, y)
+            result = self.benchmark_test(click_methods[method], x, y)
             click_result.append([method, result])
 
         def compare(res):

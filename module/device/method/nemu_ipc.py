@@ -10,10 +10,8 @@ import cv2
 import numpy as np
 
 from module.base.decorator import cached_property, del_cached_property, has_cached_property
-from module.base.utils import ensure_time
 from module.config.deep import deep_get
 from module.device.env import IS_WINDOWS
-from module.device.method.minitouch import insert_swipe, random_rectangle_point
 from module.device.method.pool import WORKER_POOL, JobTimeout
 from module.device.method.utils import RETRY_TRIES, retry_sleep
 from module.device.platform import Platform
@@ -400,46 +398,6 @@ class NemuIpcImpl:
         # image = np.ctypeslib.as_array(pixels_pointer, shape=(self.height, self.width, 4))
         return np.ctypeslib.as_array(pixels_pointer.contents).reshape((self.height, self.width, 4))
 
-    def convert_xy(self, x, y):
-        """
-        Convert classic ADB coordinates to Nemu's
-        `self.height` must be updated before calling this method
-
-        Returns:
-            int, int
-        """
-        x, y = int(x), int(y)
-        x, y = self.height - y, x
-        return x, y
-
-    @retry
-    def down(self, x, y):
-        """
-        Contact down, continuous contact down will be considered as swipe
-        """
-        if self.connect_id == 0:
-            self.connect()
-        if self.height == 0:
-            self.get_resolution()
-
-        x, y = self.convert_xy(x, y)
-
-        ret = self.run_func(self.lib.nemu_input_event_touch_down, self.connect_id, self.display_id, x, y)
-        if ret > 0:
-            raise NemuIpcError("nemu_input_event_touch_down failed")
-
-    @retry
-    def up(self):
-        """
-        Contact up
-        """
-        if self.connect_id == 0:
-            self.connect()
-
-        ret = self.run_func(self.lib.nemu_input_event_touch_up, self.connect_id, self.display_id)
-        if ret > 0:
-            raise NemuIpcError("nemu_input_event_touch_up failed")
-
     @staticmethod
     def serial_to_id(serial: str):
         """
@@ -587,43 +545,3 @@ class NemuIpc(Platform):
         image = cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
         cv2.flip(image, 0, dst=image)
         return image
-
-    def click_nemu_ipc(self, x, y):
-        down = ensure_time((0.010, 0.020))
-        self.nemu_ipc.down(x, y)
-        self.sleep(down)
-        self.nemu_ipc.up()
-        self.sleep(0.050 - down)
-
-    def long_click_nemu_ipc(self, x, y, duration=1.0):
-        self.nemu_ipc.down(x, y)
-        self.sleep(duration)
-        self.nemu_ipc.up()
-        self.sleep(0.050)
-
-    def swipe_nemu_ipc(self, p1, p2):
-        points = insert_swipe(p0=p1, p3=p2)
-
-        for point in points:
-            self.nemu_ipc.down(*point)
-            self.sleep(0.010)
-
-        self.nemu_ipc.up()
-        self.sleep(0.050)
-
-    def drag_nemu_ipc(self, p1, p2, point_random=(-10, -10, 10, 10)):
-        p1 = np.array(p1) - random_rectangle_point(point_random)
-        p2 = np.array(p2) - random_rectangle_point(point_random)
-        points = insert_swipe(p0=p1, p3=p2, speed=20)
-
-        for point in points:
-            self.nemu_ipc.down(*point)
-            self.sleep(0.010)
-
-        self.nemu_ipc.down(*p2)
-        self.sleep(0.140)
-        self.nemu_ipc.down(*p2)
-        self.sleep(0.140)
-
-        self.nemu_ipc.up()
-        self.sleep(0.050)

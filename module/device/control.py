@@ -1,6 +1,5 @@
 import numpy as np
 
-from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.base.utils import (
     ensure_int,
@@ -19,13 +18,6 @@ class Control(Minitouch, NemuIpc):
         # Device 会覆盖这个检查入口。
         pass
 
-    @cached_property
-    def click_methods(self):
-        return {
-            "minitouch": self.click_minitouch,
-            "nemu_ipc": self.click_nemu_ipc,
-        }
-
     def click(self, button, control_check=True):
         """Method to click a button.
 
@@ -38,8 +30,7 @@ class Control(Minitouch, NemuIpc):
         x, y = random_rectangle_point(button.button)
         x, y = ensure_int(x, y)
         logger.info(f"Click {point2str(x, y)} @ {button}")
-        method = self.click_methods.get(self.config.Emulator_ControlMethod, self.click_minitouch)
-        method(x, y)
+        self.click_minitouch(x, y)
 
     def multi_click(self, button, n, interval=(0.1, 0.2)):
         self.handle_control_check(button)
@@ -64,31 +55,20 @@ class Control(Minitouch, NemuIpc):
         x, y = ensure_int(x, y)
         duration = ensure_time(duration)
         logger.info(f"Click {point2str(x, y)} @ {button}, {duration}")
-        method = self.config.Emulator_ControlMethod
-        if method == "nemu_ipc":
-            self.long_click_nemu_ipc(x, y, duration)
-        else:
-            self.long_click_minitouch(x, y, duration)
+        self.long_click_minitouch(x, y, duration)
 
     def swipe(self, p1, p2, duration=(0.1, 0.2), name="SWIPE", distance_check=True):
         self.handle_control_check(name)
         p1, p2 = ensure_int(p1, p2)
         duration = ensure_time(duration)
-        method = self.config.Emulator_ControlMethod
-        if method in ["minitouch", "nemu_ipc"]:
-            logger.info(f"Swipe {point2str(*p1)} -> {point2str(*p2)}")
-        else:
-            logger.info(f"Swipe {point2str(*p1)} -> {point2str(*p2)}")
+        logger.info(f"Swipe {point2str(*p1)} -> {point2str(*p2)}")
 
         if distance_check and np.linalg.norm(np.subtract(p1, p2)) < 10:
             # 距离过短会被游戏当作点击。
             logger.info("Swipe distance < 10px, dropped")
             return
 
-        if method == "nemu_ipc":
-            self.swipe_nemu_ipc(p1, p2)
-        else:
-            self.swipe_minitouch(p1, p2)
+        self.swipe_minitouch(p1, p2)
 
     def swipe_vector(
         self,
@@ -143,8 +123,4 @@ class Control(Minitouch, NemuIpc):
         self.handle_control_check(name)
         p1, p2 = ensure_int(p1, p2)
         logger.info(f"Drag {point2str(*p1)} -> {point2str(*p2)}")
-        method = self.config.Emulator_ControlMethod
-        if method == "nemu_ipc":
-            self.drag_nemu_ipc(p1, p2, point_random=point_random)
-        else:
-            self.drag_minitouch(p1, p2, point_random=point_random)
+        self.drag_minitouch(p1, p2, point_random=point_random)
