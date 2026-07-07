@@ -12,16 +12,12 @@ class CombatAuto(ModuleBase):
     auto_mode_click_timer = Timer(5)
 
     def combat_joystick_appear(self) -> bool:
-        """
-        If joystick appear, combat is under manual mode.
-        """
+        """返回是否出现战斗摇杆。"""
         if self.appear(COMBAT_AUTO, offset=(20, 20)):
             return True
         if self.appear(COMBAT_AUTO_133, offset=(20, 20)):
             return True
-        if self.appear(COMBAT_AUTO_150, offset=(20, 20)):
-            return True
-        return False
+        return self.appear(COMBAT_AUTO_150, offset=(20, 20))
 
     def combat_auto_reset(self):
         self.auto_mode_click_timer.reset()

@@ -192,15 +192,13 @@ class Emotion:
     def reduce_per_battle(self):
         if self.map_is_2x_book:
             return 4
-        else:
-            return 2
+        return 2
 
     @property
     def reduce_per_battle_before_entering(self):
         if self.map_is_2x_book or self.config.Campaign_Use2xBook:
             return 4
-        else:
-            return 2
+        return 2
 
     def check_reduce(self, battle):
         """
@@ -308,5 +306,4 @@ class Emotion:
             self.total_reduced = 0
             self.bug_threshold_reset()
             return True
-        else:
-            return False
+        return False

@@ -84,8 +84,6 @@ class HpDaemon(ModuleBase):
             if self.low_hp_confirm_timer.reached() and self.low_hp_confirm_timer.current_time() < 300:
                 self._show_hp(self.low_hp_confirm_timer.current_time())
                 return True
-            else:
-                return False
-        else:
-            self.low_hp_confirm_timer.reset()
             return False
+        self.low_hp_confirm_timer.reset()
+        return False

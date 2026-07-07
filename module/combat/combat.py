@@ -23,23 +23,17 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
     battle_status_click_interval = 0
 
     def combat_appear(self):
-        """
-        Returns:
-            bool: If enter combat.
-        """
+        """返回是否已经进入战斗相关页面。"""
         if self.config.Campaign_UseFleetLock and not self.is_in_map():
             if self.is_combat_loading():
                 return True
 
         if self.appear(combat_assets.BATTLE_PREPARATION, offset=(30, 20)):
             return True
-        if (
+        return (
             self.appear(combat_assets.BATTLE_PREPARATION_WITH_OVERLAY, threshold=30)
             and self.handle_combat_automation_confirm()
-        ):
-            return True
-
-        return False
+        )
 
     def map_offensive(self, skip_first_screenshot=True):
         """
@@ -71,7 +65,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             bool:
         """
         image = self.image_crop((0, 620, 1280, 690), copy=False)
-        # note that CN/EN/TW are the same, but JP character is smaller
+        # 国服、英文服和台服一致，日服字符更小。
         similarity, button = TEMPLATE_COMBAT_LOADING.match_luma_result(image)
         if similarity > 0.85:
             loading = (button.area[0] + 38 - combat_assets.LOADING_BAR.area[0]) / (
@@ -79,8 +73,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             )
             logger.attr("Loading", f"{int(loading * 100)}%")
             return True
-        else:
-            return False
+        return False
 
     def is_combat_executing(self):
         """
@@ -265,14 +258,8 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
                 break
 
     def handle_battle_preparation(self):
-        """
-        Returns:
-            bool:
-        """
-        if self.appear_then_click(combat_assets.BATTLE_PREPARATION, offset=(20, 20), interval=2):
-            return True
-
-        return False
+        """返回是否点击了战斗准备按钮。"""
+        return self.appear_then_click(combat_assets.BATTLE_PREPARATION, offset=(20, 20), interval=2)
 
     def handle_combat_automation_set(self, auto):
         """

@@ -59,10 +59,7 @@ class CombatManual(ModuleBase):
     def handle_combat_weapon_release(self):
         if self.appear_then_click(READY_AIR_RAID, interval=10):
             return True
-        if self.appear_then_click(READY_TORPEDO, interval=10):
-            return True
-
-        return False
+        return self.appear_then_click(READY_TORPEDO, interval=10)
 
     def handle_combat_manual(self, auto):
         """

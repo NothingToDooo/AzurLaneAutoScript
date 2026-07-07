@@ -53,9 +53,8 @@ class DatedDuration(Ocr):
         if result:
             result = [int(s) for s in result.groups()]
             return timedelta(days=result[0], hours=result[1], minutes=result[2], seconds=result[3])
-        else:
-            logger.warning(f"Invalid dated duration: {string}")
-            return timedelta(days=0, hours=0, minutes=0, seconds=0)
+        logger.warning(f"Invalid dated duration: {string}")
+        return timedelta(days=0, hours=0, minutes=0, seconds=0)
 
 
 class DatedDurationYuv(DatedDuration, OcrYuv):
@@ -100,17 +99,10 @@ class Exercise(ExerciseCombat):
             method = self.config.Exercise_OpponentChooseMode
         if method != "leftmost":
             return super()._opponent_sort(method=method)
-        else:
-            return [0, 1, 2, 3]
+        return [0, 1, 2, 3]
 
     def _exercise_once(self):
-        """Execute exercise once.
-
-        This method handles exercise refresh and exercise failure.
-
-        Returns:
-            bool: True if success to defeat one opponent. False if failed to defeat any opponent and refresh exhausted.
-        """
+        """执行一次演习，并处理刷新对手和战斗失败。"""
         self._opponent_fleet_check_all()
         while 1:
             for opponent in self._opponent_sort():
@@ -145,15 +137,14 @@ class Exercise(ExerciseCombat):
             if success:
                 self.config.override(Exercise_LowHpThreshold=restore)
                 return success
-            else:
-                if self.opponent_change_count < 5:
-                    logger.info("Cannot beat calculated easiest opponent, refresh")
-                    self._new_opponent()
-                    self._opponent_fleet_check_all()
-                    continue
-                logger.info("Cannot beat calculated easiest opponent, MAX EXP then")
-                method = "max_exp"
-                threshold = 0
+            if self.opponent_change_count < 5:
+                logger.info("Cannot beat calculated easiest opponent, refresh")
+                self._new_opponent()
+                self._opponent_fleet_check_all()
+                continue
+            logger.info("Cannot beat calculated easiest opponent, MAX EXP then")
+            method = "max_exp"
+            threshold = 0
 
     def _get_opponent_change_count(self):
         """
@@ -166,12 +157,11 @@ class Exercise(ExerciseCombat):
         record = self.config.Exercise_OpponentRefreshRecord
         update = get_server_last_update("00:00")
         if record.date() == update.date():
-            # Same Day
+            # 同一天。
             return self.config.Exercise_OpponentRefreshValue
-        else:
-            # New Day
-            self.config.set_record(Exercise_OpponentRefreshValue=0)
-            return 0
+        # 新的一天。
+        self.config.set_record(Exercise_OpponentRefreshValue=0)
+        return 0
 
     def _get_exercise_reset_remain(self):
         """
