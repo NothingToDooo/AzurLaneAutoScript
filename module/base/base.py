@@ -18,7 +18,7 @@ from module.device.device import Device
 from module.device.method.utils import HierarchyButton
 from module.logger import logger
 from module.map_detection.utils import fit_points
-from module.statistics.azurstats import AzurStats
+from module.statistics.drop_record import DropRecorder
 from module.webui.setting import cached_class_property
 
 
@@ -66,8 +66,8 @@ class ModuleBase:
         self.early_ocr_import()
 
     @cached_property
-    def stat(self) -> AzurStats:
-        return AzurStats(config=self.config)
+    def stat(self) -> DropRecorder:
+        return DropRecorder(config=self.config)
 
     @cached_property
     def emotion(self) -> Emotion:

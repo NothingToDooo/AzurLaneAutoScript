@@ -13,7 +13,7 @@ from module.handler.auto_search import AutoSearchHandler
 from module.logger import logger
 from module.map.assets import MAP_OFFENSIVE
 from module.retire.retirement import Retirement
-from module.statistics.azurstats import DropImage
+from module.statistics.drop_record import DropImage
 from module.template.assets import TEMPLATE_COMBAT_LOADING
 from module.ui.assets import BACK_ARROW, EXERCISE_CHECK, MUNITIONS_CHECK
 

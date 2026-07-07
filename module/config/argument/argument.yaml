@@ -74,28 +74,24 @@ Optimization:
     option: [ stay_there, goto_main, close_game ]
 DropRecord:
   SaveFolder: ./screenshots
-  AzurStatsID: null
-  API:
-    value: default
-    option: [ default, cn_gz_reverse_proxy]
   ResearchRecord:
     value: do_not
-    option: [ do_not, save, upload, save_and_upload ]
+    option: [ do_not, save ]
   CommissionRecord:
     value: do_not
-    option: [ do_not, save, upload, save_and_upload ]
+    option: [ do_not, save ]
   CombatRecord:
     value: do_not
     option: [ do_not, save ]
   OpsiRecord:
     value: do_not
-    option: [ do_not, save, upload, save_and_upload ]
+    option: [ do_not, save ]
   MeowfficerBuy:
     value: do_not
     option: [ do_not, save ]
   MeowfficerTalent:
     value: do_not
-    option: [ do_not, save, upload, save_and_upload ]
+    option: [ do_not, save ]
 Retirement:
   RetireMode:
     value: one_click_retire

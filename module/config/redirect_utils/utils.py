@@ -1,5 +1,3 @@
-from module.config.server import to_server
-
 _COALITION_TO_FROSTFALL = {
     "easy": "tc1",
     "normal": "tc2",
@@ -10,34 +8,6 @@ _COALITION_TO_LITTLE_ACADEMY = {
     "tc2": "normal",
     "tc3": "hard",
 }
-
-
-def upload_redirect(value):
-    """
-    redirect attr about upload.
-    """
-    if isinstance(value, list):
-        if not value[0] and not value[1]:
-            return "do_not"
-        if value[0] and not value[1]:
-            return "save"
-        if not value[0] and value[1]:
-            return "upload"
-        return "save_and_upload"
-    if not value:
-        return "do_not"
-    return "save"
-
-
-def api_redirect(value):
-    """
-    redirect attr about api.
-    """
-    if value == "auto":
-        return "default"
-    if to_server(value) == "cn":
-        return "cn_gz_reverse_proxy"
-    return "default"
 
 
 def dossier_redirect(value):
@@ -92,15 +62,6 @@ def change_ship_redirect(value):
     if equip:
         return "ship_equip"
     return "ship"
-
-
-def api_redirect2(value):
-    """
-    remove shanghai proxy, use guangzhou
-    """
-    if value == "cn_sh_reverse_proxy":
-        return "cn_gz_reverse_proxy"
-    return value
 
 
 def coalition_to_frostfall(value):

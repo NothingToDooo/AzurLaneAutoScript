@@ -20,7 +20,6 @@ from module.config.utils import (
     filepath_i18n,
     parse_value,
     path_to_arg,
-    random_id,
     read_file,
     write_file,
 )
@@ -543,17 +542,6 @@ class ConfigUpdater:
         # ('OpsiShop.Scheduler.Enable', 'OpsiShop.OpsiShop.BuySupply'),
         # ('ShopOnce.GuildShop.Filter', 'ShopOnce.GuildShop.Filter', bp_redirect),
         # ('ShopOnce.MedalShop2.Filter', 'ShopOnce.MedalShop2.Filter', bp_redirect),
-        # (('Alas.DropRecord.SaveResearch', 'Alas.DropRecord.UploadResearch'),
-        #  'Alas.DropRecord.ResearchRecord', upload_redirect),
-        # (('Alas.DropRecord.SaveCommission', 'Alas.DropRecord.UploadCommission'),
-        #  'Alas.DropRecord.CommissionRecord', upload_redirect),
-        # (('Alas.DropRecord.SaveOpsi', 'Alas.DropRecord.UploadOpsi'),
-        #  'Alas.DropRecord.OpsiRecord', upload_redirect),
-        # (('Alas.DropRecord.SaveMeowfficerTalent', 'Alas.DropRecord.UploadMeowfficerTalent'),
-        #  'Alas.DropRecord.MeowfficerTalent', upload_redirect),
-        # ('Alas.DropRecord.SaveCombat', 'Alas.DropRecord.CombatRecord', upload_redirect),
-        # ('Alas.DropRecord.SaveMeowfficer', 'Alas.DropRecord.MeowfficerBuy', upload_redirect),
-        # ('Alas.Emulator.PackageName', 'Alas.DropRecord.API', api_redirect),
         # ('Alas.RestartEmulator.Enable', 'Alas.RestartEmulator.ErrorRestart'),
         # (
         #     'OpsiGeneral.OpsiGeneral.BuyActionPoint',
@@ -580,7 +568,6 @@ class ConfigUpdater:
         # (('GemsFarming.GemsFarming.VanguardChange', 'GemsFarming.GemsFarming.VanguardEquipChange'),
         #  'GemsFarming.GemsFarming.ChangeVanguard',
         #  change_ship_redirect),
-        # ('Alas.DropRecord.API', 'Alas.DropRecord.API', api_redirect2)
         # 2025.04.17
         # ('Coalition.Coalition.Mode', 'Coalition.Coalition.Mode', coalition_to_frostfall),
         # 2025.06.26
@@ -626,14 +613,11 @@ class ConfigUpdater:
                 or (display == "hide" and typ != "stored")
             ):
                 value = data["value"]
+            if len(keys) >= 3 and keys[-2] == "DropRecord" and value in {"upload", "save_and_upload"}:
+                value = "save" if value == "save_and_upload" else "do_not"
             value = parse_value(value, data=data)
             deep_set(new, keys=keys, value=value)
 
-        # AzurStatsID。
-        if is_template:
-            deep_set(new, "Alas.DropRecord.AzurStatsID", None)
-        else:
-            deep_default(new, "Alas.DropRecord.AzurStatsID", random_id())
         if deep_get(new, keys="OpsiHazard1Leveling.Scheduler.Enable"):
             deep_set(new, keys="OpsiMeowfficerFarming.Scheduler.Enable", value=True)
         # 更新到最新活动。

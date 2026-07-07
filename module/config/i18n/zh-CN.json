@@ -457,31 +457,17 @@
       "name": "掉落保存目录",
       "help": ""
     },
-    "AzurStatsID": {
-      "name": "AzurStat ID",
-      "help": "上传至 https://azur-stats.lyoko.io 时，声明的客户端 ID\n由随机字符组成，可随意修改"
-    },
-    "API": {
-      "name": "上传线路",
-      "help": "如果国内用户无法连接到 AzurStat，可以使用\"国内反向代理\"",
-      "default": "默认 (Cloudflare)",
-      "cn_gz_reverse_proxy": "国内反向代理 (广州)"
-    },
     "ResearchRecord": {
       "name": "科研截图",
       "help": "",
       "do_not": "无操作",
-      "save": "保存",
-      "upload": "上传",
-      "save_and_upload": "保存并上传"
+      "save": "保存"
     },
     "CommissionRecord": {
       "name": "委托截图",
       "help": "",
       "do_not": "无操作",
-      "save": "保存",
-      "upload": "上传",
-      "save_and_upload": "保存并上传"
+      "save": "保存"
     },
     "CombatRecord": {
       "name": "战斗掉落截图",
@@ -493,9 +479,7 @@
       "name": "大世界掉落截图",
       "help": "",
       "do_not": "无操作",
-      "save": "保存",
-      "upload": "上传",
-      "save_and_upload": "保存并上传"
+      "save": "保存"
     },
     "MeowfficerBuy": {
       "name": "指挥喵购买截图",
@@ -507,9 +491,7 @@
       "name": "指挥喵天赋截图",
       "help": "",
       "do_not": "无操作",
-      "save": "保存",
-      "upload": "上传",
-      "save_and_upload": "保存并上传"
+      "save": "保存"
     }
   },
   "Retirement": {
@@ -1368,7 +1350,7 @@
     },
     "PresetFilter": {
       "name": "科研过滤器",
-      "help": "科研掉落和项目刷新见 https://azur-stats.lyoko.io/，对这些没有基本了解的人不建议编写自定义过滤器，建议使用预优化科研过滤器",
+      "help": "不了解科研掉落和项目刷新时，建议使用预设科研过滤器。",
       "custom": "自定义",
       "series_8_blueprint_305": "八期 蓝图+305",
       "series_8_blueprint_only": "八期 仅蓝图",

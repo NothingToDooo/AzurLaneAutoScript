@@ -57,20 +57,17 @@ class GeneratedConfig:
 
     # 配置组 `DropRecord`
     DropRecord_SaveFolder = "./screenshots"
-    DropRecord_AzurStatsID = None
-    # 可选项：default, cn_gz_reverse_proxy
-    DropRecord_API = "default"
-    # 可选项：do_not, save, upload, save_and_upload
+    # 可选项：do_not, save
     DropRecord_ResearchRecord = "do_not"
-    # 可选项：do_not, save, upload, save_and_upload
+    # 可选项：do_not, save
     DropRecord_CommissionRecord = "do_not"
     # 可选项：do_not, save
     DropRecord_CombatRecord = "do_not"
-    # 可选项：do_not, save, upload, save_and_upload
+    # 可选项：do_not, save
     DropRecord_OpsiRecord = "do_not"
     # 可选项：do_not, save
     DropRecord_MeowfficerBuy = "do_not"
-    # 可选项：do_not, save, upload, save_and_upload
+    # 可选项：do_not, save
     DropRecord_MeowfficerTalent = "do_not"
 
     # 配置组 `Retirement`
