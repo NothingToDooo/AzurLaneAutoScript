@@ -404,23 +404,18 @@ def parse_pin_value(val, valuetype: str | None = None):
     checkbox 返回 [] 或 [True]（由 put_checkbox_ 定义）。
     """
     if isinstance(val, list):
-        if len(val) == 0:
-            return False
-        else:
-            return True
-    elif valuetype:
+        return bool(val)
+    if valuetype:
         return str2type[valuetype](val)
-    elif isinstance(val, (int, float)):
+    if isinstance(val, (int, float)):
         return val
-    else:
-        try:
-            v = float(val)
-        except ValueError:
-            return val
-        if v.is_integer():
-            return int(v)
-        else:
-            return v
+    try:
+        v = float(val)
+    except ValueError:
+        return val
+    if v.is_integer():
+        return int(v)
+    return v
 
 
 def to_pin_value(val):
@@ -429,10 +424,9 @@ def to_pin_value(val):
     """
     if val is True:
         return [True]
-    elif val is False:
+    if val is False:
         return []
-    else:
-        return val
+    return val
 
 
 def login(password):
@@ -442,9 +436,8 @@ def login(password):
     if str(pwd) == str(password):
         set_localstorage("password", str(pwd))
         return True
-    else:
-        toast("Wrong password!", color="error")
-        return False
+    toast("Wrong password!", color="error")
+    return False
 
 
 def get_window_visibility_state():

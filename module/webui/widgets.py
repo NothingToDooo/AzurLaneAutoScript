@@ -512,8 +512,7 @@ def put_output(output_kwargs: T_Output_Kwargs) -> Output | None:
 def get_loading_style(shape: str, fill: bool) -> str:
     if fill:
         return f"--loading-{shape}-fill--"
-    else:
-        return f"--loading-{shape}--"
+    return f"--loading-{shape}--"
 
 
 def put_loading_text(

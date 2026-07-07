@@ -95,24 +95,21 @@ class ProcessManager:
     def alive(self) -> bool:
         if self._process is not None:
             return self._process.is_alive()
-        else:
-            return False
+        return False
 
     @property
     def state(self) -> int:
         if self.alive:
             return 1
-        elif len(self.renderables) == 0:
+        if len(self.renderables) == 0:
             return 2
-        else:
-            console = Console(no_color=True)
-            with console.capture() as capture:
-                console.print(self.renderables[-1])
-            s = capture.get().strip()
-            if s.endswith(("Reason: Manual stop", "Reason: Finish")):
-                return 2
-            else:
-                return 3
+        console = Console(no_color=True)
+        with console.capture() as capture:
+            console.print(self.renderables[-1])
+        s = capture.get().strip()
+        if s.endswith(("Reason: Manual stop", "Reason: Finish")):
+            return 2
+        return 3
 
     @classmethod
     def get_manager(cls, config_name: str) -> ProcessManager:
