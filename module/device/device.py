@@ -9,12 +9,6 @@ from module.device.env import IS_WINDOWS
 if TYPE_CHECKING:
     from lxml import etree
 
-# 在导入 adbutils 和 uiautomator2 之前先修补 pkg_resources。
-from module.device.pkg_resources import get_distribution
-
-# 避免导入优化移除上面的修补。
-_ = get_distribution
-
 from module.base.timer import Timer
 from module.config.utils import get_server_next_update
 from module.device.app_control import AppControl

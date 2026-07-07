@@ -1,8 +1,11 @@
 import re
+import sys
 from pathlib import Path
 
 import module.config.server as server
 from module.base.decorator import cached_property, del_cached_property
+from module.logger import logger
+from module.ocr.models import OCR_MODEL
 
 
 def get_assets_from_file(file, regex):
@@ -52,8 +55,6 @@ class Resource:
 
     @classmethod
     def resource_show(cls):
-        from module.logger import logger
-
         logger.hr("Show resource")
         for key, obj in cls.instances.items():
             if cls.is_loaded(obj):
@@ -79,8 +80,6 @@ class Resource:
 
 def release_resources(next_task=""):
     # 释放 OCR 模型。通常会加载 2 个模型，每个约 20MB。
-    from module.ocr.ocr import OCR_MODEL
-
     if "Opsi" in next_task or "commission" in next_task:
         # 马上会用到 OCR，不释放。
         models = []
@@ -92,33 +91,33 @@ def release_resources(next_task=""):
     for model in models:
         del_cached_property(OCR_MODEL, model)
 
-    # Release assets cache
-    # module.ui has about 80 assets and takes about 3MB
-    # Alas has about 800 assets, but they are not all loaded.
-    # Template images take more, about 6MB each
+    # 释放已加载资源缓存。
+    # module.ui 约 80 个资源，占用约 3MB。
+    # Alas 约 800 个资源，但不会全部加载。
+    # Template 图片更大，每张约 6MB。
     for obj in Resource.instances.values():
-        # Preserve assets for ui switching
+        # 保留 UI 切换需要的资源。
         if next_task and str(obj) in _preserved_assets.ui:
             continue
         # if Resource.is_loaded(obj):
         #     logger.info(f'Release {obj}')
         obj.resource_release()
 
-    # Release cached images for map detection
-    from module.map_detection.utils_assets import ASSETS
+    # 只在地图检测资源已经加载时释放，避免为了清缓存反而导入重资源。
+    utils_assets = sys.modules.get("module.map_detection.utils_assets")
+    if utils_assets is not None:
+        attr_list = [
+            "ui_mask",
+            "ui_mask_os",
+            "ui_mask_stroke",
+            "ui_mask_in_map",
+            "ui_mask_os_in_map",
+            "tile_center_image",
+            "tile_corner_image",
+            "tile_corner_image_list",
+        ]
+        for attr in attr_list:
+            del_cached_property(utils_assets.ASSETS, attr)
 
-    attr_list = [
-        "ui_mask",
-        "ui_mask_os",
-        "ui_mask_stroke",
-        "ui_mask_in_map",
-        "ui_mask_os_in_map",
-        "tile_center_image",
-        "tile_corner_image",
-        "tile_corner_image_list",
-    ]
-    for attr in attr_list:
-        del_cached_property(ASSETS, attr)
-
-    # Useless in most cases, but just call it
+    # 多数情况下收益不大，暂时不主动调用。
     # gc.collect()
