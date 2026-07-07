@@ -36,7 +36,7 @@ from pywebio.output import (
 from pywebio.pin import pin, pin_on_change
 from pywebio.session import download, go_app, info, local, register_thread, run_js, set_env
 
-from deploy.atomic import atomic_failure_cleanup
+from module.base.atomic import atomic_failure_cleanup
 from module.config.config import AzurLaneConfig, Function
 from module.config.deep import deep_get, deep_iter, deep_set
 from module.config.server import to_server
@@ -53,7 +53,6 @@ from module.submodule.submodule import load_config
 from module.submodule.utils import get_config_mod
 from module.webui import lang
 from module.webui.base import Frame
-from module.webui.discord_presence import close_discord_rpc, init_discord_rpc
 from module.webui.fastapi import asgi_app
 from module.webui.lang import t
 from module.webui.patch import patch_executor, patch_mimetype
@@ -208,7 +207,7 @@ class AlasGUI(Frame):
     @classmethod
     def set_theme(cls, theme="default") -> None:
         cls.theme = theme
-        State.deploy_config.Theme = theme
+        State.webui_config.Theme = theme
         State.theme = theme
         webconfig(theme=theme)
 
@@ -1085,8 +1084,6 @@ def startup():
     State.init()
     lang.reload()
     task_handler.start()
-    if State.deploy_config.DiscordRichPresence:
-        init_discord_rpc()
 
 
 def clearup():
@@ -1094,7 +1091,6 @@ def clearup():
     注意：必须在 uvicorn 重新加载 app 前执行。
     """
     logger.info("Start clearup")
-    close_discord_rpc()
     for alas in ProcessManager._processes.values():
         alas.stop()
     State.clearup()
@@ -1119,20 +1115,19 @@ def app():
     args, _ = parser.parse_known_args()
 
     # 应用配置。
-    AlasGUI.set_theme(theme=State.deploy_config.Theme)
-    key = args.key or State.deploy_config.Password
-    cdn = args.cdn or State.deploy_config.CDN
+    AlasGUI.set_theme(theme=State.webui_config.Theme)
+    key = args.key or State.webui_config.Password
+    cdn = args.cdn or State.webui_config.CDN
     runs: list[str] = []
     if args.run:
         runs = args.run
-    elif State.deploy_config.Run:
-        # deploy.yaml 的 Run 仍按逗号分隔字符串读取。
-        tmp = State.deploy_config.Run.split(",")
+    elif State.webui_config.Run:
+        tmp = State.webui_config.Run.split(",")
         runs = [entry.strip(" ['\"]") for entry in tmp if entry]
     instances = runs
 
     logger.hr("Webui configs")
-    logger.attr("Theme", State.deploy_config.Theme)
+    logger.attr("Theme", State.webui_config.Theme)
     logger.attr("Password", bool(key))
     logger.attr("CDN", cdn)
 

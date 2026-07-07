@@ -2,7 +2,7 @@ import multiprocessing
 from typing import TYPE_CHECKING, cast
 
 from module.config.config_updater import ConfigUpdater
-from module.webui.config import DeployConfig
+from module.webui.config import WebUIConfig
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -69,12 +69,12 @@ class State:
         cls._clearup = True
 
     @cached_class_property
-    def deploy_config(cls) -> DeployConfig:
+    def webui_config(cls) -> WebUIConfig:
         """
         Returns:
-            DeployConfig：
+            WebUIConfig：
         """
-        return DeployConfig()
+        return WebUIConfig()
 
     @cached_class_property
     def config_updater(cls) -> ConfigUpdater:

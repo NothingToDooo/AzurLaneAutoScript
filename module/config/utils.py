@@ -7,7 +7,7 @@ from pathlib import Path
 import yaml
 from yaml.representer import SafeRepresenter
 
-from deploy.atomic import atomic_read_bytes, atomic_read_text, atomic_write
+from module.base.atomic import atomic_read_bytes, atomic_read_text, atomic_write
 from module.logger import logger
 from module.submodule.utils import get_mod_filepath, list_mod_instance, list_mod_template
 

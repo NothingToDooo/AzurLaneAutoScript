@@ -20,7 +20,6 @@ dependencies = [
     "pydantic",
     "aiofiles",
     "onepush",
-    "pypresence",
     "cnocr",
     "pywebio",
     "starlette",

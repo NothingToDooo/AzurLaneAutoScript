@@ -820,9 +820,8 @@ class Connection(ConnectionAttr):
         @run_once
         def brute_force_connect():
             logger.info("Brute force connect")
-            EmulatorManager = import_module("deploy.Windows.emulator").EmulatorManager
-            manager = EmulatorManager()
-            manager.brute_force_connect()
+            EmulatorManager = import_module("module.device.platform.emulator_windows").EmulatorManager
+            self.adb_brute_force_connect(EmulatorManager().all_emulator_serials)
 
         for _ in range(2):
             logger.info(

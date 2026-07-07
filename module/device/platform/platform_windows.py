@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING
 import psutil
 from adbutils.errors import AdbError
 
-from deploy.Windows.utils import DataProcessInfo
 from module.base.decorator import run_once
 from module.base.timer import Timer
 from module.device.platform.emulator_windows import Emulator, EmulatorInstance, EmulatorManager
 from module.device.platform.platform_base import PlatformBase
+from module.device.platform.utils import DataProcessInfo
 from module.logger import logger
 
 if TYPE_CHECKING:
@@ -139,7 +139,9 @@ class PlatformWindows(PlatformBase, EmulatorManager):
             # MuMuManager.exe api -v 1 shutdown_player
             if instance.MuMuPlayer12_id is None:
                 logger.warning(f"Cannot get MuMu instance index from name {instance.name}")
-            self.execute([Emulator.single_to_console(exe), "api", "-v", str(instance.MuMuPlayer12_id), "shutdown_player"])
+            self.execute(
+                [Emulator.single_to_console(exe), "api", "-v", str(instance.MuMuPlayer12_id), "shutdown_player"]
+            )
         else:
             raise EmulatorUnknown(f"Cannot stop an unknown emulator instance: {instance}")
 

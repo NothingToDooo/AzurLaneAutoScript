@@ -147,8 +147,8 @@ class ConnectionAttr:
 
     @cached_property
     def adb_binary(self):
-        # 优先使用 deploy.yaml 指定的 ADB。
-        file = State.deploy_config.AdbExecutable
+        # 优先使用 WebUI 配置指定的 ADB。
+        file = State.webui_config.AdbExecutable
         file = file.replace("\\", "/")
         if Path(file).exists():
             return str(Path(file).resolve())

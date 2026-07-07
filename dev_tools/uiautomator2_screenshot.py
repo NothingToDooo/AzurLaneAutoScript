@@ -1,7 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
-from deploy.atomic import atomic_write
+from module.base.atomic import atomic_write
 from module.base.base import ModuleBase, cv2, image_channel
 from module.logger import logger
 

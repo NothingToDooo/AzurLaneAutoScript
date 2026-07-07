@@ -11,13 +11,13 @@ def func() -> None:
     parser.add_argument(
         "--host",
         type=str,
-        help="监听地址，默认使用 deploy 配置里的 WebuiHost。",
+        help="监听地址，默认使用 WebUI 配置里的 WebuiHost。",
     )
     parser.add_argument(
         "-p",
         "--port",
         type=int,
-        help="监听端口，默认使用 deploy 配置里的 WebuiPort。",
+        help="监听端口，默认使用 WebUI 配置里的 WebuiPort。",
     )
     parser.add_argument("-k", "--key", type=str, help="WebUI 密码，默认不启用。")
     parser.add_argument(
@@ -33,8 +33,8 @@ def func() -> None:
     )
     args, _ = parser.parse_known_args()
 
-    host = args.host or State.deploy_config.WebuiHost or "127.0.0.1"
-    port = args.port or int(State.deploy_config.WebuiPort) or 22267
+    host = args.host or State.webui_config.WebuiHost or "127.0.0.1"
+    port = args.port or int(State.webui_config.WebuiPort) or 22267
 
     logger.hr("启动配置")
     logger.attr("Host", host)

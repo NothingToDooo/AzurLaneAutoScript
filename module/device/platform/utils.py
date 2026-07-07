@@ -1,8 +1,11 @@
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+import psutil
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable
 
 
 class cached_property[T]:
@@ -50,3 +53,35 @@ def iter_folder(folder, is_dir=False, ext=None):
                 yield sub.as_posix()
         else:
             yield sub.as_posix()
+
+
+@dataclass
+class DataProcessInfo:
+    proc: Any
+    pid: int
+
+    @cached_property
+    def name(self):
+        try:
+            return self.proc.name()
+        except psutil.Error:
+            return ""
+
+    @cached_property
+    def cmdline(self):
+        try:
+            cmdline = self.proc.cmdline()
+        except psutil.Error:
+            cmdline = []
+        return " ".join(cmdline).replace(r"\\", "/").replace("\\", "/")
+
+    def __str__(self):
+        return f'DataProcessInfo(name="{self.name}", pid={self.pid}, cmdline="{self.cmdline}")'
+
+    __repr__ = __str__
+
+
+def iter_process() -> Iterable[DataProcessInfo]:
+    for pid in psutil.pids():
+        proc = psutil._psplatform.Process(pid)
+        yield DataProcessInfo(proc=proc, pid=proc.pid)

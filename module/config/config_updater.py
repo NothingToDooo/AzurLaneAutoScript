@@ -6,7 +6,6 @@ from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
-from deploy.utils import DEPLOY_TEMPLATE, poor_yaml_read, poor_yaml_write
 from module.base.decorator import cached_property
 from module.base.timer import timer
 from module.config.deep import deep_default, deep_get, deep_iter, deep_set
@@ -513,20 +512,6 @@ class ConfigGenerator:
                 deep_set(self.args, keys=f"{task}.Campaign.Event.option_bold", value=options)
             deep_set(self.args, keys=f"{task}.Campaign.Event.option", value=options)
 
-    @staticmethod
-    def generate_deploy_template():
-        template = poor_yaml_read(DEPLOY_TEMPLATE)
-
-        def update(suffix, *args):
-            file = f"./config/deploy.{suffix}.yaml"
-            new = deepcopy(template)
-            for dic in args:
-                new.update(dic)
-            poor_yaml_write(data=new, file=file)
-
-        update("template")
-        update("template-cn")
-
     def insert_package(self):
         option = deep_get(self.argument, keys="Emulator.PackageName.option")
         option += list(VALID_PACKAGE.keys())
@@ -555,7 +540,6 @@ class ConfigGenerator:
         self.generate_code()
         for lang in LANGUAGES:
             self.generate_i18n(lang)
-        self.generate_deploy_template()
 
 
 class ConfigUpdater:

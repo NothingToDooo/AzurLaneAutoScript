@@ -4,7 +4,7 @@ config/backup/*
 config/*.ini
 !config/template.ini
 config/*.yaml
-!config/deploy.*.yaml
+!config/webui.yaml
 config/*.json
 config/tmp*
 !config/template*.json
