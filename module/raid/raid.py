@@ -216,22 +216,19 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
             bool: If triggered a stop condition.
         """
         # Oil limit
-        if oil_check:
-            if self.get_oil() < max(500, self.config.StopCondition_OilLimit):
-                logger.hr("Triggered stop condition: Oil limit")
-                self.config.task_delay(minute=(120, 240))
-                return True
+        if oil_check and self.get_oil() < max(500, self.config.StopCondition_OilLimit):
+            logger.hr("Triggered stop condition: Oil limit")
+            self.config.task_delay(minute=(120, 240))
+            return True
         # Event limit
-        if pt_check:
-            if self.event_pt_limit_triggered():
-                logger.hr("Triggered stop condition: Event PT limit")
-                return True
+        if pt_check and self.event_pt_limit_triggered():
+            logger.hr("Triggered stop condition: Event PT limit")
+            return True
         # TaskBalancer
-        if coin_check:
-            if self.config.TaskBalancer_Enable and self.triggered_task_balancer():
-                logger.hr("Triggered stop condition: Coin limit")
-                self.handle_task_balancer()
-                return True
+        if coin_check and self.config.TaskBalancer_Enable and self.triggered_task_balancer():
+            logger.hr("Triggered stop condition: Coin limit")
+            self.handle_task_balancer()
+            return True
 
         return False
 
