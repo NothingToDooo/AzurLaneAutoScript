@@ -152,6 +152,7 @@ class AutoSearchHandler(EnemySearchingHandler):
             counter += 1
             self.device.sleep((0.3, 0.5))
             continue
+        return False
 
     _auto_search_offset = (5, 5)
     # MULTIPLE_SORTIE 出现时向左移动 213px。

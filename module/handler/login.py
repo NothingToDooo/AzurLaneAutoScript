@@ -187,8 +187,7 @@ class LoginHandler(UI):
         def ensure_campaign_retreat():
             if self.appear_then_click(WITHDRAW, offset=(30, 30), interval=5):
                 return True
-            if self.handle_popup_confirm("WITHDRAW"):
-                return True
+            return bool(self.handle_popup_confirm("WITHDRAW"))
 
         def in_campaign():
             return (

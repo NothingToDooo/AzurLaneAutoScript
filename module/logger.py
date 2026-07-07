@@ -75,13 +75,13 @@ class RichRenderableHandler(RichHandler):
         message_renderable = self.render_message(record, message)
         log_renderable = self.render(record=record, traceback=traceback, message_renderable=message_renderable)
 
-        # Directly put renderable into function
+        # 直接把 renderable 交给回调函数。
         self._func(log_renderable)
 
     def handle(self, record: logging.LogRecord) -> bool:
         if not self._func:
             return True
-        super().handle(record)
+        return super().handle(record)
 
 
 class HTMLConsole(Console):

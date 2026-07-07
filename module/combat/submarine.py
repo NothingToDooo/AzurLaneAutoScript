@@ -50,3 +50,4 @@ class SubmarineCall(ModuleBase):
             logger.info("Call submarine")
             self.submarine_call_click_timer.reset()
             return True
+        return False

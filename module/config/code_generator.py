@@ -107,6 +107,7 @@ class CodeGenerator:
             self.add(f"{self._repr(value)}")
             return value
         self.add(f"{self._repr(value)},")
+        return None
 
     def Dict(self, key=None):
         if key is not None:
@@ -121,6 +122,7 @@ class CodeGenerator:
             return value
         if key is not None:
             self.add(f"{self._repr(key)}: {self._repr(value)},")
+        return None
 
     def Object(self, object_class, key=None):
         if key is not None:
@@ -139,6 +141,7 @@ class CodeGenerator:
             self.add(f"{self._repr(value)},")
         else:
             self.add(f"{key}={self._repr(value)},")
+        return None
 
     def Class(self, name, inherit=None):
         if inherit is not None:

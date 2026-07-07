@@ -268,6 +268,7 @@ class Daily(Combat, DailyEquipment):
                     return False
             if self.combat_appear():
                 return True
+        return False
 
     def daily_check(self, n=None):
         if not n:

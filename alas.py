@@ -544,6 +544,7 @@ class AzurLaneAutoScript:
 
             if self.config.should_reload():
                 return False
+        return False
 
     def get_next_task(self) -> str:
         """返回下一个任务名称。"""

@@ -524,6 +524,7 @@ class InfoHandler(ModuleBase):
             return False
 
         self.ensure_no_story()
+        return True
 
     """
     Game tips

@@ -263,9 +263,10 @@ class FastForwardHandler(AutoSearchHandler):
             if state != "unknown":
                 return True
             if timeout.reached():
-                # some maps may have clear mode but don't have auto search
+                # 有些地图有清理模式，但没有自律寻敌。
                 logger.info("map wait auto search timeout")
                 return False
+        return False
 
     def handle_auto_search(self):
         """
@@ -581,3 +582,4 @@ class FastForwardHandler(AutoSearchHandler):
                 self.device.click(handler_assets.MAP_WALK_SPEEDUP)
                 interval.reset()
                 continue
+        return False

@@ -67,6 +67,7 @@ class Equipment(StorageHandler):
             if self.appear(check_button, offset=(30, 30)) and not equipment_assets.SWIPE_CHECK.match(self.device.image):
                 logger.info("New ship detected on swipe")
                 return True
+        return False
 
     def ship_view_next(self, check_button=equipment_assets.EQUIPMENT_OPEN):
         return self._ship_view_swipe(distance=-SWIPE_DISTANCE, check_button=check_button)
