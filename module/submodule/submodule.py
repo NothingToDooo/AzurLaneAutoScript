@@ -1,5 +1,6 @@
 import importlib
 
+from module.config.config import AzurLaneConfig
 from module.logger import logger
 from module.submodule.utils import get_config_mod, get_mod_dir
 
@@ -14,8 +15,6 @@ def load_mod(name):
 
 
 def load_config(config_name):
-    from module.config.config import AzurLaneConfig
-
     mod_name = get_config_mod(config_name)
     if mod_name == "alas":
         return AzurLaneConfig(config_name, "")

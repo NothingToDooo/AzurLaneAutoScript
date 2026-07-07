@@ -2,6 +2,7 @@ import traceback
 from pathlib import Path
 
 import cv2
+import imageio
 import numpy as np
 from PIL import Image, ImageDraw
 
@@ -155,8 +156,6 @@ class Button(Resource):
         if not self._match_init:
             if self.is_gif:
                 self.image = []
-                import imageio
-
                 for frame in imageio.mimread(self.file):
                     image = frame[:, :, :3].copy() if len(frame.shape) == 3 else frame
                     image = crop(image, self.area)
