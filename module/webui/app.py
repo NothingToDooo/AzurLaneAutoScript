@@ -516,9 +516,9 @@ class AlasGUI(Frame):
             for p, v in deep_iter(config, depth=3):
                 if p[-1].endswith("un") and not isinstance(v, bool) and (v - n).days >= 31:
                     deep_set(config, p, "")
-            for k, v in modified.copy().items():
+            for k, raw_value in modified.copy().items():
                 valuetype = deep_get(self.ALAS_ARGS, k + ".valuetype")
-                v = parse_pin_value(v, valuetype)
+                v = parse_pin_value(raw_value, valuetype)
                 validate = deep_get(self.ALAS_ARGS, k + ".validate")
                 if not str(v):
                     default = deep_get(self.ALAS_ARGS, k + ".value")

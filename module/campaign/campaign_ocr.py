@@ -117,8 +117,8 @@ class CampaignOcr(ModuleBase):
         stage_image = image if stage_image is None else stage_image
         result = template.match_multi(stage_image, similarity=similarity, name="STAGE")
         name_area = (name_offset[0], name_offset[1], name_offset[0] + name_size[0], name_offset[1] + name_size[1])
-        for button in result:
-            button = button.move(self._stage_detect_area[:2])
+        for matched_button in result:
+            button = matched_button.move(self._stage_detect_area[:2])
             button_name = button.crop(area=name_area, image=image)
             name = extract_letters(button_name.image, letter=name_letter, threshold=name_thresh)
             button_name = button_name.crop(area=self._extract_stage_name(name))

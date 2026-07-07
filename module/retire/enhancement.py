@@ -281,7 +281,8 @@ class Enhancement(Dock):
         available_ship_types = VALID_SHIP_TYPES.copy()
         [available_ship_types.remove(s) for s in ship_types if s in available_ship_types]
 
-        for ship_type in ship_types:
+        for requested_ship_type in ship_types:
+            ship_type = requested_ship_type
             # None check, do not execute if is None
             # Otherwise, select a type at random since
             # user has specified an unrecognized type

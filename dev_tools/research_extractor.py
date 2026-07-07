@@ -99,8 +99,8 @@ class TechnologyTemplate:
         task = loader.load("sharecfgdata/task_data_template.lua")
 
         projects = {}
-        for key, value in tech.items():
-            if key == "all":
+        for tech_key, value in tech.items():
+            if tech_key == "all":
                 continue
             project = Project(value)
             if project.task.id:
@@ -110,9 +110,9 @@ class TechnologyTemplate:
             for i in project.output:
                 i.name = item[i.id]["name"].strip()
 
-            key = (project.series, project.name)
-            if key not in projects:
-                projects[key] = project
+            project_key = (project.series, project.name)
+            if project_key not in projects:
+                projects[project_key] = project
 
         return projects
 

@@ -23,8 +23,8 @@ def extract(dic, word_list):
         word_list (list[str]):
     """
     global count
-    for word, data in dic.items():
-        word = str(word)
+    for raw_word, data in dic.items():
+        word = str(raw_word)
         if data.get("this", False):
             new = [*word_list, word]
             new = "".join(new)

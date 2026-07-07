@@ -243,8 +243,8 @@ class EmulatorManager(EmulatorManagerBase):
         for folder in folders:
             try:
                 with winreg.OpenKey(winreg.HKEY_CURRENT_USER, f"{path}\\{folder}\\Count") as reg:
-                    for key in list_reg(reg):
-                        key = codecs.decode(key.name, "rot-13")
+                    for reg_value in list_reg(reg):
+                        key = codecs.decode(reg_value.name, "rot-13")
                         # Skip those with hash
                         if regex_hash.search(key):
                             continue

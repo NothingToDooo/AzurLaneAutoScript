@@ -645,7 +645,8 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         # if not hasattr(self, 'emotion'):
         #     self.emotion = Emotion(config=self.config)
 
-        with self.stat.new(genre=self.config.campaign_name, method=self.config.DropRecord_CombatRecord) as drop:
+        with self.stat.new(genre=self.config.campaign_name, method=self.config.DropRecord_CombatRecord) as drop_record:
+            drop = drop_record
             if save_get_items is False:
                 drop = None
             elif isinstance(save_get_items, DropImage):

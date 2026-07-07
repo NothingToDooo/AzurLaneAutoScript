@@ -106,8 +106,8 @@ class RelativeRecord:
         offset_list = np.array([(1, 0, 1, 0), (-1, 0, -1, 0), (0, 1, 0, 1), (0, -1, 0, -1)])
         out = stats.copy()
         visited = set()
-        for area in tqdm(stats):
-            area = np.array(area)
+        for raw_area in tqdm(stats):
+            area = np.array(raw_area)
             for offset in offset_list:
                 new = area + offset
                 new = tuple(new.tolist())
@@ -152,8 +152,8 @@ class RelativeRecord:
                 template_dict[count] = templates
 
         print("Saving gif")
-        for count, sim, templates in zip(sim_dict.keys(), sim_dict.values(), template_dict.values(), strict=True):
-            sim = str(int((1 - sim) * 1000000)).rjust(6, "0")
+        for count, raw_sim, templates in zip(sim_dict.keys(), sim_dict.values(), template_dict.values(), strict=True):
+            sim = str(int((1 - raw_sim) * 1000000)).rjust(6, "0")
             name = f"{count}_{sim}_{'-'.join([str(x) for x in size])}"
             imageio.mimsave(Path(self.folder) / f"{name}.gif", templates, fps=3)
         print(f"{size} done")

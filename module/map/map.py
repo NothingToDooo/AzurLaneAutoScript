@@ -142,9 +142,13 @@ class Map(Fleet):
             grids = enemy
         if len(genre):
             enemy = SelectedGrids([])
-            for enemy_genre in genre:
+            for raw_enemy_genre in genre:
                 # enemy_genre should be camel case
-                enemy_genre = enemy_genre[0].upper() + enemy_genre[1:] if enemy_genre[0].islower() else enemy_genre
+                enemy_genre = (
+                    raw_enemy_genre[0].upper() + raw_enemy_genre[1:]
+                    if raw_enemy_genre[0].islower()
+                    else raw_enemy_genre
+                )
                 enemy = enemy.add(grids.select(enemy_genre=enemy_genre))
                 if isinstance(genre, list) and enemy:
                     break

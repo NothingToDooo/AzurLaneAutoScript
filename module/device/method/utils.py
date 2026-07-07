@@ -134,8 +134,8 @@ def possible_reasons(*args):
         Possible reason #2: <reason_2>
     """
     for index, reason in enumerate(args):
-        index += 1
-        logger.critical(f"Possible reason #{index}: {reason}")
+        reason_number = index + 1
+        logger.critical(f"Possible reason #{reason_number}: {reason}")
 
 
 class PackageNotInstalled(Exception):

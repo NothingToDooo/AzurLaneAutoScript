@@ -53,11 +53,11 @@ class Filter:
             list: A list of objects and preset strings, such as [object, object, object, 'reset']
         """
         out = []
-        for raw, parsed_filter in zip(self.filter_raw, self.filter, strict=True):
-            if self.is_preset(raw):
-                raw = raw.lower()
-                if raw not in out:
-                    out.append(raw)
+        for raw_filter, parsed_filter in zip(self.filter_raw, self.filter, strict=True):
+            if self.is_preset(raw_filter):
+                preset = raw_filter.lower()
+                if preset not in out:
+                    out.append(preset)
             else:
                 for _index, obj in enumerate(objs):
                     if self.apply_filter_to_obj(obj=obj, filter_value=parsed_filter) and obj not in out:

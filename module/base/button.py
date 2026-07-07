@@ -157,8 +157,8 @@ class Button(Resource):
                 self.image = []
                 import imageio
 
-                for image in imageio.mimread(self.file):
-                    image = image[:, :, :3].copy() if len(image.shape) == 3 else image
+                for frame in imageio.mimread(self.file):
+                    image = frame[:, :, :3].copy() if len(frame.shape) == 3 else frame
                     image = crop(image, self.area)
                     self.image.append(image)
             else:

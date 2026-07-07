@@ -74,9 +74,9 @@ class VirtualBoxEmulator:
         """
         vbox = []
         for path, _folders, files in os.walk(Path(self.root) / self.vbox_path):
-            for file in files:
-                if re.match(self.vbox_name, file):
-                    file = str(Path(path) / file)
+            for filename in files:
+                if re.match(self.vbox_name, filename):
+                    file = str(Path(path) / filename)
                     vbox.append(file)
 
         serial = []

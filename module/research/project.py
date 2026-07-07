@@ -314,8 +314,8 @@ def get_research_cost_jp(image):
     folder = "./assets/stats_basic"
     templates = load_folder(folder)
     costs = {"coin": False, "cube": False, "plate": False}
-    for name, template in templates.items():
-        template = load_image(template)
+    for name, template_path in templates.items():
+        template = load_image(template_path)
         template = crop(resize(template, size_template), area_template, copy=False)
         sim = match_template(
             image=image,

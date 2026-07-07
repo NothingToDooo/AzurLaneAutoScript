@@ -190,10 +190,10 @@ class ItemGrid:
         logger.info(f"Loading template folder: {folder}")
         max_digit = 0
         data = load_folder(folder)
-        for name, image in data.items():
+        for name, image_path in data.items():
             if name in self.templates:
                 continue
-            image = load_image(image)
+            image = load_image(image_path)
             image = crop(image, area=self.template_area)
             self.colors[name] = cv2.mean(image)[:3]
             self.templates[name] = image
@@ -211,10 +211,10 @@ class ItemGrid:
         """
         max_digit = 0
         data = load_folder(folder)
-        for name, image in data.items():
+        for name, image_path in data.items():
             if name in self.cost_templates:
                 continue
-            image = load_image(image)
+            image = load_image(image_path)
             self.cost_templates[name] = image
             self.cost_templates_hit[name] = 0
             if name.isdigit():

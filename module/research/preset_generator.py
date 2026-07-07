@@ -111,10 +111,10 @@ if __name__ == "__main__":
         for series in [8, 7, 6, 5, 4, 3, 2]:
 
             def new_filter(series=series, **kwargs):
-                for k, v in kwargs.items():
-                    k = convert_name(k, series)
-                    v = translate(v, target=k)
-                    DictItem(k, v)
+                for raw_key, raw_value in kwargs.items():
+                    key = convert_name(raw_key, series)
+                    value = translate(raw_value, target=key)
+                    DictItem(key, value)
 
             # 1
             Comment("""

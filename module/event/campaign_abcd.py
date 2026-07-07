@@ -39,8 +39,8 @@ class CampaignABCD(EventBase):
                 logger.info("Start from the beginning")
 
         # Run
-        for stage in stages:
-            stage = str(stage)
+        for raw_stage in stages:
+            stage = str(raw_stage)
             try:
                 super().run(name=stage, folder=self.config.Campaign_Event, total=1)
             except TaskEnd:

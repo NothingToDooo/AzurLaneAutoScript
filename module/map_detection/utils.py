@@ -166,8 +166,8 @@ class Lines:
         prev = 0
         regrouped = []
         group = []
-        for mid, line in zip(lines.mid, lines.lines, strict=True):
-            line = line.tolist()
+        for mid, raw_line in zip(lines.mid, lines.lines, strict=True):
+            line = raw_line.tolist()
             if mid - prev > threshold:
                 if len(regrouped) == 0:
                     if len(group) != 0:

@@ -168,8 +168,8 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         for func in func_list:
             func_data = self.data.get(func, {})
             for group, group_data in func_data.items():
-                for arg, value in group_data.items():
-                    path = f"{group}.{arg}"
+                for arg_name, value in group_data.items():
+                    path = f"{group}.{arg_name}"
                     if path in visited:
                         continue
                     arg = path_to_arg(path)
@@ -204,8 +204,8 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         now = datetime.now()
         if AzurLaneConfig.is_hoarding_task:
             now -= self.hoarding
-        for func in self.data.values():
-            func = Function(func)
+        for func_data in self.data.values():
+            func = Function(func_data)
             if not func.enable:
                 continue
             if not isinstance(func.next_run, datetime):

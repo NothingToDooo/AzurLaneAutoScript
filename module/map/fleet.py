@@ -1018,12 +1018,12 @@ class Fleet(Camera, AmbushHandler):
                     block.is_enemy = True
 
                 if grid.is_accessible:
-                    select = SelectedGrids(list(select))
-                    logger.info(f"Enemy roadblock: {select}")
+                    roadblock = SelectedGrids(list(select))
+                    logger.info(f"Enemy roadblock: {roadblock}")
                     if backup is not None:
                         self.fleet_current_index = backup
                         self.find_path_initial()
-                    return select
+                    return roadblock
 
         logger.warning("Enemy roadblock try exhausted.")
         return SelectedGrids([])

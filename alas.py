@@ -161,8 +161,8 @@ class AzurLaneAutoScript:
             with Path(logger.log_file).open(encoding="utf-8") as f:
                 lines = f.readlines()
                 start = 0
-                for index, line in enumerate(lines):
-                    line = line.strip(" \r\t\n")
+                for index, raw_line in enumerate(lines):
+                    line = raw_line.strip(" \r\t\n")
                     if re.match(r"^═{15,}$", line):
                         start = index
                 lines = lines[start - 2 :]

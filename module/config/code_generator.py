@@ -62,8 +62,8 @@ class CodeGenerator:
         if isinstance(obj, str) and "\n" in obj:
             out = '"""\n'
             with self.tab():
-                for line in obj.strip().split("\n"):
-                    line = line.strip()
+                for raw_line in obj.strip().split("\n"):
+                    line = raw_line.strip()
                     out += self._line_with_tabs(line)
             out += self._line_with_tabs('"""', newline=False)
             return out
@@ -76,8 +76,8 @@ class CodeGenerator:
         self.add("")
 
     def Import(self, text, empty=2):
-        for line in text.strip().split("\n"):
-            line = line.strip()
+        for raw_line in text.strip().split("\n"):
+            line = raw_line.strip()
             self.add(line)
         for _ in range(empty):
             self.Empty()
@@ -92,8 +92,8 @@ class CodeGenerator:
             self.Value(kw_key, kw_value)
 
     def Comment(self, text):
-        for line in text.strip().split("\n"):
-            line = line.strip()
+        for raw_line in text.strip().split("\n"):
+            line = raw_line.strip()
             self.add(line, comment=True)
 
     def List(self, key=None):

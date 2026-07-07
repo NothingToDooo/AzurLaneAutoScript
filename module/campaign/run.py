@@ -312,10 +312,10 @@ class CampaignRun(CampaignEvent):
         if folder == "event_20240829_cn" and name == "tp":
             name = "sp"
         # Stage loop
-        for alias, stages in self.config.STAGE_LOOP_ALIAS.items():
-            alias_folder, alias = alias
+        for alias_key, stages_value in self.config.STAGE_LOOP_ALIAS.items():
+            alias_folder, alias = alias_key
             if folder == alias_folder and name == alias.lower():
-                stages = [i.strip(" \t\r\n") for i in stages.split(">")]
+                stages = [i.strip(" \t\r\n") for i in stages_value.split(">")]
                 cycle = len(stages)
                 count = int(self.config.StopCondition_RunCount)
                 if count == 0:

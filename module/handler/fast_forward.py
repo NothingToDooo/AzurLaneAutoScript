@@ -391,8 +391,8 @@ class FastForwardHandler(AutoSearchHandler):
 
         # Increase stage
         name = to_map_input_name(name)
-        for increase in stage_increase:
-            increase = [i.strip(" \t\r\n") for i in increase.split(">")]
+        for raw_increase in stage_increase:
+            increase = [i.strip(" \t\r\n") for i in raw_increase.split(">")]
             if name in increase:
                 index = increase.index(name) + 1
                 if index < len(increase):

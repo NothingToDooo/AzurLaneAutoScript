@@ -49,8 +49,8 @@ class ImageExtractor:
             # In a gif Button, use the first image.
             bbox = None
             mean = None
-            for image in imageio.mimread(file):
-                image = image[:, :, :3] if len(image.shape) == 3 else image
+            for frame in imageio.mimread(file):
+                image = frame[:, :, :3] if len(frame.shape) == 3 else frame
                 new_bbox, new_mean = self._extract(image, file)
                 if bbox is None:
                     bbox = new_bbox

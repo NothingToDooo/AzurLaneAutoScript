@@ -193,8 +193,8 @@ class GuildOperations(GuildBase):
         list_enter = []
         dots = TEMPLATE_OPERATIONS_RED_DOT.match_multi(self.image_crop(detection_area, copy=False), threshold=5)
         logger.info(f"Active operations found: {len(dots)}")
-        for button in dots:
-            button = button.move(vector=detection_area[:2])
+        for dot in dots:
+            button = dot.move(vector=detection_area[:2])
             expand = button.crop(area=(-257, 14, 12, 51), name="DISPATCH_ENTRANCE_1")
             enter = button.crop(area=(-257, -109, 12, -1), name="DISPATCH_ENTRANCE_2")
             for b in [expand, enter]:

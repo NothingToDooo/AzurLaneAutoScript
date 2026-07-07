@@ -13,8 +13,8 @@ class OpsiDaily(OSMap):
         if runtime_random.chance():
             ports.reverse()
 
-        for port in ports:
-            port = self.name_to_zone(port)
+        for port_name in ports:
+            port = self.name_to_zone(port_name)
             logger.hr(f"OS port daily in {port}", level=2)
             self.globe_goto(port)
 

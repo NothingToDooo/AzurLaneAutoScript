@@ -76,9 +76,8 @@ def _generated_string_segments(value: str) -> list[str]:
         suffix = "\n" if segment.endswith("\n") else ""
         body = segment.removesuffix("\n")
         chunks = wrapper.wrap(body) or [""]
-        for index, chunk in enumerate(chunks):
-            if index == len(chunks) - 1:
-                chunk += suffix
+        for index, raw_chunk in enumerate(chunks):
+            chunk = raw_chunk + suffix if index == len(chunks) - 1 else raw_chunk
             segments.append(chunk)
     return segments
 
@@ -140,14 +139,13 @@ class ConfigGenerator:
         """
         data = {}
         raw = read_file(filepath_argument("argument"))
-        for path, value in deep_iter(raw, depth=2):
+        for path, raw_value in deep_iter(raw, depth=2):
             arg = {
                 "type": "input",
                 "value": "",
                 # 可选项
             }
-            if not isinstance(value, dict):
-                value = {"value": value}
+            value = raw_value if isinstance(raw_value, dict) else {"value": raw_value}
             arg["type"] = data_to_type(value, arg=path[1])
             if isinstance(value["value"], datetime):
                 arg["type"] = "datetime"
@@ -303,10 +301,10 @@ class ConfigGenerator:
             option = []
             if data.get("option"):
                 option = _generated_comment(", ".join([str(opt) for opt in data["option"]]), prefix="可选项：")
-            path = ".".join(path)
+            path_key = ".".join(path)
             lines.extend(option)
-            lines.extend(_generated_value(path_to_arg(path), parse_value(data["value"], data=data)))
-            visited_path.add(path)
+            lines.extend(_generated_value(path_to_arg(path_key), parse_value(data["value"], data=data)))
+            visited_path.add(path_key)
 
         with Path(filepath_code()).open("w", encoding="utf-8", newline="") as f:
             f.writelines(f"{text}\n" for text in lines)
@@ -388,7 +386,8 @@ class ConfigGenerator:
             "文件": "檔案",
         }
         if lang == "zh-TW":
-            for path, value in deep_iter(new, depth=3):
+            for path, raw_value in deep_iter(new, depth=3):
+                value = raw_value
                 for before, after in dic_repl.items():
                     value = value.replace(before, after)
                 deep_set(new, keys=path, value=value)

@@ -72,8 +72,8 @@ def poor_yaml_read(file):
     content = atomic_read_text(file)
     data = {}
     regex = re.compile(r"^(.*?):(.*?)$")
-    for line in content.splitlines():
-        line = line.strip("\n\r\t ").replace("\\", "/")
+    for raw_line in content.splitlines():
+        line = raw_line.strip("\n\r\t ").replace("\\", "/")
         if line.startswith("#"):
             continue
         result = re.match(regex, line)
@@ -103,13 +103,15 @@ def poor_yaml_write(data, file, template_file=DEPLOY_TEMPLATE):
     text = atomic_read_text(template_file)
     text = text.replace("\\", "/")
 
-    for key, value in data.items():
-        if value is None:
+    for key, raw_value in data.items():
+        if raw_value is None:
             value = "null"
-        elif value is True:
+        elif raw_value is True:
             value = "true"
-        elif value is False:
+        elif raw_value is False:
             value = "false"
+        else:
+            value = raw_value
         text = re.sub(f"{key}:.*?\n", f"{key}: {value}\n", text)
 
     atomic_write(file, text)

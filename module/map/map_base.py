@@ -58,8 +58,8 @@ class CampaignMap:
     @staticmethod
     def _parse_text(text):
         text = text.strip()
-        for y, row in enumerate(text.split("\n")):
-            row = row.strip()
+        for y, raw_row in enumerate(text.split("\n")):
+            row = raw_row.strip()
             for x, data in enumerate(row.split(" ")):
                 yield (x, y), data
 
@@ -189,8 +189,8 @@ class CampaignMap:
         """
         self._maze_data = data
         self.maze_round = len(data) * 3
-        for index, maze in enumerate(data):
-            maze = self.to_selected(maze)
+        for index, raw_maze in enumerate(data):
+            maze = self.to_selected(raw_maze)
             maze.set(is_maze=True, maze_round=tuple(range(index * 3, index * 3 + 3)))
             for grid in maze:
                 self.find_path_initial(grid, has_ambush=False)
@@ -265,8 +265,8 @@ class CampaignMap:
         total = set(self.grids.keys())
         for grid in self:
             connection = set()
-            for arr in np.array([(0, -1), (0, 1), (-1, 0), (1, 0)]):
-                arr = tuple(arr + grid.location)
+            for offset in np.array([(0, -1), (0, 1), (-1, 0), (1, 0)]):
+                arr = tuple(offset + grid.location)
                 if arr in total:
                     connection.add(arr)
             self.grid_connection[grid.location] = connection
@@ -284,9 +284,9 @@ class CampaignMap:
             disconnect = []
             disconnect.extend([loca, np.add(loca, (1, 0))] for loca in (vert - (2, 0)) // (4, 2))
             disconnect.extend([loca, np.add(loca, (0, 1))] for loca in (hori - (0, 1)) // (4, 2))
-            for g1, g2 in disconnect:
-                g1 = tuple(g1.tolist())
-                g2 = tuple(g2.tolist())
+            for raw_g1, raw_g2 in disconnect:
+                g1 = tuple(raw_g1.tolist())
+                g2 = tuple(raw_g2.tolist())
                 self.grid_connection[g1].remove(g2)
                 self.grid_connection[g2].remove(g1)
 
@@ -565,8 +565,8 @@ class CampaignMap:
         while 1:
             new = visited.copy()
             for grid in visited:
-                for arr in self.grid_connection[grid.location]:
-                    arr = self[arr]
+                for location in self.grid_connection[grid.location]:
+                    arr = self[location]
                     if arr.is_land or arr.is_mechanism_block:
                         continue
                     cost = ambush_cost if arr.may_ambush else 1

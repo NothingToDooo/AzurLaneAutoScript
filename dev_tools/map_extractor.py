@@ -666,12 +666,12 @@ class ChapterTemplate:
         print(f"Searching: {name}")
         if isinstance(name, str):
             maps = []
-            for map_id, data in DATA.items():
-                if not isinstance(map_id, int) or is_extra(data["chapter_name"]):
+            for map_id, raw_data in DATA.items():
+                if not isinstance(map_id, int) or is_extra(raw_data["chapter_name"]):
                     continue
-                if not re.search(name, data["name"]):
+                if not re.search(name, raw_data["name"]):
                     continue
-                data = MapData(data, DATA_LOOP.get(map_id, None))
+                data = MapData(raw_data, DATA_LOOP.get(map_id, None))
                 print(f"Found map: {data}")
                 maps.append(data)
         else:
@@ -692,11 +692,11 @@ class ChapterTemplate:
         if select:
             event_id = get_event_id(maps[0].map_id)
             new = []
-            for map_id, data in DATA.items():
-                if not isinstance(map_id, int) or is_extra(data["chapter_name"]):
+            for map_id, raw_data in DATA.items():
+                if not isinstance(map_id, int) or is_extra(raw_data["chapter_name"]):
                     continue
-                if get_event_id(data["id"]) == event_id:
-                    data = MapData(data, DATA_LOOP.get(map_id, None))
+                if get_event_id(raw_data["id"]) == event_id:
+                    data = MapData(raw_data, DATA_LOOP.get(map_id, None))
                     print(f"Selected: {data}")
                     new.append(data)
             maps = new

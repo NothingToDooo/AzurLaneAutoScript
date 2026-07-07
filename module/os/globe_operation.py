@@ -240,8 +240,8 @@ class GlobeOperation(ActionPointHandler):
             types = [types]
 
         def get_button(selection_):
-            for typ in types:
-                typ = "SELECT_" + typ
+            for raw_type in types:
+                typ = "SELECT_" + raw_type
                 for sele in selection_:
                     if typ == sele.name:
                         return sele

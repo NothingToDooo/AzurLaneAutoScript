@@ -316,9 +316,9 @@ class Homography:
             bool: If success.
         """
         location = np.array([])
-        for kernel in close_kernel:
+        for kernel_size in close_kernel:
             # Re-creating closed image
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel, kernel))
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
             image_closed = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel)
             # Find rectangles
             contours, _ = cv2.findContours(image_closed, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)

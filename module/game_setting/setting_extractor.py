@@ -133,8 +133,8 @@ class SettingExtractor:
         with Path(file).open(encoding="utf8") as f:
             data = list(f.readlines())
 
-        for row in data:
-            row = row.strip()
+        for raw_row in data:
+            row = raw_row.strip()
             res = REGEX_SETTING.search(row)
             if res:
                 row = strip_code(res.group(0))
@@ -145,8 +145,8 @@ class SettingExtractor:
     @staticmethod
     def iter_file_from_folder(folder):
         for path, _folders, files in os.walk(folder):
-            for file in files:
-                file = f"{path}/{file}"
+            for filename in files:
+                file = f"{path}/{filename}"
                 yield file
 
     def iter_generated_lines(self, folder):

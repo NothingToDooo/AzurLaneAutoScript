@@ -332,12 +332,11 @@ class Switch:
             f = self.status[r]
             if isinstance(f, (dict, Callable)):
                 f = [f]
-            for d in f:
-                if isinstance(d, Callable):
-                    d = {"func": d}
-                func = d["func"]
-                args = d.get("args", ())
-                kwargs = d.get("kwargs", {})
+            for raw_task in f:
+                task = {"func": raw_task} if isinstance(raw_task, Callable) else raw_task
+                func = task["func"]
+                args = task.get("args", ())
+                kwargs = task.get("kwargs", {})
                 func(*args, **kwargs)
 
     def g(self) -> Generator:

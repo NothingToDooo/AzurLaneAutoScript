@@ -109,8 +109,8 @@ def random_rectangle_vector_opted(
         return False
 
     if whitelist_area:
-        for area in whitelist_area:
-            area = area_limit(area, box_pad)
+        for raw_area in whitelist_area:
+            area = area_limit(raw_area, box_pad)
             if all(x > 0 for x in area_size(area)):
                 end_point = random_rectangle_point(area)
                 for _ in range(10):
@@ -521,11 +521,8 @@ def load_image(file, area=None):
         np.ndarray:
     """
     # always remember to close Image object
-    with Image.open(file) as f:
-        if area is not None:
-            f = f.crop(area)
-
-        image = np.array(f)
+    with Image.open(file) as image_file:
+        image = np.array(image_file.crop(area)) if area is not None else np.array(image_file)
 
     channel = image_channel(image)
     if channel == 4:

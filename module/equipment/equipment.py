@@ -283,8 +283,8 @@ class Equipment(StorageHandler):
         logger.hr("Equipment take on")
         self.ship_info_enter(enter, long_click=long_click)
 
-        for index in "9".join([str(x) for x in preset_record if x > 0]):
-            index = int(index)
+        for raw_index in "9".join([str(x) for x in preset_record if x > 0]):
+            index = int(raw_index)
             if index == 9:
                 self.ship_view_next()
             else:
