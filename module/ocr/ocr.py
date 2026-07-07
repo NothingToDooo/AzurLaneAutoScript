@@ -80,7 +80,7 @@ class Ocr:
         """
         执行 OCR，单区域返回字符串，多区域返回字符串列表。
 
-        参数：
+        Args:
             image (np.ndarray, list[np.ndarray])：待识别图像。
             direct_ocr (bool)：是否跳过预处理。
         """

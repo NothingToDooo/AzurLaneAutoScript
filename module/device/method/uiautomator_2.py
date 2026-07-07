@@ -31,7 +31,7 @@ def retry(func):
     @wraps(func)
     def retry_wrapper(self, *args, **kwargs):
         """
-        参数：
+        Args:
             self (Uiautomator2):
         """
         init = None
@@ -164,7 +164,7 @@ class Uiautomator2(Connection):
     def _drag_along(self, path):
         """按路径滑动。
 
-        参数：
+        Args:
             path (list)：(x, y, sleep)。
 
         示例：
@@ -218,7 +218,7 @@ class Uiautomator2(Connection):
         普通滑动或拖拽只有两个点，效果不够稳定。
         增加一些路径点，让它更接近真实滑动。
 
-        参数：
+        Args:
             p1 (tuple)：起点 (x, y)。
             p2 (tuple)：终点 (x, y)。
             segments (int):
@@ -242,7 +242,7 @@ class Uiautomator2(Connection):
     @retry
     def app_current_uiautomator2(self):
         """
-        返回：
+        Returns:
             str：包名。
         """
         result = self.u2.app_current()
@@ -251,11 +251,11 @@ class Uiautomator2(Connection):
     @retry
     def _app_start_u2_monkey(self, package_name=None, allow_failure=False):
         """
-        参数：
+        Args:
             package_name (str):
             allow_failure (bool):
 
-        返回：
+        Returns:
             bool：是否启动成功。
 
         抛出：

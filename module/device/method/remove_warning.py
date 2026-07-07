@@ -28,10 +28,10 @@ def remove_shell_warning(s):
     [init.svc_debug_pid.gnss_service]: [406]
     [ro.boottime.gnss_service]: [27308752875]
 
-    参数：
+    Args:
         s (str | bytes)：shell 输出。
 
-    返回：
+    Returns:
         str | bytes：移除告警后的 shell 输出。
     """
     if isinstance(s, bytes):
@@ -98,10 +98,10 @@ def remove_screenshot_warning(s):
     If they do, bad things may happen!\n
     \x89PNG...
 
-    参数：
+    Args:
         s (str | bytes)：截图输出。
 
-    返回：
+    Returns:
         str | bytes：移除告警后的截图数据。
     """
     if isinstance(s, bytes):

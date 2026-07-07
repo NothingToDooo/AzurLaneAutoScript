@@ -202,7 +202,7 @@ class Radar:
         """
         根据雷达图像更新格子预测结果。
 
-        参数：
+        Args:
             image：雷达图像。
         """
         image = MASK_RADAR.apply(image)

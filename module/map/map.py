@@ -334,7 +334,7 @@ class Map(Fleet):
         """
         已弃用的简单地图 Boss 清理方法；复杂地图应使用 brute_clear_boss。
 
-        返回：
+        Returns:
             bool：是否清理成功。
         """
         grids = self.map.select(is_boss=True, is_accessible=True)
@@ -360,7 +360,7 @@ class Map(Fleet):
         """
         已弃用的简单地图 Boss 清理方法，用于旧的大世界占领地图。
 
-        返回：
+        Returns:
             bool：是否清理成功。
         """
         grids = self.map.select(is_boss=True, is_accessible=True)

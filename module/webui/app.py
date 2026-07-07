@@ -183,7 +183,7 @@ class AlasGUI(Frame):
     @use_scope("header_status")
     def set_status(self, state: int) -> None:
         """
-        参数：
+        Args:
             state (int):
                 1：运行中。
                 2：未运行。

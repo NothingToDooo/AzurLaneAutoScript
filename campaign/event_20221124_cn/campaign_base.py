@@ -98,7 +98,7 @@ class CampaignBase(CampaignBase_):
         """
         按距离顺序清理指定地图道具格。
 
-        参数：
+        Args:
             grids (GridInfo, list[GridInfo])：单个格子或格子列表。
         """
         if not isinstance(grids, list):

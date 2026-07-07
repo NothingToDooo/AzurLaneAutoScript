@@ -47,10 +47,10 @@ class Hospital(HospitalClue, HospitalCombat):
         """
         领取医院每日奖励。
 
-        返回：
+        Returns:
             bool：是否领取成功。
 
-        页面：
+        Pages:
             in：page_hospital。
         """
         if self.daily_red_dot_appear():

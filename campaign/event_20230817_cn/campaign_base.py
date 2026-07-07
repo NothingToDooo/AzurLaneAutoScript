@@ -26,7 +26,7 @@ class CampaignBase(CampaignBase_):
         """
         获取活动剧情按钮，识别耗时约 26ms。
 
-        返回：
+        Returns:
             Button | None：检测到的剧情按钮。
         """
         # Story before A1, E0-1 ~ E0-3

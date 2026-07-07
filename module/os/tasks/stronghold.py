@@ -43,10 +43,10 @@ class OpsiStronghold(OSMap):
         """
         使用指定舰队清理一次要塞。
 
-        参数：
+        Args:
             fleet (BossFleet)：用于清理要塞的舰队。
 
-        返回：
+        Returns:
             bool：是否全部清理完成。
         """
         self.config.override(OpsiGeneral_DoRandomMapEvent=False, HOMO_EDGE_DETECT=False, STORY_OPTION=0)

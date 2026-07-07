@@ -100,7 +100,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
 
         当 GemsFarming_CommonCV 为 'any' 时，只更换装备。
 
-        返回：
+        Returns:
             bool：是否完成更换。
         """
         logger.hr("Change flagship", level=1)
@@ -112,7 +112,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
     def vanguard_change(self):
         """更换前排及其装备。
 
-        返回：
+        Returns:
             bool：是否完成更换。
         """
         logger.hr("Change vanguard", level=1)

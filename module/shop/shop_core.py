@@ -54,7 +54,7 @@ class CoreShop_250814(ShopClerk, ShopStatus):
         """
         识别核心商店货币数量。
 
-        返回：
+        Returns:
             int：当前核心数量。
         """
         self._currency = self.status_get_core()

@@ -184,11 +184,11 @@ def parse_value(value, data):
     """
     尽量把配置字符串转换成 bool、int、float 或 datetime。
 
-    参数：
+    Args:
         value (str)：待解析的值。
         data (dict)：配置项定义。
 
-    返回：
+    Returns:
         object：解析后的配置值。
     """
     if "option" in data and value not in data["option"]:

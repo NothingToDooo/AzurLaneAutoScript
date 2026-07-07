@@ -840,7 +840,7 @@ class Fleet(Camera, AmbushHandler):
         """
         进入地图后、执行任何地图操作前调用。
 
-        参数：
+        Args:
             map_ (CampaignMap)：当前战役地图。
         """
         logger.hr("Map init")

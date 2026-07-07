@@ -35,13 +35,13 @@ def insert_swipe(p0, p3, speed=15, min_distance=10):
 
     先生成一条三阶贝塞尔曲线。
 
-    参数：
+    Args:
         p0：起点。
         p3：终点。
         speed：平均移动速度，单位为每 10ms 的像素数。
         min_distance:
 
-    返回：
+    Returns:
         list[list[int]]：路径点列表。
 
     示例：
@@ -104,7 +104,7 @@ class Command:
         """
         参考 https://github.com/openstf/minitouch#writable-to-the-socket。
 
-        参数：
+        Args:
             operation: c, r, d, m, u, w
             contact:
             x:
@@ -164,7 +164,7 @@ class CommandBuilder:
         handle_orientation=True,
     ):
         """
-        参数：
+        Args:
             device:
         """
         self.device = device
@@ -252,7 +252,7 @@ class CommandBuilder:
         """
         有效命令列表必须包含实际操作，不能只有 commit。
 
-        返回：
+        Returns:
             bool：命令是否为空。
         """
         empty = True
@@ -277,7 +277,7 @@ def retry(func):
     @wraps(func)
     def retry_wrapper(self, *args, **kwargs):
         """
-        参数：
+        Args:
             self (Minitouch):
         """
         init = None
