@@ -1,9 +1,9 @@
+from datetime import UTC, datetime
 from time import sleep
 
 import numpy as np
 
 from module.base.decorator import cached_property
-from module.base.time import beijing_from_timestamp, beijing_now
 from module.base.utils import random_normal_distribution_int
 from module.exception import RequestHumanTakeover, ScriptEnd, ScriptError
 from module.logger import logger
@@ -114,7 +114,7 @@ class FleetEmotion:
         return DIC_RECOVER_MAX[self.recover]
 
     def update(self):
-        recover_count = int(int(beijing_now().timestamp()) // 360 - int(self.record.timestamp()) // 360)
+        recover_count = int(int(datetime.now().timestamp()) // 360 - int(self.record.timestamp()) // 360)
         recover_count = max(recover_count, 0)
         self.current = min(max(self.value, 0) + self.speed * recover_count, self.max)
 
@@ -141,8 +141,8 @@ class FleetEmotion:
             logger.info(f'Fleet {self.fleet} expected_reduce is limited to 29 when Emotion Control="Keep Happy Bonus"')
 
         recover_count = (self.limit + expected_reduce - self.current) // self.speed
-        recovered = (int(beijing_now().timestamp()) // 360 + recover_count + 1) * 360
-        return beijing_from_timestamp(recovered)
+        recovered = (int(datetime.now().timestamp()) // 360 + recover_count + 1) * 360
+        return datetime.fromtimestamp(recovered, tz=UTC).astimezone().replace(tzinfo=None)
 
 
 class Emotion:
@@ -233,7 +233,7 @@ class Emotion:
         self.record()
         self.show()
         recovered = max([f.get_recovered(b) for f, b in zip(self.fleets, battle, strict=True)])
-        if recovered > beijing_now():
+        if recovered > datetime.now():
             logger.info("Delay current task to prevent emotion control in the future")
             self.config.task_delay(target=recovered)
             raise ScriptEnd("Emotion control")
@@ -251,12 +251,12 @@ class Emotion:
         self.show()
         fleet = self.fleets[fleet_index - 1]
         recovered = fleet.get_recovered(expected_reduce=self.reduce_per_battle)
-        if recovered > beijing_now():
+        if recovered > datetime.now():
             logger.hr("Emotion wait")
             logger.info(f"Emotion of fleet {fleet_index} will recover to {fleet.limit} at {recovered}")
 
             while 1:
-                if beijing_now() > recovered:
+                if datetime.now() > recovered:
                     break
 
                 logger.attr("Wait until", recovered)

@@ -1,6 +1,6 @@
 import re
+from datetime import datetime
 
-from module.base.time import beijing_now
 from module.campaign.campaign_status import CampaignStatus
 from module.config.config_updater import COALITIONS, EVENTS, GEMS_FARMINGS, HOSPITAL, MARITIME_ESCORTS, RAIDS
 from module.config.utils import DEFAULT_TIME
@@ -88,7 +88,7 @@ class CampaignEvent(CampaignStatus):
         if command in GEMS_FARMINGS and self.stage_is_main(self.config.Campaign_Name):
             return False
 
-        now = beijing_now().replace(microsecond=0)
+        now = datetime.now().replace(microsecond=0)
         logger.attr("Event_time_limit", f"{now} -> {limit}")
         if now > limit:
             logger.hr(f"Reach event time limit: {limit}")

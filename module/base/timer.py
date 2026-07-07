@@ -1,8 +1,7 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import wraps
 from time import sleep, time
 
-from module.base.time import beijing_now
 from module.logger import logger
 
 
@@ -25,7 +24,7 @@ def timer(function):
 def future_time(string):
     """返回指定时分对应的未来时间。"""
     hour, minute = [int(x) for x in string.split(":")]
-    now = beijing_now()
+    now = datetime.now()
     future = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
     if future < now:
         return future + timedelta(days=1)
@@ -35,7 +34,7 @@ def future_time(string):
 def past_time(string):
     """返回指定时分对应的过去时间。"""
     hour, minute = [int(x) for x in string.split(":")]
-    now = beijing_now()
+    now = datetime.now()
     past = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
     if past > now:
         return past - timedelta(days=1)
@@ -64,7 +63,7 @@ def time_range_active(time_range):
     Returns:
         bool:
     """
-    return time_range[0] < beijing_now() < time_range[1]
+    return time_range[0] < datetime.now() < time_range[1]
 
 
 class Timer:

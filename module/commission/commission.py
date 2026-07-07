@@ -1,10 +1,9 @@
 import copy
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import numpy as np
 from scipy import signal
 
-from module.base.time import beijing_now
 from module.base.timer import Timer
 from module.base.utils import crop, image_size, rgb2gray
 from module.combat import assets as combat_assets
@@ -291,7 +290,7 @@ class RewardCommission(UI, InfoHandler):
             urgent.call("convert_to_night")
 
             # 不在 21:00~03:00，却扫到了夜间委托，多半是过期数据，刷新一次即可。
-            if beijing_now() - get_server_next_update("21:00") > timedelta(hours=6):
+            if datetime.now() - get_server_next_update("21:00") > timedelta(hours=6):
                 night = urgent.select(category_str="night")
                 if night:
                     logger.warning("Not in 21:00~03:00, but scanned night commissions")

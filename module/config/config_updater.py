@@ -1,4 +1,3 @@
-import json
 import re
 import textwrap
 import typing as t
@@ -8,7 +7,6 @@ from pathlib import Path
 
 from deploy.utils import DEPLOY_TEMPLATE, poor_yaml_read, poor_yaml_write
 from module.base.decorator import cached_property
-from module.base.time import beijing_now
 from module.base.timer import timer
 from module.config.deep import deep_default, deep_get, deep_iter, deep_set
 from module.config.server import VALID_CHANNEL_PACKAGE, VALID_PACKAGE, VALID_SERVER_LIST, to_package, to_server
@@ -30,9 +28,8 @@ from module.config.utils import (
 from module.logger import logger
 
 CONFIG_IMPORT = '''
+import datetime
 from typing import ClassVar
-
-from module.base.time import beijing_datetime
 
 # 本文件由 module/config/config_updater.py 自动生成。
 # 不要手动修改。
@@ -86,41 +83,19 @@ def _generated_string_segments(value: str) -> list[str]:
     return segments
 
 
-def _generated_literal(value) -> str:
-    if isinstance(value, str):
-        return json.dumps(value, ensure_ascii=False)
-    if isinstance(value, datetime):
-        return (
-            f"beijing_datetime({value.year}, {value.month}, {value.day}, "
-            f"{value.hour}, {value.minute}, {value.second}, {value.microsecond})"
-        )
-    if isinstance(value, dict):
-        return "{" + ", ".join(f"{_generated_literal(k)}: {_generated_literal(v)}" for k, v in value.items()) + "}"
-    if isinstance(value, list):
-        return "[" + ", ".join(_generated_literal(item) for item in value) + "]"
-    if isinstance(value, tuple):
-        suffix = "," if len(value) == 1 else ""
-        return "(" + ", ".join(_generated_literal(item) for item in value) + suffix + ")"
-    if isinstance(value, set):
-        if not value:
-            return "set()"
-        return "{" + ", ".join(_generated_literal(item) for item in value) + "}"
-    return repr(value)
-
-
 def _generated_value(name: str, value) -> list[str]:
     if isinstance(value, str) and "\n" in value:
         lines = [f"{GENERATED_INDENT}{name} = ("]
-        lines.extend(f"{GENERATED_INDENT * 2}{_generated_literal(segment)}" for segment in _generated_string_segments(value))
+        lines.extend(f"{GENERATED_INDENT * 2}{segment!r}" for segment in _generated_string_segments(value))
         lines.append(f"{GENERATED_INDENT})")
         return lines
     if isinstance(value, dict):
-        return [f"{GENERATED_INDENT}{name}: ClassVar[dict[str, object]] = {_generated_literal(value)}"]
+        return [f"{GENERATED_INDENT}{name}: ClassVar[dict[str, object]] = {value!r}"]
     if isinstance(value, list):
-        return [f"{GENERATED_INDENT}{name}: ClassVar[list[object]] = {_generated_literal(value)}"]
+        return [f"{GENERATED_INDENT}{name}: ClassVar[list[object]] = {value!r}"]
     if isinstance(value, set):
-        return [f"{GENERATED_INDENT}{name}: ClassVar[set[object]] = {_generated_literal(value)}"]
-    return [f"{GENERATED_INDENT}{name} = {_generated_literal(value)}"]
+        return [f"{GENERATED_INDENT}{name}: ClassVar[set[object]] = {value!r}"]
+    return [f"{GENERATED_INDENT}{name} = {value!r}"]
 
 
 class Event:
@@ -797,7 +772,7 @@ class ConfigUpdater:
         if "Emotion" in key and "Value" in key:
             keys = key.split(".")
             keys[-1] = keys[-1].replace("Value", "Record")
-            yield ".".join(keys), beijing_now().strftime("%Y-%m-%d %H:%M:%S")
+            yield ".".join(keys), datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def read_file(self, config_name, is_template=False):
         """

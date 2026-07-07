@@ -1,5 +1,6 @@
 import collections
 import traceback
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
@@ -8,7 +9,6 @@ from module.device.env import IS_WINDOWS
 if TYPE_CHECKING:
     from lxml import etree
 
-from module.base.time import beijing_now
 from module.base.timer import Timer
 from module.config.utils import get_server_next_update
 from module.device.app_control import AppControl
@@ -138,7 +138,7 @@ class Device(Screenshot, Control, AppControl):
             bool: If handled.
         """
         update = get_server_next_update(daily_trigger=daily_trigger)
-        now = beijing_now()
+        now = datetime.now()
         diff = (update.timestamp() - now.timestamp()) % 86400
         if threshold < diff < 86400 - threshold:
             return False

@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 from typing import ClassVar
 
 import cv2
@@ -6,7 +7,6 @@ import numpy as np
 
 from module.base.button import ButtonGrid
 from module.base.filter import Filter
-from module.base.time import beijing_now
 from module.base.timer import Timer
 from module.base.utils import (
     color_similar,
@@ -417,7 +417,7 @@ class RewardTacticalClass(Dock):
         remains = ocr.ocr(self.device.image)
         remains = [remains] if not isinstance(remains, list) else remains
 
-        now = beijing_now()
+        now = datetime.now()
         self.tactical_finish = [(now + remain).replace(microsecond=0) for remain in remains if remain.total_seconds()]
         logger.info(f"Tactical finish: {[str(f) for f in self.tactical_finish]}")
         return self.tactical_finish

@@ -7,9 +7,7 @@ from pathlib import Path
 import yaml
 from yaml.representer import SafeRepresenter
 
-import module.config.server as server_
 from deploy.atomic import atomic_read_bytes, atomic_read_text, atomic_write
-from module.base.time import beijing_datetime, beijing_now
 from module.logger import logger
 from module.submodule.utils import get_mod_filepath, list_mod_instance, list_mod_template
 
@@ -21,13 +19,7 @@ SERVER_TO_LANG = {
     "tw": "zh-TW",
 }
 LANG_TO_SERVER = {v: k for k, v in SERVER_TO_LANG.items()}
-SERVER_TO_TIMEZONE = {
-    "cn": timedelta(hours=8),
-    "en": timedelta(hours=-7),
-    "jp": timedelta(hours=9),
-    "tw": timedelta(hours=8),
-}
-DEFAULT_TIME = beijing_datetime(2020, 1, 1, 0, 0)
+DEFAULT_TIME = datetime(2020, 1, 1, 0, 0)
 
 
 # https://stackoverflow.com/questions/8640959/how-can-i-control-what-scalar-form-pyyaml-uses-for-my-data/15423007
@@ -281,13 +273,9 @@ def dict_to_kv(dictionary, allow_none=True):
     return ", ".join([f"{k}={v!r}" for k, v in dictionary.items() if allow_none or v is not None])
 
 
-def server_timezone() -> timedelta:
-    return SERVER_TO_TIMEZONE.get(server_.server, SERVER_TO_TIMEZONE["cn"])
-
-
 def server_time_offset() -> timedelta:
     """
-    个人国区分支内部时间固定为北京时间，服务器时间和内部时间没有偏移。
+    个人国区分支默认本机时间就是服务器时间。
     """
     return timedelta()
 
@@ -350,7 +338,7 @@ def get_os_next_reset():
         datetime.datetime
     """
     diff = server_time_offset()
-    server_now = beijing_now() - diff
+    server_now = datetime.now() - diff
     server_reset = (server_now.replace(day=1) + timedelta(days=32)).replace(
         day=1, hour=0, minute=0, second=0, microsecond=0
     )
@@ -363,7 +351,7 @@ def get_os_reset_remain():
         int: number of days before next opsi reset
     """
     next_reset = get_os_next_reset()
-    now = beijing_now()
+    now = datetime.now()
     logger.attr("OpsiNextReset", next_reset)
 
     remain = int((next_reset - now).total_seconds() // 86400)
@@ -383,7 +371,7 @@ def get_server_next_update(daily_trigger):
         daily_trigger = daily_trigger.replace(" ", "").split(",")
 
     diff = server_time_offset()
-    local_now = beijing_now()
+    local_now = datetime.now()
     trigger = []
     for t in daily_trigger:
         h, m = [int(x) for x in t.split(":")]
@@ -406,7 +394,7 @@ def get_server_last_update(daily_trigger):
         daily_trigger = daily_trigger.replace(" ", "").split(",")
 
     diff = server_time_offset()
-    local_now = beijing_now()
+    local_now = datetime.now()
     trigger = []
     for t in daily_trigger:
         h, m = [int(x) for x in t.split(":")]
@@ -452,7 +440,7 @@ def get_nearest_weekday_date(target):
         datetime.datetime
     """
     diff = server_time_offset()
-    server_now = beijing_now() - diff
+    server_now = datetime.now() - diff
 
     days_ahead = target - server_now.weekday()
     if days_ahead <= 0:
@@ -469,7 +457,7 @@ def get_server_weekday():
         int: The server's current day of the week
     """
     diff = server_time_offset()
-    server_now = beijing_now() - diff
+    server_now = datetime.now() - diff
     return server_now.weekday()
 
 
@@ -479,7 +467,7 @@ def get_server_monthday():
         int: The server's current day of the month
     """
     diff = server_time_offset()
-    server_now = beijing_now() - diff
+    server_now = datetime.now() - diff
     return server_now.day
 
 

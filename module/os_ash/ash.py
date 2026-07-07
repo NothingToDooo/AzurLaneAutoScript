@@ -1,7 +1,6 @@
 from contextlib import suppress
-from datetime import timedelta
+from datetime import datetime, timedelta
 
-from module.base.time import beijing_now
 from module.base.utils import image_left_strip
 from module.combat.assets import BATTLE_PREPARATION
 from module.combat.combat import Combat
@@ -126,7 +125,7 @@ class OSAsh(UI, MapEventHandler):
         # AshBeacon 下次运行时间。
         next_run = self.config.cross_get(keys="OpsiAshBeacon.Scheduler.NextRun", default=DEFAULT_TIME)
         # 距离下次执行还有 30 分钟以上时，可以支援调用。
-        return next_run - beijing_now() > timedelta(minutes=30)
+        return next_run - datetime.now() > timedelta(minutes=30)
 
     def handle_ash_beacon_attack(self):
         """

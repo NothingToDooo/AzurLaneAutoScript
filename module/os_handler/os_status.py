@@ -1,7 +1,6 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
-from module.base.time import beijing_now
 from module.base.timer import Timer
 from module.config import server
 from module.config.utils import get_server_next_update
@@ -48,7 +47,7 @@ class OSStatus(UI):
         If having any tasks cooling down,
         such as recon scan cooldown and submarine call cooldown.
         """
-        now = beijing_now()
+        now = datetime.now()
         update = get_server_next_update("00:00")
         cd_tasks = [
             "OpsiObscure",

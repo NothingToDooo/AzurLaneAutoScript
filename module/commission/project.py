@@ -1,13 +1,12 @@
 import hashlib
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import cv2
 import numpy as np
 
 from module.base.button import Button
 from module.base.filter import Filter
-from module.base.time import beijing_now
 from module.base.utils import area_offset, color_similar, crop, extract_letters, get_color
 from module.commission.project_data import dictionary_cn
 from module.logger import logger
@@ -121,7 +120,7 @@ class Commission:
         if not self.duration.total_seconds():
             self.valid = False
 
-        self.create_time = beijing_now()
+        self.create_time = datetime.now()
         self.repeat_count = 1
         self.category_str = "unknown"
         self.genre_str = "unknown"
@@ -308,7 +307,7 @@ class Commission:
     def convert_to_running(self):
         if self.valid:
             self.status = "running"
-            self.create_time = beijing_now()
+            self.create_time = datetime.now()
 
     @property
     def finish_time(self):
