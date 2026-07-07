@@ -146,7 +146,7 @@ class Enhancement(Dock):
             if not retire_assets.EMPTY_ENHANCE_SLOT_PLUS.match(self.device.image):
                 logger.info("Material found. Try enhancing...")
                 return "state_enhance_attempt"
-            elif self.info_bar_count():
+            if self.info_bar_count():
                 logger.info("No material found for enhancement.")
                 logger.info("Enhancement failed. Swiping to next ship if feasible")
                 return "state_enhance_fail"
@@ -171,12 +171,12 @@ class Enhancement(Dock):
                 logger.info("Enhancement Successful")
                 self._enhance_confirm()
                 return "state_enhance_success"
-            elif self.info_bar_count():
+            if self.info_bar_count():
                 logger.info("Enhancement impossible, ship currently in battle. Swiping to next ship if feasible")
                 nonlocal need_to_skip
                 need_to_skip = True
                 return "state_enhance_fail"
-            elif self.handle_popup_confirm("ENHANCE"):
+            if self.handle_popup_confirm("ENHANCE"):
                 logger.info("Trying a temporary ship")
                 return "state_enhance_confirm"
 
@@ -193,13 +193,11 @@ class Enhancement(Dock):
                     nonlocal ship_count
                     ship_count -= 1
                 return "state_enhance_check"
-            else:
-                # 避免断网导致误判。
-                if self.appear(retire_assets.EQUIP_CONFIRM, offset=(30, 30)):
-                    return "state_enhance_confirm"
-                else:
-                    logger.info("Swiped failed, exiting current category")
-                    return "state_enhance_exit"
+            # 避免断网导致误判。
+            if self.appear(retire_assets.EQUIP_CONFIRM, offset=(30, 30)):
+                return "state_enhance_confirm"
+            logger.info("Swiped failed, exiting current category")
+            return "state_enhance_exit"
 
         def state_enhance_success():
             return True

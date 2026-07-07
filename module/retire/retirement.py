@@ -548,19 +548,18 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
                     )
 
             return None
-        else:
-            template = getattr(retire_assets, f"TEMPLATE_{self.config.GemsFarming_CommonCV.upper()}")
-            sim, button = template.match_result(resize(self.device.image, size=(1189, 669)))
+        template = getattr(retire_assets, f"TEMPLATE_{self.config.GemsFarming_CommonCV.upper()}")
+        sim, button = template.match_result(resize(self.device.image, size=(1189, 669)))
 
-            if sim > self.config.COMMON_CV_THRESHOLD:
-                return Button(
-                    button=tuple(_ * 155 // 144 for _ in button.button),
-                    area=button.area,
-                    color=button.color,
-                    name=f"TEMPLATE_{self.config.GemsFarming_CommonCV.upper()}_RETIRE",
-                )
+        if sim > self.config.COMMON_CV_THRESHOLD:
+            return Button(
+                button=tuple(_ * 155 // 144 for _ in button.button),
+                area=button.area,
+                color=button.color,
+                name=f"TEMPLATE_{self.config.GemsFarming_CommonCV.upper()}_RETIRE",
+            )
 
-            return None
+        return None
 
     def retirement_get_common_rarity_cv(self, skip_first_screenshot=False):
         """

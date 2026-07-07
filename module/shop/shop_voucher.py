@@ -188,10 +188,7 @@ class VoucherShop(ShopClerk, ShopStatus):
         if self.handle_popup_confirm(name="SHOP_BUY_VOUCHER", offset=(20, 50)):
             return True
         # 购买数量为 1 时会出现 `Exchange` 按钮。
-        if self.appear_then_click(SHOP_BUY_CONFIRM_AMOUNT, offset=(-20, -160, 20, -120), interval=3):
-            return True
-
-        return False
+        return self.appear_then_click(SHOP_BUY_CONFIRM_AMOUNT, offset=(-20, -160, 20, -120), interval=3)
 
     def shop_buy_execute(self, item, skip_first_screenshot=True):
         """

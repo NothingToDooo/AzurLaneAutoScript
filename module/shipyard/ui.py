@@ -58,12 +58,9 @@ SHIPYARD_CONFIRM_BUTTONS = {
 
 class ShipyardNavbar(Navbar):
     def is_button_active(self, button, main):
-        if main.image_color_count(button, color=(33, 113, 222), threshold=221, count=400):
-            return True
-        # Color on Odin's shoulder
-        if main.image_color_count(button, color=(41, 85, 165), threshold=221, count=400):
-            return True
-        return False
+        active_blue = main.image_color_count(button, color=(33, 113, 222), threshold=221, count=400)
+        odin_shoulder = main.image_color_count(button, color=(41, 85, 165), threshold=221, count=400)
+        return active_blue or odin_shoulder
 
 
 class ShipyardUI(UI):
@@ -95,8 +92,7 @@ class ShipyardUI(UI):
         """
         if self.appear(SHIPYARD_IN_FATE, offset=(20, 20)):
             return "FATE"
-        else:
-            return "DEV"
+        return "DEV"
 
     def _shipyard_get_total(self):
         """
@@ -181,18 +177,12 @@ class ShipyardUI(UI):
         return result[index - 1]
 
     def _shipyard_in_ui(self):
-        """
-        Returns:
-            bool whether in appropriate shipyard ui area
-        """
-        if self.appear(SHIPYARD_CHECK, offset=(20, 20)):
-            return True
-        if self.appear(SHIPYARD_IN_DEV, offset=(20, 20)):
-            return True
-        if self.appear(SHIPYARD_IN_FATE, offset=(20, 20)):
-            return True
-
-        return False
+        """返回当前是否位于船坞开发界面。"""
+        return (
+            self.appear(SHIPYARD_CHECK, offset=(20, 20))
+            or self.appear(SHIPYARD_IN_DEV, offset=(20, 20))
+            or self.appear(SHIPYARD_IN_FATE, offset=(20, 20))
+        )
 
     def _shipyard_set_series(self, series=1, skip_first_screenshot=True):
         """
@@ -432,5 +422,4 @@ class ShipyardUI(UI):
         """
         if self.ui_page_appear(page_main_white):
             return MAIN_OCR_COIN.ocr(self.device.image)
-        else:
-            return OCR_COIN.ocr(self.device.image)
+        return OCR_COIN.ocr(self.device.image)

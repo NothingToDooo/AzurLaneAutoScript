@@ -42,16 +42,13 @@ class RewardShipyard(ShipyardUI):
             cost = [v for k, v in PRBP_BUY_PRIZE.items() if amount in k]
             if cost:
                 return cost[0]
-            else:
-                return 1500
-        elif rarity == "DR":
+            return 1500
+        if rarity == "DR":
             cost = [v for k, v in DRBP_BUY_PRIZE.items() if amount in k]
             if cost:
                 return cost[0]
-            else:
-                return 6000
-        else:
-            raise ScriptError(f"Invalid rarity in _shipyard_get_cost: {rarity}")
+            return 6000
+        raise ScriptError(f"Invalid rarity in _shipyard_get_cost: {rarity}")
 
     def _shipyard_calculate(self, start, count, pay=False):
         """

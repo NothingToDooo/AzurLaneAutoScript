@@ -9,17 +9,8 @@ from module.ui.ui import UI
 
 class BeaconReward(Combat, UI):
     def meta_reward_notice_appear(self):
-        """
-        Returns:
-            bool: If appear.
-
-        Page:
-            in: page_meta
-        """
-        if self.appear(mr_assets.META_REWARD_NOTICE, threshold=30):
-            return True
-        else:
-            return False
+        """返回 META 奖励红点是否出现。"""
+        return self.appear(mr_assets.META_REWARD_NOTICE, threshold=30)
 
     def meta_reward_receive(self, skip_first_screenshot=True):
         """
@@ -71,21 +62,10 @@ class BeaconReward(Combat, UI):
         return received
 
     def meta_sync_notice_appear(self, interval=0):
-        """
-        "sync" is the period that you gather meta points to 100% and get a meta ship
-
-        Returns:
-            bool: If appear.
-
-        Page:
-            in: page_meta
-        """
-        if self.appear(mr_assets.SYNC_REWARD_NOTICE, threshold=30, interval=interval) or self.appear(
+        """返回同步奖励入口是否出现。"""
+        return self.appear(mr_assets.SYNC_REWARD_NOTICE, threshold=30, interval=interval) or self.appear(
             mr_assets.SYNC_TAP, threshold=30, interval=interval
-        ):
-            return True
-        else:
-            return False
+        )
 
     def meta_sync_receive(self, skip_first_screenshot=True):
         """
@@ -202,9 +182,8 @@ class DossierReward(Combat, UI):
         if self.appear(mr_assets.DOSSIER_REWARD_RECEIVE, offset=(-40, 10, -10, 40), similarity=0.7):
             logger.info("Found dossier reward red dot")
             return True
-        else:
-            logger.info("No dossier reward red dot")
-            return False
+        logger.info("No dossier reward red dot")
+        return False
 
     def meta_reward_enter(self, skip_first_screenshot=True):
         """

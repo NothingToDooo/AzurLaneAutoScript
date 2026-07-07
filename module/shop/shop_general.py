@@ -91,23 +91,13 @@ class GeneralShop_250814(ShopClerk, ShopUI, ShopStatus):
         return self._currency
 
     def shop_check_item(self, item):
-        """
-        Args:
-            item: Item to check
-
-        Returns:
-            bool: whether item can be bought
-        """
+        """返回当前货币是否足够购买物品。"""
         if item.cost == "Coins":
-            if item.price > self._currency:
-                return False
-            return True
+            return item.price <= self._currency
 
         if self.config.GeneralShop_UseGems:
             if item.cost == "Gems":
-                if item.price > self.gems:
-                    return False
-                return True
+                return item.price <= self.gems
 
         return False
 

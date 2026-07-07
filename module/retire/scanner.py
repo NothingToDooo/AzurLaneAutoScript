@@ -188,15 +188,14 @@ class RarityScanner(Scanner):
         """
         if color_similar(color, (171, 174, 186)):
             return "common"
-        elif color_similar(color, (106, 194, 248)):
+        if color_similar(color, (106, 194, 248)):
             return "rare"
-        elif color_similar(color, (151, 134, 254)):
+        if color_similar(color, (151, 134, 254)):
             return "elite"
-        elif color_similar(color, (247, 221, 101)):
+        if color_similar(color, (247, 221, 101)):
             return "super_rare"
-        else:
-            # Difference between ultra is too great
-            return "unknown"
+        # 海上传奇颜色差异过大。
+        return "unknown"
 
     def _scan(self, image) -> list:
         return [self.color_to_rarity(get_color(image, button.area)) for button in self.grids.buttons]
@@ -245,12 +244,11 @@ class FleetScanner(Scanner):
 
         if TEMPLATE_FLEET_1.match(image, similarity=0.80):
             return 1
-        elif TEMPLATE_FLEET_3.match(image, similarity=0.80):
+        if TEMPLATE_FLEET_3.match(image, similarity=0.80):
             return 3
-        elif TEMPLATE_FLEET_4.match(image, similarity=0.80):
+        if TEMPLATE_FLEET_4.match(image, similarity=0.80):
             return 4
-        else:
-            return 0
+        return 0
 
     def _scan(self, image) -> list:
         image = self.pre_process(image)

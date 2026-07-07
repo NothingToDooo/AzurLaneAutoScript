@@ -64,20 +64,10 @@ class MeowfficerCollect(MeowfficerBase):
         return flag
 
     def _meow_check_popup_exit(self):
-        """
-        If in appropriate page after exiting
-        either lock popup or talent detail panel
-
-        Returns:
-           bool
-        """
-        if self.match_template_color(meow_assets.MEOWFFICER_GET_CHECK, offset=(40, 40)):
-            return True
-
-        if self.appear(meow_assets.MEOWFFICER_TRAIN_START, offset=(20, 20)):
-            return True
-
-        return False
+        """返回退出锁定弹窗或天赋详情后是否位于可继续页面。"""
+        return self.match_template_color(meow_assets.MEOWFFICER_GET_CHECK, offset=(40, 40)) or self.appear(
+            meow_assets.MEOWFFICER_TRAIN_START, offset=(20, 20)
+        )
 
     def _meow_talent_cap_handle(self, btn, drop=None):
         """

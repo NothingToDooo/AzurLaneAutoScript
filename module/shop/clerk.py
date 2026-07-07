@@ -353,9 +353,8 @@ class ShopClerk(ShopBase, Retirement):
             if item is None:
                 logger.info("Shop buy finished")
                 return True
-            else:
-                self.shop_buy_execute(item)
-                continue
+            self.shop_buy_execute(item)
+            continue
 
         logger.warning("Too many items to buy, stopped")
         return True

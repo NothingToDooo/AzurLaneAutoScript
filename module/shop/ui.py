@@ -46,22 +46,8 @@ class ShopUI(UI):
         return Navbar(grids=shop_bottom_navbar, active_color=(33, 195, 239), inactive_color=(181, 178, 181))
 
     def shop_bottom_navbar_ensure(self, left=None, right=None):
-        """
-        Ensure able to transition to page and
-        page has loaded to completion
-        Below information relative to after
-        shop_swipe
-
-        Args:
-            left (int): Depends on ship navs
-            right (int):
-
-        Returns:
-            bool: if bottom_navbar set ensured
-        """
-        if self._shop_bottom_navbar.set(self, left=left, right=right):
-            return True
-        return False
+        """确保商店底部导航栏已经切换到目标范围。"""
+        return self._shop_bottom_navbar.set(self, left=left, right=right)
 
     @cached_property
     def shop_nav_250814(self):

@@ -9,17 +9,8 @@ from module.ui.ui import UI
 
 class MeowfficerBase(UI):
     def meow_additional(self):
-        """
-        Handle additional clauses
-        that may occur in between screens
-
-        Returns:
-            bool:
-        """
-        if self.appear_then_click(MEOWFFICER_INFO, offset=(30, 30), interval=3):
-            return True
-
-        return False
+        """处理页面切换间可能出现的额外弹窗。"""
+        return self.appear_then_click(MEOWFFICER_INFO, offset=(30, 30), interval=3)
 
     def meow_enter(self, click_button, check_button, skip_first_screenshot=True):
         """
@@ -117,30 +108,12 @@ class MeowfficerBase(UI):
                 continue
 
     def handle_meow_popup_confirm(self):
-        """
-        Confirm the popup; can mean close
-        the popup and allow the action
-
-        Returns:
-            bool:
-        """
-        if self.appear_then_click(meow_assets.MEOWFFICER_CONFIRM, offset=(40, 20), interval=5):
-            return True
-        else:
-            return False
+        """确认猫窝弹窗并允许继续操作。"""
+        return self.appear_then_click(meow_assets.MEOWFFICER_CONFIRM, offset=(40, 20), interval=5)
 
     def handle_meow_popup_cancel(self):
-        """
-        Cancel the popup; can mean close
-        the popup or to not allow the action
-
-        Returns:
-            bool:
-        """
-        if self.appear_then_click(meow_assets.MEOWFFICER_CANCEL, offset=(40, 20), interval=5):
-            return True
-        else:
-            return False
+        """取消猫窝弹窗或拒绝当前操作。"""
+        return self.appear_then_click(meow_assets.MEOWFFICER_CANCEL, offset=(40, 20), interval=5)
 
     def handle_meow_popup_dismiss(self):
         """
@@ -155,8 +128,7 @@ class MeowfficerBase(UI):
         ):
             self.device.click(MEOWFFICER_CHECK)
             return True
-        else:
-            return False
+        return False
 
     def meow_is_sunday(self):
         """

@@ -194,9 +194,8 @@ class ShopBase(UI):
             row = [str(item) for item in items if item.button[1] != min_row]
             logger.info(f"Shop row 2: {row}")
             return items
-        else:
-            logger.info("No shop items found")
-            return []
+        logger.info("No shop items found")
+        return []
 
     def shop_obstruct_handle(self):
         """
@@ -289,25 +288,12 @@ class ShopBase(UI):
             row = [str(item) for item in items if item.button[1] != min_row]
             logger.info(f"Shop row 2: {row}")
             return items
-        else:
-            logger.info("No shop items found")
-            return []
+        logger.info("No shop items found")
+        return []
 
     def shop_check_item(self, item):
-        """
-        Override in variant class
-        for specific check item
-        actions
-
-        Args:
-            item: Item to check
-
-        Returns:
-            bool:
-        """
-        if item.price > self._currency:
-            return False
-        return True
+        """返回当前货币是否足够购买物品。"""
+        return item.price <= self._currency
 
     def shop_check_custom_item(self, item):
         """
