@@ -126,16 +126,16 @@ class ProcessManager:
 
     @staticmethod
     def run_process(config_name, func: str, q: queue.Queue, stop_event: threading.Event | None = None) -> None:
-        # Setup logger
+        # 初始化子进程 logger。
         set_file_logger(name=config_name)
         set_func_logger(func=q.put)
 
-        # Remove fake PIL module, because subprocess will use it
+        # 子进程会使用真实 PIL，需要移除 WebUI 进程里的伪模块。
         remove_fake_pil_module()
 
         AzurLaneConfig.stop_event = cast("threading.Event", stop_event)
         try:
-            # Run alas
+            # 运行指定入口。
             if func == "alas":
                 if stop_event is not None:
                     AzurLaneAutoScript.stop_event = stop_event
@@ -153,7 +153,8 @@ class ProcessManager:
             else:
                 logger.critical(f"No function matched: {func}")
             logger.info(f"[{config_name}] exited. Reason: Finish\n")
-        except Exception as error:
+        # WebUI 子进程边界：把未知异常写入 renderable 队列，否则页面看不到堆栈。
+        except Exception as error:  # noqa: BLE001
             logger.exception(error)
 
     @classmethod

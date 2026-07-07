@@ -132,13 +132,14 @@ class AzurLaneAutoScript:
                 content=f"<{self.config_name}> RequestHumanTakeover",
             )
             sys.exit(1)
-        except Exception as e:
+        # 任务崩溃边界：保存现场、通知并退出，避免调度循环继续运行在未知状态。
+        except Exception as e:  # noqa: BLE001
             logger.exception(e)
             self.save_error_log()
             handle_notify(
                 self.config.Error_OnePushConfig,
                 title=f"Alas <{self.config_name}> crashed",
-                content=f"<{self.config_name}> Exception occured",
+                content=f"<{self.config_name}> Exception occurred",
             )
             sys.exit(1)
         else:

@@ -90,17 +90,18 @@ class Error(Outcome[NoReturn]):
 
 def capture(sync_fn, *args, **kwargs):
     """
-    Run ``sync_fn(*args, **kwargs)`` and capture the result.
+    运行 ``sync_fn(*args, **kwargs)`` 并捕获结果。
 
-    Args:
+    参数：
         sync_fn (Callable[..., ResultT]):
 
-    Returns:
+    返回：
         Value[ResultT] | Error:
     """
     try:
         return Value(sync_fn(*args, **kwargs))
-    except BaseException as exc:
+    # 线程池 outcome 边界：需要把 _JobKill、KeyboardInterrupt 等跨线程异常传回调用方。
+    except BaseException as exc:  # noqa: BLE001
         exc = remove_tb_frames(exc, 1)
         return Error(exc)
 
