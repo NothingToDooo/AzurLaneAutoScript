@@ -19,7 +19,6 @@ dependencies = [
     "inflection",
     "pydantic",
     "aiofiles",
-    "onepush",
     "cnocr",
     "pywebio",
     "starlette",

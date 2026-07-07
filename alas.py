@@ -22,7 +22,6 @@ from module.exception import (
     ScriptError,
 )
 from module.logger import logger
-from module.notify import handle_notify
 from module.task_registry import get_task_spec
 
 if TYPE_CHECKING:
@@ -98,38 +97,18 @@ class AzurLaneAutoScript:
         except GamePageUnknownError:
             logger.critical("Game page unknown")
             self.save_error_log()
-            handle_notify(
-                self.config.Error_OnePushConfig,
-                title=f"Alas <{self.config_name}> crashed",
-                content=f"<{self.config_name}> GamePageUnknownError",
-            )
             sys.exit(1)
         except ScriptError as e:
             logger.exception(e)
             logger.critical("This is likely to be a mistake of developers, but sometimes just random issues")
-            handle_notify(
-                self.config.Error_OnePushConfig,
-                title=f"Alas <{self.config_name}> crashed",
-                content=f"<{self.config_name}> ScriptError",
-            )
             sys.exit(1)
         except RequestHumanTakeover:
             logger.critical("Request human takeover")
-            handle_notify(
-                self.config.Error_OnePushConfig,
-                title=f"Alas <{self.config_name}> crashed",
-                content=f"<{self.config_name}> RequestHumanTakeover",
-            )
             sys.exit(1)
-        # 任务崩溃边界：保存现场、通知并退出，避免调度循环继续运行在未知状态。
+        # 任务崩溃边界：保存现场并退出，避免调度循环继续运行在未知状态。
         except Exception as e:  # noqa: BLE001
             logger.exception(e)
             self.save_error_log()
-            handle_notify(
-                self.config.Error_OnePushConfig,
-                title=f"Alas <{self.config_name}> crashed",
-                content=f"<{self.config_name}> Exception occurred",
-            )
             sys.exit(1)
         else:
             return True
@@ -298,11 +277,6 @@ class AzurLaneAutoScript:
                     "Please contact developers or try to fix it yourself.",
                 )
                 logger.critical("Request human takeover")
-                handle_notify(
-                    self.config.Error_OnePushConfig,
-                    title=f"Alas <{self.config_name}> crashed",
-                    content=f"<{self.config_name}> RequestHumanTakeover\nTask `{task}` failed 3 or more times.",
-                )
                 sys.exit(1)
 
             if success:

@@ -45,7 +45,6 @@ class GeneratedConfig:
     # 配置组 `Error`
     Error_HandleError = True
     Error_SaveError = True
-    Error_OnePushConfig = "provider: null"
     Error_ScreenshotLength = 1
 
     # 配置组 `Optimization`

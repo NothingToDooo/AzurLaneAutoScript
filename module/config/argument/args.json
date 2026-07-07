@@ -102,11 +102,6 @@
         "type": "checkbox",
         "value": true
       },
-      "OnePushConfig": {
-        "type": "textarea",
-        "value": "provider: null",
-        "mode": "yaml"
-      },
       "ScreenshotLength": {
         "type": "input",
         "value": 1

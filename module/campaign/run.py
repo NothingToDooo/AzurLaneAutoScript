@@ -10,7 +10,6 @@ from module.campaign.campaign_ui import MODE_SWITCH_1
 from module.exception import CampaignEnd, RequestHumanTakeover, ScriptEnd
 from module.handler.fast_forward import map_files, to_map_file_name
 from module.logger import logger
-from module.notify import handle_notify
 from module.ui.page import page_campaign
 
 if TYPE_CHECKING:
@@ -82,21 +81,11 @@ class CampaignRun(CampaignEvent):
             logger.hr("Triggered stop condition: Run count")
             self.config.StopCondition_RunCount = 0
             self.config.Scheduler_Enable = False
-            handle_notify(
-                self.config.Error_OnePushConfig,
-                title=f"Alas <{self.config.config_name}> campaign finished",
-                content=f"<{self.config.config_name}> {self.name} reached run count limit",
-            )
             return True
         # Lv120 limit
         if self.config.StopCondition_ReachLevel and self.campaign.config.LV_TRIGGERED:
             logger.hr(f"Triggered stop condition: Reach level {self.config.StopCondition_ReachLevel}")
             self.config.Scheduler_Enable = False
-            handle_notify(
-                self.config.Error_OnePushConfig,
-                title=f"Alas <{self.config.config_name}> campaign finished",
-                content=f"<{self.config.config_name}> {self.name} reached level limit",
-            )
             return True
         # Oil limit
         if oil_check and self.get_oil() < max(500, self.config.StopCondition_OilLimit):
@@ -112,11 +101,6 @@ class CampaignRun(CampaignEvent):
         if self.config.StopCondition_GetNewShip and self.campaign.config.GET_SHIP_TRIGGERED:
             logger.hr("Triggered stop condition: Get new ship")
             self.config.Scheduler_Enable = False
-            handle_notify(
-                self.config.Error_OnePushConfig,
-                title=f"Alas <{self.config.config_name}> campaign finished",
-                content=f"<{self.config.config_name}> {self.name} got new ship",
-            )
             return True
         # Event limit
         if oil_check and self.campaign.event_pt_limit_triggered():
