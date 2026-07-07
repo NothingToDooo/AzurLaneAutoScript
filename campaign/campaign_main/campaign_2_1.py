@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.map.map_base import CampaignMap
 
 from .campaign_2_base import CampaignBase
@@ -58,13 +60,13 @@ class Config:
     EDGE_LINES_HOUGHLINES_THRESHOLD = 40
     COINCIDENT_POINT_ENCOURAGE_DISTANCE = 1.5
 
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (120, 255 - 49),
         "width": (1.5, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {"height": (255 - 49, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 49, 255), "prominence": 10, "distance": 50, "wlen": 1000}
     HOMO_CANNY_THRESHOLD = (75, 100)
     HOMO_EDGE_COLOR_RANGE = (0, 49)
 

@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.base.timer import Timer
 from module.handler.assets import STRATEGY_OPENED
 from module.handler.strategy import MOB_MOVE_OFFSET
@@ -13,8 +15,8 @@ class Config:
     # Ambushes can be avoid by having more DDs.
     MAP_WALK_TURNING_OPTIMIZE = False
     MAP_HAS_MYSTERY = False
-    MAP_ENEMY_TEMPLATE = ["Light", "Main", "Carrier", "CarrierSpecial"]
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    MAP_ENEMY_TEMPLATE = ("Light", "Main", "Carrier", "CarrierSpecial")
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (80, 255 - 33),
         "width": (0.9, 10),
         "prominence": 10,

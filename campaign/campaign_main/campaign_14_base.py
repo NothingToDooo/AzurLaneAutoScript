@@ -16,8 +16,11 @@ class Config:
 
 class CampaignBase(CampaignBase_):
     ENEMY_FILTER = "1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M"
-    picked_light_house = []
-    picked_flare = []
+
+    def __init__(self, *args, **kwargs):
+        self.picked_light_house = []
+        self.picked_flare = []
+        super().__init__(*args, **kwargs)
 
     def map_data_init(self, map_):
         super().map_data_init(map_)

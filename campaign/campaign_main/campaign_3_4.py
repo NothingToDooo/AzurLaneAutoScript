@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from campaign.campaign_main.campaign_3_1 import Config as Config31
 from module.map.map_base import CampaignMap
 
@@ -66,13 +68,13 @@ MAP.spawn_data = [
 class Config(Config31):
     MAP_MYSTERY_HAS_CARRIER = False
 
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (120, 255 - 75),
         "width": (0.9, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {"height": (255 - 40, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 40, 255), "prominence": 10, "distance": 50, "wlen": 1000}
 
 
 class Campaign(CampaignBase):

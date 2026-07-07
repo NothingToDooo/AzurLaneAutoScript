@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.base.decorator import del_cached_property
 from module.base.timer import Timer
 from module.base.utils import get_color, red_overlay_transparency
@@ -12,7 +14,7 @@ from .campaign_15_base import CampaignBase as CampaignBase_
 class Config:
     MAP_WALK_TURNING_OPTIMIZE = False
     MAP_HAS_MYSTERY = False
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (80, 255 - 33),
         "prominence": 10,
         "distance": 35,

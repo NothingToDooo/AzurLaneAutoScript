@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap
 
@@ -71,13 +73,13 @@ class Config:
     FLEET_BOSS = 1
 
     MAP_MYSTERY_HAS_CARRIER = True
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (120, 255 - 33),
         "width": (1.5, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS = {"height": (255 - 33, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 33, 255), "prominence": 10, "distance": 50, "wlen": 1000}
     HOMO_EDGE_COLOR_RANGE = (0, 33)
     HOMO_EDGE_HOUGHLINES_THRESHOLD = 210
 
