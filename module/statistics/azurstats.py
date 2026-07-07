@@ -93,11 +93,10 @@ class AzurStats:
         method = self.config.DropRecord_API
         if method == "default":
             return "https://azurstats.lyoko.io/api/upload/"
-        elif method == "cn_gz_reverse_proxy" or method == "cn_sh_reverse_proxy":
+        if method in {"cn_gz_reverse_proxy", "cn_sh_reverse_proxy"}:
             return "https://image.tyy.akagiyui.com/api/upload"
-        else:
-            logger.critical("Invalid upload API, please check your settings")
-            raise ScriptError("Invalid upload API")
+        logger.critical("Invalid upload API, please check your settings")
+        raise ScriptError("Invalid upload API")
 
     @property
     def _user_agent(self):
@@ -106,12 +105,12 @@ class AzurStats:
     def _upload(self, image, genre, filename):
         """
         Args:
-            image: Image to upload.
+            image: 要上传的图片。
             genre (str):
             filename (str): 'xxx.png'
 
         Returns:
-            bool: If success
+            bool: 是否上传成功。
         """
         output = io.BytesIO()
         Image.fromarray(image, mode="RGB").save(output, format="png")
@@ -140,10 +139,9 @@ class AzurStats:
                     md5 = deep_get(info, keys="data.md5", default="")
                     logger.info(f"Image upload success, md5: {md5}")
                     return True
-                else:
-                    message = deep_get(info, keys="message", default="")
-                    logger.warning(f"Image upload failed, message: {message}")
-                    return False
+                message = deep_get(info, keys="message", default="")
+                logger.warning(f"Image upload failed, message: {message}")
+                return False
 
             # Imgurl response
             code = deep_get(info, keys="code", default=None)
@@ -152,7 +150,7 @@ class AzurStats:
                     imgid = deep_get(info, keys="imgid", default="")
                     logger.info(f"Image upload success, imgid: {imgid}")
                     return True
-                elif code == 0:
+                if code == 0:
                     msg = deep_get(info, keys="msg", default="")
                     logger.warning(f"Image upload failed, msg: {msg}")
                     return False

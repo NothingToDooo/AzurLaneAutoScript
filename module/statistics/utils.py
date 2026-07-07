@@ -6,11 +6,11 @@ from module.base.utils import crop, image_size
 
 
 class ImageError(Exception):
-    """Error when parsing images"""
+    """解析图片时发生错误。"""
 
 
 class ImageInvalidResolution(ImageError):
-    """Image is not in 1280x720"""
+    """图片不是 1280x720 或其纵向拼接尺寸。"""
 
 
 def load_folder(folder, ext=".png"):
@@ -53,18 +53,17 @@ def pack(img_list):
 
 def unpack(image):
     """
-    Split images vertically.
+    按 720 像素高度纵向拆分图片。
 
     Args:
         image:
 
     Returns:
-        list: List of np.ndarray.
+        list: np.ndarray 列表。
     """
     size = image_size(image)
     if size == (1280, 720):
         return [image]
-    else:
-        if size[0] != 1280 or size[1] % 720 != 0:
-            raise ImageInvalidResolution(f"Unexpected image size: {size}")
-        return [crop(image, (0, n * 720, 1280, (n + 1) * 720)) for n in range(size[1] // 720)]
+    if size[0] != 1280 or size[1] % 720 != 0:
+        raise ImageInvalidResolution(f"Unexpected image size: {size}")
+    return [crop(image, (0, n * 720, 1280, (n + 1) * 720)) for n in range(size[1] // 720)]

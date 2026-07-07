@@ -16,10 +16,7 @@ class BonusItem(Item):
 
 class CampaignBonusStatistics(GetItemsStatistics):
     def appear_on(self, image):
-        if AUTO_SEARCH_MENU_EXIT.match(image, offset=(200, 20)) and CAMPAIGN_BONUS.match(image, offset=(20, 500)):
-            return True
-
-        return False
+        return AUTO_SEARCH_MENU_EXIT.match(image, offset=(200, 20)) and CAMPAIGN_BONUS.match(image, offset=(20, 500))
 
     def _stats_get_items_load(self, image):
         ITEM_GROUP.item_class = BonusItem
@@ -47,8 +44,7 @@ class CampaignBonusStatistics(GetItemsStatistics):
                 valid = True
         if valid:
             return [self.revise_item(item) for item in result]
-        else:
-            raise ImageError("Campaign bonus image does not have coins, dropped")
+        raise ImageError("Campaign bonus image does not have coins, dropped")
 
     def revise_item(self, item):
         """

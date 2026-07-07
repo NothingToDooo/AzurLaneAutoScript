@@ -86,10 +86,7 @@ class Item:
         self._cost = value
 
     def is_known_item(self):
-        if self.name == "DefaultItem" or self.name.isdigit():
-            return False
-        else:
-            return True
+        return self.name != "DefaultItem" and not self.name.isdigit()
 
     def __str__(self):
         if self.name != "DefaultItem" and self.cost == "DefaultCost":
@@ -331,16 +328,15 @@ class ItemGrid:
         threshold = 50
         color = cv2.mean(np.array(image))[:3]
         if color_similar(color1=color, color2=(49, 125, 222), threshold=threshold):
-            # Blue
+            # 蓝色。
             return "catchup"
-        elif color_similar(color1=color, color2=(33, 199, 239), threshold=threshold):
-            # Cyan
+        if color_similar(color1=color, color2=(33, 199, 239), threshold=threshold):
+            # 青色。
             return "bonus"
-        elif color_similar(color1=color, color2=(255, 85, 41), threshold=threshold):
-            # red
+        if color_similar(color1=color, color2=(255, 85, 41), threshold=threshold):
+            # 红色。
             return "event"
-        else:
-            return None
+        return None
 
     def predict(self, image, name=True, amount=True, cost=False, price=False, tag=False):
         """

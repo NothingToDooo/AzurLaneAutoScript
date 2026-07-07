@@ -78,9 +78,8 @@ class GetItemsStatistics:
 
         if ITEM_GROUP.grids is None:
             return []
-        else:
-            ITEM_GROUP.predict(image, **kwargs)
-            return ITEM_GROUP.items
+        ITEM_GROUP.predict(image, **kwargs)
+        return ITEM_GROUP.items
 
     def load_template_folder(self, folder):
         """
