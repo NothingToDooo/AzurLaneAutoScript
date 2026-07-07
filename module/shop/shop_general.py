@@ -95,35 +95,32 @@ class GeneralShop_250814(ShopClerk, ShopUI, ShopStatus):
         if item.cost == "Coins":
             return item.price <= self._currency
 
-        if self.config.GeneralShop_UseGems:
-            if item.cost == "Gems":
-                return item.price <= self.gems
+        if self.config.GeneralShop_UseGems and item.cost == "Gems":
+            return item.price <= self.gems
 
         return False
 
     def shop_check_custom_item(self, item):
         """
-        Check a custom item that should be bought with specific option.
+        判断物品是否符合需要强制购买的自定义规则。
 
         Args:
-            item: Item to check
+            item: 待检查物品。
 
         Returns:
-            bool: whether item is custom
+            bool: 是否命中自定义购买规则。
         """
-        if self.config.GeneralShop_ConsumeCoins and self._currency >= 550000:
-            if item.cost == "Coins":
-                return True
+        if self.config.GeneralShop_ConsumeCoins and self._currency >= 550000 and item.cost == "Coins":
+            return True
 
-        if self.config.GeneralShop_BuySkinBox:
-            if (not item.is_known_item()) and item.amount == 1 and item.cost == "Coins" and item.price == 7000:
-                # check a custom item that cannot be template matched as color
-                # and design constantly changes i.e. equip skin box
-                logger.info(f"Item {item} is considered to be an equip skin box")
-                if self._currency >= item.price:
-                    return True
+        if not self.config.GeneralShop_BuySkinBox:
+            return False
+        if item.is_known_item() or item.amount != 1 or item.cost != "Coins" or item.price != 7000:
+            return False
 
-        return False
+        # 装备皮肤箱无法用颜色模板稳定匹配，而且外观设计经常变化。
+        logger.info(f"Item {item} is considered to be an equip skin box")
+        return self._currency >= item.price
 
     def run(self):
         """
