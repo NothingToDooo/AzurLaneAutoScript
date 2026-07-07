@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     import threading
 
 from module.base.filter import Filter
+from module.base.time import beijing_now
 from module.config.config_generated import GeneratedConfig
 from module.config.config_manual import ManualConfig, OutputConfig
 from module.config.config_updater import ConfigUpdater
@@ -201,7 +202,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         pending = []
         waiting = []
         error = []
-        now = datetime.now()
+        now = beijing_now()
         if AzurLaneConfig.is_hoarding_task:
             now -= self.hoarding
         for func_data in self.data.values():
@@ -273,7 +274,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         self.save()
 
     def override(self, **kwargs):
-        now = datetime.now().replace(microsecond=0)
+        now = beijing_now().replace(microsecond=0)
         limited = set()
 
         def limit_next_run(tasks, limit):
@@ -327,7 +328,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             for arg, value in kwargs.items():
                 record = arg.replace("Value", "Record")
                 self.__setattr__(arg, value)
-                self.__setattr__(record, datetime.now().replace(microsecond=0))
+                self.__setattr__(record, beijing_now().replace(microsecond=0))
 
     def multi_set(self):
         """
@@ -395,7 +396,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         run = []
         if success is not None:
             interval = self.Scheduler_SuccessInterval if success else self.Scheduler_FailureInterval
-            run.append(datetime.now() + ensure_delta(interval))
+            run.append(beijing_now() + ensure_delta(interval))
         if server_update is not None:
             if server_update is True:
                 server_update = self.Scheduler_ServerUpdate
@@ -405,7 +406,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             target = nearest_future(target)
             run.append(target)
         if minute is not None:
-            run.append(datetime.now() + ensure_delta(minute))
+            run.append(beijing_now() + ensure_delta(minute))
 
         if run:
             run = min(run).replace(microsecond=0)
@@ -448,7 +449,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         )
 
         def delay_tasks(task_list, minutes):
-            next_run = datetime.now().replace(microsecond=0) + timedelta(minutes=minutes)
+            next_run = beijing_now().replace(microsecond=0) + timedelta(minutes=minutes)
             for task in task_list:
                 keys = f"{task}.Scheduler.NextRun"
                 current = deep_get(self.data, keys=keys, default=DEFAULT_TIME)
@@ -545,7 +546,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
 
         if force_call or self.is_task_enabled(task):
             logger.info(f"Task call: {task}")
-            self.modified[f"{task}.Scheduler.NextRun"] = datetime.now().replace(microsecond=0)
+            self.modified[f"{task}.Scheduler.NextRun"] = beijing_now().replace(microsecond=0)
             self.modified[f"{task}.Scheduler.Enable"] = True
             if self.auto_update:
                 self.update()

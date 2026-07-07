@@ -7,6 +7,7 @@ from pathlib import Path
 
 from deploy.utils import DEPLOY_TEMPLATE, poor_yaml_read, poor_yaml_write
 from module.base.decorator import cached_property
+from module.base.time import beijing_now
 from module.base.timer import timer
 from module.config.deep import deep_default, deep_get, deep_iter, deep_set
 from module.config.server import VALID_CHANNEL_PACKAGE, VALID_PACKAGE, VALID_SERVER_LIST, to_package, to_server
@@ -772,7 +773,7 @@ class ConfigUpdater:
         if "Emotion" in key and "Value" in key:
             keys = key.split(".")
             keys[-1] = keys[-1].replace("Value", "Record")
-            yield ".".join(keys), datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            yield ".".join(keys), beijing_now().strftime("%Y-%m-%d %H:%M:%S")
 
     def read_file(self, config_name, is_template=False):
         """

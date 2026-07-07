@@ -1,7 +1,7 @@
 import json
 import random
 import string
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import yaml
@@ -9,6 +9,7 @@ from yaml.representer import SafeRepresenter
 
 import module.config.server as server_
 from deploy.atomic import atomic_read_bytes, atomic_read_text, atomic_write
+from module.base.time import beijing_datetime, beijing_now
 from module.logger import logger
 from module.submodule.utils import get_mod_filepath, list_mod_instance, list_mod_template
 
@@ -26,7 +27,7 @@ SERVER_TO_TIMEZONE = {
     "jp": timedelta(hours=9),
     "tw": timedelta(hours=8),
 }
-DEFAULT_TIME = datetime(2020, 1, 1, 0, 0)
+DEFAULT_TIME = beijing_datetime(2020, 1, 1, 0, 0)
 
 
 # https://stackoverflow.com/questions/8640959/how-can-i-control-what-scalar-form-pyyaml-uses-for-my-data/15423007
@@ -286,13 +287,9 @@ def server_timezone() -> timedelta:
 
 def server_time_offset() -> timedelta:
     """
-    To convert local time to server time:
-        server_time = local_time + server_time_offset()
-    To convert server time to local time:
-        local_time = server_time - server_time_offset()
+    个人国区分支内部时间固定为北京时间，服务器时间和内部时间没有偏移。
     """
-    local_offset = datetime.now(UTC).astimezone().utcoffset() or timedelta()
-    return local_offset - server_timezone()
+    return timedelta()
 
 
 def random_normal_distribution_int(a, b, n=3):
@@ -353,7 +350,7 @@ def get_os_next_reset():
         datetime.datetime
     """
     diff = server_time_offset()
-    server_now = datetime.now() - diff
+    server_now = beijing_now() - diff
     server_reset = (server_now.replace(day=1) + timedelta(days=32)).replace(
         day=1, hour=0, minute=0, second=0, microsecond=0
     )
@@ -366,7 +363,7 @@ def get_os_reset_remain():
         int: number of days before next opsi reset
     """
     next_reset = get_os_next_reset()
-    now = datetime.now()
+    now = beijing_now()
     logger.attr("OpsiNextReset", next_reset)
 
     remain = int((next_reset - now).total_seconds() // 86400)
@@ -386,7 +383,7 @@ def get_server_next_update(daily_trigger):
         daily_trigger = daily_trigger.replace(" ", "").split(",")
 
     diff = server_time_offset()
-    local_now = datetime.now()
+    local_now = beijing_now()
     trigger = []
     for t in daily_trigger:
         h, m = [int(x) for x in t.split(":")]
@@ -409,7 +406,7 @@ def get_server_last_update(daily_trigger):
         daily_trigger = daily_trigger.replace(" ", "").split(",")
 
     diff = server_time_offset()
-    local_now = datetime.now()
+    local_now = beijing_now()
     trigger = []
     for t in daily_trigger:
         h, m = [int(x) for x in t.split(":")]
@@ -455,7 +452,7 @@ def get_nearest_weekday_date(target):
         datetime.datetime
     """
     diff = server_time_offset()
-    server_now = datetime.now() - diff
+    server_now = beijing_now() - diff
 
     days_ahead = target - server_now.weekday()
     if days_ahead <= 0:
@@ -472,7 +469,7 @@ def get_server_weekday():
         int: The server's current day of the week
     """
     diff = server_time_offset()
-    server_now = datetime.now() - diff
+    server_now = beijing_now() - diff
     return server_now.weekday()
 
 
@@ -482,7 +479,7 @@ def get_server_monthday():
         int: The server's current day of the month
     """
     diff = server_time_offset()
-    server_now = datetime.now() - diff
+    server_now = beijing_now() - diff
     return server_now.day
 
 
