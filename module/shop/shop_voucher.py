@@ -96,18 +96,17 @@ class VoucherShop(ShopClerk, ShopStatus):
             delta_y = 191
             row = 2
 
-        # Make up a ButtonGrid
-        # Original grid is:
+        # 按新版 UI 补出商品网格。
+        # 原始网格为：
         # shop_grid = ButtonGrid(
         #     origin=(463, 200), delta=(156, 191), button_shape=(99, 99), grid_shape=(5, 2), name='SHOP_GRID')
-        shop_grid = ButtonGrid(
+        return ButtonGrid(
             origin=(305, origin_y),
             delta=(189.5, delta_y),
             button_shape=(99, 99),
             grid_shape=(5, row),
             name="SHOP_GRID",
         )
-        return shop_grid
 
     shop_template_folder = "./assets/shop/voucher"
 

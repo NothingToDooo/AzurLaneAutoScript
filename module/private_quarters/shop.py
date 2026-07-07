@@ -62,18 +62,14 @@ class PQShop(PQShopClerk, PQStatus):
 
     @cached_property
     def shop_grid(self):
-        """
-        Returns:
-            ButtonGrid:
-        """
-        shop_grid = ButtonGrid(
+        """返回私人房间商店的商品网格。"""
+        return ButtonGrid(
             origin=(290, 215),
             delta=(230, 0),
             button_shape=(96, 96),
             grid_shape=(4, 1),
             name="PRIVATE_QUARTERS_BUTTON_GRID_ITEM",
         )
-        return shop_grid
 
     @cached_property
     def shop_private_quarters_items(self):

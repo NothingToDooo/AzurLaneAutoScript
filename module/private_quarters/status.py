@@ -27,26 +27,12 @@ OCR_SHOP_PRICE = Digit([], letter=(64, 72, 77), name="OCR_SHOP_PRICE")
 
 class PQStatus(ShopStatus):
     def status_get_gold_coins(self):
-        """
-        Returns:
-            int:
-
-        Pages:
-            in:
-        """
-        amount = OCR_SHOP_GOLD_COINS.ocr(self.device.image)
-        return amount
+        """读取金币数量。"""
+        return OCR_SHOP_GOLD_COINS.ocr(self.device.image)
 
     def status_get_gems(self):
-        """
-        Returns:
-            int:
-
-        Pages:
-            in: page_shop, medal shop
-        """
-        amount = OCR_SHOP_GEMS.ocr(self.device.image)
-        return amount
+        """读取钻石数量。"""
+        return OCR_SHOP_GEMS.ocr(self.device.image)
 
     def status_get_daily_count(self):
         """

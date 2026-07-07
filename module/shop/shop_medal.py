@@ -144,14 +144,13 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
             delta_y = 223
             row = 2
 
-        # Make up a ButtonGrid
-        # Original grid is:
+        # 按新版 UI 补出商品网格。
+        # 原始网格为：
         # shop_grid = ButtonGrid(
         #     origin=(476, 246), delta=(156, 213), button_shape=(98, 98), grid_shape=(5, 2), name='SHOP_GRID')
-        shop_grid = ButtonGrid(
+        return ButtonGrid(
             origin=(265, origin_y), delta=(169, delta_y), button_shape=(64, 64), grid_shape=(5, row), name="SHOP_GRID"
         )
-        return shop_grid
 
     shop_template_folder = "./assets/shop/medal"
 

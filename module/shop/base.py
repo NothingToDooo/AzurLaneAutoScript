@@ -121,15 +121,10 @@ class ShopBase(UI):
     @cached_property
     @Config.when(SERVER=None)
     def shop_grid(self):
-        """
-        New UI in 2025-08-14
-        Returns:
-            ButtonGrid:
-        """
-        shop_grid = ButtonGrid(
+        """2025-08-14 新版商店 UI 的商品网格。"""
+        return ButtonGrid(
             origin=(265, 238), delta=(169, 223), button_shape=(64, 64), grid_shape=(5, 2), name="SHOP_GRID"
         )
-        return shop_grid
 
     def shop_items(self):
         """

@@ -14,8 +14,7 @@ class PriceOcr(DigitYuv):
             result = "1" + result
             logger.warning(f"OS shop amount {prev} is revised to {result}")
 
-        result = super().after_process(result)
-        return result
+        return super().after_process(result)
 
 
 class CounterOcr(Ocr):
@@ -27,8 +26,7 @@ class CounterOcr(Ocr):
     def after_process(self, result):
         result = super().after_process(result)
         result = result.replace("I", "1").replace("D", "0").replace("S", "5")
-        result = result.replace("B", "8")
-        return result
+        return result.replace("B", "8")
 
     def ocr(self, image, direct_ocr=False):
         """
