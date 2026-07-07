@@ -84,11 +84,11 @@ class GuildOperations(GuildBase):
                 continue
 
             # 结束。
-            if self.appear(guild_assets.GUILD_BOSS_ENTER) or self.appear(
-                guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK, offset=(20, 20)
-            ):
-                if not self.info_bar_count() and confirm_timer.reached():
-                    return True
+            if (
+                self.appear(guild_assets.GUILD_BOSS_ENTER)
+                or self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK, offset=(20, 20))
+            ) and not self.info_bar_count() and confirm_timer.reached():
+                return True
         return False
 
     def _handle_guild_operations_start(self):
@@ -402,17 +402,19 @@ class GuildOperations(GuildBase):
                 # 首次派遣会显示派遣中按钮。
                 logger.info("Fleet dispatched, dispatch in progress")
                 break
-            if dispatched and self.appear(guild_assets.GUILD_DISPATCH_FLEET, offset=(20, 20), interval=3):
-                # 满员和未满员按钮特征相同，只能再用蓝色背景确认一次。
-                if self.image_color_count(
+            if (
+                dispatched
+                and self.appear(guild_assets.GUILD_DISPATCH_FLEET, offset=(20, 20), interval=3)
+                and self.image_color_count(
                     guild_assets.GUILD_DISPATCH_FLEET,
                     color=(82, 93, 221),
                     threshold=235,
                     count=500,
-                ):
-                    # 后续派遣会继续显示满员按钮；如果实际没派出，外层会重试。
-                    logger.info("Fleet dispatched")
-                    break
+                )
+            ):
+                # 后续派遣会继续显示满员按钮；如果实际没派出，外层会重试。
+                logger.info("Fleet dispatched")
+                break
 
     def _guild_operations_dispatch_exit(self, skip_first_screenshot=True):
         """
@@ -511,18 +513,16 @@ class GuildOperations(GuildBase):
                     return False
                 continue
 
-            if self.config.GuildOperation_BossFleetRecommend:
-                if self.info_bar_count() and self.appear_then_click(
-                    guild_assets.GUILD_DISPATCH_RECOMMEND_2, interval=3
-                ):
-                    continue
+            if self.config.GuildOperation_BossFleetRecommend and self.info_bar_count() and self.appear_then_click(
+                guild_assets.GUILD_DISPATCH_RECOMMEND_2, interval=3
+            ):
+                continue
 
             # 只在首次检测到加载时打印。
-            if not is_loading:
-                if az.is_combat_loading():
-                    self.device.screenshot_interval_set("combat")
-                    is_loading = True
-                    continue
+            if not is_loading and az.is_combat_loading():
+                self.device.screenshot_interval_set("combat")
+                is_loading = True
+                continue
 
             if az.handle_combat_automation_confirm():
                 continue
