@@ -216,10 +216,7 @@ class Commission:
                 return False
         if self.repeat_count != other.repeat_count:
             return False
-        if self.genre in ["extra_oil", "night_oil"] and not self.suffix_match(other):
-            return False
-
-        return True
+        return self.genre not in ["extra_oil", "night_oil"] or self.suffix_match(other)
 
     def __hash__(self):
         return hash(f"{self.genre}_{self.name}")
@@ -264,9 +261,8 @@ class Commission:
             logger.warning(f"Invalid time string: {string}")
             self.valid = False
             return None
-        else:
-            result = [int(s) for s in result.groups()]
-            return timedelta(hours=result[0], minutes=result[1], seconds=result[2])
+        result = [int(s) for s in result.groups()]
+        return timedelta(hours=result[0], minutes=result[1], seconds=result[2])
 
     def commission_name_parse(self, string):
         """
@@ -300,12 +296,9 @@ class Commission:
         # area = area_offset((5, 5, 30, 30), self.area[0:2])
         # return color_similar(color1=get_color(self.image, area), color2=(235, 173, 161))
 
-        # 2023.04.27 Vacation Lane Rerun, pink yellow gradient like Idol Master event
+        # 2023.04.27 Vacation Lane 复刻，粉黄渐变类似偶像大师活动。
         area = area_offset((5, 5, 30, 30), self.area[0:2])
-        if color_similar(color1=get_color(self.image, area), color2=(235, 173, 161), threshold=30):
-            return True
-
-        return False
+        return color_similar(color1=get_color(self.image, area), color2=(235, 173, 161), threshold=30)
 
     def convert_to_night(self):
         if self.valid and self.category_str == "extra":
@@ -321,8 +314,7 @@ class Commission:
     def finish_time(self):
         if self.valid and self.status == "running":
             return (self.create_time + self.duration).replace(microsecond=0)
-        else:
-            return None
+        return None
 
     @staticmethod
     def beautify_name(name):

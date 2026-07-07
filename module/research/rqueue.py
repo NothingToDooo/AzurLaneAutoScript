@@ -62,13 +62,10 @@ class ResearchQueue(ResearchUI):
         """
         # RESEARCH_QUEUE_ADD.area 是 `Queue` 文字区域。
         # RESEARCH_QUEUE_ADD.button 是按钮的完整可点击区域。
-        # Available: (90, 142, 203)
-        # Unavailable: (153, 160, 170)
+        # 可用：(90, 142, 203)
+        # 不可用：(153, 160, 170)
         r, g, b = get_color(self.device.image, research_assets.RESEARCH_QUEUE_ADD.button)
-        if b - min(r, g) > 60:
-            return True
-        else:
-            return False
+        return b - min(r, g) > 60
 
     @cached_property
     def queue_status_grids(self):
@@ -100,8 +97,7 @@ class ResearchQueue(ResearchUI):
             below = button.crop((7, 14, 21, 21))
             if self.image_color_count(below, color=(24, 24, 41), threshold=221, count=10):
                 return "running"
-            else:
-                return "empty"
+            return "empty"
         logger.warning(f"Unknown queue status from {button}, assume running")
         return "running"
 

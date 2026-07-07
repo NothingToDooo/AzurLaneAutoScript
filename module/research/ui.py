@@ -70,8 +70,7 @@ class ResearchUI(UI):
         if self.appear(GET_ITEMS_3, offset=(5, 5)):
             if self.image_color_count(GET_ITEMS_3_CHECK, color=(255, 255, 255), threshold=221, count=100):
                 return GET_ITEMS_3
-            else:
-                return GET_ITEMS_2
+            return GET_ITEMS_2
         if self.appear(GET_ITEMS_1, offset=(5, 5)):
             return GET_ITEMS_1
         return None

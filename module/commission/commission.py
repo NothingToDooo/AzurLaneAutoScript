@@ -186,19 +186,12 @@ class RewardCommission(UI, InfoHandler):
         return daily_choose, urgent_choose
 
     def _commission_check(self, commission):
-        """
-        Args:
-            commission (Commission):
-
-        Returns:
-            bool:
-        """
-        if not commission.valid or commission.status != "pending":
-            return False
-        if not self.config.Commission_DoMajorCommission and commission.category_str == "major":
-            return False
-
-        return True
+        """返回委托是否可执行。"""
+        return (
+            commission.valid
+            and commission.status == "pending"
+            and (self.config.Commission_DoMajorCommission or commission.category_str != "major")
+        )
 
     def _commission_ensure_mode(self, mode):
         if COMMISSION_SWITCH.set(mode, main=self):
@@ -223,8 +216,7 @@ class RewardCommission(UI, InfoHandler):
                     self.device.screenshot()
 
             return True
-        else:
-            return False
+        return False
 
     def _commission_mode_reset(self):
         logger.hr("Commission mode reset")
@@ -245,11 +237,9 @@ class RewardCommission(UI, InfoHandler):
         if COMMISSION_SCROLL.appear(main=self):
             if COMMISSION_SCROLL.at_bottom(main=self):
                 return False
-            else:
-                COMMISSION_SCROLL.next_page(main=self)
-                return True
-        else:
-            return False
+            COMMISSION_SCROLL.next_page(main=self)
+            return True
+        return False
 
     def _commission_swipe_to_top(self):
         if not COMMISSION_SCROLL.appear(main=self):
@@ -437,11 +427,10 @@ class RewardCommission(UI, InfoHandler):
                     if self._commission_start_click(current, is_urgent=is_urgent):
                         self.device.click_record_clear()
                         return True
-                    else:
-                        self._commission_mode_reset()
-                        self._commission_swipe_to_top()
-                        failed = False
-                        break
+                    self._commission_mode_reset()
+                    self._commission_swipe_to_top()
+                    failed = False
+                    break
 
                 # 结束。
                 if not self._commission_swipe():

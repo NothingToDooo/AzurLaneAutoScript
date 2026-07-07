@@ -42,8 +42,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             logger.attr("Research_finished", index)
             self._research_finished_index = index
             return True
-        else:
-            return False
+        return False
 
     def research_reset(self, drop=None, skip_first_screenshot=True):
         """
@@ -111,15 +110,14 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             logger.info("No research project satisfies current filter")
             return self.research_enforce(drop=drop, add_queue=add_queue)
         for project in priority:
-            # priority example: ['reset', 'shortest']
+            # 优先级示例：['reset', 'shortest']。
             if project == "reset":
                 if self.research_reset(drop=drop):
                     return False
-                else:
-                    continue
+                continue
 
             if isinstance(project, str):
-                # priority example: ['shortest']
+                # 优先级示例：['shortest']。
                 if project == "shortest":
                     self.research_select(self.research_sort_shortest(self.enforce), drop=drop, add_queue=add_queue)
                 elif project == "cheapest":
@@ -127,18 +125,16 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
                 else:
                     logger.warning(f"Unknown select method: {project}")
                 return True
-            elif project.genre.upper() in ["C", "T"] and not self.enforce:
+            if project.genre.upper() in ["C", "T"] and not self.enforce:
                 return self.research_enforce(drop=drop, add_queue=add_queue)
-            else:
-                # priority example: [ResearchProject, ResearchProject,]
-                ret = self.research_project_start_with_requirements(project, add_queue=add_queue)
-                if ret:
-                    return True
-                elif ret is not None and self.research_delay_check():
-                    logger.info("Delay research when resources not enough and queue not empty")
-                    return True
-                else:
-                    continue
+            # 优先级示例：[ResearchProject, ResearchProject]。
+            ret = self.research_project_start_with_requirements(project, add_queue=add_queue)
+            if ret:
+                return True
+            if ret is not None and self.research_delay_check():
+                logger.info("Delay research when resources not enough and queue not empty")
+                return True
+            continue
 
         logger.info("No research project started")
         return self.research_enforce(drop=drop, add_queue=add_queue)
@@ -258,28 +254,27 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             in: is_in_research
             out: is_in_research
         """
-        # Project index, call it directly
+        # project 是索引时直接启动。
         if isinstance(project, int):
             return self.research_project_start(project, add_queue=add_queue)
-        elif project.genre == "E" and project.equipment_amount > 0:
+        if project.genre == "E" and project.equipment_amount > 0:
             logger.info(
                 f"Going to start an E series research: {project} and disassemble {project.equipment_amount} equipment"
             )
-            # Start it
+            # 启动项目。
             self.research_project_start(project, add_queue=False)
-            # Disassemble
+            # 拆解装备。
             self.storage_disassemble_equipment(amount=project.equipment_amount)
-            # Get back
+            # 回到科研页。
             self.ui_ensure(page_research)
             self.research_project_list_init()
-            # Add to queue
+            # 加入队列。
             result = self.research_project_start(project, add_queue=add_queue)
             if result is None:
                 logger.error("Research project is missing after disassemble equipment")
             return result
-        else:
-            # Normal project
-            return self.research_project_start(project, add_queue=add_queue)
+        # 普通项目。
+        return self.research_project_start(project, add_queue=add_queue)
 
     def research_receive(self, skip_first_screenshot=True):
         """
@@ -466,8 +461,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             if project_record is not None:
                 drop.add(project_record)
             return True
-        else:
-            return False
+        return False
 
     def research_fill_queue(self):
         """
@@ -586,11 +580,11 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         slot = self.get_queue_slot()
         # Scheduler
         if slot == 5:
-            # Queue empty, can't start any research
+            # 队列为空，无法启动任何科研。
             self.config.task_delay(server_update=True)
             return
-        elif self.end_time <= datetime.now():
-            # Get the remain of project newly started
+        if self.end_time <= datetime.now():
+            # 获取刚启动项目的剩余时间。
             self.queue_enter()
             self.end_time = self.get_research_ended()
             self.queue_quit()

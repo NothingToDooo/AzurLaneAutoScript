@@ -167,14 +167,13 @@ def get_research_finished(image):
         if max(color) - min(color) < 40:
             logger.warning(f"Unexpected color: {color}")
             continue
-        color_index = np.argmax(color)  # R, G, B
+        color_index = np.argmax(color)  # RGB 通道索引。
         if color_index == 1:
-            return index  # Green
-        elif color_index == 2:
-            continue  # Blue
-        else:
-            logger.warning(f"Unexpected color: {color}")
-            continue
+            return index  # 绿色。
+        if color_index == 2:
+            continue  # 蓝色。
+        logger.warning(f"Unexpected color: {color}")
+        continue
 
     return None
 
@@ -190,9 +189,8 @@ def parse_time(string):
     if not result:
         logger.warning(f"Invalid time string: {string}")
         return None
-    else:
-        result = [int(s) for s in result.groups()]
-        return timedelta(hours=result[0], minutes=result[1], seconds=result[2])
+    result = [int(s) for s in result.groups()]
+    return timedelta(hours=result[0], minutes=result[1], seconds=result[2])
 
 
 def match_template(image, template, area, offset=30, similarity=0.85):
@@ -675,8 +673,7 @@ class ResearchProject:
     def __str__(self):
         if self.valid:
             return f"{self.series} {self.name}"
-        else:
-            return f"{self.series} {self.name} (Invalid)"
+        return f"{self.series} {self.name} (Invalid)"
 
     def __eq__(self, other):
         return str(self) == str(other)
@@ -739,8 +736,8 @@ class ResearchProject:
             if prefix == "L" and number in ResearchProject.C_PROJECT_NUMBERS:
                 prefix = "C"
             return "-".join([prefix, number, suffix])
-        elif len(parts) == 2:
-            # Trying to insert '-', for results like H339-MI
+        if len(parts) == 2:
+            # 尝试插入 '-'，处理 H339-MI 这类结果。
             if name[0].isalpha() and name[1].isdigit():
                 return self.check_name(f"{name[0]}-{name[1:]}")
         return name
@@ -783,14 +780,13 @@ class ResearchProject:
 
     @cached_property
     def equipment_amount(self):
-        # Scrap 8 pieces of gear.
-        # Scrap 15 pieces of gear.
+        # 拆解 8 件装备。
+        # 拆解 15 件装备。
         if "8 piece" in self.task:
             return 8
-        elif "15 piece" in self.task:
+        if "15 piece" in self.task:
             return 15
-        else:
-            return 0
+        return 0
 
 
 class ResearchProjectJp:
@@ -853,8 +849,7 @@ class ResearchProjectJp:
     def __str__(self):
         if self.valid:
             return f"{self.name}"
-        else:
-            return f"{self.name} (Invalid)"
+        return f"{self.name} (Invalid)"
 
     def __eq__(self, other):
         return str(self) == str(other)
@@ -862,8 +857,7 @@ class ResearchProjectJp:
     @cached_property
     def equipment_amount(self):
         if self.genre == "E" and self.duration == "2":
-            # JP has no research names, can't distinguish E-031-MI and E-315-MI,
-            # return the max value 15
+            # 日服没有科研名称，无法区分 E-031-MI 和 E-315-MI。
+            # 返回最大值 15。
             return 15
-        else:
-            return 0
+        return 0
