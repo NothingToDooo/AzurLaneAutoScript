@@ -122,6 +122,7 @@ select = [
     "S605",
     "SIM",
     "SLOT",
+    "T201",
     "TCH",
     "TRY002",
     "TRY201",
@@ -132,7 +133,7 @@ select = [
     "W",
     "YTT",
 ]
-per-file-ignores = { "tests/**/*.py" = ["S101"] }
+per-file-ignores = { "dev_tools/**/*.py" = ["T201"], "tests/**/*.py" = ["S101"] }
 
 [tool.ty.environment]
 python-version = "3.14"

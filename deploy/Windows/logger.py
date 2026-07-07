@@ -44,7 +44,7 @@ def hr(title, level=3):
 
 
 def attr(name, text):
-    print(f"[{name}] {text}")
+    logger.info("[%s] %s", name, text)
 
 
 _logger.hr = hr
