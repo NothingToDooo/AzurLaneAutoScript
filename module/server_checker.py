@@ -4,7 +4,7 @@ from json import JSONDecodeError
 import requests
 
 from module.base.timer import Timer
-from module.config.server import VALID_SERVER_LIST as server_list
+from module.config.server import VALID_SERVER_LIST
 from module.exception import ScriptError
 from module.logger import logger
 
@@ -20,7 +20,7 @@ class ServerChecker:
 
         if server != "disabled":
             server = server.split("-")
-            server = server_list[server[0]][int(server[-1])]
+            server = VALID_SERVER_LIST[server[0]][int(server[-1])]
 
         self._server: str = server
         self._state: deque = deque(maxlen=2)
