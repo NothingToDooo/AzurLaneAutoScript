@@ -22,7 +22,7 @@ stdout_console: Console
 console_hdlr: RichHandler
 
 def set_file_logger(
-    name: str = pyw_name,
+    name: str = ...,
 ) -> None: ...
 def set_func_logger(
     func: Callable[[ConsoleRenderable], None],
@@ -57,7 +57,7 @@ class __logger(logging.Logger):
     ) -> None: ...
     def set_file_logger(
         self,
-        name: str = pyw_name,
+        name: str = ...,
     ) -> None: ...
     def set_func_logger(
         self,
