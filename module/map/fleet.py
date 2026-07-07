@@ -33,9 +33,8 @@ class Fleet(Camera, AmbushHandler):
 
     @property
     def fleet_2(self):
-        if self.config.FLEET_2:
-            if self.fleet_current_index != 2:
-                self.fleet_ensure(index=2)
+        if self.config.FLEET_2 and self.fleet_current_index != 2:
+            self.fleet_ensure(index=2)
         return self
 
     @fleet_2.setter
@@ -200,9 +199,8 @@ class Fleet(Camera, AmbushHandler):
                         break
             second += count * self.config.MAP_SIREN_MOVE_WAIT
 
-        if self.config.MAP_HAS_MAZE:
-            if (self.round + 1) % 3 == 0:
-                second += 1.0
+        if self.config.MAP_HAS_MAZE and (self.round + 1) % 3 == 0:
+            second += 1.0
 
         if self.config.MAP_HAS_BOUNCING_ENEMY:
             for route in self.map.bouncing_enemy_data:
@@ -414,11 +412,10 @@ class Fleet(Camera, AmbushHandler):
                 if arrive_unexpected_timer.started():
                     arrive_unexpected_timer.reset()
 
-                # Story
-                if expected == "story":
-                    if self.handle_story_skip():
-                        result = "story"
-                        continue
+                # 剧情。
+                if expected == "story" and self.handle_story_skip():
+                    result = "story"
+                    continue
 
                 # End
                 if ambushed_retry.started() and ambushed_retry.reached():
@@ -456,9 +453,8 @@ class Fleet(Camera, AmbushHandler):
             self.find_path_initial()
             raise MapEnemyMoved
         self.find_path_initial()
-        if self.config.MAP_HAS_DECOY_ENEMY:
-            if result == "nothing" and expected == "combat":
-                raise MapEnemyMoved
+        if self.config.MAP_HAS_DECOY_ENEMY and result == "nothing" and expected == "combat":
+            raise MapEnemyMoved
 
     def goto(self, location, expected="", step_optimize=None, turning_optimize=None):
         """
@@ -514,10 +510,9 @@ class Fleet(Camera, AmbushHandler):
         if self.fleet_2_location:
             location_dict[2] = self.fleet_2_location
         location_dict[1] = self.fleet_1_location
-        # Release fortress block
-        if self.config.MAP_HAS_FORTRESS:
-            if not self.map.select(is_fortress=True):
-                self.map.select(is_mechanism_block=True).set(is_mechanism_block=False)
+        # 解除要塞阻挡。
+        if self.config.MAP_HAS_FORTRESS and not self.map.select(is_fortress=True):
+            self.map.select(is_mechanism_block=True).set(is_mechanism_block=False)
         self.map.find_path_initial_multi_fleet(
             location_dict, current=self.fleet_current, has_ambush=self.config.MAP_HAS_AMBUSH
         )
