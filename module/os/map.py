@@ -134,11 +134,10 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         # self.ensure_no_zone_pinned()
         self.globe_update()
         self.globe_focus_to(zone)
-        if stop_if_safe:
-            if self.zone_has_safe():
-                logger.info("Zone is safe, stopped")
-                self.ensure_no_zone_pinned()
-                return False
+        if stop_if_safe and self.zone_has_safe():
+            logger.info("Zone is safe, stopped")
+            self.ensure_no_zone_pinned()
+            return False
         self.zone_type_select(types=types)
         self.globe_enter(zone)
         # IN_MAP
@@ -449,12 +448,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
     def on_auto_search_battle_count_add(self):
         self._auto_search_battle_count += 1
         logger.attr("battle_count", self._auto_search_battle_count)
-        if self.is_in_task_cl1_leveling:
-            if self._auto_search_battle_count % 2 == 1:
-                if self._auto_search_round_timer:
-                    cost = round(time.time() - self._auto_search_round_timer, 2)
-                    logger.attr("CL1 time cost", f"{cost}s/round")
-                self._auto_search_round_timer = time.time()
+        if self.is_in_task_cl1_leveling and self._auto_search_battle_count % 2 == 1:
+            if self._auto_search_round_timer:
+                cost = round(time.time() - self._auto_search_round_timer, 2)
+                logger.attr("CL1 time cost", f"{cost}s/round")
+            self._auto_search_round_timer = time.time()
 
     def os_auto_search_daemon(self, drop=None, strategic=False):
         """
@@ -503,13 +501,12 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             else:
                 died_timer.reset()
 
-            if not unlock_checked:
-                if (
-                    self.appear(AUTO_SEARCH_OS_MAP_OPTION_OFF, offset=(5, 120))
-                    or self.appear(AUTO_SEARCH_OS_MAP_OPTION_OFF_DISABLED, offset=(5, 120))
-                    or self.appear(AUTO_SEARCH_OS_MAP_OPTION_ON, offset=(5, 120))
-                ):
-                    unlock_checked = True
+            if not unlock_checked and (
+                self.appear(AUTO_SEARCH_OS_MAP_OPTION_OFF, offset=(5, 120))
+                or self.appear(AUTO_SEARCH_OS_MAP_OPTION_OFF_DISABLED, offset=(5, 120))
+                or self.appear(AUTO_SEARCH_OS_MAP_OPTION_ON, offset=(5, 120))
+            ):
+                unlock_checked = True
 
             if self.handle_os_auto_search_map_option(drop=drop, enable=success):
                 unlock_checked = True
@@ -731,12 +728,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
                 self.hp_reset()
                 self.hp_get()
-                if after_auto_search:
-                    if self.is_in_task_explore and not self.zone.is_port:
-                        prev = self.zone
-                        if self.handle_after_auto_search():
-                            self.globe_goto(prev, types="DANGEROUS")
-                            continue
+                if after_auto_search and self.is_in_task_explore and not self.zone.is_port:
+                    prev = self.zone
+                    if self.handle_after_auto_search():
+                        self.globe_goto(prev, types="DANGEROUS")
+                        continue
                 break
 
             # Rescan
