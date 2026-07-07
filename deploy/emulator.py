@@ -48,7 +48,7 @@ class VirtualBoxEmulator:
 
         file = re.search('"(.*?)"', res)
         file = file.group(1) if file else res
-        return os.path.abspath(os.path.join(os.path.dirname(file), self.root_path))
+        return str((Path(file).parent / self.root_path).resolve())
 
     @cached_property
     def adb_binary(self):

@@ -2,6 +2,7 @@ import os
 import re
 import typing as t
 from dataclasses import dataclass
+from pathlib import Path
 
 from module.device.platform.utils import cached_property, iter_folder
 
@@ -167,7 +168,8 @@ class EmulatorBase:
         # Path to .exe file
         self.path = path.replace("\\", "/")
         # Path to emulator folder
-        self.dir = os.path.dirname(path)
+        parent = Path(path).parent
+        self.dir = "" if parent == Path(".") else str(parent).replace("\\", "/")
         # str: Emulator type, or '' if this is not a emulator.
         self.type = self.__class__.path_to_type(path)
 

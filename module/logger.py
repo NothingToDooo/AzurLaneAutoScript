@@ -168,7 +168,7 @@ console_hdlr.setFormatter(console_formatter)
 logger.addHandler(console_hdlr)
 
 # Ensure running in Alas root folder
-os.chdir(os.path.join(os.path.dirname(__file__), "../"))
+os.chdir(Path(__file__).resolve().parents[1])
 
 # Add file logger
 pyw_name = Path(sys.argv[0]).stem

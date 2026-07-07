@@ -1,5 +1,6 @@
 import copy
 import os
+from pathlib import Path
 
 from deploy.logger import logger
 from deploy.utils import DEPLOY_CONFIG, DEPLOY_TEMPLATE, cached_property, poor_yaml_read, poor_yaml_write
@@ -98,12 +99,7 @@ class DeployConfig(ConfigModel):
 
     @cached_property
     def root_filepath(self):
-        return (
-            os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
-            .replace(r"\\", "/")
-            .replace("\\", "/")
-            .replace('"', '"')
-        )
+        return Path(__file__).resolve().parents[1].as_posix().replace('"', '"')
 
     def execute(self, command, allow_failure=False, output=True):
         """

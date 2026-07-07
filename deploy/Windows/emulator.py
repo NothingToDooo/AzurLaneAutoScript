@@ -160,6 +160,6 @@ class EmulatorManager(AlasManager):
 
 
 if __name__ == "__main__":
-    os.chdir(os.path.join(os.path.dirname(__file__), "../../"))
+    os.chdir(Path(__file__).resolve().parents[2])
     self = EmulatorManager()
     self.brute_force_connect()

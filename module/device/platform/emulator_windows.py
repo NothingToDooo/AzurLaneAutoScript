@@ -81,11 +81,9 @@ class Emulator(EmulatorBase):
         Returns:
             str: Emulator type, such as Emulator.MuMuPlayer12
         """
-        folder, exe = os.path.split(path)
-        folder = os.path.dirname(folder)
-        _, dir2 = os.path.split(folder)
-        exe = exe.lower()
-        dir2 = dir2.lower()
+        emulator_path = Path(path)
+        exe = emulator_path.name.lower()
+        dir2 = emulator_path.parent.parent.name.lower()
         if exe == "nemuplayer.exe":
             if dir2 == "nemu":
                 return cls.MuMuPlayer
@@ -364,16 +362,17 @@ class EmulatorManager(EmulatorManagerBase):
 
         # Uninstall registry
         for uninstall in EmulatorManager.iter_uninstall_registry():
+            folder = Path(uninstall).parent
             # Find emulator executable from uninstaller
-            for file in iter_folder(abspath(os.path.dirname(uninstall)), ext=".exe"):
+            for file in iter_folder(abspath(folder), ext=".exe"):
                 if Emulator.is_emulator(file) and os.path.exists(file):
                     exe.add(file)
             # Find from parent directory
-            for file in iter_folder(abspath(os.path.join(os.path.dirname(uninstall), "../")), ext=".exe"):
+            for file in iter_folder(abspath(folder.parent), ext=".exe"):
                 if Emulator.is_emulator(file) and os.path.exists(file):
                     exe.add(file)
             # MuMu specific directory
-            for file in iter_folder(abspath(os.path.join(os.path.dirname(uninstall), "EmulatorShell")), ext=".exe"):
+            for file in iter_folder(abspath(folder / "EmulatorShell"), ext=".exe"):
                 if Emulator.is_emulator(file) and os.path.exists(file):
                     exe.add(file)
 

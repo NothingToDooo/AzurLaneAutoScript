@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from pathlib import Path
 from typing import cast
 
 
@@ -10,7 +11,7 @@ class DeployLogger(logging.Logger):
     def attr(self, name, text): ...
 
 
-os.chdir(os.path.join(os.path.dirname(__file__), "../../"))
+os.chdir(Path(__file__).resolve().parents[2])
 
 _logger = logging.getLogger("deploy")
 logger = cast("DeployLogger", _logger)

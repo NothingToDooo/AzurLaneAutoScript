@@ -96,7 +96,7 @@ class DeployConfig(ConfigModel):
 
     @cached_property
     def root_filepath(self):
-        return os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")).replace(r"\\", "/").replace("\\", "/")
+        return Path(__file__).resolve().parents[2].as_posix()
 
     @cached_property
     def adb(self) -> str:

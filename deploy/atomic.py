@@ -188,9 +188,9 @@ def file_write(file: str, data: str | bytes):
             os.fsync(f.fileno())
     except FileNotFoundError:
         # Create parent directory
-        directory = os.path.dirname(file)
-        if directory:
-            Path(directory).mkdir(parents=True, exist_ok=True)
+        directory = Path(file).parent
+        if directory != Path("."):
+            directory.mkdir(parents=True, exist_ok=True)
         # Write again
         with open(file, mode=mode, encoding=encoding, newline=newline) as f:
             f.write(data)
@@ -243,9 +243,9 @@ def file_write_stream(file: str, data_generator):
             os.fsync(f.fileno())
     except FileNotFoundError:
         # Create parent directory
-        directory = os.path.dirname(file)
-        if directory:
-            Path(directory).mkdir(parents=True, exist_ok=True)
+        directory = Path(file).parent
+        if directory != Path("."):
+            directory.mkdir(parents=True, exist_ok=True)
         # Write again
         with open(file, mode=mode, encoding=encoding, newline=newline) as f:
             f.write(first_chunk)

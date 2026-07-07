@@ -3,6 +3,7 @@ import textwrap
 import typing as t
 from copy import deepcopy
 from datetime import datetime
+from pathlib import Path
 
 from deploy.utils import DEPLOY_TEMPLATE, poor_yaml_read, poor_yaml_write
 from module.base.decorator import cached_property
@@ -828,7 +829,7 @@ if __name__ == "__main__":
     # 确保在 Alas 根目录运行。
     import os
 
-    os.chdir(os.path.join(os.path.dirname(__file__), "../../"))
+    os.chdir(Path(__file__).resolve().parents[2])
 
     ConfigGenerator().generate()
     ConfigUpdater().update_file("template", is_template=True)
