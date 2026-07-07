@@ -540,7 +540,7 @@ class NemuIpc(Platform):
         # with E:\ProgramFiles\MuMuPlayer-12.0\shell\MuMuPlayer.exe
         # config is E:\ProgramFiles\MuMuPlayer-12.0\vms\MuMuPlayer-12.0-1\config\customer_config.json
         try:
-            with open(file, encoding="utf-8") as f:
+            with Path(file).open(encoding="utf-8") as f:
                 s = f.read()
                 data = json.loads(s)
         except FileNotFoundError:

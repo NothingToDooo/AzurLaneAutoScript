@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 
 from dev_tools.slpp import slpp
 
@@ -11,7 +12,7 @@ Server list: en-US, ja-JP, ko-KR, zh-CN, zh-TW
 """
 file = ""
 count = 0
-with open(file, encoding="utf-8") as f:
+with Path(file).open(encoding="utf-8") as f:
     text = f.read()
 
 

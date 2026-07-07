@@ -123,7 +123,7 @@ class DropStatistics:
         logger.hr(f"extract drops from {campaign}", level=1)
         _ = self.csv_overwrite_check
 
-        with open(self.csv_file, "a", newline="", encoding=DropStatistics.CSV_ENCODING) as csv_file:
+        with Path(self.csv_file).open("a", newline="", encoding=DropStatistics.CSV_ENCODING) as csv_file:
             writer = csv.writer(csv_file)
             for ts, file in tqdm(load_folder(self.drop_folder(campaign)).items()):
                 try:

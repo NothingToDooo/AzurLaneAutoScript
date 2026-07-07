@@ -5,6 +5,7 @@ import threading
 import time
 from datetime import datetime
 from functools import partial
+from pathlib import Path
 
 # 先导入伪 PIL 模块，避免 pywebio 拉起不需要的 PIL。
 from module.webui.fake_pil_module import import_fake_pil_module
@@ -962,7 +963,7 @@ def app_manage():
         mod_name = get_config_mod(config_name)
         suffix = "" if mod_name == "alas" else f".{mod_name}"
         filename = f"{config_name}{suffix}.json"
-        with open(filepath_config(config_name, mod_name), "rb") as f:
+        with Path(filepath_config(config_name, mod_name)).open("rb") as f:
             download(filename, f.read())
 
     def _new():

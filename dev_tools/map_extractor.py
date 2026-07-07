@@ -624,7 +624,7 @@ class MapData:
                 print(f"File exists: {file}")
                 return False
         print(f"Extract: {file}")
-        with open(file, "w") as f:
+        with file.open("w") as f:
             f.writelines(f"{text}\n" for text in self.get_file_lines(has_modified_campaign_base=has_modified_campaign_base))
         return True
 

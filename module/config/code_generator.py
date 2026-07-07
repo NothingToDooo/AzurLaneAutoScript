@@ -1,4 +1,5 @@
 import typing as t
+from pathlib import Path
 
 
 class TabWrapper:
@@ -46,7 +47,7 @@ class CodeGenerator:
 
     def write(self, file: str):
         lines = "".join(self.lines)
-        with open(file, "w", encoding="utf-8", newline="") as f:
+        with Path(file).open("w", encoding="utf-8", newline="") as f:
             f.write(lines)
 
     def _line_with_tabs(self, line, comment=False, newline=True):

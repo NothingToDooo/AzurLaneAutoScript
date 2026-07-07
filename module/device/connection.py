@@ -4,6 +4,7 @@ import socket
 import subprocess
 import time
 from functools import wraps
+from pathlib import Path
 
 from adbutils import AdbClient, AdbDevice, AdbTimeout, ForwardItem, ReverseItem
 from adbutils.errors import AdbError
@@ -694,7 +695,7 @@ class Connection(ConnectionAttr):
             return False
         file = instance.mumu_vms_config("customer_config.json")
         try:
-            with open(file, encoding="utf-8") as f:
+            with Path(file).open(encoding="utf-8") as f:
                 s = f.read()
                 data = json.loads(s)
         except FileNotFoundError:

@@ -7,6 +7,7 @@ import time
 import traceback
 from collections.abc import Callable, Generator
 from contextlib import suppress
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pywebio
@@ -366,13 +367,13 @@ def filepath_icon(filename):
 
 
 def add_css(filepath):
-    with open(filepath) as f:
+    with Path(filepath).open() as f:
         css = f.read().replace("\n", "")
         run_js(f"""$('head').append('<style>{css}</style>')""")
 
 
 def _read(path):
-    with open(path) as f:
+    with Path(path).open() as f:
         return f.read()
 
 

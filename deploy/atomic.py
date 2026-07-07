@@ -179,20 +179,21 @@ def file_write(file: str, data: str | bytes):
             encoding = "utf-8"
             newline = ""
 
+    path = Path(file)
     try:
         # Write temp file
-        with open(file, mode=mode, encoding=encoding, newline=newline) as f:
+        with path.open(mode=mode, encoding=encoding, newline=newline) as f:
             f.write(data)
             # Ensure data flush to disk
             f.flush()
             os.fsync(f.fileno())
     except FileNotFoundError:
         # Create parent directory
-        directory = Path(file).parent
+        directory = path.parent
         if directory != Path():
             directory.mkdir(parents=True, exist_ok=True)
         # Write again
-        with open(file, mode=mode, encoding=encoding, newline=newline) as f:
+        with path.open(mode=mode, encoding=encoding, newline=newline) as f:
             f.write(data)
             # Ensure data flush to disk
             f.flush()
@@ -233,9 +234,10 @@ def file_write_stream(file: str, data_generator):
         encoding = "utf-8"
         newline = ""
 
+    path = Path(file)
     try:
         # Write temp file
-        with open(file, mode=mode, encoding=encoding, newline=newline) as f:
+        with path.open(mode=mode, encoding=encoding, newline=newline) as f:
             f.write(first_chunk)
             f.writelines(data_iter)
             # Ensure data flush to disk
@@ -243,11 +245,11 @@ def file_write_stream(file: str, data_generator):
             os.fsync(f.fileno())
     except FileNotFoundError:
         # Create parent directory
-        directory = Path(file).parent
+        directory = path.parent
         if directory != Path():
             directory.mkdir(parents=True, exist_ok=True)
         # Write again
-        with open(file, mode=mode, encoding=encoding, newline=newline) as f:
+        with path.open(mode=mode, encoding=encoding, newline=newline) as f:
             f.write(first_chunk)
             f.writelines(data_iter)
             # Ensure data flush to disk
@@ -303,7 +305,7 @@ def file_read_text(file: str, encoding: str = "utf-8", errors: str = "strict") -
         errors: 'strict', 'ignore', 'replace' and any other errors mode in open()
     """
     try:
-        with open(file, encoding=encoding, errors=errors) as f:
+        with Path(file).open(encoding=encoding, errors=errors) as f:
             return f.read()
     except FileNotFoundError:
         return ""
@@ -320,7 +322,7 @@ def file_read_text_stream(
         chunk_size:
     """
     try:
-        with open(file, encoding=encoding, errors=errors) as f:
+        with Path(file).open(encoding=encoding, errors=errors) as f:
             while 1:
                 chunk = f.read(chunk_size)
                 if not chunk:
@@ -338,7 +340,7 @@ def file_read_bytes(file: str) -> bytes:
     try:
         # No python-side buffering when reading the entire file to speedup reading
         # https://github.com/python/cpython/pull/122111
-        with open(file, mode="rb", buffering=0) as f:
+        with Path(file).open(mode="rb", buffering=0) as f:
             return f.read()
     except FileNotFoundError:
         return b""
@@ -351,7 +353,7 @@ def file_read_bytes_stream(file: str, chunk_size: int = 8192) -> Iterable[bytes]
         chunk_size:
     """
     try:
-        with open(file, mode="rb") as f:
+        with Path(file).open(mode="rb") as f:
             while 1:
                 chunk = f.read(chunk_size)
                 if not chunk:

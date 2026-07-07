@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import module.logger
 from dev_tools.utils import LuaLoader
 from module.base.utils import location2node
@@ -115,7 +117,7 @@ class OSChapter:
 
     def write(self, file):
         print(f"writing {file}")
-        with open(file, "w", encoding="utf-8") as f:
+        with Path(file).open("w", encoding="utf-8") as f:
             f.writelines(f"{text}\n" for text in self.encode())
 
 

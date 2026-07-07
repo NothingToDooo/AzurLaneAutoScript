@@ -22,7 +22,7 @@ class AzurLaneUncensored(LoginHandler):
         with suppress(FileNotFoundError):
             shutil.rmtree(folder)
         Path(folder).mkdir(parents=True, exist_ok=True)
-        with open(Path(folder) / "localization.txt", "w", encoding="utf-8") as f:
+        with (Path(folder) / "localization.txt").open("w", encoding="utf-8") as f:
             f.write(localization_txt)
 
     def run(self):

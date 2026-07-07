@@ -2,6 +2,7 @@ import os
 import re
 import textwrap
 from dataclasses import dataclass
+from pathlib import Path
 
 from tqdm import tqdm
 
@@ -129,7 +130,7 @@ class LuaSetting:
 class SettingExtractor:
     @staticmethod
     def iter_setting_from_file(file):
-        with open(file, encoding="utf8") as f:
+        with Path(file).open(encoding="utf8") as f:
             data = list(f.readlines())
 
         for row in data:
@@ -174,7 +175,7 @@ class SettingExtractor:
 
     def generate(self, folder, output="./module/game_setting/setting_generated.py"):
         lines = [line + "\n" for line in self.iter_generated_lines(folder)]
-        with open(output, mode="w", encoding="utf8") as f:
+        with Path(output).open(mode="w", encoding="utf8") as f:
             f.writelines(lines)
 
 

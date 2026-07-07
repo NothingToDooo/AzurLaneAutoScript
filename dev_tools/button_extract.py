@@ -184,7 +184,7 @@ class ModuleExtractor:
         folder = Path(MODULE_FOLDER) / self.name
         if not folder.exists():
             folder.mkdir()
-        with open(folder / BUTTON_FILE, "w", newline="") as f:
+        with (folder / BUTTON_FILE).open("w", newline="") as f:
             f.writelines(f"{text}\n" for text in self.expression)
 
 

@@ -1,5 +1,6 @@
 import re
 from contextlib import suppress
+from pathlib import Path
 
 import module.config.server as server
 from module.base.decorator import cached_property, del_cached_property
@@ -7,7 +8,7 @@ from module.base.decorator import cached_property, del_cached_property
 
 def get_assets_from_file(file, regex):
     assets = set()
-    with open(file, encoding="utf-8") as f:
+    with Path(file).open(encoding="utf-8") as f:
         for row in f:
             result = regex.search(row)
             if result:

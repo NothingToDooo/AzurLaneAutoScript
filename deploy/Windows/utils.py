@@ -73,7 +73,7 @@ def poor_yaml_read(file):
 
     data = {}
     regex = re.compile(r"^(.*?):(.*?)$")
-    with open(file, encoding="utf-8") as f:
+    with Path(file).open(encoding="utf-8") as f:
         for line in f:
             line = line.strip("\n\r\t ").replace("\\", "/")
             if line.startswith("#"):
@@ -102,7 +102,7 @@ def poor_yaml_write(data, file, template_file=DEPLOY_TEMPLATE):
         file (str):
         template_file (str):
     """
-    with open(template_file, encoding="utf-8") as f:
+    with Path(template_file).open(encoding="utf-8") as f:
         text = f.read().replace("\\", "/")
 
     for key, value in data.items():
@@ -114,7 +114,7 @@ def poor_yaml_write(data, file, template_file=DEPLOY_TEMPLATE):
             value = "false"
         text = re.sub(f"{key}:.*?\n", f"{key}: {value}\n", text)
 
-    with open(file, "w", encoding="utf-8", newline="") as f:
+    with Path(file).open("w", encoding="utf-8", newline="") as f:
         f.write(text)
 
 

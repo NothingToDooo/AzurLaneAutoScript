@@ -309,7 +309,7 @@ class ConfigGenerator:
             lines.extend(_generated_value(path_to_arg(path), parse_value(data["value"], data=data)))
             visited_path.add(path)
 
-        with open(filepath_code(), "w", encoding="utf-8", newline="") as f:
+        with Path(filepath_code()).open("w", encoding="utf-8", newline="") as f:
             f.writelines(f"{text}\n" for text in lines)
 
     @timer
@@ -436,7 +436,7 @@ class ConfigGenerator:
         data_widths = []
         column_width = [4] * 7  # `:---`
         events = []
-        with open("./campaign/Readme.md", encoding="utf-8") as f:
+        with Path("./campaign/Readme.md").open(encoding="utf-8") as f:
             for text in f:
                 if not re.search(r"^\|.+\|$", text):
                     # 不是表格行。
@@ -466,7 +466,7 @@ class ConfigGenerator:
             )
             if i == 0:
                 lines.append("| " + " | ".join([":" + "-" * (width - 1) for width in column_width]) + " |\n")
-        with open("./campaign/Readme.md", "w", encoding="utf-8") as f:
+        with Path("./campaign/Readme.md").open("w", encoding="utf-8") as f:
             f.writelines(lines)
         return events[::-1]
 
