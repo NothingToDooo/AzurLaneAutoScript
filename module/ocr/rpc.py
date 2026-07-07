@@ -183,8 +183,7 @@ class ModelProxyFactory:
             if ModelProxy.client is None:
                 ModelProxy.init(address=State.deploy_config.OcrClientAddress)
             return ModelProxy(lang=__name)
-        else:
-            return super().__getattribute__(__name)
+        return super().__getattribute__(__name)
 
     def close(self):
         ModelProxy.close()
@@ -267,8 +266,7 @@ def stop_ocr_server_process():
 def alive() -> bool:
     if process is not None:
         return process.is_alive()
-    else:
-        return False
+    return False
 
 
 if __name__ == "__main__":

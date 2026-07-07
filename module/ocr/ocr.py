@@ -183,8 +183,9 @@ class DigitCounter(Ocr):
 
     def ocr(self, image, direct_ocr=False):
         """
-        DigitCounter only support doing OCR on one button.
-        Do OCR on a counter, such as `14/15`, and returns 14, 1, 15
+        DigitCounter 只支持单个按钮区域。
+
+        识别 `14/15` 这类计数器，并返回 14、1、15。
 
         Args:
             image:
@@ -202,9 +203,8 @@ class DigitCounter(Ocr):
             current, total = int(result[0]), int(result[1])
             current = min(current, total)
             return current, total - current, total
-        else:
-            logger.warning(f"Unexpected ocr result: {result_list}")
-            return 0, 0, 0
+        logger.warning(f"Unexpected ocr result: {result_list}")
+        return 0, 0, 0
 
 
 class DigitCounterYuv(DigitCounter, OcrYuv):
@@ -245,6 +245,8 @@ class Duration(Ocr):
     @staticmethod
     def parse_time(string):
         """
+        解析 `01:30:00` 这类时长文本。
+
         Args:
             string (str): `01:30:00`
 
@@ -255,9 +257,8 @@ class Duration(Ocr):
         if result:
             result = [int(s) for s in result.groups()]
             return timedelta(hours=result[0], minutes=result[1], seconds=result[2])
-        else:
-            logger.warning(f"Invalid duration: {string}")
-            return timedelta(hours=0, minutes=0, seconds=0)
+        logger.warning(f"Invalid duration: {string}")
+        return timedelta(hours=0, minutes=0, seconds=0)
 
 
 class DurationYuv(Duration, OcrYuv):
