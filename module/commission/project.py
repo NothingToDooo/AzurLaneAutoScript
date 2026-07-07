@@ -42,17 +42,18 @@ def crop_suffix_image(image, area):
     if not len(columns):
         return None
 
-    # Look back several pixels from the rightmost letter to include Roman numerals.
+    # 从最右侧字符向左回看几个像素，确保罗马数字后缀被包含。
     threshold = 250
     look_back = 10
-    for i in range(columns[-1], 0, -1):
-        if line[i] > threshold:
-            if columns[-1] - i > look_back:
-                look_back = columns[-1] - i
-                break
+    rightmost = columns[-1]
+    for i in range(rightmost, 0, -1):
+        gap = rightmost - i
+        if line[i] > threshold and gap > look_back:
+            look_back = gap
+            break
 
-    left = columns[-1] - look_back
-    right = columns[-1] + 1
+    left = rightmost - look_back
+    right = rightmost + 1
     x1, y1 = area[0:2]
     suffix_area = area_offset((left - 3, -3, right + 3, name_image.shape[0] + 3), (x1, y1))
     image = crop(image, suffix_area)
@@ -197,9 +198,8 @@ class Commission:
             return False
         if self.genre != other.genre or self.status != other.status:
             return False
-        if self.category_str == "daily":
-            if not self.suffix_match(other):
-                return False
+        if self.category_str == "daily" and not self.suffix_match(other):
+            return False
         if self.genre == "urgent_box":
             for tag in ["NYB", "BIW"]:
                 if tag in self.name.upper() and tag not in other.name.upper():
@@ -210,9 +210,10 @@ class Commission:
             return False
         if (not self.expire and other.expire) or (self.expire and not other.expire):
             return False
-        if self.expire and other.expire:
-            if (other.expire < self.expire - threshold) or (other.expire > self.expire + threshold):
-                return False
+        if self.expire and other.expire and (
+            (other.expire < self.expire - threshold) or (other.expire > self.expire + threshold)
+        ):
+            return False
         if self.repeat_count != other.repeat_count:
             return False
         return self.genre not in ["extra_oil", "night_oil"] or self.suffix_match(other)
