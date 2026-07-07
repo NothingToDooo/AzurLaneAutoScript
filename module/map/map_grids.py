@@ -1,5 +1,7 @@
 import operator
 
+import numpy as np
+
 
 class SelectedGrids:
     def __init__(self, grids):
@@ -263,8 +265,6 @@ class SelectedGrids:
         Returns:
             SelectedGrids:
         """
-        import numpy as np
-
         if not self:
             return self
         location = np.array(self.location)
@@ -283,8 +283,6 @@ class SelectedGrids:
         Returns:
             SelectedGrids:
         """
-        import numpy as np
-
         if not self:
             return self
         vector = np.subtract(self.location, center)

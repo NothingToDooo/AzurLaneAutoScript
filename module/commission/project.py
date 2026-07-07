@@ -1,3 +1,4 @@
+import hashlib
 import re
 from datetime import datetime, timedelta
 
@@ -70,8 +71,6 @@ def image_hash(image):
     """
     if image is None:
         return ""
-
-    import hashlib
 
     return hashlib.md5(image.tobytes(), usedforsecurity=False).hexdigest()
 

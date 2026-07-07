@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 from functools import wraps
 from time import sleep, time
 
+from module.logger import logger
+
 
 def timer(function):
     """
@@ -10,8 +12,6 @@ def timer(function):
 
     @wraps(function)
     def function_timer(*args, **kwargs):
-        from module.logger import logger
-
         start = time()
         result = function(*args, **kwargs)
         cost = time() - start
@@ -187,8 +187,6 @@ class Timer:
             sleep(diff)
 
     def show(self):
-        from module.logger import logger
-
         logger.info(str(self))
 
     def __str__(self):

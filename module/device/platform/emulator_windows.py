@@ -5,6 +5,8 @@ import winreg
 from dataclasses import dataclass
 from pathlib import Path
 
+import psutil
+
 # module/device/platform/emulator_base.py
 # module/device/platform/emulator_windows.py
 # 会被独立安装流程使用，因此这里不要导入 Alas 业务模块。
@@ -324,13 +326,9 @@ class EmulatorManager(EmulatorManagerBase):
         Yields:
             str: Path to emulator executables, may contains duplicate values
         """
-        try:
-            import psutil
-        except ModuleNotFoundError:
-            return
-        # Since this is a one-time-usage, we access psutil._psplatform.Process directly
-        # to bypass the call of psutil.Process.is_running().
-        # This only costs about 0.017s.
+        # 这里是一次性扫描，直接访问 psutil._psplatform.Process，
+        # 避开 psutil.Process.is_running() 的额外开销。
+        # 这段通常只需要约 0.017 秒。
         for pid in psutil.pids():
             proc = psutil._psplatform.Process(pid)
             try:

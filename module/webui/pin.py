@@ -1,10 +1,11 @@
 """
-Copy from pywebio.pin
-Add **other_html_attrs to put_xxx()
+基于 pywebio.pin 修改，给 put_xxx() 增加 **other_html_attrs。
 """
 
 from typing import TYPE_CHECKING
 
+from pywebio.input import checkbox, select, textarea
+from pywebio.input import input as pywebio_input
 from pywebio.output import OutputPosition
 from pywebio.pin import _pin_output, check_dom_name_value
 
@@ -26,9 +27,7 @@ def put_input(
     position=OutputPosition.BOTTOM,
     **other_html_attrs,
 ) -> Output:
-    """Output an input widget. Refer to: `pywebio.input.input()`"""
-    from pywebio.input import input as pywebio_input
-
+    """输出 input 控件，参数参考 `pywebio.input.input()`。"""
     check_dom_name_value(name, "pin `name`")
     single_input_return = pywebio_input(
         name=name,
@@ -60,9 +59,7 @@ def put_textarea(
     position=OutputPosition.BOTTOM,
     **other_html_attrs,
 ) -> Output:
-    """Output a textarea widget. Refer to: `pywebio.input.textarea()`"""
-    from pywebio.input import textarea
-
+    """输出 textarea 控件，参数参考 `pywebio.input.textarea()`。"""
     check_dom_name_value(name, "pin `name`")
     single_input_return = textarea(
         name=name,
@@ -92,9 +89,7 @@ def put_select(
     position=OutputPosition.BOTTOM,
     **other_html_attrs,
 ) -> Output:
-    """Output a select widget. Refer to: `pywebio.input.select()`"""
-    from pywebio.input import select
-
+    """输出 select 控件，参数参考 `pywebio.input.select()`。"""
     check_dom_name_value(name, "pin `name`")
     single_input_return = select(
         name=name, options=options, label=label, multiple=multiple, value=value, help_text=help_text, **other_html_attrs
@@ -114,9 +109,7 @@ def put_checkbox(
     position=OutputPosition.BOTTOM,
     **other_html_attrs,
 ) -> Output:
-    """Output a checkbox widget. Refer to: `pywebio.input.checkbox()`"""
-    from pywebio.input import checkbox
-
+    """输出 checkbox 控件，参数参考 `pywebio.input.checkbox()`。"""
     check_dom_name_value(name, "pin `name`")
     single_input_return = checkbox(
         name=name, options=options, label=label, inline=inline, value=value, help_text=help_text, **other_html_attrs

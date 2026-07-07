@@ -4,6 +4,8 @@ from contextlib import suppress
 from functools import cached_property as cached_property
 from functools import wraps
 
+from module.logger import logger
+
 
 class Config:
     """
@@ -35,8 +37,6 @@ class Config:
             def retire_ships(self, amount=None, rarity=None):
                 pass
         """
-        from module.logger import logger
-
         options = kwargs
 
         def decorate(func):
@@ -132,8 +132,6 @@ def function_drop(rate=0.5, default=None):
         70% possibility:
         INFO | Click (1091,  628) @ REWARD_GOTO_MAIN
     """
-    from module.logger import logger
-
     def decorate(func):
         @wraps(func)
         def wrapper(*args, **kwargs):

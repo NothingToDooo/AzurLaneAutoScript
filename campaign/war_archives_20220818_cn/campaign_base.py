@@ -1,11 +1,11 @@
+from module.logger import logger
+
 from ..campaign_war_archives.campaign_base import CampaignBase as CampaignBase_
 
 
 class CampaignBase(CampaignBase_):
     def campaign_set_chapter_sp(self, chapter, mode="normal"):
-        # SP event but has an `event` UI
-        from module.logger import logger
-
+        # SP 活动入口仍显示 event UI。
         logger.info("Set chapter SP")
         if chapter in ["sp", "sp_sp"]:
             self.ui_goto_sp()

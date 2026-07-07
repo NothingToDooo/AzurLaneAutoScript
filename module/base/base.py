@@ -1,3 +1,7 @@
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+
 import cv2
 import numpy as np
 from PIL import Image
@@ -70,9 +74,9 @@ class ModuleBase:
 
     def early_ocr_import(self):
         """
-        Start a thread to import cnocr and mxnet while the Alas instance just starting to take screenshots
-        The import is paralleled since taking screenshot is I/O-bound while importing is CPU-bound,
-        thus would speed up the startup 0.5 ~ 1.0s and even 5s on slow PCs.
+        在开始截图时提前导入 OCR 依赖。
+
+        截图是 I/O 密集，OCR 导入是 CPU 密集，放到后台线程可以缩短启动等待。
         """
         if ModuleBase.EARLY_OCR_IMPORT:
             return
@@ -84,9 +88,7 @@ class ModuleBase:
             return
 
         def do_ocr_import():
-            # Wait first image
-            import time
-
+            # 等第一张截图缓存完成。
             while 1:
                 if self.device.has_cached_image:
                     break
@@ -99,8 +101,6 @@ class ModuleBase:
             logger.info("early_ocr_import finish")
 
         logger.info("early_ocr_import call")
-        import threading
-
         thread = threading.Thread(target=do_ocr_import, daemon=True)
         thread.start()
         ModuleBase.EARLY_OCR_IMPORT = True
@@ -108,9 +108,9 @@ class ModuleBase:
     @cached_class_property
     def worker(self):
         """
-        A thread pool to run things at background
+        后台线程池，用于执行不阻塞主流程的工作。
 
-        Examples:
+        示例：
         ```
         def func(image):
             logger.info('Update thread start')
@@ -121,8 +121,6 @@ class ModuleBase:
         ```
         """
         logger.hr("Creating worker")
-        from concurrent.futures import ThreadPoolExecutor
-
         return ThreadPoolExecutor(1)
 
     def ensure_button(self, button):

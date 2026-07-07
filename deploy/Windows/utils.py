@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, overload
 
+import psutil
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
@@ -151,15 +153,10 @@ class DataProcessInfo:
 
 
 def iter_process() -> Iterable[DataProcessInfo]:
-    try:
-        import psutil
-    except ModuleNotFoundError:
-        return
-
     if psutil.WINDOWS:
-        # Since this is a one-time-usage, we access psutil._psplatform.Process directly
-        # to bypass the call of psutil.Process.is_running().
-        # This only costs about 0.017s.
+        # 这里是一次性扫描，直接访问 psutil._psplatform.Process，
+        # 避开 psutil.Process.is_running() 的额外开销。
+        # 这段通常只需要约 0.017 秒。
         for pid in psutil.pids():
             proc = psutil._psplatform.Process(pid)
             yield DataProcessInfo(
@@ -167,7 +164,7 @@ def iter_process() -> Iterable[DataProcessInfo]:
                 pid=proc.pid,
             )
     else:
-        # This will cost about 0.45s, even `attr` is given.
+        # 即使指定 attr，这条路径也大约需要 0.45 秒。
         for proc in psutil.process_iter():
             yield DataProcessInfo(
                 proc=proc,

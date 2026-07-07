@@ -1,3 +1,5 @@
+import time
+
 import cv2
 import numpy as np
 from scipy import signal
@@ -247,8 +249,6 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
         Run Medal Shop
         """
         # Base case; exit run if filter empty
-        import time
-
         if not self.shop_filter:
             return
 

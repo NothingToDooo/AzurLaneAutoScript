@@ -365,8 +365,6 @@ def get_os_reset_remain():
     Returns:
         int: number of days before next opsi reset
     """
-    from module.logger import logger
-
     next_reset = get_os_next_reset()
     now = datetime.now()
     logger.attr("OpsiNextReset", next_reset)

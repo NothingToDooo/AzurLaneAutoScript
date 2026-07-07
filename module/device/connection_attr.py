@@ -1,4 +1,6 @@
 import os
+import re
+import sys
 from pathlib import Path
 
 import adbutils
@@ -97,8 +99,6 @@ class ConnectionAttr:
                 pass
         # MuMu模拟器12127.0.0.1:16384
         if "模拟" in serial:
-            import re
-
             res = re.search(r"(127\.\d+\.\d+\.\d+:\d+)", serial)
             if res:
                 serial = res.group(1)
@@ -160,8 +160,6 @@ class ConnectionAttr:
                 return str(Path(file).resolve())
 
         # 再尝试 Python 环境里的 ADB。
-        import sys
-
         file = (Path(sys.executable) / "../Lib/site-packages/adbutils/binaries/adb.exe").resolve().as_posix()
         if Path(file).exists():
             return file

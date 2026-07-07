@@ -1,3 +1,4 @@
+import re
 from datetime import timedelta
 
 from module.config.utils import get_server_last_update
@@ -46,8 +47,6 @@ class DatedDuration(Ocr):
         Returns:
             datetime.timedelta:
         """
-        import re
-
         result = re.search(r"(\d{1,2})\D?(\d{1,2}):?(\d{2}):?(\d{2})", string)
         if result:
             result = [int(s) for s in result.groups()]

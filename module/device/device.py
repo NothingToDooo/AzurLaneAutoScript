@@ -1,4 +1,5 @@
 import collections
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -47,8 +48,6 @@ def show_function_call():
                    entry.py L335 rogue_world_enter()
                     path.py L193 rogue_path_select()
     """
-    import traceback
-
     stack = traceback.extract_stack()
     func_list = []
     for row in stack:
