@@ -122,7 +122,7 @@ class LuaLoader:
                 pattern = rf"^{re.escape(keyword)}.*?\{{\s*\n(.*?)^\}}"
             else:
                 pattern = r"\{\s*\n(.*?)^\}"
-            m = re.search(pattern, text, re.S | re.M)
+            m = re.search(pattern, text, re.DOTALL | re.MULTILINE)
             if m:
                 result = slpp.decode("{" + m.group(1) + "}")
         return result

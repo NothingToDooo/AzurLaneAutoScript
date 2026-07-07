@@ -215,7 +215,7 @@ class GridPredictor:
                 )
                 raise ScriptError(f"Enemy detection template not found: {name}")
 
-            short_name = name[6:] if name.startswith("Siren_") else name
+            short_name = name.removeprefix("Siren_")
             scaling = scaling_dic.get(short_name, 1)
             scaling = (scaling,) if not isinstance(scaling, tuple) else scaling
             for scale in scaling:

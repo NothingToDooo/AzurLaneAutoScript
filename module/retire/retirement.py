@@ -303,7 +303,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
             self._have_kept_cv = False
 
         while amount:
-            selected = self._retirement_choose(amount=10 if amount > 10 else amount, target_rarity=rarity)
+            selected = self._retirement_choose(amount=min(amount, 10), target_rarity=rarity)
             total += selected
             if selected == 0:
                 break

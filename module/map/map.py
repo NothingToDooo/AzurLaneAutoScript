@@ -64,7 +64,7 @@ class Map(Fleet):
 
             # self.ammo_count -= 5 - self.battle_count
             recover = 5 - self.fleet_ammo
-            recover = 3 if recover > 3 else recover
+            recover = min(recover, 3)
             logger.attr("Got ammo", recover)
 
             self.ammo_count -= recover

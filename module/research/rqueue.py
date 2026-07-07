@@ -111,7 +111,7 @@ class ResearchQueue(ResearchUI):
         """
         status = [self._queue_status_detect(button) for button in self.queue_status_grids.buttons]
         logger.info(f"Research queue: {status}")
-        status = status[::-1]
+        status.reverse()
         for index, s in enumerate(status):
             if s != "empty":
                 logger.attr("Research queue slot", index)
