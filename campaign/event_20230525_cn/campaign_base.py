@@ -63,7 +63,7 @@ class CampaignBase(CampaignBase_):
                 else:
                     self._campaign_ball_set("red")
             elif chapter in ["ts", "hts"]:
-                if stage in ["1"]:
+                if stage == "1":
                     self._campaign_ball_set("blue")
                 else:
                     self._campaign_ball_set("red")

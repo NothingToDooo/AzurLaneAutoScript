@@ -43,7 +43,7 @@ class Ocr:
         self.threshold = threshold
         self.alphabet = alphabet
         self.lang = lang
-        if lang == "azur_lane" and server.server in ["jp"]:
+        if lang == "azur_lane" and server.server == "jp":
             self.lang = "azur_lane_" + server.server
 
     @property

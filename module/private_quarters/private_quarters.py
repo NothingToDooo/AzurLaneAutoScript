@@ -151,9 +151,9 @@ class PrivateQuarters(PQInteract, PQShop):
             f"Target_ShipGirl={target_title}"
         )
 
-        # Enter shop and buy weekly items (if any)
+        # 进入商店并购买每周物品（如果有）。
         if self.shop_filter:
-            if server.server not in ["tw"]:
+            if server.server != "tw":
                 self.pq_shop_weekly_items()
             else:
                 logger.info(f"Private Quarters shop not supported for {server.server} server.")

@@ -17,7 +17,7 @@ class CampaignBase(CampaignBase_):
     def _campaign_separate_name(name):
         if name in ["esp", "sp"]:
             return "sp_sp", "2"
-        if name in ["ex"]:
+        if name == "ex":
             return "sp_ex", "3"
         return CampaignBase_._campaign_separate_name(name)
 
@@ -28,8 +28,8 @@ class CampaignBase(CampaignBase_):
 
     @staticmethod
     def _campaign_get_chapter_index(name):
-        if name in ["sp_sp"]:
+        if name == "sp_sp":
             return 2
-        if name in ["sp_ex"]:
+        if name == "sp_ex":
             return 3
         return CampaignBase_._campaign_get_chapter_index(name)

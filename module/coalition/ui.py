@@ -355,7 +355,7 @@ class CoalitionUI(Combat):
             out: BATTLE_PREPARATION
         """
         button = self.coalition_get_entrance(event, stage)
-        if event in ["coalition_20251120"]:
+        if event == "coalition_20251120":
             button_difficulty = self.coalition_20251120_get_entrance_difficulty(event, stage)
         else:
             button_difficulty = None

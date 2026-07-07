@@ -43,7 +43,7 @@ class CampaignBaseT(CampaignBase_):
 class CampaignBaseTS(CampaignBaseT):
     def campaign_set_chapter_20241219(self, chapter, stage, mode="combat"):
         # TS 是困难模式。
-        if self.config.MAP_CHAPTER_SWITCH_20241219 and chapter in ["ts"]:
+        if self.config.MAP_CHAPTER_SWITCH_20241219 and chapter == "ts":
             self.ui_goto_event()
             self.campaign_ensure_mode_20241219("combat")
             self.campaign_ensure_aside_20241219("part2")

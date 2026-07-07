@@ -86,7 +86,7 @@ class CampaignBase(CampaignBase_):
             return 1
         if name in ["b", "d", "ex_sp"]:  # 活动差异。
             return 2
-        if name in ["ex_ex"]:  # 活动差异。
+        if name == "ex_ex":  # 活动差异。
             return 3
         raise CampaignNameError
 

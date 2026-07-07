@@ -157,7 +157,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         """
         if mode in ["normal", "hard", "ex", "combat"]:
             MODE_SWITCH_20241219.set("combat", main=self)
-        elif mode in ["story"]:
+        elif mode == "story":
             MODE_SWITCH_20241219.set("story", main=self)
         else:
             logger.warning(f"Unknown campaign mode: {mode}")
@@ -282,13 +282,13 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
                 self.campaign_ensure_aside_20241219("part2")
                 self.campaign_ensure_chapter(chapter)
                 return True
-            if chapter in ["ex_sp"]:
+            if chapter == "ex_sp":
                 self.ui_goto_event()
                 self.campaign_ensure_mode_20241219("combat")
                 self.campaign_ensure_aside_20241219("sp")
                 self.campaign_ensure_chapter(chapter)
                 return True
-            if chapter in ["ex_ex"]:
+            if chapter == "ex_ex":
                 self.ui_goto_event()
                 self.campaign_ensure_mode_20241219("combat")
                 self.campaign_ensure_aside_20241219("ex")
@@ -305,7 +305,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
                 self.campaign_ensure_aside_20241219("part2")
                 self.campaign_ensure_chapter(chapter)
                 return True
-            if chapter in ["ex_sp"]:
+            if chapter == "ex_sp":
                 self.ui_goto_event()
                 self.campaign_ensure_mode_20241219("combat")
                 self.campaign_ensure_aside_20241219("sp")
@@ -324,16 +324,16 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
                     self.campaign_ensure_aside_20241219("part2")
                     self.campaign_ensure_chapter(chapter)
                     return True
-                if chapter in ["ex_sp"]:
+                if chapter == "ex_sp":
                     self.ui_goto_event()
                     self.campaign_ensure_mode_20241219("combat")
                     self.campaign_ensure_aside_20241219("sp")
                     self.campaign_ensure_chapter(chapter)
                     return True
-                if chapter in ["ex_sp"]:
+                if chapter == "ex_ex":
                     self.ui_goto_event()
                     self.campaign_ensure_mode_20241219("combat")
-                    self.campaign_ensure_aside_20241219("sp")
+                    self.campaign_ensure_aside_20241219("ex")
                     self.campaign_ensure_chapter(chapter)
                     return True
             finally:

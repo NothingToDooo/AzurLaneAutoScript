@@ -69,7 +69,7 @@ class CounterOcr(Ocr):
 
 
 COUNTER_OCR = CounterOcr([], threshold=96, name="Counter_ocr")
-if server.server in ["jp"]:
+if server.server == "jp":
     PRICE_OCR = PriceOcr([], letter=(245, 214, 58), threshold=32, name="Price_ocr")
 else:
     PRICE_OCR = PriceOcr([], letter=(255, 223, 57), threshold=32, name="Price_ocr")

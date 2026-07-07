@@ -425,7 +425,7 @@ class MeowfficerEnhance(MeowfficerBase):
         """
         while 1:
             result = self._meow_enhance()
-            if result not in ["leveled_max"]:
+            if result != "leveled_max":
                 break
 
             # Only for 'leveled_max'

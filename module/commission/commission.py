@@ -550,7 +550,7 @@ class RewardCommission(UI, InfoHandler):
                     # click_timer.reset()
                     continue
                 # 处理石油已满。
-                if self.config.SERVER in ["cn"] and self.appear(
+                if self.config.SERVER == "cn" and self.appear(
                     commission_assets.OIL_MAXED, offset=(20, 20), interval=3
                 ):
                     raise OilMaxed

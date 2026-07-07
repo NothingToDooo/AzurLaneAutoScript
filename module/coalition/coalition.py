@@ -66,8 +66,8 @@ class Coalition(CoalitionCombat, CampaignEvent):
         pt = 0
         for _ in self.loop(timeout=1.5):
             pt = ocr.ocr(self.device.image)
-            # 999999 seems to be a default value, wait
-            if pt not in [999999]:
+            # 999999 看起来是默认值，继续等待。
+            if pt != 999999:
                 break
         else:
             logger.warning("Wait PT timeout, assume it is")

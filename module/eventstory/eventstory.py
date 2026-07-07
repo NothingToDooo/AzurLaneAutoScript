@@ -15,9 +15,7 @@ class EventStory(CampaignUI, Combat, LoginHandler):
             str: 'finish', 'story', 'unknown'
         """
         event = self.config.cross_get("Event.Campaign.Event", "")
-        if event in [
-            "event_20251023_cn",
-        ]:
+        if event == "event_20251023_cn":
             # SP 活动。
             self.ui_ensure(page_sp)
         else:
@@ -196,10 +194,8 @@ class EventStory(CampaignUI, Combat, LoginHandler):
 
     def run(self):
         event = self.config.cross_get("Event.Campaign.Event", "")
-        if event in [
-            # 活动剧情在活动小游戏中。
-            "event_20260226_cn",
-        ]:
+        # 活动剧情在活动小游戏中。
+        if event == "event_20260226_cn":
             logger.info(f"Current event ({event}) does not have event story, stopped")
             return
 
