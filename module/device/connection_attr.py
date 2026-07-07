@@ -54,7 +54,7 @@ class ConnectionAttr:
                 if not isinstance(v, str):
                     continue
                 if "eri" in k[0].split("_")[-1]:
-                    print(k, v)
+                    logger.debug(f"Mask environment value {k[0]}")
                     su.__setattr__(k[0], chr(8) + v)
         # 预热 adb_client 缓存。
         _ = self.adb_client

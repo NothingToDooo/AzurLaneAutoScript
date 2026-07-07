@@ -101,7 +101,6 @@ class DropStatistics:
         Args:
             campaign (str):
         """
-        print("")
         logger.hr(f"Extract templates from {campaign}", level=1)
         for ts, file in tqdm(load_folder(self.drop_folder(campaign)).items()):
             try:
@@ -121,7 +120,6 @@ class DropStatistics:
         Args:
             campaign (str):
         """
-        print("")
         logger.hr(f"extract drops from {campaign}", level=1)
         _ = self.csv_overwrite_check
 

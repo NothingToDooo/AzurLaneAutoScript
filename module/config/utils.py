@@ -9,6 +9,7 @@ from yaml.representer import SafeRepresenter
 
 import module.config.server as server_
 from deploy.atomic import atomic_read_bytes, atomic_read_text, atomic_write
+from module.logger import logger
 from module.submodule.utils import get_mod_filepath, list_mod_instance, list_mod_template
 
 LANGUAGES = ["zh-CN"]
@@ -79,7 +80,7 @@ def read_file(file):
     Returns:
         dict, list:
     """
-    print(f"read: {file}")
+    logger.debug(f"read: {file}")
     if file.endswith(".json"):
         content = atomic_read_bytes(file)
         if not content:
@@ -94,7 +95,7 @@ def read_file(file):
             data = {}
         return data
     else:
-        print(f"Unsupported config file extension: {file}")
+        logger.warning(f"Unsupported config file extension: {file}")
         return {}
 
 
@@ -106,7 +107,7 @@ def write_file(file, data):
         file (str):
         data (dict, list):
     """
-    print(f"write: {file}")
+    logger.debug(f"write: {file}")
     if file.endswith(".json"):
         content = json.dumps(data, indent=2, ensure_ascii=False, sort_keys=False, default=str)
         atomic_write(file, content)
@@ -121,7 +122,7 @@ def write_file(file, data):
             )
         atomic_write(file, content)
     else:
-        print(f"Unsupported config file extension: {file}")
+        logger.warning(f"Unsupported config file extension: {file}")
 
 
 def iter_folder(folder, is_dir=False, ext=None):

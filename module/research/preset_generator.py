@@ -1,5 +1,7 @@
 import re
 
+from module.logger import logger
+
 
 def split_filter(string):
     if isinstance(string, list):
@@ -34,7 +36,7 @@ def translate(string: str, target="series_4_tenrai_only_cube", for_simulate=Fals
     if res:
         series = res.group(1)
     else:
-        print(f"Translate target from unknown series: {target}")
+        logger.warning(f"Translate target from unknown series: {target}")
         return None
     cube = "cube" in target
     string = string.replace("S4-H0.5 > !4-0.5", "0.5")

@@ -1,5 +1,6 @@
 from module.config.deep import deep_iter
 from module.config.utils import filepath_i18n, read_file
+from module.logger import logger
 from module.submodule.utils import list_mod_dir
 
 LANG = "zh-CN"
@@ -21,7 +22,7 @@ def _t(s):
     try:
         return dic_lang[s]
     except KeyError:
-        print(f"Language key ({s}) not found")
+        logger.warning(f"Language key ({s}) not found")
         return s
 
 

@@ -399,9 +399,3 @@ class EmulatorManager(EmulatorManagerBase):
 
         instances: list[EmulatorInstance] = sorted(instances, key=lambda x: str(x))
         return instances
-
-
-if __name__ == "__main__":
-    self = EmulatorManager()
-    for emu in self.all_emulator_instances:
-        print(emu)

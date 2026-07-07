@@ -309,9 +309,3 @@ class PlatformWindows(PlatformBase, EmulatorManager):
 
         logger.error("Failed to stop emulator 3 times, stopped")
         return False
-
-
-if __name__ == "__main__":
-    self = PlatformWindows("alas")
-    d = self.emulator_instance
-    print(d)

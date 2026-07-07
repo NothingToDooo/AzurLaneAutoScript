@@ -5,15 +5,17 @@ from time import sleep, time
 
 def timer(function):
     """
-    Decorator to time a function, for debug only
+    记录函数执行耗时，仅用于调试和生成流程。
     """
 
     @wraps(function)
     def function_timer(*args, **kwargs):
+        from module.logger import logger
+
         start = time()
         result = function(*args, **kwargs)
         cost = time() - start
-        print(f"{function.__name__}: {cost:.10f} s")
+        logger.info(f"{function.__name__}: {cost:.10f} s")
         return result
 
     return function_timer

@@ -25,6 +25,7 @@ from module.config.utils import (
     read_file,
     write_file,
 )
+from module.logger import logger
 
 CONFIG_IMPORT = '''
 import datetime
@@ -223,7 +224,7 @@ class ConfigGenerator:
             groups.append("Storage")
             for group in groups:
                 if group not in self.argument:
-                    print(f"`{task}.{group}` is not related to any argument group")
+                    logger.warning(f"`{task}.{group}` is not related to any argument group")
                     continue
                 deep_set(data, keys=[task, group], value=deepcopy(self.argument[group]))
 
@@ -231,7 +232,7 @@ class ConfigGenerator:
             # 检查参数是否存在。
             old = deep_get(data, keys=path, default=None)
             if old is None:
-                print(f"`{'.'.join(path)}` is not a existing argument")
+                logger.warning(f"`{'.'.join(path)}` is not a existing argument")
                 return False
             # 检查类型，但允许 `Interval` 使用不同类型。
             old_value = old.get("value", None) if isinstance(old, dict) else old
@@ -241,12 +242,14 @@ class ConfigGenerator:
                 and old_value is not None
                 and path[2] not in ["SuccessInterval", "FailureInterval"]
             ):
-                print(f"`{value}` ({type(value)}) and `{'.'.join(path)}` ({type(old_value)}) are in different types")
+                logger.warning(
+                    f"`{value}` ({type(value)}) and `{'.'.join(path)}` ({type(old_value)}) are in different types"
+                )
                 return False
             # 检查可选项。
             if isinstance(old, dict) and "option" in old:
                 if value not in old["option"]:
-                    print(f"`{value}` is not an option of argument `{'.'.join(path)}`")
+                    logger.warning(f"`{value}` is not an option of argument `{'.'.join(path)}`")
                     return False
             return True
 

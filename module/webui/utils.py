@@ -530,27 +530,3 @@ def get_alas_config_listen_path(args):
         if d.get("display") in ["readonly", "hide"]:
             continue
         yield path
-
-
-if __name__ == "__main__":
-
-    def gen(x):
-        n = 0
-        while True:
-            n += x
-            print(n)
-            yield n
-
-    th = TaskHandler()
-    th.start()
-
-    t1 = Task(gen(1), delay=1)
-    t2 = Task(gen(-2), delay=3)
-
-    th.add_task(t1)
-    th.add_task(t2)
-
-    time.sleep(5)
-    th.remove_task(t2, nowait=True)
-    time.sleep(5)
-    th.stop()
