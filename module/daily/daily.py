@@ -59,9 +59,7 @@ class Daily(Combat, DailyEquipment):
         self.device.screenshot()
 
     def handle_daily_additional(self):
-        if self.handle_guild_popup_cancel():
-            return True
-        return False
+        return bool(self.handle_guild_popup_cancel())
 
     def get_daily_stage_and_fleet(self):
         """
@@ -147,17 +145,11 @@ class Daily(Combat, DailyEquipment):
 
     @property
     def supply_line_disruption_index(self):
-        if self.emergency_module_development:
-            return 2
-        else:
-            return 2
+        return 2
 
     @property
     def empty_index(self):
-        if self.emergency_module_development:
-            return 4
-        else:
-            return 4
+        return 4
 
     def daily_execute(self, remain=3, stage=1, fleet=1):
         """

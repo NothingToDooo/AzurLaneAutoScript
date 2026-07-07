@@ -19,27 +19,23 @@ class BattlePass(Combat, UI):
     def battle_pass_red_dot_appear(self):
         """
         Returns:
-            bool: If appear.
+            bool: 红点是否出现。
 
         Page:
             in: page_reward
         """
         if self.appear(REWARD_GOTO_BATTLE_PASS, offset=(50, 150)):
-            # Load button offset from REWARD_GOTO_BATTLE_PASS,
-            # because entrance may not be the top one.
+            # 从 REWARD_GOTO_BATTLE_PASS 读取偏移，因为入口可能不在最上方。
             BATTLE_PASS_RED_DOT.load_offset(REWARD_GOTO_BATTLE_PASS)
-            # Not using self.appear() here, because it's transparent,
-            # color may be different depending on background.
+            # 红点是透明素材，背景不同会影响颜色，所以不使用 self.appear()。
             r, _, _ = get_color(self.device.image, BATTLE_PASS_RED_DOT.button)
             if r > BATTLE_PASS_RED_DOT.color[0] - 40:
                 logger.info("Found battle pass red dot")
                 return True
-            else:
-                logger.info("No battle pass red dot")
-                return False
-        else:
-            logger.warning("No battle pass entrance")
+            logger.info("No battle pass red dot")
             return False
+        logger.warning("No battle pass entrance")
+        return False
 
     def handle_battle_pass_popup(self):
         return self.appear_then_click(PURCHASE_POPUP, offset=(20, 20), interval=2)

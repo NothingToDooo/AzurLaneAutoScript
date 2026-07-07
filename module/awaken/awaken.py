@@ -33,12 +33,8 @@ class Awaken(Dock):
             # 向下检查是否存在红字。
             area = button.button
             area = (area[0], area[3], area[2], area[3] + 60)
-            if self.image_color_count(area, color=(214, 53, 33), threshold=180, count=16):
-                return False
-            else:
-                return True
-        else:
-            return None
+            return not self.image_color_count(area, color=(214, 53, 33), threshold=180, count=16)
+        return None
 
     def _get_awaken_cost(self, use_array=False):
         """
@@ -160,14 +156,14 @@ class Awaken(Dock):
                 # 正常不应出现。
                 self.awaken_popup_close()
                 return result
-            elif result is False:
+            if result is False:
                 logger.info("Insufficient resources to awaken")
                 self.awaken_popup_close()
                 return "insufficient"
-            elif result is True:
+            if result is True:
                 # 资源充足。
                 break
-            elif result == "invalid":
+            if result == "invalid":
                 # 重试，同时继续检查超时。
                 pass
             else:
@@ -268,24 +264,22 @@ class Awaken(Dock):
                 if level >= stop_level:
                     logger.info("Awaken ship ended at stop_level")
                     return "level_max"
-                else:
-                    result = self.awaken_once(use_array)
-                    # 'no_exp', 'unexpected_array', 'insufficient', 'timeout', 'success'
-                    if result == "success":
-                        continue
-                    if result in ["insufficient", "no_exp"]:
-                        # 原样返回。
-                        return result
-                    if result == "unexpected_array":
-                        # 可能只是误入唤醒确认页，重跑 awaken_once 会重新检查。
-                        continue
-                    if result == "timeout":
-                        # 获取资源超时，重试通常可以恢复。
-                        continue
-                    raise ScriptError(f"Unexpected awaken_once result: {result}")
-            else:
-                # 获取等级超时，要求退出。
-                return "timeout"
+                result = self.awaken_once(use_array)
+                # 'no_exp', 'unexpected_array', 'insufficient', 'timeout', 'success'
+                if result == "success":
+                    continue
+                if result in ["insufficient", "no_exp"]:
+                    # 原样返回。
+                    return result
+                if result == "unexpected_array":
+                    # 可能只是误入唤醒确认页，重跑 awaken_once 会重新检查。
+                    continue
+                if result == "timeout":
+                    # 获取资源超时，重试通常可以恢复。
+                    continue
+                raise ScriptError(f"Unexpected awaken_once result: {result}")
+            # 获取等级超时，要求退出。
+            return "timeout"
 
         # 异常退出。
         logger.warning("Too many awaken trial on one ship")

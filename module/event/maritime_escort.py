@@ -14,13 +14,9 @@ class MaritimeEscort(MapOperation, CampaignEvent):
 
     def handle_in_stage(self):
         if self.is_in_escort():
-            if self.in_stage_timer.reached():
-                return True
-            else:
-                return False
-        else:
-            self.in_stage_timer.reset()
-            return False
+            return bool(self.in_stage_timer.reached())
+        self.in_stage_timer.reset()
+        return False
 
     def run_escort(self):
         """

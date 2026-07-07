@@ -27,7 +27,7 @@ class HospitalUI(UI):
     def handle_clue_exit(self):
         """
         Returns:
-            bool: If clicked
+            bool: 是否发生点击。
         """
         if self.appear_then_click(hospital_assets.HOSPITAL_BATTLE_EXIT, offset=(20, 20), interval=2):
             return True
@@ -43,6 +43,4 @@ class HospitalUI(UI):
             logger.info(f"{RAID_FLEET_PREPARATION} -> {BACK}")
             self.device.click(BACK)
             return True
-        if self.handle_get_clue():
-            return True
-        return False
+        return bool(self.handle_get_clue())

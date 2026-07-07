@@ -83,8 +83,7 @@ class EventStory(CampaignUI, Combat, LoginHandler):
             self.device.click(button)
             interval.reset()
             return True
-        else:
-            return False
+        return False
 
     def event_story(self, skip_first_screenshot=True):
         """

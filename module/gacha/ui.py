@@ -82,8 +82,7 @@ class GachaUI(UI):
 
     def gacha_side_navbar_ensure(self, upper=None, bottom=None):
         """
-        Ensure able to transition to page and
-        page has loaded to completion
+        确保建造侧边栏已经切换到目标页面，并等待页面加载完成。
 
         Args:
             upper (int):
@@ -102,16 +101,14 @@ class GachaUI(UI):
                 1     for retire.
 
         Returns:
-            bool: if side_navbar set ensured
+            bool: 是否已经确保侧边栏目标项。
         """
         retire_upper = 5 if self._gacha_side_navbar.get_total(main=self) == 5 else 4
         if upper == retire_upper or bottom == 1:
             logger.warning('Transitions to "retire" is not supported')
             return False
 
-        if self._gacha_side_navbar.set(self, upper=upper, bottom=bottom) and self.gacha_load_ensure():
-            return True
-        return False
+        return self._gacha_side_navbar.set(self, upper=upper, bottom=bottom) and self.gacha_load_ensure()
 
     @cached_property
     def _construct_bottom_navbar(self):
@@ -148,21 +145,18 @@ class GachaUI(UI):
 
     def _gacha_bottom_navbar(self, is_build=True):
         """
-        Return corresponding Navbar type based on
-        parameter 'is_build'
+        根据 is_build 返回对应的底部导航栏。
 
         Returns:
             Navbar
         """
         if is_build:
             return self._construct_bottom_navbar
-        else:
-            return self._exchange_bottom_navbar
+        return self._exchange_bottom_navbar
 
     def gacha_bottom_navbar_ensure(self, left=None, right=None, is_build=True):
         """
-        Ensure able to transition to page and
-        page has loaded to completion
+        确保建造或兑换底部导航栏已经切换到目标页面，并等待页面加载完成。
 
         Args:
             left (int):
@@ -190,7 +184,7 @@ class GachaUI(UI):
             is_build (bool):
 
         Returns:
-            bool: if bottom_navbar set ensured
+            bool: 是否已经确保底部导航栏目标项。
         """
         gacha_bottom_navbar = self._gacha_bottom_navbar(is_build)
         if is_build and gacha_bottom_navbar.get_total(main=self) == 3:
@@ -201,9 +195,7 @@ class GachaUI(UI):
             if left == 4:
                 left = 3
 
-        if gacha_bottom_navbar.set(self, left=left, right=right) and self.gacha_load_ensure():
-            return True
-        return False
+        return gacha_bottom_navbar.set(self, left=left, right=right) and self.gacha_load_ensure()
 
     def ui_goto_gacha(self):
         self.ui_ensure(page_build)

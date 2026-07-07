@@ -43,11 +43,10 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
             logger.info("Recommend fleet")
             fleet_1.recommend()
             return True
-        else:
-            logger.error(
-                "Fleet not prepared and fleet recommend is not enabled, please prepare fleets manually before running"
-            )
-            raise RequestHumanTakeover
+        logger.error(
+            "Fleet not prepared and fleet recommend is not enabled, please prepare fleets manually before running"
+        )
+        raise RequestHumanTakeover
 
     def combat_preparation(self, balance_hp=False, emotion_reduce=False, auto="combat_auto", fleet_index=1):
         """
