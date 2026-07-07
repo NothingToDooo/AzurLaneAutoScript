@@ -166,9 +166,8 @@ class ModuleBase:
                 timeout = Timer.from_seconds(timeout).start()
 
         while 1:
-            if timeout is not None:
-                if timeout.reached():
-                    return
+            if timeout is not None and timeout.reached():
+                return
 
             if skip_first:
                 skip_first = False

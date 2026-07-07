@@ -366,9 +366,8 @@ class Adb(Connection):
         if not activity_name:
             activity_name = DICT_PACKAGE_TO_ACTIVITY.get(package_name)
 
-        if activity_name:
-            if self._app_start_adb_am(package_name, activity_name, allow_failure):
-                return True
+        if activity_name and self._app_start_adb_am(package_name, activity_name, allow_failure):
+            return True
         if self._app_start_adb_monkey(package_name, allow_failure):
             return True
         if self._app_start_adb_am(package_name, activity_name, allow_failure):

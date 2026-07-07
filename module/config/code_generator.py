@@ -58,15 +58,14 @@ class CodeGenerator:
         return out
 
     def _repr(self, obj):
-        if isinstance(obj, str):
-            if "\n" in obj:
-                out = '"""\n'
-                with self.tab():
-                    for line in obj.strip().split("\n"):
-                        line = line.strip()
-                        out += self._line_with_tabs(line)
-                out += self._line_with_tabs('"""', newline=False)
-                return out
+        if isinstance(obj, str) and "\n" in obj:
+            out = '"""\n'
+            with self.tab():
+                for line in obj.strip().split("\n"):
+                    line = line.strip()
+                    out += self._line_with_tabs(line)
+            out += self._line_with_tabs('"""', newline=False)
+            return out
         return repr(obj)
 
     def tab(self):

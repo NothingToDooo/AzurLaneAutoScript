@@ -60,11 +60,10 @@ def enhance_favourite_redirect(value):
 
 def enhance_check_redirect(value):
     """
-    CheckPerCategory should be at least 5
+    CheckPerCategory 至少为 5。
     """
-    if isinstance(value, int):
-        if value < 5:
-            return 5
+    if isinstance(value, int) and value < 5:
+        return 5
     return value
 
 

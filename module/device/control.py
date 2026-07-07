@@ -80,11 +80,10 @@ class Control(Minitouch, NemuIpc):
         else:
             logger.info(f"Swipe {point2str(*p1)} -> {point2str(*p2)}")
 
-        if distance_check:
-            if np.linalg.norm(np.subtract(p1, p2)) < 10:
-                # 距离过短会被游戏当作点击。
-                logger.info("Swipe distance < 10px, dropped")
-                return
+        if distance_check and np.linalg.norm(np.subtract(p1, p2)) < 10:
+            # 距离过短会被游戏当作点击。
+            logger.info("Swipe distance < 10px, dropped")
+            return
 
         if method == "nemu_ipc":
             self.swipe_nemu_ipc(p1, p2)

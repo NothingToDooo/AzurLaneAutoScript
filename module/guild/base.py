@@ -57,9 +57,8 @@ class GuildBase(UI):
         Returns:
             bool: 是否已经确保侧边栏目标项。
         """
-        if self._guild_side_navbar.get_total(main=self) == 6:
-            if upper == 3 or bottom == 4:
-                logger.warning('Transitions to "apply" is not supported')
-                return False
+        if self._guild_side_navbar.get_total(main=self) == 6 and (upper == 3 or bottom == 4):
+            logger.warning('Transitions to "apply" is not supported')
+            return False
 
         return self._guild_side_navbar.set(self, upper=upper, bottom=bottom)

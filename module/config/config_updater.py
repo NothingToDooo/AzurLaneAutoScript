@@ -246,10 +246,9 @@ class ConfigGenerator:
                 )
                 return False
             # 检查可选项。
-            if isinstance(old, dict) and "option" in old:
-                if value not in old["option"]:
-                    logger.warning(f"`{value}` is not an option of argument `{'.'.join(path)}`")
-                    return False
+            if isinstance(old, dict) and "option" in old and value not in old["option"]:
+                logger.warning(f"`{value}` is not an option of argument `{'.'.join(path)}`")
+                return False
             return True
 
         # 写入默认值。

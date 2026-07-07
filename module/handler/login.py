@@ -84,9 +84,8 @@ class LoginHandler(UI):
                 continue
             if self.appear_then_click(handler_assets.LOGIN_GAME_UPDATE, offset=(30, 30), interval=5):
                 continue
-            if not login_success:
-                if self.handle_cn_user_agreement():
-                    continue
+            if not login_success and self.handle_cn_user_agreement():
+                continue
             # 回归玩家。
             if self.appear_then_click(handler_assets.LOGIN_RETURN_SIGN, offset=(30, 30), interval=5):
                 continue

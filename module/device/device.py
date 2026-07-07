@@ -102,9 +102,8 @@ class Device(Screenshot, Control, AppControl):
         self.screenshot_interval_set()
 
         # 提前初始化 minitouch，避免第一次点击时才安装服务。
-        if self.config.is_actual_task:
-            if self.config.Emulator_ControlMethod == "minitouch":
-                self.early_minitouch_init()
+        if self.config.is_actual_task and self.config.Emulator_ControlMethod == "minitouch":
+            self.early_minitouch_init()
 
     def run_simple_screenshot_benchmark(self):
         """
