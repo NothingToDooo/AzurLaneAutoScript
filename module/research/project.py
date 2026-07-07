@@ -274,8 +274,7 @@ def get_research_duration_jp(image):
         duration (int): number of seconds
     """
     ocr = Duration(research_assets.DURATION_DETAIL)
-    duration = ocr.ocr(image).total_seconds()
-    return duration
+    return ocr.ocr(image).total_seconds()
 
 
 def get_research_genre_jp(image):

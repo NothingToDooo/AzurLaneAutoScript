@@ -581,8 +581,7 @@ class RewardCommission(UI, InfoHandler):
         """
         for _ in range(3):
             try:
-                reward = self._commission_receive()
-                return reward
+                return self._commission_receive()
             except OilMaxed:
                 logger.info("Oil maxed, buy food to consume oil")
                 RewardDorm(self.config, self.device).dorm_food_run(amount=10)

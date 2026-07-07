@@ -60,11 +60,10 @@ class HPBalancer(ModuleBase):
         Returns:
             float: HP.
         """
-        data = max(
+        return max(
             color_bar_percentage(self.device.image, area=area, prev_color=COLOR_HP_RED),
             color_bar_percentage(self.device.image, area=area, prev_color=COLOR_HP_GREEN),
         )
-        return data
 
     def _hp_grid(self):
         return ButtonGrid(origin=(35, 206), delta=(0, 100), button_shape=(66, 4), grid_shape=(1, 6))

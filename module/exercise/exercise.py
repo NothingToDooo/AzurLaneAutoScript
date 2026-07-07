@@ -16,8 +16,7 @@ class DatedDuration(Ocr):
 
     def after_process(self, result):
         result = super().after_process(result)
-        result = result.replace("I", "1").replace("D", "0").replace("S", "5")
-        return result
+        return result.replace("I", "1").replace("D", "0").replace("S", "5")
 
     def ocr(self, image, direct_ocr=False):
         """
@@ -168,8 +167,7 @@ class Exercise(ExerciseCombat):
         Returns:
             datetime.timedelta
         """
-        result = OCR_PERIOD_REMAIN.ocr(self.device.image)
-        return result
+        return OCR_PERIOD_REMAIN.ocr(self.device.image)
 
     def _get_exercise_strategy(self):
         """

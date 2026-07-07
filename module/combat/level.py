@@ -129,8 +129,5 @@ class LevelOcr(Digit):
         result = result.replace("I", "1").replace("D", "0").replace("S", "5")
         result = result.replace("B", "8")
 
-        # No correction log, cause levels are usually empty
-        # Like: [23, 0, 0, 100, 0, 0]
-        result = int(result) if result else 0
-
-        return result
+        # 等级通常为空，不记录修正日志。示例：[23, 0, 0, 100, 0, 0]。
+        return int(result) if result else 0

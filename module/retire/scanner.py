@@ -34,12 +34,11 @@ class EmotionDigit(Digit):
                 if i < col:
                     break
             image = image[:, :i]
-        image = super().pre_process(image)
-        return image
+        return super().pre_process(image)
 
     def after_process(self, result):
-        # Random OCR error on Downes' hair
-        # OCR DOCK_EMOTION_OCR: Result "044" is revised to "44"
+        # 唐斯头发容易造成随机 OCR 错误。
+        # OCR DOCK_EMOTION_OCR 会把 "044" 修正为 "44"。
         if result == "044" or result == "D44":
             result = "0"
 
@@ -227,9 +226,8 @@ class FleetScanner(Scanner):
         """
         _, g, _ = cv2.split(image)
         _, image = cv2.threshold(g, 205, 255, cv2.THRESH_BINARY)
-        image = cv2.merge([image, image, image])
+        return cv2.merge([image, image, image])
 
-        return image
 
     def _match(self, image) -> int:
         """

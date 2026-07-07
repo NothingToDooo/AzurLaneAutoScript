@@ -58,14 +58,12 @@ class EventStory(CampaignUI, Combat, LoginHandler):
         if sim >= 0.85:
             button = button.move(area[:2])
             # 下移以点击文字。
-            button = button.move((0, 44))
-            return button
+            return button.move((0, 44))
         sim, button = eventstory_assets.TEMPLATE_ALCHEMIST_BATTLE.match_result(image)
         if sim >= 0.85:
             button = button.move(area[:2])
             # 下移以点击文字。
-            button = button.move((0, 44))
-            return button
+            return button.move((0, 44))
         return None
 
     def handle_event_20250724(self, interval=2):

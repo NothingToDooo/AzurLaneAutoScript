@@ -34,8 +34,7 @@ class OcrDormFood(DigitCounter):
         orange = color_similarity_2d(image, color=(239, 158, 49))
         gray = color_similarity_2d(image, color=(99, 97, 99))
         image = cv2.subtract(255, cv2.max(orange, gray))
-        image = cv2.multiply(image, 2)
-        return image
+        return cv2.multiply(image, 2)
 
     def after_process(self, result):
         result = super().after_process(result)
@@ -596,8 +595,7 @@ class RewardDorm(UI):
             5: 313,
             6: 278,
         }
-        delay = dict_delay.get(ships, self.config.Scheduler_SuccessInterval)
-        return delay
+        return dict_delay.get(ships, self.config.Scheduler_SuccessInterval)
 
     def run(self):
         """

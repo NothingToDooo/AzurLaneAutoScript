@@ -91,10 +91,9 @@ class HospitalClue(HospitalUI):
 
         list_row = merge_rows(list_word, merge=5)
         list_row = [area_offset(r, offset=area[:2]) for r in list_row]
-        list_button = [
+        return [
             Button(area=rect, color=(), button=rect, name=f"CLUE_LIST_{i}") for i, rect in enumerate(list_row)
         ]
-        return list_button
 
     def get_invest_button(self) -> Button | None:
         """

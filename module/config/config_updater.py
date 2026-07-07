@@ -785,10 +785,9 @@ class ConfigUpdater:
             dict:
         """
         old = read_file(filepath_config(config_name))
-        new = self.config_update(old, is_template=is_template)
         # 更新后的配置不会立刻写回文件；这里为了性能保留只读行为。
         # self.write_file(config_name, new)
-        return new
+        return self.config_update(old, is_template=is_template)
 
     @staticmethod
     def write_file(config_name, data, mod_name="alas"):

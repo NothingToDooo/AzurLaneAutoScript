@@ -360,8 +360,7 @@ def get_os_next_reset():
     server_reset = (server_now.replace(day=1) + timedelta(days=32)).replace(
         day=1, hour=0, minute=0, second=0, microsecond=0
     )
-    local_reset = server_reset + diff
-    return local_reset
+    return server_reset + diff
 
 
 def get_os_reset_remain():
@@ -400,8 +399,7 @@ def get_server_next_update(daily_trigger):
         s = (future - local_now).total_seconds() % 86400
         future = local_now + timedelta(seconds=s)
         trigger.append(future)
-    update = sorted(trigger)[0]
-    return update
+    return sorted(trigger)[0]
 
 
 def get_server_last_update(daily_trigger):
@@ -424,8 +422,7 @@ def get_server_last_update(daily_trigger):
         s = (future - local_now).total_seconds() % 86400 - 86400
         future = local_now + timedelta(seconds=s)
         trigger.append(future)
-    update = sorted(trigger)[-1]
-    return update
+    return sorted(trigger)[-1]
 
 
 def nearest_future(future, interval=120):
@@ -471,8 +468,7 @@ def get_nearest_weekday_date(target):
         days_ahead += 7
     server_reset = (server_now + timedelta(days=days_ahead)).replace(hour=0, minute=0, second=0, microsecond=0)
 
-    local_reset = server_reset + diff
-    return local_reset
+    return server_reset + diff
 
 
 def get_server_weekday():
@@ -482,8 +478,7 @@ def get_server_weekday():
     """
     diff = server_time_offset()
     server_now = datetime.now() - diff
-    result = server_now.weekday()
-    return result
+    return server_now.weekday()
 
 
 def get_server_monthday():
@@ -493,8 +488,7 @@ def get_server_monthday():
     """
     diff = server_time_offset()
     server_now = datetime.now() - diff
-    result = server_now.day
-    return result
+    return server_now.day
 
 
 def random_id(length=32):
@@ -520,8 +514,7 @@ def to_list(text, length=1):
     """
     if text.isdigit():
         return [int(text)] * length
-    out = [int(letter.strip()) for letter in text.split(",")]
-    return out
+    return [int(letter.strip()) for letter in text.split(",")]
 
 
 def type_to_str(typ):

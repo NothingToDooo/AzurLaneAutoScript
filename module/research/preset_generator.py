@@ -27,8 +27,7 @@ def beautify_filter(list_filter):
             length = 0
         out.append(selection)
         length += len(selection) + 3
-    string = " > ".join(out).strip("\n >").replace(" > \n", "\n").replace("\n ", "\n")
-    return string
+    return " > ".join(out).strip("\n >").replace(" > \n", "\n").replace("\n ", "\n")
 
 
 def translate(string: str, target="series_4_tenrai_only_cube", for_simulate=False):

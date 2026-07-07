@@ -47,8 +47,7 @@ def pack(img_list):
     Returns:
         np.ndarray:
     """
-    image = cv2.vconcat(img_list)
-    return image
+    return cv2.vconcat(img_list)
 
 
 def unpack(image):

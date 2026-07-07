@@ -27,8 +27,7 @@ class RaidCounterPostMixin(DigitCounter):
 class RaidCounter(DigitCounter):
     def pre_process(self, image):
         image = super().pre_process(image)
-        image = np.pad(image, ((2, 2), (0, 0)), mode="constant", constant_values=255)
-        return image
+        return np.pad(image, ((2, 2), (0, 0)), mode="constant", constant_values=255)
 
 
 class HuanChangCounter(Digit):

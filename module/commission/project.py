@@ -56,8 +56,7 @@ def crop_suffix_image(image, area):
     x1, y1 = area[0:2]
     suffix_area = area_offset((left - 3, -3, right + 3, name_image.shape[0] + 3), (x1, y1))
     image = crop(image, suffix_area)
-    image = extract_letters(image, letter=(255, 255, 255), threshold=128).astype(np.uint8)
-    return image
+    return extract_letters(image, letter=(255, 255, 255), threshold=128).astype(np.uint8)
 
 
 def image_hash(image):
@@ -324,5 +323,4 @@ class Commission:
         name = re.sub(r"V$", "Ⅴ", name)
         name = re.sub(r"III$", "Ⅲ", name)
         name = re.sub(r"II$", "Ⅱ", name)
-        name = re.sub(r"I$", "Ⅰ", name)
-        return name
+        return re.sub(r"I$", "Ⅰ", name)

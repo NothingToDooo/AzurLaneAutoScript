@@ -55,8 +55,7 @@ class Opponent:
         ).buttons
 
         level = Level(level, name="LEVEL", letter=(255, 255, 255), threshold=128)
-        result = level.ocr(image)
-        return result
+        return level.ocr(image)
 
     def get_power(self, image):
         """
@@ -70,8 +69,7 @@ class Opponent:
         power = [grids[self.index, 0], grids[self.index, 1]]
 
         power = Digit(power, name="POWER", letter=(255, 223, 57), threshold=128)
-        result = power.ocr(image)
-        return result
+        return power.ocr(image)
 
     def get_priority(self, method="max_exp"):
         """

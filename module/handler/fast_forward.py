@@ -64,11 +64,10 @@ def to_map_input_name(name: str) -> str:
     res = re.match(r"([a-zA-Z])+[- ]+(\d+)", name)
     if res:
         name = f"{res.group(1)}{res.group(2)}"
-    # Change back to upper case for campaign removal
+    # 先转回大写，便于移除战役前缀。
     name = str(name).upper()
     # campaign_7_2 -> 7-2
-    name = name.replace("CAMPAIGN_", "").replace("_", "-")
-    return name
+    return name.replace("CAMPAIGN_", "").replace("_", "-")
 
 
 def to_map_file_name(name: str) -> str:
@@ -246,9 +245,8 @@ class FastForwardHandler(AutoSearchHandler):
         if enable is None:
             enable = self.config.Campaign_UseFleetLock
         state = "on" if enable else "off"
-        changed = FLEET_LOCK.set(state, main=self)
+        return FLEET_LOCK.set(state, main=self)
 
-        return changed
 
     def map_wait_auto_search(self):
         """
@@ -286,9 +284,8 @@ class FastForwardHandler(AutoSearchHandler):
             return False
 
         state = "on" if self.map_is_auto_search else "off"
-        changed = AUTO_SEARCH.set(state, main=self)
+        return AUTO_SEARCH.set(state, main=self)
 
-        return changed
 
     def handle_auto_search_setting(self):
         """

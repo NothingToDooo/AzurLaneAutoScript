@@ -25,8 +25,7 @@ def info_letter_preprocess(image):
     image = (image - 64) / 0.75
     image[image > 255] = 255
     image[image < 0] = 0
-    image = image.astype("uint8")
-    return image
+    return image.astype("uint8")
 
 
 class InfoHandler(ModuleBase):
