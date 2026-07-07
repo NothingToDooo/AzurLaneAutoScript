@@ -6,7 +6,9 @@ from subprocess import list2cmdline
 
 import cv2
 import numpy as np
+import requests
 import uiautomator2 as u2
+import uiautomator2.exceptions as u2_exc
 from adbutils.errors import AdbError
 from lxml import etree
 
@@ -29,7 +31,7 @@ def retry(func):
     @wraps(func)
     def retry_wrapper(self, *args, **kwargs):
         """
-        Args:
+        参数：
             self (Uiautomator2):
         """
         init = None
@@ -93,12 +95,18 @@ def retry(func):
 
                 def init():
                     pass
-            # 未知错误。
-            except Exception as e:
-                logger.exception(e)
+            # uiautomator2/RPC/HTTP 或本地图像/XML 解析失败时重试。
+            except (
+                u2_exc.BaseException,
+                requests.exceptions.RequestException,
+                cv2.error,
+                etree.XMLSyntaxError,
+                OSError,
+            ) as e:
+                logger.error(e)
 
                 def init():
-                    pass
+                    self.install_uiautomator2()
 
         logger.critical(f"Retry {func.__name__}() failed")
         raise RequestHumanTakeover

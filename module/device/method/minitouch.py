@@ -350,12 +350,14 @@ def retry(func):
 
                 def init():
                     del_cached_property(self, "_minitouch_builder")
-            # 未知错误，按不可恢复处理。
-            except Exception as e:
-                logger.exception(e)
+            # minitouch socket 或 ADB forward 的 I/O 失败。
+            except OSError as e:
+                logger.error(e)
 
                 def init():
-                    pass
+                    if self._minitouch_port:
+                        self.adb_forward_remove(f"tcp:{self._minitouch_port}")
+                    del_cached_property(self, "_minitouch_builder")
 
         logger.critical(f"Retry {func.__name__}() failed")
         raise RequestHumanTakeover

@@ -26,7 +26,7 @@ def retry(func):
     @wraps(func)
     def retry_wrapper(self, *args, **kwargs):
         """
-        Args:
+        参数：
             self (Adb):
         """
         init = None
@@ -70,9 +70,9 @@ def retry(func):
 
                 def init():
                     pass
-            # 未知错误。
-            except Exception as e:
-                logger.exception(e)
+            # ADB 输出损坏或本地图像/XML 解析失败时重试。
+            except (OSError, cv2.error, etree.XMLSyntaxError) as e:
+                logger.error(e)
 
                 def init():
                     pass

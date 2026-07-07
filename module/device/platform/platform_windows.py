@@ -145,23 +145,28 @@ class PlatformWindows(PlatformBase, EmulatorManager):
 
     def _emulator_function_wrapper(self, func: callable):
         """
-        Args:
-            func (callable): _emulator_start or _emulator_stop
+        参数：
+            func：_emulator_start 或 _emulator_stop。
 
-        Returns:
-            bool: If success
+        返回：
+            bool：是否成功。
         """
+        instance = self.emulator_instance
+        if instance is None:
+            logger.error("未找到可启动或停止的模拟器实例")
+            return False
+
         try:
-            func(self.emulator_instance)
+            func(instance)
         except OSError as e:
             msg = str(e)
             # OSError: [WinError 740] 请求的操作需要提升。
             if "WinError 740" in msg:
                 logger.error("To start/stop MuMuPlayer, ALAS needs to be run as administrator")
-        except EmulatorUnknown as e:
+            else:
+                logger.error(e)
+        except (EmulatorUnknown, psutil.Error) as e:
             logger.error(e)
-        except Exception as e:
-            logger.exception(e)
         else:
             return True
 

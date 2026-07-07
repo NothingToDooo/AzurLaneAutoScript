@@ -75,9 +75,9 @@ def retry(func):
 
                 def init():
                     self.detect_package()
-            # 未知错误，可能是截图损坏。
-            except Exception as e:
-                logger.exception(e)
+            # ADB 底层连接可能抛出 socket/pipe 类 I/O 错误。
+            except OSError as e:
+                logger.error(e)
 
                 def init():
                     pass

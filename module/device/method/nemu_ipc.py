@@ -174,28 +174,28 @@ def retry(func):
                     time.sleep(retry_sleep(_))
                     init()
                 return func(self, *args, **kwargs)
-            # Can't handle
+            # 无法自动处理。
             except RequestHumanTakeover:
                 break
-            # Can't handle
+            # 版本不兼容，无法自动处理。
             except NemuIpcIncompatible as e:
                 logger.error(e)
                 break
-            # Function call timeout
+            # native 调用超时。
             except JobTimeout:
                 logger.warning(f"Func {func.__name__}() call timeout, retrying: {_}")
 
                 def init():
                     pass
-            # NemuIpcError
+            # IPC 连接错误，重连后重试。
             except NemuIpcError as e:
                 logger.error(e)
 
                 def init():
                     self.reconnect()
-            # Unknown, probably a trucked image
-            except Exception as e:
-                logger.exception(e)
+            # native 调用或像素缓冲异常，按本次调用失败重试。
+            except (OSError, ValueError, ctypes.ArgumentError) as e:
+                logger.error(e)
 
                 def init():
                     pass
