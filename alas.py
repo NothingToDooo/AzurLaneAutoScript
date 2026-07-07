@@ -21,6 +21,7 @@ from module.exception import (
 )
 from module.logger import logger
 from module.notify import handle_notify
+from module.task_registry import get_task_spec
 
 if TYPE_CHECKING:
     import threading
@@ -76,7 +77,11 @@ class AzurLaneAutoScript:
         try:
             if not skip_first_screenshot:
                 self.device.screenshot()
-            self.__getattribute__(command)()
+            task_spec = get_task_spec(command)
+            if task_spec is not None:
+                task_spec.execute(self)
+            else:
+                self.__getattribute__(command)()
         except TaskEnd:
             return True
         except GameNotRunningError as e:
@@ -232,16 +237,6 @@ class AzurLaneAutoScript:
 
         Awaken(config=self.config, device=self.device).run()
 
-    def shop_frequent(self) -> None:
-        from module.shop.shop_reward import RewardShop
-
-        RewardShop(config=self.config, device=self.device).run_frequent()
-
-    def shop_once(self) -> None:
-        from module.shop.shop_reward import RewardShop
-
-        RewardShop(config=self.config, device=self.device).run_once()
-
     def shipyard(self) -> None:
         from module.shipyard.shipyard_reward import RewardShipyard
 
@@ -301,26 +296,6 @@ class AzurLaneAutoScript:
 
         RaidDaily(config=self.config, device=self.device).run()
 
-    def event_a(self) -> None:
-        from module.event.campaign_abcd import CampaignABCD
-
-        CampaignABCD(config=self.config, device=self.device).run()
-
-    def event_b(self) -> None:
-        from module.event.campaign_abcd import CampaignABCD
-
-        CampaignABCD(config=self.config, device=self.device).run()
-
-    def event_c(self) -> None:
-        from module.event.campaign_abcd import CampaignABCD
-
-        CampaignABCD(config=self.config, device=self.device).run()
-
-    def event_d(self) -> None:
-        from module.event.campaign_abcd import CampaignABCD
-
-        CampaignABCD(config=self.config, device=self.device).run()
-
     def event_sp(self) -> None:
         from module.event.campaign_sp import CampaignSP
 
@@ -341,111 +316,6 @@ class AzurLaneAutoScript:
 
         OpsiAshBeacon(config=self.config, device=self.device).run()
 
-    def opsi_explore(self) -> None:
-        from module.campaign.os_run import OSCampaignRun
-
-        OSCampaignRun(config=self.config, device=self.device).opsi_explore()
-
-    def opsi_shop(self) -> None:
-        from module.campaign.os_run import OSCampaignRun
-
-        OSCampaignRun(config=self.config, device=self.device).opsi_shop()
-
-    def opsi_voucher(self) -> None:
-        from module.campaign.os_run import OSCampaignRun
-
-        OSCampaignRun(config=self.config, device=self.device).opsi_voucher()
-
-    def opsi_daily(self) -> None:
-        from module.campaign.os_run import OSCampaignRun
-
-        OSCampaignRun(config=self.config, device=self.device).opsi_daily()
-
-    def opsi_obscure(self) -> None:
-        from module.campaign.os_run import OSCampaignRun
-
-        OSCampaignRun(config=self.config, device=self.device).opsi_obscure()
-
-    def opsi_month_boss(self) -> None:
-        from module.campaign.os_run import OSCampaignRun
-
-        OSCampaignRun(config=self.config, device=self.device).opsi_month_boss()
-
-    def opsi_abyssal(self) -> None:
-        from module.campaign.os_run import OSCampaignRun
-
-        OSCampaignRun(config=self.config, device=self.device).opsi_abyssal()
-
-    def opsi_archive(self) -> None:
-        from module.campaign.os_run import OSCampaignRun
-
-        OSCampaignRun(config=self.config, device=self.device).opsi_archive()
-
-    def opsi_stronghold(self) -> None:
-        from module.campaign.os_run import OSCampaignRun
-
-        OSCampaignRun(config=self.config, device=self.device).opsi_stronghold()
-
-    def opsi_meowfficer_farming(self) -> None:
-        from module.campaign.os_run import OSCampaignRun
-
-        OSCampaignRun(config=self.config, device=self.device).opsi_meowfficer_farming()
-
-    def opsi_hazard1_leveling(self) -> None:
-        from module.campaign.os_run import OSCampaignRun
-
-        OSCampaignRun(config=self.config, device=self.device).opsi_hazard1_leveling()
-
-    def opsi_cross_month(self) -> None:
-        from module.campaign.os_run import OSCampaignRun
-
-        OSCampaignRun(config=self.config, device=self.device).opsi_cross_month()
-
-    def main(self) -> None:
-        from module.campaign.run import CampaignRun
-
-        CampaignRun(config=self.config, device=self.device).run(
-            name=self.config.Campaign_Name,
-            folder=self.config.Campaign_Event,
-            mode=self.config.Campaign_Mode,
-        )
-
-    def main2(self) -> None:
-        from module.campaign.run import CampaignRun
-
-        CampaignRun(config=self.config, device=self.device).run(
-            name=self.config.Campaign_Name,
-            folder=self.config.Campaign_Event,
-            mode=self.config.Campaign_Mode,
-        )
-
-    def main3(self) -> None:
-        from module.campaign.run import CampaignRun
-
-        CampaignRun(config=self.config, device=self.device).run(
-            name=self.config.Campaign_Name,
-            folder=self.config.Campaign_Event,
-            mode=self.config.Campaign_Mode,
-        )
-
-    def event(self) -> None:
-        from module.campaign.run import CampaignRun
-
-        CampaignRun(config=self.config, device=self.device).run(
-            name=self.config.Campaign_Name,
-            folder=self.config.Campaign_Event,
-            mode=self.config.Campaign_Mode,
-        )
-
-    def event2(self) -> None:
-        from module.campaign.run import CampaignRun
-
-        CampaignRun(config=self.config, device=self.device).run(
-            name=self.config.Campaign_Name,
-            folder=self.config.Campaign_Event,
-            mode=self.config.Campaign_Mode,
-        )
-
     def raid(self) -> None:
         from module.raid.run import RaidRun
 
@@ -465,33 +335,6 @@ class AzurLaneAutoScript:
         from module.coalition.coalition_sp import CoalitionSP
 
         CoalitionSP(config=self.config, device=self.device).run()
-
-    def c72_mystery_farming(self) -> None:
-        from module.campaign.run import CampaignRun
-
-        CampaignRun(config=self.config, device=self.device).run(
-            name=self.config.Campaign_Name,
-            folder=self.config.Campaign_Event,
-            mode=self.config.Campaign_Mode,
-        )
-
-    def c122_medium_leveling(self) -> None:
-        from module.campaign.run import CampaignRun
-
-        CampaignRun(config=self.config, device=self.device).run(
-            name=self.config.Campaign_Name,
-            folder=self.config.Campaign_Event,
-            mode=self.config.Campaign_Mode,
-        )
-
-    def c124_large_leveling(self) -> None:
-        from module.campaign.run import CampaignRun
-
-        CampaignRun(config=self.config, device=self.device).run(
-            name=self.config.Campaign_Name,
-            folder=self.config.Campaign_Event,
-            mode=self.config.Campaign_Mode,
-        )
 
     def gems_farming(self) -> None:
         from module.campaign.gems_farming import GemsFarming
