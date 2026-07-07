@@ -52,10 +52,10 @@ def iter_folder(folder, is_dir=False, ext=None):
     for file in os.listdir(folder):
         sub = os.path.join(folder, file)
         if is_dir:
-            if os.path.isdir(sub):
+            if Path(sub).is_dir():
                 yield sub.replace("\\\\", "/").replace("\\", "/")
         elif ext is not None:
-            if not os.path.isdir(sub) and Path(file).suffix == ext:
+            if not Path(sub).is_dir() and Path(file).suffix == ext:
                 yield os.path.join(folder, file).replace("\\\\", "/").replace("\\", "/")
         else:
             yield os.path.join(folder, file).replace("\\\\", "/").replace("\\", "/")

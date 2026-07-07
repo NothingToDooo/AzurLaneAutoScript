@@ -38,7 +38,7 @@ class LuaLoader:
             if server in alias_list:
                 for alias in alias_list:
                     folder = os.path.join(self.folder, alias)
-                    if os.path.exists(folder) and os.path.isdir(folder):
+                    if Path(folder).is_dir():
                         return alias
 
         return server
@@ -140,7 +140,7 @@ class LuaLoader:
             dict:
         """
         print(f"Loading {path}")
-        if os.path.isdir(self.filepath(path)):
+        if Path(self.filepath(path)).is_dir():
             result = {}
             for file in tqdm(os.listdir(self.filepath(path))):
                 result.update(self._load_file(f"./{path}/{file}", keyword=keyword))

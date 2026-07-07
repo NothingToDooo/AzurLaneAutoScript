@@ -215,10 +215,11 @@ class AssetExtractor:
     def __init__(self):
         logger.info("Assets extract")
 
+        assets_folder = Path(AzurLaneConfig.ASSETS_FOLDER) / "cn"
         modules = [
             m
-            for m in os.listdir(AzurLaneConfig.ASSETS_FOLDER + "/cn")
-            if os.path.isdir(os.path.join(AzurLaneConfig.ASSETS_FOLDER + "/cn", m))
+            for m in os.listdir(assets_folder)
+            if (assets_folder / m).is_dir()
         ]
 
         process_map(worker, modules)
