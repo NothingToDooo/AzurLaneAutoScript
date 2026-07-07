@@ -111,14 +111,9 @@ def replace_tmp(tmp: str, file: str):
         except Exception as e:
             last_error = e
 
-    # Clean up tmp file on failure
-    try:
+    # 写入失败时尽力清理临时文件；清理失败仍然抛出原始写入错误。
+    with suppress(Exception):
         os.unlink(tmp)
-    except FileNotFoundError:
-        # tmp file already get deleted
-        pass
-    except Exception:
-        pass
     if last_error is not None:
         raise last_error from None
 
@@ -582,31 +577,24 @@ def atomic_failure_cleanup(folder: str, recursive: bool = False):
         with os.scandir(folder) as entries:
             for entry in entries:
                 if is_tmp_file(entry.name):
-                    try:
-                        # Delete temp file or directory
+                    # 临时文件可能仍被其他进程占用；失败时留到下次启动再清理。
+                    with suppress(Exception):
                         if entry.is_dir(follow_symlinks=False):
                             folder_rmtree(entry.path, may_symlinks=False)
                         else:
                             file_remove(entry.path)
-                    except PermissionError:
-                        # Another process is reading/writing
-                        pass
-                    except Exception:
-                        pass
                 else:
                     if recursive:
-                        try:
+                        # 递归清理是附带动作，单个目录失败不应中断启动。
+                        with suppress(Exception):
                             if entry.is_dir(follow_symlinks=False):
-                                # Normal directory
                                 atomic_failure_cleanup(entry.path, recursive=True)
-                        except Exception:
-                            pass
 
     except FileNotFoundError:
-        # directory to clean up does not exist, no need to clean up
-        pass
+        # 需要清理的目录不存在。
+        return
     except NotADirectoryError:
         file_remove(folder)
     except Exception:
-        # Ignore all failures, it doesn't matter if tmp files still exist
-        pass
+        # 清理失败不影响启动；残留临时文件可下次再处理。
+        return

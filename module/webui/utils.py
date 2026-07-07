@@ -6,6 +6,7 @@ import threading
 import time
 import traceback
 from collections.abc import Callable, Generator
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 import pywebio
@@ -490,14 +491,12 @@ def on_task_exception(self):
     theme = DARK_TERMINAL_THEME if State.theme == "dark" else LIGHT_TERMINAL_THEME
 
     html = traceback_console.export_html(theme=theme, code_format=TRACEBACK_CODE_FORMAT, inline_styles=True)
-    try:
+    with suppress(Exception):
         popup(title=toast_msg, content=put_html(html), size=PopupSize.LARGE)
         run_js(
             "console.error(traceback_msg)",
             traceback_msg="Internal Server Error\n" + traceback_msg,
         )
-    except Exception:
-        pass
 
 
 # 猴子补丁。

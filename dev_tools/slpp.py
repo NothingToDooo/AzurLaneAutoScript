@@ -1,4 +1,5 @@
 import re
+from contextlib import suppress
 from numbers import Number
 
 """
@@ -245,10 +246,8 @@ class SLPP:
         except ParseError as e:
             print(e)
             return 0
-        try:
+        with suppress(ValueError):
             return int(n, 0)
-        except Exception:
-            pass
         return float(n)
 
     def digit(self):
