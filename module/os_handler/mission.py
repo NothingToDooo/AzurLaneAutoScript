@@ -34,12 +34,11 @@ class MissionHandler(GlobeOperation, ZoneManager):
             logger.warning("Unable to find mission on OS mission map")
 
         point = np.add(fit_points(points, mod=(1000, 1000), encourage=5), (0, 11))
-        # Location of zone.
-        # (2570, 1694) is the shape of os_globe_map.png
+        # 作战海域坐标。
+        # GLOBE_MAP_SHAPE 是 os_globe_map.png 的尺寸。
         point *= np.array(GLOBE_MAP_SHAPE) / np.subtract(area[2:], area[:2])
 
-        zone = self.camera_to_zone(tuple(point))
-        return zone
+        return self.camera_to_zone(tuple(point))
 
     def is_in_os_mission(self):
         return self.appear(os_assets.MISSION_CHECK, offset=(20, 20))

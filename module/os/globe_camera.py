@@ -149,10 +149,9 @@ class GlobeCamera(GlobeOperation, ZoneManager):
             Button:
         """
         pinned = self.globe2screen([zone.location])[0]
-        # pinned is the bottom left corner of where its actually pinned.
+        # pinned 是实际标记位置的左下角。
         area = area_offset((0, -10, 16, 0), offset=pinned)
-        button = Button(area=area, color=(), button=area, name=f"ZONE_{zone.zone_id}")
-        return button
+        return Button(area=area, color=(), button=area, name=f"ZONE_{zone.zone_id}")
 
     def globe_in_sight(self, zone, swipe_limit=(620, 340), sight=(20, 220, 980, 620)):
         """

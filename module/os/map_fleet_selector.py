@@ -68,12 +68,8 @@ class FleetSelector:
         return result
 
     def selected(self):
-        """
-        Returns:
-            list: List of int. Currently selected fleet ranges from 1 to 4.
-        """
-        data = self.parse_fleet_bar(self.main.image_crop(self._bar, copy=False))
-        return data
+        """返回当前选择的舰队编号，范围为 1 到 4。"""
+        return self.parse_fleet_bar(self.main.image_crop(self._bar, copy=False))
 
     def get_button(self, index):
         """

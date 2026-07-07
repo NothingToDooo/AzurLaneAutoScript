@@ -86,8 +86,7 @@ class OSCamera(OSMapOperation, Camera):
                 self.ensure_edge_insight()
                 continue
 
-            button = Button(area=area, color=(), button=area, name="MAP_OUTSIDE")
-            return button
+            return Button(area=area, color=(), button=area, name="MAP_OUTSIDE")
 
     def update_os(self):
         """

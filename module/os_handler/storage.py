@@ -249,5 +249,4 @@ class StorageHandler(GlobeOperation, ZoneManager):
         if use_logger:
             self.storage_logger_use_all()
 
-        result = self.storage_checkout_item(item)
-        return result
+        return self.storage_checkout_item(item)

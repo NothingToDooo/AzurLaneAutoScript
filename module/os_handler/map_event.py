@@ -254,6 +254,4 @@ class MapEventHandler(EnemySearchingHandler):
         if enable is None:
             enable = self.config.Campaign_UseFleetLock
         state = "on" if enable else "off"
-        changed = fleet_lock.set(state, main=self)
-
-        return changed
+        return fleet_lock.set(state, main=self)

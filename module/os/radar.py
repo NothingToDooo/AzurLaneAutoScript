@@ -295,8 +295,7 @@ class Radar:
         grids = np.array(list(grids))
         distance = np.linalg.norm(grids, axis=1)
         degree = np.sum(grids * point, axis=1) / distance / np.linalg.norm(point)
-        grid = grids[np.argmax(degree)]
-        return grid
+        return grids[np.argmax(degree)]
 
     def port_predict(self, image):
         """
@@ -314,8 +313,7 @@ class Radar:
 
         point = self.predict_port_outside(image)
         if point is not None:
-            port = self.port_outside_to_inside(point)
-            return port
+            return self.port_outside_to_inside(point)
 
         return None
 

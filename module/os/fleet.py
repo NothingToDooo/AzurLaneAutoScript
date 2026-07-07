@@ -57,8 +57,7 @@ class PercentageOcr(Ocr):
 
     def pre_process(self, image):
         image = super().pre_process(image)
-        image = np.pad(image, ((2, 2), (0, 0)), mode="constant", constant_values=255)
-        return image
+        return np.pad(image, ((2, 2), (0, 0)), mode="constant", constant_values=255)
 
 
 FLEET_LOW_RESOLVE = Button(
@@ -110,8 +109,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
 
     @property
     def _walk_sight(self):
-        sight = (-4, -1, 3, 2)
-        return sight
+        return (-4, -1, 3, 2)
 
     _os_map_event_handled = False
 
@@ -677,10 +675,9 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             center = self.view[self.view.center_loca]
 
         logger.info(f"Fleet in boss: {center}")
-        # The left half grid next to the center grid.
+        # 中心格右侧相邻格的左半部分用于点击离开首领。
         area = corner2inner(center.grid2screen(area2corner((1, 0.25, 1.5, 0.75))))
-        button = Button(area=area, color=(), button=area, name="BOSS_LEAVE")
-        return button
+        return Button(area=area, color=(), button=area, name="BOSS_LEAVE")
 
     def boss_leave(self):
         """
@@ -854,8 +851,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             logger.info("No boss at front, retry question_goto")
             continue
 
-        result = self.boss_clear(has_fleet_step=True)
-        return result
+        return self.boss_clear(has_fleet_step=True)
 
     def get_stronghold_percentage(self):
         """

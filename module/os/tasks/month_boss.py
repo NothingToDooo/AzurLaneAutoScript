@@ -9,9 +9,7 @@ from module.os_handler.assets import OS_MONTHBOSS_HARD, OS_MONTHBOSS_NORMAL
 
 class OpsiMonthBoss(OSMap):
     def get_adaptability(self):
-        adaptability = OCR_OS_ADAPTABILITY.ocr(self.device.image)
-
-        return adaptability
+        return OCR_OS_ADAPTABILITY.ocr(self.device.image)
 
     def clear_month_boss(self):
         """

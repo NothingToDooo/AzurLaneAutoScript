@@ -15,8 +15,7 @@ from module.ui.ui import UI
 class DailyDigitCounter(DigitCounter):
     def pre_process(self, image):
         image = super().pre_process(image)
-        image = image_left_strip(image, threshold=120, length=35)
-        return image
+        return image_left_strip(image, threshold=120, length=35)
 
 
 class AshBeaconFinished(Exception):

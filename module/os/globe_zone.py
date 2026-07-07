@@ -38,12 +38,10 @@ class Zone:
 
     @staticmethod
     def point_convert(point):
-        """
-        Convert coordinates in world_chapter_colormask.lua to os_globe_map.png
-        """
+        """把 world_chapter_colormask.lua 坐标转换到 os_globe_map.png。"""
         point = np.multiply(point, 1.25)
-        point = np.array((point[0], GLOBE_MAP_SHAPE[1] - point[1]))  # 1694 is the height of os_globe_map.png
-        return point
+        # GLOBE_MAP_SHAPE[1] 是 os_globe_map.png 的高度。
+        return np.array((point[0], GLOBE_MAP_SHAPE[1] - point[1]))
 
     def __str__(self):
         """
@@ -113,8 +111,7 @@ class ZoneManager:
         else:
 
             def parse_name(n):
-                n = str(n).replace(" ", "").lower()
-                return n
+                return str(n).replace(" ", "").lower()
 
             name = parse_name(name)
             for zone in self.zones:

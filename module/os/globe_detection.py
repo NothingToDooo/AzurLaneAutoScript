@@ -110,8 +110,7 @@ class GlobeDetection:
         Returns:
             np.ndarray: Image without perspective, like normal 2D maps.
         """
-        image = cv2.warpPerspective(image, self.homography.homo_data, self.homography.homo_size)
-        return image
+        return cv2.warpPerspective(image, self.homography.homo_data, self.homography.homo_size)
 
     def load(self, image):
         """
