@@ -14,7 +14,10 @@ if TYPE_CHECKING:
 class AppControl(Adb, Uiautomator2):
     hierarchy: etree._Element
     _app_u2_family = ("minitouch", "nemu_ipc")
-    _hierarchy_interval = Timer(0.1)
+
+    def __init__(self, *args, **kwargs):
+        self._hierarchy_interval = Timer(0.1)
+        super().__init__(*args, **kwargs)
 
     def app_current(self) -> str:
         method = self.config.Emulator_ControlMethod

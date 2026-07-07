@@ -2,7 +2,7 @@ import collections
 import traceback
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from module.device.env import IS_WINDOWS
 
@@ -64,14 +64,14 @@ def show_function_call():
 
 
 class Device(Screenshot, Control, AppControl):
-    _screen_size_checked = False
-    detect_record = set()
-    click_record = collections.deque(maxlen=15)
-    stuck_timer = Timer(60, count=60).start()
-    stuck_timer_long = Timer(180, count=180).start()
-    stuck_long_wait_list = ("BATTLE_STATUS_S", "PAUSE", "LOGIN_CHECK")
+    stuck_long_wait_list: ClassVar[tuple[str, ...]] = ("BATTLE_STATUS_S", "PAUSE", "LOGIN_CHECK")
 
     def __init__(self, *args, **kwargs):
+        self.detect_record: set[str] = set()
+        self.click_record: collections.deque[str] = collections.deque(maxlen=15)
+        self.stuck_timer = Timer(60, count=60).start()
+        self.stuck_timer_long = Timer(180, count=180).start()
+
         for trial in range(4):
             try:
                 super().__init__(*args, **kwargs)

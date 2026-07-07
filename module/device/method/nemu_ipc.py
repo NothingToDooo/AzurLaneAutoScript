@@ -10,7 +10,6 @@ import cv2
 import numpy as np
 
 from module.base.decorator import cached_property, del_cached_property, has_cached_property
-from module.base.timer import Timer
 from module.base.utils import ensure_time
 from module.config.deep import deep_get
 from module.device.env import IS_WINDOWS
@@ -465,8 +464,6 @@ class NemuIpcImpl:
 
 
 class NemuIpc(Platform):
-    _screenshot_interval = Timer(0.1)
-
     @cached_property
     def nemu_ipc(self) -> NemuIpcImpl:
         """

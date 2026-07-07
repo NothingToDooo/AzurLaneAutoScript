@@ -20,12 +20,15 @@ if TYPE_CHECKING:
 
 
 class Screenshot(Adb, NemuIpc):
-    _screen_size_checked = False
-    _screen_black_checked = False
-    _minicap_uninstalled = False
-    _screenshot_interval = Timer(0.1)
-    _last_save_time = {}
     image: np.ndarray
+
+    def __init__(self, *args, **kwargs):
+        self._screen_size_checked = False
+        self._screen_black_checked = False
+        self._minicap_uninstalled = False
+        self._screenshot_interval = Timer(0.1)
+        self._last_save_time: dict[str, float] = {}
+        super().__init__(*args, **kwargs)
 
     @cached_property
     def screenshot_methods(self):
