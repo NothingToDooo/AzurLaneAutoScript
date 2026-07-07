@@ -19,17 +19,14 @@ def upload_redirect(value):
     if isinstance(value, list):
         if not value[0] and not value[1]:
             return "do_not"
-        elif value[0] and not value[1]:
+        if value[0] and not value[1]:
             return "save"
-        elif not value[0] and value[1]:
+        if not value[0] and value[1]:
             return "upload"
-        else:
-            return "save_and_upload"
-    else:
-        if not value:
-            return "do_not"
-        else:
-            return "save"
+        return "save_and_upload"
+    if not value:
+        return "do_not"
+    return "save"
 
 
 def api_redirect(value):
@@ -38,10 +35,9 @@ def api_redirect(value):
     """
     if value == "auto":
         return "default"
-    elif to_server(value) == "cn":
+    if to_server(value) == "cn":
         return "cn_gz_reverse_proxy"
-    else:
-        return "default"
+    return "default"
 
 
 def dossier_redirect(value):
@@ -50,8 +46,7 @@ def dossier_redirect(value):
     """
     if value:
         return "current_dossier"
-    else:
-        return "current"
+    return "current"
 
 
 def enhance_favourite_redirect(value):
@@ -60,8 +55,7 @@ def enhance_favourite_redirect(value):
     """
     if value:
         return "all"
-    else:
-        return "favourite"
+    return "favourite"
 
 
 def enhance_check_redirect(value):
@@ -82,14 +76,11 @@ def emotion_mode_redirect(value):
     if calculate:
         if ignore:
             return "calculate_ignore"
-        else:
-            return "calculate"
-    else:
-        if ignore:
-            return "ignore"
-        else:
-            # Invalid, fallback to calculate
-            return "calculate"
+        return "calculate"
+    if ignore:
+        return "ignore"
+    # Invalid, fallback to calculate
+    return "calculate"
 
 
 def change_ship_redirect(value):
@@ -99,10 +90,9 @@ def change_ship_redirect(value):
     ship, equip = value
     if not ship:
         return "disabled"
-    elif equip:
+    if equip:
         return "ship_equip"
-    else:
-        return "ship"
+    return "ship"
 
 
 def api_redirect2(value):
@@ -111,8 +101,7 @@ def api_redirect2(value):
     """
     if value == "cn_sh_reverse_proxy":
         return "cn_gz_reverse_proxy"
-    else:
-        return value
+    return value
 
 
 def coalition_to_frostfall(value):

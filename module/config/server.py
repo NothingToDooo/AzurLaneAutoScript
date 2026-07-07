@@ -133,12 +133,11 @@ def to_server(package_or_server: str) -> str:
     """
     if package_or_server in VALID_SERVER:
         return package_or_server
-    elif package_or_server in VALID_PACKAGE:
+    if package_or_server in VALID_PACKAGE:
         return VALID_PACKAGE[package_or_server]
-    elif package_or_server in VALID_CHANNEL_PACKAGE:
+    if package_or_server in VALID_CHANNEL_PACKAGE:
         return VALID_CHANNEL_PACKAGE[package_or_server][0]
-    else:
-        return "cn"
+    return "cn"
 
 
 def to_package(package_or_server: str) -> str:

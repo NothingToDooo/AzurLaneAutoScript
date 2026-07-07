@@ -46,10 +46,7 @@ class Function:
         if not isinstance(other, Function):
             return False
 
-        if self.command == other.command and self.next_run == other.next_run:
-            return True
-        else:
-            return False
+        return self.command == other.command and self.next_run == other.next_run
 
 
 def name_to_function(name):
@@ -244,8 +241,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             task = self.pending_task[0]
             logger.attr("Task", task)
             return task
-        else:
-            AzurLaneConfig.is_hoarding_task = True
+        AzurLaneConfig.is_hoarding_task = True
 
         if self.waiting_task:
             logger.info("No task pending")
@@ -253,10 +249,9 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             task.next_run = (task.next_run + self.hoarding).replace(microsecond=0)
             logger.attr("Task", task)
             return task
-        else:
-            logger.critical("No task waiting or pending")
-            logger.critical("Please enable at least one task")
-            raise RequestHumanTakeover
+        logger.critical("No task waiting or pending")
+        logger.critical("Please enable at least one task")
+        raise RequestHumanTakeover
 
     def save(self, mod_name="alas"):
         if not self.modified:
@@ -554,9 +549,8 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             if self.auto_update:
                 self.update()
             return True
-        else:
-            logger.info(f"Task call: {task} (skipped because disabled by user)")
-            return False
+        logger.info(f"Task call: {task} (skipped because disabled by user)")
+        return False
 
     @staticmethod
     def task_stop(message=""):
@@ -587,9 +581,8 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         if prev == new:
             logger.info(f"Continue task `{new}`")
             return False
-        else:
-            logger.info(f"Switch task `{prev}` to `{new}`")
-            return True
+        logger.info(f"Switch task `{prev}` to `{new}`")
+        return True
 
     def check_task_switch(self, message=""):
         """
@@ -676,16 +669,12 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
     def FLEET_BOSS(self):
         if self._fleet_boss:
             return self._fleet_boss
-        if self.Fleet_Fleet2:
-            if self.Fleet_FleetOrder in [
-                "fleet1_mob_fleet2_boss",
-                "fleet1_boss_fleet2_mob",
-            ]:
-                return 2
-            else:
-                return 1
-        else:
-            return 1
+        if self.Fleet_Fleet2 and self.Fleet_FleetOrder in [
+            "fleet1_mob_fleet2_boss",
+            "fleet1_boss_fleet2_mob",
+        ]:
+            return 2
+        return 1
 
     @FLEET_BOSS.setter
     def FLEET_BOSS(self, value):

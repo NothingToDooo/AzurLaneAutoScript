@@ -9,5 +9,4 @@ def action_point_redirect(value):
     """
     if value is True:
         return 5
-    else:
-        return 0
+    return 0

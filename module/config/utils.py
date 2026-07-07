@@ -43,8 +43,7 @@ SafeRepresenter.add_representer(str, str_presenter)
 def filepath_args(filename="args", mod_name="alas"):
     if mod_name == "alas":
         return f"./module/config/argument/{filename}.json"
-    else:
-        return os.path.join(get_mod_filepath(mod_name), f"./module/config/argument/{filename}.json")
+    return os.path.join(get_mod_filepath(mod_name), f"./module/config/argument/{filename}.json")
 
 
 def filepath_argument(filename):
@@ -54,15 +53,13 @@ def filepath_argument(filename):
 def filepath_i18n(lang, mod_name="alas"):
     if mod_name == "alas":
         return os.path.join("./module/config/i18n", f"{lang}.json")
-    else:
-        return os.path.join(get_mod_filepath(mod_name), "./module/config/i18n", f"{lang}.json")
+    return os.path.join(get_mod_filepath(mod_name), "./module/config/i18n", f"{lang}.json")
 
 
 def filepath_config(filename, mod_name="alas"):
     if mod_name == "alas":
         return os.path.join("./config", f"{filename}.json")
-    else:
-        return os.path.join("./config", f"{filename}.{mod_name}.json")
+    return os.path.join("./config", f"{filename}.{mod_name}.json")
 
 
 def filepath_code():
@@ -86,7 +83,7 @@ def read_file(file):
         if not content:
             return {}
         return json.loads(content)
-    elif file.endswith(".yaml"):
+    if file.endswith(".yaml"):
         content = atomic_read_text(file)
         data = list(yaml.safe_load_all(content))
         if len(data) == 1:
@@ -94,9 +91,8 @@ def read_file(file):
         if not data:
             data = {}
         return data
-    else:
-        logger.warning(f"Unsupported config file extension: {file}")
-        return {}
+    logger.warning(f"Unsupported config file extension: {file}")
+    return {}
 
 
 def write_file(file, data):
@@ -244,12 +240,11 @@ def data_to_type(data, **kwargs):
     kwargs.update(data)
     if isinstance(kwargs["value"], bool):
         return "checkbox"
-    elif kwargs.get("option"):
+    if kwargs.get("option"):
         return "select"
-    elif "Filter" in kwargs["arg"]:
+    if "Filter" in kwargs["arg"]:
         return "textarea"
-    else:
-        return "input"
+    return "input"
 
 
 def data_to_path(data):
@@ -323,8 +318,7 @@ def random_normal_distribution_int(a, b, n=3):
     if a < b:
         output = sum([random.randint(a, b) for _ in range(n)]) / n
         return round(output)
-    else:
-        return b
+    return b
 
 
 def ensure_time(second, n=3, precision=3):
@@ -341,7 +335,7 @@ def ensure_time(second, n=3, precision=3):
     if isinstance(second, tuple):
         multiply = 10**precision
         return random_normal_distribution_int(second[0] * multiply, second[1] * multiply, n) / multiply
-    elif isinstance(second, str):
+    if isinstance(second, str):
         if "," in second:
             lower, upper = second.replace(" ", "").split(",")
             lower, upper = int(lower), int(upper)
@@ -350,10 +344,8 @@ def ensure_time(second, n=3, precision=3):
             lower, upper = second.replace(" ", "").split("-")
             lower, upper = int(lower), int(upper)
             return ensure_time((lower, upper), n=n, precision=precision)
-        else:
-            return int(second)
-    else:
-        return second
+        return int(second)
+    return second
 
 
 def get_os_next_reset():

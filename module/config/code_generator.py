@@ -99,22 +99,19 @@ class CodeGenerator:
     def List(self, key=None):
         if key is not None:
             return TabWrapper(self, prefix=str(key) + " = [", suffix="]")
-        else:
-            return TabWrapper(self, prefix="[", suffix="]", newline=False)
+        return TabWrapper(self, prefix="[", suffix="]", newline=False)
 
     def ListItem(self, value):
         if isinstance(value, TabWrapper):
             value.set_nested(suffix=",")
             self.add(f"{self._repr(value)}")
             return value
-        else:
-            self.add(f"{self._repr(value)},")
+        self.add(f"{self._repr(value)},")
 
     def Dict(self, key=None):
         if key is not None:
             return TabWrapper(self, prefix=str(key) + " = {", suffix="}")
-        else:
-            return TabWrapper(self, prefix="{", suffix="}", newline=False)
+        return TabWrapper(self, prefix="{", suffix="}", newline=False)
 
     def DictItem(self, key=None, value=None):
         if isinstance(value, TabWrapper):
@@ -122,15 +119,13 @@ class CodeGenerator:
             if key is not None:
                 self.add(f"{self._repr(key)}: {self._repr(value)}")
             return value
-        else:
-            if key is not None:
-                self.add(f"{self._repr(key)}: {self._repr(value)},")
+        if key is not None:
+            self.add(f"{self._repr(key)}: {self._repr(value)},")
 
     def Object(self, object_class, key=None):
         if key is not None:
             return TabWrapper(self, prefix=f"{key} = {object_class}(", suffix=")")
-        else:
-            return TabWrapper(self, prefix=f"{object_class}(", suffix=")", newline=False)
+        return TabWrapper(self, prefix=f"{object_class}(", suffix=")", newline=False)
 
     def ObjectAttr(self, key=None, value=None):
         if isinstance(value, TabWrapper):
@@ -140,17 +135,15 @@ class CodeGenerator:
             else:
                 self.add(f"{key}={self._repr(value)}")
             return value
+        if key is None:
+            self.add(f"{self._repr(value)},")
         else:
-            if key is None:
-                self.add(f"{self._repr(value)},")
-            else:
-                self.add(f"{key}={self._repr(value)},")
+            self.add(f"{key}={self._repr(value)},")
 
     def Class(self, name, inherit=None):
         if inherit is not None:
             return TabWrapper(self, prefix=f"class {name}({inherit}):")
-        else:
-            return TabWrapper(self, prefix=f"class {name}:")
+        return TabWrapper(self, prefix=f"class {name}:")
 
     def Def(self, name, args=""):
         return TabWrapper(self, prefix=f"def {name}({args}):")
