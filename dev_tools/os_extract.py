@@ -20,25 +20,15 @@ class OSChapter:
 
         for index, name in self.extract_chapter_name("zh-CN").items():
             self.chapter[index]["cn"] = name
-        for index, name in self.extract_chapter_name("en-US").items():
-            self.chapter[index]["en"] = name
-        for index, name in self.extract_chapter_name("ja-JP").items():
-            self.chapter[index]["jp"] = name
-        for index, name in self.extract_chapter_name("zh-TW").items():
-            self.chapter[index]["tw"] = name
         for index, shape in self.extract_map_size().items():
             self.chapter[index]["shape"] = shape
-        # hazard_level
         new = {}
         for index, chapter in self.chapter.items():
             new[index] = {
-                # The structure of world_chapter_template.lua has changed, so load the old map data
+                # world_chapter_template.lua 结构变过，缺失尺寸时沿用旧地图数据。
                 "shape": chapter.get("shape", DIC_OS_MAP[index]["shape"]),
                 "hazard_level": chapter["hazard_level"],
                 "cn": chapter["cn"],
-                "en": chapter["en"],
-                "jp": chapter["jp"],
-                "tw": chapter["tw"],
             }
         self.chapter = new
 
@@ -53,7 +43,7 @@ class OSChapter:
             if not isinstance(index, int) or index >= 200:
                 continue
             name = chapter["name"]
-            name = name.replace("é", "e")  # OCR can't recognize letter "é"
+            name = name.replace("é", "e")  # OCR 识别不了字母 "é"。
             out[index] = name
 
         # Zone 40000 is zone 154
@@ -122,12 +112,12 @@ class OSChapter:
 
 
 """
-This an auto-tool to extract map data for operation siren.
+这是用于抽取大型作战地图数据的开发工具。
 
-Git clone https://github.com/AzurLaneTools/AzurLaneLuaScripts, to get the decrypted scripts.
+先克隆 https://github.com/AzurLaneTools/AzurLaneLuaScripts 获取解密后的 Lua 脚本。
 Arguments:
-    FILE:  Path to repository, such as 'xxx/AzurLaneLuaScripts'
-    SAVE:  File to save, 'module/os/map_data.py'
+    FILE: Lua 脚本仓库路径，例如 'xxx/AzurLaneLuaScripts'
+    SAVE: 保存目标，例如 'module/os/map_data.py'
 """
 FOLDER = ""
 SAVE = "module/os/map_data.py"

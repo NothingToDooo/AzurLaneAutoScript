@@ -8,16 +8,10 @@ from dev_tools.slpp import slpp
 
 class LuaLoader:
     """
-    Load decrypted scripts
+    读取解密后的国区 Lua 脚本。
     """
 
-    server_alias = (
-        ("zh-CN", "zh-cn", "cn", "CN"),
-        ("en-US", "en-us", "en", "EN"),
-        ("ja-JP", "ja-jp", "jp", "JP"),
-        ("zh-TW", "zh-tw", "tw", "TW"),
-        ("ko-KR", "ko-kr", "kr", "KR"),
-    )
+    server_alias = (("zh-CN", "zh-cn", "cn", "CN"),)
 
     def __init__(self, folder, server="zh-CN"):
         self.folder = folder
@@ -128,11 +122,11 @@ class LuaLoader:
 
     def load(self, path, keyword=None):
         """
-        Load a lua file to python dictionary, handling the differences
+        读取 Lua 文件并转换为 Python 字典。
 
         Args:
-            path (str): Relavice path from {folder}/{server}.
-                Can be a file or a directory
+            path (str): Relative path from {folder}/{server}.
+                Can be a file or a directory.
 
         Returns:
             dict:
@@ -150,6 +144,6 @@ class LuaLoader:
 
 
 if __name__ == "__main__":
-    # Use example
-    lua = LuaLoader(r"xxx/AzurLaneData", server="en-US")
+    # 使用示例。
+    lua = LuaLoader(r"xxx/AzurLaneData", server="zh-CN")
     res = lua.load("./sharecfg/item_data_statistics.lua")
