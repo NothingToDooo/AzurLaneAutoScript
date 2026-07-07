@@ -69,8 +69,7 @@ class SLPP:
         self.at, self.ch, self.depth = 0, "", 0
         self.len = len(text)
         self.next_chr()
-        result = self.value()
-        return result
+        return self.value()
 
     def encode(self, obj):
         self.depth = 0

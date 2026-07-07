@@ -28,5 +28,4 @@ class CampaignBase(CampaignBase_):
         if sim < 0.85:
             raise CampaignNameError
 
-        entrance = button.crop((-12, -12, 44, 32), image=self.device.image, name=name)
-        return entrance
+        return button.crop((-12, -12, 44, 32), image=self.device.image, name=name)

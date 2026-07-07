@@ -140,8 +140,7 @@ class DataProcessInfo:
             # psutil.AccessDenied
             # # NoSuchProcess: process no longer exists (pid=xxx)
             cmdline = []
-        cmdline = " ".join(cmdline).replace(r"\\", "/").replace("\\", "/")
-        return cmdline
+        return " ".join(cmdline).replace(r"\\", "/").replace("\\", "/")
 
     def __str__(self):
         # Don't print `proc`, it will take some time to get process properties

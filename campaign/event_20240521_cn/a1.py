@@ -209,8 +209,7 @@ class Campaign(CampaignBase):
                 return self.battle_default()
             if self.bored_visit():
                 return True
-            result = self.battle_boss()
-            return result
+            return self.battle_boss()
         return super().battle_function()
 
     def battle_0(self):

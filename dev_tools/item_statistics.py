@@ -70,8 +70,7 @@ class DropStatistics(BattleStatusStatistics, GetItemsStatistics):
 
         enemy_name = self.stats_battle_status(battle_status)
         items = self.stats_get_items(get_items)
-        data = [[timestamp, battle_status_timestamp, enemy_name, item.name, item.amount] for item in items]
-        return data
+        return [[timestamp, battle_status_timestamp, enemy_name, item.name, item.amount] for item in items]
 
     def generate_data(self):
         """

@@ -40,14 +40,12 @@ class CampaignBase(CampaignBase_):
         # E1-1 ~ E1-2
         sim, button = TEMPLATE_EVENT_20230817_STORY_E1.match_result(image)
         if sim > 0.85:
-            button = button.move(area[:2])
-            return button
+            return button.move(area[:2])
 
         # E21-1 ~ E2-7
         sim, button = TEMPLATE_EVENT_20230817_STORY_E2.match_result(image)
         if sim > 0.85:
-            button = button.move(area[:2])
-            return button
+            return button.move(area[:2])
 
         return None
 

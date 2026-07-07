@@ -40,8 +40,7 @@ class ImageExtractor:
 
         ext = ".png"
         file = f"{self.name}.{genre}{ext}" if genre else f"{self.name}{ext}"
-        file = os.path.join(AzurLaneConfig.ASSETS_FOLDER, server, self.module, file).replace("\\", "/")
-        return file
+        return os.path.join(AzurLaneConfig.ASSETS_FOLDER, server, self.module, file).replace("\\", "/")
 
     def extract(self, file):
         if os.path.splitext(file)[1] == ".gif":
@@ -176,8 +175,7 @@ class ModuleExtractor:
             imports.append("from module.base.button import Button")
         if any("Template(" in row for row in exp):
             imports.append("from module.base.template import Template")
-        exp = [*imports, "", *HEADER_EXP, *exp]
-        return exp
+        return [*imports, "", *HEADER_EXP, *exp]
 
     def write(self):
         folder = os.path.join(MODULE_FOLDER, self.name)
