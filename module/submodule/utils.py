@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 MOD_DICT = {}
 MOD_FUNC_DICT = {}
@@ -46,8 +47,11 @@ def get_mod_filepath(name):
 def list_mod_template():
     out = []
     for file in os.listdir("./config"):
-        name, extension = os.path.splitext(file)
-        config_name, mod_name = os.path.splitext(name)
+        path = Path(file)
+        name = path.stem
+        extension = path.suffix
+        config_name = Path(name).stem
+        mod_name = Path(name).suffix
         mod_name = mod_name[1:]
         if config_name == "template" and extension == ".json" and mod_name in MOD_DICT:
             out.append(f"{config_name}-{mod_name}")
@@ -59,8 +63,11 @@ def list_mod_instance():
     MOD_CONFIG_DICT.clear()
     out = []
     for file in os.listdir("./config"):
-        name, extension = os.path.splitext(file)
-        config_name, mod_name = os.path.splitext(name)
+        path = Path(file)
+        name = path.stem
+        extension = path.suffix
+        config_name = Path(name).stem
+        mod_name = Path(name).suffix
         mod_name = mod_name[1:]
         if config_name != "template" and extension == ".json" and mod_name in MOD_DICT:
             out.append(config_name)

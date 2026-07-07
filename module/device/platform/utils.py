@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -47,9 +48,7 @@ def iter_folder(folder, is_dir=False, ext=None):
             if os.path.isdir(sub):
                 yield sub.replace("\\\\", "/").replace("\\", "/")
         elif ext is not None:
-            if not os.path.isdir(sub):
-                _, extension = os.path.splitext(file)
-                if extension == ext:
-                    yield os.path.join(folder, file).replace("\\\\", "/").replace("\\", "/")
+            if not os.path.isdir(sub) and Path(file).suffix == ext:
+                yield os.path.join(folder, file).replace("\\\\", "/").replace("\\", "/")
         else:
             yield os.path.join(folder, file).replace("\\\\", "/").replace("\\", "/")

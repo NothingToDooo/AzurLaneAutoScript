@@ -3,6 +3,7 @@ import os
 import random
 import string
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import yaml
 from yaml.representer import SafeRepresenter
@@ -137,10 +138,8 @@ def iter_folder(folder, is_dir=False, ext=None):
             if os.path.isdir(sub):
                 yield sub.replace("\\\\", "/").replace("\\", "/")
         elif ext is not None:
-            if not os.path.isdir(sub):
-                _, extension = os.path.splitext(file)
-                if extension == ext:
-                    yield os.path.join(folder, file).replace("\\\\", "/").replace("\\", "/")
+            if not os.path.isdir(sub) and Path(file).suffix == ext:
+                yield os.path.join(folder, file).replace("\\\\", "/").replace("\\", "/")
         else:
             yield os.path.join(folder, file).replace("\\\\", "/").replace("\\", "/")
 
@@ -152,8 +151,9 @@ def alas_template():
     """
     out = []
     for file in os.listdir("./config"):
-        name, extension = os.path.splitext(file)
-        if name == "template" and extension == ".json":
+        path = Path(file)
+        name = path.stem
+        if name == "template" and path.suffix == ".json":
             out.append(f"{name}-alas")
 
     out.extend(list_mod_template())
@@ -168,8 +168,10 @@ def alas_instance():
     """
     out = []
     for file in os.listdir("./config"):
-        name, extension = os.path.splitext(file)
-        _config_name, mod_name = os.path.splitext(name)
+        path = Path(file)
+        name = path.stem
+        extension = path.suffix
+        mod_name = Path(name).suffix
         mod_name = mod_name[1:]
         if name != "template" and extension == ".json" and mod_name == "":
             out.append(name)

@@ -1,5 +1,5 @@
-import os
 import traceback
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -78,13 +78,13 @@ class Button(Resource):
         if self.raw_name:
             return self.raw_name
         if self.file:
-            return os.path.splitext(os.path.split(self.file)[1])[0]
+            return Path(self.file).stem
         return "BUTTON"
 
     @cached_property
     def is_gif(self):
         if self.file:
-            return os.path.splitext(self.file)[1] == ".gif"
+            return Path(self.file).suffix == ".gif"
         return False
 
     def __str__(self):

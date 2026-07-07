@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import cv2
@@ -38,7 +37,7 @@ class Template(Resource):
 
     @cached_property
     def is_gif(self):
-        return os.path.splitext(self.file)[1] == ".gif"
+        return Path(self.file).suffix == ".gif"
 
     @property
     def image(self):

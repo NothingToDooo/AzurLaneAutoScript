@@ -1,5 +1,6 @@
 import os
 import re
+from pathlib import Path
 
 from module.base.timer import Timer
 from module.base.utils import color_bar_percentage
@@ -41,9 +42,10 @@ def map_files(event):
 
     files = []
     for file in os.listdir(folder):
-        name, ext = os.path.splitext(file)
-        if ext != ".py":
+        path = Path(file)
+        if path.suffix != ".py":
             continue
+        name = path.stem
         if name == "campaign_base":
             continue
         files.append(name)

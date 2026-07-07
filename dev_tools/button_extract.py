@@ -26,8 +26,10 @@ class ImageExtractor:
             module(str):
             file(str): xxx.png or xxx.gif
         """
+        path = Path(file)
         self.module = module
-        self.name, self.ext = os.path.splitext(file)
+        self.name = path.stem
+        self.ext = path.suffix
         self.area, self.color, self.button, self.file = {}, {}, {}, {}
         for server in VALID_SERVER:
             self.load(server)
@@ -44,7 +46,7 @@ class ImageExtractor:
         return os.path.join(AzurLaneConfig.ASSETS_FOLDER, server, self.module, file).replace("\\", "/")
 
     def extract(self, file):
-        if os.path.splitext(file)[1] == ".gif":
+        if Path(file).suffix == ".gif":
             # In a gif Button, use the first image.
             bbox = None
             mean = None
@@ -144,9 +146,9 @@ class ModuleExtractor:
 
     @staticmethod
     def split(file):
-        name, ext = os.path.splitext(file)
-        name, sub = os.path.splitext(name)
-        return name, sub, ext
+        path = Path(file)
+        name = Path(path.stem)
+        return name.stem, name.suffix, path.suffix
 
     def is_base_image(self, file):
         _, sub, _ = self.split(file)

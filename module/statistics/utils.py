@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import cv2
 
@@ -30,9 +31,9 @@ def load_folder(folder, ext=".png"):
 
     out = {}
     for file in os.listdir(folder):
-        name, extension = os.path.splitext(file)
-        if extension == ext:
-            out[name] = os.path.join(folder, file)
+        path = Path(file)
+        if path.suffix == ext:
+            out[path.stem] = os.path.join(folder, file)
 
     return out
 
