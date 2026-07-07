@@ -323,7 +323,7 @@ def show():
     logger.hr("hr3", 3)
     logger.info(r"Brace { [ ( ) ] }")
     logger.info(r"True, False, None")
-    logger.info(r"E:/path\\to/alas/alas.exe, /root/alas/, ./relative/path/log.txt")
+    logger.info(r"F:/alas/gui.py, F:/alas/alas.py, ./relative/path/log.txt")
     # Line before exception
     raise LoggerDemoError("Exception")
     # Line below exception

@@ -187,7 +187,6 @@ class AlasGUI(Frame):
                 1：运行中。
                 2：未运行。
                 3：警告，异常停止。
-                4：更新时停止。
                 0：隐藏。
                 -1：状态未变化。
         """
@@ -201,8 +200,6 @@ class AlasGUI(Frame):
             put_loading_text(t("Gui.Status.Inactive"), color="secondary", fill=True)
         elif state == 3:
             put_loading_text(t("Gui.Status.Warning"), shape="grow", color="warning")
-        elif state == 4:
-            put_loading_text(t("Gui.Status.Updating"), shape="grow", color="success")
 
     @classmethod
     def set_theme(cls, theme="default") -> None:

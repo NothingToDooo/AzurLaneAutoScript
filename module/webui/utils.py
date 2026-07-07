@@ -16,7 +16,6 @@ from pywebio.input import PASSWORD
 from pywebio.input import input as pywebio_input
 from pywebio.output import PopupSize, popup, put_html, toast
 from pywebio.session import eval_js, register_thread, run_js
-from pywebio.session import info as session_info
 from rich.console import Console
 from rich.terminal_theme import TerminalTheme
 
@@ -483,9 +482,7 @@ def get_next_time(t: datetime.time):
 def on_task_exception(self):
     del self
     logger.exception("An internal error occurred in the application")
-    toast_msg = (
-        "应用发生内部错误" if "zh" in session_info.user_language else "An internal error occurred in the application"
-    )
+    toast_msg = "应用发生内部错误"
 
     e_type, e_value, e_tb = sys.exc_info()
     lines = traceback.format_exception(e_type, e_value, e_tb)
