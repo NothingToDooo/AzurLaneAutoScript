@@ -1,4 +1,3 @@
-import os
 import re
 from pathlib import Path
 
@@ -37,14 +36,14 @@ class LuaLoader:
         for alias_list in self.server_alias:
             if server in alias_list:
                 for alias in alias_list:
-                    folder = os.path.join(self.folder, alias)
-                    if Path(folder).is_dir():
+                    folder = Path(self.folder) / alias
+                    if folder.is_dir():
                         return alias
 
         return server
 
     def filepath(self, path):
-        return os.path.join(self.folder, self.server, path)
+        return (Path(self.folder) / self.server / path).as_posix()
 
     def _find_matching_brace(self, text, start_index):
         depth = 0

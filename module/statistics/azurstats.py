@@ -1,6 +1,5 @@
 import io
 import json
-import os
 import threading
 import time
 from pathlib import Path
@@ -173,10 +172,10 @@ class AzurStats:
             bool: If success
         """
         try:
-            folder = os.path.join(str(self.config.DropRecord_SaveFolder), genre)
+            folder = Path(str(self.config.DropRecord_SaveFolder)) / genre
             Path(folder).mkdir(parents=True, exist_ok=True)
-            file = os.path.join(folder, filename)
-            save_image(image, file)
+            file = folder / filename
+            save_image(image, str(file))
             logger.info(f"Image save success, file: {file}")
             return True
         except Exception as e:

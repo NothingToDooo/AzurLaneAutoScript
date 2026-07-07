@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import cv2
@@ -61,7 +60,7 @@ class RelativeRecord:
         ]
         self.images = np.array(self.images)
         self.images_amount = len(self.images)
-        self.folder = os.path.join(FOLDER, f"{NAME}_gif")
+        self.folder = (Path(FOLDER) / f"{NAME}_gif").as_posix()
         if not Path(self.folder).exists():
             Path(self.folder).mkdir()
 
@@ -156,7 +155,7 @@ class RelativeRecord:
         for count, sim, templates in zip(sim_dict.keys(), sim_dict.values(), template_dict.values(), strict=True):
             sim = str(int((1 - sim) * 1000000)).rjust(6, "0")
             name = f"{count}_{sim}_{'-'.join([str(x) for x in size])}"
-            imageio.mimsave(os.path.join(self.folder, f"{name}.gif"), templates, fps=3)
+            imageio.mimsave(Path(self.folder) / f"{name}.gif", templates, fps=3)
         print(f"{size} done")
 
 

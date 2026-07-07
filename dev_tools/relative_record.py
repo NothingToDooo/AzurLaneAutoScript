@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import numpy as np
@@ -57,9 +56,9 @@ NAME = "Deutschland"
 NODE = "D5"
 
 if __name__ == "__main__":
-    for folder in [FOLDER, os.path.join(FOLDER, NAME)]:
-        if not Path(folder).exists():
-            Path(folder).mkdir()
+    for folder in [Path(FOLDER), Path(FOLDER) / NAME]:
+        if not folder.exists():
+            folder.mkdir()
 
     cfg = AzurLaneConfig(CONFIG).merge(Config())
     al = ModuleBase(cfg)
@@ -81,6 +80,6 @@ if __name__ == "__main__":
         grid.image = np.array(image)
         image = rgb2gray(grid.relative_crop((-0.5, -1, 0.5, 0), shape=(60, 60)))
         image = Image.fromarray(image, mode="L")
-        image.save(os.path.join(FOLDER, NAME, f"{n}.png"))
+        image.save(Path(FOLDER) / NAME / f"{n}.png")
 
     print("relative_record done")

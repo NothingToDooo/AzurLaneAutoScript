@@ -1,4 +1,3 @@
-import os
 import shutil
 from pathlib import Path
 
@@ -25,12 +24,12 @@ class DropStatistics(BattleStatusStatistics, GetItemsStatistics):
             folder (str): Such as <your_drop_screenshot_folder>/campaign_7_2
         """
         self.folder = folder
-        self.template_folder = os.path.join(self.folder, "item_template")
+        self.template_folder = (Path(self.folder) / "item_template").as_posix()
         if not Path(self.template_folder).exists():
             shutil.copytree("./assets/stats_basic", self.template_folder)
         self.load_template_folder(self.template_folder)
-        self.battle_status = load_folder(os.path.join(folder, "status"))
-        self.get_items = load_folder(os.path.join(folder, "get_items"))
+        self.battle_status = load_folder(Path(folder) / "status")
+        self.get_items = load_folder(Path(folder) / "get_items")
         self.battle_status_timestamp = np.array([int(f) for f in self.battle_status])
 
     def _items_to_status(self, get_items):

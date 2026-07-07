@@ -1,5 +1,4 @@
 import csv
-import os
 import shutil
 from pathlib import Path
 
@@ -38,15 +37,15 @@ class DropStatistics:
 
     @property
     def template_folder(self):
-        return os.path.join(DropStatistics.DROP_FOLDER, DropStatistics.TEMPLATE_FOLDER)
+        return (Path(DropStatistics.DROP_FOLDER) / DropStatistics.TEMPLATE_FOLDER).as_posix()
 
     @property
     def csv_file(self):
-        return os.path.join(DropStatistics.DROP_FOLDER, DropStatistics.CSV_FILE)
+        return (Path(DropStatistics.DROP_FOLDER) / DropStatistics.CSV_FILE).as_posix()
 
     @staticmethod
     def drop_folder(campaign):
-        return os.path.join(DropStatistics.DROP_FOLDER, campaign)
+        return (Path(DropStatistics.DROP_FOLDER) / campaign).as_posix()
 
     @cached_property
     def csv_overwrite_check(self):

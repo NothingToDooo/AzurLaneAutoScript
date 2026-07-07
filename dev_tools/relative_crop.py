@@ -1,4 +1,3 @@
-import os
 import time
 from pathlib import Path
 
@@ -43,5 +42,5 @@ for grid in grids:
     piece = rgb2gray(grid.relative_crop((-0.5, -1, 0.5, 0), shape=(60, 60)))
 
     file = f"{int(time.time())}_{grid.location[0]}_{grid.location[1]}.png"
-    file = os.path.join(folder, file)
+    file = Path(folder) / file
     Image.fromarray(piece).save(file)

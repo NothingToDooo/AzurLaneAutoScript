@@ -1,4 +1,3 @@
-import os
 import re
 import typing as t
 from dataclasses import dataclass
@@ -194,7 +193,7 @@ class EmulatorBase:
     def abspath(self, path, folder=None):
         if folder is None:
             folder = self.dir
-        return abspath(os.path.join(folder, path))
+        return abspath(Path(folder) / path)
 
     @classmethod
     def is_emulator(cls, path: str) -> bool:

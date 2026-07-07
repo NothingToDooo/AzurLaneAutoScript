@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import cv2
@@ -60,4 +59,4 @@ if __name__ == "__main__":
         print(f"New template: {n}")
         templates.append(crop(image, area=area_offset(AREA, np.subtract(loca, AREA[:2]))))
 
-    imageio.mimsave(os.path.join(FOLDER, f"TEMPLATE_SIREN_{NAME}.gif"), templates, fps=3)
+    imageio.mimsave(Path(FOLDER) / f"TEMPLATE_SIREN_{NAME}.gif", templates, fps=3)

@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import imageio
@@ -37,13 +36,13 @@ class ImageExtractor:
     def get_file(self, genre="", server="cn"):
         for ext in [".png", ".gif"]:
             file = f"{self.name}.{genre}{ext}" if genre else f"{self.name}{ext}"
-            file = os.path.join(AzurLaneConfig.ASSETS_FOLDER, server, self.module, file).replace("\\", "/")
+            file = (Path(AzurLaneConfig.ASSETS_FOLDER) / server / self.module / file).as_posix()
             if Path(file).exists():
                 return file
 
         ext = ".png"
         file = f"{self.name}.{genre}{ext}" if genre else f"{self.name}{ext}"
-        return os.path.join(AzurLaneConfig.ASSETS_FOLDER, server, self.module, file).replace("\\", "/")
+        return (Path(AzurLaneConfig.ASSETS_FOLDER) / server / self.module / file).as_posix()
 
     def extract(self, file):
         if Path(file).suffix == ".gif":
@@ -142,7 +141,7 @@ class TemplateExtractor(ImageExtractor):
 class ModuleExtractor:
     def __init__(self, name):
         self.name = name
-        self.folder = os.path.join(AzurLaneConfig.ASSETS_FOLDER, "cn", name)
+        self.folder = (Path(AzurLaneConfig.ASSETS_FOLDER) / "cn" / name).as_posix()
 
     @staticmethod
     def split(file):
@@ -182,10 +181,10 @@ class ModuleExtractor:
         return [*imports, "", *HEADER_EXP, *exp]
 
     def write(self):
-        folder = os.path.join(MODULE_FOLDER, self.name)
-        if not Path(folder).exists():
-            Path(folder).mkdir()
-        with open(os.path.join(folder, BUTTON_FILE), "w", newline="") as f:
+        folder = Path(MODULE_FOLDER) / self.name
+        if not folder.exists():
+            folder.mkdir()
+        with open(folder / BUTTON_FILE, "w", newline="") as f:
             f.writelines(f"{text}\n" for text in self.expression)
 
 

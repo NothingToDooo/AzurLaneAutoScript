@@ -1,5 +1,4 @@
 import json
-import os
 import random
 import string
 from datetime import UTC, datetime, timedelta
@@ -44,7 +43,7 @@ SafeRepresenter.add_representer(str, str_presenter)
 def filepath_args(filename="args", mod_name="alas"):
     if mod_name == "alas":
         return f"./module/config/argument/{filename}.json"
-    return os.path.join(get_mod_filepath(mod_name), f"./module/config/argument/{filename}.json")
+    return (Path(get_mod_filepath(mod_name)) / "module/config/argument" / f"{filename}.json").as_posix()
 
 
 def filepath_argument(filename):
@@ -53,14 +52,14 @@ def filepath_argument(filename):
 
 def filepath_i18n(lang, mod_name="alas"):
     if mod_name == "alas":
-        return os.path.join("./module/config/i18n", f"{lang}.json")
-    return os.path.join(get_mod_filepath(mod_name), "./module/config/i18n", f"{lang}.json")
+        return (Path("./module/config/i18n") / f"{lang}.json").as_posix()
+    return (Path(get_mod_filepath(mod_name)) / "module/config/i18n" / f"{lang}.json").as_posix()
 
 
 def filepath_config(filename, mod_name="alas"):
     if mod_name == "alas":
-        return os.path.join("./config", f"{filename}.json")
-    return os.path.join("./config", f"{filename}.{mod_name}.json")
+        return (Path("./config") / f"{filename}.json").as_posix()
+    return (Path("./config") / f"{filename}.{mod_name}.json").as_posix()
 
 
 def filepath_code():

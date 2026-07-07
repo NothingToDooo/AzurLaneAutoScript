@@ -1,4 +1,3 @@
-import os
 import time
 from collections import deque
 from datetime import datetime
@@ -126,12 +125,12 @@ class Screenshot(Adb, NemuIpc):
             file = f"{int(now * 1000)}.{fmt}"
 
             folder = self.config.SCREEN_SHOT_SAVE_FOLDER_BASE if to_base_folder else self.config.SCREEN_SHOT_SAVE_FOLDER
-            folder = os.path.join(folder, genre)
-            if not Path(folder).exists():
-                Path(folder).mkdir()
+            folder = Path(folder) / genre
+            if not folder.exists():
+                folder.mkdir()
 
-            file = os.path.join(folder, file)
-            self.image_save(file)
+            file = folder / file
+            self.image_save(str(file))
             self._last_save_time[genre] = now
             return True
         self._last_save_time[genre] = now

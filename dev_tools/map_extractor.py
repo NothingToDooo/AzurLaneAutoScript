@@ -1,4 +1,3 @@
-import os
 import re
 from contextlib import suppress
 from pathlib import Path
@@ -613,7 +612,7 @@ class MapData:
         return lines
 
     def write(self, path):
-        file = os.path.join(path, self.map_file_name())
+        file = Path(path) / self.map_file_name()
         has_modified_campaign_base = Path(path, "campaign_base.py").exists()
         if has_modified_campaign_base:
             print("Using existing campaign_base.py")

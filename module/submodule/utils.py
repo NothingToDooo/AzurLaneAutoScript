@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 MOD_DICT = {}
@@ -41,7 +40,7 @@ def get_mod_filepath(name):
     dir_name = get_mod_dir(name)
     if dir_name is None:
         return ""
-    return os.path.join("./submodule", dir_name)
+    return (Path("./submodule") / dir_name).as_posix()
 
 
 def list_mod_template():

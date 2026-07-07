@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -281,7 +281,7 @@ class ItemGrid:
 
         if folder is not None:
             for name, im in new.items():
-                save_image(im, os.path.join(folder, f"{name}.png"))
+                save_image(im, str(Path(folder) / f"{name}.png"))
 
         return new
 
