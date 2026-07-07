@@ -106,7 +106,7 @@ class Device(Screenshot, Control, AppControl):
         """
         logger.info("run_simple_screenshot_benchmark")
         # 先确认分辨率，再固定使用 nemu_ipc。
-        self.resolution_check_uiautomator2()
+        self.resolution_check()
         with self.config.multi_set():
             self.config.Emulator_ScreenshotMethod = "nemu_ipc"
 

@@ -185,6 +185,39 @@ class Connection(ConnectionAttr):
         """
         return self.adb_shell(["getprop", name]).strip()
 
+    @retry
+    def resolution_adb(self, cal_rotation=True) -> tuple[int, int]:
+        """
+        使用 ADB 获取设备分辨率。
+        """
+        output = self.adb_shell(["wm", "size"])
+        result = re.search(r"Physical size:\s*(?P<width>\d+)x(?P<height>\d+)", output)
+        if result is None:
+            logger.error(output)
+            logger.critical("Unable to get emulator resolution from `wm size`")
+            raise RequestHumanTakeover
+
+        width = int(result.group("width"))
+        height = int(result.group("height"))
+        if cal_rotation:
+            rotation = self.get_orientation()
+            if (width > height) != (rotation % 2 == 1):
+                width, height = height, width
+        return width, height
+
+    def resolution_check(self) -> tuple[int, int]:
+        """
+        检查模拟器分辨率是否为 1280x720。
+        """
+        width, height = self.resolution_adb()
+        logger.attr("Screen_size", f"{width}x{height}")
+        if (width, height) in {(1280, 720), (720, 1280)}:
+            return (width, height)
+
+        logger.critical(f"Resolution not supported: {width}x{height}")
+        logger.critical("Please set emulator resolution to 1280x720")
+        raise RequestHumanTakeover
+
     @cached_property
     @retry
     def cpu_abi(self) -> str:
