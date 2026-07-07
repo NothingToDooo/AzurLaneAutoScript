@@ -96,12 +96,10 @@ class CampaignBase(CampaignBase_):
 
     def clear_map_items(self, grids):
         """
+        按距离顺序清理指定地图道具格。
 
-        Args:
-            grids (GridInfo, list[GridInfo]): Grid object or a list of them
-
-        Returns:
-
+        参数：
+            grids (GridInfo, list[GridInfo])：单个格子或格子列表。
         """
         if not isinstance(grids, list):
             grids = [grids]

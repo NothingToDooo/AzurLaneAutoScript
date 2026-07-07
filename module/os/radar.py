@@ -200,11 +200,10 @@ class Radar:
 
     def predict(self, image):
         """
-        Args:
-            image:
+        根据雷达图像更新格子预测结果。
 
-        Returns:
-
+        参数：
+            image：雷达图像。
         """
         image = MASK_RADAR.apply(image)
         for grid in self:

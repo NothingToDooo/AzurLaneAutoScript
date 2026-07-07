@@ -41,11 +41,13 @@ class OpsiStronghold(OSMap):
 
     def run_stronghold_one_fleet(self, fleet):
         """
-        Args
-            fleet (BossFleet):
+        使用指定舰队清理一次要塞。
 
-        Returns:
-            bool: If all cleared.
+        参数：
+            fleet (BossFleet)：用于清理要塞的舰队。
+
+        返回：
+            bool：是否全部清理完成。
         """
         self.config.override(OpsiGeneral_DoRandomMapEvent=False, HOMO_EDGE_DETECT=False, STORY_OPTION=0)
         # Try 3 times, because fleet may stuck in fog.

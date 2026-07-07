@@ -78,12 +78,11 @@ class Ocr:
 
     def ocr(self, image, direct_ocr=False):
         """
-        Args:
-            image (np.ndarray, list[np.ndarray]):
-            direct_ocr (bool): True to skip preprocess.
+        执行 OCR，单区域返回字符串，多区域返回字符串列表。
 
-        Returns:
-
+        参数：
+            image (np.ndarray, list[np.ndarray])：待识别图像。
+            direct_ocr (bool)：是否跳过预处理。
         """
         start_time = time.time()
 

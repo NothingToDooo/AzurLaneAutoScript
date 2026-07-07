@@ -174,8 +174,7 @@ class SelectedGrids:
 
     def first_or_none(self):
         """
-        Returns:
-
+        返回第一个格子；没有格子时返回 None。
         """
         try:
             return self.grids[0]

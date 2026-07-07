@@ -24,10 +24,10 @@ class CampaignBase(CampaignBase_):
 
     def get_story_button(self):
         """
-        This method costs about 26ms.
+        获取活动剧情按钮，识别耗时约 26ms。
 
-        Returns:
-            Button:
+        返回：
+            Button | None：检测到的剧情按钮。
         """
         # Story before A1, E0-1 ~ E0-3
         if self.appear(EVENT_20230817_STORY, offset=(20, 100)):

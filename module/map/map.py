@@ -331,11 +331,11 @@ class Map(Fleet):
         return False
 
     def clear_boss(self):
-        """This method is deprecated, although it works well in simple map.
-        In a complex map, brute_clear_boss is recommended.
+        """
+        已弃用的简单地图 Boss 清理方法；复杂地图应使用 brute_clear_boss。
 
-        Returns:
-            bool:
+        返回：
+            bool：是否清理成功。
         """
         grids = self.map.select(is_boss=True, is_accessible=True)
         grids = grids.add(self.map.select(may_boss=True, is_caught_by_siren=True))
@@ -357,12 +357,11 @@ class Map(Fleet):
         return self.clear_potential_boss()
 
     def capture_clear_boss(self):
-        """This method is deprecated, although it works well in simple map.
-        In a complex map, brute_clear_boss is recommended.
-        Note: Lazy method to handle with grand capture map
+        """
+        已弃用的简单地图 Boss 清理方法，用于旧的大世界占领地图。
 
-        Returns:
-            bool:
+        返回：
+            bool：是否清理成功。
         """
         grids = self.map.select(is_boss=True, is_accessible=True)
         grids = grids.add(self.map.select(may_boss=True, is_caught_by_siren=True))

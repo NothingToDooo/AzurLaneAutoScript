@@ -150,9 +150,9 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
     def os_map_goto_globe(self, *args, **kwargs):
         """
-        Wraps os_map_goto_globe()
-        When zone has uncollected exploration rewards preventing exit,
-        run auto search and goto globe again
+        包装 os_map_goto_globe，处理未领取探索奖励导致的退出失败。
+
+        区域内存在未领取探索奖励时，先执行自动搜索，再重新进入大地图。
         """
         for _ in range(3):
             try:

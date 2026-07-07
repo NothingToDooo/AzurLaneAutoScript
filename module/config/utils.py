@@ -182,14 +182,14 @@ def alas_instance():
 
 def parse_value(value, data):
     """
-    Convert a string to float, int, datetime, if possible.
+    尽量把配置字符串转换成 bool、int、float 或 datetime。
 
-    Args:
-        value (str):
-        data (dict):
+    参数：
+        value (str)：待解析的值。
+        data (dict)：配置项定义。
 
-    Returns:
-
+    返回：
+        object：解析后的配置值。
     """
     if "option" in data and value not in data["option"]:
         return data["value"]

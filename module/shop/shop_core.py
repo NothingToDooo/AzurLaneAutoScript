@@ -52,11 +52,10 @@ class CoreShop_250814(ShopClerk, ShopStatus):
 
     def shop_currency(self):
         """
-        Ocr shop core currency
-        Then return core count
+        识别核心商店货币数量。
 
-        Returns
-            int: core amount
+        返回：
+            int：当前核心数量。
         """
         self._currency = self.status_get_core()
         logger.info(f"Core: {self._currency}")

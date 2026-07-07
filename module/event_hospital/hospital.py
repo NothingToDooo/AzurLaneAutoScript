@@ -44,12 +44,14 @@ class Hospital(HospitalClue, HospitalCombat):
         return self.match_template_color(hospital_assets.HOSIPITAL_CLUE_CHECK, offset=(30, 30), interval=interval)
 
     def daily_reward_receive(self):
-        """ "
-        Returns:
-            bool: If received
+        """
+        领取医院每日奖励。
 
-        Pages:
-            in: page_hospital
+        返回：
+            bool：是否领取成功。
+
+        页面：
+            in：page_hospital。
         """
         if self.daily_red_dot_appear():
             logger.info("Daily red dot appear")

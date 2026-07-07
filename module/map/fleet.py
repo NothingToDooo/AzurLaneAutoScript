@@ -838,10 +838,10 @@ class Fleet(Camera, AmbushHandler):
 
     def map_init(self, map_):
         """
-        This method should be called after entering a map and before doing any operations.
+        进入地图后、执行任何地图操作前调用。
 
-        Args:
-            map_ (CampaignMap):
+        参数：
+            map_ (CampaignMap)：当前战役地图。
         """
         logger.hr("Map init")
         self.map_data_init(map_)

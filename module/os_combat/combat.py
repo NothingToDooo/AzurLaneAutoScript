@@ -150,13 +150,10 @@ class Combat(Combat_, MapEventHandler):
 
     def combat(self, *args, save_get_items=False, **kwargs):
         """
-        This handle continuous combat in operation siren.
+        处理大世界中的连续战斗。
 
-        In siren scanning device, there are 2 ambush enemies with no interval.
-        Fleet goto siren scanning device, attack one enemy, skip TB, attack another.
-        Function `combat` has to confirm that combat was finished, and is_in_map.
-        When handling siren scanning device, it will stuck in the second combat.
-        This function inherits it and detect the second combat.
+        塞壬扫描装置可能连续触发两场伏击，中间没有间隔。这里在继承普通 combat
+        流程的基础上额外识别第二场战斗，避免停在战斗确认阶段。
         """
         for count in range(3):
             if count >= 2:

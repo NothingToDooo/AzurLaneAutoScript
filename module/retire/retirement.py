@@ -614,8 +614,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
 
     def keep_one_common_cv(self):
         """
-        Returns:
-
+        保留一个普通航母用于任务需求。
         """
         logger.info("Keep one common CV")
         button = self.retirement_get_common_rarity_cv()
