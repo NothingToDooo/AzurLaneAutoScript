@@ -68,7 +68,7 @@ select = [
     "F",
     "I",
     "ICN",
-    "NPY002",
+    "NPY",
     "PLE",
     "PERF",
     "PIE",
