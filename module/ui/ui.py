@@ -109,23 +109,21 @@ class UI(InfoHandler):
             else:
                 self.device.screenshot()
 
-            if self.ui_process_check_button(check_button, offset=offset):
-                if confirm_timer.reached():
-                    break
-            else:
+            if not self.ui_process_check_button(check_button, offset=offset):
                 confirm_timer.reset()
+            elif confirm_timer.reached():
+                break
 
-            if click_timer.reached():
-                if (isinstance(appear_button, Button) and self.appear(appear_button, offset=offset)) or (
-                    callable(appear_button) and appear_button()
-                ):
-                    self.device.click(click_button)
-                    click_timer.reset()
-                    continue
+            if click_timer.reached() and (
+                (isinstance(appear_button, Button) and self.appear(appear_button, offset=offset))
+                or (callable(appear_button) and appear_button())
+            ):
+                self.device.click(click_button)
+                click_timer.reset()
+                continue
 
-            if additional is not None:
-                if additional():
-                    continue
+            if additional is not None and additional():
+                continue
 
     def ui_process_check_button(self, check_button, offset=(30, 30)):
         """
@@ -359,13 +357,13 @@ class UI(InfoHandler):
 
     def ui_page_main_popups(self, get_ship=True):
         """
-        Handle popups appear at page_main, page_reward
+        处理 page_main、page_reward 上出现的弹窗。
         """
-        # Guild popup
+        # 公会弹窗。
         if self.handle_guild_popup_cancel():
             return True
 
-        # Daily reset
+        # 每日重置。
         if self.appear_then_click(LOGIN_ANNOUNCE, offset=(30, 30), interval=3):
             return True
         if self.appear_then_click(LOGIN_ANNOUNCE_2, offset=(30, 30), interval=3):
@@ -374,9 +372,8 @@ class UI(InfoHandler):
             return True
         if self.appear_then_click(GET_ITEMS_2, offset=True, interval=3):
             return True
-        if get_ship:
-            if self.appear_then_click(GET_SHIP, interval=5):
-                return True
+        if get_ship and self.appear_then_click(GET_SHIP, interval=5):
+            return True
         if self.appear_then_click(LOGIN_RETURN_SIGN, offset=(30, 30), interval=3):
             return True
         if self.appear(ui_assets.EVENT_LIST_CHECK, offset=(30, 30), interval=5):
