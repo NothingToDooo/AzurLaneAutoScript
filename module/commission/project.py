@@ -73,7 +73,7 @@ def image_hash(image):
 
     import hashlib
 
-    return hashlib.md5(image.tobytes()).hexdigest()
+    return hashlib.md5(image.tobytes(), usedforsecurity=False).hexdigest()
 
 
 class Commission:
