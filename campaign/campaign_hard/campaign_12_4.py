@@ -151,9 +151,11 @@ class Campaign(CampaignBase):
     def battle_7(self):
         self.pick_up_ammo()
         boss = self.map.select(is_boss=True)
-        if boss:
-            if not self.check_accessibility(boss[0], fleet="boss"):
-                if self.clear_roadblocks([road_main]):
-                    return True
+        if (
+            boss
+            and not self.check_accessibility(boss[0], fleet="boss")
+            and self.clear_roadblocks([road_main])
+        ):
+            return True
 
         return self.fleet_boss.clear_boss()
