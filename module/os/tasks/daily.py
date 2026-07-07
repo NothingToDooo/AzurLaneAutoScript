@@ -6,15 +6,15 @@ from module.os.map import OSMap
 class OpsiDaily(OSMap):
     def os_port_mission(self):
         """
-        Visit all ports and do the daily mission in it.
+        访问所有港口并完成港口日常任务。
         """
         logger.hr("OS port mission", level=1)
-        ports = ["NY City", "Dakar", "Taranto", "Gibraltar", "Brest", "Liverpool", "Kiel", "St. Petersburg"]
+        ports = [0, 7, 5, 2, 6, 1, 4, 3]
         if runtime_random.chance():
             ports.reverse()
 
-        for port_name in ports:
-            port = self.name_to_zone(port_name)
+        for port_id in ports:
+            port = self.name_to_zone(port_id)
             logger.hr(f"OS port daily in {port}", level=2)
             self.globe_goto(port)
 

@@ -185,10 +185,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
             logger.info("Goto another port then re-enter")
             prev = self.zone
-            if prev == self.name_to_zone("NY City"):
-                other = self.name_to_zone("Liverpool")
-            else:
-                other = self.zone_nearest_azur_port(self.zone)
+            other = self.name_to_zone(1) if prev.zone_id == 0 else self.zone_nearest_azur_port(prev)
             self.globe_goto(other)
             self.globe_goto(prev)
 
