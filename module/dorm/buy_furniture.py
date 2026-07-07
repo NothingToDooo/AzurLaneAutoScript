@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
-from module.base.button import Button
 from module.combat.assets import GET_SHIP
 from module.dorm import assets as dorm_assets
 from module.exercise.assets import EXERCISE_PREPARATION
@@ -8,6 +8,9 @@ from module.logger import logger
 from module.ocr.ocr import Digit
 from module.ui.assets import DORM_CHECK
 from module.ui.ui import UI
+
+if TYPE_CHECKING:
+    from module.base.button import Button
 
 OCR_FURNITURE_COIN = Digit(
     dorm_assets.OCR_DORM_FURNITURE_COIN,

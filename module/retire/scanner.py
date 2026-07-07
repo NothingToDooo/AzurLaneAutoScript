@@ -1,12 +1,11 @@
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import cv2
 import numpy as np
 
 import module.config.server as server
-from module.base.button import ButtonGrid
 from module.base.utils import color_similar, crop, extract_letters, get_color, limit_in
 from module.combat.level import LevelOcr
 from module.logger import logger
@@ -23,6 +22,9 @@ from module.retire.assets import (
     TEMPLATE_IN_EVENT_FLEET,
 )
 from module.retire.dock import CARD_EMOTION_GRIDS, CARD_GRIDS, CARD_LEVEL_GRIDS, CARD_RARITY_GRIDS
+
+if TYPE_CHECKING:
+    from module.base.button import ButtonGrid
 
 
 class EmotionDigit(Digit):

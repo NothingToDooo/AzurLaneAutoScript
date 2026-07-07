@@ -1,6 +1,7 @@
 import argparse
 import multiprocessing
 import pickle
+from typing import TYPE_CHECKING
 
 from module.logger import logger
 from module.webui.setting import State
@@ -193,8 +194,10 @@ def start_ocr_server(port=22268):
     import zerorpc
     import zmq
 
-    from module.ocr.al_ocr import AlOcr
     from module.ocr.models import OcrModel
+
+    if TYPE_CHECKING:
+        from module.ocr.al_ocr import AlOcr
 
     class OCRServer(OcrModel):
         def hello(self):

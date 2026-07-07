@@ -1,11 +1,12 @@
 from typing import TYPE_CHECKING
 
-from module.config.config import AzurLaneConfig
 from module.map_detection.homography import Homography
 from module.map_detection.perspective import Perspective
 
 if TYPE_CHECKING:
     import numpy as np
+
+    from module.config.config import AzurLaneConfig
 
 
 class MapDetector:

@@ -1,11 +1,14 @@
 import copy
+from typing import TYPE_CHECKING
 
-from module.base.base import ModuleBase
 from module.base.button import Button, ButtonGrid
 from module.base.timer import Timer
 from module.config.utils import dict_to_kv
 from module.exception import ScriptError
 from module.logger import logger
+
+if TYPE_CHECKING:
+    from module.base.base import ModuleBase
 
 
 class Setting:

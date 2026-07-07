@@ -22,7 +22,6 @@ from pywebio.session import eval_js, local, run_js
 from module.logger import WEB_THEME, Highlighter, HTMLConsole
 from module.webui.lang import t
 from module.webui.pin import put_checkbox, put_input, put_select, put_textarea
-from module.webui.process_manager import ProcessManager
 from module.webui.setting import State
 from module.webui.utils import (
     DARK_TERMINAL_THEME,
@@ -38,6 +37,7 @@ if TYPE_CHECKING:
     from rich.console import ConsoleRenderable
 
     from module.webui.app import AlasGUI
+    from module.webui.process_manager import ProcessManager
 
 
 class ScrollableCode:

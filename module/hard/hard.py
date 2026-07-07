@@ -1,11 +1,14 @@
 import importlib
+from typing import TYPE_CHECKING
 
-from campaign.campaign_hard.campaign_hard import Campaign
 from module.campaign.run import CampaignRun
 from module.handler.fast_forward import to_map_file_name
 from module.hard import assets as hard_assets
 from module.logger import logger
 from module.ocr.ocr import Digit
+
+if TYPE_CHECKING:
+    from campaign.campaign_hard.campaign_hard import Campaign
 
 OCR_HARD_REMAIN = Digit(hard_assets.OCR_HARD_REMAIN, letter=(123, 227, 66), threshold=128, alphabet="0123")
 

@@ -1,8 +1,8 @@
 import re
 from enum import Enum
+from typing import TYPE_CHECKING
 
 import module.config.server as server
-from module.base.button import Button
 from module.base.timer import Timer
 from module.combat.combat import BATTLE_PREPARATION
 from module.logger import logger
@@ -14,6 +14,9 @@ from module.os_handler.map_event import MapEventHandler
 from module.ui.assets import BACK_ARROW
 from module.ui.page import page_reward
 from module.ui.ui import UI
+
+if TYPE_CHECKING:
+    from module.base.button import Button
 
 
 class MetaState(Enum):

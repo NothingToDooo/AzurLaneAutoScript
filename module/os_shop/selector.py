@@ -1,9 +1,12 @@
 import re
+from typing import TYPE_CHECKING
 
 from module.base.filter import Filter
 from module.config.config_generated import GeneratedConfig
-from module.os_shop.item import OSShopItem as Item
 from module.os_shop.preset import OS_SHOP
+
+if TYPE_CHECKING:
+    from module.os_shop.item import OSShopItem as Item
 
 FILTER_REGEX = re.compile(
     "^(actionpoint|crystallizedheatresistantsteel|developmentmaterial"

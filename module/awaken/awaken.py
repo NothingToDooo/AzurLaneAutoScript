@@ -1,5 +1,6 @@
+from typing import TYPE_CHECKING
+
 from module.awaken import assets as awaken_assets
-from module.base.button import Button
 from module.base.timer import Timer
 from module.exception import ScriptError
 from module.logger import logger
@@ -7,6 +8,9 @@ from module.ocr.ocr import Digit
 from module.retire.dock import DOCK_EMPTY, Dock
 from module.ui.assets import BACK_ARROW
 from module.ui.page import page_dock, page_main
+
+if TYPE_CHECKING:
+    from module.base.button import Button
 
 
 class ShipLevel(Digit):

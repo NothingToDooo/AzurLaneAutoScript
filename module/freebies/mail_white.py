@@ -1,4 +1,5 @@
-from module.base.button import Button
+from typing import TYPE_CHECKING
+
 from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2
@@ -7,6 +8,9 @@ from module.logger import logger
 from module.ui.page import GOTO_MAIN_WHITE, page_mail, page_main, page_main_white
 from module.ui.setting import Setting
 from module.ui.ui import UI
+
+if TYPE_CHECKING:
+    from module.base.button import Button
 
 
 class MailSelectSetting(Setting):

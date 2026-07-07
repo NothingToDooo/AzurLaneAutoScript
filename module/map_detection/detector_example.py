@@ -1,9 +1,9 @@
 from typing import TYPE_CHECKING
 
-from module.config.config import AzurLaneConfig
-
 if TYPE_CHECKING:
     import numpy as np
+
+    from module.config.config import AzurLaneConfig
 
 
 class DetectionBackendExample:

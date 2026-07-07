@@ -3,16 +3,19 @@ import importlib
 import os
 import random
 from contextlib import suppress
+from typing import TYPE_CHECKING
 
-from module.campaign.campaign_base import CampaignBase
 from module.campaign.campaign_event import CampaignEvent
 from module.campaign.campaign_ui import MODE_SWITCH_1
-from module.config.config import AzurLaneConfig
 from module.exception import CampaignEnd, RequestHumanTakeover, ScriptEnd
 from module.handler.fast_forward import map_files, to_map_file_name
 from module.logger import logger
 from module.notify import handle_notify
 from module.ui.page import page_campaign
+
+if TYPE_CHECKING:
+    from module.campaign.campaign_base import CampaignBase
+    from module.config.config import AzurLaneConfig
 
 
 class CampaignRun(CampaignEvent):

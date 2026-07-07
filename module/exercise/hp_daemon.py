@@ -1,9 +1,13 @@
+from typing import TYPE_CHECKING
+
 from module.base.base import ModuleBase
-from module.base.timer import Timer
 from module.base.utils import color_bar_percentage
 from module.combat_ui import assets as combat_ui_assets
 from module.exercise import assets as exercise_assets
 from module.logger import logger
+
+if TYPE_CHECKING:
+    from module.base.timer import Timer
 
 NEW_HP_BAR_PAUSES = (
     combat_ui_assets.PAUSE_New,

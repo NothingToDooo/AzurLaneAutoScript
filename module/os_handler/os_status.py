@@ -1,14 +1,17 @@
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 import module.config.server as server
 from module.base.timer import Timer
-from module.config.config import Function
 from module.config.utils import get_server_next_update
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
 from module.ocr.ocr import Digit
 from module.os_shop.assets import OS_SHOP_CHECK, OS_SHOP_PURPLE_COINS, SHOP_PURPLE_COINS, SHOP_YELLOW_COINS
 from module.ui.ui import UI
+
+if TYPE_CHECKING:
+    from module.config.config import Function
 
 if server.server != "jp":
     OCR_SHOP_YELLOW_COINS = Digit(

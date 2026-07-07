@@ -1,6 +1,9 @@
-from module.map_detection.grid import GridInfo
+from typing import TYPE_CHECKING
 
 from ..campaign_war_archives.campaign_base import CampaignBase as CampaignBase_
+
+if TYPE_CHECKING:
+    from module.map_detection.grid import GridInfo
 
 
 class CampaignBase(CampaignBase_):

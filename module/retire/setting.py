@@ -1,4 +1,5 @@
-from module.base.button import Button
+from typing import TYPE_CHECKING
+
 from module.base.decorator import cached_property
 from module.retire.assets import (
     RETIRE_SETTING_1,
@@ -12,6 +13,9 @@ from module.retire.assets import (
 )
 from module.ui.setting import Setting
 from module.ui.ui import UI
+
+if TYPE_CHECKING:
+    from module.base.button import Button
 
 
 class QuickRetireSetting(Setting):

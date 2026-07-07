@@ -1,16 +1,19 @@
 import ctypes
 import re
 import subprocess
+from typing import TYPE_CHECKING
 
 import psutil
 
 from deploy.Windows.utils import DataProcessInfo
 from module.base.decorator import run_once
 from module.base.timer import Timer
-from module.device.connection import AdbDeviceWithStatus
 from module.device.platform.emulator_windows import Emulator, EmulatorInstance, EmulatorManager
 from module.device.platform.platform_base import PlatformBase
 from module.logger import logger
+
+if TYPE_CHECKING:
+    from module.device.connection import AdbDeviceWithStatus
 
 
 class EmulatorUnknown(Exception):
