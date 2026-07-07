@@ -265,19 +265,8 @@ class GridPredictor:
         return template_assets.TEMPLATE_CAUGHT_BY_SIREN.match(image, similarity=0.6)
 
     def predict_mystery(self):
-        """
-        Returns:
-            bool: True if is mystery.
-        """
-        # cyan question mark
-        if self.relative_rgb_count(area=(-0.3, -2, 0.3, -0.6), color=(148, 255, 247), shape=(20, 50)) > 50:
-            return True
-        # white background
-        # if self.relative_rgb_count(
-        #         area=(-0.7, -1.7, 0.7, -0.3), color=(239, 239, 239), shape=(50, 50)) > 700:
-        #     return True
-
-        return False
+        """返回是否识别到问号神秘点。"""
+        return self.relative_rgb_count(area=(-0.3, -2, 0.3, -0.6), color=(148, 255, 247), shape=(20, 50)) > 50
 
     def predict_current_fleet(self):
         count = self.relative_hsv_count(area=(-0.5, -3.5, 0.5, -2.5), h=(141 - 3, 141 + 10), shape=(50, 50))
@@ -286,10 +275,7 @@ class GridPredictor:
 
         image = self.relative_crop((-0.5, -3.5, 0.5, -2.5), shape=(60, 60))
         image = color_similarity_2d(image, color=(24, 255, 107))
-        if not template_assets.TEMPLATE_FLEET_CURRENT.match(image):
-            return False
-
-        return True
+        return template_assets.TEMPLATE_FLEET_CURRENT.match(image)
 
     def predict_sea(self):
         area = area_pad((48, 48, 48 + 46, 48 + 46), pad=5)

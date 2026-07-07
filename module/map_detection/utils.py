@@ -30,8 +30,7 @@ class Points:
     def __len__(self):
         if self:
             return len(self.points)
-        else:
-            return 0
+        return 0
 
     def __bool__(self):
         return self._bool
@@ -40,12 +39,11 @@ class Points:
         if is_horizontal:
             lines = [[y, np.pi / 2] for y in self.y]
             return Lines(lines, is_horizontal=True)
-        else:
-            x, y = point
-            theta = -np.arctan((self.x - x) / (self.y - y))
-            rho = self.x * np.cos(theta) + self.y * np.sin(theta)
-            lines = np.array([rho, theta]).T
-            return Lines(lines, is_horizontal=False)
+        x, y = point
+        theta = -np.arctan((self.x - x) / (self.y - y))
+        rho = self.x * np.cos(theta) + self.y * np.sin(theta)
+        lines = np.array([rho, theta]).T
+        return Lines(lines, is_horizontal=False)
 
     def mean(self):
         if not self:
@@ -100,8 +98,7 @@ class Lines:
     def __len__(self):
         if self:
             return len(self.lines)
-        else:
-            return 0
+        return 0
 
     def __bool__(self):
         return self._bool
@@ -120,11 +117,10 @@ class Lines:
             return None
         if self.is_horizontal:
             return np.mean(self.lines, axis=0)
-        else:
-            x = np.mean(self.mid)
-            theta = np.mean(self.theta)
-            rho = x * np.cos(theta) + self.MID_Y * np.sin(theta)
-            return np.array((rho, theta))
+        x = np.mean(self.mid)
+        theta = np.mean(self.theta)
+        rho = x * np.cos(theta) + self.MID_Y * np.sin(theta)
+        return np.array((rho, theta))
 
     @property
     def mid(self):
@@ -132,8 +128,7 @@ class Lines:
             return np.array([])
         if self.is_horizontal:
             return self.rho
-        else:
-            return (self.rho - self.MID_Y * self.sin) / self.cos
+        return (self.rho - self.MID_Y * self.sin) / self.cos
 
     def get_x(self, y):
         return (self.rho - y * self.sin) / self.cos
@@ -286,10 +281,9 @@ def trapezoid2area(corner, pad=0):
     """
     if pad > 0:
         return area_pad(corner2inner(corner), pad=pad)
-    elif pad < 0:
+    if pad < 0:
         return area_pad(corner2outer(corner), pad=pad)
-    else:
-        return area_pad(corner2area(corner), pad=pad)
+    return area_pad(corner2area(corner), pad=pad)
 
 
 def points_to_area_generator(points, shape):
@@ -334,15 +328,14 @@ def separate_edges(edges, inner):
     """
     if len(edges) == 0:
         return None, None
-    elif len(edges) == 1:
+    if len(edges) == 1:
         edge = edges[0]
         return (None, edge) if edge > inner else (edge, None)
-    else:
-        lower = [edge for edge in edges if edge < inner]
-        upper = [edge for edge in edges if edge > inner]
-        lower = lower[0] if lower else None
-        upper = upper[-1] if upper else None
-        return lower, upper
+    lower = [edge for edge in edges if edge < inner]
+    upper = [edge for edge in edges if edge > inner]
+    lower = lower[0] if lower else None
+    upper = upper[-1] if upper else None
+    return lower, upper
 
 
 def perspective_transform(points, data):

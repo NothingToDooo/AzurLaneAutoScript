@@ -49,8 +49,7 @@ class View(MapDetector):
     def _image_clear_ui(self, image):
         if self.mode == "os":
             return cv2.copyTo(image, ASSETS.ui_mask_os_in_map)
-        else:
-            return cv2.copyTo(image, ASSETS.ui_mask_in_map)
+        return cv2.copyTo(image, ASSETS.ui_mask_in_map)
 
     def load(self, image):
         """

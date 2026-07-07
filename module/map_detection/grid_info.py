@@ -222,21 +222,19 @@ class GridInfo:
             if not self.is_land and self.may_boss:
                 self.is_boss = True
                 return True
-            else:
-                return False
+            return False
         if info.is_siren:
             if (not self.is_land and self.may_siren) or ((mode == "movable" or self.is_movable) and not self.is_land):
                 self.is_siren = True
                 self.enemy_scale = 0
                 self.enemy_genre = info.enemy_genre
                 return True
-            else:
-                return False
+            return False
         if info.is_enemy:
             if self.is_fortress:
                 # Fortress can be a normal enemy
                 return True
-            elif not self.is_land and (self.may_enemy or self.is_carrier or mode == "decoy"):
+            if not self.is_land and (self.may_enemy or self.is_carrier or mode == "decoy"):
                 self.is_enemy = True
                 if info.enemy_scale and not self.enemy_scale:
                     self.enemy_scale = info.enemy_scale
@@ -246,7 +244,7 @@ class GridInfo:
                 if info.enemy_genre and not (info.enemy_genre == "Enemy" and self.enemy_genre):
                     self.enemy_genre = info.enemy_genre
                 return True
-            elif mode == "carrier" and not self.is_land and self.may_carrier:
+            if mode == "carrier" and not self.is_land and self.may_carrier:
                 self.is_enemy = True
                 self.is_carrier = True
                 if info.enemy_scale:
@@ -254,32 +252,29 @@ class GridInfo:
                 if info.enemy_genre and not (info.enemy_genre == "Enemy" and self.enemy_genre):
                     self.enemy_genre = info.enemy_genre
                 return True
-            elif (mode == "movable" or self.is_movable) and not self.is_land:
+            if (mode == "movable" or self.is_movable) and not self.is_land:
                 self.is_enemy = True
                 if info.enemy_scale:
                     self.enemy_scale = info.enemy_scale
                 if info.enemy_genre and not (info.enemy_genre == "Enemy" and self.enemy_genre):
                     self.enemy_genre = info.enemy_genre
                 return True
-            else:
-                return False
+            return False
         if info.is_mystery:
             if self.may_mystery:
                 self.is_mystery = info.is_mystery
                 return True
-            else:
-                return False
+            return False
         if info.is_ammo:
             if self.may_ammo:
                 self.is_ammo = info.is_ammo
                 return True
-            else:
-                return False
+            return False
         if info.is_missile_attack:
             if self.may_siren:
                 self.is_siren = True
                 return True
-            elif self.may_enemy:
+            if self.may_enemy:
                 self.is_enemy = True
                 return True
             # Allow wrong predictions

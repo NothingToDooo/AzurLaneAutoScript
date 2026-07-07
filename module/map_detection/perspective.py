@@ -225,8 +225,7 @@ class Perspective:
         lines = cv2.HoughLines(image, 1, np.pi / 180, threshold)
         if lines is None:
             return Lines(None, is_horizontal=is_horizontal)
-        else:
-            lines = lines[:, 0, :]
+        lines = lines[:, 0, :]
         if is_horizontal:
             lines = lines[(np.deg2rad(90 - theta) < lines[:, 1]) & (lines[:, 1] < np.deg2rad(90 + theta))]
         else:

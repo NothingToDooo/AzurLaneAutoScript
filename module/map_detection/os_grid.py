@@ -195,20 +195,7 @@ class OSGridPredictor(GridPredictor):
             ASSETS.tile_center_image, crop(self.image_homo, area=area, copy=False), cv2.TM_CCOEFF_NORMED
         )
         _, sim, _, _ = cv2.minMaxLoc(res)
-        if sim > 0.8:
-            return True
-
-        # tile = 135
-        # corner = 25
-        # corner = [(5, 5, corner, corner), (tile - corner, 5, tile, corner), (5, tile - corner, corner, tile),
-        #           (tile - corner, tile - corner, tile, tile)]
-        # for area, template in zip(corner[::-1], ASSETS.tile_corner_image_list[::-1]):
-        #     res = cv2.matchTemplate(template, crop(self.image_homo, area=area), cv2.TM_CCOEFF_NORMED)
-        #     _, sim, _, _ = cv2.minMaxLoc(res)
-        #     if sim > 0.8:
-        #         return True
-
-        return False
+        return sim > 0.8
 
     _os_template_enemy = {
         "Akashi": template_assets.TEMPLATE_SIREN_Akashi,
@@ -322,10 +309,7 @@ class OSGridPredictor(GridPredictor):
         sim, button = os_assets.TEMPLATE_FleetMechanism.match_result(image)
         point = (53, 37)
         distance = np.linalg.norm(np.subtract(button.area[:2], point))
-        if distance > 5 or sim < 0.3:
-            return False
-
-        return True
+        return not (distance > 5 or sim < 0.3)
 
 
 class OSGrid(OSGridInfo, OSGridPredictor, Grid):
