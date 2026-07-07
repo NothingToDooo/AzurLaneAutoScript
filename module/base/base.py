@@ -106,7 +106,7 @@ class ModuleBase:
         ModuleBase.EARLY_OCR_IMPORT = True
 
     @cached_class_property
-    def worker(self):
+    def worker(cls):
         """
         后台线程池，用于执行不阻塞主流程的工作。
 
