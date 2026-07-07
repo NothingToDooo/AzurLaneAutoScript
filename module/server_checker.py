@@ -34,6 +34,13 @@ class ServerChecker:
 
         self.check_now()
 
+    def _raise_unknown_server(self) -> None:
+        raise ScriptError(f'Server "{self._server}" does not exist!')
+
+    @staticmethod
+    def _raise_bad_response(resp) -> None:
+        raise ScriptError(f"Get status_code {resp.status_code}. Response is {resp.text}")
+
     def _load_server(self) -> None:
         """
         Get server status using API.
@@ -70,9 +77,9 @@ class ServerChecker:
                         logger.warning(f"Timestamp {self._timestamp} has not been updated for 3 times.")
             elif resp.status_code == 404:
                 self._state.append(False)
-                raise ScriptError(f'Server "{self._server}" does not exist!')
+                self._raise_unknown_server()
             else:
-                raise ScriptError(f"Get status_code {resp.status_code}. Response is {resp.text}")
+                self._raise_bad_response(resp)
         except (requests.exceptions.ConnectionError, requests.exceptions.ConnectTimeout) as e:
             logger.error(e)
             logger.error("Timeout while connecting to server checker API.")

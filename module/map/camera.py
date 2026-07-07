@@ -101,20 +101,23 @@ class Camera(MapOperation):
         if not hasattr(self, "view"):
             self.view = View(self.config, grid_class=self.grid_class)
 
+    def _ensure_image_detectable(self) -> None:
+        if (
+            not self.is_in_map()
+            and not self.is_in_strategy_submarine_move()
+            and not self.is_in_strategy_mob_move()
+            and not self.is_in_strategy_air_strike()
+        ):
+            logger.warning("Image to detect is not in_map")
+            raise MapDetectionError("Image to detect is not in_map")
+
     def _update_view(self):
         """
         Update map view
         """
         self._view_init()
         try:
-            if (
-                not self.is_in_map()
-                and not self.is_in_strategy_submarine_move()
-                and not self.is_in_strategy_mob_move()
-                and not self.is_in_strategy_air_strike()
-            ):
-                logger.warning("Image to detect is not in_map")
-                raise MapDetectionError("Image to detect is not in_map")
+            self._ensure_image_detectable()
             self.view.load(self.device.image)
         except MapDetectionError as e:
             if self.info_bar_count():

@@ -223,6 +223,10 @@ class SLPP:
                 raise ParseError(err)
             return n
 
+        def require_exponent_sign():
+            if not self.ch or self.ch not in ("+", "-"):
+                raise ParseError(ERRORS["mfnumber_sci"])
+
         n = ""
         try:
             if self.ch == "-":
@@ -239,8 +243,7 @@ class SLPP:
                 if self.ch and self.ch in ["e", "E"]:
                     n += self.ch
                     self.next_chr()
-                    if not self.ch or self.ch not in ("+", "-"):
-                        raise ParseError(ERRORS["mfnumber_sci"])
+                    require_exponent_sign()
                     n += next_digit(ERRORS["mfnumber_sci"])
                     n += self.digit()
         except ParseError as e:
