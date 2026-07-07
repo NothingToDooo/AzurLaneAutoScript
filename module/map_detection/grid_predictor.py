@@ -97,9 +97,8 @@ class GridPredictor:
         self.is_current_fleet = self.predict_current_fleet()
         # self.is_caught_by_siren = self.predict_caught_by_siren()
 
-        if self.config.MAP_HAS_MISSILE_ATTACK:
-            if self.predict_missile_attack():
-                self.is_missile_attack = True
+        if self.config.MAP_HAS_MISSILE_ATTACK and self.predict_missile_attack():
+            self.is_missile_attack = True
         if self.enemy_genre:
             self.is_enemy = True
         if self.enemy_scale:
@@ -108,10 +107,9 @@ class GridPredictor:
         #     self.is_enemy = self.predict_static_red_border()
         if self.is_enemy and not self.enemy_genre:
             self.enemy_genre = "Enemy"
-        if self.config.MAP_HAS_SIREN:
-            if self.enemy_genre is not None and self.enemy_genre.startswith("Siren"):
-                self.is_siren = True
-                self.enemy_scale = 0
+        if self.config.MAP_HAS_SIREN and self.enemy_genre is not None and self.enemy_genre.startswith("Siren"):
+            self.is_siren = True
+            self.enemy_scale = 0
 
     def relative_crop(self, area, shape=None):
         """Crop image and rescale to target shape. Eliminate the effect of perspective.
@@ -193,15 +191,18 @@ class GridPredictor:
                 return ""
             image = self.relative_crop((-0.55, -0.2, 0.45, 0.2), shape=(50, 20))
             image = color_similarity_2d(image, color=(255, 150, 24))
-            if image[image > 221].shape[0] > 200:
-                if template_assets.TEMPLATE_ENEMY_BOSS.match(image, similarity=0.6):
-                    return "Siren_Siren"
-        if self.config.MAP_SIREN_HAS_BOSS_ICON_SMALL:
-            if self.relative_hsv_count(area=(0.03, -0.15, 0.63, 0.15), h=(32 - 3, 32 + 3), shape=(50, 20)) > 100:
-                image = self.relative_crop((0.03, -0.15, 0.63, 0.15), shape=(50, 20))
-                image = color_similarity_2d(image, color=(255, 150, 33))
-                if template_assets.TEMPLATE_ENEMY_BOSS.match(image, similarity=0.7):
-                    return "Siren_Siren"
+            if image[image > 221].shape[0] > 200 and template_assets.TEMPLATE_ENEMY_BOSS.match(
+                image, similarity=0.6
+            ):
+                return "Siren_Siren"
+        if (
+            self.config.MAP_SIREN_HAS_BOSS_ICON_SMALL
+            and self.relative_hsv_count(area=(0.03, -0.15, 0.63, 0.15), h=(32 - 3, 32 + 3), shape=(50, 20)) > 100
+        ):
+            image = self.relative_crop((0.03, -0.15, 0.63, 0.15), shape=(50, 20))
+            image = color_similarity_2d(image, color=(255, 150, 33))
+            if template_assets.TEMPLATE_ENEMY_BOSS.match(image, similarity=0.7):
+                return "Siren_Siren"
 
         image_dic = {}
         scaling_dic = self.config.MAP_ENEMY_GENRE_DETECTION_SCALING
