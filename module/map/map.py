@@ -150,14 +150,14 @@ class Map(Fleet):
                     break
             grids = enemy
         if strongest:
-            for scale in [3, 2, 1, 0]:
-                enemy = grids.select(enemy_scale=scale)
+            for candidate_scale in [3, 2, 1, 0]:
+                enemy = grids.select(enemy_scale=candidate_scale)
                 if enemy:
                     grids = enemy
                     break
         if weakest:
-            for scale in [1, 2, 3, 0]:
-                enemy = grids.select(enemy_scale=scale)
+            for candidate_scale in [1, 2, 3, 0]:
+                enemy = grids.select(enemy_scale=candidate_scale)
                 if enemy:
                     grids = enemy
                     break

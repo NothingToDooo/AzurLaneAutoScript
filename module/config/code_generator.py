@@ -87,8 +87,8 @@ class CodeGenerator:
                 self.add(f"{key}: {type_} = {self._repr(value)}")
             else:
                 self.add(f"{key} = {self._repr(value)}")
-        for key, value in kwargs.items():
-            self.Value(key, value)
+        for kw_key, kw_value in kwargs.items():
+            self.Value(kw_key, kw_value)
 
     def Comment(self, text):
         for line in text.strip().split("\n"):

@@ -339,13 +339,13 @@ def deep_iter(data, min_depth=None, depth=3):
         new_q = deque()
         # max depth
         if current == depth:
-            for key, data in q:
-                for k, v in data.items():
+            for key, item_data in q:
+                for k, v in item_data.items():
                     yield [*key, k], v
         # in target depth
         elif min_depth <= current < depth:
-            for key, data in q:
-                for k, v in data.items():
+            for key, item_data in q:
+                for k, v in item_data.items():
                     subkey = [*key, k]
                     if type(v) is dict:
                         new_q.append((subkey, v))
@@ -353,8 +353,8 @@ def deep_iter(data, min_depth=None, depth=3):
                         yield subkey, v
         # Haven't reached min depth
         else:
-            for key, data in q:
-                for k, v in data.items():
+            for key, item_data in q:
+                for k, v in item_data.items():
                     subkey = [*key, k]
                     if type(v) is dict:
                         new_q.append((subkey, v))
@@ -410,21 +410,21 @@ def deep_values(data, min_depth=None, depth=3):
         new_q = deque()
         # max depth
         if current == depth:
-            for data in q:
-                for v in data.values():
+            for item_data in q:
+                for v in item_data.values():
                     yield v
         # in target depth
         elif min_depth <= current < depth:
-            for data in q:
-                for v in data.values():
+            for item_data in q:
+                for v in item_data.values():
                     if type(v) is dict:
                         new_q.append(v)
                     else:
                         yield v
         # Haven't reached min depth
         else:
-            for data in q:
-                for v in data.values():
+            for item_data in q:
+                for v in item_data.values():
                     if type(v) is dict:
                         new_q.append(v)
         q = new_q
