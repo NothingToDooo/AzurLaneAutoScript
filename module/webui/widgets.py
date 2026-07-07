@@ -2,7 +2,6 @@ import copy
 import json
 import random
 import string
-from collections.abc import Callable, Generator
 from typing import TYPE_CHECKING, Any
 
 from pywebio.exceptions import SessionException
@@ -35,6 +34,8 @@ from module.webui.utils import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
+
     from module.webui.app import AlasGUI
 
 

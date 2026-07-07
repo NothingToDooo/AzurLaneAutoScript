@@ -2,7 +2,7 @@ import datetime
 import logging
 import os
 import sys
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from rich.console import Console, ConsoleOptions, ConsoleRenderable, NewLine
 from rich.highlighter import NullHighlighter, RegexHighlighter
@@ -11,6 +11,9 @@ from rich.rule import Rule
 from rich.style import Style
 from rich.theme import Theme
 from rich.traceback import Traceback
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def empty_function(*args, **kwargs):

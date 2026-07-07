@@ -2,8 +2,11 @@ import os
 import random
 import string
 import time
-from collections.abc import Iterable
 from contextlib import suppress
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 IS_WINDOWS = os.name == "nt"
 # Max attempt if another process is reading/writing, effective only on Windows

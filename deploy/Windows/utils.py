@@ -1,8 +1,10 @@
 import os
 import re
-from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Any, overload
+from typing import TYPE_CHECKING, Any, overload
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
 
 DEPLOY_CONFIG = "./config/deploy.yaml"
 DEPLOY_TEMPLATE = "./deploy/template"

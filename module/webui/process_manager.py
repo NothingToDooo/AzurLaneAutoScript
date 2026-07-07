@@ -1,11 +1,13 @@
 import queue
 import threading
-from collections.abc import Sequence
 from multiprocessing import Process
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import inflection
 from rich.console import Console, ConsoleRenderable
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 # 这个文件不会运行在 app.py 的同一进程或子进程中，下面的初始化需要重复执行。
 # 先导入伪 PIL 模块，避免 pywebio 拉起不需要的 PIL。

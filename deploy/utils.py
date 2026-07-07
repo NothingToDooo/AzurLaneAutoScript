@@ -1,9 +1,11 @@
 import os
 import re
-from collections.abc import Callable
-from typing import Any, overload
+from typing import TYPE_CHECKING, Any, overload
 
 from deploy.atomic import atomic_read_text, atomic_write
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 DEPLOY_CONFIG = "./config/deploy.yaml"
 DEPLOY_TEMPLATE = "./deploy/template"

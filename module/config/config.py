@@ -1,9 +1,12 @@
 import copy
 import operator
-import threading
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 import pywebio
+
+if TYPE_CHECKING:
+    import threading
 
 from module.base.filter import Filter
 from module.config.config_generated import GeneratedConfig

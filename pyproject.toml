@@ -106,6 +106,7 @@ select = [
     "RET508",
     "SIM",
     "SLOT",
+    "TC003",
     "TC006",
     "UP",
     "W",

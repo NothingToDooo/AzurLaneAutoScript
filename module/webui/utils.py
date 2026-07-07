@@ -6,7 +6,7 @@ import threading
 import time
 import traceback
 from collections.abc import Callable, Generator
-from queue import Queue
+from typing import TYPE_CHECKING
 
 import pywebio
 from pywebio.input import PASSWORD
@@ -20,6 +20,9 @@ from rich.terminal_theme import TerminalTheme
 from module.config.deep import deep_iter
 from module.logger import logger
 from module.webui.setting import State
+
+if TYPE_CHECKING:
+    from queue import Queue
 
 RE_DATETIME = (
     r"\d{4}\-(0\d|1[0-2])\-([0-2]\d|[3][0-1]) "

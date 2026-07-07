@@ -1,9 +1,9 @@
 import re
 import sys
-import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import inflection
 
@@ -21,6 +21,9 @@ from module.exception import (
 )
 from module.logger import logger
 from module.notify import handle_notify
+
+if TYPE_CHECKING:
+    import threading
 
 
 class AzurLaneAutoScript:

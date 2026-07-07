@@ -1,9 +1,10 @@
 import multiprocessing
-from collections.abc import Callable
-from multiprocessing.managers import SyncManager
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+    from multiprocessing.managers import SyncManager
+
     from module.config.config_updater import ConfigUpdater
     from module.webui.config import DeployConfig
 
