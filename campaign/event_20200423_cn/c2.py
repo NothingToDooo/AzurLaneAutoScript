@@ -1,4 +1,4 @@
-from campaign.event_20200423_cn.c1 import Config as Config
+from campaign.event_20200423_cn.c1 import Config as ConfigBase
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap
 
@@ -20,6 +20,10 @@ MAP.spawn_data = [
     {"battle": 3, "enemy": 1},
     {"battle": 4, "enemy": 1, "boss": 1},
 ]
+
+
+class Config(ConfigBase):
+    pass
 
 
 class Campaign(CampaignBase):

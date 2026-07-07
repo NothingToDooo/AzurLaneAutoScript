@@ -2,9 +2,7 @@ import copy
 
 from .campaign_15_4 import MAP as MAP_15_4
 from .campaign_15_4 import Campaign as Campaign_15_4
-
-# Do not remove the Config import. It's inherited from 15-4 and needs to be exported.
-from .campaign_15_4 import Config as Config  # pylint: disable=unused-import
+from .campaign_15_4 import Config as ConfigBase
 
 MAP = copy.copy(MAP_15_4)
 MAP.name = "15-4-121"
@@ -110,6 +108,10 @@ MAP.name = "15-4-121"
     J9,
     K9,
 ) = MAP.flatten()
+
+
+class Config(ConfigBase):
+    pass
 
 
 class Campaign(Campaign_15_4):

@@ -1,4 +1,4 @@
-from campaign.campaign_main.campaign_12_1 import Config as Config
+from campaign.campaign_main.campaign_12_1 import Config as ConfigBase
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap
 from module.map.map_grids import RoadGrids
@@ -101,6 +101,10 @@ MAP.spawn_data = [
 ) = MAP.flatten()
 
 road_main = RoadGrids([[C4, D5], B3])
+
+
+class Config(ConfigBase):
+    pass
 
 
 class Campaign(CampaignBase):

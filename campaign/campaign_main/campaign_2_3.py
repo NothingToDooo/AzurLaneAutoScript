@@ -1,4 +1,4 @@
-from campaign.campaign_main.campaign_2_1 import Config as Config
+from campaign.campaign_main.campaign_2_1 import Config as ConfigBase
 from module.map.map_base import CampaignMap
 
 from .campaign_2_base import CampaignBase
@@ -59,6 +59,10 @@ MAP.spawn_data = [
     E5,
     F5,
 ) = MAP.flatten()
+
+
+class Config(ConfigBase):
+    pass
 
 
 class Campaign(CampaignBase):
