@@ -5,6 +5,7 @@ import time
 from functools import wraps
 from importlib import import_module
 from pathlib import Path
+from typing import ClassVar
 
 from adbutils import AdbClient, AdbDevice, AdbTimeout, ForwardItem, ReverseItem
 from adbutils.errors import AdbError
@@ -734,7 +735,7 @@ class Connection(ConnectionAttr):
         """
         time.sleep(ensure_time(second))
 
-    _orientation_description = {
+    _orientation_description: ClassVar[dict[int, str]] = {
         0: "Normal",
         1: "HOME key on the right",
         2: "HOME key on the top",

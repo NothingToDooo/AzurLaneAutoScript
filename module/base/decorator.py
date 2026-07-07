@@ -3,6 +3,7 @@ import re
 from contextlib import suppress
 from functools import cached_property as cached_property
 from functools import wraps
+from typing import ClassVar
 
 from module.logger import logger
 
@@ -20,7 +21,7 @@ class Config:
     }
     """
 
-    func_list = {}
+    func_list: ClassVar[dict[str, list[dict[str, object]]]] = {}
 
     @classmethod
     def when(cls, **kwargs):

@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 class AppControl(Adb, Uiautomator2):
     hierarchy: etree._Element
-    _app_u2_family = ["minitouch", "nemu_ipc"]
+    _app_u2_family = ("minitouch", "nemu_ipc")
     _hierarchy_interval = Timer(0.1)
 
     def app_current(self) -> str:

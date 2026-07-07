@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import ClassVar
 
 import cv2
 import imageio
@@ -25,7 +26,7 @@ class Template(Resource):
 
         self.resource_add(self.file)
 
-    cached = ["file", "name", "is_gif"]
+    cached: ClassVar[tuple[str, ...]] = ("file", "name", "is_gif")
 
     @cached_property
     def file(self):

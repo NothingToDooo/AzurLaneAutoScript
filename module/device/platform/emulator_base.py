@@ -82,7 +82,7 @@ class EmulatorInstanceBase:
     def __eq__(self, other):
         if isinstance(other, str) and self.type == other:
             return True
-        if isinstance(other, list) and self.type in other:
+        if isinstance(other, (list, tuple)) and self.type in other:
             return True
         if isinstance(other, EmulatorInstanceBase):
             return super().__eq__(other) and self.type == other.type
@@ -135,7 +135,7 @@ class EmulatorBase:
     MuMuPlayer = "MuMuPlayer"
     MuMuPlayerX = "MuMuPlayerX"
     MuMuPlayer12 = "MuMuPlayer12"
-    MuMuPlayerFamily = [MuMuPlayer, MuMuPlayerX, MuMuPlayer12]
+    MuMuPlayerFamily = (MuMuPlayer, MuMuPlayerX, MuMuPlayer12)
 
     @classmethod
     def path_to_type(cls, path: str) -> str:
@@ -175,7 +175,7 @@ class EmulatorBase:
     def __eq__(self, other):
         if isinstance(other, str) and self.type == other:
             return True
-        if isinstance(other, list) and self.type in other:
+        if isinstance(other, (list, tuple)) and self.type in other:
             return True
         return super().__eq__(other)
 

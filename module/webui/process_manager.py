@@ -1,7 +1,7 @@
 import queue
 import threading
 from multiprocessing import Process
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 
 import inflection
 from rich.console import Console, ConsoleRenderable
@@ -31,7 +31,7 @@ from module.webui.setting import State
 
 
 class ProcessManager:
-    _processes: dict[str, ProcessManager] = {}
+    _processes: ClassVar[dict[str, ProcessManager]] = {}
 
     def __init__(self, config_name: str = "alas") -> None:
         self.config_name = config_name

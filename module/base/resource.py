@@ -1,6 +1,7 @@
 import re
 import sys
 from pathlib import Path
+from typing import ClassVar
 
 from module.base.decorator import cached_property, del_cached_property
 from module.config import server
@@ -36,10 +37,10 @@ _preserved_assets = PreservedAssets()
 
 
 class Resource:
-    # Class property, record all button and templates
-    instances = {}
-    # Instance property, record cached properties of instance
-    cached = []
+    # 记录所有按钮和模板实例。
+    instances: ClassVar[dict[str, Resource]] = {}
+    # 子类声明需要释放的缓存属性。
+    cached: ClassVar[tuple[str, ...]] = ()
 
     def resource_add(self, key):
         Resource.instances[key] = self

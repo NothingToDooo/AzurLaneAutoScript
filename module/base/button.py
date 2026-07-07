@@ -1,5 +1,6 @@
 import traceback
 from pathlib import Path
+from typing import ClassVar
 
 import cv2
 import imageio
@@ -56,7 +57,7 @@ class Button(Resource):
         if self.file:
             self.resource_add(key=self.file)
 
-    cached = ["area", "color", "_button", "file", "name", "is_gif"]
+    cached: ClassVar[tuple[str, ...]] = ("area", "color", "_button", "file", "name", "is_gif")
 
     @cached_property
     def area(self):

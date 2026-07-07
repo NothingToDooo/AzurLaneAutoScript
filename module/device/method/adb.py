@@ -114,8 +114,8 @@ def load_screencap(data):
 
 
 class Adb(Connection):
-    __screenshot_method = [0, 1, 2]
-    __screenshot_method_fixed = [0, 1, 2]
+    __screenshot_method = (0, 1, 2)
+    __screenshot_method_fixed = (0, 1, 2)
 
     @staticmethod
     def __load_screenshot(screenshot, method):
@@ -151,7 +151,7 @@ class Adb(Connection):
             except OSError, ImageTruncated:
                 continue
             else:
-                self.__screenshot_method_fixed = [method, *self.__screenshot_method]
+                self.__screenshot_method_fixed = (method, *self.__screenshot_method)
                 return result
 
         self.__screenshot_method_fixed = self.__screenshot_method

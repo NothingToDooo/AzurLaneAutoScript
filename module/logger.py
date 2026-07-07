@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from rich.console import Console, ConsoleOptions, ConsoleRenderable, NewLine
 from rich.highlighter import NullHighlighter, RegexHighlighter
@@ -108,7 +108,7 @@ class HTMLConsole(Console):
 
 class Highlighter(RegexHighlighter):
     base_style = "web."
-    highlights = [
+    highlights: ClassVar[list[str]] = [
         # (r'(?P<datetime>(\d{2}|\d{4})(?:\-)?([0]{1}\d{1}|[1]{1}[0-2]{1})'
         #  r'(?:\-)?([0-2]{1}\d{1}|[3]{1}[0-1]{1})(?:\s)?([0-1]{1}\d{1}|'
         #  r'[2]{1}[0-3]{1})(?::)?([0-5]{1}\d{1})(?::)?([0-5]{1}\d{1}).\d+\b)'),
