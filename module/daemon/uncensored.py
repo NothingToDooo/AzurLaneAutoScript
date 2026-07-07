@@ -44,9 +44,8 @@ class AzurLaneUncensored(LoginHandler):
         self.create_level1_uncensored()
 
         logger.hr("推送反和谐文件", level=1)
-        command = ["push", "files", f"/sdcard/Android/data/{self.device.package}"]
-        logger.info(f"命令: {command}")
-        self.device.adb_command(command, timeout=30)
+        remote = f"/sdcard/Android/data/{self.device.package}"
+        self.device.adb_push("files", remote)
         logger.info("推送完成")
 
         # 回到项目根目录。

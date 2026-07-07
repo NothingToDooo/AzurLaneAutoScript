@@ -44,7 +44,7 @@ class EmulatorManager(AlasManager):
             list[DataAdbDevice]: Connected devices in adb
         """
         logger.hr("Adb deivces", level=2)
-        result = self.subprocess_execute([self.adb, "devices"])
+        result = self.run_command([self.adb, "devices"])
         devices = []
         for line in result.replace("\r\r\n", "\n").replace("\r\n", "\n").split("\n"):
             if line.startswith("List") or "\t" not in line:
@@ -67,7 +67,7 @@ class EmulatorManager(AlasManager):
         # Disconnect offline devices
         for device in devices:
             if device.status == "offline":
-                self.subprocess_execute([self.adb, "disconnect", device.serial])
+                self.run_command([self.adb, "disconnect", device.serial])
 
         # Get serial
         list_serial = self.emulator_manager.all_emulator_serials

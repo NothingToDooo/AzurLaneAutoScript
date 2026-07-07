@@ -1,6 +1,8 @@
 import os
 import typing as t
 
+import psutil
+
 from deploy.Windows.config import DeployConfig
 from deploy.Windows.logger import logger
 from deploy.Windows.utils import DataProcessInfo, cached_property, iter_process
@@ -50,4 +52,22 @@ class AlasManager(DeployConfig):
             return False
 
     def kill_process(self, process: DataProcessInfo):
-        self.execute(f"taskkill /f /t /pid {process.pid}", allow_failure=True, output=False)
+        try:
+            proc = psutil.Process(process.pid)
+            children = proc.children(recursive=True)
+        except psutil.Error as e:
+            logger.info(f"进程 {process.pid} 已不可用，跳过：{e}")
+            return
+
+        for child in children:
+            try:
+                logger.info(f"Kill child process: {child.pid}")
+                child.kill()
+            except psutil.Error as e:
+                logger.info(f"子进程 {child.pid} 已不可用，跳过：{e}")
+
+        try:
+            logger.info(f"Kill process: {process.pid}")
+            proc.kill()
+        except psutil.Error as e:
+            logger.info(f"进程 {process.pid} 已不可用，跳过：{e}")

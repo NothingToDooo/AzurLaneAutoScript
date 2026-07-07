@@ -1,7 +1,6 @@
 import json
 import re
 import socket
-import subprocess
 import time
 from functools import wraps
 from pathlib import Path
@@ -136,50 +135,13 @@ class Connection(ConnectionAttr):
 
         self.check_mumu_app_keep_alive()
 
-    def adb_command(self, cmd, timeout=10):
-        """
-        在子进程中执行 ADB 命令，通常用于拉取或推送大文件。
-
-        参数：
-            cmd (list):
-            timeout (int):
-
-        返回：
-            str:
-        """
-        cmd = list(map(str, cmd))
-        cmd = [self.adb_binary, "-s", self.serial, *cmd]
-        return self.subprocess_run(cmd, timeout=timeout)
-
-    def subprocess_run(self, cmd, timeout=10):
-        """
-        参数：
-            cmd (list):
-            timeout (int):
-
-        返回：
-            str:
-        """
-        logger.info(f"Execute: {cmd}")
-        # 直接运行 ADB 命令，避免额外 shell 干扰参数传递。
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=False)
-        try:
-            stdout, stderr = process.communicate(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            stdout, stderr = process.communicate()
-            logger.warning(f"TimeoutExpired when calling {cmd}, stdout={stdout}, stderr={stderr}")
-        return stdout
-
     def adb_start_server(self):
         """
-        用 `adb devices` 触发 `adb start-server`，命令结果本身没有实际用途。
-
-        这里用子进程启动 ADB，而不是通过 socket 连接，避免误杀其他 ADB。
+        触发 adbutils 启动 ADB server。
         """
-        stdout = self.subprocess_run([self.adb_binary, "devices"])
-        logger.info(stdout)
-        return stdout
+        version = self.adb_client.server_version()
+        logger.info(f"ADB server version: {version}")
+        return version
 
     def adb_shell(self, cmd, stream=False, recvall=True, timeout=10, rstrip=True):
         """
@@ -401,10 +363,6 @@ class Connection(ConnectionAttr):
         conn.close()
         return data
 
-    def adb_exec_out(self, cmd, serial=None):
-        cmd.insert(0, "exec-out")
-        return self.adb_command(cmd, serial)
-
     def adb_forward(self, remote):
         """
         执行 `adb forward <local> <remote>`。
@@ -537,10 +495,10 @@ class Connection(ConnectionAttr):
             remote (str):
 
         返回：
-            str:
+            None:
         """
-        cmd = ["push", local, remote]
-        return self.adb_command(cmd)
+        logger.info(f"ADB push: {local} -> {remote}")
+        return self.adb.push(local, remote)
 
     def _wait_device_appear(self, serial, first_devices=None):
         """

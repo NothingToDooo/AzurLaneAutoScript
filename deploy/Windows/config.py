@@ -1,14 +1,12 @@
 import copy
-import subprocess
 import sys
 from pathlib import Path
+from subprocess import PIPE, TimeoutExpired
+
+import psutil
 
 from deploy.Windows.logger import logger
 from deploy.Windows.utils import DEPLOY_CONFIG, DEPLOY_TEMPLATE, cached_property, poor_yaml_read, poor_yaml_write
-
-
-class ExecutionError(Exception):
-    pass
 
 
 class ConfigModel:
@@ -110,37 +108,7 @@ class DeployConfig(ConfigModel):
         logger.warning(f"PythonExecutable: {exe} 不存在，改用当前 Python: {current}")
         return current
 
-    def execute(self, command, allow_failure=False, output=True):
-        """
-        参数：
-            command (str):
-            allow_failure (bool):
-            output(bool):
-
-        返回：
-            bool：是否成功。
-        """
-        command = command.replace(r"\\", "/").replace("\\", "/").replace('"', '"')
-        logger.info(command)
-        output_target = None if output else subprocess.DEVNULL
-        error_code = subprocess.run(
-            command,
-            stdout=output_target,
-            stderr=output_target,
-            shell=False,
-            check=False,
-        ).returncode
-        if error_code:
-            if allow_failure:
-                logger.info(f"[允许失败]，error_code: {error_code}")
-                return False
-            logger.info(f"[失败]，error_code: {error_code}")
-            self.show_error(command)
-            raise ExecutionError
-        logger.info("[成功]")
-        return True
-
-    def subprocess_execute(self, cmd, timeout=10):
+    def run_command(self, cmd, timeout=10):
         """
         参数：
             cmd (list[str]):
@@ -150,20 +118,11 @@ class DeployConfig(ConfigModel):
             str:
         """
         logger.info(" ".join(cmd))
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        process = psutil.Popen(cmd, stdout=PIPE)
         try:
             stdout, stderr = process.communicate(timeout=timeout)
-            process.kill()
-        except subprocess.TimeoutExpired:
+        except TimeoutExpired:
             process.kill()
             stdout, stderr = process.communicate()
             logger.info(f"TimeoutExpired, stdout={stdout}, stderr={stderr}")
         return stdout.decode()
-
-    def show_error(self, command=None):
-        logger.hr("命令执行失败", 0)
-        self.show_config()
-        logger.info("")
-        logger.info(f"最后执行的命令: {command}")
-        logger.info("请检查 config/deploy.yaml 中的 deploy 配置")
-        logger.info("如果需要排查，请保留完整窗口截图")

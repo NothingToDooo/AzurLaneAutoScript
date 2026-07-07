@@ -1,6 +1,5 @@
 import abc
 import ctypes
-import subprocess
 from collections import deque
 from functools import wraps
 from itertools import count
@@ -399,49 +398,6 @@ class WorkerPool:
             return self.start_thread_soon(func, *args, **kwargs)
 
         return thread_wrapper
-
-    @staticmethod
-    def _subprocess_execute(cmd, timeout=10):
-        """
-        Helper function to run cmd in subprocess
-
-        Args:
-            cmd (list[str]):
-            timeout:
-
-        Returns:
-            bytes:
-        """
-        logger.info(f"Execute: {cmd}")
-
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=False)
-
-        try:
-            stdout, stderr = process.communicate(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            stdout, stderr = process.communicate()
-            logger.warning(f"TimeoutExpired when calling {cmd}, stdout={stdout}, stderr={stderr}")
-        return stdout
-
-    def start_cmd_soon(self, cmd, timeout=10):
-        """
-        Run cmd on subprocess and communicate it on another thread,
-        result can be got from `job` object
-
-        Args:
-            cmd (list[str]):
-            timeout:
-
-        Returns:
-            Job[bytes]:
-        """
-        worker = self._get_thread_worker()
-        job = Job(worker=worker, func_args_kwargs=(self._subprocess_execute, (cmd,), {"timeout": timeout}))
-
-        worker.job = job
-        worker.worker_lock.release()
-        return job
 
     def wait_jobs(self) -> WaitJobsWrapper:
         """

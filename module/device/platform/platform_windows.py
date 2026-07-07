@@ -1,6 +1,5 @@
 import ctypes
 import re
-import subprocess
 from typing import TYPE_CHECKING
 
 import psutil
@@ -51,16 +50,14 @@ class PlatformWindows(PlatformBase, EmulatorManager):
     def execute(cls, command):
         """
         Args:
-            command (str):
+            command (list[str]):
 
         Returns:
-            subprocess.Popen:
+            psutil.Popen:
         """
-        command = command.replace(r"\\", "/").replace("\\", "/").replace('"', '"')
         logger.info(f"Execute: {command}")
-        # `close_fds` only work on Windows
-        # `start_new_session` to avoid emulator getting tree-killed when Alas gets killed
-        return subprocess.Popen(command, close_fds=True, start_new_session=True)
+        # 让模拟器进程脱离 ALAS，避免 ALAS 退出时连带结束模拟器。
+        return psutil.Popen(command, close_fds=True, start_new_session=True)
 
     @classmethod
     def kill_process_by_regex(cls, regex: str) -> int:
@@ -91,16 +88,16 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         exe: str = instance.emulator.path
         if instance == Emulator.MuMuPlayer:
             # NemuPlayer.exe
-            self.execute(exe)
+            self.execute([exe])
         elif instance == Emulator.MuMuPlayerX:
             # NemuPlayer.exe -m nemu-12.0-x64-default
-            self.execute(f'"{exe}" -m {instance.name}')
+            self.execute([exe, "-m", instance.name])
         elif instance == Emulator.MuMuPlayer12:
             # MuMuManager.exe api -v 0 launch_player
             # 通过 MuMuManager 启动，避免多个 MuMuNxMain.exe 同时启动时请求被吞掉。
             if instance.MuMuPlayer12_id is None:
                 logger.warning(f"Cannot get MuMu instance index from name {instance.name}")
-            self.execute(f'"{Emulator.single_to_console(exe)}" api -v {instance.MuMuPlayer12_id} launch_player')
+            self.execute([Emulator.single_to_console(exe), "api", "-v", str(instance.MuMuPlayer12_id), "launch_player"])
         else:
             raise EmulatorUnknown(f"Cannot start an unknown emulator instance: {instance}")
 
@@ -141,7 +138,7 @@ class PlatformWindows(PlatformBase, EmulatorManager):
             # MuMuManager.exe api -v 1 shutdown_player
             if instance.MuMuPlayer12_id is None:
                 logger.warning(f"Cannot get MuMu instance index from name {instance.name}")
-            self.execute(f'"{Emulator.single_to_console(exe)}" api -v {instance.MuMuPlayer12_id} shutdown_player')
+            self.execute([Emulator.single_to_console(exe), "api", "-v", str(instance.MuMuPlayer12_id), "shutdown_player"])
         else:
             raise EmulatorUnknown(f"Cannot stop an unknown emulator instance: {instance}")
 
