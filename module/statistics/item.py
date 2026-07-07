@@ -4,9 +4,8 @@ import cv2
 import numpy as np
 
 from module.base.utils import area_offset, color_similar, crop, extract_white_letters, load_image, rgb2gray, save_image
-from module.config import server
 from module.logger import logger
-from module.ocr.ocr import Digit, DigitYuv
+from module.ocr.ocr import Digit
 from module.statistics.utils import load_folder
 
 
@@ -24,13 +23,7 @@ class AmountOcr(Digit):
 
 
 AMOUNT_OCR = AmountOcr([], threshold=96, name="Amount_ocr")
-# UI update in 20250814, but server TW is still old UI.
-if server.server == "tw":
-    PRICE_OCR = DigitYuv([], letter=(255, 223, 57), threshold=128, name="Price_ocr")
-elif server.server == "jp":
-    PRICE_OCR = Digit([], lang="cnocr", letter=(205, 205, 205), threshold=128, name="Price_ocr")
-else:
-    PRICE_OCR = Digit([], letter=(255, 255, 255), threshold=128, name="Price_ocr")
+PRICE_OCR = Digit([], letter=(255, 255, 255), threshold=128, name="Price_ocr")
 
 
 class Item:

@@ -7,10 +7,6 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
-from module.config import server
-
-server.server = "cn"  # 在这里修改服务器。
-
 from module.base.utils import load_image
 from module.logger import logger
 from module.statistics.battle_status import BattleStatusStatistics

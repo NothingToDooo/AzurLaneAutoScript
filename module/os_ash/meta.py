@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 
 from module.base.timer import Timer
 from module.combat.assets import BATTLE_PREPARATION
-from module.config import server
 from module.logger import logger
 from module.meta_reward.meta_reward import MetaReward
 from module.ocr.ocr import Digit, DigitCounter
@@ -27,10 +26,7 @@ class MetaState(Enum):
 
 
 OCR_BEACON_TIER = Digit(ash_assets.BEACON_TIER, name="OCR_ASH_TIER")
-if server.server != "jp":
-    OCR_META_DAMAGE = Digit(ash_assets.META_DAMAGE, name="OCR_META_DAMAGE")
-else:
-    OCR_META_DAMAGE = Digit(ash_assets.META_DAMAGE, letter=(201, 201, 201), name="OCR_META_DAMAGE")
+OCR_META_DAMAGE = Digit(ash_assets.META_DAMAGE, name="OCR_META_DAMAGE")
 
 
 class MetaDigitCounter(DigitCounter):
@@ -78,14 +74,6 @@ class Meta(UI, MapEventHandler):
         if self.handle_popup_cancel("META"):
             return True
         return self.appear_then_click(ash_assets.META_ENTRANCE, offset=(20, 300), interval=2)
-
-
-def _server_support():
-    return server.server in ["cn", "en", "jp", "tw"]
-
-
-def _server_support_dossier_auto_attack():
-    return server.server in ["cn", "en"]
 
 
 class OpsiAshBeacon(Meta):
@@ -205,11 +193,7 @@ class OpsiAshBeacon(Meta):
         档案：
             启用自动攻击且正在自动攻击时，不允许手动攻击。
         """
-        if (
-            self.appear(ash_assets.BEACON_LIST, offset=(20, 20))
-            and _server_support()
-            and self.config.OpsiAshBeacon_OneHitMode
-        ):
+        if self.appear(ash_assets.BEACON_LIST, offset=(20, 20)) and self.config.OpsiAshBeacon_OneHitMode:
             # 开启 OneHitMode 且已经攻击过当前 META。
             damage = self._get_meta_damage()
             if damage > 0:
@@ -269,10 +253,8 @@ class OpsiAshBeacon(Meta):
             return not needs_assist or self._ask_for_help()
         if self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20)):
             # 可自动攻击但尚未自动攻击。
-            if (
-                _server_support_dossier_auto_attack()
-                and self.config.OpsiAshBeacon_DossierAutoAttackMode
-                and self.appear(ash_assets.META_AUTO_ATTACK_START, offset=(5, 5))
+            if self.config.OpsiAshBeacon_DossierAutoAttackMode and self.appear(
+                ash_assets.META_AUTO_ATTACK_START, offset=(5, 5)
             ):
                 return self._dossier_auto_attack()
             return True
@@ -393,11 +375,7 @@ class OpsiAshBeacon(Meta):
                 logger.info("Select beacon entrance into")
                 return True
             # Dossier
-            if (
-                _server_support()
-                and self.config.OpsiAshBeacon_AttackMode == "current_dossier"
-                and self._check_dossier_point()
-            ):
+            if self.config.OpsiAshBeacon_AttackMode == "current_dossier" and self._check_dossier_point():
                 if self.appear_then_click(ash_assets.META_MAIN_DOSSIER_ENTRANCE, offset=(20, 20), interval=2):
                     logger.info("Select dossier entrance into")
                     return True
@@ -410,7 +388,7 @@ class OpsiAshBeacon(Meta):
                 logger.info("Begin a beacon")
             return True
         # 档案页。
-        if _server_support() and self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20), interval=2):
+        if self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20), interval=2):
             if self.config.OpsiAshBeacon_AttackMode == "current_dossier" and self._check_dossier_point():
                 if self.appear_then_click(ash_assets.META_BEGIN_ENTRANCE, offset=(20, 20), interval=2):
                     logger.info("Begin a dossier")
@@ -496,8 +474,6 @@ class OpsiAshBeacon(Meta):
 
     def _begin_beacon(self):
         logger.hr("Meta Beacon Attack")
-        if not _server_support():
-            logger.info("Server not support dossier beacon and OneHitMode, please contact the developer.")
         self._ensure_meta_page()
         self._attack_meta()
 

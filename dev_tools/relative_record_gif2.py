@@ -6,10 +6,6 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-from module.config import server
-
-server.server = "cn"  # 不需要修改，用来避免服务器相关错误。
-
 from dev_tools.relative_record import FOLDER, NAME
 from module.base.utils import area_offset
 
@@ -53,11 +49,7 @@ def crop(image, area):
 class RelativeRecord:
     def __init__(self):
         folder = Path(FOLDER) / NAME
-        self.images = [
-            np.array(Image.open(file).convert("RGB"))
-            for file in folder.iterdir()
-            if file.suffix == ".png"
-        ]
+        self.images = [np.array(Image.open(file).convert("RGB")) for file in folder.iterdir() if file.suffix == ".png"]
         self.images = np.array(self.images)
         self.images_amount = len(self.images)
         self.folder = (Path(FOLDER) / f"{NAME}_gif").as_posix()

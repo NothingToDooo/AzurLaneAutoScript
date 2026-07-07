@@ -5,9 +5,8 @@ from typing import TYPE_CHECKING, Any
 import cv2
 import numpy as np
 
-from module.base.utils import color_similar, crop, extract_letters, get_color, limit_in
+from module.base.utils import color_similar, crop, get_color, limit_in
 from module.combat.level import LevelOcr
-from module.config import server
 from module.logger import logger
 from module.ocr.ocr import Digit
 from module.retire.assets import (
@@ -30,16 +29,6 @@ type ScannerLimitValue = int | str
 
 
 class EmotionDigit(Digit):
-    def pre_process(self, image):
-        if server.server == "jp":
-            image_gray = extract_letters(image, letter=(255, 255, 255), threshold=self.threshold)
-            right_side = np.nonzero(image_gray[0:16, :].max(axis=0) > 192)[-1]
-            for i, col in enumerate(right_side):
-                if i < col:
-                    break
-            image = image[:, :i]
-        return super().pre_process(image)
-
     def after_process(self, result):
         # 唐斯头发容易造成随机 OCR 错误。
         # OCR DOCK_EMOTION_OCR 会把 "044" 修正为 "44"。
@@ -156,12 +145,7 @@ class EmotionScanner(Scanner):
         super().__init__()
         self._results = []
         self.grids = CARD_EMOTION_GRIDS
-        if server.server != "jp":
-            self.ocr_model = EmotionDigit(self.grids.buttons, name="DOCK_EMOTION_OCR", threshold=176)
-        else:
-            self.ocr_model = EmotionDigit(
-                self.grids.buttons, name="DOCK_EMOTION_OCR", letter=(201, 201, 201), threshold=176
-            )
+        self.ocr_model = EmotionDigit(self.grids.buttons, name="DOCK_EMOTION_OCR", threshold=176)
 
     def _scan(self, image) -> list:
         return self.ocr_model.ocr(image)
@@ -232,7 +216,6 @@ class FleetScanner(Scanner):
         _, g, _ = cv2.split(image)
         _, image = cv2.threshold(g, 205, 255, cv2.THRESH_BINARY)
         return cv2.merge([image, image, image])
-
 
     def _match(self, image) -> int:
         """

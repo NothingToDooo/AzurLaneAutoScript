@@ -4,7 +4,6 @@ import numpy as np
 from module.base.timer import Timer
 from module.campaign.campaign_event import CampaignEvent
 from module.combat.assets import BATTLE_PREPARATION
-from module.config import server
 from module.exception import ScriptError
 from module.logger import logger
 from module.map.map_operation import MapOperation
@@ -138,11 +137,6 @@ def raid_ocr(raid, mode):
         return RaidCounter(button, letter=(214, 231, 219), threshold=128)
     if raid == "IRIS":
         # 字体不在 azur_lane 模型中，使用通用 OCR 模型。
-        if server.server == "en":
-            # 英文服字体更粗。
-            return RaidCounter(button, letter=(148, 138, 123), threshold=80, lang="cnocr")
-        if server.server == "jp":
-            return RaidCounter(button, letter=(148, 138, 123), threshold=128, lang="cnocr")
         return DigitCounter(button, letter=(148, 138, 123), threshold=128, lang="cnocr")
     if raid == "ALBION":
         return DigitCounter(button, letter=(99, 73, 57), threshold=128)

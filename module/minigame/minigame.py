@@ -1,7 +1,6 @@
 from importlib import import_module
 
 from module.combat.assets import GET_ITEMS_1
-from module.config import server
 from module.logger import logger
 from module.minigame import assets as minigame_assets
 from module.ocr.ocr import Digit
@@ -10,10 +9,7 @@ from module.ui.page import page_academy, page_game_room
 from module.ui.scroll import Scroll
 from module.ui.ui import UI
 
-if server.server != "jp":
-    OCR_COIN = Digit(minigame_assets.COIN_HOLDER, name="OCR_COIN", letter=(255, 235, 115), threshold=128)
-else:
-    OCR_COIN = Digit(minigame_assets.COIN_HOLDER, name="OCR_COIN", letter=(211, 196, 95), threshold=128)
+OCR_COIN = Digit(minigame_assets.COIN_HOLDER, name="OCR_COIN", letter=(255, 235, 115), threshold=128)
 MINIGAME_SCROLL = Scroll(minigame_assets.MINIGAME_SCROLL_AREA, color=(247, 247, 247), name="MINIGAME_SCROLL")
 
 
@@ -177,9 +173,6 @@ class Minigame(UI):
             in: Any page
             out: page_game_room
         """
-        # 临时处理：2026.02.18 将 self.ui_ensure(page_game_room) 拆成两步。
-        # EN 服的学院页识别不同；若直接 ui_ensure(page_game_room)，ui_goto 必须改用 ui_page_appear。
-        # 这会导致 page_main/page_main_white 点击静态切换按钮，所以这里先保持局部处理。
         self.ui_ensure(page_academy)
         # 学院页 -> 游戏室。
         for _ in self.loop():

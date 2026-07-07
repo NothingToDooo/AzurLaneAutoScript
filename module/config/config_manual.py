@@ -2,13 +2,11 @@ from typing import ClassVar
 
 from pywebio.io_ctrl import Output
 
-from module.config import server
-
 
 class ManualConfig:
     @property
     def SERVER(self):
-        return server.server
+        return "cn"
 
     SCHEDULER_PRIORITY = """
     Restart

@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from module.base.timer import Timer
-from module.config import server
 from module.config.utils import get_server_next_update
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
@@ -13,14 +12,7 @@ from module.ui.ui import UI
 if TYPE_CHECKING:
     from module.config.config import Function
 
-if server.server != "jp":
-    OCR_SHOP_YELLOW_COINS = Digit(
-        SHOP_YELLOW_COINS, letter=(239, 239, 239), threshold=160, name="OCR_SHOP_YELLOW_COINS"
-    )
-else:
-    OCR_SHOP_YELLOW_COINS = Digit(
-        SHOP_YELLOW_COINS, letter=(201, 201, 201), threshold=200, name="OCR_SHOP_YELLOW_COINS"
-    )
+OCR_SHOP_YELLOW_COINS = Digit(SHOP_YELLOW_COINS, letter=(239, 239, 239), threshold=160, name="OCR_SHOP_YELLOW_COINS")
 OCR_SHOP_PURPLE_COINS = Digit(SHOP_PURPLE_COINS, letter=(255, 255, 255), name="OCR_SHOP_PURPLE_COINS")
 OCR_OS_SHOP_PURPLE_COINS = Digit(OS_SHOP_PURPLE_COINS, letter=(255, 255, 255), name="OCR_OS_SHOP_PURPLE_COINS")
 

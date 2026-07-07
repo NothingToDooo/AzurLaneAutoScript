@@ -5,10 +5,6 @@ import imageio
 import numpy as np
 from PIL import Image
 
-from module.config import server
-
-server.server = "cn"  # 不需要修改，用来避免服务器相关错误。
-
 from dev_tools.relative_record import FOLDER, NAME
 from module.base.utils import area_offset, crop
 
@@ -33,11 +29,7 @@ THRESHOLD = 0.92
 
 if __name__ == "__main__":
     folder = Path(FOLDER) / NAME
-    images = [
-        np.array(Image.open(file))
-        for file in folder.iterdir()
-        if file.suffix == ".png"
-    ]
+    images = [np.array(Image.open(file)) for file in folder.iterdir() if file.suffix == ".png"]
     templates = [crop(images[0], area=AREA)]
 
     def match(im):

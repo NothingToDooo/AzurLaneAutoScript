@@ -22,20 +22,17 @@ class CampaignBase(CampaignBase_):
             return True
         self.ui_ensure(page_campaign_menu)
         if self.is_event_entrance_available():
-            if self.config.SERVER == "tw":
-                self.ui_goto(page_event)
+            self.ui_goto_main()
+            if self.ui_page_appear(page_main_white):
+                self.ui_click(EVENT_20260417_DETAIL_WHITE, check_button=EVENT_20260417_DETAIL_CHECK)
             else:
-                self.ui_goto_main()
-                if self.ui_page_appear(page_main_white):
-                    self.ui_click(EVENT_20260417_DETAIL_WHITE, check_button=EVENT_20260417_DETAIL_CHECK)
-                else:
-                    self.ui_click(EVENT_20260417_DETAIL, check_button=EVENT_20260417_DETAIL_CHECK)
-                self.ui_click(
-                    EVENT_20260417_ENTRANCE,
-                    check_button=EVENT_20260417_PT_ICON,
-                    appear_button=EVENT_20260417_DETAIL_CHECK,
-                    offset=(40, 20),
-                )
+                self.ui_click(EVENT_20260417_DETAIL, check_button=EVENT_20260417_DETAIL_CHECK)
+            self.ui_click(
+                EVENT_20260417_ENTRANCE,
+                check_button=EVENT_20260417_PT_ICON,
+                appear_button=EVENT_20260417_DETAIL_CHECK,
+                offset=(40, 20),
+            )
             return True
         return False
 

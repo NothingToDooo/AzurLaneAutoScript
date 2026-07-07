@@ -29,15 +29,12 @@ class CampaignBase(CampaignBase_):
 
     def campaign_set_chapter_20241219(self, *args, **kwargs):
         """
-        THe origin event is mixed with classic stage entrance and MODE_SWITCH_20240912
-        2025.05.01 TW airs event_20240912_cn but uses event entry after 20241219
-        See https://github.com/LmeSzinc/AzurLaneAutoScript/pull/4768
+        国区活动同时使用传统章节入口和 MODE_SWITCH_20240912。
         """
-        if self.config.SERVER != "tw":
-            self.config.override(
-                MAP_CHAPTER_SWITCH_20241219=False,
-                MAP_HAS_MODE_SWITCH=False,
-            )
+        self.config.override(
+            MAP_CHAPTER_SWITCH_20241219=False,
+            MAP_HAS_MODE_SWITCH=False,
+        )
         return super().campaign_set_chapter_20241219(*args, **kwargs)
 
     def handle_exp_info(self):

@@ -2,7 +2,6 @@ from module.base.button import ButtonGrid, color_similar, get_color
 from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1
-from module.config import server
 from module.equipment.equipment import Equipment
 from module.logger import logger
 from module.ocr.ocr import DigitCounter
@@ -23,12 +22,8 @@ CARD_GRIDS = ButtonGrid(
     origin=(93, 76), delta=(164 + 2 / 3, 227), button_shape=(138, 204), grid_shape=(7, 2), name="CARD"
 )
 CARD_RARITY_GRIDS = CARD_GRIDS.crop(area=(0, 0, 138, 5), name="RARITY")
-if server.server != "jp":
-    CARD_LEVEL_GRIDS = CARD_GRIDS.crop(area=(77, 5, 138, 27), name="LEVEL")
-    CARD_EMOTION_GRIDS = CARD_GRIDS.crop(area=(23, 29, 48, 52), name="EMOTION")
-else:
-    CARD_LEVEL_GRIDS = CARD_GRIDS.crop(area=(74, 5, 136, 27), name="LEVEL")
-    CARD_EMOTION_GRIDS = CARD_GRIDS.crop(area=(21, 29, 71, 48), name="EMOTION")
+CARD_LEVEL_GRIDS = CARD_GRIDS.crop(area=(77, 5, 138, 27), name="LEVEL")
+CARD_EMOTION_GRIDS = CARD_GRIDS.crop(area=(23, 29, 48, 52), name="EMOTION")
 
 DOCK_SCROLL = Scroll(retire_assets.DOCK_SCROLL, color=(247, 211, 66), name="DOCK_SCROLL")
 

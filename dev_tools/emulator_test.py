@@ -5,9 +5,6 @@ import numpy as np
 
 # os.chdir('../')
 print(Path.cwd())
-from module.config import server
-
-server.server = "cn"  # Don't need to edit, it's used to avoid error.
 
 from module.config.config import AzurLaneConfig
 from module.device.device import Device

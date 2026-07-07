@@ -3,7 +3,6 @@ import numpy as np
 from module.base.utils import get_color
 from module.combat.assets import BATTLE_PREPARATION
 from module.combat.combat import Combat
-from module.config import server
 from module.daily import assets as daily_assets
 from module.daily.equipment import DailyEquipment
 from module.logger import logger
@@ -16,10 +15,7 @@ DAILY_MISSION_LIST = [
     daily_assets.DAILY_MISSION_2,
     daily_assets.DAILY_MISSION_3,
 ]
-if server.server != "jp":
-    OCR_REMAIN = Digit(daily_assets.OCR_REMAIN, threshold=128, alphabet="01234")
-else:
-    OCR_REMAIN = Digit(daily_assets.OCR_REMAIN, letter=(222, 223, 222), threshold=128, alphabet="01234")
+OCR_REMAIN = Digit(daily_assets.OCR_REMAIN, threshold=128, alphabet="01234")
 OCR_DAILY_FLEET_INDEX = Digit(
     daily_assets.OCR_DAILY_FLEET_INDEX, letter=(90, 154, 255), threshold=128, alphabet="123456"
 )

@@ -5,10 +5,6 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-from module.config import server
-
-server.server = "cn"  # 不需要修改，用来避免服务器相关错误。
-
 from module.base.base import ModuleBase
 from module.base.utils import node2location, rgb2gray
 from module.config.config import AzurLaneConfig

@@ -4,10 +4,6 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from module.config import server
-
-server.server = "cn"  # 不需要修改，用来避免服务器相关错误。
-
 from module.base.utils import load_image, rgb2gray
 from module.config.config import AzurLaneConfig
 from module.map_detection.view import View

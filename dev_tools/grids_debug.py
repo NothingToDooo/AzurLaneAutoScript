@@ -1,9 +1,5 @@
 from typing import ClassVar
 
-from module.config import server
-
-server.server = "cn"  # 不需要修改，用来避免服务器相关错误。
-
 import numpy as np
 from PIL import Image
 

@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from module.base.timer import Timer
-from module.config import server
 from module.logger import logger
 from module.private_quarters.assets import (
     PRIVATE_QUARTERS_SHOP_BACK,
@@ -14,13 +13,7 @@ from module.ui.page import page_dormmenu, page_private_quarters
 
 
 class PrivateQuarters(PQInteract, PQShop):
-    # key 是服务器名，value 是尚未支持的舰船名称。
-    not_supported_filter: ClassVar[dict[str, tuple[str, ...]]] = {
-        "cn": ("nakhimov",),
-        "en": (),
-        "jp": ("nakhimov",),
-        "tw": ("taihou", "nakhimov"),
-    }
+    not_supported_ships: ClassVar[tuple[str, ...]] = ("nakhimov",)
 
     def _pq_get_daily_count(self, retry=3):
         """
@@ -154,17 +147,12 @@ class PrivateQuarters(PQInteract, PQShop):
 
         # 进入商店并购买每周物品（如果有）。
         if self.shop_filter:
-            if server.server != "tw":
-                self.pq_shop_weekly_items()
-            else:
-                logger.info(f"Private Quarters shop not supported for {server.server} server.")
+            self.pq_shop_weekly_items()
 
         # Interact with target if enabled
         if target_interact:
-            # Ensure target is supported for server
-            # Update `not_supported_filter` to enable a target
-            if target_ship in self.not_supported_filter[server.server]:
-                logger.info(f"Target ship:{target_ship} not supported for {server.server} server.")
+            if target_ship in self.not_supported_ships:
+                logger.info(f"Target ship:{target_ship} not supported.")
                 return
 
             # Pull count here, exit run if = 0
