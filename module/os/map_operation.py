@@ -156,11 +156,10 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
             logger.warning("Unable to get zone name, get current zone from globe map instead")
             if hasattr(self, "get_current_zone_from_globe"):
                 return self.get_current_zone_from_globe()
-            else:
-                logger.warning("OperationSiren.get_current_zone_from_globe() not exists")
-                if not self.is_in_map():
-                    logger.warning("Trying to get zone name, but not in OS map")
-                return self.get_current_zone()
+            logger.warning("OperationSiren.get_current_zone_from_globe() not exists")
+            if not self.is_in_map():
+                logger.warning("Trying to get zone name, but not in OS map")
+            return self.get_current_zone()
 
     def is_in_special_zone(self):
         """

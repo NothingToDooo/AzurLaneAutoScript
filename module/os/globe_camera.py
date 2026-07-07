@@ -254,10 +254,10 @@ class GlobeCamera(GlobeOperation, ZoneManager):
         location = np.add(zone.location, (-9.5, -12.5))
         # Area around the center, on 2D map.
         location = [np.subtract(location, (4, 4)), np.add(location, (4, 4))]
-        # Area around the center, on screen.
+        # 取屏幕上的中心邻域。
         screen = self.globe2screen(location).flatten().round()
         screen = np.round(screen).astype(int).tolist()
-        # Average color of whirlpool center
+        # 取漩涡中心的平均颜色。
         center = self.image_crop(screen, copy=False)
         center = np.array(
             [
@@ -267,11 +267,8 @@ class GlobeCamera(GlobeOperation, ZoneManager):
             ]
         ).astype(np.uint8)
         h, s, v = rgb2hsv(center)[0][0]
-        # hsv usually to be (338, 74.9, 100)
-        if 285 < h <= 360 and s > 45 and v > 45:
-            return True
-        else:
-            return False
+        # 漩涡中心通常接近 HSV (338, 74.9, 100)。
+        return bool(285 < h <= 360 and s > 45 and v > 45)
 
     def _find_siren_stronghold(self, zones):
         """
@@ -302,9 +299,8 @@ class GlobeCamera(GlobeOperation, ZoneManager):
                     if self.get_zone_pinned_name() == "STRONGHOLD":
                         logger.info("Confirm it is a siren stronghold")
                         return zone
-                    else:
-                        logger.warning("Not a siren stronghold, continue searching")
-                        self.ensure_no_zone_pinned()
+                    logger.warning("Not a siren stronghold, continue searching")
+                    self.ensure_no_zone_pinned()
                 else:
                     logger.info(f"Zone {zone.zone_id} is not a siren stronghold")
 

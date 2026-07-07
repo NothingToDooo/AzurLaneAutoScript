@@ -80,8 +80,7 @@ class GlobeOperation(ActionPointHandler):
         pinned = self.get_zone_pinned()
         if pinned is not None:
             return self.pinned_to_name(pinned)
-        else:
-            return ""
+        return ""
 
     def handle_zone_pinned(self):
         """
@@ -286,15 +285,14 @@ class GlobeOperation(ActionPointHandler):
         """
         if self.get_zone_pinned_name() == "SAFE":
             return True
-        elif self.zone_has_switch():
+        if self.zone_has_switch():
             self.zone_select_enter()
             flag = os_assets.SELECT_SAFE in self.ensure_zone_select_expanded()
             button = os_assets.SELECT_SAFE if flag else os_assets.SELECT_DANGEROUS
             self.zone_select_execute(button)
             return flag
-        else:
-            # 没有 zone_switch，已在 DANGEROUS。
-            return False
+        # 没有 zone_switch，已在 DANGEROUS。
+        return False
 
     def os_globe_goto_map(self, skip_first_screenshot=True):
         """

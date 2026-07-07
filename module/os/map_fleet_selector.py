@@ -187,7 +187,7 @@ class FleetSelector:
             if current == index:
                 logger.info(f"It is fleet {index} already")
                 return False
-            elif current > 0:
+            if current > 0:
                 logger.info(f"Ensure fleet to be {index}")
                 self.open()
                 self.click(index)

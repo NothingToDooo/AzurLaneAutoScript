@@ -60,22 +60,21 @@ class OpsiStronghold(OSMap):
             if self.get_stronghold_percentage() == "0":
                 logger.info("BOSS clear")
                 return True
-            elif any(self.need_repair):
+            if any(self.need_repair):
                 logger.info("Auto search stopped, because fleet died")
-                # Re-enter to reset fleet position
+                # 重新进入以重置舰队位置。
                 prev = self.zone
                 self.globe_goto(self.zone_nearest_azur_port(self.zone))
                 self.handle_fog_block(repair=True)
                 self.globe_goto(prev, types="STRONGHOLD")
                 return False
-            else:
-                logger.info("Auto search stopped, because fleet stuck")
-                # Re-enter to reset fleet position
-                prev = self.zone
-                self.globe_goto(self.zone_nearest_azur_port(self.zone))
-                self.handle_fog_block(repair=False)
-                self.globe_goto(prev, types="STRONGHOLD")
-                continue
+            logger.info("Auto search stopped, because fleet stuck")
+            # 重新进入以重置舰队位置。
+            prev = self.zone
+            self.globe_goto(self.zone_nearest_azur_port(self.zone))
+            self.handle_fog_block(repair=False)
+            self.globe_goto(prev, types="STRONGHOLD")
+            continue
 
     def run_stronghold(self):
         """
@@ -100,8 +99,7 @@ class OpsiStronghold(OSMap):
             result = self.run_stronghold_one_fleet(fleet)
             if result:
                 return True
-            else:
-                continue
+            continue
 
         logger.critical("Unable to clear boss, fleets exhausted")
         return False

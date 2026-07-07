@@ -257,8 +257,7 @@ class Radar:
             point[point > 500] -= 1000
             self.port_loca = point
             return point
-        else:
-            return None
+        return None
 
     def predict_port_inside(self, image):
         """
@@ -387,5 +386,4 @@ class Radar:
         limited = point_limit(nearest.location, area=camera_sight)
         if nearest.location == limited:
             return nearest
-        else:
-            return self[limited]
+        return self[limited]

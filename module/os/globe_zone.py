@@ -100,7 +100,7 @@ class ZoneManager:
         """
         if isinstance(name, Zone):
             return name
-        elif isinstance(name, int):
+        if isinstance(name, int):
             try:
                 return self.zones.select(zone_id=name)[0]
             except IndexError as e:
@@ -175,7 +175,6 @@ class ZoneManager:
         """
         if 1 <= hazard_level <= 6:
             return self.zones.select(hazard_level=hazard_level).delete(self.zones.select(region=5))
-        elif hazard_level == 10:
+        if hazard_level == 10:
             return self.zones.select(region=5)
-        else:
-            raise ScriptError(f"Invalid hazard_level of zones: {hazard_level}")
+        raise ScriptError(f"Invalid hazard_level of zones: {hazard_level}")

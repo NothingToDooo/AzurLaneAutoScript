@@ -127,12 +127,11 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             self.device.sleep(0.3)
             self.device.screenshot()
             return True
-        elif self.handle_map_event():
+        if self.handle_map_event():
             self.ensure_no_map_event()
             self._os_map_event_handled = True
             return True
-        else:
-            return False
+        return False
 
     def handle_mystery(self, button=None):
         """
@@ -140,8 +139,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         """
         if self._os_map_event_handled and button.predict_fleet() and button.predict_current_fleet():
             return "get_item"
-        else:
-            return False
+        return False
 
     @staticmethod
     def _get_goto_expected(grid):
@@ -150,10 +148,9 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         """
         if grid.is_enemy:
             return "combat"
-        elif grid.is_resource or grid.is_meowfficer or grid.is_exclamation:
+        if grid.is_resource or grid.is_meowfficer or grid.is_exclamation:
             return "mystery"
-        else:
-            return ""
+        return ""
 
     def hp_retreat_triggered(self):
         return False
@@ -486,8 +483,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         if self.fleet_selector.ensure_to_be(index):
             self.wait_until_camera_stable()
             return True
-        else:
-            return False
+        return False
 
     def parse_fleet_filter(self):
         """

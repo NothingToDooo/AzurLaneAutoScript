@@ -243,14 +243,13 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             self.fleet_repair(revert=revert)
             self.hp_reset()
             return True
-        else:
-            logger.info(
-                "No ship found to be below threshold "
-                f"{int(self.config.OpsiGeneral_RepairThreshold * 100)!s}%, "
-                "continue OS exploration"
-            )
-            self.hp_reset()
-            return False
+        logger.info(
+            "No ship found to be below threshold "
+            f"{int(self.config.OpsiGeneral_RepairThreshold * 100)!s}%, "
+            "continue OS exploration"
+        )
+        self.hp_reset()
+        return False
 
     def fleet_resolve(self, revert=True):
         """
@@ -405,20 +404,18 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                     "set OpsiMeowfficerFarming.ActionPointPreserve to 300 temporarily"
                 )
                 return 300
-            else:
-                logger.info("Just less than 1 day to OpSi reset, set ActionPointPreserve to 0 temporarily")
-                return 0
-        elif self.is_cl1_enabled and remain <= 2:
+            logger.info("Just less than 1 day to OpSi reset, set ActionPointPreserve to 0 temporarily")
+            return 0
+        if self.is_cl1_enabled and remain <= 2:
             logger.info(
                 "Just less than 3 days to OpSi reset, set ActionPointPreserve to 1000 temporarily for hazard 1 leveling"
             )
             return 1000
-        elif remain <= 2:
+        if remain <= 2:
             logger.info("Just less than 3 days to OpSi reset, set ActionPointPreserve to 300 temporarily")
             return 300
-        else:
-            logger.info("Not close to OpSi reset")
-            return 2000
+        logger.info("Not close to OpSi reset")
+        return 2000
 
     def handle_after_auto_search(self):
         logger.hr("After auto search", level=2)
@@ -680,16 +677,15 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             if "akashi" in result:
                 self._solved_map_event.add("is_akashi")
                 return True
-            elif "event" in result and grid.is_logging_tower:
+            if "event" in result and grid.is_logging_tower:
                 self._solved_map_event.add("is_logging_tower")
                 return True
-            elif "event" in result and grid.is_scanning_device:
+            if "event" in result and grid.is_scanning_device:
                 self._solved_map_event.add("is_scanning_device")
                 self.os_auto_search_run(drop=drop)
                 return True
-            else:
-                logger.warning(f"Arrive question with unexpected result: {result}, expected: {grid.str}")
-                continue
+            logger.warning(f"Arrive question with unexpected result: {result}, expected: {grid.str}")
+            continue
 
         logger.warning("Failed to goto question mark after 5 trail, this might be 2 adjacent fleet mechanism, stopped")
         return False
@@ -789,8 +785,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             if "event" in result:
                 self._solved_map_event.add("is_exploration_reward")
                 return True
-            else:
-                return False
+            return False
 
         grids = self.view.select(is_akashi=True)
         if "is_akashi" not in self._solved_map_event and grids and grids[0].is_akashi:
@@ -804,13 +799,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 if "akashi" in result:
                     self._solved_map_event.add("is_akashi")
                     return True
-                else:
-                    return False
-            else:
-                logger.info(f"Akashi ({grid}) is near current fleet ({fleet})")
-                self.handle_akashi_supply_buy(grid)
-                self._solved_map_event.add("is_akashi")
-                return True
+                return False
+            logger.info(f"Akashi ({grid}) is near current fleet ({fleet})")
+            self.handle_akashi_supply_buy(grid)
+            self._solved_map_event.add("is_akashi")
+            return True
 
         grids = self.view.select(is_scanning_device=True)
         if "is_scanning_device" not in self._solved_map_event and grids and grids[0].is_scanning_device:
@@ -830,8 +823,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             if "event" in result:
                 self._solved_map_event.add("is_scanning_device")
                 return True
-            else:
-                return False
+            return False
 
         grids = self.view.select(is_logging_tower=True)
         if "is_logging_tower" not in self._solved_map_event and grids and grids[0].is_logging_tower:
@@ -845,8 +837,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             if "event" in result:
                 self._solved_map_event.add("is_logging_tower")
                 return True
-            else:
-                return False
+            return False
 
         grids = self.view.select(is_fleet_mechanism=True)
         if (
@@ -865,10 +856,9 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 self.os_auto_search_run(drop=drop)
                 self._solved_map_event.add("is_fleet_mechanism")
                 return True
-            else:
-                logger.info("One of the fleet mechanism is solved")
-                self._solved_fleet_mechanism = True
-                return True
+            logger.info("One of the fleet mechanism is solved")
+            self._solved_fleet_mechanism = True
+            return True
 
         logger.info("No map event")
         return False
