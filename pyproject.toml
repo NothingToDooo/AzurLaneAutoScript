@@ -48,6 +48,7 @@ target-version = "py314"
 [tool.ruff.lint]
 select = [
     "A",
+    "ANN401",
     "ARG001",
     "ARG003",
     "B",

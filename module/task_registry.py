@@ -1,9 +1,21 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from importlib import import_module
-from typing import Any
+from typing import Protocol
 
-type TaskArgsFactory = Callable[[Any], tuple[tuple[Any, ...], dict[str, Any]]]
+
+class CampaignConfig(Protocol):
+    Campaign_Name: str
+    Campaign_Event: str
+    Campaign_Mode: str
+
+
+class TaskRunner(Protocol):
+    config: CampaignConfig
+    device: object
+
+
+type TaskArgsFactory = Callable[[TaskRunner], tuple[tuple[object, ...], dict[str, object]]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -14,7 +26,7 @@ class TaskSpec:
     args_factory: TaskArgsFactory | None = None
     task_name: str | None = None
 
-    def execute(self, runner: Any) -> None:
+    def execute(self, runner: TaskRunner) -> None:
         module = import_module(self.module_name)
         task_class = getattr(module, self.class_name)
         init_kwargs = {
@@ -33,13 +45,13 @@ class FunctionTaskSpec:
     module_name: str
     function_name: str
 
-    def execute(self, runner: Any) -> None:
+    def execute(self, runner: TaskRunner) -> None:
         module = import_module(self.module_name)
         function = getattr(module, self.function_name)
         function(config=runner.config)
 
 
-def _campaign_args(runner: Any) -> tuple[tuple[Any, ...], dict[str, Any]]:
+def _campaign_args(runner: TaskRunner) -> tuple[tuple[object, ...], dict[str, object]]:
     config = runner.config
     return (
         (),

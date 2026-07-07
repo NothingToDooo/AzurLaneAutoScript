@@ -759,13 +759,13 @@ class ConfigUpdater:
     def _override(self, data):
         return data
 
-    def save_callback(self, key: str, value: t.Any) -> t.Iterable[tuple[str, t.Any]]:
+    def save_callback(self, key: str, value: object) -> t.Iterable[tuple[str, object]]:
         """
-        参数：
+        Args:
             key：配置 json 中的键路径，例如 "Main.Emotion.Fleet1Value"。
             value：用户设置的值，例如 "98"。
 
-        生成：
+        Yields:
             str：需要写入配置 json 的键路径，例如 "Main.Emotion.Fleet1Record"。
             any：需要写入的值，例如 "2020-01-01 00:00:00"。
         """

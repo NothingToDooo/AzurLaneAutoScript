@@ -26,6 +26,8 @@ from module.retire.dock import CARD_EMOTION_GRIDS, CARD_GRIDS, CARD_LEVEL_GRIDS,
 if TYPE_CHECKING:
     from module.base.button import ButtonGrid
 
+type ScannerLimitValue = int | str
+
 
 class EmotionDigit(Digit):
     def pre_process(self, image):
@@ -93,7 +95,7 @@ class Scanner(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def limit_value(self, value) -> Any:
+    def limit_value(self, value) -> ScannerLimitValue:
         pass
 
     def clear(self) -> None:
