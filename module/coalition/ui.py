@@ -69,16 +69,16 @@ class CoalitionUI(Combat):
     def coalition_set_fleet(self, event, mode):
         """
         Args:
-            event (str): Event name.
+            event (str): 活动名称。
             mode (str): 'single' or 'multi'
 
         Returns:
-            bool: If clicked
+            bool: 是否发生点击。
 
         Pages:
             in: FLEET_PREPARATION
         """
-        fleet_switch = Switch("FleetMode", is_selector=True, offset=0)  # No offset for color match
+        fleet_switch = Switch("FleetMode", is_selector=True, offset=0)  # 颜色匹配不使用 offset。
         if event == "coalition_20230323":
             fleet_switch.add_state("single", coalition_assets.FROSTFALL_SWITCH_SINGLE)
             fleet_switch.add_state("multi", coalition_assets.FROSTFALL_SWITCH_MULTI)
@@ -103,12 +103,11 @@ class CoalitionUI(Combat):
         if mode == "single":
             fleet_switch.set("single", main=self)
             return True
-        elif mode == "multi":
+        if mode == "multi":
             fleet_switch.set("multi", main=self)
             return True
-        else:
-            logger.warning(f"Unknown coalition fleet mode: {mode}")
-            return False
+        logger.warning(f"Unknown coalition fleet mode: {mode}")
+        return False
 
     @staticmethod
     def coalition_get_entrance(event, stage):
@@ -258,25 +257,24 @@ class CoalitionUI(Combat):
     def coalition_get_fleet_preparation(event):
         """
         Args:
-            event (str): Event name.
+            event (str): 活动名称。
 
         Returns:
             Button:
         """
         if event == "coalition_20230323":
             return coalition_assets.FROSTFALL_FLEET_PREPARATION
-        elif event == "coalition_20240627":
+        if event == "coalition_20240627":
             return coalition_assets.ACEDEMY_FLEET_PREPARATION
-        elif event == "coalition_20250626":
+        if event == "coalition_20250626":
             return coalition_assets.NEONCITY_FLEET_PREPARATION
-        elif event == "coalition_20251120":
+        if event == "coalition_20251120":
             return coalition_assets.DAL_FLEET_PREPARATION
-        elif event == "coalition_20260122":
-            # FASHION reuses NEONCITY, just (-12, -12) shifted
+        if event == "coalition_20260122":
+            # FASHION 复用 NEONCITY，只整体偏移 (-12, -12)。
             return coalition_assets.NEONCITY_FLEET_PREPARATION
-        else:
-            logger.error(f"FLEET_PREPARATION is not defined in event {event}")
-            raise ScriptError
+        logger.error(f"FLEET_PREPARATION is not defined in event {event}")
+        raise ScriptError
 
     def handle_fleet_preparation(self, event, stage, mode):
         """

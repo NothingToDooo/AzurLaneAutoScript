@@ -57,21 +57,16 @@ class GuildLogistics(GuildBase):
 
     def _is_in_guild_logistics(self):
         """
-        Color sample the GUILD_LOGISTICS_ENSURE_CHECK
-        to determine whether is currently
-        visible or not
+        通过 GUILD_LOGISTICS_ENSURE_CHECK 颜色采样判断当前是否在后勤页。
 
         Pages:
             in: GUILD_LOGISTICS
             out: GUILD_LOGISTICS
         """
-        # Axis (181, 97, 99) and Azur (148, 178, 255)
-        if self.image_color_count(
+        # 赤色阵营 (181, 97, 99)，蓝色阵营 (148, 178, 255)。
+        return self.image_color_count(
             GUILD_LOGISTICS_ENSURE_CHECK, color=(181, 97, 99), threshold=221, count=400
-        ) or self.image_color_count(GUILD_LOGISTICS_ENSURE_CHECK, color=(148, 178, 255), threshold=221, count=400):
-            return True
-        else:
-            return False
+        ) or self.image_color_count(GUILD_LOGISTICS_ENSURE_CHECK, color=(148, 178, 255), threshold=221, count=400)
 
     def _guild_logistics_ensure(self, skip_first_screenshot=True):
         """
@@ -92,14 +87,12 @@ class GuildLogistics(GuildBase):
 
     def _guild_logistics_mission_available(self):
         """
-        Color sample the GUILD_MISSION area to determine
-        whether the button is enabled, mission already
-        in progress, or no more missions can be accepted
+        通过 GUILD_MISSION 区域颜色判断任务按钮状态。
 
-        Used at least twice, 'Collect' and 'Accept'
+        领取和接受任务时都会调用。
 
         Returns:
-            bool: If button active
+            bool: 任务按钮是否可点击。
 
         Pages:
             in: GUILD_LOGISTICS
@@ -107,74 +100,66 @@ class GuildLogistics(GuildBase):
         """
         r, g, b = get_color(self.device.image, GUILD_MISSION.area)
         if g > max(r, b) - 10:
-            # Green tick at the bottom right corner if guild mission finished
+            # 任务完成后右下角会出现绿色勾。
             logger.info("Guild mission has finished this week")
             self._guild_logistics_mission_finished = True
             return False
-        elif self.image_color_count(GUILD_MISSION, color=(255, 255, 255), threshold=180, count=400):
-            # Unfinished mission accept/collect range from about 240 to 322
+        if self.image_color_count(GUILD_MISSION, color=(255, 255, 255), threshold=180, count=400):
+            # 未完成任务的接受/领取按钮计数大约在 240 到 322。
             logger.info("Guild mission button active")
             return True
-        elif not self.image_color_count(GUILD_MISSION, color=(255, 255, 255), threshold=180, count=50):
-            # No guild mission counter
+        if not self.image_color_count(GUILD_MISSION, color=(255, 255, 255), threshold=180, count=50):
+            # 没有公会任务计数。
             logger.info("No guild mission found, mission of this week may not started")
             return False
             # if self.image_color_count(GUILD_MISSION_CHOOSE, color=(255, 255, 255), threshold=221, count=100):
-            #     # Guild mission choose available if user is guild master
+            #     # 公会会长可以选择公会任务。
             #     logger.info('Guild mission choose found')
             #     return True
             # else:
             #     logger.info('Guild mission choose not found')
             #     return False
-        else:
-            logger.info("Guild mission button inactive")
-            return False
+        logger.info("Guild mission button inactive")
+        return False
 
     def _guild_logistics_supply_available(self):
         """
-        Color sample the GUILD_SUPPLY area to determine
-        whether the button is enabled or disabled
-
-        mode determines
+        通过 GUILD_SUPPLY 区域颜色判断补给按钮是否可用。
 
         Returns:
-            bool: If button active
+            bool: 补给按钮是否可点击。
 
         Pages:
             in: GUILD_LOGISTICS
             out: GUILD_LOGISTICS
         """
         color = get_color(self.device.image, GUILD_SUPPLY.area)
-        # Active button has white letters, inactive button have gray letters
+        # 可点击按钮是白字，不可点击按钮是灰字。
         if np.max(color) > np.mean(color) + 25:
-            # For members, click to receive supply
-            # For leaders, click to buy supply and receive supply
+            # 成员点击领取补给；会长点击购买并领取补给。
             logger.info("Guild supply button active")
             return True
-        else:
-            logger.info("Guild supply button inactive")
-            return False
+        logger.info("Guild supply button inactive")
+        return False
 
     def _handle_guild_fleet_mission_start(self):
         """
-        Select new weekly fleet mission.
-        Current account must be a guild master or officer.
+        选择新的每周舰队任务。
+
+        当前账号必须是公会会长或军官。
 
         Returns:
-            bool: If clicked
+            bool: 是否发生点击。
         """
         if not self.config.GuildLogistics_SelectNewMission:
             return False
 
         if self.appear_then_click(GUILD_MISSION_NEW, offset=(20, 20), interval=2):
             return True
-        if self.appear_then_click(GUILD_MISSION_SELECT, offset=(20, 20), interval=2):
-            # Select guild mission for guild leader
-            # Hard-coded to select mission: Siren Subjugation III, defeat 300 enemies
-            # This mission has the most guild supply and it's the easiest one for members to finish
-            return True
-
-        return False
+        # 公会会长选择公会任务。
+        # 固定选择“塞壬歼灭 III，击败 300 个敌人”。
+        # 这个任务补给最多，也最容易让成员完成。
+        return self.appear_then_click(GUILD_MISSION_SELECT, offset=(20, 20), interval=2)
 
     def _guild_logistics_collect(self, skip_first_screenshot=True):
         """
@@ -300,13 +285,12 @@ class GuildLogistics(GuildBase):
 
     def _guild_exchange(self):
         """
-        Performs sift check and executes the applicable
-        exchanges, number performed based on limit
-        If unable to exchange at all, loop terminates
-        prematurely
+        根据筛选器执行可用的公会兑换。
+
+        兑换次数由剩余次数限制决定；完全无法兑换时外层流程会提前结束。
 
         Returns:
-            bool: If clicked.
+            bool: 是否发生点击。
 
         Pages:
             in: GUILD_LOGISTICS
@@ -322,12 +306,11 @@ class GuildLogistics(GuildBase):
 
         if len(selected):
             button = EXCHANGE_BUTTONS.buttons[items.index(selected[0])]
-            # Just bored click, will retry in self._guild_logistics_collect
+            # 点击后交给 self._guild_logistics_collect 重试确认。
             self.device.click(button)
             return True
-        else:
-            logger.warning("No guild exchange items satisfy current filter, or not having enough resources")
-            return False
+        logger.warning("No guild exchange items satisfy current filter, or not having enough resources")
+        return False
 
     def guild_logistics(self):
         """

@@ -76,13 +76,8 @@ class Coalition(CoalitionCombat, CampaignEvent):
 
     @property
     def _coalition_has_oil_icon(self):
-        """
-        Game devs are too asshole to drop oil display for UI design
-        https://github.com/LmeSzinc/AzurLaneAutoScript/issues/5214
-        """
-        if self.config.Campaign_Event == "coalition_20260122":
-            return False
-        return True
+        """返回当前共斗活动是否显示油量图标。"""
+        return self.config.Campaign_Event != "coalition_20260122"
 
     def triggered_stop_condition(self, oil_check=False, pt_check=False):
         """

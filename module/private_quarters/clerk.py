@@ -86,14 +86,13 @@ class PQShopClerk(ShopClerk, PQShopUI):
             if item is None:
                 logger.info("Shop buy finished")
                 return True
-            else:
-                self.shop_buy_execute(item)
+            self.shop_buy_execute(item)
 
-                # 购买后导航栏会重置到默认位置，需要移回去继续扫描。
-                self.shop_left_navbar_ensure(2)
-                self.shop_bottom_navbar_ensure(2)
+            # 购买后导航栏会重置到默认位置，需要移回去继续扫描。
+            self.shop_left_navbar_ensure(2)
+            self.shop_bottom_navbar_ensure(2)
 
-                continue
+            continue
 
         logger.warning("Too many items to buy, stopped")
         return True

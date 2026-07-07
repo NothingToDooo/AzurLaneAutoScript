@@ -32,9 +32,9 @@ class GuildBase(UI):
 
     def guild_side_navbar_ensure(self, upper=None, bottom=None):
         """
-        Ensure able to transition to page
-        Whether page has completely loaded is handled
-        separately and optionally
+        确保公会侧边栏能切换到目标页面。
+
+        页面是否完全加载由调用方根据需要另行确认。
 
         Args:
             upper (int):
@@ -55,13 +55,11 @@ class GuildBase(UI):
                 1     for operations.
 
         Returns:
-            bool: if side_navbar set ensured
+            bool: 是否已经确保侧边栏目标项。
         """
         if self._guild_side_navbar.get_total(main=self) == 6:
             if upper == 3 or bottom == 4:
                 logger.warning('Transitions to "apply" is not supported')
                 return False
 
-        if self._guild_side_navbar.set(self, upper=upper, bottom=bottom):
-            return True
-        return False
+        return self._guild_side_navbar.set(self, upper=upper, bottom=bottom)

@@ -36,8 +36,7 @@ class GuildCombat(Combat):
         if super().handle_get_items(drop=drop):
             self.interval_reset(BATTLE_STATUS_CF)
             return True
-        else:
-            return False
+        return False
 
     def handle_exp_info(self):
         """

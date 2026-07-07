@@ -35,23 +35,9 @@ class PQShopUI(ShopUI):
 
     def shop_bottom_navbar_ensure(self, left=None, right=None):
         """
-        Ensure able to transition to page and
-        page has loaded to completion
-        Use 1 arg or the other, never both
-
-        Args:
-            left (int): Depends on ship navs
-                        index starts from 1 then
-                        increments rightward
-            right (int): index stars from 1
-                         then increments leftward
-
-        Returns:
-            bool: if bottom_navbar set ensured
+        确保私宅商店底部导航栏位置。
         """
-        if self._shop_bottom_navbar.set(self, left=left, right=right):
-            return True
-        return False
+        return self._shop_bottom_navbar.set(self, left=left, right=right)
 
     @cached_property
     def _shop_left_navbar(self):
@@ -84,20 +70,6 @@ class PQShopUI(ShopUI):
 
     def shop_left_navbar_ensure(self, upper=None, bottom=None):
         """
-        Ensure able to transition to page and
-        page has loaded to completion
-        Use 1 arg or the other, never both
-
-        Args:
-            upper (int): Depends on ship navs
-                         index starts from 1
-                         then increments downward
-            bottom (int): index starts from 1
-                          then increments upward
-
-        Returns:
-            bool: if bottom_navbar set ensured
+        确保私宅商店左侧导航栏位置。
         """
-        if self._shop_left_navbar.set(self, upper=upper, bottom=bottom):
-            return True
-        return False
+        return self._shop_left_navbar.set(self, upper=upper, bottom=bottom)

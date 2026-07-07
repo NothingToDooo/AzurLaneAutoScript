@@ -92,15 +92,13 @@ class GuildOperations(GuildBase):
 
     def _handle_guild_operations_start(self):
         """
-        Start a new guild operation.
-        Current account must be a guild master or officer.
+        开启新的公会作战。
 
-        Starting the third operation of every month is not recommended. Members can only join 2 operations each month,
-        most of them can't participate in the dispatch in the third. This will affect the evaluation of the dispatch
-        event, resulting in a reduction in the final reward.
+        当前账号必须是公会会长或军官。每月第三次公会作战不建议开启，普通成员每月只能参加两次，
+        第三次通常无法参与派遣，最终会降低派遣评价和奖励。
 
         Returns:
-            bool: If clicked.
+            bool: 是否发生点击。
         """
         if not self.config.GuildOperation_SelectNewOperation:
             return False
@@ -121,10 +119,7 @@ class GuildOperations(GuildBase):
         # - handle_popup_confirm()，确认消耗公会资金。
         # - GUILD_OPERATIONS_JOIN
         # - GUILD_OPERATIONS_ACTIVE_CHECK
-        if self.appear_then_click(guild_assets.GUILD_OPERATIONS_NEW, offset=(20, 20), interval=3):
-            return True
-
-        return False
+        return self.appear_then_click(guild_assets.GUILD_OPERATIONS_NEW, offset=(20, 20), interval=3)
 
     def _guild_operation_fund_insufficient(self):
         """
@@ -146,11 +141,11 @@ class GuildOperations(GuildBase):
     def _guild_operations_get_mode(self):
         """
         Returns:
-            int: Determine which operations menu has loaded
-                0 - No ongoing operations, Officers/Elites/Leader must select one to begin
-                1 - Operations available, displaying a state diagram/web of operations
-                2 - Guild Raid Boss active
-                Otherwise None if unable to ensure or determine the menu at all
+            int: 当前公会作战菜单状态。
+                0 - 没有进行中的作战，需要精英、军官或会长先选择一个。
+                1 - 作战进行中，显示作战节点图。
+                2 - 公会 Raid Boss 已开启。
+                无法确认状态时返回 None。
 
         Pages:
             in: GUILD_OPERATIONS
@@ -164,18 +159,17 @@ class GuildOperations(GuildBase):
                 "an operation difficulty"
             )
             return 0
-        elif self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK):
+        if self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK):
             logger.info("Mode: Operations Active, may proceed to scan and dispatch fleets")
             return 1
-        elif self.appear(guild_assets.GUILD_BOSS_ENTER):
+        if self.appear(guild_assets.GUILD_BOSS_ENTER):
             logger.info("Mode: Guild Raid Boss (GUILD_BOSS_ENTER)")
             return 2
-        elif self.appear(guild_assets.GUILD_OPERATIONS_NEW, offset=(20, 20)):
+        if self.appear(guild_assets.GUILD_OPERATIONS_NEW, offset=(20, 20)):
             logger.info("Mode: Guild Raid Boss (GUILD_OPERATIONS_NEW)")
             return 2
-        else:
-            logger.warning("Operations interface is unrecognized")
-            return None
+        logger.warning("Operations interface is unrecognized")
+        return None
 
     def _guild_operations_get_entrance(self):
         """
@@ -297,12 +291,12 @@ class GuildOperations(GuildBase):
 
     def _guild_operations_get_dispatch(self):
         """
-        Get the button to switch available dispatch
-        In previous version, this function detects the red dot on the switch.
-        But the red dot may not shows for unknown reason sometimes, so we detect the switch itself.
+        获取用于切换到可用派遣舰队的按钮。
+
+        旧版本会检测切换点上的红点；红点偶尔会原因不明地不显示，所以这里直接检测切换点本身。
 
         Returns:
-            Button: Button to switch available dispatch. None if already reach the most right fleet.
+            Button: 切换到可用派遣的按钮；已经在最右侧舰队时返回 None。
 
         Pages:
             in: page_guild, guild operation, operation dispatch preparation (GUILD_DISPATCH_RECOMMEND)
@@ -338,8 +332,7 @@ class GuildOperations(GuildBase):
         if text.endswith("]"):
             logger.info("Already at the most right fleet")
             return None
-        else:
-            return button
+        return button
 
     def _guild_operations_dispatch_switch_fleet(self, skip_first_screenshot=True):
         """

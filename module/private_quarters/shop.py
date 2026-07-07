@@ -127,15 +127,11 @@ class PQShop(PQShopClerk, PQStatus):
         """
         if self.config.PrivateQuarters_BuyRoses:
             if item.sub_genre == "roses":
-                if self._currency < 24000:
-                    return False
-                return True
+                return self._currency >= 24000
 
         if self.config.PrivateQuarters_BuyCake:
             if item.sub_genre == "cake":
-                if self.gems < 210:
-                    return False
-                return True
+                return self.gems >= 210
 
         return False
 

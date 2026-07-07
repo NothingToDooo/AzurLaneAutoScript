@@ -105,7 +105,7 @@ class PQInteract(UI):
         if target_ship not in self.available_targets:
             logger.error(f"Unsupported target ship: {target_title}, cannot continue subtask")
             return False
-        elif len(self.available_targets[target_ship]) < 2:
+        if len(self.available_targets[target_ship]) < 2:
             logger.error(f"Missing tuple info page locale for target ship: {target_title}, cannot continue subtask")
             return False
 
@@ -151,9 +151,7 @@ class PQInteract(UI):
         """
         if self.appear(pq_assets.PRIVATE_QUARTERS_LOADING_CHECK, offset=(20, 20)):
             return True
-        if self.appear(POPUP_CANCEL, offset=(20, 20)):
-            return True
-        return False
+        return bool(self.appear(POPUP_CANCEL, offset=(20, 20)))
 
     def _pq_goto_room_enter(self, target_ship):
         """
@@ -170,7 +168,7 @@ class PQInteract(UI):
         if target_ship not in self.available_targets:
             logger.error(f"Unsupported target ship: {target_title}, cannot continue subtask")
             return False
-        elif len(self.available_targets[target_ship]) < 1:
+        if len(self.available_targets[target_ship]) < 1:
             logger.error(f"Missing tuple info room entrance for target ship: {target_title}, cannot continue subtask")
             return False
 

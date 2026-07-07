@@ -15,19 +15,18 @@ class GuildLobby(GuildBase):
     def guild_lobby_get_report(self):
         """
         Returns:
-            Button: Button to enter guild report.
+            Button: 进入公会报告的按钮。
         """
-        # Find red color in the area of GUILD_REPORT_AVAILABLE
+        # 在 GUILD_REPORT_AVAILABLE 区域寻找红点。
         image = color_similarity_2d(self.image_crop(GUILD_REPORT_AVAILABLE, copy=False), color=(255, 8, 8))
         points = np.array(np.where(image > 221)).T[:, ::-1]
         if len(points):
-            # The center of red dot
+            # 红点中心。
             points = Points(points).group(threshold=40) + GUILD_REPORT_AVAILABLE.area[:2]
-            # Shift to the center of report icon
+            # 移到报告图标中心。
             area = area_offset((-51, -45, -13, 0), offset=points[0])
             return Button(area=area, color=(255, 255, 255), button=area, name="GUILD_REPORT")
-        else:
-            return None
+        return None
 
     def _guild_lobby_collect(self, skip_first_screenshot=True):
         """
