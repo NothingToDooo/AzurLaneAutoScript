@@ -156,6 +156,7 @@ class MissionHandler(GlobeOperation, ZoneManager):
             if self.handle_popup_confirm("OS_MISSION_CHECKOUT"):
                 # Popup: Submarine will retreat after exiting current zone.
                 continue
+        return False
 
     def os_mission_overview_accept(self):
         """

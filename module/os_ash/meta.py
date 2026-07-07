@@ -328,6 +328,7 @@ class OpsiAshBeacon(Meta):
             # Click
             if self.appear_then_click(ash_assets.HELP_CONFIRM, offset=(30, 30), interval=3):
                 continue
+        return False
 
     def _dossier_auto_attack(self):
         """
@@ -367,6 +368,7 @@ class OpsiAshBeacon(Meta):
             if self.appear(BATTLE_PREPARATION, offset=(30, 30), interval=2):
                 self.device.click(BACK_ARROW)
                 continue
+        return False
 
     def _begin_meta(self):
         """
@@ -463,6 +465,7 @@ class OpsiAshBeacon(Meta):
                 continue
             if self.appear_then_click(ash_assets.META_ENTRANCE, offset=(20, 300), interval=2):
                 continue
+        return False
 
     def ensure_dossier_page(self, skip_first_screenshot=True):
         self.ui_ensure(page_reward)
@@ -482,6 +485,7 @@ class OpsiAshBeacon(Meta):
             if self.appear(ash_assets.ASH_SHOWDOWN, offset=(30, 30)):
                 self.device.click(ash_assets.META_MAIN_DOSSIER_ENTRANCE)
                 continue
+        return False
 
     def _begin_beacon(self):
         logger.hr("Meta Beacon Attack")
@@ -615,6 +619,7 @@ class AshBeaconAssist(Meta):
             if self.appear_then_click(ash_assets.DOSSIER_LIST, offset=(20, 20), interval=2):
                 logger.info("In meta page dossier")
                 continue
+        return False
 
     def _begin_meta_assist(self):
         logger.hr("Meta Beacon Assist")

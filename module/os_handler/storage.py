@@ -229,6 +229,7 @@ class StorageHandler(GlobeOperation, ZoneManager):
                 logger.info(f"No more {item} items in storage")
                 self.storage_quit()
                 return False
+        return False
 
     def storage_get_next_item(self, item, use_logger=True):
         """

@@ -100,6 +100,7 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
                 confirm_timer.reset()
                 missing_timer.reset()
                 continue
+        return False
 
     def wait_until_order_finished(self):
         for _ in self.loop():

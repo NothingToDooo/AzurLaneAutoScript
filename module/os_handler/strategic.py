@@ -25,6 +25,7 @@ class StrategicSearchHandler(MapEventHandler):
             if self.match_template_color(os_assets.STRATEGIC_SEARCH_MAP_OPTION_OFF, offset=(20, 20), interval=2):
                 self.device.click(os_assets.STRATEGIC_SEARCH_MAP_OPTION_OFF)
                 continue
+        return False
 
     def strategic_search_set_tab(self):
         logger.info("Strategic search set tab")
@@ -125,6 +126,7 @@ class StrategicSearchHandler(MapEventHandler):
                 continue
             if self.is_in_map():
                 return True
+        return False
 
     def strategic_search_start(self):
         """
