@@ -21,19 +21,13 @@ class GeneratedConfig:
 
     # 配置组 `Emulator`
     Emulator_Serial = "auto"
-    # 可选项：auto, com.bilibili.azurlane, com.bilibili.blhx.huawei, com.bilibili.blhx.honor, com.bilibili.blhx.mi,
-    # com.tencent.tmgp.bilibili.blhx, com.bilibili.blhx.baidu, com.bilibili.blhx.qihoo,
-    # com.bilibili.blhx.nearme.gamecenter, com.bilibili.blhx.vivo, com.bilibili.blhx.mz, com.bilibili.blhx.dl,
-    # com.bilibili.blhx.lenovo, com.bilibili.blhx.uc, com.bilibili.blhx.mzw, com.yiwu.blhx.yx15,
-    # com.bilibili.blhx.m4399, com.bilibili.blhx.bilibiliMove
+    # 可选项：auto, com.bilibili.azurlane
     Emulator_PackageName = "auto"
     # 可选项：disabled, cn_android-0, cn_android-1, cn_android-2, cn_android-3, cn_android-4, cn_android-5,
     # cn_android-6, cn_android-7, cn_android-8, cn_android-9, cn_android-10, cn_android-11, cn_android-12,
     # cn_android-13, cn_android-14, cn_android-15, cn_android-16, cn_android-17, cn_android-18, cn_android-19,
     # cn_android-20, cn_android-21, cn_android-22, cn_android-23, cn_android-24, cn_android-25, cn_android-26,
-    # cn_android-27, cn_android-28, cn_ios-0, cn_ios-1, cn_ios-2, cn_ios-3, cn_ios-4, cn_ios-5, cn_ios-6, cn_ios-7,
-    # cn_ios-8, cn_ios-9, cn_ios-10, cn_channel-0, cn_channel-1, cn_channel-2, cn_channel-3, cn_channel-4,
-    # cn_channel-5
+    # cn_android-27, cn_android-28
     Emulator_ServerName = "disabled"
     # 可选项：nemu_ipc
     Emulator_ScreenshotMethod = "nemu_ipc"
@@ -376,7 +370,11 @@ class GeneratedConfig:
     GeneralShop_Refresh = False
     GeneralShop_BuySkinBox = False
     GeneralShop_ConsumeCoins = False
-    GeneralShop_Filter = "BookRedT3 > BookYellowT3 > BookBlueT3 > BookRedT2\n> Cube\n> FoodT6 > FoodT5"
+    GeneralShop_Filter = (
+        "BookRedT3 > BookYellowT3 > BookBlueT3 > BookRedT2\n"
+        "> Cube\n"
+        "> FoodT6 > FoodT5"
+    )
 
     # 配置组 `GuildShop`
     GuildShop_Refresh = True

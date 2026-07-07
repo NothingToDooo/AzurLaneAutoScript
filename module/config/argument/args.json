@@ -11,23 +11,7 @@
         "value": "auto",
         "option": [
           "auto",
-          "com.bilibili.azurlane",
-          "com.bilibili.blhx.huawei",
-          "com.bilibili.blhx.honor",
-          "com.bilibili.blhx.mi",
-          "com.tencent.tmgp.bilibili.blhx",
-          "com.bilibili.blhx.baidu",
-          "com.bilibili.blhx.qihoo",
-          "com.bilibili.blhx.nearme.gamecenter",
-          "com.bilibili.blhx.vivo",
-          "com.bilibili.blhx.mz",
-          "com.bilibili.blhx.dl",
-          "com.bilibili.blhx.lenovo",
-          "com.bilibili.blhx.uc",
-          "com.bilibili.blhx.mzw",
-          "com.yiwu.blhx.yx15",
-          "com.bilibili.blhx.m4399",
-          "com.bilibili.blhx.bilibiliMove"
+          "com.bilibili.azurlane"
         ]
       },
       "ServerName": {
@@ -63,24 +47,7 @@
           "cn_android-25",
           "cn_android-26",
           "cn_android-27",
-          "cn_android-28",
-          "cn_ios-0",
-          "cn_ios-1",
-          "cn_ios-2",
-          "cn_ios-3",
-          "cn_ios-4",
-          "cn_ios-5",
-          "cn_ios-6",
-          "cn_ios-7",
-          "cn_ios-8",
-          "cn_ios-9",
-          "cn_ios-10",
-          "cn_channel-0",
-          "cn_channel-1",
-          "cn_channel-2",
-          "cn_channel-3",
-          "cn_channel-4",
-          "cn_channel-5"
+          "cn_android-28"
         ]
       },
       "ScreenshotMethod": {

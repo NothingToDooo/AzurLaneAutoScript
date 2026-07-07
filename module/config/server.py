@@ -10,49 +10,8 @@ VALID_SERVER = ["cn"]
 VALID_PACKAGE = {
     "com.bilibili.azurlane": "cn",
 }
-VALID_CHANNEL_PACKAGE = {
-    # App stores
-    "com.bilibili.blhx.huawei": ("cn", "华为"),
-    "com.bilibili.blhx.honor": ("cn", "荣耀"),
-    "com.bilibili.blhx.mi": ("cn", "小米"),
-    "com.tencent.tmgp.bilibili.blhx": ("cn", "腾讯应用宝"),
-    "com.bilibili.blhx.baidu": ("cn", "百度"),
-    "com.bilibili.blhx.qihoo": ("cn", "360"),
-    "com.bilibili.blhx.nearme.gamecenter": ("cn", "oppo"),
-    "com.bilibili.blhx.vivo": ("cn", "vivo"),
-    "com.bilibili.blhx.mz": ("cn", "魅族"),
-    "com.bilibili.blhx.dl": ("cn", "当乐"),
-    "com.bilibili.blhx.lenovo": ("cn", "联想"),
-    # 'com.bilibili.blhx.letv': ('cn', '乐视'),  # Not confirmed
-    # 'com.bilibili.blhx.gionee': ('cn', '金立'),  # Not confirmed
-    # 3rd party gaming platforms
-    "com.bilibili.blhx.uc": ("cn", "UC九游"),
-    "com.bilibili.blhx.mzw": ("cn", "拇指玩"),
-    "com.yiwu.blhx.yx15": ("cn", "一五游戏"),
-    "com.bilibili.blhx.m4399": ("cn", "4399"),
-    "com.bilibili.blhx.bilibiliMove": ("cn", "迁移"),
-}
 DICT_PACKAGE_TO_ACTIVITY = {
-    # com.manjuu.azurlane.MainActivity
-    # VALID_PACKAGE
     "com.bilibili.azurlane": "com.manjuu.azurlane.MainActivity",
-    # App stores
-    "com.bilibili.blhx.huawei": "com.manjuu.azurlane.SplashActivity",
-    "com.bilibili.blhx.mi": "com.manjuu.azurlane.SplashActivity",
-    "com.tencent.tmgp.bilibili.blhx": "com.manjuu.azurlane.SplashActivity",
-    "com.bilibili.blhx.baidu": "com.manjuu.azurlane.SplashActivity",
-    "com.bilibili.blhx.qihoo": "com.manjuu.azurlane.SplashActivity",
-    "com.bilibili.blhx.nearme.gamecenter": "com.manjuu.azurlane.SplashActivity",
-    "com.bilibili.blhx.vivo": "com.manjuu.azurlane.SplashActivity",
-    "com.bilibili.blhx.mz": "com.manjuu.azurlane.SplashActivity",
-    "com.bilibili.blhx.dl": "com.manjuu.azurlane.SplashActivity",
-    "com.bilibili.blhx.lenovo": "com.manjuu.azurlane.SplashActivity",
-    # 3rd party gaming platforms
-    "com.bilibili.blhx.uc": "com.manjuu.azurlane.SplashActivity",
-    "com.bilibili.blhx.mzw": "com.manjuu.azurlane.SplashActivity",
-    "com.yiwu.blhx.yx15": "com.manjuu.azurlane.SplashActivity",
-    "com.bilibili.blhx.m4399": "com.manjuu.azurlane.SplashActivity",
-    "com.bilibili.blhx.bilibiliMove": "com.manjuu.azurlane.SplashActivity",
 }
 VALID_SERVER_LIST = {
     "cn_android": [
@@ -86,27 +45,6 @@ VALID_SERVER_LIST = {
         "长弓计划",
         "裁决协议",
     ],
-    "cn_ios": [
-        "夏威夷",
-        "珊瑚海",
-        "中途岛",
-        "铁底湾",
-        "所罗门",
-        "马里亚纳",
-        "莱特湾",
-        "硫磺岛",
-        "冲绳岛",
-        "阿留申群岛",
-        "马耳他",
-    ],
-    "cn_channel": [
-        "皇家巡游",
-        "大西洋宪章",
-        "十字军行动",
-        "龙骑兵行动",
-        "冥王星行动",
-        "群岛计划",
-    ],
 }
 
 
@@ -114,14 +52,12 @@ def to_server(package_or_server: str) -> str:
     """
     转换包名或服务器名到服务器。
 
-    未知包名按国服渠道服处理。
+    未知包名按国服处理。
     """
     if package_or_server in VALID_SERVER:
         return package_or_server
     if package_or_server in VALID_PACKAGE:
         return VALID_PACKAGE[package_or_server]
-    if package_or_server in VALID_CHANNEL_PACKAGE:
-        return VALID_CHANNEL_PACKAGE[package_or_server][0]
     return "cn"
 
 

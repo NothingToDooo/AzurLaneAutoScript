@@ -14,7 +14,7 @@ from module.base.decorator import cached_property, del_cached_property, run_once
 from module.base.timer import Timer
 from module.base.utils import ensure_time
 from module.config.deep import deep_get
-from module.config.server import VALID_CHANNEL_PACKAGE, VALID_PACKAGE
+from module.config.server import VALID_PACKAGE
 from module.device.connection_attr import ConnectionAttr
 from module.device.env import IS_WINDOWS
 from module.device.method.pool import WORKER_POOL
@@ -626,7 +626,7 @@ class Connection(ConnectionAttr):
         def connect(s):
             try:
                 msg = self.adb_client.connect(s)
-            except (AdbError, OSError):
+            except AdbError, OSError:
                 return ""
             logger.info(msg)
             return msg
@@ -963,7 +963,7 @@ class Connection(ConnectionAttr):
         返回：
             list[str]：包名列表。
         """
-        return [p for p in self.list_package(show_log=show_log) if p in VALID_PACKAGE or p in VALID_CHANNEL_PACKAGE]
+        return [p for p in self.list_package(show_log=show_log) if p in VALID_PACKAGE]
 
     def detect_package(self, set_config=True):
         """

@@ -1,3 +1,4 @@
+import json
 import re
 import textwrap
 import typing as t
@@ -9,10 +10,9 @@ from deploy.utils import DEPLOY_TEMPLATE, poor_yaml_read, poor_yaml_write
 from module.base.decorator import cached_property
 from module.base.timer import timer
 from module.config.deep import deep_default, deep_get, deep_iter, deep_set
-from module.config.server import VALID_CHANNEL_PACKAGE, VALID_PACKAGE, VALID_SERVER_LIST, to_package, to_server
+from module.config.server import VALID_PACKAGE, VALID_SERVER_LIST, to_server
 from module.config.utils import (
     LANGUAGES,
-    SERVER_TO_LANG,
     data_to_type,
     filepath_args,
     filepath_argument,
@@ -83,10 +83,16 @@ def _generated_string_segments(value: str) -> list[str]:
     return segments
 
 
+def _generated_string(value: str) -> str:
+    return json.dumps(value, ensure_ascii=False)
+
+
 def _generated_value(name: str, value) -> list[str]:
     if isinstance(value, str) and "\n" in value:
         lines = [f"{GENERATED_INDENT}{name} = ("]
-        lines.extend(f"{GENERATED_INDENT * 2}{segment!r}" for segment in _generated_string_segments(value))
+        lines.extend(
+            f"{GENERATED_INDENT * 2}{_generated_string(segment)}" for segment in _generated_string_segments(value)
+        )
         lines.append(f"{GENERATED_INDENT})")
         return lines
     if isinstance(value, dict):
@@ -95,6 +101,8 @@ def _generated_value(name: str, value) -> list[str]:
         return [f"{GENERATED_INDENT}{name}: ClassVar[list[object]] = {value!r}"]
     if isinstance(value, set):
         return [f"{GENERATED_INDENT}{name}: ClassVar[set[object]] = {value!r}"]
+    if isinstance(value, str):
+        return [f"{GENERATED_INDENT}{name} = {_generated_string(value)}"]
     return [f"{GENERATED_INDENT}{name} = {value!r}"]
 
 
@@ -367,11 +375,6 @@ class ConfigGenerator:
             if deep_get(new, keys=path) == package:
                 deep_set(new, keys=path, value=server.upper())
 
-        for package, server_and_channel in VALID_CHANNEL_PACKAGE.items():
-            server, channel = server_and_channel
-            name = deep_get(new, keys=["Emulator", "PackageName", to_package(server)])
-            value = f"{name} {channel}渠道服 {package}" if lang == SERVER_TO_LANG[server] else f"{name} {package}"
-            deep_set(new, keys=["Emulator", "PackageName", package], value=value)
         # 游戏服务器名称。
         for server, _list in VALID_SERVER_LIST.items():
             for index in range(len(_list)):
@@ -383,22 +386,6 @@ class ConfigGenerator:
         for path, _ in deep_iter(self.gui, depth=2):
             group, key = path
             deep_load(keys=["Gui", group], words=(key,))
-        # 繁体中文用字替换。
-        dic_repl = {
-            "設置": "設定",
-            "支持": "支援",
-            "啓": "啟",
-            "异": "異",
-            "服務器": "伺服器",
-            "文件": "檔案",
-        }
-        if lang == "zh-TW":
-            for path, raw_value in deep_iter(new, depth=3):
-                value = raw_value
-                for before, after in dic_repl.items():
-                    value = value.replace(before, after)
-                deep_set(new, keys=path, value=value)
-
         write_file(filepath_i18n(lang), new)
 
     @cached_property
@@ -543,7 +530,6 @@ class ConfigGenerator:
     def insert_package(self):
         option = deep_get(self.argument, keys="Emulator.PackageName.option")
         option += list(VALID_PACKAGE.keys())
-        option += list(VALID_CHANNEL_PACKAGE.keys())
         deep_set(self.argument, keys="Emulator.PackageName.option", value=option)
         deep_set(self.args, keys="Alas.Emulator.PackageName.option", value=option)
 

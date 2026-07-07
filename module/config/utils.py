@@ -12,13 +12,6 @@ from module.logger import logger
 from module.submodule.utils import get_mod_filepath, list_mod_instance, list_mod_template
 
 LANGUAGES = ["zh-CN"]
-SERVER_TO_LANG = {
-    "cn": "zh-CN",
-    "en": "en-US",
-    "jp": "ja-JP",
-    "tw": "zh-TW",
-}
-LANG_TO_SERVER = {v: k for k, v in SERVER_TO_LANG.items()}
 DEFAULT_TIME = datetime(2020, 1, 1, 0, 0)
 
 
