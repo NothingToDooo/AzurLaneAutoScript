@@ -128,8 +128,7 @@ class TechnologyTemplate:
     def write(self, file):
         print(f"writing {file}")
         with open(file, "w", encoding="utf-8") as f:
-            for text in self.encode():
-                f.write(text + "\n")
+            f.writelines(f"{text}\n" for text in self.encode())
 
 
 """

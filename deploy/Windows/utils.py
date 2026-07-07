@@ -75,7 +75,7 @@ def poor_yaml_read(file):
     data = {}
     regex = re.compile(r"^(.*?):(.*?)$")
     with open(file, encoding="utf-8") as f:
-        for line in f.readlines():
+        for line in f:
             line = line.strip("\n\r\t ").replace("\\", "/")
             if line.startswith("#"):
                 continue

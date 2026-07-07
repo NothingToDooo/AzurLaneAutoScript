@@ -625,8 +625,7 @@ class MapData:
                 return False
         print(f"Extract: {file}")
         with open(file, "w") as f:
-            for text in self.get_file_lines(has_modified_campaign_base=has_modified_campaign_base):
-                f.write(text + "\n")
+            f.writelines(f"{text}\n" for text in self.get_file_lines(has_modified_campaign_base=has_modified_campaign_base))
         return True
 
 
@@ -683,7 +682,7 @@ class ChapterTemplate:
         if not maps:
             print("No maps found")
             return []
-        print("")
+        print()
 
         print("<<< SELECT MAP >>>")
 
@@ -705,7 +704,7 @@ class ChapterTemplate:
             maps = maps[:1]
             print(f"Selected: {maps[0]}")
 
-        print("")
+        print()
         return maps
 
     def extract(self, maps, folder):

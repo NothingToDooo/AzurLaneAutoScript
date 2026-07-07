@@ -309,8 +309,7 @@ class ConfigGenerator:
             visited_path.add(path)
 
         with open(filepath_code(), "w", encoding="utf-8", newline="") as f:
-            for text in lines:
-                f.write(text + "\n")
+            f.writelines(f"{text}\n" for text in lines)
 
     @timer
     def generate_i18n(self, lang):
@@ -437,7 +436,7 @@ class ConfigGenerator:
         column_width = [4] * 7  # `:---`
         events = []
         with open("./campaign/Readme.md", encoding="utf-8") as f:
-            for text in f.readlines():
+            for text in f:
                 if not re.search(r"^\|.+\|$", text):
                     # 不是表格行。
                     lines.append(text)

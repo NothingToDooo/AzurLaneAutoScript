@@ -238,8 +238,7 @@ def file_write_stream(file: str, data_generator):
         # Write temp file
         with open(file, mode=mode, encoding=encoding, newline=newline) as f:
             f.write(first_chunk)
-            for chunk in data_iter:
-                f.write(chunk)
+            f.writelines(data_iter)
             # Ensure data flush to disk
             f.flush()
             os.fsync(f.fileno())
@@ -251,8 +250,7 @@ def file_write_stream(file: str, data_generator):
         # Write again
         with open(file, mode=mode, encoding=encoding, newline=newline) as f:
             f.write(first_chunk)
-            for chunk in data_iter:
-                f.write(chunk)
+            f.writelines(data_iter)
             # Ensure data flush to disk
             f.flush()
             os.fsync(f.fileno())

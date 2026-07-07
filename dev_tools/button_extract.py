@@ -182,8 +182,7 @@ class ModuleExtractor:
         if not os.path.exists(folder):
             os.mkdir(folder)
         with open(os.path.join(folder, BUTTON_FILE), "w", newline="") as f:
-            for text in self.expression:
-                f.write(text + "\n")
+            f.writelines(f"{text}\n" for text in self.expression)
 
 
 def worker(module):
