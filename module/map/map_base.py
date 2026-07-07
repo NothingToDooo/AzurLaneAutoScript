@@ -363,9 +363,8 @@ class CampaignMap:
             if mode == "init":
                 self.fixup_submarine_fleet()
             return True
-        else:
-            logger.warning("Too many wrong prediction")
-            return False
+        logger.warning("Too many wrong prediction")
+        return False
 
     def reset(self):
         for grid in self:
@@ -416,8 +415,7 @@ class CampaignMap:
         """
         if self._spawn_data_use_loop:
             return self._spawn_data_loop
-        else:
-            return self._spawn_data
+        return self._spawn_data
 
     @spawn_data.setter
     def spawn_data(self, data_list):
@@ -517,9 +515,7 @@ class CampaignMap:
     def is_map_data_poor(self):
         if not self.select(may_enemy=True) or not self.select(may_boss=True) or not self.select(is_spawn_point=True):
             return False
-        if not len(self.spawn_data):
-            return False
-        return True
+        return bool(self.spawn_data)
 
     def show_cost(self):
         logger.info("   " + " ".join(["   " + chr(x + 64 + 1) for x in range(self.shape[0] + 1)]))

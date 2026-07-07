@@ -15,10 +15,9 @@ def location_ensure(location):
     """
     if hasattr(location, "location"):
         return location.location
-    elif isinstance(location, str):
+    if isinstance(location, str):
         return node2location(location)
-    else:
-        return location
+    return location
 
 
 def camera_1d(shape, sight):
@@ -173,15 +172,14 @@ def match_movable(before, spawn, after, fleets, fleet_step=2):
 
     if len(permutations) == 0 or len(permutations[0]) == 0:
         return [], []
-    else:
-        permutations = np.array(permutations)
-        permutations = permutations[np.argsort(np.sum(permutations, axis=1))]
-        distance = np.pad(distance, ((0, 0), (0, 1)), mode="constant", constant_values=base_weight)
-        index_x = permutations
-        index_y = list(range(y)) * int(index_x.shape[0])
-        match = distance[index_y, index_x.ravel()].reshape(-1, y)
-        match = np.sum(match, axis=1)
-        best_match = permutations[int(np.argmax(match))]
-        before = [before[index] for index, match in enumerate(best_match) if match < x]
-        after = [after[index] for index in best_match if index < x]
-        return before, after
+    permutations = np.array(permutations)
+    permutations = permutations[np.argsort(np.sum(permutations, axis=1))]
+    distance = np.pad(distance, ((0, 0), (0, 1)), mode="constant", constant_values=base_weight)
+    index_x = permutations
+    index_y = list(range(y)) * int(index_x.shape[0])
+    match = distance[index_y, index_x.ravel()].reshape(-1, y)
+    match = np.sum(match, axis=1)
+    best_match = permutations[int(np.argmax(match))]
+    before = [before[index] for index, match in enumerate(best_match) if match < x]
+    after = [after[index] for index in best_match if index < x]
+    return before, after

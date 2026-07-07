@@ -12,8 +12,7 @@ class SelectedGrids:
     def __getitem__(self, item):
         if isinstance(item, int):
             return self.grids[item]
-        else:
-            return SelectedGrids(self.grids[item])
+        return SelectedGrids(self.grids[item])
 
     def __contains__(self, item):
         return item in self.grids
@@ -254,8 +253,7 @@ class SelectedGrids:
         if args:
             grids = sorted(self.grids, key=operator.attrgetter(*args))
             return SelectedGrids(grids)
-        else:
-            return self
+        return self
 
     def sort_by_camera_distance(self, camera):
         """

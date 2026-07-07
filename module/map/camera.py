@@ -57,10 +57,9 @@ class Camera(MapOperation):
             # self.device.sleep(0.3)
             self.update(wait_swipe=True)
             return True
-        else:
-            # Drop swipe
-            # self.update(camera=False)
-            return False
+        # Drop swipe
+        # self.update(camera=False)
+        return False
 
     def map_swipe(self, vector):
         """
@@ -122,39 +121,39 @@ class Camera(MapOperation):
                 logger.warning("Perspective error caused by info bar")
                 self.handle_info_bar()
                 return False
-            elif self.appear(GET_ITEMS_1, offset=5):
+            if self.appear(GET_ITEMS_1, offset=5):
                 logger.warning("Perspective error caused by get_items")
                 # Don't use handle_mystery() here since OpSi overrides it.
                 self.device.click(GET_ITEMS_1)
                 return False
-            elif self.appear(GET_ITEMS_1_RYZA, offset=(-20, -100, 20, 20)):
+            if self.appear(GET_ITEMS_1_RYZA, offset=(-20, -100, 20, 20)):
                 logger.warning("Perspective error caused by GET_ITEMS_1_RYZA")
                 self.device.click(GET_ITEMS_1_RYZA)
                 return False
-            elif self.appear(GET_ADAPTABILITY, offset=(20, 20)):
+            if self.appear(GET_ADAPTABILITY, offset=(20, 20)):
                 logger.warning("Perspective error caused by GET_ADAPTABILITY")
                 self.device.click(GET_ADAPTABILITY)
                 return False
-            elif self.handle_story_skip():
+            if self.handle_story_skip():
                 logger.warning("Perspective error caused by story")
                 self.ensure_no_story(skip_first_screenshot=False)
                 return False
-            elif self.appear(GET_MISSION, offset=(20, 20)):
+            if self.appear(GET_MISSION, offset=(20, 20)):
                 logger.warning("Perspective error caused by GET_MISSION")
                 self.device.click(GET_MISSION)
                 return False
-            elif self.is_in_stage():
+            if self.is_in_stage():
                 logger.warning("Image is in stage")
                 raise CampaignEnd("Image is in stage") from e
-            elif self.appear(MAP_PREPARATION, offset=(20, 20)):
+            if self.appear(MAP_PREPARATION, offset=(20, 20)):
                 logger.warning("Image is in MAP_PREPARATION")
                 self.enter_map_cancel()
                 raise CampaignEnd("Image is in MAP_PREPARATION") from e
-            elif self.appear(AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset):
+            if self.appear(AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset):
                 logger.warning("Image is in auto search menu")
                 self.ensure_auto_search_exit()
                 raise CampaignEnd("Image is in auto search menu") from e
-            elif self.appear(GLOBE_GOTO_MAP, offset=(20, 20)):
+            if self.appear(GLOBE_GOTO_MAP, offset=(20, 20)):
                 logger.warning("Image is in OS globe map")
                 self.ui_click(
                     GLOBE_GOTO_MAP,
@@ -164,45 +163,43 @@ class Camera(MapOperation):
                     skip_first_screenshot=True,
                 )
                 return False
-            elif self.appear(AUTO_SEARCH_REWARD, offset=(50, 50)):
+            if self.appear(AUTO_SEARCH_REWARD, offset=(50, 50)):
                 logger.warning("Perspective error caused by AUTO_SEARCH_REWARD")
                 if hasattr(self, "os_auto_search_quit"):
                     self.os_auto_search_quit()
                     return False
-                else:
-                    logger.warning("Cannot find method os_auto_search_quit(), use ui_click() instead")
-                    self.ui_click(
-                        AUTO_SEARCH_REWARD,
-                        check_button=self.is_in_map,
-                        offset=(50, 50),
-                        retry_wait=3,
-                        skip_first_screenshot=True,
-                    )
-                    return False
-            elif self.appear(OPSI_MISSION_CHECK, offset=(20, 20)):
+                logger.warning("Cannot find method os_auto_search_quit(), use ui_click() instead")
+                self.ui_click(
+                    AUTO_SEARCH_REWARD,
+                    check_button=self.is_in_map,
+                    offset=(50, 50),
+                    retry_wait=3,
+                    skip_first_screenshot=True,
+                )
+                return False
+            if self.appear(OPSI_MISSION_CHECK, offset=(20, 20)):
                 logger.warning("Perspective error caused by OPSI_MISSION_CHECK")
                 if hasattr(self, "os_mission_quit"):
                     self.os_mission_quit()
                     return False
-                else:
-                    logger.warning("Cannot find method os_mission_quit(), use ui_click() instead")
-                    self.ui_click(
-                        OPSI_MISSION_CHECK, check_button=self.is_in_map, offset=(200, 5), skip_first_screenshot=True
-                    )
-                    return False
-            elif "opsi" in self.config.task.command.lower() and self.handle_popup_confirm("OPSI"):
+                logger.warning("Cannot find method os_mission_quit(), use ui_click() instead")
+                self.ui_click(
+                    OPSI_MISSION_CHECK, check_button=self.is_in_map, offset=(200, 5), skip_first_screenshot=True
+                )
+                return False
+            if "opsi" in self.config.task.command.lower() and self.handle_popup_confirm("OPSI"):
                 # Always confirm popups in OpSi, same popups in os_map_goto_globe()
                 logger.warning("Perspective error caused by popups")
                 return False
-            elif self.appear(PORT_SUPPLY_CHECK, offset=(20, 20)):
+            if self.appear(PORT_SUPPLY_CHECK, offset=(20, 20)):
                 logger.warning("Perspective error caused by akashi shop")
                 self.device.click(BACK_ARROW)
                 return False
-            elif self.appear(GAME_TIPS, offset=(20, 20)):
+            if self.appear(GAME_TIPS, offset=(20, 20)):
                 logger.warning("Perspective error caused by game tips")
                 self.device.click(GAME_TIPS)
                 return False
-            elif "Camera outside map" in str(e):
+            if "Camera outside map" in str(e):
                 string = str(e)
                 logger.warning(string)
                 x, y = string.split("=")[1].strip("() ").split(",")
@@ -281,9 +278,7 @@ class Camera(MapOperation):
         def is_grid_center():
             # Is focusing on grid center
             # From focus_to_grid_center
-            if np.any(np.abs(self.view.center_offset - 0.5) > self.config.MAP_GRID_CENTER_TOLERANCE):
-                return False
-            return True
+            return not np.any(np.abs(self.view.center_offset - 0.5) > self.config.MAP_GRID_CENTER_TOLERANCE)
 
         def is_still_prev():
             # Still the same as prev view
@@ -496,11 +491,10 @@ class Camera(MapOperation):
         )
         if local in self.view:
             return self.view[local]
-        else:
-            logger.warning("Convert global to local Failed.")
-            self.focus_to(location)
-            local = np.array(location) - self.camera + self.view.center_loca
-            return self.view[local]
+        logger.warning("Convert global to local Failed.")
+        self.focus_to(location)
+        local = np.array(location) - self.camera + self.view.center_loca
+        return self.view[local]
 
     def convert_local_to_global(self, location):
         """
@@ -522,11 +516,10 @@ class Camera(MapOperation):
 
         if global_ in self.map:
             return self.map[global_]
-        else:
-            logger.warning("Convert local to global Failed.")
-            self.ensure_edge_insight(reverse=True)
-            global_ = np.array(location) + self.camera - self.view.center_loca
-            return self.map[global_]
+        logger.warning("Convert local to global Failed.")
+        self.ensure_edge_insight(reverse=True)
+        global_ = np.array(location) + self.camera - self.view.center_loca
+        return self.map[global_]
 
     def full_scan_find_boss(self):
         logger.info("Full scan find boss.")

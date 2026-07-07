@@ -35,13 +35,12 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         if self.appear(map_assets.FLEET_NUM_1, offset=(20, 20)):
             self.fleet_show_index = 1
             return 1
-        elif self.appear(map_assets.FLEET_NUM_2, offset=(20, 20)):
+        if self.appear(map_assets.FLEET_NUM_2, offset=(20, 20)):
             self.fleet_show_index = 2
             return 2
-        else:
-            logger.warning("Unknown fleet current index, use 1 by default")
-            self.fleet_show_index = 1
-            return 1
+        logger.warning("Unknown fleet current index, use 1 by default")
+        self.fleet_show_index = 1
+        return 1
 
     def get_fleet_current_index(self):
         """
@@ -51,9 +50,8 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         if self.fleets_reversed:
             self.fleet_current_index = 3 - self.fleet_show_index
             return self.fleet_current_index
-        else:
-            self.fleet_current_index = self.fleet_show_index
-            return self.fleet_current_index
+        self.fleet_current_index = self.fleet_show_index
+        return self.fleet_current_index
 
     def fleet_set(self, index=None, skip_first_screenshot=True):
         """
@@ -147,8 +145,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
                 if not checked_in_map and self.is_in_map():
                     logger.info("Already in map, skip enter_map.")
                     return False
-                else:
-                    checked_in_map = True
+                checked_in_map = True
 
                 # 误点击。
                 if self.appear(DAILY_CHECK, offset=(20, 20), interval=3):
@@ -287,7 +284,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
                 self.device.click(map_assets.MAP_MODE_SWITCH_NORMAL)
                 self.interval_reset(map_assets.MAP_MODE_SWITCH_HARD)
             return False
-        elif mode == "hard":
+        if mode == "hard":
             if self._is_mod_switch_hard_appear(active=True):
                 logger.attr("MAP_MODE_SWITCH", "hard")
                 return True
@@ -297,9 +294,8 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
                 self.device.click(map_assets.MAP_MODE_SWITCH_HARD)
                 return False
             return False
-        else:
-            logger.attr("MAP_MODE_SWITCH", "unknown")
-            return False
+        logger.attr("MAP_MODE_SWITCH", "unknown")
+        return False
 
     def _is_mod_switch_hard_appear(self, active=True, interval=0):
         if interval:
@@ -318,8 +314,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
             if self.appear(button, offset=(20, 20), similarity=0.7):
                 if active:
                     return self._is_mod_switch_hard_active(button)
-                else:
-                    return True
+                return True
         return False
 
     def _is_mod_switch_hard_active(self, button):
@@ -362,14 +357,10 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
             return True
         if abs(percent - self.map_clear_percentage_prev) < 0.02:
             self.map_clear_percentage_prev = percent
-            if self.map_clear_percentage_timer.reached():
-                return True
-            else:
-                return False
-        else:
-            self.map_clear_percentage_prev = percent
-            self.map_clear_percentage_timer.reset()
-            return False
+            return bool(self.map_clear_percentage_timer.reached())
+        self.map_clear_percentage_prev = percent
+        self.map_clear_percentage_timer.reset()
+        return False
 
     def withdraw(self, skip_first_screenshot=True):
         """

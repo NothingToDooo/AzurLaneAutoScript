@@ -54,8 +54,7 @@ class Fleet(Camera, AmbushHandler):
     def fleet_current(self):
         if self.fleet_current_index == 2:
             return self.fleet_2_location
-        else:
-            return self.fleet_1_location
+        return self.fleet_1_location
 
     @fleet_current.setter
     def fleet_current(self, value):
@@ -68,15 +67,13 @@ class Fleet(Camera, AmbushHandler):
     def fleet_boss(self):
         if self.config.FLEET_BOSS == 2 and self.config.FLEET_2:
             return self.fleet_2
-        else:
-            return self.fleet_1
+        return self.fleet_1
 
     @property
     def fleet_boss_index(self):
         if self.config.FLEET_BOSS == 2 and self.config.FLEET_2:
             return 2
-        else:
-            return 1
+        return 1
 
     @property
     def fleet_step(self):
@@ -85,13 +82,10 @@ class Fleet(Camera, AmbushHandler):
         if self.fleet_current_index == 2:
             if self.fleets_reversed:
                 return self.config.Fleet_Fleet1Step
-            else:
-                return self.config.Fleet_Fleet2Step
-        else:
-            if self.fleets_reversed:
-                return self.config.Fleet_Fleet2Step
-            else:
-                return self.config.Fleet_Fleet1Step
+            return self.config.Fleet_Fleet2Step
+        if self.fleets_reversed:
+            return self.config.Fleet_Fleet2Step
+        return self.config.Fleet_Fleet1Step
 
     def fleet_ensure(self, index):
         if self.fleet_set(index=index):
@@ -104,8 +98,7 @@ class Fleet(Camera, AmbushHandler):
             self.lv_get()
             self.handle_strategy(index=self.fleet_show_index)
             return True
-        else:
-            return False
+        return False
 
     def switch_to(self):
         pass
@@ -162,13 +155,10 @@ class Fleet(Camera, AmbushHandler):
         if self.config.MAP_HAS_MOVABLE_ENEMY:
             if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
                 return tuple(set(list(self.config.MOVABLE_ENEMY_TURN) + list(self.config.MOVABLE_NORMAL_ENEMY_TURN)))
-            else:
-                return self.config.MOVABLE_ENEMY_TURN
-        else:
-            if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
-                return self.config.MOVABLE_NORMAL_ENEMY_TURN
-            else:
-                return ()
+            return self.config.MOVABLE_ENEMY_TURN
+        if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
+            return self.config.MOVABLE_NORMAL_ENEMY_TURN
+        return ()
 
     @property
     def round_is_new(self):
@@ -933,8 +923,7 @@ class Fleet(Camera, AmbushHandler):
             if data.get("battle") == self.battle_count + 1:
                 if data.get("enemy", 0) + data.get("siren", 0) + data.get("boss", 0) > 0:
                     return "with_searching"
-                else:
-                    return "no_searching"
+                return "no_searching"
 
         if "boss" in expected:
             return "in_stage"
@@ -947,18 +936,15 @@ class Fleet(Camera, AmbushHandler):
             # No spawn_data
             # spawn_data is not continuous, some battles are missing
             return None
-        else:
-            # Out of the spawn_data, nothing will spawn
-            return "no_searching"
+        # Out of the spawn_data, nothing will spawn
+        return "no_searching"
 
     def _submarine_mode(self, expected):
         if self.is_call_submarine_at_boss:
             if "boss" in expected:
                 return "every_combat"
-            else:
-                return "do_not_use"
-        else:
-            return None
+            return "do_not_use"
+        return None
 
     def fleet_at(self, grid, fleet=None):
         """
@@ -973,8 +959,7 @@ class Fleet(Camera, AmbushHandler):
             return self.fleet_current == grid.location
         if fleet == 1:
             return self.fleet_1_location == grid.location
-        else:
-            return self.fleet_2_location == grid.location
+        return self.fleet_2_location == grid.location
 
     def check_accessibility(self, grid, fleet=None):
         """
@@ -994,15 +979,14 @@ class Fleet(Camera, AmbushHandler):
 
         if fleet == self.fleet_current_index:
             return grid.is_accessible
-        else:
-            backup = self.fleet_current_index
-            self.fleet_current_index = fleet
-            self.find_path_initial()
-            result = grid.is_accessible
+        backup = self.fleet_current_index
+        self.fleet_current_index = fleet
+        self.find_path_initial()
+        result = grid.is_accessible
 
-            self.fleet_current_index = backup
-            self.find_path_initial()
-            return result
+        self.fleet_current_index = backup
+        self.find_path_initial()
+        return result
 
     def brute_find_roadblocks(self, grid, fleet=None):
         """
@@ -1219,12 +1203,11 @@ class Fleet(Camera, AmbushHandler):
             )
             if grids:
                 return grids.sort("cost")[0].location
-            elif distance > 0:
+            if distance > 0:
                 logger.info(f"Unable to find a grid near boss in distance {distance}, fallback to {distance - 1}")
                 return get_location(distance - 1)
-            else:
-                logger.warning(f"Unable to find a grid near boss in distance {distance}, return boss position")
-                return boss
+            logger.warning(f"Unable to find a grid near boss in distance {distance}, return boss position")
+            return boss
 
         distance_dict = {"to_boss_position": 0, "1_grid_to_boss": 1, "2_grid_to_boss": 2}
         distance_to_boss = distance_dict.get(self.config.Submarine_DistanceToBoss, 0)
@@ -1234,8 +1217,7 @@ class Fleet(Camera, AmbushHandler):
             logger.info("Boss is already in hunting zone")
             self.find_path_initial()
             return False
-        else:
-            near = get_location(distance_to_boss)
-            self.find_path_initial()
-            logger.info(f"Move submarine to {location2node(near)}")
-            return self.submarine_goto(near)
+        near = get_location(distance_to_boss)
+        self.find_path_initial()
+        logger.info(f"Move submarine to {location2node(near)}")
+        return self.submarine_goto(near)

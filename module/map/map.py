@@ -399,8 +399,7 @@ class Map(Fleet):
             if self.battle_count > battle_count:
                 logger.info("Boss guessing correct.")
                 return True
-            else:
-                logger.info("Boss guessing incorrect.")
+            logger.info("Boss guessing incorrect.")
 
         grids = self.map.select(may_boss=True, is_accessible=False).sort("weight", "cost")
         logger.info(f"May boss: {grids}")
@@ -432,15 +431,13 @@ class Map(Fleet):
                 logger.info(f"Grids: {grids}")
                 self.clear_chosen_enemy(grids[0])
                 return True
-            else:
-                return self.fleet_boss.clear_boss()
-        elif self.map.select(may_boss=True, is_caught_by_siren=True):
+            return self.fleet_boss.clear_boss()
+        if self.map.select(may_boss=True, is_caught_by_siren=True):
             logger.info("BOSS appear on fleet grid")
             self.fleet_2.switch_to()
             return self.clear_chosen_enemy(self.map.select(may_boss=True, is_caught_by_siren=True)[0])
-        else:
-            logger.warning("BOSS not detected, trying all boss spawn point.")
-            return self.clear_potential_boss()
+        logger.warning("BOSS not detected, trying all boss spawn point.")
+        return self.clear_potential_boss()
 
     def brute_fleet_meet(self):
         """
@@ -455,8 +452,7 @@ class Map(Fleet):
             logger.info(f"Grids: {grids}")
             self.clear_chosen_enemy(grids[0])
             return True
-        else:
-            return False
+        return False
 
     def clear_siren(self, **kwargs):
         """
@@ -659,11 +655,10 @@ class Map(Fleet):
                 grids = self.select_grids(approaching, sort=("cost_2", "cost_1"))
                 self.clear_chosen_enemy(grids[0], expected="siren")
                 return True
-            else:
-                grids = nearby.delete(self.map.select(is_fleet=True))
-                grids = self.select_grids(grids, sort=("cost_2", "cost_1"))
-                self.goto(grids[0])
-                continue
+            grids = nearby.delete(self.map.select(is_fleet=True))
+            grids = self.select_grids(grids, sort=("cost_2", "cost_1"))
+            self.goto(grids[0])
+            continue
 
         logger.warning("fleet_2_protect no siren approaching")
         return False
@@ -682,9 +677,7 @@ class Map(Fleet):
             bool: If clear an enemy.
         """
         if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
-            if self.clear_any_enemy(sort=("cost_2",)):
-                return True
-            return False
+            return bool(self.clear_any_enemy(sort=("cost_2",)))
 
         if self.config.EnemyPriority_EnemyScaleBalanceWeight == "S3_enemy_first":
             string = "3L > 3M > 3E > 3C > 2L > 2M > 2E > 2C > 1L > 1M > 1E > 1C"
