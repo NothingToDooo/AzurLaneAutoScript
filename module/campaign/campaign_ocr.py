@@ -31,15 +31,13 @@ class CampaignOcr(ModuleBase):
         """
         if isinstance(name, int):
             return name
-        else:
-            if name.isdigit():
-                return int(name)
-            elif name in ["a", "c", "as", "cs", "t", "ht", "ts", "hts", "sp", "ex_sp"]:
-                return 1
-            elif name in ["b", "d", "bs", "ds", "ex_ex"]:
-                return 2
-            else:
-                raise CampaignNameError
+        if name.isdigit():
+            return int(name)
+        if name in ["a", "c", "as", "cs", "t", "ht", "ts", "hts", "sp", "ex_sp"]:
+            return 1
+        if name in ["b", "d", "bs", "ds", "ex_ex"]:
+            return 2
+        raise CampaignNameError
 
     @staticmethod
     def _campaign_ocr_result_process(result):
@@ -73,15 +71,15 @@ class CampaignOcr(ModuleBase):
         name = name.strip("-")
         if name == "sp":
             return "ex_sp", "1"
-        elif name.startswith("extra") or name == "ex":
+        if name.startswith("extra") or name == "ex":
             return "ex_ex", "1"
-        elif "-" in name:
+        if "-" in name:
             return name.split("-")
-        elif name.startswith("sp"):
+        if name.startswith("sp"):
             return "sp", name[-1]
-        elif name[-1].isdigit():
+        if name[-1].isdigit():
             return name[:-1], name[-1]
-        elif name[0].isdigit() and name[-1].isalpha():
+        if name[0].isdigit() and name[-1].isalpha():
             # 49X
             logger.warning(f"Unknown stage name: {name}")
             return "", ""

@@ -70,8 +70,7 @@ class CampaignEvent(CampaignStatus):
             logger.hr(f"Reach event PT limit: {limit}")
             self._disable_tasks(tasks)
             return True
-        else:
-            return False
+        return False
 
     def event_time_limit_triggered(self):
         """
@@ -95,8 +94,7 @@ class CampaignEvent(CampaignStatus):
             logger.hr(f"Reach event time limit: {limit}")
             self._disable_tasks(tasks)
             return True
-        else:
-            return False
+        return False
 
     def triggered_task_balancer(self):
         """
@@ -112,15 +110,12 @@ class CampaignEvent(CampaignStatus):
             # Avoid wrong/zero OCR result
             logger.warning("Coin not found")
             return False
-        else:
-            if self.is_balancer_task():
-                if coin < limit:
-                    logger.hr("Reach Coin limit")
-                    return True
-                else:
-                    return False
-            else:
-                return False
+        if self.is_balancer_task():
+            if coin < limit:
+                logger.hr("Reach Coin limit")
+                return True
+            return False
+        return False
 
     def handle_task_balancer(self):
         self.config.task_delay(minute=5)
@@ -156,7 +151,7 @@ class CampaignEvent(CampaignStatus):
                 logger.info("Already at page_event")
                 return True
         self.ui_goto(page_campaign_menu)
-        # Check event availability
+        # 检查活动入口是否可用。
         if self.is_event_entrance_available():
             self.ui_goto(page_event)
             return True
@@ -181,12 +176,11 @@ class CampaignEvent(CampaignStatus):
         if self.ui_get_current_page() == page_coalition:
             logger.info("Already at page_coalition")
             return True
-        else:
-            self.ui_goto(page_campaign_menu)
-            # Check event availability
-            if self.is_event_entrance_available():
-                self.ui_goto(page_coalition)
-                return True
+        self.ui_goto(page_campaign_menu)
+        # Check event availability
+        if self.is_event_entrance_available():
+            self.ui_goto(page_coalition)
+            return True
 
     def disable_raid_on_event(self):
         """
@@ -205,8 +199,7 @@ class CampaignEvent(CampaignStatus):
             logger.info("New event ongoing, disable old raid event tasks")
             self._disable_tasks(tasks)
             return True
-        else:
-            return False
+        return False
 
     def disable_event_on_raid(self):
         """

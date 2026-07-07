@@ -70,16 +70,14 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
                 if self.clear_any_enemy(sort=("cost_2",)):
                     return True
                 return self.battle_default()
-            else:
-                if self.clear_bouncing_enemy():
-                    return True
-                if self.clear_siren():
-                    return True
-                self.clear_mechanism()
-                return self.battle_default()
-        else:
-            result = self.battle_boss()
-            return result
+            if self.clear_bouncing_enemy():
+                return True
+            if self.clear_siren():
+                return True
+            self.clear_mechanism()
+            return self.battle_default()
+        result = self.battle_boss()
+        return result
 
     @Config.when(MAP_CLEAR_ALL_THIS_TIME=False, POOR_MAP_DATA=False)
     def battle_function(self):  # noqa: F811
@@ -168,8 +166,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
             if "boss" in data:
                 if "battle" in data:
                     return data["battle"] + 1
-                else:
-                    logger.warning("No battle count in spawn_data")
+                logger.warning("No battle count in spawn_data")
 
         logger.warning("No boss data found in spawn_data")
         return 0

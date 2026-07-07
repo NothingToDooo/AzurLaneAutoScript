@@ -92,8 +92,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
     def fleet_to_attack(self):
         if self.config.Fleet_FleetOrder == "fleet1_standby_fleet2_all":
             return self.config.Fleet_Fleet2
-        else:
-            return self.config.Fleet_Fleet1
+        return self.config.Fleet_Fleet1
 
     def flagship_change(self):
         """
@@ -167,40 +166,39 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
             scanner.set_limitation(fleet=0)
             return scanner.scan(self.device.image, output=False)
 
-        else:
-            template = {
-                "BOGUE": TEMPLATE_BOGUE,
-                "HERMES": TEMPLATE_HERMES,
-                "LANGLEY": TEMPLATE_LANGLEY,
-                "RANGER": TEMPLATE_RANGER,
-            }[f"{self.config.GemsFarming_CommonCV.upper()}"]
+        template = {
+            "BOGUE": TEMPLATE_BOGUE,
+            "HERMES": TEMPLATE_HERMES,
+            "LANGLEY": TEMPLATE_LANGLEY,
+            "RANGER": TEMPLATE_RANGER,
+        }[f"{self.config.GemsFarming_CommonCV.upper()}"]
 
-            ships = scanner.scan(self.device.image)
-            if ships:
-                # Don't need to change current
-                return ships
+        ships = scanner.scan(self.device.image)
+        if ships:
+            # 当前舰船可用，无需更换。
+            return ships
 
-            scanner.set_limitation(fleet=0)
-            candidates = [
-                ship
-                for ship in scanner.scan(self.device.image, output=False)
-                if template.match(self.image_crop(ship.button, copy=False), similarity=SIM_VALUE)
-            ]
+        scanner.set_limitation(fleet=0)
+        candidates = [
+            ship
+            for ship in scanner.scan(self.device.image, output=False)
+            if template.match(self.image_crop(ship.button, copy=False), similarity=SIM_VALUE)
+        ]
 
-            if candidates:
-                # Change to specific ship
-                return candidates
-
-            logger.info("No specific CV was found, try reversed order.")
-            self.dock_sort_method_dsc_set(True)
-
-            candidates = [
-                ship
-                for ship in scanner.scan(self.device.image)
-                if template.match(self.image_crop(ship.button, copy=False), similarity=SIM_VALUE)
-            ]
-
+        if candidates:
+            # 更换到指定舰船。
             return candidates
+
+        logger.info("No specific CV was found, try reversed order.")
+        self.dock_sort_method_dsc_set(True)
+
+        candidates = [
+            ship
+            for ship in scanner.scan(self.device.image)
+            if template.match(self.image_crop(ship.button, copy=False), similarity=SIM_VALUE)
+        ]
+
+        return candidates
 
     def get_common_rarity_dd(self):
         """
@@ -279,11 +277,10 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         """
         if common_dd == "aulick_or_foote":
             return [TEMPLATE_AULICK, TEMPLATE_FOOTE]
-        elif common_dd == "cassin_or_downes":
+        if common_dd == "cassin_or_downes":
             return [TEMPLATE_CASSIN_1, TEMPLATE_CASSIN_2, TEMPLATE_DOWNES_1, TEMPLATE_DOWNES_2]
-        else:
-            logger.error(f"Invalid CommonDD setting: {common_dd}")
-            raise ScriptError(f"Invalid CommonDD setting: {common_dd}")
+        logger.error(f"Invalid CommonDD setting: {common_dd}")
+        raise ScriptError(f"Invalid CommonDD setting: {common_dd}")
 
     def flagship_change_execute(self):
         """
@@ -310,11 +307,10 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
 
             logger.info("Change flagship success")
             return True
-        else:
-            logger.info("Change flagship failed, no CV in common rarity.")
-            self._dock_reset()
-            self.ui_back(check_button=page_fleet.check_button)
-            return False
+        logger.info("Change flagship failed, no CV in common rarity.")
+        self._dock_reset()
+        self.ui_back(check_button=page_fleet.check_button)
+        return False
 
     def vanguard_change_execute(self):
         """
@@ -341,11 +337,10 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
 
             logger.info("Change vanguard ship success")
             return True
-        else:
-            logger.info("Change vanguard ship failed, no DD in common rarity.")
-            self._dock_reset()
-            self.ui_back(check_button=page_fleet.check_button)
-            return False
+        logger.info("Change vanguard ship failed, no DD in common rarity.")
+        self._dock_reset()
+        self.ui_back(check_button=page_fleet.check_button)
+        return False
 
     _trigger_lv32 = False
     _trigger_emotion = False

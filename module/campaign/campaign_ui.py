@@ -202,20 +202,9 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         return [name]
 
     def _campaign_name_is_hard(self, name):
-        """
-        Reuse manual defination in campaign_get_mode_names()
-
-        Args:
-            name: 'a1', 'ht1', 'sp1'
-
-        Returns:
-            bool: If stage is hard mode
-        """
+        """返回关卡名是否属于 hard 模式。"""
         mode_names = self.campaign_get_mode_names(name)
-        if len(mode_names) == 2 and mode_names[1] == name:
-            return True
-        else:
-            return False
+        return len(mode_names) == 2 and mode_names[1] == name
 
     def campaign_get_entrance(self, name):
         """
@@ -251,8 +240,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
                 self.handle_info_bar()
                 self.campaign_ensure_chapter(chapter)
             return True
-        else:
-            return False
+        return False
 
     def campaign_set_chapter_event(self, chapter, mode="normal"):
         if chapter in ["a", "b", "c", "d", "ex_sp", "as", "bs", "cs", "ds", "t", "ts", "tss", "ht", "hts"]:
@@ -265,16 +253,14 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
                 self.campaign_ensure_mode("ex")
             self.campaign_ensure_chapter(chapter)
             return True
-        else:
-            return False
+        return False
 
     def campaign_set_chapter_sp(self, chapter, mode="normal"):
         if chapter == "sp":
             self.ui_goto_sp()
             self.campaign_ensure_chapter(chapter)
             return True
-        else:
-            return False
+        return False
 
     def campaign_set_chapter_20241219(self, chapter, stage, mode="combat"):
         if self.config.MAP_CHAPTER_SWITCH_20241219:

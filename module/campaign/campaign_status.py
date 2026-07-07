@@ -54,9 +54,8 @@ class CampaignStatus(UI):
             pt = int(res.group(1))
             logger.attr("Event_PT", pt)
             return pt
-        else:
-            logger.warning(f"Invalid pt result: {pt}")
-            return 0
+        logger.warning(f"Invalid pt result: {pt}")
+        return 0
 
     def get_coin(self, skip_first_screenshot=True):
         """
@@ -129,10 +128,7 @@ class CampaignStatus(UI):
         return amount
 
     def is_balancer_task(self):
-        """
-        Returns:
-             bool: If is event task but not daily event task
-        """
+        """返回当前任务是否为非日常的活动任务。"""
         tasks = [
             "Event",
             "Event2",
@@ -141,10 +137,4 @@ class CampaignStatus(UI):
             "GemsFarming",
         ]
         command = self.config.Scheduler_Command
-        if command in tasks:
-            if self.config.Campaign_Event == "campaign_main":
-                return False
-            else:
-                return True
-        else:
-            return False
+        return command in tasks and self.config.Campaign_Event != "campaign_main"
