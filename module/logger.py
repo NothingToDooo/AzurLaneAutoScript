@@ -54,20 +54,19 @@ class RichRenderableHandler(RichHandler):
         traceback = None
         if self.rich_tracebacks and record.exc_info and record.exc_info != (None, None, None):
             exc_type, exc_value, exc_traceback = record.exc_info
-            assert exc_type is not None
-            assert exc_value is not None
-            traceback = Traceback.from_exception(
-                exc_type,
-                exc_value,
-                exc_traceback,
-                width=self.tracebacks_width,
-                extra_lines=self.tracebacks_extra_lines,
-                theme=self.tracebacks_theme,
-                word_wrap=self.tracebacks_word_wrap,
-                show_locals=self.tracebacks_show_locals,
-                locals_max_length=self.locals_max_length,
-                locals_max_string=self.locals_max_string,
-            )
+            if exc_type is not None and exc_value is not None:
+                traceback = Traceback.from_exception(
+                    exc_type,
+                    exc_value,
+                    exc_traceback,
+                    width=self.tracebacks_width,
+                    extra_lines=self.tracebacks_extra_lines,
+                    theme=self.tracebacks_theme,
+                    word_wrap=self.tracebacks_word_wrap,
+                    show_locals=self.tracebacks_show_locals,
+                    locals_max_length=self.locals_max_length,
+                    locals_max_string=self.locals_max_string,
+                )
             message = record.getMessage()
             if self.formatter:
                 record.message = record.getMessage()

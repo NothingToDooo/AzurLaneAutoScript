@@ -22,7 +22,8 @@ def remove_tb_frames(exc, n: int):
     """
     tb = exc.__traceback__
     for _ in range(n):
-        assert tb is not None
+        if tb is None:
+            return exc.with_traceback(None)
         tb = tb.tb_next
     return exc.with_traceback(tb)
 

@@ -13,6 +13,13 @@ OP_SET = "set"
 OP_DEL = "del"
 
 
+def _validate_depth_range(min_depth: int, depth: int) -> None:
+    """检查深度参数是否有效。"""
+    if 1 <= min_depth <= depth:
+        return
+    raise ValueError(f"Invalid depth range: min_depth={min_depth}, depth={depth}")
+
+
 def deep_get(d, keys, default=None):
     """
     Get value from nested dict and list
@@ -311,7 +318,7 @@ def deep_iter(data, min_depth=None, depth=3):
     """
     if min_depth is None:
         min_depth = depth
-    assert 1 <= min_depth <= depth
+    _validate_depth_range(min_depth, depth)
 
     # Equivalent to dict.items()
     try:
@@ -384,7 +391,7 @@ def deep_values(data, min_depth=None, depth=3):
     """
     if min_depth is None:
         min_depth = depth
-    assert 1 <= min_depth <= depth
+    _validate_depth_range(min_depth, depth)
 
     # Equivalent to dict.items()
     try:

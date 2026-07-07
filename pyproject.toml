@@ -101,6 +101,7 @@ select = [
     "RUF100",
     "RSE",
     "RET",
+    "S101",
     "S110",
     "S324",
     "S602",
@@ -118,6 +119,7 @@ select = [
     "W",
     "YTT",
 ]
+per-file-ignores = { "tests/**/*.py" = ["S101"] }
 
 [tool.ty.environment]
 python-version = "3.14"

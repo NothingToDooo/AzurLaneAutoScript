@@ -10,9 +10,11 @@ class DiscordPresence:
         self.task: asyncio.Task[None] | None = None
 
     async def run(self) -> None:
-        assert self.client is not None
-        await self.client.connect()
-        await self.client.update(state="Alas is playing Azurlane", start=time.time(), large_image="alas")
+        client = self.client
+        if client is None:
+            raise RuntimeError("Discord RPC client 未初始化")
+        await client.connect()
+        await client.update(state="Alas is playing Azurlane", start=time.time(), large_image="alas")
 
     def init(self) -> None:
         self.client = AioPresence("929437173764223057")
