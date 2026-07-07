@@ -200,9 +200,11 @@ class MeowfficerCollect(MeowfficerBase):
 
             # 下一个指挥喵的 MEOWFFICER_APPLY_LOCK 比 MEOWFFICER_GET_CHECK 加载更快，
             # 退出前需要确保已有完整截图。
-            if self.appear(meow_assets.MEOWFFICER_GET_CHECK, offset=(40, 40)):
-                if self.appear(meow_assets.MEOWFFICER_APPLY_LOCK, offset=(40, 40)):
-                    break
+            if (
+                self.appear(meow_assets.MEOWFFICER_GET_CHECK, offset=(40, 40))
+                and self.appear(meow_assets.MEOWFFICER_APPLY_LOCK, offset=(40, 40))
+            ):
+                break
             # 意外退出领取队列。
             if self.appear(meow_assets.MEOWFFICER_TRAIN_START, offset=(20, 20)):
                 logger.info("_meow_skip_popup_after_locking exits at MEOWFFICER_TRAIN_START")
@@ -286,9 +288,12 @@ class MeowfficerCollect(MeowfficerBase):
                             continue
                         self._meow_apply_lock()
 
-                    if self.appear(meow_assets.MEOWFFICER_PURPLE_CHECK, offset=(40, 40)):
-                        if self.config.MeowfficerTrain_RetainTalentedPurple and special_talent:
-                            self._meow_apply_lock()
+                    if (
+                        self.appear(meow_assets.MEOWFFICER_PURPLE_CHECK, offset=(40, 40))
+                        and self.config.MeowfficerTrain_RetainTalentedPurple
+                        and special_talent
+                    ):
+                        self._meow_apply_lock()
 
                     # 多次领取时容易触发异常，通过弹出 click_record 缓解。
                     self.device.click(meow_assets.MEOWFFICER_TRAIN_CLICK_SAFE_AREA)

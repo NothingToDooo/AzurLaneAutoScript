@@ -144,14 +144,15 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         Check whether the conditions allow the delay of research.
 
         Returns:
-            bool: If conditions allow to delay research.
+            bool: 是否允许延后科研。
         """
         if self.config.Research_AllowDelay:
             slot = self.get_queue_slot()
             if slot < 4:
                 return True
             if slot == 4:
-                if self.end_time <= datetime.now() or self.end_time + timedelta(minutes=-10) > datetime.now():
+                now = datetime.now()
+                if self.end_time <= now or self.end_time + timedelta(minutes=-10) > now:
                     return True
 
         return False
@@ -304,9 +305,11 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
                 else:
                     self.device.screenshot()
 
-                if self.appear(RESEARCH_CHECK, offset=(20, 20), interval=10):
-                    if self.research_has_finished():
-                        self.device.click(RESEARCH_ENTRANCE[self._research_finished_index])
+                if (
+                    self.appear(RESEARCH_CHECK, offset=(20, 20), interval=10)
+                    and self.research_has_finished()
+                ):
+                    self.device.click(RESEARCH_ENTRANCE[self._research_finished_index])
 
                 if self.appear(research_assets.RESEARCH_STOP, offset=(20, 20)):
                     logger.info("The research time is up, but requirements are not satisfied")

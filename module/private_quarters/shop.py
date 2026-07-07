@@ -116,18 +116,16 @@ class PQShop(PQShopClerk, PQStatus):
     def shop_check_item(self, item):
         """
         Args:
-            item: Item to check
+            item: 待检查物品。
 
         Returns:
-            bool: whether item can be bought
+            bool: 是否可以购买。
         """
-        if self.config.PrivateQuarters_BuyRoses:
-            if item.sub_genre == "roses":
-                return self._currency >= 24000
+        if self.config.PrivateQuarters_BuyRoses and item.sub_genre == "roses":
+            return self._currency >= 24000
 
-        if self.config.PrivateQuarters_BuyCake:
-            if item.sub_genre == "cake":
-                return self.gems >= 210
+        if self.config.PrivateQuarters_BuyCake and item.sub_genre == "cake":
+            return self.gems >= 210
 
         return False
 

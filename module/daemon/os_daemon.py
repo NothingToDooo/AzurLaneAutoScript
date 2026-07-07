@@ -48,19 +48,19 @@ class AzurLaneDaemon(DaemonBase, OSFleet, PortHandler):
                 continue
 
             # Port repair
-            if self.config.OpsiDaemon_RepairShip:
-                if self.appear(PORT_ENTER, offset=(20, 20), interval=30):
-                    self.port_enter()
-                    self.port_dock_repair()
-                    self.port_quit()
-                    self.interval_reset(PORT_ENTER)
-                    logger.info(
-                        "Port repair finished, please move your fleet out of the port in 30s to avoid repairing again"
-                    )
+            if self.config.OpsiDaemon_RepairShip and self.appear(
+                PORT_ENTER, offset=(20, 20), interval=30
+            ):
+                self.port_enter()
+                self.port_dock_repair()
+                self.port_quit()
+                self.interval_reset(PORT_ENTER)
+                logger.info(
+                    "Port repair finished, please move your fleet out of the port in 30s to avoid repairing again"
+                )
 
-            if self.config.OpsiDaemon_SelectEnemy:
-                if self.click_nearest_object():
-                    continue
+            if self.config.OpsiDaemon_SelectEnemy and self.click_nearest_object():
+                continue
 
             # End
             # No end condition, stop it manually.
