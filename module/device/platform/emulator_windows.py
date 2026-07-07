@@ -4,6 +4,7 @@ import re
 import typing as t
 import winreg
 from dataclasses import dataclass
+from pathlib import Path
 
 # module/device/platform/emulator_base.py
 # module/device/platform/emulator_windows.py
@@ -175,7 +176,7 @@ class Emulator(EmulatorBase):
                     if serial:
                         yield EmulatorInstance(
                             serial=serial,
-                            name=os.path.basename(folder),
+                            name=Path(folder).name,
                             path=self.path,
                         )
         elif self == Emulator.MuMuPlayer12:
@@ -183,7 +184,7 @@ class Emulator(EmulatorBase):
             for folder in self.list_folder("../vms", is_dir=True):
                 for file in iter_folder(folder, ext=".nemu"):
                     serial = Emulator.vbox_file_to_serial(file)
-                    name = os.path.basename(folder)
+                    name = Path(folder).name
                     if serial:
                         yield EmulatorInstance(
                             serial=serial,

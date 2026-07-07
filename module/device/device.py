@@ -1,5 +1,6 @@
 import collections
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from module.device.env import IS_WINDOWS
@@ -46,14 +47,13 @@ def show_function_call():
                    entry.py L335 rogue_world_enter()
                     path.py L193 rogue_path_select()
     """
-    import os
     import traceback
 
     stack = traceback.extract_stack()
     func_list = []
     for row in stack:
         filename, line_number, function_name, _ = row
-        filename = os.path.basename(filename)
+        filename = Path(filename).name
         # /tasks/character/switch.py:64 character_update()
         func_list.append([filename, str(line_number), function_name])
     max_filename = max([len(row[0]) for row in func_list])

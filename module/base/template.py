@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import cv2
 import imageio
@@ -33,7 +34,7 @@ class Template(Resource):
 
     @cached_property
     def name(self):
-        return os.path.splitext(os.path.basename(self.file))[0].upper()
+        return Path(self.file).stem.upper()
 
     @cached_property
     def is_gif(self):

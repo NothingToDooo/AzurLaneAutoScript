@@ -171,7 +171,7 @@ logger.addHandler(console_hdlr)
 os.chdir(os.path.join(os.path.dirname(__file__), "../"))
 
 # Add file logger
-pyw_name = os.path.splitext(os.path.basename(sys.argv[0]))[0]
+pyw_name = Path(sys.argv[0]).stem
 
 
 def set_file_logger(name=pyw_name):

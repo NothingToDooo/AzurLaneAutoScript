@@ -1,5 +1,6 @@
 import os
 import re
+from pathlib import Path
 
 from tqdm import tqdm
 
@@ -77,7 +78,7 @@ class LuaLoader:
             if keyword.startswith("pg."):
                 return keyword[len("pg.") :]
             return keyword
-        return os.path.splitext(os.path.basename(file))[0]
+        return Path(file).stem
 
     def _load_pg_base_entries(self, text, base_name):
         pattern = rf"pg\.base\.{re.escape(base_name)}\[(\d+)\]\s*=\s*\{{"

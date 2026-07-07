@@ -80,8 +80,9 @@ class DropStatistics:
         Yields:
             list: [timestamp, campaign, enemy_name, drop_type, item, amount]
         """
-        ts = os.path.splitext(os.path.basename(file))[0]
-        campaign = os.path.basename(os.path.abspath(os.path.join(file, "../")))
+        path = Path(file)
+        ts = path.stem
+        campaign = path.parent.name
         images = unpack(load_image(file))
         enemy_name = "unknown"
         for image in images:
