@@ -25,21 +25,6 @@ class OcrModel:
         )
 
     @cached_property
-    def azur_lane_jp(self):
-        # Folder: ./bin/cnocr_models/azur_lane_jp
-        # Size: 3.25MB
-        # Model: densenet-lite-gru
-        # Epoch: 20
-        # Validation accuracy: 99.01%
-        # Font: Impact, VibeMO Compressed Pro Thin, Folk R, Source Han Serif JP
-        # Charset: 0123456789ABCDEFGHIJKLMNPQRSTUVWXYZ:/- (Letter 'O' and <space> is not included)
-        # _num_classes: 39
-        AlOcr = _al_ocr_class()
-        return AlOcr(
-            model_name="densenet-lite-gru", model_epoch=20, root="./bin/cnocr_models/azur_lane_jp", name="azur_lane_jp"
-        )
-
-    @cached_property
     def cnocr(self):
         # Folder: ./bin/cnocr_models/cnocr
         # Size: 9.51MB
@@ -51,24 +36,6 @@ class OcrModel:
         # _num_classes: 6426
         AlOcr = _al_ocr_class()
         return AlOcr(model_name="densenet-lite-gru", model_epoch=39, root="./bin/cnocr_models/cnocr", name="cnocr")
-
-    @cached_property
-    def jp(self):
-        AlOcr = _al_ocr_class()
-        return AlOcr(model_name="densenet-lite-gru", model_epoch=125, root="./bin/cnocr_models/jp", name="jp")
-
-    @cached_property
-    def tw(self):
-        # Folder: ./bin/cnocr_models/tw
-        # Size: 8.43MB
-        # Model: densenet-lite-gru
-        # Epoch: 63
-        # Validation accuracy: 99.24%
-        # Font: Various, 6 kinds
-        # Charset: Numbers, Upper english characters, Chinese traditional characters
-        # _num_classes: 5322
-        AlOcr = _al_ocr_class()
-        return AlOcr(model_name="densenet-lite-gru", model_epoch=63, root="./bin/cnocr_models/tw", name="tw")
 
 
 OCR_MODEL = OcrModel()

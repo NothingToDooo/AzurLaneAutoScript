@@ -9,7 +9,6 @@ import numpy as np
 from module.base.button import Button
 from module.base.decorator import cached_property
 from module.base.utils import crop, extract_letters, float2str, rgb2luma
-from module.config import server
 from module.logger import logger
 from module.ocr.models import OCR_MODEL
 
@@ -37,8 +36,6 @@ class Ocr:
         self.threshold = threshold
         self.alphabet = alphabet
         self.lang = lang
-        if lang == "azur_lane" and server.server == "jp":
-            self.lang = "azur_lane_" + server.server
 
     @property
     def cnocr(self) -> AlOcr:

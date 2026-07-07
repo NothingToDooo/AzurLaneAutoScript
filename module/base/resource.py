@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import ClassVar
 
 from module.base.decorator import cached_property, del_cached_property
-from module.config import server
 from module.logger import logger
 from module.ocr.models import OCR_MODEL
 
@@ -63,19 +62,10 @@ class Resource:
             logger.info(f"{obj}: {key}")
 
     @staticmethod
-    def parse_property(data, s=None):
+    def parse_property(data):
         """
-        Parse properties of Button or Template object input.
-        Such as `area`, `color` and `button`.
-
-        Args:
-            data: Dict or str
-            s (str): Load from given a server or load from global attribute `server.server`
+        返回按钮或模板的原始属性。
         """
-        if s is None:
-            s = server.server
-        if isinstance(data, dict):
-            return data[s]
         return data
 
 
@@ -86,9 +76,9 @@ def release_resources(next_task=""):
         models = []
     elif next_task:
         # 保留常用的 azur_lane 模型。
-        models = ["cnocr", "jp", "tw"]
+        models = ["cnocr"]
     else:
-        models = ["azur_lane", "cnocr", "jp", "tw"]
+        models = ["azur_lane", "cnocr"]
     for model in models:
         del_cached_property(OCR_MODEL, model)
 
