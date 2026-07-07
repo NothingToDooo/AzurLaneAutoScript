@@ -12,6 +12,7 @@ from module.config.config import AzurLaneConfig
 from module.config.deep import deep_iter
 from module.device.method.utils import get_serial_pair
 from module.logger import logger
+from module.webui.setting import State
 
 
 class ConnectionAttr:
@@ -147,8 +148,6 @@ class ConnectionAttr:
     @cached_property
     def adb_binary(self):
         # 优先使用 deploy.yaml 指定的 ADB。
-        from module.webui.setting import State
-
         file = State.deploy_config.AdbExecutable
         file = file.replace("\\", "/")
         if Path(file).exists():

@@ -1,12 +1,12 @@
 import multiprocessing
 from typing import TYPE_CHECKING, cast
 
+from module.config.config_updater import ConfigUpdater
+from module.webui.config import DeployConfig
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from multiprocessing.managers import SyncManager
-
-    from module.config.config_updater import ConfigUpdater
-    from module.webui.config import DeployConfig
 
 
 class cached_class_property[T]:
@@ -74,8 +74,6 @@ class State:
         Returns:
             DeployConfig：
         """
-        from module.webui.config import DeployConfig
-
         return DeployConfig()
 
     @cached_class_property
@@ -84,6 +82,4 @@ class State:
         Returns:
             ConfigUpdater：
         """
-        from module.config.config_updater import ConfigUpdater
-
         return ConfigUpdater()

@@ -37,6 +37,7 @@ from pywebio.pin import pin, pin_on_change
 from pywebio.session import download, go_app, info, local, register_thread, run_js, set_env
 
 import module.webui.lang as lang
+from deploy.atomic import atomic_failure_cleanup
 from module.config.config import AzurLaneConfig, Function
 from module.config.deep import deep_get, deep_iter, deep_set
 from module.config.server import to_server
@@ -1135,8 +1136,6 @@ def app():
     logger.attr("Theme", State.deploy_config.Theme)
     logger.attr("Password", bool(key))
     logger.attr("CDN", cdn)
-
-    from deploy.atomic import atomic_failure_cleanup
 
     atomic_failure_cleanup("./config")
 

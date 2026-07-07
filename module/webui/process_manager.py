@@ -15,6 +15,8 @@ from module.webui.fake_pil_module import import_fake_pil_module, remove_fake_pil
 
 import_fake_pil_module()
 
+from alas import AzurLaneAutoScript
+from module.config.config import AzurLaneConfig
 from module.logger import logger, set_file_logger, set_func_logger
 from module.submodule.submodule import load_mod
 from module.submodule.utils import (
@@ -128,8 +130,6 @@ class ProcessManager:
         set_file_logger(name=config_name)
         set_func_logger(func=q.put)
 
-        from module.config.config import AzurLaneConfig
-
         # Remove fake PIL module, because subprocess will use it
         remove_fake_pil_module()
 
@@ -137,14 +137,10 @@ class ProcessManager:
         try:
             # Run alas
             if func == "alas":
-                from alas import AzurLaneAutoScript
-
                 if stop_event is not None:
                     AzurLaneAutoScript.stop_event = stop_event
                 AzurLaneAutoScript(config_name=config_name).loop()
             elif func in get_available_func():
-                from alas import AzurLaneAutoScript
-
                 AzurLaneAutoScript(config_name=config_name).run(inflection.underscore(func), skip_first_screenshot=True)
             elif func in get_available_mod():
                 mod = load_mod(func)
