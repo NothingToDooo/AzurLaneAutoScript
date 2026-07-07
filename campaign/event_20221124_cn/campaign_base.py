@@ -24,6 +24,7 @@ class CampaignBase(CampaignBase_):
                 EVENT_20221124_ENTRANCE, check_button=EVENT_20221124_PT_ICON, appear_button=EVENT_20221124_ENTRANCE
             )
             return True
+        return False
 
     def campaign_set_chapter_event(self, chapter, mode="normal"):
         if chapter.startswith("t"):

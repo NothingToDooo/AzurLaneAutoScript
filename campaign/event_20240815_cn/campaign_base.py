@@ -64,6 +64,7 @@ class CampaignBase(CampaignBase_):
             if self.appear_then_click(GET_ITEMS_1, offset=(20, 20), interval=3):
                 self.entrance_timer.clear()
                 continue
+        return False
 
     def handle_in_stage(self):
         # Click after stage ended

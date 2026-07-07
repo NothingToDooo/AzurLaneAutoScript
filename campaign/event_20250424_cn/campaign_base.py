@@ -19,3 +19,4 @@ class CampaignBase(CampaignBase_):
         if self.is_event_entrance_available():
             self.ui_goto(page_event)
             return True
+        return False

@@ -36,7 +36,8 @@ class CampaignBase(CampaignBase_):
                     appear_button=EVENT_20260417_DETAIL_CHECK,
                     offset=(40, 20),
                 )
-                return True
+            return True
+        return False
 
     @staticmethod
     def _campaign_ocr_result_process(result):

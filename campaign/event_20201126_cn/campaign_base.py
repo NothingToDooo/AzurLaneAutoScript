@@ -54,6 +54,7 @@ class CampaignBase(CampaignBase_):
                 offset=(40, 20),
             )
             return True
+        return False
 
     @staticmethod
     def _campaign_separate_name(name):

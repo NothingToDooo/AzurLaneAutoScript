@@ -227,10 +227,11 @@ class Campaign(CampaignBase):
                 return True
             if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
                 return True
-        else:
-            if not self.action:
-                self.action = actions[self.fleet_1_location[0]]
-            return self.execute_actions(self.battle_count)
+            return self.battle_default()
+
+        if not self.action:
+            self.action = actions[self.fleet_1_location[0]]
+        return self.execute_actions(self.battle_count)
 
     def battle_7(self):
         return self.fleet_boss.clear_boss()
