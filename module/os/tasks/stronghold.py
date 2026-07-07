@@ -75,6 +75,7 @@ class OpsiStronghold(OSMap):
             self.handle_fog_block(repair=False)
             self.globe_goto(prev, types="STRONGHOLD")
             continue
+        return False
 
     def run_stronghold(self):
         """

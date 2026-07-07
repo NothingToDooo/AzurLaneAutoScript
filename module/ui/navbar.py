@@ -215,3 +215,4 @@ class Navbar:
             if interval.reached():
                 main.device.click(self.grids.buttons[index])
                 interval.reset()
+        return False

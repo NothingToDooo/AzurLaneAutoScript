@@ -137,9 +137,9 @@ class CampaignEvent(CampaignStatus):
             tasks = EVENTS + RAIDS + COALITIONS + GEMS_FARMINGS + HOSPITAL
             self._disable_tasks(tasks)
             self.config.task_stop()
-        else:
-            logger.info("Event available")
-            return True
+            return False
+        logger.info("Event available")
+        return True
 
     def ui_goto_event(self):
         # Already in page_event, skip event_check.
@@ -155,6 +155,7 @@ class CampaignEvent(CampaignStatus):
         if self.is_event_entrance_available():
             self.ui_goto(page_event)
             return True
+        return False
 
     def ui_goto_sp(self):
         # Already in page_event, skip event_check.
@@ -170,6 +171,7 @@ class CampaignEvent(CampaignStatus):
         if self.is_event_entrance_available():
             self.ui_goto(page_sp)
             return True
+        return False
 
     def ui_goto_coalition(self):
         # Already in page_event, skip event_check.
@@ -181,6 +183,7 @@ class CampaignEvent(CampaignStatus):
         if self.is_event_entrance_available():
             self.ui_goto(page_coalition)
             return True
+        return False
 
     def disable_raid_on_event(self):
         """

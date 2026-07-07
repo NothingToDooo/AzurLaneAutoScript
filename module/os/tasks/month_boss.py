@@ -71,6 +71,7 @@ class OpsiMonthBoss(OSMap):
         self.fleet_repair(revert=False)
         self.handle_fleet_resolve(revert=False)
         self.month_boss_delay(is_normal=is_normal, result=result)
+        return result
 
     def month_boss_delay(self, is_normal=True, result=True):
         """

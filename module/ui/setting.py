@@ -151,6 +151,7 @@ class Setting:
                     retry.reset()
             else:
                 return True
+        return False
 
     def set(self, **kwargs):
         """
@@ -164,4 +165,4 @@ class Setting:
         """
         if self.reset_first:
             self._set_execute()  # Reset options
-        self._set_execute(**kwargs)
+        return self._set_execute(**kwargs)

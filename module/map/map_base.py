@@ -791,7 +791,7 @@ class CampaignMap:
 
     def missing_predict(self, battle_count, mystery_count=0, siren_count=0, carrier_count=0, mode="normal"):
         if self.poor_map_data:
-            return False
+            return
 
         may, missing = self.missing_get(battle_count, mystery_count, siren_count, carrier_count, mode)
 

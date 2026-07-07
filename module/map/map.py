@@ -69,6 +69,8 @@ class Map(Fleet):
 
             self.ammo_count -= recover
             self.fleet_ammo += recover
+            return True
+        return False
 
     def clear_mechanism(self, grids=None):
         """

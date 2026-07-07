@@ -87,6 +87,7 @@ class OSCamera(OSMapOperation, Camera):
                 continue
 
             return Button(area=area, color=(), button=area, name="MAP_OUTSIDE")
+        return None
 
     def update_os(self):
         """

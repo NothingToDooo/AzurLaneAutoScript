@@ -945,3 +945,4 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             return False
         self.device.click(nearest)
         self._nearest_object_click_timer.reset()
+        return True

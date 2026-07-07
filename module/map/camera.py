@@ -329,6 +329,7 @@ class Camera(MapOperation):
 
         # Calculate view data
         self._update_view_data()
+        return True
 
     def predict(self):
         self.view.predict()

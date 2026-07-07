@@ -150,8 +150,8 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
             logger.warning("ScriptError, Battle function exhausted, Withdrawing")
             with suppress(CampaignEnd):
                 self.withdraw()
-        else:
-            raise ScriptError("Battle function exhausted.")
+            return False
+        raise ScriptError("Battle function exhausted.")
 
     @cached_property
     def _map_battle(self):

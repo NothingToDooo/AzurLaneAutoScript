@@ -71,6 +71,7 @@ class GemsCampaignOverride(CampaignBase):
                     self.enter_map_cancel()
                     break
             raise CampaignEnd("Emotion withdraw")
+        return False
 
 
 class GemsFarming(CampaignRun, FleetEquipment, Dock):

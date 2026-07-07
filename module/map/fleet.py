@@ -114,6 +114,7 @@ class Fleet(Camera, AmbushHandler):
             return False
         self.round += 1
         logger.info(f"Round: {self.round}, enemy_round: {self.enemy_round}")
+        return True
 
     def round_battle(self, after_battle=True):
         """
@@ -137,6 +138,7 @@ class Fleet(Camera, AmbushHandler):
         if enemy > 0:
             r = self.round
             self.enemy_round[r] = self.enemy_round.get(r, 0) + enemy
+        return True
 
     def round_reset(self):
         """
@@ -1029,6 +1031,7 @@ class Fleet(Camera, AmbushHandler):
                     return select
 
         logger.warning("Enemy roadblock try exhausted.")
+        return SelectedGrids([])
 
     def catch_camera_repositioning(self, destination):
         """

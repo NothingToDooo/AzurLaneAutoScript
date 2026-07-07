@@ -73,6 +73,7 @@ def __retry_internal(
 
             if max_delay is not None:
                 _delay = min(_delay, max_delay)
+    return None
 
 
 def retry(exceptions=Exception, tries=-1, delay=0, max_delay=None, backoff=1, jitter=0, logger=logging_logger):

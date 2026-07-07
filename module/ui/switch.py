@@ -227,3 +227,4 @@ class Switch:
             # Handle additional popups
             if self.handle_additional(main=main):
                 continue
+        return False

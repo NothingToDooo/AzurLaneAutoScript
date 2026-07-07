@@ -83,7 +83,7 @@ class RadarGrid:
 
     def predict(self):
         if self.is_fleet:
-            return False
+            return
 
         self.is_enemy = self.predict_enemy() or self.predict_boss()
         self.is_resource = self.predict_resource()

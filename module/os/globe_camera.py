@@ -207,6 +207,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
             if timeout.reached():
                 logger.warning("Wait until zone pinned timeout")
                 return False
+        return False
 
     def globe_focus_to(self, zone):
         """

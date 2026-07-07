@@ -160,6 +160,7 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
             if not self.is_in_map():
                 logger.warning("Trying to get zone name, but not in OS map")
             return self.get_current_zone()
+        return None
 
     def is_in_special_zone(self):
         """
