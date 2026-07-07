@@ -45,10 +45,6 @@ class Benchmark(DaemonBase, CampaignUI):
                 logger.critical("RequestHumanTakeover")
                 logger.warning(f"Benchmark tests failed on func: {func.__name__}")
                 return "Failed"
-            except Exception as e:
-                logger.exception(e)
-                logger.warning(f"Benchmark tests failed on func: {func.__name__}")
-                return "Failed"
 
             cost = time.perf_counter() - start
             logger.attr(f"{str(n).rjust(2, '0')}/{self.TEST_TOTAL}", f"{float2str(cost)}")

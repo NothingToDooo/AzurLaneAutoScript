@@ -54,9 +54,6 @@ class AzurLaneAutoScript:
         except RequestHumanTakeover:
             logger.critical("Request human takeover")
             sys.exit(1)
-        except Exception as e:
-            logger.exception(e)
-            sys.exit(1)
 
     @cached_property
     def device(self):
@@ -66,18 +63,11 @@ class AzurLaneAutoScript:
         except RequestHumanTakeover:
             logger.critical("Request human takeover")
             sys.exit(1)
-        except Exception as e:
-            logger.exception(e)
-            sys.exit(1)
 
     @cached_property
     def checker(self):
-        try:
-            ServerChecker = _load_attr("module.server_checker", "ServerChecker")
-            return ServerChecker(server=self.config.Emulator_ServerName)
-        except Exception as e:
-            logger.exception(e)
-            sys.exit(1)
+        ServerChecker = _load_attr("module.server_checker", "ServerChecker")
+        return ServerChecker(server=self.config.Emulator_ServerName)
 
     def run(self, command: str, skip_first_screenshot: bool = False) -> bool:
         try:

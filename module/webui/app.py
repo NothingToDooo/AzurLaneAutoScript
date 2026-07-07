@@ -550,7 +550,7 @@ class AlasGUI(Frame):
                     position="right",
                     color="success",
                 )
-        except Exception as e:
+        except (KeyError, OSError, TypeError, ValueError) as e:
             logger.exception(e)
             toast("设置保存失败", duration=3, position="right", color="error")
 
