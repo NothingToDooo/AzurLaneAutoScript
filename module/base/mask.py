@@ -31,15 +31,12 @@ class Mask(Template):
         if channel == 0:
             if mask_channel == 0:
                 return False
-            else:
-                self._image, _, _ = cv2.split(self._image)
-                return True
-        else:
-            if mask_channel == 0:
-                self._image = cv2.merge([self._image] * 3)
-                return True
-            else:
-                return False
+            self._image, _, _ = cv2.split(self._image)
+            return True
+        if mask_channel == 0:
+            self._image = cv2.merge([self._image] * 3)
+            return True
+        return False
 
     def apply(self, image):
         """

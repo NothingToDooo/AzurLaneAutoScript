@@ -113,8 +113,7 @@ class Template(Resource):
     def size(self):
         if self.is_gif:
             return self.image[0].shape[0:2][::-1]
-        else:
-            return self.image.shape[0:2][::-1]
+        return self.image.shape[0:2][::-1]
 
     def match(self, image, scaling=1.0, similarity=0.85):
         """
@@ -140,11 +139,10 @@ class Template(Resource):
 
             return False
 
-        else:
-            res = cv2.matchTemplate(image, self.image, cv2.TM_CCOEFF_NORMED)
-            _, sim, _, _ = cv2.minMaxLoc(res)
-            # print(self.file, sim)
-            return sim > similarity
+        res = cv2.matchTemplate(image, self.image, cv2.TM_CCOEFF_NORMED)
+        _, sim, _, _ = cv2.minMaxLoc(res)
+        # print(self.file, sim)
+        return sim > similarity
 
     def match_binary(self, image, similarity=0.85):
         """
@@ -172,16 +170,15 @@ class Template(Resource):
 
             return False
 
-        else:
-            # graying
-            image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            # binarization
-            _, image_binary = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-            # template matching
-            res = cv2.matchTemplate(self.image_binary, image_binary, cv2.TM_CCOEFF_NORMED)
-            _, sim, _, _ = cv2.minMaxLoc(res)
-            # print(self.file, sim)
-            return sim > similarity
+        # graying
+        image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        # binarization
+        _, image_binary = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+        # template matching
+        res = cv2.matchTemplate(self.image_binary, image_binary, cv2.TM_CCOEFF_NORMED)
+        _, sim, _, _ = cv2.minMaxLoc(res)
+        # print(self.file, sim)
+        return sim > similarity
 
     def match_luma(self, image, similarity=0.85):
         if self.is_gif:
@@ -195,11 +192,10 @@ class Template(Resource):
 
             return False
 
-        else:
-            res = cv2.matchTemplate(image, self.image, cv2.TM_CCOEFF_NORMED)
-            _, sim, _, _ = cv2.minMaxLoc(res)
-            # print(self.file, sim)
-            return sim > similarity
+        res = cv2.matchTemplate(image, self.image, cv2.TM_CCOEFF_NORMED)
+        _, sim, _, _ = cv2.minMaxLoc(res)
+        # print(self.file, sim)
+        return sim > similarity
 
     def _point_to_button(self, point, image=None, name=None):
         """

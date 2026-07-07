@@ -121,8 +121,7 @@ class Filter:
 
         if result and len(string) and result.span()[1]:
             return [result.group(index + 1) for index, attr in enumerate(self.attr)]
-        else:
-            logger.warning(f'Invalid filter: "{string}". This selector does not match the regex, nor a preset.')
-            # Invalid filter will be ignored.
-            # Return strange things and make it impossible to match
-            return ["1nVa1d"] + [None] * (len(self.attr) - 1)
+        logger.warning(f'Invalid filter: "{string}". This selector does not match the regex, nor a preset.')
+        # Invalid filter will be ignored.
+        # Return strange things and make it impossible to match
+        return ["1nVa1d"] + [None] * (len(self.attr) - 1)

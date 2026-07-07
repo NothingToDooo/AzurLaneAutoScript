@@ -69,17 +69,15 @@ class Button(Resource):
     def name(self):
         if self.raw_name:
             return self.raw_name
-        elif self.file:
+        if self.file:
             return os.path.splitext(os.path.split(self.file)[1])[0]
-        else:
-            return "BUTTON"
+        return "BUTTON"
 
     @cached_property
     def is_gif(self):
         if self.file:
             return os.path.splitext(self.file)[1] == ".gif"
-        else:
-            return False
+        return False
 
     def __str__(self):
         return self.name
@@ -99,8 +97,7 @@ class Button(Resource):
     def button(self):
         if self._button_offset is None:
             return self._button
-        else:
-            return self._button_offset
+        return self._button_offset
 
     def appear_on(self, image, threshold=10):
         """Check if the button appears on the image.
@@ -227,11 +224,10 @@ class Button(Resource):
                 if sim > similarity:
                     return True
             return False
-        else:
-            res = cv2.matchTemplate(self.image, image, cv2.TM_CCOEFF_NORMED)
-            _, sim, _, point = cv2.minMaxLoc(res)
-            self._button_offset = area_offset(self._button, offset[:2] + np.array(point))
-            return sim > similarity
+        res = cv2.matchTemplate(self.image, image, cv2.TM_CCOEFF_NORMED)
+        _, sim, _, point = cv2.minMaxLoc(res)
+        self._button_offset = area_offset(self._button, offset[:2] + np.array(point))
+        return sim > similarity
 
     def match_binary(self, image, offset=30, similarity=0.85):
         """Detects button by template matching. To Some button, its location may not be static.
@@ -270,16 +266,15 @@ class Button(Resource):
                 if sim > similarity:
                     return True
             return False
-        else:
-            # graying
-            image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            # binarization
-            _, image_binary = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-            # template matching
-            res = cv2.matchTemplate(self.image_binary, image_binary, cv2.TM_CCOEFF_NORMED)
-            _, sim, _, point = cv2.minMaxLoc(res)
-            self._button_offset = area_offset(self._button, offset[:2] + np.array(point))
-            return sim > similarity
+        # graying
+        image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        # binarization
+        _, image_binary = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+        # template matching
+        res = cv2.matchTemplate(self.image_binary, image_binary, cv2.TM_CCOEFF_NORMED)
+        _, sim, _, point = cv2.minMaxLoc(res)
+        self._button_offset = area_offset(self._button, offset[:2] + np.array(point))
+        return sim > similarity
 
     def match_luma(self, image, offset=30, similarity=0.85):
         """
@@ -338,8 +333,7 @@ class Button(Resource):
             area = area_offset(self.area, offset=diff)
             color = get_color(image, area)
             return color_similar(color1=color, color2=self.color, threshold=threshold)
-        else:
-            return False
+        return False
 
     def crop(self, area, image=None, name=None):
         """

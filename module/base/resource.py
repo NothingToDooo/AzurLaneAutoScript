@@ -47,9 +47,8 @@ class Resource:
 
     @classmethod
     def is_loaded(cls, obj):
-        if (hasattr(obj, "_image") and obj._image is None) or (hasattr(obj, "image") and obj.image is None):
-            return False
-        return True
+        unloaded = (hasattr(obj, "_image") and obj._image is None) or (hasattr(obj, "image") and obj.image is None)
+        return not unloaded
 
     @classmethod
     def resource_show(cls):
@@ -75,8 +74,7 @@ class Resource:
             s = server.server
         if isinstance(data, dict):
             return data[s]
-        else:
-            return data
+        return data
 
 
 def release_resources(next_task=""):

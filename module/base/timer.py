@@ -135,8 +135,7 @@ class Timer:
             if diff < 0:
                 diff = 0.0
             return diff
-        else:
-            return 0.0
+        return 0.0
 
     def current_count(self):
         """
@@ -158,9 +157,8 @@ class Timer:
         self._access += 1
         if self._start > 0:
             return self._access > self.count and time() - self._start > self.limit
-        else:
-            # not started, return True for fast first try
-            return True
+        # not started, return True for fast first try
+        return True
 
     def reset(self):
         """
@@ -186,8 +184,7 @@ class Timer:
         if self.reached():
             self.reset()
             return True
-        else:
-            return False
+        return False
 
     def wait(self):
         """

@@ -371,8 +371,7 @@ class ModuleBase:
         """
         if isinstance(button, Button) or hasattr(button, "area"):
             return crop(self.device.image, button.area, copy=copy)
-        else:
-            return crop(self.device.image, button, copy=copy)
+        return crop(self.device.image, button, copy=copy)
 
     def image_color_count(self, button, color, threshold=221, count=50):
         """

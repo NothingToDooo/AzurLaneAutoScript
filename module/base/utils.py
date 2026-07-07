@@ -28,8 +28,7 @@ def random_normal_distribution_int(a, b, n=3):
         for _ in range(n):
             total += random.randint(a, b)
         return round(total / n)
-    else:
-        return b
+    return b
 
 
 def random_rectangle_point(area, n=3):
@@ -162,7 +161,7 @@ def ensure_time(second, n=3, precision=3):
         multiply = 10**precision
         result = random_normal_distribution_int(second[0] * multiply, second[1] * multiply, n) / multiply
         return round(result, precision)
-    elif isinstance(second, str):
+    if isinstance(second, str):
         if "," in second:
             lower, upper = second.replace(" ", "").split(",")
             lower, upper = int(lower), int(upper)
@@ -171,10 +170,8 @@ def ensure_time(second, n=3, precision=3):
             lower, upper = second.replace(" ", "").split("-")
             lower, upper = int(lower), int(upper)
             return ensure_time((lower, upper), n=n, precision=precision)
-        else:
-            return int(second)
-    else:
-        return second
+        return int(second)
+    return second
 
 
 def ensure_int(*args):
@@ -411,8 +408,7 @@ def col2name(col):
 
     if col_neg:
         return "-" + col_str
-    else:
-        return col_str
+    return col_str
 
 
 def name2col(col_str):
@@ -435,8 +431,7 @@ def name2col(col_str):
 
     if col_neg:
         return -col
-    else:
-        return col - 1  # Convert 1-index to zero-index
+    return col - 1  # Convert 1-index to zero-index
 
 
 def node2location(node):
@@ -456,9 +451,8 @@ def node2location(node):
         if y > 0:
             y -= 1
         return name2col(x), y
-    else:
-        # Whatever
-        return ord(node[0]) % 32 - 1, int(node[1:]) - 1
+    # Whatever
+    return ord(node[0]) % 32 - 1, int(node[1:]) - 1
 
 
 def location2node(location):
@@ -644,10 +638,9 @@ def crop(image, area, copy=True):
         else:
             value = tuple(0 for _ in range(image.shape[2]))
         return cv2.copyMakeBorder(image, top, bottom, left, right, borderType=cv2.BORDER_CONSTANT, value=value)
-    elif copy:
+    if copy:
         return copy_image(image)
-    else:
-        return image
+    return image
 
 
 def resize(image, size):
@@ -852,9 +845,8 @@ def get_bbox(image, threshold=0):
             max_y = y2
     if min_x < max_x and min_y < max_y:
         return min_x, min_y, max_x, max_y
-    else:
-        # This shouldn't happen
-        raise ImageNotSupported(f"Empty bbox {(min_x, min_y, max_x, max_y)}")
+    # This shouldn't happen
+    raise ImageNotSupported(f"Empty bbox {(min_x, min_y, max_x, max_y)}")
 
 
 def get_bbox_reversed(image, threshold=255):
@@ -913,9 +905,8 @@ def get_bbox_reversed(image, threshold=255):
             max_y = y2
     if min_x < max_x and min_y < max_y:
         return min_x, min_y, max_x, max_y
-    else:
-        # This shouldn't happen
-        raise ImageNotSupported(f"Empty bbox {(min_x, min_y, max_x, max_y)}")
+    # This shouldn't happen
+    raise ImageNotSupported(f"Empty bbox {(min_x, min_y, max_x, max_y)}")
 
 
 def color_similarity(color1, color2):
@@ -1187,8 +1178,7 @@ def color_bar_percentage(image, area, prev_color, reverse=False, starter=0, thre
         index = np.where(np.any(bar > 255 - threshold, axis=0))[0]
         if not index.size:
             return prev_index / length
-        else:
-            index = index[-1]
+        index = index[-1]
         if index <= prev_index:
             return index / length
         prev_index = index
