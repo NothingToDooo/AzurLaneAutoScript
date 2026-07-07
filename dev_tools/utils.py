@@ -142,8 +142,8 @@ class LuaLoader:
         print(f"Loading {path}")
         if Path(self.filepath(path)).is_dir():
             result = {}
-            for file in tqdm(os.listdir(self.filepath(path))):
-                result.update(self._load_file(f"./{path}/{file}", keyword=keyword))
+            for file in tqdm(Path(self.filepath(path)).iterdir()):
+                result.update(self._load_file(f"./{path}/{file.name}", keyword=keyword))
         else:
             result = self._load_file(path, keyword=keyword)
 

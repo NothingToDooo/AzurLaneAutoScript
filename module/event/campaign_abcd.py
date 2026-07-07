@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 
 from module.config.config import TaskEnd
 from module.config.utils import get_server_last_update
@@ -10,7 +10,7 @@ from module.logger import logger
 class CampaignABCD(EventBase):
     def run(self, *args, **kwargs):
         # Filter map files
-        stages = [EventStage(file) for file in os.listdir(f"./campaign/{self.config.Campaign_Event}")]
+        stages = [EventStage(file.name) for file in Path(f"./campaign/{self.config.Campaign_Event}").iterdir()]
         stages = self.convert_stages(stages)
         logger.attr("Stage", [str(stage) for stage in stages])
         logger.attr("StageFilter", self.config.EventDaily_StageFilter)

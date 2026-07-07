@@ -30,10 +30,9 @@ def load_folder(folder, ext=".png"):
         return {}
 
     out = {}
-    for file in os.listdir(folder):
-        path = Path(file)
+    for path in Path(folder).iterdir():
         if path.suffix == ext:
-            out[path.stem] = os.path.join(folder, file)
+            out[path.stem] = path.as_posix()
 
     return out
 

@@ -132,16 +132,15 @@ def iter_folder(folder, is_dir=False, ext=None):
     Yields:
         str: Absolute path of files
     """
-    for file in os.listdir(folder):
-        sub = os.path.join(folder, file)
+    for sub in Path(folder).iterdir():
         if is_dir:
-            if Path(sub).is_dir():
-                yield sub.replace("\\\\", "/").replace("\\", "/")
+            if sub.is_dir():
+                yield sub.as_posix()
         elif ext is not None:
-            if not Path(sub).is_dir() and Path(file).suffix == ext:
-                yield os.path.join(folder, file).replace("\\\\", "/").replace("\\", "/")
+            if not sub.is_dir() and sub.suffix == ext:
+                yield sub.as_posix()
         else:
-            yield os.path.join(folder, file).replace("\\\\", "/").replace("\\", "/")
+            yield sub.as_posix()
 
 
 def alas_template():
@@ -150,8 +149,7 @@ def alas_template():
         list[str]: Name of all Alas instances, except `template`.
     """
     out = []
-    for file in os.listdir("./config"):
-        path = Path(file)
+    for path in Path("./config").iterdir():
         name = path.stem
         if name == "template" and path.suffix == ".json":
             out.append(f"{name}-alas")
@@ -167,8 +165,7 @@ def alas_instance():
         list[str]: Name of all Alas instances, except `template`.
     """
     out = []
-    for file in os.listdir("./config"):
-        path = Path(file)
+    for path in Path("./config").iterdir():
         name = path.stem
         extension = path.suffix
         mod_name = Path(name).suffix

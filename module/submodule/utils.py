@@ -46,8 +46,7 @@ def get_mod_filepath(name):
 
 def list_mod_template():
     out = []
-    for file in os.listdir("./config"):
-        path = Path(file)
+    for path in Path("./config").iterdir():
         name = path.stem
         extension = path.suffix
         config_name = Path(name).stem
@@ -62,8 +61,7 @@ def list_mod_template():
 def list_mod_instance():
     MOD_CONFIG_DICT.clear()
     out = []
-    for file in os.listdir("./config"):
-        path = Path(file)
+    for path in Path("./config").iterdir():
         name = path.stem
         extension = path.suffix
         config_name = Path(name).stem

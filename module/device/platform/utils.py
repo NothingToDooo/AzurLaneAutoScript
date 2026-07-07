@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -38,17 +37,16 @@ def iter_folder(folder, is_dir=False, ext=None):
         str: Absolute path of files
     """
     try:
-        files = os.listdir(folder)
+        files = list(Path(folder).iterdir())
     except FileNotFoundError:
         return
 
-    for file in files:
-        sub = os.path.join(folder, file)
+    for sub in files:
         if is_dir:
-            if Path(sub).is_dir():
-                yield sub.replace("\\\\", "/").replace("\\", "/")
+            if sub.is_dir():
+                yield sub.as_posix()
         elif ext is not None:
-            if not Path(sub).is_dir() and Path(file).suffix == ext:
-                yield os.path.join(folder, file).replace("\\\\", "/").replace("\\", "/")
+            if not sub.is_dir() and sub.suffix == ext:
+                yield sub.as_posix()
         else:
-            yield os.path.join(folder, file).replace("\\\\", "/").replace("\\", "/")
+            yield sub.as_posix()

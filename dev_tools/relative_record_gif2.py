@@ -53,10 +53,11 @@ def crop(image, area):
 
 class RelativeRecord:
     def __init__(self):
+        folder = Path(FOLDER) / NAME
         self.images = [
-            np.array(Image.open(os.path.join(FOLDER, NAME, file)).convert("RGB"))
-            for file in os.listdir(os.path.join(FOLDER, NAME))
-            if file[-4:] == ".png"
+            np.array(Image.open(file).convert("RGB"))
+            for file in folder.iterdir()
+            if file.suffix == ".png"
         ]
         self.images = np.array(self.images)
         self.images_amount = len(self.images)

@@ -1,4 +1,3 @@
-import os
 import re
 import sys
 from pathlib import Path
@@ -50,7 +49,8 @@ class PackageCache:
             dict：key 为包名，value 为 FakeDistributionObject。
         """
         dic = {}
-        for file in os.listdir(self.site_packages):
+        for path in Path(self.site_packages).iterdir():
+            file = path.name
             # mxnet_cu101-1.6.0.dist-info
             # adbutils-0.11.0-py3.7.egg-info
             res = re.match(r"^([a-zA-Z0-9._]+)-([a-zA-Z0-9._]+)-", file)

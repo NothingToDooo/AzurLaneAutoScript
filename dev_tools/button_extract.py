@@ -157,7 +157,8 @@ class ModuleExtractor:
     @property
     def expression(self):
         exp = []
-        for file in os.listdir(self.folder):
+        for path in Path(self.folder).iterdir():
+            file = path.name
             if file[0].isdigit():
                 continue
             if file.startswith("TEMPLATE_"):
@@ -217,9 +218,9 @@ class AssetExtractor:
 
         assets_folder = Path(AzurLaneConfig.ASSETS_FOLDER) / "cn"
         modules = [
-            m
-            for m in os.listdir(assets_folder)
-            if (assets_folder / m).is_dir()
+            path.name
+            for path in assets_folder.iterdir()
+            if path.is_dir()
         ]
 
         process_map(worker, modules)

@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import cv2
 import imageio
@@ -32,10 +33,11 @@ AREA = (32, 32, 54, 52)
 THRESHOLD = 0.92
 
 if __name__ == "__main__":
+    folder = Path(FOLDER) / NAME
     images = [
-        np.array(Image.open(os.path.join(FOLDER, NAME, file)))
-        for file in os.listdir(os.path.join(FOLDER, NAME))
-        if file[-4:] == ".png"
+        np.array(Image.open(file))
+        for file in folder.iterdir()
+        if file.suffix == ".png"
     ]
     templates = [crop(images[0], area=AREA)]
 

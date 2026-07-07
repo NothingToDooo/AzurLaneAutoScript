@@ -41,8 +41,7 @@ def map_files(event):
         return []
 
     files = []
-    for file in os.listdir(folder):
-        path = Path(file)
+    for path in Path(folder).iterdir():
         if path.suffix != ".py":
             continue
         name = path.stem
