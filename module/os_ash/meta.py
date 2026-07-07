@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import module.config.server as server
 from module.base.timer import Timer
-from module.combat.combat import BATTLE_PREPARATION
+from module.combat.assets import BATTLE_PREPARATION
 from module.logger import logger
 from module.meta_reward.meta_reward import MetaReward
 from module.ocr.ocr import Digit, DigitCounter

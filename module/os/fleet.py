@@ -20,7 +20,8 @@ from module.os.assets import FLEET_EMP_DEBUFF, MAP_EXIT, MAP_GOTO_GLOBE, STRONGH
 from module.os.camera import OSCamera
 from module.os.map_base import OSCampaignMap
 from module.os_ash.ash import OSAsh
-from module.os_combat.combat import BATTLE_PREPARATION, SIREN_PREPARATION, Combat
+from module.os_combat import assets as os_combat_assets
+from module.os_combat.combat import Combat
 from module.os_handler.assets import AUTO_SEARCH_REWARD, CLICK_SAFE_AREA, IN_MAP, PORT_ENTER
 from module.os_shop.assets import PORT_SUPPLY_CHECK
 from module.ui.assets import BACK_ARROW
@@ -701,13 +702,13 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
 
             # Re-enter boss accidentally
             if pause_interval.reached():
-                if self.appear(BATTLE_PREPARATION):
-                    logger.info(f"{BATTLE_PREPARATION} -> {BACK_ARROW}")
+                if self.appear(os_combat_assets.BATTLE_PREPARATION):
+                    logger.info(f"{os_combat_assets.BATTLE_PREPARATION} -> {BACK_ARROW}")
                     self.device.click(BACK_ARROW)
                     pause_interval.reset()
                     continue
-                if self.appear(SIREN_PREPARATION, offset=(20, 20)):
-                    logger.info(f"{SIREN_PREPARATION} -> {BACK_ARROW}")
+                if self.appear(os_combat_assets.SIREN_PREPARATION, offset=(20, 20)):
+                    logger.info(f"{os_combat_assets.SIREN_PREPARATION} -> {BACK_ARROW}")
                     self.device.click(BACK_ARROW)
                     pause_interval.reset()
                     continue

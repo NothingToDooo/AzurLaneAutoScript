@@ -5,7 +5,8 @@ import inflection
 from module.base.timer import Timer
 from module.config.utils import get_os_reset_remain
 from module.exception import CampaignEnd, GameTooManyClickError, MapWalkError, RequestHumanTakeover, ScriptError
-from module.handler.login import MAINTENANCE_ANNOUNCE, LoginHandler
+from module.handler.assets import MAINTENANCE_ANNOUNCE
+from module.handler.login import LoginHandler
 from module.logger import logger
 from module.map.map import Map
 from module.os.assets import FLEET_EMP_DEBUFF, MAP_GOTO_GLOBE_FOG

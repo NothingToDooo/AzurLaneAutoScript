@@ -5,8 +5,8 @@ from module.logger import logger
 from module.os.config import OSConfig
 from module.os.fleet import OSFleet
 from module.os_combat.combat import ContinuousCombat
-from module.os_handler.assets import AUTO_SEARCH_REWARD
-from module.os_handler.port import PORT_ENTER, PortHandler
+from module.os_handler.assets import AUTO_SEARCH_REWARD, PORT_ENTER
+from module.os_handler.port import PortHandler
 
 
 class AzurLaneDaemon(DaemonBase, OSFleet, PortHandler):

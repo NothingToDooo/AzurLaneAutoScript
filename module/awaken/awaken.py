@@ -5,7 +5,8 @@ from module.base.timer import Timer
 from module.exception import ScriptError
 from module.logger import logger
 from module.ocr.ocr import Digit
-from module.retire.dock import DOCK_EMPTY, Dock
+from module.retire.assets import DOCK_EMPTY
+from module.retire.dock import Dock
 from module.ui.assets import BACK_ARROW
 from module.ui.page import page_dock, page_main
 

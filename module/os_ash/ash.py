@@ -2,7 +2,8 @@ from contextlib import suppress
 from datetime import datetime, timedelta
 
 from module.base.utils import image_left_strip
-from module.combat.combat import BATTLE_PREPARATION, Combat
+from module.combat.assets import BATTLE_PREPARATION
+from module.combat.combat import Combat
 from module.config.utils import DEFAULT_TIME
 from module.logger import logger
 from module.ocr.ocr import DigitCounter

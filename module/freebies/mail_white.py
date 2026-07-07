@@ -5,9 +5,10 @@ from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2
 from module.freebies import assets as freebies_assets
 from module.logger import logger
-from module.ui.page import GOTO_MAIN_WHITE, page_mail, page_main, page_main_white
+from module.ui.page import page_mail, page_main, page_main_white
 from module.ui.setting import Setting
 from module.ui.ui import UI
+from module.ui_white.assets import GOTO_MAIN_WHITE
 
 if TYPE_CHECKING:
     from module.base.button import Button

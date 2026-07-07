@@ -1,7 +1,8 @@
 from module.base.decorator import run_once
 from module.base.timer import Timer
 from module.campaign.campaign_event import CampaignEvent
-from module.combat.combat import BATTLE_PREPARATION, Combat
+from module.combat.assets import BATTLE_PREPARATION
+from module.combat.combat import Combat
 from module.event_hospital.assets import HOSPITAL_BATTLE_PREPARE
 from module.event_hospital.ui import HospitalUI
 from module.exception import OilExhausted, RequestHumanTakeover
