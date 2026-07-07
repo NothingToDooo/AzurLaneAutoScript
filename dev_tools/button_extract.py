@@ -6,7 +6,6 @@ from tqdm.contrib.concurrent import process_map
 
 from module.base.utils import get_bbox, get_color, image_size, load_image
 from module.config.config_manual import ManualConfig as AzurLaneConfig
-from module.config.server import VALID_SERVER
 from module.logger import logger
 
 MODULE_FOLDER = "./module"
@@ -30,23 +29,22 @@ class ImageExtractor:
         self.name = path.stem
         self.ext = path.suffix
         self.area, self.color, self.button, self.file = {}, {}, {}, {}
-        for server in VALID_SERVER:
-            self.load(server)
+        self.load()
 
-    def get_file(self, genre="", server="cn"):
+    def get_file(self, genre=""):
         for ext in [".png", ".gif"]:
             file = f"{self.name}.{genre}{ext}" if genre else f"{self.name}{ext}"
-            file = (Path(AzurLaneConfig.ASSETS_FOLDER) / server / self.module / file).as_posix()
+            file = (Path(AzurLaneConfig.ASSETS_FOLDER) / "cn" / self.module / file).as_posix()
             if Path(file).exists():
                 return file
 
         ext = ".png"
         file = f"{self.name}.{genre}{ext}" if genre else f"{self.name}{ext}"
-        return (Path(AzurLaneConfig.ASSETS_FOLDER) / server / self.module / file).as_posix()
+        return (Path(AzurLaneConfig.ASSETS_FOLDER) / "cn" / self.module / file).as_posix()
 
     def extract(self, file):
         if Path(file).suffix == ".gif":
-            # In a gif Button, use the first image.
+            # GIF 按钮使用第一帧。
             bbox = None
             mean = None
             for frame in imageio.mimread(file):
@@ -72,31 +70,27 @@ class ImageExtractor:
         mean = tuple(np.rint(mean).astype(int))
         return bbox, mean
 
-    def load(self, server="cn"):
-        file = self.get_file(server=server)
+    def load(self):
+        file = self.get_file()
         if Path(file).exists():
             area, color = self.extract(file)
             button = area
-            override = self.get_file("AREA", server=server)
+            override = self.get_file("AREA")
             if Path(override).exists():
                 area, _ = self.extract(override)
-            override = self.get_file("COLOR", server=server)
+            override = self.get_file("COLOR")
             if Path(override).exists():
                 _, color = self.extract(override)
-            override = self.get_file("BUTTON", server=server)
+            override = self.get_file("BUTTON")
             if Path(override).exists():
                 button, _ = self.extract(override)
 
-            self.area[server] = area
-            self.color[server] = color
-            self.button[server] = button
-            self.file[server] = file
+            self.area["cn"] = area
+            self.color["cn"] = color
+            self.button["cn"] = button
+            self.file["cn"] = file
         else:
-            logger.attr(server, f"{self.name} not found, use cn server assets")
-            self.area[server] = self.area["cn"]
-            self.color[server] = self.color["cn"]
-            self.button[server] = self.button["cn"]
-            self.file[server] = self.file["cn"]
+            raise FileNotFoundError(file)
 
     @property
     def expression(self):
@@ -195,32 +189,17 @@ def worker(module):
 
 class AssetExtractor:
     """
-    Extract Asset to asset.py.
-    All the filename of assets should be in uppercase.
+    抽取国区资源并生成 assets.py。
 
-    Asset name starts with digit will be ignore.
-        E.g. 2020XXXX.png.
-    Asset name starts with 'TEMPLATE_' will treat as template.
-        E.g. TEMPLATE_AMBUSH_EVADE_SUCCESS.png
-             > TEMPLATE_AMBUSH_EVADE_SUCCESS = Template(file='./assets/handler/TEMPLATE_AMBUSH_EVADE_SUCCESS.png')
-    Asset name starts other will treat as button.
-        E.g. GET_MISSION.png
-             > Button(area=(553, 482, 727, 539), color=(93, 142, 203), button=(553, 482, 727, 539), name='GET_MISSION')
-    Asset name like XXX.AREA.png, XXX.COLOR.png, XXX.BUTTON.png, will overwrite the attribute of XXX.png.
-        E.g. BATTLE_STATUS_S.BUTTON.png overwrites the attribute 'button' of BATTLE_STATUS_S
-    Asset name starts with 'OCR_' will be treat as button.
-        E.g. OCR_EXERCISE_TIMES.png.
+    资源文件名应使用大写。数字开头的文件会被忽略，`TEMPLATE_` 开头的文件会生成 Template，
+    其他文件会生成 Button。`XXX.AREA.png`、`XXX.COLOR.png`、`XXX.BUTTON.png` 会覆盖对应字段。
     """
 
     def __init__(self):
         logger.info("Assets extract")
 
         assets_folder = Path(AzurLaneConfig.ASSETS_FOLDER) / "cn"
-        modules = [
-            path.name
-            for path in assets_folder.iterdir()
-            if path.is_dir()
-        ]
+        modules = [path.name for path in assets_folder.iterdir() if path.is_dir()]
 
         process_map(worker, modules)
 

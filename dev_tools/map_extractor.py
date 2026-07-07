@@ -626,7 +626,9 @@ class MapData:
                 return False
         print(f"Extract: {file}")
         with file.open("w") as f:
-            f.writelines(f"{text}\n" for text in self.get_file_lines(has_modified_campaign_base=has_modified_campaign_base))
+            f.writelines(
+                f"{text}\n" for text in self.get_file_lines(has_modified_campaign_base=has_modified_campaign_base)
+            )
         return True
 
 
@@ -725,19 +727,16 @@ class ChapterTemplate:
 
 
 """
-This an auto-tool to extract map files used in Alas.
+这是用于抽取地图文件的开发工具。
 
-Git clone https://github.com/AzurLaneTools/AzurLaneLuaScripts, to get the decrypted scripts.
+先克隆 https://github.com/AzurLaneTools/AzurLaneLuaScripts 获取解密后的 Lua 脚本。
 Arguments:
-    FILE:            Path to your AzurLaneLuaScripts directory
-    FOLDER:          Folder to save, './campaign/test'
-    KEYWORD:         A keyword in map name, such as '短兵相接' (7-2, zh-CN), 'Counterattack!' (3-4, en-US)
-                     Or map id, such as 702 (7-2), 1140017 (Iris of Light and Dark D2)
-    SELECT:          True if select all maps in the same event
-                     False if extract this map only
-    OVERWRITE:       If overwrite existing files
-    IS_WAR_ARCHIVES: True if retrieved map is to be
-                     adapted for war_archives usage
+    FILE:            Lua 脚本仓库路径
+    FOLDER:          保存目录，例如 './campaign/test'
+    KEYWORD:         地图名称关键词，例如 '短兵相接'；也可以是地图 ID，例如 702
+    SELECT:          是否选择同活动的全部地图
+    OVERWRITE:       是否覆盖已有文件
+    IS_WAR_ARCHIVES: 是否按作战档案用法适配
 """
 FILE = "../AzurLaneLuaScripts"
 FOLDER = "./campaign/event_20260417_cn"
