@@ -121,9 +121,8 @@ class AutoSearchHandler(EnemySearchingHandler):
         if target_index in active:
             logger.info("Selected to the correct auto search setting")
             return True
-        else:
-            self.device.click(AUTO_SEARCH_SETTINGS[target_index])
-            return False
+        self.device.click(AUTO_SEARCH_SETTINGS[target_index])
+        return False
 
     def auto_search_setting_ensure(self, setting, skip_first_screenshot=True):
         """
@@ -147,13 +146,12 @@ class AutoSearchHandler(EnemySearchingHandler):
                 self.device.screenshot()
             if self._auto_search_set_click(setting):
                 return True
-            else:
-                if counter >= 5:
-                    logger.warning("Auto search setting could not be ensured")
-                    return False
-                counter += 1
-                self.device.sleep((0.3, 0.5))
-                continue
+            if counter >= 5:
+                logger.warning("Auto search setting could not be ensured")
+                return False
+            counter += 1
+            self.device.sleep((0.3, 0.5))
+            continue
 
     _auto_search_offset = (5, 5)
     # MULTIPLE_SORTIE 出现时向左移动 213px。
@@ -175,12 +173,9 @@ class AutoSearchHandler(EnemySearchingHandler):
         Returns:
             bool: If clicked
         """
-        if self.appear(
+        return self.appear(
             handler_assets.AUTO_SEARCH_MAP_OPTION_OFF, offset=self._auto_search_offset
-        ) and self.appear_then_click(handler_assets.AUTO_SEARCH_MAP_OPTION_OFF, interval=2):
-            return True
-
-        return False
+        ) and self.appear_then_click(handler_assets.AUTO_SEARCH_MAP_OPTION_OFF, interval=2)
 
     def is_in_auto_search_menu(self):
         """
@@ -211,8 +206,7 @@ class AutoSearchHandler(EnemySearchingHandler):
             self.device.click(handler_assets.AUTO_SEARCH_MENU_EXIT)
             self.interval_reset(handler_assets.AUTO_SEARCH_MENU_EXIT)
             return True
-        else:
-            return False
+        return False
 
     def ensure_auto_search_exit(self, skip_first_screenshot=True):
         """

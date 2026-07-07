@@ -137,11 +137,10 @@ class LoginHandler(UI):
             self.device.click(right)
             self._user_agreement_timer.reset()
             return True
-        else:
-            # 用户登录。
-            self.device.click(right)
-            self._user_agreement_timer.reset()
-            return True
+        # 用户登录。
+        self.device.click(right)
+        self._user_agreement_timer.reset()
+        return True
 
     def handle_app_login(self):
         """
@@ -284,10 +283,9 @@ class LoginHandler(UI):
         )
         if login_wait_results is False:
             return False
-        else:
-            USER_LOGIN_BTN = Button(area=login_wait_results, color=(), button=login_wait_results, name="USER_LOGIN_BTN")
-            self.device.click(USER_LOGIN_BTN)
-            return True
+        USER_LOGIN_BTN = Button(area=login_wait_results, color=(), button=login_wait_results, name="USER_LOGIN_BTN")
+        self.device.click(USER_LOGIN_BTN)
+        return True
 
     @staticmethod
     def get_for_any_ele(list_u2_path: list) -> bool | tuple:
@@ -303,12 +301,12 @@ class LoginHandler(UI):
                 if isinstance(path, UiObject):
                     if path.exists():
                         return path.bounds()
-                    elif not path.exists():
+                    if not path.exists():
                         continue
                 elif isinstance(path, XPathSelector):
                     if path.exists:
                         return path.bounds
-                    elif not path.exists:
+                    if not path.exists:
                         continue
             except XPathElementNotFoundError:
                 continue

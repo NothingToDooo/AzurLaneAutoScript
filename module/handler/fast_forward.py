@@ -408,12 +408,10 @@ class FastForwardHandler(AutoSearchHandler):
                     logger.info(f"Existing files: {existing}")
                     if new.lower() in existing:
                         return new
-                    else:
-                        logger.info(f"Stage increase reach end, new map {new} does not exist")
-                        return name
-                else:
-                    logger.info("Stage increase reach end")
+                    logger.info(f"Stage increase reach end, new map {new} does not exist")
                     return name
+                logger.info("Stage increase reach end")
+                return name
 
         return name
 

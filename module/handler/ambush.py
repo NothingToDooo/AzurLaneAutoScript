@@ -128,8 +128,7 @@ class AmbushHandler(Combat):
     def _handle_ambush(self):
         if self.config.Campaign_AmbushEvade:
             return self._handle_ambush_evade()
-        else:
-            return self._handle_ambush_attack()
+        return self._handle_ambush_attack()
 
     def handle_ambush(self):
         if not self.config.MAP_HAS_AMBUSH:

@@ -68,8 +68,7 @@ class InfoHandler(ModuleBase):
         if self.info_bar_count():
             self.wait_until_info_bar_disappear()
             return True
-        else:
-            return False
+        return False
 
     def ensure_no_info_bar(self, timeout=0.6, skip_first_screenshot=True):
         timeout = Timer(timeout).start()
@@ -141,9 +140,7 @@ class InfoHandler(ModuleBase):
         return False
 
     def handle_popup_single_white(self, interval=2):
-        if self.appear_then_click(POPUP_SINGLE_WHITE, offset=(20, 20), interval=interval):
-            return True
-        return False
+        return self.appear_then_click(POPUP_SINGLE_WHITE, offset=(20, 20), interval=interval)
 
     def popup_interval_clear(self):
         self.interval_clear(
@@ -428,10 +425,7 @@ class InfoHandler(ModuleBase):
         if color_similar(color, handler_assets.STORY_LETTER_BLACK.color, threshold=10):
             return True
         # 黑色背景、少量文字的剧情。
-        if color_similar(color, (0, 0, 0), threshold=10):
-            return True
-
-        return False
+        return color_similar(color, (0, 0, 0), threshold=10)
 
     def story_skip(self, drop=None):
         """
@@ -489,8 +483,7 @@ class InfoHandler(ModuleBase):
                 self._story_confirm.reset()
                 self.story_popup_timeout.reset()
                 return True
-            else:
-                self.interval_clear(handler_assets.STORY_SKIP_3)
+            self.interval_clear(handler_assets.STORY_SKIP_3)
         else:
             self._story_confirm.reset()
         if self.appear_then_click(handler_assets.STORY_CLOSE, offset=(10, 10), interval=2):
@@ -596,5 +589,4 @@ class InfoHandler(ModuleBase):
             logger.info(f"Manjuu count: {count}, waiting for manjuu to disappear")
             self.wait_until_manjuu_disappear()
             return True
-        else:
-            return False
+        return False

@@ -23,10 +23,7 @@ class EnemySearchingHandler(InfoHandler):
         if not self.is_in_map():
             return False
 
-        if MAP_ENEMY_SEARCHING.match_luma(self.device.image, offset=(5, 5)):
-            return True
-
-        return False
+        return MAP_ENEMY_SEARCHING.match_luma(self.device.image, offset=(5, 5))
 
     def handle_enemy_flashing(self):
         self.device.sleep(1.2)
@@ -38,11 +35,10 @@ class EnemySearchingHandler(InfoHandler):
                 self.ensure_no_info_bar(timeout=1.2)
                 raise CampaignEnd("In stage.")
             return False
-        else:
-            if self.appear(MAP_PREPARATION, offset=(20, 20)) or self.appear(FLEET_PREPARATION, offset=(20, 50)):
-                self.device.click(MAP_PREPARATION_CANCEL)
-            self.in_stage_timer.reset()
-            return False
+        if self.appear(MAP_PREPARATION, offset=(20, 20)) or self.appear(FLEET_PREPARATION, offset=(20, 50)):
+            self.device.click(MAP_PREPARATION_CANCEL)
+        self.in_stage_timer.reset()
+        return False
 
     def is_in_stage_page(self):
         return any(self.appear(check, offset=(20, 20)) for check in (CAMPAIGN_CHECK, EVENT_CHECK, SP_CHECK))
@@ -66,9 +62,7 @@ class EnemySearchingHandler(InfoHandler):
     def is_in_stage(self):
         if not self.is_in_stage_page():
             return False
-        if not self.is_stage_page_has_entrance():
-            return False
-        return True
+        return self.is_stage_page_has_entrance()
 
     def is_in_map(self):
         return self.appear(IN_MAP)

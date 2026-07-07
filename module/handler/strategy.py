@@ -219,10 +219,7 @@ class StrategyHandler(InfoHandler):
             in: STRATEGY_OPENED
             out: STRATEGY_OPENED
         """
-        if self.match_template_color(handler_assets.MOB_MOVE_ENTER, offset=MOB_MOVE_OFFSET):
-            return True
-        else:
-            return False
+        return self.match_template_color(handler_assets.MOB_MOVE_ENTER, offset=MOB_MOVE_OFFSET)
 
     def strategy_mob_move_enter(self, skip_first_screenshot=True):
         """
@@ -271,10 +268,7 @@ class StrategyHandler(InfoHandler):
             in: STRATEGY_OPENED
             out: STRATEGY_OPENED
         """
-        if self.match_template_color(handler_assets.AIR_STRIKE_ENTER, offset=(150, 200)):
-            return True
-        else:
-            return False
+        return self.match_template_color(handler_assets.AIR_STRIKE_ENTER, offset=(150, 200))
 
     def strategy_air_strike_enter(self, skip_first_screenshot=True):
         """
