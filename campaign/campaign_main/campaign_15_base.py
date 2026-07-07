@@ -72,9 +72,9 @@ class CampaignBase(CampaignBase_):
 
         try:
             logger.info(f"location: {self.map[location]}, target: {self.map[target]}")
-        except KeyError as e:
+        except KeyError:
             logger.exception("Given coordinates are outside the map.")
-            raise e
+            raise
 
         if abs(location[0] - target[0]) + abs(location[1] - target[1]) != 1:
             logger.error(f"{self.map[target]} is not adjacent from {self.map[location]}.")

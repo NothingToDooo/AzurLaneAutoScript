@@ -401,10 +401,10 @@ class MapData:
             self.MAP_HAS_LAND_BASED = bool(len(self.land_based))
             for n in range(1, 4):
                 self.__setattr__(f"STAR_REQUIRE_{n}", data[f"star_require_{n}"])
-        except Exception as e:
+        except Exception:
             for k, v in data.items():
                 print(f"{k} = {v}")
-            raise e
+            raise
 
     def __str__(self):
         return f"{self.map_id} {self.chapter_name} {self.name}"

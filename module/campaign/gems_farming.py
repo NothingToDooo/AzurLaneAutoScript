@@ -366,7 +366,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
                 if e.args[0] == "Emotion withdraw":
                     self._trigger_emotion = True
                 else:
-                    raise e
+                    raise
 
             # End
             if self._trigger_lv32 or self._trigger_emotion:

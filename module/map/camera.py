@@ -209,7 +209,7 @@ class Camera(MapOperation):
                 logger.error("Trying to update camera but game died")
                 raise GameNotRunningError from e
             else:
-                raise e
+                raise
 
         return True
 

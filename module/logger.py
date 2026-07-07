@@ -307,6 +307,10 @@ def attr_align(name, text, front="", align=22):
     logger.info("%s: %s", name, text)
 
 
+class LoggerDemoError(Exception):
+    pass
+
+
 def show():
     logger.info("INFO")
     logger.warning("WARNING")
@@ -321,7 +325,7 @@ def show():
     logger.info(r"True, False, None")
     logger.info(r"E:/path\\to/alas/alas.exe, /root/alas/, ./relative/path/log.txt")
     # Line before exception
-    raise Exception("Exception")
+    raise LoggerDemoError("Exception")
     # Line below exception
 
 

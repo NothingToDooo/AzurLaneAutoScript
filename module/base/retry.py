@@ -55,12 +55,12 @@ def __retry_internal(
         except exceptions as e:
             _tries -= 1
             if not _tries:
-                # Difference, raise same exception
-                raise e
+                # 保留原始 traceback。
+                raise
 
             if logger is not None:
-                # Difference, show exception
-                logger.exception(e)
+                # 记录当前异常，再等待重试。
+                logger.exception("Retry failed")
                 logger.warning("%s(%s), retrying in %s seconds...", type(e).__name__, e, _delay)
 
             time.sleep(_delay)

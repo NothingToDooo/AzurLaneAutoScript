@@ -504,14 +504,16 @@ def on_task_exception(self):
 pywebio.session.base.Session.on_task_exception = on_task_exception
 
 
+class WebUITestError(Exception):
+    pass
+
+
 def raise_exception(x=3):
-    """
-    For testing purpose
-    """
+    """用于手动测试 WebUI 异常展示。"""
     if x > 0:
         raise_exception(x - 1)
     else:
-        raise Exception("quq")
+        raise WebUITestError("quq")
 
 
 def get_alas_config_listen_path(args):

@@ -86,7 +86,7 @@ class ServerChecker:
         except Exception as e:
             logger.error(e)
             self._state.append(False)
-            raise e
+            raise
 
     def wait_until_available(self) -> None:
         while not self.is_available():
@@ -123,8 +123,6 @@ class ServerChecker:
             self._server = "disabled"
             self._recover = True
             self._state.append(True)
-        except Exception as e:
-            raise e
 
     def reset(self) -> None:
         self._timestamp = 0
