@@ -414,28 +414,18 @@ class FastForwardHandler(AutoSearchHandler):
         return name
 
     def triggered_map_stop(self):
-        """
-        Returns:
-            bool:
-        """
-
-        if self.config.StopCondition_MapAchievement == "100_percent_clear":
-            if self.map_is_100_percent_clear:
-                return True
-
-        if self.config.StopCondition_MapAchievement == "map_3_stars":
-            if self.map_is_100_percent_clear and self.map_is_3_stars:
-                return True
-
-        if self.config.StopCondition_MapAchievement == "threat_safe_without_3_stars":
-            if self.map_is_100_percent_clear and self.map_is_threat_safe:
-                return True
-
-        if self.config.StopCondition_MapAchievement == "threat_safe":
-            if self.map_is_100_percent_clear and self.map_is_3_stars and self.map_is_threat_safe:
-                return True
-
-        return False
+        """返回地图成就停止条件是否已触发。"""
+        match self.config.StopCondition_MapAchievement:
+            case "100_percent_clear":
+                return self.map_is_100_percent_clear
+            case "map_3_stars":
+                return self.map_is_100_percent_clear and self.map_is_3_stars
+            case "threat_safe_without_3_stars":
+                return self.map_is_100_percent_clear and self.map_is_threat_safe
+            case "threat_safe":
+                return self.map_is_100_percent_clear and self.map_is_3_stars and self.map_is_threat_safe
+            case _:
+                return False
 
     def handle_map_stop(self):
         """
@@ -544,11 +534,7 @@ class FastForwardHandler(AutoSearchHandler):
         return True
 
     def handle_2x_book_popup(self):
-        if self.appear(handler_assets.BOOK_POPUP_CHECK, offset=(20, 20)):
-            if self.handle_popup_confirm("2X_BOOK"):
-                return True
-
-        return False
+        return self.appear(handler_assets.BOOK_POPUP_CHECK, offset=(20, 20)) and self.handle_popup_confirm("2X_BOOK")
 
     def handle_submarine_support_popup(self):
         """
