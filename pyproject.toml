@@ -12,7 +12,6 @@ dependencies = [
     "imageio",
     "adbutils",
     "uiautomator2",
-    "uiautomator2cache",
     "psutil",
     "rich",
     "tqdm",

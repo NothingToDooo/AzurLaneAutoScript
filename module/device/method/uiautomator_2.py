@@ -48,7 +48,7 @@ def retry(func):
 
                 def init():
                     self.adb_reconnect()
-            # 发生在 `device.set_new_command_timeout(604800)` 中。
+            # uiautomator2 服务偶尔返回非 JSON 内容。
             # json.decoder.JSONDecodeError: Expecting value: line 1 column 2 (char 1)
             except JSONDecodeError as e:
                 logger.error(e)
@@ -262,16 +262,14 @@ class Uiautomator2(Connection):
             # ** No activities found to run, monkey aborted.
             if allow_failure:
                 return False
-            else:
-                logger.error(result)
-                raise PackageNotInstalled(package_name)
-        elif "inaccessible" in result:
+            logger.error(result)
+            raise PackageNotInstalled(package_name)
+        if "inaccessible" in result:
             # /system/bin/sh: monkey: inaccessible or not found
             return False
-        else:
-            # Events injected: 1
-            # ## Network stats: elapsed time=4ms (0ms mobile, 0ms wifi, 4ms not connected)
-            return True
+        # Events injected: 1
+        # ## Network stats: elapsed time=4ms (0ms mobile, 0ms wifi, 4ms not connected)
+        return True
 
     @retry
     def _app_start_u2_am(self, package_name=None, activity_name=None, allow_failure=False):
@@ -296,12 +294,11 @@ class Uiautomator2(Connection):
                 if allow_failure:
                     return False
                 # BaseError('package "111" not found')
-                elif "not found" in str(e):
+                if "not found" in str(e):
                     logger.error(e)
                     raise PackageNotInstalled(package_name) from e
                 # 未知错误。
-                else:
-                    raise
+                raise
             activity_name = info["mainActivity"]
 
         cmd = [
@@ -322,9 +319,8 @@ class Uiautomator2(Connection):
         if "Error: Activity class" in ret.output:
             if allow_failure:
                 return False
-            else:
-                logger.error(ret)
-                return False
+            logger.error(ret)
+            return False
         # 已经在运行。
         # Warning: Activity not started, intent has been delivered to currently running top-most instance.
         if "Warning: Activity not started" in ret.output:
@@ -348,10 +344,9 @@ class Uiautomator2(Connection):
         if "Permission Denial" in ret.output:
             if allow_failure:
                 return False
-            else:
-                logger.error(ret)
-                logger.error("Permission Denial while starting app, probably because activity invalid")
-                return False
+            logger.error(ret)
+            logger.error("Permission Denial while starting app, probably because activity invalid")
+            return False
         # 启动成功。
         # Starting: Intent...
         return True
@@ -402,8 +397,7 @@ class Uiautomator2(Connection):
     def dump_hierarchy_uiautomator2(self) -> etree._Element:
         content = self.u2.dump_hierarchy(compressed=False)
         # print(content)
-        hierarchy = etree.fromstring(content.encode("utf-8"))
-        return hierarchy
+        return etree.fromstring(content.encode("utf-8"))
 
     def uninstall_uiautomator2(self):
         logger.info("Removing uiautomator2")
@@ -461,7 +455,7 @@ class Uiautomator2(Connection):
         """
         resp = self.u2.http.get("/proc/list", timeout=10)
         resp.raise_for_status()
-        result = [
+        return [
             ProcessInfo(
                 pid=proc["pid"],
                 ppid=proc["ppid"],
@@ -471,7 +465,6 @@ class Uiautomator2(Connection):
             )
             for proc in resp.json()
         ]
-        return result
 
     @retry
     def u2_shell_background(self, cmdline, timeout=10) -> ShellBackgroundResponse:
@@ -491,7 +484,6 @@ class Uiautomator2(Connection):
         ret.raise_for_status()
 
         resp = ret.json()
-        resp = ShellBackgroundResponse(
+        return ShellBackgroundResponse(
             success=bool(resp.get("success", False)), pid=resp.get("pid", 0), description=resp.get("description", "")
         )
-        return resp

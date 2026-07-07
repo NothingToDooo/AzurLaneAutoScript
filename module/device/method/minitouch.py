@@ -17,8 +17,7 @@ from module.logger import logger
 
 
 def random_normal_distribution(a, b, n=5):
-    output = np.mean(runtime_random.uniform(a, b, size=n))
-    return output
+    return np.mean(runtime_random.uniform(a, b, size=n))
 
 
 def random_theta():
@@ -126,14 +125,13 @@ class Command:
         """
         if self.operation == "c" or self.operation == "r":
             return f"{self.operation}\n"
-        elif self.operation == "d" or self.operation == "m":
+        if self.operation == "d" or self.operation == "m":
             return f"{self.operation} {self.contact} {self.x} {self.y} {self.pressure}\n"
-        elif self.operation == "u":
+        if self.operation == "u":
             return f"{self.operation} {self.contact}\n"
-        elif self.operation == "w":
+        if self.operation == "w":
             return f"{self.operation} {self.ms}\n"
-        else:
-            return ""
+        return ""
 
 
 class CommandBuilder:
@@ -179,8 +177,7 @@ class CommandBuilder:
     def orientation(self):
         if self.handle_orientation:
             return self.device.orientation
-        else:
-            return 0
+        return 0
 
     def convert(self, x, y):
         max_x, max_y = self.device.max_x, self.device.max_y
@@ -325,7 +322,7 @@ def retry(func):
                 logger.error(e)
 
                 def init():
-                    self.restart_atx()
+                    self.restart_uiautomator2()
                     if self._minitouch_port:
                         self.adb_forward_remove(f"tcp:{self._minitouch_port}")
                     del_cached_property(self, "_minitouch_builder")

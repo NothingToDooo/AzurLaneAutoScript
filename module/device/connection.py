@@ -1,12 +1,10 @@
 import json
-import logging
 import re
 import socket
 import subprocess
 import time
 from functools import wraps
 
-import uiautomator2 as u2
 from adbutils import AdbClient, AdbDevice, AdbTimeout, ForwardItem, ReverseItem
 from adbutils.errors import AdbError
 
@@ -208,14 +206,10 @@ class Connection(ConnectionAttr):
             if recvall:
                 # bytes。
                 return recv_all(result)
-            else:
-                # socket。
-                return result
-        else:
-            result = self.adb.shell(cmd, stream=stream, timeout=timeout, rstrip=rstrip)
-            result = remove_shell_warning(result)
-            # str。
+            # socket。
             return result
+        # str。
+        return remove_shell_warning(self.adb.shell(cmd, stream=stream, timeout=timeout, rstrip=rstrip))
 
     def adb_getprop(self, name):
         """
@@ -278,16 +272,15 @@ class Connection(ConnectionAttr):
         if res == "":
             # 空属性通常表示 MuMu6 或低于 3.5.6 的 MuMu12。
             return True
-        elif res == "false":
+        if res == "false":
             # 已关闭。
             return True
-        elif res == "true":
+        if res == "true":
             # https://mumu.163.com/help/20230802/35047_1102450.html
             logger.critical('请在MuMu模拟器设置内关闭 "后台挂机时保活运行"')
             raise RequestHumanTakeover
-        else:
-            logger.warning(f"Invalid nemud.app_keep_alive value: {res}")
-            return False
+        logger.warning(f"Invalid nemud.app_keep_alive value: {res}")
+        return False
 
     @cached_property
     def is_mumu_over_version_400(self) -> bool:
@@ -456,13 +449,12 @@ class Connection(ConnectionAttr):
 
         if port:
             return port
-        else:
-            # 创建新的 forward。
-            port = random_port(self.config.FORWARD_PORT_RANGE)
-            forward = ForwardItem(self.serial, f"tcp:{port}", remote)
-            logger.info(f"Create forward: {forward}")
-            self.adb.forward(forward.local, forward.remote)
-            return port
+        # 创建新的 forward。
+        port = random_port(self.config.FORWARD_PORT_RANGE)
+        forward = ForwardItem(self.serial, f"tcp:{port}", remote)
+        logger.info(f"Create forward: {forward}")
+        self.adb.forward(forward.local, forward.remote)
+        return port
 
     def _adb_reverse_transport(self, remote: str, local: str, norebind: bool = False):
         """
@@ -494,13 +486,12 @@ class Connection(ConnectionAttr):
 
         if port:
             return port
-        else:
-            # 创建新的 reverse。
-            port = random_port(self.config.FORWARD_PORT_RANGE)
-            reverse = ReverseItem(remote, f"tcp:{port}")
-            logger.info(f"Create reverse: {reverse}")
-            self._adb_reverse_transport(reverse.remote, reverse.local)
-            return port
+        # 创建新的 reverse。
+        port = random_port(self.config.FORWARD_PORT_RANGE)
+        reverse = ReverseItem(remote, f"tcp:{port}")
+        logger.info(f"Create reverse: {reverse}")
+        self._adb_reverse_transport(reverse.remote, reverse.local)
+        return port
 
     def adb_forward_remove(self, local):
         """
@@ -632,8 +623,7 @@ class Connection(ConnectionAttr):
                 if self._wait_device_appear(self.serial, first_devices=devices):
                     logger.info(f"Serial {self.serial} connected")
                     return True
-                else:
-                    logger.info(f"Serial {self.serial} is not connected")
+                logger.info(f"Serial {self.serial} is not connected")
             logger.info(f'"{self.serial}" is a `emulator-*` serial, skip adb connect')
             return True
         if re.match(r"^[a-zA-Z0-9]+$", self.serial):
@@ -641,8 +631,7 @@ class Connection(ConnectionAttr):
                 if self._wait_device_appear(self.serial, first_devices=devices):
                     logger.info(f"Serial {self.serial} connected")
                     return True
-                else:
-                    logger.info(f"Serial {self.serial} is not connected")
+                logger.info(f"Serial {self.serial} is not connected")
             logger.info(f'"{self.serial}" seems to be a Android serial, skip adb connect')
             return True
 
@@ -655,12 +644,12 @@ class Connection(ConnectionAttr):
             if "connected" in msg:
                 return True
             # bad port number '598265' in '127.0.0.1:598265'
-            elif "bad port" in msg:
+            if "bad port" in msg:
                 possible_reasons("Serial incorrect, might be a typo")
                 raise RequestHumanTakeover
             # cannot connect to 127.0.0.1:55555:
             # No connection could be made because the target machine actively refused it. (10061)
-            elif "(10061)" in msg:
+            if "(10061)" in msg:
                 # MuMu12 端口被占用时可能切换 serial。
                 # 这里尝试连接相邻端口来处理动态切换。
                 if self.is_mumu12_family:
@@ -771,19 +760,11 @@ class Connection(ConnectionAttr):
 
     def install_uiautomator2(self):
         """
-        初始化 uiautomator2，并移除 minicap。
+        初始化 uiautomator2 3.x 服务，并移除旧 minicap。
         """
         logger.info("Install uiautomator2")
-        init = u2.init.Initer(self.adb, loglevel=logging.DEBUG)
-        # MuMu X 没有 ro.product.cpu.abi，需要从 ro.product.cpu.abilist 选 ABI。
-        if init.abi not in ["x86_64", "x86", "arm64-v8a", "armeabi-v7a", "armeabi"]:
-            init.abi = init.abis[0]
-        init.set_atx_agent_addr("127.0.0.1:7912")
-        try:
-            init.install()
-        except ConnectionError:
-            u2.init.GITHUB_BASEURL = "http://tool.appetizer.io/openatx"
-            init.install()
+        del_cached_property(self, "u2")
+        _ = self.u2
         self.uninstall_minicap()
 
     def uninstall_minicap(self):
@@ -792,16 +773,13 @@ class Connection(ConnectionAttr):
         self.adb_shell(["rm", "/data/local/tmp/minicap"])
         self.adb_shell(["rm", "/data/local/tmp/minicap.so"])
 
-    def restart_atx(self):
+    def restart_uiautomator2(self):
         """
-        minitouch 同时只支持一个连接。
-
-        重启 ATX 可以踢掉已有连接。
+        重启 uiautomator2 服务，释放 minitouch 占用。
         """
-        logger.info("Restart ATX")
-        atx_agent_path = "/data/local/tmp/atx-agent"
-        self.adb_shell([atx_agent_path, "server", "--stop"])
-        self.adb_shell([atx_agent_path, "server", "--nouia", "-d", "--addr", "127.0.0.1:7912"])
+        logger.info("Restart uiautomator2")
+        del_cached_property(self, "u2")
+        _ = self.u2
 
     @staticmethod
     def sleep(second):
@@ -1030,8 +1008,7 @@ class Connection(ConnectionAttr):
         if show_log:
             logger.info("Get package list")
         output = self.adb_shell(["pm", "list", "packages"])
-        packages = re.findall(r"package:([^\s]+)", output)
-        return packages
+        return re.findall(r"package:([^\s]+)", output)
 
     def list_known_packages(self, show_log=True):
         """
@@ -1041,9 +1018,7 @@ class Connection(ConnectionAttr):
         返回：
             list[str]：包名列表。
         """
-        packages = self.list_package(show_log=show_log)
-        packages = [p for p in packages if p in VALID_PACKAGE or p in VALID_CHANNEL_PACKAGE]
-        return packages
+        return [p for p in self.list_package(show_log=show_log) if p in VALID_PACKAGE or p in VALID_CHANNEL_PACKAGE]
 
     def detect_package(self, set_config=True):
         """

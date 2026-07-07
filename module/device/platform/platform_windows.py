@@ -183,12 +183,11 @@ class PlatformWindows(PlatformBase, EmulatorManager):
                 # Connected to 127.0.0.1:59865
                 # Already connected to 127.0.0.1:59865
                 return False
-            elif "(10061)" in m:
+            if "(10061)" in m:
                 # cannot connect to 127.0.0.1:55555:
                 # No connection could be made because the target machine actively refused it. (10061)
                 return False
-            else:
-                return True
+            return True
 
         @run_once
         def show_online(m):
@@ -282,14 +281,12 @@ class PlatformWindows(PlatformBase, EmulatorManager):
                 if self.emulator_start_watch():
                     # Success
                     return True
-                else:
-                    # Start command was sent but emulator didn't come online, stop and start again
-                    continue
-            else:
-                # Failed to start, stop and start again
-                if self._emulator_function_wrapper(self._emulator_stop):
-                    continue
-                return False
+                # Start command was sent but emulator didn't come online, stop and start again
+                continue
+            # Failed to start, stop and start again
+            if self._emulator_function_wrapper(self._emulator_stop):
+                continue
+            return False
 
         logger.error("Failed to start emulator 3 times, stopped")
         return False
@@ -301,11 +298,10 @@ class PlatformWindows(PlatformBase, EmulatorManager):
             if self._emulator_function_wrapper(self._emulator_stop):
                 # Success
                 return True
-            else:
-                # Failed to stop, start and stop again
-                if self._emulator_function_wrapper(self._emulator_start):
-                    continue
-                return False
+            # Failed to stop, start and stop again
+            if self._emulator_function_wrapper(self._emulator_start):
+                continue
+            return False
 
         logger.error("Failed to stop emulator 3 times, stopped")
         return False

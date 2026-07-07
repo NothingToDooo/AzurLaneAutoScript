@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from tqdm import tqdm
 
 from module.base.decorator import cached_property
-from module.device.method.utils import removeprefix
 
 REGEX_SETTING = re.compile(r"PlayerPrefs.Get(\w{1,10})\((.*)\)")
 REGEX_SETTING_KEY = re.compile(r'"(.*?)"')
@@ -172,7 +171,7 @@ class SettingExtractor:
             if not settings:
                 continue
             yield ""
-            f = removeprefix(file, folder).replace("\\", "/")
+            f = file.removeprefix(folder).replace("\\", "/")
             yield f"    # {f}"
             for setting in settings:
                 if setting.key in dic_settings:

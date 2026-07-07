@@ -1,12 +1,9 @@
-import os
 import random
 import re
 import socket
 import time
-import typing as t
 
 import uiautomator2 as u2
-import uiautomator2cache
 from adbutils import AdbTimeout
 from lxml import etree
 
@@ -52,10 +49,7 @@ from module.logger import logger
 RETRY_TRIES = 5
 RETRY_DELAY = 3
 
-# Patch uiautomator2 appdir
-u2.init.appdir = os.path.dirname(uiautomator2cache.__file__)
-
-# Patch uiautomator2 logger
+# 接管 uiautomator2 日志，统一输出到 Alas 日志。
 u2_logger = u2.logger
 u2_logger.debug = logger.info
 u2_logger.info = logger.info
@@ -69,39 +63,6 @@ def setup_logger(*_args, **_kwargs):
 
 
 u2.setup_logger = setup_logger
-u2.init.setup_logger = setup_logger
-
-
-# Patch Initer
-class PatchedIniter(u2.init.Initer):
-    @property
-    def atx_agent_url(self):
-        files = {
-            "armeabi-v7a": "atx-agent_{v}_linux_armv7.tar.gz",
-            # 'arm64-v8a': 'atx-agent_{v}_linux_armv7.tar.gz',
-            "arm64-v8a": "atx-agent_{v}_linux_arm64.tar.gz",
-            "armeabi": "atx-agent_{v}_linux_armv6.tar.gz",
-            "x86": "atx-agent_{v}_linux_386.tar.gz",
-            "x86_64": "atx-agent_{v}_linux_386.tar.gz",
-        }
-        name = None
-        for abi in self.abis:
-            name = files.get(abi)
-            if name:
-                break
-        if not name:
-            raise Exception("arch(%s) need to be supported yet, please report an issue in github" % self.abis)
-        return u2.init.GITHUB_BASEURL + "/atx-agent/releases/download/%s/%s" % (
-            u2.version.__atx_agent_version__,
-            name.format(v=u2.version.__atx_agent_version__),
-        )
-
-    @property
-    def minicap_urls(self):
-        return []
-
-
-u2.init.Initer = PatchedIniter
 
 
 def is_port_using(port_num):
@@ -124,8 +85,7 @@ def random_port(port_range):
     new_port = random.choice(list(range(*port_range)))
     if is_port_using(new_port):
         return random_port(port_range)
-    else:
-        return new_port
+    return new_port
 
 
 def recv_all(stream, chunk_size=4096, recv_interval=0.000) -> bytes:
@@ -187,11 +147,10 @@ def retry_sleep(trial):
     if trial == 0 or trial == 1:
         return 0
     # Failed twice
-    elif trial == 2:
+    if trial == 2:
         return 1
     # Failed more
-    else:
-        return RETRY_DELAY
+    return RETRY_DELAY
 
 
 def handle_adb_error(e):
@@ -209,17 +168,17 @@ def handle_adb_error(e):
         # AdbError(device '127.0.0.1:59865' not found)
         logger.error(e)
         return True
-    elif "timeout" in text:
+    if "timeout" in text:
         # AdbTimeout(adb read timeout)
         logger.error(e)
         return True
-    elif "closed" in text:
+    if "closed" in text:
         # AdbError(closed)
         # Usually after AdbTimeout(adb read timeout)
         # Disconnect and re-connect should fix this.
         logger.error(e)
         return True
-    elif "device offline" in text:
+    if "device offline" in text:
         # AdbError(device offline)
         # When a device that has been connected wirelessly is disconnected passively,
         # it does not disappear from the adb device list,
@@ -229,24 +188,23 @@ def handle_adb_error(e):
         # the device is still available, but it needs to be disconnected and re-connected.
         logger.error(e)
         return True
-    elif "is offline" in text:
+    if "is offline" in text:
         # RuntimeError: USB device 127.0.0.1:7555 is offline
         # Raised by uiautomator2 when current adb service is killed by another version of adb service.
         logger.error(e)
         return True
-    elif text == "rest":
+    if text == "rest":
         # AdbError(rest)
         # Response telling adbd service has reset, client should reconnect
         logger.error(e)
         return True
-    else:
-        # AdbError()
-        logger.exception(e)
-        possible_reasons(
-            "Emulator died, please restart emulator",
-            "Serial incorrect, no such device exists or emulator is not running",
-        )
-        return False
+    # AdbError()
+    logger.exception(e)
+    possible_reasons(
+        "Emulator died, please restart emulator",
+        "Serial incorrect, no such device exists or emulator is not running",
+    )
+    return False
 
 
 def handle_unknown_host_service(e):
@@ -264,8 +222,7 @@ def handle_unknown_host_service(e):
         # Usually because user opened a Chinese emulator, which uses ADB from the Stone Age.
         logger.error(e)
         return True
-    else:
-        return False
+    return False
 
 
 def get_serial_pair(serial):
@@ -294,76 +251,14 @@ def get_serial_pair(serial):
     return None, None
 
 
-@t.overload
-def removeprefix(s: str, prefix: str) -> str: ...
-
-
-@t.overload
-def removeprefix(s: bytes, prefix: bytes) -> bytes: ...
-
-
-@t.overload
-def removesuffix(s: str, suffix: str) -> str: ...
-
-
-@t.overload
-def removesuffix(s: bytes, suffix: bytes) -> bytes: ...
-
-
-def removeprefix(s, prefix):
-    """
-    Backport `string.removeprefix(prefix)`, which is on Python>=3.9
-
-    Args:
-        s (str | bytes):
-        prefix (str | bytes):
-
-    Returns:
-        str | bytes:
-    """
-    if s.startswith(prefix):
-        return s[len(prefix) :]
-    return s
-
-
-def removesuffix(s, suffix):
-    """
-    Backport `string.removesuffix(suffix)`, which is on Python>=3.9
-
-    Args:
-        s (str | bytes):
-        suffix (str | bytes):
-
-    Returns:
-        str | bytes:
-    """
-    # s[:-0] is empty string, so we need to check if suffix is empty
-    if suffix and s.endswith(suffix):
-        return s[: -len(suffix)]
-    return s
-
-
-class IniterNoMinicap(u2.init.Initer):
-    @property
-    def minicap_urls(self):
-        """
-        Don't install minicap on emulators, return empty urls.
-
-        binary from https://github.com/openatx/stf-binaries
-        only got abi: armeabi-v7a and arm64-v8a
-        """
-        return []
-
-
 class Device(u2.Device):
     def show_float_window(self, show=True):
         """
-        Don't show float windows.
+        不显示 uiautomator2 悬浮窗。
         """
 
 
-# Monkey patch
-u2.init.Initer = IniterNoMinicap
+# 猴子补丁。
 u2.Device = Device
 
 
@@ -384,8 +279,7 @@ class HierarchyButton:
         res = HierarchyButton._name_regex.findall(self.xpath)
         if res:
             return res[0]
-        else:
-            return self.xpath
+        return self.xpath
 
     @cached_property
     def count(self):
@@ -399,8 +293,7 @@ class HierarchyButton:
     def attrib(self):
         if self.exist:
             return self.nodes[0].attrib
-        else:
-            return {}
+        return {}
 
     @cached_property
     def area(self):
@@ -408,16 +301,14 @@ class HierarchyButton:
             bounds = self.attrib.get("bounds")
             lx, ly, rx, ry = map(int, re.findall(r"\d+", bounds))
             return lx, ly, rx, ry
-        else:
-            return None
+        return None
 
     @cached_property
     def size(self):
         if self.area is not None:
             lx, ly, rx, ry = self.area
             return rx - lx, ry - ly
-        else:
-            return None
+        return None
 
     @cached_property
     def button(self):

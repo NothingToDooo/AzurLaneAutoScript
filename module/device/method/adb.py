@@ -248,16 +248,14 @@ class Adb(Connection):
             # ** No activities found to run, monkey aborted.
             if allow_failure:
                 return False
-            else:
-                logger.error(result)
-                raise PackageNotInstalled(package_name)
-        elif "inaccessible" in result:
+            logger.error(result)
+            raise PackageNotInstalled(package_name)
+        if "inaccessible" in result:
             # /system/bin/sh: monkey: inaccessible or not found
             return False
-        else:
-            # Events injected: 1
-            # ## Network stats: elapsed time=4ms (0ms mobile, 0ms wifi, 4ms not connected)
-            return True
+        # Events injected: 1
+        # ## Network stats: elapsed time=4ms (0ms mobile, 0ms wifi, 4ms not connected)
+        return True
 
     @retry
     def _app_start_adb_am(self, package_name=None, activity_name=None, allow_failure=False):
@@ -293,9 +291,8 @@ class Adb(Connection):
             else:
                 if allow_failure:
                     return False
-                else:
-                    logger.error(result)
-                    raise PackageNotInstalled(package_name)
+                logger.error(result)
+                raise PackageNotInstalled(package_name)
 
         cmd = [
             "am",
@@ -315,9 +312,8 @@ class Adb(Connection):
         if "Error: Activity class" in ret:
             if allow_failure:
                 return False
-            else:
-                logger.error(ret)
-                return False
+            logger.error(ret)
+            return False
         # 已经在运行。
         # Warning: Activity not started, intent has been delivered to currently running top-most instance.
         if "Warning: Activity not started" in ret:
@@ -341,10 +337,9 @@ class Adb(Connection):
         if "Permission Denial" in ret:
             if allow_failure:
                 return False
-            else:
-                logger.error(ret)
-                logger.error("Permission Denial while starting app, probably because activity invalid")
-                return False
+            logger.error(ret)
+            logger.error("Permission Denial while starting app, probably because activity invalid")
+            return False
         # 启动成功。
         # Starting: Intent...
         return True
@@ -425,5 +420,4 @@ class Adb(Connection):
                 break
 
         # 使用 lxml 解析。
-        hierarchy = etree.fromstring(content)
-        return hierarchy
+        return etree.fromstring(content)

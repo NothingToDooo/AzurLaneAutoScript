@@ -6,40 +6,21 @@ from module.base.decorator import cached_property
 from module.logger import logger
 
 """
-Importing pkg_resources is so slow, like 0.4 ~ 1.0s, just google it you will find it indeed really slow.
-Since it was some kind of standard library there is no way to modify it or speed it up.
-So here's a poor but fast implementation of pkg_resources returning the things in need.
+替代很慢的 pkg_resources，只实现 adbutils 和 uiautomator2 会用到的最小接口。
 
-To patch:
+用法：
 ```
-# Patch pkg_resources before importing adbutils and uiautomator2
+# 必须在导入 adbutils 和 uiautomator2 前注入。
 from module.device.pkg_resources import get_distribution
-# Just avoid being removed by import optimization
+# 避免被导入优化删除。
 _ = get_distribution
 ```
 """
-# Inject sys.modules, pretend we have pkg_resources imported
+# 注入 sys.modules，让依赖以为 pkg_resources 已经导入。
 try:
     sys.modules["pkg_resources"] = sys.modules["module.device.pkg_resources"]
 except KeyError:
     logger.error("Patch pkg_resources failed, patch module does not exists")
-
-
-def removesuffix(s, suffix):
-    """
-    Remove suffix of a string or bytes like `string.removesuffix(suffix)`, which is on Python3.9+
-
-    Args:
-        s (str, bytes):
-        suffix (str, bytes):
-
-    Returns:
-        str, bytes:
-    """
-    # s[:-0] is empty string, so we need to check if suffix is empty
-    if suffix and s.endswith(suffix):
-        return s[: -len(suffix)]
-    return s
 
 
 class FakeDistributionObject:
@@ -56,18 +37,16 @@ class FakeDistributionObject:
 class PackageCache:
     @cached_property
     def site_packages(self):
-        # Just whatever library to locate the `site-packages` directory
+        # 借用已安装依赖定位当前环境的 site-packages。
         import requests
 
-        path = os.path.abspath(os.path.join(requests.__file__, "../../"))
-        return path
+        return os.path.abspath(os.path.join(requests.__file__, "../../"))
 
     @cached_property
     def dict_installed_packages(self):
         """
-        Returns:
-            dict: Key: str, package name
-                Value: FakeDistributionObject
+        返回：
+            dict：key 为包名，value 为 FakeDistributionObject。
         """
         dic = {}
         for file in os.listdir(self.site_packages):
@@ -75,7 +54,7 @@ class PackageCache:
             # adbutils-0.11.0-py3.7.egg-info
             res = re.match(r"^([a-zA-Z0-9._]+)-([a-zA-Z0-9._]+)-", file)
             if res:
-                version = removesuffix(res.group(2), ".dist")
+                version = res.group(2).removesuffix(".dist")
                 # version = res.group(2)
                 obj = FakeDistributionObject(
                     dist=res.group(1),
@@ -91,12 +70,12 @@ PACKAGE_CACHE = PackageCache()
 
 def resource_filename(*args):
     if args == ("adbutils", "binaries"):
-        path = os.path.abspath(os.path.join(PACKAGE_CACHE.site_packages, *args))
-        return path
+        return os.path.abspath(os.path.join(PACKAGE_CACHE.site_packages, *args))
+    return None
 
 
 def get_distribution(dist):
-    """Return a current distribution object for a Requirement or string"""
+    """返回当前依赖版本；这里只实现 adbutils 和 uiautomator2 需要的最小接口。"""
     if dist == "adbutils":
         return PACKAGE_CACHE.dict_installed_packages.get(
             "adbutils",
@@ -107,6 +86,7 @@ def get_distribution(dist):
             "uiautomator2",
             FakeDistributionObject("uiautomator2", "2.16.17"),
         )
+    return None
 
 
 class DistributionNotFound(Exception):

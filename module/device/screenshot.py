@@ -133,9 +133,8 @@ class Screenshot(Adb, NemuIpc):
             self.image_save(file)
             self._last_save_time[genre] = now
             return True
-        else:
-            self._last_save_time[genre] = now
-            return False
+        self._last_save_time[genre] = now
+        return False
 
     def screenshot_last_save_time_reset(self, genre):
         self._last_save_time[genre] = 0
@@ -198,7 +197,7 @@ class Screenshot(Adb, NemuIpc):
             if width == 1280 and height == 720:
                 self._screen_size_checked = True
                 return True
-            elif not orientated and (width == 720 and height == 1280):
+            if not orientated and (width == 720 and height == 1280):
                 logger.info("Received orientated screenshot, handling")
                 self.get_orientation()
                 self.image = self._handle_orientated_image(self.image)
@@ -207,15 +206,14 @@ class Screenshot(Adb, NemuIpc):
                 if width == 720 and height == 1280:
                     logger.info("Unable to handle orientated screenshot, continue for now")
                     return True
-                else:
-                    continue
-            elif hasattr(self, "app_is_running") and not self.app_is_running():
+                continue
+            if hasattr(self, "app_is_running") and not self.app_is_running():
                 logger.warning("Received orientated screenshot, game not running")
                 return True
-            else:
-                logger.critical(f"Resolution not supported: {width}x{height}")
-                logger.critical("Please set emulator resolution to 1280x720")
-                raise RequestHumanTakeover
+            logger.critical(f"Resolution not supported: {width}x{height}")
+            logger.critical("Please set emulator resolution to 1280x720")
+            raise RequestHumanTakeover
+        return False
 
     def check_screen_black(self):
         if self._screen_black_checked:
@@ -232,6 +230,5 @@ class Screenshot(Adb, NemuIpc):
                 logger.warning("如果正在使用 MuMu X，请升级到 12.1.5.0 或更高版本")
             self._screen_black_checked = False
             return False
-        else:
-            self._screen_black_checked = True
-            return True
+        self._screen_black_checked = True
+        return True

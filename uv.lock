@@ -176,7 +176,6 @@ dependencies = [
     { name = "starlette" },
     { name = "tqdm" },
     { name = "uiautomator2" },
-    { name = "uiautomator2cache" },
     { name = "uvicorn" },
     { name = "zerorpc" },
 ]
@@ -212,7 +211,6 @@ requires-dist = [
     { name = "starlette" },
     { name = "tqdm" },
     { name = "uiautomator2" },
-    { name = "uiautomator2cache" },
     { name = "uvicorn", specifier = ">=0.50.2" },
     { name = "zerorpc" },
 ]
@@ -2283,14 +2281,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/f4/91/ebf4a51460f64a8627595cae43380d1a9ca0cd8a93ea342339f95df914c5/uiautomator2-3.7.0.tar.gz", hash = "sha256:d9640a1cdd4a689d56bf8a83f62c5b7b2fca6dc4905ffda88f96c0365d96650f", size = 5176919, upload-time = "2026-06-26T13:10:09.015Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/55/23/a5f93de8bb197ae2d2d0185c2c13d4b36ae7f18215e3e599e217f8e90e0d/uiautomator2-3.7.0-py3-none-any.whl", hash = "sha256:731bf4e26e35cd440cd165b399b8a4d4b795178d78b9243769e336aee6dce985", size = 5174323, upload-time = "2026-06-26T13:10:06.5Z" },
-]
-
-[[package]]
-name = "uiautomator2cache"
-version = "0.3.1"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/15/63/97cab943afefb379c421ccd9ec890b0c2acbe0c3a1f7963e0022900f6f17/uiautomator2cache-0.3.1-py3-none-any.whl", hash = "sha256:cad9930b37e0ab57e13fedd090b8956871c8d857c95408f0ea5f0844c0ac53f8", size = 17143599, upload-time = "2024-07-01T16:46:10.752Z" },
 ]
 
 [[package]]

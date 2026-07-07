@@ -7,7 +7,6 @@ from scipy import signal
 
 from module.base.decorator import cached_property
 from module.base.utils import color_similarity_2d, crop, extract_white_letters, get_color, load_image, resize
-from module.device.method.utils import removesuffix
 from module.logger import logger
 from module.ocr.ocr import Duration, Ocr
 from module.research import assets as research_assets
@@ -383,7 +382,7 @@ def research_jp_detect(image):
     """
     project = ResearchProjectJp()
     project.series = get_research_series_jp(image)
-    project.duration = removesuffix(str(get_research_duration_jp(image) / 3600), ".0")
+    project.duration = str(get_research_duration_jp(image) / 3600).removesuffix(".0")
     if project.duration == "":
         project.duration = "0"
     project.genre = get_research_genre_jp(image)

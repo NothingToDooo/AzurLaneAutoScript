@@ -19,8 +19,7 @@ class AppControl(Adb, Uiautomator2):
             package = self.app_current_uiautomator2()
         else:
             package = self.app_current_adb()
-        package = package.strip(" \t\r\n")
-        return package
+        return package.strip(" \t\r\n")
 
     def app_is_running(self) -> bool:
         package = self.app_current()

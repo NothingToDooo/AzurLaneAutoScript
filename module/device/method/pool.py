@@ -162,9 +162,8 @@ class Job[ResultT]:
             # Return job result or raise job error
             item = self.queue.popleft()
             return item.unwrap()
-        else:
-            self._kill()
-            raise JobTimeout
+        self._kill()
+        raise JobTimeout
 
     def _kill(self):
         with self.put_lock:
@@ -273,15 +272,14 @@ class WorkerThread:
             self.thread_pool.all_workers.pop(self, None)
             self.thread_pool.release_full_lock()
             return True
-        else:
-            try:
-                job = self.job
-            except AttributeError:
-                job = None
-            logger.error(f"Failed to kill thread {self.thread.ident} from job {job}")
-            # Failed to send SystemExit, reset it
-            ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0)
-            return False
+        try:
+            job = self.job
+        except AttributeError:
+            job = None
+        logger.error(f"Failed to kill thread {self.thread.ident} from job {job}")
+        # Failed to send SystemExit, reset it
+        ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0)
+        return False
 
 
 class WorkerPool:
@@ -478,8 +476,7 @@ class WorkerPool:
             list[ResultT]:
         """
         jobs = [self.start_thread_soon(func, arg) for arg in iterables]
-        results = [job.get() for job in jobs]
-        return results
+        return [job.get() for job in jobs]
 
     def thread_starmap(self, func, iterables):
         """
@@ -493,8 +490,7 @@ class WorkerPool:
             list[ResultT]:
         """
         jobs = [self.start_thread_soon(func, *arg) for arg in iterables]
-        results = [job.get() for job in jobs]
-        return results
+        return [job.get() for job in jobs]
 
     def thread_funcmap(self, func_iterables):
         """
@@ -507,8 +503,7 @@ class WorkerPool:
             list[ResultT]:
         """
         jobs = [self.start_thread_soon(func) for func in func_iterables]
-        results = [job.get() for job in jobs]
-        return results
+        return [job.get() for job in jobs]
 
 
 class WaitJobsWrapper:

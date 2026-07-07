@@ -92,8 +92,7 @@ class CaptureStd:
                 fragments.append(chunk)
             else:
                 break
-        output = b"".join(fragments)
-        return output
+        return b"".join(fragments)
 
 
 class CaptureNemuIpc(CaptureStd):
@@ -399,8 +398,7 @@ class NemuIpcImpl:
         pixels_pointer = self.run_func(self._screenshot, timeout=timeout)
 
         # image = np.ctypeslib.as_array(pixels_pointer, shape=(self.height, self.width, 4))
-        image = np.ctypeslib.as_array(pixels_pointer.contents).reshape((self.height, self.width, 4))
-        return image
+        return np.ctypeslib.as_array(pixels_pointer.contents).reshape((self.height, self.width, 4))
 
     def convert_xy(self, x, y):
         """
@@ -462,8 +460,7 @@ class NemuIpcImpl:
         offset -= 16
         if 0 <= index < 32 and offset in [-2, -1, 0, 1, 2]:
             return index
-        else:
-            return None
+        return None
 
 
 class NemuIpc(Platform):

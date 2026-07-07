@@ -88,10 +88,9 @@ class Emulator(EmulatorBase):
         if exe == "nemuplayer.exe":
             if dir2 == "nemu":
                 return cls.MuMuPlayer
-            elif dir2 == "nemu9":
+            if dir2 == "nemu9":
                 return cls.MuMuPlayerX
-            else:
-                return cls.MuMuPlayer
+            return cls.MuMuPlayer
         if exe in ["mumuplayer.exe", "mumunxmain.exe"]:
             return cls.MuMuPlayer12
 
@@ -131,10 +130,9 @@ class Emulator(EmulatorBase):
         if "MuMuPlayer.exe" in exe:
             return exe.replace("MuMuPlayer.exe", "MuMuManager.exe")
         # MuMuPlayer12 5.0
-        elif "MuMuNxMain.exe" in exe:
+        if "MuMuNxMain.exe" in exe:
             return exe.replace("MuMuNxMain.exe", "MuMuManager.exe")
-        else:
-            return exe
+        return exe
 
     @staticmethod
     def vbox_file_to_serial(file: str) -> str:
@@ -383,10 +381,9 @@ class EmulatorManager(EmulatorManagerBase):
             if os.path.exists(file):
                 exe.add(file)
 
-        # De-redundancy
-        exe = [Emulator(path).path for path in exe if Emulator.is_emulator(path)]
-        exe = [Emulator(path) for path in remove_duplicated_path(exe)]
-        return exe
+        # 去重。
+        emulator_paths = [Emulator(path).path for path in exe if Emulator.is_emulator(path)]
+        return [Emulator(path) for path in remove_duplicated_path(emulator_paths)]
 
     @cached_property
     def all_emulator_instances(self) -> list[EmulatorInstance]:

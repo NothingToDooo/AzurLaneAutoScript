@@ -167,8 +167,7 @@ class ConnectionAttr:
             return file
 
         # 最后使用系统 PATH 里的 ADB。
-        file = "adb"
-        return file
+        return "adb"
 
     @cached_property
     def adb_client(self) -> AdbClient:
@@ -193,8 +192,6 @@ class ConnectionAttr:
     @cached_property
     def u2(self) -> u2.Device:
         device = u2.connect_usb(self.serial)
-        # 长时间运行时保持 uiautomator2 会话可用。
-        device.set_new_command_timeout(604800)
 
-        logger.attr("u2.Device", f"Device(atx_agent_url={device._get_atx_agent_url()})")
+        logger.attr("u2.Device", f"Device(serial={self.serial})")
         return device

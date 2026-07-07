@@ -36,8 +36,7 @@ def serial_to_id(serial: str):
     offset -= 16
     if 0 <= index < 32 and offset in [-2, -1, 0, 1, 2]:
         return index
-    else:
-        return None
+    return None
 
 
 class PlatformBase(Connection, EmulatorManagerBase):
@@ -78,8 +77,7 @@ class PlatformBase(Connection, EmulatorManagerBase):
                 if value in ["None", "False", "True"]:
                     value = ""
                 return value
-            else:
-                return ""
+            return ""
 
         name = parse_info(self.config.EmulatorInfo_name)
         path = parse_info(self.config.EmulatorInfo_path)
