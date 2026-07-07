@@ -64,11 +64,6 @@ class AzurLaneAutoScript:
             logger.critical("Request human takeover")
             sys.exit(1)
 
-    @cached_property
-    def checker(self):
-        ServerChecker = _load_attr("module.server_checker", "ServerChecker")
-        return ServerChecker(server=self.config.Emulator_ServerName)
-
     def run(self, command: str, skip_first_screenshot: bool = False) -> bool:
         try:
             if not skip_first_screenshot:
@@ -101,20 +96,14 @@ class AzurLaneAutoScript:
             self.device.sleep(10)
             return False
         except GamePageUnknownError:
-            logger.info("Game server may be under maintenance or network may be broken, check server status now")
-            self.checker.check_now()
-            if self.checker.is_available():
-                logger.critical("Game page unknown")
-                self.save_error_log()
-                handle_notify(
-                    self.config.Error_OnePushConfig,
-                    title=f"Alas <{self.config_name}> crashed",
-                    content=f"<{self.config_name}> GamePageUnknownError",
-                )
-                sys.exit(1)
-            else:
-                self.checker.wait_until_available()
-                return False
+            logger.critical("Game page unknown")
+            self.save_error_log()
+            handle_notify(
+                self.config.Error_OnePushConfig,
+                title=f"Alas <{self.config_name}> crashed",
+                content=f"<{self.config_name}> GamePageUnknownError",
+            )
+            sys.exit(1)
         except ScriptError as e:
             logger.exception(e)
             logger.critical("This is likely to be a mistake of developers, but sometimes just random issues")
@@ -274,14 +263,6 @@ class AzurLaneAutoScript:
                 logger.info("Update event detected")
                 logger.info(f"Alas [{self.config_name}] exited.")
                 break
-            # 检查游戏服务器维护状态。
-            self.checker.wait_until_available()
-            if self.checker.is_recovered():
-                # 有个很难复现的偶发问题：
-                # 配置变化后可能因为阻塞没能及时更新，所以恢复后主动刷新一次。
-                del_cached_property(self, "config")
-                logger.info("Server or network is recovered. Restart game client")
-                self.config.task_call("Restart")
             # 获取任务。
             task = self.get_next_task()
             # 初始化设备并切换服务器配置。
@@ -330,7 +311,6 @@ class AzurLaneAutoScript:
             if self.config.Error_HandleError:
                 # self.config.task_delay(success=False)
                 del_cached_property(self, "config")
-                self.checker.check_now()
                 continue
             break
 
