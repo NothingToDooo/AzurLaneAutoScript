@@ -107,23 +107,17 @@ def _generated_value(name: str, value) -> list[str]:
 
 class Event:
     def __init__(self, text):
-        self.date, self.directory, self.name, self.cn, self.en, self.jp, self.tw = [
-            x.strip() for x in text.strip("| \n").split("|")
-        ]
+        self.date, self.directory, self.cn = [x.strip() for x in text.strip("| \n").split("|")]
 
         self.directory = self.directory.replace(" ", "_")
         self.cn = self.cn.replace("、", "")
-        self.en = self.en.replace(",", "").replace("'", "").replace("\\", "")
-        self.jp = self.jp.replace("、", "")
-        self.tw = self.tw.replace("、", "")
         self.is_war_archives = self.directory.startswith("war_archives")
         self.is_raid = self.directory.startswith("raid_")
         self.is_coalition = self.directory.startswith("coalition_")
-        for server, prefix in ARCHIVES_PREFIX.items():
-            if self.__getattribute__(server) == "-":
-                self.__setattr__(server, None)
-            elif self.is_war_archives:
-                self.__setattr__(server, prefix + self.__getattribute__(server))
+        if self.cn == "-":
+            self.cn = None
+        elif self.is_war_archives:
+            self.cn = f"{ARCHIVES_PREFIX['cn']}{self.cn}"
 
     def __str__(self):
         return self.directory
@@ -425,7 +419,7 @@ class ConfigGenerator:
         lines = []
         data_lines = []
         data_widths = []
-        column_width = [4] * 7  # `:---`
+        column_width = [4] * 3  # `:---`
         events = []
         with Path("./campaign/Readme.md").open(encoding="utf-8") as f:
             for text in f:
