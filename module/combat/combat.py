@@ -24,9 +24,8 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
     def combat_appear(self):
         """返回是否已经进入战斗相关页面。"""
-        if self.config.Campaign_UseFleetLock and not self.is_in_map():
-            if self.is_combat_loading():
-                return True
+        if self.config.Campaign_UseFleetLock and not self.is_in_map() and self.is_combat_loading():
+            return True
 
         if self.appear(combat_assets.BATTLE_PREPARATION, offset=(30, 20)):
             return True
@@ -225,9 +224,10 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             self.hp_balance()
 
         for _ in self.loop():
-            if self.appear(combat_assets.BATTLE_PREPARATION, offset=(20, 20)):
-                if self.handle_combat_automation_set(auto=auto == "combat_auto"):
-                    continue
+            if self.appear(combat_assets.BATTLE_PREPARATION, offset=(20, 20)) and self.handle_combat_automation_set(
+                auto=auto == "combat_auto"
+            ):
+                continue
             if self.handle_retirement():
                 continue
             if self.handle_combat_low_emotion():
@@ -240,11 +240,10 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
                 continue
             if self.handle_story_skip():
                 continue
-            # slow down the screenshot interval earlier
-            if not interval_set:
-                if self.is_combat_loading():
-                    self.device.screenshot_interval_set("combat")
-                    interval_set = True
+            # 提前降低截图间隔。
+            if not interval_set and self.is_combat_loading():
+                self.device.screenshot_interval_set("combat")
+                interval_set = True
 
             # End
             pause = self.is_combat_executing()
@@ -252,7 +251,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
                 logger.attr("BattleUI", pause)
                 if emotion_reduce:
                     self.emotion.reduce(fleet_index)
-                # fallback slow down if is_combat_loading() not detected
+                # 未识别到 is_combat_loading() 时兜底降低截图间隔。
                 if not interval_set:
                     self.device.screenshot_interval_set("combat")
                 break
@@ -357,9 +356,8 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         confirm_timer.start()
 
         for _ in self.loop():
-            if not confirm_timer.reached():
-                if self.handle_combat_automation_confirm():
-                    continue
+            if not confirm_timer.reached() and self.handle_combat_automation_confirm():
+                continue
 
             if self.handle_story_skip():
                 continue
@@ -367,9 +365,13 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
                 continue
             if self.handle_combat_manual(auto):
                 continue
-            if auto != "combat_auto" and self.auto_mode_checked and self.is_combat_executing():
-                if self.handle_combat_weapon_release():
-                    continue
+            if (
+                auto != "combat_auto"
+                and self.auto_mode_checked
+                and self.is_combat_executing()
+                and self.handle_combat_weapon_release()
+            ):
+                continue
             if self.handle_submarine_call(submarine):
                 continue
             # bunch of popup handlers
@@ -554,9 +556,8 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
                     break
                 if expected_end == "in_ui" and self.appear(BACK_ARROW, offset=(30, 30)):
                     break
-            if callable(expected_end):
-                if expected_end():
-                    break
+            if callable(expected_end) and expected_end():
+                break
 
             if self.handle_story_skip(drop=drop):
                 continue
@@ -605,9 +606,8 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             # End
             if self.handle_in_stage():
                 break
-            if expected_end is None:
-                if self.handle_in_map_with_enemy_searching(drop=drop):
-                    break
+            if expected_end is None and self.handle_in_map_with_enemy_searching(drop=drop):
+                break
 
     def combat(
         self,
