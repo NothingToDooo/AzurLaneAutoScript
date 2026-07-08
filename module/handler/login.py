@@ -168,11 +168,13 @@ class LoginHandler(UI):
         # self.ensure_no_unfinished_campaign()
         self.config.task_delay(server_update=True)
 
-    def ensure_no_unfinished_campaign(self, confirm_wait=3):
+    def ensure_no_unfinished_campaign(self):
         """
-        Pages:
-            in: page_main
-            out: page_main
+        确保没有未完成的战役停留在地图中。
+
+        页面：
+            进入：page_main
+            退出：page_main
         """
 
         def ensure_campaign_retreat():

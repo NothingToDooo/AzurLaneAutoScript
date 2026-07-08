@@ -20,9 +20,7 @@ class OcrModel:
         # Charset: 0123456789ABCDEFGHIJKLMNPQRSTUVWXYZ:/- (Letter 'O' and <space> is not included)
         # _num_classes: 39
         AlOcr = _al_ocr_class()
-        return AlOcr(
-            model_name="densenet-lite-gru", model_epoch=15, root="./bin/cnocr_models/azur_lane", name="azur_lane"
-        )
+        return AlOcr(model_name="densenet-lite-gru", root="./bin/cnocr_models/azur_lane")
 
     @cached_property
     def cnocr(self):
@@ -35,7 +33,7 @@ class OcrModel:
         # Charset: Number, English character, Chinese character, symbols, <space>
         # _num_classes: 6426
         AlOcr = _al_ocr_class()
-        return AlOcr(model_name="densenet-lite-gru", model_epoch=39, root="./bin/cnocr_models/cnocr", name="cnocr")
+        return AlOcr(model_name="densenet-lite-gru", root="./bin/cnocr_models/cnocr")
 
 
 OCR_MODEL = OcrModel()

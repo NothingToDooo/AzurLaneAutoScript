@@ -22,13 +22,11 @@ class AlOcr(CnOcr):
     def __init__(
         self,
         model_name="densenet-lite-gru",
-        model_epoch=None,
         cand_alphabet=None,
         root=_DEFAULT_OCR_ROOT,
         context="cpu",
-        name=None,
     ):
-        self._args = (model_name, model_epoch, cand_alphabet, root, context, name)
+        self._args = (model_name, cand_alphabet, root, context)
         self._model_loaded = False
 
     @classmethod
@@ -44,11 +42,9 @@ class AlOcr(CnOcr):
     def init(
         self,
         model_name="densenet-lite-gru",
-        model_epoch=None,
         cand_alphabet=None,
         root=_DEFAULT_OCR_ROOT,
         context="cpu",
-        name=None,
     ):
         model_name = self._normalize_model_name(model_name)
         logger.info(f"Loading OCR model: {model_name}")
