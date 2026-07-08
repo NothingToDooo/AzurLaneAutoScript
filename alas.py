@@ -62,53 +62,69 @@ class AzurLaneAutoScript:
             logger.critical("Request human takeover")
             sys.exit(1)
 
-    def run(self, command: str, skip_first_screenshot: bool = False) -> bool:
-        try:
-            if not skip_first_screenshot:
-                self.device.screenshot()
-            task_spec = get_task_spec(command)
-            if task_spec is not None:
-                task_spec.execute(self)
-            else:
-                self.__getattribute__(command)()
-        except TaskEnd:
-            return True
-        except GameNotRunningError as e:
-            logger.warning(e)
+    def _execute_run_command(self, command: str, skip_first_screenshot: bool = False) -> None:
+        if not skip_first_screenshot:
+            self.device.screenshot()
+        task_spec = get_task_spec(command)
+        if task_spec is not None:
+            task_spec.execute(self)
+        else:
+            self.__getattribute__(command)()
+
+    def _handle_recoverable_run_error(
+        self,
+        error: GameNotRunningError | GameStuckError | GameTooManyClickError | GameBugError,
+    ) -> bool:
+        if isinstance(error, GameNotRunningError):
+            logger.warning(error)
             self.config.task_call("Restart")
             return False
-        except (GameStuckError, GameTooManyClickError) as e:
-            logger.error(e)
+        if isinstance(error, (GameStuckError, GameTooManyClickError)):
+            logger.error(error)
             self.save_error_log()
             logger.warning(f"Game stuck, {self.device.package} will be restarted in 10 seconds")
             logger.warning("If you are playing by hand, please stop Alas")
             self.config.task_call("Restart")
             self.device.sleep(10)
             return False
-        except GameBugError as e:
-            logger.warning(e)
-            self.save_error_log()
-            logger.warning("An error has occurred in Azur Lane game client, Alas is unable to handle")
-            logger.warning(f"Restarting {self.device.package} to fix it")
-            self.config.task_call("Restart")
-            self.device.sleep(10)
-            return False
-        except GamePageUnknownError:
+
+        logger.warning(error)
+        self.save_error_log()
+        logger.warning("An error has occurred in Azur Lane game client, Alas is unable to handle")
+        logger.warning(f"Restarting {self.device.package} to fix it")
+        self.config.task_call("Restart")
+        self.device.sleep(10)
+        return False
+
+    def _exit_on_fatal_run_error(self, error: GamePageUnknownError | ScriptError | RequestHumanTakeover) -> None:
+        if isinstance(error, GamePageUnknownError):
             logger.critical("Game page unknown")
             self.save_error_log()
-            sys.exit(1)
-        except ScriptError as e:
-            logger.exception(e)
+        elif isinstance(error, ScriptError):
+            logger.exception(error)
             logger.critical("This is likely to be a mistake of developers, but sometimes just random issues")
-            sys.exit(1)
-        except RequestHumanTakeover:
+        else:
             logger.critical("Request human takeover")
-            sys.exit(1)
+        sys.exit(1)
+
+    def _exit_on_unexpected_run_error(self, error: Exception) -> None:
+        # 任务崩溃边界：保存现场并退出，避免调度循环继续运行在未知状态。
+        logger.exception(error)
+        self.save_error_log()
+        sys.exit(1)
+
+    def run(self, command: str, skip_first_screenshot: bool = False) -> bool:
+        try:
+            self._execute_run_command(command, skip_first_screenshot)
+        except TaskEnd:
+            return True
+        except (GameNotRunningError, GameStuckError, GameTooManyClickError, GameBugError) as e:
+            return self._handle_recoverable_run_error(e)
+        except (GamePageUnknownError, ScriptError, RequestHumanTakeover) as e:
+            self._exit_on_fatal_run_error(e)
         # 任务崩溃边界：保存现场并退出，避免调度循环继续运行在未知状态。
         except Exception as e:  # noqa: BLE001
-            logger.exception(e)
-            self.save_error_log()
-            sys.exit(1)
+            self._exit_on_unexpected_run_error(e)
         else:
             return True
 
