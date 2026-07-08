@@ -54,43 +54,55 @@ class MissionHandler(GlobeOperation, ZoneManager):
         logger.info("OS mission enter")
         confirm_timer = Timer(2, count=6).start()
         for _ in self.loop():
-            # End
-            if (
-                self.is_in_os_mission()
-                and not self.appear(os_assets.MISSION_FINISH, offset=(20, 20))
-                and not self.match_template_color(os_assets.MISSION_CHECKOUT, offset=(20, 20))
-            ):
-                # No mission found, wait to confirm. Missions might not be loaded so fast.
-                if confirm_timer.reached():
-                    logger.info("No OS mission found.")
-                    break
-            elif self.is_in_os_mission() and self.match_template_color(os_assets.MISSION_CHECKOUT, offset=(20, 20)):
-                # Found one mission.
-                logger.info("Found at least one OS missions.")
+            if self._os_mission_enter_finished(confirm_timer):
                 break
-            else:
-                confirm_timer.reset()
+            if self._os_mission_enter_step(confirm_timer):
+                continue
 
-            # Click
-            if self.appear_then_click(os_assets.MISSION_ENTER, offset=(200, 5), interval=5):
+    def _os_mission_enter_finished(self, confirm_timer):
+        if not self.is_in_os_mission():
+            confirm_timer.reset()
+            return False
+
+        has_finish = self.appear(os_assets.MISSION_FINISH, offset=(20, 20))
+        has_checkout = self.match_template_color(os_assets.MISSION_CHECKOUT, offset=(20, 20))
+        if not has_finish and not has_checkout:
+            # 没有任务时也等一下，避免列表还没加载完。
+            if confirm_timer.reached():
+                logger.info("No OS mission found.")
+                return True
+            return False
+        if has_checkout:
+            logger.info("Found at least one OS missions.")
+            return True
+
+        confirm_timer.reset()
+        return False
+
+    def _os_mission_enter_step(self, confirm_timer):
+        if self._os_mission_click_entry_buttons(confirm_timer):
+            return True
+        if self.handle_popup_confirm("MISSION_FINISH"):
+            confirm_timer.reset()
+            return True
+        if self.handle_map_get_items() or self.handle_info_bar():
+            confirm_timer.reset()
+            return True
+        if self.appear_then_click(GLOBE_GOTO_MAP, offset=(20, 20), interval=2):
+            # 意外进入了大世界海图。
+            confirm_timer.reset()
+            return True
+        return False
+
+    def _os_mission_click_entry_buttons(self, confirm_timer):
+        for button, offset, interval in (
+            (os_assets.MISSION_ENTER, (200, 5), 5),
+            (os_assets.MISSION_FINISH, (20, 20), 2),
+        ):
+            if self.appear_then_click(button, offset=offset, interval=interval):
                 confirm_timer.reset()
-                continue
-            if self.appear_then_click(os_assets.MISSION_FINISH, offset=(20, 20), interval=2):
-                confirm_timer.reset()
-                continue
-            if self.handle_popup_confirm("MISSION_FINISH"):
-                confirm_timer.reset()
-                continue
-            if self.handle_map_get_items():
-                confirm_timer.reset()
-                continue
-            if self.handle_info_bar():
-                confirm_timer.reset()
-                continue
-            if self.appear_then_click(GLOBE_GOTO_MAP, offset=(20, 20), interval=2):
-                # Accidentally entered globe
-                confirm_timer.reset()
-                continue
+                return True
+        return False
 
     def os_mission_quit(self):
         logger.info("OS mission quit")
