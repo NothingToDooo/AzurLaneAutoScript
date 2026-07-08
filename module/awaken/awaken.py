@@ -115,7 +115,8 @@ class Awaken(Dock):
                 continue
 
     def awaken_once(self, use_array=False, skip_first_screenshot=True):
-        """
+        """执行单次唤醒。
+
         Args:
             use_array:
             skip_first_screenshot:
@@ -128,6 +129,17 @@ class Awaken(Dock):
             out: is_in_awaken
         """
         logger.hr("Awaken once", level=2)
+        result = self._wait_awaken_confirm_button(skip_first_screenshot=skip_first_screenshot)
+        if result is not None:
+            return result
+
+        result = self._wait_awaken_cost(use_array)
+        if result is not None:
+            return result
+
+        return self._confirm_awaken_once()
+
+    def _wait_awaken_confirm_button(self, skip_first_screenshot=True):
         interval = Timer(3, count=6)
         while 1:
             if skip_first_screenshot:
@@ -146,6 +158,9 @@ class Awaken(Dock):
                 interval.reset()
                 continue
 
+        return None
+
+    def _wait_awaken_cost(self, use_array):
         logger.info("Get awaken cost")
         timeout = Timer(2, count=6).start()
         skip_first_screenshot = True
@@ -156,27 +171,34 @@ class Awaken(Dock):
                 self.device.screenshot()
 
             result = self._get_awaken_cost(use_array)
-            if result == "unexpected_array":
-                # 正常不应出现。
-                self.awaken_popup_close()
-                return result
-            if result is False:
-                logger.info("Insufficient resources to awaken")
-                self.awaken_popup_close()
-                return "insufficient"
             if result is True:
                 # 资源充足。
-                break
-            if result == "invalid":
-                # 重试，同时继续检查超时。
-                pass
-            else:
-                raise ScriptError(f"Unexpected _get_awaken_cost result: {result}")
-            if timeout.reached():
-                logger.warning("Get awaken cost timeout")
-                self.awaken_popup_close()
-                return "timeout"
+                return None
+            handled = self._handle_awaken_cost_unready(result, timeout)
+            if handled is not None:
+                return handled
+        return None
 
+    def _handle_awaken_cost_unready(self, result, timeout):
+        if result == "unexpected_array":
+            # 正常不应出现。
+            self.awaken_popup_close()
+            return result
+        if result is False:
+            logger.info("Insufficient resources to awaken")
+            self.awaken_popup_close()
+            return "insufficient"
+        if result != "invalid":
+            raise ScriptError(f"Unexpected _get_awaken_cost result: {result}")
+
+        # invalid 结果会重试，同时继续检查超时。
+        if timeout.reached():
+            logger.warning("Get awaken cost timeout")
+            self.awaken_popup_close()
+            return "timeout"
+        return None
+
+    def _confirm_awaken_once(self):
         # 资源已确认充足。
         logger.info("Awaken confirm")
         self.interval_clear(awaken_assets.AWAKEN_CONFIRM)
@@ -191,25 +213,29 @@ class Awaken(Dock):
             else:
                 self.device.screenshot()
 
-            # 结束。
-            if timeout.reached():
-                logger.warning("Awaken confirm timeout")
-                self.awaken_popup_close()
+            should_break, finished = self._handle_awaken_confirm_step(timeout, finished)
+            if should_break:
                 break
-            if finished and self.is_in_awaken():
-                logger.info("Awaken finished")
-                break
-            # 点击确认。
-            if self.appear_then_click(awaken_assets.AWAKEN_CONFIRM, offset=(20, 20), interval=3):
-                continue
-            if self.handle_popup_confirm("AWAKEN"):
-                continue
-            if self.handle_awaken_finish():
-                finished = True
-                continue
 
         self.device.click_record_clear()
         return "success"
+
+    def _handle_awaken_confirm_step(self, timeout, finished):
+        if timeout.reached():
+            logger.warning("Awaken confirm timeout")
+            self.awaken_popup_close()
+            return True, finished
+        if finished and self.is_in_awaken():
+            logger.info("Awaken finished")
+            return True, finished
+        # 点击确认。
+        if self.appear_then_click(awaken_assets.AWAKEN_CONFIRM, offset=(20, 20), interval=3):
+            return False, finished
+        if self.handle_popup_confirm("AWAKEN"):
+            return False, finished
+        if self.handle_awaken_finish():
+            return False, True
+        return False, finished
 
     def get_ship_level(self, skip_first_screenshot=True):
         """
