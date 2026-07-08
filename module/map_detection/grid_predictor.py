@@ -185,43 +185,56 @@ class GridPredictor:
 
         return scale
 
+    def _predict_siren_with_boss_icon(self):
+        if not self.config.MAP_SIREN_HAS_BOSS_ICON:
+            return False
+        if self.enemy_scale:
+            return False
+        image = self.relative_crop((-0.55, -0.2, 0.45, 0.2), shape=(50, 20))
+        image = color_similarity_2d(image, color=(255, 150, 24))
+        return image[image > 221].shape[0] > 200 and template_assets.TEMPLATE_ENEMY_BOSS.match(image, similarity=0.6)
+
+    def _predict_siren_with_small_boss_icon(self):
+        if not self.config.MAP_SIREN_HAS_BOSS_ICON_SMALL:
+            return False
+        if self.relative_hsv_count(area=(0.03, -0.15, 0.63, 0.15), h=(32 - 3, 32 + 3), shape=(50, 20)) <= 100:
+            return False
+        image = self.relative_crop((0.03, -0.15, 0.63, 0.15), shape=(50, 20))
+        image = color_similarity_2d(image, color=(255, 150, 33))
+        return template_assets.TEMPLATE_ENEMY_BOSS.match(image, similarity=0.7)
+
+    def _ensure_enemy_genre_template(self, name, template):
+        if template is not None:
+            return
+        logger.warning(f"Enemy detection template not found: {name}")
+        logger.warning(
+            "Enemy detection template asset is missing. "
+            "Update checked-in assets/<server>/template before running this map."
+        )
+        raise ScriptError(f"Enemy detection template not found: {name}")
+
+    def _enemy_genre_scaling(self, name):
+        short_name = name.removeprefix("Siren_")
+        scaling = self.config.MAP_ENEMY_GENRE_DETECTION_SCALING.get(short_name, 1)
+        return scaling if isinstance(scaling, tuple) else (scaling,)
+
+    def _enemy_genre_image(self, image_dic, scale):
+        if scale not in image_dic:
+            shape = tuple(np.round(np.array((60, 60)) * scale).astype(int))
+            image_dic[scale] = rgb2gray(self.relative_crop((-0.5, -1, 0.5, 0), shape=shape))
+        return image_dic[scale]
+
     def predict_enemy_genre(self):
-        if self.config.MAP_SIREN_HAS_BOSS_ICON:
-            if self.enemy_scale:
-                return ""
-            image = self.relative_crop((-0.55, -0.2, 0.45, 0.2), shape=(50, 20))
-            image = color_similarity_2d(image, color=(255, 150, 24))
-            if image[image > 221].shape[0] > 200 and template_assets.TEMPLATE_ENEMY_BOSS.match(image, similarity=0.6):
-                return "Siren_Siren"
-        if (
-            self.config.MAP_SIREN_HAS_BOSS_ICON_SMALL
-            and self.relative_hsv_count(area=(0.03, -0.15, 0.63, 0.15), h=(32 - 3, 32 + 3), shape=(50, 20)) > 100
-        ):
-            image = self.relative_crop((0.03, -0.15, 0.63, 0.15), shape=(50, 20))
-            image = color_similarity_2d(image, color=(255, 150, 33))
-            if template_assets.TEMPLATE_ENEMY_BOSS.match(image, similarity=0.7):
-                return "Siren_Siren"
+        if self._predict_siren_with_boss_icon() or self._predict_siren_with_small_boss_icon():
+            return "Siren_Siren"
 
         image_dic = {}
-        scaling_dic = self.config.MAP_ENEMY_GENRE_DETECTION_SCALING
         for name, template in self.template_enemy_genre.items():
-            if template is None:
-                logger.warning(f"Enemy detection template not found: {name}")
-                logger.warning(
-                    "Enemy detection template asset is missing. "
-                    "Update checked-in assets/<server>/template before running this map."
-                )
-                raise ScriptError(f"Enemy detection template not found: {name}")
-
-            short_name = name.removeprefix("Siren_")
-            scaling = scaling_dic.get(short_name, 1)
-            scaling = (scaling,) if not isinstance(scaling, tuple) else scaling
-            for scale in scaling:
-                if scale not in image_dic:
-                    shape = tuple(np.round(np.array((60, 60)) * scale).astype(int))
-                    image_dic[scale] = rgb2gray(self.relative_crop((-0.5, -1, 0.5, 0), shape=shape))
-
-                if template.match(image_dic[scale], similarity=self.config.MAP_ENEMY_GENRE_SIMILARITY):
+            self._ensure_enemy_genre_template(name, template)
+            for scale in self._enemy_genre_scaling(name):
+                if template.match(
+                    self._enemy_genre_image(image_dic, scale), similarity=self.config.MAP_ENEMY_GENRE_SIMILARITY
+                ):
                     return name
 
         return None
