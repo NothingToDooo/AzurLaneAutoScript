@@ -12,6 +12,36 @@ from module.ui.page import page_shop, page_supply_pack
 
 
 class SupplyPack(CampaignStatus):
+    def _clear_supply_pack_intervals(self, supply_pack):
+        for asset in [GET_ITEMS_1, GET_ITEMS_2, supply_pack, BUY_CONFIRM]:
+            self.interval_clear(asset)
+
+    def _handle_visible_supply_pack(self, supply_pack, click_count, confirm_timer):
+        if not self.appear(supply_pack, offset=(200, 20), interval=3):
+            return click_count, False, False
+        if click_count >= 3:
+            logger.warning(f"Failed to buy {supply_pack} after 3 trail, probably reached resource limit, skip")
+            return click_count, True, True
+
+        self.device.click(supply_pack)
+        confirm_timer.reset()
+        return click_count + 1, True, False
+
+    def _handle_supply_pack_reward_popup(self, confirm_timer):
+        for button in [GET_ITEMS_1, GET_ITEMS_2]:
+            if self.appear_then_click(button, offset=(30, 30), interval=3):
+                confirm_timer.reset()
+                return True
+        return False
+
+    def _supply_pack_buy_finished(self, supply_pack, confirm_timer):
+        if self.appear(page_supply_pack.check_button, offset=(20, 20)) and not self.appear(
+            supply_pack, offset=(20, 20)
+        ):
+            return confirm_timer.reached()
+        confirm_timer.reset()
+        return False
+
     def supply_pack_buy(self, supply_pack, skip_first_screenshot=True):
         """
         Args:
@@ -22,7 +52,7 @@ class SupplyPack(CampaignStatus):
             bool: If bought.
         """
         logger.hr("Supply pack buy")
-        [self.interval_clear(asset) for asset in [GET_ITEMS_1, GET_ITEMS_2, supply_pack, BUY_CONFIRM]]
+        self._clear_supply_pack_intervals(supply_pack)
 
         logger.info(f"Buying {supply_pack}")
         executed = False
@@ -34,13 +64,12 @@ class SupplyPack(CampaignStatus):
             else:
                 self.device.screenshot()
 
-            if self.appear(supply_pack, offset=(200, 20), interval=3):
-                if click_count >= 3:
-                    logger.warning(f"Failed to buy {supply_pack} after 3 trail, probably reached resource limit, skip")
-                    break
-                self.device.click(supply_pack)
-                click_count += 1
-                confirm_timer.reset()
+            click_count, handled, failed = self._handle_visible_supply_pack(
+                supply_pack=supply_pack, click_count=click_count, confirm_timer=confirm_timer
+            )
+            if failed:
+                break
+            if handled:
                 continue
             if self.appear_then_click(BUY_CONFIRM, offset=(20, 20), interval=3):
                 confirm_timer.reset()
@@ -50,19 +79,11 @@ class SupplyPack(CampaignStatus):
                 self.interval_reset(BUY_CONFIRM)
                 executed = True
                 continue
-            for button in [GET_ITEMS_1, GET_ITEMS_2]:
-                if self.appear_then_click(button, offset=(30, 30), interval=3):
-                    confirm_timer.reset()
-                    continue
+            if self._handle_supply_pack_reward_popup(confirm_timer):
+                continue
 
-            # End
-            if self.appear(page_supply_pack.check_button, offset=(20, 20)) and not self.appear(
-                supply_pack, offset=(20, 20)
-            ):
-                if confirm_timer.reached():
-                    break
-            else:
-                confirm_timer.reset()
+            if self._supply_pack_buy_finished(supply_pack=supply_pack, confirm_timer=confirm_timer):
+                break
 
         logger.info(f"Supply pack buy finished, executed={executed}")
         return executed
