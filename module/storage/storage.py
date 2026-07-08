@@ -44,7 +44,8 @@ class StorageHandler(StorageUI):
         raise ScriptError(f"Unknown box template rarity: {rarity}")
 
     def _handle_use_box_amount(self, amount):
-        """
+        """设置单次开箱数量。
+
         Args:
             amount (int): Expected amount to set
 
@@ -60,8 +61,11 @@ class StorageHandler(StorageUI):
         # 复用商店数量选择的识别逻辑。
         ocr = Digit(storage_assets.BOX_AMOUNT_OCR, letter=(239, 239, 239), name="OCR_SHOP_AMOUNT")
         index_offset = (40, 50)
+        self._wait_use_box_amount_buttons(index_offset)
+        current = self._wait_use_box_amount_ocr(ocr, amount)
+        return self._adjust_use_box_amount(ocr, amount, current)
 
-        # 等待数量按钮出现。
+    def _wait_use_box_amount_buttons(self, index_offset) -> None:
         timeout = Timer(1, count=3).start()
         for _ in self.loop():
             # -/+ 按钮可能偏移，这里沿用船坞 OCR 的定位方式提高识别稳定性。
@@ -71,7 +75,7 @@ class StorageHandler(StorageUI):
                 logger.warning("Wait AMOUNT_MINUS AMOUNT_PLUS timeout")
                 break
 
-        # 等到 OCR 读到正常数量。
+    def _wait_use_box_amount_ocr(self, ocr, amount: int) -> int:
         current = 0
         timeout = Timer(1, count=3).start()
         for _ in self.loop():
@@ -81,8 +85,9 @@ class StorageHandler(StorageUI):
             if timeout.reached():
                 logger.warning("Wait box amount timeout")
                 break
+        return current
 
-        # 设置数量，相当于轻量版 ui_ensure_index。
+    def _adjust_use_box_amount(self, ocr, amount: int, current: int) -> int:
         logger.info(f"Set box amount: {amount}")
         skip_first = True
         retry = Timer(1, count=2)
@@ -109,7 +114,8 @@ class StorageHandler(StorageUI):
         return current
 
     def _storage_use_one_box(self, button, amount=1):
-        """
+        """使用一组装备箱。
+
         Args:
             button (Button): Box
             amount (int):
@@ -141,60 +147,83 @@ class StorageHandler(StorageUI):
         )
 
         for _ in self.loop():
-            # 结束。
-            if success and self._storage_in_material() and not self.appear(EQUIP_CONFIRM_2, offset=(20, 20)):
+            if self._storage_use_box_finished(success=success):
                 break
+            if self._handle_storage_box_entry(button):
+                continue
 
-            # 使用箱子。
-            if self._storage_in_material(interval=5):
-                self.device.click(button)
-                continue
-            if self.appear_then_click(storage_assets.BOX_USE, offset=(-330, -20, 20, 20), interval=5):
-                self.interval_reset(storage_assets.MATERIAL_CHECK)
-                continue
-            if self.appear(GET_ITEMS_1, offset=(5, 5), interval=5):
-                logger.info(f"{GET_ITEMS_1} -> {storage_assets.MATERIAL_ENTER}")
-                self.device.click(storage_assets.MATERIAL_ENTER)
-                self.interval_reset(storage_assets.MATERIAL_CHECK)
-                continue
-            if self.appear(GET_ITEMS_2, offset=(5, 5), interval=5):
-                logger.info(f"{GET_ITEMS_2} -> {storage_assets.MATERIAL_ENTER}")
-                self.device.click(storage_assets.MATERIAL_ENTER)
-                self.interval_reset(storage_assets.MATERIAL_CHECK)
-                continue
-            # 开箱动画会覆盖确认按钮，用颜色模板等待确认按钮真正露出。
-            if self.match_template_color(storage_assets.BOX_AMOUNT_CONFIRM, offset=(20, 20), interval=5):
-                actual = self._handle_use_box_amount(amount)
-                self.device.click(storage_assets.BOX_AMOUNT_CONFIRM)
-                self.interval_reset(storage_assets.BOX_AMOUNT_CONFIRM)
+            actual = self._handle_storage_box_amount_confirm(amount)
+            if actual is not None:
                 used = actual
                 continue
-            if self.appear_then_click(EQUIP_CONFIRM, offset=(20, 20), interval=5):
-                self.interval_reset(storage_assets.MATERIAL_CHECK)
-                continue
-            if self.appear_then_click(EQUIP_CONFIRM_2, offset=(20, 20), interval=5):
-                # GET_ITEMS_* 不会这么快出现。
-                self.interval_reset(storage_assets.MATERIAL_CHECK)
-                self.interval_clear([GET_ITEMS_1, GET_ITEMS_2])
-                # EQUIP_CONFIRM_2 -> GET_ITEMS -> _storage_in_material，把 EQUIP_CONFIRM_2 视作最后一步。
-                success = True
+
+            confirm_success = self._handle_storage_box_confirm()
+            if confirm_success is not None:
+                success = success or confirm_success
                 continue
 
-            # 仓库已满。
-            if self.appear(storage_assets.EQUIPMENT_FULL, offset=(20, 20)):
-                logger.info("Storage full")
-                # 关闭弹窗。
-                self.ui_click(
-                    storage_assets.MATERIAL_ENTER,
-                    check_button=self._storage_in_material,
-                    appear_button=storage_assets.EQUIPMENT_FULL,
-                    retry_wait=3,
-                    skip_first_screenshot=True,
-                )
-                raise StorageFull
+            self._raise_if_storage_box_full()
 
         logger.info(f"Used {used} box(es)")
         return used
+
+    def _storage_use_box_finished(self, *, success: bool) -> bool:
+        return success and self._storage_in_material() and not self.appear(EQUIP_CONFIRM_2, offset=(20, 20))
+
+    def _handle_storage_box_entry(self, button) -> bool:
+        if self._storage_in_material(interval=5):
+            self.device.click(button)
+            return True
+        if self.appear_then_click(storage_assets.BOX_USE, offset=(-330, -20, 20, 20), interval=5):
+            self.interval_reset(storage_assets.MATERIAL_CHECK)
+            return True
+        return self._handle_storage_box_get_items()
+
+    def _handle_storage_box_get_items(self) -> bool:
+        for button in (GET_ITEMS_1, GET_ITEMS_2):
+            if self.appear(button, offset=(5, 5), interval=5):
+                logger.info(f"{button} -> {storage_assets.MATERIAL_ENTER}")
+                self.device.click(storage_assets.MATERIAL_ENTER)
+                self.interval_reset(storage_assets.MATERIAL_CHECK)
+                return True
+        return False
+
+    def _handle_storage_box_amount_confirm(self, amount: int) -> int | None:
+        # 开箱动画会覆盖确认按钮，用颜色模板等待确认按钮真正露出。
+        if not self.match_template_color(storage_assets.BOX_AMOUNT_CONFIRM, offset=(20, 20), interval=5):
+            return None
+
+        actual = self._handle_use_box_amount(amount)
+        self.device.click(storage_assets.BOX_AMOUNT_CONFIRM)
+        self.interval_reset(storage_assets.BOX_AMOUNT_CONFIRM)
+        return actual
+
+    def _handle_storage_box_confirm(self) -> bool | None:
+        if self.appear_then_click(EQUIP_CONFIRM, offset=(20, 20), interval=5):
+            self.interval_reset(storage_assets.MATERIAL_CHECK)
+            return False
+        if self.appear_then_click(EQUIP_CONFIRM_2, offset=(20, 20), interval=5):
+            # GET_ITEMS_* 不会这么快出现。
+            self.interval_reset(storage_assets.MATERIAL_CHECK)
+            self.interval_clear([GET_ITEMS_1, GET_ITEMS_2])
+            # EQUIP_CONFIRM_2 -> GET_ITEMS -> _storage_in_material，把 EQUIP_CONFIRM_2 视作最后一步。
+            return True
+        return None
+
+    def _raise_if_storage_box_full(self) -> None:
+        if not self.appear(storage_assets.EQUIPMENT_FULL, offset=(20, 20)):
+            return
+
+        logger.info("Storage full")
+        # 关闭弹窗。
+        self.ui_click(
+            storage_assets.MATERIAL_ENTER,
+            check_button=self._storage_in_material,
+            appear_button=storage_assets.EQUIPMENT_FULL,
+            retry_wait=3,
+            skip_first_screenshot=True,
+        )
+        raise StorageFull
 
     def _storage_use_box_in_page(self, rarity, amount, skip_first_screenshot=False):
         """
