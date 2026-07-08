@@ -208,8 +208,8 @@ class GridPredictor:
             if template is None:
                 logger.warning(f"Enemy detection template not found: {name}")
                 logger.warning(
-                    "Please create it with dev_tools/relative_record.py or dev_tools/relative_crop.py, "
-                    "then place it under ./assets/<server>/template"
+                    "Enemy detection template asset is missing. "
+                    "Update checked-in assets/<server>/template before running this map."
                 )
                 raise ScriptError(f"Enemy detection template not found: {name}")
 
