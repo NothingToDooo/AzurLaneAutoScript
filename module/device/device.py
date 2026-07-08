@@ -96,16 +96,6 @@ class Device(Screenshot, Control, AppControl):
         if self.config.is_actual_task:
             self.early_minitouch_init()
 
-    def run_simple_screenshot_benchmark(self):
-        """
-        固定使用 nemu_ipc，并保留旧入口给调用方兼容。
-        """
-        logger.info("run_simple_screenshot_benchmark")
-        # 先确认分辨率，再固定使用 nemu_ipc。
-        self.resolution_check()
-        with self.config.multi_set():
-            self.config.Emulator_ScreenshotMethod = "nemu_ipc"
-
     def method_check(self):
         """
         检查当前个人版保留的截图和控制方案。

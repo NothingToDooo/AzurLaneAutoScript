@@ -178,21 +178,6 @@ class Benchmark(DaemonBase, CampaignUI):
         screenshot, click = self.get_test_methods()
         self.benchmark(screenshot, click)
 
-    def run_simple_screenshot_benchmark(self):
-        """
-        Returns:
-            str: The fastest screenshot method on current device.
-        """
-        if not self.device.nemu_ipc_available():
-            logger.critical("当前个人版只保留 MuMu + nemu_ipc 截图方案")
-            raise RequestHumanTakeover
-
-        self.TEST_TOTAL = 3
-        self.TEST_BEST = 1
-        method, _ = self.benchmark(("nemu_ipc",), ())
-
-        return method
-
 
 def run_benchmark(config):
     try:
