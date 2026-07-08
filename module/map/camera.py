@@ -21,6 +21,17 @@ from module.os_handler.assets import MISSION_CHECK as OPSI_MISSION_CHECK
 from module.os_shop.assets import PORT_SUPPLY_CHECK
 from module.ui.assets import BACK_ARROW
 
+_EARLY_CLICK_RECOVERY_OVERLAYS = (
+    (GET_ITEMS_1, 5, GET_ITEMS_1, "Perspective error caused by get_items"),
+    (GET_ITEMS_1_RYZA, (-20, -100, 20, 20), GET_ITEMS_1_RYZA, "Perspective error caused by GET_ITEMS_1_RYZA"),
+    (GET_ADAPTABILITY, (20, 20), GET_ADAPTABILITY, "Perspective error caused by GET_ADAPTABILITY"),
+    (GET_MISSION, (20, 20), GET_MISSION, "Perspective error caused by GET_MISSION"),
+)
+_LATE_CLICK_RECOVERY_OVERLAYS = (
+    (PORT_SUPPLY_CHECK, (20, 20), BACK_ARROW, "Perspective error caused by akashi shop"),
+    (GAME_TIPS, (20, 20), GAME_TIPS, "Perspective error caused by game tips"),
+)
+
 
 class Camera(MapOperation):
     view: View
@@ -112,109 +123,209 @@ class Camera(MapOperation):
             raise MapDetectionError("Image to detect is not in_map")
 
     def _update_view(self):
-        """
-        Update map view
-        """
+        """更新地图视图。"""
         self._view_init()
         try:
             self._ensure_image_detectable()
             self.view.load(self.device.image)
         except MapDetectionError as e:
-            if self.info_bar_count():
-                logger.warning("Perspective error caused by info bar")
-                self.handle_info_bar()
-                return False
-            if self.appear(GET_ITEMS_1, offset=5):
-                logger.warning("Perspective error caused by get_items")
-                # Don't use handle_mystery() here since OpSi overrides it.
-                self.device.click(GET_ITEMS_1)
-                return False
-            if self.appear(GET_ITEMS_1_RYZA, offset=(-20, -100, 20, 20)):
-                logger.warning("Perspective error caused by GET_ITEMS_1_RYZA")
-                self.device.click(GET_ITEMS_1_RYZA)
-                return False
-            if self.appear(GET_ADAPTABILITY, offset=(20, 20)):
-                logger.warning("Perspective error caused by GET_ADAPTABILITY")
-                self.device.click(GET_ADAPTABILITY)
-                return False
-            if self.handle_story_skip():
-                logger.warning("Perspective error caused by story")
-                self.ensure_no_story(skip_first_screenshot=False)
-                return False
-            if self.appear(GET_MISSION, offset=(20, 20)):
-                logger.warning("Perspective error caused by GET_MISSION")
-                self.device.click(GET_MISSION)
-                return False
-            if self.is_in_stage():
-                logger.warning("Image is in stage")
-                raise CampaignEnd("Image is in stage") from e
-            if self.appear(MAP_PREPARATION, offset=(20, 20)):
-                logger.warning("Image is in MAP_PREPARATION")
-                self.enter_map_cancel()
-                raise CampaignEnd("Image is in MAP_PREPARATION") from e
-            if self.appear(AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset):
-                logger.warning("Image is in auto search menu")
-                self.ensure_auto_search_exit()
-                raise CampaignEnd("Image is in auto search menu") from e
-            if self.appear(GLOBE_GOTO_MAP, offset=(20, 20)):
-                logger.warning("Image is in OS globe map")
-                self.ui_click(
-                    GLOBE_GOTO_MAP,
-                    check_button=self.is_in_map,
-                    offset=(20, 20),
-                    retry_wait=3,
-                    skip_first_screenshot=True,
-                )
-                return False
-            if self.appear(AUTO_SEARCH_REWARD, offset=(50, 50)):
-                logger.warning("Perspective error caused by AUTO_SEARCH_REWARD")
-                if hasattr(self, "os_auto_search_quit"):
-                    self.os_auto_search_quit()
-                    return False
-                logger.warning("Cannot find method os_auto_search_quit(), use ui_click() instead")
-                self.ui_click(
-                    AUTO_SEARCH_REWARD,
-                    check_button=self.is_in_map,
-                    offset=(50, 50),
-                    retry_wait=3,
-                    skip_first_screenshot=True,
-                )
-                return False
-            if self.appear(OPSI_MISSION_CHECK, offset=(20, 20)):
-                logger.warning("Perspective error caused by OPSI_MISSION_CHECK")
-                if hasattr(self, "os_mission_quit"):
-                    self.os_mission_quit()
-                    return False
-                logger.warning("Cannot find method os_mission_quit(), use ui_click() instead")
-                self.ui_click(
-                    OPSI_MISSION_CHECK, check_button=self.is_in_map, offset=(200, 5), skip_first_screenshot=True
-                )
-                return False
-            if "opsi" in self.config.task.command.lower() and self.handle_popup_confirm("OPSI"):
-                # Always confirm popups in OpSi, same popups in os_map_goto_globe()
-                logger.warning("Perspective error caused by popups")
-                return False
-            if self.appear(PORT_SUPPLY_CHECK, offset=(20, 20)):
-                logger.warning("Perspective error caused by akashi shop")
-                self.device.click(BACK_ARROW)
-                return False
-            if self.appear(GAME_TIPS, offset=(20, 20)):
-                logger.warning("Perspective error caused by game tips")
-                self.device.click(GAME_TIPS)
-                return False
-            if "Camera outside map" in str(e):
-                string = str(e)
-                logger.warning(string)
-                x, y = string.split("=")[1].strip("() ").split(",")
-                self._map_swipe((-int(x.strip()), -int(y.strip())))
-            # 最后检查游戏是否仍在运行。
-            elif not self.device.app_is_running():
-                logger.error("Trying to update camera but game died")
-                raise GameNotRunningError from e
-            else:
-                raise
+            return self._handle_update_view_error(e)
 
         return True
+
+    def _handle_update_view_error(self, error):
+        if self._recover_perspective_error(error):
+            return False
+        if self._recover_camera_outside_map(error):
+            return True
+
+        # 最后检查游戏是否仍在运行。
+        if not self.device.app_is_running():
+            logger.error("Trying to update camera but game died")
+            raise GameNotRunningError from error
+        raise error
+
+    def _recover_perspective_error(self, error):
+        for handler in (
+            self._recover_info_bar,
+            self._recover_early_click_overlays,
+            self._recover_story,
+        ):
+            if handler():
+                return True
+
+        self._end_if_in_stage(error)
+        self._end_if_map_preparation(error)
+        self._end_if_auto_search_menu(error)
+
+        for handler in (
+            self._recover_globe_map,
+            self._recover_auto_search_reward,
+            self._recover_opsi_mission_check,
+            self._recover_opsi_popup,
+            self._recover_late_click_overlays,
+        ):
+            if handler():
+                return True
+        return False
+
+    def _recover_info_bar(self):
+        if not self.info_bar_count():
+            return False
+
+        logger.warning("Perspective error caused by info bar")
+        self.handle_info_bar()
+        return True
+
+    def _recover_early_click_overlays(self):
+        return self._recover_click_overlays(_EARLY_CLICK_RECOVERY_OVERLAYS)
+
+    def _recover_late_click_overlays(self):
+        return self._recover_click_overlays(_LATE_CLICK_RECOVERY_OVERLAYS)
+
+    def _recover_click_overlays(self, overlays):
+        for button, offset, click_button, message in overlays:
+            if self.appear(button, offset=offset):
+                logger.warning(message)
+                self.device.click(click_button)
+                return True
+        return False
+
+    def _recover_story(self):
+        if not self.handle_story_skip():
+            return False
+
+        logger.warning("Perspective error caused by story")
+        self.ensure_no_story(skip_first_screenshot=False)
+        return True
+
+    def _end_if_in_stage(self, error):
+        if not self.is_in_stage():
+            return False
+
+        logger.warning("Image is in stage")
+        raise CampaignEnd("Image is in stage") from error
+
+    def _end_if_map_preparation(self, error):
+        if not self.appear(MAP_PREPARATION, offset=(20, 20)):
+            return False
+
+        logger.warning("Image is in MAP_PREPARATION")
+        self.enter_map_cancel()
+        raise CampaignEnd("Image is in MAP_PREPARATION") from error
+
+    def _end_if_auto_search_menu(self, error):
+        if not self.appear(AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset):
+            return False
+
+        logger.warning("Image is in auto search menu")
+        self.ensure_auto_search_exit()
+        raise CampaignEnd("Image is in auto search menu") from error
+
+    def _recover_globe_map(self):
+        if not self.appear(GLOBE_GOTO_MAP, offset=(20, 20)):
+            return False
+
+        logger.warning("Image is in OS globe map")
+        self.ui_click(
+            GLOBE_GOTO_MAP,
+            check_button=self.is_in_map,
+            offset=(20, 20),
+            retry_wait=3,
+            skip_first_screenshot=True,
+        )
+        return True
+
+    def _recover_auto_search_reward(self):
+        if not self.appear(AUTO_SEARCH_REWARD, offset=(50, 50)):
+            return False
+
+        logger.warning("Perspective error caused by AUTO_SEARCH_REWARD")
+        if hasattr(self, "os_auto_search_quit"):
+            self.os_auto_search_quit()
+            return True
+
+        logger.warning("Cannot find method os_auto_search_quit(), use ui_click() instead")
+        self.ui_click(
+            AUTO_SEARCH_REWARD,
+            check_button=self.is_in_map,
+            offset=(50, 50),
+            retry_wait=3,
+            skip_first_screenshot=True,
+        )
+        return True
+
+    def _recover_opsi_mission_check(self):
+        if not self.appear(OPSI_MISSION_CHECK, offset=(20, 20)):
+            return False
+
+        logger.warning("Perspective error caused by OPSI_MISSION_CHECK")
+        if hasattr(self, "os_mission_quit"):
+            self.os_mission_quit()
+            return True
+
+        logger.warning("Cannot find method os_mission_quit(), use ui_click() instead")
+        self.ui_click(OPSI_MISSION_CHECK, check_button=self.is_in_map, offset=(200, 5), skip_first_screenshot=True)
+        return True
+
+    def _recover_opsi_popup(self):
+        if "opsi" not in self.config.task.command.lower() or not self.handle_popup_confirm("OPSI"):
+            return False
+
+        # 大型作战内始终确认弹窗，和 os_map_goto_globe() 的处理保持一致。
+        logger.warning("Perspective error caused by popups")
+        return True
+
+    def _recover_camera_outside_map(self, error):
+        message = str(error)
+        if "Camera outside map" not in message:
+            return False
+
+        logger.warning(message)
+        x, y = message.split("=")[1].strip("() ").split(",")
+        self._map_swipe((-int(x.strip()), -int(y.strip())))
+        return True
+
+    def _get_previous_center_offset(self, wait_swipe):
+        if not wait_swipe:
+            return None
+
+        try:
+            prev_center_offset = self._prev_view.center_offset
+        except AttributeError:
+            logger.warning("Camera.update(wait_swipe=True) but camera has no _prev_view")
+            prev_center_offset = None
+        logger.attr("prev.center_offset", prev_center_offset)
+        return prev_center_offset
+
+    def _capture_update_screenshot(self, swipe_wait_timeout) -> None:
+        # Camera.update() 没有 skip_first_screenshot。
+        # 等待 swipe_wait_timeout 时不要额外限制截图间隔。
+        if not swipe_wait_timeout.reached():
+            self.device.screenshot_interval_clear()
+        self.device.screenshot()
+
+    def _is_grid_center(self):
+        return not np.any(np.abs(self.view.center_offset - 0.5) > self.config.MAP_GRID_CENTER_TOLERANCE)
+
+    @staticmethod
+    def _is_still_prev_view(center_offset, prev_center_offset):
+        if prev_center_offset is None:
+            return False
+        return np.linalg.norm(center_offset - prev_center_offset) < 0.001
+
+    def _handle_wait_swipe_view(self, prev_center_offset, swiped, error_confirm):
+        if self._is_still_prev_view(self.view.center_offset, prev_center_offset):
+            swiped = False
+        if self._is_grid_center():
+            if swiped:
+                return True, swiped
+        else:
+            swiped = True
+
+        # 没有错误，重置检测错误确认计时。
+        error_confirm.reset()
+        return False, swiped
 
     def _update_view_data(self):
         if self._prev_view is not None and np.linalg.norm(self._prev_swipe) > 0:
@@ -254,75 +365,27 @@ class Camera(MapOperation):
         return True
 
     def update(self, camera=True, wait_swipe=False, allow_error=False):
-        """
-        Update map image.
-        Wraps the original `update()` method to handle random MapDetectionError
-        which is usually caused by network issues and mistaken clicks.
+        """更新地图截图和相机视图。
 
         Args:
-            camera: True to update camera position and perspective data.
-            wait_swipe: True to wait camera reaching grid center
-            allow_error: True to exit when encountered detection error
+            camera: 是否更新相机位置和透视数据。
+            wait_swipe: 是否等待相机回到格子中心。
+            allow_error: 遇到检测错误时是否直接退出本轮更新。
         """
         error_confirm = Timer(5, count=10).start()
         swipe_wait_timeout = Timer(0.35, count=1).start()
-        # Assume swiped first
         swiped = True
-        if wait_swipe:
-            try:
-                prev_center_offset = self._prev_view.center_offset
-            except AttributeError:
-                logger.warning("Camera.update(wait_swipe=True) but camera has no _prev_view")
-                prev_center_offset = None
-            logger.attr("prev.center_offset", prev_center_offset)
-        else:
-            prev_center_offset = None
-
-        def is_grid_center():
-            # Is focusing on grid center
-            # From focus_to_grid_center
-            return not np.any(np.abs(self.view.center_offset - 0.5) > self.config.MAP_GRID_CENTER_TOLERANCE)
-
-        def is_still_prev():
-            # Still the same as prev view
-            return np.linalg.norm(self.view.center_offset - prev_center_offset) < 0.001
+        prev_center_offset = self._get_previous_center_offset(wait_swipe)
 
         while 1:
-            # Camera.update() 没有 skip_first_screenshot。
-            # 等待 swipe_wait_timeout 时不要额外限制截图间隔。
-            if not swipe_wait_timeout.reached():
-                self.device.screenshot_interval_clear()
-            self.device.screenshot()
+            self._capture_update_screenshot(swipe_wait_timeout)
 
-            # Update image in view only
             if not camera:
                 self.view.update(image=self.device.image)
                 return True
 
-            # _update_view()
             try:
                 success = self._update_view()
-                if not success:
-                    continue
-                logger.attr("view.center_offset", self.view.center_offset)
-                if wait_swipe and not swipe_wait_timeout.reached() and success:
-                    # If first screenshot is still prev view
-                    # must getting out of grid center once and re-focusing center
-                    if is_still_prev():
-                        swiped = False
-                    if is_grid_center():
-                        if swiped:
-                            break
-                    else:
-                        swiped = True
-                    # No error
-                    error_confirm.reset()
-                    continue
-                if success:
-                    break
-                # MapDetectionError 已在 _update_view() 内处理，这里重新更新。
-                error_confirm.reset()
-                continue
             except MapDetectionError:
                 if allow_error:
                     break
@@ -330,7 +393,17 @@ class Camera(MapOperation):
                     raise
                 continue
 
-        # Calculate view data
+            if not success:
+                continue
+
+            logger.attr("view.center_offset", self.view.center_offset)
+            if wait_swipe and not swipe_wait_timeout.reached():
+                should_stop, swiped = self._handle_wait_swipe_view(prev_center_offset, swiped, error_confirm)
+                if should_stop:
+                    break
+                continue
+            break
+
         self._update_view_data()
         return True
 
