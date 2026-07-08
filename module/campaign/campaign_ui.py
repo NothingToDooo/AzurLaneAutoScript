@@ -242,6 +242,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         return False
 
     def campaign_set_chapter_event(self, chapter, mode="normal"):
+        del mode
         if chapter in ["a", "b", "c", "d", "ex_sp", "as", "bs", "cs", "ds", "t", "ts", "tss", "ht", "hts"]:
             self.ui_goto_event()
             if chapter in ["a", "b", "as", "bs", "t", "ts", "tss"]:
@@ -255,6 +256,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         return False
 
     def campaign_set_chapter_sp(self, chapter, mode="normal"):
+        del mode
         if chapter == "sp":
             self.ui_goto_sp()
             self.campaign_ensure_chapter(chapter)

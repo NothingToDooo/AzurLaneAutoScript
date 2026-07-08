@@ -46,6 +46,7 @@ select = [
     "ANN401",
     "ASYNC",
     "ARG001",
+    "ARG002",
     "ARG003",
     "B",
     "B9",

@@ -37,10 +37,13 @@ class OSCampaignMap(CampaignMap):
             camera (tuple):
             mode (str): Scan mode, such as 'normal', 'carrier', 'movable'
         """
+        if mode != "normal":
+            raise ValueError(f"OS map update only supports normal scan mode: {mode}")
+
         offset = np.array(camera) - np.array(grids.center_loca)
         grids.show()
 
         for grid in grids.grids.values():
             loca = tuple(offset + grid.location)
             if loca in self.grids:
-                self.grids[loca].merge(grid)
+                self.grids[loca].merge(grid, mode=mode)

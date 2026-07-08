@@ -40,6 +40,7 @@ class Combat(Combat_, MapEventHandler):
         self.device.stuck_record_clear()
         self.device.click_record_clear()
         # OS 战斗保留基类调用签名，但不执行普通战斗的心情等待和血量平衡。
+        del balance_hp, emotion_reduce, fleet_index
 
         for _ in self.loop():
             if self.appear(os_combat_assets.BATTLE_PREPARATION) and self.handle_combat_automation_set(

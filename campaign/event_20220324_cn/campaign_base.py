@@ -3,6 +3,7 @@ from module.campaign.campaign_base import CampaignBase as CampaignBase_
 
 class CampaignBase(CampaignBase_):
     def campaign_set_chapter_sp(self, chapter, mode="normal"):
+        del mode
         if chapter == "sp":
             self.ui_goto_event()
             self.campaign_ensure_chapter(chapter)

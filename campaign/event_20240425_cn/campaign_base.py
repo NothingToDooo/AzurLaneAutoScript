@@ -11,6 +11,7 @@ class CampaignBase(CampaignBase_):
         """,)
 
     def campaign_set_chapter_event(self, chapter, mode="normal"):
+        del mode
         self.ui_goto_event()
         self.campaign_ensure_chapter(chapter)
         return True

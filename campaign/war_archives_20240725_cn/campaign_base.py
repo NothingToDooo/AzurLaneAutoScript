@@ -3,6 +3,7 @@ from ..campaign_war_archives.campaign_base import CampaignBase as CampaignBase_
 
 class CampaignBase(CampaignBase_):
     def campaign_set_chapter_event(self, chapter, mode="normal"):
+        del mode
         self.ui_goto_sp()
         if chapter in ["a", "b", "as", "bs", "t", "ts", "tss"]:
             self.campaign_ensure_mode("normal")

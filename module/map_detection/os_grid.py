@@ -80,6 +80,9 @@ class OSGridInfo(GridInfo):
         Returns:
             bool: If success.
         """
+        if mode != "normal":
+            raise ValueError(f"OS grid merge only supports normal scan mode: {mode}")
+
         if isinstance(info, RadarGrid):
             self.is_radar_scanned = True
 

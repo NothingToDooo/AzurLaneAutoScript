@@ -4,6 +4,7 @@ from module.logger import logger
 
 class CampaignBase(CampaignBase_):
     def campaign_set_chapter_sp(self, chapter, mode="normal"):
+        del mode
         # SP 活动入口仍显示 event UI。
         logger.info("Set chapter SP")
         if chapter in ["sp", "sp_sp"]:
