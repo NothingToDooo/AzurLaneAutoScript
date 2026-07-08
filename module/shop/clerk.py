@@ -149,11 +149,22 @@ class ShopClerk(ShopBase, Retirement):
         Returns:
             bool:
         """
-        # Search for appropriate select grid button for item
         select = self.shop_get_select(item)
+        limit = self._read_shop_select_stock_limit(item)
+        self._wait_shop_select_amount_controls(select)
+        limit = self._limit_shop_select_amount_by_currency(limit, item)
 
-        # Get displayed stock limit; varies between shops
-        # If read 0, then warn and exit as cannot safely buy
+        self.ui_ensure_index(
+            limit,
+            letter=self._shop_select_stock_letter(item, limit),
+            prev_button=SELECT_MINUS,
+            next_button=SELECT_PLUS,
+            skip_first_screenshot=True,
+        )
+        self.device.click(SHOP_BUY_CONFIRM_SELECT)
+        return True
+
+    def _read_shop_select_stock_limit(self, item):
         timeout = Timer(5, count=10).start()
         skip_first_screenshot = True
         limit = 0
@@ -173,8 +184,9 @@ class ShopClerk(ShopBase, Retirement):
                 f"{item.name}'s stock count cannot be extracted. Advised to re-cut the asset OCR_SHOP_SELECT_STOCK"
             )
             raise ScriptError
+        return limit
 
-        # Click in intervals until plus/minus are onscreen
+    def _wait_shop_select_amount_controls(self, select):
         click_timer = Timer(3, count=6)
         select_offset = (500, 400)
         while 1:
@@ -182,24 +194,22 @@ class ShopClerk(ShopBase, Retirement):
                 self.device.click(select)
                 click_timer.reset()
 
-            # Scan for plus/minus locations; searching within
-            # offset will update the click position automatically
+            # 在偏移范围内查找加减按钮，顺便刷新后续点击坐标。
             self.device.screenshot()
             if self.appear(SELECT_MINUS, offset=select_offset) and self.appear(SELECT_PLUS, offset=select_offset):
                 break
             continue
 
-        # 本次总购买数量。
+    def _limit_shop_select_amount_by_currency(self, limit, item):
         total = int(self._currency // item.price)
         diff = limit - total
         if diff > 0:
-            limit = total
+            return total
+        return limit
 
-        # Alias OCR_SHOP_SELECT_STOCK to adapt with
-        # ui_ensure_index; prevent overbuying when
-        # out of stock; item.price may still evaluate
-        # incorrectly
-        def shop_buy_select_ensure_index(image):
+    def _shop_select_stock_letter(self, item, limit):
+        # 适配 ui_ensure_index，避免库存耗尽时继续加购。
+        def read_remain(image):
             current, remain, _ = OCR_SHOP_SELECT_STOCK.ocr(image)
             if not current:
                 group_case = item.group.title() if len(item.group) > 2 else item.group.upper()
@@ -207,15 +217,7 @@ class ShopClerk(ShopBase, Retirement):
                 return limit
             return remain
 
-        self.ui_ensure_index(
-            limit,
-            letter=shop_buy_select_ensure_index,
-            prev_button=SELECT_MINUS,
-            next_button=SELECT_PLUS,
-            skip_first_screenshot=True,
-        )
-        self.device.click(SHOP_BUY_CONFIRM_SELECT)
-        return True
+        return read_remain
 
     def shop_buy_amount_execute(self, item):
         """
