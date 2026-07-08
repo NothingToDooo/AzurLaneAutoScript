@@ -1,5 +1,7 @@
 import numpy as np
 
+PROBABILITY_RANGE_MESSAGE = "probability must be between 0 and 1"
+
 
 class RuntimeRandom:
     """运行期随机源，供非可复现实验的路径复用。"""
@@ -12,7 +14,7 @@ class RuntimeRandom:
 
     def chance(self, probability: float = 0.5) -> bool:
         if not 0.0 <= probability <= 1.0:
-            raise ValueError("probability must be between 0 and 1")
+            raise ValueError(PROBABILITY_RANGE_MESSAGE)
         return bool(self._generator.random() < probability)
 
 

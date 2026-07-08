@@ -782,6 +782,9 @@ class ImageNotSupported(Exception):
     """
 
 
+PURE_BLACK_BBOX_MESSAGE = "Cannot get bbox from a pure black image"
+
+
 def get_bbox(image, threshold=0):
     """
     Get outbound box of the content in image
@@ -813,7 +816,8 @@ def get_bbox(image, threshold=0):
         mask = cv2.cvtColor(image, cv2.COLOR_RGBA2GRAY)
         cv2.threshold(mask, threshold, 255, cv2.THRESH_BINARY, dst=mask)
     else:
-        raise ImageNotSupported(f"shape={image.shape}")
+        message = f"shape={image.shape}"
+        raise ImageNotSupported(message)
 
     # find bbox
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -822,7 +826,7 @@ def get_bbox(image, threshold=0):
     max_y = 0
     # all black
     if not contours:
-        raise ImageNotSupported("Cannot get bbox from a pure black image")
+        raise ImageNotSupported(PURE_BLACK_BBOX_MESSAGE)
     for contour in contours:
         # x, y, w, h
         x1, y1, x2, y2 = cv2.boundingRect(contour)
@@ -835,7 +839,9 @@ def get_bbox(image, threshold=0):
     if min_x < max_x and min_y < max_y:
         return min_x, min_y, max_x, max_y
     # This shouldn't happen
-    raise ImageNotSupported(f"Empty bbox {(min_x, min_y, max_x, max_y)}")
+    bbox = (min_x, min_y, max_x, max_y)
+    message = f"Empty bbox {bbox}"
+    raise ImageNotSupported(message)
 
 
 def get_bbox_reversed(image, threshold=255):
@@ -869,7 +875,8 @@ def get_bbox_reversed(image, threshold=255):
         mask = cv2.cvtColor(image, cv2.COLOR_RGBA2GRAY)
         cv2.threshold(mask, 0, threshold, cv2.THRESH_BINARY, dst=mask)
     else:
-        raise ImageNotSupported(f"shape={image.shape}")
+        message = f"shape={image.shape}"
+        raise ImageNotSupported(message)
 
     # find bbox
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -878,7 +885,7 @@ def get_bbox_reversed(image, threshold=255):
     max_y = 0
     # all black
     if not contours:
-        raise ImageNotSupported("Cannot get bbox from a pure black image")
+        raise ImageNotSupported(PURE_BLACK_BBOX_MESSAGE)
     for contour in contours:
         # x, y, w, h
         x1, y1, x2, y2 = cv2.boundingRect(contour)
@@ -891,7 +898,9 @@ def get_bbox_reversed(image, threshold=255):
     if min_x < max_x and min_y < max_y:
         return min_x, min_y, max_x, max_y
     # This shouldn't happen
-    raise ImageNotSupported(f"Empty bbox {(min_x, min_y, max_x, max_y)}")
+    bbox = (min_x, min_y, max_x, max_y)
+    message = f"Empty bbox {bbox}"
+    raise ImageNotSupported(message)
 
 
 def color_similarity(color1, color2):

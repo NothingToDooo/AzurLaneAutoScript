@@ -51,7 +51,8 @@ def windows_attempt_delay(attempt: int) -> float:
 
 
 def _raise_after_retry(file: FilePath, action: str) -> NoReturn:
-    raise PermissionError(f"Unable to {action} {os.fspath(file)!r} after {WINDOWS_MAX_ATTEMPT} attempts")
+    message = f"Unable to {action} {os.fspath(file)!r} after {WINDOWS_MAX_ATTEMPT} attempts"
+    raise PermissionError(message)
 
 
 def replace_tmp(tmp: FilePath, file: FilePath) -> None:
