@@ -774,57 +774,74 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         fleets = self.parse_fleet_filter()
         for fleet in fleets:
             logger.hr(f"Turn: {fleet}", level=2)
-            if not isinstance(fleet, BossFleet):
-                self.os_order_execute(recon_scan=False, submarine_call=True)
+            if self._boss_clear_call_submarine(fleet):
                 continue
 
-            # Switch fleet
-            if self.fleet_set(fleet.fleet_index):
-                pass
-            else:
-                # Refocus camera if fleet not
-                others = [f for f in fleets if isinstance(f, BossFleet) and f != fleet]
-                if others:
-                    other: BossFleet = others[0]
-                    self.fleet_set(other.fleet_index)
-                    self.fleet_set(fleet.fleet_index)
-                else:
-                    logger.warning(f"No other fleets from {fleets}, skip refocus")
-
-            # Check fleet
-            self.handle_os_map_fleet_lock(enable=False)
-            if self.fleet_low_resolve_appear():
-                logger.warning("Skip using current fleet because of the low resolve debuff")
-                self.boss_goto(location=fleet.standby_loca, has_fleet_step=has_fleet_step, is_month=is_month)
+            self._boss_clear_set_fleet(fleet, fleets)
+            if self._boss_clear_skip_low_resolve(fleet, has_fleet_step=has_fleet_step, is_month=is_month):
                 continue
 
-            # Ensure boss is appear
-            if is_month:
-                while not self.radar.select(is_enemy=True):
-                    self.relative_goto(has_fleet_step=True, is_question=True, relative_position=(1, -6), index=0)
-                    try:
-                        self.relative_goto(has_fleet_step=True, is_question=True, index=1)
-                    except IndexError:
-                        self.relative_goto(has_fleet_step=True, is_question=True, relative_position=(1, -7), index=0)
-
-            # Attack
+            self._boss_clear_ensure_month_boss(is_month=is_month)
             self.boss_goto(location=(0, 0), has_fleet_step=has_fleet_step, is_month=is_month)
 
-            # End
-            self.predict_radar()
-            if self.radar.select(is_question=True):
-                logger.info("BOSS clear")
-                self.map_exit()
+            if self._boss_clear_finished():
                 return True
-
-            # Standby
-            self.boss_leave()
-            if fleet.standby_loca != (0, 0):
-                self.boss_goto(location=fleet.standby_loca, has_fleet_step=has_fleet_step)
-            else:
+            if self._boss_clear_standby(fleet, has_fleet_step=has_fleet_step):
                 break
 
         logger.critical("Unable to clear boss, fleets exhausted")
+        return False
+
+    def _boss_clear_call_submarine(self, fleet):
+        if isinstance(fleet, BossFleet):
+            return False
+        self.os_order_execute(recon_scan=False, submarine_call=True)
+        return True
+
+    def _boss_clear_set_fleet(self, fleet, fleets):
+        if self.fleet_set(fleet.fleet_index):
+            return
+
+        # 当前舰队无法切换时，先切到其他舰队再切回来以重新聚焦镜头。
+        others = [item for item in fleets if isinstance(item, BossFleet) and item != fleet]
+        if others:
+            other: BossFleet = others[0]
+            self.fleet_set(other.fleet_index)
+            self.fleet_set(fleet.fleet_index)
+            return
+        logger.warning(f"No other fleets from {fleets}, skip refocus")
+
+    def _boss_clear_skip_low_resolve(self, fleet, *, has_fleet_step, is_month):
+        self.handle_os_map_fleet_lock(enable=False)
+        if not self.fleet_low_resolve_appear():
+            return False
+        logger.warning("Skip using current fleet because of the low resolve debuff")
+        self.boss_goto(location=fleet.standby_loca, has_fleet_step=has_fleet_step, is_month=is_month)
+        return True
+
+    def _boss_clear_ensure_month_boss(self, *, is_month):
+        if not is_month:
+            return
+        while not self.radar.select(is_enemy=True):
+            self.relative_goto(has_fleet_step=True, is_question=True, relative_position=(1, -6), index=0)
+            try:
+                self.relative_goto(has_fleet_step=True, is_question=True, index=1)
+            except IndexError:
+                self.relative_goto(has_fleet_step=True, is_question=True, relative_position=(1, -7), index=0)
+
+    def _boss_clear_finished(self):
+        self.predict_radar()
+        if self.radar.select(is_question=True):
+            logger.info("BOSS clear")
+            self.map_exit()
+            return True
+        return False
+
+    def _boss_clear_standby(self, fleet, *, has_fleet_step):
+        self.boss_leave()
+        if fleet.standby_loca == (0, 0):
+            return True
+        self.boss_goto(location=fleet.standby_loca, has_fleet_step=has_fleet_step)
         return False
 
     def run_abyssal(self):

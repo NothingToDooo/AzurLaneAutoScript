@@ -3,7 +3,7 @@ from typing import ClassVar, TypeVar
 import pytest
 
 from module.os import fleet as fleet_module
-from module.os.fleet import OSFleet
+from module.os.fleet import BossFleet, OSFleet
 from module.os_combat import assets as os_combat_assets
 from module.ui.assets import BACK_ARROW
 
@@ -52,8 +52,13 @@ class _Radar:
 
     def select(self, **kwargs: object) -> list[object]:
         self.owner.calls.append(("radar_select", kwargs))
-        has_enemy = self.owner.radar_enemy_results.pop(0) if self.owner.radar_enemy_results else False
-        return [object()] if has_enemy else []
+        if kwargs.get("is_enemy"):
+            matched = self.owner.radar_enemy_results.pop(0) if self.owner.radar_enemy_results else False
+        elif kwargs.get("is_question"):
+            matched = self.owner.radar_question_results.pop(0) if self.owner.radar_question_results else False
+        else:
+            matched = False
+        return [object()] if matched else []
 
 
 class _Fleet(OSFleet):
@@ -63,15 +68,25 @@ class _Fleet(OSFleet):
         self.calls: list[tuple[object, ...]] = []
         self.in_map_results: list[bool] = []
         self.radar_enemy_results: list[bool] = []
+        self.radar_question_results: list[bool] = []
         self.appear_results: dict[str, list[bool]] = {}
         self.combat_executing_results: list[object | None] = []
         self.combat_quit_results: list[bool] = []
         self.combat_quit_reconfirm_results: list[bool] = []
         self.leave_button_results: list[object | None] = []
         self.interval_resets: list[object] = []
+        self.fleet_filter_results: list[object] = []
+        self.fleet_set_results: list[bool] = []
+        self.low_resolve_results: list[bool] = []
+        self.boss_goto_calls: list[dict[str, object]] = []
+        self.map_exit_count = 0
+        self.boss_leave_count = 0
 
     def leave_boss(self) -> None:
-        self.boss_leave()
+        OSFleet.boss_leave(self)
+
+    def clear_boss(self, *, has_fleet_step: bool = True, is_month: bool = False) -> bool:
+        return self.boss_clear(has_fleet_step=has_fleet_step, is_month=is_month)
 
     def _next_result(self, results: list[_T], *, default: _T) -> _T:
         if results:
@@ -118,6 +133,39 @@ class _Fleet(OSFleet):
     def get_boss_leave_button(self) -> object | None:
         self.calls.append(("get_boss_leave_button",))
         return self._next_result(self.leave_button_results, default=None)
+
+    def parse_fleet_filter(self) -> list[object]:
+        self.calls.append(("parse_fleet_filter",))
+        return self.fleet_filter_results
+
+    def os_order_execute(self, **kwargs: object) -> None:
+        self.calls.append(("os_order_execute", kwargs))
+
+    def fleet_set(self, index: int = 1) -> bool:
+        self.calls.append(("fleet_set", index))
+        return self._next_result(self.fleet_set_results, default=True)
+
+    def handle_os_map_fleet_lock(self, **kwargs: object) -> None:
+        self.calls.append(("handle_os_map_fleet_lock", kwargs))
+
+    def fleet_low_resolve_appear(self) -> bool:
+        self.calls.append(("fleet_low_resolve_appear",))
+        return self._next_result(self.low_resolve_results, default=False)
+
+    def boss_goto(self, **kwargs: object) -> None:
+        self.calls.append(("boss_goto", kwargs))
+        self.boss_goto_calls.append(kwargs)
+
+    def relative_goto(self, **kwargs: object) -> None:
+        self.calls.append(("relative_goto", kwargs))
+
+    def map_exit(self) -> None:
+        self.calls.append(("map_exit",))
+        self.map_exit_count += 1
+
+    def boss_leave(self) -> None:
+        self.calls.append(("boss_leave",))
+        self.boss_leave_count += 1
 
 
 @pytest.fixture(autouse=True)
@@ -166,3 +214,40 @@ def test_boss_leave_clicks_leave_button_until_boss_returns() -> None:
 
     assert fleet.device.clicks == [leave_button]
     assert _Timer.reset_count == 1
+
+
+def test_boss_clear_exits_when_question_mark_returns_after_attack() -> None:
+    fleet = _Fleet()
+    boss_fleet = BossFleet(1)
+    fleet.fleet_filter_results = [boss_fleet]
+    fleet.radar_question_results = [True]
+
+    result = fleet.clear_boss(has_fleet_step=True)
+
+    assert result is True
+    assert fleet.map_exit_count == 1
+    assert fleet.boss_goto_calls == [{"location": (0, 0), "has_fleet_step": True, "is_month": False}]
+
+
+def test_boss_clear_calls_submarine_order_for_non_fleet_entry() -> None:
+    fleet = _Fleet()
+    fleet.fleet_filter_results = ["CallSubmarine", BossFleet(1)]
+    fleet.radar_question_results = [True]
+
+    result = fleet.clear_boss()
+
+    assert result is True
+    assert ("os_order_execute", {"recon_scan": False, "submarine_call": True}) in fleet.calls
+
+
+def test_boss_clear_skips_low_resolve_fleet_to_standby() -> None:
+    fleet = _Fleet()
+    boss_fleet = BossFleet(1)
+    boss_fleet.standby_loca = (0, -1)
+    fleet.fleet_filter_results = [boss_fleet]
+    fleet.low_resolve_results = [True]
+
+    result = fleet.clear_boss(has_fleet_step=True)
+
+    assert result is False
+    assert fleet.boss_goto_calls == [{"location": (0, -1), "has_fleet_step": True, "is_month": False}]
