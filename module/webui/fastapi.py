@@ -1,14 +1,12 @@
 """基于 pywebio.platform.fastapi 精简出的本地 WebUI 服务。"""
 
-import asyncio
 import functools
 import inspect
 import mimetypes
 import os
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-import uvicorn
 from pywebio import session as pywebio_session
 from pywebio import utils as pywebio_utils
 from pywebio.platform import page as pywebio_page
@@ -16,8 +14,6 @@ from pywebio.platform.fastapi import (
     STATIC_PATH,
     Session,
     cdn_validation,
-    get_free_port,
-    open_webbrowser_on_server_started,
     webio_routes,
 )
 from starlette.applications import Starlette
@@ -61,14 +57,6 @@ class AsgiAppOptions:
     debug: bool = False
     allowed_origins: object = None
     check_origin: object = None
-
-
-@dataclass(slots=True)
-class ServerOptions:
-    port: int = 0
-    host: str = ""
-    auto_open_webbrowser: bool = False
-    asgi_options: AsgiAppOptions = field(default_factory=AsgiAppOptions)
 
 
 class LocalStaticFiles(StaticFiles):
@@ -148,37 +136,3 @@ def asgi_app(applications, options=None, **starlette_settings):
     middleware = [Middleware(HeaderMiddleware)]
     lifespan = _build_lifespan(starlette_settings)
     return Starlette(routes=routes, middleware=middleware, debug=debug, lifespan=lifespan, **starlette_settings)
-
-
-def _server_options_from_settings(options, settings):
-    if options is not None:
-        return options
-    return ServerOptions(
-        port=settings.pop("port", 0),
-        host=settings.pop("host", ""),
-        auto_open_webbrowser=settings.pop("auto_open_webbrowser", False),
-        asgi_options=AsgiAppOptions(
-            cdn=settings.pop("cdn", True),
-            static_dir=settings.pop("static_dir", None),
-            debug=settings.pop("debug", False),
-            allowed_origins=settings.pop("allowed_origins", None),
-            check_origin=settings.pop("check_origin", None),
-        ),
-    )
-
-
-def start_server(applications, options=None, **uvicorn_settings):
-    options = _server_options_from_settings(options, uvicorn_settings)
-    app = asgi_app(applications, options=options.asgi_options)
-
-    if options.auto_open_webbrowser:
-        asyncio.get_event_loop().create_task(open_webbrowser_on_server_started("localhost", options.port))
-
-    host = options.host or "127.0.0.1"
-    port = options.port
-
-    if port == 0:
-        port = get_free_port()
-
-    uvicorn_settings.setdefault("log_config", None)
-    uvicorn.run(app, host=host, port=port, **uvicorn_settings)
