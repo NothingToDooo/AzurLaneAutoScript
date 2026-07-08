@@ -26,6 +26,9 @@ from module.ui.assets import BACK_ARROW
 from module.ui.page import page_fleet
 
 SIM_VALUE = 0.92
+EMOTION_WITHDRAW_MESSAGE = "Emotion withdraw"
+INVALID_GEMS_FARMING_COMMON_DD_MESSAGE = "Invalid GemsFarming_CommonDD"
+INVALID_COMMON_DD_SETTING_TEMPLATE = "Invalid CommonDD setting: {common_dd}"
 
 
 class GemsCampaignOverride(CampaignBase):
@@ -43,7 +46,7 @@ class GemsCampaignOverride(CampaignBase):
         self.config.GEMS_EMOTION_TRIGGERED = True
         logger.hr("EMOTION WITHDRAW")
         self._withdraw_for_low_emotion()
-        raise CampaignEnd("Emotion withdraw")
+        raise CampaignEnd(EMOTION_WITHDRAW_MESSAGE)
 
     def _handle_low_emotion_ignore(self):
         result = self.handle_popup_confirm("IGNORE_LOW_EMOTION")
@@ -234,8 +237,9 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         elif self.config.GemsFarming_CommonDD in ["aulick_or_foote", "cassin_or_downes"]:
             faction = "eagle"
         else:
-            logger.error(f"Invalid CommonDD setting: {self.config.GemsFarming_CommonDD}")
-            raise ScriptError("Invalid GemsFarming_CommonDD")
+            message = INVALID_COMMON_DD_SETTING_TEMPLATE.format(common_dd=self.config.GemsFarming_CommonDD)
+            logger.error(message)
+            raise ScriptError(INVALID_GEMS_FARMING_COMMON_DD_MESSAGE)
 
         favourite = self.config.GemsFarming_CommonDD == "favourite"
         self.dock_favourite_set(favourite, wait_loading=False)
@@ -287,8 +291,9 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
             return [TEMPLATE_AULICK, TEMPLATE_FOOTE]
         if common_dd == "cassin_or_downes":
             return [TEMPLATE_CASSIN_1, TEMPLATE_CASSIN_2, TEMPLATE_DOWNES_1, TEMPLATE_DOWNES_2]
-        logger.error(f"Invalid CommonDD setting: {common_dd}")
-        raise ScriptError(f"Invalid CommonDD setting: {common_dd}")
+        message = INVALID_COMMON_DD_SETTING_TEMPLATE.format(common_dd=common_dd)
+        logger.error(message)
+        raise ScriptError(message)
 
     def flagship_change_execute(self):
         """
@@ -384,7 +389,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
             try:
                 super().run(name=name, folder=folder, mode=mode, total=total)
             except CampaignEnd as e:
-                if e.args[0] == "Emotion withdraw":
+                if str(e) == EMOTION_WITHDRAW_MESSAGE:
                     self._trigger_emotion = True
                 else:
                     raise

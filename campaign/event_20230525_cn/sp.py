@@ -6,6 +6,9 @@ from module.map.map_base import CampaignMap
 from .campaign_base import CampaignBase
 from .config_base import ConfigBase
 
+INVALID_SP_MOVEMENT_MESSAGE = "Invalid movement"
+FLEET_MOVE_MISMATCH_TEMPLATE = "Fleet{fleet_index} fail to move {src} -> {dst}, now on {fleet_location}"
+
 MAP = CampaignMap("SP")
 MAP.shape = "J8"
 
@@ -168,7 +171,7 @@ actions = {
 
 def parse_move(movement: str, step: int):
     if step % len(movement) != 0:
-        raise ScriptError("Invalid movement")
+        raise ScriptError(INVALID_SP_MOVEMENT_MESSAGE)
 
     movement = movement * int(step / len(movement))
     dx, dy = 0, 0
@@ -209,9 +212,13 @@ class Campaign(CampaignBase):
 
                 fleet_location = self.__getattribute__(f"fleet_{fleet_index}_location")
                 if fleet_location not in [src, dst]:
-                    raise RequestHumanTakeover(
-                        f"Fleet{fleet_index} fail to move {src} -> {dst}, now on {fleet_location}"
+                    message = FLEET_MOVE_MISMATCH_TEMPLATE.format(
+                        fleet_index=fleet_index,
+                        src=src,
+                        dst=dst,
+                        fleet_location=fleet_location,
                     )
+                    raise RequestHumanTakeover(message)
                 if fleet_location == dst:
                     break
                 logger.warning(f"Fleet{fleet_index} did not move, retry")

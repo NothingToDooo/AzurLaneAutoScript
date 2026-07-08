@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from module.campaign.campaign_ui import CAMPAIGN_NAME_ERROR_MESSAGE
 from module.config.config import TaskEnd
 from module.config.utils import get_server_last_update
 from module.event.base import STAGE_FILTER, EventBase, EventStage
@@ -48,7 +49,7 @@ class CampaignABCD(EventBase):
                 pass
             except ScriptEnd as e:
                 # Raise from CampaignUI.ensure_campaign_ui()
-                if str(e) == "Campaign name error":
+                if str(e) == CAMPAIGN_NAME_ERROR_MESSAGE:
                     task = self.config.task.command
                     logger.critical(
                         f'Cannot find stage "{stage}". '

@@ -11,6 +11,9 @@ from module.map.map import Map
 if TYPE_CHECKING:
     from module.map.map_base import CampaignMap
 
+NO_COMBAT_EXECUTED_MESSAGE = "No combat executed."
+BATTLE_FUNCTION_EXHAUSTED_MESSAGE = "Battle function exhausted."
+
 
 class CampaignBase(CampaignUI, Map, AutoSearchCombat):
     FUNCTION_NAME_BASE = "battle_"
@@ -117,7 +120,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
                 logger.warning("ScriptError, No combat executed, Withdrawing")
                 self.withdraw()
             else:
-                raise ScriptError("No combat executed.")
+                raise ScriptError(NO_COMBAT_EXECUTED_MESSAGE)
 
         return result
 
@@ -157,7 +160,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
             with suppress(CampaignEnd):
                 self.withdraw()
             return False
-        raise ScriptError("Battle function exhausted.")
+        raise ScriptError(BATTLE_FUNCTION_EXHAUSTED_MESSAGE)
 
     @cached_property
     def _map_battle(self):

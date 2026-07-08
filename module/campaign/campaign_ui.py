@@ -13,6 +13,8 @@ from module.map.map_operation import MapOperation
 from module.ui.assets import CAMPAIGN_CHECK
 from module.ui.switch import Switch
 
+CAMPAIGN_NAME_ERROR_MESSAGE = "Campaign name error"
+
 
 class ModeSwitch(Switch):
     def handle_additional(self, main):
@@ -381,8 +383,8 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
             if self.handle_campaign_ui_additional():
                 continue
 
-        logger.warning("Campaign name error")
-        raise ScriptEnd("Campaign name error")
+        logger.warning(CAMPAIGN_NAME_ERROR_MESSAGE)
+        raise ScriptEnd(CAMPAIGN_NAME_ERROR_MESSAGE)
 
     def commission_notice_show_at_campaign(self):
         """

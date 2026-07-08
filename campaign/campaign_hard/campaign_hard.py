@@ -6,6 +6,8 @@ from module.logger import logger
 from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION
 from module.ui.assets import CAMPAIGN_CHECK
 
+HARD_BOSS_CLEAR_MESSAGE = "BOSS Clear."
+
 
 class Config:
     MAP_HAS_AMBUSH = False
@@ -28,7 +30,7 @@ class Campaign(CampaignBase, HardEquipment):
             grids = grids.sort("weight", "cost")
             logger.info(f"Grids: {grids}")
             self._goto(grids[0], expected="boss")
-            raise CampaignEnd("BOSS Clear.")
+            raise CampaignEnd(HARD_BOSS_CLEAR_MESSAGE)
 
         logger.warning("BOSS not detected, trying all boss spawn point.")
         self.clear_potential_boss()

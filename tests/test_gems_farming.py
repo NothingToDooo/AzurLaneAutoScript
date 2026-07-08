@@ -115,7 +115,7 @@ def test_low_emotion_withdraw_raises_after_stage_return() -> None:
     campaign.cancel_results = [True, False]
     campaign.stage_results = [True]
 
-    with pytest.raises(CampaignEnd, match="Emotion withdraw"):
+    with pytest.raises(CampaignEnd, match=gems_module.EMOTION_WITHDRAW_MESSAGE):
         campaign.handle_combat_low_emotion()
 
     assert campaign.config.GEMS_EMOTION_TRIGGERED is True
@@ -130,7 +130,7 @@ def test_low_emotion_withdraw_backs_out_then_withdraws_from_map() -> None:
     campaign.stage_results = [False]
     campaign.map_results = [True]
 
-    with pytest.raises(CampaignEnd, match="Emotion withdraw"):
+    with pytest.raises(CampaignEnd, match=gems_module.EMOTION_WITHDRAW_MESSAGE):
         campaign.handle_combat_low_emotion()
 
     assert campaign.device.clicks == [BACK_ARROW]
