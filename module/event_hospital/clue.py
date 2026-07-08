@@ -70,12 +70,6 @@ class HospitalClue(HospitalUI):
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         cv2.dilate(gray, kernel, dst=gray)
 
-        # import matplotlib.pyplot as plt
-        # plt.imshow(gray)
-        # plt.show()
-        # from PIL import Image
-        # Image.fromarray(gray, mode='L').show()
-
         # 查找文字矩形。
         list_word = []
         contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -84,7 +78,6 @@ class HospitalClue(HospitalUI):
             # 按文字高度过滤，通常约为 16。
             rect = xywh2xyxy(rect)
             if rect[3] - rect[1] < 12:
-                # logger.warning(f'Text row too high: {rect}')
                 continue
             center_y = (rect[1] + rect[3]) // 2
             list_word.append((rect, center_y))

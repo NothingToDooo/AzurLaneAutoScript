@@ -455,12 +455,7 @@ class RewardDorm(UI):
 
         self.ui_ensure(page_dormmenu)
         self.handle_info_bar()
-        # 2025.10.17 Remove DORM_RED_DOT check, as dorm card has a slow appear animation
-        # if not self.appear(DORM_RED_DOT, offset=(30, 30)):
-        #     logger.info('Nothing to collect. Dorm collecting skipped.')
-        #     collect = False
-        #     if not feed and not buy_furniture:
-        #         return
+        # 宿舍卡片红点动画较慢，不再用 DORM_RED_DOT 跳过收集。
         self.ui_goto(page_dorm, skip_first_screenshot=True)
 
         # 先喂食以处理 DORM_INFO；它可能遮挡宿舍金币和爱心。

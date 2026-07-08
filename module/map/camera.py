@@ -80,12 +80,8 @@ class Camera(MapOperation):
                 vector,
                 SwipeVectorOptions(box=box, name=name, whitelist_area=whitelist, blacklist_area=blacklist),
             )
-            # Donno why initial commit have a sleep here
-            # self.device.sleep(0.3)
             self.update(wait_swipe=True)
             return True
-        # Drop swipe
-        # self.update(camera=False)
         return False
 
     def map_swipe(self, vector):
@@ -686,7 +682,6 @@ class Camera(MapOperation):
             .add(self.view.select(is_fleet=True, is_current_fleet=False))
         )
 
-        # self.view.show()
         whitelist = local_to_area(globe_to_local(whitelist), pad=25)
         blacklist = [grid.outer for grid in blacklist] + local_to_area(blacklist, pad=-5)
 

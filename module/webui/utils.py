@@ -218,9 +218,7 @@ class TaskHandler:
                     start_time = time.time()
                     try:
                         self._task = task
-                        # logger.debug(f'Start task {task.g.__name__}')
                         task.send(self)
-                        # logger.debug(f'End task {task.g.__name__}')
                     except StopIteration:
                         logger.info(f"Task {task} finished")
                         self.remove_task(task, nowait=True)

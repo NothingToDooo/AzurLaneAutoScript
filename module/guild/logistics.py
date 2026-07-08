@@ -127,13 +127,6 @@ class GuildLogistics(GuildBase):
             # 没有公会任务计数。
             logger.info("No guild mission found, mission of this week may not started")
             return False
-            # if self.image_color_count(GUILD_MISSION_CHOOSE, color=(255, 255, 255), threshold=221, count=100):
-            #     # 公会会长可以选择公会任务。
-            #     logger.info('Guild mission choose found')
-            #     return True
-            # else:
-            #     logger.info('Guild mission choose not found')
-            #     return False
         logger.info("Guild mission button inactive")
         return False
 

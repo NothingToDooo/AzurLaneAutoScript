@@ -67,7 +67,6 @@ def get_research_series_old(image, series_button=RESEARCH_SERIES):
         im = color_similarity_2d(resize(crop(image, button.area, copy=False), (46, 25)), color=(255, 255, 255))
         peaks = [len(signal.find_peaks(row, **parameters)[0]) for row in im[5:-5]]
         upper, lower = max(peaks), min(peaks)
-        # print(peaks)
 
         # Remove noise like [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 2]
         if upper == 3 and lower == 2 and peaks.count(3) <= 2:
@@ -88,7 +87,6 @@ def get_research_series_old(image, series_button=RESEARCH_SERIES):
 
 
 def _get_research_series(img):
-    # img = rgb2luma(img)
     img = extract_white_letters(img)
     pos = img.shape[0] * 2 // 5
 
@@ -119,7 +117,6 @@ def get_research_series(image, series_button=RESEARCH_SERIES):
     """
     result = []
     for button in series_button:
-        # img = resize(crop(image, button.area), (46, 25))
         img = crop(image, button.area, copy=False)
         img = cv2.resize(img, (46, 25), interpolation=cv2.INTER_AREA)
         series = _get_research_series(img)

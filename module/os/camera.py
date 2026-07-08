@@ -63,12 +63,6 @@ class OSCamera(OSMapOperation, Camera):
             x = 0
         return x == 0 and y == 0
 
-    # def ensure_edge_insight(self, reverse=False, preset=None, swipe_limit=(4, 3)):
-    #     return super().ensure_edge_insight(reverse=reverse, preset=preset, swipe_limit=swipe_limit)
-    #
-    # def focus_to(self, location, swipe_limit=(4, 3)):
-    #     return super().focus_to(location, swipe_limit=swipe_limit)
-
     def _get_map_outside_button(self):
         """
         Returns:
@@ -93,7 +87,6 @@ class OSCamera(OSMapOperation, Camera):
         """
         Similar to `Camera.update()`, but for OPSI.
         """
-        # self.device.screenshot()
         self._view_init()
 
         try:

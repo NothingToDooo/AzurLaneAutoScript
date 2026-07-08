@@ -29,13 +29,11 @@ class Assets:
     @cached_property
     def ui_mask_in_map(self):
         area = np.append(np.subtract(0, DETECTING_AREA[:2]), self.ui_mask.shape[::-1])
-        # area = (-123, -55, 1157, 665)
         return crop(self.ui_mask, area)
 
     @cached_property
     def ui_mask_os_in_map(self):
         area = np.append(np.subtract(0, DETECTING_AREA[:2]), self.ui_mask.shape[::-1])
-        # area = (-123, -55, 1157, 665)
         return crop(self.ui_mask_os, area)
 
     @cached_property
@@ -48,7 +46,7 @@ class Assets:
 
     @cached_property
     def tile_corner_image_list(self):
-        # [upper-left, upper-right, bottom-left, bottom-right]
+        # 顺序：左上、右上、左下、右下。
         return [
             cv2.flip(self.tile_corner_image, -1),
             cv2.flip(self.tile_corner_image, 0),

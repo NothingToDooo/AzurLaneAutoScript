@@ -499,10 +499,8 @@ class Minitouch(Connection):
                 self.sleep(1)
                 continue
 
-        # self.max_contacts = max_contacts
         self.max_x = int(max_x)
         self.max_y = int(max_y)
-        # self.max_pressure = max_pressure
 
         # $ <pid>
         out = socket_out.readline().replace("\n", "").replace("\r", "")
@@ -515,7 +513,6 @@ class Minitouch(Connection):
 
     def minitouch_send(self, builder: CommandBuilder):
         content = builder.to_minitouch()
-        # logger.info("发送操作: {}".format(content.replace("\n", "\\n")))
         byte_content = content.encode("utf-8")
         self._minitouch_client.sendall(byte_content)
         self._minitouch_client.recv(0)

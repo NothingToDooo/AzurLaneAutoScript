@@ -20,7 +20,6 @@ class SelectedGrids:
         return item in self.grids
 
     def __str__(self):
-        # return str([str(grid) for grid in self])
         return "[" + ", ".join([str(grid) for grid in self]) + "]"
 
     def __len__(self):
@@ -28,9 +27,6 @@ class SelectedGrids:
 
     def __bool__(self):
         return self.count > 0
-
-    # def __getattr__(self, item):
-    #     return [grid.__getattribute__(item) for grid in self.grids]
 
     @property
     def location(self):
@@ -85,7 +81,6 @@ class SelectedGrids:
 
     def create_index(self, *attrs):
         indexes = {}
-        # index_keys = [(grid.__getattribute__(attr) for attr in attrs) for grid in self.grids]
         for grid in self.grids:
             k = tuple(grid.__getattribute__(attr) for attr in attrs)
             try:
@@ -268,7 +263,6 @@ class SelectedGrids:
             return self
         location = np.array(self.location)
         diff = np.sum(np.abs(location - camera), axis=1)
-        # grids = [x for _, x in sorted(zip(diff, self.grids))]
         grids = tuple(np.array(self.grids)[np.argsort(diff)])
         return SelectedGrids(grids)
 

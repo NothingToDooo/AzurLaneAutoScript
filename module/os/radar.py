@@ -81,8 +81,6 @@ class RadarGrid:
         self.enemy_scale = 0
         self.enemy_genre = None
 
-        # self.is_fleet = False
-
     def predict(self):
         if self.is_fleet:
             return
@@ -99,8 +97,6 @@ class RadarGrid:
             self.is_enemy = True
         if self.enemy_scale:
             self.is_enemy = True
-        # if not self.is_enemy:
-        #     self.is_enemy = self.predict_static_red_border()
         if self.is_enemy and not self.enemy_genre:
             self.enemy_genre = "Enemy"
         if self.config.MAP_HAS_SIREN and self.enemy_genre is not None and self.enemy_genre.startswith("Siren"):
@@ -247,7 +243,6 @@ class Radar:
         """
         radius = (15, 82)
         image = crop(image, area_offset((-radius[1], -radius[1], radius[1], radius[1]), self.center), copy=False)
-        # image.show()
         points = np.where(color_similarity_2d(image, color=(255, 255, 255)) > 250)
         points = np.array(points).T[:, ::-1] - (radius[1], radius[1])
         distance = np.linalg.norm(points, axis=1)

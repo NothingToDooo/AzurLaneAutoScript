@@ -125,8 +125,6 @@ class Job[ResultT]:
     Faster but can only put() once and get() once.
     """
 
-    # __slots__ = ('worker', 'func_args_kwargs', 'queue', 'mutex', 'finished')
-
     def __init__(self, worker, func_args_kwargs):
         # Having attribute "worker" means job is ongoing
         # Not having attribute "worker" means job is finished or killed
@@ -343,12 +341,9 @@ class WorkerPool:
             else:
                 return worker
             # A worker just exited
-            # if len(self.all_workers) < WorkerPool.MAX_WORKER:
-            #     break
 
         # Create new worker
         worker = WorkerThread(self)
-        # logger.info(f'New worker thread: {worker.default_name}')
         self.all_workers[worker] = None
         return worker
 

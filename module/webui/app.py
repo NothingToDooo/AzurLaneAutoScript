@@ -935,16 +935,9 @@ def app_manage():
                     put_buttons(
                         buttons=[
                             {"label": t("Gui.AppManage.Export"), "value": name},
-                            # {
-                            #     "label": t("Gui.AppManage.Delete"),
-                            #     "value": name,
-                            #     "disabled": True,
-                            #     "color": "danger",
-                            # },
                         ],
                         onclick=[
                             partial(_export, name),
-                            # partial(_delete, name),
                         ],
                         group=True,
                         small=True,

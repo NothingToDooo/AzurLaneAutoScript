@@ -124,10 +124,7 @@ class PlatformWindows(PlatformBase, EmulatorManager):
                 r")"
             )
         elif instance == Emulator.MuMuPlayerX:
-            # MuMu X has 3 processes
-            # "E:\ProgramFiles\MuMu9\emulator\nemu9\EmulatorShell\NemuPlayer.exe" -m nemu-12.0-x64-default -s 0 -l
-            # "C:\Program Files\Muvm6Vbox\Hypervisor\Muvm6Headless.exe" --comment nemu-12.0-x64-default --startvm xxx
-            # "C:\Program Files\Muvm6Vbox\Hypervisor\Muvm6SVC.exe" --Embedding
+            # MuMu X 会启动 NemuPlayer、Muvm6Headless 和 Muvm6SVC。
             self.kill_process_by_regex(
                 rf"("
                 rf"NemuPlayer.exe.*-m {instance.name}"
@@ -210,7 +207,6 @@ class PlatformWindows(PlatformBase, EmulatorManager):
 
     def _check_start_watch_device(self, serial: str):
         devices = self.list_device().select(serial=serial)
-        # logger.info(devices)
         if not devices:
             # Try to connect
             self._adb_connect_for_start_watch()
@@ -274,7 +270,6 @@ class PlatformWindows(PlatformBase, EmulatorManager):
                 return False
 
             # Check emulator window showing up
-            # logger.info([get_focused_window(), get_window_title(get_focused_window())])
             new_window = self._focus_back_from_new_window(current_window, new_window)
 
             # Check device connection

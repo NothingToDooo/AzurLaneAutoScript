@@ -168,7 +168,6 @@ class View(MapDetector):
             previous_fleet = prev.select(is_fleet=True, is_current_fleet=True)
             if len(current_fleet) == 1 and len(previous_fleet) == 1:
                 diff = np.subtract(current_fleet[0].location, previous_fleet[0].location) - offset
-                # print(current_fleet[0].location, previous_fleet[0].location, offset, diff)
                 diff = tuple(diff.tolist())
                 logger.info(
                     f"Map swipe predict: {diff} ({float2str(time.time() - start_time) + 's'}, current fleet match)"
@@ -183,11 +182,9 @@ class View(MapDetector):
                     if current_piece.is_similar_to(previous_piece):
                         diff = np.subtract(current_loca, previous_loca) - offset
                         swipes.append(tuple(diff.tolist()))
-                        # print(current_loca, previous_loca, offset, diff)
 
             counter = collections.Counter(swipes)
             diff = counter.most_common()
-            # print(diff)
             if len(diff) == 1 or (len(diff) >= 2 and diff[0][1] > diff[1][1]):
                 logger.info(
                     f"Map swipe predict: {diff[0][0]} "

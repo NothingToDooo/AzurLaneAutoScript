@@ -114,9 +114,6 @@ class HTMLConsole(Console):
 class Highlighter(RegexHighlighter):
     base_style = "web."
     highlights: ClassVar[list[str]] = [
-        # (r'(?P<datetime>(\d{2}|\d{4})(?:\-)?([0]{1}\d{1}|[1]{1}[0-2]{1})'
-        #  r'(?:\-)?([0-2]{1}\d{1}|[3]{1}[0-1]{1})(?:\s)?([0-1]{1}\d{1}|'
-        #  r'[2]{1}[0-3]{1})(?::)?([0-5]{1}\d{1})(?::)?([0-5]{1}\d{1}).\d+\b)'),
         (
             r"(?P<time>([0-1]{1}\d{1}|[2]{1}[0-3]{1})(?::)?"
             r"([0-5]{1}\d{1})(?::)?([0-5]{1}\d{1})(.\d+\b))"
@@ -124,7 +121,6 @@ class Highlighter(RegexHighlighter):
         r"(?P<brace>[\{\[\(\)\]\}])",
         r"\b(?P<bool_true>True)\b|\b(?P<bool_false>False)\b|\b(?P<none>None)\b",
         r"(?P<path>(([A-Za-z]\:)|.)?\B([\/\\][\w\.\-\_\+]+)*[\/\\])(?P<filename>[\w\.\-\_\+]*)?",
-        # r"(?<![\\\w])(?P<str>b?\'\'\'.*?(?<!\\)\'\'\'|b?\'.*?(?<!\\)\'|b?\"\"\".*?(?<!\\)\"\"\"|b?\".*?(?<!\\)\")",
     ]
 
 
@@ -143,7 +139,7 @@ WEB_THEME = Theme(
 )
 
 
-# Logger init
+# 初始化日志。
 logger_debug = False
 logger = logging.getLogger("alas")
 logger.setLevel(logging.DEBUG if logger_debug else logging.INFO)
@@ -153,13 +149,7 @@ file_formatter = logging.Formatter(
 console_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d │ %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 web_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d │ %(message)s", datefmt="%H:%M:%S")
 
-# Add console logger
-# console = logging.StreamHandler(stream=sys.stdout)
-# console.setFormatter(formatter)
-# console.flush = sys.stdout.flush
-# logger.addHandler(console)
-
-# Add rich console logger
+# 添加 rich 控制台日志。
 stdout_console = console = Console()
 console_hdlr = RichHandler(
     show_path=False,

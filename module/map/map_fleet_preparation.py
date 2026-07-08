@@ -139,7 +139,6 @@ class FleetOperator:
         parameters = {"height": 180, "distance": 5}
         peaks, _ = signal.find_peaks(height, **parameters)
         lines = len(peaks)
-        # logger.attr('Light_orange_line', lines)
         return lines > 0
 
     def raise_hard_not_satisfied(self):
@@ -280,12 +279,7 @@ class FleetOperator:
         Returns:
             bool: If has selected to any fleet.
         """
-        # 处理自律寻敌信息条。
-        # if area_cross_area(self._in_use.area, INFO_BAR_1.area):
-        #     self.main.handle_info_bar()
-
-        # 裁剪 FLEET_*_IN_USE 以避开 info_bar，也能达到同样效果。
-        # 这样还能避免浪费时间处理 info_bar。
+        # 裁剪 FLEET_*_IN_USE 以避开 info_bar，也能避免额外处理 info_bar。
         image = self.main.image_crop(self._in_use.button, copy=False)
 
         # 针对英仙座皮肤的特殊修正，它的颜色过于平坦。
@@ -472,8 +466,6 @@ class FleetPreparation(InfoHandler):
         map_allow_submarine = self._prepare_submarine_fleet(fleet_2, submarine)
 
         # 不需要，这可能会误清 FLEET_2；在地图配置里清理 FLEET_2。
-        # if not fleet_2.allow():
-        #     self.config.FLEET_2 = 0
 
         self._prepare_surface_fleets(fleet_1, fleet_2)
         self._finalize_submarine_fleet(submarine, map_allow_submarine)

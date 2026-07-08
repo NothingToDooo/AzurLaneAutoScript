@@ -64,7 +64,6 @@ class Map(Fleet):
         logger.info(f"Clear mystery: {grid}")
         self.show_fleet()
         self.goto(grid, expected="mystery")
-        # self.mystery_count += 1
         self.map.show_cost()
 
     def pick_up_ammo(self, grid=None):
@@ -84,7 +83,6 @@ class Map(Fleet):
             self.goto(grid, expected="")
             self.ensure_no_info_bar()
 
-            # self.ammo_count -= 5 - self.battle_count
             recover = 5 - self.fleet_ammo
             recover = min(recover, 3)
             logger.attr("Got ammo", recover)
@@ -536,9 +534,6 @@ class Map(Fleet):
         for grid in grids:
             if self.fleet_at(grid=grid, fleet=2):
                 return False
-        # if grids.count == len([grid for grid in grids if grid.is_enemy or grid.is_cleared]):
-        #     logger.info('Fleet 2 step on, no need')
-        #     return False
         all_cleared = grids.select(is_cleared=True).count == grids.count
 
         logger.info("Fleet 2 step on")

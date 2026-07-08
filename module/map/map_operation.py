@@ -249,7 +249,6 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
 
             # 结束。
             if self._enter_map_finished():
-                # self.handle_map_after_combat_story()
                 break
 
         return True

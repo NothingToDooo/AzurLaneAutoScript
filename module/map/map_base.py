@@ -333,7 +333,6 @@ class CampaignMap:
             grid.is_current_fleet = False
 
     def show(self):
-        # logger.info('Showing grids:')
         logger.info("   " + " ".join([" " + chr(x + 64 + 1) for x in range(self.shape[0] + 1)]))
         for y in range(self.shape[1] + 1):
             text = (
@@ -351,7 +350,6 @@ class CampaignMap:
             mode (str): Scan mode, such as 'init', 'normal', 'carrier', 'movable'
         """
         offset = np.array(camera) - np.array(grids.center_loca)
-        # grids.show()
 
         failed_count = 0
         for grid in grids.grids.values():
@@ -603,9 +601,6 @@ class CampaignMap:
                 break
             visited = new
 
-        # self.show_cost()
-        # self.show_connection()
-
     def find_path_initial_multi_fleet(self, location_dict, current, has_ambush):
         """
         Args:
@@ -644,7 +639,6 @@ class CampaignMap:
             if len(res) > 30:
                 logger.warning("Route too long")
                 logger.warning(res)
-                # exit(1)
             if location is not None:
                 res.append(location)
             else:
