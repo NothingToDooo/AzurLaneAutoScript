@@ -13,7 +13,9 @@ REGEX_SETTING_KEY = re.compile(r'"(.*?)"')
 
 
 def _comment_lines(text):
-    return [f"# {line}" for line in textwrap.wrap(text, width=116, break_long_words=False, break_on_hyphens=False)]
+    return [
+        f"# 来源：{line}" for line in textwrap.wrap(text, width=108, break_long_words=False, break_on_hyphens=False)
+    ]
 
 
 def _strip_code(string):
