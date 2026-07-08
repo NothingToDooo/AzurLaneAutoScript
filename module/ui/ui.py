@@ -144,6 +144,51 @@ class UI(InfoHandler):
             return any(self.appear(button, offset=offset) for button in check_button)
         return self.appear(check_button, offset=offset)
 
+    def _create_current_page_app_check(self):
+        @run_once
+        def app_check():
+            if not self.device.app_is_running():
+                raise GameNotRunningError("Game not running")
+
+        return app_check
+
+    def _take_current_page_screenshot(self, skip_first_screenshot):
+        if skip_first_screenshot and self.device.has_cached_image:
+            return
+        self.device.screenshot()
+
+    def _match_current_page(self):
+        for page in Page.iter_pages():
+            if page.check_button is None:
+                continue
+            if not self.ui_page_appear(page=page):
+                continue
+            logger.attr("UI", page.name)
+            self.ui_current = page
+            return page
+        return None
+
+    def _handle_unknown_current_page(self):
+        logger.info("Unknown ui page")
+        return self._appear_then_click_any(
+            [
+                (ui_assets.GOTO_MAIN, {"offset": (30, 30), "interval": 2}),
+                (ui_white_assets.GOTO_MAIN_WHITE, {"offset": (30, 30), "interval": 2}),
+                (raid_assets.RPG_HOME, {"offset": (30, 30), "interval": 2}),
+            ]
+        ) or self.ui_additional()
+
+    def _raise_unknown_current_page_error(self):
+        logger.warning("Unknown ui page")
+        logger.attr("EMULATOR__SCREENSHOT_METHOD", self.config.Emulator_ScreenshotMethod)
+        logger.attr("EMULATOR__CONTROL_METHOD", self.config.Emulator_ControlMethod)
+        logger.attr("SERVER", self.config.SERVER)
+        logger.warning("Starting from current page is not supported")
+        logger.warning(f"Supported page: {[str(page) for page in Page.iter_pages()]}")
+        logger.warning('Supported page: Any page with a "HOME" button on the upper-right')
+        logger.critical("Please switch to a supported page before starting Alas")
+        raise GamePageUnknownError
+
     def ui_get_current_page(self, skip_first_screenshot=True):
         """
         Args:
@@ -154,66 +199,30 @@ class UI(InfoHandler):
         """
         logger.info("UI get current page")
 
-        @run_once
-        def app_check():
-            if not self.device.app_is_running():
-                raise GameNotRunningError("Game not running")
-
+        app_check = self._create_current_page_app_check()
         orientation_timer = Timer(5)
-
         timeout = Timer(10, count=20).start()
         while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-                if not self.device.has_cached_image:
-                    self.device.screenshot()
-            else:
-                self.device.screenshot()
+            self._take_current_page_screenshot(skip_first_screenshot)
+            skip_first_screenshot = False
 
-            # End
             if timeout.reached():
                 break
 
-            # Known pages
-            for page in Page.iter_pages():
-                if page.check_button is None:
-                    continue
-                if self.ui_page_appear(page=page):
-                    logger.attr("UI", page.name)
-                    self.ui_current = page
-                    return page
+            if page := self._match_current_page():
+                return page
 
-            # Unknown page but able to handle
-            logger.info("Unknown ui page")
-            if self.appear_then_click(ui_assets.GOTO_MAIN, offset=(30, 30), interval=2):
-                timeout.reset()
-                continue
-            if self.appear_then_click(ui_white_assets.GOTO_MAIN_WHITE, offset=(30, 30), interval=2):
-                timeout.reset()
-                continue
-            if self.appear_then_click(raid_assets.RPG_HOME, offset=(30, 30), interval=2):
-                timeout.reset()
-                continue
-            if self.ui_additional():
+            if self._handle_unknown_current_page():
                 timeout.reset()
                 continue
 
             app_check()
-            # continuously check rotation
+            # 未知页面期间持续刷新横竖屏状态。
             if orientation_timer.reached():
                 self.device.get_orientation()
                 orientation_timer.reset()
 
-        # Unknown page, need manual switching
-        logger.warning("Unknown ui page")
-        logger.attr("EMULATOR__SCREENSHOT_METHOD", self.config.Emulator_ScreenshotMethod)
-        logger.attr("EMULATOR__CONTROL_METHOD", self.config.Emulator_ControlMethod)
-        logger.attr("SERVER", self.config.SERVER)
-        logger.warning("Starting from current page is not supported")
-        logger.warning(f"Supported page: {[str(page) for page in Page.iter_pages()]}")
-        logger.warning('Supported page: Any page with a "HOME" button on the upper-right')
-        logger.critical("Please switch to a supported page before starting Alas")
-        raise GamePageUnknownError
+        return self._raise_unknown_current_page_error()
 
     def ui_goto(self, destination, get_ship=True, offset=(30, 30), skip_first_screenshot=True):
         """
