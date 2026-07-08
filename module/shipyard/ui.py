@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.base.utils import area_pad
@@ -55,6 +57,14 @@ SHIPYARD_CONFIRM_BUTTONS = {
     "DEV": SHIPYARD_CONFIRM_DEV,
     "FATE": SHIPYARD_CONFIRM_FATE,
 }
+
+
+@dataclass(slots=True)
+class _ShipyardBuyConfirmState:
+    button: object
+    ocr_timer: Timer
+    confirm_timer: Timer
+    success: bool = False
 
 
 class ShipyardNavbar(Navbar):
@@ -323,19 +333,19 @@ class ShipyardUI(UI):
                 confirm_timer.reset()
 
     def _shipyard_buy_confirm(self, text, skip_first_screenshot=True):
-        """
-        Handles screen transitions to use/buy BPs
+        """处理蓝图使用或购买后的确认流程。
 
         Args:
             text (str): for handle_popup_confirm
             skip_first_screenshot (bool):
         """
-        success = False
         append = self._shipyard_get_append()
-        button = SHIPYARD_CONFIRM_BUTTONS[append]
-        ocr_timer = Timer(10, count=10).start()
-        confirm_timer = Timer(1, count=2).start()
-        self.interval_clear(button)
+        state = _ShipyardBuyConfirmState(
+            button=SHIPYARD_CONFIRM_BUTTONS[append],
+            ocr_timer=Timer(10, count=10).start(),
+            confirm_timer=Timer(1, count=2).start(),
+        )
+        self.interval_clear(state.button)
 
         while 1:
             if skip_first_screenshot:
@@ -343,53 +353,58 @@ class ShipyardUI(UI):
             else:
                 self.device.screenshot()
 
-            if ocr_timer.reached():
-                logger.warning("Failed to detect for normal exit routine, resort to OCR check")
-                _, _, current = self._shipyard_get_total()
-                if not current:
-                    logger.info("Confirm action has completed, setting flag for exit")
-                    self.interval_reset(button)
-                    success = True
-                ocr_timer.reset()
+            if self._handle_shipyard_confirm_ocr_check(state):
                 continue
-
-            if self.appear_then_click(button, offset=(20, 20), interval=3):
+            if self.appear_then_click(state.button, offset=(20, 20), interval=3):
                 continue
-
-            if self.handle_popup_confirm(text):
-                self.interval_reset(button)
-                ocr_timer.reset()
-                confirm_timer.reset()
+            if self._handle_shipyard_confirm_popups(text, state):
                 continue
+            if self._shipyard_buy_confirm_finished(state):
+                break
 
-            if self.story_skip():
-                self.interval_reset(button)
-                success = True
-                ocr_timer.reset()
-                confirm_timer.reset()
-                continue
+    def _handle_shipyard_confirm_ocr_check(self, state):
+        if not state.ocr_timer.reached():
+            return False
 
-            if self.handle_info_bar():
-                self.interval_reset(button)
-                success = True
-                ocr_timer.reset()
-                confirm_timer.reset()
-                continue
+        logger.warning("Failed to detect for normal exit routine, resort to OCR check")
+        _, _, current = self._shipyard_get_total()
+        if not current:
+            logger.info("Confirm action has completed, setting flag for exit")
+            self.interval_reset(state.button)
+            state.success = True
+        state.ocr_timer.reset()
+        return True
 
-            # A popup of FATE info shows when ship DEV finished entering FATE
-            if self.appear_then_click(LOGIN_ANNOUNCE, offset=area_pad((-300, 127, -300, 127), pad=-50), interval=3):
-                self.interval_reset(button)
-                success = True
-                ocr_timer.reset()
-                confirm_timer.reset()
-                continue
+    def _handle_shipyard_confirm_popups(self, text, state):
+        if self.handle_popup_confirm(text):
+            self._reset_shipyard_confirm_timers(state)
+            return True
+        if self.story_skip():
+            self._mark_shipyard_confirm_success(state)
+            return True
+        if self.handle_info_bar():
+            self._mark_shipyard_confirm_success(state)
+            return True
+        # 舰船 DEV 完成并进入 FATE 时，会出现 FATE 信息弹窗。
+        if self.appear_then_click(LOGIN_ANNOUNCE, offset=area_pad((-300, 127, -300, 127), pad=-50), interval=3):
+            self._mark_shipyard_confirm_success(state)
+            return True
+        return False
 
-            # End
-            if success and self._shipyard_in_ui():
-                if confirm_timer.reached():
-                    break
-            else:
-                confirm_timer.reset()
+    def _mark_shipyard_confirm_success(self, state) -> None:
+        self.interval_reset(state.button)
+        state.success = True
+        self._reset_shipyard_confirm_timers(state)
+
+    def _reset_shipyard_confirm_timers(self, state) -> None:
+        state.ocr_timer.reset()
+        state.confirm_timer.reset()
+
+    def _shipyard_buy_confirm_finished(self, state):
+        if state.success and self._shipyard_in_ui():
+            return state.confirm_timer.reached()
+        state.confirm_timer.reset()
+        return False
 
     def _shipyard_buy_enter(self):
         """
