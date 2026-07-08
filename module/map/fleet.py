@@ -751,67 +751,93 @@ class Fleet(Camera, AmbushHandler):
 
     def find_current_fleet(self):
         logger.hr("Find current fleet")
-        if not self.config.POOR_MAP_DATA:
-            fleets = self.map.select(is_fleet=True, is_spawn_point=True)
-        else:
-            fleets = self.map.select(is_fleet=True)
+        fleets = self._find_current_fleet_candidates()
         logger.info(f"Fleets: {fleets}")
+
         count = fleets.count
         if count == 1:
-            if not self.config.FLEET_2:
-                self.fleet_1 = fleets[0].location
-            else:
-                logger.info("Fleet_2 not detected.")
-                if self.config.POOR_MAP_DATA and not self.map.select(is_spawn_point=True):
-                    self.fleet_1 = fleets[0].location
-                elif self.map.select(is_spawn_point=True).count == 2:
-                    logger.info("Predict fleet to be spawn point")
-                    another = self.map.select(is_spawn_point=True).delete(SelectedGrids([fleets[0]]))[0]
-                    if fleets[0].is_current_fleet:
-                        self.fleet_1 = fleets[0].location
-                        self.fleet_2 = another.location
-                    else:
-                        self.fleet_1 = another.location
-                        self.fleet_2 = fleets[0].location
-                else:
-                    cover = self.map.grid_covered(fleets[0], location=[(0, -1)])
-                    if fleets[0].is_current_fleet and len(cover) and cover[0].is_spawn_point:
-                        self.fleet_1 = fleets[0].location
-                        self.fleet_2 = cover[0].location
-                    else:
-                        self.find_all_fleets()
+            self._find_current_fleet_from_single(fleets)
         elif count == 2:
-            current = self.map.select(is_current_fleet=True)
-            if current.count == 1:
-                self.fleet_1 = current[0].location
-                self.fleet_2 = fleets.delete(current)[0].location
-            else:
-                fleets = fleets.sort_by_camera_distance(self.camera)
-                self.in_sight(fleets[0], sight=(-1, 0, 1, 2))
-                if self.convert_global_to_local(fleets[0]).predict_current_fleet():
-                    self.fleet_1 = fleets[0].location
-                    self.fleet_2 = fleets[1].location
-                else:
-                    self.in_sight(fleets[1], sight=(-1, 0, 1, 2))
-                    if self.convert_global_to_local(fleets[1]).predict_current_fleet():
-                        self.fleet_1 = fleets[1].location
-                        self.fleet_2 = fleets[0].location
-                    else:
-                        logger.warning("Current fleet not found")
-                        self.fleet_1 = fleets[0].location
-                        self.fleet_2 = fleets[1].location
+            self._find_current_fleet_from_pair(fleets)
         else:
-            if count == 0:
-                logger.warning("No fleets detected.")
-                fleets = self.map.select(is_current_fleet=True)
-                if fleets.count:
-                    self.fleet_1 = fleets[0].location
-            if count > 2:
-                logger.warning(f"Too many fleets: {fleets}.")
-            self.find_all_fleets()
+            self._find_current_fleet_from_unexpected_count(fleets)
 
         self.show_fleet()
         return self.fleet_current
+
+    def _find_current_fleet_candidates(self):
+        if not self.config.POOR_MAP_DATA:
+            return self.map.select(is_fleet=True, is_spawn_point=True)
+        return self.map.select(is_fleet=True)
+
+    def _find_current_fleet_from_single(self, fleets):
+        if not self.config.FLEET_2:
+            self.fleet_1 = fleets[0].location
+            return
+
+        logger.info("Fleet_2 not detected.")
+        spawn_points = self.map.select(is_spawn_point=True)
+        if self.config.POOR_MAP_DATA and not spawn_points:
+            self.fleet_1 = fleets[0].location
+        elif spawn_points.count == 2:
+            self._find_current_fleet_from_spawn_points(fleets[0], spawn_points)
+        else:
+            self._find_current_fleet_from_cover(fleets[0])
+
+    def _find_current_fleet_from_spawn_points(self, detected, spawn_points):
+        logger.info("Predict fleet to be spawn point")
+        another = spawn_points.delete(SelectedGrids([detected]))[0]
+        if detected.is_current_fleet:
+            self.fleet_1 = detected.location
+            self.fleet_2 = another.location
+        else:
+            self.fleet_1 = another.location
+            self.fleet_2 = detected.location
+
+    def _find_current_fleet_from_cover(self, detected):
+        cover = self.map.grid_covered(detected, location=[(0, -1)])
+        if detected.is_current_fleet and len(cover) and cover[0].is_spawn_point:
+            self.fleet_1 = detected.location
+            self.fleet_2 = cover[0].location
+        else:
+            self.find_all_fleets()
+
+    def _find_current_fleet_from_pair(self, fleets):
+        current = self.map.select(is_current_fleet=True)
+        if current.count == 1:
+            self.fleet_1 = current[0].location
+            self.fleet_2 = fleets.delete(current)[0].location
+            return
+
+        self._find_current_fleet_pair_by_prediction(fleets)
+
+    def _find_current_fleet_pair_by_prediction(self, fleets):
+        fleets = fleets.sort_by_camera_distance(self.camera)
+        first, second = fleets[0], fleets[1]
+        if self._is_current_fleet_by_prediction(first):
+            self.fleet_1 = first.location
+            self.fleet_2 = second.location
+        elif self._is_current_fleet_by_prediction(second):
+            self.fleet_1 = second.location
+            self.fleet_2 = first.location
+        else:
+            logger.warning("Current fleet not found")
+            self.fleet_1 = first.location
+            self.fleet_2 = second.location
+
+    def _is_current_fleet_by_prediction(self, grid):
+        self.in_sight(grid, sight=(-1, 0, 1, 2))
+        return self.convert_global_to_local(grid).predict_current_fleet()
+
+    def _find_current_fleet_from_unexpected_count(self, fleets):
+        if fleets.count == 0:
+            logger.warning("No fleets detected.")
+            current = self.map.select(is_current_fleet=True)
+            if current.count:
+                self.fleet_1 = current[0].location
+        else:
+            logger.warning(f"Too many fleets: {fleets}.")
+        self.find_all_fleets()
 
     def find_all_submarines(self):
         logger.hr("Find all submarines")
