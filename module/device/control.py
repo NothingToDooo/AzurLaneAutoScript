@@ -2,12 +2,14 @@ import numpy as np
 
 from module.base.timer import Timer
 from module.base.utils import (
+    SwipePathOptions,
     ensure_int,
     ensure_time,
     point2str,
     random_rectangle_point,
     random_rectangle_vector_opted,
 )
+from module.device.control_options import SwipeVectorOptions
 from module.device.method.minitouch import Minitouch
 from module.device.method.nemu_ipc import NemuIpc
 from module.logger import logger
@@ -70,43 +72,26 @@ class Control(Minitouch, NemuIpc):
 
         self.swipe_minitouch(p1, p2)
 
-    def swipe_vector(
-        self,
-        vector,
-        box=(123, 159, 1175, 628),
-        random_range=(0, 0, 0, 0),
-        padding=15,
-        duration=(0.1, 0.2),
-        whitelist_area=None,
-        blacklist_area=None,
-        name="SWIPE",
-        distance_check=True,
-    ):
+    def swipe_vector(self, vector, options=None):
         """Method to swipe.
 
         Args:
-            box (tuple): Swipe in box (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
             vector (tuple): (x, y).
-            random_range (tuple): (x_min, y_min, x_max, y_max).
-            padding (int):
-            duration (int, float, tuple):
-            whitelist_area: (list[tuple[int]]):
-                A list of area that safe to click. Swipe path will end there.
-            blacklist_area: (list[tuple[int]]):
-                If none of the whitelist_area satisfies current vector, blacklist_area will be used.
-                Delete random path that ends in any blacklist_area.
-            name (str): Swipe name
-            distance_check: (bool):
+            options: 滑动路径和校验参数。
         """
+        if options is None:
+            options = SwipeVectorOptions()
         p1, p2 = random_rectangle_vector_opted(
             vector,
-            box=box,
-            random_range=random_range,
-            padding=padding,
-            whitelist_area=whitelist_area,
-            blacklist_area=blacklist_area,
+            SwipePathOptions(
+                box=options.box,
+                random_range=options.random_range,
+                padding=options.padding,
+                whitelist_area=options.whitelist_area,
+                blacklist_area=options.blacklist_area,
+            ),
         )
-        self.swipe(p1, p2, duration=duration, name=name, distance_check=distance_check)
+        self.swipe(p1, p2, duration=options.duration, name=options.name, distance_check=options.distance_check)
 
     def drag(
         self,

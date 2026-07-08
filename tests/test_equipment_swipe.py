@@ -49,8 +49,8 @@ class _Device:
     def screenshot(self) -> None:
         self.screenshot_count += 1
 
-    def swipe_vector(self, **kwargs: object) -> None:
-        self.swipes.append(kwargs)
+    def swipe_vector(self, vector: object, options: object = None) -> None:
+        self.swipes.append({"vector": vector, "options": options})
 
 
 class _Equipment(Equipment):

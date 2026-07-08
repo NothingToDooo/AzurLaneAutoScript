@@ -4,6 +4,7 @@ import numpy as np
 from module.base.button import Button
 from module.base.timer import Timer
 from module.base.utils import area_offset, point_in_area, point_limit, rgb2hsv
+from module.device.control_options import SwipeVectorOptions
 from module.exception import GameStuckError
 from module.logger import logger
 from module.os.assets import MAP_GOTO_GLOBE, MAP_GOTO_GLOBE_FOG, ZONE_PINNED
@@ -111,7 +112,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
         vector = np.array(distance) * vector
 
         vector = -vector
-        self.device.swipe_vector(vector, name=name, box=box)
+        self.device.swipe_vector(vector, SwipeVectorOptions(box=box, name=name))
         self.device.sleep(0.3)
 
         self.globe_update()

@@ -1,11 +1,28 @@
 import random
 import re
+from dataclasses import dataclass
 
 import cv2
 import numpy as np
 from PIL import Image
 
 REGEX_NODE = re.compile(r"(-?[A-Za-z]+)(-?\d+)")
+
+
+@dataclass(slots=True)
+class SwipePathOptions:
+    box: object
+    random_range: tuple[int, int, int, int] = (0, 0, 0, 0)
+    padding: int = 15
+    whitelist_area: object = None
+    blacklist_area: object = None
+
+
+@dataclass(slots=True)
+class ColorBarOptions:
+    reverse: bool = False
+    starter: int = 0
+    threshold: int = 30
 
 
 def random_normal_distribution_int(a, b, n=3):
@@ -105,9 +122,7 @@ def _random_end_point_outside_blacklist(box_pad, vector, blacklist_area, segment
     return random_rectangle_point(box_pad)
 
 
-def random_rectangle_vector_opted(
-    vector, box, random_range=(0, 0, 0, 0), padding=15, whitelist_area=None, blacklist_area=None
-):
+def random_rectangle_vector_opted(vector, options):
     """
     在指定区域里随机放置滑动向量。
 
@@ -116,32 +131,29 @@ def random_rectangle_vector_opted(
 
     Args:
         vector: (x, y)
-        box: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-        random_range (tuple): Add a random_range to vector. (x_min, y_min, x_max, y_max).
-        padding (int):
-        whitelist_area: (list[tuple[int]]):
-            A list of area that safe to click. Swipe path will end there.
-        blacklist_area: (list[tuple[int]]):
-            If none of the whitelist_area satisfies current vector, blacklist_area will be used.
-            Delete random path that ends in any blacklist_area.
+        options: 滑动区域、随机范围和安全区域。
 
     Returns:
         tuple(int), tuple(int): start_point, end_point.
     """
-    vector = np.array(vector) + random_rectangle_point(random_range)
+    vector = np.array(vector) + random_rectangle_point(options.random_range)
     vector = np.round(vector).astype(int)
     half_vector = np.round(vector / 2).astype(int)
-    box_pad = np.array(box) + np.append(np.abs(half_vector) + padding, -np.abs(half_vector) - padding)
+    box_pad = np.array(options.box) + np.append(
+        np.abs(half_vector) + options.padding, -np.abs(half_vector) - options.padding
+    )
     box_pad = area_offset(box_pad, half_vector)
     segment = int(np.linalg.norm(vector) // 70) + 1
 
-    if whitelist_area:
-        end_point = _random_end_point_in_whitelist(vector, box_pad, whitelist_area, blacklist_area, segment)
+    if options.whitelist_area:
+        end_point = _random_end_point_in_whitelist(
+            vector, box_pad, options.whitelist_area, options.blacklist_area, segment
+        )
         if end_point is not None:
-            return _limited_swipe_points(end_point, vector, box)
+            return _limited_swipe_points(end_point, vector, options.box)
 
-    end_point = _random_end_point_outside_blacklist(box_pad, vector, blacklist_area, segment)
-    return _limited_swipe_points(end_point, vector, box)
+    end_point = _random_end_point_outside_blacklist(box_pad, vector, options.blacklist_area, segment)
+    return _limited_swipe_points(end_point, vector, options.box)
 
 
 def random_line_segments(p1, p2, n, random_range=(0, 0, 0, 0)):
@@ -1134,27 +1146,27 @@ def red_overlay_transparency(color1, color2, red=247):
     return (color2[0] - color1[0]) / (red - color1[0])
 
 
-def color_bar_percentage(image, area, prev_color, reverse=False, starter=0, threshold=30):
+def color_bar_percentage(image, area, prev_color, options=None):
     """
     Args:
         image:
         area:
         prev_color:
-        reverse: True if bar goes from right to left.
-        starter:
-        threshold:
+        options: 扫描方向、起点和颜色阈值。
 
     Returns:
         float: 0 to 1.
     """
+    if options is None:
+        options = ColorBarOptions()
     image = crop(image, area, copy=False)
-    image = image[:, ::-1, :] if reverse else image
+    image = image[:, ::-1, :] if options.reverse else image
     length = image.shape[1]
-    prev_index = starter
+    prev_index = options.starter
 
     for _ in range(1280):
         bar = color_similarity_2d(image, color=prev_color)
-        index = np.where(np.any(bar > 255 - threshold, axis=0))[0]
+        index = np.where(np.any(bar > 255 - options.threshold, axis=0))[0]
         if not index.size:
             return prev_index / length
         index = index[-1]
@@ -1162,12 +1174,12 @@ def color_bar_percentage(image, area, prev_color, reverse=False, starter=0, thre
             return index / length
         prev_index = index
 
-        prev_row = bar[:, prev_index] > 255 - threshold
+        prev_row = bar[:, prev_index] > 255 - options.threshold
         if not prev_row.size:
             return prev_index / length
         # Look back 5px to get average color
         left = max(prev_index - 5, 0)
-        mask = np.where(bar[:, left : prev_index + 1] > 255 - threshold)
+        mask = np.where(bar[:, left : prev_index + 1] > 255 - options.threshold)
         prev_color = np.mean(image[:, left : prev_index + 1][mask], axis=0)
 
     return 0.0

@@ -1,4 +1,5 @@
 from module.base.timer import Timer
+from module.device.control_options import SwipeVectorOptions
 from module.handler import assets as handler_assets
 from module.logger import logger
 from module.map.assets import WITHDRAW
@@ -160,8 +161,8 @@ class LoginHandler(UI):
         if left is None:
             # 用户协议在中间区域。
             box = (350, 230, 920, 430)
-            self.device.swipe_vector((0, -150), box, name="AGREEMENT_SCROLL")
-            self.device.swipe_vector((0, -150), box, name="AGREEMENT_SCROLL")
+            self.device.swipe_vector((0, -150), SwipeVectorOptions(box=box, name="AGREEMENT_SCROLL"))
+            self.device.swipe_vector((0, -150), SwipeVectorOptions(box=box, name="AGREEMENT_SCROLL"))
             self.device.click(right)
             self._user_agreement_timer.reset()
             return True

@@ -1,6 +1,7 @@
 from module.base.button import ButtonGrid
 from module.base.decorator import cached_property
 from module.base.timer import Timer
+from module.device.control_options import SwipeVectorOptions
 from module.equipment import assets as equipment_assets
 from module.logger import logger
 from module.retire.assets import DOCK_CHECK
@@ -46,11 +47,13 @@ class Equipment(StorageHandler):
         swipe_timer.reset()
         self.device.swipe_vector(
             vector=(distance, 0),
-            box=equipment_assets.SWIPE_AREA.area,
-            random_range=SWIPE_RANDOM_RANGE,
-            padding=0,
-            duration=(0.1, 0.12),
-            name="SHIP_SWIPE",
+            options=SwipeVectorOptions(
+                box=equipment_assets.SWIPE_AREA.area,
+                random_range=SWIPE_RANDOM_RANGE,
+                padding=0,
+                duration=(0.1, 0.12),
+                name="SHIP_SWIPE",
+            ),
         )
         return self._ship_view_wait_after_swipe(check_button)
 

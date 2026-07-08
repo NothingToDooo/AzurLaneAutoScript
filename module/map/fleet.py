@@ -7,7 +7,7 @@ from module.base.timer import Timer
 from module.exception import MapDetectionError, MapEnemyMoved, MapWalkError
 from module.handler.ambush import AmbushHandler
 from module.logger import logger
-from module.map.camera import Camera
+from module.map.camera import Camera, FullScanOptions
 from module.map.map_base import SelectedGrids, location2node, location_ensure
 from module.map.utils import match_movable
 
@@ -621,13 +621,15 @@ class Fleet(Camera, AmbushHandler):
         if self.config.MAP_HAS_DECOY_ENEMY and mode == "normal":
             mode = "decoy"
         super().full_scan(
-            queue=queue,
-            must_scan=must_scan,
-            battle_count=self.battle_count,
-            mystery_count=self.mystery_count,
-            siren_count=self.siren_count,
-            carrier_count=self.carrier_count,
-            mode=mode,
+            FullScanOptions(
+                queue=queue,
+                must_scan=must_scan,
+                battle_count=self.battle_count,
+                mystery_count=self.mystery_count,
+                siren_count=self.siren_count,
+                carrier_count=self.carrier_count,
+                mode=mode,
+            )
         )
 
         if self.config.FLEET_2 and not self.fleet_2_location:

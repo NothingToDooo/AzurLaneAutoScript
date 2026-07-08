@@ -4,6 +4,7 @@ import numpy as np
 from module.base.timer import Timer
 from module.campaign.campaign_event import CampaignEvent
 from module.combat.assets import BATTLE_PREPARATION
+from module.device.control_options import SwipeVectorOptions
 from module.exception import ScriptError
 from module.logger import logger
 from module.map.map_operation import MapOperation
@@ -413,6 +414,6 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
             if self.handle_get_items():
                 continue
             if interval.reached():
-                self.device.swipe_vector((-900, 0), box=(0, 130, 1280, 440))
+                self.device.swipe_vector((-900, 0), SwipeVectorOptions(box=(0, 130, 1280, 440)))
                 interval.reset()
                 continue

@@ -1,10 +1,12 @@
 import copy
+from dataclasses import dataclass
 
 import numpy as np
 
 from module.base.timer import Timer
 from module.base.utils import area_offset
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_1_RYZA
+from module.device.control_options import SwipeVectorOptions
 from module.exception import CampaignEnd, GameNotRunningError, MapDetectionError
 from module.handler.assets import AUTO_SEARCH_MENU_CONTINUE, GAME_TIPS, GET_MISSION
 from module.logger import logger
@@ -31,6 +33,17 @@ _LATE_CLICK_RECOVERY_OVERLAYS = (
     (PORT_SUPPLY_CHECK, (20, 20), BACK_ARROW, "Perspective error caused by akashi shop"),
     (GAME_TIPS, (20, 20), GAME_TIPS, "Perspective error caused by game tips"),
 )
+
+
+@dataclass(slots=True)
+class FullScanOptions:
+    queue: object = None
+    must_scan: object = None
+    battle_count: int = 0
+    mystery_count: int = 0
+    siren_count: int = 0
+    carrier_count: int = 0
+    mode: str = "normal"
 
 
 class Camera(MapOperation):
@@ -63,7 +76,10 @@ class Camera(MapOperation):
 
             vector = distance * vector
             vector = -vector
-            self.device.swipe_vector(vector, name=name, box=box, whitelist_area=whitelist, blacklist_area=blacklist)
+            self.device.swipe_vector(
+                vector,
+                SwipeVectorOptions(box=box, name=name, whitelist_area=whitelist, blacklist_area=blacklist),
+            )
             # Donno why initial commit have a sleep here
             # self.device.sleep(0.3)
             self.update(wait_swipe=True)
@@ -479,31 +495,31 @@ class Camera(MapOperation):
             if not has_swiped:
                 break
 
-    def full_scan(
-        self, queue=None, must_scan=None, battle_count=0, mystery_count=0, siren_count=0, carrier_count=0, mode="normal"
-    ):
+    def full_scan(self, options=None):
         """Scan the whole map.
 
         Args:
-            queue (SelectedGrids): Grids to focus on. If none, use map.camera_data
-            must_scan (SelectedGrids): Must scan these grids
-            battle_count:
-            mystery_count:
-            siren_count:
-            carrier_count:
-            mode (str): Scan mode, such as 'init', 'normal', 'carrier', 'movable'
+            options: 扫描队列、必扫格子、计数快照和模式。
 
         """
-        logger.info(f"Full scan start, mode={mode}")
+        if options is None:
+            options = FullScanOptions()
+        logger.info(f"Full scan start, mode={options.mode}")
         self.map.reset_fleet()
 
-        queue = queue or self.map.camera_data
-        if must_scan:
-            queue = queue.add(must_scan)
+        queue = options.queue or self.map.camera_data
+        if options.must_scan:
+            queue = queue.add(options.must_scan)
 
         while len(queue) > 0:
-            if self.map.missing_is_none(battle_count, mystery_count, siren_count, carrier_count, mode):
-                if must_scan and queue.count != queue.delete(must_scan).count:
+            if self.map.missing_is_none(
+                options.battle_count,
+                options.mystery_count,
+                options.siren_count,
+                options.carrier_count,
+                options.mode,
+            ):
+                if options.must_scan and queue.count != queue.delete(options.must_scan).count:
                     logger.info("Continue scanning.")
                 else:
                     logger.info("All spawn found, Early stopped.")
@@ -512,14 +528,20 @@ class Camera(MapOperation):
             queue = queue.sort_by_camera_distance(self.camera)
             self.focus_to(queue[0])
             self.focus_to_grid_center(0.25)
-            success = self.map.update(grids=self.view, camera=self.camera, mode=mode)
+            success = self.map.update(grids=self.view, camera=self.camera, mode=options.mode)
             if not success:
                 self.ensure_edge_insight(skip_first_update=False)
                 continue
 
             queue = queue[1:]
 
-        self.map.missing_predict(battle_count, mystery_count, siren_count, carrier_count, mode)
+        self.map.missing_predict(
+            options.battle_count,
+            options.mystery_count,
+            options.siren_count,
+            options.carrier_count,
+            options.mode,
+        )
         self.map.show()
 
     def in_sight(self, location, sight=None):

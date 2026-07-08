@@ -1,5 +1,6 @@
 from module.base.timer import Timer
 from module.base.utils import area_pad
+from module.device.control_options import SwipeVectorOptions
 from module.logger import logger
 from module.os import assets as os_assets
 from module.os_handler.action_point import ActionPointHandler
@@ -96,10 +97,12 @@ class GlobeOperation(ActionPointHandler):
             # 点击不会取消区域固定，滑动才会。
             self.device.swipe_vector(
                 (50, -50),
-                box=area_pad(os_assets.ZONE_PINNED.area, pad=-80),
-                random_range=(-10, -10, 10, 10),
-                padding=0,
-                name="PINNED_DISABLE",
+                SwipeVectorOptions(
+                    box=area_pad(os_assets.ZONE_PINNED.area, pad=-80),
+                    random_range=(-10, -10, 10, 10),
+                    padding=0,
+                    name="PINNED_DISABLE",
+                ),
             )
             self._zone_unpin_interval.reset()
             return True

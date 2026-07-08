@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from module.base.base import ModuleBase
-from module.base.utils import color_bar_percentage
+from module.base.utils import ColorBarOptions, color_bar_percentage
 from module.combat_ui import assets as combat_ui_assets
 from module.exercise import assets as exercise_assets
 from module.logger import logger
@@ -38,22 +38,24 @@ class HpDaemon(ModuleBase):
     low_hp_confirm_timer: Timer
 
     @staticmethod
-    def _calculate_hp(image, area, reverse=False, starter=2, prev_color=(239, 32, 33), threshold=30):
+    def _calculate_hp(image, area, options=None, prev_color=(239, 32, 33)):
         """
         Args:
             image:
             area:
-            reverse: True if HP is left align.
-            starter:
+            options:
             prev_color:
-            threshold:
 
         Returns:
             float: HP. 0 to 1.
         """
-        return color_bar_percentage(
-            image, area, prev_color=prev_color, starter=starter, reverse=reverse, threshold=threshold
-        )
+        if options is None:
+            options = ColorBarOptions(starter=2)
+        return color_bar_percentage(image, area, prev_color=prev_color, options=options)
+
+    @staticmethod
+    def _hp_options(*, reverse):
+        return ColorBarOptions(reverse=reverse, starter=2)
 
     def _show_hp(self, low_hp_time=0.0):
         """
@@ -71,15 +73,27 @@ class HpDaemon(ModuleBase):
 
     def _at_low_hp(self, image, pause=combat_ui_assets.PAUSE):
         if pause == combat_ui_assets.PAUSE:
-            self.attacker_hp = self._calculate_hp(image, area=exercise_assets.ATTACKER_HP_AREA.area, reverse=True)
-            self.defender_hp = self._calculate_hp(image, area=exercise_assets.DEFENDER_HP_AREA.area, reverse=False)
+            self.attacker_hp = self._calculate_hp(
+                image, area=exercise_assets.ATTACKER_HP_AREA.area, options=self._hp_options(reverse=True)
+            )
+            self.defender_hp = self._calculate_hp(
+                image, area=exercise_assets.DEFENDER_HP_AREA.area, options=self._hp_options(reverse=False)
+            )
         elif pause in NEW_HP_BAR_PAUSES:
-            self.attacker_hp = self._calculate_hp(image, area=exercise_assets.ATTACKER_HP_AREA_New.area, reverse=True)
-            self.defender_hp = self._calculate_hp(image, area=exercise_assets.DEFENDER_HP_AREA_New.area, reverse=True)
+            self.attacker_hp = self._calculate_hp(
+                image, area=exercise_assets.ATTACKER_HP_AREA_New.area, options=self._hp_options(reverse=True)
+            )
+            self.defender_hp = self._calculate_hp(
+                image, area=exercise_assets.DEFENDER_HP_AREA_New.area, options=self._hp_options(reverse=True)
+            )
         else:
             logger.warning(f"_at_low_hp received unknown pause: {pause}")
-            self.attacker_hp = self._calculate_hp(image, area=exercise_assets.ATTACKER_HP_AREA.area, reverse=True)
-            self.defender_hp = self._calculate_hp(image, area=exercise_assets.DEFENDER_HP_AREA.area, reverse=False)
+            self.attacker_hp = self._calculate_hp(
+                image, area=exercise_assets.ATTACKER_HP_AREA.area, options=self._hp_options(reverse=True)
+            )
+            self.defender_hp = self._calculate_hp(
+                image, area=exercise_assets.DEFENDER_HP_AREA.area, options=self._hp_options(reverse=False)
+            )
 
         # 对手已被击败，或血条被遮挡。
         if self.defender_hp < 0.01:

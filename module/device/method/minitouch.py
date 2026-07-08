@@ -1,6 +1,7 @@
 import socket
 import threading
 import time
+from dataclasses import dataclass
 from functools import wraps
 
 import numpy as np
@@ -91,42 +92,27 @@ def insert_swipe(p0, p3, speed=15, min_distance=10):
     return points
 
 
+@dataclass(slots=True)
 class Command:
-    def __init__(
-        self,
-        operation: str,
-        contact: int = 0,
-        x: int = 0,
-        y: int = 0,
-        ms: int = 10,
-        pressure: int = 100,
-    ):
-        """
-        参考 https://github.com/openstf/minitouch#writable-to-the-socket。
+    """
+    参考 https://github.com/openstf/minitouch#writable-to-the-socket。
+    """
 
-        Args:
-            operation: c, r, d, m, u, w
-            contact:
-            x:
-            y:
-            ms:
-            pressure:
-        """
-        self.operation = operation
-        self.contact = contact
-        self.x = x
-        self.y = y
-        self.ms = ms
-        self.pressure = pressure
+    operation: str
+    contact: int = 0
+    position: tuple[int, int] = (0, 0)
+    ms: int = 10
+    pressure: int = 100
 
     def to_minitouch(self) -> str:
         """
-        String that write into minitouch socket
+        写入 minitouch socket 的协议字符串。
         """
         if self.operation in {"c", "r"}:
             return f"{self.operation}\n"
         if self.operation in {"d", "m"}:
-            return f"{self.operation} {self.contact} {self.x} {self.y} {self.pressure}\n"
+            x, y = self.position
+            return f"{self.operation} {self.contact} {x} {y} {self.pressure}\n"
         if self.operation == "u":
             return f"{self.operation} {self.contact}\n"
         if self.operation == "w":
@@ -225,13 +211,13 @@ class CommandBuilder:
     def down(self, x, y, pressure=100):
         r"""添加 minitouch 命令：'d <contact> <x> <y> <pressure>\n'。"""
         x, y = self.convert(x, y)
-        self.commands.append(Command("d", x=x, y=y, contact=self.contact, pressure=pressure))
+        self.commands.append(Command("d", contact=self.contact, position=(x, y), pressure=pressure))
         return self
 
     def move(self, x, y, pressure=100):
         r"""添加 minitouch 命令：'m <contact> <x> <y> <pressure>\n'。"""
         x, y = self.convert(x, y)
-        self.commands.append(Command("m", x=x, y=y, contact=self.contact, pressure=pressure))
+        self.commands.append(Command("m", contact=self.contact, position=(x, y), pressure=pressure))
         return self
 
     def clear(self):
