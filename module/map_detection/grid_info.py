@@ -187,101 +187,159 @@ class GridInfo:
         return self.cost < 20
 
     def merge(self, info, mode="normal"):
-        """
+        """把一次识别结果合并到当前网格状态。
+
         Args:
             info (GridInfo):
-            mode (str): Scan mode, such as 'init', 'normal', 'carrier', 'movable'
+            mode (str): 扫描模式，如 'init'、'normal'、'carrier'、'movable'。
 
         Returns:
-            bool: If success.
+            bool: 是否合并成功。
         """
-        # Submarines can be anywhere, so no success/failure in merging info
-        # But expects submarines at spawn points to be found at the beginning
-        if info.is_submarine:
-            if self.is_submarine_spawn_point:
-                self.is_submarine = True
-            else:
-                pass
-        if info.is_caught_by_siren:
-            if self.is_sea:
-                self.is_fleet = True
-                self.is_caught_by_siren = True
-            else:
-                return False
-        if info.is_fleet:
-            if self.is_sea:
-                self.is_fleet = True
-                if info.is_current_fleet:
-                    self.is_current_fleet = True
-                if mode == "init" and info.is_enemy:
-                    # on init scan, we allow a grid to be both is_fleet and is_enemy
-                    # so fixup_submarine_fleet can info
-                    pass
-                else:
-                    return True
-            else:
-                return False
-        if info.is_boss:
-            if not self.is_land and self.may_boss:
-                self.is_boss = True
-                return True
-            return False
-        if info.is_siren:
-            if (not self.is_land and self.may_siren) or ((mode == "movable" or self.is_movable) and not self.is_land):
-                self.is_siren = True
-                self.enemy_scale = 0
-                self.enemy_genre = info.enemy_genre
-                return True
-            return False
-        if info.is_enemy:
-            if self.is_fortress:
-                # Fortress can be a normal enemy
-                return True
-            if not self.is_land and (self.may_enemy or self.is_carrier or mode == "decoy"):
-                self.is_enemy = True
-                if info.enemy_scale and not self.enemy_scale:
-                    self.enemy_scale = info.enemy_scale
-                if info.enemy_scale == 3 and self.enemy_scale == 2:
-                    # But allow 3 overwrites 2
-                    self.enemy_scale = info.enemy_scale
-                if info.enemy_genre and not (info.enemy_genre == "Enemy" and self.enemy_genre):
-                    self.enemy_genre = info.enemy_genre
-                return True
-            if mode == "carrier" and not self.is_land and self.may_carrier:
-                self.is_enemy = True
-                self.is_carrier = True
-                if info.enemy_scale:
-                    self.enemy_scale = info.enemy_scale
-                if info.enemy_genre and not (info.enemy_genre == "Enemy" and self.enemy_genre):
-                    self.enemy_genre = info.enemy_genre
-                return True
-            if (mode == "movable" or self.is_movable) and not self.is_land:
-                self.is_enemy = True
-                if info.enemy_scale:
-                    self.enemy_scale = info.enemy_scale
-                if info.enemy_genre and not (info.enemy_genre == "Enemy" and self.enemy_genre):
-                    self.enemy_genre = info.enemy_genre
-                return True
-            return False
-        if info.is_mystery:
-            if self.may_mystery:
-                self.is_mystery = info.is_mystery
-                return True
-            return False
-        if info.is_ammo:
-            if self.may_ammo:
-                self.is_ammo = info.is_ammo
-                return True
-            return False
-        if info.is_missile_attack:
-            if self.may_siren:
-                self.is_siren = True
-                return True
-            if self.may_enemy:
-                self.is_enemy = True
-                return True
-            # 允许误判，不返回失败。
+        self._merge_submarine(info)
 
+        result = self._merge_caught_by_siren(info)
+        if result is None:
+            result = self._merge_fleet(info, mode)
+        if result is None:
+            result = self._merge_boss(info)
+        if result is None:
+            result = self._merge_siren(info, mode)
+        if result is None:
+            result = self._merge_enemy(info, mode)
+        if result is None:
+            result = self._merge_mystery(info)
+        if result is None:
+            result = self._merge_ammo(info)
+        if result is None:
+            result = self._merge_missile_attack(info)
+
+        return True if result is None else result
+
+    def _merge_submarine(self, info):
+        if info.is_submarine and self.is_submarine_spawn_point:
+            self.is_submarine = True
+
+    def _merge_caught_by_siren(self, info):
+        if not info.is_caught_by_siren:
+            return None
+        if not self.is_sea:
+            return False
+
+        self.is_fleet = True
+        self.is_caught_by_siren = True
+        return None
+
+    def _merge_fleet(self, info, mode):
+        if not info.is_fleet:
+            return None
+        if not self.is_sea:
+            return False
+
+        self.is_fleet = True
+        if info.is_current_fleet:
+            self.is_current_fleet = True
+        if mode == "init" and info.is_enemy:
+            # 初始扫描允许同一格同时保留舰队和敌人，供潜艇舰队修正继续判断。
+            return None
+        return True
+
+    def _merge_boss(self, info):
+        if not info.is_boss:
+            return None
+        if not self.is_land and self.may_boss:
+            self.is_boss = True
+            return True
+        return False
+
+    def _merge_siren(self, info, mode):
+        if not info.is_siren:
+            return None
+        if not self._can_merge_siren(mode):
+            return False
+
+        self.is_siren = True
+        self.enemy_scale = 0
+        self.enemy_genre = info.enemy_genre
+        return True
+
+    def _can_merge_siren(self, mode):
+        return not self.is_land and (self.may_siren or mode == "movable" or self.is_movable)
+
+    def _merge_enemy(self, info, mode):
+        if not info.is_enemy:
+            return None
+        if self.is_fortress:
+            # 堡垒可被普通敌人识别命中，但不改变格子状态。
+            return True
+        if self._can_merge_known_enemy(mode):
+            self.is_enemy = True
+            self._update_enemy_spawn_info(info)
+            return True
+        if self._can_merge_carrier_enemy(mode):
+            self.is_enemy = True
+            self.is_carrier = True
+            self._replace_enemy_info(info)
+            return True
+        if self._can_merge_movable_enemy(mode):
+            self.is_enemy = True
+            self._replace_enemy_info(info)
+            return True
+        return False
+
+    def _can_merge_known_enemy(self, mode):
+        return not self.is_land and (self.may_enemy or self.is_carrier or mode == "decoy")
+
+    def _can_merge_carrier_enemy(self, mode):
+        return mode == "carrier" and not self.is_land and self.may_carrier
+
+    def _can_merge_movable_enemy(self, mode):
+        return not self.is_land and (mode == "movable" or self.is_movable)
+
+    def _update_enemy_spawn_info(self, info):
+        if info.enemy_scale and not self.enemy_scale:
+            self.enemy_scale = info.enemy_scale
+        if info.enemy_scale == 3 and self.enemy_scale == 2:
+            # 允许大型敌人覆盖中型敌人。
+            self.enemy_scale = info.enemy_scale
+        self._update_enemy_genre(info)
+
+    def _replace_enemy_info(self, info):
+        if info.enemy_scale:
+            self.enemy_scale = info.enemy_scale
+        self._update_enemy_genre(info)
+
+    def _update_enemy_genre(self, info):
+        if info.enemy_genre and not (info.enemy_genre == "Enemy" and self.enemy_genre):
+            self.enemy_genre = info.enemy_genre
+
+    def _merge_mystery(self, info):
+        if not info.is_mystery:
+            return None
+        if self.may_mystery:
+            self.is_mystery = info.is_mystery
+            return True
+        return False
+
+    def _merge_ammo(self, info):
+        if not info.is_ammo:
+            return None
+        if self.may_ammo:
+            self.is_ammo = info.is_ammo
+            return True
+        return False
+
+    def _merge_missile_attack(self, info):
+        if not info.is_missile_attack:
+            return None
+        if self.may_siren:
+            self.is_siren = True
+            return True
+        if self.may_enemy:
+            self.is_enemy = True
+            return True
+
+        # 允许误判，不返回失败。
         return True
 
     def wipe_out(self):
