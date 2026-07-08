@@ -90,7 +90,8 @@ def test_connection_retry_stops_on_unhandled_adb_error(monkeypatch) -> None:
     @connection_module.retry
     def always_boom(target):
         target.calls.append("run")
-        raise AdbError("boom")
+        message = "boom"
+        raise AdbError(message)
 
     with pytest.raises(RequestHumanTakeover):
         always_boom(device)

@@ -65,7 +65,8 @@ class _Coalition(Coalition):
     def coalition_execute_once(self, event, stage, fleet):
         self.calls.append(("coalition_execute_once", event, stage, fleet))
         if self.execute_raises:
-            raise ScriptEnd("stop")
+            message = "stop"
+            raise ScriptEnd(message)
 
 
 def test_coalition_run_requires_arguments() -> None:

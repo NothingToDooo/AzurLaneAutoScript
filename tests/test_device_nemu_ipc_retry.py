@@ -71,7 +71,8 @@ def test_nemu_ipc_retry_stops_on_incompatible_version(monkeypatch) -> None:
     @nemu_ipc_module.retry
     def always_incompatible(target):
         target.calls.append("run")
-        raise NemuIpcIncompatible("old")
+        message = "old"
+        raise NemuIpcIncompatible(message)
 
     with pytest.raises(RequestHumanTakeover):
         always_incompatible(device)

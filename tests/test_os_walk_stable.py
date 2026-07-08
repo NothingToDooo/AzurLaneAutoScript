@@ -3,6 +3,11 @@ from typing import ClassVar
 from module.os import fleet as fleet_module
 from module.os.fleet import OSFleet
 
+UNEXPECTED_GLOBE_RECOVERY_MESSAGE = "unexpected globe recovery"
+UNEXPECTED_STORAGE_RECOVERY_MESSAGE = "unexpected storage recovery"
+UNEXPECTED_MISSION_RECOVERY_MESSAGE = "unexpected mission recovery"
+UNEXPECTED_ORDER_RECOVERY_MESSAGE = "unexpected order recovery"
+
 
 class _Timer:
     created: ClassVar[list[_Timer]] = []
@@ -102,19 +107,19 @@ class _WalkStableFleet(OSFleet):
         return False
 
     def os_globe_goto_map(self) -> None:
-        raise AssertionError("unexpected globe recovery")
+        raise AssertionError(UNEXPECTED_GLOBE_RECOVERY_MESSAGE)
 
     def is_in_storage(self) -> bool:
         return False
 
     def storage_quit(self) -> None:
-        raise AssertionError("unexpected storage recovery")
+        raise AssertionError(UNEXPECTED_STORAGE_RECOVERY_MESSAGE)
 
     def is_in_os_mission(self) -> bool:
         return False
 
     def os_mission_quit(self) -> None:
-        raise AssertionError("unexpected mission recovery")
+        raise AssertionError(UNEXPECTED_MISSION_RECOVERY_MESSAGE)
 
     def handle_os_game_tips(self) -> bool:
         return False
@@ -123,7 +128,7 @@ class _WalkStableFleet(OSFleet):
         return False
 
     def order_quit(self) -> None:
-        raise AssertionError("unexpected order recovery")
+        raise AssertionError(UNEXPECTED_ORDER_RECOVERY_MESSAGE)
 
     def combat_appear(self) -> bool:
         return False

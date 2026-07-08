@@ -42,7 +42,8 @@ class _Map(OSMap):
         self.calls: list[tuple[object, ...]] = []
 
     def name_to_zone(self, value: object) -> object:
-        raise AssertionError(f"legacy zone override should not run: {value}")
+        message = f"legacy zone override should not run: {value}"
+        raise AssertionError(message)
 
     def is_in_map(self) -> bool:
         self.calls.append(("is_in_map",))

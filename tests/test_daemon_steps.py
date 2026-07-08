@@ -53,7 +53,8 @@ def test_handle_daemon_map_operation_sleeps_after_ambush_evade() -> None:
 
 def test_handle_daemon_map_preparation_skips_clicks_when_disabled() -> None:
     def unexpected_click():
-        raise AssertionError("disabled map preparation should not click")
+        message = "disabled map preparation should not click"
+        raise AssertionError(message)
 
     daemon = SimpleNamespace(
         config=SimpleNamespace(Daemon_EnterMap=False),

@@ -67,9 +67,10 @@ def test_run_treats_task_end_as_success() -> None:
 
 def test_run_schedules_restart_when_game_is_not_running() -> None:
     runner = _make_runner()
+    message = "missing"
 
     def sample_task() -> None:
-        raise GameNotRunningError("missing")
+        raise GameNotRunningError(message)
 
     runner.sample_task = sample_task
 
@@ -79,9 +80,10 @@ def test_run_schedules_restart_when_game_is_not_running() -> None:
 
 def test_run_saves_error_log_for_stuck_game() -> None:
     runner = _make_runner()
+    message = "stuck"
 
     def sample_task() -> None:
-        raise GameStuckError("stuck")
+        raise GameStuckError(message)
 
     runner.sample_task = sample_task
 

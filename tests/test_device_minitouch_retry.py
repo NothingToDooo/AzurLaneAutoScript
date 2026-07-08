@@ -125,7 +125,8 @@ def test_minitouch_retry_stops_on_unhandled_adb_error(monkeypatch) -> None:
     @minitouch_module.retry
     def always_boom(target):
         target.calls.append("run")
-        raise AdbError("boom")
+        message = "boom"
+        raise AdbError(message)
 
     with pytest.raises(RequestHumanTakeover):
         always_boom(device)
@@ -141,7 +142,8 @@ def test_minitouch_retry_hands_over_when_minitouch_missing(monkeypatch) -> None:
     @minitouch_module.retry
     def always_missing(target):
         target.calls.append("run")
-        raise MinitouchNotInstalledError("missing")
+        message = "missing"
+        raise MinitouchNotInstalledError(message)
 
     with pytest.raises(RequestHumanTakeover):
         always_missing(device)

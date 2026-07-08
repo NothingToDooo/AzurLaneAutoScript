@@ -69,7 +69,8 @@ class _Fleet(Fleet):
         self.calls.append(("_goto", location, expected))
         if location in self.fail_once:
             self.fail_once.remove(location)
-            raise MapWalkError("walk_out_of_step")
+            message = "walk_out_of_step"
+            raise MapWalkError(message)
 
     def maze_active_on(self, grid: object) -> bool:
         return grid in self.maze_nodes

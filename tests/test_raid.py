@@ -98,7 +98,8 @@ class _RaidRun(RaidRun):
     def raid_execute_once(self, mode, raid):
         self.calls.append(("raid_execute_once", mode, raid))
         if self.raise_script_end:
-            raise ScriptEnd("end")
+            message = "end"
+            raise ScriptEnd(message)
 
 
 def test_raid_name_shorten_returns_asset_prefix() -> None:

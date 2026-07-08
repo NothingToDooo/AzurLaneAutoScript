@@ -77,7 +77,8 @@ class _Explore(OpsiExplore):
 
     def name_to_zone(self, zone):
         if zone == "bad":
-            raise ScriptError("bad zone")
+            message = "bad zone"
+            raise ScriptError(message)
         return _Zone(zone)
 
     def globe_goto(self, zone, stop_if_safe=False):
