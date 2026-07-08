@@ -234,35 +234,50 @@ class Daily(Combat, DailyEquipment):
             else:
                 self.device.screenshot()
 
-            if self.appear(daily_assets.DAILY_ENTER_CHECK, threshold=30, interval=5):
-                self.device.click(button)
+            if self._click_daily_entry_if_ready(button):
                 continue
             if self.handle_get_items():
                 reward_received = True
                 continue
-            if self.config.Daily_UseDailySkip:
-                if self.appear_then_click(daily_assets.DAILY_SKIP, offset=(20, 20), interval=5):
-                    continue
-            elif self.appear_then_click(daily_assets.DAILY_NORMAL_RUN, offset=(20, 20), interval=5):
+            if self._handle_daily_run_choice():
                 continue
-            if self.handle_combat_automation_confirm():
-                continue
-            if self.handle_daily_additional():
-                continue
-            if self.handle_popup_confirm("DAILY_SKIP"):
+            if self._handle_daily_enter_popup():
                 continue
 
-            # 结束。
-            if self.appear(daily_assets.DAILY_SKIP, offset=(20, 20)):
-                if reward_received:
-                    return False
-                if self.info_bar_count():
-                    return False
-            if self.appear(daily_assets.DAILY_ENTER_CHECK, threshold=30) and self.info_bar_count():
-                return False
-            if self.combat_appear():
-                return True
+            result = self._daily_enter_result(reward_received)
+            if result is not None:
+                return result
         return False
+
+    def _click_daily_entry_if_ready(self, button):
+        if not self.appear(daily_assets.DAILY_ENTER_CHECK, threshold=30, interval=5):
+            return False
+        self.device.click(button)
+        return True
+
+    def _handle_daily_run_choice(self):
+        if self.config.Daily_UseDailySkip:
+            return self.appear_then_click(daily_assets.DAILY_SKIP, offset=(20, 20), interval=5)
+        return self.appear_then_click(daily_assets.DAILY_NORMAL_RUN, offset=(20, 20), interval=5)
+
+    def _handle_daily_enter_popup(self):
+        return (
+            self.handle_combat_automation_confirm()
+            or self.handle_daily_additional()
+            or self.handle_popup_confirm("DAILY_SKIP")
+        )
+
+    def _daily_enter_result(self, reward_received):
+        if self.appear(daily_assets.DAILY_SKIP, offset=(20, 20)):
+            if reward_received:
+                return False
+            if self.info_bar_count():
+                return False
+        if self.appear(daily_assets.DAILY_ENTER_CHECK, threshold=30) and self.info_bar_count():
+            return False
+        if self.combat_appear():
+            return True
+        return None
 
     def daily_check(self, n=None):
         if not n:

@@ -49,6 +49,42 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
         )
         raise RequestHumanTakeover
 
+    def _handle_hospital_preparation_page(self, *, auto, check_oil, check_coin):
+        if not self.appear(BATTLE_PREPARATION, offset=(30, 20)):
+            return False
+        if self.handle_combat_automation_set(auto=auto == "combat_auto"):
+            return True
+        check_oil()
+        check_coin()
+        return False
+
+    def _handle_hospital_preparation_actions(self):
+        return (
+            self.handle_retirement()
+            or self.handle_combat_low_emotion()
+            or self.appear_then_click(BATTLE_PREPARATION, offset=(30, 20), interval=2)
+            or self.handle_combat_automation_confirm()
+            or self.handle_story_skip()
+        )
+
+    def _handle_hospital_fleet_preparation(self):
+        if self.appear(RAID_FLEET_PREPARATION, offset=(30, 30), interval=2):
+            if self.handle_fleet_recommend(recommend=self.config.Hospital_UseRecommendFleet):
+                self.interval_clear(RAID_FLEET_PREPARATION)
+                return True
+            self.device.click(RAID_FLEET_PREPARATION)
+            return True
+        return self.appear_then_click(HOSPITAL_BATTLE_PREPARE, offset=(20, 20), interval=2)
+
+    def _finish_hospital_preparation_if_combat_started(self, *, emotion_reduce, fleet_index):
+        pause = self.is_combat_executing()
+        if not pause:
+            return False
+        logger.attr("BattleUI", pause)
+        if emotion_reduce:
+            self.emotion.reduce(fleet_index)
+        return True
+
     def combat_preparation(self, balance_hp=False, emotion_reduce=False, auto="combat_auto", fleet_index=1):
         """
         Args:
@@ -79,37 +115,17 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
             return False
 
         for _ in self.loop():
-            if self.appear(BATTLE_PREPARATION, offset=(30, 20)):
-                if self.handle_combat_automation_set(auto=auto == "combat_auto"):
-                    continue
-                check_oil()
-                check_coin()
-            if self.handle_retirement():
+            if self._handle_hospital_preparation_page(auto=auto, check_oil=check_oil, check_coin=check_coin):
                 continue
-            if self.handle_combat_low_emotion():
+            if self._handle_hospital_preparation_actions():
                 continue
-            if self.appear_then_click(BATTLE_PREPARATION, offset=(30, 20), interval=2):
-                continue
-            if self.handle_combat_automation_confirm():
-                continue
-            if self.handle_story_skip():
-                continue
-            # Handle fleet preparation
-            if self.appear(RAID_FLEET_PREPARATION, offset=(30, 30), interval=2):
-                if self.handle_fleet_recommend(recommend=self.config.Hospital_UseRecommendFleet):
-                    self.interval_clear(RAID_FLEET_PREPARATION)
-                    continue
-                self.device.click(RAID_FLEET_PREPARATION)
-                continue
-            if self.appear_then_click(HOSPITAL_BATTLE_PREPARE, offset=(20, 20), interval=2):
+            if self._handle_hospital_fleet_preparation():
                 continue
 
             # End
-            pause = self.is_combat_executing()
-            if pause:
-                logger.attr("BattleUI", pause)
-                if emotion_reduce:
-                    self.emotion.reduce(fleet_index)
+            if self._finish_hospital_preparation_if_combat_started(
+                emotion_reduce=emotion_reduce, fleet_index=fleet_index
+            ):
                 break
 
     in_clue_confirm = Timer(0.5, count=2)

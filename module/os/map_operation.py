@@ -98,6 +98,47 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
             self.config.HOMO_EDGE_COLOR_RANGE = (0, 33)
             self.config.MAP_ENSURE_EDGE_INSIGHT_CORNER = ""
 
+    def _handle_zone_init_blocker(self, timeout):
+        # 这些可见状态会挡住地图名 OCR，先处理再重试。
+        if self.handle_map_event():
+            timeout.reset()
+            return True
+        if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
+            return True
+        if self.is_in_globe():
+            self.os_globe_goto_map()
+            timeout.reset()
+            return True
+        if self.appear(EXCHANGE_CHECK, offset=(30, 30), interval=3):
+            self.device.click(BACK_ARROW)
+            timeout.reset()
+            return True
+        if self.is_in_map() and not self.appear(OS_CHECK, offset=(20, 20)):
+            self.wait_until_appear(OS_CHECK)
+            timeout.reset()
+            return True
+        return False
+
+    def _try_get_current_zone_from_map(self, timeout):
+        if not self.is_in_map():
+            timeout.reset()
+            return None
+        try:
+            return self.get_current_zone()
+        except MapDetectionError:
+            return None
+
+    def _fallback_zone_init(self, fallback_init):
+        if not fallback_init:
+            return None
+        logger.warning("Unable to get zone name, get current zone from globe map instead")
+        if hasattr(self, "get_current_zone_from_globe"):
+            return self.get_current_zone_from_globe()
+        logger.warning("OperationSiren.get_current_zone_from_globe() not exists")
+        if not self.is_in_map():
+            logger.warning("Trying to get zone name, but not in OS map")
+        return self.get_current_zone()
+
     def zone_init(self, fallback_init=True):
         """
         Wrap get_current_zone(), set self.zone to the current zone.
@@ -118,49 +159,17 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
         logger.info("Get zone name")
         timeout = Timer(1.5, count=5).start()
         for _ in self.loop():
-            # Handle popups
-            if self.handle_map_event():
-                timeout.reset()
-                continue
-            # A game bug that AUTO_SEARCH_REWARD from the last cleared zone popups
-            if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
-                continue
-            # EXCHANGE_CHECK popups after monthly reset
-            if self.is_in_globe():
-                self.os_globe_goto_map()
-                timeout.reset()
-                continue
-            if self.appear(EXCHANGE_CHECK, offset=(30, 30), interval=3):
-                self.device.click(BACK_ARROW)
-                timeout.reset()
-                continue
-            # Handle mission complete header, can block
-            # map name or mis-read OCR due to extra text
-            if self.is_in_map() and not self.appear(OS_CHECK, offset=(20, 20)):
-                self.wait_until_appear(OS_CHECK)
-                timeout.reset()
+            if self._handle_zone_init_blocker(timeout):
                 continue
 
             if timeout.reached():
                 logger.warning("Zone init timeout")
                 break
-            if self.is_in_map():
-                try:
-                    return self.get_current_zone()
-                except MapDetectionError:
-                    continue
-            else:
-                timeout.reset()
+            zone = self._try_get_current_zone_from_map(timeout)
+            if zone is not None:
+                return zone
 
-        if fallback_init:
-            logger.warning("Unable to get zone name, get current zone from globe map instead")
-            if hasattr(self, "get_current_zone_from_globe"):
-                return self.get_current_zone_from_globe()
-            logger.warning("OperationSiren.get_current_zone_from_globe() not exists")
-            if not self.is_in_map():
-                logger.warning("Trying to get zone name, but not in OS map")
-            return self.get_current_zone()
-        return None
+        return self._fallback_zone_init(fallback_init)
 
     def is_in_special_zone(self):
         """

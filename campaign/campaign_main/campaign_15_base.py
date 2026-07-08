@@ -95,31 +95,16 @@ class CampaignBase(CampaignBase_):
 
         return movable
 
-    def _mob_move(self, location, target):
-        """
-        Move mob from location to target, and confirm if successfully moved.
-
-        Args:
-            location (tuple, str, GridInfo): Location of mob.
-            target (tuple, str, GridInfo): Destination.
-
-        Returns:
-            bool: If mob moved.
-
-        Pages:
-            in: MOB_MOVE_CANCEL
-            out: STRATEGY_OPENED
-        """
-        location = location_ensure(location)
-        target = location_ensure(target)
-
+    def _mob_move_grids(self, location, target):
         view_target = SelectedGrids([self.map[location], self.map[target]]).sort_by_camera_distance(self.camera)[1]
         self.in_sight(view_target)
         origin_grid = self.convert_global_to_local(location)
         origin_grid.__str__ = location
         target_grid = self.convert_global_to_local(target)
         target_grid.__str__ = target
+        return origin_grid, target_grid
 
+    def _select_mob_move_origin(self, origin_grid):
         logger.info("Select mob to move")
         skip_first_screenshot = True
         interval = Timer(2, count=4)
@@ -140,6 +125,7 @@ class CampaignBase(CampaignBase_):
                 interval.reset()
                 continue
 
+    def _select_mob_move_target(self, target_grid):
         logger.info("Select target grid")
         skip_first_screenshot = True
         interval = Timer(2, count=4)
@@ -159,6 +145,27 @@ class CampaignBase(CampaignBase_):
                 continue
             if self.handle_popup_confirm("MOB_MOVE"):
                 continue
+
+    def _mob_move(self, location, target):
+        """
+        Move mob from location to target, and confirm if successfully moved.
+
+        Args:
+            location (tuple, str, GridInfo): Location of mob.
+            target (tuple, str, GridInfo): Destination.
+
+        Returns:
+            bool: If mob moved.
+
+        Pages:
+            in: MOB_MOVE_CANCEL
+            out: STRATEGY_OPENED
+        """
+        location = location_ensure(location)
+        target = location_ensure(target)
+        origin_grid, target_grid = self._mob_move_grids(location, target)
+        self._select_mob_move_origin(origin_grid)
+        self._select_mob_move_target(target_grid)
 
     def _mob_move_info_change(self, location, target):
         location = location_ensure(location)

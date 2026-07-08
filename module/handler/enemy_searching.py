@@ -84,6 +84,42 @@ class EnemySearchingHandler(InfoHandler):
         """
         return False
 
+    @staticmethod
+    def _reset_enemy_searching_timeout(timeout, *, extend=False):
+        if extend:
+            timeout.limit = 10
+        timeout.reset()
+
+    def _handle_enemy_searching_interrupts(self, timeout, *, extend_timeout):
+        if self.handle_auto_search_exit():
+            self._reset_enemy_searching_timeout(timeout, extend=extend_timeout)
+            return True
+        if self.handle_vote_popup():
+            self._reset_enemy_searching_timeout(timeout, extend=extend_timeout)
+            return True
+        if self.handle_story_skip():
+            self.ensure_no_story()
+            self._reset_enemy_searching_timeout(timeout, extend=extend_timeout)
+        if self.handle_guild_popup_cancel():
+            self._reset_enemy_searching_timeout(timeout, extend=extend_timeout)
+            return True
+        if self.handle_urgent_commission():
+            self._reset_enemy_searching_timeout(timeout, extend=extend_timeout)
+            return True
+        return False
+
+    def _handle_enemy_searching_animation_end(self, appeared):
+        if self.enemy_searching_appear():
+            return True, False
+        if appeared:
+            self.handle_enemy_flashing()
+            self.device.sleep(0.3)
+            self.device.screenshot()
+            logger.info("Enemy searching appeared.")
+            return appeared, True
+        self.enemy_searching_color_initial()
+        return appeared, False
+
     def handle_in_map_with_enemy_searching(self):
         """
         Returns:
@@ -111,40 +147,13 @@ class EnemySearchingHandler(InfoHandler):
             if hasattr(self, "is_combat_loading") and self.is_combat_loading():
                 logger.warning("Entered map with is_combat_loading appeared")
                 break
-            if self.handle_auto_search_exit():
-                timeout.limit = 10
-                timeout.reset()
-                continue
-
-            # Popups
-            if self.handle_vote_popup():
-                timeout.limit = 10
-                timeout.reset()
-                continue
-            if self.handle_story_skip():
-                self.ensure_no_story()
-                timeout.limit = 10
-                timeout.reset()
-            if self.handle_guild_popup_cancel():
-                timeout.limit = 10
-                timeout.reset()
-                continue
-            if self.handle_urgent_commission():
-                timeout.limit = 10
-                timeout.reset()
+            if self._handle_enemy_searching_interrupts(timeout, extend_timeout=True):
                 continue
 
             # End
-            if self.enemy_searching_appear():
-                appeared = True
-            else:
-                if appeared:
-                    self.handle_enemy_flashing()
-                    self.device.sleep(0.3)
-                    self.device.screenshot()
-                    logger.info("Enemy searching appeared.")
-                    break
-                self.enemy_searching_color_initial()
+            appeared, finished = self._handle_enemy_searching_animation_end(appeared)
+            if finished:
+                break
             if timeout.reached():
                 logger.info("Enemy searching timeout.")
                 break
@@ -170,22 +179,7 @@ class EnemySearchingHandler(InfoHandler):
             # although here expects an enemy searching animation.
             if self.handle_in_stage():
                 return True
-            if self.handle_auto_search_exit():
-                timeout.reset()
-                continue
-
-            # Popups
-            if self.handle_vote_popup():
-                timeout.reset()
-                continue
-            if self.handle_story_skip():
-                self.ensure_no_story()
-                timeout.reset()
-            if self.handle_guild_popup_cancel():
-                timeout.reset()
-                continue
-            if self.handle_urgent_commission():
-                timeout.reset()
+            if self._handle_enemy_searching_interrupts(timeout, extend_timeout=False):
                 continue
 
             # End

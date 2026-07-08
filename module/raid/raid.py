@@ -219,6 +219,36 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
 
         return False
 
+    def _handle_raid_preparation_page(self, *, auto, checked):
+        if not self.appear(BATTLE_PREPARATION, offset=(30, 20)):
+            return checked, False
+        if self.handle_combat_automation_set(auto=auto == "combat_auto"):
+            return checked, True
+        if not checked and self._raid_has_oil_icon:
+            checked = True
+            if self.triggered_stop_condition(oil_check=True, coin_check=True):
+                self.config.task_stop()
+        return checked, False
+
+    def _handle_raid_preparation_actions(self):
+        return (
+            self.handle_raid_ticket_use()
+            or self.handle_retirement()
+            or self.handle_combat_low_emotion()
+            or self.appear_then_click(BATTLE_PREPARATION, offset=(30, 20), interval=2)
+            or self.handle_combat_automation_confirm()
+            or self.handle_story_skip()
+        )
+
+    def _finish_raid_preparation_if_combat_started(self, *, emotion_reduce, fleet_index):
+        pause = self.is_combat_executing()
+        if not pause:
+            return False
+        logger.attr("BattleUI", pause)
+        if emotion_reduce:
+            self.emotion.reduce(fleet_index)
+        return True
+
     def combat_preparation(self, balance_hp=False, emotion_reduce=False, auto="combat_auto", fleet_index=1):
         """
         Args:
@@ -237,32 +267,14 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
 
         checked = False
         for _ in self.loop():
-            if self.appear(BATTLE_PREPARATION, offset=(30, 20)):
-                if self.handle_combat_automation_set(auto=auto == "combat_auto"):
-                    continue
-                if not checked and self._raid_has_oil_icon:
-                    checked = True
-                    if self.triggered_stop_condition(oil_check=True, coin_check=True):
-                        self.config.task_stop()
-            if self.handle_raid_ticket_use():
+            checked, handled = self._handle_raid_preparation_page(auto=auto, checked=checked)
+            if handled:
                 continue
-            if self.handle_retirement():
-                continue
-            if self.handle_combat_low_emotion():
-                continue
-            if self.appear_then_click(BATTLE_PREPARATION, offset=(30, 20), interval=2):
-                continue
-            if self.handle_combat_automation_confirm():
-                continue
-            if self.handle_story_skip():
+            if self._handle_raid_preparation_actions():
                 continue
 
             # End
-            pause = self.is_combat_executing()
-            if pause:
-                logger.attr("BattleUI", pause)
-                if emotion_reduce:
-                    self.emotion.reduce(fleet_index)
+            if self._finish_raid_preparation_if_combat_started(emotion_reduce=emotion_reduce, fleet_index=fleet_index):
                 break
 
     def handle_raid_ticket_use(self):
