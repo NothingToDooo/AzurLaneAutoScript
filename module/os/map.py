@@ -466,56 +466,72 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         died_timer = Timer(1.5, count=3)
         self.hp_reset()
         for _ in self.loop():
-            # End
-            if not unlock_checked and unlock_check_timer.reached():
-                logger.critical("Unable to use auto search in current zone")
-                logger.critical(
-                    "Please finish the story mode of OpSi to unlock auto search before using any OpSi functions"
-                )
-                raise RequestHumanTakeover
-            if self.is_in_map():
-                self.device.stuck_record_clear()
-                if not success:
-                    if died_timer.reached():
-                        logger.warning("Fleet died confirm")
-                        break
-                else:
-                    died_timer.reset()
-            else:
-                died_timer.reset()
-
-            if not unlock_checked and (
-                self.appear(AUTO_SEARCH_OS_MAP_OPTION_OFF, offset=(5, 120))
-                or self.appear(AUTO_SEARCH_OS_MAP_OPTION_OFF_DISABLED, offset=(5, 120))
-                or self.appear(AUTO_SEARCH_OS_MAP_OPTION_ON, offset=(5, 120))
-            ):
-                unlock_checked = True
+            unlock_checked = self._os_auto_search_check_unlock_timeout(unlock_checked, unlock_check_timer)
+            if self._os_auto_search_fleet_died_confirmed(success=success, died_timer=died_timer):
+                break
+            if not unlock_checked:
+                unlock_checked = self._os_auto_search_option_appeared()
 
             if self.handle_os_auto_search_map_option(enable=success):
                 unlock_checked = True
                 continue
             if self.handle_retirement():
-                # Retire will interrupt auto search, need a retry
+                # 退役流程会打断自动搜索，需要重新进入本轮循环。
                 self.ash_popup_canceled = True
                 continue
             if self.combat_appear():
-                self.on_auto_search_battle_count_add()
-                if strategic and self.config.task_switched():
-                    self.interrupt_auto_search()
-                result = self.auto_search_combat()
-                if result:
-                    finished_combat += 1
-                else:
-                    self.hp_get()
-                    if any(self.need_repair):
-                        success = False
-                        logger.warning("Fleet died, stop auto search")
-                        continue
+                combat_count, fleet_died = self._os_auto_search_handle_combat(strategic=strategic)
+                finished_combat += combat_count
+                if fleet_died:
+                    success = False
+                    continue
             if self.handle_map_event():
-                # Auto search can not handle siren searching device.
+                # 自动搜索不能处理塞壬搜索装置，交给地图事件处理。
                 continue
 
         return finished_combat
+
+    def _os_auto_search_check_unlock_timeout(self, unlock_checked, unlock_check_timer):
+        if unlock_checked or not unlock_check_timer.reached():
+            return unlock_checked
+
+        logger.critical("Unable to use auto search in current zone")
+        logger.critical("Please finish the story mode of OpSi to unlock auto search before using any OpSi functions")
+        raise RequestHumanTakeover
+
+    def _os_auto_search_fleet_died_confirmed(self, *, success, died_timer):
+        if not self.is_in_map():
+            died_timer.reset()
+            return False
+
+        self.device.stuck_record_clear()
+        if success:
+            died_timer.reset()
+            return False
+        if died_timer.reached():
+            logger.warning("Fleet died confirm")
+            return True
+        return False
+
+    def _os_auto_search_option_appeared(self):
+        return (
+            self.appear(AUTO_SEARCH_OS_MAP_OPTION_OFF, offset=(5, 120))
+            or self.appear(AUTO_SEARCH_OS_MAP_OPTION_OFF_DISABLED, offset=(5, 120))
+            or self.appear(AUTO_SEARCH_OS_MAP_OPTION_ON, offset=(5, 120))
+        )
+
+    def _os_auto_search_handle_combat(self, *, strategic):
+        self.on_auto_search_battle_count_add()
+        if strategic and self.config.task_switched():
+            self.interrupt_auto_search()
+        if self.auto_search_combat():
+            return 1, False
+
+        self.hp_get()
+        if any(self.need_repair):
+            logger.warning("Fleet died, stop auto search")
+            return 0, True
+        return 0, False
 
     def interrupt_auto_search(self):
         """
