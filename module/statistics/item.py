@@ -270,11 +270,6 @@ class ItemGrid:
             name = self.match_template(item.image, similarity=self.extract_similarity)
             if name not in prev:
                 new[name] = item.image
-                # Rollback changes
-                # self.next_template_index -= 1
-                # del self.colors[name]
-                # del self.templates[name]
-                # del self.templates_hit[name]
 
         if folder is not None:
             for name, im in new.items():
@@ -301,15 +296,7 @@ class ItemGrid:
                 self.cost_templates_hit[name] += 1
                 return name
 
-        # self.next_cost_template_index += 1
-        # name = str(self.next_cost_template_index)
-        # logger.info(f'New template: {name}')
-        # self.cost_templates[name] = item.crop(self.cost_area)
-        # self.cost_templates_hit[name] = self.cost_templates_hit.get(name, 0) + 1
-        # return name
-
-        # Not generating new cost template.
-        # If not cost template matched, consider this item is empty.
+        # 不生成新的成本模板；未匹配时把该商品视为空位。
         return None
 
     @staticmethod
