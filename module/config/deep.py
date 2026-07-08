@@ -8,6 +8,7 @@ from collections import deque
 # - When not key exists
 #   if key in dict: dict[key] < dict.get(key) <<< try: dict[key] except KeyError
 
+
 def _validate_depth_range(min_depth: int, depth: int) -> None:
     """检查深度参数是否有效。"""
     if 1 <= min_depth <= depth:
@@ -298,9 +299,10 @@ def deep_iter_depth2(data):
 
 def deep_iter(data, min_depth=None, depth=3):
     """
-    Iter key and value in nested dict
+    遍历嵌套字典里的键路径和值。
+
     300us on alas.json depth=3 (530+ rows)
-    Can only iter dict
+    只遍历 dict。
 
     Args:
         data:
@@ -315,56 +317,23 @@ def deep_iter(data, min_depth=None, depth=3):
         min_depth = depth
     _validate_depth_range(min_depth, depth)
 
-    # Equivalent to dict.items()
     try:
-        if depth == 1:
-            for k, v in data.items():
-                yield [k], v
-            return
-        # Iter first depth
-        elif min_depth == 1:
-            q = deque()
-            for k, v in data.items():
-                key = [k]
-                if type(v) is dict:
-                    q.append((key, v))
-                else:
-                    yield key, v
-        # Iter target depth only
-        else:
-            q = deque()
-            for k, v in data.items():
-                key = [k]
-                if type(v) is dict:
-                    q.append((key, v))
+        queue = deque([([], data.items())])
     except AttributeError:
-        # `data` is not dict
+        # `data` 不是字典。
         return
 
-    # Iter depths
-    current = 2
+    current = 1
     while current <= depth:
-        new_q = deque()
-        # max depth
-        if current == depth:
-            for key, item_data in q:
-                for k, v in item_data.items():
-                    yield [*key, k], v
-        # in target depth
-        elif min_depth <= current < depth:
-            for key, item_data in q:
-                for k, v in item_data.items():
-                    subkey = [*key, k]
-                    if type(v) is dict:
-                        new_q.append((subkey, v))
-                    else:
-                        yield subkey, v
-        # Haven't reached min depth
-        else:
-            for key, item_data in q:
-                for k, v in item_data.items():
-                    subkey = [*key, k]
-                    if type(v) is dict:
-                        new_q.append((subkey, v))
-        q = new_q
+        new_queue = deque()
+        for key, items in queue:
+            for k, v in items:
+                subkey = [*key, k]
+                if current == depth:
+                    yield subkey, v
+                elif type(v) is dict:
+                    new_queue.append((subkey, v.items()))
+                elif current >= min_depth:
+                    yield subkey, v
+        queue = new_queue
         current += 1
