@@ -68,7 +68,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
             chapter (int, str): Chapter. Such as 7, 'd', 'sp'.
             skip_first_screenshot:
         """
-        index = self._campaign_get_chapter_index(chapter)
+        index = self.campaign_get_chapter_index(chapter)
         isdigit = is_digit_chapter(chapter)
 
         # 复用 ui_ensure_index 的索引切换逻辑。
@@ -345,7 +345,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
             name (str): Campaign name, such as '7-2', 'd3', 'sp3'.
             mode (str): 'normal' or 'hard'.
         """
-        chapter, stage = self._campaign_separate_name(name)
+        chapter, stage = self.campaign_separate_name(name)
 
         if (
             self.campaign_set_chapter_main(chapter, mode)

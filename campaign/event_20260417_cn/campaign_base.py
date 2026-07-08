@@ -37,8 +37,8 @@ class CampaignBase(CampaignBase_):
         return False
 
     @staticmethod
-    def _campaign_ocr_result_process(result):
-        result = CampaignBase_._campaign_ocr_result_process(result)
+    def campaign_ocr_result_process(result):
+        result = CampaignBase_.campaign_ocr_result_process(result)
         if result in ["ysp", "usp", "vsp"]:
             result = "sp"
         return result

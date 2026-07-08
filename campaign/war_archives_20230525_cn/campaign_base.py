@@ -22,7 +22,7 @@ class CampaignBase(CampaignBase_):
             name (str): Campaign name, such as '7-2', 'd3', 'sp3'.
             mode (str): 'normal' or 'hard'.
         """
-        chapter, stage = self._campaign_separate_name(name)
+        chapter, stage = self.campaign_separate_name(name)
         name = chapter + stage
 
         if chapter.isdigit():

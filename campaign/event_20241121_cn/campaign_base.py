@@ -7,7 +7,7 @@ class CampaignBase(CampaignBase_):
         "TTL1 > TTL2 > TTL3 > TTL4 > TTL5",)
 
     @staticmethod
-    def _campaign_get_chapter_index(name):
+    def campaign_get_chapter_index(name):
         """
         Args:
             name (str, int):
@@ -17,7 +17,7 @@ class CampaignBase(CampaignBase_):
         """
         if name == "ttl":
             return 1
-        return CampaignBase_._campaign_get_chapter_index(name)
+        return CampaignBase_.campaign_get_chapter_index(name)
 
     def campaign_set_chapter_20241219(self, chapter, stage, mode="combat"):
         if chapter == "t":

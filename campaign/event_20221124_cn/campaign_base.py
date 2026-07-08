@@ -33,7 +33,7 @@ class CampaignBase(CampaignBase_):
         return super().campaign_set_chapter_event(chapter, mode=mode)
 
     @staticmethod
-    def _campaign_separate_name(name):
+    def campaign_separate_name(name):
         # T, TH, ASP, EX
         if name == "ex":
             return "t4", "1"
@@ -48,10 +48,10 @@ class CampaignBase(CampaignBase_):
         if name.startswith("t"):
             return "t1", name[-1]
 
-        return CampaignBase_._campaign_separate_name(name)
+        return CampaignBase_.campaign_separate_name(name)
 
     @staticmethod
-    def _campaign_get_chapter_index(name):
+    def campaign_get_chapter_index(name):
         if name == "t4":
             return 4
         if name == "t3":
@@ -61,7 +61,7 @@ class CampaignBase(CampaignBase_):
         if name == "t1":
             return 1
 
-        return CampaignBase_._campaign_get_chapter_index(name)
+        return CampaignBase_.campaign_get_chapter_index(name)
 
     def campaign_get_entrance(self, name):
         if name == "sp":

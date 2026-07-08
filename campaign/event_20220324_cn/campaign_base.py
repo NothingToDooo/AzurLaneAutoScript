@@ -19,7 +19,7 @@ class CampaignBase(CampaignBase_):
         """
         # No need to switch
 
-    def _campaign_get_chapter_index(self, name):
+    def campaign_get_chapter_index(self, name):
         """
         Args:
             name (str, int):
@@ -34,10 +34,10 @@ class CampaignBase(CampaignBase_):
         if name == "ex_ex":
             return 3
 
-        return super(CampaignBase, CampaignBase)._campaign_get_chapter_index(name)
+        return super(CampaignBase, CampaignBase).campaign_get_chapter_index(name)
 
     @staticmethod
-    def _campaign_separate_name(name):
+    def campaign_separate_name(name):
         """
         Args:
             name (str): Stage name in lowercase, such as 7-2, d3, sp3.
@@ -50,7 +50,7 @@ class CampaignBase(CampaignBase_):
         if "ex" in name:
             return ["ex_ex", "1"]
 
-        return super(CampaignBase, CampaignBase)._campaign_separate_name(name)
+        return super(CampaignBase, CampaignBase).campaign_separate_name(name)
 
     def campaign_get_entrance(self, name):
         """

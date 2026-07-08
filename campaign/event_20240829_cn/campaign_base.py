@@ -16,7 +16,7 @@ class CampaignBase(CampaignBase_):
         self.campaign_ensure_mode_20241219(mode)
 
     @staticmethod
-    def _campaign_separate_name(name):
+    def campaign_separate_name(name):
         """
         Args:
             name (str): Stage name in lowercase, such as 7-2, d3, sp3.
@@ -26,7 +26,7 @@ class CampaignBase(CampaignBase_):
         """
         if name == "tp":
             return "ex_sp", "1"
-        return CampaignBase_._campaign_separate_name(name)
+        return CampaignBase_.campaign_separate_name(name)
 
     def campaign_get_entrance(self, name):
         if name == "sp":

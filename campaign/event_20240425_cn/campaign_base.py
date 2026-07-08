@@ -15,7 +15,7 @@ class CampaignBase(CampaignBase_):
         self.campaign_ensure_chapter(chapter)
         return True
 
-    def _campaign_get_chapter_index(self, name):
+    def campaign_get_chapter_index(self, name):
         """
         Args:
             name (str, int):
@@ -32,11 +32,11 @@ class CampaignBase(CampaignBase_):
         if name == "ex_ex":
             return 4
 
-        return super(CampaignBase, CampaignBase)._campaign_get_chapter_index(name)
+        return super(CampaignBase, CampaignBase).campaign_get_chapter_index(name)
 
     @staticmethod
-    def _campaign_ocr_result_process(result):
-        result = CampaignBase_._campaign_ocr_result_process(result)
+    def campaign_ocr_result_process(result):
+        result = CampaignBase_.campaign_ocr_result_process(result)
         if result in ["usp", "iisp", "ijsp", "jjsp"]:
             result = "sp"
         return result

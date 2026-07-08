@@ -22,7 +22,7 @@ class CampaignBase(CampaignBase_):
             name (str): Campaign name, such as '7-2', 'd3', 'sp3'.
             mode (str): 'normal' or 'hard'.
         """
-        chapter, stage = self._campaign_separate_name(name)
+        chapter, stage = self.campaign_separate_name(name)
         name = chapter + stage
 
         if chapter.isdigit():
@@ -66,7 +66,7 @@ class CampaignBase(CampaignBase_):
             logger.warning(f"Unknown campaign chapter: {name}")
 
     @staticmethod
-    def _campaign_get_chapter_index(name):
+    def campaign_get_chapter_index(name):
         """
         Args:
             name (str, int):

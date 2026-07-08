@@ -22,7 +22,7 @@ class CampaignBase(CampaignBase_):
     """
 
     @staticmethod
-    def _campaign_separate_name(name):
+    def campaign_separate_name(name):
         """
         Args:
             name (str): Stage name in lowercase, such as 7-2, d3, sp3.
@@ -41,10 +41,10 @@ class CampaignBase(CampaignBase_):
         if name[-1].isdigit():
             return name[:-1], name[-1]
 
-        return CampaignBase_._campaign_separate_name(name)
+        return CampaignBase_.campaign_separate_name(name)
 
     @staticmethod
-    def _campaign_get_chapter_index(name):
+    def campaign_get_chapter_index(name):
         """
         Args:
             name (str, int):
@@ -68,7 +68,7 @@ class CampaignBase(CampaignBase_):
             name (str): Campaign name, such as '7-2', 'd3', 'sp3'.
             mode (str): 'normal' or 'hard'.
         """
-        chapter, _ = self._campaign_separate_name(name)
+        chapter, _ = self.campaign_separate_name(name)
 
         if chapter.isdigit():
             self.ui_goto_campaign()

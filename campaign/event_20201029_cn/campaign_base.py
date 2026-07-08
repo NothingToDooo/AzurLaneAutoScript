@@ -13,7 +13,7 @@ class CampaignBase(CampaignBase_):
     """
 
     @staticmethod
-    def _campaign_get_chapter_index(name):
+    def campaign_get_chapter_index(name):
         """
         Args:
             name (str, int):
@@ -37,7 +37,7 @@ class CampaignBase(CampaignBase_):
             name (str): Campaign name, such as '7-2', 'd3', 'sp3'.
             mode (str): 'normal' or 'hard'.
         """
-        chapter, _stage = self._campaign_separate_name(name)
+        chapter, _stage = self.campaign_separate_name(name)
 
         if chapter.isdigit():
             self.ui_goto_campaign()

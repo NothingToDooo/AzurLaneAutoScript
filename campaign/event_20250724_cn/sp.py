@@ -192,8 +192,8 @@ class Campaign(CampaignBase):
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
     @staticmethod
-    def _campaign_ocr_result_process(result):
-        result = CampaignBase._campaign_ocr_result_process(result)
+    def campaign_ocr_result_process(result):
+        result = CampaignBase.campaign_ocr_result_process(result)
         if result in ["ysp", "usp", "iisp", "ijsp", "jjsp"]:
             result = "sp"
         return result

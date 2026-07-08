@@ -24,7 +24,7 @@ class CampaignOcr(ModuleBase):
         super().__init__(*args, **kwargs)
 
     @staticmethod
-    def _campaign_get_chapter_index(name):
+    def campaign_get_chapter_index(name):
         """
         Args:
             name (str, int):
@@ -43,7 +43,7 @@ class CampaignOcr(ModuleBase):
         raise CampaignNameError
 
     @staticmethod
-    def _campaign_ocr_result_process(result):
+    def campaign_ocr_result_process(result):
         # The result will be like '7--2', because tha dash in game is '–' not '-'
         result = result.replace("--", "-").replace("--", "-").lstrip("-")
 
@@ -62,7 +62,7 @@ class CampaignOcr(ModuleBase):
         return result.lower()
 
     @staticmethod
-    def _campaign_separate_name(name):
+    def campaign_separate_name(name):
         """
         Args:
             name (str): Stage name in lowercase, such as 7-2, d3, sp3.
@@ -283,9 +283,9 @@ class CampaignOcr(ModuleBase):
         result = ocr.ocr(image)
         if not isinstance(result, list):
             result = [result]
-        result = [self._campaign_ocr_result_process(res) for res in result]
+        result = [self.campaign_ocr_result_process(res) for res in result]
 
-        chapter = [self._campaign_separate_name(res)[0] for res in result if res]
+        chapter = [self.campaign_separate_name(res)[0] for res in result if res]
         chapter = list(filter(("").__ne__, chapter))
         if not chapter:
             raise CampaignNameError
@@ -349,4 +349,4 @@ class CampaignOcr(ModuleBase):
             if self.handle_get_chapter_additional():
                 continue
 
-        return self._campaign_get_chapter_index(self.campaign_chapter)
+        return self.campaign_get_chapter_index(self.campaign_chapter)

@@ -35,8 +35,8 @@ class CampaignBase(CampaignBase_):
             float: 0 to 1.
         """
         value = super().get_map_clear_percentage()
-        chapter, _ = self._campaign_separate_name(self.MAP.name.lower())
-        chapter = self._campaign_get_chapter_index(chapter)
+        chapter, _ = self.campaign_separate_name(self.MAP.name.lower())
+        chapter = self.campaign_get_chapter_index(chapter)
         if chapter == 1:
             value *= 1.4
         return value

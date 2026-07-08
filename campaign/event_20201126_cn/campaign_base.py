@@ -46,7 +46,7 @@ class CampaignBase(CampaignBase_):
         return False
 
     @staticmethod
-    def _campaign_separate_name(name):
+    def campaign_separate_name(name):
         """
         Args:
             name (str): Stage name in lowercase, such as 7-2, d3, sp3.
@@ -56,10 +56,10 @@ class CampaignBase(CampaignBase_):
         """
         if name in {"vsp", "sp"}:  # 活动差异。
             return "ex_sp", "1"
-        return CampaignBase_._campaign_separate_name(name)
+        return CampaignBase_.campaign_separate_name(name)
 
     @staticmethod
-    def _campaign_get_chapter_index(name):
+    def campaign_get_chapter_index(name):
         """
         Args:
             name (str, int):

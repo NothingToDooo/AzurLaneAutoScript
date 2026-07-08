@@ -14,12 +14,12 @@ class CampaignBase(CampaignBase_):
         return False
 
     @staticmethod
-    def _campaign_separate_name(name):
+    def campaign_separate_name(name):
         if name in ["esp", "sp"]:
             return "sp_sp", "2"
         if name == "ex":
             return "sp_ex", "3"
-        return CampaignBase_._campaign_separate_name(name)
+        return CampaignBase_.campaign_separate_name(name)
 
     def campaign_get_entrance(self, name):
         if name == "sp":
@@ -27,9 +27,9 @@ class CampaignBase(CampaignBase_):
         return super().campaign_get_entrance(name)
 
     @staticmethod
-    def _campaign_get_chapter_index(name):
+    def campaign_get_chapter_index(name):
         if name == "sp_sp":
             return 2
         if name == "sp_ex":
             return 3
-        return CampaignBase_._campaign_get_chapter_index(name)
+        return CampaignBase_.campaign_get_chapter_index(name)
