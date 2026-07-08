@@ -2,6 +2,9 @@ from module.base.timer import Timer
 from module.exception import ScriptError
 from module.logger import logger
 
+UNKNOWN_STATE_NAME_MESSAGE = 'Cannot use "unknown" as state name'
+INVALID_SWITCH_STATE_TEMPLATE = "Switch {name} received an invalid state: {state}"
+
 
 class Switch:
     """
@@ -43,7 +46,7 @@ class Switch:
             offset (bool, int, tuple):
         """
         if state == "unknown":
-            raise ScriptError('Cannot use "unknown" as state name')
+            raise ScriptError(UNKNOWN_STATE_NAME_MESSAGE)
         self.state_list.append(
             {
                 "state": state,
@@ -111,7 +114,8 @@ class Switch:
             if row["state"] == state:
                 return row
 
-        raise ScriptError(f"Switch {self.name} received an invalid state: {state}")
+        message = INVALID_SWITCH_STATE_TEMPLATE.format(name=self.name, state=state)
+        raise ScriptError(message)
 
     def handle_additional(self, _main):
         """

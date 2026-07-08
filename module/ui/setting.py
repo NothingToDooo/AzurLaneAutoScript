@@ -10,6 +10,8 @@ from module.logger import logger
 if TYPE_CHECKING:
     from module.base.base import ModuleBase
 
+INVALID_DEFAULT_OPTION_TEMPLATE = 'Define option_default="{default}", but default is not in option_names={options}'
+
 
 class Setting:
     def __init__(self, name="Setting", main: ModuleBase = None):
@@ -43,9 +45,8 @@ class Setting:
             self.settings[(setting, option_name)] = option
 
         if option_default not in option_names:
-            raise ScriptError(
-                f'Define option_default="{option_default}", but default is not in option_names={option_names}'
-            )
+            message = INVALID_DEFAULT_OPTION_TEMPLATE.format(default=option_default, options=option_names)
+            raise ScriptError(message)
         self.settings_default[setting] = option_default
 
     def is_option_active(self, option: Button) -> bool:

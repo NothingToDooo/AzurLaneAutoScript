@@ -29,6 +29,9 @@ from module.ui import assets as ui_assets
 from module.ui.page import Page, page_campaign, page_event, page_main, page_main_white, page_sp
 from module.ui_white import assets as ui_white_assets
 
+UI_CLICK_OPTIONS_CONFLICT_MESSAGE = "options 和散装 UI 点击参数不能混用"
+GAME_NOT_RUNNING_MESSAGE = "Game not running"
+
 
 @dataclass(slots=True)
 class UiClickOptions:
@@ -53,7 +56,7 @@ def _ui_click_options(options, settings):
     if options is None:
         return UiClickOptions(**settings)
     if settings:
-        raise TypeError("options 和散装 UI 点击参数不能混用")
+        raise TypeError(UI_CLICK_OPTIONS_CONFLICT_MESSAGE)
     return options
 
 
@@ -170,7 +173,7 @@ class UI(InfoHandler):
         @run_once
         def app_check():
             if not self.device.app_is_running():
-                raise GameNotRunningError("Game not running")
+                raise GameNotRunningError(GAME_NOT_RUNNING_MESSAGE)
 
         return app_check
 

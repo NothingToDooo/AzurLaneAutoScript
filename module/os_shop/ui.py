@@ -20,6 +20,9 @@ OS_SHOP_SCROLL = AdaptiveScroll(
 OS_SHOP_SCROLL.drag_threshold = 0.1
 OS_SHOP_SCROLL.edge_threshold = 0.1
 
+OS_SHOP_LOAD_TIMEOUT_MESSAGE = "Waiting too long for OpsiShop to appear."
+SCROLL_DRAG_PAGE_ERROR_MESSAGE = "Scroll drag page error."
+
 
 class OSShopUI(UI):
     def os_shop_load_ensure(self, skip_first_screenshot=True):
@@ -48,7 +51,7 @@ class OSShopUI(UI):
 
             # 异常处理。
             if ensure_timeout.reached():
-                raise GameStuckError("Waiting too long for OpsiShop to appear.")
+                raise GameStuckError(OS_SHOP_LOAD_TIMEOUT_MESSAGE)
 
     @cached_property
     def _os_shop_side_navbar(self):
@@ -116,7 +119,7 @@ class OSShopUI(UI):
             logger.info("Scroll does not at top, try to scroll")
             OS_SHOP_SCROLL.set_top(main=self)
             if retry.reached():
-                raise GameStuckError("Scroll drag page error.")
+                raise GameStuckError(SCROLL_DRAG_PAGE_ERROR_MESSAGE)
         return -1.0, 0.0
 
     def rescue_slider(self, distance=200):
@@ -158,6 +161,6 @@ class OSShopUI(UI):
                     logger.info(f"Scroll success drag page to {cur_pos}")
                     return cur_pos
                 if retry.reached():
-                    raise GameStuckError("Scroll drag page error.")
+                    raise GameStuckError(SCROLL_DRAG_PAGE_ERROR_MESSAGE)
         else:
             return cur_pos

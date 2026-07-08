@@ -15,6 +15,8 @@ from module.shop.assets import SHOP_BUY_CONFIRM as OS_SHOP_BUY_CONFIRM
 from module.shop.clerk import OCR_SHOP_AMOUNT
 from module.ui.ui import UiIndexControls
 
+UNKNOWN_OS_SHOP_CURRENCY_TEMPLATE = "Unknown OS shop currency: {cost}"
+
 
 @dataclass(slots=True)
 class _OSShopBuyState:
@@ -355,14 +357,16 @@ class OSShop(PortShop, AkashiShop):
             if get_os_reset_remain() == 0:
                 return self._shop_purple_coins
             return self._shop_purple_coins - self.config.OS_NORMAL_PURPLE_COINS_PRESERVE
-        raise ScriptError(f"Unknown OS shop currency: {item.cost}")
+        message = UNKNOWN_OS_SHOP_CURRENCY_TEMPLATE.format(cost=item.cost)
+        raise ScriptError(message)
 
     def get_coins_no_limit(self, item):
         if item.cost == "YellowCoins":
             return self._shop_yellow_coins
         if item.cost == "PurpleCoins":
             return self._shop_purple_coins
-        raise ScriptError(f"Unknown OS shop currency: {item.cost}")
+        message = UNKNOWN_OS_SHOP_CURRENCY_TEMPLATE.format(cost=item.cost)
+        raise ScriptError(message)
 
     def is_coins_both_not_enough(self):
         if get_os_reset_remain() == 0:
