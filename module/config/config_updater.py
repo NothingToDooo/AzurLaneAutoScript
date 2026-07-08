@@ -209,6 +209,102 @@ class ConfigGenerator:
         """
         return read_file(filepath_argument("gui"))
 
+    def _iter_task_argument_groups(self):
+        for path, groups in deep_iter(self.task, depth=3):
+            if "tasks" not in path:
+                continue
+            task = path[2]
+            # 给所有任务加入存储组，但不修改 task.yaml 的缓存数据。
+            yield task, (*groups, "Storage")
+
+    def _build_task_args(self):
+        data = {}
+        for task, groups in self._iter_task_argument_groups():
+            for group in groups:
+                if group not in self.argument:
+                    logger.warning(f"`{task}.{group}` is not related to any argument group")
+                    continue
+                deep_set(data, keys=[task, group], value=deepcopy(self.argument[group]))
+        return data
+
+    @staticmethod
+    def _argument_value(argument):
+        if isinstance(argument, dict):
+            return argument.get("value", None)
+        return argument
+
+    @staticmethod
+    def _override_validation_value(argument, override):
+        if isinstance(override, dict):
+            # 字典覆盖通常用于改元数据，沿用旧语义，只用原参数值做合法性校验。
+            return ConfigGenerator._argument_value(argument)
+        return override
+
+    @staticmethod
+    def _has_incompatible_override_type(path, old_value, value):
+        return (
+            type(value) is not type(old_value)
+            and old_value is not None
+            and path[2] not in ["SuccessInterval", "FailureInterval"]
+        )
+
+    @staticmethod
+    def _has_invalid_override_option(argument, value):
+        return isinstance(argument, dict) and "option" in argument and value not in argument["option"]
+
+    def _can_apply_override(self, data, path, value):
+        # 检查参数是否存在。
+        old = deep_get(data, keys=path, default=None)
+        if old is None:
+            logger.warning(f"`{'.'.join(path)}` is not a existing argument")
+            return False
+
+        old_value = self._argument_value(old)
+        value = self._override_validation_value(old, value)
+        if self._has_incompatible_override_type(path, old_value, value):
+            logger.warning(
+                f"`{value}` ({type(value)}) and `{'.'.join(path)}` ({type(old_value)}) are in different types"
+            )
+            return False
+        if self._has_invalid_override_option(old, value):
+            logger.warning(f"`{value}` is not an option of argument `{'.'.join(path)}`")
+            return False
+        return True
+
+    def _apply_default_values(self, data) -> None:
+        for path, value in deep_iter(self.default, depth=3):
+            if self._can_apply_override(data, path, value):
+                deep_set(data, keys=[*path, "value"], value=value)
+
+    @staticmethod
+    def _normalized_override(value):
+        value = deepcopy(value)
+        typ = value.get("type")
+        if typ not in {"state", "lock"} and deep_get(value, keys="value") is not None:
+            deep_default(value, keys="display", value="hide")
+        return value
+
+    @staticmethod
+    def _apply_override_value(data, path, value) -> None:
+        if isinstance(value, dict):
+            for arg_k, arg_v in ConfigGenerator._normalized_override(value).items():
+                deep_set(data, keys=[*path, arg_k], value=arg_v)
+            return
+
+        deep_set(data, keys=[*path, "value"], value=value)
+        deep_set(data, keys=[*path, "display"], value="hide")
+
+    def _apply_override_values(self, data) -> None:
+        for path, value in deep_iter(self.override, depth=3):
+            if self._can_apply_override(data, path, value):
+                self._apply_override_value(data, path, value)
+
+    def _hide_task_commands(self, data) -> None:
+        for task, _groups in self._iter_task_argument_groups():
+            if deep_get(data, keys=f"{task}.Scheduler.Command"):
+                deep_set(data, keys=f"{task}.Scheduler.Command.value", value=task)
+                deep_set(data, keys=f"{task}.Scheduler.Command.display", value="hide")
+
     @cached_property
     @timer
     def args(self):
@@ -221,73 +317,10 @@ class ConfigGenerator:
          default.yaml ---+
 
         """
-        # 构造参数。
-        data = {}
-        for path, groups in deep_iter(self.task, depth=3):
-            if "tasks" not in path:
-                continue
-            task = path[2]
-            # 给所有任务加入存储组。
-            groups.append("Storage")
-            for group in groups:
-                if group not in self.argument:
-                    logger.warning(f"`{task}.{group}` is not related to any argument group")
-                    continue
-                deep_set(data, keys=[task, group], value=deepcopy(self.argument[group]))
-
-        def check_override(path, value):
-            # 检查参数是否存在。
-            old = deep_get(data, keys=path, default=None)
-            if old is None:
-                logger.warning(f"`{'.'.join(path)}` is not a existing argument")
-                return False
-            # 检查类型，但允许 `Interval` 使用不同类型。
-            old_value = old.get("value", None) if isinstance(old, dict) else old
-            value = old.get("value", None) if isinstance(value, dict) else value
-            if (
-                type(value) is not type(old_value)
-                and old_value is not None
-                and path[2] not in ["SuccessInterval", "FailureInterval"]
-            ):
-                logger.warning(
-                    f"`{value}` ({type(value)}) and `{'.'.join(path)}` ({type(old_value)}) are in different types"
-                )
-                return False
-            # 检查可选项。
-            if isinstance(old, dict) and "option" in old and value not in old["option"]:
-                logger.warning(f"`{value}` is not an option of argument `{'.'.join(path)}`")
-                return False
-            return True
-
-        # 写入默认值。
-        for p, v in deep_iter(self.default, depth=3):
-            if not check_override(p, v):
-                continue
-            deep_set(data, keys=[*p, "value"], value=v)
-        # 覆盖不可直接修改的参数。
-        for p, v in deep_iter(self.override, depth=3):
-            if not check_override(p, v):
-                continue
-            if isinstance(v, dict):
-                typ = v.get("type")
-                if typ in {"state", "lock"}:
-                    pass
-                elif deep_get(v, keys="value") is not None:
-                    deep_default(v, keys="display", value="hide")
-                for arg_k, arg_v in v.items():
-                    deep_set(data, keys=[*p, arg_k], value=arg_v)
-            else:
-                deep_set(data, keys=[*p, "value"], value=v)
-                deep_set(data, keys=[*p, "display"], value="hide")
-        # 写入任务命令。
-        for path, _groups in deep_iter(self.task, depth=3):
-            if "tasks" not in path:
-                continue
-            task = path[2]
-            if deep_get(data, keys=f"{task}.Scheduler.Command"):
-                deep_set(data, keys=f"{task}.Scheduler.Command.value", value=task)
-                deep_set(data, keys=f"{task}.Scheduler.Command.display", value="hide")
-
+        data = self._build_task_args()
+        self._apply_default_values(data)
+        self._apply_override_values(data)
+        self._hide_task_commands(data)
         return data
 
     @timer
