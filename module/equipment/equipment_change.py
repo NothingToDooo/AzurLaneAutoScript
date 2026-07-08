@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 
 from module.base.button import Button, ButtonGrid
-from module.base.decorator import Config
 from module.base.utils import random_rectangle_vector
 from module.equipment import assets as equipment_assets
 from module.equipment.equipment import Equipment
@@ -117,16 +116,7 @@ class EquipmentChange(Equipment):
                 self.handle_info_bar()
                 self._find_equipment(index)
 
-    @Config.when(DEVICE_CONTROL_METHOD="minitouch")
     def _equipment_swipe(self, distance=190):
-        # 两个委托之间的距离是 146px。
-        p1, p2 = random_rectangle_vector((0, -distance), box=(620, 67, 1154, 692), random_range=(-20, -5, 20, 5))
-        self.device.drag(p1, p2, point_random=(0, 0, 0, 0))
-        self.device.sleep(0.3)
-        self.device.screenshot()
-
-    @Config.when(DEVICE_CONTROL_METHOD=None)
-    def _equipment_swipe(self, distance=300):
         # 两个委托之间的距离是 146px。
         p1, p2 = random_rectangle_vector((0, -distance), box=(620, 67, 1154, 692), random_range=(-20, -5, 20, 5))
         self.device.drag(p1, p2, point_random=(0, 0, 0, 0))
