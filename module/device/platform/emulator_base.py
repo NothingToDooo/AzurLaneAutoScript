@@ -97,20 +97,20 @@ class EmulatorInstanceBase:
     @cached_property
     def MuMuPlayer12_id(self):
         """
-        Convert MuMu 12 instance name to instance id.
-        Example names:
+        将当前个人版支持的 MuMu 实例名称转换为实例编号。
+
+        示例名称：
             MuMuPlayer-12.0-3
-            MuMuPlayerGlobal-12.0-0
             MuMuPlayer-15.0-0
             YXArkNights-12.0-1
 
         Returns:
-            int: Instance ID, or None if this is not a MuMu 12 instance
+            int: 实例编号；不是当前个人版支持的 MuMu 实例时返回 None
         """
-        res = re.search(r"MuMuPlayer(?:Global)?-12.0-(\d+)", self.name)
+        res = re.search(r"MuMuPlayer-12.0-(\d+)", self.name)
         if res:
             return int(res.group(1))
-        res = re.search(r"MuMuPlayer(?:Global)?-15.0-(\d+)", self.name)
+        res = re.search(r"MuMuPlayer-15.0-(\d+)", self.name)
         if res:
             return int(res.group(1))
         res = re.search(r"YXArkNights-12.0-(\d+)", self.name)

@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from module.device.platform.emulator_windows import Emulator
+from module.device.platform.emulator_windows import Emulator, EmulatorInstance
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -49,3 +49,27 @@ def test_iter_instances_falls_back_to_mumu12_default_serial(tmp_path: Path) -> N
     assert instances[0].serial == "127.0.0.1:16448"
     assert instances[0].name == "MuMuPlayer-12.0-2"
     assert instances[0].path == emulator.path
+
+
+def test_mumu_global_name_is_not_supported(tmp_path: Path) -> None:
+    exe = _touch_exe(tmp_path / "shell" / "MuMuPlayer.exe")
+    instance = EmulatorInstance(
+        serial="",
+        name="MuMuPlayerGlobal-12.0-0",
+        path=exe.as_posix(),
+    )
+
+    assert instance.MuMuPlayer12_id is None
+
+
+def test_iter_instances_ignores_mumu_global_folder(tmp_path: Path) -> None:
+    exe = _touch_exe(tmp_path / "shell" / "MuMuPlayer.exe")
+    _write_nemu(tmp_path / "vms" / "MuMuPlayerGlobal-12.0-0", hostport="16384")
+    _write_nemu(tmp_path / "vms" / "MuMuPlayer-12.0-1", hostport="16416")
+    emulator = Emulator(exe.as_posix())
+
+    instances = list(emulator.iter_instances())
+
+    assert len(instances) == 1
+    assert instances[0].serial == "127.0.0.1:16416"
+    assert instances[0].name == "MuMuPlayer-12.0-1"

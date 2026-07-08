@@ -117,6 +117,9 @@ class Emulator(EmulatorBase):
 
     def _iter_vbox_folder_instances(self, folder):
         name = Path(folder).name
+        if "MuMuPlayerGlobal" in name:
+            return
+
         for file in iter_folder(folder, ext=".nemu"):
             serial = Emulator.vbox_file_to_serial(file)
             if serial:
