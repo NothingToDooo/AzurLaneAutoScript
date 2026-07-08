@@ -136,35 +136,34 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         for path, value in self.modified.items():
             deep_set(self.data, keys=path, value=value)
 
-    def bind(self, func, func_list=None):
-        """
-        Args:
-            func (str, Function): Function to run
-            func_list (list[str]): List of tasks to be bound
-        """
+    @staticmethod
+    def _task_name(func):
         if isinstance(func, Function):
-            func = func.command
-        # func_list: ["General", "Alas", <task_general>, <task>, *func_list]
-        if func_list is None:
-            func_list = []
-        if func not in func_list:
-            func_list.insert(0, func)
-        if func.startswith("Opsi") and "OpsiGeneral" not in func_list:
-            func_list.insert(0, "OpsiGeneral")
-        if func.startswith(("Event", "Raid", "Coalition")) or func in ["MaritimeEscort", "GemsFarming"]:
-            if "EventGeneral" not in func_list:
-                func_list.insert(0, "EventGeneral")
-            if "TaskBalancer" not in func_list:
-                func_list.insert(0, "TaskBalancer")
-        if "Alas" not in func_list:
-            func_list.insert(0, "Alas")
-        if "General" not in func_list:
-            func_list.insert(0, "General")
-        logger.info(f"Bind task {func_list}")
+            return func.command
+        return func
 
-        # Bind arguments
+    @staticmethod
+    def _prepend_missing(items, item) -> None:
+        if item not in items:
+            items.insert(0, item)
+
+    @classmethod
+    def task_bind_chain(cls, func, func_list=None):
+        task = cls._task_name(func)
+        tasks = [] if func_list is None else func_list
+
+        cls._prepend_missing(tasks, task)
+        if task.startswith("Opsi"):
+            cls._prepend_missing(tasks, "OpsiGeneral")
+        if task.startswith(("Event", "Raid", "Coalition")) or task in ["MaritimeEscort", "GemsFarming"]:
+            cls._prepend_missing(tasks, "EventGeneral")
+            cls._prepend_missing(tasks, "TaskBalancer")
+        cls._prepend_missing(tasks, "Alas")
+        cls._prepend_missing(tasks, "General")
+        return tasks
+
+    def _iter_bound_arguments(self, func_list):
         visited = set()
-        self.bound.clear()
         for func in func_list:
             func_data = self.data.get(func, {})
             for group, group_data in func_data.items():
@@ -172,14 +171,30 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
                     path = f"{group}.{arg_name}"
                     if path in visited:
                         continue
-                    arg = path_to_arg(path)
-                    super().__setattr__(arg, value)
-                    self.bound[arg] = f"{func}.{path}"
                     visited.add(path)
+                    yield path_to_arg(path), f"{func}.{path}", value
 
-        # Override arguments
+    def _bind_arguments(self, func_list) -> None:
+        self.bound.clear()
+        for arg, path, value in self._iter_bound_arguments(func_list):
+            super().__setattr__(arg, value)
+            self.bound[arg] = path
+
+    def _apply_overridden_arguments(self) -> None:
         for arg, value in self.overridden.items():
             super().__setattr__(arg, value)
+
+    def bind(self, func, func_list=None):
+        """
+        Args:
+            func (str, Function): Function to run
+            func_list (list[str]): List of tasks to be bound
+        """
+        # 绑定顺序：General、Alas、任务通用配置、当前任务、额外任务。
+        func_list = self.task_bind_chain(func, func_list=func_list)
+        logger.info(f"Bind task {func_list}")
+        self._bind_arguments(func_list)
+        self._apply_overridden_arguments()
 
     @property
     def hoarding(self):
