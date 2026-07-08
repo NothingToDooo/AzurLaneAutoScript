@@ -663,14 +663,6 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         return config
 
     @property
-    def DEVICE_SCREENSHOT_METHOD(self):
-        return self.Emulator_ScreenshotMethod
-
-    @property
-    def DEVICE_CONTROL_METHOD(self):
-        return self.Emulator_ControlMethod
-
-    @property
     def FLEET_1(self):
         return self.Fleet_Fleet1
 
