@@ -41,6 +41,37 @@ class Field:
     regex: str
 
 
+_LUA_TYPE_DEFAULTS = {
+    "Int": 0,
+    "String": repr(""),
+    "Float": 0.0,
+}
+
+
+def _parse_lua_int_default(value: str) -> int:
+    try:
+        return int(value)
+    except ValueError:
+        return 0
+
+
+def _parse_lua_float_default(value: str) -> float:
+    try:
+        return float(value)
+    except ValueError:
+        return 0.0
+
+
+def _parse_lua_default(typ: str, value: str):
+    if typ == "Int":
+        return _parse_lua_int_default(value)
+    if typ == "String":
+        return repr(value)
+    if typ == "Float":
+        return _parse_lua_float_default(value)
+    return None
+
+
 @dataclass
 class LuaSetting:
     raw: str
@@ -58,29 +89,11 @@ class LuaSetting:
 
     @cached_property
     def default(self):
-        if "," in self.code:
-            _name, default = self.code.split(",", 1)
-            default = default.strip(' ",')
-            if self.typ == "Int":
-                try:
-                    return int(default)
-                except ValueError:
-                    return 0
-            if self.typ == "String":
-                return repr(default)
-            if self.typ == "Float":
-                try:
-                    return float(default)
-                except ValueError:
-                    return 0.0
-        else:
-            if self.typ == "Int":
-                return 0
-            if self.typ == "String":
-                return repr("")
-            if self.typ == "Float":
-                return 0.0
-        return None
+        if "," not in self.code:
+            return _LUA_TYPE_DEFAULTS.get(self.typ)
+
+        _name, default = self.code.split(",", 1)
+        return _parse_lua_default(self.typ, default.strip(' ",'))
 
     @cached_property
     def key(self):
