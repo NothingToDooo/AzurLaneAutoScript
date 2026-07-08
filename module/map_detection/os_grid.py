@@ -10,6 +10,19 @@ from module.os import assets as os_assets
 from module.os.radar import RadarGrid
 from module.template import assets as template_assets
 
+_OS_DIRECT_MERGE_FLAGS = (
+    "is_ally",
+    "is_akashi",
+    "is_scanning_device",
+    "is_logging_tower",
+    "is_exploration_reward",
+    "is_fleet_mechanism",
+    "is_question",
+    "is_meowfficer",
+    "is_exclamation",
+    "is_resource",
+)
+
 
 class OSGridInfo(GridInfo):
     is_os = True
@@ -72,13 +85,14 @@ class OSGridInfo(GridInfo):
         return "--"
 
     def merge(self, info, mode="normal"):
-        """
+        """把大型作战地图或雷达识别结果合并到当前格子。
+
         Args:
             info (OSGridInfo, RadarGrid):
-            mode (str): Scan mode, must be 'normal' in OS
+            mode (str): 大型作战只支持 'normal'。
 
         Returns:
-            bool: If success.
+            bool: 是否合并成功。
         """
         if mode != "normal":
             raise ValueError(f"OS grid merge only supports normal scan mode: {mode}")
@@ -86,49 +100,37 @@ class OSGridInfo(GridInfo):
         if isinstance(info, RadarGrid):
             self.is_radar_scanned = True
 
-        if info.is_ally:
-            self.is_ally = True
-            return True
-        if info.is_akashi:
-            self.is_akashi = True
-            return True
-        if info.is_scanning_device:
-            self.is_scanning_device = True
-            return True
-        if info.is_logging_tower:
-            self.is_logging_tower = True
-            return True
-        if info.is_exploration_reward:
-            self.is_exploration_reward = True
-            return True
-        if info.is_fleet_mechanism:
-            self.is_fleet_mechanism = True
+        if self._merge_direct_marker(info):
             return True
 
-        if info.is_question:
-            self.is_question = True
-            return True
-        if info.is_meowfficer:
-            self.is_meowfficer = True
-            return True
-        if info.is_exclamation:
-            self.is_exclamation = True
-            return True
-        if info.is_resource:
-            self.is_resource = True
-            return True
-        if info.is_enemy:
-            self.is_enemy = True
-            if info.enemy_scale:
-                self.enemy_scale = info.enemy_scale
-            if info.enemy_genre and not (info.enemy_genre == "Enemy" and self.enemy_genre):
-                self.enemy_genre = info.enemy_genre
+        if self._merge_enemy(info):
             return True
 
         # if info.is_fleet:
         #     self.is_fleet = True
         #     return True
 
+        return True
+
+    def _merge_direct_marker(self, info):
+        for flag in _OS_DIRECT_MERGE_FLAGS:
+            if getattr(info, flag, False):
+                setattr(self, flag, True)
+                return True
+        return False
+
+    def _merge_enemy(self, info):
+        if not getattr(info, "is_enemy", False):
+            return False
+
+        self.is_enemy = True
+        enemy_scale = getattr(info, "enemy_scale", 0)
+        if enemy_scale:
+            self.enemy_scale = enemy_scale
+
+        enemy_genre = getattr(info, "enemy_genre", None)
+        if enemy_genre and not (enemy_genre == "Enemy" and self.enemy_genre):
+            self.enemy_genre = enemy_genre
         return True
 
     def wipe_out(self):
