@@ -47,6 +47,10 @@ class _Device:
 
     def __init__(self) -> None:
         self.screenshot_count = 0
+        self.clicks: list[object] = []
+
+    def click(self, button: object) -> None:
+        self.clicks.append(button)
 
     def screenshot(self) -> None:
         self.screenshot_count += 1
@@ -59,6 +63,10 @@ class _Item:
     def __init__(self, *, price: int, count: int) -> None:
         self.price = price
         self.count = count
+
+
+class _BuyItem:
+    name = "buy-item"
 
 
 class _Shop(OSShop):
@@ -98,6 +106,56 @@ class _Shop(OSShop):
 
     def ui_ensure_index(self, index: int, **kwargs: object) -> None:
         self.calls.append(("ui_ensure_index", index, kwargs))
+
+
+class _BuyShop(OSShop):
+    def __init__(self) -> None:
+        self.device = _Device()
+        self.calls: list[tuple[object, ...]] = []
+        self.get_items_results: list[bool] = []
+        self.appear_results: dict[str, list[bool]] = {}
+        self.appear_then_click_results: dict[str, list[bool]] = {}
+        self.popup_results: list[bool] = []
+        self.amount_results: list[bool] = []
+
+    def buy_execute(self, item: _BuyItem) -> bool:
+        return self.os_shop_buy_execute(item)
+
+    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+        if results:
+            return results.pop(0)
+        return default
+
+    def handle_map_get_items(self, **kwargs: object) -> bool:
+        self.calls.append(("handle_map_get_items", kwargs))
+        return self._next_result(self.get_items_results, default=False)
+
+    def interval_clear(self, button: object) -> None:
+        self.calls.append(("interval_clear", button))
+
+    def interval_reset(self, button: object) -> None:
+        self.calls.append(("interval_reset", button))
+
+    def appear_then_click(self, button: object, **kwargs: object) -> bool:
+        key = button_key(button)
+        self.calls.append(("appear_then_click", key, kwargs))
+        return self._next_result(self.appear_then_click_results.get(key, []), default=False)
+
+    def appear(self, button: object, **kwargs: object) -> bool:
+        key = button_key(button)
+        self.calls.append(("appear", key, kwargs))
+        return self._next_result(self.appear_results.get(key, []), default=False)
+
+    def handle_popup_confirm(self, text: str) -> bool:
+        self.calls.append(("handle_popup_confirm", text))
+        return self._next_result(self.popup_results, default=False)
+
+    def shop_buy_amount_handler(self, item: _BuyItem) -> bool:
+        self.calls.append(("shop_buy_amount_handler", item))
+        return self._next_result(self.amount_results, default=False)
+
+    def close_shop_buy_confirm_amount(self, skip_first_screenshot: object = True) -> None:
+        self.calls.append(("close_shop_buy_confirm_amount", skip_first_screenshot))
 
 
 @pytest.fixture(autouse=True)
@@ -151,3 +209,38 @@ def test_shop_buy_amount_handler_sets_max_before_target_amount(monkeypatch: pyte
             "skip_first_screenshot": True,
         },
     ) in shop.calls
+
+
+def test_os_shop_buy_execute_returns_true_after_reward() -> None:
+    shop = _BuyShop()
+    shop.get_items_results = [True, False]
+    shop.appear_results[button_key(shop_module.PORT_SUPPLY_CHECK)] = [True]
+
+    result = shop.buy_execute(_BuyItem())
+
+    assert result is True
+    assert ("interval_clear", shop_module.PORT_SUPPLY_CHECK) in shop.calls
+
+
+def test_os_shop_buy_execute_clicks_item_from_supply_page() -> None:
+    shop = _BuyShop()
+    item = _BuyItem()
+    shop.get_items_results = [False, True, False]
+    shop.appear_results[button_key(shop_module.PORT_SUPPLY_CHECK)] = [True, True]
+
+    result = shop.buy_execute(item)
+
+    assert result is True
+    assert item in shop.device.clicks
+
+
+def test_os_shop_buy_execute_closes_after_amount_retry_failure() -> None:
+    shop = _BuyShop()
+    item = _BuyItem()
+    shop.appear_results[button_key(shop_module.SHOP_BUY_CONFIRM_AMOUNT)] = [True, True, True, True]
+    shop.amount_results = [False, False, False, False]
+
+    result = shop.buy_execute(item)
+
+    assert result is False
+    assert ("close_shop_buy_confirm_amount", False) in shop.calls

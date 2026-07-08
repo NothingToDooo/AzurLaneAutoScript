@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1
@@ -13,6 +15,14 @@ from module.shop.assets import SHOP_BUY_CONFIRM as OS_SHOP_BUY_CONFIRM
 from module.shop.clerk import OCR_SHOP_AMOUNT
 
 
+@dataclass(slots=True)
+class _OSShopBuyState:
+    button: object
+    amount_finish: bool = False
+    success: bool = False
+    set_amount_retry: int = 0
+
+
 class OSShop(PortShop, AkashiShop):
     def os_shop_buy_execute(self, button, skip_first_screenshot=True) -> bool:
         """
@@ -23,8 +33,7 @@ class OSShop(PortShop, AkashiShop):
         Pages:
             in: PORT_SUPPLY_CHECK
         """
-        success = False
-        amount_finish = False
+        state = _OSShopBuyState(button=button)
         self.interval_clear(
             [
                 PORT_SUPPLY_CHECK,
@@ -35,7 +44,6 @@ class OSShop(PortShop, AkashiShop):
                 SHOP_CLICK_SAFE_AREA,
             ]
         )
-        set_amount_retry = 0
 
         while True:
             if skip_first_screenshot:
@@ -43,45 +51,81 @@ class OSShop(PortShop, AkashiShop):
             else:
                 self.device.screenshot()
 
-            if self.handle_map_get_items(interval=3):
-                self.interval_clear(PORT_SUPPLY_CHECK)
-                success = True
+            if self._handle_os_shop_buy_rewards(state):
                 continue
-
-            if self.appear_then_click(SHOP_BUY_CONFIRM, offset=(20, 20), interval=3):
-                self.interval_reset(SHOP_BUY_CONFIRM)
+            if self._handle_os_shop_buy_confirm_buttons():
                 continue
-
-            if self.appear_then_click(OS_SHOP_BUY_CONFIRM, offset=(20, 20), interval=3):
-                self.interval_reset(OS_SHOP_BUY_CONFIRM)
+            amount_handled, amount_failed = self._handle_os_shop_buy_amount(
+                state, skip_first_screenshot=skip_first_screenshot
+            )
+            if amount_failed:
+                break
+            if amount_handled:
                 continue
-
-            if not amount_finish and self.appear(SHOP_BUY_CONFIRM_AMOUNT, offset=(20, 20)):
-                amount_finish = self.shop_buy_amount_handler(button)
-                set_amount_retry += 1
-                if not amount_finish and set_amount_retry > 3:
-                    logger.warning(f"Item {button.name} cant get amount.")
-                    self.close_shop_buy_confirm_amount(skip_first_screenshot)
-                    break
+            if self._handle_os_shop_buy_amount_confirm(state):
                 continue
-
-            if amount_finish and self.appear_then_click(SHOP_BUY_CONFIRM_AMOUNT, offset=(20, 20), interval=3):
-                self.interval_reset(SHOP_BUY_CONFIRM_AMOUNT)
+            if self._handle_os_shop_buy_misc(state):
                 continue
-
-            if self.handle_popup_confirm("SHOP_BUY"):
-                continue
-
-            if not success and self.appear(PORT_SUPPLY_CHECK, offset=(20, 20), interval=5):
-                amount_finish = False
-                self.device.click(button)
-                continue
-
-            # End
-            if success and self.appear(PORT_SUPPLY_CHECK, offset=(20, 20)):
+            if self._os_shop_buy_finished(state):
                 break
 
-        return success
+        return state.success
+
+    def _handle_os_shop_buy_rewards(self, state: _OSShopBuyState) -> bool:
+        if not self.handle_map_get_items(interval=3):
+            return False
+
+        self.interval_clear(PORT_SUPPLY_CHECK)
+        state.success = True
+        return True
+
+    def _handle_os_shop_buy_confirm_buttons(self) -> bool:
+        for button in (SHOP_BUY_CONFIRM, OS_SHOP_BUY_CONFIRM):
+            if self.appear_then_click(button, offset=(20, 20), interval=3):
+                self.interval_reset(button)
+                return True
+        return False
+
+    def _handle_os_shop_buy_amount(self, state: _OSShopBuyState, *, skip_first_screenshot: bool) -> tuple[bool, bool]:
+        if state.amount_finish:
+            return False, False
+        if not self.appear(SHOP_BUY_CONFIRM_AMOUNT, offset=(20, 20)):
+            return False, False
+
+        state.amount_finish = self.shop_buy_amount_handler(state.button)
+        state.set_amount_retry += 1
+        if not state.amount_finish and state.set_amount_retry > 3:
+            logger.warning(f"Item {state.button.name} cant get amount.")
+            self.close_shop_buy_confirm_amount(skip_first_screenshot)
+            return True, True
+        return True, False
+
+    def _handle_os_shop_buy_amount_confirm(self, state: _OSShopBuyState) -> bool:
+        if not state.amount_finish:
+            return False
+        if not self.appear_then_click(SHOP_BUY_CONFIRM_AMOUNT, offset=(20, 20), interval=3):
+            return False
+
+        self.interval_reset(SHOP_BUY_CONFIRM_AMOUNT)
+        return True
+
+    def _handle_os_shop_buy_misc(self, state: _OSShopBuyState) -> bool:
+        if self.handle_popup_confirm("SHOP_BUY"):
+            return True
+        return self._handle_os_shop_buy_entry(state)
+
+    def _handle_os_shop_buy_entry(self, state: _OSShopBuyState) -> bool:
+        if state.success:
+            return False
+        if not self.appear(PORT_SUPPLY_CHECK, offset=(20, 20), interval=5):
+            return False
+
+        state.amount_finish = False
+        self.device.click(state.button)
+        return True
+
+    def _os_shop_buy_finished(self, state: _OSShopBuyState) -> bool:
+        return state.success and self.appear(PORT_SUPPLY_CHECK, offset=(20, 20))
 
     def os_shop_buy(self, select_func) -> int:
         """
