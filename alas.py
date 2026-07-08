@@ -6,9 +6,8 @@ from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import inflection
-
 from module.base.decorator import cached_property, del_cached_property
+from module.base.naming import camel_to_snake
 from module.base.resource import release_resources
 from module.config.config import AzurLaneConfig, TaskEnd
 from module.config.deep import deep_get, deep_set
@@ -259,7 +258,7 @@ class AzurLaneAutoScript:
             self.device.stuck_record_clear()
             self.device.click_record_clear()
             logger.hr(task, level=0)
-            success = self.run(inflection.underscore(task))
+            success = self.run(camel_to_snake(task))
             logger.info(f"Scheduler: End task `{task}`")
             self.is_first_task = False
 

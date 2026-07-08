@@ -3,7 +3,6 @@ import threading
 from multiprocessing import Process
 from typing import TYPE_CHECKING, ClassVar, cast
 
-import inflection
 from rich.console import Console, ConsoleRenderable
 
 if TYPE_CHECKING:
@@ -16,6 +15,7 @@ from module.webui.fake_pil_module import import_fake_pil_module, remove_fake_pil
 import_fake_pil_module()
 
 from alas import AzurLaneAutoScript
+from module.base.naming import camel_to_snake
 from module.config.config import AzurLaneConfig
 from module.logger import logger, set_file_logger, set_func_logger
 from module.submodule.submodule import load_mod
@@ -141,7 +141,7 @@ class ProcessManager:
                     AzurLaneAutoScript.stop_event = stop_event
                 AzurLaneAutoScript(config_name=config_name).loop()
             elif func in get_available_func():
-                AzurLaneAutoScript(config_name=config_name).run(inflection.underscore(func), skip_first_screenshot=True)
+                AzurLaneAutoScript(config_name=config_name).run(camel_to_snake(func), skip_first_screenshot=True)
             elif func in get_available_mod():
                 mod = load_mod(func)
 
@@ -149,7 +149,7 @@ class ProcessManager:
                     mod.set_stop_event(stop_event)
                 mod.loop(config_name)
             elif func in get_available_mod_func():
-                getattr(load_mod(get_func_mod(func)), inflection.underscore(func))(config_name)
+                getattr(load_mod(get_func_mod(func)), camel_to_snake(func))(config_name)
             else:
                 logger.critical(f"No function matched: {func}")
             logger.info(f"[{config_name}] exited. Reason: Finish\n")
