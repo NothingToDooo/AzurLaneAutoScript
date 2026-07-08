@@ -468,37 +468,61 @@ class Fleet(Camera, AmbushHandler):
             turning_optimize (bool): True to optimize route to reduce ambushes
         """
         location = location_ensure(location)
-        if step_optimize is None:
-            step_optimize = self.config.MAP_HAS_FLEET_STEP
-            if self.config.MAP_HAS_PORTAL or self.config.MAP_HAS_MAZE:
-                step_optimize = True
-        if turning_optimize is None:
-            turning_optimize = self.config.MAP_HAS_AMBUSH
+        step_optimize = self._goto_step_optimize(step_optimize)
+        turning_optimize = self._goto_turning_optimize(turning_optimize)
 
-        # self.device.sleep(1000)
-        if step_optimize or turning_optimize:
-            step = self.fleet_step if step_optimize else 0
-            nodes = self.map.find_path(location, step=step, turning_optimize=turning_optimize)
-            for node in nodes:
-                if self.maze_active_on(node):
-                    logger.info(f"Maze is active on {location2node(node)}, bouncing to wait")
-                    for _ in range(10):
-                        grids = self.map[node].maze_nearby.delete(self.map.select(is_fleet=True))
-                        if grids.select(is_enemy=False):
-                            grids = grids.select(is_enemy=False)
-                        grids = grids.sort("cost")
-                        self._goto(grids[0], expected="")
-                try:
-                    self._goto(node, expected=expected if node == nodes[-1] else "")
-                except MapWalkError:
-                    logger.warning("Map walk error.")
-                    self.predict()
-                    self.ensure_edge_insight()
-                    nodes_ = self.map.find_path(node, step=1, turning_optimize=False)
-                    for node_ in nodes_:
-                        self._goto(node_, expected=expected if node == nodes[-1] else "")
-        else:
+        if not step_optimize and not turning_optimize:
             self._goto(location, expected=expected)
+            return
+
+        nodes = self._goto_find_path(location, step_optimize=step_optimize, turning_optimize=turning_optimize)
+        for node in nodes:
+            self._goto_wait_maze(node)
+            self._goto_path_node(node, nodes[-1], expected=expected)
+
+    def _goto_step_optimize(self, step_optimize):
+        if step_optimize is not None:
+            return step_optimize
+        if self.config.MAP_HAS_PORTAL or self.config.MAP_HAS_MAZE:
+            return True
+        return self.config.MAP_HAS_FLEET_STEP
+
+    def _goto_turning_optimize(self, turning_optimize):
+        if turning_optimize is None:
+            return self.config.MAP_HAS_AMBUSH
+        return turning_optimize
+
+    def _goto_find_path(self, location, *, step_optimize, turning_optimize):
+        step = self.fleet_step if step_optimize else 0
+        return self.map.find_path(location, step=step, turning_optimize=turning_optimize)
+
+    def _goto_wait_maze(self, node):
+        if not self.maze_active_on(node):
+            return
+
+        logger.info(f"Maze is active on {location2node(node)}, bouncing to wait")
+        for _ in range(10):
+            grids = self.map[node].maze_nearby.delete(self.map.select(is_fleet=True))
+            non_enemy_grids = grids.select(is_enemy=False)
+            if non_enemy_grids:
+                grids = non_enemy_grids
+            grids = grids.sort("cost")
+            self._goto(grids[0], expected="")
+
+    def _goto_path_node(self, node, final_node, *, expected):
+        node_expected = expected if node == final_node else ""
+        try:
+            self._goto(node, expected=node_expected)
+        except MapWalkError:
+            self._goto_retry_after_walk_error(node, expected=node_expected)
+
+    def _goto_retry_after_walk_error(self, node, *, expected):
+        logger.warning("Map walk error.")
+        self.predict()
+        self.ensure_edge_insight()
+        nodes = self.map.find_path(node, step=1, turning_optimize=False)
+        for retry_node in nodes:
+            self._goto(retry_node, expected=expected)
 
     def find_path_initial(self):
         """
