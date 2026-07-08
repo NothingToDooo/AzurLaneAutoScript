@@ -16,7 +16,7 @@ from module.template import assets as template_assets
 
 class CampaignOcr(ModuleBase):
     campaign_chapter: str = "0"
-    # An approximate area where stages will appear for faster template matching
+    # 大致关卡名区域，用来缩小模板匹配范围。
     _stage_detect_area = (87, 117, 1151, 636)
 
     def __init__(self, *args, **kwargs):
@@ -44,11 +44,10 @@ class CampaignOcr(ModuleBase):
 
     @staticmethod
     def campaign_ocr_result_process(result):
-        # The result will be like '7--2', because tha dash in game is '–' not '-'
+        # 游戏内短横线不是普通 '-'，OCR 结果可能变成 '7--2'。
         result = result.replace("--", "-").replace("--", "-").lstrip("-")
 
-        # Replace wrong 'I' from results like 'I1-1', '1I-1', 'I-I', '11-I', 'I4-4', to '1'
-        # while keeping results like 'isp-2', 'sp1'
+        # 修正 'I1-1'、'1I-1' 这类数字段误识别，同时保留 'isp-2'、'sp1'。
         def replace_func(match):
             segment = match.group(0)
             return segment.replace("I", "1")
@@ -71,23 +70,26 @@ class CampaignOcr(ModuleBase):
             tuple[str]: Campaign_name and stage index in lowercase, Such as ['7', '2'], ['d', '3'], ['sp', '3'].
         """
         name = name.strip("-")
+        result = None
         if name == "sp":
-            return "ex_sp", "1"
-        if name.startswith("extra") or name == "ex":
-            return "ex_ex", "1"
-        if "-" in name:
-            return name.split("-")
-        if name.startswith("sp"):
-            return "sp", name[-1]
-        if name[-1].isdigit():
-            return name[:-1], name[-1]
-        if name[0].isdigit() and name[-1].isalpha():
-            # 49X
+            result = ("ex_sp", "1")
+        elif name.startswith("extra") or name == "ex":
+            result = ("ex_ex", "1")
+        elif "-" in name:
+            result = name.split("-")
+        elif name.startswith("sp"):
+            result = ("sp", name[-1])
+        elif name[-1].isdigit():
+            result = (name[:-1], name[-1])
+        elif name[0].isdigit() and name[-1].isalpha():
+            # 例如 49X。
             logger.warning(f"Unknown stage name: {name}")
-            return "", ""
+            result = ("", "")
 
-        logger.warning(f"Unknown stage name: {name}")
-        return "", ""
+        if result is None:
+            logger.warning(f"Unknown stage name: {name}")
+            result = ("", "")
+        return result
 
     def campaign_match_multi(
         self,
@@ -125,11 +127,7 @@ class CampaignOcr(ModuleBase):
             button_name = button.crop(area=name_area, image=image)
             name = extract_letters(button_name.image, letter=name_letter, threshold=name_thresh)
             button_name = button_name.crop(area=self._extract_stage_name(name))
-            # To each Button instance:
-            # button.area: Area of stage name, such as '3-4'. Temporarily replaced for OCR.
-            # button.color: Color of stage icon, such as 'CLEAR' and '%'.
-            # button.button: Area of stage icon, such as 'CLEAR' and '%'.
-            # button.name: 'STAGE', a meaningless name.
+            # 每个按钮的 area 临时替换成关卡名区域，供 OCR 使用；button 保留关卡图标区域。
             button.load_color(image)
             button.area = button_name.area
             digits.append(button)
@@ -165,17 +163,6 @@ class CampaignOcr(ModuleBase):
                 name_offset=(75, 9),
                 name_size=(60, 16),
             )
-            # 2024.04.11 Game client bugged with random broken assets around TEMPLATE_STAGE_CLEAR
-            # digits += self.campaign_match_multi(
-            #     TEMPLATE_STAGE_CLEAR_SMALL,
-            #     image, self._stage_image_gray,
-            #     name_offset=(53, 2), name_size=(60, 16)
-            # )
-            # digits += self.campaign_match_multi(
-            #     TEMPLATE_STAGE_HALF_PERCENT,
-            #     image, self._stage_image_gray,
-            #     name_offset=(48, 0), name_size=(60, 16)
-            # )
             digits += self.campaign_match_multi(
                 template_assets.TEMPLATE_STAGE_PERCENT,
                 image,
@@ -294,7 +281,7 @@ class CampaignOcr(ModuleBase):
         self.campaign_chapter = counter.most_common()[0][0]
 
         if self.campaign_chapter in {0, "0"}:
-            # ['0F', 'F-IB', 'IGI']
+            # OCR 误识别示例：'0F'、'F-IB'、'IGI'。
             raise CampaignNameError
 
         # OCR 后恢复按钮属性。

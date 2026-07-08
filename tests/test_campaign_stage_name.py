@@ -1,5 +1,6 @@
 import pytest
 
+from module.campaign.campaign_ocr import CampaignOcr
 from module.campaign.run import (
     _apply_campaign_folder_policies,
     _apply_stage_alias_policies,
@@ -119,3 +120,20 @@ def test_campaign_folder_policies_fallback_threat_safe_without_3_stars() -> None
     _apply_campaign_folder_policies("event_20240912_cn", config)
 
     assert config.overrides == [{"StopCondition_MapAchievement": "100_percent_clear"}]
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("sp", ("ex_sp", "1")),
+        ("extra", ("ex_ex", "1")),
+        ("ex", ("ex_ex", "1")),
+        ("7-2", ["7", "2"]),
+        ("sp3", ("sp", "3")),
+        ("d3", ("d", "3")),
+        ("49x", ("", "")),
+        ("unknown", ("", "")),
+    ],
+)
+def test_campaign_separate_name(name, expected) -> None:
+    assert CampaignOcr.campaign_separate_name(name) == expected
