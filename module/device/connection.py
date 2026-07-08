@@ -269,7 +269,7 @@ class Connection(ConnectionAttr):
 
         res = self.nemud_app_keep_alive
         if res == "":
-            # 空属性通常表示 MuMu6 或低于 3.5.6 的 MuMu12。
+            # 旧版 MuMu 无法通过该属性判断后台保活。
             return True
         if res == "false":
             # 已关闭。
@@ -817,7 +817,7 @@ class Connection(ConnectionAttr):
                 available = devices.select(status="device")
                 self._log_available_devices(available)
                 continue
-            # MuMu6
+            # 不是当前可确认的 MuMu12 端口形态。
             break
         return available
 

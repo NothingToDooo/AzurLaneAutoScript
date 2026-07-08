@@ -183,8 +183,6 @@ class Screenshot(NemuIpc):
                 f"Screenshot method `{self.config.Emulator_ScreenshotMethod}` "
                 f"may not work on emulator `{self.serial}`, or the emulator is not fully started"
             )
-            if self.is_mumu_family:
-                logger.warning("如果正在使用 MuMu X，请升级到 12.1.5.0 或更高版本")
             self._screen_black_checked = False
             return False
         self._screen_black_checked = True

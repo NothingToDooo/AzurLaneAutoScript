@@ -444,7 +444,7 @@ class NemuIpc(Platform):
             logger.error("Unable to use NemuIpc because emulator instance not found")
             raise RequestHumanTakeover
         if "MuMuPlayerGlobal" in self.emulator_instance.path:
-            logger.info(f"nemu_ipc is not available on MuMuPlayerGlobal, {self.emulator_instance.path}")
+            logger.info(f"当前个人版不支持 MuMuPlayerGlobal：{self.emulator_instance.path}")
             raise RequestHumanTakeover
         try:
             impl = NemuIpcImpl(
@@ -467,9 +467,8 @@ class NemuIpc(Platform):
             # >= 4.0 has no info in getprop
             # Try initializing nemu_ipc for final check
             pass
-        # Having version, probably MuMu6 or MuMu12 version 3.x
+        # 有版本号时，用 app_keep_alive 属性判断 nemu_ipc 所需的 MuMu12 能力。
         elif self.nemud_app_keep_alive == "":
-            # Empty property, probably MuMu6 or MuMu12 version < 3.5.6
             return False
         try:
             _ = self.nemu_ipc
