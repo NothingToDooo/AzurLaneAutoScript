@@ -92,6 +92,32 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             return self.research_select(self.research_sort_filter(self.enforce), add_queue=add_queue)
         return True
 
+    def _research_select_priority(self, project, add_queue):
+        result = None
+        if project == "reset":
+            if self.research_reset():
+                result = False
+        elif isinstance(project, str):
+            # 优先级示例：['shortest']。
+            if project == "shortest":
+                self.research_select(self.research_sort_shortest(self.enforce), add_queue=add_queue)
+            elif project == "cheapest":
+                self.research_select(self.research_sort_cheapest(self.enforce), add_queue=add_queue)
+            else:
+                logger.warning(f"Unknown select method: {project}")
+            result = True
+        elif project.genre.upper() in ["C", "T"] and not self.enforce:
+            result = self.research_enforce(add_queue=add_queue)
+        else:
+            # 优先级示例：[ResearchProject, ResearchProject]。
+            started = self.research_project_start_with_requirements(project, add_queue=add_queue)
+            if started:
+                result = True
+            elif started is not None and self.research_delay_check():
+                logger.info("Delay research when resources not enough and queue not empty")
+                result = True
+        return result
+
     def research_select(self, priority, add_queue=True):
         """
         Args:
@@ -108,30 +134,9 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             return self.research_enforce(add_queue=add_queue)
         for project in priority:
             # 优先级示例：['reset', 'shortest']。
-            if project == "reset":
-                if self.research_reset():
-                    return False
-                continue
-
-            if isinstance(project, str):
-                # 优先级示例：['shortest']。
-                if project == "shortest":
-                    self.research_select(self.research_sort_shortest(self.enforce), add_queue=add_queue)
-                elif project == "cheapest":
-                    self.research_select(self.research_sort_cheapest(self.enforce), add_queue=add_queue)
-                else:
-                    logger.warning(f"Unknown select method: {project}")
-                return True
-            if project.genre.upper() in ["C", "T"] and not self.enforce:
-                return self.research_enforce(add_queue=add_queue)
-            # 优先级示例：[ResearchProject, ResearchProject]。
-            ret = self.research_project_start_with_requirements(project, add_queue=add_queue)
-            if ret:
-                return True
-            if ret is not None and self.research_delay_check():
-                logger.info("Delay research when resources not enough and queue not empty")
-                return True
-            continue
+            result = self._research_select_priority(project, add_queue=add_queue)
+            if result is not None:
+                return result
 
         logger.info("No research project started")
         return self.research_enforce(add_queue=add_queue)
@@ -224,7 +229,6 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
                     self.research_queue_add()
                 else:
                     self.research_detail_quit()
-                # self.ensure_no_info_bar(timeout=3)  # Research started
                 self.research_project_started = project
                 self._research_project_offset = (index - 2) % 5
                 return True
