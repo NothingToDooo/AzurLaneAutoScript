@@ -1,4 +1,5 @@
 import re
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -44,6 +45,20 @@ class ExchangeLimitOcr(Digit):
 
 
 GUILD_EXCHANGE_LIMIT = ExchangeLimitOcr(OCR_GUILD_EXCHANGE_LIMIT, threshold=64)
+
+
+@dataclass(slots=True)
+class _GuildLogisticsCollectState:
+    confirm_timer: Timer
+    exchange_interval: Timer
+    click_interval: Timer
+    supply_checked: bool = False
+    mission_checked: bool = False
+    exchange_checked: bool = False
+    exchange_count: int = 0
+
+    def all_checked(self):
+        return all([self.supply_checked, self.mission_checked, self.exchange_checked])
 
 
 class GuildLogistics(GuildBase):
@@ -162,15 +177,13 @@ class GuildLogistics(GuildBase):
         return self.appear_then_click(GUILD_MISSION_SELECT, offset=(20, 20), interval=2)
 
     def _guild_logistics_collect(self, skip_first_screenshot=True):
-        """
-        Execute collect/accept screen transitions within
-        logistics
+        """执行公会后勤页的领取、接取和兑换流程。
 
         Args:
             skip_first_screenshot (bool):
 
         Returns:
-            bool: If all guild logistics are check, no need to check them today.
+            bool: 三个后勤区块是否都已经检查完成。
 
         Pages:
             in: GUILD_LOGISTICS
@@ -178,13 +191,11 @@ class GuildLogistics(GuildBase):
         """
         logger.hr("Guild logistics")
         logger.attr("Guild master/official", self.config.GuildLogistics_SelectNewMission)
-        confirm_timer = Timer(1.5, count=3).start()
-        exchange_interval = Timer(1.5, count=3)
-        click_interval = Timer(0.5, count=1)
-        supply_checked = False
-        mission_checked = False
-        exchange_checked = False
-        exchange_count = 0
+        state = _GuildLogisticsCollectState(
+            confirm_timer=Timer(1.5, count=3).start(),
+            exchange_interval=Timer(1.5, count=3),
+            click_interval=Timer(0.5, count=1),
+        )
 
         while 1:
             if skip_first_screenshot:
@@ -192,68 +203,91 @@ class GuildLogistics(GuildBase):
             else:
                 self.device.screenshot()
 
-            # Handle all popups
-            if self.handle_popup_confirm("GUILD_LOGISTICS"):
-                confirm_timer.reset()
-                exchange_interval.reset()
+            if self._handle_guild_logistics_popups(state):
                 continue
-            if self.appear_then_click(GET_ITEMS_1, interval=2):
-                confirm_timer.reset()
-                exchange_interval.reset()
-                continue
-            if self._handle_guild_fleet_mission_start():
-                confirm_timer.reset()
-                continue
-
-            if self._is_in_guild_logistics():
-                # Supply
-                if not supply_checked and self._guild_logistics_supply_available():
-                    if click_interval.reached():
-                        self.device.click(GUILD_SUPPLY)
-                        click_interval.reset()
-                    confirm_timer.reset()
-                    continue
-                supply_checked = True
-                # Mission
-                if not mission_checked and self._guild_logistics_mission_available():
-                    if click_interval.reached():
-                        self.device.click(GUILD_MISSION)
-                        click_interval.reset()
-                    confirm_timer.reset()
-                    continue
-                mission_checked = True
-                # Exchange
-                if not exchange_checked and exchange_interval.reached():
-                    if self._guild_exchange():
-                        confirm_timer.reset()
-                        exchange_interval.reset()
-                        exchange_count += 1
-                        continue
-                    exchange_checked = True
-                # End
-                if not self.info_bar_count() and confirm_timer.reached():
-                    break
-                # if supply_checked and mission_checked and exchange_checked:
-                #     break
-                if exchange_count >= 5:
-                    # If you run AL across days, then do guild exchange.
-                    # There will show an error, said time is not up.
-                    # Restart the game can't fix the problem.
-                    # To fix this, you have to enter guild logistics once, then restart.
-                    # If exchange for 5 times, this bug is considered to be triggered.
-                    logger.warning("Unable to do guild exchange, probably because the timer in game was bugged")
-                    raise GameBugError("Triggered guild logistics refresh bug")
-
-            else:
-                confirm_timer.reset()
+            if not self._guild_logistics_collect_step(state):
+                break
 
         logger.info(
-            f"supply_checked: {supply_checked}, mission_checked: {mission_checked}, "
-            f"exchange_checked: {exchange_checked}, mission_finished: {self._guild_logistics_mission_finished}"
+            f"supply_checked: {state.supply_checked}, mission_checked: {state.mission_checked}, "
+            f"exchange_checked: {state.exchange_checked}, mission_finished: {self._guild_logistics_mission_finished}"
         )
-        # Azur Lane receives new guild missions now
-        # No longer consider `self._guild_logistics_mission_finished` as a check
-        return all([supply_checked, mission_checked, exchange_checked])
+        # 游戏现在会发放新的公会任务，不再把任务完成状态作为已检查条件。
+        return state.all_checked()
+
+    def _handle_guild_logistics_popups(self, state):
+        if self.handle_popup_confirm("GUILD_LOGISTICS"):
+            state.confirm_timer.reset()
+            state.exchange_interval.reset()
+            return True
+        if self.appear_then_click(GET_ITEMS_1, interval=2):
+            state.confirm_timer.reset()
+            state.exchange_interval.reset()
+            return True
+        if self._handle_guild_fleet_mission_start():
+            state.confirm_timer.reset()
+            return True
+        return False
+
+    def _guild_logistics_collect_step(self, state):
+        if not self._is_in_guild_logistics():
+            state.confirm_timer.reset()
+            return True
+
+        if self._handle_guild_supply(state):
+            return True
+        if self._handle_guild_mission(state):
+            return True
+        if self._handle_guild_exchange(state):
+            return True
+        if not self.info_bar_count() and state.confirm_timer.reached():
+            return False
+        self._raise_if_guild_exchange_bugged(state)
+        return True
+
+    def _handle_guild_supply(self, state):
+        if state.supply_checked:
+            return False
+        if self._guild_logistics_supply_available():
+            if state.click_interval.reached():
+                self.device.click(GUILD_SUPPLY)
+                state.click_interval.reset()
+            state.confirm_timer.reset()
+            return True
+        state.supply_checked = True
+        return False
+
+    def _handle_guild_mission(self, state):
+        if state.mission_checked:
+            return False
+        if self._guild_logistics_mission_available():
+            if state.click_interval.reached():
+                self.device.click(GUILD_MISSION)
+                state.click_interval.reset()
+            state.confirm_timer.reset()
+            return True
+        state.mission_checked = True
+        return False
+
+    def _handle_guild_exchange(self, state):
+        if state.exchange_checked or not state.exchange_interval.reached():
+            return False
+        if self._guild_exchange():
+            state.confirm_timer.reset()
+            state.exchange_interval.reset()
+            state.exchange_count += 1
+            return True
+        state.exchange_checked = True
+        return False
+
+    def _raise_if_guild_exchange_bugged(self, state) -> None:
+        if state.exchange_count < 5:
+            return
+
+        # 跨天运行后再做公会兑换，游戏可能持续提示时间未到。
+        # 进入一次公会后勤再重启游戏才能恢复；兑换五次仍失败就视为触发。
+        logger.warning("Unable to do guild exchange, probably because the timer in game was bugged")
+        raise GameBugError("Triggered guild logistics refresh bug")
 
     def _guild_exchange_scan(self):
         """
