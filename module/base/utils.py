@@ -556,10 +556,38 @@ def copy_image(src):
     return dst
 
 
+def _round_area(area):
+    x1, y1, x2, y2 = area
+    return round(x1), round(y1), round(x2), round(y2)
+
+
+def _crop_output_shape(image_shape, area):
+    x1, y1, x2, y2 = area
+    shape = (y2 - y1, x2 - x1)
+    if len(image_shape) == 2:
+        return shape
+    return (*shape, image_shape[2])
+
+
+def _crop_padding_and_overflow(image_shape, area):
+    x1, y1, x2, y2 = area
+    h, w = image_shape[:2]
+    padding = (max(-y1, 0), max(y2 - h, 0), max(-x1, 0), max(x2 - w, 0))
+    overflow = y1 >= h or y2 <= 0 or x1 >= w or x2 <= 0
+    return padding, overflow
+
+
+def _crop_border_value(image_shape):
+    if len(image_shape) == 2:
+        return 0
+    return tuple(0 for _ in range(image_shape[2]))
+
+
 def crop(image, area, copy=True):
     """
-    Crop image like pillow, when using opencv / numpy.
-    Provides a black background if cropping outside of image.
+    使用 opencv / numpy 按 Pillow 语义裁剪图片。
+
+    裁剪范围超出图片时，用黑色背景补齐。
 
     Args:
         image (np.ndarray):
@@ -569,58 +597,20 @@ def crop(image, area, copy=True):
     Returns:
         np.ndarray:
     """
-    # map(round, area)
-    x1, y1, x2, y2 = area
-    x1 = round(x1)
-    y1 = round(y1)
-    x2 = round(x2)
-    y2 = round(y2)
-    # h, w = image.shape[:2]
+    area = _round_area(area)
     shape = image.shape
-    h = shape[0]
-    w = shape[1]
-    # top, bottom, left, right
-    # border = np.maximum((0 - y1, y2 - h, 0 - x1, x2 - w), 0)
-    overflow = False
-    if y1 >= 0:
-        top = 0
-        if y1 >= h:
-            overflow = True
-    else:
-        top = -y1
-    if y2 > h:
-        bottom = y2 - h
-    else:
-        bottom = 0
-        if y2 <= 0:
-            overflow = True
-    if x1 >= 0:
-        left = 0
-        if x1 >= w:
-            overflow = True
-    else:
-        left = -x1
-    if x2 > w:
-        right = x2 - w
-    else:
-        right = 0
-        if x2 <= 0:
-            overflow = True
-    # If overflowed, return empty image
+    padding, overflow = _crop_padding_and_overflow(shape, area)
     if overflow:
-        size = (y2 - y1, x2 - x1) if len(shape) == 2 else (y2 - y1, x2 - x1, shape[2])
-        return np.zeros(size, dtype=image.dtype)
-    # x1, y1, x2, y2 = np.maximum((x1, y1, x2, y2), 0)
+        return np.zeros(_crop_output_shape(shape, area), dtype=image.dtype)
+
+    x1, y1, x2, y2 = area
     x1 = max(x1, 0)
     y1 = max(y1, 0)
     x2 = max(x2, 0)
     y2 = max(y2, 0)
-    # crop image
     image = image[y1:y2, x1:x2]
-    # if border
-    if top or bottom or left or right:
-        value = 0 if len(shape) == 2 else tuple(0 for _ in range(image.shape[2]))
-        return cv2.copyMakeBorder(image, top, bottom, left, right, borderType=cv2.BORDER_CONSTANT, value=value)
+    if any(padding):
+        return cv2.copyMakeBorder(image, *padding, borderType=cv2.BORDER_CONSTANT, value=_crop_border_value(shape))
     if copy:
         return copy_image(image)
     return image
