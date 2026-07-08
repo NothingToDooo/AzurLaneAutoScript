@@ -34,7 +34,7 @@ class Navbar:
         self.inactive_threshold = inactive_threshold
         self.active_count = active_count
         self.inactive_count = inactive_count
-        self.name = name if name is not None else grids._name
+        self.name = name if name is not None else grids.name
 
     def is_button_active(self, button, main):
         """

@@ -273,7 +273,7 @@ class ModuleBase:
                 break
 
     def wait_until_stable(self, button, timer=None, timeout=None, skip_first_screenshot=True):
-        button._match_init = False
+        button.reset_match_state()
         if timer is None:
             timer = Timer(0.3, count=1)
         if timeout is None:
@@ -285,7 +285,7 @@ class ModuleBase:
             else:
                 self.device.screenshot()
 
-            if button._match_init:
+            if button.is_match_initialized:
                 if button.match(self.device.image, offset=(0, 0)):
                     if timer.reached():
                         break
@@ -294,7 +294,7 @@ class ModuleBase:
                     timer.reset()
             else:
                 button.load_color(self.device.image)
-                button._match_init = True
+                button.mark_match_initialized()
 
             if timeout.reached():
                 logger.warning(f"wait_until_stable({button}) timeout")

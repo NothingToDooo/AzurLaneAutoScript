@@ -83,5 +83,5 @@ class DataProcessInfo:
 
 def iter_process() -> Iterable[DataProcessInfo]:
     for pid in psutil.pids():
-        proc = psutil._psplatform.Process(pid)
+        proc = psutil.Process(pid)
         yield DataProcessInfo(proc=proc, pid=proc.pid)

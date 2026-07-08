@@ -24,7 +24,7 @@ class Equipment(StorageHandler):
         self.handle_info_bar()
         equipment_assets.SWIPE_CHECK.load_color(self.device.image)
         # 跳过 match() 里的 ensure_template()，让截图对比只判断舰船是否真的变化。
-        equipment_assets.SWIPE_CHECK._match_init = True
+        equipment_assets.SWIPE_CHECK.mark_match_initialized()
         while 1:
             if not swipe_timer.started() or swipe_timer.reached():
                 swipe_timer.reset()

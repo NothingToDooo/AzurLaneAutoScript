@@ -129,6 +129,9 @@ class Screenshot(NemuIpc):
     def screenshot_last_save_time_reset(self, genre):
         self._last_save_time[genre] = 0
 
+    def screenshot_interval_clear(self) -> None:
+        self._screenshot_interval.clear()
+
     def screenshot_interval_set(self, interval=None):
         """
         Args:

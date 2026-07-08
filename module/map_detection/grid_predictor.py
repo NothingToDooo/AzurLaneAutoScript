@@ -346,7 +346,11 @@ class GridPredictor:
         if not self.is_in_detecting_area or not grid.is_in_detecting_area:
             return False
         piece_1 = self._image_similar_piece
-        piece_2 = grid._image_similar_full
+        piece_2 = grid.image_similar_full
         res = cv2.matchTemplate(piece_2, piece_1, cv2.TM_CCOEFF_NORMED)
         sim = cv2.minMaxLoc(res)[1]
         return sim > similarity
+
+    @property
+    def image_similar_full(self):
+        return self._image_similar_full

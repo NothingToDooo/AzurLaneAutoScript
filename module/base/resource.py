@@ -50,7 +50,8 @@ class Resource:
 
     @classmethod
     def is_loaded(cls, obj):
-        unloaded = (hasattr(obj, "_image") and obj._image is None) or (hasattr(obj, "image") and obj.image is None)
+        missing = object()
+        unloaded = getattr(obj, "_image", missing) is None or getattr(obj, "image", missing) is None
         return not unloaded
 
     @classmethod

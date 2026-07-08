@@ -509,7 +509,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         """
         count = 0
         retire_assets.RETIRE_COIN.load_color(self.device.image)
-        retire_assets.RETIRE_COIN._match_init = True
+        retire_assets.RETIRE_COIN.mark_match_initialized()
         self.interval_clear(retire_assets.SHIP_CONFIRM_2)
 
         while 1:

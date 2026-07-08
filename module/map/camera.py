@@ -288,10 +288,10 @@ class Camera(MapOperation):
             return np.linalg.norm(self.view.center_offset - prev_center_offset) < 0.001
 
         while 1:
-            # Camera.update() has no skip_first_screenshot
-            # No screenshot interval while waiting swipe_wait_timeout
+            # Camera.update() 没有 skip_first_screenshot。
+            # 等待 swipe_wait_timeout 时不要额外限制截图间隔。
             if not swipe_wait_timeout.reached():
-                self.device._screenshot_interval.clear()
+                self.device.screenshot_interval_clear()
             self.device.screenshot()
 
             # Update image in view only

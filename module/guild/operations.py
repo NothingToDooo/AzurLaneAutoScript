@@ -204,7 +204,7 @@ class GuildOperations(GuildBase):
             enter = button.crop(area=(-257, -109, 12, -1), name="DISPATCH_ENTRANCE_2")
             for b in [expand, enter]:
                 b.area = area_limit(b.area, detection_area)
-                b._button = area_pad(b.area, pad)
+                b.set_button_area(area_pad(b.area, pad))
             list_expand.append(expand)
             list_enter.append(enter)
 

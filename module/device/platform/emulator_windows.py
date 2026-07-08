@@ -196,11 +196,8 @@ class EmulatorManager(EmulatorManagerBase):
         Yields:
             str: Path to emulator executables, may contains duplicate values
         """
-        # 这里是一次性扫描，直接访问 psutil._psplatform.Process，
-        # 避开 psutil.Process.is_running() 的额外开销。
-        # 这段通常只需要约 0.017 秒。
         for pid in psutil.pids():
-            proc = psutil._psplatform.Process(pid)
+            proc = psutil.Process(pid)
             try:
                 exe = proc.cmdline()
                 exe = exe[0].replace(r"\\", "/").replace("\\", "/")

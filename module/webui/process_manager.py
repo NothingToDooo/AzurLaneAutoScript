@@ -161,6 +161,11 @@ class ProcessManager:
     def running_instances(cls) -> list[ProcessManager]:
         return [process for process in cls._processes.values() if process.alive]
 
+    @classmethod
+    def stop_all(cls) -> None:
+        for process in cls._processes.values():
+            process.stop()
+
     @staticmethod
     def restart_processes(
         instances: Sequence[ProcessManager | str] | None = None,

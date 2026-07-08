@@ -29,7 +29,7 @@ dic_setting_index_to_name = {v: k for k, v in dic_setting_name_to_index.items()}
 class AutoSearchHandler(EnemySearchingHandler):
     def _fleet_sidebar(self):
         if FLEET_PREPARATION_CHECK.match(self.device.image, offset=(20, 80)):
-            offset = np.subtract(FLEET_PREPARATION_CHECK.button, FLEET_PREPARATION_CHECK._button)[1]
+            offset = np.subtract(FLEET_PREPARATION_CHECK.button, FLEET_PREPARATION_CHECK.base_button)[1]
         else:
             offset = 0
         logger.attr("_fleet_sidebar_offset", offset)

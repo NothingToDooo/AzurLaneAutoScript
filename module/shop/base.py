@@ -82,7 +82,7 @@ class ShopItemGrid(ItemGrid):
             # Sometimes book's color and/or tier will be misidentified
             # Undergo a second template match using Book class
             if item.group == "book":
-                book = Book(image, item._button)
+                book = Book(image, item.source_button)
                 if item.sub_genre is not None:
                     item.sub_genre = book.genre_str
                 item.tier = book.tier_str.lower()

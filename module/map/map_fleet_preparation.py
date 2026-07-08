@@ -52,6 +52,10 @@ class FleetOperator:
             in_use.load_offset(clear)
             hard_satisfied.load_offset(clear)
 
+    @property
+    def clear_button(self):
+        return self._clear
+
     def __str__(self):
         return str(self._choose)[:-7]
 
@@ -400,7 +404,7 @@ class FleetPreparation(InfoHandler):
         if map_allow_submarine:
             if self.config.Submarine_Fleet:
                 if fleet_2.allow():
-                    self.device.click(fleet_2._clear)
+                    self.device.click(fleet_2.clear_button)
                     # 不需要重新截图，因为潜艇检查不需要 fleet_2 部分。
                 submarine.ensure_to_be(self.config.Submarine_Fleet)
             else:
@@ -409,10 +413,10 @@ class FleetPreparation(InfoHandler):
                 # 后续 clear() 调用可以保证点击成功。
                 op = False
                 if fleet_2.allow():
-                    self.device.click(fleet_2._clear)
+                    self.device.click(fleet_2.clear_button)
                     op = True
                 if submarine.allow():
-                    self.device.click(submarine._clear)
+                    self.device.click(submarine.clear_button)
                     op = True
                 if op:
                     self.device.screenshot()

@@ -109,6 +109,30 @@ class Button(Resource):
             return self._button
         return self._button_offset
 
+    @property
+    def base_button(self):
+        """返回未应用 offset 的原始点击区域。"""
+        return self._button
+
+    @property
+    def is_match_initialized(self):
+        """返回模板匹配缓存是否已初始化。"""
+        return self._match_init
+
+    def mark_match_initialized(self):
+        """标记当前 image/color 已可直接用于 match。"""
+        self._match_init = True
+
+    def reset_match_state(self):
+        """重置模板匹配缓存状态。"""
+        self._match_init = False
+
+    def set_button_area(self, button):
+        """更新原始点击区域。"""
+        self.raw_button = button
+        self.__dict__["_button"] = self.parse_property(button)
+        self._button_offset = None
+
     def appear_on(self, image, threshold=10):
         """Check if the button appears on the image.
 
@@ -143,7 +167,7 @@ class Button(Resource):
         Args:
             button (Button):
         """
-        offset = np.subtract(button.button, button._button)[:2]
+        offset = np.subtract(button.button, button.base_button)[:2]
         self._button_offset = area_offset(self._button, offset=offset)
 
     def clear_offset(self):
@@ -380,6 +404,10 @@ class ButtonGrid:
         else:
             text = traceback.extract_stack()[-2].line or ""
             self._name = text[: text.find("=")].strip()
+
+    @property
+    def name(self):
+        return self._name
 
     def __getitem__(self, item):
         base = np.round(np.array(item) * self.delta + self.origin).astype(int)

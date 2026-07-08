@@ -474,6 +474,10 @@ class CampaignMap:
             covered += self.grid_covered(grid).grids
         return SelectedGrids(covered).add(self._map_covered)
 
+    @property
+    def manual_map_covered(self):
+        return self._map_covered
+
     @map_covered.setter
     def map_covered(self, nodes):
         """

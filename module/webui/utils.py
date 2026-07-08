@@ -191,6 +191,10 @@ class TaskHandler:
     def remove_current_task(self) -> None:
         self.remove_task(self._task, nowait=True)
 
+    def set_current_task_delay(self, delay: float) -> None:
+        if self._task is not None:
+            self._task.delay = delay
+
     def get_task(self, name) -> Task:
         with self._lock:
             for task in self.tasks:

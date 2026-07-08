@@ -883,11 +883,11 @@ class AlasGUI(Frame):
                 True: [
                     lambda: self.__setattr__("visible", True),
                     lambda: self.alas_update_overview_task() if self.page == "Overview" else 0,
-                    lambda: self.task_handler._task.__setattr__("delay", 15),
+                    lambda: self.task_handler.set_current_task_delay(15),
                 ],
                 False: [
                     lambda: self.__setattr__("visible", False),
-                    lambda: self.task_handler._task.__setattr__("delay", 1),
+                    lambda: self.task_handler.set_current_task_delay(1),
                 ],
             },
             get_state=get_window_visibility_state,
@@ -1074,8 +1074,7 @@ def clearup():
     注意：必须在 uvicorn 重新加载 app 前执行。
     """
     logger.info("Start clearup")
-    for alas in ProcessManager._processes.values():
-        alas.stop()
+    ProcessManager.stop_all()
     State.clearup()
     task_handler.stop()
     logger.info("Alas closed.")

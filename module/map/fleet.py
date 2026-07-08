@@ -657,7 +657,7 @@ class Fleet(Camera, AmbushHandler):
                     covered = covered.add(self.map.grid_covered(self.map[self.fleet_1_location], location=[(1, 0)]))
                 if self.fleet_2_location:
                     covered = covered.add(self.map.grid_covered(self.map[self.fleet_2_location], location=[(1, 0)]))
-            covered = covered.add(self.map._map_covered)
+            covered = covered.add(self.map.manual_map_covered)
             if siren:
                 for grid in after:
                     covered = covered.add(self.map.grid_covered(grid))

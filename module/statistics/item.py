@@ -101,6 +101,10 @@ class Item:
     def button(self):
         return self._button.button
 
+    @property
+    def source_button(self):
+        return self._button
+
     def crop(self, area):
         return crop(self.image_raw, area_offset(area, offset=self._button.area[:2]))
 
