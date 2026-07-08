@@ -46,6 +46,7 @@ target-version = "py314"
 select = [
     "A",
     "ANN401",
+    "ASYNC",
     "ARG001",
     "ARG003",
     "B",
@@ -140,7 +141,8 @@ select = [
     "S605",
     "SIM",
     "SLOT",
-    "T201",
+    "T10",
+    "T20",
     "TCH",
     "TRY002",
     "TRY201",
