@@ -27,6 +27,7 @@ from module.os_shop.assets import PORT_SUPPLY_CHECK
 from module.ui.assets import BACK_ARROW
 
 FLEET_FILTER = Filter(regex=re.compile(r"fleet-?(\d)"), attr=("fleet",), preset=("callsubmarine",))
+WALK_OUT_OF_STEP_MESSAGE = "walk_out_of_step"
 
 
 @dataclass(slots=True)
@@ -274,7 +275,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             return True
         if self.handle_walk_out_of_step():
             if context.walk_out_of_step:
-                raise MapWalkError("walk_out_of_step")
+                raise MapWalkError(WALK_OUT_OF_STEP_MESSAGE)
             return True
         if self.handle_popup_confirm("WALK_UNTIL_STABLE"):
             self._walk_stable_reset(context)

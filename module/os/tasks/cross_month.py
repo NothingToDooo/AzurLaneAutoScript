@@ -6,6 +6,8 @@ from module.logger import logger
 from module.map.map_grids import SelectedGrids
 from module.os.map import OSMap
 
+INVALID_OPSI_NEXT_RESET_TEMPLATE = "Invalid OpsiNextReset: {next_reset} < {now}"
+
 
 class OpsiCrossMonth(OSMap):
     def os_cross_month_end(self):
@@ -27,7 +29,8 @@ class OpsiCrossMonth(OSMap):
         logger.attr("OpsiNextReset", next_reset)
 
         if next_reset < now:
-            raise ScriptError(f"Invalid OpsiNextReset: {next_reset} < {now}")
+            message = INVALID_OPSI_NEXT_RESET_TEMPLATE.format(next_reset=next_reset, now=now)
+            raise ScriptError(message)
         remain = next_reset - now
         if remain > timedelta(days=3):
             logger.error(

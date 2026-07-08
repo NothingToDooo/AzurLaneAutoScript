@@ -6,6 +6,9 @@ from module.map.map_grids import SelectedGrids
 from module.os.globe_detection import GLOBE_MAP_SHAPE
 from module.os.map_data import DIC_OS_MAP
 
+OS_GLOBE_ZONE_NOT_FOUND_TEMPLATE = "Unable to find OS globe zone: {name}"
+INVALID_HAZARD_LEVEL_TEMPLATE = "Invalid hazard_level of zones: {hazard_level}"
+
 
 class Zone:
     zone_id: int
@@ -95,7 +98,8 @@ class ZoneManager:
         try:
             return self.zones.select(zone_id=zone_id)[0]
         except IndexError as e:
-            raise ScriptError(f"Unable to find OS globe zone: {name}") from e
+            message = OS_GLOBE_ZONE_NOT_FOUND_TEMPLATE.format(name=name)
+            raise ScriptError(message) from e
 
     def name_to_zone(self, name):
         """
@@ -125,7 +129,8 @@ class ZoneManager:
         # 普通难度：仲裁者·XXX, 困难难度：仲裁者·XXX, 困难模拟战：仲裁机关。
         if any(keyword in parsed_name for keyword in ("普通", "困难", "仲裁")):
             return self.name_to_zone(154)
-        raise ScriptError(f"Unable to find OS globe zone: {parsed_name}")
+        message = OS_GLOBE_ZONE_NOT_FOUND_TEMPLATE.format(name=parsed_name)
+        raise ScriptError(message)
 
     def zone_nearest_azur_port(self, zone):
         """
@@ -159,4 +164,5 @@ class ZoneManager:
             return self.zones.select(hazard_level=hazard_level).delete(self.zones.select(region=5))
         if hazard_level == 10:
             return self.zones.select(region=5)
-        raise ScriptError(f"Invalid hazard_level of zones: {hazard_level}")
+        message = INVALID_HAZARD_LEVEL_TEMPLATE.format(hazard_level=hazard_level)
+        raise ScriptError(message)

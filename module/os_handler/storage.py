@@ -10,6 +10,7 @@ from module.os_handler import assets as os_assets
 from module.ui.scroll import Scroll
 
 SCROLL_STORAGE = Scroll(os_assets.STORATE_SCROLL, color=(247, 211, 66))
+UNKNOWN_STORAGE_ITEM_TEMPLATE = "Unknown storage item: {item}"
 
 
 class StorageHandler(GlobeOperation, ZoneManager):
@@ -197,7 +198,8 @@ class StorageHandler(GlobeOperation, ZoneManager):
             return os_assets.TEMPLATE_STORAGE_OBSCURE
         if item == "ABYSSAL":
             return os_assets.TEMPLATE_STORAGE_ABYSSAL
-        raise ScriptError(f"Unknown storage item: {item}")
+        message = UNKNOWN_STORAGE_ITEM_TEMPLATE.format(item=item)
+        raise ScriptError(message)
 
     def storage_checkout_item(self, item):
         """

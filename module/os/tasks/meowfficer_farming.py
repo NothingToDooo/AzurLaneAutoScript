@@ -4,6 +4,8 @@ from module.logger import logger
 from module.map.map_grids import SelectedGrids
 from module.os.map import OSMap
 
+WRONG_ZONE_INPUT_MESSAGE = "wrong input, task stopped"
+
 
 class OpsiMeowfficerFarming(OSMap):
     def os_meowfficer_farming(self):
@@ -97,7 +99,7 @@ class OpsiMeowfficerFarming(OSMap):
             return self.name_to_zone(self.config.OpsiMeowfficerFarming_TargetZone)
         except ScriptError as e:
             logger.warning(f"wrong zone_id input:{self.config.OpsiMeowfficerFarming_TargetZone}")
-            raise RequestHumanTakeover("wrong input, task stopped") from e
+            raise RequestHumanTakeover(WRONG_ZONE_INPUT_MESSAGE) from e
 
     def _run_meowfficer_farming_zone(self, zone, *, refresh) -> None:
         logger.hr(f"OS meowfficer farming, zone_id={zone.zone_id}", level=1)

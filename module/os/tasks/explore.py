@@ -4,6 +4,8 @@ from module.logger import logger
 from module.os.globe_operation import OSExploreError
 from module.os.map import OSMap
 
+INVALID_LAST_ZONE_TEMPLATE = "Invalid last_zone: {last_zone}"
+
 
 class OpsiExplore(OSMap):
     def __init__(self, *args, **kwargs):
@@ -63,7 +65,8 @@ class OpsiExplore(OSMap):
         elif last_zone == 0:
             logger.info(f"First run, next zone: {order[:1]}")
         else:
-            raise ScriptError(f"Invalid last_zone: {last_zone}")
+            message = INVALID_LAST_ZONE_TEMPLATE.format(last_zone=last_zone)
+            raise ScriptError(message)
         return order
 
     def _skip_cleared_os_explore_zone(self, zone):

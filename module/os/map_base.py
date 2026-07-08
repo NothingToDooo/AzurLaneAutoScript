@@ -4,6 +4,8 @@ from module.base.utils import location2node, node2location
 from module.map.map_base import CampaignMap, camera_2d
 from module.map_detection.os_grid import OSGridInfo
 
+OS_MAP_UPDATE_MODE_MESSAGE = "OS map update only supports normal scan mode"
+
 
 class OSCampaignMap(CampaignMap):
     def __init__(self, name=None):
@@ -38,7 +40,8 @@ class OSCampaignMap(CampaignMap):
             mode (str): Scan mode, such as 'normal', 'carrier', 'movable'
         """
         if mode != "normal":
-            raise ValueError(f"OS map update only supports normal scan mode: {mode}")
+            message = f"{OS_MAP_UPDATE_MODE_MESSAGE}: {mode}"
+            raise ValueError(message)
 
         offset = np.array(camera) - np.array(grids.center_loca)
         grids.show()
