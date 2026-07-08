@@ -183,7 +183,6 @@ python-version = "3.14"
 exclude = [
     "campaign/**",
     "dev_tools/**",
-    "submodule/**",
 ]
 
 [tool.ty.rules]
@@ -203,7 +202,6 @@ missing-argument = "ignore"
 no-matching-overload = "ignore"
 not-iterable = "ignore"
 not-subscriptable = "ignore"
-possibly-missing-submodule = "ignore"
 unbound-type-variable = "ignore"
 unresolved-attribute = "ignore"
 unresolved-import = "ignore"
