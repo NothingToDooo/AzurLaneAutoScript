@@ -203,7 +203,7 @@ class Daily(Combat, DailyEquipment):
                 fast=False,
                 skip_first_screenshot=True,
             )
-            self.combat(emotion_reduce=False, save_get_items=False, expected_end=daily_end, balance_hp=False)
+            self.combat(emotion_reduce=False, expected_end=daily_end, balance_hp=False)
 
         self.ui_click(
             click_button=BACK_ARROW,

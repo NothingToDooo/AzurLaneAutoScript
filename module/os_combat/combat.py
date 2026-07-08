@@ -136,7 +136,7 @@ class Combat(Combat_, MapEventHandler):
         finally:
             self._disable_handle_get_items = False
 
-    def combat(self, *args, save_get_items=False, **kwargs):
+    def combat(self, *args, **kwargs):
         """
         处理大世界中的连续战斗。
 
@@ -148,7 +148,7 @@ class Combat(Combat_, MapEventHandler):
                 logger.warning("Too many continuous combat")
 
             try:
-                super().combat(*args, save_get_items=save_get_items, **kwargs)
+                super().combat(*args, **kwargs)
                 break
             except ContinuousCombat:
                 logger.info("Continuous combat detected")

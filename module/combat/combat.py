@@ -580,7 +580,6 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         emotion_reduce=None,
         auto_mode=None,
         submarine_mode=None,
-        save_get_items=None,
         expected_end=None,
         fleet_index=1,
     ):
@@ -593,7 +592,6 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             emotion_reduce (bool):
             auto_mode (str): combat_auto, combat_manual, stand_still_in_the_middle, hide_in_bottom_left
             submarine_mode (str): do_not_use, hunt_only, every_combat
-            save_get_items:
             expected_end (str, callable):
             fleet_index (int): 1 or 2
         """
@@ -605,7 +603,6 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             submarine_mode = "do_not_use"
             if self.config.Submarine_Fleet:
                 submarine_mode = self.config.Submarine_Mode
-        self.battle_status_click_interval = 7 if save_get_items else 0
 
         # if not hasattr(self, 'emotion'):
         #     self.emotion = Emotion(config=self.config)

@@ -18,7 +18,7 @@ class CampaignBase(CampaignBase_):
         # all emenies spawned already, so no need to wait enemy searching
         if self.use_support_fleet:
             logger.hr(f"{self.FUNCTION_NAME_BASE}SUBMARINE", level=2)
-            self.combat(balance_hp=False, emotion_reduce=False, save_get_items=False, expected_end="no_searching")
+            self.combat(balance_hp=False, emotion_reduce=False, expected_end="no_searching")
         super().map_init(map_)
 
     def handle_submarine_support_popup(self):
