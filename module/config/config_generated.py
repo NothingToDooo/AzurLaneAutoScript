@@ -37,7 +37,7 @@ class GeneratedConfig:
     Emulator_AdbRestart = False
 
     # 配置组 `EmulatorInfo`
-    # 可选项：auto, MuMuPlayer, MuMuPlayerX, MuMuPlayer12
+    # 可选项：auto, MuMuPlayer12
     EmulatorInfo_Emulator = "auto"
     EmulatorInfo_name = None
     EmulatorInfo_path = None

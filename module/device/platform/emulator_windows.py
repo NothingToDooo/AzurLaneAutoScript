@@ -38,13 +38,6 @@ class Emulator(EmulatorBase):
         """
         emulator_path = Path(path)
         exe = emulator_path.name.lower()
-        dir2 = emulator_path.parent.parent.name.lower()
-        if exe == "nemuplayer.exe":
-            if dir2 == "nemu":
-                return cls.MuMuPlayer
-            if dir2 == "nemu9":
-                return cls.MuMuPlayerX
-            return cls.MuMuPlayer
         if exe in ["mumuplayer.exe", "mumunxmain.exe"]:
             return cls.MuMuPlayer12
 
@@ -61,9 +54,7 @@ class Emulator(EmulatorBase):
         Yields:
             str: Path to emulator executable
         """
-        if "NemuMultiPlayer.exe" in exe:
-            yield exe.replace("NemuMultiPlayer.exe", "NemuPlayer.exe")
-        elif "MuMuMultiPlayer.exe" in exe:
+        if "MuMuMultiPlayer.exe" in exe:
             yield exe.replace("MuMuMultiPlayer.exe", "MuMuPlayer.exe")
         elif "MuMuManager.exe" in exe:
             yield exe.replace("MuMuManager.exe", "MuMuPlayer.exe")
@@ -117,28 +108,14 @@ class Emulator(EmulatorBase):
         Yields:
             EmulatorInstance: Emulator instances found in this emulator
         """
-        if self == Emulator.MuMuPlayer:
-            yield self._default_mumu_instance()
-            return
-        if self == Emulator.MuMuPlayerX:
-            yield from self._iter_vbox_instances()
-            return
         if self == Emulator.MuMuPlayer12:
-            yield from self._iter_vbox_instances(allow_mumu12_default_serial=True)
+            yield from self._iter_vbox_instances()
 
-    def _default_mumu_instance(self):
-        # MuMu 单开版固定使用 7555。
-        return EmulatorInstance(
-            serial="127.0.0.1:7555",
-            name="",
-            path=self.path,
-        )
-
-    def _iter_vbox_instances(self, allow_mumu12_default_serial=False):
+    def _iter_vbox_instances(self):
         for folder in self.list_folder("../vms", is_dir=True):
-            yield from self._iter_vbox_folder_instances(folder, allow_mumu12_default_serial=allow_mumu12_default_serial)
+            yield from self._iter_vbox_folder_instances(folder)
 
-    def _iter_vbox_folder_instances(self, folder, allow_mumu12_default_serial=False):
+    def _iter_vbox_folder_instances(self, folder):
         name = Path(folder).name
         for file in iter_folder(folder, ext=".nemu"):
             serial = Emulator.vbox_file_to_serial(file)
@@ -155,7 +132,7 @@ class Emulator(EmulatorBase):
                 name=name,
                 path=self.path,
             )
-            if allow_mumu12_default_serial and instance.MuMuPlayer12_id:
+            if instance.MuMuPlayer12_id is not None:
                 instance.serial = self._mumu12_default_serial(instance)
                 yield instance
 
@@ -169,15 +146,14 @@ class Emulator(EmulatorBase):
         Yields:
             str: Filepath to adb binaries found in this emulator
         """
-        if self != Emulator.MuMuPlayerFamily:
+        if self != Emulator.MuMuPlayer12:
             return
 
-        # MuMu9\emulator\nemu9\EmulatorShell -> MuMu9\emulator\nemu9\vmonitor\bin\adb_server.exe
+        # MuMu 目录内可能带有 ADB。
         exe = self.abspath("../vmonitor/bin/adb_server.exe")
         if Path(exe).exists():
             yield exe
 
-        # MuMu 目录内可能有 adb.exe。
         exe = self.abspath("./adb.exe")
         if Path(exe).exists():
             yield exe

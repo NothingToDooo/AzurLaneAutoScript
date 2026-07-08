@@ -47,8 +47,6 @@ EmulatorInfo:
     value: auto
     option: [
       auto,
-      MuMuPlayer,
-      MuMuPlayerX,
       MuMuPlayer12,
     ]
   name:

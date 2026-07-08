@@ -21,29 +21,21 @@ def _write_nemu(folder: Path, hostport: str | None = None) -> None:
     (folder / "instance.nemu").write_text(text, encoding="utf-8")
 
 
-def test_iter_instances_returns_legacy_mumu_default_serial(tmp_path: Path) -> None:
+def test_legacy_nemu_player_is_not_supported(tmp_path: Path) -> None:
     exe = _touch_exe(tmp_path / "nemu" / "EmulatorShell" / "NemuPlayer.exe")
     emulator = Emulator(exe.as_posix())
 
-    instances = list(emulator.iter_instances())
-
-    assert len(instances) == 1
-    assert instances[0].serial == "127.0.0.1:7555"
-    assert instances[0].name == ""
-    assert instances[0].path == emulator.path
+    assert emulator.type == ""
+    assert list(emulator.iter_instances()) == []
 
 
-def test_iter_instances_reads_vbox_serial_for_mumux(tmp_path: Path) -> None:
+def test_legacy_mumux_player_is_not_supported(tmp_path: Path) -> None:
     exe = _touch_exe(tmp_path / "nemu9" / "EmulatorShell" / "NemuPlayer.exe")
     _write_nemu(tmp_path / "nemu9" / "vms" / "nemu-12.0-x64-default", hostport="62026")
     emulator = Emulator(exe.as_posix())
 
-    instances = list(emulator.iter_instances())
-
-    assert len(instances) == 1
-    assert instances[0].serial == "127.0.0.1:62026"
-    assert instances[0].name == "nemu-12.0-x64-default"
-    assert instances[0].path == emulator.path
+    assert emulator.type == ""
+    assert list(emulator.iter_instances()) == []
 
 
 def test_iter_instances_falls_back_to_mumu12_default_serial(tmp_path: Path) -> None:

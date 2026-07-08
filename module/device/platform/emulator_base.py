@@ -132,10 +132,7 @@ class EmulatorInstanceBase:
 
 class EmulatorBase:
     # 这里的值必须和 argument.yaml 里的 EmulatorInfo.Emulator.option 保持一致。
-    MuMuPlayer = "MuMuPlayer"
-    MuMuPlayerX = "MuMuPlayerX"
     MuMuPlayer12 = "MuMuPlayer12"
-    MuMuPlayerFamily = (MuMuPlayer, MuMuPlayerX, MuMuPlayer12)
 
     @classmethod
     def path_to_type(cls, path: str) -> str:
