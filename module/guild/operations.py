@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from module.base.button import ButtonGrid
 from module.base.timer import Timer
 from module.base.utils import area_limit, area_pad, point_in_area, random_rectangle_vector
@@ -15,6 +17,18 @@ GUILD_OPERATIONS_PROGRESS = DigitCounter(
 )
 
 
+@dataclass(slots=True)
+class _GuildDispatchEntrances:
+    expand: list
+    enter: list
+
+
+@dataclass(slots=True)
+class _GuildOperationsEnsureState:
+    confirm_timer: object
+    join_confirm_count: int = 0
+
+
 class GuildOperations(GuildBase):
     def _guild_operations_ensure(self, skip_first_screenshot=True):
         """
@@ -26,75 +40,95 @@ class GuildOperations(GuildBase):
                 False if fund insufficient
         """
         logger.attr("Guild master/official", self.config.GuildOperation_SelectNewOperation)
-        confirm_timer = Timer(1.5, count=3).start()
-        click_count = 0
+        state = _GuildOperationsEnsureState(confirm_timer=Timer(1.5, count=3).start())
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
             else:
                 self.device.screenshot()
 
-            # 结束。
-            if click_count > 5:
-                # 信息条显示 `none4302` 时，多半是其他公会管理已经开启了作战。
-                # 重新进入公会页通常可以恢复。
-                logger.warning(
-                    "Unable to start/join guild operation, "
-                    "probably because guild operation has been started by another guild officer already"
-                )
-                raise GameBugError("Unable to start/join guild operation")
-
+            self._raise_if_guild_operations_join_stuck(state)
             if self._guild_operation_fund_insufficient():
                 return False
             if self._handle_guild_operations_start():
-                confirm_timer.reset()
+                state.confirm_timer.reset()
                 continue
-            if self.appear(guild_assets.GUILD_OPERATIONS_JOIN, interval=3):
-                if self.image_color_count(
-                    guild_assets.GUILD_OPERATIONS_MONTHLY_COUNT,
-                    color=(255, 93, 90),
-                    threshold=221,
-                    count=20,
-                ):
-                    logger.info("Unable to join operation, no more monthly attempts left")
-                    self.device.click(guild_assets.GUILD_OPERATIONS_CLICK_SAFE_AREA)
-                else:
-                    current, _remain, total = GUILD_OPERATIONS_PROGRESS.ocr(self.device.image)
-                    threshold = total * self.config.GuildOperation_JoinThreshold
-                    if current <= threshold:
-                        logger.info(f"Joining Operation, current progress less than threshold ({threshold:.2f})")
-                        self.device.click(guild_assets.GUILD_OPERATIONS_JOIN)
-                    else:
-                        logger.info(
-                            f"Refrain from joining operation, current progress exceeds threshold ({threshold:.2f})"
-                        )
-                        self.device.click(guild_assets.GUILD_OPERATIONS_CLICK_SAFE_AREA)
-                confirm_timer.reset()
+            if self._handle_guild_operations_join(state):
                 continue
-            if self.handle_popup_confirm("JOIN_OPERATION"):
-                click_count += 1
-                confirm_timer.reset()
+            if self._handle_guild_operations_join_popups(state):
                 continue
-            if self.handle_popup_single("FLEET_UPDATED"):
-                logger.info(
-                    "Fleet composition altered, may still be dispatch-able. However "
-                    "fellow guild members have updated their support line up. "
-                    "Suggestion: Enable Boss Recommend"
-                )
-                confirm_timer.reset()
-                continue
-
-            # 结束。
-            if (
-                (
-                    self.appear(guild_assets.GUILD_BOSS_ENTER)
-                    or self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK, offset=(20, 20))
-                )
-                and not self.info_bar_count()
-                and confirm_timer.reached()
-            ):
+            if self._guild_operations_loaded(state):
                 return True
         return False
+
+    def _raise_if_guild_operations_join_stuck(self, state):
+        if state.join_confirm_count <= 5:
+            return
+
+        # 信息条显示 `none4302` 时，多半是其他公会管理已经开启了作战。
+        # 重新进入公会页通常可以恢复。
+        logger.warning(
+            "Unable to start/join guild operation, "
+            "probably because guild operation has been started by another guild officer already"
+        )
+        raise GameBugError("Unable to start/join guild operation")
+
+    def _handle_guild_operations_join(self, state):
+        if not self.appear(guild_assets.GUILD_OPERATIONS_JOIN, interval=3):
+            return False
+
+        if self._guild_operations_monthly_attempts_depleted():
+            logger.info("Unable to join operation, no more monthly attempts left")
+            self.device.click(guild_assets.GUILD_OPERATIONS_CLICK_SAFE_AREA)
+        else:
+            self._guild_operations_click_join_by_progress()
+        state.confirm_timer.reset()
+        return True
+
+    def _guild_operations_monthly_attempts_depleted(self):
+        return self.image_color_count(
+            guild_assets.GUILD_OPERATIONS_MONTHLY_COUNT,
+            color=(255, 93, 90),
+            threshold=221,
+            count=20,
+        )
+
+    def _guild_operations_click_join_by_progress(self):
+        current, _remain, total = GUILD_OPERATIONS_PROGRESS.ocr(self.device.image)
+        threshold = total * self.config.GuildOperation_JoinThreshold
+        if current <= threshold:
+            logger.info(f"Joining Operation, current progress less than threshold ({threshold:.2f})")
+            self.device.click(guild_assets.GUILD_OPERATIONS_JOIN)
+            return
+
+        logger.info(f"Refrain from joining operation, current progress exceeds threshold ({threshold:.2f})")
+        self.device.click(guild_assets.GUILD_OPERATIONS_CLICK_SAFE_AREA)
+
+    def _handle_guild_operations_join_popups(self, state):
+        if self.handle_popup_confirm("JOIN_OPERATION"):
+            state.join_confirm_count += 1
+            state.confirm_timer.reset()
+            return True
+        if not self.handle_popup_single("FLEET_UPDATED"):
+            return False
+
+        logger.info(
+            "Fleet composition altered, may still be dispatch-able. However "
+            "fellow guild members have updated their support line up. "
+            "Suggestion: Enable Boss Recommend"
+        )
+        state.confirm_timer.reset()
+        return True
+
+    def _guild_operations_loaded(self, state):
+        if not (
+            self.appear(guild_assets.GUILD_BOSS_ENTER)
+            or self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK, offset=(20, 20))
+        ):
+            return False
+        if self.info_bar_count():
+            return False
+        return state.confirm_timer.reached()
 
     def _handle_guild_operations_start(self):
         """
@@ -265,33 +299,60 @@ class GuildOperations(GuildBase):
             else:
                 self.device.screenshot()
 
-            if self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK, offset=(20, 20)):
-                entrance_1, entrance_2 = self._guild_operations_get_entrance()
-                if not len(entrance_1):
-                    return False
-                if timer_1.reached():
-                    self.device.click(entrance_1[0])
-                    timer_1.reset()
+            active, entrances = self._guild_operations_active_dispatch_entrances()
+            if active and entrances is None:
+                return False
+            if entrances is not None:
+                if self._guild_operations_click_dispatch_expand(entrances, timer_1):
                     continue
-                if timer_2.reached():
-                    for button in entrance_2:
-                        # 进入按钮右上角的 Easy/Normal/Hard 周围有黑色区域。
-                        # 作战未展开时，这个位置只是高斯模糊背景。
-                        if self.image_color_count(button, color=(0, 0, 0), threshold=235, count=50):
-                            self.device.click(button)
-                            timer_1.reset()
-                            timer_2.reset()
-                            break
+                self._guild_operations_click_dispatch_enter(entrances, timer_1, timer_2)
 
-            if self.appear_then_click(guild_assets.GUILD_DISPATCH_QUICK, offset=(20, 20), interval=2):
-                timer_1.reset()
-                timer_2.reset()
+            if self._guild_operations_handle_dispatch_quick(timer_1, timer_2):
                 continue
 
             # 结束。
             if self.appear(guild_assets.GUILD_DISPATCH_RECOMMEND, offset=(20, 20)):
                 break
 
+        return True
+
+    def _guild_operations_active_dispatch_entrances(self):
+        if not self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK, offset=(20, 20)):
+            return False, None
+
+        entrance_1, entrance_2 = self._guild_operations_get_entrance()
+        if not entrance_1:
+            return True, None
+        return True, _GuildDispatchEntrances(expand=entrance_1, enter=entrance_2)
+
+    def _guild_operations_click_dispatch_expand(self, entrances, timer):
+        if not timer.reached():
+            return False
+
+        self.device.click(entrances.expand[0])
+        timer.reset()
+        return True
+
+    def _guild_operations_click_dispatch_enter(self, entrances, expand_timer, enter_timer):
+        if not enter_timer.reached():
+            return False
+
+        for button in entrances.enter:
+            # 进入按钮右上角的 Easy/Normal/Hard 周围有黑色区域。
+            # 作战未展开时，这个位置只是高斯模糊背景。
+            if self.image_color_count(button, color=(0, 0, 0), threshold=235, count=50):
+                self.device.click(button)
+                expand_timer.reset()
+                enter_timer.reset()
+                return True
+        return False
+
+    def _guild_operations_handle_dispatch_quick(self, expand_timer, enter_timer):
+        if not self.appear_then_click(guild_assets.GUILD_DISPATCH_QUICK, offset=(20, 20), interval=2):
+            return False
+
+        expand_timer.reset()
+        enter_timer.reset()
         return True
 
     def _guild_operations_get_dispatch(self):
