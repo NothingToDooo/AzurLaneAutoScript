@@ -158,29 +158,30 @@ class ShopBase(UI):
 
     def shop_detect_items(self, image=None):
         """
-        Detect items on image for testing purpose
+        在指定截图上识别商店商品，主要用于测试。
         """
         if image is None:
             image = self.device.image
 
-        # Retrieve ShopItemGrid
         shop_items = self.shop_items()
         if shop_items is None:
             logger.warning("Expected type 'ShopItemGrid' but was None")
             return []
 
-        if self.config.SHOP_EXTRACT_TEMPLATE:
-            if self.shop_template_folder:
-                logger.info(f"Extract item templates to {self.shop_template_folder}")
-                shop_items.extract_template(image, self.shop_template_folder)
-            else:
-                logger.warning("SHOP_EXTRACT_TEMPLATE enabled but shop_template_folder is not set, skip extracting")
-
+        self._shop_extract_template(shop_items, image)
         shop_items.predict(image, name=True, amount=False, cost=True, price=True, tag=False)
+        return self._log_shop_items(shop_items.items, shop_items.grids)
 
-        # Log final result on predicted items
-        items = shop_items.items
-        grids = shop_items.grids
+    def _shop_extract_template(self, shop_items, image):
+        if not self.config.SHOP_EXTRACT_TEMPLATE:
+            return
+        if self.shop_template_folder:
+            logger.info(f"Extract item templates to {self.shop_template_folder}")
+            shop_items.extract_template(image, self.shop_template_folder)
+            return
+        logger.warning("SHOP_EXTRACT_TEMPLATE enabled but shop_template_folder is not set, skip extracting")
+
+    def _log_shop_items(self, items, grids):
         if len(items):
             min_row = grids[0, 0].area[1]
             row = [str(item) for item in items if item.button[1] == min_row]
@@ -217,23 +218,12 @@ class ShopBase(UI):
 
         return False
 
-    def shop_get_items(self, skip_first_screenshot=True):
-        """
-        Args:
-            skip_first_screenshot (bool):
+    def _shop_items_still_loading(self, items, record):
+        known = len([item for item in items if item.is_known_item])
+        logger.attr("Item detected", known)
+        return known == 0 or known != record, known
 
-        Returns:
-            list[Item]:
-        """
-        # Retrieve ShopItemGrid
-        shop_items = self.shop_items()
-        if shop_items is None:
-            logger.warning("Expected type 'ShopItemGrid' but was None")
-            return []
-
-        # Loop on predict to ensure items
-        # have loaded and can accurately
-        # be read
+    def _wait_shop_items_loaded(self, shop_items, skip_first_screenshot):
         record = 0
         timeout = Timer(3, count=9).start()
         while 1:
@@ -246,44 +236,36 @@ class ShopBase(UI):
                 timeout.reset()
                 continue
 
-            if self.config.SHOP_EXTRACT_TEMPLATE:
-                if self.shop_template_folder:
-                    logger.info(f"Extract item templates to {self.shop_template_folder}")
-                    shop_items.extract_template(self.device.image, self.shop_template_folder)
-                else:
-                    logger.warning("SHOP_EXTRACT_TEMPLATE enabled but shop_template_folder is not set, skip extracting")
-
+            self._shop_extract_template(shop_items, self.device.image)
             shop_items.predict(self.device.image, name=True, amount=False, cost=True, price=True, tag=False)
 
             if timeout.reached():
                 logger.warning("Items loading timeout; continue and assumed has loaded")
                 break
 
-            # Check unloaded items, because AL loads items too slow.
             items = shop_items.items
-            known = len([item for item in items if item.is_known_item])
-            logger.attr("Item detected", known)
-            if known == 0 or known != record:
-                record = known
+            loading, record = self._shop_items_still_loading(items, record)
+            if loading:
                 continue
-            record = known
 
-            # End
             if self.shop_has_loaded(items):
                 break
 
-        # Log final result on predicted items
-        items = shop_items.items
-        grids = shop_items.grids
-        if len(items):
-            min_row = grids[0, 0].area[1]
-            row = [str(item) for item in items if item.button[1] == min_row]
-            logger.info(f"Shop row 1: {row}")
-            row = [str(item) for item in items if item.button[1] != min_row]
-            logger.info(f"Shop row 2: {row}")
-            return items
-        logger.info("No shop items found")
-        return []
+    def shop_get_items(self, skip_first_screenshot=True):
+        """
+        Args:
+            skip_first_screenshot (bool):
+
+        Returns:
+            list[Item]:
+        """
+        shop_items = self.shop_items()
+        if shop_items is None:
+            logger.warning("Expected type 'ShopItemGrid' but was None")
+            return []
+
+        self._wait_shop_items_loaded(shop_items, skip_first_screenshot=skip_first_screenshot)
+        return self._log_shop_items(shop_items.items, shop_items.grids)
 
     def shop_check_item(self, item):
         """返回当前货币是否足够购买物品。"""
