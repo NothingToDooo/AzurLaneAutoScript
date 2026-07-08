@@ -597,33 +597,37 @@ class UI(InfoHandler):
             return True
         return False
 
+    def _iter_button_interval_reset_targets(self, button):
+        if button in (
+            ui_assets.MEOWFFICER_GOTO_DORMMENU,
+            ui_assets.DORMMENU_GOTO_DORM,
+            ui_assets.DORMMENU_GOTO_MEOWFFICER,
+        ):
+            yield GET_SHIP
+        for switch_button in page_main.links.values():
+            if button == switch_button:
+                yield GET_SHIP
+        if button in [ui_assets.MAIN_GOTO_REWARD, ui_white_assets.MAIN_GOTO_REWARD_WHITE]:
+            yield GET_SHIP
+        if button == ui_assets.REWARD_GOTO_TACTICAL:
+            yield ui_white_assets.REWARD_GOTO_TACTICAL_WHITE
+        if button == ui_white_assets.REWARD_GOTO_TACTICAL_WHITE:
+            yield ui_assets.REWARD_GOTO_TACTICAL
+        if button in [ui_assets.MAIN_GOTO_CAMPAIGN, ui_white_assets.MAIN_GOTO_CAMPAIGN_WHITE]:
+            yield GET_SHIP
+            # 信浓活动和 raid 的标题相同。
+            yield ui_assets.RAID_CHECK
+        if button == ui_assets.SHOP_GOTO_SUPPLY_PACK:
+            yield EXCHANGE_CHECK
+
     def ui_button_interval_reset(self, button):
         """
-        Reset interval of some button to avoid mistaken clicks
+        重置部分按钮的点击间隔，避免误触。
 
         Args:
             button (Button):
         """
-        if button == ui_assets.MEOWFFICER_GOTO_DORMMENU:
-            self.interval_reset(GET_SHIP)
-        if button == ui_assets.DORMMENU_GOTO_DORM:
-            self.interval_reset(GET_SHIP)
-        if button == ui_assets.DORMMENU_GOTO_MEOWFFICER:
-            self.interval_reset(GET_SHIP)
-        for switch_button in page_main.links.values():
-            if button == switch_button:
-                self.interval_reset(GET_SHIP)
-        if button in [ui_assets.MAIN_GOTO_REWARD, ui_white_assets.MAIN_GOTO_REWARD_WHITE]:
-            self.interval_reset(GET_SHIP)
-        if button == ui_assets.REWARD_GOTO_TACTICAL:
-            self.interval_reset(ui_white_assets.REWARD_GOTO_TACTICAL_WHITE)
-        if button == ui_white_assets.REWARD_GOTO_TACTICAL_WHITE:
-            self.interval_reset(ui_assets.REWARD_GOTO_TACTICAL)
-        if button in [ui_assets.MAIN_GOTO_CAMPAIGN, ui_white_assets.MAIN_GOTO_CAMPAIGN_WHITE]:
-            self.interval_reset(GET_SHIP)
-            # Shinano event has the same title as raid
-            self.interval_reset(ui_assets.RAID_CHECK)
-        if button == ui_assets.SHOP_GOTO_SUPPLY_PACK:
-            self.interval_reset(EXCHANGE_CHECK)
+        for reset_button in self._iter_button_interval_reset_targets(button):
+            self.interval_reset(reset_button)
         if button in [raid_assets.RPG_GOTO_STAGE, raid_assets.RPG_GOTO_STORY, raid_assets.RPG_LEAVE_CITY]:
             self.interval_timer[GET_SHIP.name] = Timer(5).reset()
