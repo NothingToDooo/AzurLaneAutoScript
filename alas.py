@@ -62,7 +62,7 @@ class AzurLaneAutoScript:
             logger.critical("Request human takeover")
             sys.exit(1)
 
-    def _execute_run_command(self, command: str, skip_first_screenshot: bool = False) -> None:
+    def _execute_run_command(self, command: str, *, skip_first_screenshot: bool = False) -> None:
         if not skip_first_screenshot:
             self.device.screenshot()
         task_spec = get_task_spec(command)
@@ -113,9 +113,9 @@ class AzurLaneAutoScript:
         self.save_error_log()
         sys.exit(1)
 
-    def run(self, command: str, skip_first_screenshot: bool = False) -> bool:
+    def run(self, command: str, *, skip_first_screenshot: bool = False) -> bool:
         try:
-            self._execute_run_command(command, skip_first_screenshot)
+            self._execute_run_command(command, skip_first_screenshot=skip_first_screenshot)
         except TaskEnd:
             return True
         except (GameNotRunningError, GameStuckError, GameTooManyClickError, GameBugError) as e:

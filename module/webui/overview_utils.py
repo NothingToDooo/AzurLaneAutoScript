@@ -1,4 +1,4 @@
-def split_overview_tasks(pending_tasks, waiting_tasks, is_alive: bool):
+def split_overview_tasks(pending_tasks, waiting_tasks, *, is_alive: bool):
     if not pending_tasks:
         return [], [], waiting_tasks
     if is_alive:

@@ -89,9 +89,9 @@ class RichLog:
         """
         )
 
-    def set_scroll(self, b: bool) -> None:
-        # use for lambda callback function
-        self.keep_bottom = b
+    def set_scroll(self, *, keep_bottom: bool) -> None:
+        # 用于开关回调，回调入口通过 lambda 转成关键字参数。
+        self.keep_bottom = keep_bottom
 
     def get_width(self):
         js = f"""
@@ -431,7 +431,7 @@ def put_output(output_kwargs: T_Output_Kwargs) -> Output | None:
     return _widget_type_to_func[output_kwargs["widget_type"]](output_kwargs)
 
 
-def get_loading_style(shape: str, fill: bool) -> str:
+def get_loading_style(shape: str, *, fill: bool) -> str:
     if fill:
         return f"--loading-{shape}-fill--"
     return f"--loading-{shape}--"
@@ -439,6 +439,7 @@ def get_loading_style(shape: str, fill: bool) -> str:
 
 def put_loading_text(
     text: str,
+    *,
     shape: str = "border",
     color: str = "dark",
     fill: bool = False,

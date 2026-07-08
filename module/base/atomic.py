@@ -319,7 +319,7 @@ def _remove_empty_folder(path: Path) -> bool:
     return True
 
 
-def folder_rmtree(folder: FilePath, may_symlinks: bool = True) -> bool:
+def folder_rmtree(folder: FilePath, *, may_symlinks: bool = True) -> bool:
     try:
         path = _as_path(folder)
         if may_symlinks and path.is_symlink():
@@ -350,7 +350,7 @@ def atomic_rmtree(folder: FilePath) -> None:
     folder_rmtree(temp)
 
 
-def atomic_failure_cleanup(folder: FilePath, recursive: bool = False) -> None:
+def atomic_failure_cleanup(folder: FilePath, *, recursive: bool = False) -> None:
     """启动时清理残留临时文件。"""
     try:
         with os.scandir(folder) as entries:

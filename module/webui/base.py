@@ -25,7 +25,7 @@ class Frame(Base):
         super().__init__()
         self.page = "Home"
 
-    def init_aside(self, expand_menu: bool = True, name: str | None = None) -> None:
+    def init_aside(self, *, expand_menu: bool = True, name: str | None = None) -> None:
         """
         在侧边栏按钮回调中调用。
         参数：
@@ -41,7 +41,7 @@ class Frame(Base):
             self.active_button("aside", name)
             set_localstorage("aside", name)
 
-    def init_menu(self, collapse_menu: bool = True, name: str | None = None) -> None:
+    def init_menu(self, *, collapse_menu: bool = True, name: str | None = None) -> None:
         """
         在菜单按钮回调中调用。
         参数：

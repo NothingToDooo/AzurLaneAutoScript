@@ -132,7 +132,7 @@ class TaskHandler:
         self._alive = False
         self._lock = threading.Lock()
 
-    def add(self, func, delay: float, pending_delete: bool = False) -> None:
+    def add(self, func, delay: float, *, pending_delete: bool = False) -> None:
         """
         Add a task running background.
         Another way of `self.add_task()`.
@@ -144,7 +144,7 @@ class TaskHandler:
             g = func
         self.add_task(Task(g, delay), pending_delete=pending_delete)
 
-    def add_task(self, task: Task, pending_delete: bool = False) -> None:
+    def add_task(self, task: Task, *, pending_delete: bool = False) -> None:
         """
         Add a task running background.
         """
@@ -164,7 +164,7 @@ class TaskHandler:
         else:
             logger.warning(f"Failed to remove task {task}. Current tasks list: {self.tasks}")
 
-    def remove_task(self, task: Task, nowait: bool = False) -> None:
+    def remove_task(self, task: Task, *, nowait: bool = False) -> None:
         """
         Remove a task in `self.tasks`.
 

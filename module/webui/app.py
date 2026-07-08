@@ -409,8 +409,8 @@ class AlasGUI(Frame):
         switch_log_scroll = BinarySwitchButton(
             label_on=t("Gui.Button.ScrollON"),
             label_off=t("Gui.Button.ScrollOFF"),
-            onclick_on=lambda: log.set_scroll(False),
-            onclick_off=lambda: log.set_scroll(True),
+            onclick_on=lambda: log.set_scroll(keep_bottom=False),
+            onclick_off=lambda: log.set_scroll(keep_bottom=True),
             get_state=lambda: log.keep_bottom,
             color_on="on",
             color_off="off",
@@ -607,8 +607,8 @@ class AlasGUI(Frame):
         switch_log_scroll = BinarySwitchButton(
             label_on=t("Gui.Button.ScrollON"),
             label_off=t("Gui.Button.ScrollOFF"),
-            onclick_on=lambda: log.set_scroll(False),
-            onclick_off=lambda: log.set_scroll(True),
+            onclick_on=lambda: log.set_scroll(keep_bottom=False),
+            onclick_off=lambda: log.set_scroll(keep_bottom=True),
             get_state=lambda: log.keep_bottom,
             color_on="on",
             color_off="off",
