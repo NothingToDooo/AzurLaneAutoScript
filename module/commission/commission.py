@@ -541,7 +541,8 @@ class RewardCommission(UI, InfoHandler):
             logger.info("No commission chose")
 
     def _commission_receive(self, skip_first_screenshot=True):
-        """
+        """领取委托奖励。
+
         Args:
             skip_first_screenshot:
 
@@ -562,64 +563,91 @@ class RewardCommission(UI, InfoHandler):
             else:
                 self.device.screenshot()
 
-            # 结束。
-            if self.ui_page_appear(page_commission, offset=(20, 20)):
-                # 留在委托页时，委托奖励可能弹出过慢，导致 UI 切换卡住。
+            if self._commission_reward_finished():
                 break
 
-            for button in [
-                commission_assets.EXP_INFO_S_REWARD,
-                combat_assets.GET_ITEMS_1,
-                combat_assets.GET_ITEMS_2,
-                combat_assets.GET_ITEMS_3,
-            ]:
-                if self.appear(button, interval=1):
-                    commission_assets.REWARD_SAVE_CLICK.name = button.name
-                    self.device.click(commission_assets.REWARD_SAVE_CLICK)
-                    click_timer.reset()
-                    reward = True
-                    continue
-            if click_timer.reached() and self.appear_then_click(
-                commission_assets.REWARD_1, offset=(20, 20), interval=1
-            ):
-                self.interval_reset(combat_assets.GET_SHIP)
-                click_timer.reset()
+            if self._handle_commission_reward_save(click_timer):
                 reward = True
                 continue
-            if click_timer.reached() and self.appear_then_click(REWARD_1_WHITE, offset=(20, 20), interval=1):
-                self.interval_reset(combat_assets.GET_SHIP)
-                click_timer.reset()
-                reward = True
+
+            reward_click = self._handle_commission_reward_buttons(click_timer)
+            if reward_click is not None:
+                reward = reward or reward_click
                 continue
-            if click_timer.reached() and self.appear_then_click(REWARD_GOTO_COMMISSION, offset=(20, 20)):
-                self.interval_reset(combat_assets.GET_SHIP)
-                click_timer.reset()
-                continue
-            if click_timer.reached() and self.appear_then_click(REWARD_GOTO_COMMISSION_WHITE, offset=(20, 20)):
-                self.interval_reset(combat_assets.GET_SHIP)
-                click_timer.reset()
-                continue
+
             if self.ui_main_appear_then_click(page_reward, interval=3):
                 self.interval_reset(combat_assets.GET_SHIP)
                 # 不需要重置 click_timer，直接立即点击 REWARD_1。
                 # click_timer.reset()
                 continue
-            # 处理石油已满。
-            if self.config.SERVER == "cn" and self.appear(commission_assets.OIL_MAXED, offset=(20, 20), interval=3):
-                raise OilMaxed
-            # 最后检查 GET_SHIP，以处理主界面随机白底。
-            for button in [combat_assets.GET_SHIP]:
-                if click_timer.reached() and self.appear(button, interval=1):
-                    commission_assets.REWARD_SAVE_CLICK.name = button.name
-                    self.device.click(commission_assets.REWARD_SAVE_CLICK)
-                    click_timer.reset()
-                    reward = True
-                    continue
-            if click_timer.reached() and self.ui_additional():
+
+            self._raise_if_commission_oil_maxed()
+
+            if self._handle_commission_get_ship(click_timer):
+                reward = True
+                continue
+
+            if self._handle_commission_additional(click_timer):
                 click_timer.reset()
                 continue
 
         return reward
+
+    def _commission_reward_finished(self) -> bool:
+        # 留在委托页时，委托奖励可能弹出过慢，导致 UI 切换卡住。
+        return self.ui_page_appear(page_commission, offset=(20, 20))
+
+    def _handle_commission_reward_save(self, click_timer) -> bool:
+        for button in (
+            commission_assets.EXP_INFO_S_REWARD,
+            combat_assets.GET_ITEMS_1,
+            combat_assets.GET_ITEMS_2,
+            combat_assets.GET_ITEMS_3,
+        ):
+            if self._click_commission_reward_save(button, click_timer):
+                return True
+        return False
+
+    def _click_commission_reward_save(self, button, click_timer) -> bool:
+        if not self.appear(button, interval=1):
+            return False
+
+        commission_assets.REWARD_SAVE_CLICK.name = button.name
+        self.device.click(commission_assets.REWARD_SAVE_CLICK)
+        click_timer.reset()
+        return True
+
+    def _handle_commission_reward_buttons(self, click_timer) -> bool | None:
+        if not click_timer.reached():
+            return None
+
+        for button, is_reward in (
+            (commission_assets.REWARD_1, True),
+            (REWARD_1_WHITE, True),
+        ):
+            if self.appear_then_click(button, offset=(20, 20), interval=1):
+                self.interval_reset(combat_assets.GET_SHIP)
+                click_timer.reset()
+                return is_reward
+        for button in (REWARD_GOTO_COMMISSION, REWARD_GOTO_COMMISSION_WHITE):
+            if self.appear_then_click(button, offset=(20, 20)):
+                self.interval_reset(combat_assets.GET_SHIP)
+                click_timer.reset()
+                return False
+        return None
+
+    def _raise_if_commission_oil_maxed(self) -> None:
+        if self.config.SERVER == "cn" and self.appear(commission_assets.OIL_MAXED, offset=(20, 20), interval=3):
+            raise OilMaxed
+
+    def _handle_commission_get_ship(self, click_timer) -> bool:
+        if not click_timer.reached():
+            return False
+        # 最后检查 GET_SHIP，以处理主界面随机白底。
+        return self._click_commission_reward_save(combat_assets.GET_SHIP, click_timer)
+
+    def _handle_commission_additional(self, click_timer) -> bool:
+        return click_timer.reached() and self.ui_additional()
 
     def commission_receive(self):
         """
