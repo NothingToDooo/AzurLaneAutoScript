@@ -326,16 +326,6 @@
       "auto": "自动检测",
       "com.bilibili.azurlane": "国服"
     },
-    "ScreenshotMethod": {
-      "name": "模拟器截图方案",
-      "help": "",
-      "nemu_ipc": "nemu_ipc"
-    },
-    "ControlMethod": {
-      "name": "模拟器控制方案",
-      "help": "",
-      "minitouch": "minitouch"
-    },
     "ScreenshotDedithering": {
       "name": "去除图片色彩抖动",
       "help": ""

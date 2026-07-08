@@ -180,8 +180,8 @@ class Screenshot(NemuIpc):
         if sum(color) < 1:
             logger.warning(f"Received pure black screenshots from emulator, color: {color}")
             logger.warning(
-                f"Screenshot method `{self.config.Emulator_ScreenshotMethod}` "
-                f"may not work on emulator `{self.serial}`, or the emulator is not fully started"
+                f"Screenshot method `nemu_ipc` may not work on emulator `{self.serial}`, "
+                f"or the emulator is not fully started"
             )
             self._screen_black_checked = False
             return False

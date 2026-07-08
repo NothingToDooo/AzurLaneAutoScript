@@ -170,7 +170,6 @@ class Benchmark(DaemonBase, CampaignUI):
         return tuple(screenshot), tuple(click)
 
     def run(self):
-        self.config.override(Emulator_ScreenshotMethod="nemu_ipc", Emulator_ControlMethod="minitouch")
         self.ensure_campaign_ui("7-2", mode="normal")
 
         logger.attr("DeviceType", self.config.Benchmark_DeviceType)

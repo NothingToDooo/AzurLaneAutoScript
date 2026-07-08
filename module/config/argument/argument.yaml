@@ -27,16 +27,6 @@ Emulator:
   PackageName:
     value: auto
     option: [ auto, ]
-  ScreenshotMethod:
-    value: nemu_ipc
-    option: [
-      nemu_ipc,
-    ]
-  ControlMethod:
-    value: minitouch
-    option: [
-      minitouch,
-    ]
   ScreenshotDedithering: false
   AdbRestart: false
 EmulatorInfo:

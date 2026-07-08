@@ -14,20 +14,6 @@
           "com.bilibili.azurlane"
         ]
       },
-      "ScreenshotMethod": {
-        "type": "select",
-        "value": "nemu_ipc",
-        "option": [
-          "nemu_ipc"
-        ]
-      },
-      "ControlMethod": {
-        "type": "select",
-        "value": "minitouch",
-        "option": [
-          "minitouch"
-        ]
-      },
       "ScreenshotDedithering": {
         "type": "checkbox",
         "value": false

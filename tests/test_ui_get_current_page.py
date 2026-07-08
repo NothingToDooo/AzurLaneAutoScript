@@ -61,8 +61,6 @@ class _FakeUI(UI):
         options = _fake_ui_options(options, settings)
         self.device = _FakeDevice(has_cached_image=options.has_cached_image, app_running=options.app_running)
         self.config = SimpleNamespace(
-            Emulator_ScreenshotMethod="ADB",
-            Emulator_ControlMethod="ADB",
             SERVER="cn",
         )
         self.ui_current = None

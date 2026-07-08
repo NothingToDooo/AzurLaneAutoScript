@@ -98,15 +98,8 @@ class Device(Screenshot, Control, AppControl):
 
     def method_check(self):
         """
-        检查当前个人版保留的截图和控制方案。
+        检查当前个人版保留的模拟器实例。
         """
-        if self.config.Emulator_ScreenshotMethod != "nemu_ipc":
-            logger.warning("当前个人版只保留截图方案 nemu_ipc，已自动改为 nemu_ipc")
-            self.config.Emulator_ScreenshotMethod = "nemu_ipc"
-        if self.config.Emulator_ControlMethod != "minitouch":
-            logger.warning("当前个人版只保留控制方案 minitouch，已自动改为 minitouch")
-            self.config.Emulator_ControlMethod = "minitouch"
-
         instance = self.emulator_instance
         if instance is None or instance.type != EmulatorBase.MuMuPlayer12:
             logger.critical("当前个人版只保留 MuMu + nemu_ipc 截图 + minitouch 控制，当前需要 MuMu12 实例")

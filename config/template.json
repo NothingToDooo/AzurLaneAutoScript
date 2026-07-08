@@ -3,8 +3,6 @@
     "Emulator": {
       "Serial": "auto",
       "PackageName": "auto",
-      "ScreenshotMethod": "nemu_ipc",
-      "ControlMethod": "minitouch",
       "ScreenshotDedithering": false,
       "AdbRestart": false
     },

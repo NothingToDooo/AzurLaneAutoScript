@@ -25,10 +25,6 @@ class EmulatorChecker(Device):
 class Config:
     SERIAL = "127.0.0.1:5555"
 
-    Emulator_ScreenshotMethod = "nemu_ipc"
-
-    Emulator_ControlMethod = "minitouch"
-
 
 def main() -> None:
     print(Path.cwd())

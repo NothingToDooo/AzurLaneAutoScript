@@ -23,10 +23,6 @@ class GeneratedConfig:
     Emulator_Serial = "auto"
     # 可选项：auto, com.bilibili.azurlane
     Emulator_PackageName = "auto"
-    # 可选项：nemu_ipc
-    Emulator_ScreenshotMethod = "nemu_ipc"
-    # 可选项：minitouch
-    Emulator_ControlMethod = "minitouch"
     Emulator_ScreenshotDedithering = False
     Emulator_AdbRestart = False
 
