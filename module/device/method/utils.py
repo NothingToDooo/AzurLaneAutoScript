@@ -2,7 +2,6 @@ import random
 import socket
 import time
 
-import uiautomator2 as u2
 from adbutils import AdbTimeout
 
 from module.device.method.remove_warning import remove_shell_warning
@@ -45,21 +44,6 @@ from module.logger import logger
 
 RETRY_TRIES = 5
 RETRY_DELAY = 3
-
-# 接管 uiautomator2 日志，统一输出到 Alas 日志。
-u2_logger = u2.logger
-u2_logger.debug = logger.info
-u2_logger.info = logger.info
-u2_logger.warning = logger.warning
-u2_logger.error = logger.error
-u2_logger.critical = logger.critical
-
-
-def setup_logger(*_args, **_kwargs):
-    return u2_logger
-
-
-u2.setup_logger = setup_logger
 
 
 def is_port_using(port_num):
@@ -247,14 +231,3 @@ def get_serial_pair(serial):
             pass
 
     return None, None
-
-
-class Device(u2.Device):
-    def show_float_window(self, show=True):
-        """
-        不显示 uiautomator2 悬浮窗。
-        """
-
-
-# 猴子补丁。
-u2.Device = Device
