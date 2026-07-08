@@ -12,6 +12,9 @@ from module.commission.project_data import dictionary_cn
 from module.logger import logger
 from module.ocr.ocr import Duration, Ocr
 
+COMMISSION_COMPARE_THRESHOLD = timedelta(seconds=120)
+URGENT_BOX_TAGS = ("NYB", "BIW")
+
 COMMISSION_FILTER = Filter(
     regex=re.compile(
         "(major|daily|extra|urgent|night)?"
@@ -76,37 +79,31 @@ def image_hash(image):
 
 
 class Commission:
-    # Button to enter commission start
+    # 进入委托开始页的按钮。
     button: Button
-    # OCR result
+    # OCR 结果。
     name: str
-    # If success to parse commission name
+    # 委托名是否解析成功。
     valid: bool
-    # Cropped suffix image, black letters on white background, or None
+    # 裁剪后的后缀图，黑字白底；没有后缀时为 None。
     suffix_image: np.ndarray
-    # Hash of suffix image, used only for logging, or empty string if suffix_image is None
+    # 后缀图 hash，仅用于日志；没有后缀时为空字符串。
     suffix_hash: str
-    # Genre name in project_data.py
-    # Value: major_comm, daily_resource, urgent_cube, ...
+    # project_data.py 中的委托类型名，例如 major_comm、daily_resource。
     genre: str
-    # Status of commission
-    # Value: finished, running, pending
+    # 委托状态：finished、running、pending。
     status: str
-    # Duration to run this commission
+    # 委托耗时。
     duration: timedelta
-    # Expire, only in urgent commission, None in others
+    # 紧急委托的过期时间，其他委托为 None。
     expire: timedelta
-    # Category for filter
-    # Value: major|daily|extra|urgent|night
+    # 过滤分类：major、daily、extra、urgent、night。
     category_str: str
-    # Genre for filter
-    # Value: resource|chip|event|drill|part|cube|oil|book|retrofit|box|gem|ship
+    # 过滤类型：resource、chip、event、drill、part、cube 等。
     genre_str: str
-    # Duration in hours
-    # Value: 0.5, 1, 1.16, 2.5, ...
+    # 小时形式的耗时。
     duration_hour: str
-    # Duration in HH:MM
-    # Value: 1:30, 1:45, 2:00, 8:00, 12:00, ...
+    # HH:MM 形式的耗时。
     duration_hm: str
 
     def __init__(self, image, y, config):
@@ -182,6 +179,27 @@ class Commission:
         info = ", ".join([f"{k}: {v}" for k, v in info.items()])
         return f"{name} ({info})"
 
+    @staticmethod
+    def _timedelta_close(left, right):
+        return left - COMMISSION_COMPARE_THRESHOLD <= right <= left + COMMISSION_COMPARE_THRESHOLD
+
+    def _expire_matches(self, other):
+        if bool(self.expire) != bool(other.expire):
+            return False
+        return not self.expire or self._timedelta_close(self.expire, other.expire)
+
+    def _urgent_box_tags_match(self, other):
+        self_name = self.name.upper()
+        other_name = other.name.upper()
+        return all((tag in self_name) == (tag in other_name) for tag in URGENT_BOX_TAGS)
+
+    def _suffix_required_match(self, other):
+        if self.category_str == "daily":
+            return self.suffix_match(other)
+        if self.genre in {"extra_oil", "night_oil"}:
+            return self.suffix_match(other)
+        return True
+
     def __eq__(self, other):
         """
         Args:
@@ -192,30 +210,18 @@ class Commission:
         """
         if not isinstance(other, Commission):
             return False
-        threshold = timedelta(seconds=120)
-        if not self.valid or not other.valid:
-            return False
-        if self.genre != other.genre or self.status != other.status:
-            return False
-        if self.category_str == "daily" and not self.suffix_match(other):
-            return False
-        if self.genre == "urgent_box":
-            for tag in ["NYB", "BIW"]:
-                if tag in self.name.upper() and tag not in other.name.upper():
-                    return False
-                if tag not in self.name.upper() and tag in other.name.upper():
-                    return False
-        if (other.duration < self.duration - threshold) or (other.duration > self.duration + threshold):
-            return False
-        if (not self.expire and other.expire) or (self.expire and not other.expire):
-            return False
-        if self.expire and other.expire and (
-            (other.expire < self.expire - threshold) or (other.expire > self.expire + threshold)
-        ):
-            return False
-        if self.repeat_count != other.repeat_count:
-            return False
-        return self.genre not in ["extra_oil", "night_oil"] or self.suffix_match(other)
+
+        return (
+            self.valid
+            and other.valid
+            and self.genre == other.genre
+            and self.status == other.status
+            and (self.genre != "urgent_box" or self._urgent_box_tags_match(other))
+            and self._timedelta_close(self.duration, other.duration)
+            and self._expire_matches(other)
+            and self.repeat_count == other.repeat_count
+            and self._suffix_required_match(other)
+        )
 
     def __hash__(self):
         return hash(f"{self.genre}_{self.name}")
@@ -287,14 +293,6 @@ class Commission:
         Returns:
             bool:
         """
-        # Event commission in Vacation Lane, with pink area on the left.
-        # area = area_offset((5, 5, 30, 30), self.area[0:2])
-        # return color_similar(color1=get_color(self.image, area), color2=(239, 166, 231))
-
-        # 2021.07.22 Event commissions in The Idol Master event, with
-        # area = area_offset((5, 5, 30, 30), self.area[0:2])
-        # return color_similar(color1=get_color(self.image, area), color2=(235, 173, 161))
-
         # 2023.04.27 Vacation Lane 复刻，粉黄渐变类似偶像大师活动。
         area = area_offset((5, 5, 30, 30), self.area[0:2])
         return color_similar(color1=get_color(self.image, area), color2=(235, 173, 161), threshold=30)
