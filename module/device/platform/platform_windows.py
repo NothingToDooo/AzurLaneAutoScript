@@ -175,6 +175,79 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         logger.error(f"Emulator function {func.__name__}() failed")
         return False
 
+    def _adb_connect_for_start_watch(self) -> bool:
+        msg = self.adb_client.connect(self.serial)
+        if "connected" in msg:
+            # 已连接时会输出：Connected to 127.0.0.1:59865。
+            # 重复连接会输出：Already connected to 127.0.0.1:59865。
+            return False
+        # 10061 表示本机端口拒绝连接，不算成功连接。
+        return "(10061)" not in msg
+
+    @staticmethod
+    def _log_emulator_online(device) -> None:
+        logger.info(f"Emulator online: {device}")
+
+    @staticmethod
+    def _log_command_ping(pong) -> None:
+        logger.info(f"Command ping: {pong}")
+
+    @staticmethod
+    def _log_package_found(packages) -> None:
+        logger.info(f"Found azurlane packages: {packages}")
+
+    @staticmethod
+    def _focus_back_from_new_window(current_window: int, new_window: int) -> int:
+        if current_window == 0 or new_window != 0:
+            return new_window
+
+        detected_window = get_focused_window()
+        if current_window != detected_window:
+            logger.info(f"New window showing up: {detected_window}, focus back")
+            set_focus_window(current_window)
+            return detected_window
+        return 0
+
+    def _check_start_watch_device(self, serial: str):
+        devices = self.list_device().select(serial=serial)
+        # logger.info(devices)
+        if not devices:
+            # Try to connect
+            self._adb_connect_for_start_watch()
+            return None
+
+        device: AdbDeviceWithStatus = devices.first_or_none()
+        if device.status == "offline":
+            self.adb_client.disconnect(serial)
+            self._adb_connect_for_start_watch()
+            return None
+        return device
+
+    def _check_start_watch_shell(self):
+        try:
+            return self.adb_shell(["echo", "pong"])
+        except (AdbError, ConnectionResetError, OSError) as e:
+            logger.info(e)
+            return None
+
+    def _check_start_watch_package(self):
+        packages = self.list_known_packages(show_log=False)
+        if len(packages):
+            return packages
+        return None
+
+    @staticmethod
+    def _finish_start_watch_window_state(current_window: int, new_window: int) -> None:
+        if new_window not in (0, current_window):
+            logger.info(f"Minimize new window: {new_window}")
+            minimize_window(new_window)
+        if current_window:
+            logger.info(f"De-flash current window: {current_window}")
+            flash_window(current_window, flash=False)
+        if new_window:
+            logger.info(f"Flash new window: {new_window}")
+            flash_window(new_window, flash=True)
+
     def emulator_start_watch(self):
         """
         Returns:
@@ -186,26 +259,9 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         serial = self.emulator_instance.serial
         logger.info(f"Current window: {current_window}")
 
-        def adb_connect():
-            m = self.adb_client.connect(self.serial)
-            if "connected" in m:
-                # 已连接时会输出：Connected to 127.0.0.1:59865。
-                # 重复连接会输出：Already connected to 127.0.0.1:59865。
-                return False
-            # 10061 表示本机端口拒绝连接，不算成功连接。
-            return "(10061)" not in m
-
-        @run_once
-        def show_online(m):
-            logger.info(f"Emulator online: {m}")
-
-        @run_once
-        def show_ping(m):
-            logger.info(f"Command ping: {m}")
-
-        @run_once
-        def show_package(m):
-            logger.info(f"Found azurlane packages: {m}")
+        show_online = run_once(self._log_emulator_online)
+        show_ping = run_once(self._log_command_ping)
+        show_package = run_once(self._log_package_found)
 
         interval = Timer(0.5).start()
         timeout = Timer(180).start()
@@ -219,60 +275,30 @@ class PlatformWindows(PlatformBase, EmulatorManager):
 
             # Check emulator window showing up
             # logger.info([get_focused_window(), get_window_title(get_focused_window())])
-            if current_window != 0 and new_window == 0:
-                new_window = get_focused_window()
-                if current_window != new_window:
-                    logger.info(f"New window showing up: {new_window}, focus back")
-                    set_focus_window(current_window)
-                else:
-                    new_window = 0
+            new_window = self._focus_back_from_new_window(current_window, new_window)
 
             # Check device connection
-            devices = self.list_device().select(serial=serial)
-            # logger.info(devices)
-            if devices:
-                device: AdbDeviceWithStatus = devices.first_or_none()
-                if device.status == "device":
-                    # Emulator online
-                    pass
-                if device.status == "offline":
-                    self.adb_client.disconnect(serial)
-                    adb_connect()
-                    continue
-            else:
-                # Try to connect
-                adb_connect()
+            device = self._check_start_watch_device(serial)
+            if device is None:
                 continue
-            show_online(devices.first_or_none())
+            show_online(device)
 
             # Check command availability
-            try:
-                pong = self.adb_shell(["echo", "pong"])
-            except (AdbError, ConnectionResetError, OSError) as e:
-                logger.info(e)
+            pong = self._check_start_watch_shell()
+            if pong is None:
                 continue
             show_ping(pong)
 
             # Check azuelane package
-            packages = self.list_known_packages(show_log=False)
-            if len(packages):
-                pass
-            else:
+            packages = self._check_start_watch_package()
+            if packages is None:
                 continue
             show_package(packages)
 
             # All check passed
             break
 
-        if new_window not in (0, current_window):
-            logger.info(f"Minimize new window: {new_window}")
-            minimize_window(new_window)
-        if current_window:
-            logger.info(f"De-flash current window: {current_window}")
-            flash_window(current_window, flash=False)
-        if new_window:
-            logger.info(f"Flash new window: {new_window}")
-            flash_window(new_window, flash=True)
+        self._finish_start_watch_window_state(current_window, new_window)
         logger.info("Emulator start completed")
         return True
 
