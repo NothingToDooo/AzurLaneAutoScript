@@ -223,18 +223,27 @@ class Campaign(CampaignBase):
         if self.map_is_clear_mode:
             return self.fleet_boss.clear_boss()
 
+        if self._battle_4_clear_boss_if_accessible():
+            return True
+
+        return self._battle_4_clear_path_to_boss()
+
+    def _battle_4_clear_boss_if_accessible(self):
         boss = self.map.select(is_boss=True)
-        if boss:
-            if not self.check_accessibility(boss[0], fleet="boss"):
-                return self.clear_roadblocks([road_main])
+        if not boss:
+            return False
 
-            if self.use_support_fleet:
-                # at this stage the most right zone should be accessible
-                self.goto(J6)
-                self.air_strike(I8)
+        if not self.check_accessibility(boss[0], fleet="boss"):
+            return self.clear_roadblocks([road_main])
 
-            return self.fleet_boss.clear_boss()
+        if self.use_support_fleet:
+            # 此时最右侧区域应该已经可达。
+            self.goto(J6)
+            self.air_strike(I8)
 
+        return self.fleet_boss.clear_boss()
+
+    def _battle_4_clear_path_to_boss(self):
         if self.clear_roadblocks([road_main]):
             return True
         if self.clear_potential_roadblocks([road_main]):

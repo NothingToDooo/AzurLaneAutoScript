@@ -7,6 +7,17 @@ from module.logger import logger
 from module.map.map_grids import SelectedGrids
 from module.ui.page import page_campaign_menu, page_event
 
+_CAMPAIGN_NAME_ALIAS = {
+    "ex": ("t4", "1"),
+    "asp": ("t3", "1"),
+    "sp": ("t3", "1"),
+}
+_CAMPAIGN_PREFIX_ALIAS = (
+    ("ts", "t1"),
+    ("th", "t2"),
+    ("t", "t1"),
+)
+
 
 class CampaignBase(CampaignBase_):
     STAGE_INCREASE = (
@@ -36,19 +47,11 @@ class CampaignBase(CampaignBase_):
 
     @staticmethod
     def campaign_separate_name(name):
-        # T, TH, ASP, EX
-        if name == "ex":
-            return "t4", "1"
-        if name == "asp":
-            return "t3", "1"
-        if name == "sp":
-            return "t3", "1"
-        if name == "ts1":
-            return "t1", name[-1]
-        if name.startswith("th"):
-            return "t2", name[-1]
-        if name.startswith("t"):
-            return "t1", name[-1]
+        if alias := _CAMPAIGN_NAME_ALIAS.get(name):
+            return alias
+        for prefix, chapter in _CAMPAIGN_PREFIX_ALIAS:
+            if name.startswith(prefix):
+                return chapter, name[-1]
 
         return CampaignBase_.campaign_separate_name(name)
 

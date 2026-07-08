@@ -274,26 +274,31 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
             return True
 
         if mode == "normal":
-            if self.match_template_color(map_assets.MAP_MODE_SWITCH_NORMAL, offset=(20, 20)):
-                logger.attr("MAP_MODE_SWITCH", "normal")
-                return True
-            if self._is_mod_switch_hard_appear(active=False, interval=2):
-                logger.attr("MAP_MODE_SWITCH", "hard")
-                map_assets.MAP_MODE_SWITCH_NORMAL.clear_offset()
-                self.device.click(map_assets.MAP_MODE_SWITCH_NORMAL)
-                self.interval_reset(map_assets.MAP_MODE_SWITCH_HARD)
-            return False
+            return self._handle_map_mode_switch_normal()
         if mode == "hard":
-            if self._is_mod_switch_hard_appear(active=True):
-                logger.attr("MAP_MODE_SWITCH", "hard")
-                return True
-            if self.match_template_color(map_assets.MAP_MODE_SWITCH_NORMAL, offset=(20, 20), interval=2):
-                logger.attr("MAP_MODE_SWITCH", "normal")
-                map_assets.MAP_MODE_SWITCH_HARD.clear_offset()
-                self.device.click(map_assets.MAP_MODE_SWITCH_HARD)
-                return False
-            return False
+            return self._handle_map_mode_switch_hard()
         logger.attr("MAP_MODE_SWITCH", "unknown")
+        return False
+
+    def _handle_map_mode_switch_normal(self):
+        if self.match_template_color(map_assets.MAP_MODE_SWITCH_NORMAL, offset=(20, 20)):
+            logger.attr("MAP_MODE_SWITCH", "normal")
+            return True
+        if self._is_mod_switch_hard_appear(active=False, interval=2):
+            logger.attr("MAP_MODE_SWITCH", "hard")
+            map_assets.MAP_MODE_SWITCH_NORMAL.clear_offset()
+            self.device.click(map_assets.MAP_MODE_SWITCH_NORMAL)
+            self.interval_reset(map_assets.MAP_MODE_SWITCH_HARD)
+        return False
+
+    def _handle_map_mode_switch_hard(self):
+        if self._is_mod_switch_hard_appear(active=True):
+            logger.attr("MAP_MODE_SWITCH", "hard")
+            return True
+        if self.match_template_color(map_assets.MAP_MODE_SWITCH_NORMAL, offset=(20, 20), interval=2):
+            logger.attr("MAP_MODE_SWITCH", "normal")
+            map_assets.MAP_MODE_SWITCH_HARD.clear_offset()
+            self.device.click(map_assets.MAP_MODE_SWITCH_HARD)
         return False
 
     def _is_mod_switch_hard_appear(self, active=True, interval=0):
@@ -333,20 +338,35 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         Returns:
             bool: If MAP_PREPARATION and tha animation of map information finished
         """
-        if not self.appear(map_assets.MAP_PREPARATION, offset=(20, 20)):
-            self.map_clear_percentage_prev = -1
-            self.map_clear_percentage_timer.reset()
+        if not self._map_preparation_appeared():
             return False
+
+        if self._map_preparation_has_no_percentage_wait():
+            return True
+        # info_bar 会遮住百分比和 MAP_GREEN。
+        if self.info_bar_count():
+            return False
+
+        return self._map_clear_percentage_stable()
+
+    def _map_preparation_appeared(self):
+        if self.appear(map_assets.MAP_PREPARATION, offset=(20, 20)):
+            return True
+
+        self.map_clear_percentage_prev = -1
+        self.map_clear_percentage_timer.reset()
+        return False
+
+    def _map_preparation_has_no_percentage_wait(self):
         if not self.config.MAP_HAS_CLEAR_PERCENTAGE:
             logger.attr("MAP_HAS_CLEAR_PERCENTAGE", self.config.MAP_HAS_CLEAR_PERCENTAGE)
             return True
         if self.config.MAP_IS_ONE_TIME_STAGE:
             logger.attr("MAP_IS_ONE_TIME_STAGE", self.config.MAP_IS_ONE_TIME_STAGE)
             return True
-        # info_bar 会遮住百分比和 MAP_GREEN。
-        if self.info_bar_count():
-            return False
+        return False
 
+    def _map_clear_percentage_stable(self):
         percent = self.get_map_clear_percentage()
         logger.attr("Map_clear_percentage", f"{int(percent * 100)}%")
         # 百分比会从 100% 开始，再从 0% 增加到实际值。
