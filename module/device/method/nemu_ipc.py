@@ -151,6 +151,34 @@ class CaptureNemuIpc(CaptureStd):
             raise NemuIpcError("Emulator instance is probably dead")
 
 
+def _noop_recovery():
+    pass
+
+
+def _apply_retry_timeout(func_name, trial, kwargs):
+    if func_name != "screenshot":
+        return
+    timeout = retry_sleep(trial)
+    if timeout > 0:
+        kwargs["timeout"] = timeout
+
+
+def _nemu_ipc_error_recovery(self, error, func_name, trial):
+    if isinstance(error, NemuIpcIncompatible):
+        logger.error(error)
+        return None
+    if isinstance(error, JobTimeout):
+        logger.warning(f"Func {func_name}() call timeout, retrying: {trial}")
+        return _noop_recovery
+    if isinstance(error, NemuIpcError):
+        logger.error(error)
+        return self.reconnect
+    if isinstance(error, (OSError, ValueError, ctypes.ArgumentError)):
+        logger.error(error)
+        return _noop_recovery
+    return None
+
+
 def retry(func):
     @wraps(func)
     def retry_wrapper(self, *args, **kwargs):
@@ -158,43 +186,22 @@ def retry(func):
         Args:
             self (NemuIpcImpl):
         """
-        init = None
-        for _ in range(RETRY_TRIES):
-            # Extend timeout on retries
-            if func.__name__ == "screenshot":
-                timeout = retry_sleep(_)
-                if timeout > 0:
-                    kwargs["timeout"] = timeout
+        recovery = None
+        func_name = func.__name__
+        for trial in range(RETRY_TRIES):
+            _apply_retry_timeout(func_name, trial, kwargs)
             try:
-                if callable(init):
-                    time.sleep(retry_sleep(_))
-                    init()
+                if callable(recovery):
+                    time.sleep(retry_sleep(trial))
+                    recovery()
                 return func(self, *args, **kwargs)
             # 无法自动处理。
             except RequestHumanTakeover:
                 break
-            # 版本不兼容，无法自动处理。
-            except NemuIpcIncompatible as e:
-                logger.error(e)
-                break
-            # native 调用超时。
-            except JobTimeout:
-                logger.warning(f"Func {func.__name__}() call timeout, retrying: {_}")
-
-                def init():
-                    pass
-            # IPC 连接错误，重连后重试。
-            except NemuIpcError as e:
-                logger.error(e)
-
-                def init():
-                    self.reconnect()
-            # native 调用或像素缓冲异常，按本次调用失败重试。
-            except (OSError, ValueError, ctypes.ArgumentError) as e:
-                logger.error(e)
-
-                def init():
-                    pass
+            except (NemuIpcIncompatible, JobTimeout, NemuIpcError, OSError, ValueError, ctypes.ArgumentError) as e:
+                recovery = _nemu_ipc_error_recovery(self, e, func_name, trial)
+                if recovery is None:
+                    break
 
         logger.critical(f"Retry {func.__name__}() failed")
         raise RequestHumanTakeover
