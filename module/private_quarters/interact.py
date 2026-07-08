@@ -225,8 +225,18 @@ class PQInteract(UI):
 
         offset=(0, 60) 用于兼容资产纵向位置；不同亲密度下资产可能偏移。
         """
-        # 点击目标舰船，进入第一阶段。
         logger.hr("Interact Start", level=2)
+        self._pq_wait_interact_button()
+
+        for index in range(1, 4):
+            logger.hr(f"Interact Loop {index}/3", level=3)
+            self._pq_interact_once()
+
+        logger.hr("Interact End", level=2)
+        self._pq_goto_room_exit()
+
+    def _pq_wait_interact_button(self):
+        """点击目标舰船，等待互动按钮出现。"""
         click_timer = Timer(1.5, count=3).start()
         skip_first_screenshot = True
         while 1:
@@ -243,41 +253,42 @@ class PQInteract(UI):
                 self.device.click(pq_assets.PRIVATE_QUARTERS_ROOM_TARGET_CLICK_AREA)
                 click_timer.reset()
 
-        # 重复第二、第三阶段，共三轮。
-        for i in range(1, 4):
-            logger.hr(f"Interact Loop {i}/3", level=3)
-            self.interval_clear([pq_assets.PRIVATE_QUARTERS_INTERACT_CHECK, pq_assets.PRIVATE_QUARTERS_INTERACT])
-            skip_first_screenshot = True
-            while 1:
-                if skip_first_screenshot:
-                    skip_first_screenshot = False
-                else:
-                    self.device.screenshot()
+    def _pq_interact_once(self):
+        """执行一轮互动确认。"""
+        self.interval_clear([pq_assets.PRIVATE_QUARTERS_INTERACT_CHECK, pq_assets.PRIVATE_QUARTERS_INTERACT])
+        self._pq_enter_interact_confirm()
+        self._pq_leave_interact_confirm()
 
-                # 已进入互动确认页。
-                if self.appear(pq_assets.PRIVATE_QUARTERS_INTERACT_CHECK, offset=(20, 20)):
-                    break
+    def _pq_enter_interact_confirm(self):
+        skip_first_screenshot = True
+        while 1:
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
 
-                if self.appear_then_click(pq_assets.PRIVATE_QUARTERS_INTERACT, offset=(0, 60), interval=1):
-                    continue
+            # 已进入互动确认页。
+            if self.appear(pq_assets.PRIVATE_QUARTERS_INTERACT_CHECK, offset=(20, 20)):
+                break
 
-            skip_first_screenshot = True
-            while 1:
-                if skip_first_screenshot:
-                    skip_first_screenshot = False
-                else:
-                    self.device.screenshot()
+            if self.appear_then_click(pq_assets.PRIVATE_QUARTERS_INTERACT, offset=(0, 60), interval=1):
+                continue
 
-                # 已回到互动按钮状态。
-                if self.appear(pq_assets.PRIVATE_QUARTERS_INTERACT, offset=(0, 60)):
-                    break
+    def _pq_leave_interact_confirm(self):
+        skip_first_screenshot = True
+        while 1:
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
 
-                if self.appear(pq_assets.PRIVATE_QUARTERS_INTERACT_CHECK, offset=(20, 20), interval=1):
-                    self.device.click(pq_assets.PRIVATE_QUARTERS_ROOM_BACK)
-                    continue
+            # 已回到互动按钮状态。
+            if self.appear(pq_assets.PRIVATE_QUARTERS_INTERACT, offset=(0, 60)):
+                break
 
-        logger.hr("Interact End", level=2)
-        self._pq_goto_room_exit()
+            if self.appear(pq_assets.PRIVATE_QUARTERS_INTERACT_CHECK, offset=(20, 20), interval=1):
+                self.device.click(pq_assets.PRIVATE_QUARTERS_ROOM_BACK)
+                continue
 
     def pq_goto_room(self, target_ship, retry=3):
         """
