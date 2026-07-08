@@ -8,6 +8,7 @@ from module.base.timer import Timer
 from module.config.utils import get_server_next_update
 from module.device.app_control import AppControl
 from module.device.control import Control
+from module.device.platform.emulator_base import EmulatorBase
 from module.device.screenshot import Screenshot
 from module.exception import (
     EmulatorNotRunningError,
@@ -116,8 +117,9 @@ class Device(Screenshot, Control, AppControl):
             logger.warning("当前个人版只保留控制方案 minitouch，已自动改为 minitouch")
             self.config.Emulator_ControlMethod = "minitouch"
 
-        if not (self.is_emulator and self.is_mumu_family):
-            logger.critical("当前个人版只保留 MuMu + nemu_ipc 运行路径")
+        instance = self.emulator_instance
+        if instance is None or instance.type != EmulatorBase.MuMuPlayer12:
+            logger.critical("当前个人版只保留 MuMu + nemu_ipc 截图 + minitouch 控制，当前需要 MuMu12 实例")
             raise RequestHumanTakeover
 
     def handle_night_commission(self, daily_trigger="21:00", threshold=30):
