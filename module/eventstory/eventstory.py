@@ -81,6 +81,36 @@ class EventStory(CampaignUI, Combat, LoginHandler):
             return True
         return False
 
+    def _event_story_clear_intervals(self):
+        self.story_skip_interval_clear()
+        self.popup_interval_clear()
+        self.device.click_record_clear()
+
+    def _handle_event_story_entry(self):
+        if self.appear_then_click(eventstory_assets.STORY_FIRST, offset=(20, 20), interval=3):
+            return True
+        if self.match_template_color(eventstory_assets.STORY_LAST, offset=(20, 20), interval=3):
+            self.device.click(eventstory_assets.STORY_LAST)
+            return True
+        if self.appear_then_click(eventstory_assets.STORY_MIDDLE, offset=(20, 200), interval=3):
+            return True
+        if self.appear_then_click(eventstory_assets.BATTLE_MIDDLE, offset=(20, 200), interval=3):
+            return True
+        return self.handle_event_20250724()
+
+    def _event_story_finished(self):
+        if self.match_template_color(eventstory_assets.STORY_FINISHED, offset=(20, 20)):
+            return True
+        return self.appear(eventstory_assets.REWARD_GOT, offset=(50, 30))
+
+    def _event_story_regular_available(self):
+        return (
+            self.appear_then_click(eventstory_assets.STORY_FIRST, offset=(20, 20))
+            or self.match_template_color(eventstory_assets.STORY_LAST, offset=(20, 20))
+            or self.appear_then_click(eventstory_assets.STORY_MIDDLE, offset=(20, 200))
+            or self.appear_then_click(eventstory_assets.BATTLE_MIDDLE, offset=(20, 200))
+        )
+
     def event_story(self, skip_first_screenshot=True):
         """
         Args:
@@ -115,31 +145,8 @@ class EventStory(CampaignUI, Combat, LoginHandler):
                 continue
 
             # 点击剧情入口。
-            if self.appear_then_click(eventstory_assets.STORY_FIRST, offset=(20, 20), interval=3):
-                self.story_skip_interval_clear()
-                self.popup_interval_clear()
-                self.device.click_record_clear()
-                continue
-            if self.match_template_color(eventstory_assets.STORY_LAST, offset=(20, 20), interval=3):
-                self.device.click(eventstory_assets.STORY_LAST)
-                self.story_skip_interval_clear()
-                self.popup_interval_clear()
-                self.device.click_record_clear()
-                continue
-            if self.appear_then_click(eventstory_assets.STORY_MIDDLE, offset=(20, 200), interval=3):
-                self.story_skip_interval_clear()
-                self.popup_interval_clear()
-                self.device.click_record_clear()
-                continue
-            if self.appear_then_click(eventstory_assets.BATTLE_MIDDLE, offset=(20, 200), interval=3):
-                self.story_skip_interval_clear()
-                self.popup_interval_clear()
-                self.device.click_record_clear()
-                continue
-            if self.handle_event_20250724():
-                self.story_skip_interval_clear()
-                self.popup_interval_clear()
-                self.device.click_record_clear()
+            if self._handle_event_story_entry():
+                self._event_story_clear_intervals()
                 continue
             # 深渊秘境（event_20250814_cn）全部剧情结束后会弹出状态窗口。
             if self.appear_then_click(eventstory_assets.POPUP_RPG_STATUS, offset=(20, 20), interval=3):
@@ -174,18 +181,10 @@ class EventStory(CampaignUI, Combat, LoginHandler):
         Returns:
             str: 'finish', 'story', 'unknown'
         """
-        if self.match_template_color(eventstory_assets.STORY_FINISHED, offset=(20, 20)):
-            return "finish"
-        if self.appear(eventstory_assets.REWARD_GOT, offset=(50, 30)):
+        if self._event_story_finished():
             return "finish"
 
-        if self.appear_then_click(eventstory_assets.STORY_FIRST, offset=(20, 20)):
-            return "story"
-        if self.match_template_color(eventstory_assets.STORY_LAST, offset=(20, 20)):
-            return "story"
-        if self.appear_then_click(eventstory_assets.STORY_MIDDLE, offset=(20, 200)):
-            return "story"
-        if self.appear_then_click(eventstory_assets.BATTLE_MIDDLE, offset=(20, 200)):
+        if self._event_story_regular_available():
             return "story"
         if self.get_event_20250724_button():
             return "story_alchemist"
