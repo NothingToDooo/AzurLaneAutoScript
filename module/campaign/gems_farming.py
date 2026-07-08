@@ -35,43 +35,66 @@ class GemsCampaignOverride(CampaignBase):
         If change vanguard is enabled, withdraw combat and change flagship and vanguard
         """
         if self.config.GemsFarming_ChangeVanguard == "disabled":
-            result = self.handle_popup_confirm("IGNORE_LOW_EMOTION")
-            if result:
-                # Avoid clicking AUTO_SEARCH_MAP_OPTION_OFF
-                self.interval_reset(AUTO_SEARCH_MAP_OPTION_OFF)
-            return result
+            return self._handle_low_emotion_ignore()
 
-        if self.handle_popup_cancel("IGNORE_LOW_EMOTION"):
-            self.config.GEMS_EMOTION_TRIGGERED = True
-            logger.hr("EMOTION WITHDRAW")
+        if not self.handle_popup_cancel("IGNORE_LOW_EMOTION"):
+            return False
 
-            while 1:
-                self.device.screenshot()
+        self.config.GEMS_EMOTION_TRIGGERED = True
+        logger.hr("EMOTION WITHDRAW")
+        self._withdraw_for_low_emotion()
+        raise CampaignEnd("Emotion withdraw")
 
-                if self.handle_story_skip():
-                    continue
-                if self.handle_popup_cancel("IGNORE_LOW_EMOTION"):
-                    continue
+    def _handle_low_emotion_ignore(self):
+        result = self.handle_popup_confirm("IGNORE_LOW_EMOTION")
+        if result:
+            # 避免点击 AUTO_SEARCH_MAP_OPTION_OFF。
+            self.interval_reset(AUTO_SEARCH_MAP_OPTION_OFF)
+        return result
 
-                if self.appear(BATTLE_PREPARATION, offset=(20, 20), interval=2):
-                    self.device.click(BACK_ARROW)
-                    continue
-                if self.handle_auto_search_exit():
-                    continue
-                if self.is_in_stage():
-                    break
+    def _withdraw_for_low_emotion(self):
+        while 1:
+            self.device.screenshot()
+            handled, finished = self._low_emotion_withdraw_step()
+            if finished:
+                break
+            if handled:
+                continue
 
-                if self.is_in_map():
-                    self.withdraw()
-                    break
+    def _low_emotion_withdraw_step(self):
+        if self._low_emotion_skip_dialogs():
+            return True, False
+        if self._low_emotion_leave_battle_preparation():
+            return True, False
+        if self.handle_auto_search_exit():
+            return True, False
+        return self._low_emotion_finish_withdraw()
 
-                if self.appear(FLEET_PREPARATION, offset=(20, 50), interval=2) or self.appear(
-                    MAP_PREPARATION, offset=(20, 20), interval=2
-                ):
-                    self.enter_map_cancel()
-                    break
-            raise CampaignEnd("Emotion withdraw")
-        return False
+    def _low_emotion_skip_dialogs(self):
+        return self.handle_story_skip() or self.handle_popup_cancel("IGNORE_LOW_EMOTION")
+
+    def _low_emotion_leave_battle_preparation(self):
+        if not self.appear(BATTLE_PREPARATION, offset=(20, 20), interval=2):
+            return False
+
+        self.device.click(BACK_ARROW)
+        return True
+
+    def _low_emotion_finish_withdraw(self):
+        if self.is_in_stage():
+            return True, True
+        if self.is_in_map():
+            self.withdraw()
+            return True, True
+        if self._low_emotion_at_preparation():
+            self.enter_map_cancel()
+            return True, True
+        return False, False
+
+    def _low_emotion_at_preparation(self):
+        return self.appear(FLEET_PREPARATION, offset=(20, 50), interval=2) or self.appear(
+            MAP_PREPARATION, offset=(20, 20), interval=2
+        )
 
 
 class GemsFarming(CampaignRun, FleetEquipment, Dock):
