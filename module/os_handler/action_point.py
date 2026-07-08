@@ -146,6 +146,10 @@ class ActionPointHandler(UI, MapEventHandler):
             self.config.override(OpsiGeneral_DoRandomMapEvent=False)
 
     def action_point_safe_get(self):
+        self._wait_current_ap_visible()
+        self._wait_reliable_action_point()
+
+    def _wait_current_ap_visible(self):
         timeout = Timer(3, count=6).start()
         for _ in self.loop():
             # 结束。
@@ -159,6 +163,19 @@ class ActionPointHandler(UI, MapEventHandler):
                 timeout.reset()
                 continue
 
+    def _is_reliable_action_point(self):
+        # 当前行动力过高时，大概率是 OCR 误判。
+        if self._action_point_current > 600:
+            return False
+
+        oil, boxes = self._action_point_box[0], self._action_point_box[1:]
+        # 有行动力箱时，石油读数也需要加载完成。
+        if sum(boxes) > 0:
+            return oil > 100
+        # 或者有石油。页面未完全加载时可能识别成 0 或 1。
+        return oil > 100
+
+    def _wait_reliable_action_point(self):
         skip_first_screenshot = True
         timeout = Timer(1, count=2).start()
         while 1:
@@ -176,22 +193,7 @@ class ActionPointHandler(UI, MapEventHandler):
                 continue
 
             self.action_point_update()
-
-            # 当前行动力过高时，大概率是 OCR 误判。
-            if self._action_point_current > 600:
-                continue
-
-            oil, boxes = self._action_point_box[0], self._action_point_box[1:]
-            # 有行动力箱。
-            if sum(boxes) > 0:
-                if oil > 100:
-                    break
-                # [11, 0, 1, 0]
-                continue
-            # 或者有石油。
-            # 页面未完全加载时可能识别成 0 或 1。
-            # [1, 0, 0, 0]
-            if oil > 100:
+            if self._is_reliable_action_point():
                 break
 
     @staticmethod
@@ -356,68 +358,96 @@ class ActionPointHandler(UI, MapEventHandler):
             cost = self.action_point_get_cost(zone, pinned)
         buy_checked = False
 
-        # 检查今天剩余可恢复行动力。
-        if check_rest_ap:
-            diff = get_server_next_update("00:00") - datetime.now()
-            today_rest = int(diff.total_seconds() // 600)
-            if self._action_point_current + today_rest >= 200:
-                logger.info(
-                    "The sum of the current action points and the rest action points"
-                    " that can be obtained today exceeds 200, skip AP check"
-                )
-                logger.info(f"Current={self._action_point_current}  Rest={today_rest}")
-                keep_current_ap = False
+        if self._can_skip_current_ap_preserve(check_rest_ap):
+            keep_current_ap = False
 
         # 先检查行动力。
-        if keep_current_ap and self._action_point_total <= self.config.OS_ACTION_POINT_PRESERVE:
-            logger.info(f"Reach the limit of action points, preserve={self.config.OS_ACTION_POINT_PRESERVE}")
-            self.action_point_quit()
-            raise ActionPointLimit
+        self._ensure_action_point_above_preserve(keep_current_ap)
 
         for _ in range(12):
             # 行动力足够。
-            if self._action_point_current >= cost:
-                logger.info("Having enough action points")
-                self.action_point_quit()
+            if self._has_enough_action_point(cost):
                 return True
 
             # 购买行动力。
-            if self.config.OpsiGeneral_BuyActionPointLimit > 0 and not buy_checked:
-                if self.action_point_buy(preserve=self.config.OpsiGeneral_OilLimit):
-                    self.action_point_safe_get()
-                    continue
-                buy_checked = True
+            bought, buy_checked = self._try_buy_action_point(buy_checked)
+            if bought:
+                continue
 
             # 重新检查总行动力是否小于消耗；如果不足，跳过使用箱子。
-            if self._action_point_total < cost:
-                logger.info("Not having enough action points")
-                self.action_point_quit()
-                raise ActionPointLimit
-
-            # 行动力箱排序。
-            box = []
-            for index in [1, 2, 3]:
-                if self._action_point_box[index] > 0:
-                    if self._action_point_current + ACTION_POINT_BOX[index] >= 200:
-                        box.append(index)
-                    else:
-                        box.insert(0, index)
+            self._ensure_action_point_total_enough(cost)
 
             # 使用行动力箱。
-            if box:
-                if self._action_point_total > self.config.OS_ACTION_POINT_PRESERVE:
-                    self.action_point_set_button(box[0])
-                    self.action_point_use()
-                    continue
-                logger.info(f"Reach the limit of action points, preserve={self.config.OS_ACTION_POINT_PRESERVE}")
-                self.action_point_quit()
-                raise ActionPointLimit
-            logger.info("No more action point boxes")
-            self.action_point_quit()
-            raise ActionPointLimit
+            self._use_best_action_point_box()
 
         logger.warning("Failed to get action points after 12 trial")
         return False
+
+    def _can_skip_current_ap_preserve(self, check_rest_ap):
+        if not check_rest_ap:
+            return False
+        diff = get_server_next_update("00:00") - datetime.now()
+        today_rest = int(diff.total_seconds() // 600)
+        if self._action_point_current + today_rest < 200:
+            return False
+        logger.info(
+            "The sum of the current action points and the rest action points"
+            " that can be obtained today exceeds 200, skip AP check"
+        )
+        logger.info(f"Current={self._action_point_current}  Rest={today_rest}")
+        return True
+
+    def _raise_action_point_limit(self, message):
+        logger.info(message)
+        self.action_point_quit()
+        raise ActionPointLimit
+
+    def _ensure_action_point_above_preserve(self, keep_current_ap):
+        if keep_current_ap and self._action_point_total <= self.config.OS_ACTION_POINT_PRESERVE:
+            self._raise_action_point_limit(
+                f"Reach the limit of action points, preserve={self.config.OS_ACTION_POINT_PRESERVE}"
+            )
+
+    def _has_enough_action_point(self, cost):
+        if self._action_point_current < cost:
+            return False
+        logger.info("Having enough action points")
+        self.action_point_quit()
+        return True
+
+    def _try_buy_action_point(self, buy_checked):
+        if self.config.OpsiGeneral_BuyActionPointLimit <= 0 or buy_checked:
+            return False, buy_checked
+        if self.action_point_buy(preserve=self.config.OpsiGeneral_OilLimit):
+            self.action_point_safe_get()
+            return True, buy_checked
+        return False, True
+
+    def _ensure_action_point_total_enough(self, cost):
+        if self._action_point_total < cost:
+            self._raise_action_point_limit("Not having enough action points")
+
+    def _action_point_box_order(self):
+        boxes = []
+        for index in [1, 2, 3]:
+            if self._action_point_box[index] <= 0:
+                continue
+            if self._action_point_current + ACTION_POINT_BOX[index] >= 200:
+                boxes.append(index)
+            else:
+                boxes.insert(0, index)
+        return boxes
+
+    def _use_best_action_point_box(self):
+        boxes = self._action_point_box_order()
+        if not boxes:
+            self._raise_action_point_limit("No more action point boxes")
+        if self._action_point_total <= self.config.OS_ACTION_POINT_PRESERVE:
+            self._raise_action_point_limit(
+                f"Reach the limit of action points, preserve={self.config.OS_ACTION_POINT_PRESERVE}"
+            )
+        self.action_point_set_button(boxes[0])
+        self.action_point_use()
 
     def action_point_enter(self):
         """
