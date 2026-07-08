@@ -16,7 +16,6 @@ dependencies = [
     "tqdm",
     "pyyaml",
     "inflection",
-    "pydantic",
     "cnocr",
     "pywebio",
     "starlette",

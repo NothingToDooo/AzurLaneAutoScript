@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from dataclasses import dataclass
 
 from module.base.decorator import cached_property, del_cached_property
 from module.device.connection import Connection
@@ -8,7 +8,8 @@ from module.logger import logger
 from module.map.map_grids import SelectedGrids
 
 
-class EmulatorInfo(BaseModel):
+@dataclass
+class EmulatorInfo:
     emulator: str = ""
     name: str = ""
     path: str = ""
