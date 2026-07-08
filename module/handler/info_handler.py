@@ -420,6 +420,17 @@ class InfoHandler(ModuleBase):
         2023.09.14 剧情选项改为屏幕中部的大块白色选项，
         需要检查 STORY_SKIP_3，但实际点击旧的 STORY_SKIP。
         """
+        if self._handle_story_popup_confirm():
+            return True
+        if self._handle_story_letters_only():
+            return True
+        if self._handle_story_options():
+            return True
+        if self._handle_story_skip_button():
+            return True
+        return self._handle_story_close()
+
+    def _handle_story_popup_confirm(self) -> bool:
         if (
             self.story_popup_timeout.started()
             and not self.story_popup_timeout.reached()
@@ -429,35 +440,52 @@ class InfoHandler(ModuleBase):
             self.interval_reset(handler_assets.STORY_SKIP_3)
             self.interval_reset(handler_assets.STORY_LETTERS_ONLY)
             return True
+        return False
+
+    def _handle_story_letters_only(self) -> bool:
         if self._is_story_black() and self.appear_then_click(
             handler_assets.STORY_LETTERS_ONLY, offset=(20, 20), interval=2
         ):
             self.story_popup_timeout.reset()
             return True
+        return False
+
+    def _handle_story_options(self) -> bool:
         if self._story_option_timer.reached() and self.appear(handler_assets.STORY_SKIP_3, offset=(20, 20), interval=0):
             options = self._story_option_buttons_2()
-            options_count = len(options)
-            logger.attr("Story_options", options_count)
-            if not options_count:
-                self._story_option_record = 0
-                self._story_option_confirm.reset()
-            elif options_count == self._story_option_record:
-                if self._story_option_confirm.reached():
-                    try:
-                        select = options[self.config.STORY_OPTION]
-                    except IndexError:
-                        select = options[0]
-                    self.device.click(select)
-                    self._story_option_timer.reset()
-                    self.story_popup_timeout.reset()
-                    self.interval_reset(handler_assets.STORY_SKIP_3)
-                    self.interval_reset(handler_assets.STORY_LETTERS_ONLY)
-                    self._story_option_record = 0
-                    self._story_option_confirm.reset()
-                    return True
-            else:
-                self._story_option_record = options_count
-                self._story_option_confirm.reset()
+            return self._handle_story_option_buttons(options)
+        return False
+
+    def _handle_story_option_buttons(self, options) -> bool:
+        options_count = len(options)
+        logger.attr("Story_options", options_count)
+        if not options_count:
+            self._story_option_record = 0
+            self._story_option_confirm.reset()
+            return False
+        if options_count != self._story_option_record:
+            self._story_option_record = options_count
+            self._story_option_confirm.reset()
+            return False
+        if not self._story_option_confirm.reached():
+            return False
+
+        self.device.click(self._story_option_select(options))
+        self._story_option_timer.reset()
+        self.story_popup_timeout.reset()
+        self.interval_reset(handler_assets.STORY_SKIP_3)
+        self.interval_reset(handler_assets.STORY_LETTERS_ONLY)
+        self._story_option_record = 0
+        self._story_option_confirm.reset()
+        return True
+
+    def _story_option_select(self, options):
+        try:
+            return options[self.config.STORY_OPTION]
+        except IndexError:
+            return options[0]
+
+    def _handle_story_skip_button(self) -> bool:
         if self.appear(handler_assets.STORY_SKIP_3, offset=(20, 20), interval=2):
             # 确认这是剧情。
             # 剧情播放速度为 Very Fast 时，Alas 点击跳过时剧情可能刚好消失。
@@ -474,8 +502,12 @@ class InfoHandler(ModuleBase):
                 self.story_popup_timeout.reset()
                 return True
             self.interval_clear(handler_assets.STORY_SKIP_3)
-        else:
-            self._story_confirm.reset()
+            return False
+
+        self._story_confirm.reset()
+        return False
+
+    def _handle_story_close(self) -> bool:
         if self.appear_then_click(handler_assets.STORY_CLOSE, offset=(10, 10), interval=2):
             self.story_popup_timeout.reset()
             return True
