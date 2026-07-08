@@ -1,3 +1,4 @@
+from dataclasses import dataclass, field
 from random import choice
 
 from module.base.timer import Timer
@@ -10,6 +11,13 @@ from module.retire.dock import Dock
 
 VALID_SHIP_TYPES = ["dd", "ss", "cl", "ca", "bb", "cv", "repair", "others"]
 OCR_DOCK_AMOUNT = DigitCounter(retire_assets.DOCK_AMOUNT, letter=(255, 255, 255), threshold=192)
+
+
+@dataclass(slots=True)
+class _EnhanceChooseContext:
+    ship_count: int
+    need_to_skip: bool = False
+    state_list: list[str] = field(default_factory=list)
 
 
 class Enhancement(Dock):
@@ -92,6 +100,131 @@ class Enhancement(Dock):
             else:
                 confirm_timer.reset()
 
+    def _enhance_state_check(self, context):
+        # 检查基础条件，能继续强化时进入 ready。
+        context.need_to_skip = False
+        if context.ship_count <= 0:
+            logger.info("Reached maximum number to check, exiting current category")
+            return "state_enhance_exit"
+        if not self.ship_side_navbar_ensure(bottom=4):
+            return "state_enhance_check"
+
+        self.wait_until_appear(retire_assets.ENHANCE_RECOMMEND, offset=(5, 5), skip_first_screenshot=True)
+        return "state_enhance_ready"
+
+    def _enhance_state_ready(self, _context):
+        # 等待推荐强化按钮出现。
+        if self.appear_then_click(retire_assets.ENHANCE_RECOMMEND, offset=(5, 5), interval=0.3):
+            logger.info("Set enhancement material by recommendation.")
+            return "state_enhance_recommend"
+
+        return "state_enhance_ready"
+
+    def _enhance_state_recommend(self, _context):
+        # 判断强化素材是否已经放入槽位。
+        if not retire_assets.EMPTY_ENHANCE_SLOT_PLUS.match(self.device.image):
+            logger.info("Material found. Try enhancing...")
+            return "state_enhance_attempt"
+        if self.info_bar_count():
+            logger.info("No material found for enhancement.")
+            logger.info("Enhancement failed. Swiping to next ship if feasible")
+            return "state_enhance_fail"
+
+        return "state_enhance_ready"
+
+    def _enhance_state_attempt(self, _context):
+        # 等待强化确认按钮出现。
+        if (
+            self.appear_then_click(retire_assets.ENHANCE_CONFIRM, offset=(5, 5), interval=0.3)
+            or self.appear(retire_assets.EQUIP_CONFIRM, offset=(30, 30))
+            or self.info_bar_count()
+            or self.handle_popup_confirm("ENHANCE")
+        ):
+            return "state_enhance_confirm"
+
+        return "state_enhance_attempt"
+
+    def _enhance_state_confirm(self, context):
+        # 出现确认弹窗表示强化成功，否则视为失败。
+        if self.appear(retire_assets.EQUIP_CONFIRM, offset=(30, 30)):
+            logger.info("Enhancement Successful")
+            self._enhance_confirm()
+            return "state_enhance_success"
+        if self.info_bar_count():
+            logger.info("Enhancement impossible, ship currently in battle. Swiping to next ship if feasible")
+            context.need_to_skip = True
+            return "state_enhance_fail"
+        if self.handle_popup_confirm("ENHANCE"):
+            logger.info("Trying a temporary ship")
+            return "state_enhance_confirm"
+
+        return "state_enhance_attempt"
+
+    def _enhance_state_fail(self, context):
+        # 避免断网导致误判。
+        if self.appear(retire_assets.EQUIP_CONFIRM, offset=(30, 30)):
+            return "state_enhance_confirm"
+
+        # 尝试滑到下一艘船。
+        if self.ship_view_next(check_button=retire_assets.ENHANCE_RECOMMEND):
+            if not context.need_to_skip:
+                context.ship_count -= 1
+            return "state_enhance_check"
+        # 避免断网导致误判。
+        if self.appear(retire_assets.EQUIP_CONFIRM, offset=(30, 30)):
+            return "state_enhance_confirm"
+        logger.info("Swiped failed, exiting current category")
+        return "state_enhance_exit"
+
+    @staticmethod
+    def _enhance_state_success(_context):
+        return True
+
+    @staticmethod
+    def _enhance_state_exit(_context):
+        return False
+
+    def _enhance_state_handlers(self):
+        return {
+            "state_enhance_check": self._enhance_state_check,
+            "state_enhance_ready": self._enhance_state_ready,
+            "state_enhance_recommend": self._enhance_state_recommend,
+            "state_enhance_attempt": self._enhance_state_attempt,
+            "state_enhance_confirm": self._enhance_state_confirm,
+            "state_enhance_fail": self._enhance_state_fail,
+            "state_enhance_success": self._enhance_state_success,
+            "state_enhance_exit": self._enhance_state_exit,
+        }
+
+    def _clear_enhance_state_click_record(self, state_list):
+        if state_list[-2:] == ["state_enhance_recommend", "state_enhance_fail"]:
+            names = ["ENHANCE_RECOMMEND", "SHIP_SWIPE"]
+        elif state_list[-3:] == ["state_enhance_attempt", "state_enhance_confirm", "state_enhance_fail"]:
+            names = ["ENHANCE_RECOMMEND", "SHIP_SWIPE", "ENHANCE_CONFIRM"]
+        else:
+            state_list.clear()
+            return
+
+        while self.device.click_record and self.device.click_record[-1] in names:
+            self.device.click_record.pop()
+        state_list.clear()
+
+    @staticmethod
+    def _check_enhance_state_loop(state_list):
+        if len(state_list) <= 30:
+            return
+        logger.critical(f"Too many state transitions: {state_list}")
+        raise GameStuckError("Too many state transitions")
+
+    @staticmethod
+    def _run_enhance_state(handlers, state, context):
+        try:
+            handler = handlers[state]
+        except KeyError as e:
+            logger.warning(f"Unknown state function: {state}")
+            raise ScriptError(f"Unknown state function: {state}") from e
+        return handler(context)
+
     def _enhance_choose(self, ship_count, skip_first_screenshot=True):
         """
         Refactor the implementation.
@@ -113,95 +246,9 @@ class Enhancement(Dock):
             True if able to enhance otherwise False
             Always paired with current ship_count
         """
-        need_to_skip: bool = False
-
-        def state_enhance_check():
-            # 检查基础条件，能继续强化时进入 ready。
-            nonlocal need_to_skip
-            need_to_skip = False
-            if ship_count <= 0:
-                logger.info("Reached maximum number to check, exiting current category")
-                return "state_enhance_exit"
-            if not self.ship_side_navbar_ensure(bottom=4):
-                return "state_enhance_check"
-
-            self.wait_until_appear(retire_assets.ENHANCE_RECOMMEND, offset=(5, 5), skip_first_screenshot=True)
-            return "state_enhance_ready"
-
-        def state_enhance_ready():
-            # 等待推荐强化按钮出现。
-            if self.appear_then_click(retire_assets.ENHANCE_RECOMMEND, offset=(5, 5), interval=0.3):
-                logger.info("Set enhancement material by recommendation.")
-                return "state_enhance_recommend"
-
-            return "state_enhance_ready"
-
-        def state_enhance_recommend():
-            # 判断强化素材是否已经放入槽位。
-            if not retire_assets.EMPTY_ENHANCE_SLOT_PLUS.match(self.device.image):
-                logger.info("Material found. Try enhancing...")
-                return "state_enhance_attempt"
-            if self.info_bar_count():
-                logger.info("No material found for enhancement.")
-                logger.info("Enhancement failed. Swiping to next ship if feasible")
-                return "state_enhance_fail"
-
-            return "state_enhance_ready"
-
-        def state_enhance_attempt():
-            # 等待强化确认按钮出现。
-            if (
-                self.appear_then_click(retire_assets.ENHANCE_CONFIRM, offset=(5, 5), interval=0.3)
-                or self.appear(retire_assets.EQUIP_CONFIRM, offset=(30, 30))
-                or self.info_bar_count()
-                or self.handle_popup_confirm("ENHANCE")
-            ):
-                return "state_enhance_confirm"
-
-            return "state_enhance_attempt"
-
-        def state_enhance_confirm():
-            # 出现确认弹窗表示强化成功，否则视为失败。
-            if self.appear(retire_assets.EQUIP_CONFIRM, offset=(30, 30)):
-                logger.info("Enhancement Successful")
-                self._enhance_confirm()
-                return "state_enhance_success"
-            if self.info_bar_count():
-                logger.info("Enhancement impossible, ship currently in battle. Swiping to next ship if feasible")
-                nonlocal need_to_skip
-                need_to_skip = True
-                return "state_enhance_fail"
-            if self.handle_popup_confirm("ENHANCE"):
-                logger.info("Trying a temporary ship")
-                return "state_enhance_confirm"
-
-            return "state_enhance_attempt"
-
-        def state_enhance_fail():
-            # 避免断网导致误判。
-            if self.appear(retire_assets.EQUIP_CONFIRM, offset=(30, 30)):
-                return "state_enhance_confirm"
-
-            # 尝试滑到下一艘船。
-            if self.ship_view_next(check_button=retire_assets.ENHANCE_RECOMMEND):
-                if not need_to_skip:
-                    nonlocal ship_count
-                    ship_count -= 1
-                return "state_enhance_check"
-            # 避免断网导致误判。
-            if self.appear(retire_assets.EQUIP_CONFIRM, offset=(30, 30)):
-                return "state_enhance_confirm"
-            logger.info("Swiped failed, exiting current category")
-            return "state_enhance_exit"
-
-        def state_enhance_success():
-            return True
-
-        def state_enhance_exit():
-            return False
-
+        context = _EnhanceChooseContext(ship_count=ship_count)
+        handlers = self._enhance_state_handlers()
         state = "state_enhance_check"
-        state_list = []
         while isinstance(state, str):
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -210,31 +257,12 @@ class Enhancement(Dock):
             logger.info(f"Call state function: {state}")
 
             if state == "state_enhance_check":
-                # Avoid too_many_click exception caused by multiple tries without material
-                if state_list[-2:] == ["state_enhance_recommend", "state_enhance_fail"]:
-                    while self.device.click_record and (
-                        self.device.click_record[-1] in ["ENHANCE_RECOMMEND", "SHIP_SWIPE"]
-                    ):
-                        self.device.click_record.pop()
-                # Avoid too_many_click exception caused by enhancement failure on in-battle ships
-                elif state_list[-3:] == ["state_enhance_attempt", "state_enhance_confirm", "state_enhance_fail"]:
-                    while self.device.click_record and (
-                        self.device.click_record[-1] in ["ENHANCE_RECOMMEND", "SHIP_SWIPE", "ENHANCE_CONFIRM"]
-                    ):
-                        self.device.click_record.pop()
-                state_list.clear()
-            state_list.append(state)
-            if len(state_list) > 30:
-                logger.critical(f"Too many state transitions: {state_list}")
-                raise GameStuckError("Too many state transitions")
+                self._clear_enhance_state_click_record(context.state_list)
+            context.state_list.append(state)
+            self._check_enhance_state_loop(context.state_list)
+            state = self._run_enhance_state(handlers, state, context)
 
-            try:
-                state = locals()[state]()
-            except KeyError as e:
-                logger.warning(f"Unknown state function: {state}")
-                raise ScriptError(f"Unknown state function: {state}") from e
-
-        return state, ship_count
+        return state, context.ship_count
 
     def enhance_ships(self, favourite=None):
         """

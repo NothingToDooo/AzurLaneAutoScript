@@ -43,6 +43,91 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
                 logger.attr("BattleUI", pause)
                 break
 
+    def _exercise_combat_ended(self, end):
+        if not (self._in_exercise() or self.appear(BATTLE_PREPARATION, offset=(20, 20))):
+            return False
+        logger.hr("Combat end")
+        if not end:
+            logger.warning("Combat ended without end conditions detected")
+        return True
+
+    def _handle_exercise_battle_status(self):
+        if self.appear(BATTLE_STATUS_S, interval=1):
+            logger.info(f"{BATTLE_STATUS_S} -> {CLICK_SAFE_AREA}")
+            self.device.click(CLICK_SAFE_AREA)
+            return True
+        if self.appear(BATTLE_STATUS_D, interval=1):
+            logger.info(f"{BATTLE_STATUS_D} -> {CLICK_SAFE_AREA}")
+            self.device.click(CLICK_SAFE_AREA)
+            logger.info("Exercise LOST")
+            return True
+        return False
+
+    def _handle_exercise_reward_screens(self, battle_status_detected):
+        if battle_status_detected and self.appear(GET_ITEMS_1, offset=(30, 30), interval=1):
+            logger.info(f"{GET_ITEMS_1} -> {CLICK_SAFE_AREA}")
+            self.device.click(CLICK_SAFE_AREA)
+            return True, False
+        if self.appear(EXP_INFO_S, interval=1):
+            logger.info(f"{EXP_INFO_S} -> {CLICK_SAFE_AREA}")
+            self.device.click(CLICK_SAFE_AREA)
+            return True, False
+        if self.appear(EXP_INFO_D, interval=1):
+            logger.info(f"{EXP_INFO_D} -> {CLICK_SAFE_AREA}")
+            self.device.click(CLICK_SAFE_AREA)
+            return True, False
+        if self.appear_then_click(OPTS_INFO_D, offset=(30, 30), interval=1):
+            logger.info("Exercise LOST")
+            return True, True
+        return False, False
+
+    def _handle_exercise_quit(self, pause_interval):
+        if self.handle_combat_quit():
+            pause_interval.reset()
+            return True, True
+        if self.handle_combat_quit_reconfirm():
+            pause_interval.reset()
+            return None, True
+        return None, False
+
+    def _handle_exercise_low_hp(self, p, pause, pause_interval, show_hp_timer):
+        if p and self._at_low_hp(image=self.device.image, pause=pause):
+            logger.info("Exercise quit")
+            if pause_interval.reached():
+                self.device.click(p)
+                pause_interval.reset()
+                return True
+        elif show_hp_timer.reached():
+            show_hp_timer.reset()
+            self._show_hp()
+        return False
+
+    def _handle_exercise_combat_popups(self):
+        return (
+            self.handle_popup_confirm("EXERCISE_COMBAT_EXECUTE")
+            or self.handle_urgent_commission()
+            or self.handle_guild_popup_cancel()
+            or self.handle_vote_popup()
+            or self.handle_mission_popup_ack()
+        )
+
+    def _update_exercise_combat_pause(self, pause, end):
+        p = self.is_combat_executing()
+        if p:
+            if end:
+                end = False
+            if pause is None:
+                pause = p
+        else:
+            self.low_hp_confirm_timer.reset()
+        return p, pause, end
+
+    def _handle_exercise_reward_result(self, battle_status_detected):
+        handled_reward, reward_end = self._handle_exercise_reward_screens(battle_status_detected)
+        if not handled_reward:
+            return None
+        return reward_end
+
     def _combat_execute(self):
         """
         Returns:
@@ -62,84 +147,33 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
         while 1:
             self.device.screenshot()
             # End
-            if self._in_exercise() or self.appear(BATTLE_PREPARATION, offset=(20, 20)):
-                logger.hr("Combat end")
-                if not end:
-                    logger.warning("Combat ended without end conditions detected")
+            if self._exercise_combat_ended(end):
                 break
-            p = self.is_combat_executing()
-            if p:
-                if end:
-                    end = False
-                if pause is None:
-                    pause = p
-            else:
-                self.low_hp_confirm_timer.reset()
-                # Finish - S or D rank
-                if self.appear(BATTLE_STATUS_S, interval=1):
-                    logger.info(f"{BATTLE_STATUS_S} -> {CLICK_SAFE_AREA}")
-                    self.device.click(CLICK_SAFE_AREA)
-                    success = True
-                    end = True
-                    battle_status_detected = True
-                    continue
-                if self.appear(BATTLE_STATUS_D, interval=1):
-                    logger.info(f"{BATTLE_STATUS_D} -> {CLICK_SAFE_AREA}")
-                    self.device.click(CLICK_SAFE_AREA)
-                    success = True
-                    end = True
-                    battle_status_detected = True
-                    logger.info("Exercise LOST")
-                    continue
-
-            # Only handle GET_ITEMS_1 after battle status
-            if battle_status_detected and self.appear(GET_ITEMS_1, offset=(30, 30), interval=1):
-                logger.info(f"{GET_ITEMS_1} -> {CLICK_SAFE_AREA}")
-                self.device.click(CLICK_SAFE_AREA)
-                continue
-            if self.appear(EXP_INFO_S, interval=1):
-                logger.info(f"{EXP_INFO_S} -> {CLICK_SAFE_AREA}")
-                self.device.click(CLICK_SAFE_AREA)
-                continue
-            if self.appear(EXP_INFO_D, interval=1):
-                logger.info(f"{EXP_INFO_D} -> {CLICK_SAFE_AREA}")
-                self.device.click(CLICK_SAFE_AREA)
-                continue
-            # Last D rank screen
-            if self.appear_then_click(OPTS_INFO_D, offset=(30, 30), interval=1):
+            p, pause, end = self._update_exercise_combat_pause(pause, end)
+            if not p and self._handle_exercise_battle_status():
                 success = True
                 end = True
-                logger.info("Exercise LOST")
+                battle_status_detected = True
+                continue
+
+            # Only handle GET_ITEMS_1 after battle status
+            reward_end = self._handle_exercise_reward_result(battle_status_detected)
+            if reward_end is not None:
+                if reward_end:
+                    success = True
+                    end = True
                 continue
             # Quit
-            if self.handle_combat_quit():
-                pause_interval.reset()
-                success = False
-                end = True
+            quit_success, handled = self._handle_exercise_quit(pause_interval)
+            if handled:
+                if quit_success is not None:
+                    success = quit_success
+                    end = True
                 continue
-            if self.handle_combat_quit_reconfirm():
-                pause_interval.reset()
+            if not end and self._handle_exercise_low_hp(p, pause, pause_interval, show_hp_timer):
                 continue
-            if not end:
-                if p and self._at_low_hp(image=self.device.image, pause=pause):
-                    logger.info("Exercise quit")
-                    if pause_interval.reached():
-                        self.device.click(p)
-                        pause_interval.reset()
-                        continue
-                elif show_hp_timer.reached():
-                    show_hp_timer.reset()
-                    self._show_hp()
             # bunch of popup handlers
-            if self.handle_popup_confirm("EXERCISE_COMBAT_EXECUTE"):
-                continue
-            if self.handle_urgent_commission():
-                continue
-            if self.handle_guild_popup_cancel():
-                continue
-            if self.handle_vote_popup():
-                continue
-            if self.handle_mission_popup_ack():
+            if self._handle_exercise_combat_popups():
                 continue
         return success
 
