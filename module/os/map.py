@@ -547,59 +547,76 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         pause_interval = Timer(0.5, count=1)
         in_main_timer = Timer(3, count=6)
         for _ in self.loop():
-            # End
             if self.is_in_main():
                 logger.info("Auto search interrupted")
                 self.config.task_stop()
 
-            if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
-                self.interval_clear(GOTO_MAIN)
-                in_main_timer.reset()
+            if self._interrupt_auto_search_handle_reward(in_main_timer):
                 continue
-            if pause_interval.reached():
-                pause = self.is_combat_executing()
-                if pause:
-                    self.device.click(pause)
-                    self.interval_reset(MAINTENANCE_ANNOUNCE)
-                    is_loading = False
-                    pause_interval.reset()
-                    in_main_timer.reset()
-                    continue
-            if self.handle_combat_quit():
-                self.interval_reset(MAINTENANCE_ANNOUNCE)
-                pause_interval.reset()
-                in_main_timer.reset()
+            if self._interrupt_auto_search_handle_pause(pause_interval, in_main_timer):
+                is_loading = False
                 continue
-            if self.handle_combat_quit_reconfirm():
-                self.interval_reset(MAINTENANCE_ANNOUNCE)
-                pause_interval.reset()
-                in_main_timer.reset()
+            if self._interrupt_auto_search_handle_quit(pause_interval, in_main_timer):
+                continue
+            if self._interrupt_auto_search_handle_navigation(in_main_timer):
+                continue
+            is_loading, handled = self._interrupt_auto_search_handle_loading(is_loading, in_main_timer)
+            if handled:
                 continue
 
-            if self.appear_then_click(GOTO_MAIN, offset=(20, 20), interval=3):
-                in_main_timer.reset()
-                continue
-            if self.ui_additional():
-                continue
-            if self.handle_map_event():
-                continue
-            # Only print once when detected
-            if not is_loading:
-                if self.is_combat_loading():
-                    is_loading = True
-                    in_main_timer.clear()
-                    continue
-                # Random background from page_main may trigger EXP_INFO_*, don't check them
-                if in_main_timer.reached():
-                    logger.info("handle_exp_info")
-                    if self.handle_battle_status():
-                        continue
-                    if self.handle_exp_info():
-                        continue
-            elif self.is_combat_executing():
-                is_loading = False
+    def _interrupt_auto_search_handle_reward(self, in_main_timer):
+        if not self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
+            return False
+
+        self.interval_clear(GOTO_MAIN)
+        in_main_timer.reset()
+        return True
+
+    def _interrupt_auto_search_reset_combat_timers(self, pause_interval, in_main_timer):
+        self.interval_reset(MAINTENANCE_ANNOUNCE)
+        pause_interval.reset()
+        in_main_timer.reset()
+
+    def _interrupt_auto_search_handle_pause(self, pause_interval, in_main_timer):
+        if not pause_interval.reached():
+            return False
+
+        pause = self.is_combat_executing()
+        if not pause:
+            return False
+
+        self.device.click(pause)
+        self._interrupt_auto_search_reset_combat_timers(pause_interval, in_main_timer)
+        return True
+
+    def _interrupt_auto_search_handle_quit(self, pause_interval, in_main_timer):
+        if not (self.handle_combat_quit() or self.handle_combat_quit_reconfirm()):
+            return False
+
+        self._interrupt_auto_search_reset_combat_timers(pause_interval, in_main_timer)
+        return True
+
+    def _interrupt_auto_search_handle_navigation(self, in_main_timer):
+        if self.appear_then_click(GOTO_MAIN, offset=(20, 20), interval=3):
+            in_main_timer.reset()
+            return True
+        return self.ui_additional() or self.handle_map_event()
+
+    def _interrupt_auto_search_handle_loading(self, is_loading, in_main_timer):
+        if is_loading:
+            if self.is_combat_executing():
                 in_main_timer.clear()
-                continue
+                return False, True
+            return True, False
+
+        if self.is_combat_loading():
+            in_main_timer.clear()
+            return True, True
+        if not in_main_timer.reached():
+            return False, False
+
+        logger.info("handle_exp_info")
+        return False, self.handle_battle_status() or self.handle_exp_info()
 
     def os_auto_search_run(self, strategic=False):
         """
