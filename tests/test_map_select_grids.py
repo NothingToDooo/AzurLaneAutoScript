@@ -1,26 +1,18 @@
+from dataclasses import dataclass
+
 from module.map.map import Map
 from module.map.map_grids import SelectedGrids
 
 
+@dataclass(slots=True, eq=False)
 class _Grid:
-    def __init__(
-        self,
-        name,
-        *,
-        enemy_scale=1,
-        enemy_genre="Light",
-        is_nearby=True,
-        is_accessible=True,
-        weight=0,
-        cost=0,
-    ) -> None:
-        self.name = name
-        self.enemy_scale = enemy_scale
-        self.enemy_genre = enemy_genre
-        self.is_nearby = is_nearby
-        self.is_accessible = is_accessible
-        self.weight = weight
-        self.cost = cost
+    name: str
+    enemy_scale: int = 1
+    enemy_genre: str = "Light"
+    is_nearby: bool = True
+    is_accessible: bool = True
+    weight: int = 0
+    cost: int = 0
 
     def __str__(self) -> str:
         return self.name

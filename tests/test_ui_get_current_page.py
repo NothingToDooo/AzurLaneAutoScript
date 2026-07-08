@@ -1,3 +1,4 @@
+from dataclasses import dataclass, replace
 from types import SimpleNamespace
 
 import pytest
@@ -38,30 +39,39 @@ class _FakeDevice:
         self.orientation_count += 1
 
 
+@dataclass(frozen=True, slots=True)
+class _FakeUIOptions:
+    visible_page: object = None
+    visible_after_checks: int = 0
+    recover_buttons: tuple = ()
+    additional_results: tuple = ()
+    has_cached_image: bool = True
+    app_running: bool = True
+
+
+def _fake_ui_options(options=None, settings=None) -> _FakeUIOptions:
+    options = _FakeUIOptions() if options is None else options
+    if settings:
+        options = replace(options, **settings)
+    return options
+
+
 class _FakeUI(UI):
-    def __init__(
-        self,
-        *,
-        visible_page=None,
-        visible_after_checks=0,
-        recover_buttons=(),
-        additional_results=(),
-        has_cached_image=True,
-        app_running=True,
-    ) -> None:
-        self.device = _FakeDevice(has_cached_image=has_cached_image, app_running=app_running)
+    def __init__(self, options=None, **settings) -> None:
+        options = _fake_ui_options(options, settings)
+        self.device = _FakeDevice(has_cached_image=options.has_cached_image, app_running=options.app_running)
         self.config = SimpleNamespace(
             Emulator_ScreenshotMethod="ADB",
             Emulator_ControlMethod="ADB",
             SERVER="cn",
         )
         self.ui_current = None
-        self.visible_page = visible_page
-        self.visible_after_checks = visible_after_checks
+        self.visible_page = options.visible_page
+        self.visible_after_checks = options.visible_after_checks
         self.page_check_count = 0
-        self.recover_buttons = list(recover_buttons)
+        self.recover_buttons = list(options.recover_buttons)
         self.appear_then_click_calls = []
-        self.additional_results = list(additional_results)
+        self.additional_results = list(options.additional_results)
         self.additional_calls = 0
 
     def ui_page_appear(self, page, **_kwargs) -> bool:

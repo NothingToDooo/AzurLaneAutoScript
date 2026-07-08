@@ -1,5 +1,6 @@
 import time
 import warnings
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import cv2
@@ -17,6 +18,15 @@ if TYPE_CHECKING:
     from module.config.config import AzurLaneConfig
 
 warnings.filterwarnings("ignore")
+
+
+@dataclass(frozen=True, slots=True)
+class LineDetectionOptions:
+    is_horizontal: bool
+    peak_params: dict
+    hough_threshold: int
+    theta_threshold: float
+    pad: int = 0
 
 
 class Perspective:
@@ -76,33 +86,41 @@ class Perspective:
         # Lines detection
         inner_h = self.detect_lines(
             image,
-            is_horizontal=True,
-            param=self.config.INTERNAL_LINES_FIND_PEAKS_PARAMETERS,
-            threshold=self.config.INTERNAL_LINES_HOUGHLINES_THRESHOLD,
-            theta=self.config.HORIZONTAL_LINES_THETA_THRESHOLD,
+            LineDetectionOptions(
+                is_horizontal=True,
+                peak_params=self.config.INTERNAL_LINES_FIND_PEAKS_PARAMETERS,
+                hough_threshold=self.config.INTERNAL_LINES_HOUGHLINES_THRESHOLD,
+                theta_threshold=self.config.HORIZONTAL_LINES_THETA_THRESHOLD,
+            ),
         ).move(*self.config.DETECTING_AREA[:2])
         inner_v = self.detect_lines(
             image,
-            is_horizontal=False,
-            param=self.config.INTERNAL_LINES_FIND_PEAKS_PARAMETERS,
-            threshold=self.config.INTERNAL_LINES_HOUGHLINES_THRESHOLD,
-            theta=self.config.VERTICAL_LINES_THETA_THRESHOLD,
+            LineDetectionOptions(
+                is_horizontal=False,
+                peak_params=self.config.INTERNAL_LINES_FIND_PEAKS_PARAMETERS,
+                hough_threshold=self.config.INTERNAL_LINES_HOUGHLINES_THRESHOLD,
+                theta_threshold=self.config.VERTICAL_LINES_THETA_THRESHOLD,
+            ),
         ).move(*self.config.DETECTING_AREA[:2])
         edge_h = self.detect_lines(
             image,
-            is_horizontal=True,
-            param=self.config.EDGE_LINES_FIND_PEAKS_PARAMETERS,
-            threshold=self.config.EDGE_LINES_HOUGHLINES_THRESHOLD,
-            theta=self.config.HORIZONTAL_LINES_THETA_THRESHOLD,
-            pad=self.config.DETECTING_AREA[2] - self.config.DETECTING_AREA[0],
+            LineDetectionOptions(
+                is_horizontal=True,
+                peak_params=self.config.EDGE_LINES_FIND_PEAKS_PARAMETERS,
+                hough_threshold=self.config.EDGE_LINES_HOUGHLINES_THRESHOLD,
+                theta_threshold=self.config.HORIZONTAL_LINES_THETA_THRESHOLD,
+                pad=self.config.DETECTING_AREA[2] - self.config.DETECTING_AREA[0],
+            ),
         ).move(*self.config.DETECTING_AREA[:2])
         edge_v = self.detect_lines(
             image,
-            is_horizontal=False,
-            param=self.config.EDGE_LINES_FIND_PEAKS_PARAMETERS,
-            threshold=self.config.EDGE_LINES_HOUGHLINES_THRESHOLD,
-            theta=self.config.VERTICAL_LINES_THETA_THRESHOLD,
-            pad=self.config.DETECTING_AREA[3] - self.config.DETECTING_AREA[1],
+            LineDetectionOptions(
+                is_horizontal=False,
+                peak_params=self.config.EDGE_LINES_FIND_PEAKS_PARAMETERS,
+                hough_threshold=self.config.EDGE_LINES_HOUGHLINES_THRESHOLD,
+                theta_threshold=self.config.VERTICAL_LINES_THETA_THRESHOLD,
+                pad=self.config.DETECTING_AREA[3] - self.config.DETECTING_AREA[1],
+            ),
         ).move(*self.config.DETECTING_AREA[:2])
 
         # Lines pre-cleansing
@@ -238,10 +256,21 @@ class Perspective:
         #     return Lines(lines, is_horizontal=is_horizontal)
         return Lines(lines, is_horizontal=is_horizontal)
 
-    def detect_lines(self, image, is_horizontal, param, threshold, theta, pad=0):
+    def detect_lines(self, image, options):
         """包装 find_peaks 和 hough_lines。"""
-        peaks = self.find_peaks(image, is_horizontal=is_horizontal, param=param, pad=pad, mask=ASSETS.ui_mask_stroke)
-        return self.hough_lines(peaks, is_horizontal=is_horizontal, threshold=threshold, theta=theta)
+        peaks = self.find_peaks(
+            image,
+            is_horizontal=options.is_horizontal,
+            param=options.peak_params,
+            pad=options.pad,
+            mask=ASSETS.ui_mask_stroke,
+        )
+        return self.hough_lines(
+            peaks,
+            is_horizontal=options.is_horizontal,
+            threshold=options.hough_threshold,
+            theta=options.theta_threshold,
+        )
 
     @staticmethod
     def show_array(arr):

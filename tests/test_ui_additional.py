@@ -1,3 +1,5 @@
+from dataclasses import dataclass, replace
+
 from module.combat.assets import GET_SHIP
 from module.handler.assets import GAME_TIPS
 from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION_CANCEL, WITHDRAW
@@ -23,28 +25,37 @@ class _FakeDevice:
         self.screenshot_count += 1
 
 
+@dataclass(frozen=True, slots=True)
+class _FakeUIOptions:
+    appear_buttons: tuple = ()
+    appear_then_click_buttons: tuple = ()
+    os_popups: bool = False
+    popup_confirm: bool = False
+    urgent_commission: bool = False
+    main_popups: bool = False
+    story_skip: bool = False
+    idle_page: bool = False
+
+
+def _fake_ui_options(options=None, settings=None) -> _FakeUIOptions:
+    options = _FakeUIOptions() if options is None else options
+    if settings:
+        options = replace(options, **settings)
+    return options
+
+
 class _FakeUI(UI):
-    def __init__(
-        self,
-        *,
-        appear_buttons=(),
-        appear_then_click_buttons=(),
-        os_popups=False,
-        popup_confirm=False,
-        urgent_commission=False,
-        main_popups=False,
-        story_skip=False,
-        idle_page=False,
-    ) -> None:
+    def __init__(self, options=None, **settings) -> None:
+        options = _fake_ui_options(options, settings)
         self.device = _FakeDevice()
-        self.appear_buttons = list(appear_buttons)
-        self.appear_then_click_buttons = list(appear_then_click_buttons)
-        self.os_popups = os_popups
-        self.popup_confirm = popup_confirm
-        self.urgent_commission = urgent_commission
-        self.main_popups = main_popups
-        self.story_skip = story_skip
-        self.idle_page = idle_page
+        self.appear_buttons = list(options.appear_buttons)
+        self.appear_then_click_buttons = list(options.appear_then_click_buttons)
+        self.os_popups = options.os_popups
+        self.popup_confirm = options.popup_confirm
+        self.urgent_commission = options.urgent_commission
+        self.main_popups = options.main_popups
+        self.story_skip = options.story_skip
+        self.idle_page = options.idle_page
         self.main_popup_get_ship_values = []
         self.popup_confirm_names = []
         self.reset_buttons = []

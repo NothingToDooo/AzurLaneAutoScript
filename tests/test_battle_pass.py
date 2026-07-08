@@ -1,3 +1,5 @@
+from dataclasses import dataclass, replace
+
 import module.freebies.battle_pass as battle_pass_module
 from module.freebies.assets import REWARD_RECEIVE, REWARD_RECEIVE_SP, REWARD_RECEIVE_WHITE
 from module.freebies.battle_pass import BattlePass
@@ -34,28 +36,37 @@ class _FakeDevice:
         self.screenshot_count += 1
 
 
+@dataclass(frozen=True, slots=True)
+class _FakeBattlePassOptions:
+    appear_results: object = None
+    appear_then_click_results: object = None
+    match_results: object = None
+    popup_results: object = None
+    get_items_results: tuple = ()
+    get_ship_results: tuple = ()
+    get_skin_results: tuple = ()
+
+
+def _fake_battle_pass_options(options=None, settings=None) -> _FakeBattlePassOptions:
+    options = _FakeBattlePassOptions() if options is None else options
+    if settings:
+        options = replace(options, **settings)
+    return options
+
+
 class _FakeBattlePass(BattlePass):
-    def __init__(
-        self,
-        *,
-        appear_results=None,
-        appear_then_click_results=None,
-        match_results=None,
-        popup_results=None,
-        get_items_results=(),
-        get_ship_results=(),
-        get_skin_results=(),
-    ) -> None:
+    def __init__(self, options=None, **settings) -> None:
+        options = _fake_battle_pass_options(options, settings)
         self.device = _FakeDevice()
-        self.appear_results = {id(button): list(results) for button, results in (appear_results or {}).items()}
+        self.appear_results = {id(button): list(results) for button, results in (options.appear_results or {}).items()}
         self.appear_then_click_results = {
-            id(button): list(results) for button, results in (appear_then_click_results or {}).items()
+            id(button): list(results) for button, results in (options.appear_then_click_results or {}).items()
         }
-        self.match_results = {id(button): list(results) for button, results in (match_results or {}).items()}
-        self.popup_results = list(popup_results or [])
-        self.get_items_results = list(get_items_results)
-        self.get_ship_results = list(get_ship_results)
-        self.get_skin_results = list(get_skin_results)
+        self.match_results = {id(button): list(results) for button, results in (options.match_results or {}).items()}
+        self.popup_results = list(options.popup_results or [])
+        self.get_items_results = list(options.get_items_results)
+        self.get_ship_results = list(options.get_ship_results)
+        self.get_skin_results = list(options.get_skin_results)
 
     def _pop_button_result(self, results_by_button, button) -> bool:
         results = results_by_button.get(id(button), [])
