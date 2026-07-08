@@ -5,12 +5,15 @@ from collections import deque
 # 键存在时，直接索引并捕获 KeyError 最快，dict.get 次之，先检查成员最慢。
 # 键不存在时，先检查成员最快，dict.get 次之，直接索引并捕获 KeyError 最慢。
 
+INVALID_DEPTH_RANGE_MESSAGE = "Invalid depth range"
+
 
 def _validate_depth_range(min_depth: int, depth: int) -> None:
     """检查深度参数是否有效。"""
     if 1 <= min_depth <= depth:
         return
-    raise ValueError(f"Invalid depth range: min_depth={min_depth}, depth={depth}")
+    message = f"{INVALID_DEPTH_RANGE_MESSAGE}: min_depth={min_depth}, depth={depth}"
+    raise ValueError(message)
 
 
 def deep_get(d, keys, default=None):

@@ -10,6 +10,7 @@ VALID_SERVER = ["cn"]
 VALID_PACKAGE = {
     "com.bilibili.azurlane": "cn",
 }
+INVALID_SERVER_MESSAGE = "Server invalid"
 DICT_PACKAGE_TO_ACTIVITY = {
     "com.bilibili.azurlane": "com.manjuu.azurlane.MainActivity",
 }
@@ -73,4 +74,5 @@ def to_package(package_or_server: str) -> str:
         if value == package_or_server:
             return key
 
-    raise ValueError(f"Server invalid: {package_or_server}")
+    message = f"{INVALID_SERVER_MESSAGE}: {package_or_server}"
+    raise ValueError(message)

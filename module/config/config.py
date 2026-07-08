@@ -28,6 +28,9 @@ from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
 
+MISSING_DELAY_ARGUMENT_MESSAGE = "Missing argument in delay_next_run, should set at least one"
+TASK_CALL_MISSING_TEMPLATE = "Task to call: `{task}` does not exist in user config"
+
 
 class TaskEnd(Exception):
     pass
@@ -439,7 +442,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             self.modified[f"{task}.Scheduler.NextRun"] = run
             self.update()
         else:
-            raise ScriptError("Missing argument in delay_next_run, should set at least one")
+            raise ScriptError(MISSING_DELAY_ARGUMENT_MESSAGE)
 
     def _delay_opsi_tasks(self, task_list, minutes, kv) -> None:
         next_run = datetime.now().replace(microsecond=0) + timedelta(minutes=minutes)
@@ -565,7 +568,8 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             bool: If called.
         """
         if deep_get(self.data, keys=f"{task}.Scheduler.NextRun", default=None) is None:
-            raise ScriptError(f"Task to call: `{task}` does not exist in user config")
+            message = TASK_CALL_MISSING_TEMPLATE.format(task=task)
+            raise ScriptError(message)
 
         if force_call or self.is_task_enabled(task):
             logger.info(f"Task call: {task}")
