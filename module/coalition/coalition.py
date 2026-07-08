@@ -155,64 +155,75 @@ class Coalition(CoalitionCombat, CampaignEvent):
         return event, stage
 
     def run(self, event="", mode="", fleet="", total=0):
+        event, mode, fleet = self._coalition_run_arguments(event, mode, fleet)
+        event, mode = self.handle_stage_name(event, mode)
+        self.run_count = 0
+        self.run_limit = self.config.StopCondition_RunCount
+
+        while not self._coalition_total_reached(total):
+            if self.event_time_limit_triggered():
+                self.config.task_stop()
+
+            self._coalition_log_run(event, mode)
+            if not self._coalition_prepare_run(event):
+                break
+            if self.triggered_stop_condition(pt_check=True):
+                break
+            if not self._coalition_run_once(event, mode, fleet):
+                break
+
+            self._coalition_after_run()
+            if self.triggered_stop_condition(pt_check=True):
+                break
+            if self.config.task_switched():
+                self.config.task_stop()
+
+    def _coalition_run_arguments(self, event, mode, fleet):
         event = event or self.config.Campaign_Event
         mode = mode or self.config.Coalition_Mode
         fleet = fleet or self.config.Coalition_Fleet
         if not event or not mode or not fleet:
             raise ScriptError(f"Coalition arguments unfilled. name={event}, mode={mode}, fleet={fleet}")
+        return event, mode, fleet
 
-        event, mode = self.handle_stage_name(event, mode)
-        self.run_count = 0
-        self.run_limit = self.config.StopCondition_RunCount
-        while 1:
-            # End
-            if total and self.run_count == total:
-                break
-            if self.event_time_limit_triggered():
-                self.config.task_stop()
+    def _coalition_total_reached(self, total):
+        return bool(total and self.run_count == total)
 
-            # Log
-            logger.hr(f"{event}_{mode}", level=2)
-            if self.config.StopCondition_RunCount > 0:
-                logger.info(f"Count remain: {self.config.StopCondition_RunCount}")
-            else:
-                logger.info(f"Count: {self.run_count}")
+    def _coalition_log_run(self, event, mode):
+        logger.hr(f"{event}_{mode}", level=2)
+        if self.config.StopCondition_RunCount > 0:
+            logger.info(f"Count remain: {self.config.StopCondition_RunCount}")
+            return
+        logger.info(f"Count: {self.run_count}")
 
-            # UI switches
-            if not self._coalition_has_oil_icon:
-                self.ui_goto(page_campaign_menu)
-                if self.triggered_stop_condition(oil_check=True):
-                    break
-            self.device.stuck_record_clear()
-            self.device.click_record_clear()
-            self.ui_goto_coalition()
-            self.disable_event_on_raid()
-            self.coalition_ensure_mode(event, "battle")
+    def _coalition_prepare_run(self, event):
+        if not self._coalition_has_oil_icon:
+            self.ui_goto(page_campaign_menu)
+            if self.triggered_stop_condition(oil_check=True):
+                return False
 
-            # End
-            if self.triggered_stop_condition(pt_check=True):
-                break
+        self.device.stuck_record_clear()
+        self.device.click_record_clear()
+        self.ui_goto_coalition()
+        self.disable_event_on_raid()
+        self.coalition_ensure_mode(event, "battle")
+        return True
 
-            # Run
-            self.device.stuck_record_clear()
-            self.device.click_record_clear()
-            try:
-                self.coalition_execute_once(event=event, stage=mode, fleet=fleet)
-            except ScriptEnd as e:
-                logger.hr("Script end")
-                logger.info(str(e))
-                break
+    def _coalition_run_once(self, event, mode, fleet):
+        self.device.stuck_record_clear()
+        self.device.click_record_clear()
+        try:
+            self.coalition_execute_once(event=event, stage=mode, fleet=fleet)
+        except ScriptEnd as e:
+            logger.hr("Script end")
+            logger.info(str(e))
+            return False
+        return True
 
-            # After run
-            self.run_count += 1
-            if self.config.StopCondition_RunCount:
-                self.config.StopCondition_RunCount -= 1
-            # End
-            if self.triggered_stop_condition(pt_check=True):
-                break
-            # Scheduler
-            if self.config.task_switched():
-                self.config.task_stop()
+    def _coalition_after_run(self):
+        self.run_count += 1
+        if self.config.StopCondition_RunCount:
+            self.config.StopCondition_RunCount -= 1
 
 
 if __name__ == "__main__":
