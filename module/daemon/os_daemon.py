@@ -16,54 +16,74 @@ class AzurLaneDaemon(DaemonBase, OSFleet, PortHandler):
 
         return super()._os_combat_expected_end()
 
-    def run(self):
+    def prepare_os_daemon_config(self):
         self.config.merge(OSConfig())
         self.config.override(HOMO_EDGE_DETECT=False)
+
+    def handle_os_daemon_combat(self):
+        # 战斗中只保持截图轮询，不插入其他操作。
+        if self.is_combat_executing():
+            return True
+
+        if self.combat_appear():
+            self.combat_preparation()
+        try:
+            if self.handle_battle_status():
+                self.combat_status(expected_end="no_searching")
+                return True
+        except CampaignEnd, ContinuousCombat:
+            return True
+        return False
+
+    def handle_os_daemon_exp_info(self):
+        if self.appear_then_click(EXP_INFO_C, interval=2):
+            return True
+        return bool(self.appear_then_click(EXP_INFO_D, interval=2))
+
+    def handle_os_daemon_map_event(self):
+        if not self.handle_map_event():
+            return False
+        self._nearest_object_click_timer.clear()
+        return True
+
+    def handle_os_daemon_auto_search_reward(self):
+        return bool(self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=2))
+
+    def handle_os_daemon_port_repair(self):
+        if not self.config.OpsiDaemon_RepairShip:
+            return False
+        if not self.appear(PORT_ENTER, offset=(20, 20), interval=30):
+            return False
+
+        self.port_enter()
+        self.port_dock_repair()
+        self.port_quit()
+        self.interval_reset(PORT_ENTER)
+        logger.info("Port repair finished, please move your fleet out of the port in 30s to avoid repairing again")
+        return True
+
+    def handle_os_daemon_enemy_selection(self):
+        return bool(self.config.OpsiDaemon_SelectEnemy and self.click_nearest_object())
+
+    def run(self):
+        self.prepare_os_daemon_config()
         while 1:
             self.device.screenshot()
 
-            # If is running a combat, do nothing.
-            if self.is_combat_executing():
+            if self.handle_os_daemon_combat():
+                continue
+            if self.handle_os_daemon_exp_info():
+                continue
+            if self.handle_os_daemon_map_event():
+                continue
+            if self.handle_os_daemon_auto_search_reward():
                 continue
 
-            # Combat
-            if self.combat_appear():
-                self.combat_preparation()
-            try:
-                if self.handle_battle_status():
-                    self.combat_status(expected_end="no_searching")
-                    continue
-            except CampaignEnd, ContinuousCombat:
-                continue
-            if self.appear_then_click(EXP_INFO_C, interval=2):
-                continue
-            if self.appear_then_click(EXP_INFO_D, interval=2):
+            self.handle_os_daemon_port_repair()
+            if self.handle_os_daemon_enemy_selection():
                 continue
 
-            # Map events
-            if self.handle_map_event():
-                self._nearest_object_click_timer.clear()
-                continue
-            if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=2):
-                continue
-
-            # Port repair
-            if self.config.OpsiDaemon_RepairShip and self.appear(
-                PORT_ENTER, offset=(20, 20), interval=30
-            ):
-                self.port_enter()
-                self.port_dock_repair()
-                self.port_quit()
-                self.interval_reset(PORT_ENTER)
-                logger.info(
-                    "Port repair finished, please move your fleet out of the port in 30s to avoid repairing again"
-                )
-
-            if self.config.OpsiDaemon_SelectEnemy and self.click_nearest_object():
-                continue
-
-            # End
-            # No end condition, stop it manually.
+            # 没有自动结束条件，需要手动停止。
 
         return True
 
