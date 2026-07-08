@@ -1,4 +1,5 @@
 import re
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -26,6 +27,17 @@ from module.os_shop.assets import PORT_SUPPLY_CHECK
 from module.ui.assets import BACK_ARROW
 
 FLEET_FILTER = Filter(regex=re.compile(r"fleet-?(\d)"), attr=("fleet",), preset=("callsubmarine",))
+
+
+@dataclass(slots=True)
+class _WalkStableContext:
+    confirm_timer: object
+    stuck_timer: object
+    walk_out_of_step: bool
+    record: object = None
+    enemy_searching_appear: bool = False
+    clicked_story: bool = False
+    result: set[str] = field(default_factory=set)
 
 
 def limit_walk(location, step=3):
@@ -240,6 +252,135 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
 
         logger.info("Camera stabled")
 
+    def _walk_stable_reset(self, context):
+        context.confirm_timer.reset()
+        context.stuck_timer.reset()
+
+    def _walk_stable_abyssal_expected_end(self):
+        # OSCombat.combat_status() 会禁用普通掉落处理，这里补充地图事件处理。
+        if self.handle_map_event():
+            return False
+        return self.is_in_map()
+
+    def _handle_walk_stable_map_event(self, context):
+        event = self.handle_map_event()
+        if not event:
+            return False
+        self._walk_stable_reset(context)
+        context.result.add("event")
+        if event == "story_skip":
+            context.clicked_story = True
+        elif event == "map_get_items" and context.clicked_story:
+            logger.info("Got items from story")
+            self.device.click_record_clear()
+            context.clicked_story = False
+        else:
+            context.clicked_story = False
+        return True
+
+    def _handle_walk_stable_basic_blockers(self, context):
+        if self.handle_retirement():
+            self._walk_stable_reset(context)
+            return True
+        if self.handle_walk_out_of_step():
+            if context.walk_out_of_step:
+                raise MapWalkError("walk_out_of_step")
+            return True
+        if self.handle_popup_confirm("WALK_UNTIL_STABLE"):
+            self._walk_stable_reset(context)
+            return True
+        return False
+
+    def _handle_walk_stable_accident_clicks(self, context):
+        if self.is_in_globe():
+            self.os_globe_goto_map()
+        elif self.is_in_storage():
+            self.storage_quit()
+        elif self.is_in_os_mission():
+            self.os_mission_quit()
+        elif self.handle_os_game_tips():
+            pass
+        elif self.is_in_map_order():
+            self.order_quit()
+        else:
+            return False
+        self._walk_stable_reset(context)
+        return True
+
+    def _handle_walk_stable_combat(self, context):
+        if not self.combat_appear():
+            return False
+        self.combat(expected_end=self._walk_stable_abyssal_expected_end, fleet_index=self.fleet_show_index)
+        self._walk_stable_reset(context)
+        context.result.add("event")
+        return True
+
+    def _handle_walk_stable_akashi(self, context):
+        if not self.appear(PORT_SUPPLY_CHECK, offset=(20, 20)):
+            return False
+        self.interval_clear(PORT_SUPPLY_CHECK)
+        self.handle_akashi_supply_buy(CLICK_SAFE_AREA)
+        self._walk_stable_reset(context)
+        context.result.add("akashi")
+        return True
+
+    def _handle_walk_stable_reward_popup(self, context):
+        if not self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
+            return False
+        self._walk_stable_reset(context)
+        return True
+
+    def _handle_walk_stable_enemy_searching(self, context):
+        if not context.enemy_searching_appear and self.enemy_searching_appear():
+            context.enemy_searching_appear = True
+            self._walk_stable_reset(context)
+            return True
+        if not context.enemy_searching_appear:
+            return False
+        self.handle_enemy_flashing()
+        self.device.sleep(0.3)
+        logger.info("Enemy searching appeared.")
+        context.enemy_searching_appear = False
+        self._walk_stable_reset(context)
+        context.result.add("search")
+        return False
+
+    def _handle_walk_stable_interruption(self, context):
+        handlers = (
+            self._handle_walk_stable_map_event,
+            self._handle_walk_stable_basic_blockers,
+            self._handle_walk_stable_accident_clicks,
+            self._handle_walk_stable_combat,
+            self._handle_walk_stable_akashi,
+            self._handle_walk_stable_reward_popup,
+            self._handle_walk_stable_enemy_searching,
+        )
+        return any(handler(context) for handler in handlers)
+
+    def _handle_walk_stable_arrival(self, context):
+        # Check colors, because screen goes black when something is unlocking.
+        # A direct use of IN_MAP, basically `self.is_in_map() and IN_MAP.match_template_color()`
+        if not self.match_template_color(IN_MAP, offset=(200, 5)):
+            self._walk_stable_reset(context)
+            return False
+        self.update_os()
+        current = self.view.backend.homo_loca
+        logger.attr("homo_loca", current)
+        # Max known distance is 4.48px, homo_loca between ( 56,  60) and ( 52,  58)
+        if context.record is None or (
+            current is not None and np.linalg.norm(np.subtract(current, context.record)) < 5.5
+        ):
+            if context.confirm_timer.reached():
+                return True
+        else:
+            if context.stuck_timer.reached():
+                logger.warning("homo_loca stuck at current view, try reset.")
+                if self.fleet_reset_view():
+                    context.stuck_timer.reset()
+            context.confirm_timer.reset()
+        context.record = current
+        return False
+
     def wait_until_walk_stable(self, confirm_timer=None, skip_first_screenshot=False, walk_out_of_step=True):
         """
         Wait until homo_loca stabled.
@@ -261,147 +402,27 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             MapWalkError: If unable to goto such grid.
         """
         logger.hr("Wait until walk stable")
-        record = None
-        enemy_searching_appear = False
         self.device.screenshot_interval_set(0.35)
         if confirm_timer is None:
             confirm_timer = Timer(0.8, count=2)
-        result = set()
-        # Record story history to clear click record
-        clicked_story = False
         stuck_timer = Timer(20, count=5).start()
         confirm_timer.reset()
-
-        def abyssal_expected_end():
-            # OSCombat.combat_status() 会禁用普通掉落处理，这里补充地图事件处理。
-            if self.handle_map_event():
-                return False
-            return self.is_in_map()
+        context = _WalkStableContext(
+            confirm_timer=confirm_timer,
+            stuck_timer=stuck_timer,
+            walk_out_of_step=walk_out_of_step,
+        )
 
         for _ in self.loop(skip_first=skip_first_screenshot):
-            # Map event
-            event = self.handle_map_event()
-            if event:
-                confirm_timer.reset()
-                stuck_timer.reset()
-                result.add("event")
-                if event == "story_skip":
-                    clicked_story = True
-                elif event == "map_get_items":
-                    # story_skip -> map_get_items means abyssal progress reward is received
-                    if clicked_story:
-                        logger.info("Got items from story")
-                        self.device.click_record_clear()
-                        clicked_story = False
-                else:
-                    # Handled other events, clear history
-                    clicked_story = False
+            if self._handle_walk_stable_interruption(context):
                 continue
-            if self.handle_retirement():
-                confirm_timer.reset()
-                stuck_timer.reset()
-                continue
-            if self.handle_walk_out_of_step():
-                if walk_out_of_step:
-                    raise MapWalkError("walk_out_of_step")
-                continue
-            if self.handle_popup_confirm("WALK_UNTIL_STABLE"):
-                # Confirm to submit items, in siren scanning devices
-                confirm_timer.reset()
-                stuck_timer.reset()
-                continue
-
-            # Accident click
-            if self.is_in_globe():
-                self.os_globe_goto_map()
-                confirm_timer.reset()
-                stuck_timer.reset()
-                continue
-            if self.is_in_storage():
-                self.storage_quit()
-                confirm_timer.reset()
-                stuck_timer.reset()
-                continue
-            if self.is_in_os_mission():
-                self.os_mission_quit()
-                confirm_timer.reset()
-                stuck_timer.reset()
-                continue
-            if self.handle_os_game_tips():
-                confirm_timer.reset()
-                stuck_timer.reset()
-                continue
-            if self.is_in_map_order():
-                self.order_quit()
-                confirm_timer.reset()
-                stuck_timer.reset()
-                continue
-
-            # Combat
-            if self.combat_appear():
-                # Use ui_back() for testing, because there are too few abyssal loggers every month.
-                # self.ui_back(check_button=self.is_in_map)
-                self.combat(expected_end=abyssal_expected_end, fleet_index=self.fleet_show_index)
-                confirm_timer.reset()
-                stuck_timer.reset()
-                result.add("event")
-                continue
-
-            # Akashi shop
-            if self.appear(PORT_SUPPLY_CHECK, offset=(20, 20)):
-                self.interval_clear(PORT_SUPPLY_CHECK)
-                self.handle_akashi_supply_buy(CLICK_SAFE_AREA)
-                confirm_timer.reset()
-                stuck_timer.reset()
-                result.add("akashi")
-                continue
-
-            # A game bug that AUTO_SEARCH_REWARD from the last cleared zone popups
-            if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
-                confirm_timer.reset()
-                stuck_timer.reset()
-                continue
-
-            # Enemy searching
-            if not enemy_searching_appear and self.enemy_searching_appear():
-                enemy_searching_appear = True
-                confirm_timer.reset()
-                stuck_timer.reset()
-                continue
-            if enemy_searching_appear:
-                self.handle_enemy_flashing()
-                self.device.sleep(0.3)
-                logger.info("Enemy searching appeared.")
-                enemy_searching_appear = False
-                confirm_timer.reset()
-                stuck_timer.reset()
-                result.add("search")
             if self.is_in_map():
                 self.enemy_searching_color_initial()
 
-            # Arrive
-            # Check colors, because screen goes black when something is unlocking.
-            # A direct use of IN_MAP, basically `self.is_in_map() and IN_MAP.match_template_color()`
-            if self.match_template_color(IN_MAP, offset=(200, 5)):
-                self.update_os()
-                current = self.view.backend.homo_loca
-                logger.attr("homo_loca", current)
-                # Max known distance is 4.48px, homo_loca between ( 56,  60) and ( 52,  58)
-                if record is None or (current is not None and np.linalg.norm(np.subtract(current, record)) < 5.5):
-                    if confirm_timer.reached():
-                        break
-                else:
-                    if stuck_timer.reached():
-                        logger.warning("homo_loca stuck at current view, try reset.")
-                        if self.fleet_reset_view():
-                            stuck_timer.reset()
-                    confirm_timer.reset()
-                record = current
-            else:
-                confirm_timer.reset()
-                stuck_timer.reset()
+            if self._handle_walk_stable_arrival(context):
+                break
 
-        result = "_".join(result)
+        result = "_".join(context.result)
         logger.info(f"Walk stabled, result: {result}")
         self.device.screenshot_interval_set()
         return result

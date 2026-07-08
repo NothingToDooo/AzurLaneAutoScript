@@ -1,4 +1,5 @@
 import itertools
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -9,6 +10,23 @@ from module.logger import logger
 from module.map.camera import Camera
 from module.map.map_base import SelectedGrids, location2node, location_ensure
 from module.map.utils import match_movable
+
+
+@dataclass(slots=True)
+class _GotoState:
+    location: object
+    expected: str
+    grid: object
+    is_portal: bool
+    may_submarine_icon: bool
+    extra: float
+    result: str = "nothing"
+    result_mystery: str = ""
+    arrived: bool = False
+    arrive_timer: object = None
+    arrive_unexpected_timer: object = None
+    ambushed_retry: object = None
+    walk_timeout: object = None
 
 
 class Fleet(Camera, AmbushHandler):
@@ -245,6 +263,231 @@ class Fleet(Camera, AmbushHandler):
         sight = self.map.camera_sight
         return (sight[0], 0, sight[2], sight[3])
 
+    def _goto_walk_extra(self, grid):
+        extra = 0
+        if self.config.Submarine_Mode in ["hunt_only", "hunt_and_boss"]:
+            extra += 4.5
+        if self.config.MAP_HAS_LAND_BASED and grid.is_mechanism_trigger:
+            extra += grid.mechanism_wait
+        return extra
+
+    def _goto_click_target(self, location):
+        self.fleet_ensure(self.fleet_current_index)
+        self.in_sight(location, sight=self._walk_sight)
+        self.focus_to_grid_center()
+        grid = self.convert_global_to_local(location)
+
+        self.ambush_color_initial()
+        self.enemy_searching_color_initial()
+        grid.__str__ = location
+        self.device.click(grid)
+        return grid
+
+    def _goto_state(self, location, expected, grid, is_portal, may_submarine_icon):
+        extra = self._goto_walk_extra(grid)
+        return _GotoState(
+            location=location,
+            expected=expected,
+            grid=grid,
+            is_portal=is_portal,
+            may_submarine_icon=may_submarine_icon,
+            extra=extra,
+            arrive_timer=Timer(0.5 + self.round_wait + extra, count=2),
+            arrive_unexpected_timer=Timer(1.5 + self.round_wait + extra, count=6),
+            ambushed_retry=Timer(0.5 + self.round_wait + extra, count=2),
+            walk_timeout=Timer(20).start(),
+        )
+
+    def _goto_handle_fleet_lock(self, state):
+        if not self.config.Campaign_UseFleetLock or self.is_in_map():
+            return
+        if self.handle_retirement():
+            self.map_offensive()
+            state.walk_timeout.reset()
+        if self.handle_combat_low_emotion():
+            state.walk_timeout.reset()
+
+    def _goto_handle_combat(self, state):
+        if not self.combat_appear():
+            return
+        self.combat(
+            expected_end=self._expected_end(state.expected),
+            fleet_index=self.fleet_show_index,
+            submarine_mode=self._submarine_mode(state.expected),
+        )
+        self.hp_get()
+        self.lv_get(after_battle=True)
+        state.arrived = not self.config.MAP_HAS_MOVABLE_ENEMY
+        state.result = "combat"
+        self.battle_count += 1
+        self.fleet_ammo -= 1
+        if "siren" in state.expected or (self.config.MAP_HAS_MOVABLE_ENEMY and not state.expected):
+            self.siren_count += 1
+        elif self.map[state.location].may_enemy:
+            self.map[state.location].is_cleared = True
+
+        if self.catch_camera_repositioning():
+            self.handle_boss_appear_refocus()
+            if sum(self.hp) < 0.01:
+                logger.warning("Empty HP on all slots, trying hp_get again")
+                self.hp_get()
+        if self.config.MAP_FOCUS_ENEMY_AFTER_BATTLE:
+            self.camera = state.location
+            self.update()
+        state.grid = self.convert_global_to_local(state.location)
+        state.arrive_timer = Timer(0.5 + state.extra, count=2)
+        state.arrive_unexpected_timer = Timer(1.5 + state.extra, count=6)
+        state.walk_timeout.reset()
+        if not (state.grid.predict_fleet() and state.grid.predict_current_fleet()):
+            state.ambushed_retry.start()
+
+    def _goto_handle_ambush(self, state):
+        if not self.handle_ambush():
+            return
+        self.hp_get()
+        self.lv_get(after_battle=True)
+        state.walk_timeout.reset()
+        self.view.update(image=self.device.image)
+        if not (state.grid.predict_fleet() and state.grid.predict_current_fleet()):
+            state.ambushed_retry.start()
+
+    def _goto_handle_mystery(self, state):
+        mystery = self.handle_mystery(button=state.grid)
+        if not mystery:
+            return
+        self.mystery_count += 1
+        state.result = "mystery"
+        state.result_mystery = mystery
+
+    def _goto_handle_cat_attack(self, state):
+        if not self.handle_map_cat_attack():
+            return False
+        # Already arrive, combat will appear later, but still need to wait siren moving
+        state.arrive_timer.reset()
+        state.arrive_unexpected_timer.reset()
+        state.walk_timeout.reset()
+        return True
+
+    def _goto_handle_guild_popup(self, state):
+        # Usually handled in combat_status, but sometimes delayed until after battle on slow PCs.
+        if not self.handle_guild_popup_cancel():
+            return False
+        state.walk_timeout.reset()
+        return True
+
+    def _goto_arrive_prediction(self, state):
+        if not self.is_in_map():
+            return "", False
+        if not state.may_submarine_icon and state.grid.predict_fleet():
+            return "(is_fleet)", True
+        if state.may_submarine_icon and state.grid.predict_current_fleet():
+            return "(may_submarine_icon, is_current_fleet)", True
+        if (
+            self.config.MAP_WALK_USE_CURRENT_FLEET
+            and state.expected != "combat_boss"
+            and not ("combat" in state.expected and state.grid.may_boss)
+            and (state.grid.predict_fleet() or state.grid.predict_current_fleet())
+        ):
+            return "(MAP_WALK_USE_CURRENT_FLEET, is_current_fleet)", True
+        if state.walk_timeout.reached() and state.grid.predict_current_fleet():
+            return "(walk_timeout, is_current_fleet)", True
+        return "", False
+
+    def _goto_confirm_arrival(self, state):
+        arrive_predict, arrive_checker = self._goto_arrive_prediction(state)
+        if not arrive_checker:
+            if state.arrive_timer.started():
+                state.arrive_timer.reset()
+            if state.arrive_unexpected_timer.started():
+                state.arrive_unexpected_timer.reset()
+            return False
+        if not state.arrive_timer.started():
+            logger.info(f"Arrive {location2node(state.location)} {arrive_predict}".strip())
+        state.arrive_timer.start()
+        state.arrive_unexpected_timer.start()
+        if state.result == "nothing" and not state.arrive_timer.reached():
+            return False
+        if state.expected and state.result not in state.expected:
+            if state.arrive_unexpected_timer.reached():
+                logger.warning("Arrive with unexpected result")
+            else:
+                return False
+        if state.is_portal:
+            state.location = self.map[state.location].portal_link
+            self.camera = state.location
+        logger.info(
+            f"Arrive {location2node(state.location)} confirm. Result: {state.result}. Expected: {state.expected}"
+        )
+        state.arrived = True
+        return True
+
+    def _goto_handle_story(self, state):
+        if state.expected == "story" and self.handle_story_skip():
+            state.result = "story"
+            return True
+        return False
+
+    def _goto_retry_needed(self, state):
+        if state.ambushed_retry.started() and state.ambushed_retry.reached():
+            return True
+        if not state.walk_timeout.reached():
+            return False
+        logger.warning("Walk timeout. Retrying.")
+        self.predict()
+        self.ensure_edge_insight(skip_first_update=False)
+        return True
+
+    def _goto_wait_arrival(self, state):
+        while 1:
+            self.device.screenshot()
+            self.view.update(image=self.device.image)
+            if state.is_portal:
+                self.update(allow_error=True)
+                state.grid = self.view[self.view.center_loca]
+
+            self._goto_handle_fleet_lock(state)
+            self._goto_handle_combat(state)
+            self._goto_handle_ambush(state)
+            self._goto_handle_mystery(state)
+
+            if self._goto_handle_cat_attack(state):
+                continue
+            if self._goto_handle_guild_popup(state):
+                continue
+            if self.handle_walk_out_of_step():
+                raise MapWalkError("walk_out_of_step")
+            if self._goto_confirm_arrival(state):
+                break
+            if self._goto_handle_story(state):
+                continue
+            if self._goto_retry_needed(state):
+                break
+        return state
+
+    def _goto_finish(self, state):
+        self.map[self.fleet_current].is_fleet = False
+        self.map[state.location].wipe_out()
+        self.map[state.location].is_fleet = True
+        self.__setattr__(f"fleet_{self.fleet_current_index}_location", state.location)
+        if state.result_mystery == "get_carrier":
+            self.full_scan_carrier()
+        if state.result == "combat":
+            self.round_battle()
+            self.predict()
+        self.round_next()
+        if self.round_is_new:
+            if state.result != "combat":
+                self.predict()
+            self.full_scan_movable(enemy_cleared=state.result == "combat")
+            self.find_path_initial()
+            raise MapEnemyMoved
+        if self.round_maze_changed:
+            self.find_path_initial()
+            raise MapEnemyMoved
+        self.find_path_initial()
+        if self.config.MAP_HAS_DECOY_ENEMY and state.result == "nothing" and state.expected == "combat":
+            raise MapEnemyMoved
+
     def _goto(self, location, expected=""):
         """Goto a grid directly and handle ambush, air raid, mystery picked up, combat.
 
@@ -254,7 +497,6 @@ class Fleet(Camera, AmbushHandler):
                 Will give a waring if arrive with unexpected result.
         """
         location = location_ensure(location)
-        result_mystery = ""
         self.movable_before = self.map.select(is_siren=True)
         self.movable_before_normal = self.map.select(is_enemy=True)
         if self.hp_retreat_triggered():
@@ -265,198 +507,16 @@ class Fleet(Camera, AmbushHandler):
         may_submarine_icon = may_submarine_icon and self.fleet_submarine_location == may_submarine_icon[0].location
 
         while 1:
-            self.fleet_ensure(self.fleet_current_index)
-            self.in_sight(location, sight=self._walk_sight)
-            self.focus_to_grid_center()
-            grid = self.convert_global_to_local(location)
-
-            self.ambush_color_initial()
-            self.enemy_searching_color_initial()
-            grid.__str__ = location
-            result = "nothing"
-
-            self.device.click(grid)
-            arrived = False
-            # Wait to confirm fleet arrived. It does't appear immediately if fleet in combat.
-            extra = 0
-            if self.config.Submarine_Mode in ["hunt_only", "hunt_and_boss"]:
-                extra += 4.5
-            if self.config.MAP_HAS_LAND_BASED and grid.is_mechanism_trigger:
-                extra += grid.mechanism_wait
-            arrive_timer = Timer(0.5 + self.round_wait + extra, count=2)
-            arrive_unexpected_timer = Timer(1.5 + self.round_wait + extra, count=6)
-            # Wait after ambushed.
-            ambushed_retry = Timer(0.5 + self.round_wait + extra, count=2)
-            # If nothing happens, click again.
-            walk_timeout = Timer(20)
-            walk_timeout.start()
-
-            while 1:
-                self.device.screenshot()
-                self.view.update(image=self.device.image)
-                if is_portal:
-                    self.update(allow_error=True)
-                    grid = self.view[self.view.center_loca]
-
-                # Combat
-                if self.config.Campaign_UseFleetLock and not self.is_in_map():
-                    if self.handle_retirement():
-                        self.map_offensive()
-                        walk_timeout.reset()
-                    if self.handle_combat_low_emotion():
-                        walk_timeout.reset()
-                if self.combat_appear():
-                    self.combat(
-                        expected_end=self._expected_end(expected),
-                        fleet_index=self.fleet_show_index,
-                        submarine_mode=self._submarine_mode(expected),
-                    )
-                    self.hp_get()
-                    self.lv_get(after_battle=True)
-                    arrived = not self.config.MAP_HAS_MOVABLE_ENEMY
-                    result = "combat"
-                    self.battle_count += 1
-                    self.fleet_ammo -= 1
-                    if "siren" in expected or (self.config.MAP_HAS_MOVABLE_ENEMY and not expected):
-                        self.siren_count += 1
-                    elif self.map[location].may_enemy:
-                        self.map[location].is_cleared = True
-
-                    if self.catch_camera_repositioning():
-                        self.handle_boss_appear_refocus()
-                        if sum(self.hp) < 0.01:
-                            logger.warning("Empty HP on all slots, trying hp_get again")
-                            self.hp_get()
-                    if self.config.MAP_FOCUS_ENEMY_AFTER_BATTLE:
-                        self.camera = location
-                        self.update()
-                    grid = self.convert_global_to_local(location)
-                    arrive_timer = Timer(0.5 + extra, count=2)
-                    arrive_unexpected_timer = Timer(1.5 + extra, count=6)
-                    walk_timeout.reset()
-                    if not (grid.predict_fleet() and grid.predict_current_fleet()):
-                        ambushed_retry.start()
-
-                # Ambush
-                if self.handle_ambush():
-                    self.hp_get()
-                    self.lv_get(after_battle=True)
-                    walk_timeout.reset()
-                    self.view.update(image=self.device.image)
-                    if not (grid.predict_fleet() and grid.predict_current_fleet()):
-                        ambushed_retry.start()
-
-                # Mystery
-                mystery = self.handle_mystery(button=grid)
-                if mystery:
-                    self.mystery_count += 1
-                    result = "mystery"
-                    result_mystery = mystery
-
-                # Cat attack animation
-                if self.handle_map_cat_attack():
-                    # Already arrive, combat will appear later, but still need to wait siren moving
-                    arrive_timer.reset()
-                    arrive_unexpected_timer.reset()
-                    walk_timeout.reset()
-                    continue
-
-                # Guild popup
-                # Usually handled in combat_status, but sometimes delayed until after battle on slow PCs.
-                if self.handle_guild_popup_cancel():
-                    walk_timeout.reset()
-                    continue
-
-                if self.handle_walk_out_of_step():
-                    raise MapWalkError("walk_out_of_step")
-
-                # Arrive
-                arrive_predict = ""
-                arrive_checker = False
-                if self.is_in_map():
-                    if not may_submarine_icon and grid.predict_fleet():
-                        arrive_predict = "(is_fleet)"
-                        arrive_checker = True
-                    elif may_submarine_icon and grid.predict_current_fleet():
-                        arrive_predict = "(may_submarine_icon, is_current_fleet)"
-                        arrive_checker = True
-                    elif (
-                        self.config.MAP_WALK_USE_CURRENT_FLEET
-                        and expected != "combat_boss"
-                        and not ("combat" in expected and grid.may_boss)
-                        and (grid.predict_fleet() or grid.predict_current_fleet())
-                    ):
-                        arrive_predict = "(MAP_WALK_USE_CURRENT_FLEET, is_current_fleet)"
-                        arrive_checker = True
-                    elif walk_timeout.reached() and grid.predict_current_fleet():
-                        arrive_predict = "(walk_timeout, is_current_fleet)"
-                        arrive_checker = True
-                if arrive_checker:
-                    if not arrive_timer.started():
-                        logger.info(f"Arrive {location2node(location)} {arrive_predict}".strip())
-                    arrive_timer.start()
-                    arrive_unexpected_timer.start()
-                    if result == "nothing" and not arrive_timer.reached():
-                        continue
-                    if expected and result not in expected:
-                        if arrive_unexpected_timer.reached():
-                            logger.warning("Arrive with unexpected result")
-                        else:
-                            continue
-                    if is_portal:
-                        location = self.map[location].portal_link
-                        self.camera = location
-                    logger.info(f"Arrive {location2node(location)} confirm. Result: {result}. Expected: {expected}")
-                    arrived = True
-                    break
-                if arrive_timer.started():
-                    arrive_timer.reset()
-                if arrive_unexpected_timer.started():
-                    arrive_unexpected_timer.reset()
-
-                # 剧情。
-                if expected == "story" and self.handle_story_skip():
-                    result = "story"
-                    continue
-
-                # End
-                if ambushed_retry.started() and ambushed_retry.reached():
-                    break
-                if walk_timeout.reached():
-                    logger.warning("Walk timeout. Retrying.")
-                    self.predict()
-                    self.ensure_edge_insight(skip_first_update=False)
-                    break
-
-            # End
-            if arrived:
+            grid = self._goto_click_target(location)
+            state = self._goto_state(location, expected, grid, is_portal, may_submarine_icon)
+            self._goto_wait_arrival(state)
+            if state.arrived:
                 # Ammo grid needs to click again, otherwise the next click doesn't work.
-                if self.map[location].may_ammo:
-                    self.device.click(grid)
+                if self.map[state.location].may_ammo:
+                    self.device.click(state.grid)
                 break
 
-        self.map[self.fleet_current].is_fleet = False
-        self.map[location].wipe_out()
-        self.map[location].is_fleet = True
-        self.__setattr__(f"fleet_{self.fleet_current_index}_location", location)
-        if result_mystery == "get_carrier":
-            self.full_scan_carrier()
-        if result == "combat":
-            self.round_battle()
-            self.predict()
-        self.round_next()
-        if self.round_is_new:
-            if result != "combat":
-                self.predict()
-            self.full_scan_movable(enemy_cleared=result == "combat")
-            self.find_path_initial()
-            raise MapEnemyMoved
-        if self.round_maze_changed:
-            self.find_path_initial()
-            raise MapEnemyMoved
-        self.find_path_initial()
-        if self.config.MAP_HAS_DECOY_ENEMY and result == "nothing" and expected == "combat":
-            raise MapEnemyMoved
+        self._goto_finish(state)
 
     def goto(self, location, expected="", step_optimize=None, turning_optimize=None):
         """
