@@ -5,7 +5,7 @@ from module.base.utils import random_rectangle_vector
 from module.exception import GameStuckError
 from module.logger import logger
 from module.os_shop.assets import OS_SHOP_CHECK, OS_SHOP_SAFE_AREA, OS_SHOP_SCROLL_AREA
-from module.ui.navbar import Navbar
+from module.ui.navbar import Navbar, NavbarColorRule, NavbarTarget, NavbarVisualRules
 from module.ui.scroll import AdaptiveScroll
 from module.ui.ui import UI
 
@@ -65,10 +65,10 @@ class OSShopUI(UI):
 
         return Navbar(
             grids=os_shop_side_navbar,
-            active_color=(43, 94, 248),
-            active_threshold=221,
-            inactive_color=(12, 58, 86),
-            inactive_threshold=221,
+            visual=NavbarVisualRules(
+                active=NavbarColorRule(color=(43, 94, 248), threshold=221),
+                inactive=NavbarColorRule(color=(12, 58, 86), threshold=221, count=50),
+            ),
         )
 
     def os_shop_side_navbar_ensure(self, upper=None, bottom=None):
@@ -99,7 +99,7 @@ class OSShopUI(UI):
         """
         logger.info(f"OpsiShop side navbar set to {upper or bottom}")
         self.os_shop_load_ensure()
-        self._os_shop_side_navbar.set(self, upper=upper, bottom=bottom)
+        self._os_shop_side_navbar.set(self, NavbarTarget(upper=upper, bottom=bottom))
 
     def init_slider(self) -> tuple[float, float]:
         """Initialize the slider

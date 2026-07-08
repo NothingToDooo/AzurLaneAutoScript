@@ -10,6 +10,7 @@ from module.handler.assets import POPUP_CONFIRM, STORY_SKIP
 from module.logger import logger
 from module.ocr.ocr import Digit
 from module.retire.retirement import Retirement
+from module.ui.ui import UiIndexControls
 
 RECORD_GACHA_OPTION = ("RewardRecord", "gacha")
 RECORD_GACHA_SINCE = (0,)
@@ -98,9 +99,11 @@ class RewardGacha(GachaUI, Retirement):
         ]
         self.ui_ensure_index(
             target,
-            letter=ocr_submit,
-            prev_button=gacha_assets.BUILD_MINUS,
-            next_button=gacha_assets.BUILD_PLUS,
+            UiIndexControls(
+                letter=ocr_submit,
+                prev_button=gacha_assets.BUILD_MINUS,
+                next_button=gacha_assets.BUILD_PLUS,
+            ),
             skip_first_screenshot=True,
         )
 

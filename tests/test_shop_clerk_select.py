@@ -54,9 +54,9 @@ class _FakeShopClerk(ShopClerk):
             return results.pop(0)
         return False
 
-    def ui_ensure_index(self, index, **kwargs) -> None:
-        self.ensure_calls.append((index, kwargs))
-        self.ensure_letter_result = kwargs["letter"](self.device.image)
+    def ui_ensure_index(self, index, controls, **kwargs) -> None:
+        self.ensure_calls.append((index, controls, kwargs))
+        self.ensure_letter_result = controls.letter(self.device.image)
 
 
 class _ImmediateTimer:

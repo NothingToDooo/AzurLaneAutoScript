@@ -37,7 +37,7 @@ from module.shipyard.ui_globals import (
     SHIPYARD_SERIES_GRID,
 )
 from module.ui.assets import SHIPYARD_CHECK
-from module.ui.navbar import Navbar
+from module.ui.navbar import Navbar, NavbarColorRule, NavbarTarget, NavbarVisualRules
 from module.ui.page import page_main_white
 from module.ui.ui import UI
 
@@ -233,7 +233,8 @@ class ShipyardUI(UI):
         must verify the index for themselves
         """
         return ShipyardNavbar(
-            grids=SHIPYARD_FACE_GRID, inactive_color=(49, 60, 82), inactive_threshold=221, inactive_count=50
+            grids=SHIPYARD_FACE_GRID,
+            visual=NavbarVisualRules(inactive=NavbarColorRule(color=(49, 60, 82), threshold=221, count=50)),
         )
 
     def shipyard_bottom_navbar_ensure(self, left=None, right=None, skip_first_screenshot=True):
@@ -257,7 +258,9 @@ class ShipyardUI(UI):
             return False
 
         ensured = False
-        if self._shipyard_bottom_navbar.set(self, left=left, right=right, skip_first_screenshot=skip_first_screenshot):
+        if self._shipyard_bottom_navbar.set(
+            self, NavbarTarget(left=left, right=right), skip_first_screenshot=skip_first_screenshot
+        ):
             ensured = True
 
         # After navbar set, wait until

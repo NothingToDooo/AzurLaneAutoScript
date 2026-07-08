@@ -4,7 +4,7 @@ from module.base.timer import Timer
 from module.combat import assets as combat_assets
 from module.logger import logger
 from module.reward import assets as reward_assets
-from module.ui.navbar import Navbar
+from module.ui.navbar import Navbar, NavbarColorRule, NavbarTarget, NavbarVisualRules
 from module.ui.page import page_main, page_mission, page_reward
 from module.ui.ui import UI
 from module.ui_white.assets import MISSION_NOTICE_WHITE
@@ -294,7 +294,10 @@ class Reward(UI):
             origin=(21, 118), delta=(0, 94.5), button_shape=(60, 75), grid_shape=(1, 6), name="REWARD_SIDE_NAVBAR"
         )
 
-        return Navbar(grids=reward_side_navbar, active_color=(247, 255, 173), inactive_color=(140, 162, 181))
+        return Navbar(
+            grids=reward_side_navbar,
+            visual=NavbarVisualRules(active=NavbarColorRule(color=(247, 255, 173))),
+        )
 
     def reward_side_navbar_ensure(self, upper=None, bottom=None):
         """
@@ -321,7 +324,7 @@ class Reward(UI):
         Returns:
             bool: 是否已经确保侧边栏目标项。
         """
-        return self._reward_side_navbar.set(self, upper=upper, bottom=bottom)
+        return self._reward_side_navbar.set(self, NavbarTarget(upper=upper, bottom=bottom))
 
     def run(self):
         """

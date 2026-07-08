@@ -9,6 +9,7 @@ from module.logger import logger
 from module.ocr.ocr import Digit
 from module.ui.assets import BACK_ARROW, DAILY_CHECK
 from module.ui.page import page_campaign_menu, page_daily
+from module.ui.ui import UiIndexControls
 
 DAILY_MISSION_LIST = [
     daily_assets.DAILY_MISSION_1,
@@ -197,10 +198,12 @@ class Daily(Combat, DailyEquipment):
             # 执行传统每日战斗。
             self.ui_ensure_index(
                 fleet,
-                letter=OCR_DAILY_FLEET_INDEX,
-                prev_button=daily_assets.DAILY_FLEET_PREV,
-                next_button=daily_assets.DAILY_FLEET_NEXT,
-                fast=False,
+                UiIndexControls(
+                    letter=OCR_DAILY_FLEET_INDEX,
+                    prev_button=daily_assets.DAILY_FLEET_PREV,
+                    next_button=daily_assets.DAILY_FLEET_NEXT,
+                    fast=False,
+                ),
                 skip_first_screenshot=True,
             )
             self.combat(emotion_reduce=False, expected_end=daily_end, balance_hp=False)

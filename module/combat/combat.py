@@ -527,7 +527,6 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         self,
         balance_hp=None,
         emotion_reduce=None,
-        auto_mode=None,
         submarine_mode=None,
         expected_end=None,
         fleet_index=1,
@@ -539,15 +538,13 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         Args:
             balance_hp (bool):
             emotion_reduce (bool):
-            auto_mode (str): combat_auto, combat_manual, stand_still_in_the_middle, hide_in_bottom_left
             submarine_mode (str): do_not_use, hunt_only, every_combat
             expected_end (str, callable):
             fleet_index (int): 1 or 2
         """
         balance_hp = balance_hp if balance_hp is not None else self.config.HpControl_UseHpBalance
         emotion_reduce = emotion_reduce if emotion_reduce is not None else self.emotion.is_calculate
-        if auto_mode is None:
-            auto_mode = self.config.Fleet_Fleet1Mode if fleet_index == 1 else self.config.Fleet_Fleet2Mode
+        auto_mode = self.config.Fleet_Fleet1Mode if fleet_index == 1 else self.config.Fleet_Fleet2Mode
         if submarine_mode is None:
             submarine_mode = "do_not_use"
             if self.config.Submarine_Fleet:

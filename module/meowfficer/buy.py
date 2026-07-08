@@ -4,6 +4,7 @@ from module.meowfficer import assets as meow_assets
 from module.meowfficer.base import MeowfficerBase
 from module.ocr.ocr import Digit, DigitCounter
 from module.ui.assets import MEOWFFICER_GOTO_DORMMENU
+from module.ui.ui import UiIndexControls
 
 BUY_MAX = 15
 BUY_PRIZE = 1500
@@ -125,9 +126,11 @@ class MeowfficerBuy(MeowfficerBase):
 
         self.ui_ensure_index(
             count,
-            letter=MEOWFFICER_CHOOSE,
-            prev_button=meow_assets.MEOWFFICER_BUY_PREV,
-            next_button=meow_assets.MEOWFFICER_BUY_NEXT,
+            UiIndexControls(
+                letter=MEOWFFICER_CHOOSE,
+                prev_button=meow_assets.MEOWFFICER_BUY_PREV,
+                next_button=meow_assets.MEOWFFICER_BUY_NEXT,
+            ),
             skip_first_screenshot=True,
         )
 

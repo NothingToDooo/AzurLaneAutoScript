@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import cv2
 import numpy as np
 from scipy import signal
@@ -19,6 +21,16 @@ from module.logger import logger
 from module.map import assets as map_assets
 
 
+@dataclass(slots=True)
+class FleetOperatorAssets:
+    choose: Button
+    advice: Button
+    bar: Button
+    clear: Button
+    in_use: Button
+    hard_satisfied: Button
+
+
 class FleetOperator:
     FLEET_BAR_SHAPE_Y = 33
     FLEET_BAR_MARGIN_Y = 9
@@ -27,30 +39,25 @@ class FleetOperator:
 
     OFFSET = (-20, -80, 20, 5)
 
-    def __init__(self, choose, advice, bar, clear, in_use, hard_satisfied, main):
+    def __init__(self, assets, main):
         """
         Args:
-            choose (Button): Button to activate or deactivate dropdown menu.
-            advice (Button): Button to recommend ships.
-            bar (Button): Dropdown menu for fleet selection。
-            clear (Button): Button to clear current fleet.
-            in_use (Button): Button to detect if it's using current fleet.
-            hard_satisfied (Button): Area to detect if fleet satiesfies hard restrictions.
+            assets (FleetOperatorAssets): 舰队下拉控件的按钮资产。
             main (InfoHandler): Alas module.
         """
-        self._choose = choose
-        self._advice = advice
-        self._bar = bar
-        self._clear = clear
-        self._in_use = in_use
-        self._hard_satisfied = hard_satisfied
+        self._choose = assets.choose
+        self._advice = assets.advice
+        self._bar = assets.bar
+        self._clear = assets.clear
+        self._in_use = assets.in_use
+        self._hard_satisfied = assets.hard_satisfied
         self.main = main
 
-        if main.appear(clear, offset=FleetOperator.OFFSET):
-            choose.load_offset(clear)
-            bar.load_offset(clear)
-            in_use.load_offset(clear)
-            hard_satisfied.load_offset(clear)
+        if main.appear(assets.clear, offset=FleetOperator.OFFSET):
+            assets.choose.load_offset(assets.clear)
+            assets.bar.load_offset(assets.clear)
+            assets.in_use.load_offset(assets.clear)
+            assets.hard_satisfied.load_offset(assets.clear)
 
     @property
     def clear_button(self):
@@ -339,30 +346,36 @@ class FleetPreparation(InfoHandler):
 
     def _fleet_operators(self):
         fleet_1 = FleetOperator(
-            choose=map_assets.FLEET_1_CHOOSE,
-            advice=map_assets.FLEET_1_ADVICE,
-            bar=map_assets.FLEET_1_BAR,
-            clear=map_assets.FLEET_1_CLEAR,
-            in_use=map_assets.FLEET_1_IN_USE,
-            hard_satisfied=map_assets.FLEET_1_HARD_SATIESFIED,
+            assets=FleetOperatorAssets(
+                choose=map_assets.FLEET_1_CHOOSE,
+                advice=map_assets.FLEET_1_ADVICE,
+                bar=map_assets.FLEET_1_BAR,
+                clear=map_assets.FLEET_1_CLEAR,
+                in_use=map_assets.FLEET_1_IN_USE,
+                hard_satisfied=map_assets.FLEET_1_HARD_SATIESFIED,
+            ),
             main=self,
         )
         fleet_2 = FleetOperator(
-            choose=map_assets.FLEET_2_CHOOSE,
-            advice=map_assets.FLEET_2_ADVICE,
-            bar=map_assets.FLEET_2_BAR,
-            clear=map_assets.FLEET_2_CLEAR,
-            in_use=self._fleet_2_in_use_button(),
-            hard_satisfied=map_assets.FLEET_2_HARD_SATIESFIED,
+            assets=FleetOperatorAssets(
+                choose=map_assets.FLEET_2_CHOOSE,
+                advice=map_assets.FLEET_2_ADVICE,
+                bar=map_assets.FLEET_2_BAR,
+                clear=map_assets.FLEET_2_CLEAR,
+                in_use=self._fleet_2_in_use_button(),
+                hard_satisfied=map_assets.FLEET_2_HARD_SATIESFIED,
+            ),
             main=self,
         )
         submarine = FleetOperator(
-            choose=map_assets.SUBMARINE_CHOOSE,
-            advice=map_assets.SUBMARINE_ADVICE,
-            bar=map_assets.SUBMARINE_BAR,
-            clear=map_assets.SUBMARINE_CLEAR,
-            in_use=map_assets.SUBMARINE_IN_USE,
-            hard_satisfied=map_assets.SUBMARINE_HARD_SATIESFIED,
+            assets=FleetOperatorAssets(
+                choose=map_assets.SUBMARINE_CHOOSE,
+                advice=map_assets.SUBMARINE_ADVICE,
+                bar=map_assets.SUBMARINE_BAR,
+                clear=map_assets.SUBMARINE_CLEAR,
+                in_use=map_assets.SUBMARINE_IN_USE,
+                hard_satisfied=map_assets.SUBMARINE_HARD_SATIESFIED,
+            ),
             main=self,
         )
         return fleet_1, fleet_2, submarine

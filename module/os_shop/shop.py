@@ -13,6 +13,7 @@ from module.os_shop.ui import OS_SHOP_SCROLL
 from module.shop.assets import AMOUNT_MAX, AMOUNT_MINUS, AMOUNT_PLUS, SHOP_BUY_CONFIRM_AMOUNT, SHOP_CLICK_SAFE_AREA
 from module.shop.assets import SHOP_BUY_CONFIRM as OS_SHOP_BUY_CONFIRM
 from module.shop.clerk import OCR_SHOP_AMOUNT
+from module.ui.ui import UiIndexControls
 
 
 @dataclass(slots=True)
@@ -197,7 +198,9 @@ class OSShop(PortShop, AkashiShop):
             self._shop_buy_amount_set_to_max()
 
         self.ui_ensure_index(
-            limit, letter=OCR_SHOP_AMOUNT, prev_button=AMOUNT_MINUS, next_button=AMOUNT_PLUS, skip_first_screenshot=True
+            limit,
+            UiIndexControls(letter=OCR_SHOP_AMOUNT, prev_button=AMOUNT_MINUS, next_button=AMOUNT_PLUS),
+            skip_first_screenshot=True,
         )
         return True
 

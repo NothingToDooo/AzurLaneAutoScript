@@ -104,8 +104,8 @@ class _Shop(OSShop):
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)
 
-    def ui_ensure_index(self, index: int, **kwargs: object) -> None:
-        self.calls.append(("ui_ensure_index", index, kwargs))
+    def ui_ensure_index(self, index: int, controls: object, **kwargs: object) -> None:
+        self.calls.append(("ui_ensure_index", index, controls, kwargs))
 
 
 class _BuyShop(OSShop):
@@ -199,16 +199,12 @@ def test_shop_buy_amount_handler_sets_max_before_target_amount(monkeypatch: pyte
     assert result is True
     assert ("interval_clear", AMOUNT_MAX) in shop.calls
     assert shop.device.screenshot_count == 2
-    assert (
-        "ui_ensure_index",
-        25,
-        {
-            "letter": fake_ocr,
-            "prev_button": shop_module.AMOUNT_MINUS,
-            "next_button": shop_module.AMOUNT_PLUS,
-            "skip_first_screenshot": True,
-        },
-    ) in shop.calls
+    ensure_call = next(call for call in shop.calls if call[0] == "ui_ensure_index")
+    assert ensure_call[1] == 25
+    assert ensure_call[2].letter is fake_ocr
+    assert ensure_call[2].prev_button == shop_module.AMOUNT_MINUS
+    assert ensure_call[2].next_button == shop_module.AMOUNT_PLUS
+    assert ensure_call[3] == {"skip_first_screenshot": True}
 
 
 def test_os_shop_buy_execute_returns_true_after_reward() -> None:

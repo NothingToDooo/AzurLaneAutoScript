@@ -183,6 +183,48 @@ class _CombatStatusContext(_CombatLoopContext):
         return button == combat.BACK_ARROW and kwargs == {"offset": (30, 30)}
 
 
+class _CombatOrchestrationContext(combat.Combat):
+    def __init__(self) -> None:
+        self.config = SimpleNamespace(
+            HpControl_UseHpBalance=True,
+            Fleet_Fleet1Mode="combat_auto",
+            Fleet_Fleet2Mode="combat_manual",
+            Submarine_Fleet=True,
+            Submarine_Mode="every_combat",
+        )
+        self.emotion = SimpleNamespace(is_calculate=False)
+        self.preparation_calls = []
+        self.execute_calls = []
+        self.status_calls = []
+
+    def combat_preparation(self, **kwargs) -> None:
+        self.preparation_calls.append(kwargs)
+
+    def combat_execute(self, **kwargs) -> None:
+        self.execute_calls.append(kwargs)
+
+    def combat_status(self, **kwargs) -> None:
+        self.status_calls.append(kwargs)
+
+
+def test_combat_orchestrates_config_defaults_for_selected_fleet() -> None:
+    handler = _CombatOrchestrationContext()
+    expected_end = object()
+
+    handler.combat(expected_end=expected_end, fleet_index=2)
+
+    assert handler.preparation_calls == [
+        {
+            "balance_hp": True,
+            "emotion_reduce": False,
+            "auto": "combat_manual",
+            "fleet_index": 2,
+        }
+    ]
+    assert handler.execute_calls == [{"auto": "combat_manual", "submarine": "every_combat"}]
+    assert handler.status_calls == [{"expected_end": expected_end}]
+
+
 def test_handle_emergency_repair_use_clicks_when_hp_crosses_threshold() -> None:
     context = _EmergencyRepairContext(
         hp=[0.1, 1, 1, 1, 1, 1],

@@ -25,6 +25,7 @@ from module.shop.assets import (
 from module.shop.base import ShopBase
 from module.shop.shop_select_globals import SELECT_ITEM_INFO_MAP
 from module.ui.assets import SHOP_BACK_ARROW
+from module.ui.ui import UiIndexControls
 
 
 class StockCounter(DigitCounter):
@@ -156,9 +157,11 @@ class ShopClerk(ShopBase, Retirement):
 
         self.ui_ensure_index(
             limit,
-            letter=self._shop_select_stock_letter(item, limit),
-            prev_button=SELECT_MINUS,
-            next_button=SELECT_PLUS,
+            UiIndexControls(
+                letter=self._shop_select_stock_letter(item, limit),
+                prev_button=SELECT_MINUS,
+                next_button=SELECT_PLUS,
+            ),
             skip_first_screenshot=True,
         )
         self.device.click(SHOP_BUY_CONFIRM_SELECT)
@@ -265,7 +268,9 @@ class ShopClerk(ShopBase, Retirement):
             limit = total
 
         self.ui_ensure_index(
-            limit, letter=OCR_SHOP_AMOUNT, prev_button=AMOUNT_MINUS, next_button=AMOUNT_PLUS, skip_first_screenshot=True
+            limit,
+            UiIndexControls(letter=OCR_SHOP_AMOUNT, prev_button=AMOUNT_MINUS, next_button=AMOUNT_PLUS),
+            skip_first_screenshot=True,
         )
         self.device.click(SHOP_BUY_CONFIRM_AMOUNT)
         return True

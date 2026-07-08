@@ -15,7 +15,7 @@ from module.map.assets import (
     FLEET_1_HARD_SATIESFIED,
     FLEET_1_IN_USE,
 )
-from module.map.map_fleet_preparation import FleetOperator
+from module.map.map_fleet_preparation import FleetOperator, FleetOperatorAssets
 from module.raid.assets import RAID_FLEET_PREPARATION
 
 
@@ -29,12 +29,14 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
             bool: If clicked
         """
         fleet_1 = FleetOperator(
-            choose=FLEET_1_CHOOSE,
-            advice=FLEET_1_ADVICE,
-            bar=FLEET_1_BAR,
-            clear=FLEET_1_CLEAR,
-            in_use=FLEET_1_IN_USE,
-            hard_satisfied=FLEET_1_HARD_SATIESFIED,
+            assets=FleetOperatorAssets(
+                choose=FLEET_1_CHOOSE,
+                advice=FLEET_1_ADVICE,
+                bar=FLEET_1_BAR,
+                clear=FLEET_1_CLEAR,
+                in_use=FLEET_1_IN_USE,
+                hard_satisfied=FLEET_1_HARD_SATIESFIED,
+            ),
             main=self,
         )
         if fleet_1.in_use():

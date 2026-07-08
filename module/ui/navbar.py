@@ -1,39 +1,69 @@
+from dataclasses import dataclass, field
+
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2, GET_SHIP
 from module.logger import logger
 from module.shop.assets import SHOP_CLICK_SAFE_AREA
 
 
+@dataclass(slots=True, frozen=True)
+class NavbarColorRule:
+    color: tuple[int, int, int]
+    threshold: int = 180
+    count: int = 100
+
+
+@dataclass(slots=True, frozen=True)
+class NavbarVisualRules:
+    active: NavbarColorRule = field(default_factory=lambda: NavbarColorRule(color=(247, 251, 181)))
+    inactive: NavbarColorRule = field(default_factory=lambda: NavbarColorRule(color=(140, 162, 181), count=50))
+
+
+@dataclass(slots=True, frozen=True)
+class NavbarTarget:
+    left: int | None = None
+    right: int | None = None
+    upper: int | None = None
+    bottom: int | None = None
+
+    @property
+    def left_index(self):
+        if self.left is not None:
+            return self.left
+        return self.upper
+
+    @property
+    def right_index(self):
+        if self.right is not None:
+            return self.right
+        return self.bottom
+
+    def format(self):
+        return " ".join(
+            f"{key}={value}"
+            for key, value in [
+                ("left", self.left),
+                ("right", self.right),
+                ("upper", self.upper),
+                ("bottom", self.bottom),
+            ]
+            if value is not None
+        )
+
+    def is_empty(self):
+        return self.left is None and self.right is None and self.upper is None and self.bottom is None
+
+
 class Navbar:
-    def __init__(
-        self,
-        grids,
-        active_color=(247, 251, 181),
-        inactive_color=(140, 162, 181),
-        active_threshold=180,
-        inactive_threshold=180,
-        active_count=100,
-        inactive_count=50,
-        name=None,
-    ):
+    def __init__(self, grids, *, visual=None, name=None):
         """
         Args:
             grids (ButtonGrid):
-            active_color (tuple[int, int, int]):
-            inactive_color (tuple[int, int, int]):
-            active_threshold (int):
-            inactive_threshold (int):
-            active_count (int):
-            inactive_count (int):
+            visual (NavbarVisualRules):
             name (str):
         """
         self.grids = grids
-        self.active_color = active_color
-        self.inactive_color = inactive_color
-        self.active_threshold = active_threshold
-        self.inactive_threshold = inactive_threshold
-        self.active_count = active_count
-        self.inactive_count = inactive_count
+        self.visual = visual if visual is not None else NavbarVisualRules()
         self.name = name if name is not None else grids.name
 
     def is_button_active(self, button, main):
@@ -45,9 +75,8 @@ class Navbar:
         Returns:
             bool:
         """
-        return main.image_color_count(
-            button, color=self.active_color, threshold=self.active_threshold, count=self.active_count
-        )
+        active = self.visual.active
+        return main.image_color_count(button, color=active.color, threshold=active.threshold, count=active.count)
 
     def is_button_inactive(self, button, main):
         """
@@ -58,9 +87,8 @@ class Navbar:
         Returns:
             bool:
         """
-        return main.image_color_count(
-            button, color=self.inactive_color, threshold=self.inactive_threshold, count=self.inactive_count
-        )
+        inactive = self.visual.inactive
+        return main.image_color_count(button, color=inactive.color, threshold=inactive.threshold, count=inactive.count)
 
     def get_info(self, main):
         """
@@ -148,30 +176,11 @@ class Navbar:
 
         return False
 
-    def _format_set_target(self, left, right, upper, bottom):
-        return " ".join(
-            f"{key}={value}"
-            for key, value in [
-                ("left", left),
-                ("right", right),
-                ("upper", upper),
-                ("bottom", bottom),
-            ]
-            if value is not None
-        )
-
-    def _resolve_set_target(self, left, right, upper, bottom):
-        if left is None and right is None and upper is None and bottom is None:
+    def _resolve_set_target(self, target):
+        if target.is_empty():
             logger.warning("Invalid index to set, must set an index from 1 direction")
             return None
-
-        if left is None and upper is not None:
-            left = upper
-        if right is None and bottom is not None:
-            right = bottom
-
-        text = self._format_set_target(left=left, right=right, upper=upper, bottom=bottom)
-        return left, right, text
+        return target.left_index, target.right_index, target.format()
 
     def _index_from_visible_range(self, minimum, maximum, left, right):
         if minimum is None or maximum is None:
@@ -194,25 +203,22 @@ class Navbar:
             return None
         return index
 
-    def set(self, main, left=None, right=None, upper=None, bottom=None, skip_first_screenshot=True):
+    def set(self, main, target, skip_first_screenshot=True):
         """
         Set nav bar from 1 direction.
 
         Args:
             main (ModuleBase):
-            left (int): Index of nav item counted from left. Start from 1.
-            right (int): Index of nav item counted from right. Start from 1.
-            upper (int): Index of nav item counted from upper. Start from 1.
-            bottom (int): Index of nav item counted from bottom. Start from 1.
+            target (NavbarTarget): 从某一侧计数的目标导航项，从 1 开始。
             skip_first_screenshot (bool):
 
         Returns:
             bool: If success
         """
-        target = self._resolve_set_target(left=left, right=right, upper=upper, bottom=bottom)
-        if target is None:
+        resolved = self._resolve_set_target(target)
+        if resolved is None:
             return False
-        left, right, text = target
+        left, right, text = resolved
         logger.info(f"{self.name} set to {text}")
 
         interval = Timer(2, count=4)

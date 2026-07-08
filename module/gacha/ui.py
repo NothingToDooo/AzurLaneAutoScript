@@ -9,7 +9,7 @@ from module.gacha.assets import (
     SHOP_MEDAL_CHECK,
 )
 from module.logger import logger
-from module.ui.navbar import Navbar
+from module.ui.navbar import Navbar, NavbarColorRule, NavbarTarget, NavbarVisualRules
 from module.ui.page import page_build
 from module.ui.ui import UI
 
@@ -75,10 +75,10 @@ class GachaUI(UI):
 
         return Navbar(
             grids=gacha_side_navbar,
-            active_color=(247, 255, 173),
-            active_threshold=221,
-            inactive_color=(140, 162, 181),
-            inactive_threshold=221,
+            visual=NavbarVisualRules(
+                active=NavbarColorRule(color=(247, 255, 173), threshold=221),
+                inactive=NavbarColorRule(color=(140, 162, 181), threshold=221, count=50),
+            ),
         )
 
     def gacha_side_navbar_ensure(self, upper=None, bottom=None):
@@ -109,7 +109,7 @@ class GachaUI(UI):
             logger.warning('Transitions to "retire" is not supported')
             return False
 
-        return self._gacha_side_navbar.set(self, upper=upper, bottom=bottom) and self.gacha_load_ensure()
+        return self._gacha_side_navbar.set(self, NavbarTarget(upper=upper, bottom=bottom)) and self.gacha_load_ensure()
 
     @cached_property
     def _construct_bottom_navbar(self):
@@ -129,7 +129,13 @@ class GachaUI(UI):
             origin=(262, 615), delta=(209, 0), button_shape=(70, 49), grid_shape=(4, 1), name="CONSTRUCT_BOTTOM_NAVBAR"
         )
 
-        return Navbar(grids=construct_bottom_navbar, active_color=(247, 227, 148), inactive_color=(189, 231, 247))
+        return Navbar(
+            grids=construct_bottom_navbar,
+            visual=NavbarVisualRules(
+                active=NavbarColorRule(color=(247, 227, 148)),
+                inactive=NavbarColorRule(color=(189, 231, 247), count=50),
+            ),
+        )
 
     @cached_property
     def _exchange_bottom_navbar(self):
@@ -142,7 +148,13 @@ class GachaUI(UI):
             origin=(569, 637), delta=(208, 0), button_shape=(70, 49), grid_shape=(2, 1), name="EXCHANGE_BOTTOM_NAVBAR"
         )
 
-        return Navbar(grids=exchange_bottom_navbar, active_color=(247, 227, 148), inactive_color=(189, 231, 247))
+        return Navbar(
+            grids=exchange_bottom_navbar,
+            visual=NavbarVisualRules(
+                active=NavbarColorRule(color=(247, 227, 148)),
+                inactive=NavbarColorRule(color=(189, 231, 247), count=50),
+            ),
+        )
 
     def _gacha_bottom_navbar(self, is_build=True):
         """
@@ -196,7 +208,7 @@ class GachaUI(UI):
             if left == 4:
                 left = 3
 
-        return gacha_bottom_navbar.set(self, left=left, right=right) and self.gacha_load_ensure()
+        return gacha_bottom_navbar.set(self, NavbarTarget(left=left, right=right)) and self.gacha_load_ensure()
 
     def ui_goto_gacha(self):
         self.ui_ensure(page_build)

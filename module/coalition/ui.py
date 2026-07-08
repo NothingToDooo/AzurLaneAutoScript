@@ -385,15 +385,6 @@ class CoalitionUI(Combat):
         campaign_difficulty_timer.reset()
         return True
 
-    def _handle_coalition_fleet_preparation(self, event, stage, mode, fleet_preparation, fleet_timer, campaign_timer):
-        if not fleet_timer.reached() or not self.appear(fleet_preparation, offset=(20, 50)):
-            return False
-        self.handle_fleet_preparation(event, stage, mode)
-        self.device.click(fleet_preparation)
-        fleet_timer.reset()
-        campaign_timer.reset()
-        return True
-
     def _handle_coalition_enter_interrupts(self, campaign_timer):
         if self.handle_auto_search_continue():
             campaign_timer.reset()
@@ -448,9 +439,11 @@ class CoalitionUI(Combat):
             if self._click_coalition_difficulty(event, button_difficulty, campaign_difficulty_timer):
                 campaign_difficulty_click += 1
                 continue
-            if self._handle_coalition_fleet_preparation(
-                event, stage, mode, fleet_preparation, fleet_timer, campaign_timer
-            ):
+            if fleet_timer.reached() and self.appear(fleet_preparation, offset=(20, 50)):
+                self.handle_fleet_preparation(event, stage, mode)
+                self.device.click(fleet_preparation)
+                fleet_timer.reset()
+                campaign_timer.reset()
                 fleet_click += 1
                 continue
 

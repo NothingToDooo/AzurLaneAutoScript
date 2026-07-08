@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from module.base.button import Button
 from module.base.decorator import run_once
 from module.base.timer import Timer
@@ -26,6 +28,33 @@ from module.raid import assets as raid_assets
 from module.ui import assets as ui_assets
 from module.ui.page import Page, page_campaign, page_event, page_main, page_main_white, page_sp
 from module.ui_white import assets as ui_white_assets
+
+
+@dataclass(slots=True)
+class UiClickOptions:
+    appear_button: object = None
+    additional: object = None
+    confirm_wait: int | float = 1
+    offset: object = (30, 30)
+    retry_wait: int | float = 10
+    skip_first_screenshot: bool = False
+
+
+@dataclass(slots=True)
+class UiIndexControls:
+    letter: object
+    prev_button: object
+    next_button: object
+    fast: bool = True
+    interval: object = (0.2, 0.3)
+
+
+def _ui_click_options(options, settings):
+    if options is None:
+        return UiClickOptions(**settings)
+    if settings:
+        raise TypeError("options 和散装 UI 点击参数不能混用")
+    return options
 
 
 class UI(InfoHandler):
@@ -78,51 +107,44 @@ class UI(InfoHandler):
         self,
         click_button,
         check_button,
-        appear_button=None,
-        additional=None,
-        confirm_wait=1,
-        offset=(30, 30),
-        retry_wait=10,
-        skip_first_screenshot=False,
+        options=None,
+        **settings,
     ):
         """
         Args:
             click_button (Button):
             check_button (Button, callable):
-            appear_button (Button, callable):
-            additional (callable):
-            confirm_wait (int, float):
-            offset (bool, int, tuple):
-            retry_wait (int, float):
-            skip_first_screenshot (bool):
+            options (UiClickOptions):
+            **settings: 旧调用形状，进入函数后会转为 UiClickOptions。
         """
+        options = _ui_click_options(options, settings)
         logger.hr("UI click")
-        if appear_button is None:
-            appear_button = click_button
+        appear_button = options.appear_button if options.appear_button is not None else click_button
 
-        click_timer = Timer(retry_wait, count=retry_wait // 0.5)
-        confirm_wait = confirm_wait if additional is not None else 0
+        click_timer = Timer(options.retry_wait, count=options.retry_wait // 0.5)
+        confirm_wait = options.confirm_wait if options.additional is not None else 0
         confirm_timer = Timer(confirm_wait, count=confirm_wait // 0.5).start()
+        skip_first_screenshot = options.skip_first_screenshot
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
             else:
                 self.device.screenshot()
 
-            if not self.ui_process_check_button(check_button, offset=offset):
+            if not self.ui_process_check_button(check_button, offset=options.offset):
                 confirm_timer.reset()
             elif confirm_timer.reached():
                 break
 
             if click_timer.reached() and (
-                (isinstance(appear_button, Button) and self.appear(appear_button, offset=offset))
+                (isinstance(appear_button, Button) and self.appear(appear_button, offset=options.offset))
                 or (callable(appear_button) and appear_button())
             ):
                 self.device.click(click_button)
                 click_timer.reset()
                 continue
 
-            if additional is not None and additional():
+            if options.additional is not None and options.additional():
                 continue
 
     def ui_process_check_button(self, check_button, offset=(30, 30)):
@@ -309,22 +331,14 @@ class UI(InfoHandler):
     def ui_ensure_index(
         self,
         index,
-        letter,
-        next_button,
-        prev_button,
+        controls,
         skip_first_screenshot=False,
-        fast=True,
-        interval=(0.2, 0.3),
     ):
         """
         Args:
             index (int):
-            letter (Ocr, callable): OCR button.
-            next_button (Button):
-            prev_button (Button):
+            controls (UiIndexControls): OCR 和前后按钮。
             skip_first_screenshot (bool):
-            fast (bool): Default true. False when index is not continuous.
-            interval (tuple, int, float): Seconds between two click.
         """
         logger.hr("UI ensure index")
         retry = Timer(1, count=2)
@@ -334,6 +348,7 @@ class UI(InfoHandler):
             else:
                 self.device.screenshot()
 
+            letter = controls.letter
             current = letter.ocr(self.device.image) if isinstance(letter, Ocr) else letter(self.device.image)
 
             logger.attr("Index", current)
@@ -342,9 +357,9 @@ class UI(InfoHandler):
                 break
 
             if retry.reached():
-                button = next_button if diff > 0 else prev_button
-                if fast:
-                    self.device.multi_click(button, n=abs(diff), interval=interval)
+                button = controls.next_button if diff > 0 else controls.prev_button
+                if controls.fast:
+                    self.device.multi_click(button, n=abs(diff), interval=controls.interval)
                 else:
                     self.device.click(button)
                 retry.reset()
@@ -353,10 +368,12 @@ class UI(InfoHandler):
         return self.ui_click(
             click_button=ui_assets.BACK_ARROW,
             check_button=check_button,
-            appear_button=appear_button,
-            offset=offset,
-            retry_wait=retry_wait,
-            skip_first_screenshot=skip_first_screenshot,
+            options=UiClickOptions(
+                appear_button=appear_button,
+                offset=offset,
+                retry_wait=retry_wait,
+                skip_first_screenshot=skip_first_screenshot,
+            ),
         )
 
     _opsi_reset_fleet_preparation_click = 0

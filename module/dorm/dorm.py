@@ -17,7 +17,7 @@ from module.ocr.ocr import Digit, DigitCounter
 from module.template.assets import TEMPLATE_DORM_COIN, TEMPLATE_DORM_LOVE
 from module.ui.assets import DORM_CHECK
 from module.ui.page import page_dorm, page_dormmenu
-from module.ui.ui import UI
+from module.ui.ui import UI, UiIndexControls
 
 MASK_DORM = Mask(file="./assets/mask/MASK_DORM.png")
 DORM_CAMERA_SWIPE = (300, 250)
@@ -398,9 +398,11 @@ class RewardDorm(UI):
 
         self.ui_ensure_index(
             amount,
-            letter=OCR_BUY_FOOD_AMOUNT,
-            prev_button=dorm_assets.FOOD_MINUS,
-            next_button=dorm_assets.FOOD_PLUS,
+            UiIndexControls(
+                letter=OCR_BUY_FOOD_AMOUNT,
+                prev_button=dorm_assets.FOOD_MINUS,
+                next_button=dorm_assets.FOOD_PLUS,
+            ),
             skip_first_screenshot=True,
         )
         return True

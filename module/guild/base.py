@@ -1,7 +1,7 @@
 from module.base.button import ButtonGrid
 from module.base.decorator import cached_property
 from module.logger import logger
-from module.ui.navbar import Navbar
+from module.ui.navbar import Navbar, NavbarColorRule, NavbarTarget, NavbarVisualRules
 from module.ui.ui import UI
 
 
@@ -28,7 +28,10 @@ class GuildBase(UI):
             origin=(21, 118), delta=(0, 94.5), button_shape=(60, 75), grid_shape=(1, 6), name="GUILD_SIDE_NAVBAR"
         )
 
-        return Navbar(grids=guild_side_navbar, active_color=(247, 255, 173), inactive_color=(140, 162, 181))
+        return Navbar(
+            grids=guild_side_navbar,
+            visual=NavbarVisualRules(active=NavbarColorRule(color=(247, 255, 173))),
+        )
 
     def guild_side_navbar_ensure(self, upper=None, bottom=None):
         """
@@ -61,4 +64,4 @@ class GuildBase(UI):
             logger.warning('Transitions to "apply" is not supported')
             return False
 
-        return self._guild_side_navbar.set(self, upper=upper, bottom=bottom)
+        return self._guild_side_navbar.set(self, NavbarTarget(upper=upper, bottom=bottom))

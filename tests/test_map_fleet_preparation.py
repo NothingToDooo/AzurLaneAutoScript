@@ -20,14 +20,14 @@ class _Device:
 class _FakeFleetOperator:
     OFFSET = (0, 0)
 
-    def __init__(self, *, choose, clear, main, **_kwargs) -> None:
+    def __init__(self, assets, main) -> None:
         self.main = main
-        self.clear_button = clear
+        self.clear_button = assets.clear
         self.name = {
             map_assets.FLEET_1_CHOOSE: "fleet1",
             map_assets.FLEET_2_CHOOSE: "fleet2",
             map_assets.SUBMARINE_CHOOSE: "submarine",
-        }[choose]
+        }[assets.choose]
         config = main.operator_configs.get(self.name, {})
         self.hard_result = config.get("hard", False)
         self.allow_results = list(config.get("allow", []))

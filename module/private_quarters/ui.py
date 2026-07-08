@@ -1,7 +1,7 @@
 from module.base.button import ButtonGrid
 from module.base.decorator import cached_property
 from module.shop.ui import ShopUI
-from module.ui.navbar import Navbar
+from module.ui.navbar import Navbar, NavbarColorRule, NavbarTarget, NavbarVisualRules
 
 
 class PQShopUI(ShopUI):
@@ -23,13 +23,11 @@ class PQShopUI(ShopUI):
         )
 
         return Navbar(
-            shop_navgrid,
-            active_color=(186, 226, 245),
-            inactive_color=(236, 237, 243),
-            active_count=350,
-            inactive_count=350,
-            active_threshold=221,
-            inactive_threshold=221,
+            grids=shop_navgrid,
+            visual=NavbarVisualRules(
+                active=NavbarColorRule(color=(186, 226, 245), threshold=221, count=350),
+                inactive=NavbarColorRule(color=(236, 237, 243), threshold=221, count=350),
+            ),
             name="PRIVATE_QUARTERS_BOTTOM_NAVBAR",
         )
 
@@ -37,7 +35,7 @@ class PQShopUI(ShopUI):
         """
         确保私宅商店底部导航栏位置。
         """
-        return self._shop_bottom_navbar.set(self, left=left, right=right)
+        return self._shop_bottom_navbar.set(self, NavbarTarget(left=left, right=right))
 
     @cached_property
     def _shop_left_navbar(self):
@@ -58,13 +56,11 @@ class PQShopUI(ShopUI):
         )
 
         return Navbar(
-            shop_navgrid,
-            active_color=(255, 255, 255),
-            inactive_color=(176, 245, 250),
-            active_count=200,
-            inactive_count=200,
-            active_threshold=221,
-            inactive_threshold=221,
+            grids=shop_navgrid,
+            visual=NavbarVisualRules(
+                active=NavbarColorRule(color=(255, 255, 255), threshold=221, count=200),
+                inactive=NavbarColorRule(color=(176, 245, 250), threshold=221, count=200),
+            ),
             name="PRIVATE_QUARTERS_LEFT_NAVBAR",
         )
 
@@ -72,4 +68,4 @@ class PQShopUI(ShopUI):
         """
         确保私宅商店左侧导航栏位置。
         """
-        return self._shop_left_navbar.set(self, upper=upper, bottom=bottom)
+        return self._shop_left_navbar.set(self, NavbarTarget(upper=upper, bottom=bottom))

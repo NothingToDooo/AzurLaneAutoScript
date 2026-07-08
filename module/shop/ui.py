@@ -20,7 +20,7 @@ from module.shop.assets import (
     TAB_PROTOTYPE,
 )
 from module.ui.assets import ACADEMY_GOTO_MUNITIONS, SHOP_BACK_ARROW
-from module.ui.navbar import Navbar
+from module.ui.navbar import Navbar, NavbarColorRule, NavbarTarget, NavbarVisualRules
 from module.ui.page import page_academy, page_munitions
 from module.ui.switch import Switch
 from module.ui.ui import UI
@@ -46,11 +46,17 @@ class ShopUI(UI):
             origin=(399, 619), delta=(182, 0), button_shape=(56, 42), grid_shape=(5, 1), name="SHOP_BOTTOM_NAVBAR"
         )
 
-        return Navbar(grids=shop_bottom_navbar, active_color=(33, 195, 239), inactive_color=(181, 178, 181))
+        return Navbar(
+            grids=shop_bottom_navbar,
+            visual=NavbarVisualRules(
+                active=NavbarColorRule(color=(33, 195, 239)),
+                inactive=NavbarColorRule(color=(181, 178, 181), count=50),
+            ),
+        )
 
     def shop_bottom_navbar_ensure(self, left=None, right=None):
         """确保商店底部导航栏已经切换到目标范围。"""
-        return self._shop_bottom_navbar.set(self, left=left, right=right)
+        return self._shop_bottom_navbar.set(self, NavbarTarget(left=left, right=right))
 
     @cached_property
     def shop_nav_250814(self):

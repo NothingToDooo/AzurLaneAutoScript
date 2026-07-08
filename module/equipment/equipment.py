@@ -8,7 +8,7 @@ from module.retire.assets import DOCK_CHECK
 from module.retire.assets import EQUIP_CONFIRM as RETIRE_EQUIP_CONFIRM
 from module.storage.storage import StorageHandler
 from module.ui.assets import BACK_ARROW
-from module.ui.navbar import Navbar
+from module.ui.navbar import Navbar, NavbarColorRule, NavbarTarget, NavbarVisualRules
 
 SWIPE_DISTANCE = 250
 SWIPE_RANDOM_RANGE = (-40, -20, 40, 20)
@@ -148,10 +148,10 @@ class Equipment(StorageHandler):
 
         return Navbar(
             grids=ship_side_navbar,
-            active_color=(247, 255, 173),
-            active_threshold=221,
-            inactive_color=(140, 162, 181),
-            inactive_threshold=221,
+            visual=NavbarVisualRules(
+                active=NavbarColorRule(color=(247, 255, 173), threshold=221),
+                inactive=NavbarColorRule(color=(140, 162, 181), threshold=221, count=50),
+            ),
         )
 
     def ship_side_navbar_ensure(self, upper=None, bottom=None):
@@ -185,7 +185,7 @@ class Equipment(StorageHandler):
             logger.warning('Transitions to "research" is not supported')
             return False
 
-        return self._ship_side_navbar.set(self, upper=upper, bottom=bottom)
+        return self._ship_side_navbar.set(self, NavbarTarget(upper=upper, bottom=bottom))
 
     def ship_equipment_take_off(self, skip_first_screenshot=True):
         logger.info("Equipment take off")

@@ -1,5 +1,7 @@
 import itertools
 import re
+from dataclasses import dataclass
+from dataclasses import fields as dataclass_fields
 
 from module.base.filter import Filter
 from module.exception import MapEnemyMoved
@@ -8,6 +10,26 @@ from module.map.fleet import Fleet
 from module.map.map_grids import SelectedGrids
 
 ENEMY_FILTER = Filter(regex=re.compile("^(.*?)$"), attr=("str",))
+
+
+@dataclass(slots=True)
+class GridSelection:
+    nearby: bool = False
+    is_accessible: bool = True
+    scale: tuple[int, ...] | list[int] = ()
+    genre: tuple[str, ...] | list[str] = ()
+    strongest: bool = False
+    weakest: bool = False
+    sort: tuple[str, ...] = ("weight", "cost")
+    ignore: object = None
+
+    @classmethod
+    def from_settings(cls, settings) -> GridSelection:
+        allowed = {field.name for field in dataclass_fields(cls)}
+        unknown = set(settings) - allowed
+        if unknown:
+            raise TypeError(f"Unknown grid selection settings: {', '.join(sorted(unknown))}")
+        return cls(**settings)
 
 
 class Map(Fleet):
@@ -87,7 +109,7 @@ class Map(Fleet):
             grids = self.map.select(is_mechanism_trigger=True, is_mechanism_block=False)
         else:
             grids = grids.select(is_mechanism_trigger=True, is_mechanism_block=False)
-        grids = self.select_grids(grids, is_accessible=True, sort=("weight", "cost"))
+        grids = self.select_grids(grids, GridSelection(is_accessible=True, sort=("weight", "cost")))
 
         for grid in grids:
             logger.info(f"Clear mechanism: {grid}")
@@ -136,45 +158,45 @@ class Map(Fleet):
     @staticmethod
     def select_grids(
         grids,
-        nearby=False,
-        is_accessible=True,
-        scale=(),
-        genre=(),
-        strongest=False,
-        weakest=False,
-        sort=("weight", "cost"),
-        ignore=None,
+        selection=None,
     ):
         """
         Args:
             grids (SelectedGrids):
-            nearby (bool):
-            is_accessible (bool):
-            scale (tuple[int], list[int]): Tuple: select out of order, list: select in order.
-            genre (tuple[str], list[str]): light, main, carrier, treasure. (Case insensitive).
-            strongest (bool):
-            weakest (bool):
-            sort (tuple(str)):
-            ignore (SelectedGrids):
+            selection (GridSelection):
 
         Returns:
             SelectedGrids:
         """
-        grids = Map._select_basic_grids(grids, nearby, is_accessible, ignore)
-        if len(scale):
-            grids = Map._select_by_ordered_values(grids, "enemy_scale", scale)
-        if len(genre):
-            normalized_genre = [Map._normalize_enemy_genre(item) for item in genre]
+        if selection is None:
+            selection = GridSelection()
+
+        grids = Map._select_basic_grids(grids, selection.nearby, selection.is_accessible, selection.ignore)
+        if len(selection.scale):
+            grids = Map._select_by_ordered_values(grids, "enemy_scale", selection.scale)
+        if len(selection.genre):
+            normalized_genre = [Map._normalize_enemy_genre(item) for item in selection.genre]
             grids = Map._select_by_ordered_values(grids, "enemy_genre", normalized_genre)
-        if strongest:
+        if selection.strongest:
             grids = Map._select_by_scale_priority(grids, [3, 2, 1, 0])
-        if weakest:
+        if selection.weakest:
             grids = Map._select_by_scale_priority(grids, [1, 2, 3, 0])
 
         if grids:
-            grids = grids.sort(*sort)
+            grids = grids.sort(*selection.sort)
 
         return grids
+
+    @staticmethod
+    def _selection_settings_with_enemy_priority(settings, target, clear_all):
+        settings = dict(settings)
+        if target == "S3_enemy_first":
+            settings["strongest"] = True
+        elif target == "S1_enemy_first":
+            settings["weakest"] = True
+        elif clear_all:
+            settings["strongest"] = True
+        return settings
 
     @staticmethod
     def show_select_grids(grids, **kwargs):
@@ -193,10 +215,10 @@ class Map(Fleet):
         Returns:
             bool: False, because didn't clear any enemy.
         """
-        kwargs["sort"] = ("cost",)
+        kwargs = {**kwargs, "sort": ("cost",)}
         while 1:
             grids = self.map.select(is_mystery=True)
-            grids = self.select_grids(grids, **kwargs)
+            grids = self.select_grids(grids, GridSelection.from_settings(kwargs))
 
             if not grids:
                 break
@@ -216,13 +238,8 @@ class Map(Fleet):
         grids = self.map.select(is_enemy=True, is_boss=False)
 
         target = self.config.EnemyPriority_EnemyScaleBalanceWeight
-        if target == "S3_enemy_first":
-            kwargs["strongest"] = True
-        elif target == "S1_enemy_first":
-            kwargs["weakest"] = True
-        elif self.config.MAP_CLEAR_ALL_THIS_TIME:
-            kwargs["strongest"] = True
-        grids = self.select_grids(grids, **kwargs)
+        kwargs = self._selection_settings_with_enemy_priority(kwargs, target, self.config.MAP_CLEAR_ALL_THIS_TIME)
+        grids = self.select_grids(grids, GridSelection.from_settings(kwargs))
 
         if grids:
             logger.hr("Clear enemy")
@@ -246,13 +263,8 @@ class Map(Fleet):
             grids = grids.add(road.roadblocks())
 
         target = self.config.EnemyPriority_EnemyScaleBalanceWeight
-        if target == "S3_enemy_first":
-            kwargs["strongest"] = True
-        elif target == "S1_enemy_first":
-            kwargs["weakest"] = True
-        elif self.config.MAP_CLEAR_ALL_THIS_TIME:
-            kwargs["strongest"] = True
-        grids = self.select_grids(grids, **kwargs)
+        kwargs = self._selection_settings_with_enemy_priority(kwargs, target, self.config.MAP_CLEAR_ALL_THIS_TIME)
+        grids = self.select_grids(grids, GridSelection.from_settings(kwargs))
 
         if grids:
             logger.hr("Clear roadblock")
@@ -276,13 +288,8 @@ class Map(Fleet):
             grids = grids.add(road.potential_roadblocks())
 
         target = self.config.EnemyPriority_EnemyScaleBalanceWeight
-        if target == "S3_enemy_first":
-            kwargs["strongest"] = True
-        elif target == "S1_enemy_first":
-            kwargs["weakest"] = True
-        elif self.config.MAP_CLEAR_ALL_THIS_TIME:
-            kwargs["strongest"] = True
-        grids = self.select_grids(grids, **kwargs)
+        kwargs = self._selection_settings_with_enemy_priority(kwargs, target, self.config.MAP_CLEAR_ALL_THIS_TIME)
+        grids = self.select_grids(grids, GridSelection.from_settings(kwargs))
 
         if grids:
             logger.hr("Avoid potential roadblock")
@@ -305,7 +312,7 @@ class Map(Fleet):
         for road in roads:
             grids = grids.add(road.first_roadblocks())
 
-        grids = self.select_grids(grids, **kwargs)
+        grids = self.select_grids(grids, GridSelection.from_settings(kwargs))
 
         if grids:
             logger.hr("Clear first roadblock")
@@ -325,7 +332,7 @@ class Map(Fleet):
             bool: True if clear an enemy.
         """
         grids = grids.select(is_enemy=True)
-        grids = self.select_grids(grids, **kwargs)
+        grids = self.select_grids(grids, GridSelection.from_settings(kwargs))
 
         if grids:
             logger.hr("Clear grids for faster")
@@ -468,11 +475,11 @@ class Map(Fleet):
             return False
 
         if self.config.FLEET_2:
-            kwargs["sort"] = ("weight", "cost_2")
+            kwargs = {**kwargs, "sort": ("weight", "cost_2")}
         grids = self.map.select(is_siren=True)
         if self.config.MAP_HAS_FORTRESS:
             grids = grids.add(self.map.select(is_fortress=True))
-        grids = self.select_grids(grids, **kwargs)
+        grids = self.select_grids(grids, GridSelection.from_settings(kwargs))
 
         if grids:
             logger.hr("Clear siren")
@@ -495,7 +502,7 @@ class Map(Fleet):
         if self.config.MAP_HAS_FORTRESS:
             grids = grids.add(self.map.select(is_fortress=True))
 
-        grids = self.select_grids(grids, **kwargs)
+        grids = self.select_grids(grids, GridSelection.from_settings(kwargs))
 
         if grids:
             logger.hr("Clear enemy")
@@ -654,11 +661,11 @@ class Map(Fleet):
             if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
                 approaching = approaching.add(nearby.select(is_enemy=True))
             if approaching:
-                grids = self.select_grids(approaching, sort=("cost_2", "cost_1"))
+                grids = self.select_grids(approaching, GridSelection(sort=("cost_2", "cost_1")))
                 self.clear_chosen_enemy(grids[0], expected="siren")
                 return True
             grids = nearby.delete(self.map.select(is_fleet=True))
-            grids = self.select_grids(grids, sort=("cost_2", "cost_1"))
+            grids = self.select_grids(grids, GridSelection(sort=("cost_2", "cost_1")))
             self.goto(grids[0])
             continue
 
