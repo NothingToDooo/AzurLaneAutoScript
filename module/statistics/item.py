@@ -322,6 +322,44 @@ class ItemGrid:
             return "event"
         return None
 
+    def _predict_amounts(self):
+        amount_list = [item.crop(self.amount_area) for item in self.items]
+        amount_list = self.amount_ocr.ocr(amount_list, direct_ocr=True)
+        for item, amount in zip(self.items, amount_list, strict=True):
+            item.amount = amount
+
+    def _predict_names(self):
+        name_list = [self.match_template(item.image) for item in self.items]
+        for item, name in zip(self.items, name_list, strict=True):
+            item.name = name
+
+    def _predict_costs(self):
+        cost_list = [self.match_cost_template(item) for item in self.items]
+        self.items = [item for item, cost in zip(self.items, cost_list, strict=True) if cost is not None]
+        cost_list = [cost for cost in cost_list if cost is not None]
+        for item, cost in zip(self.items, cost_list, strict=True):
+            item.cost = cost
+
+    def _predict_prices(self):
+        if not self.items:
+            return
+        price_list = [item.crop(self.price_area) for item in self.items]
+        price_list = self.price_ocr.ocr(price_list, direct_ocr=True)
+        for item, price in zip(self.items, price_list, strict=True):
+            item.price = price
+
+    def _predict_tags(self):
+        tag_list = [self.predict_tag(item.crop(self.tag_area)) for item in self.items]
+        for item, tag in zip(self.items, tag_list, strict=True):
+            item.tag = tag
+
+    def _discard_invalid_prices(self):
+        items = [item for item in self.items if item.price > 0]
+        diff = len(self.items) - len(items)
+        if diff > 0:
+            logger.warning(f"Ignore {diff} items, because price <= 0")
+            self.items = items
+
     def predict(self, image, name=True, amount=True, cost=False, price=False, tag=False):
         """
         Args:
@@ -337,35 +375,17 @@ class ItemGrid:
         """
         self._load_image(image)
         if amount:
-            amount_list = [item.crop(self.amount_area) for item in self.items]
-            amount_list = self.amount_ocr.ocr(amount_list, direct_ocr=True)
-            for item, a in zip(self.items, amount_list, strict=True):
-                item.amount = a
+            self._predict_amounts()
         if name:
-            name_list = [self.match_template(item.image) for item in self.items]
-            for item, n in zip(self.items, name_list, strict=True):
-                item.name = n
+            self._predict_names()
         if cost:
-            cost_list = [self.match_cost_template(item) for item in self.items]
-            self.items = [item for item, c in zip(self.items, cost_list, strict=True) if c is not None]
-            cost_list = [c for c in cost_list if c is not None]
-            for item, c in zip(self.items, cost_list, strict=True):
-                item.cost = c
-        if price and len(self.items):
-            price_list = [item.crop(self.price_area) for item in self.items]
-            price_list = self.price_ocr.ocr(price_list, direct_ocr=True)
-            for item, p in zip(self.items, price_list, strict=True):
-                item.price = p
+            self._predict_costs()
+        if price:
+            self._predict_prices()
         if tag:
-            tag_list = [self.predict_tag(item.crop(self.tag_area)) for item in self.items]
-            for item, t in zip(self.items, tag_list, strict=True):
-                item.tag = t
+            self._predict_tags()
 
-        # Delete wrong results
-        items = [item for item in self.items if not (price and item.price <= 0)]
-        diff = len(self.items) - len(items)
-        if diff > 0:
-            logger.warning(f"Ignore {diff} items, because price <= 0")
-            self.items = items
+        if price:
+            self._discard_invalid_prices()
 
         return self.items

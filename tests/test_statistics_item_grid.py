@@ -1,0 +1,85 @@
+from module.statistics.item import ItemGrid
+
+
+class FakeOcr:
+    def __init__(self, values):
+        self.values = values
+        self.images = None
+
+    def ocr(self, images, direct_ocr=False):
+        assert direct_ocr is True
+        self.images = images
+        return self.values
+
+
+class FakeItem:
+    def __init__(self, label):
+        self.label = label
+        self.image = f"image-{label}"
+        self.name = "DefaultItem"
+        self.amount = 1
+        self.cost = "DefaultCost"
+        self.price = 0
+        self.tag = None
+
+    def crop(self, area):
+        return (self.label, area)
+
+
+class FakeItemGrid(ItemGrid):
+    def __init__(self, items, costs, prices):
+        self.source_items = items
+        self.items = []
+        self.costs = costs
+        self.amount_area = "amount_area"
+        self.price_area = "price_area"
+        self.tag_area = "tag_area"
+        self.amount_ocr = FakeOcr([11, 22, 33])
+        self.price_ocr = FakeOcr(prices)
+
+    def _load_image(self, image):
+        assert image == "screen"
+        self.items = list(self.source_items)
+
+    def match_template(self, image, similarity=None):
+        assert similarity is None
+        return {
+            "image-a": "Oil_2",
+            "image-b": "Coin",
+            "image-c": "Gear",
+        }[image]
+
+    def match_cost_template(self, item):
+        return self.costs[item.label]
+
+    @staticmethod
+    def predict_tag(image):
+        return f"tag-{image[0]}"
+
+
+def test_item_grid_predict_runs_enabled_stages_and_filters_invalid_price() -> None:
+    items = [FakeItem("a"), FakeItem("b"), FakeItem("c")]
+    grid = FakeItemGrid(items, costs={"a": "Gem", "b": None, "c": "Coin"}, prices=[5, 0])
+
+    result = grid.predict("screen", name=True, amount=True, cost=True, price=True, tag=True)
+
+    assert result == [items[0]]
+    assert items[0].name == "Oil_2"
+    assert items[0].amount == 11
+    assert items[0].cost == "Gem"
+    assert items[0].price == 5
+    assert items[0].tag == "tag-a"
+
+
+def test_item_grid_predict_keeps_disabled_stages_untouched() -> None:
+    item = FakeItem("a")
+    grid = FakeItemGrid([item], costs={"a": "Gem"}, prices=[5])
+
+    result = grid.predict("screen", name=False, amount=False, cost=False, price=False, tag=False)
+
+    assert result == [item]
+    assert item.name == "DefaultItem"
+    assert item.amount == 1
+    assert item.cost == "DefaultCost"
+    assert item.price == 0
+    assert item.tag is None
