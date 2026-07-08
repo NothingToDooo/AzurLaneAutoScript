@@ -5,6 +5,22 @@ from module.os_combat import assets as os_combat_assets
 from module.os_handler import assets as os_assets
 from module.os_handler.map_event import MapEventHandler
 
+_OS_EXP_INFO_BUTTONS = (
+    combat_assets.EXP_INFO_S,
+    combat_assets.EXP_INFO_A,
+    combat_assets.EXP_INFO_B,
+    combat_assets.EXP_INFO_C,
+    combat_assets.EXP_INFO_D,
+)
+_OS_AUTO_SEARCH_EXP_INFO_BUTTONS = (
+    combat_assets.EXP_INFO_C,
+    combat_assets.EXP_INFO_D,
+)
+_OS_AUTO_SEARCH_BATTLE_STATUS_BUTTONS = (
+    (combat_assets.BATTLE_STATUS_C, "Battle Status C"),
+    (combat_assets.BATTLE_STATUS_D, "Battle Status D"),
+)
+
 
 class ContinuousCombat(Exception):
     pass
@@ -70,21 +86,10 @@ class Combat(Combat_, MapEventHandler):
     def handle_exp_info(self):
         if self.is_combat_executing():
             return False
-        if self.appear_then_click(combat_assets.EXP_INFO_S):
-            self.device.sleep((0.25, 0.5))
-            return True
-        if self.appear_then_click(combat_assets.EXP_INFO_A):
-            self.device.sleep((0.25, 0.5))
-            return True
-        if self.appear_then_click(combat_assets.EXP_INFO_B):
-            self.device.sleep((0.25, 0.5))
-            return True
-        if self.appear_then_click(combat_assets.EXP_INFO_C):
-            self.device.sleep((0.25, 0.5))
-            return True
-        if self.appear_then_click(combat_assets.EXP_INFO_D):
-            self.device.sleep((0.25, 0.5))
-            return True
+        for button in _OS_EXP_INFO_BUTTONS:
+            if self.appear_then_click(button):
+                self.device.sleep((0.25, 0.5))
+                return True
 
         return False
 
@@ -155,44 +160,24 @@ class Combat(Combat_, MapEventHandler):
                 continue
 
     def handle_auto_search_battle_status(self):
-        if self.appear(combat_assets.BATTLE_STATUS_C, interval=self.battle_status_click_interval):
-            logger.warning("Battle Status C")
-            # raise GameStuckError("Battle status C")
-            self.device.sleep((0.25, 0.5))
-            self.device.click(combat_assets.BATTLE_STATUS_C)
-            return True
-        if self.appear(combat_assets.BATTLE_STATUS_D, interval=self.battle_status_click_interval):
-            logger.warning("Battle Status D")
-            # raise GameStuckError("Battle Status D")
-            self.device.sleep((0.25, 0.5))
-            self.device.click(combat_assets.BATTLE_STATUS_D)
-            return True
+        for button, warning in _OS_AUTO_SEARCH_BATTLE_STATUS_BUTTONS:
+            if self.appear(button, interval=self.battle_status_click_interval):
+                logger.warning(warning)
+                self.device.sleep((0.25, 0.5))
+                self.device.click(button)
+                return True
 
         return False
 
     def handle_auto_search_exp_info(self):
-        if self.appear_then_click(combat_assets.EXP_INFO_C):
-            self.device.sleep((0.25, 0.5))
-            return True
-        if self.appear_then_click(combat_assets.EXP_INFO_D):
-            self.device.sleep((0.25, 0.5))
-            return True
+        for button in _OS_AUTO_SEARCH_EXP_INFO_BUTTONS:
+            if self.appear_then_click(button):
+                self.device.sleep((0.25, 0.5))
+                return True
 
         return False
 
-    def auto_search_combat(self):
-        """
-        Returns:
-            bool: True if enemy cleared, False if fleet died.
-
-        Pages:
-            in: is_combat_loading()
-            out: combat status
-        """
-        logger.info("Auto search combat loading")
-        self.device.stuck_record_clear()
-        self.device.click_record_clear()
-        self.device.screenshot_interval_set("combat")
+    def _auto_search_combat_wait_execute(self):
         while 1:
             self.device.screenshot()
 
@@ -209,14 +194,7 @@ class Combat(Combat_, MapEventHandler):
             if self.is_in_map():
                 break
 
-        logger.info("Auto Search combat execute")
-        self.submarine_call_reset()
-        self.device.stuck_record_clear()
-        self.device.click_record_clear()
-        submarine_mode = "do_not_use"
-        if self.config.Submarine_Fleet:
-            submarine_mode = self.config.Submarine_Mode
-
+    def _auto_search_combat_execute(self, submarine_mode):
         success = True
         while 1:
             self.device.screenshot()
@@ -243,5 +221,31 @@ class Combat(Combat_, MapEventHandler):
             if self.handle_map_event():
                 continue
 
+        return success
+
+    def auto_search_combat(self):
+        """
+        Returns:
+            bool: True if enemy cleared, False if fleet died.
+
+        Pages:
+            in: is_combat_loading()
+            out: combat status
+        """
+        logger.info("Auto search combat loading")
+        self.device.stuck_record_clear()
+        self.device.click_record_clear()
+        self.device.screenshot_interval_set("combat")
+        self._auto_search_combat_wait_execute()
+
+        logger.info("Auto Search combat execute")
+        self.submarine_call_reset()
+        self.device.stuck_record_clear()
+        self.device.click_record_clear()
+        submarine_mode = "do_not_use"
+        if self.config.Submarine_Fleet:
+            submarine_mode = self.config.Submarine_Mode
+
+        success = self._auto_search_combat_execute(submarine_mode=submarine_mode)
         logger.info("Combat end.")
         return success
