@@ -66,75 +66,99 @@ class RaidRun(Raid, CampaignEvent):
         return remain
 
     def run(self, name="", mode="", total=0):
-        """
+        """运行 raid 任务。
+
         Args:
-            name (str): Raid name, such as 'raid_20200624'
-            mode (str): Raid mode, such as 'hard', 'normal', 'easy'
-            total (int): Total run count
+            name (str): Raid 名称，如 'raid_20200624'。
+            mode (str): Raid 难度，如 'hard'、'normal'、'easy'。
+            total (int): 总运行次数。
         """
+        name, mode = self._resolve_raid_run_args(name, mode)
+        self.run_count = 0
+        self.run_limit = self.config.StopCondition_RunCount
+        while 1:
+            if self._raid_run_total_reached(total):
+                break
+
+            self._handle_raid_event_time_limit()
+            self._log_raid_run_status(name, mode)
+            if not self._prepare_raid_run_ui():
+                break
+
+            if self._stop_ex_raid_without_ticket(mode):
+                break
+
+            if not self._execute_raid_once(name, mode):
+                break
+
+            if self._handle_raid_after_run():
+                break
+
+    def _resolve_raid_run_args(self, name, mode):
         name = name or self.config.Campaign_Event
         mode = mode or self.config.Raid_Mode
         if not name or not mode:
             raise ScriptError(f"RaidRun arguments unfilled. name={name}, mode={mode}")
+        return name, mode
 
-        self.run_count = 0
-        self.run_limit = self.config.StopCondition_RunCount
-        while 1:
-            # End
-            if total and self.run_count == total:
-                break
-            if self.event_time_limit_triggered():
-                self.config.task_stop()
+    def _raid_run_total_reached(self, total):
+        return bool(total and self.run_count == total)
 
-            # Log
-            logger.hr(f"{name}_{mode}", level=2)
-            if self.config.StopCondition_RunCount > 0:
-                logger.info(f"Count remain: {self.config.StopCondition_RunCount}")
-            else:
-                logger.info(f"Count: {self.run_count}")
+    def _handle_raid_event_time_limit(self) -> None:
+        if self.event_time_limit_triggered():
+            self.config.task_stop()
 
-            # UI switches
-            if not self._raid_has_oil_icon:
-                self.ui_ensure(page_campaign_menu)
-                if self.triggered_stop_condition(oil_check=True, coin_check=True):
-                    break
+    def _log_raid_run_status(self, name, mode) -> None:
+        logger.hr(f"{name}_{mode}", level=2)
+        if self.config.StopCondition_RunCount > 0:
+            logger.info(f"Count remain: {self.config.StopCondition_RunCount}")
+        else:
+            logger.info(f"Count: {self.run_count}")
 
-            # UI ensure
-            self.device.stuck_record_clear()
-            self.device.click_record_clear()
-            if not self.is_raid_rpg():
-                self.ui_ensure(page_raid)
-            else:
-                self.ui_ensure(page_rpg_stage)
-                self.raid_rpg_swipe()
-            self.disable_event_on_raid()
+    def _prepare_raid_run_ui(self):
+        if not self._raid_has_oil_icon:
+            self.ui_ensure(page_campaign_menu)
+            if self.triggered_stop_condition(oil_check=True, coin_check=True):
+                return False
 
-            # End for mode EX
-            if mode == "ex" and not self.is_raid_rpg() and not self.get_remain(mode):
-                logger.info("Triggered stop condition: Zero raid tickets to do EX mode")
-                if self.config.task.command == "Raid":
-                    with self.config.multi_set():
-                        self.config.StopCondition_RunCount = 0
-                        self.config.Scheduler_Enable = False
-                break
+        self.device.stuck_record_clear()
+        self.device.click_record_clear()
+        if not self.is_raid_rpg():
+            self.ui_ensure(page_raid)
+        else:
+            self.ui_ensure(page_rpg_stage)
+            self.raid_rpg_swipe()
+        self.disable_event_on_raid()
+        return True
 
-            # Run
-            self.device.stuck_record_clear()
-            self.device.click_record_clear()
-            try:
-                self.raid_execute_once(mode=mode, raid=name)
-            except ScriptEnd as e:
-                logger.hr("Script end")
-                logger.info(str(e))
-                break
+    def _stop_ex_raid_without_ticket(self, mode):
+        if mode != "ex" or self.is_raid_rpg() or self.get_remain(mode):
+            return False
 
-            # After run
-            self.run_count += 1
-            if self.config.StopCondition_RunCount:
-                self.config.StopCondition_RunCount -= 1
-            # End
-            if self.triggered_stop_condition():
-                break
-            # Scheduler
-            if self.config.task_switched():
-                self.config.task_stop()
+        logger.info("Triggered stop condition: Zero raid tickets to do EX mode")
+        if self.config.task.command == "Raid":
+            with self.config.multi_set():
+                self.config.StopCondition_RunCount = 0
+                self.config.Scheduler_Enable = False
+        return True
+
+    def _execute_raid_once(self, name, mode):
+        self.device.stuck_record_clear()
+        self.device.click_record_clear()
+        try:
+            self.raid_execute_once(mode=mode, raid=name)
+        except ScriptEnd as e:
+            logger.hr("Script end")
+            logger.info(str(e))
+            return False
+        return True
+
+    def _handle_raid_after_run(self):
+        self.run_count += 1
+        if self.config.StopCondition_RunCount:
+            self.config.StopCondition_RunCount -= 1
+        if self.triggered_stop_condition():
+            return True
+        if self.config.task_switched():
+            self.config.task_stop()
+        return False
