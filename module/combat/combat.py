@@ -69,6 +69,11 @@ _GET_ITEM_CHECKS = (
     combat_assets.GET_ITEMS_2,
     combat_assets.GET_ITEMS_3,
 )
+_EXPECTED_END_HANDLERS = {
+    "in_stage": "handle_in_stage",
+    "with_searching": "handle_in_map_with_enemy_searching",
+    "no_searching": "handle_in_map_no_enemy_searching",
+}
 
 
 def _match_first_combat_ui_button(image, buttons, offset):
@@ -172,6 +177,20 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
         return False
 
+    def _handle_combat_preparation_action(self, auto, balance_hp):
+        return (
+            (
+                self.appear(combat_assets.BATTLE_PREPARATION, offset=(20, 20))
+                and self.handle_combat_automation_set(auto=auto == "combat_auto")
+            )
+            or self.handle_retirement()
+            or self.handle_combat_low_emotion()
+            or (balance_hp and self.handle_emergency_repair_use())
+            or self.handle_battle_preparation()
+            or self.handle_combat_automation_confirm()
+            or self.handle_story_skip()
+        )
+
     def combat_preparation(self, balance_hp=False, emotion_reduce=False, auto="combat_auto", fleet_index=1):
         """
         Args:
@@ -191,21 +210,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             self.hp_balance()
 
         for _ in self.loop():
-            if self.appear(combat_assets.BATTLE_PREPARATION, offset=(20, 20)) and self.handle_combat_automation_set(
-                auto=auto == "combat_auto"
-            ):
-                continue
-            if self.handle_retirement():
-                continue
-            if self.handle_combat_low_emotion():
-                continue
-            if balance_hp and self.handle_emergency_repair_use():
-                continue
-            if self.handle_battle_preparation():
-                continue
-            if self.handle_combat_automation_confirm():
-                continue
-            if self.handle_story_skip():
+            if self._handle_combat_preparation_action(auto=auto, balance_hp=balance_hp):
                 continue
             # 提前降低截图间隔。
             if not interval_set and self.is_combat_loading():
@@ -260,51 +265,85 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
         return False
 
+    def _emergency_repair_available(self):
+        if not self.appear(combat_assets.BATTLE_PREPARATION, offset=(20, 20)):
+            return False
+        if not self.appear(combat_assets.EMERGENCY_REPAIR_AVAILABLE):
+            return False
+
+        # 进入战斗准备页或刚维修后，维修图标会短暂保持可用状态，要等舰队战力稳定后再复查。
+        self.wait_until_disappear(combat_assets.MAIN_FLEET_POWER_ZERO, offset=(20, 20))
+        stable_checker = Button(
+            area=combat_assets.MAIN_FLEET_POWER_ZERO.area,
+            color=(),
+            button=combat_assets.MAIN_FLEET_POWER_ZERO.button,
+            name="STABLE_CHECKER",
+        )
+        self.wait_until_stable(stable_checker)
+        return self.appear(combat_assets.EMERGENCY_REPAIR_AVAILABLE)
+
+    def _emergency_repair_hp_valid(self):
+        if not len(self.hp):
+            return False
+        if max(self.hp[:3]) <= 0.001 or max(self.hp[3:]) <= 0.001:
+            logger.warning(f"Invalid HP to use emergency repair: {self.hp}")
+            return False
+        return True
+
+    def _emergency_repair_needed(self):
+        hp = np.array(self.hp)
+        hp = hp[hp > 0.001]
+        return (
+            (len(hp) and np.min(hp) < self.config.HpControl_RepairUseSingleThreshold)
+            or max(self.hp[:3]) < self.config.HpControl_RepairUseMultiThreshold
+            or max(self.hp[3:]) < self.config.HpControl_RepairUseMultiThreshold
+        )
+
     def handle_emergency_repair_use(self):
         if not self.config.HpControl_UseEmergencyRepair:
             return False
 
         if self.appear_then_click(combat_assets.EMERGENCY_REPAIR_CONFIRM, offset=True, interval=3):
             return True
-        if self.appear(combat_assets.BATTLE_PREPARATION, offset=(20, 20)) and self.appear(
-            combat_assets.EMERGENCY_REPAIR_AVAILABLE
-        ):
-            # When entering battle_preparation page (or after emergency repairing),
-            # the emergency icon is active by default, even if nothing to use.
-            # After a short animation, everything shows as usual.
-            # Using fleet power number as a stable checker.
-            # First wait for it to be non-zero, then wait for it to be stable.
-            self.wait_until_disappear(combat_assets.MAIN_FLEET_POWER_ZERO, offset=(20, 20))
-            stable_checker = Button(
-                area=combat_assets.MAIN_FLEET_POWER_ZERO.area,
-                color=(),
-                button=combat_assets.MAIN_FLEET_POWER_ZERO.button,
-                name="STABLE_CHECKER",
-            )
-            self.wait_until_stable(stable_checker)
-            if not self.appear(combat_assets.EMERGENCY_REPAIR_AVAILABLE):
-                return False
+        if not self._emergency_repair_available():
+            return False
 
-            logger.info("EMERGENCY_REPAIR_AVAILABLE")
-            if not len(self.hp):
-                return False
-            if max(self.hp[:3]) <= 0.001 or max(self.hp[3:]) <= 0.001:
-                logger.warning(f"Invalid HP to use emergency repair: {self.hp}")
-                return False
+        logger.info("EMERGENCY_REPAIR_AVAILABLE")
+        if not self._emergency_repair_hp_valid() or not self._emergency_repair_needed():
+            return False
 
-            hp = np.array(self.hp)
-            hp = hp[hp > 0.001]
-            if (
-                (len(hp) and np.min(hp) < self.config.HpControl_RepairUseSingleThreshold)
-                or max(self.hp[:3]) < self.config.HpControl_RepairUseMultiThreshold
-                or max(self.hp[3:]) < self.config.HpControl_RepairUseMultiThreshold
-            ):
-                logger.info("Use emergency repair")
-                self.device.click(combat_assets.EMERGENCY_REPAIR_AVAILABLE)
-                self.interval_clear(combat_assets.EMERGENCY_REPAIR_CONFIRM)
-                return True
+        logger.info("Use emergency repair")
+        self.device.click(combat_assets.EMERGENCY_REPAIR_AVAILABLE)
+        self.interval_clear(combat_assets.EMERGENCY_REPAIR_CONFIRM)
+        return True
 
-        return False
+    def _handle_common_combat_popup(self, popup):
+        return (
+            self.handle_popup_confirm(popup)
+            or self.handle_urgent_commission()
+            or self.handle_guild_popup_cancel()
+            or self.handle_vote_popup()
+            or self.handle_mission_popup_ack()
+        )
+
+    def _handle_manual_weapon_release(self, auto):
+        return (
+            auto != "combat_auto"
+            and self.auto_mode_checked
+            and self.is_combat_executing()
+            and self.handle_combat_weapon_release()
+        )
+
+    def _handle_combat_execute_action(self, auto, submarine, confirm_timer):
+        return (
+            (not confirm_timer.reached() and self.handle_combat_automation_confirm())
+            or self.handle_story_skip()
+            or self.handle_combat_auto(auto)
+            or self.handle_combat_manual(auto)
+            or self._handle_manual_weapon_release(auto)
+            or self.handle_submarine_call(submarine)
+            or self._handle_common_combat_popup("COMBAT_EXECUTE")
+        )
 
     def combat_execute(self, auto="combat_auto", submarine="do_not_use"):
         """
@@ -322,37 +361,10 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         confirm_timer.start()
 
         for _ in self.loop():
-            if not confirm_timer.reached() and self.handle_combat_automation_confirm():
+            if self._handle_combat_execute_action(auto=auto, submarine=submarine, confirm_timer=confirm_timer):
                 continue
 
-            if self.handle_story_skip():
-                continue
-            if self.handle_combat_auto(auto):
-                continue
-            if self.handle_combat_manual(auto):
-                continue
-            if (
-                auto != "combat_auto"
-                and self.auto_mode_checked
-                and self.is_combat_executing()
-                and self.handle_combat_weapon_release()
-            ):
-                continue
-            if self.handle_submarine_call(submarine):
-                continue
-            # bunch of popup handlers
-            if self.handle_popup_confirm("COMBAT_EXECUTE"):
-                continue
-            if self.handle_urgent_commission():
-                continue
-            if self.handle_guild_popup_cancel():
-                continue
-            if self.handle_vote_popup():
-                continue
-            if self.handle_mission_popup_ack():
-                continue
-
-            # End
+            # 结束。
             if self.handle_battle_status() or self.handle_get_items():
                 break
 
@@ -436,6 +448,42 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
         return False
 
+    def _combat_status_expected_end_reached(self, expected_end):
+        handler_name = _EXPECTED_END_HANDLERS.get(expected_end)
+        if handler_name is not None:
+            return getattr(self, handler_name)()
+        if expected_end == "in_ui":
+            return self.appear(BACK_ARROW, offset=(30, 30))
+        if callable(expected_end):
+            return expected_end()
+        return False
+
+    def _handle_combat_status_progress(self, battle_status, exp_info):
+        if battle_status:
+            if self.handle_exp_info():
+                return True, battle_status, True
+            if not exp_info and self.handle_battle_status():
+                return True, True, exp_info
+            return False, battle_status, exp_info
+
+        if not exp_info and self.handle_battle_status():
+            return True, True, exp_info
+        if self.handle_exp_info():
+            return True, battle_status, True
+        return False, battle_status, exp_info
+
+    def _handle_combat_status_result(self, battle_status, exp_info):
+        if not exp_info and self.handle_get_ship():
+            return True, battle_status, exp_info
+        if self.handle_get_items():
+            return True, battle_status, exp_info
+        if self.handle_popup_confirm("COMBAT_STATUS"):
+            if battle_status and not exp_info:
+                logger.info("Locking a new ship")
+                self.config.GET_SHIP_TRIGGERED = True
+            return True, battle_status, exp_info
+        return self._handle_combat_status_progress(battle_status=battle_status, exp_info=exp_info)
+
     def combat_status(self, expected_end=None):
         """
         Args:
@@ -447,66 +495,29 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         self.device.stuck_record_clear()
         self.device.click_record_clear()
         battle_status = False
-        exp_info = False  # This is for the white screen bug in game
+        exp_info = False  # 规避游戏白屏时结算信息延迟出现。
         for _ in self.loop():
-            # Expected end
-            if isinstance(expected_end, str):
-                if expected_end == "in_stage" and self.handle_in_stage():
-                    break
-                if expected_end == "with_searching" and self.handle_in_map_with_enemy_searching():
-                    break
-                if expected_end == "no_searching" and self.handle_in_map_no_enemy_searching():
-                    break
-                if expected_end == "in_ui" and self.appear(BACK_ARROW, offset=(30, 30)):
-                    break
-            if callable(expected_end) and expected_end():
+            # 期望结束条件。
+            if self._combat_status_expected_end_reached(expected_end):
                 break
 
             if self.handle_story_skip():
                 continue
-            # Combat status
-            if not exp_info and self.handle_get_ship():
+            # 结算信息推进。
+            handled, battle_status, exp_info = self._handle_combat_status_result(
+                battle_status=battle_status, exp_info=exp_info
+            )
+            if handled:
                 continue
-            if self.handle_get_items():
+            if self._handle_common_combat_popup("COMBAT_STATUS"):
                 continue
-            if self.handle_popup_confirm("COMBAT_STATUS"):
-                if battle_status and not exp_info:
-                    logger.info("Locking a new ship")
-                    self.config.GET_SHIP_TRIGGERED = True
-                continue
-            if not battle_status:
-                if not exp_info and self.handle_battle_status():
-                    battle_status = True
-                    continue
-                if self.handle_exp_info():
-                    exp_info = True
-                    continue
-            else:
-                # Check exp_info first if battle_status has been clicked.
-                if self.handle_exp_info():
-                    exp_info = True
-                    continue
-                if not exp_info and self.handle_battle_status():
-                    battle_status = True
-                    continue
-            # bunch of popup handlers
-            if self.handle_popup_confirm("COMBAT_STATUS"):
-                continue
-            if self.handle_urgent_commission():
-                continue
-            if self.handle_guild_popup_cancel():
-                continue
-            if self.handle_vote_popup():
-                continue
-            if self.handle_mission_popup_ack():
-                continue
-            # additional handlers in combat
+            # 战斗结算附加处理。
             if self.handle_auto_search_exit():
                 continue
             if self.handle_combat_mis_click():
                 continue
 
-            # End
+            # 结束。
             if self.handle_in_stage():
                 break
             if expected_end is None and self.handle_in_map_with_enemy_searching():
