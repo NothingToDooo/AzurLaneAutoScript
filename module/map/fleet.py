@@ -11,6 +11,8 @@ from module.map.camera import Camera, FullScanOptions
 from module.map.map_base import SelectedGrids, location2node, location_ensure
 from module.map.utils import match_movable
 
+WALK_OUT_OF_STEP_MESSAGE = "walk_out_of_step"
+
 
 @dataclass(slots=True)
 class _GotoState:
@@ -455,7 +457,7 @@ class Fleet(Camera, AmbushHandler):
             if self._goto_handle_guild_popup(state):
                 continue
             if self.handle_walk_out_of_step():
-                raise MapWalkError("walk_out_of_step")
+                raise MapWalkError(WALK_OUT_OF_STEP_MESSAGE)
             if self._goto_confirm_arrival(state):
                 break
             if self._goto_handle_story(state):

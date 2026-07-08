@@ -29,6 +29,7 @@ COMMISSION_SWITCH = Switch("Commission_switch", is_selector=True)
 COMMISSION_SWITCH.add_state("daily", commission_assets.COMMISSION_DAILY)
 COMMISSION_SWITCH.add_state("urgent", commission_assets.COMMISSION_URGENT)
 COMMISSION_SCROLL = Scroll(commission_assets.COMMISSION_SCROLL_AREA, color=(247, 211, 66), name="COMMISSION_SCROLL")
+COMMISSION_ADVICE_FLASHING_BUG_MESSAGE = "Triggered commission list flashing bug"
 
 
 def lines_detect(image):
@@ -395,8 +396,8 @@ class RewardCommission(UI, InfoHandler):
         if count < 3:
             return
         # 重启游戏以处理委托推荐 bug：点击“推荐”后舰船短暂出现又消失，同时委托图标闪烁。
-        logger.warning("Triggered commission list flashing bug")
-        raise GameStuckError("Triggered commission list flashing bug")
+        logger.warning(COMMISSION_ADVICE_FLASHING_BUG_MESSAGE)
+        raise GameStuckError(COMMISSION_ADVICE_FLASHING_BUG_MESSAGE)
 
     def _handle_commission_start_button(self, comm_timer) -> bool:
         if self.match_template_color(commission_assets.COMMISSION_START, offset=(5, 20), interval=7):

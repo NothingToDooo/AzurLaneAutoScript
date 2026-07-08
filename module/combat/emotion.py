@@ -25,6 +25,8 @@ DIC_RECOVER_MAX = {
     "dormitory_floor_2": 150,
 }
 OATH_RECOVER = 10
+UNKNOWN_FLEET_ORDER_TEMPLATE = "Unknown fleet order: {method}"
+EMOTION_CONTROL_DELAY_MESSAGE = "Emotion control"
 
 
 class FleetEmotion:
@@ -224,7 +226,8 @@ class Emotion:
         elif method == "fleet1_standby_fleet2_all":
             battle = (0, battle)
         else:
-            raise ScriptError(f"Unknown fleet order: {method}")
+            message = UNKNOWN_FLEET_ORDER_TEMPLATE.format(method=method)
+            raise ScriptError(message)
 
         battle = tuple(np.array(battle) * self.reduce_per_battle_before_entering)
         logger.info(f"Expect emotion reduce: {battle}")
@@ -236,7 +239,7 @@ class Emotion:
         if recovered > datetime.now():
             logger.info("Delay current task to prevent emotion control in the future")
             self.config.task_delay(target=recovered)
-            raise ScriptEnd("Emotion control")
+            raise ScriptEnd(EMOTION_CONTROL_DELAY_MESSAGE)
 
     def wait(self, fleet_index):
         """

@@ -30,6 +30,7 @@ EXCHANGE_BUTTONS = ButtonGrid(
     origin=(440, 609), delta=(198.5, 0), button_shape=(144, 31), grid_shape=(3, 1), name="EXCHANGE_BUTTONS"
 )
 EXCHANGE_FILTER = Filter(regex=re.compile("^(.*?)$"), attr=("name",))
+GUILD_LOGISTICS_REFRESH_BUG_MESSAGE = "Triggered guild logistics refresh bug"
 
 
 class ExchangeLimitOcr(Digit):
@@ -280,7 +281,7 @@ class GuildLogistics(GuildBase):
         # 跨天运行后再做公会兑换，游戏可能持续提示时间未到。
         # 进入一次公会后勤再重启游戏才能恢复；兑换五次仍失败就视为触发。
         logger.warning("Unable to do guild exchange, probably because the timer in game was bugged")
-        raise GameBugError("Triggered guild logistics refresh bug")
+        raise GameBugError(GUILD_LOGISTICS_REFRESH_BUG_MESSAGE)
 
     def _guild_exchange_scan(self):
         """

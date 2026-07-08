@@ -119,6 +119,7 @@ BOOK_FILTER = Filter(
     attr=("same_str", "genre_str", "tier_str"),
     preset=("first",),
 )
+NO_TACTICAL_BOOK_FOUND_MESSAGE = "No book found, after 15 attempts."
 
 
 class Book:
@@ -250,7 +251,7 @@ class RewardTacticalClass(Dock):
             continue
 
         logger.warning("No book found.")
-        raise ScriptError("No book found, after 15 attempts.")
+        raise ScriptError(NO_TACTICAL_BOOK_FOUND_MESSAGE)
 
     def _tactical_book_select(self, book, skip_first_screenshot=True):
         """

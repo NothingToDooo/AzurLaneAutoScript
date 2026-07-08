@@ -7,6 +7,8 @@ from module.logger import logger
 from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION, MAP_PREPARATION_CANCEL
 from module.ui.assets import CAMPAIGN_CHECK, EVENT_CHECK, SP_CHECK
 
+IN_STAGE_MESSAGE = "In stage."
+
 
 class EnemySearchingHandler(InfoHandler):
     MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD = 0.5  # Usually (0.70, 0.80).
@@ -31,9 +33,9 @@ class EnemySearchingHandler(InfoHandler):
     def handle_in_stage(self):
         if self.is_in_stage():
             if self.in_stage_timer.reached():
-                logger.info("In stage.")
+                logger.info(IN_STAGE_MESSAGE)
                 self.ensure_no_info_bar(timeout=1.2)
-                raise CampaignEnd("In stage.")
+                raise CampaignEnd(IN_STAGE_MESSAGE)
             return False
         if self.appear(MAP_PREPARATION, offset=(20, 20)) or self.appear(FLEET_PREPARATION, offset=(20, 50)):
             self.device.click(MAP_PREPARATION_CANCEL)

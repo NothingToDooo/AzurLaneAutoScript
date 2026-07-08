@@ -9,6 +9,8 @@ from module.logger import logger
 from module.ocr.ocr import Digit
 from module.ui.page import page_campaign_menu
 
+COALITION_ARGUMENTS_UNFILLED_TEMPLATE = "Coalition arguments unfilled. name={event}, mode={mode}, fleet={fleet}"
+
 
 class AcademyPtOcr(Digit):
     def __init__(self, *args, **kwargs):
@@ -183,7 +185,8 @@ class Coalition(CoalitionCombat, CampaignEvent):
         mode = mode or self.config.Coalition_Mode
         fleet = fleet or self.config.Coalition_Fleet
         if not event or not mode or not fleet:
-            raise ScriptError(f"Coalition arguments unfilled. name={event}, mode={mode}, fleet={fleet}")
+            message = COALITION_ARGUMENTS_UNFILLED_TEMPLATE.format(event=event, mode=mode, fleet=fleet)
+            raise ScriptError(message)
         return event, mode, fleet
 
     def _coalition_total_reached(self, total):

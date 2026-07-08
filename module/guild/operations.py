@@ -15,6 +15,7 @@ from module.template.assets import TEMPLATE_OPERATIONS_RED_DOT
 GUILD_OPERATIONS_PROGRESS = DigitCounter(
     guild_assets.OCR_GUILD_OPERATIONS_PROGRESS, letter=(255, 247, 247), threshold=64
 )
+GUILD_OPERATION_JOIN_STUCK_MESSAGE = "Unable to start/join guild operation"
 
 
 @dataclass(slots=True)
@@ -71,7 +72,7 @@ class GuildOperations(GuildBase):
             "Unable to start/join guild operation, "
             "probably because guild operation has been started by another guild officer already"
         )
-        raise GameBugError("Unable to start/join guild operation")
+        raise GameBugError(GUILD_OPERATION_JOIN_STUCK_MESSAGE)
 
     def _handle_guild_operations_join(self, state):
         if not self.appear(guild_assets.GUILD_OPERATIONS_JOIN, interval=3):

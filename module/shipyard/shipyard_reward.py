@@ -20,6 +20,7 @@ DRBP_BUY_PRIZE = {
     (7, 8, 9, 10): 1200,
     (11, 12, 13, 14, 15): 3000,
 }
+INVALID_SHIPYARD_RARITY_TEMPLATE = "Invalid rarity in _shipyard_get_cost: {rarity}"
 
 
 class RewardShipyard(ShipyardUI):
@@ -48,7 +49,8 @@ class RewardShipyard(ShipyardUI):
             if cost:
                 return cost[0]
             return 6000
-        raise ScriptError(f"Invalid rarity in _shipyard_get_cost: {rarity}")
+        message = INVALID_SHIPYARD_RARITY_TEMPLATE.format(rarity=rarity)
+        raise ScriptError(message)
 
     def _shipyard_calculate(self, start, count, pay=False):
         """

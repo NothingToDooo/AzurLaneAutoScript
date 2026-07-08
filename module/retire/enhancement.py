@@ -11,6 +11,8 @@ from module.retire.dock import Dock
 
 VALID_SHIP_TYPES = ["dd", "ss", "cl", "ca", "bb", "cv", "repair", "others"]
 OCR_DOCK_AMOUNT = DigitCounter(retire_assets.DOCK_AMOUNT, letter=(255, 255, 255), threshold=192)
+TOO_MANY_ENHANCE_STATE_TRANSITIONS_MESSAGE = "Too many state transitions"
+UNKNOWN_ENHANCE_STATE_FUNCTION_TEMPLATE = "Unknown state function: {state}"
 
 
 @dataclass(slots=True)
@@ -214,15 +216,16 @@ class Enhancement(Dock):
         if len(state_list) <= 30:
             return
         logger.critical(f"Too many state transitions: {state_list}")
-        raise GameStuckError("Too many state transitions")
+        raise GameStuckError(TOO_MANY_ENHANCE_STATE_TRANSITIONS_MESSAGE)
 
     @staticmethod
     def _run_enhance_state(handlers, state, context):
         try:
             handler = handlers[state]
         except KeyError as e:
-            logger.warning(f"Unknown state function: {state}")
-            raise ScriptError(f"Unknown state function: {state}") from e
+            message = UNKNOWN_ENHANCE_STATE_FUNCTION_TEMPLATE.format(state=state)
+            logger.warning(message)
+            raise ScriptError(message) from e
         return handler(context)
 
     def _enhance_choose(self, ship_count, skip_first_screenshot=True):

@@ -18,6 +18,10 @@ OCR_BUILD_CUBE_COUNT = Digit(gacha_assets.BUILD_CUBE_COUNT, letter=(255, 247, 24
 OCR_BUILD_TICKET_COUNT = Digit(gacha_assets.BUILD_TICKET_COUNT, letter=(255, 247, 247), threshold=64)
 OCR_BUILD_SUBMIT_COUNT = Digit(gacha_assets.BUILD_SUBMIT_COUNT, letter=(255, 247, 247), threshold=64)
 OCR_BUILD_SUBMIT_WW_COUNT = Digit(gacha_assets.BUILD_SUBMIT_WW_COUNT, letter=(255, 247, 247), threshold=64)
+GACHA_PREP_OCR_ASSET_MISSING_MESSAGE = "Failed to identify ocr asset required, cannot continue prep work"
+WISHING_WELL_MANUAL_CONFIG_MESSAGE = (
+    "'wishing_well' must be configured manually by user, cannot continue gacha_goto_pool"
+)
 
 
 @dataclass(slots=True)
@@ -92,7 +96,7 @@ class RewardGacha(GachaUI, Retirement):
 
         # 检查是否提前退出，并套用正确的提交数量 OCR。
         if ocr_submit is None:
-            raise ScriptError("Failed to identify ocr asset required, cannot continue prep work")
+            raise ScriptError(GACHA_PREP_OCR_ASSET_MISSING_MESSAGE)
         area = ocr_submit.buttons[0]
         ocr_submit.buttons = [
             (gacha_assets.BUILD_MINUS.button[2] + 3, area[1], gacha_assets.BUILD_PLUS.button[0] - 3, area[3])
@@ -174,9 +178,7 @@ class RewardGacha(GachaUI, Retirement):
             else:
                 self.gacha_side_navbar_ensure(upper=2)
                 if self.appear(gacha_assets.BUILD_WW_CHECK):
-                    raise ScriptError(
-                        "'wishing_well' must be configured manually by user, cannot continue gacha_goto_pool"
-                    )
+                    raise ScriptError(WISHING_WELL_MANUAL_CONFIG_MESSAGE)
         elif target_pool == "event":
             gacha_bottom_navbar = self._gacha_bottom_navbar(is_build=True)
             if gacha_bottom_navbar.get_total(main=self) == 3:

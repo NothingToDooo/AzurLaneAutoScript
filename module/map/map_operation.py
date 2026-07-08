@@ -10,6 +10,9 @@ from module.map.map_fleet_preparation import FleetPreparation
 from module.retire.retirement import Retirement
 from module.ui.assets import BACK_ARROW, DAILY_CHECK
 
+MAP_ACHIEVEMENT_REACHED_TEMPLATE = "Reach condition: {condition}"
+MAP_WITHDRAW_MESSAGE = "Withdraw"
+
 
 class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHandler):
     map_cat_attack_timer = Timer(2)
@@ -131,7 +134,8 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         if self.triggered_map_stop():
             self.enter_map_cancel()
             self.handle_map_stop()
-            raise ScriptEnd(f"Reach condition: {self.config.StopCondition_MapAchievement}")
+            message = MAP_ACHIEVEMENT_REACHED_TEMPLATE.format(condition=self.config.StopCondition_MapAchievement)
+            raise ScriptEnd(message)
         self.device.click(map_assets.MAP_PREPARATION)
         map_timer.reset()
         campaign_timer.reset()
@@ -419,7 +423,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
 
             # 结束。
             if self.handle_in_stage():
-                raise CampaignEnd("Withdraw")
+                raise CampaignEnd(MAP_WITHDRAW_MESSAGE)
 
     def handle_map_cat_attack(self):
         """

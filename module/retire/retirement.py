@@ -30,6 +30,7 @@ RETIRE_CONFIRM_SCROLL = Scroll(
     retire_assets.RETIRE_CONFIRM_SCROLL_AREA, color=(74, 77, 110), name="STRATEGIC_SEARCH_SCROLL"
 )
 RETIRE_CONFIRM_SCROLL.color_threshold = 240  # 背景色是 (66, 72, 77)，默认阈值 (256-221)=35 不够区分。
+UNKNOWN_RETIRE_MODE_TEMPLATE = "Unknown retire mode: {mode}"
 
 
 class Retirement(Enhancement, QuickRetireSettingHandler):
@@ -550,7 +551,8 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         elif mode == "old_retire":
             total = self._retire_old_with_flagships()
         else:
-            raise ScriptError(f"Unknown retire mode: {self.config.Retirement_RetireMode}")
+            message = UNKNOWN_RETIRE_MODE_TEMPLATE.format(mode=mode)
+            raise ScriptError(message)
 
         self._retirement_quit()
         self.config.DOCK_FULL_TRIGGERED = True

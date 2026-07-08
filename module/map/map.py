@@ -10,6 +10,7 @@ from module.map.fleet import Fleet
 from module.map.map_grids import SelectedGrids
 
 ENEMY_FILTER = Filter(regex=re.compile("^(.*?)$"), attr=("str",))
+UNKNOWN_GRID_SELECTION_SETTINGS_TEMPLATE = "Unknown grid selection settings: {settings}"
 
 
 @dataclass(slots=True)
@@ -28,7 +29,8 @@ class GridSelection:
         allowed = {field.name for field in dataclass_fields(cls)}
         unknown = set(settings) - allowed
         if unknown:
-            raise TypeError(f"Unknown grid selection settings: {', '.join(sorted(unknown))}")
+            message = UNKNOWN_GRID_SELECTION_SETTINGS_TEMPLATE.format(settings=", ".join(sorted(unknown)))
+            raise TypeError(message)
         return cls(**settings)
 
 
