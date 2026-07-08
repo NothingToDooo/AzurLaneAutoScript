@@ -10,32 +10,6 @@ def abspath(path):
     return Path(path).resolve().as_posix()
 
 
-def get_serial_pair(serial):
-    """
-    Args:
-        serial (str):
-
-    Returns:
-        str, str: `127.0.0.1:5555+{X}` and `emulator-5554+{X}`, 0 <= X <= 32
-    """
-    if serial.startswith("127.0.0.1:"):
-        try:
-            port = int(serial[10:])
-            if 5555 <= port <= 5555 + 32:
-                return f"127.0.0.1:{port}", f"emulator-{port - 1}"
-        except ValueError, IndexError:
-            pass
-    if serial.startswith("emulator-"):
-        try:
-            port = int(serial[9:])
-            if 5554 <= port <= 5554 + 32:
-                return f"127.0.0.1:{port + 1}", f"emulator-{port}"
-        except ValueError, IndexError:
-            pass
-
-    return None, None
-
-
 def remove_duplicated_path(paths):
     """
     Args:
@@ -245,17 +219,9 @@ class EmulatorManagerBase:
     @cached_property
     def all_emulator_serials(self) -> list[str]:
         """
-        Returns:
-            list[str]: All possible serials on current computer.
+        返回当前个人版可尝试连接的 MuMu TCP serial。
         """
-        out = []
-        for emulator in self.all_emulator_instances:
-            out.append(emulator.serial)
-            # 同时添加 `emulator-5554` 形式的 serial。
-            _port_serial, emu_serial = get_serial_pair(emulator.serial)
-            if emu_serial:
-                out.append(emu_serial)
-        return out
+        return [emulator.serial for emulator in self.all_emulator_instances if emulator.serial]
 
     @cached_property
     def all_adb_binaries(self) -> list[str]:

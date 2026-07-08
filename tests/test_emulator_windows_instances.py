@@ -1,5 +1,7 @@
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
+from module.device.platform.emulator_base import EmulatorManagerBase
 from module.device.platform.emulator_windows import Emulator, EmulatorInstance
 
 if TYPE_CHECKING:
@@ -49,6 +51,16 @@ def test_iter_instances_falls_back_to_mumu12_default_serial(tmp_path: Path) -> N
     assert instances[0].serial == "127.0.0.1:16448"
     assert instances[0].name == "MuMuPlayer-12.0-2"
     assert instances[0].path == emulator.path
+
+
+def test_all_emulator_serials_keeps_only_mumu_tcp_serials() -> None:
+    manager = object.__new__(EmulatorManagerBase)
+    manager.all_emulator_instances = [
+        SimpleNamespace(serial="127.0.0.1:5555"),
+        SimpleNamespace(serial="127.0.0.1:16384"),
+    ]
+
+    assert manager.all_emulator_serials == ["127.0.0.1:5555", "127.0.0.1:16384"]
 
 
 def test_mumu_global_name_is_not_supported(tmp_path: Path) -> None:

@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 from module.base.decorator import cached_property, del_cached_property
 from module.device.connection import Connection
-from module.device.method.utils import get_serial_pair
 from module.device.platform.emulator_base import EmulatorInstanceBase, EmulatorManagerBase, remove_duplicated_path
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
@@ -78,14 +77,8 @@ class PlatformBase(Connection, EmulatorManagerBase):
             "path": data.path,
             "name": data.name,
         }
-        # 将 emulator-5554 重定向到 127.0.0.1:5555。
-        serial = self.serial
-        port_serial, _ = get_serial_pair(self.serial)
-        if port_serial is not None:
-            serial = port_serial
-
         instance = self.find_emulator_instance(
-            serial=serial,
+            serial=self.serial,
             name=data.name,
             path=data.path,
             emulator=data.emulator,

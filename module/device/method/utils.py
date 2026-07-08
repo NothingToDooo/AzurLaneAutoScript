@@ -151,29 +151,3 @@ def handle_unknown_host_service(e):
         logger.error(e)
         return True
     return False
-
-
-def get_serial_pair(serial):
-    """
-    Args:
-        serial (str):
-
-    Returns:
-        tuple[Optional[str], Optional[str]]: `127.0.0.1:5555+{X}` and `emulator-5554+{X}`, 0 <= X <= 32
-    """
-    if serial.startswith("127.0.0.1:"):
-        try:
-            port = int(serial[10:])
-            if 5555 <= port <= 5555 + 64:
-                return f"127.0.0.1:{port}", f"emulator-{port - 1}"
-        except ValueError, IndexError:
-            pass
-    if serial.startswith("emulator-"):
-        try:
-            port = int(serial[9:])
-            if 5554 <= port <= 5554 + 64:
-                return f"127.0.0.1:{port + 1}", f"emulator-{port}"
-        except ValueError, IndexError:
-            pass
-
-    return None, None

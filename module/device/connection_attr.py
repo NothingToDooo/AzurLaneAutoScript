@@ -8,7 +8,6 @@ from adbutils import AdbClient, AdbDevice
 
 from module.base.decorator import cached_property
 from module.config.config import AzurLaneConfig
-from module.device.method.utils import get_serial_pair
 from module.logger import logger
 from module.webui.setting import State
 
@@ -99,11 +98,8 @@ class ConnectionAttr:
 
     @cached_property
     def port(self) -> int:
-        port_serial, _ = get_serial_pair(self.serial)
-        if port_serial is None:
-            port_serial = self.serial
         try:
-            return int(port_serial.split(":")[1])
+            return int(self.serial.split(":")[1])
         except IndexError, ValueError:
             return 0
 
@@ -117,10 +113,6 @@ class ConnectionAttr:
         # 127.0.0.1:7555
         # 127.0.0.1:16384 + 32*n
         return self.serial == "127.0.0.1:7555" or self.is_mumu12_family
-
-    @cached_property
-    def is_emulator(self):
-        return self.serial.startswith("emulator-") or self.serial.startswith("127.0.0.1:")
 
     @cached_property
     def adb_binary(self):
