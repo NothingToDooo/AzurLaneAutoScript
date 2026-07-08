@@ -70,36 +70,48 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
         assume_zone = self.name_to_zone(11)
 
         for _ in self.loop():
-            # 结束。
-            if self.is_in_map():
-                if confirm_timer.reached():
-                    return True
-            else:
-                confirm_timer.reset()
-
-            if self.is_in_map_order() and not self.appear(button):
-                if missing_timer.reached():
-                    logger.info(f"Map order not available: {button}")
-                    self.order_quit()
-                    return False
-            else:
-                missing_timer.reset()
-
-            if self.appear_then_click(button, interval=3):
-                continue
-            if self.handle_popup_confirm(button.name):
-                continue
-            if self.handle_map_event():
-                continue
-            if self.handle_map_cat_attack():
-                continue
-            if self.handle_action_point(zone=assume_zone, pinned="OBSCURE"):
-                # 点击行动力取消后，游戏会关闭指令页面，需要重新进入并执行指令。
-                self.order_enter()
-                confirm_timer.reset()
-                missing_timer.reset()
+            if self._order_execute_finished(confirm_timer):
+                return True
+            if self._order_missing(button, missing_timer):
+                self.order_quit()
+                return False
+            if self._order_execute_step(button, assume_zone, confirm_timer, missing_timer):
                 continue
         return False
+
+    def _order_execute_finished(self, confirm_timer):
+        if self.is_in_map():
+            return confirm_timer.reached()
+
+        confirm_timer.reset()
+        return False
+
+    def _order_missing(self, button, missing_timer):
+        if not self.is_in_map_order() or self.appear(button):
+            missing_timer.reset()
+            return False
+
+        if not missing_timer.reached():
+            return False
+
+        logger.info(f"Map order not available: {button}")
+        return True
+
+    def _order_execute_step(self, button, assume_zone, confirm_timer, missing_timer):
+        if self.appear_then_click(button, interval=3):
+            return True
+        if self.handle_popup_confirm(button.name):
+            return True
+        if self.handle_map_event() or self.handle_map_cat_attack():
+            return True
+        if not self.handle_action_point(zone=assume_zone, pinned="OBSCURE"):
+            return False
+
+        # 点击行动力取消后，游戏会关闭指令页面，需要重新进入并执行指令。
+        self.order_enter()
+        confirm_timer.reset()
+        missing_timer.reset()
+        return True
 
     def wait_until_order_finished(self):
         for _ in self.loop():
