@@ -16,7 +16,7 @@ from module.map.map_operation import MapOperation
 from module.map.utils import location_ensure, random_direction
 from module.map_detection.grid import Grid
 from module.map_detection.utils import area2corner, trapezoid2area
-from module.map_detection.view import View
+from module.map_detection.view import CAMERA_OUTSIDE_MAP_MESSAGE, View
 from module.os.assets import GLOBE_GOTO_MAP
 from module.os_handler.assets import AUTO_SEARCH_REWARD, GET_ADAPTABILITY
 from module.os_handler.assets import MISSION_CHECK as OPSI_MISSION_CHECK
@@ -33,6 +33,10 @@ _LATE_CLICK_RECOVERY_OVERLAYS = (
     (PORT_SUPPLY_CHECK, (20, 20), BACK_ARROW, "Perspective error caused by akashi shop"),
     (GAME_TIPS, (20, 20), GAME_TIPS, "Perspective error caused by game tips"),
 )
+IMAGE_NOT_IN_MAP_MESSAGE = "Image to detect is not in_map"
+IMAGE_IN_STAGE_MESSAGE = "Image is in stage"
+IMAGE_IN_MAP_PREPARATION_MESSAGE = "Image is in MAP_PREPARATION"
+IMAGE_IN_AUTO_SEARCH_MENU_MESSAGE = "Image is in auto search menu"
 
 
 @dataclass(slots=True)
@@ -131,8 +135,8 @@ class Camera(MapOperation):
             and not self.is_in_strategy_mob_move()
             and not self.is_in_strategy_air_strike()
         ):
-            logger.warning("Image to detect is not in_map")
-            raise MapDetectionError("Image to detect is not in_map")
+            logger.warning(IMAGE_NOT_IN_MAP_MESSAGE)
+            raise MapDetectionError(IMAGE_NOT_IN_MAP_MESSAGE)
 
     def _update_view(self):
         """更新地图视图。"""
@@ -215,24 +219,24 @@ class Camera(MapOperation):
         if not self.is_in_stage():
             return False
 
-        logger.warning("Image is in stage")
-        raise CampaignEnd("Image is in stage") from error
+        logger.warning(IMAGE_IN_STAGE_MESSAGE)
+        raise CampaignEnd(IMAGE_IN_STAGE_MESSAGE) from error
 
     def _end_if_map_preparation(self, error):
         if not self.appear(MAP_PREPARATION, offset=(20, 20)):
             return False
 
-        logger.warning("Image is in MAP_PREPARATION")
+        logger.warning(IMAGE_IN_MAP_PREPARATION_MESSAGE)
         self.enter_map_cancel()
-        raise CampaignEnd("Image is in MAP_PREPARATION") from error
+        raise CampaignEnd(IMAGE_IN_MAP_PREPARATION_MESSAGE) from error
 
     def _end_if_auto_search_menu(self, error):
         if not self.appear(AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset):
             return False
 
-        logger.warning("Image is in auto search menu")
+        logger.warning(IMAGE_IN_AUTO_SEARCH_MENU_MESSAGE)
         self.ensure_auto_search_exit()
-        raise CampaignEnd("Image is in auto search menu") from error
+        raise CampaignEnd(IMAGE_IN_AUTO_SEARCH_MENU_MESSAGE) from error
 
     def _recover_globe_map(self):
         if not self.appear(GLOBE_GOTO_MAP, offset=(20, 20)):
@@ -290,7 +294,7 @@ class Camera(MapOperation):
 
     def _recover_camera_outside_map(self, error):
         message = str(error)
-        if "Camera outside map" not in message:
+        if CAMERA_OUTSIDE_MAP_MESSAGE not in message:
             return False
 
         logger.warning(message)

@@ -270,8 +270,15 @@ def test_update_view_confirms_opsi_popup_only_for_opsi_tasks() -> None:
     assert ("handle_popup_confirm", "OPSI") in camera.calls
 
 
-def test_update_view_swipes_back_when_camera_is_outside_map() -> None:
-    camera = _failing_camera(message="Camera outside map = (2, -3)")
+@pytest.mark.parametrize(
+    "message",
+    [
+        f"{camera_module.CAMERA_OUTSIDE_MAP_MESSAGE}: offset=(2, -3)",
+        f"{camera_module.CAMERA_OUTSIDE_MAP_MESSAGE} = (2, -3)",
+    ],
+)
+def test_update_view_swipes_back_when_camera_is_outside_map(message: str) -> None:
+    camera = _failing_camera(message=message)
 
     assert camera.update_view_for_test() is True
 
