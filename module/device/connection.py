@@ -10,7 +10,6 @@ from adbutils import AdbClient, AdbDevice, ForwardItem
 from adbutils.errors import AdbError
 
 from module.base.decorator import cached_property, del_cached_property, run_once
-from module.base.timer import Timer
 from module.base.utils import ensure_time
 from module.config.deep import deep_get
 from module.config.server import VALID_PACKAGE
@@ -128,7 +127,7 @@ class Connection(ConnectionAttr):
         self.detect_device()
 
         # 建立 ADB 连接。
-        self.adb_connect(wait_device=False)
+        self.adb_connect()
         logger.attr("AdbDevice", self.adb)
 
         # 确认游戏包名。
@@ -372,38 +371,6 @@ class Connection(ConnectionAttr):
         logger.info(f"ADB push: {local} -> {remote}")
         return self.adb.push(local, remote)
 
-    def _wait_device_appear(self, serial, first_devices=None):
-        """
-        参数：
-            serial:
-            first_devices (list[AdbDeviceWithStatus]):
-
-        返回：
-            bool：设备是否已出现。
-        """
-        # 比 5 秒略长一点，避开边界误判。
-        timeout = Timer(5.2).start()
-        first_log = True
-        while 1:
-            if first_devices is not None:
-                devices = first_devices
-                first_devices = None
-            else:
-                devices = self.list_device()
-            # 检查设备是否已经出现。
-            for device in devices:
-                if device.serial == serial and device.status == "device":
-                    return True
-            # 稍后重试。
-            if timeout.reached():
-                break
-            if first_log:
-                logger.info(f"Waiting device appear: {serial}")
-                first_log = False
-            time.sleep(0.05)
-
-        return False
-
     def _cleanup_adb_device_statuses(self, devices):
         """
         参数：
@@ -422,50 +389,21 @@ class Connection(ConnectionAttr):
             else:
                 logger.warning(f"Device {device.serial} is is having a unknown status: {device.status}")
 
-    def _skip_adb_connect_for_waited_serial(self, wait_device, devices, skip_message):
+    @staticmethod
+    def _is_mumu_tcp_serial(serial: str) -> bool:
         """
-        等待由 ADB 自动维护的 serial，并跳过 `adb connect`。
-
-        参数：
-            wait_device (bool): 是否先等待设备出现。
-            devices (list[AdbDeviceWithStatus]): 初始设备列表。
-            skip_message (str): 未等待到设备时输出的跳过原因。
-
-        返回：
-            bool：True 表示该 serial 已完成处理。
+        判断 serial 是否是个人分支支持的 MuMu TCP serial。
         """
-        if wait_device:
-            if self._wait_device_appear(self.serial, first_devices=devices):
-                logger.info(f"Serial {self.serial} connected")
-                return True
-            logger.info(f"Serial {self.serial} is not connected")
-        logger.info(skip_message)
-        return True
+        return re.fullmatch(r"127\.0\.0\.1:\d+", serial) is not None
 
-    def _skip_adb_connect_for_auto_serial(self, wait_device, devices):
+    def _ensure_mumu_tcp_serial(self):
         """
-        emulator-* 和 Android 真机通常由 ADB 自动维护，不需要 `adb connect`。
-
-        参数：
-            wait_device (bool): 是否先等待设备出现。
-            devices (list[AdbDeviceWithStatus]): 初始设备列表。
-
-        返回：
-            bool：True 表示已跳过 TCP 连接流程。
+        个人分支只支持 MuMu TCP serial，旧的 emulator-* 和真机 serial 不再兼容。
         """
-        if "emulator-" in self.serial:
-            return self._skip_adb_connect_for_waited_serial(
-                wait_device,
-                devices,
-                f'"{self.serial}" is a `emulator-*` serial, skip adb connect',
-            )
-        if re.match(r"^[a-zA-Z0-9]+$", self.serial):
-            return self._skip_adb_connect_for_waited_serial(
-                wait_device,
-                devices,
-                f'"{self.serial}" seems to be a Android serial, skip adb connect',
-            )
-        return False
+        if self._is_mumu_tcp_serial(self.serial):
+            return
+        logger.critical(f'当前个人分支只支持 MuMu TCP serial，例如 "127.0.0.1:16384"，当前为 "{self.serial}"')
+        raise RequestHumanTakeover
 
     def _recover_mumu12_shifted_port(self):
         """
@@ -525,21 +463,16 @@ class Connection(ConnectionAttr):
 
         return False
 
-    def adb_connect(self, wait_device=True):
+    def adb_connect(self):
         """
-        连接指定 serial。
-
-        参数：
-            wait_device：是否等待 emulator-* 和 Android 真机出现。
+        连接当前 MuMu TCP serial。
 
         返回：
             bool：是否连接成功。
         """
         devices = self.list_device()
         self._cleanup_adb_device_statuses(devices)
-
-        if self._skip_adb_connect_for_auto_serial(wait_device, devices):
-            return True
+        self._ensure_mumu_tcp_serial()
 
         if self._connect_adb_tcp_serial():
             return True

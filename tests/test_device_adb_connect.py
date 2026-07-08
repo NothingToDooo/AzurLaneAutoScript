@@ -32,25 +32,18 @@ def _make_connection(
     serial: str = "127.0.0.1:16384",
     devices: list[object] | None = None,
     connect_messages: list[str] | None = None,
-    wait_result: bool = False,
     detect_serial: str | None = None,
 ):
     connection = object.__new__(Connection)
     connection.serial = serial
     connection.adb_client = _AdbClient(connect_messages)
     connection.devices = devices or []
-    connection.wait_result = wait_result
-    connection.wait_calls: list[tuple[str, list[object] | None]] = []
     connection.detect_calls = 0
     connection.brute_force_calls: list[list[str]] = []
     connection.bridge_check_calls = 0
 
     def list_device():
         return connection.devices
-
-    def wait_device_appear(serial: str, first_devices=None) -> bool:
-        connection.wait_calls.append((serial, first_devices))
-        return connection.wait_result
 
     def detect_device() -> None:
         connection.detect_calls += 1
@@ -65,7 +58,6 @@ def _make_connection(
         return True
 
     connection.list_device = list_device
-    connection.__dict__["_wait_device_appear"] = wait_device_appear
     connection.detect_device = detect_device
     connection.adb_brute_force_connect = adb_brute_force_connect
     connection.check_mumu_bridge_network = check_mumu_bridge_network
@@ -83,19 +75,12 @@ def test_adb_connect_disconnects_offline_devices_before_connecting() -> None:
     assert connection.adb_client.connect_calls == ["127.0.0.1:16384"]
 
 
-def test_adb_connect_skips_emulator_serial_tcp_connect_when_device_appears() -> None:
-    connection = _make_connection(serial="emulator-5554", wait_result=True)
+@pytest.mark.parametrize("serial", ["emulator-5554", "abcdef123456", "auto", "192.168.1.2:5555"])
+def test_adb_connect_rejects_non_mumu_tcp_serial(serial: str) -> None:
+    connection = _make_connection(serial=serial)
 
-    assert connection.adb_connect(wait_device=True)
-    assert connection.wait_calls == [("emulator-5554", [])]
-    assert connection.adb_client.connect_calls == []
-
-
-def test_adb_connect_skips_android_serial_tcp_connect() -> None:
-    connection = _make_connection(serial="abcdef123456", wait_result=False)
-
-    assert connection.adb_connect(wait_device=True)
-    assert connection.wait_calls == [("abcdef123456", [])]
+    with pytest.raises(RequestHumanTakeover):
+        connection.adb_connect()
     assert connection.adb_client.connect_calls == []
 
 
