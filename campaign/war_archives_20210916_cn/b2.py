@@ -1,7 +1,7 @@
 from module.map.map_base import CampaignMap
 
+from ..campaign_war_archives.campaign_base import CampaignBase
 from .b1 import Config as ConfigBase
-from .campaign_base import CampaignBase
 
 MAP = CampaignMap("B2")
 MAP.shape = "J8"
@@ -147,7 +147,6 @@ class Config(ConfigBase):
 
 class Campaign(CampaignBase):
     MAP = MAP
-    MACHINE_FORTRESS = (I7,)
 
     def battle_0(self):
         if self.clear_siren():

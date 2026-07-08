@@ -2,7 +2,7 @@ from typing import ClassVar
 
 from module.map.map_base import CampaignMap
 
-from .campaign_base import CampaignBase
+from ..campaign_war_archives.campaign_base import CampaignBase
 
 MAP = CampaignMap("A1")
 MAP.shape = "H7"

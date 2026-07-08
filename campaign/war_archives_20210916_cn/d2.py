@@ -1,6 +1,6 @@
 from module.map.map_base import CampaignMap
 
-from .campaign_base import CampaignBase
+from ..campaign_war_archives.campaign_base import CampaignBase
 from .d1 import Config as ConfigBase
 
 MAP = CampaignMap("D2")

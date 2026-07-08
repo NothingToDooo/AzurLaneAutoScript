@@ -1,7 +1,7 @@
 from module.map.map_base import CampaignMap
 
+from ..campaign_war_archives.campaign_base import CampaignBase
 from .b1 import Config as ConfigBase
-from .campaign_base import CampaignBase
 
 MAP = CampaignMap("B3")
 MAP.shape = "I9"
