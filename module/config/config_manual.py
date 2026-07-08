@@ -148,15 +148,7 @@ class ManualConfig:
 
     POOR_MAP_DATA = False
     # 将地图格子距离转换为滑动距离。
-    # 常见范围在 1/0.62 到 1/0.61，不同地图可能不同。
-    # 2023.05.25 之前
-    # MAP_SWIPE_MULTIPLY = 1.626
-    # MAP_SWIPE_MULTIPLY_MINITOUCH = 1.572
-    # MAP_SWIPE_MULTIPLY_MINITOUCH = 1.525
-    # 2023.05.25，适配 14-1 滑动。
-    # MAP_SWIPE_MULTIPLY = (1.006, 1.025)
-    # MAP_SWIPE_MULTIPLY_MINITOUCH = (0.973, 0.991)
-    # 2023.05.25，换算到 7-2 基准。
+    # 当前数值按 7-2 基准换算。
     MAP_SWIPE_MULTIPLY = (1.064, 1.084)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.029, 1.048)
     # Swipe distance in map grid lower than this will be dropped,
@@ -195,7 +187,7 @@ class ManualConfig:
     """
     HOMO_TILE = (140, 140)
     HOMO_CENTER_OFFSET = (48, 48)
-    # [upper-left, upper-right, bottom-left, bottom-right]
+    # 四角顺序为左上、右上、左下、右下。
     HOMO_CORNER_OFFSET_LIST: ClassVar[tuple[tuple[int, int], ...]] = (
         (-42, -42),
         (68, -42),
@@ -212,7 +204,7 @@ class ManualConfig:
     HOMO_EDGE_DETECT = True
     HOMO_EDGE_HOUGHLINES_THRESHOLD = 180
     HOMO_EDGE_COLOR_RANGE = (0, 33)
-    # ((x, y), [upper-left, upper-right, bottom-left, bottom-right])
+    # 格式为中心点和四角点列表，四角顺序为左上、右上、左下、右下。
     HOMO_STORAGE = None
 
     """
@@ -230,7 +222,6 @@ class ManualConfig:
         "height": (255 - 33, 255),
         "prominence": 10,
         "distance": 50,
-        # 'width': (0, 7),
         "wlen": 1000,
     }
     # Parameters for cv2.HoughLines
@@ -333,14 +324,12 @@ class ManualConfig:
     OS_GLOBE_IMAGE_RESIZE = 0.5
     OS_GLOBE_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": 100,
-        # 'width': (0.9, 5),
         "prominence": 20,
         "distance": 35,
         "wlen": 500,
     }
     OS_LOCAL_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": 50,
-        # 'width': (0.9, 5),
         "prominence": 20,
         "distance": 35,
         "wlen": 500,
