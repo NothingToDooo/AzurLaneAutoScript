@@ -125,7 +125,7 @@ class OSShopUI(UI):
         p1, p2 = random_rectangle_vector(
             direction_vector, box=detection_area, random_range=(-10, -40, 10, 40), padding=10
         )
-        self.device.drag(p1, p2, segments=2, shake=(25, 0), point_random=(0, 0, 0, 0), shake_random=(-5, 0, 5, 0))
+        self.device.drag(p1, p2, point_random=(0, 0, 0, 0))
         self.device.click(OS_SHOP_SAFE_AREA)
         self.device.screenshot()
 

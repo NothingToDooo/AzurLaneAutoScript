@@ -112,12 +112,7 @@ class Control(Minitouch, NemuIpc):
         self,
         p1,
         p2,
-        segments=1,
-        shake=(0, 15),
         point_random=(-10, -10, 10, 10),
-        shake_random=(-5, -5, 5, 5),
-        swipe_duration=0.25,
-        shake_duration=0.1,
         name="DRAG",
     ):
         self.handle_control_check(name)

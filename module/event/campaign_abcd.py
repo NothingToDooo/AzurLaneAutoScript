@@ -8,7 +8,7 @@ from module.logger import logger
 
 
 class CampaignABCD(EventBase):
-    def run(self, *args, **kwargs):
+    def run(self):
         # Filter map files
         stages = [EventStage(file.name) for file in Path(f"./campaign/{self.config.Campaign_Event}").iterdir()]
         stages = self.convert_stages(stages)

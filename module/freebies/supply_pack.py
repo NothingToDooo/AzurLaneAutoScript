@@ -67,13 +67,13 @@ class SupplyPack(CampaignStatus):
         logger.info(f"Supply pack buy finished, executed={executed}")
         return executed
 
-    def goto_supply_pack(self, skip_first_screenshot=True):
+    def goto_supply_pack(self):
         """
-        Pages:
-            in: page_shop
-            out: page_supply_pack, supply pack tab
+        页面：
+            进入：page_shop
+            退出：page_supply_pack，补给包页签。
         """
-        self.ui_goto(page_supply_pack, skip_first_screenshot=skip_first_screenshot)
+        self.ui_goto(page_supply_pack)
 
     def run(self):
         """
@@ -123,11 +123,11 @@ class SupplyPack_250814(SupplyPack):
 
         return amount
 
-    def goto_supply_pack(self, skip_first_screenshot=True):
+    def goto_supply_pack(self):
         """
-        Pages:
-            in: page_shop
-            out: page_supply_pack, supply pack tab
+        页面：
+            进入：page_shop
+            退出：page_supply_pack，补给包页签。
         """
         logger.info("Goto supply pack")
         for _ in self.loop():

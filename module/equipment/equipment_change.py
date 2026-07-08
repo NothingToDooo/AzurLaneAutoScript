@@ -121,7 +121,7 @@ class EquipmentChange(Equipment):
     def _equipment_swipe(self, distance=190):
         # 两个委托之间的距离是 146px。
         p1, p2 = random_rectangle_vector((0, -distance), box=(620, 67, 1154, 692), random_range=(-20, -5, 20, 5))
-        self.device.drag(p1, p2, segments=2, shake=(25, 0), point_random=(0, 0, 0, 0), shake_random=(-5, 0, 5, 0))
+        self.device.drag(p1, p2, point_random=(0, 0, 0, 0))
         self.device.sleep(0.3)
         self.device.screenshot()
 
@@ -129,7 +129,7 @@ class EquipmentChange(Equipment):
     def _equipment_swipe(self, distance=300):
         # 两个委托之间的距离是 146px。
         p1, p2 = random_rectangle_vector((0, -distance), box=(620, 67, 1154, 692), random_range=(-20, -5, 20, 5))
-        self.device.drag(p1, p2, segments=2, shake=(25, 0), point_random=(0, 0, 0, 0), shake_random=(-5, 0, 5, 0))
+        self.device.drag(p1, p2, point_random=(0, 0, 0, 0))
         self.device.sleep(0.3)
         self.device.screenshot()
 

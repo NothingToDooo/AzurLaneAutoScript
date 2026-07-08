@@ -48,7 +48,7 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
 
         return False
 
-    def map_offensive_auto_search(self, skip_first_screenshot=True):
+    def map_offensive_auto_search(self):
         """
         Pages:
             in: in_map, MAP_OFFENSIVE
@@ -157,7 +157,7 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
 
         return checked
 
-    def _wait_until_in_map(self, skip_first_screenshot=True):
+    def _wait_until_in_map(self):
         """
         To handle a bug in Azur Lane game client.
         Auto search icon shows it's running but it's doing nothing
@@ -175,7 +175,7 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
                 logger.warning("Wait in_map after retirement timeout, assume it is in_map")
                 break
 
-    def auto_search_moving(self, skip_first_screenshot=True):
+    def auto_search_moving(self):
         """
         Pages:
             in: map

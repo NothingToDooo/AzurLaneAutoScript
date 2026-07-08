@@ -74,7 +74,7 @@ class NewYearChallenge(MinigameRun):
                 MINIGAME_SCROLL.set_bottom(main=self)
                 continue
 
-    def use_coin(self, skip_first_screenshot=True):
+    def use_coin(self):
         return self.use_coin_new_year_challenge(count=5)
 
     def play_game(self, skip_first_screenshot=True):

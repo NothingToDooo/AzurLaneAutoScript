@@ -18,14 +18,13 @@ class PQShopClerk(ShopClerk, PQShopUI):
             ]
         )
 
-    def shop_buy_execute(self, item, skip_first_screenshot=True):
+    def shop_buy_execute(self, item):
         """
         Args:
-            item: Item to check
-            skip_first_screenshot: bool
+            item: 要购买的商品。
 
         Returns:
-            None: exits appropriately therefore successful
+            None: 正常退出即表示购买成功。
         """
 
         # 确认购买前后需要等待的状态。

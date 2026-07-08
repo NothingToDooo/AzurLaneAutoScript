@@ -84,7 +84,7 @@ class MinigameRun(UI):
             out: page_game_room game_entrance
         """
 
-    def use_coin(self, skip_first_screenshot=True):
+    def use_coin(self):
         return False
 
     def play_game(self, skip_first_screenshot=True):

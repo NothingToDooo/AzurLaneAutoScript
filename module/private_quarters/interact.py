@@ -84,9 +84,7 @@ class PQInteract(UI):
                     random_range=(-10, -10, 10, 10),
                     padding=5,
                 )
-                self.device.drag(
-                    p1, p2, segments=2, shake=(0, 25), point_random=(0, 0, 0, 0), shake_random=(0, -5, 0, 5)
-                )
+                self.device.drag(p1, p2, point_random=(0, 0, 0, 0))
                 settle_timer.reset()
             else:
                 # 检查点不存在通常表示仍在对话中。
