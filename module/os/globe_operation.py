@@ -331,38 +331,58 @@ class GlobeOperation(ActionPointHandler):
             if self.is_in_globe():
                 break
 
-            if self.appear_then_click(os_assets.MAP_GOTO_GLOBE, offset=(200, 5), interval=5):
-                # 只是为了初始化 MAP_GOTO_GLOBE_FOG 的间隔计时器。
-                self.appear(os_assets.MAP_GOTO_GLOBE_FOG, interval=5)
-                self.interval_reset(os_assets.MAP_GOTO_GLOBE_FOG)
-                click_count += 1
-                if click_count >= 5:
-                    # 存在未领取区域探索奖励时，AL 不允许离开。
-                    logger.warning(
-                        "Unable to goto globe, there might be uncollected zone exploration rewards preventing exit"
-                    )
-                    raise RewardUncollectedError
-                continue
-            if self.appear_then_click(os_assets.MAP_GOTO_GLOBE_FOG, interval=5):
-                # 只会在据点遇到；即使地图内仍有探索奖励，AL 也不会阻止区域退出。
-                self.interval_reset(os_assets.MAP_GOTO_GLOBE)
-                continue
-            if self.handle_map_event():
-                continue
-            # 误入港口。
-            if self.appear(PORT_CHECK, offset=(20, 20), interval=5):
-                logger.info(f"Page switch: {PORT_CHECK} -> {BACK_ARROW}")
-                self.device.click(BACK_ARROW)
-                continue
-            # 弹窗：AUTO_SEARCH_REWARD 出现较慢。
-            if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=5):
-                continue
-            # 弹窗：离开当前区域会终止指挥喵搜寻。
-            # 弹窗：离开当前区域会让潜艇撤退。
-            # 搜索奖励会在进入另一个区域后显示。
-            if self.handle_popup_confirm("GOTO_GLOBE"):
+            handled, click_count = self._os_map_goto_globe_handle_entry(click_count)
+            if handled:
                 continue
 
+        self._os_map_goto_globe_handle_pinned(unpin=unpin)
+
+    def _os_map_goto_globe_handle_entry(self, click_count):
+        handled, click_count = self._os_map_goto_globe_click_button(click_count)
+        if handled:
+            return True, click_count
+        if self._os_map_goto_globe_click_fog():
+            return True, click_count
+        if self._os_map_goto_globe_handle_popup():
+            return True, click_count
+        return False, click_count
+
+    def _os_map_goto_globe_click_button(self, click_count):
+        if not self.appear_then_click(os_assets.MAP_GOTO_GLOBE, offset=(200, 5), interval=5):
+            return False, click_count
+
+        # 只是为了初始化 MAP_GOTO_GLOBE_FOG 的间隔计时器。
+        self.appear(os_assets.MAP_GOTO_GLOBE_FOG, interval=5)
+        self.interval_reset(os_assets.MAP_GOTO_GLOBE_FOG)
+        click_count += 1
+        if click_count >= 5:
+            # 存在未领取区域探索奖励时，AL 不允许离开。
+            logger.warning("Unable to goto globe, there might be uncollected zone exploration rewards preventing exit")
+            raise RewardUncollectedError
+        return True, click_count
+
+    def _os_map_goto_globe_click_fog(self):
+        if self.appear_then_click(os_assets.MAP_GOTO_GLOBE_FOG, interval=5):
+            # 只会在据点遇到；即使地图内仍有探索奖励，AL 也不会阻止区域退出。
+            self.interval_reset(os_assets.MAP_GOTO_GLOBE)
+            return True
+        return False
+
+    def _os_map_goto_globe_handle_popup(self):
+        if self.handle_map_event():
+            return True
+        # 误入港口。
+        if self.appear(PORT_CHECK, offset=(20, 20), interval=5):
+            logger.info(f"Page switch: {PORT_CHECK} -> {BACK_ARROW}")
+            self.device.click(BACK_ARROW)
+            return True
+        # 弹窗：AUTO_SEARCH_REWARD 出现较慢。
+        if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=5):
+            return True
+        # 离开当前区域时，猫指挥搜索和潜艇可能被终止；搜索奖励会在进入新区后出现。
+        return self.handle_popup_confirm("GOTO_GLOBE")
+
+    def _os_map_goto_globe_handle_pinned(self, *, unpin):
         confirm_timer = Timer(1, count=2).start()
         unpinned = 0
         for _ in self.loop():
