@@ -26,48 +26,65 @@ class Equipment(StorageHandler):
         # 跳过 match() 里的 ensure_template()，让截图对比只判断舰船是否真的变化。
         equipment_assets.SWIPE_CHECK.mark_match_initialized()
         while 1:
-            if not swipe_timer.started() or swipe_timer.reached():
-                swipe_timer.reset()
-                self.device.swipe_vector(
-                    vector=(distance, 0),
-                    box=equipment_assets.SWIPE_AREA.area,
-                    random_range=SWIPE_RANDOM_RANGE,
-                    padding=0,
-                    duration=(0.1, 0.12),
-                    name="SHIP_SWIPE",
-                )
-                # self.wait_until_appear(check_button, offset=(30, 30))
-                skip_first_screenshot = True
-                while 1:
-                    if skip_first_screenshot:
-                        skip_first_screenshot = False
-                    else:
-                        self.device.screenshot()
-                    if self.appear(check_button, offset=(30, 30)):
-                        break
-                    if self.appear(RETIRE_EQUIP_CONFIRM, offset=(30, 30)):
-                        logger.info("RETIRE_EQUIP_CONFIRM popup in _ship_view_swipe()")
-                        return False
-                    # 强化 NPC 舰船时可能出现确认弹窗。
-                    if self.handle_popup_confirm("SHIP_VIEW_SWIPE"):
-                        continue
+            if self._ship_view_should_swipe(swipe_timer):
+                if not self._ship_view_swipe_once(distance, check_button, swipe_timer):
+                    return False
                 swipe_count += 1
 
             self.device.screenshot()
+            result = self._ship_view_swipe_result(check_button, swipe_count)
+            if result is not None:
+                return result
 
+        return False
+
+    @staticmethod
+    def _ship_view_should_swipe(swipe_timer):
+        return not swipe_timer.started() or swipe_timer.reached()
+
+    def _ship_view_swipe_once(self, distance, check_button, swipe_timer):
+        swipe_timer.reset()
+        self.device.swipe_vector(
+            vector=(distance, 0),
+            box=equipment_assets.SWIPE_AREA.area,
+            random_range=SWIPE_RANDOM_RANGE,
+            padding=0,
+            duration=(0.1, 0.12),
+            name="SHIP_SWIPE",
+        )
+        return self._ship_view_wait_after_swipe(check_button)
+
+    def _ship_view_wait_after_swipe(self, check_button):
+        skip_first_screenshot = True
+        while 1:
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
+            if self.appear(check_button, offset=(30, 30)):
+                return True
             if self.appear(RETIRE_EQUIP_CONFIRM, offset=(30, 30)):
                 logger.info("RETIRE_EQUIP_CONFIRM popup in _ship_view_swipe()")
                 return False
-            if equipment_assets.SWIPE_CHECK.match(self.device.image):
-                if swipe_count > 1:
-                    logger.info("Same ship on multiple swipes")
-                    return False
+            # 强化 NPC 舰船时可能出现确认弹窗。
+            if self.handle_popup_confirm("SHIP_VIEW_SWIPE"):
                 continue
-
-            if self.appear(check_button, offset=(30, 30)) and not equipment_assets.SWIPE_CHECK.match(self.device.image):
-                logger.info("New ship detected on swipe")
-                return True
         return False
+
+    def _ship_view_swipe_result(self, check_button, swipe_count):
+        if self.appear(RETIRE_EQUIP_CONFIRM, offset=(30, 30)):
+            logger.info("RETIRE_EQUIP_CONFIRM popup in _ship_view_swipe()")
+            return False
+        if equipment_assets.SWIPE_CHECK.match(self.device.image):
+            if swipe_count > 1:
+                logger.info("Same ship on multiple swipes")
+                return False
+            return None
+
+        if self.appear(check_button, offset=(30, 30)) and not equipment_assets.SWIPE_CHECK.match(self.device.image):
+            logger.info("New ship detected on swipe")
+            return True
+        return None
 
     def ship_view_next(self, check_button=equipment_assets.EQUIPMENT_OPEN):
         return self._ship_view_swipe(distance=-SWIPE_DISTANCE, check_button=check_button)
