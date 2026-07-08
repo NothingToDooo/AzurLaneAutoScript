@@ -196,7 +196,7 @@ class Book:
         return np.mean(im) > 127
 
     def __str__(self):
-        # Example: Red_T3_Exp
+        # 字符串示例为 Red_T3_Exp。
         text = f"{self.genre_str}_{self.tier_str}"
         if self.exp:
             text += "_Exp"
@@ -695,11 +695,7 @@ class RewardTacticalClass(Dock):
             logger.info("Dock is empty or favorite ships is empty")
             return False
 
-        # Ship cards may slow to show, like:
-        # [0, 0, 120, 120, 120, 120, 0, 0, 0, 0, 0, 0, 0, 0]
-        # [12, 0, 0, 120, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        # Wait until they turn into
-        # [120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120]
+        # 舰船卡片加载较慢，等待等级 OCR 区域从零散亮块变为整行稳定亮块。
         level_ocr = LevelOcr(CARD_LEVEL_GRIDS.buttons, name="DOCK_LEVEL_OCR", threshold=64)
         list_level = []
         for _ in self.loop(timeout=1):

@@ -275,7 +275,6 @@ class GuildOperations(GuildBase):
                 direction_vector, box=detection_area, random_range=(-50, -50, 50, 50), padding=20
             )
             self.device.drag(p1, p2, point_random=(0, 0, 0, 0))
-            # self.device.sleep(0.3)
 
         logger.warning("Failed to find active operation dispatch")
         return False

@@ -170,7 +170,6 @@ class GlobeCamera(GlobeOperation, ZoneManager):
             sight (tuple):
         """
         zone = self.name_to_zone(zone)
-        # logger.info(f'Globe in_sight: {zone}')
 
         while 1:
             if point_in_area(self.globe2screen([zone.location])[0], area=sight):

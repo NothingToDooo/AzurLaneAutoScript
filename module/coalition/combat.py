@@ -33,13 +33,13 @@ class CoalitionCombat(CoalitionUI, CampaignBase):
                 raise CampaignEnd
 
             if self.appear_then_click(BATTLE_STATUS, offset=(80, 20), interval=2):
-                # About (+53, +3)
+                # 点击区域相对原按钮略微右下偏移。
                 continue
             if self.appear_then_click(COALITION_REWARD_CONFIRM, offset=(20, 20), interval=2):
-                # Stop clicking BATTLE_STATUS because combat ends
+                # 战斗已结束，停止继续点击 BATTLE_STATUS。
                 status_clicked = False
                 continue
-            # Coalition 20251120 has ship drop
+            # 2025-11-20 联合作战会掉落舰船。
             if self.handle_get_ship():
                 continue
             if self.handle_battle_status():

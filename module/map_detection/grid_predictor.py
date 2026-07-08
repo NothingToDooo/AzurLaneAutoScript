@@ -95,7 +95,6 @@ class GridPredictor:
         if self.config.MAP_HAS_MYSTERY:
             self.is_mystery = self.predict_mystery()
         self.is_current_fleet = self.predict_current_fleet()
-        # self.is_caught_by_siren = self.predict_caught_by_siren()
 
         if self.config.MAP_HAS_MISSILE_ATTACK and self.predict_missile_attack():
             self.is_missile_attack = True
@@ -103,8 +102,6 @@ class GridPredictor:
             self.is_enemy = True
         if self.enemy_scale:
             self.is_enemy = True
-        # if not self.is_enemy:
-        #     self.is_enemy = self.predict_static_red_border()
         if self.is_enemy and not self.enemy_genre:
             self.enemy_genre = "Enemy"
         if self.config.MAP_HAS_SIREN and self.enemy_genre is not None and self.enemy_genre.startswith("Siren"):
@@ -321,8 +318,6 @@ class GridPredictor:
         return template_assets.TEMPLATE_MOB_MOVE_ICON.match(image)
 
     def predict_air_strike_icon(self):
-        # area = area_pad((0, 0, 140, 140), pad=5)
-        # image = color_similarity_2d(crop(self.image_trans, area=area, copy=False), color=(255, 255, 160))
         image = color_similarity_2d(self.image_trans, color=(255, 255, 160))
         cv2.threshold(image, 175, 255, cv2.THRESH_BINARY, dst=image)
         return template_assets.TEMPLATE_AIR_STRIKE_ICON.match(image, similarity=0.7)

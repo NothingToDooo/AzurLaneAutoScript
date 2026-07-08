@@ -57,10 +57,9 @@ class OpsiMonthBoss(OSMap):
                 logger.info("Adaptability is lower than suppression level, get stronger and come back")
                 self.config.task_delay(server_update=True)
                 self.config.task_stop()
-            # No need to exit, reuse
-            # self.os_globe_goto_map()
+            # 不需要退出地图，直接复用当前页面。
 
-        # combat
+        # 战斗。
         logger.hr("Month Boss goto", level=2)
         self.globe_goto(154)
         self.go_month_boss_room(is_normal=is_normal)

@@ -156,12 +156,6 @@ def match_movable(before, spawn, after, fleets, fleet_step=2):
     distance[before_len:, :] += encourage_weight
     distance[:, after_len:] += encourage_weight
     distance = np.maximum(distance, base_weight)
-    # print(distance)
-    # [[-100    1    1    0 -100]
-    #  [-100 -100    1    0 -100]
-    #  [-100 -100    0    1 -100]
-    #  [-100 -100 -100 -100    1]
-    #  [-100 -100 -100 -100 -100]]
 
     permutations = [[]]
     for row in distance:

@@ -112,11 +112,10 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         # MAP_EXIT
         if self.is_in_special_zone():
             self.map_exit()
-        # IN_MAP
+        # 当前在地图内。
         if self.is_in_map():
             self.os_map_goto_globe()
-        # IN_GLOBE
-        # self.ensure_no_zone_pinned()
+        # 当前在大世界总览。
         self.globe_update()
         self.globe_focus_to(zone)
         if stop_if_safe and self.zone_has_safe():
@@ -125,11 +124,10 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             return False
         self.zone_type_select(types=types)
         self.globe_enter(zone)
-        # IN_MAP
+        # 回到地图内。
         if hasattr(self, "zone"):
             del self.zone
         self.zone_init()
-        # self.map_init()
         return True
 
     def os_map_goto_globe(self, *args, **kwargs):

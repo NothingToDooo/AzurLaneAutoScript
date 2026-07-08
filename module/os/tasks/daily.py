@@ -58,11 +58,9 @@ class OpsiDaily(OSMap):
         return count
 
     def os_daily(self):
-        # Finish existing missions first
-        # No need anymore, os_mission_overview_accept() is able to handle
-        # self.os_finish_daily_mission()
+        # os_mission_overview_accept() 已经能处理旧任务，不需要先完成已有任务。
 
-        # Clear tuning samples daily
+        # 每日清理调适样本。
         if self.config.OpsiDaily_UseTuningSample:
             self.tuning_sample_use()
 

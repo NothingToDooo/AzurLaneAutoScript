@@ -222,9 +222,7 @@ class Exercise(ExerciseCombat):
                 logger.info("New opponent exhausted")
                 break
 
-        # self.equipment_take_off_when_finished()
-
-        # Scheduler
+        # 调度。
         with self.config.multi_set():
             self.config.set_record(Exercise_OpponentRefreshValue=self.opponent_change_count)
             if self.remain <= self.preserve or self.opponent_change_count >= 5:

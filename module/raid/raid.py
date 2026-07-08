@@ -263,8 +263,6 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
         # Raid 战斗复用普通战斗入口，但不执行普通战斗的血量平衡。
         del balance_hp
         # 不需要等待，raid_execute_once() 已经处理过。
-        # if emotion_reduce:
-        #     self.emotion.wait(fleet_index)
 
         checked = False
         for _ in self.loop():

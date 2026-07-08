@@ -49,8 +49,7 @@ class CampaignHard(CampaignRun):
             self.campaign.run()
 
         self.campaign.ensure_auto_search_exit()
-        # self.campaign.equipment_take_off_when_finished()
 
-        # Scheduler
+        # 调度。
         self.config.task_delay(server_update=True)
         self.config.task_call("Reward")

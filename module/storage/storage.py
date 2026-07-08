@@ -491,7 +491,6 @@ class StorageHandler(StorageUI):
         logger.hr("Disassemble Equipment", level=2)
         self.ui_goto_storage()
         # 不需要切换装备中开关，它不影响拆解。
-        # self.equipping_set()
         # 也不需要单独等待仓库稳定，筛选确认会处理。
         disassembled = 0
         while 1:

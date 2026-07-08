@@ -142,8 +142,6 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
             in: is_in_map
             out: is_in_map
         """
-        # backup = self.config.cover(OS_ACTION_POINT_PRESERVE=0, OS_ACTION_POINT_BOX_USE=True)
-
         if recon_scan:
             recon_scan = self.order_execute(os_assets.ORDER_SCAN)
         if submarine_call:
@@ -152,8 +150,6 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
                 self.wait_until_order_finished()
 
         self.config.opsi_task_delay(recon_scan=recon_scan, submarine_call=submarine_call)
-
-        # backup.recover()
 
     def handle_map_cat_attack(self):
         """

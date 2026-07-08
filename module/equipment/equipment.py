@@ -200,8 +200,6 @@ class Equipment(StorageHandler):
                 self.device.screenshot()
 
             # 已脱下至少一件装备。
-            # if self.handle_info_bar():
-            #     break
             if off_timer.started() and self.info_bar_count():
                 break
 
@@ -269,14 +267,11 @@ class Equipment(StorageHandler):
                 self.device.screenshot()
 
             # 已穿上一件装备。
-            # if self.handle_info_bar():
-            #     break
             if on_timer.started() and self.info_bar_count():
                 break
 
             if bar_timer.reached() and not self.appear(equipment_assets.EQUIP_1, offset=10):
                 self.device.click(equipment_assets.EQUIPMENT_OPEN)
-                # self.device.sleep(0.3)
                 bar_timer.reset()
                 continue
 

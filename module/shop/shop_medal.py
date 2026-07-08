@@ -115,7 +115,6 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
         Returns:
             ButtonGrid:
         """
-        # (472, 348, 1170, 648)
         medals = self._get_medals()
         count = len(medals)
         if count == 0:
@@ -143,9 +142,6 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
             row = 2
 
         # 按新版 UI 补出商品网格。
-        # 原始网格为：
-        # shop_grid = ButtonGrid(
-        #     origin=(476, 246), delta=(156, 213), button_shape=(98, 98), grid_shape=(5, 2), name='SHOP_GRID')
         return ButtonGrid(
             origin=(265, origin_y), delta=(169, delta_y), button_shape=(64, 64), grid_shape=(5, row), name="SHOP_GRID"
         )

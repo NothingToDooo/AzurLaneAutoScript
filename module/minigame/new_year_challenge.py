@@ -95,7 +95,6 @@ class NewYearChallenge(MinigameRun):
             # 一轮选择。
             if self.appear(minigame_assets.NEW_YEAR_CHALLENGE_CHOOSING, offset=(5, 5), interval=3):
                 # 点时钟会被误判为两个按钮之间点击过多，所以这里只执行颜色选择。
-                # self.device.click(minigame_assets.NEW_YEAR_CHALLENGE_CHOOSING)
                 self.new_year_challenge_turn(skip_first_screenshot=False)
                 self.device.click_record_clear()
                 continue

@@ -32,8 +32,6 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
                 self.device.screenshot()
 
             if self.appear(BATTLE_PREPARATION, offset=(20, 20), interval=2):
-                # self.equipment_take_on()
-
                 self.device.click(BATTLE_PREPARATION)
                 continue
 
@@ -197,7 +195,6 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
                 opponent_timer.reset()
 
             if preparation_timer.reached() and self.appear_then_click(EXERCISE_PREPARATION):
-                # self.device.sleep(0.3)
                 preparation_timer.reset()
                 opponent_timer.reset()
                 continue

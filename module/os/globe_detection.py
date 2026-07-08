@@ -85,8 +85,6 @@ class GlobeDetection:
             np.ndarray: Image in monochrome, map borders in white, others in black.
         """
         r, g, b = cv2.split(image)
-        # b = cv2.add(cv2.multiply(g, 0.6), cv2.multiply(b, 0.4))
-        # image = cv2.subtract(b, r)
         cv2.convertScaleAbs(g, alpha=0.6, dst=g)
         cv2.convertScaleAbs(b, alpha=0.4, dst=b)
         cv2.add(g, b, dst=b)

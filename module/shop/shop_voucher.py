@@ -120,9 +120,6 @@ class VoucherShop(ShopClerk, ShopStatus):
             row = 2
 
         # 按新版 UI 补出商品网格。
-        # 原始网格为：
-        # shop_grid = ButtonGrid(
-        #     origin=(463, 200), delta=(156, 191), button_shape=(99, 99), grid_shape=(5, 2), name='SHOP_GRID')
         return ButtonGrid(
             origin=(305, origin_y),
             delta=(189.5, delta_y),

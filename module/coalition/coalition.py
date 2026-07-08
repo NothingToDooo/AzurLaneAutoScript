@@ -18,7 +18,7 @@ class AcademyPtOcr(Digit):
     def after_process(self, result):
         logger.attr(self.name, result)
         with suppress(IndexError):
-            # 累计: 840
+            # OCR 文本会包含“累计”前缀。
             result = result.rsplit(":")[1]
         return super().after_process(result)
 
