@@ -4,7 +4,7 @@ import pytest
 
 from module.os import assets as os_assets
 from module.os import globe_operation as globe_operation_module
-from module.os.globe_operation import GlobeOperation, RewardUncollectedError
+from module.os.globe_operation import GlobeOperation, OSExploreError, RewardUncollectedError
 
 _T = TypeVar("_T")
 
@@ -17,6 +17,7 @@ class _Timer:
     next_index: ClassVar[int] = 0
     reached_results: ClassVar[dict[int, list[bool]]] = {}
     reset_count: ClassVar[int] = 0
+    clear_count: ClassVar[int] = 0
 
     def __init__(self, *_args: object, **_kwargs: object) -> None:
         self.index = _Timer.next_index
@@ -33,6 +34,10 @@ class _Timer:
 
     def reset(self) -> _Timer:
         _Timer.reset_count += 1
+        return self
+
+    def clear(self) -> _Timer:
+        _Timer.clear_count += 1
         return self
 
 
@@ -56,10 +61,12 @@ class _GlobeOperation(GlobeOperation):
         self.calls: list[tuple[object, ...]] = []
         self.loop_count = 10
         self.in_globe_results: list[bool] = []
+        self.in_map_results: list[bool] = []
         self.appear_then_click_results: dict[str, list[bool]] = {}
         self.appear_results: dict[str, list[bool]] = {}
         self.map_event_results: list[bool] = []
         self.popup_results: list[bool] = []
+        self.action_point_results: list[bool] = []
         self.handle_zone_pinned_results: list[bool] = []
         self.zone_pinned_results: list[bool] = []
         self.interval_resets: list[str] = []
@@ -69,6 +76,9 @@ class _GlobeOperation(GlobeOperation):
 
     def goto_globe(self, *, unpin: bool = True) -> None:
         self.os_map_goto_globe(unpin=unpin)
+
+    def enter_globe(self, zone: object) -> None:
+        self.globe_enter(zone)
 
     def _next_result(self, results: list[_T], *, default: _T) -> _T:
         if results:
@@ -101,6 +111,10 @@ class _GlobeOperation(GlobeOperation):
         self.calls.append(("is_in_globe",))
         return self._next_result(self.in_globe_results, default=False)
 
+    def is_in_map(self) -> bool:
+        self.calls.append(("is_in_map",))
+        return self._next_result(self.in_map_results, default=False)
+
     def appear_then_click(self, button: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear_then_click", key, kwargs))
@@ -124,6 +138,10 @@ class _GlobeOperation(GlobeOperation):
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 
+    def handle_action_point(self, **kwargs: object) -> bool:
+        self.calls.append(("handle_action_point", kwargs))
+        return self._next_result(self.action_point_results, default=False)
+
     def handle_zone_pinned(self) -> bool:
         self.calls.append(("handle_zone_pinned",))
         return self._next_result(self.handle_zone_pinned_results, default=False)
@@ -138,6 +156,7 @@ def _patch_timer(monkeypatch: pytest.MonkeyPatch) -> None:
     _Timer.next_index = 0
     _Timer.reached_results = {}
     _Timer.reset_count = 0
+    _Timer.clear_count = 0
     monkeypatch.setattr(globe_operation_module, "Timer", _Timer)
 
 
@@ -231,3 +250,47 @@ def test_os_map_goto_globe_can_keep_zone_pinned() -> None:
 
     assert ("is_zone_pinned",) in operation.calls
     assert ("handle_zone_pinned",) not in operation.calls
+
+
+def test_globe_enter_clicks_zone_entrance() -> None:
+    operation = _GlobeOperation()
+    operation.pinned_name = "SAFE"
+    operation.in_map_results = [False, True]
+    operation.zone_pinned_results = [True]
+    _Timer.reached_results = {0: [True]}
+
+    operation.enter_globe(zone="zone-1")
+
+    assert operation.device.clicks == [os_assets.ZONE_ENTRANCE]
+    assert _Timer.reset_count == 1
+
+
+def test_globe_enter_raises_when_zone_locked() -> None:
+    operation = _GlobeOperation()
+    operation.in_map_results = [False]
+    operation.zone_pinned_results = [True]
+    operation.appear_results[button_key(os_assets.ZONE_LOCKED)] = [True]
+
+    with pytest.raises(OSExploreError):
+        operation.enter_globe(zone="zone-1")
+
+    assert operation.device.clicks == []
+
+
+def test_globe_enter_clears_click_timer_after_action_point_handler() -> None:
+    operation = _GlobeOperation()
+    operation.pinned_name = "DANGEROUS"
+    operation.in_map_results = [False, True]
+    operation.zone_pinned_results = [False]
+    operation.action_point_results = [True]
+
+    operation.enter_globe(zone="zone-1")
+
+    assert _Timer.clear_count == 1
+    assert (
+        "handle_action_point",
+        {
+            "zone": "zone-1",
+            "pinned": "DANGEROUS",
+        },
+    ) in operation.calls

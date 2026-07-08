@@ -418,25 +418,35 @@ class GlobeOperation(ActionPointHandler):
             if self.is_in_map():
                 break
 
-            if self.is_zone_pinned():
-                if self.appear(os_assets.ZONE_LOCKED, offset=(20, 20)):
-                    logger.warning(f"Zone {zone} locked, neighbouring zones may not have been explored")
-                    raise OSExploreError
-                if click_count > 5:
-                    logger.warning(f"Unable to enter zone {zone}, neighbouring zones may not have been explored")
-                    raise OSExploreError
-                if click_timer.reached():
-                    self.device.click(os_assets.ZONE_ENTRANCE)
-                    click_count += 1
-                    click_timer.reset()
-                    continue
-            if self.handle_action_point(zone=zone, pinned=pinned):
-                click_timer.clear()
+            clicked, click_count = self._globe_enter_click_zone(zone, click_timer, click_count)
+            if clicked:
                 continue
-            if self.handle_map_event():
+            if self._globe_enter_handle_blocker(zone, pinned, click_timer):
                 continue
-            if self.handle_popup_confirm("GLOBE_ENTER"):
-                continue
-            # 游戏 bug：上一个已清理区域的 AUTO_SEARCH_REWARD 会弹出。
-            if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
-                continue
+
+    def _globe_enter_click_zone(self, zone, click_timer, click_count):
+        if not self.is_zone_pinned():
+            return False, click_count
+        if self.appear(os_assets.ZONE_LOCKED, offset=(20, 20)):
+            logger.warning(f"Zone {zone} locked, neighbouring zones may not have been explored")
+            raise OSExploreError
+        if click_count > 5:
+            logger.warning(f"Unable to enter zone {zone}, neighbouring zones may not have been explored")
+            raise OSExploreError
+        if not click_timer.reached():
+            return False, click_count
+
+        self.device.click(os_assets.ZONE_ENTRANCE)
+        click_timer.reset()
+        return True, click_count + 1
+
+    def _globe_enter_handle_blocker(self, zone, pinned, click_timer):
+        if self.handle_action_point(zone=zone, pinned=pinned):
+            click_timer.clear()
+            return True
+        if self.handle_map_event():
+            return True
+        if self.handle_popup_confirm("GLOBE_ENTER"):
+            return True
+        # 游戏 bug：上一个已清理区域的 AUTO_SEARCH_REWARD 会弹出。
+        return self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3)
