@@ -33,35 +33,30 @@ class OpsiExplore(OSMap):
                     logger.info(f"Delay task `{task}` to {next_run}")
                     self.config.cross_set(keys=keys, value=next_run)
 
-    def _os_explore(self):
-        """
-        Explore all dangerous zones at the beginning of month.
-        Failed zone id will be set to _os_explore_failed_zone
-        """
+    def _finish_os_explore(self):
+        logger.info("OS explore finished, delay to next reset")
+        next_reset = get_os_next_reset()
+        logger.attr("OpsiNextReset", next_reset)
+        logger.info("To run again, clear OpsiExplore.Scheduler.NextRun and set OpsiExplore.OpsiExplore.LastZone=0")
+        with self.config.multi_set():
+            self.config.OpsiExplore_LastZone = 0
+            self.config.OpsiExplore_SpecialRadar = False
+            self.config.task_delay(target=next_reset)
+            self.config.task_call("OpsiDaily", force_call=False)
+            self.config.task_call("OpsiShop", force_call=False)
+            self.config.task_call("OpsiHazard1Leveling", force_call=False)
+        self.config.task_stop()
 
-        def end():
-            logger.info("OS explore finished, delay to next reset")
-            next_reset = get_os_next_reset()
-            logger.attr("OpsiNextReset", next_reset)
-            logger.info("To run again, clear OpsiExplore.Scheduler.NextRun and set OpsiExplore.OpsiExplore.LastZone=0")
-            with self.config.multi_set():
-                self.config.OpsiExplore_LastZone = 0
-                self.config.OpsiExplore_SpecialRadar = False
-                self.config.task_delay(target=next_reset)
-                self.config.task_call("OpsiDaily", force_call=False)
-                self.config.task_call("OpsiShop", force_call=False)
-                self.config.task_call("OpsiHazard1Leveling", force_call=False)
-            self.config.task_stop()
-
-        logger.hr("OS explore", level=1)
-        order = [int(f.strip(" \t\r\n")) for f in self.config.OS_EXPLORE_FILTER.split(">")]
-        # Convert user input
+    def _last_os_explore_zone(self):
         try:
-            last_zone = self.name_to_zone(self.config.OpsiExplore_LastZone).zone_id
+            return self.name_to_zone(self.config.OpsiExplore_LastZone).zone_id
         except ScriptError:
             logger.warning(f"Invalid OpsiExplore_LastZone={self.config.OpsiExplore_LastZone}, re-explore")
-            last_zone = 0
-        # Start from last zone
+            return 0
+
+    def _os_explore_order(self):
+        order = [int(f.strip(" \t\r\n")) for f in self.config.OS_EXPLORE_FILTER.split(">")]
+        last_zone = self._last_os_explore_zone()
         if last_zone in order:
             order = order[order.index(last_zone) + 1 :]
             logger.info(f"Last zone: {self.name_to_zone(last_zone)}, next zone: {order[:1]}")
@@ -69,42 +64,57 @@ class OpsiExplore(OSMap):
             logger.info(f"First run, next zone: {order[:1]}")
         else:
             raise ScriptError(f"Invalid last_zone: {last_zone}")
-        if not len(order):
-            end()
+        return order
 
-        # Run
+    def _skip_cleared_os_explore_zone(self, zone):
+        if self.globe_goto(zone, stop_if_safe=True):
+            return False
+        logger.info(f"Zone cleared: {self.name_to_zone(zone)}")
+        self.config.OpsiExplore_LastZone = zone
+        return True
+
+    def _prepare_os_explore_zone(self):
+        if not self.config.OpsiExplore_SpecialRadar:
+            self.tuning_sample_use()
+        self.fleet_set(self.config.OpsiFleet_Fleet)
+        self.os_order_execute(
+            recon_scan=not self.config.OpsiExplore_SpecialRadar, submarine_call=self.config.OpsiFleet_Submarine
+        )
+        self._os_explore_task_delay()
+
+    def _run_os_explore_zone(self, zone):
+        logger.hr(f"OS explore {zone}", level=1)
+        self._prepare_os_explore_zone()
+
+        finished_combat = self.run_auto_search()
+        self.config.OpsiExplore_LastZone = zone
+        logger.info(f"Zone cleared: {self.name_to_zone(zone)}")
+        if finished_combat == 0:
+            logger.warning("Zone cleared but did not finish any combat")
+            self._os_explore_failed_zone.append(zone)
+        self.handle_after_auto_search()
+        self.config.check_task_switch()
+
+    def _os_explore(self):
+        """
+        Explore all dangerous zones at the beginning of month.
+        Failed zone id will be set to _os_explore_failed_zone
+        """
+        logger.hr("OS explore", level=1)
+        order = self._os_explore_order()
+        if not len(order):
+            self._finish_os_explore()
+            return
+
         self._os_explore_failed_zone = []
         for zone in order:
-            # Check if zone already unlock safe zone
-            if not self.globe_goto(zone, stop_if_safe=True):
-                logger.info(f"Zone cleared: {self.name_to_zone(zone)}")
-                self.config.OpsiExplore_LastZone = zone
+            if self._skip_cleared_os_explore_zone(zone):
                 continue
-
-            # Run zone
-            logger.hr(f"OS explore {zone}", level=1)
-            if not self.config.OpsiExplore_SpecialRadar:
-                # Special radar gives 90 turning samples,
-                # If no special radar, use the turning samples in storage to acquire stronger fleets.
-                self.tuning_sample_use()
-            self.fleet_set(self.config.OpsiFleet_Fleet)
-            self.os_order_execute(
-                recon_scan=not self.config.OpsiExplore_SpecialRadar, submarine_call=self.config.OpsiFleet_Submarine
-            )
-            self._os_explore_task_delay()
-
-            finished_combat = self.run_auto_search()
-            self.config.OpsiExplore_LastZone = zone
-            logger.info(f"Zone cleared: {self.name_to_zone(zone)}")
-            if finished_combat == 0:
-                logger.warning("Zone cleared but did not finish any combat")
-                self._os_explore_failed_zone.append(zone)
-            self.handle_after_auto_search()
-            self.config.check_task_switch()
+            self._run_os_explore_zone(zone)
 
             # Reached end
             if zone == order[-1]:
-                end()
+                self._finish_os_explore()
 
     def os_explore(self):
         for _ in range(2):
