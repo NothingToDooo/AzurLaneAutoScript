@@ -563,19 +563,12 @@ class ConfigGenerator:
         for task in EVENTS + GEMS_FARMINGS + WAR_ARCHIVES + RAIDS + COALITIONS:
             self._clean_campaign_event_options(task)
 
-    def insert_package(self):
-        option = deep_get(self.argument, keys="Emulator.PackageName.option")
-        option += list(VALID_PACKAGE.keys())
-        deep_set(self.argument, keys="Emulator.PackageName.option", value=option)
-        deep_set(self.args, keys="Alas.Emulator.PackageName.option", value=option)
-
     @timer
     def generate(self):
         _ = self.args
         _ = self.menu
         _ = self.event
         self.insert_event()
-        self.insert_package()
         write_file(filepath_args(), self.args)
         write_file(filepath_args("menu"), self.menu)
         self.generate_code()

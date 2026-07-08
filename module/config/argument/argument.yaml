@@ -26,7 +26,7 @@ Emulator:
     valuetype: str
   PackageName:
     value: auto
-    option: [ auto, ]
+    option: [ auto, com.bilibili.azurlane ]
   ScreenshotDedithering: false
   AdbRestart: false
 EmulatorInfo:
