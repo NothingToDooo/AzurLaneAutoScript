@@ -250,6 +250,52 @@ class CampaignMap:
         if bouncing_enemy:
             self._load_bouncing_enemy_data(self._bouncing_enemy_data)
 
+    def _init_grid_connection(self):
+        total = set(self.grids.keys())
+        for grid in self:
+            connection = set()
+            for dx, dy in ((0, -1), (0, 1), (-1, 0), (1, 0)):
+                arr = (grid.location[0] + dx, grid.location[1] + dy)
+                if arr in total:
+                    connection.add(arr)
+            self.grid_connection[grid.location] = connection
+
+    def _parse_wall_disconnects(self):
+        wall = []
+        for y, line in enumerate(filter(None, self._wall_data.splitlines())):
+            for x, letter in enumerate(line[4:-2]):
+                if letter != " ":
+                    wall.append((x, y))
+        if not wall:
+            return []
+
+        wall = np.array(wall)
+        vert = wall[np.all([wall[:, 0] % 4 == 2, wall[:, 1] % 2 == 0], axis=0)]
+        hori = wall[np.all([wall[:, 0] % 4 == 0, wall[:, 1] % 2 == 1], axis=0)]
+        disconnect = []
+        disconnect.extend([loca, np.add(loca, (1, 0))] for loca in (vert - (2, 0)) // (4, 2))
+        disconnect.extend([loca, np.add(loca, (0, 1))] for loca in (hori - (0, 1)) // (4, 2))
+        return disconnect
+
+    def _apply_wall_connections(self):
+        for raw_g1, raw_g2 in self._parse_wall_disconnects():
+            g1 = tuple(raw_g1.tolist())
+            g2 = tuple(raw_g2.tolist())
+            self.grid_connection[g1].remove(g2)
+            self.grid_connection[g2].remove(g1)
+
+    def _apply_portal_connections(self, portal):
+        for start, end in self._portal_data:
+            if portal:
+                self.grid_connection[start].add(end)
+                self[start].is_portal = True
+                self[start].portal_link = end
+                continue
+            if end in self.grid_connection[start]:
+                self.grid_connection[start].remove(end)
+            self[start].is_portal = False
+            self[start].portal_link = None
+
     def grid_connection_initial(self, wall=False, portal=False):
         """
         Args:
@@ -261,46 +307,10 @@ class CampaignMap:
         """
         logger.info(f"grid_connection: wall={wall}, portal={portal}")
 
-        # 生成格子连接。
-        total = set(self.grids.keys())
-        for grid in self:
-            connection = set()
-            for offset in np.array([(0, -1), (0, 1), (-1, 0), (1, 0)]):
-                arr = tuple(offset + grid.location)
-                if arr in total:
-                    connection.add(arr)
-            self.grid_connection[grid.location] = connection
-
-        # 使用 wall_data 删除连接。
+        self._init_grid_connection()
         if wall and self._wall_data:
-            wall = []
-            for y, line in enumerate(filter(None, self._wall_data.splitlines())):
-                for x, letter in enumerate(line[4:-2]):
-                    if letter != " ":
-                        wall.append((x, y))
-            wall = np.array(wall)
-            vert = wall[np.all([wall[:, 0] % 4 == 2, wall[:, 1] % 2 == 0], axis=0)]
-            hori = wall[np.all([wall[:, 0] % 4 == 0, wall[:, 1] % 2 == 1], axis=0)]
-            disconnect = []
-            disconnect.extend([loca, np.add(loca, (1, 0))] for loca in (vert - (2, 0)) // (4, 2))
-            disconnect.extend([loca, np.add(loca, (0, 1))] for loca in (hori - (0, 1)) // (4, 2))
-            for raw_g1, raw_g2 in disconnect:
-                g1 = tuple(raw_g1.tolist())
-                g2 = tuple(raw_g2.tolist())
-                self.grid_connection[g1].remove(g2)
-                self.grid_connection[g2].remove(g1)
-
-        # Create portal link
-        for start, end in self._portal_data:
-            if portal:
-                self.grid_connection[start].add(end)
-                self[start].is_portal = True
-                self[start].portal_link = end
-            else:
-                if end in self.grid_connection[start]:
-                    self.grid_connection[start].remove(end)
-                self[start].is_portal = False
-                self[start].portal_link = None
+            self._apply_wall_connections()
+        self._apply_portal_connections(portal)
 
         return True
 
@@ -547,6 +557,30 @@ class CampaignMap:
             )
             logger.info(text)
 
+    def _reset_path_costs(self, start_location):
+        for grid in self:
+            grid.cost = 9999
+            grid.connection = None
+        start = self[start_location]
+        start.cost = 0
+        return {start}
+
+    def _update_path_neighbor(self, grid, location, ambush_cost, has_enemy):
+        neighbor = self[location]
+        if neighbor.is_land or neighbor.is_mechanism_block:
+            return None
+
+        cost = ambush_cost if neighbor.may_ambush else 1
+        cost += grid.cost
+        if cost < neighbor.cost:
+            neighbor.cost = cost
+            neighbor.connection = grid.location
+        elif cost == neighbor.cost and abs(neighbor.location[0] - grid.location[0]) == 1:
+            neighbor.connection = grid.location
+        if neighbor.is_sea or not has_enemy:
+            return neighbor
+        return None
+
     def find_path_initial(self, location, has_ambush=True, has_enemy=True):
         """
         Args:
@@ -556,32 +590,15 @@ class CampaignMap:
         """
         location = location_ensure(location)
         ambush_cost = 10 if has_ambush else 1
-        for grid in self:
-            grid.cost = 9999
-            grid.connection = None
-        start = self[location]
-        start.cost = 0
-        visited = [start]
-        visited = set(visited)
+        visited = self._reset_path_costs(location)
 
         while 1:
             new = visited.copy()
             for grid in visited:
                 for location in self.grid_connection[grid.location]:
-                    arr = self[location]
-                    if arr.is_land or arr.is_mechanism_block:
-                        continue
-                    cost = ambush_cost if arr.may_ambush else 1
-                    cost += grid.cost
-
-                    if cost < arr.cost:
-                        arr.cost = cost
-                        arr.connection = grid.location
-                    elif cost == arr.cost:
-                        if abs(arr.location[0] - grid.location[0]) == 1:
-                            arr.connection = grid.location
-                    if arr.is_sea or not has_enemy:
-                        new.add(arr)
+                    neighbor = self._update_path_neighbor(grid, location, ambush_cost, has_enemy)
+                    if neighbor is not None:
+                        new.add(neighbor)
             if len(new) == len(visited):
                 break
             visited = new
@@ -640,6 +657,53 @@ class CampaignMap:
 
         return res
 
+    @staticmethod
+    def _append_avoid_indexes(index, route, base_indexes, inserted):
+        if (index > 1) and (index - 1 not in base_indexes):
+            inserted.append(index - 1)
+        if (index < len(route) - 2) and (index + 1 not in base_indexes):
+            inserted.append(index + 1)
+
+    def _turning_route_indexes(self, route):
+        res = []
+        diff = np.abs(np.diff(route, axis=0))
+        turning = np.diff(diff, axis=0)[:, 0]
+        indexes = np.where(turning == -1)[0] + 1
+        for index in indexes:
+            if not self[route[index]].is_fleet:
+                res.append(index)
+                continue
+
+            logger.info(f"Path_node_avoid: {self[route[index]]}")
+            self._append_avoid_indexes(index, route, indexes, res)
+        res.append(len(route) - 1)
+        return res
+
+    def _step_route_indexes(self, route, indexes, step):
+        indexes.insert(0, 0)
+        inserted = []
+        for left, right in pairwise(indexes):
+            for index in list(range(left, right, step))[1:]:
+                way_node = self[route[index]]
+                if way_node.is_fleet or way_node.is_portal or way_node.is_flare:
+                    logger.info(f"Path_node_avoid: {way_node}")
+                    self._append_avoid_indexes(index, route, indexes, inserted)
+                else:
+                    inserted.append(index)
+            inserted.append(right)
+        return inserted
+
+    def _route_node_indexes(self, route, step, turning_optimize):
+        if turning_optimize:
+            indexes = self._turning_route_indexes(route)
+            if step == 0:
+                return indexes
+        else:
+            if step == 0:
+                return [len(route) - 1]
+            indexes = [max(len(route) - 1, 0)]
+        return self._step_route_indexes(route, indexes, step)
+
     def _find_route_node(self, route, step=0, turning_optimize=False):
         """
         Args:
@@ -654,48 +718,7 @@ class CampaignMap:
             MAP_7_2._find_route_node([(2, 2), (3, 2), (4, 2), (5, 2), (6, 2), (6, 1), (7, 1)])
             [(6, 2), (7, 1)]
         """
-        if turning_optimize:
-            res = []
-            diff = np.abs(np.diff(route, axis=0))
-            turning = np.diff(diff, axis=0)[:, 0]
-            indexes = np.where(turning == -1)[0] + 1
-            for index in indexes:
-                if not self[route[index]].is_fleet:
-                    res.append(index)
-                else:
-                    logger.info(f"Path_node_avoid: {self[route[index]]}")
-                    if (index > 1) and (index - 1 not in indexes):
-                        res.append(index - 1)
-                    if (index < len(route) - 2) and (index + 1 not in indexes):
-                        res.append(index + 1)
-            res.append(len(route) - 1)
-            # res = [4, 6]
-            if step == 0:
-                return [route[index] for index in res]
-        else:
-            if step == 0:
-                return [route[-1]]
-            # 最后一个节点的索引。
-            # res = [6]
-            res = [max(len(route) - 1, 0)]
-
-        res.insert(0, 0)
-        inserted = []
-        for left, right in pairwise(res):
-            for index in list(range(left, right, step))[1:]:
-                way_node = self[route[index]]
-                if way_node.is_fleet or way_node.is_portal or way_node.is_flare:
-                    logger.info(f"Path_node_avoid: {way_node}")
-                    if (index > 1) and (index - 1 not in res):
-                        inserted.append(index - 1)
-                    if (index < len(route) - 2) and (index + 1 not in res):
-                        inserted.append(index + 1)
-                else:
-                    inserted.append(index)
-            inserted.append(right)
-        res = inserted
-        # res = [3, 6, 8]
-        return [route[index] for index in res]
+        return [route[index] for index in self._route_node_indexes(route, step, turning_optimize)]
 
     def find_path(self, location, step=0, turning_optimize=False):
         location = location_ensure(location)
@@ -743,28 +766,27 @@ class CampaignMap:
         covered = [self[upper] for upper in covered if upper in self]
         return SelectedGrids(covered)
 
-    def missing_get(self, battle_count, mystery_count=0, siren_count=0, carrier_count=0, mode="normal"):
+    def _get_spawn_missing(self, battle_count):
         try:
-            missing = self.spawn_data_stack[battle_count].copy()
+            return self.spawn_data_stack[battle_count].copy()
         except IndexError:
-            missing = self.spawn_data_stack[-1].copy()
-        may = {"enemy": 0, "mystery": 0, "siren": 0, "boss": 0, "carrier": 0}
-        missing["enemy"] -= battle_count - siren_count
-        missing["mystery"] -= mystery_count
-        missing["siren"] -= siren_count
-        missing["carrier"] = (
-            carrier_count - self.select(is_enemy=True, may_enemy=False).count if mode == "carrier" else 0
-        )
+            return self.spawn_data_stack[-1].copy()
+
+    def _apply_seen_grid_missing(self, missing):
         for grid in self:
             for attr in ["enemy", "mystery", "siren", "boss"]:
-                if grid.__getattribute__("is_" + attr):
+                if getattr(grid, "is_" + attr):
                     missing[attr] -= 1
+
+    def _apply_dynamic_enemy_missing(self, missing):
         missing["enemy"] += len(self.fortress_data[0]) - self.select(is_fortress=True).count
         for route in self.bouncing_enemy_data:
             if not route.select(may_bouncing_enemy=True):
-                # bouncing enemy cleared, re-add one enemy
+                # 弹跳敌人已被清理，重新补一个敌人缺口。
                 missing["enemy"] += 1
 
+    def _get_may_missing(self, mode):
+        may = {"enemy": 0, "mystery": 0, "siren": 0, "boss": 0, "carrier": 0}
         for upper in self.map_covered:
             if (upper.may_enemy or mode == "movable") and not upper.is_enemy:
                 may["enemy"] += 1
@@ -776,6 +798,19 @@ class CampaignMap:
                 may["boss"] += 1
             if upper.may_carrier:
                 may["carrier"] += 1
+        return may
+
+    def missing_get(self, battle_count, mystery_count=0, siren_count=0, carrier_count=0, mode="normal"):
+        missing = self._get_spawn_missing(battle_count)
+        missing["enemy"] -= battle_count - siren_count
+        missing["mystery"] -= mystery_count
+        missing["siren"] -= siren_count
+        missing["carrier"] = (
+            carrier_count - self.select(is_enemy=True, may_enemy=False).count if mode == "carrier" else 0
+        )
+        self._apply_seen_grid_missing(missing)
+        self._apply_dynamic_enemy_missing(missing)
+        may = self._get_may_missing(mode)
 
         logger.attr(
             "enemy_missing",
