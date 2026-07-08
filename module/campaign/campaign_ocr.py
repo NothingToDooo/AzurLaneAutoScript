@@ -1,5 +1,6 @@
 import collections
 import re
+from dataclasses import dataclass, replace
 
 import numpy as np
 
@@ -12,6 +13,22 @@ from module.logger import logger
 from module.map.assets import WITHDRAW
 from module.ocr.ocr import Ocr
 from module.template import assets as template_assets
+
+
+@dataclass(frozen=True, slots=True)
+class StageMatchOptions:
+    name_offset: tuple[int, int] = (75, 9)
+    name_size: tuple[int, int] = (60, 16)
+    name_letter: tuple[int, int, int] = (255, 255, 255)
+    name_thresh: int = 128
+    similarity: float = 0.85
+
+
+def stage_match_options(options=None, settings=None) -> StageMatchOptions:
+    options = StageMatchOptions() if options is None else options
+    if settings:
+        options = replace(options, **settings)
+    return options
 
 
 class CampaignOcr(ModuleBase):
@@ -96,36 +113,36 @@ class CampaignOcr(ModuleBase):
         template,
         image,
         stage_image=None,
-        name_offset=(75, 9),
-        name_size=(60, 16),
-        name_letter=(255, 255, 255),
-        name_thresh=128,
-        similarity=0.85,
+        options=None,
+        **settings,
     ):
         """
-        Find stage entrances from the given image.
+        从截图中匹配关卡入口。
 
         Args:
             template (Template):
-            image: Screenshot
-            stage_image: Screenshot to find stage entrance.
-            name_offset (tuple[int]):
-            name_size (tuple[int]):
-            name_letter (tuple[int]):
-            name_thresh (int):
-            similarity (float):
+            image: 截图。
+            stage_image: 用于查找关卡入口的截图。
+            options (StageMatchOptions): 关卡入口匹配配置。
+            **settings: 覆盖 `StageMatchOptions` 中的字段。
 
         Returns:
             list[Button]: Stage clear buttons.
         """
+        options = stage_match_options(options, settings)
         digits = []
         stage_image = image if stage_image is None else stage_image
-        result = template.match_multi(stage_image, similarity=similarity, name="STAGE")
-        name_area = (name_offset[0], name_offset[1], name_offset[0] + name_size[0], name_offset[1] + name_size[1])
+        result = template.match_multi(stage_image, similarity=options.similarity, name="STAGE")
+        name_area = (
+            options.name_offset[0],
+            options.name_offset[1],
+            options.name_offset[0] + options.name_size[0],
+            options.name_offset[1] + options.name_size[1],
+        )
         for matched_button in result:
             button = matched_button.move(self._stage_detect_area[:2])
             button_name = button.crop(area=name_area, image=image)
-            name = extract_letters(button_name.image, letter=name_letter, threshold=name_thresh)
+            name = extract_letters(button_name.image, letter=options.name_letter, threshold=options.name_thresh)
             button_name = button_name.crop(area=self._extract_stage_name(name))
             # 每个按钮的 area 临时替换成关卡名区域，供 OCR 使用；button 保留关卡图标区域。
             button.load_color(image)

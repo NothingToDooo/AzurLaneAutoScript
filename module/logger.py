@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 import sys
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
@@ -238,19 +239,31 @@ def set_func_logger(func):
     logger.addHandler(hdlr)
 
 
+@dataclass(frozen=True, slots=True)
+class RenderOptions:
+    sep: str = " "
+    end: str = "\n"
+    justify: object = None
+    emoji: object = None
+    markup: object = None
+    highlight: object = None
+
+
+def render_options(options=None, settings=None) -> RenderOptions:
+    options = RenderOptions() if options is None else options
+    if settings:
+        options = replace(options, **settings)
+    return options
+
+
 def _get_renderables(
     self: Console,
     *objects,
-    sep=" ",
-    end="\n",
-    justify=None,
-    emoji=None,
-    markup=None,
-    highlight=None,
+    options=None,
+    **settings,
 ) -> list[ConsoleRenderable]:
-    """
-    Refer to rich.console.Console.print()
-    """
+    """参考 rich.console.Console.print() 收集可渲染对象。"""
+    options = render_options(options, settings)
     if not objects:
         objects = (NewLine(),)
 
@@ -258,12 +271,12 @@ def _get_renderables(
     with self:
         renderables = self._collect_renderables(
             objects,
-            sep,
-            end,
-            justify=justify,
-            emoji=emoji,
-            markup=markup,
-            highlight=highlight,
+            options.sep,
+            options.end,
+            justify=options.justify,
+            emoji=options.emoji,
+            markup=options.markup,
+            highlight=options.highlight,
         )
         for hook in render_hooks:
             renderables = hook.process_renderables(renderables)

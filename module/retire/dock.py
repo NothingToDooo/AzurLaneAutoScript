@@ -1,3 +1,5 @@
+from dataclasses import dataclass, replace
+
 from module.base.button import ButtonGrid, color_similar, get_color
 from module.base.decorator import cached_property
 from module.base.timer import Timer
@@ -28,6 +30,23 @@ CARD_EMOTION_GRIDS = CARD_GRIDS.crop(area=(23, 29, 48, 52), name="EMOTION")
 DOCK_SCROLL = Scroll(retire_assets.DOCK_SCROLL, color=(247, 211, 66), name="DOCK_SCROLL")
 
 OCR_DOCK_SELECTED = DigitCounter(retire_assets.DOCK_SELECTED, threshold=64, name="OCR_DOCK_SELECTED")
+
+
+@dataclass(frozen=True, slots=True)
+class DockFilterOptions:
+    sort: str | list[str] = "level"
+    index: str | list[str] = "all"
+    faction: str | list[str] = "all"
+    rarity: str | list[str] = "all"
+    extra: str | list[str] = "no_limit"
+    wait_loading: bool = True
+
+
+def dock_filter_options(options=None, settings=None) -> DockFilterOptions:
+    options = DockFilterOptions() if options is None else options
+    if settings:
+        options = replace(options, **settings)
+    return options
 
 
 class Dock(Equipment):
@@ -208,24 +227,25 @@ class Dock(Equipment):
         )
         return setting
 
-    def dock_filter_set(
-        self, sort="level", index="all", faction="all", rarity="all", extra="no_limit", wait_loading=True
-    ):
+    def dock_filter_set(self, options=None, **settings):
         """
         更快的筛选设置入口。
 
         Args:
-            sort (str, list):
+            options (DockFilterOptions): 船坞筛选配置。
+            **settings: 覆盖 `DockFilterOptions` 中的字段。
+
+            sort:
                 ['rarity', 'level', 'total', 'join', 'intimacy', 'mood', 'stat']
-            index (str, list):
+            index:
                 ['all', 'vanguard', 'main', 'dd', 'cl', 'ca', 'bb',
                  'cv', 'repair', 'ss', 'others', 'not_available', 'not_available', 'not_available']
-            faction (str, list):
+            faction:
                 ['all', 'eagle', 'royal', 'sakura', 'iron', 'dragon', 'sardegna',
                  'northern', 'iris', 'vichya', 'other', 'not_available', 'not_available', 'not_available']
-            rarity (str, list):
+            rarity:
                 ['all', 'common', 'rare', 'elite', 'super_rare', 'ultra', 'not_available']
-            extra (str, list):
+            extra:
                 ['no_limit', 'has_skin', 'can_retrofit', 'enhanceable', 'can_limit_break',
                  'not_level_max', 'can_awaken', 'can_awaken_plus', 'special', 'oath_skin',
                  'unique_augment_module', 'wear_skin', 'oathed', 'not_available']
@@ -233,9 +253,16 @@ class Dock(Equipment):
         Pages:
             in: page_dock
         """
+        options = dock_filter_options(options, settings)
         self.dock_filter_enter()
-        self.dock_filter.set(sort=sort, index=index, faction=faction, rarity=rarity, extra=extra)
-        self.dock_filter_confirm(wait_loading=wait_loading)
+        self.dock_filter.set(
+            sort=options.sort,
+            index=options.index,
+            faction=options.faction,
+            rarity=options.rarity,
+            extra=options.extra,
+        )
+        self.dock_filter_confirm(wait_loading=options.wait_loading)
 
     def dock_select_one(self, button, skip_first_screenshot=True):
         """

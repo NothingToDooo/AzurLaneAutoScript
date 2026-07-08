@@ -4,7 +4,7 @@ from module.logger import logger
 from module.meowfficer import assets as meow_assets
 from module.meowfficer.base import MeowfficerBase
 from module.meowfficer.buy import MEOWFFICER_COINS
-from module.ocr.ocr import Digit, DigitCounter
+from module.ocr.ocr import Digit, DigitCounter, ocr_options
 from module.ui.assets import MEOWFFICER_GOTO_DORMMENU
 from module.ui.page import page_meowfficer
 
@@ -21,10 +21,8 @@ MEOWFFICER_FEED = DigitCounter(meow_assets.OCR_MEOWFFICER_FEED, letter=(131, 121
 
 
 class MeowfficerLevelOcr(Digit):
-    def __init__(
-        self, buttons, lang="azur_lane", letter=(255, 255, 255), threshold=128, alphabet="0123456789IDSLV", name=None
-    ):
-        super().__init__(buttons, lang=lang, letter=letter, threshold=threshold, alphabet=alphabet, name=name)
+    def __init__(self, buttons, options=None, **settings):
+        super().__init__(buttons, options=ocr_options(options, settings, alphabet="0123456789IDSLV"))
 
     def after_process(self, result):
         result = result.replace("L", "").replace("V", "").replace(".", "")

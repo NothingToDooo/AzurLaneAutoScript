@@ -5,15 +5,15 @@ from module.config.utils import get_server_last_update
 from module.exercise import assets as exercise_assets
 from module.exercise.combat import ExerciseCombat
 from module.logger import logger
-from module.ocr.ocr import Digit, Ocr, OcrYuv
+from module.ocr.ocr import Digit, Ocr, OcrYuv, ocr_options
 from module.ui.page import page_exercise
 
 
 class DatedDuration(Ocr):
-    def __init__(
-        self, buttons, lang="cnocr", letter=(255, 255, 255), threshold=128, alphabet="0123456789:IDS天日d", name=None
-    ):
-        super().__init__(buttons, lang=lang, letter=letter, threshold=threshold, alphabet=alphabet, name=name)
+    def __init__(self, buttons, options=None, **settings):
+        if options is None:
+            settings = {"lang": "cnocr", **settings}
+        super().__init__(buttons, options=ocr_options(options, settings, alphabet="0123456789:IDS天日d"))
 
     def after_process(self, result):
         result = super().after_process(result)

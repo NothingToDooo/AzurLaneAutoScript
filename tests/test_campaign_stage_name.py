@@ -1,6 +1,6 @@
 import pytest
 
-from module.campaign.campaign_ocr import CampaignOcr
+from module.campaign.campaign_ocr import CampaignOcr, StageMatchOptions, stage_match_options
 from module.campaign.run import (
     _apply_campaign_folder_policies,
     _apply_stage_alias_policies,
@@ -137,3 +137,10 @@ def test_campaign_folder_policies_fallback_threat_safe_without_3_stars() -> None
 )
 def test_campaign_separate_name(name, expected) -> None:
     assert CampaignOcr.campaign_separate_name(name) == expected
+
+
+def test_stage_match_options_override_existing_options() -> None:
+    options = stage_match_options(StageMatchOptions(name_offset=(1, 2)), {"similarity": 0.6})
+
+    assert options.name_offset == (1, 2)
+    assert options.similarity == 0.6
