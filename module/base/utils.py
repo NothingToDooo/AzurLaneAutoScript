@@ -68,14 +68,51 @@ def random_rectangle_vector(vector, box, random_range=(0, 0, 0, 0), padding=15):
     return tuple(start_point), tuple(end_point)
 
 
+def _swipe_path_in_blacklist(end_point, vector, blacklist_area, segment):
+    if not blacklist_area:
+        return False
+    for index in range(segment + 1):
+        point = -vector * index / segment + end_point
+        if any(point_in_area(point, area, threshold=0) for area in blacklist_area):
+            return True
+    return False
+
+
+def _limited_swipe_points(end_point, vector, box):
+    return point_limit(end_point - vector, box), point_limit(end_point, box)
+
+
+def _random_end_point_in_whitelist(vector, box_pad, whitelist_area, blacklist_area, segment):
+    for raw_area in whitelist_area:
+        area = area_limit(raw_area, box_pad)
+        if not all(size > 0 for size in area_size(area)):
+            continue
+
+        end_point = random_rectangle_point(area)
+        for _ in range(10):
+            if _swipe_path_in_blacklist(end_point, vector, blacklist_area, segment):
+                continue
+            return end_point
+    return None
+
+
+def _random_end_point_outside_blacklist(box_pad, vector, blacklist_area, segment):
+    for _ in range(100):
+        end_point = random_rectangle_point(box_pad)
+        if _swipe_path_in_blacklist(end_point, vector, blacklist_area, segment):
+            continue
+        return end_point
+    return random_rectangle_point(box_pad)
+
+
 def random_rectangle_vector_opted(
     vector, box, random_range=(0, 0, 0, 0), padding=15, whitelist_area=None, blacklist_area=None
 ):
     """
-    Place a vector in a box randomly.
+    在指定区域里随机放置滑动向量。
 
-    When emulator/game stuck, it treats a swipe as a click, clicking at the end of swipe path.
-    To prevent this, random results need to be filtered.
+    模拟器或游戏卡顿时，滑动可能会被当成点击，并点击在滑动终点。
+    为避免误触，随机结果需要按白名单和黑名单过滤。
 
     Args:
         vector: (x, y)
@@ -98,34 +135,13 @@ def random_rectangle_vector_opted(
     box_pad = area_offset(box_pad, half_vector)
     segment = int(np.linalg.norm(vector) // 70) + 1
 
-    def in_blacklist(end):
-        if not blacklist_area:
-            return False
-        for x in range(segment + 1):
-            point = -vector * x / segment + end
-            for area in blacklist_area:
-                if point_in_area(point, area, threshold=0):
-                    return True
-        return False
-
     if whitelist_area:
-        for raw_area in whitelist_area:
-            area = area_limit(raw_area, box_pad)
-            if all(x > 0 for x in area_size(area)):
-                end_point = random_rectangle_point(area)
-                for _ in range(10):
-                    if in_blacklist(end_point):
-                        continue
-                    return point_limit(end_point - vector, box), point_limit(end_point, box)
+        end_point = _random_end_point_in_whitelist(vector, box_pad, whitelist_area, blacklist_area, segment)
+        if end_point is not None:
+            return _limited_swipe_points(end_point, vector, box)
 
-    for _ in range(100):
-        end_point = random_rectangle_point(box_pad)
-        if in_blacklist(end_point):
-            continue
-        return point_limit(end_point - vector, box), point_limit(end_point, box)
-
-    end_point = random_rectangle_point(box_pad)
-    return point_limit(end_point - vector, box), point_limit(end_point, box)
+    end_point = _random_end_point_outside_blacklist(box_pad, vector, blacklist_area, segment)
+    return _limited_swipe_points(end_point, vector, box)
 
 
 def random_line_segments(p1, p2, n, random_range=(0, 0, 0, 0)):
