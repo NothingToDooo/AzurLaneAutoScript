@@ -82,7 +82,6 @@ MAP.spawn_data = [
     H6,
 ) = MAP.flatten()
 
-# road_a1 = RoadGrids([[A2, B1], [A2, B3], [B3, A4], [A4, B3, D2, E1], [C4, B3, D2, E1]])
 road_a1 = RoadGrids([[A2, B1], [A2, B3], [B3, A4], [B3, C4]]).combine(RoadGrids([A2, [E1, D2]]))
 road_c6 = RoadGrids([B6, A6, A4, [B3, C4]])
 road_h1 = RoadGrids([[H2, G1], [G1, F2], [F2, E1]])
@@ -93,7 +92,6 @@ fleet_2_step_on = SelectedGrids([A4, B3, E1, F5])
 
 class Config:
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 40
-    # EDGE_LINES_HOUGHLINES_THRESHOLD = 40
     COINCIDENT_POINT_ENCOURAGE_DISTANCE = 1.5
 
 
