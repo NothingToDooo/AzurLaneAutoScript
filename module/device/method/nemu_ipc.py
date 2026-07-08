@@ -11,7 +11,6 @@ import numpy as np
 
 from module.base.decorator import cached_property, del_cached_property, has_cached_property
 from module.config.deep import deep_get
-from module.device.env import IS_WINDOWS
 from module.device.method.pool import WORKER_POOL, JobTimeout
 from module.device.method.utils import RETRY_TRIES, retry_sleep
 from module.device.platform import Platform
@@ -462,8 +461,6 @@ class NemuIpc(Platform):
             return impl
 
     def nemu_ipc_available(self) -> bool:
-        if not IS_WINDOWS:
-            return False
         if not self.is_mumu_family:
             return False
         if self.nemud_player_version == "":

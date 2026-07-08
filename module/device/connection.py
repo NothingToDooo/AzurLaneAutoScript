@@ -15,7 +15,6 @@ from module.base.utils import ensure_time
 from module.config.deep import deep_get
 from module.config.server import VALID_PACKAGE
 from module.device.connection_attr import ConnectionAttr
-from module.device.env import IS_WINDOWS
 from module.device.method.pool import WORKER_POOL
 from module.device.method.remove_warning import remove_shell_warning
 from module.device.method.utils import (
@@ -682,10 +681,8 @@ class Connection(ConnectionAttr):
             # 暴力尝试连接 MuMu 实例。
             if self.config.Emulator_Serial == "auto" and available.count == 0:
                 logger.warning("No available device found")
-                if IS_WINDOWS:
-                    brute_force_connect()
-                    continue
-                break
+                brute_force_connect()
+                continue
             break
 
         # 自动检测设备。
@@ -735,8 +732,7 @@ class Connection(ConnectionAttr):
                     # is_mumu_over_version_356 和 nemud_app_keep_alive 已被缓存。
                     # 这里仍是同一个设备，可以接受。
                     logger.warning(f"Device {self.serial} is MuMu12 but corresponding port not found")
-                    if IS_WINDOWS:
-                        brute_force_connect()
+                    brute_force_connect()
                     devices = self.list_device()
                     # 显示可用设备。
                     available = devices.select(status="device")

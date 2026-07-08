@@ -8,7 +8,6 @@ from module.base.timer import Timer
 from module.config.utils import get_server_next_update
 from module.device.app_control import AppControl
 from module.device.control import Control
-from module.device.env import IS_WINDOWS
 from module.device.screenshot import Screenshot
 from module.exception import (
     EmulatorNotRunningError,
@@ -86,7 +85,7 @@ class Device(Screenshot, Control, AppControl):
                     raise RequestHumanTakeover from e
 
         # 自动补全模拟器信息。
-        if IS_WINDOWS and self.config.EmulatorInfo_Emulator == "auto":
+        if self.config.EmulatorInfo_Emulator == "auto":
             _ = self.emulator_instance
 
         self.method_check()
@@ -117,9 +116,6 @@ class Device(Screenshot, Control, AppControl):
             logger.warning("当前个人版只保留控制方案 minitouch，已自动改为 minitouch")
             self.config.Emulator_ControlMethod = "minitouch"
 
-        if not IS_WINDOWS:
-            logger.critical("nemu_ipc 仅支持 Windows")
-            raise RequestHumanTakeover
         if not (self.is_emulator and self.is_mumu_family):
             logger.critical("当前个人版只保留 MuMu + nemu_ipc 运行路径")
             raise RequestHumanTakeover

@@ -1,5 +1,3 @@
-import sys
-
 from pydantic import BaseModel
 
 from module.base.decorator import cached_property, del_cached_property
@@ -42,28 +40,7 @@ def serial_to_id(serial: str):
 class PlatformBase(Connection, EmulatorManagerBase):
     """
     Windows 模拟器平台的基类。
-
-    每个 `Platform` 类需要实现以下接口：
-    - all_emulators()
-    - all_emulator_instances()
-    - emulator_start()
-    - emulator_stop()
     """
-
-    def emulator_start(self):
-        """
-        启动模拟器并等待启动完成。
-
-        - 需要自行重试。
-        - 不要用固定 sleep 等待启动。
-        """
-        logger.info(f"Current platform {sys.platform} does not support emulator_start, skip")
-
-    def emulator_stop(self):
-        """
-        停止模拟器。
-        """
-        logger.info(f"Current platform {sys.platform} does not support emulator_stop, skip")
 
     @cached_property
     def emulator_info(self) -> EmulatorInfo:
