@@ -1,6 +1,7 @@
 """基于 pywebio.platform.fastapi 精简出的本地 WebUI 服务。"""
 
 import asyncio
+import functools
 import inspect
 import mimetypes
 import os
@@ -8,6 +9,9 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 
 import uvicorn
+from pywebio import session as pywebio_session
+from pywebio import utils as pywebio_utils
+from pywebio.platform import page as pywebio_page
 from pywebio.platform.fastapi import (
     STATIC_PATH,
     Session,
@@ -30,6 +34,22 @@ class HeaderMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         response.headers["Cache-Control"] = "no-cache"
         return response
+
+
+def _iscoroutinefunction(obj):
+    while isinstance(obj, functools.partial):
+        obj = obj.func
+    return inspect.iscoroutinefunction(obj)
+
+
+def _patch_pywebio_coroutine_checker() -> None:
+    # pywebio 在导入时缓存了旧协程判断函数，统一收口到 WebUI 依赖边界。
+    pywebio_utils.iscoroutinefunction = _iscoroutinefunction
+    pywebio_page.iscoroutinefunction = _iscoroutinefunction
+    pywebio_session.iscoroutinefunction = _iscoroutinefunction
+
+
+_patch_pywebio_coroutine_checker()
 
 
 @dataclass(slots=True)

@@ -1,5 +1,6 @@
 import asyncio
 import mimetypes
+import warnings
 
 from module.webui.fastapi import AsgiAppOptions, LocalStaticFiles, asgi_app
 
@@ -39,6 +40,10 @@ def test_asgi_app_accepts_options_object():
     def index():
         return None
 
-    app = asgi_app([index], options=AsgiAppOptions(cdn=False, debug=True))
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DeprecationWarning)
+        app = asgi_app([index], options=AsgiAppOptions(cdn=False, debug=True))
 
     assert app.debug is True
+    deprecation_warnings = [item.message for item in caught if issubclass(item.category, DeprecationWarning)]
+    assert deprecation_warnings == []
