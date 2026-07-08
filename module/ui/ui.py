@@ -349,6 +349,60 @@ class UI(InfoHandler):
 
     _opsi_reset_fleet_preparation_click = 0
 
+    def _appear_then_click_any(self, button_options):
+        return any(self.appear_then_click(button, **kwargs) for button, kwargs in button_options)
+
+    def _return_to_main_from_page(self, page_button):
+        if not self.appear(page_button, offset=(30, 30), interval=5):
+            return False
+        logger.info(f"UI additional: {page_button} -> {ui_assets.GOTO_MAIN}")
+        return bool(self.appear_then_click(ui_assets.GOTO_MAIN, offset=(30, 30)))
+
+    def _handle_main_daily_popups(self, get_ship):
+        daily_buttons = [
+            (LOGIN_ANNOUNCE, {"offset": (30, 30), "interval": 3}),
+            (LOGIN_ANNOUNCE_2, {"offset": (30, 30), "interval": 3}),
+            (GET_ITEMS_1, {"offset": True, "interval": 3}),
+            (GET_ITEMS_2, {"offset": True, "interval": 3}),
+        ]
+        if self._appear_then_click_any(daily_buttons):
+            return True
+        if get_ship and self.appear_then_click(GET_SHIP, interval=5):
+            return True
+        return self.appear_then_click(LOGIN_RETURN_SIGN, offset=(30, 30), interval=3)
+
+    def _handle_main_notice_popups(self):
+        notice_buttons = [
+            (MONTHLY_PASS_NOTICE, {"offset": (30, 30), "interval": 3}),
+            (BATTLE_PASS_NOTICE, {"offset": (30, 30), "interval": 3}),
+        ]
+        if self._appear_then_click_any(notice_buttons):
+            return True
+        if self.appear(BATTLE_PASS_NEW_SEASON, offset=(30, 30), interval=3):
+            logger.info(f"UI additional: {BATTLE_PASS_NEW_SEASON} -> {ui_assets.BACK_ARROW}")
+            self.device.click(ui_assets.BACK_ARROW)
+            return True
+        return False
+
+    def _handle_main_expired_popups(self):
+        if self.handle_popup_single(offset=(-6, 48, 54, 88), name="ITEM_EXPIRED"):
+            return True
+        return self.handle_popup_single_white()
+
+    def _handle_main_routed_pages(self):
+        return self._return_to_main_from_page(ui_assets.SHIPYARD_CHECK) or self._return_to_main_from_page(
+            ui_assets.META_CHECK
+        )
+
+    def _handle_main_player_page(self):
+        if not self.appear(ui_assets.PLAYER_CHECK, offset=(30, 30), interval=3):
+            return False
+        logger.info(f"UI additional: {ui_assets.PLAYER_CHECK} -> {ui_assets.GOTO_MAIN}")
+        return bool(
+            self.appear_then_click(ui_assets.GOTO_MAIN, offset=(30, 30))
+            or self.appear_then_click(ui_assets.BACK_ARROW, offset=(30, 30))
+        )
+
     def ui_page_main_popups(self, get_ship=True):
         """
         处理 page_main、page_reward 上出现的弹窗。
@@ -357,62 +411,14 @@ class UI(InfoHandler):
         if self.handle_guild_popup_cancel():
             return True
 
-        # 每日重置。
-        if self.appear_then_click(LOGIN_ANNOUNCE, offset=(30, 30), interval=3):
-            return True
-        if self.appear_then_click(LOGIN_ANNOUNCE_2, offset=(30, 30), interval=3):
-            return True
-        if self.appear_then_click(GET_ITEMS_1, offset=True, interval=3):
-            return True
-        if self.appear_then_click(GET_ITEMS_2, offset=True, interval=3):
-            return True
-        if get_ship and self.appear_then_click(GET_SHIP, interval=5):
-            return True
-        if self.appear_then_click(LOGIN_RETURN_SIGN, offset=(30, 30), interval=3):
-            return True
-        if self.appear(ui_assets.EVENT_LIST_CHECK, offset=(30, 30), interval=5):
-            logger.info(f"UI additional: {ui_assets.EVENT_LIST_CHECK} -> {ui_assets.GOTO_MAIN}")
-            if self.appear_then_click(ui_assets.GOTO_MAIN, offset=(30, 30)):
-                return True
-        # Monthly pass is about to expire
-        if self.appear_then_click(MONTHLY_PASS_NOTICE, offset=(30, 30), interval=3):
-            return True
-        # Battle pass is about to expire and player has uncollected battle pass rewards
-        if self.appear_then_click(BATTLE_PASS_NOTICE, offset=(30, 30), interval=3):
-            return True
-        # Popup that advertise you to buy battle pass
-        # 2024.12.19, PURCHASE_POPUP at main page becomes BATTLE_PASS_NEW_SEASON
-        # if self.appear_then_click(PURCHASE_POPUP, offset=(44, -77, 84, -37), interval=3):
-        #     return True
-        # Popup that tells you new battle pass season is aired
-        if self.appear(BATTLE_PASS_NEW_SEASON, offset=(30, 30), interval=3):
-            logger.info(f"UI additional: {BATTLE_PASS_NEW_SEASON} -> {ui_assets.BACK_ARROW}")
-            self.device.click(ui_assets.BACK_ARROW)
-            return True
-        # Item expired offset=(37, 72), skin expired, offset=(24, 68)
-        if self.handle_popup_single(offset=(-6, 48, 54, 88), name="ITEM_EXPIRED"):
-            return True
-        # Mail full popup
-        if self.handle_popup_single_white():
-            return True
-        # Routed from confirm click
-        if self.appear(ui_assets.SHIPYARD_CHECK, offset=(30, 30), interval=5):
-            logger.info(f"UI additional: {ui_assets.SHIPYARD_CHECK} -> {ui_assets.GOTO_MAIN}")
-            if self.appear_then_click(ui_assets.GOTO_MAIN, offset=(30, 30)):
-                return True
-        if self.appear(ui_assets.META_CHECK, offset=(30, 30), interval=5):
-            logger.info(f"UI additional: {ui_assets.META_CHECK} -> {ui_assets.GOTO_MAIN}")
-            if self.appear_then_click(ui_assets.GOTO_MAIN, offset=(30, 30)):
-                return True
-        # Mistaken click
-        if self.appear(ui_assets.PLAYER_CHECK, offset=(30, 30), interval=3):
-            logger.info(f"UI additional: {ui_assets.PLAYER_CHECK} -> {ui_assets.GOTO_MAIN}")
-            if self.appear_then_click(ui_assets.GOTO_MAIN, offset=(30, 30)):
-                return True
-            if self.appear_then_click(ui_assets.BACK_ARROW, offset=(30, 30)):
-                return True
-
-        return False
+        return (
+            self._handle_main_daily_popups(get_ship=get_ship)
+            or self._return_to_main_from_page(ui_assets.EVENT_LIST_CHECK)
+            or self._handle_main_notice_popups()
+            or self._handle_main_expired_popups()
+            or self._handle_main_routed_pages()
+            or self._handle_main_player_page()
+        )
 
     def ui_page_os_popups(self):
         """
