@@ -162,11 +162,12 @@ class HPBalancer(ModuleBase):
     @Config.when(DEVICE_CONTROL_METHOD="minitouch")
     def _gen_exchange_step(self, target):
         """
-        Minitouch swiping is more like human, when it drag the first ship to the third ship,
-        [0, 1, 2] becomes [1, 2, 0], while in adb/uiautomator2, it becomes [2, 1, 0].
+        minitouch 拖动更接近人的手势。
+
+        把第一艘船拖到第三艘时，[0, 1, 2] 会变成 [1, 2, 0]。
 
         Args:
-            target (list[int]): Such as [2, 0, 1].
+            target: 目标顺序，例如 [2, 0, 1]。
         """
         diff = np.array(target) - np.array((0, 1, 2))
         count = np.count_nonzero(diff)

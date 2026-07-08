@@ -11,7 +11,6 @@ dependencies = [
     "opencv-python",
     "imageio",
     "adbutils",
-    "uiautomator2",
     "psutil",
     "rich",
     "tqdm",

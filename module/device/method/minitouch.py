@@ -296,68 +296,51 @@ def retry(func):
 
                 def init():
                     self.adb_reconnect()
-                    if self._minitouch_port:
-                        self.adb_forward_remove(f"tcp:{self._minitouch_port}")
-                    del_cached_property(self, "_minitouch_builder")
+                    self._reset_minitouch_connection()
             # 模拟器已关闭。
             except ConnectionAbortedError as e:
                 logger.error(e)
 
                 def init():
                     self.adb_reconnect()
-                    if self._minitouch_port:
-                        self.adb_forward_remove(f"tcp:{self._minitouch_port}")
-                    del_cached_property(self, "_minitouch_builder")
+                    self._reset_minitouch_connection()
             # minitouch 返回空数据，通常是没有安装。
             except MinitouchNotInstalledError as e:
-                logger.error(e)
-
-                def init():
-                    self.install_uiautomator2()
-                    if self._minitouch_port:
-                        self.adb_forward_remove(f"tcp:{self._minitouch_port}")
-                    del_cached_property(self, "_minitouch_builder")
+                logger.critical(e)
+                raise RequestHumanTakeover from e
             # 连接 minitouch 超时，通常是已有连接占用。
             except MinitouchOccupiedError as e:
                 logger.error(e)
 
                 def init():
-                    self.restart_uiautomator2()
-                    if self._minitouch_port:
-                        self.adb_forward_remove(f"tcp:{self._minitouch_port}")
-                    del_cached_property(self, "_minitouch_builder")
+                    self._restart_minitouch_service()
+                    self._reset_minitouch_connection()
             # ADB 错误。
             except AdbError as e:
                 if handle_adb_error(e):
 
                     def init():
                         self.adb_reconnect()
-                        if self._minitouch_port:
-                            self.adb_forward_remove(f"tcp:{self._minitouch_port}")
-                        del_cached_property(self, "_minitouch_builder")
+                        self._reset_minitouch_connection()
                 elif handle_unknown_host_service(e):
 
                     def init():
                         self.adb_start_server()
                         self.adb_reconnect()
-                        if self._minitouch_port:
-                            self.adb_forward_remove(f"tcp:{self._minitouch_port}")
-                        del_cached_property(self, "_minitouch_builder")
+                        self._reset_minitouch_connection()
                 else:
                     break
             except BrokenPipeError as e:
                 logger.error(e)
 
                 def init():
-                    del_cached_property(self, "_minitouch_builder")
+                    self._reset_minitouch_connection(remove_forward=False)
             # minitouch socket 或 ADB forward 的 I/O 失败。
             except OSError as e:
                 logger.error(e)
 
                 def init():
-                    if self._minitouch_port:
-                        self.adb_forward_remove(f"tcp:{self._minitouch_port}")
-                    del_cached_property(self, "_minitouch_builder")
+                    self._reset_minitouch_connection()
 
         logger.critical(f"Retry {func.__name__}() failed")
         raise RequestHumanTakeover
@@ -367,11 +350,83 @@ def retry(func):
 
 class Minitouch(Connection):
     _minitouch_port: int = 0
-    _minitouch_client: socket.socket = None
-    _minitouch_pid: int
+    _minitouch_client: socket.socket | None = None
+    _minitouch_pid: str = ""
+    _minitouch_stream = None
     max_x: int
     max_y: int
     _minitouch_init_thread = None
+
+    def release_resource(self):
+        super().release_resource()
+        self._close_minitouch_client()
+        self._close_minitouch_stream()
+
+    def _close_minitouch_client(self):
+        client = self._minitouch_client
+        if client is None:
+            return
+        try:
+            client.close()
+        except OSError as e:
+            logger.error(e)
+        self._minitouch_client = None
+
+    def _close_minitouch_stream(self):
+        stream = self._minitouch_stream
+        if stream is None:
+            return
+        close = getattr(stream, "close", None)
+        if callable(close):
+            try:
+                close()
+            except OSError as e:
+                logger.error(e)
+        self._minitouch_stream = None
+
+    def _reset_minitouch_connection(self, remove_forward=True):
+        self._close_minitouch_client()
+        if remove_forward and self._minitouch_port:
+            self.adb_forward_remove(f"tcp:{self._minitouch_port}")
+            self._minitouch_port = 0
+        del_cached_property(self, "_minitouch_builder")
+
+    def _ensure_minitouch_executable(self):
+        path = self.config.MINITOUCH_FILEPATH_REMOTE
+        self.adb_shell(["chmod", "755", path])
+        state = self.adb_shell(f"if [ -x {path} ]; then echo ok; else echo missing; fi").strip()
+        if state == "ok":
+            return
+        raise MinitouchNotInstalledError(
+            f"未找到可执行的 minitouch：{path}。请先把 MuMu 当前 ABI 对应的 minitouch 推送到这个路径。"
+        )
+
+    def _start_minitouch_service(self):
+        if self._minitouch_stream is not None:
+            return
+        path = self.config.MINITOUCH_FILEPATH_REMOTE
+        self._ensure_minitouch_executable()
+        logger.info(f"Start minitouch: {path}")
+        self._minitouch_stream = self.adb_shell([path], stream=True, recvall=False)
+
+    def _find_minitouch_pids(self) -> set[str]:
+        pids = {self._minitouch_pid} if self._minitouch_pid else set()
+        output = self.adb_shell("(ps -A; ps) 2>/dev/null | grep '[m]initouch'", timeout=5)
+        for line in output.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[1].isdigit():
+                pids.add(parts[1])
+        return pids
+
+    def _restart_minitouch_service(self):
+        logger.info("Restart minitouch")
+        self._close_minitouch_client()
+        self._close_minitouch_stream()
+        for pid in self._find_minitouch_pids():
+            logger.info(f"Kill minitouch pid: {pid}")
+            self.adb_shell(["kill", pid])
+        self._minitouch_pid = ""
+        self._start_minitouch_service()
 
     @cached_property
     @retry
@@ -412,19 +467,12 @@ class Minitouch(Connection):
         max_pressure = 50
 
         # 尝试关闭已有连接。
-        if self._minitouch_client is not None:
-            try:
-                self._minitouch_client.close()
-            except OSError as e:
-                logger.error(e)
-            del self._minitouch_client
+        self._close_minitouch_client()
 
         self.get_orientation()
 
+        self._start_minitouch_service()
         self._minitouch_port = self.adb_forward("localabstract:minitouch")
-
-        # 不需要手动启动，minitouch 已经由 uiautomator2 拉起。
-        # self.adb_shell([self.config.MINITOUCH_FILEPATH_REMOTE])
 
         retry_timeout = Timer(2).start()
         while 1:

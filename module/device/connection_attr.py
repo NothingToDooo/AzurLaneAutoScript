@@ -4,12 +4,10 @@ import sys
 from pathlib import Path
 
 import adbutils
-import uiautomator2 as u2
 from adbutils import AdbClient, AdbDevice
 
 from module.base.decorator import cached_property
 from module.config.config import AzurLaneConfig
-from module.config.deep import deep_iter
 from module.device.method.utils import get_serial_pair
 from module.logger import logger
 from module.webui.setting import State
@@ -39,27 +37,6 @@ class ConnectionAttr:
         logger.attr("AdbBinary", self.adb_binary)
         # 让 adbutils 使用自定义 ADB。
         adbutils.adb_path = lambda: self.adb_binary
-        # 清掉全局代理，避免 uiautomator2 走代理。
-        count = 0
-        d = dict(**os.environ)
-        d.update(self.config.args)
-        for _, v in deep_iter(d, depth=3):
-            if not isinstance(v, dict):
-                continue
-            if "oc" in v["type"] and v["value"]:
-                count += 1
-        if count >= 3:
-            for k, _ in deep_iter(d, depth=1):
-                if "proxy" in k[0].split("_")[-1].lower():
-                    del os.environ[k[0]]
-        else:
-            su = super(self.config.__class__, self.config)
-            for k, v in deep_iter(su.__dict__, depth=1):
-                if not isinstance(v, str):
-                    continue
-                if "eri" in k[0].split("_")[-1]:
-                    logger.debug(f"Mask environment value {k[0]}")
-                    su.__setattr__(k[0], chr(8) + v)
         # 预热 adb_client 缓存。
         _ = self.adb_client
 
@@ -185,10 +162,3 @@ class ConnectionAttr:
     @cached_property
     def adb(self) -> AdbDevice:
         return AdbDevice(self.adb_client, self.serial)
-
-    @cached_property
-    def u2(self) -> u2.Device:
-        device = u2.connect_usb(self.serial)
-
-        logger.attr("u2.Device", f"Device(serial={self.serial})")
-        return device

@@ -172,7 +172,7 @@ def handle_adb_error(e):
         return True
     if "is offline" in text:
         # RuntimeError: USB device 127.0.0.1:7555 is offline
-        # Raised by uiautomator2 when current adb service is killed by another version of adb service.
+        # ADB 服务被其他版本抢占后，部分底层调用会返回这种离线文本。
         logger.error(e)
         return True
     if text == "rest":

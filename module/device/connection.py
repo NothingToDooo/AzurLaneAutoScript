@@ -572,29 +572,6 @@ class Connection(ConnectionAttr):
             self.adb_connect()
             self.detect_device()
 
-    def install_uiautomator2(self):
-        """
-        初始化 uiautomator2 3.x 服务，并移除旧 minicap。
-        """
-        logger.info("Install uiautomator2")
-        del_cached_property(self, "u2")
-        _ = self.u2
-        self.uninstall_minicap()
-
-    def uninstall_minicap(self):
-        """部分模拟器上 minicap 不可用，或会返回压缩图片。"""
-        logger.info("Removing minicap")
-        self.adb_shell(["rm", "/data/local/tmp/minicap"])
-        self.adb_shell(["rm", "/data/local/tmp/minicap.so"])
-
-    def restart_uiautomator2(self):
-        """
-        重启 uiautomator2 服务，释放 minitouch 占用。
-        """
-        logger.info("Restart uiautomator2")
-        del_cached_property(self, "u2")
-        _ = self.u2
-
     @staticmethod
     def sleep(second):
         """

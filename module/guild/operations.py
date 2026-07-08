@@ -86,9 +86,13 @@ class GuildOperations(GuildBase):
 
             # 结束。
             if (
-                self.appear(guild_assets.GUILD_BOSS_ENTER)
-                or self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK, offset=(20, 20))
-            ) and not self.info_bar_count() and confirm_timer.reached():
+                (
+                    self.appear(guild_assets.GUILD_BOSS_ENTER)
+                    or self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK, offset=(20, 20))
+                )
+                and not self.info_bar_count()
+                and confirm_timer.reached()
+            ):
                 return True
         return False
 
@@ -208,17 +212,16 @@ class GuildOperations(GuildBase):
 
     def _guild_operations_dispatch_swipe(self, forward=True, skip_first_screenshot=True):
         """
-        Although AL will auto focus to active dispatch, but it's bugged.
-        It can't reach the operations behind.
-        So this method will swipe behind, and focus to active dispatch.
-        Force to use minitouch, because uiautomator2 will need longer swipes.
+        碧蓝航线会自动聚焦到可执行任务，但无法覆盖后面的作战任务。
+
+        这里主动向后滑动，再查找可执行任务。
 
         Args:
-            forward (bool): direction of horizontal swipe
+            forward: 横向滑动方向。
             skip_first_screenshot (bool):
 
         Returns:
-            bool: If found active dispatch.
+            bool: 是否找到可执行任务。
         """
         # 整条作战任务链所在区域。
         detection_area = (152, 135, 1280, 630)
@@ -514,8 +517,10 @@ class GuildOperations(GuildBase):
                     return False
                 continue
 
-            if self.config.GuildOperation_BossFleetRecommend and self.info_bar_count() and self.appear_then_click(
-                guild_assets.GUILD_DISPATCH_RECOMMEND_2, interval=3
+            if (
+                self.config.GuildOperation_BossFleetRecommend
+                and self.info_bar_count()
+                and self.appear_then_click(guild_assets.GUILD_DISPATCH_RECOMMEND_2, interval=3)
             ):
                 continue
 
