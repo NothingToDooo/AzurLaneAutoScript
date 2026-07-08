@@ -1,8 +1,5 @@
-import codecs
 import re
 import typing as t
-import winreg
-from dataclasses import dataclass
 from pathlib import Path
 
 import psutil
@@ -17,49 +14,6 @@ from module.device.platform.emulator_base import (
     remove_duplicated_path,
 )
 from module.device.platform.utils import cached_property, iter_folder
-
-
-@dataclass
-class RegValue:
-    name: str
-    value: str
-    typ: int
-
-
-def list_reg(reg) -> list[RegValue]:
-    """
-    List all values in a reg key
-    """
-    rows = []
-    index = 0
-    try:
-        while 1:
-            value = RegValue(*winreg.EnumValue(reg, index))
-            index += 1
-            rows.append(value)
-    except OSError:
-        pass
-    return rows
-
-
-def list_key(reg) -> list[RegValue]:
-    """
-    List all values in a reg key
-    """
-    rows = []
-    index = 0
-    try:
-        while 1:
-            value = winreg.EnumKey(reg, index)
-            index += 1
-            rows.append(value)
-    except OSError:
-        pass
-    return rows
-
-
-def abspath(path):
-    return Path(path).resolve().as_posix()
 
 
 class EmulatorInstance(EmulatorInstanceBase):
@@ -224,101 +178,17 @@ class Emulator(EmulatorBase):
 
 
 class EmulatorManager(EmulatorManagerBase):
-    @staticmethod
-    def iter_user_assist():
+    def iter_configured_emulator(self):
         """
-        Get recently executed programs in UserAssist
-        https://github.com/forensicmatt/MonitorUserAssist
-
         Yields:
-            str: Path to emulator executables, may contains duplicate values
+            str: 当前配置里明确填写的 MuMu 可执行文件路径。
         """
-        path = r"Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist"
-        # {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}\xxx.exe
-        regex_hash = re.compile(r"{.*}")
-        try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path) as reg:
-                folders = list_key(reg)
-        except FileNotFoundError:
+        emulator_info = getattr(self, "emulator_info", None)
+        if emulator_info is None or not emulator_info.path:
             return
-
-        for folder in folders:
-            try:
-                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, f"{path}\\{folder}\\Count") as reg:
-                    for reg_value in list_reg(reg):
-                        key = codecs.decode(reg_value.name, "rot-13")
-                        # Skip those with hash
-                        if regex_hash.search(key):
-                            continue
-                        yield from Emulator.multi_to_single(key)
-            except FileNotFoundError:
-                # FileNotFoundError: [WinError 2] 系统找不到指定的文件。
-                # Might be a random directory without "Count" subdirectory
-                continue
-
-    @staticmethod
-    def iter_mui_cache():
-        """
-        Iter emulator executables that has ever run.
-        http://what-when-how.com/windows-forensic-analysis/registry-analysis-windows-forensic-analysis-part-8/
-        https://3gstudent.github.io/%E6%B8%97%E9%80%8F%E6%8A%80%E5%B7%A7-Windows%E7%B3%BB%E7%BB%9F%E6%96%87%E4%BB%B6%E6%89%A7%E8%A1%8C%E8%AE%B0%E5%BD%95%E7%9A%84%E8%8E%B7%E5%8F%96%E4%B8%8E%E6%B8%85%E9%99%A4
-
-        Yields:
-            str: Path to emulator executable, may contains duplicate values
-        """
-        path = r"Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache"
-        try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path) as reg:
-                rows = list_reg(reg)
-        except FileNotFoundError:
-            return
-
-        regex = re.compile(r"(^.*\.exe)\.")
-        for row in rows:
-            res = regex.search(row.name)
-            if not res:
-                continue
-            yield from Emulator.multi_to_single(res.group(1))
-
-    @staticmethod
-    def iter_uninstall_registry():
-        """
-        Iter emulator uninstaller from registry.
-
-        Yields:
-            str: Path to uninstall exe file
-        """
-        known_uninstall_registry_path = [
-            r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
-            r"Software\Microsoft\Windows\CurrentVersion\Uninstall",
-        ]
-        known_emulator_registry_name = [
-            "Nemu",
-            "Nemu9",
-            "MuMuPlayer",
-            "MuMuPlayer-12.0",
-            "MuMu Player 12.0",
-        ]
-        for path in known_uninstall_registry_path:
-            try:
-                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path) as reg:
-                    software_list = list_key(reg)
-            except FileNotFoundError:
-                continue
-            for software in software_list:
-                if software not in known_emulator_registry_name:
-                    continue
-                try:
-                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, f"{path}\\{software}") as software_reg:
-                        uninstall = winreg.QueryValueEx(software_reg, "UninstallString")[0]
-                except FileNotFoundError:
-                    continue
-                if not uninstall:
-                    continue
-                # 从带引号的 UninstallString 中提取可执行文件路径。
-                res = re.search('"(.*?)"', uninstall)
-                uninstall = res.group(1) if res else uninstall
-                yield uninstall
+        for file in Emulator.multi_to_single(emulator_info.path.replace("\\", "/")):
+            if Emulator.is_emulator(file) and Path(file).exists():
+                yield file
 
     @staticmethod
     def iter_running_emulator():
@@ -346,38 +216,13 @@ class EmulatorManager(EmulatorManagerBase):
     @cached_property
     def all_emulators(self) -> list[Emulator]:
         """
-        Get all emulators installed on current computer.
+        获取当前个人版会使用的 MuMu。
         """
         exe = set()
 
-        # MuiCache
-        for file in EmulatorManager.iter_mui_cache():
-            if Emulator.is_emulator(file) and Path(file).exists():
-                exe.add(file)
-
-        # UserAssist
-        for file in EmulatorManager.iter_user_assist():
-            if Emulator.is_emulator(file) and Path(file).exists():
-                exe.add(file)
-
-        # Uninstall registry
-        for uninstall in EmulatorManager.iter_uninstall_registry():
-            folder = Path(uninstall).parent
-            # Find emulator executable from uninstaller
-            for file in iter_folder(abspath(folder), ext=".exe"):
-                if Emulator.is_emulator(file) and Path(file).exists():
-                    exe.add(file)
-            # Find from parent directory
-            for file in iter_folder(abspath(folder.parent), ext=".exe"):
-                if Emulator.is_emulator(file) and Path(file).exists():
-                    exe.add(file)
-            # MuMu specific directory
-            for file in iter_folder(abspath(folder / "EmulatorShell"), ext=".exe"):
-                if Emulator.is_emulator(file) and Path(file).exists():
-                    exe.add(file)
-
-        # Running
-        for file in EmulatorManager.iter_running_emulator():
+        for file in self.iter_configured_emulator():
+            exe.add(file)
+        for file in self.iter_running_emulator() or ():
             if Path(file).exists():
                 exe.add(file)
 
