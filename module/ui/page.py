@@ -136,29 +136,6 @@ page_coalition = Page(coalition_assets.FROSTFALL_COALITION_CHECK)
 page_coalition.link(button=ui_assets.GOTO_MAIN, destination=page_main)
 page_coalition.link(button=ui_assets.BACK_ARROW, destination=page_campaign_menu)
 page_campaign_menu.link(button=ui_assets.CAMPAIGN_MENU_GOTO_EVENT, destination=page_coalition)
-# ACADEMY
-# page_coalition_menu = Page(COALITION_ACADEMY_MAIN_CHECK)
-# page_coalition_menu.link(button=COALITION_ACADEMY_HOME, destination=page_main)
-# page_coalition = Page(COALITION_ACADEMY_CAMPAIGN_CHECK)
-# page_coalition.link(button=COALITION_ACADEMY_HOME, destination=page_main)
-# page_coalition.link(button=COALITION_ACADEMY_BACK, destination=page_coalition_menu)
-# page_campaign_menu.link(button=CAMPAIGN_MENU_GOTO_EVENT, destination=page_coalition)
-# page_coalition_menu.link(button=COALITION_ACADEMY_GOTO_CAMPAIGN, destination=page_coalition)
-# NEONCITY
-# page_coalition = Page(NEONCITY_COALITION_CHECK)
-# page_coalition.link(button=NEONCITY_UI_HOME, destination=page_main)
-# page_coalition.link(button=NEONCITY_UI_BACK, destination=page_campaign_menu)
-# page_campaign_menu.link(button=CAMPAIGN_MENU_GOTO_EVENT, destination=page_coalition)
-# DAL
-# page_coalition = Page(FROSTFALL_COALITION_CHECK)
-# page_coalition.link(button=GOTO_MAIN, destination=page_main)
-# page_coalition.link(button=BACK_ARROW, destination=page_campaign_menu)
-# page_campaign_menu.link(button=CAMPAIGN_MENU_GOTO_EVENT, destination=page_coalition)
-# FASHION
-# page_coalition = Page(FASHION_COALITION_CHECK)
-# page_coalition.link(button=GOTO_MAIN, destination=page_main)
-# page_coalition.link(button=BACK_ARROW, destination=page_campaign_menu)
-# page_campaign_menu.link(button=CAMPAIGN_MENU_GOTO_EVENT, destination=page_coalition)
 
 # Operation Siren
 page_os = Page(ui_assets.OS_CHECK)
@@ -215,12 +192,7 @@ page_main.link(button=ui_assets.MAIN_GOTO_EVENT_LIST, destination=page_event_lis
 page_main_white.link(button=ui_white_assets.MAIN_GOTO_EVENT_LIST_WHITE, destination=page_event_list)
 
 # Raid
-# before
-# page_raid = Page(RAID_CHECK)
-# page_raid.link(button=GOTO_MAIN, destination=page_main)
-# page_main.link(button=MAIN_GOTO_RAID, destination=page_raid)
-# page_main_white.link(button=MAIN_GOTO_RAID_WHITE, destination=page_raid)
-# after 2026.02.12
+# 当前从活动入口进入。
 page_raid = Page(ui_assets.RAID_CHECK)
 page_raid.link(button=ui_assets.GOTO_MAIN, destination=page_main)
 page_raid.link(button=ui_assets.BACK_ARROW, destination=page_campaign_menu)
@@ -300,8 +272,7 @@ page_main_white.link(button=ui_white_assets.MAIN_GOTO_SHOP_WHITE, destination=pa
 
 # Munitions
 page_munitions = Page(ui_assets.MUNITIONS_CHECK)
-# Prefer latter path since defaults to shop_general on load, stable background color
-# page_shop.link(button=SHOP_GOTO_MUNITIONS, destination=page_munitions)
+# 选择学院入口，载入后默认在普通商店，背景色更稳定。
 page_academy.link(button=ui_assets.ACADEMY_GOTO_MUNITIONS, destination=page_munitions)
 page_munitions.link(button=ui_assets.GOTO_MAIN, destination=page_main)
 
@@ -340,15 +311,12 @@ page_rpg_story.link(button=raid_assets.RPG_HOME, destination=page_main)
 page_rpg_story.link(button=raid_assets.RPG_BACK, destination=page_campaign_menu)
 
 page_campaign_menu.link(button=ui_assets.CAMPAIGN_MENU_GOTO_EVENT, destination=page_rpg_stage)
-# page_main.link(button=MAIN_GOTO_RAID, destination=page_rpg_stage)
-# page_main_white.link(button=MAIN_GOTO_RAID_WHITE, destination=page_rpg_stage)
 
 page_rpg_city = Page(raid_assets.RPG_LEAVE_CITY)
 page_rpg_city.link(button=raid_assets.RPG_LEAVE_CITY, destination=page_rpg_stage)
 page_rpg_city.link(button=raid_assets.RPG_HOME, destination=page_main)
 
-# Keep page_rpg_stage, so Raid can import
-# page_rpg_stage = page_raid
+# 保留独立的 page_rpg_stage，Raid 模块会直接导入。
 
 # Hospital event (20250327)
 page_hospital = Page(HOSIPITAL_CHECK)
