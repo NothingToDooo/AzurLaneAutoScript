@@ -150,10 +150,6 @@ class Config(ConfigBase):
     }
 
 
-# step_on = SelectedGrids([A7, B1, B7, C7, D2, D3, G7, J2, K4, K6])
-# road_main = RoadGrids([A7, B1, B7, C7, D2, D3, [G7, J2], K4, K6])
-
-
 class Campaign(CampaignBase):
     MAP = MAP
 

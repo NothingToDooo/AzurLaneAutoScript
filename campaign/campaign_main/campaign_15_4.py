@@ -147,16 +147,9 @@ MAP.spawn_data = [
 
 
 class Config(ConfigBase):
-    # ===== Start of generated config =====
-    # MAP_SIREN_TEMPLATE = ['BOSS']
-    # MOVABLE_ENEMY_TURN = (2,)
-    # MAP_HAS_SIREN = True
-    # MAP_HAS_MOVABLE_ENEMY = True
     MAP_HAS_MAP_STORY = False
     MAP_HAS_FLEET_STEP = False
     MAP_HAS_AMBUSH = True
-    # MAP_HAS_MYSTERY = True
-    # ===== End of generated config =====
 
     MAP_SWIPE_MULTIPLY = (1.055, 1.075)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.020, 1.039)

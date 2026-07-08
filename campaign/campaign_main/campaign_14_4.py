@@ -153,14 +153,14 @@ MAP.spawn_data_loop = [
     K9,
 ) = MAP.flatten()
 
-# 14-4 has special enemy spawn mechanism
-# After entering map or each battle, enemies spawn on these nodes:
-# ['C2', 'D3', 'D4', 'H8', 'I7'], and 'B8' must spawns an enemy
-# ['A1', 'B2', 'B6', 'C7']
-# ['F5', 'G4', 'G6', 'I8', 'J9']
-# ['F2', 'G1', 'H2', 'K4', 'K5']
-# ['C5', 'C6', 'D5']
-# ['E8', 'G8']
+# 14-4 有特殊敌人刷新机制。
+# 进入地图或每次战斗后，敌人会刷新在以下节点组。
+# 第一组：C2、D3、D4、H8、I7，其中 B8 必定刷新敌人。
+# 第二组：A1、B2、B6、C7。
+# 第三组：F5、G4、G6、I8、J9。
+# 第四组：F2、G1、H2、K4、K5。
+# 第五组：C5、C6、D5。
+# 第六组：E8、G8。
 OVERRIDE = CampaignMap("14-4")
 OVERRIDE.map_data = """
     ME -- -- -- -- -- ME -- -- -- --
@@ -182,16 +182,9 @@ road_H9 = RoadGrids(
 
 
 class Config(ConfigBase):
-    # ===== Start of generated config =====
-    # MAP_SIREN_TEMPLATE = ['0']
-    # MOVABLE_ENEMY_TURN = (2,)
-    # MAP_HAS_SIREN = True
-    # MAP_HAS_MOVABLE_ENEMY = True
     MAP_HAS_MAP_STORY = False
     MAP_HAS_FLEET_STEP = False
     MAP_HAS_AMBUSH = True
-    # MAP_HAS_MYSTERY = True
-    # ===== End of generated config =====
 
     MAP_WALK_USE_CURRENT_FLEET = True
 
