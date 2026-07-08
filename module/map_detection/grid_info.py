@@ -1,5 +1,22 @@
 from module.base.utils import location2node
 
+_PRIMARY_GRID_CODES = {
+    "++": "is_land",
+    "BO": "is_boss",
+}
+_SECONDARY_GRID_CODES = {
+    "FL": "is_current_fleet",
+    "Fc": "is_caught_by_siren",
+    "Fl": "is_fleet",
+    "ss": "is_submarine",
+    "MY": "is_mystery",
+    "AM": "is_ammo",
+    "FR": "is_fortress",
+    "MI": "is_missile_attack",
+    "BE": "may_bouncing_enemy",
+    "==": "is_cleared",
+}
+
 
 class GridInfo:
     """
@@ -92,57 +109,43 @@ class GridInfo:
             self.__setattr__(v, valid and bool(k == text))
 
         self.may_ambush = not (self.may_enemy or self.may_boss or self.may_mystery or self.may_mystery)
-        # if self.may_siren:
-        #     self.may_enemy = True
-        # if self.may_boss:
-        #     self.may_enemy = True
+
+    def _encode_flag(self, flags):
+        for key, value in flags.items():
+            if self.__getattribute__(value):
+                return key
+        return ""
+
+    def _encode_siren(self):
+        if not self.enemy_genre:
+            return "SU"
+        # enemy_genre 形如 "Siren_xxx"。
+        name = self.enemy_genre[6:]
+        if "_" in name:
+            _, _, name = name.partition("_")
+        name = name[:2].upper()
+        if len(name) == 2:
+            return name
+        if len(name) == 1:
+            return f"{name} "
+        return "SU"
+
+    def _encode_enemy(self):
+        scale = self.enemy_scale or 0
+        genre = self.enemy_genre[0].upper() if self.enemy_genre else "E"
+        return f"{scale}{genre}"
 
     def encode(self):
-        dic = {
-            "++": "is_land",
-            "BO": "is_boss",
-        }
-        for key, value in dic.items():
-            if self.__getattribute__(value):
-                return key
-
+        primary = self._encode_flag(_PRIMARY_GRID_CODES)
+        if primary:
+            return primary
         if self.is_siren:
-            if not self.enemy_genre:
-                return "SU"
-            # enemy_genre is like "Siren_xxx"
-            name = self.enemy_genre[6:]
-            if "_" in name:
-                _, _, name = name.partition("_")
-            name = name[:2]
-            length = len(name)
-            if length == 2:
-                return name.upper()
-            if length == 1:
-                return f"{name.upper()} "
-            return "SU"
-
+            return self._encode_siren()
         if self.is_enemy:
-            scale = self.enemy_scale or 0
-            genre = self.enemy_genre[0].upper() if self.enemy_genre else "E"
-            return f"{scale}{genre}"
+            return self._encode_enemy()
 
-        dic = {
-            "FL": "is_current_fleet",
-            "Fc": "is_caught_by_siren",
-            "Fl": "is_fleet",
-            "ss": "is_submarine",
-            "MY": "is_mystery",
-            "AM": "is_ammo",
-            "FR": "is_fortress",
-            "MI": "is_missile_attack",
-            "BE": "may_bouncing_enemy",
-            "==": "is_cleared",
-        }
-        for key, value in dic.items():
-            if self.__getattribute__(value):
-                return key
-
-        return "--"
+        secondary = self._encode_flag(_SECONDARY_GRID_CODES)
+        return secondary or "--"
 
     def __str__(self):
         return location2node(self.location)
@@ -277,9 +280,7 @@ class GridInfo:
             if self.may_enemy:
                 self.is_enemy = True
                 return True
-            # Allow wrong predictions
-            # else:
-            #     return False
+            # 允许误判，不返回失败。
 
         return True
 
