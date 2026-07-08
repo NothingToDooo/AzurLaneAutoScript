@@ -15,7 +15,6 @@ class EmulatorChecker(Device):
         while 1:
             t0 = time.time()
             self.screenshot_nemu_ipc()
-            # self.click_minitouch(1270, 360)
 
             cost = time.time() - t0
             record.append(cost)
@@ -25,10 +24,6 @@ class EmulatorChecker(Device):
 
 class Config:
     SERIAL = "127.0.0.1:5555"
-    # SERIAL = '127.0.0.1:62001'
-    # SERIAL = '127.0.0.1:7555'
-    # SERIAL = 'emulator-5554'
-    # SERIAL = '127.0.0.1:21503'
 
     Emulator_ScreenshotMethod = "nemu_ipc"
 

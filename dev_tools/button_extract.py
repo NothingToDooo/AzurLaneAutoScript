@@ -98,16 +98,6 @@ class ImageExtractor:
 
 
 class TemplateExtractor(ImageExtractor):
-    # def __init__(self, module, file, config):
-    #     """
-    #     Args:
-    #         module(str):
-    #         file(str): xxx.png
-    #         config(AzurLaneConfig):
-    #     """
-    #     self.module = module
-    #     self.file = file
-    #     self.config = config
     @staticmethod
     def extract(file):
         image = load_image(file)
@@ -119,17 +109,6 @@ class TemplateExtractor(ImageExtractor):
     @property
     def expression(self):
         return f"{self.name} = Template(file={self.file})"
-        # return '%s = Template(area=%s, color=%s, button=%s, file=\'%s\')' % (
-        #     self.name, self.area, self.color, self.button,
-        #     self.config.ASSETS_FOLDER + '/' + self.module + '/' + self.name + '.png')
-
-
-# class OcrExtractor(ImageExtractor):
-#     @property
-#     def expression(self):
-#         return '%s = OcrArea(area=%s, color=%s, button=%s, file=\'%s\')' % (
-#             self.name, self.area, self.color, self.button,
-#             self.config.ASSETS_FOLDER + '/' + self.module + '/' + self.name + '.png')
 
 
 class ModuleExtractor:
@@ -157,9 +136,6 @@ class ModuleExtractor:
             if file.startswith("TEMPLATE_"):
                 exp.append(TemplateExtractor(module=self.name, file=file).expression)
                 continue
-            # if file.startswith('OCR_'):
-            #     exp.append(OcrExtractor(module=self.name, file=file, config=self.config).expression)
-            #     continue
             if self.is_base_image(file):
                 exp.append(ImageExtractor(module=self.name, file=file).expression)
                 continue

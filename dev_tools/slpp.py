@@ -56,8 +56,7 @@ class SLPP:
         # 删除注释可能导致错误，例如下面这类内容会被误认为注释：
         # `profiles = "现世与梦境夹缝中的蝴蝶，狂风与巨浪蹂躏中的小舟。`
         # `跨越虚无，驱散黑暗，为重樱带来希望和未来吧---------- ",`
-        # reg = re.compile('--.*$', re.M)
-        # text = reg.sub('', text, 0)
+        # 早期尝试用 "--.*$" 正则删注释，后来确认会误伤包含长破折号的文本。
         self.text = text
         self.at, self.ch, self.depth = 0, "", 0
         self.len = len(text)
