@@ -26,7 +26,7 @@ class cached_class_property[T]:
     """
 
     class AliasConflict(ValueError):
-        pass
+        """缓存属性名与生成的缓存字段名冲突。"""
 
     def __init__(self, func: Callable[..., T]):
         self.__func__ = func
