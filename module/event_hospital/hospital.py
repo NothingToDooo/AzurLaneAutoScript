@@ -53,14 +53,24 @@ class Hospital(HospitalClue, HospitalCombat):
         Pages:
             in：page_hospital。
         """
-        if self.daily_red_dot_appear():
-            logger.info("Daily red dot appear")
-        else:
-            logger.info("No daily red dot")
+        if not self._daily_reward_available():
             return False
 
         logger.hr("Daily reward receive", level=2)
-        # 进入每日奖励。
+        self._enter_daily_reward()
+        self._claim_daily_reward()
+        self._exit_daily_reward()
+        return True
+
+    def _daily_reward_available(self):
+        if self.daily_red_dot_appear():
+            logger.info("Daily red dot appear")
+            return True
+
+        logger.info("No daily red dot")
+        return False
+
+    def _enter_daily_reward(self) -> None:
         logger.info("Daily reward enter")
         skip_first_screenshot = True
         self.interval_clear(page_hospital.check_button)
@@ -76,7 +86,7 @@ class Hospital(HospitalClue, HospitalCombat):
                 self.device.click(hospital_assets.HOSPITAL_GOTO_DAILY)
                 continue
 
-        # 领取每日奖励。
+    def _claim_daily_reward(self) -> None:
         logger.info("Daily reward receive")
         skip_first_screenshot = True
         self.interval_clear(hospital_assets.HOSIPITAL_CLUE_CHECK)
@@ -100,7 +110,7 @@ class Hospital(HospitalClue, HospitalCombat):
                 clicked = True
                 continue
 
-        # 退出每日奖励页。
+    def _exit_daily_reward(self) -> None:
         logger.info("Daily reward exit")
         skip_first_screenshot = True
         self.interval_clear(hospital_assets.HOSIPITAL_CLUE_CHECK)
@@ -116,8 +126,6 @@ class Hospital(HospitalClue, HospitalCombat):
                 self.device.click(hospital_assets.HOSIPITAL_CLUE_CHECK)
                 logger.info(f"is_in_daily_reward -> {hospital_assets.HOSIPITAL_CLUE_CHECK}")
                 continue
-
-        return True
 
     def loop_invest(self):
         """
