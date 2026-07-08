@@ -457,6 +457,55 @@ class ConfigGenerator:
             f.writelines(lines)
         return events[::-1]
 
+    @staticmethod
+    def _event_insert_tasks(event) -> tuple[str, ...]:
+        if event.is_raid:
+            return tuple(RAIDS)
+        if event.is_war_archives:
+            return tuple(WAR_ARCHIVES)
+        if event.is_coalition:
+            return tuple(COALITIONS)
+        return tuple(EVENTS + GEMS_FARMINGS)
+
+    def _event_latest_date_key(self, event) -> str | None:
+        if event.is_war_archives:
+            return None
+        if event.is_raid:
+            return "_latest_raid_date"
+        if event.is_coalition:
+            return "_latest_coalition_date"
+        return "_latest_event_date"
+
+    def _is_latest_event(self, event) -> bool:
+        date_key = self._event_latest_date_key(event)
+        if date_key is None:
+            return True
+        if not hasattr(self, date_key):
+            setattr(self, date_key, int(event.date))
+        return int(event.date) == getattr(self, date_key)
+
+    def _append_event_option(self, task, event) -> None:
+        opts = deep_get(self.args, keys=f"{task}.Campaign.Event.option", default=[])
+        if event not in opts:
+            opts.append(event)
+        deep_set(self.args, keys=f"{task}.Campaign.Event.option", value=opts)
+
+    def _insert_campaign_event(self, event) -> None:
+        if not event.cn or not self._is_latest_event(event):
+            return
+        for task in self._event_insert_tasks(event):
+            self._append_event_option(task, event)
+
+    def _clean_campaign_event_options(self, task) -> None:
+        options = []
+        for option in deep_get(self.args, keys=f"{task}.Campaign.Event.option", default=[]):
+            if option == "campaign_main" or option in options:
+                continue
+            options.append(option)
+        if task not in WAR_ARCHIVES:
+            deep_set(self.args, keys=f"{task}.Campaign.Event.option_bold", value=options)
+        deep_set(self.args, keys=f"{task}.Campaign.Event.option", value=options)
+
     def insert_event(self):
         """
         将活动信息写入 `self.args`。
@@ -466,46 +515,9 @@ class ConfigGenerator:
                    args.json -----+-----> args.json
         """
         for event in self.event:
-            name = event.cn
-
-            def insert(key, event=event):
-                opts = deep_get(self.args, keys=f"{key}.Campaign.Event.option", default=[])
-                if event not in opts:
-                    opts.append(event)
-                deep_set(self.args, keys=f"{key}.Campaign.Event.option", value=opts)
-
-            if name:
-                if event.is_raid:
-                    if not hasattr(self, "_latest_raid_date"):
-                        self._latest_raid_date = int(event.date)
-                    if int(event.date) == self._latest_raid_date:
-                        for task in RAIDS:
-                            insert(task)
-                elif event.is_war_archives:
-                    for task in WAR_ARCHIVES:
-                        insert(task)
-                elif event.is_coalition:
-                    if not hasattr(self, "_latest_coalition_date"):
-                        self._latest_coalition_date = int(event.date)
-                    if int(event.date) == self._latest_coalition_date:
-                        for task in COALITIONS:
-                            insert(task)
-                else:
-                    if not hasattr(self, "_latest_event_date"):
-                        self._latest_event_date = int(event.date)
-                    if int(event.date) == self._latest_event_date:
-                        for task in EVENTS + GEMS_FARMINGS:
-                            insert(task)
-
+            self._insert_campaign_event(event)
         for task in EVENTS + GEMS_FARMINGS + WAR_ARCHIVES + RAIDS + COALITIONS:
-            options = []
-            for option in deep_get(self.args, keys=f"{task}.Campaign.Event.option", default=[]):
-                if option == "campaign_main" or option in options:
-                    continue
-                options.append(option)
-            if task not in WAR_ARCHIVES:
-                deep_set(self.args, keys=f"{task}.Campaign.Event.option_bold", value=options)
-            deep_set(self.args, keys=f"{task}.Campaign.Event.option", value=options)
+            self._clean_campaign_event_options(task)
 
     def insert_package(self):
         option = deep_get(self.argument, keys="Emulator.PackageName.option")
