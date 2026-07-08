@@ -26,7 +26,6 @@ MAP.weight_data = """
     10 10 10 10 10 10 10
     10 10 10 10 10 10 10
 """
-# MAP.camera_data = ['D3', 'D5']
 MAP.camera_data = ["C3", "D5"]
 MAP.spawn_data = [
     {"battle": 0, "enemy": 2, "siren": 2},

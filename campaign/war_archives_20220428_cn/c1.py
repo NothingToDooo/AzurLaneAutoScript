@@ -123,7 +123,6 @@ class Config:
         "height": (255 - 33, 255),
         "prominence": 10,
         "distance": 50,
-        # 'width': (0, 7),
         "wlen": 1000,
     }
     HOMO_CANNY_THRESHOLD = (50, 75)

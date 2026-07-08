@@ -176,7 +176,6 @@ MAP.spawn_data = [
 class Config:
     SUBMARINE = 0
 
-    # POOR_MAP_DATA = True
     MAP_HAS_AMBUSH = False
     MAP_HAS_FLEET_STEP = True
     MAP_HAS_MOVABLE_ENEMY = True

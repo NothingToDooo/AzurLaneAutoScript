@@ -6,7 +6,6 @@ from .campaign_base import CampaignBase
 
 MAP = CampaignMap("HT1")
 MAP.shape = "K7"
-# MAP.camera_data = ['D2', 'D5', 'H2', 'H5']
 MAP.camera_data = ["D3", "D5", "H3", "H5"]
 MAP.camera_data_spawn_point = ["H5", "D5"]
 MAP.map_data = """

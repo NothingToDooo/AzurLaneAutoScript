@@ -5,7 +5,6 @@ from .b1 import Config as ConfigBase
 
 MAP = CampaignMap("B3")
 MAP.shape = "I9"
-# MAP.camera_data = ['D2', 'D6', 'D7', 'F2', 'F6', 'F7']
 MAP.camera_data = ["D2", "D5", "D7", "F2", "F5", "F7"]
 MAP.camera_data_spawn_point = ["F7", "D7"]
 MAP.map_data = """
@@ -138,7 +137,6 @@ class Config(ConfigBase):
     MAP_SWIPE_MULTIPLY = (1.002, 1.021)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (0.970, 0.987)
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 40
-    # EDGE_LINES_HOUGHLINES_THRESHOLD = 40
 
 
 class Campaign(CampaignBase):

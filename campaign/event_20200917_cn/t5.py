@@ -7,8 +7,6 @@ from .t1 import Config as ConfigBase
 
 MAP = CampaignMap("T5")
 MAP.shape = "I9"
-# MAP.camera_data = ['D2', 'D6', 'D7', 'F2', 'F6', 'F7']
-# MAP.camera_data_spawn_point = ['F7', 'D2']
 MAP.camera_data = ["D3", "D5", "D7", "F3", "F5", "F7"]
 MAP.camera_data_spawn_point = ["F7", "D3"]
 MAP.portal_data = [("D3", "F3"), ("G4", "G6"), ("F7", "D7"), ("C6", "C4")]

@@ -136,7 +136,6 @@ class Config:
     # ===== End of generated config =====
 
     MAP_CHAPTER_SWITCH_20241219 = True
-    # MAP_HAS_MODE_SWITCH = True
     STAGE_ENTRANCE = ("half", "20240725")
     STAGE_INCREASE_AB = True
     MAP_IS_ONE_TIME_STAGE = True
@@ -150,7 +149,6 @@ class Config:
         "height": (255 - 33, 255),
         "prominence": 10,
         "distance": 50,
-        # 'width': (0, 7),
         "wlen": 1000,
     }
     MAP_SWIPE_MULTIPLY = (1.153, 1.175)

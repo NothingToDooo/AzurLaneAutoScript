@@ -102,7 +102,6 @@ class Config:
         "height": (255 - 80, 255),
         "prominence": 10,
         "distance": 50,
-        # 'width': (0, 7),
         "wlen": 1000,
     }
 

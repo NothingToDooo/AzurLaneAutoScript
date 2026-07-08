@@ -133,7 +133,6 @@ class Config:
         "height": (255 - 24, 255),
         "prominence": 10,
         "distance": 50,
-        # 'width': (0, 7),
         "wlen": 1000,
     }
     MAP_ENEMY_GENRE_DETECTION_SCALING: ClassVar[dict[str, object]] = {

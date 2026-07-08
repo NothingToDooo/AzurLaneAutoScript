@@ -158,7 +158,6 @@ class Config:
         "height": (255 - 33, 255),
         "prominence": 10,
         "distance": 50,
-        # 'width': (0, 7),
         "wlen": 1000,
     }
     MAP_SWIPE_MULTIPLY = (1.254, 1.278)

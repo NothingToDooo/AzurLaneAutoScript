@@ -7,7 +7,6 @@ from ..campaign_war_archives.campaign_base import CampaignBase
 MAP = CampaignMap("C1")
 MAP.camera_sight = (-4, -2, 4, 2)
 MAP.shape = "I6"
-# MAP.camera_data = ['D2', 'D4', 'F2', 'F4']
 MAP.camera_data_spawn_point = []
 MAP.map_data = """
     Me -- -- ME -- -- ME -- Me

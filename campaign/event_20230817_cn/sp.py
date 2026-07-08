@@ -173,7 +173,6 @@ class Config:
         "height": (255 - 17, 255),
         "prominence": 10,
         "distance": 50,
-        # 'width': (0, 7),
         "wlen": 1000,
     }
     HOMO_EDGE_HOUGHLINES_THRESHOLD = 180

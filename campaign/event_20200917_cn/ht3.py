@@ -5,8 +5,6 @@ from .ht1 import Config as ConfigBase
 
 MAP = CampaignMap("HT3")
 MAP.shape = "I9"
-# MAP.camera_data = ['D2', 'D6', 'D7', 'F2', 'F6', 'F7']
-# MAP.camera_data_spawn_point = ['D7', 'D6']
 MAP.camera_data = ["D3", "D5", "D7", "F3", "F5", "F7"]
 MAP.camera_data_spawn_point = ["D5"]
 MAP.portal_data = [("I2", "A1"), ("A1", "I2"), ("I9", "H1"), ("H1", "I9")]

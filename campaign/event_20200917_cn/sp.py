@@ -6,8 +6,6 @@ from .campaign_base import CampaignBase
 
 MAP = CampaignMap("SP")
 MAP.shape = "K9"
-# MAP.camera_data = ['D2', 'D6', 'D7', 'H2', 'H6', 'H7']
-# MAP.camera_data_spawn_point = ['D2', 'H2']
 MAP.camera_data = ["F2", "F4", "F7"]
 MAP.camera_data_spawn_point = ["F2"]
 MAP.portal_data = [("E1", "K1"), ("K1", "E1"), ("A1", "G1"), ("G1", "A1")]
