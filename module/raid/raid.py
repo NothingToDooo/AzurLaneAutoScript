@@ -62,36 +62,69 @@ class HuanChangPtOcr(Digit):
         return image.astype(np.uint8)
 
 
+RAID_NAME_PREFIX = {
+    "raid_20200624": "ESSEX",
+    "raid_20210708": "SURUGA",
+    "raid_20220127": "BRISTOL",
+    "raid_20220630": "IRIS",
+    "raid_20221027": "ALBION",
+    "raid_20230118": "KUYBYSHEY",
+    "raid_20230629": "GORIZIA",
+    "raid_20240130": "HUANCHANG",
+    "raid_20240328": "RPG",
+    "raid_20250116": "CHIENWU",
+    "raid_20260212": "CHANGWU",
+}
+
+RAID_OCR_CONFIG = {
+    "ESSEX": {"default": (RaidCounter, {"letter": (57, 52, 255), "threshold": 128})},
+    "SURUGA": {"default": (RaidCounter, {"letter": (49, 48, 49), "threshold": 128})},
+    "BRISTOL": {"default": (RaidCounter, {"letter": (214, 231, 219), "threshold": 128})},
+    "IRIS": {"default": (DigitCounter, {"letter": (148, 138, 123), "threshold": 128, "lang": "cnocr"})},
+    "ALBION": {"default": (DigitCounter, {"letter": (99, 73, 57), "threshold": 128})},
+    "KUYBYSHEY": {
+        "default": (DigitCounter, {"letter": (231, 239, 247), "threshold": 128}),
+        "ex": (Digit, {"letter": (189, 203, 214), "threshold": 128}),
+    },
+    "GORIZIA": {
+        "default": (DigitCounter, {"letter": (82, 89, 66), "threshold": 128}),
+        "ex": (Digit, {"letter": (198, 223, 140), "threshold": 128}),
+    },
+    "HUANCHANG": {
+        "default": (HuanChangCounter, {"letter": (255, 255, 255), "threshold": 80}),
+        "ex": (Digit, {"letter": (255, 255, 255), "threshold": 180}),
+    },
+    "CHIENWU": {
+        "default": (DigitCounter, {"letter": (0, 0, 0), "threshold": 128}),
+        "ex": (Digit, {"letter": (247, 223, 222), "threshold": 128}),
+    },
+    "CHANGWU": {
+        "default": (RaidCounterPostMixin, {"lang": "cnocr", "letter": (154, 148, 133), "threshold": 128}),
+        "ex": (Digit, {"letter": (255, 239, 215), "threshold": 128}),
+    },
+}
+
+RAID_PT_OCR_CONFIG = {
+    "IRIS": (Digit, {"letter": (181, 178, 165), "threshold": 128}),
+    "ALBION": (Digit, {"letter": (23, 20, 9), "threshold": 128}),
+    "KUYBYSHEY": (Digit, {"letter": (16, 24, 33), "threshold": 64}),
+    "GORIZIA": (Digit, {"letter": (255, 255, 255), "threshold": 64}),
+    "HUANCHANG": (HuanChangPtOcr, {"letter": (23, 20, 6), "threshold": 128}),
+    "CHIENWU": (Digit, {"letter": (255, 231, 231), "threshold": 128}),
+    "CHANGWU": (Digit, {"letter": (255, 239, 215), "threshold": 128}),
+}
+
+
 def raid_name_shorten(name):
     """
     Args:
-        name (str): Raid name, such as raid_20200624, raid_20210708.
+        name (str): 共斗活动名，例如 raid_20200624、raid_20210708。
 
     Returns:
-        str: Prefix of button name, such as ESSEX, SURUGA.
+        str: 按钮名前缀，例如 ESSEX、SURUGA。
     """
-    if name == "raid_20200624":
-        return "ESSEX"
-    if name == "raid_20210708":
-        return "SURUGA"
-    if name == "raid_20220127":
-        return "BRISTOL"
-    if name == "raid_20220630":
-        return "IRIS"
-    if name == "raid_20221027":
-        return "ALBION"
-    if name == "raid_20230118":
-        return "KUYBYSHEY"
-    if name == "raid_20230629":
-        return "GORIZIA"
-    if name == "raid_20240130":
-        return "HUANCHANG"
-    if name == "raid_20240328":
-        return "RPG"
-    if name == "raid_20250116":
-        return "CHIENWU"
-    if name == "raid_20260212":
-        return "CHANGWU"
+    if prefix := RAID_NAME_PREFIX.get(name):
+        return prefix
     raise ScriptError(f"Unknown raid name: {name}")
 
 
@@ -127,40 +160,11 @@ def raid_ocr(raid, mode):
     raid = raid_name_shorten(raid)
     key = f"{raid}_OCR_REMAIN_{mode.upper()}"
     button = _raid_asset(key)
-    # 旧共斗使用 RaidCounter，以兼容旧 OCR 模型和素材。
-    # 新共斗使用 DigitCounter。
-    if raid == "ESSEX":
-        return RaidCounter(button, letter=(57, 52, 255), threshold=128)
-    if raid == "SURUGA":
-        return RaidCounter(button, letter=(49, 48, 49), threshold=128)
-    if raid == "BRISTOL":
-        return RaidCounter(button, letter=(214, 231, 219), threshold=128)
-    if raid == "IRIS":
-        # 字体不在 azur_lane 模型中，使用通用 OCR 模型。
-        return DigitCounter(button, letter=(148, 138, 123), threshold=128, lang="cnocr")
-    if raid == "ALBION":
-        return DigitCounter(button, letter=(99, 73, 57), threshold=128)
-    if raid == "KUYBYSHEY":
-        if mode == "ex":
-            return Digit(button, letter=(189, 203, 214), threshold=128)
-        return DigitCounter(button, letter=(231, 239, 247), threshold=128)
-    if raid == "GORIZIA":
-        if mode == "ex":
-            return Digit(button, letter=(198, 223, 140), threshold=128)
-        return DigitCounter(button, letter=(82, 89, 66), threshold=128)
-    if raid == "HUANCHANG":
-        if mode == "ex":
-            return Digit(button, letter=(255, 255, 255), threshold=180)
-        # 竖排数量。
-        return HuanChangCounter(button, letter=(255, 255, 255), threshold=80)
-    if raid == "CHIENWU":
-        if mode == "ex":
-            return Digit(button, letter=(247, 223, 222), threshold=128)
-        return DigitCounter(button, letter=(0, 0, 0), threshold=128)
-    if raid == "CHANGWU":
-        if mode == "ex":
-            return Digit(button, letter=(255, 239, 215), threshold=128)
-        return RaidCounterPostMixin(button, lang="cnocr", letter=(154, 148, 133), threshold=128)
+    config = RAID_OCR_CONFIG.get(raid, {})
+    counter_config = config.get(mode, config.get("default"))
+    if counter_config is not None:
+        counter, kwargs = counter_config
+        return counter(button, **kwargs)
     raise ScriptError(f"Raid OCR is not configured: {raid}, mode={mode}")
 
 
@@ -176,22 +180,11 @@ def pt_ocr(raid):
     key = f"{raid}_OCR_PT"
     button = getattr(raid_assets, key, None)
     if button is None:
-        # raise ScriptError(f'Raid pt ocr asset not exists: {key}')
         return None
-    if raid == "IRIS":
-        return Digit(button, letter=(181, 178, 165), threshold=128)
-    if raid == "ALBION":
-        return Digit(button, letter=(23, 20, 9), threshold=128)
-    if raid == "KUYBYSHEY":
-        return Digit(button, letter=(16, 24, 33), threshold=64)
-    if raid == "GORIZIA":
-        return Digit(button, letter=(255, 255, 255), threshold=64)
-    if raid == "HUANCHANG":
-        return HuanChangPtOcr(button, letter=(23, 20, 6), threshold=128)
-    if raid == "CHIENWU":
-        return Digit(button, letter=(255, 231, 231), threshold=128)
-    if raid == "CHANGWU":
-        return Digit(button, letter=(255, 239, 215), threshold=128)
+    ocr_config = RAID_PT_OCR_CONFIG.get(raid)
+    if ocr_config is not None:
+        counter, kwargs = ocr_config
+        return counter(button, **kwargs)
     raise ScriptError(f"Raid PT OCR is not configured: {raid}")
 
 
