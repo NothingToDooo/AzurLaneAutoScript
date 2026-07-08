@@ -123,7 +123,7 @@ class Config:
     MAP_HAS_DYNAMIC_RED_BORDER = False
     MAP_SIREN_COUNT = 1
     MAP_HAS_PT_BONUS = True
-    # MAP_SIREN_TEMPLATE = ['DD', 'CL']
+    # 旧记录的塞壬候选模板为 DD 和 CL。
 
     INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (100, 255 - 24),

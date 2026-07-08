@@ -93,7 +93,6 @@ class CampaignBase(CampaignBase_):
             self.device.click(MYSTERY_ITEM)
             self.device.sleep(0.5)
             self.device.screenshot()
-            # self.strategy_close()
             return True
         return False
 

@@ -93,7 +93,6 @@ ROAD_MAIN = RoadGrids([[E6, E7, F5, G5]])
 class Config:
     MAP_HAS_AMBUSH = False
     CAMPAIGN_MODE = "cd"
-    # INTERNAL_LINES_HOUGHLINES_THRESHOLD = 60
     INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (150, 255 - 25),
         "width": 1,
@@ -136,7 +135,6 @@ class Campaign(CampaignBase):
     def handle_in_stage(self):
         if self.appear(ENTRANCE):
             logger.info("In stage.")
-            # self.device.sleep(0.5)
             self.ensure_no_info_bar(timeout=0.6)
             return True
         return False

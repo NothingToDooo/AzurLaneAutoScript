@@ -181,7 +181,6 @@ class Config:
     MAP_HAS_MOVABLE_ENEMY = True
     MAP_HAS_SIREN = True
     MAP_HAS_DYNAMIC_RED_BORDER = False
-    # MAP_HAS_MAP_STORY = True
     MAP_SIREN_COUNT = 3
     STAR_REQUIRE_3 = 0  # SP map don't need to clear all enemies.
     DETECTION_BACKEND = "homography"

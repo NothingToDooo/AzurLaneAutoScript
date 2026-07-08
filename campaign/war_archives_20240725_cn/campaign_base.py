@@ -25,6 +25,4 @@ class CampaignBase(CampaignBase_):
         if mode == "hard":
             self.config.override(Campaign_Mode="hard")
 
-        # this event only have chapter T/HT and chapter SP, and war archive does not have SP
-        # so there is no mode switch buttons
-        # self.campaign_ensure_mode_20241219(mode)
+        # 该活动只有 T/HT 和 SP，复刻档案没有 SP，因此没有模式切换按钮。

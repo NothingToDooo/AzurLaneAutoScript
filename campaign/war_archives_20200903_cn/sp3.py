@@ -40,7 +40,6 @@ MAP.spawn_data = [
     {"battle": 0, "enemy": 2, "siren": 2},
     {"battle": 1, "enemy": 2},
     {"battle": 2, "enemy": 1},
-    # {'battle': 3, 'enemy': 1, 'mystery': 1},
     {"battle": 3, "enemy": 1},
     {"battle": 4, "enemy": 1},
     {"battle": 5, "boss": 1},

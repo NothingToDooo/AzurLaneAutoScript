@@ -85,13 +85,13 @@ class CampaignBase(CampaignBase_):
             elif chapter in ["c", "d", "cs", "ds"]:
                 self.campaign_ensure_mode("hard")
             elif chapter == "ex_sp":
-                # self.campaign_ensure_mode('ex')
+                # 活动差异：EX_SP 不切换 EX 模式。
                 pass  # 活动差异。
             self.campaign_ensure_chapter(chapter)
 
         elif chapter == "sp":
-            # self.ui_goto_sp()
-            self.ui_goto_event()  # 活动差异。
+            # 活动差异：SP 从活动入口进入。
+            self.ui_goto_event()
             self.campaign_ensure_chapter(chapter)
 
         else:

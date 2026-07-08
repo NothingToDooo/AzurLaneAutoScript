@@ -26,10 +26,6 @@ MAP.weight_data = """
 MAP.land_based_data = [["D6", "up"], ["H5", "up"], ["F2", "down"], ["C1", "down"]]
 MAP.spawn_data = [
     {"battle": 0, "boss": 1},
-    # {'battle': 1, 'enemy': 2},
-    # {'battle': 2, 'enemy': 1},
-    # {'battle': 3, 'enemy': 1, 'mystery': 1},
-    # {'battle': 4, 'enemy': 1},
 ]
 (
     A1,
