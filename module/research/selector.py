@@ -39,6 +39,11 @@ FILTER_REGEX = re.compile(
 FILTER_ATTR = ("series", "ship", "ship_rarity", "genre", "number", "duration")
 FILTER_PRESET = ("shortest", "cheapest", "reset")
 FILTER = Filter(FILTER_REGEX, FILTER_ATTR, FILTER_PRESET)
+_RESEARCH_RESOURCE_RULES = (
+    ("need_cube", "Research_UseCube"),
+    ("need_coin", "Research_UseCoin"),
+    ("need_part", "Research_UsePart"),
+)
 
 
 class ResearchSelector(ResearchUI):
@@ -131,57 +136,45 @@ class ResearchSelector(ResearchUI):
         return priority
 
     def _research_check(self, project, enforce=False):
-        """
+        """检查科研项目是否符合当前筛选策略。
+
         Args:
             project (ResearchProject):
-            enforce (Bool):
+            enforce (bool):
+
         Returns:
             bool:
         """
         if not project.valid:
             return False
+        if not self._research_resource_allowed(project, enforce):
+            return False
+        return self._research_genre_allowed(project)
 
-        # Check project consumption
+    def _research_resource_allowed(self, project, enforce):
         is_05 = str(project.duration) == "0.5"
-        if project.need_cube:
-            if self.config.Research_UseCube == "do_not_use":
+        for need_attr, config_attr in _RESEARCH_RESOURCE_RULES:
+            if getattr(project, need_attr) and not self._research_resource_config_allowed(
+                getattr(self.config, config_attr), is_05, enforce
+            ):
                 return False
-            if self.config.Research_UseCube == "only_no_project" and not enforce:
-                return False
-            if self.config.Research_UseCube == "only_05_hour" and not is_05 and not enforce:
-                return False
-        if project.need_coin:
-            if self.config.Research_UseCoin == "do_not_use":
-                return False
-            if self.config.Research_UseCoin == "only_no_project" and not enforce:
-                return False
-            if self.config.Research_UseCoin == "only_05_hour" and not is_05 and not enforce:
-                return False
-        if project.need_part:
-            if self.config.Research_UsePart == "do_not_use":
-                return False
-            if self.config.Research_UsePart == "only_no_project" and not enforce:
-                return False
-            if self.config.Research_UsePart == "only_05_hour" and not is_05 and not enforce:
-                return False
+        return True
 
-        # Reasons to ignore B series and E-2:
-        # - Can't guarantee research condition satisfied.
-        #   You may get nothing after a day of running, because you didn't complete the precondition.
-        # - Low income from B series research.
-        #   Gold B-4 basically equivalent to C-12, but needs a lot of oil.
-
-        if project.genre.upper() == "B":
+    @staticmethod
+    def _research_resource_config_allowed(config, is_05, enforce):
+        if config == "do_not_use":
             return False
-        # T series require commission
-        # 2022.05.08 Allow T series researches because commission is now force to enable
-        # 2022.07.17 再次禁用 T 类，因为前置条件不满足时无法入队。
+        if enforce:
+            return True
+        if config == "only_no_project":
+            return False
+        return not (config == "only_05_hour" and not is_05)
+
+    def _research_genre_allowed(self, project):
         genre = project.genre.upper()
-        if genre == "T":
+        # B 类收益低且前置条件不稳定；T 类前置条件不满足时无法入队。
+        if genre in {"B", "T"}:
             return False
-        # 2021.08.19 允许 E-2 拆科技箱。
-        # 2022.08.23 允许全部 E-2，拆装备已经支持。
-        # 没有可拆箱子时忽略 E-2，避免开始科研、尝试拆箱、取消科研的循环。
         return self.storage_has_boxes or genre != "E" or project.equipment_amount == 0
 
     def research_sort_shortest(self, enforce):
