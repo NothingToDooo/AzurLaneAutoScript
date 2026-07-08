@@ -100,6 +100,20 @@ def retry_sleep(trial):
     return RETRY_DELAY
 
 
+_RETRYABLE_ADB_ERROR_SNIPPETS = (
+    "not found",
+    "timeout",
+    "closed",
+    "device offline",
+    "is offline",
+)
+
+
+def is_retryable_adb_error(text: str) -> bool:
+    # `rest` 是 adbd 重置响应，其他片段来自常见断线、超时和离线错误。
+    return text == "rest" or any(snippet in text for snippet in _RETRYABLE_ADB_ERROR_SNIPPETS)
+
+
 def handle_adb_error(e):
     """
     Args:
@@ -109,43 +123,9 @@ def handle_adb_error(e):
         bool: If should retry
     """
     text = str(e)
-    if "not found" in text:
-        # When you call `adb disconnect <serial>`
-        # Or when adb server was killed (low possibility)
-        # AdbError(device '127.0.0.1:59865' not found)
+    if is_retryable_adb_error(text):
         logger.error(e)
         return True
-    if "timeout" in text:
-        # AdbTimeout(adb read timeout)
-        logger.error(e)
-        return True
-    if "closed" in text:
-        # AdbError(closed)
-        # Usually after AdbTimeout(adb read timeout)
-        # Disconnect and re-connect should fix this.
-        logger.error(e)
-        return True
-    if "device offline" in text:
-        # AdbError(device offline)
-        # When a device that has been connected wirelessly is disconnected passively,
-        # it does not disappear from the adb device list,
-        # but will be displayed as offline.
-        # In many cases, such as disconnection and recovery caused by network fluctuations,
-        # or after VMOS reboot when running Alas on a phone,
-        # the device is still available, but it needs to be disconnected and re-connected.
-        logger.error(e)
-        return True
-    if "is offline" in text:
-        # RuntimeError: USB device 127.0.0.1:7555 is offline
-        # ADB 服务被其他版本抢占后，部分底层调用会返回这种离线文本。
-        logger.error(e)
-        return True
-    if text == "rest":
-        # AdbError(rest)
-        # Response telling adbd service has reset, client should reconnect
-        logger.error(e)
-        return True
-    # AdbError()
     logger.exception(e)
     possible_reasons(
         "Emulator died, please restart emulator",
