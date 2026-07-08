@@ -18,6 +18,33 @@ def float2str(n, decimal=3):
     return float2str_(n, decimal=decimal) + "s"
 
 
+_SCREENSHOT_SPEED_LEVELS = (
+    (0.025, "Insane Fast", "bold bright_green"),
+    (0.100, "Ultra Fast", "bold bright_green"),
+    (0.200, "Very Fast", "bright_green"),
+    (0.300, "Fast", "green"),
+    (0.500, "Medium", "yellow"),
+    (0.750, "Slow", "red"),
+    (1.000, "Very Slow", "bright_red"),
+)
+_CLICK_SPEED_LEVELS = (
+    (0.100, "Fast", "bright_green"),
+    (0.200, "Medium", "yellow"),
+    (0.400, "Slow", "red"),
+)
+
+
+def _evaluate_speed(cost, levels, fallback):
+    if not isinstance(cost, (float, int)):
+        return Text(cost, style="bold bright_red")
+
+    for limit, label, style in levels:
+        if cost < limit:
+            return Text(label, style=style)
+    label, style = fallback
+    return Text(label, style=style)
+
+
 class Benchmark(DaemonBase, CampaignUI):
     TEST_TOTAL = 15
     TEST_BEST = int(TEST_TOTAL * 0.8)
@@ -57,37 +84,11 @@ class Benchmark(DaemonBase, CampaignUI):
 
     @staticmethod
     def evaluate_screenshot(cost):
-        if not isinstance(cost, (float, int)):
-            return Text(cost, style="bold bright_red")
-
-        if cost < 0.025:
-            return Text("Insane Fast", style="bold bright_green")
-        if cost < 0.100:
-            return Text("Ultra Fast", style="bold bright_green")
-        if cost < 0.200:
-            return Text("Very Fast", style="bright_green")
-        if cost < 0.300:
-            return Text("Fast", style="green")
-        if cost < 0.500:
-            return Text("Medium", style="yellow")
-        if cost < 0.750:
-            return Text("Slow", style="red")
-        if cost < 1.000:
-            return Text("Very Slow", style="bright_red")
-        return Text("Ultra Slow", style="bold bright_red")
+        return _evaluate_speed(cost, _SCREENSHOT_SPEED_LEVELS, ("Ultra Slow", "bold bright_red"))
 
     @staticmethod
     def evaluate_click(cost):
-        if not isinstance(cost, (float, int)):
-            return Text(cost, style="bold bright_red")
-
-        if cost < 0.100:
-            return Text("Fast", style="bright_green")
-        if cost < 0.200:
-            return Text("Medium", style="yellow")
-        if cost < 0.400:
-            return Text("Slow", style="red")
-        return Text("Very Slow", style="bright_red")
+        return _evaluate_speed(cost, _CLICK_SPEED_LEVELS, ("Very Slow", "bright_red"))
 
     @staticmethod
     def show(test, data, evaluate_func):
