@@ -410,6 +410,25 @@ class CampaignRun(CampaignEvent):
             self.config.task_call("Commission", force_call=True)
             self.config.task_stop("Commission notice found")
 
+    def _handle_campaign_after_run(self) -> bool:
+        self.run_count += 1
+        if self.config.StopCondition_RunCount:
+            self.config.StopCondition_RunCount -= 1
+        if self.triggered_stop_condition(oil_check=False):
+            return True
+        if self.campaign.config.MAP_IS_ONE_TIME_STAGE and self.run_count >= 1:
+            logger.hr("Triggered one-time stage limit")
+            self.campaign.handle_map_stop()
+            return True
+        if self.is_stage_loop and self.run_count >= 1:
+            logger.hr("Triggered loop stage switch")
+            return True
+        if self.config.task_switched():
+            self.campaign.ensure_auto_search_exit()
+            self.config.task_stop()
+
+        return False
+
     def run(self, name, folder="campaign_main", mode="normal", total=0):
         """
         Args:
@@ -483,25 +502,7 @@ class CampaignRun(CampaignEvent):
                 logger.info(str(e))
                 break
 
-            # After run
-            self.run_count += 1
-            if self.config.StopCondition_RunCount:
-                self.config.StopCondition_RunCount -= 1
-            # End
-            if self.triggered_stop_condition(oil_check=False):
+            if self._handle_campaign_after_run():
                 break
-            # One-time stage limit
-            if self.campaign.config.MAP_IS_ONE_TIME_STAGE and self.run_count >= 1:
-                logger.hr("Triggered one-time stage limit")
-                self.campaign.handle_map_stop()
-                break
-            # Loop stages
-            if self.is_stage_loop and self.run_count >= 1:
-                logger.hr("Triggered loop stage switch")
-                break
-            # Scheduler
-            if self.config.task_switched():
-                self.campaign.ensure_auto_search_exit()
-                self.config.task_stop()
 
         self.campaign.ensure_auto_search_exit()
