@@ -451,51 +451,37 @@ class UI(InfoHandler):
 
         return False
 
-    def ui_additional(self, get_ship=True):
-        """
-        处理 UI 切换期间可能出现的干扰弹窗。
-
-        Args:
-            get_ship:
-        """
-        # Popups appear at page_os
-        # Has a popup_confirm variant
-        # so must take precedence
+    def _handle_priority_additional_popups(self, get_ship):
+        # page_os 的弹窗有 confirm 变体，必须先处理。
         if self.ui_page_os_popups():
             return True
-
-        # Research popup, lost connection popup
         if self.handle_popup_confirm("UI_ADDITIONAL"):
             return True
         if self.handle_urgent_commission():
             return True
-
-        # Popups appear at page_main, page_reward
         if self.ui_page_main_popups(get_ship=get_ship):
             return True
+        return self.handle_story_skip()
 
-        # Story
-        if self.handle_story_skip():
-            return True
+    def _handle_game_tips_popup(self):
+        if not self.appear(GAME_TIPS, offset=(30, 30), interval=2):
+            return False
+        logger.info(f"UI additional: {GAME_TIPS} -> {ui_assets.GOTO_MAIN}")
+        self.device.click(ui_assets.GOTO_MAIN)
+        return True
 
-        # Game tips
-        # Event commission in Vacation Lane.
-        # 2025.05.29 game tips that infos skin feature when you enter dock
-        if self.appear(GAME_TIPS, offset=(30, 30), interval=2):
-            logger.info(f"UI additional: {GAME_TIPS} -> {ui_assets.GOTO_MAIN}")
-            self.device.click(ui_assets.GOTO_MAIN)
-            return True
-
-        # Dorm popup
+    def _handle_dorm_popups(self):
         if self.appear(ui_assets.DORM_INFO, offset=(30, 30), similarity=0.75, interval=3):
             self.device.click(ui_assets.DORM_INFO)
             return True
-        if self.appear_then_click(ui_assets.DORM_FEED_CANCEL, offset=(30, 30), interval=3):
-            return True
-        if self.appear_then_click(ui_assets.DORM_TROPHY_CONFIRM, offset=(30, 30), interval=3):
-            return True
+        return self._appear_then_click_any(
+            [
+                (ui_assets.DORM_FEED_CANCEL, {"offset": (30, 30), "interval": 3}),
+                (ui_assets.DORM_TROPHY_CONFIRM, {"offset": (30, 30), "interval": 3}),
+            ]
+        )
 
-        # Meowfficer popup
+    def _handle_meowfficer_popups(self):
         if self.appear_then_click(ui_assets.MEOWFFICER_INFO, offset=(30, 30), interval=3):
             self.interval_reset(GET_SHIP)
             return True
@@ -504,79 +490,89 @@ class UI(InfoHandler):
             self.device.click(ui_assets.BACK_ARROW)
             self.interval_reset(GET_SHIP)
             return True
+        return False
 
-        # Campaign preparation
-        if (
-            self.appear(MAP_PREPARATION, offset=(30, 30), interval=3)
-            or self.appear(FLEET_PREPARATION, offset=(20, 50), interval=3)
-            or self.appear(raid_assets.RAID_FLEET_PREPARATION, offset=(30, 30), interval=3)
-        ):
+    def _handle_campaign_preparation_popups(self):
+        preparation_buttons = [
+            (MAP_PREPARATION, {"offset": (30, 30), "interval": 3}),
+            (FLEET_PREPARATION, {"offset": (20, 50), "interval": 3}),
+            (raid_assets.RAID_FLEET_PREPARATION, {"offset": (30, 30), "interval": 3}),
+        ]
+        if any(self.appear(button, **kwargs) for button, kwargs in preparation_buttons):
             self.device.click(MAP_PREPARATION_CANCEL)
             return True
-        if self.appear_then_click(AUTO_SEARCH_MENU_EXIT, offset=(200, 30), interval=3):
+        if self._appear_then_click_any(
+            [
+                (AUTO_SEARCH_MENU_EXIT, {"offset": (200, 30), "interval": 3}),
+                (AUTO_SEARCH_REWARD, {"offset": (50, 50), "interval": 3}),
+            ]
+        ):
             return True
-        if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
-            return True
-        if self.appear(WITHDRAW, offset=(30, 30), interval=3):
-            # 这里故意等待，用来规避 2022-04-07 更新后的客户端卡死问题。
-            # 复现方式（基本稳定）：
-            # - 进入任意关卡，例如 12-4。
-            # - 停止并重启游戏。
-            # - 运行 Alas 的 `Main` 任务。
-            # - Alas 切换到 page_campaign，并从已进入的关卡撤退。
-            # - 客户端卡在 page_campaign W12，点击屏幕任意位置都没有响应。
-            # - 再次重启客户端即可恢复。
-            logger.info("WITHDRAW button found, wait until map loaded to prevent bugs in game client")
-            self.device.sleep(2)
-            self.device.screenshot()
-            if self.appear_then_click(WITHDRAW, offset=(30, 30)):
-                self.interval_reset(WITHDRAW)
-                return True
-            logger.warning("WITHDRAW button does not exist anymore")
+        return self._handle_withdraw_popup()
+
+    def _handle_withdraw_popup(self):
+        if not self.appear(WITHDRAW, offset=(30, 30), interval=3):
+            return False
+        # 这里故意等待，用来规避 2022-04-07 更新后的客户端卡死问题。
+        # 复现方式（基本稳定）：
+        # - 进入任意关卡，例如 12-4。
+        # - 停止并重启游戏。
+        # - 运行 Alas 的 `Main` 任务。
+        # - Alas 切换到 page_campaign，并从已进入的关卡撤退。
+        # - 客户端卡在 page_campaign W12，点击屏幕任意位置都没有响应。
+        # - 再次重启客户端即可恢复。
+        logger.info("WITHDRAW button found, wait until map loaded to prevent bugs in game client")
+        self.device.sleep(2)
+        self.device.screenshot()
+        if self.appear_then_click(WITHDRAW, offset=(30, 30)):
             self.interval_reset(WITHDRAW)
-
-        # Login
-        if self.appear_then_click(LOGIN_CHECK, offset=(30, 30), interval=3):
             return True
-        if self.appear_then_click(MAINTENANCE_ANNOUNCE, offset=(30, 30), interval=3):
-            return True
-
-        # Mistaken click
-        if self.appear(EXERCISE_PREPARATION, interval=3):
-            logger.info(f"UI additional: {EXERCISE_PREPARATION} -> {ui_assets.GOTO_MAIN}")
-            self.device.click(ui_assets.GOTO_MAIN)
-            return True
-
-        # RPG event (raid_20240328)
-        # if self.appear_then_click(RPG_STATUS_POPUP, offset=(30, 30), interval=3):
-        #     return True
-        # Hospital event (20250327)
-        # if self.appear_then_click(HOSIPITAL_CLUE_CHECK, offset=(20, 20), interval=2):
-        #     return True
-        # if self.appear_then_click(HOSPITAL_BATTLE_EXIT, offset=(20, 20), interval=2):
-        #     return True
-        # Neon city (coalition_20250626)
-        # FASHION (coalition_20260122) reuse NEONCITY
-        # if self.appear(NEONCITY_FLEET_PREPARATION, offset=(20, 20), interval=3):
-        #     logger.info(f'{NEONCITY_FLEET_PREPARATION} -> {NEONCITY_PREPARATION_EXIT}')
-        #     self.device.click(NEONCITY_PREPARATION_EXIT)
-        #     return True
-        # DATE A LANE (coalition_20251120)
-        # if self.appear_then_click(DAL_DIFFICULTY_EXIT, offset=(20, 20), interval=3):
-        #     return True
-
-        # Idle page
-        if self.handle_idle_page():
-            return True
-        # Switch on ui_white, no offset just color match
-        if self.appear(ui_white_assets.MAIN_GOTO_MEMORIES_WHITE, interval=3):
-            logger.info(
-                f"UI additional: {ui_white_assets.MAIN_GOTO_MEMORIES_WHITE} -> {ui_white_assets.MAIN_TAB_SWITCH_WHITE}"
-            )
-            self.device.click(ui_white_assets.MAIN_TAB_SWITCH_WHITE)
-            return True
-
+        logger.warning("WITHDRAW button does not exist anymore")
+        self.interval_reset(WITHDRAW)
         return False
+
+    def _handle_login_popups(self):
+        return self._appear_then_click_any(
+            [
+                (LOGIN_CHECK, {"offset": (30, 30), "interval": 3}),
+                (MAINTENANCE_ANNOUNCE, {"offset": (30, 30), "interval": 3}),
+            ]
+        )
+
+    def _handle_exercise_preparation_popup(self):
+        if not self.appear(EXERCISE_PREPARATION, interval=3):
+            return False
+        logger.info(f"UI additional: {EXERCISE_PREPARATION} -> {ui_assets.GOTO_MAIN}")
+        self.device.click(ui_assets.GOTO_MAIN)
+        return True
+
+    def _handle_white_main_tab_switch(self):
+        if not self.appear(ui_white_assets.MAIN_GOTO_MEMORIES_WHITE, interval=3):
+            return False
+        logger.info(
+            f"UI additional: {ui_white_assets.MAIN_GOTO_MEMORIES_WHITE} -> {ui_white_assets.MAIN_TAB_SWITCH_WHITE}"
+        )
+        self.device.click(ui_white_assets.MAIN_TAB_SWITCH_WHITE)
+        return True
+
+    def ui_additional(self, get_ship=True):
+        """
+        处理 UI 切换期间可能出现的干扰弹窗。
+
+        Args:
+            get_ship:
+        """
+        return (
+            self._handle_priority_additional_popups(get_ship=get_ship)
+            or self._handle_game_tips_popup()
+            or self._handle_dorm_popups()
+            or self._handle_meowfficer_popups()
+            or self._handle_campaign_preparation_popups()
+            or self._handle_login_popups()
+            or self._handle_exercise_preparation_popup()
+            or self.handle_idle_page()
+            or self._handle_white_main_tab_switch()
+        )
 
     def handle_idle_page(self):
         """
