@@ -340,6 +340,75 @@ class CoalitionUI(Combat):
                 logger.info(f"{coalition_assets.DAL_DIFFICULTY_EXIT} -> {coalition_assets.DAL_DIFFICULTY_EXIT}")
                 continue
 
+    @staticmethod
+    def _coalition_difficulty_button(event, stage):
+        if event != "coalition_20251120":
+            return None
+        return CoalitionUI.coalition_20251120_get_entrance_difficulty(event, stage)
+
+    @staticmethod
+    def _check_coalition_enter_clicks(
+        button, button_difficulty, campaign_click, campaign_difficulty_click, fleet_click
+    ):
+        if campaign_click > 5:
+            logger.critical(f"Failed to enter {button}, too many click on {button}")
+            logger.critical("Possible reason #1: You haven't cleared previous stage to unlock the stage.")
+            raise RequestHumanTakeover
+        if campaign_difficulty_click > 5:
+            logger.critical(f"Failed to enter {button_difficulty}, too many click on {button_difficulty}")
+            logger.critical("Possible reason #1: The difficulty asset is not correct.")
+            raise RequestHumanTakeover
+        if fleet_click <= 5:
+            return
+        logger.critical(f"Failed to enter {button}, too many click on FLEET_PREPARATION")
+        logger.critical("Possible reason #1: Your fleets haven't satisfied the stat restrictions of this stage.")
+        logger.critical(
+            "Possible reason #2: "
+            "This stage can only be farmed once a day, "
+            "but it's the second time that you are entering"
+        )
+        raise RequestHumanTakeover
+
+    def _click_coalition_stage(self, button, campaign_timer):
+        if not campaign_timer.reached() or not self.in_coalition():
+            return False
+        self.device.click(button)
+        campaign_timer.reset()
+        return True
+
+    def _click_coalition_difficulty(self, event, button_difficulty, campaign_difficulty_timer):
+        if event != "coalition_20251120" or not button_difficulty:
+            return False
+        if not campaign_difficulty_timer.reached() or not self.in_coalition_20251120_difficulty_selection():
+            return False
+        self.device.click(button_difficulty)
+        campaign_difficulty_timer.reset()
+        return True
+
+    def _handle_coalition_fleet_preparation(self, event, stage, mode, fleet_preparation, fleet_timer, campaign_timer):
+        if not fleet_timer.reached() or not self.appear(fleet_preparation, offset=(20, 50)):
+            return False
+        self.handle_fleet_preparation(event, stage, mode)
+        self.device.click(fleet_preparation)
+        fleet_timer.reset()
+        campaign_timer.reset()
+        return True
+
+    def _handle_coalition_enter_interrupts(self, campaign_timer):
+        if self.handle_auto_search_continue():
+            campaign_timer.reset()
+            return True
+        if self.handle_retirement():
+            return True
+        if self.handle_combat_low_emotion():
+            return True
+        if self.handle_urgent_commission():
+            return True
+        if self.handle_story_skip():
+            campaign_timer.reset()
+            return True
+        return self.handle_combat_automation_confirm() or self.handle_popup_confirm("COALITION")
+
     def enter_map(self, event, stage, mode):
         """
         Args:
@@ -352,10 +421,7 @@ class CoalitionUI(Combat):
             out: BATTLE_PREPARATION
         """
         button = self.coalition_get_entrance(event, stage)
-        if event == "coalition_20251120":
-            button_difficulty = self.coalition_20251120_get_entrance_difficulty(event, stage)
-        else:
-            button_difficulty = None
+        button_difficulty = self._coalition_difficulty_button(event, stage)
         fleet_preparation = self.coalition_get_fleet_preparation(event)
         campaign_timer = Timer(5)
         campaign_difficulty_timer = Timer(5)
@@ -365,26 +431,9 @@ class CoalitionUI(Combat):
         fleet_click = 0
 
         for _ in self.loop():
-            # Check errors
-            if campaign_click > 5:
-                logger.critical(f"Failed to enter {button}, too many click on {button}")
-                logger.critical("Possible reason #1: You haven't cleared previous stage to unlock the stage.")
-                raise RequestHumanTakeover
-            if campaign_difficulty_click > 5:
-                logger.critical(f"Failed to enter {button_difficulty}, too many click on {button_difficulty}")
-                logger.critical("Possible reason #1: The difficulty asset is not correct.")
-                raise RequestHumanTakeover
-            if fleet_click > 5:
-                logger.critical(f"Failed to enter {button}, too many click on FLEET_PREPARATION")
-                logger.critical(
-                    "Possible reason #1: Your fleets haven't satisfied the stat restrictions of this stage."
-                )
-                logger.critical(
-                    "Possible reason #2: "
-                    "This stage can only be farmed once a day, "
-                    "but it's the second time that you are entering"
-                )
-                raise RequestHumanTakeover
+            self._check_coalition_enter_clicks(
+                button, button_difficulty, campaign_click, campaign_difficulty_click, fleet_click
+            )
 
             # End
             if self.appear(BATTLE_PREPARATION, offset=(20, 20)):
@@ -393,59 +442,17 @@ class CoalitionUI(Combat):
             if self.handle_guild_popup_cancel():
                 continue
 
-            # Enter campaign
-            if campaign_timer.reached() and self.in_coalition():
-                self.device.click(button)
+            if self._click_coalition_stage(button, campaign_timer):
                 campaign_click += 1
-                campaign_timer.reset()
                 continue
-            if (
-                event == "coalition_20251120"
-                and campaign_difficulty_timer.reached()
-                and self.in_coalition_20251120_difficulty_selection()
-                and button_difficulty
-            ):
-                self.device.click(button_difficulty)
+            if self._click_coalition_difficulty(event, button_difficulty, campaign_difficulty_timer):
                 campaign_difficulty_click += 1
-                campaign_difficulty_timer.reset()
                 continue
-
-            # Fleet preparation
-            if fleet_timer.reached() and self.appear(fleet_preparation, offset=(20, 50)):
-                self.handle_fleet_preparation(event, stage, mode)
-                self.device.click(fleet_preparation)
+            if self._handle_coalition_fleet_preparation(
+                event, stage, mode, fleet_preparation, fleet_timer, campaign_timer
+            ):
                 fleet_click += 1
-                fleet_timer.reset()
-                campaign_timer.reset()
                 continue
 
-            # Auto search continue
-            if self.handle_auto_search_continue():
-                campaign_timer.reset()
-                continue
-
-            # Retire
-            if self.handle_retirement():
-                continue
-
-            # Emotion
-            if self.handle_combat_low_emotion():
-                continue
-
-            # Urgent commission
-            if self.handle_urgent_commission():
-                continue
-
-            # Story skip
-            if self.handle_story_skip():
-                campaign_timer.reset()
-                continue
-
-            # Auto confirm
-            if self.handle_combat_automation_confirm():
-                continue
-
-            # 2026.01.22 coalition FASHION adds popup to load fleet from previous fleet
-            # coalition does not allow low emotion battle, so clicking any popup confirm should be safe
-            if self.handle_popup_confirm("COALITION"):
+            if self._handle_coalition_enter_interrupts(campaign_timer):
                 continue

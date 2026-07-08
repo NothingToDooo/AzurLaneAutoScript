@@ -319,16 +319,7 @@ class FleetPreparation(InfoHandler):
     map_fleet_checked = False
     map_is_hard_mode = False
 
-    def fleet_preparation(self):
-        """Change fleets.
-
-        Returns:
-            bool: True if changed.
-        """
-        logger.info(f"Using fleet: {[self.config.Fleet_Fleet1, self.config.Fleet_Fleet2, self.config.Submarine_Fleet]}")
-        if self.map_fleet_checked:
-            return False
-
+    def _load_fleet_asset_offsets(self):
         if self.appear(map_assets.FLEET_1_CLEAR, offset=FleetOperator.OFFSET):
             AUTO_SEARCH_SET_MOB.load_offset(map_assets.FLEET_1_CLEAR)
             AUTO_SEARCH_SET_BOSS.load_offset(map_assets.FLEET_1_CLEAR)
@@ -338,6 +329,15 @@ class FleetPreparation(InfoHandler):
             AUTO_SEARCH_SET_SUB_AUTO.load_offset(map_assets.SUBMARINE_CLEAR)
             AUTO_SEARCH_SET_SUB_STANDBY.load_offset(map_assets.SUBMARINE_CLEAR)
 
+    @staticmethod
+    def _fleet_2_in_use_button():
+        y = map_assets.FLEET_1_CLEAR.button[1] - map_assets.FLEET_1_CLEAR.area[1]
+        if y < -10:
+            logger.info("FLEET_1_CLEAR moves up, load W15 assets")
+            return map_assets.FLEET_2_IN_USE_W15
+        return map_assets.FLEET_2_IN_USE
+
+    def _fleet_operators(self):
         fleet_1 = FleetOperator(
             choose=map_assets.FLEET_1_CHOOSE,
             advice=map_assets.FLEET_1_ADVICE,
@@ -347,18 +347,12 @@ class FleetPreparation(InfoHandler):
             hard_satisfied=map_assets.FLEET_1_HARD_SATIESFIED,
             main=self,
         )
-        y = map_assets.FLEET_1_CLEAR.button[1] - map_assets.FLEET_1_CLEAR.area[1]
-        if y < -10:
-            logger.info("FLEET_1_CLEAR moves up, load W15 assets")
-            in_use = map_assets.FLEET_2_IN_USE_W15
-        else:
-            in_use = map_assets.FLEET_2_IN_USE
         fleet_2 = FleetOperator(
             choose=map_assets.FLEET_2_CHOOSE,
             advice=map_assets.FLEET_2_ADVICE,
             bar=map_assets.FLEET_2_BAR,
             clear=map_assets.FLEET_2_CLEAR,
-            in_use=in_use,
+            in_use=self._fleet_2_in_use_button(),
             hard_satisfied=map_assets.FLEET_2_HARD_SATIESFIED,
             main=self,
         )
@@ -371,8 +365,9 @@ class FleetPreparation(InfoHandler):
             hard_satisfied=map_assets.SUBMARINE_HARD_SATIESFIED,
             main=self,
         )
+        return fleet_1, fleet_2, submarine
 
-        # 检查困难模式舰船是否已准备。
+    def _check_fleet_hard_satisfied(self, fleet_1, fleet_2, submarine):
         h1, h2, h3 = fleet_1.is_hard_satisfied(), fleet_2.is_hard_satisfied(), submarine.is_hard_satisfied()
         logger.info(f"Hard satisfied: Fleet_1: {h1}, Fleet_2: {h2}, Submarine: {h3}")
         if self.config.Fleet_Fleet1:
@@ -381,50 +376,45 @@ class FleetPreparation(InfoHandler):
             fleet_2.raise_hard_not_satisfied()
         if self.config.Submarine_Fleet:
             submarine.raise_hard_not_satisfied()
+        return h1 or h2 or h3
 
-        # 困难模式跳过舰队准备。
-        self.map_is_hard_mode = h1 or h2 or h3
-        if self.map_is_hard_mode:
-            logger.info("Hard Campaign. No fleet preparation")
-            # 如果用户未设置潜艇舰队，清空潜艇。
-            if submarine.allow():
-                if self.config.Submarine_Fleet:
-                    pass
-                else:
-                    submarine.clear()
-            else:
-                self.config.SUBMARINE = 0
-            return False
+    def _handle_hard_mode_fleet_preparation(self, submarine):
+        logger.info("Hard Campaign. No fleet preparation")
+        # 如果用户未设置潜艇舰队，清空潜艇。
+        if submarine.allow():
+            if not self.config.Submarine_Fleet:
+                submarine.clear()
+        else:
+            self.config.SUBMARINE = 0
 
-        # 潜艇。
+    def _prepare_submarine_fleet(self, fleet_2, submarine):
         # 缓存 submarine.allow()，避免设置 fleet_2 后结果不一致。
         # 展开的 fleet_2 可能覆盖潜艇按钮。
         map_allow_submarine = submarine.allow()
         logger.attr("map_allow_submarine", map_allow_submarine)
-        if map_allow_submarine:
-            if self.config.Submarine_Fleet:
-                if fleet_2.allow():
-                    self.device.click(fleet_2.clear_button)
-                    # 不需要重新截图，因为潜艇检查不需要 fleet_2 部分。
-                submarine.ensure_to_be(self.config.Submarine_Fleet)
-            else:
-                # 用简单点击同时清空 submarine 和 fleet2。
-                # 这样更快，因为不需要等待点击动画消失。
-                # 后续 clear() 调用可以保证点击成功。
-                op = False
-                if fleet_2.allow():
-                    self.device.click(fleet_2.clear_button)
-                    op = True
-                if submarine.allow():
-                    self.device.click(submarine.clear_button)
-                    op = True
-                if op:
-                    self.device.screenshot()
+        if not map_allow_submarine:
+            return False
+        if self.config.Submarine_Fleet:
+            if fleet_2.allow():
+                self.device.click(fleet_2.clear_button)
+                # 不需要重新截图，因为潜艇检查不需要 fleet_2 部分。
+            submarine.ensure_to_be(self.config.Submarine_Fleet)
+            return True
+        # 用简单点击同时清空 submarine 和 fleet2。
+        # 这样更快，因为不需要等待点击动画消失。
+        # 后续 clear() 调用可以保证点击成功。
+        op = False
+        if fleet_2.allow():
+            self.device.click(fleet_2.clear_button)
+            op = True
+        if submarine.allow():
+            self.device.click(submarine.clear_button)
+            op = True
+        if op:
+            self.device.screenshot()
+        return True
 
-        # 不需要，这可能会误清 FLEET_2；在地图配置里清理 FLEET_2。
-        # if not fleet_2.allow():
-        #     self.config.FLEET_2 = 0
-
+    def _prepare_surface_fleets(self, fleet_1, fleet_2):
         if self.config.Fleet_Fleet2:
             # 使用两支舰队。
             # 强制重新设置一次。
@@ -432,19 +422,47 @@ class FleetPreparation(InfoHandler):
             fleet_2.clear()
             fleet_1.ensure_to_be(self.config.Fleet_Fleet1)
             fleet_2.ensure_to_be(self.config.Fleet_Fleet2)
-        else:
-            # 不使用 fleet 2。
-            if fleet_2.allow():
-                fleet_2.clear()
-            fleet_1.ensure_to_be(self.config.Fleet_Fleet1)
+            return
+        # 不使用 fleet 2。
+        if fleet_2.allow():
+            fleet_2.clear()
+        fleet_1.ensure_to_be(self.config.Fleet_Fleet1)
 
+    def _finalize_submarine_fleet(self, submarine, map_allow_submarine):
         # 再次检查潜艇是否为空。
         if map_allow_submarine:
-            if self.config.Submarine_Fleet:
-                pass
-            else:
+            if not self.config.Submarine_Fleet:
                 submarine.clear()
         else:
             self.config.SUBMARINE = 0
+
+    def fleet_preparation(self):
+        """Change fleets.
+
+        Returns:
+            bool: True if changed.
+        """
+        logger.info(f"Using fleet: {[self.config.Fleet_Fleet1, self.config.Fleet_Fleet2, self.config.Submarine_Fleet]}")
+        if self.map_fleet_checked:
+            return False
+
+        self._load_fleet_asset_offsets()
+        fleet_1, fleet_2, submarine = self._fleet_operators()
+
+        # 困难模式跳过舰队准备。
+        self.map_is_hard_mode = self._check_fleet_hard_satisfied(fleet_1, fleet_2, submarine)
+        if self.map_is_hard_mode:
+            self._handle_hard_mode_fleet_preparation(submarine)
+            return False
+
+        # 潜艇。
+        map_allow_submarine = self._prepare_submarine_fleet(fleet_2, submarine)
+
+        # 不需要，这可能会误清 FLEET_2；在地图配置里清理 FLEET_2。
+        # if not fleet_2.allow():
+        #     self.config.FLEET_2 = 0
+
+        self._prepare_surface_fleets(fleet_1, fleet_2)
+        self._finalize_submarine_fleet(submarine, map_allow_submarine)
 
         return True
