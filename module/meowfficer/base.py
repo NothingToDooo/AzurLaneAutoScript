@@ -63,49 +63,54 @@ class MeowfficerBase(UI):
             else:
                 self.device.screenshot()
 
-            # 结束。
-            if self.match_template_color(MEOWFFICER_CHECK, offset=(20, 20)):
+            if self._meow_menu_closed():
                 break
-            if click_timer.reached():
-                # MEOWFFICER_CHECK 可以安全点击。
-                self.device.click(MEOWFFICER_CHECK)
-                click_timer.reset()
+            if self._meow_menu_safe_click(click_timer):
+                continue
+            if self._meow_menu_handle_known_page(click_timer):
+                continue
+            if self._meow_menu_handle_popup(click_timer):
                 continue
 
-            # 后宅事务。
-            if self.appear(meow_assets.MEOWFFICER_FORT_CHECK, offset=(20, 20), interval=3):
+    def _meow_menu_closed(self):
+        return self.match_template_color(MEOWFFICER_CHECK, offset=(20, 20))
+
+    def _meow_menu_safe_click(self, click_timer):
+        if not click_timer.reached():
+            return False
+
+        # MEOWFFICER_CHECK 可以安全点击。
+        self.device.click(MEOWFFICER_CHECK)
+        click_timer.reset()
+        return True
+
+    def _meow_menu_handle_known_page(self, click_timer):
+        for button in (
+            meow_assets.MEOWFFICER_FORT_CHECK,
+            meow_assets.MEOWFFICER_BUY,
+            meow_assets.MEOWFFICER_TRAIN_FILL_QUEUE,
+            meow_assets.MEOWFFICER_TRAIN_FINISH_ALL,
+        ):
+            if self.appear(button, offset=(20, 20), interval=3):
                 self.device.click(MEOWFFICER_CHECK)
                 click_timer.reset()
-                continue
-            # 购买。
-            if self.appear(meow_assets.MEOWFFICER_BUY, offset=(20, 20), interval=3):
+                return True
+        return False
+
+    def _meow_menu_handle_popup(self, click_timer):
+        for button in (meow_assets.MEOWFFICER_CONFIRM, meow_assets.MEOWFFICER_CANCEL):
+            if self.appear(button, offset=(40, 20), interval=3):
                 self.device.click(MEOWFFICER_CHECK)
                 click_timer.reset()
-                continue
-            # 训练。
-            if self.appear(meow_assets.MEOWFFICER_TRAIN_FILL_QUEUE, offset=(20, 20), interval=3):
-                self.device.click(MEOWFFICER_CHECK)
-                click_timer.reset()
-                continue
-            if self.appear(meow_assets.MEOWFFICER_TRAIN_FINISH_ALL, offset=(20, 20), interval=3):
-                self.device.click(MEOWFFICER_CHECK)
-                click_timer.reset()
-                continue
-            # 弹窗。
-            if self.appear(meow_assets.MEOWFFICER_CONFIRM, offset=(40, 20), interval=3):
-                self.device.click(MEOWFFICER_CHECK)
-                click_timer.reset()
-                continue
-            if self.appear(meow_assets.MEOWFFICER_CANCEL, offset=(40, 20), interval=3):
-                self.device.click(MEOWFFICER_CHECK)
-                click_timer.reset()
-                continue
-            if self.appear_then_click(GET_ITEMS_1, offset=5, interval=3):
-                click_timer.reset()
-                continue
-            if self.meow_additional():
-                click_timer.reset()
-                continue
+                return True
+        if self.appear_then_click(GET_ITEMS_1, offset=5, interval=3):
+            click_timer.reset()
+            return True
+        if not self.meow_additional():
+            return False
+
+        click_timer.reset()
+        return True
 
     def handle_meow_popup_confirm(self):
         """确认猫窝弹窗并允许继续操作。"""
