@@ -46,14 +46,14 @@ class _Hospital(Hospital):
         self.calls.append(("daily_red_dot_appear",))
         return self.red_dot
 
-    def interval_clear(self, button: object, interval: int | float = 0) -> None:
+    def interval_clear(self, button: object, interval: float = 0) -> None:
         self.calls.append(("interval_clear", button, interval))
 
-    def is_in_daily_reward(self, interval: int | float = 0) -> bool:
+    def is_in_daily_reward(self, interval: float = 0) -> bool:
         self.calls.append(("is_in_daily_reward", interval))
         return self.in_daily_results.pop(0)
 
-    def ui_page_appear(self, page: object, interval: int | float = 0) -> bool:
+    def ui_page_appear(self, page: object, interval: float = 0) -> bool:
         self.calls.append(("ui_page_appear", page, interval))
         return self.page_results.pop(0)
 

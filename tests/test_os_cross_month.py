@@ -21,9 +21,9 @@ class _FixedDateTime:
 
 class _Device:
     def __init__(self) -> None:
-        self.sleeps: list[int | float] = []
+        self.sleeps: list[float] = []
 
-    def sleep(self, seconds: int | float) -> None:
+    def sleep(self, seconds: float) -> None:
         self.sleeps.append(seconds)
 
 
