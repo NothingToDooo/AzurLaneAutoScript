@@ -6,60 +6,59 @@ from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION
 
 
 class AzurLaneDaemon(DaemonBase, CampaignBase):
+    def handle_daemon_combat(self):
+        # 战斗中只保持截图轮询，不插入其他操作。
+        if self.is_combat_executing():
+            return True
+
+        if self.combat_appear():
+            self.combat_preparation()
+        try:
+            if self.handle_battle_status():
+                self.combat_status(expected_end="no_searching")
+                return True
+        except CampaignEnd:
+            return True
+        return False
+
+    def handle_daemon_map_operation(self):
+        if self.appear_then_click(MAP_AMBUSH_EVADE, offset=(20, 20)):
+            self.device.sleep(1)
+            return True
+        return bool(self.handle_mystery_items())
+
+    def handle_daemon_map_preparation(self):
+        if not self.config.Daemon_EnterMap:
+            return False
+        if self.appear_then_click(MAP_PREPARATION, offset=(20, 20), interval=2):
+            return True
+        return bool(self.appear_then_click(FLEET_PREPARATION, offset=(20, 50), interval=2))
+
+    def handle_daemon_misc(self):
+        if self.handle_retirement():
+            return True
+        if self.handle_urgent_commission():
+            return True
+        if self.handle_vote_popup():
+            return True
+        return bool(self.story_skip())
+
     def run(self):
         while 1:
             self.device.screenshot()
 
-            # If is running a combat, do nothing.
-            if self.is_combat_executing():
+            if self.handle_daemon_combat():
+                continue
+            if self.handle_daemon_map_operation():
+                continue
+            if self.handle_daemon_map_preparation():
+                continue
+            if self.handle_daemon_misc():
                 continue
 
-            # Combat
-            if self.combat_appear():
-                self.combat_preparation()
-            try:
-                if self.handle_battle_status():
-                    self.combat_status(expected_end="no_searching")
-                    continue
-            except CampaignEnd:
-                continue
-
-            # Map operation
-            if self.appear_then_click(MAP_AMBUSH_EVADE, offset=(20, 20)):
-                self.device.sleep(1)
-                continue
-            if self.handle_mystery_items():
-                continue
-
-            # Map preparation
-            if self.config.Daemon_EnterMap:
-                if self.appear_then_click(MAP_PREPARATION, offset=(20, 20), interval=2):
-                    continue
-                if self.appear_then_click(FLEET_PREPARATION, offset=(20, 50), interval=2):
-                    continue
-
-            # Retire
-            if self.handle_retirement():
-                continue
-
-            # Emotion
-
-            # Urgent commission
-            if self.handle_urgent_commission():
-                continue
-
-            # Popups
             if self.handle_guild_popup_cancel():
                 return True
-            if self.handle_vote_popup():
-                continue
-
-            # Story
-            if self.story_skip():
-                continue
-
-            # End
-            # No end condition, stop it manually.
+            # 没有自动结束条件，需要手动停止。
 
         return True
 
