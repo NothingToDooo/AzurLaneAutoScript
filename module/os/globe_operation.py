@@ -239,36 +239,45 @@ class GlobeOperation(ActionPointHandler):
         if isinstance(types, str):
             types = [types]
 
-        def get_button(selection_):
-            for raw_type in types:
-                typ = "SELECT_" + raw_type
-                for sele in selection_:
-                    if typ == sele.name:
-                        return sele
-            return None
-
         pinned = self.get_zone_pinned_name()
         if pinned in types:
             logger.info(f"Already selected at {pinned}")
             return True
 
         for _ in range(3):
-            self.zone_select_enter()
-            selection = self.ensure_zone_select_expanded()
-            logger.attr("Zone_selection", selection)
-
-            button = get_button(selection)
-            if button is None:
-                logger.warning("No such zone type to select, fallback to default")
-                types = ("SAFE", "DANGEROUS")
-                button = get_button(selection)
-
-            self.zone_select_execute(button)
-            if self.pinned_to_name(button) == self.get_zone_pinned_name():
+            success, types = self._zone_type_select_once(types)
+            if success:
                 return True
 
         logger.warning("Failed to select zone type after 3 trial")
         return False
+
+    @staticmethod
+    def _zone_select_get_button(selection, types):
+        for raw_type in types:
+            button_name = "SELECT_" + raw_type
+            for button in selection:
+                if button_name == button.name:
+                    return button
+        return None
+
+    def _zone_select_get_button_with_fallback(self, selection, types):
+        button = self._zone_select_get_button(selection, types)
+        if button is not None:
+            return button, types
+
+        logger.warning("No such zone type to select, fallback to default")
+        fallback = ("SAFE", "DANGEROUS")
+        return self._zone_select_get_button(selection, fallback), fallback
+
+    def _zone_type_select_once(self, types):
+        self.zone_select_enter()
+        selection = self.ensure_zone_select_expanded()
+        logger.attr("Zone_selection", selection)
+
+        button, types = self._zone_select_get_button_with_fallback(selection, types)
+        self.zone_select_execute(button)
+        return self.pinned_to_name(button) == self.get_zone_pinned_name(), types
 
     def zone_has_safe(self):
         """
