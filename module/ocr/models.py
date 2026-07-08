@@ -11,27 +11,27 @@ def _al_ocr_class():
 class OcrModel:
     @cached_property
     def azur_lane(self):
-        # Folder: ./bin/cnocr_models/azur_lane
-        # Size: 3.25MB
-        # Model: densenet-lite-gru
-        # Epoch: 15
-        # Validation accuracy: 99.43%
-        # Font: Impact, AgencyFB-Regular, MStiffHeiHK-UltraBold
-        # Charset: 0123456789ABCDEFGHIJKLMNPQRSTUVWXYZ:/- (Letter 'O' and <space> is not included)
-        # _num_classes: 39
+        # 目录：./bin/cnocr_models/azur_lane
+        # 大小：3.25MB
+        # 模型：densenet-lite-gru
+        # 训练轮次：15
+        # 验证准确率：99.43%
+        # 字体：Impact、AgencyFB-Regular、MStiffHeiHK-UltraBold。
+        # 字符集：数字、大写英文字母、冒号、斜杠和连字符，不包含字母 O 和空格。
+        # 类别数：39
         al_ocr_class = _al_ocr_class()
         return al_ocr_class(model_name="densenet-lite-gru", root="./bin/cnocr_models/azur_lane")
 
     @cached_property
     def cnocr(self):
-        # Folder: ./bin/cnocr_models/cnocr
-        # Size: 9.51MB
-        # Model: densenet-lite-gru
-        # Epoch: 39
-        # Validation accuracy: 99.04%
-        # Font: Various
-        # Charset: Number, English character, Chinese character, symbols, <space>
-        # _num_classes: 6426
+        # 目录：./bin/cnocr_models/cnocr
+        # 大小：9.51MB
+        # 模型：densenet-lite-gru
+        # 训练轮次：39
+        # 验证准确率：99.04%
+        # 字体：多字体。
+        # 字符集：数字、英文、中文、符号和空格。
+        # 类别数：6426
         al_ocr_class = _al_ocr_class()
         return al_ocr_class(model_name="densenet-lite-gru", root="./bin/cnocr_models/cnocr")
 

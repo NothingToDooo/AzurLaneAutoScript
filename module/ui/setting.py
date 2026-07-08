@@ -14,24 +14,15 @@ if TYPE_CHECKING:
 class Setting:
     def __init__(self, name="Setting", main: ModuleBase = None):
         self.name = name
-        # Alas module object
+        # ALAS 模块对象。
         self.main: ModuleBase = main
-        # Reset options before setting any options
+        # 设置选项前是否先重置。
         self.reset_first = True
-        # Deselect active options
+        # 是否取消已启用但不需要的选项。
         self.need_deselect = False
-        # (setting, opiton_name): option_button
-        # {
-        #     ('sort', 'rarity'): Button(),
-        #     ('sort', 'level'): Button(),
-        #     ('sort', 'total'): Button(),
-        # }
+        # 记录每个设置项选项对应的按钮。
         self.settings: dict[tuple[str, str], Button] = {}
-        # setting: option_name
-        # {
-        #     'sort': 'rarity',
-        #     'index': 'all',
-        # }
+        # 记录每个设置项的默认选项。
         self.settings_default: dict[str, str] = {}
 
     def add_setting(self, setting, option_buttons, option_names, option_default):
@@ -72,12 +63,11 @@ class Setting:
         Returns:
             dict: Key: option_button, value: whether should be active
         """
-        # Add defaults
+        # 添加默认选项。
         required_options = copy.deepcopy(self.settings_default)
         required_options.update(kwargs)
 
-        # option_button: Whether should be active
-        # {BUTTON_1: True, BUTTON_2: False, ...}
+        # 记录每个选项按钮是否应该启用。
         status: dict[Button, bool] = {}
         for key, option_button in self.settings.items():
             setting, option_name = key

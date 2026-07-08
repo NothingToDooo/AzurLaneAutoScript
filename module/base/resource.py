@@ -27,8 +27,7 @@ class PreservedAssets:
         assets |= get_assets_from_file(
             file="./module/handler/info_handler.py", regex=re.compile(r"\(([A-Z][A-Z0-9_]+),")
         )
-        # MAIN_CHECK == MAIN_GOTO_CAMPAIGN
-        # assets.add('MAIN_GOTO_CAMPAIGN')
+        # MAIN_CHECK 与 MAIN_GOTO_CAMPAIGN 共用资源，不需要额外保留。
         return assets
 
 
@@ -91,8 +90,6 @@ def release_resources(next_task=""):
         # 保留 UI 切换需要的资源。
         if next_task and str(obj) in _preserved_assets.ui:
             continue
-        # if Resource.is_loaded(obj):
-        #     logger.info(f'Release {obj}')
         obj.resource_release()
 
     # 只在地图检测资源已经加载时释放，避免为了清缓存反而导入重资源。
@@ -111,5 +108,4 @@ def release_resources(next_task=""):
         for attr in attr_list:
             del_cached_property(utils_assets.ASSETS, attr)
 
-    # 多数情况下收益不大，暂时不主动调用。
-    # gc.collect()
+    # 多数情况下主动 GC 收益不大，暂时不调用。

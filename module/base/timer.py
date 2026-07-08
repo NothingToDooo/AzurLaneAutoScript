@@ -191,7 +191,7 @@ class Timer:
         logger.info(str(self))
 
     def __str__(self):
-        # Timer(limit=2.351/3, count=4/6)
+        # 字符串会显示当前耗时、限制和计数。
         return f"Timer(limit={round(self.current_time(), 3)}/{self.limit}, count={self._access}/{self.count})"
 
     __repr__ = __str__

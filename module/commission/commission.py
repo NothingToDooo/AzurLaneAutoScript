@@ -578,7 +578,6 @@ class RewardCommission(UI, InfoHandler):
             if self.ui_main_appear_then_click(page_reward, interval=3):
                 self.interval_reset(combat_assets.GET_SHIP)
                 # 不需要重置 click_timer，直接立即点击 REWARD_1。
-                # click_timer.reset()
                 continue
 
             self._raise_if_commission_oil_maxed()

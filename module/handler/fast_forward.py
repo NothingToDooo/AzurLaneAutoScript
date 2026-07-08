@@ -214,8 +214,7 @@ class FastForwardHandler(AutoSearchHandler):
                 self.map_is_auto_search = self.config.Campaign_UseAutoSearch
             self.map_is_2x_book = self.config.Campaign_Use2xBook
         else:
-            # When disable fast forward, MAP_HAS_AMBUSH depends on map settings.
-            # self.config.MAP_HAS_AMBUSH = True
+            # 禁用快速前进时，是否存在伏击由地图配置决定。
             self.map_is_clear_mode = False
             self.map_is_auto_search = False
             self.map_is_2x_book = False
@@ -276,9 +275,6 @@ class FastForwardHandler(AutoSearchHandler):
         Pages:
             in: MAP_PREPARATION
         """
-        # if not self.map_is_clear_mode:
-        #     return False
-
         if not AUTO_SEARCH.appear(main=self):
             logger.info("No auto search option.")
             self.map_is_auto_search = False

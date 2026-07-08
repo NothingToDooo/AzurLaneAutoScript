@@ -645,8 +645,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         Returns:
             AzurLaneConfig
         """
-        # Since all tasks run independently, there's no need to separate configs
-        # config = copy.copy(self)
+        # 所有任务独立运行，直接复用当前配置对象。
         config = self
 
         for attr in dir(config):

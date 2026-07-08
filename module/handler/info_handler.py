@@ -238,8 +238,7 @@ class InfoHandler(ModuleBase):
         Returns:
             bool:
         """
-        # Vote popups are removed in 2023
-        # return self.appear_then_click(VOTE_CANCEL, offset=(20, 20), interval=2)
+        # 投票弹窗已于 2023 年移除。
         return False
 
     def handle_get_skin(self):

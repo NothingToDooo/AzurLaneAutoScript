@@ -347,7 +347,7 @@ class RewardGacha(GachaUI, Retirement):
             cube_cost = 2
 
         # OCR 建造券数量，决定使用建造券还是魔方/金币。
-        # buy = [使用建造券的次数, 使用魔方的次数]
+        # buy 列表依次记录使用建造券和魔方的次数。
         buy = [self.config.Gacha_Amount, 0]
         if actual_pool == "event" and self.config.Gacha_UseTicket:
             if self.appear(gacha_assets.BUILD_TICKET_CHECK, offset=(30, 30)):

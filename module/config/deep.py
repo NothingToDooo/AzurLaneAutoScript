@@ -1,12 +1,9 @@
 from collections import deque
 
-# deep_* functions are used for access nested dictionary.
-# They target for high performance so code are complicated to read
-# In general performance practise, time costs are as below:
-# - When key exists
-#   try: dict[key] except KeyError << dict.get(key) < if key in dict: dict[key]
-# - When not key exists
-#   if key in dict: dict[key] < dict.get(key) <<< try: dict[key] except KeyError
+# deep_* 函数用于访问嵌套字典和列表。
+# 这些函数位于热路径，优先保留实测更快的写法。
+# 键存在时，直接索引并捕获 KeyError 最快，dict.get 次之，先检查成员最慢。
+# 键不存在时，先检查成员最快，dict.get 次之，直接索引并捕获 KeyError 最慢。
 
 
 def _validate_depth_range(min_depth: int, depth: int) -> None:
@@ -29,21 +26,21 @@ def deep_get(d, keys, default=None):
     Returns:
         Value on given keys
     """
-    # 240 + 30 * depth (ns)
+    # 基准成本约为 240 加 30 乘 depth 纳秒。
     if type(keys) is str:
         keys = keys.split(".")
 
     try:
         for k in keys:
             d = d[k]
-    # No such key
+    # 没有这个键。
     except KeyError:
         return default
-    # No such key
+    # 没有这个索引。
     except IndexError:
         return default
-    # Input `keys` is not iterable or input `d` is not dict
-    # list indices must be integers or slices, not str
+    # `keys` 不可迭代，或者 `d` 不是字典。
+    # 例如：list indices must be integers or slices, not str。
     except TypeError:
         return default
     else:
@@ -64,16 +61,14 @@ def deep_get_with_error(d, keys):
     Raises:
         KeyError: If key not exists
     """
-    # 240 + 30 * depth (ns)
+    # 基准成本约为 240 加 30 乘 depth 纳秒。
     if type(keys) is str:
         keys = keys.split(".")
 
     try:
         for k in keys:
             d = d[k]
-    # 没有这个键。
-    # except KeyError:
-    #     raise
+    # KeyError 保持原样向外抛出。
     # 没有这个键。
     except IndexError as e:
         raise KeyError from e
@@ -96,21 +91,21 @@ def deep_exist(d, keys):
     Returns:
         bool: If key exists
     """
-    # 240 + 30 * depth (ns)
+    # 基准成本约为 240 加 30 乘 depth 纳秒。
     if type(keys) is str:
         keys = keys.split(".")
 
     try:
         for k in keys:
             d = d[k]
-    # No such key
+    # 没有这个键。
     except KeyError:
         return False
-    # No such key
+    # 没有这个索引。
     except IndexError:
         return False
-    # Input `keys` is not iterable or input `d` is not dict
-    # list indices must be integers or slices, not str
+    # `keys` 不可迭代，或者 `d` 不是字典。
+    # 例如：list indices must be integers or slices, not str。
     except TypeError:
         return False
     else:
@@ -122,7 +117,7 @@ def deep_set(d, keys, value):
     Set value into nested dict safely, imitating deep_get().
     Can only set dict
     """
-    # 150 * depth (ns)
+    # 基准成本约为 150 乘 depth 纳秒。
     if type(keys) is str:
         keys = keys.split(".")
 
@@ -139,7 +134,7 @@ def deep_set(d, keys, value):
                 first = False
                 continue
             try:
-                # if key in dict: dict[key] > dict.get > dict.setdefault > try dict[key] except
+                # 成员检查比 get、setdefault 和异常路径更快。
                 if exist and prev_k in d:
                     prev_d = d
                     d = d[prev_k]
@@ -149,22 +144,21 @@ def deep_set(d, keys, value):
                     d[prev_k] = new
                     d = new
             except TypeError:
-                # `d` is not dict
+                # `d` 不是字典。
                 exist = False
                 d = {}
                 prev_d[prev_k2] = {prev_k: d}
 
             prev_k2 = prev_k
             prev_k = k
-            # prev_k2, prev_k = prev_k, k
-    # Input `keys` is not iterable
+    # `keys` 不可迭代。
     except TypeError:
         return
 
-    # Last key, set value
+    # 最后一个键，写入值。
     try:
         d[prev_k] = value
-    # Last value `d` is not dict
+    # 最后一层的 `d` 不是字典。
     except TypeError:
         prev_d[prev_k2] = {prev_k: value}
         return
@@ -177,7 +171,7 @@ def deep_default(d, keys, value):
     Set value into nested dict safely, imitating deep_get().
     Can only set dict
     """
-    # 150 * depth (ns)
+    # 基准成本约为 150 乘 depth 纳秒。
     if type(keys) is str:
         keys = keys.split(".")
 
@@ -194,7 +188,7 @@ def deep_default(d, keys, value):
                 first = False
                 continue
             try:
-                # if key in dict: dict[key] > dict.get > dict.setdefault > try dict[key] except
+                # 成员检查比 get、setdefault 和异常路径更快。
                 if exist and prev_k in d:
                     prev_d = d
                     d = d[prev_k]
@@ -204,22 +198,21 @@ def deep_default(d, keys, value):
                     d[prev_k] = new
                     d = new
             except TypeError:
-                # `d` is not dict
+                # `d` 不是字典。
                 exist = False
                 d = {}
                 prev_d[prev_k2] = {prev_k: d}
 
             prev_k2 = prev_k
             prev_k = k
-            # prev_k2, prev_k = prev_k, k
-    # Input `keys` is not iterable
+    # `keys` 不可迭代。
     except TypeError:
         return
 
-    # Last key, set value
+    # 最后一个键，写入默认值。
     try:
         d.setdefault(prev_k, value)
-    # Last value `d` is not dict
+    # 最后一层的 `d` 不是字典。
     except AttributeError:
         prev_d[prev_k2] = {prev_k: value}
         return
@@ -237,19 +230,19 @@ def deep_pop(d, keys, default=None):
     try:
         for k in keys[:-1]:
             d = d[k]
-        # No `pop(k, default)` so it can pop list
+        # 不使用 pop(k, default)，这样才能同时弹出列表元素。
         return d.pop(keys[-1])
-    # No such key
+    # 没有这个键。
     except KeyError:
         return default
-    # Input `keys` is not iterable or input `d` is not dict
-    # list indices must be integers or slices, not str
+    # `keys` 不可迭代，或者 `d` 不是字典。
+    # 例如：list indices must be integers or slices, not str。
     except TypeError:
         return default
-    # Input `keys` out of index
+    # `keys` 超出索引范围。
     except IndexError:
         return default
-    # Last `d` is not dict
+    # 最后一层的 `d` 不是字典。
     except AttributeError:
         return default
 
@@ -268,7 +261,7 @@ def deep_iter_depth1(data):
     try:
         yield from data.items()
     except AttributeError:
-        # `data` is not dict
+        # `data` 不是字典。
         return
     else:
         return
@@ -293,7 +286,7 @@ def deep_iter_depth2(data):
                 for k2, v2 in v1.items():
                     yield k1, k2, v2
     except AttributeError:
-        # `data` is not dict
+        # `data` 不是字典。
         return
 
 

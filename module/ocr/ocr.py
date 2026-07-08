@@ -105,9 +105,6 @@ class Ocr:
         else:
             image_list = [self.pre_process(crop(image, area)) for area in self.buttons]
 
-        # This will show the images feed to OCR model
-        # self.cnocr.debug(image_list)
-
         result_list = self.cnocr.atomic_ocr_for_single_lines(image_list, self.alphabet)
         result_list = ["".join(result) for result in result_list]
         result_list = [self.after_process(result) for result in result_list]

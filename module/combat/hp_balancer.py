@@ -180,16 +180,14 @@ class HPBalancer(ModuleBase):
                 yield (0, 2)
         elif count == 2:
             if np.argsort(target)[0] == 2:
-                # [0, 1, 2] -> [1, 2, 0] -> [2, 1, 0]
+                # 从原始顺序变为 1、2、0，再变为 2、1、0。
                 yield (0, 2)
                 yield (1, 0)
             else:
-                # [0, 2, 1]
-                # [1, 0, 2]
+                # 两个错位时直接交换错位位置，可覆盖 0、2、1 和 1、0、2。
                 yield tuple(np.nonzero(diff)[0])
         elif count == 0:
-            # [0, 1, 2]
-            # Target is the same as origin. Do nothing
+            # 目标顺序与原始顺序相同，不需要交换。
             pass
 
     @Config.when(DEVICE_CONTROL_METHOD=None)
@@ -203,19 +201,16 @@ class HPBalancer(ModuleBase):
         if count == 3:
             yield (2, 0)
             if np.argsort(target)[0] == 1:
-                # [0, 1, 2] -> [2, 1, 0] -> [2, 0, 1]
+                # 从原始顺序变为 2、1、0，再变为 2、0、1。
                 yield (2, 1)
             else:
-                # [0, 1, 2] -> [2, 1, 0] -> [1, 2, 0]
+                # 从原始顺序变为 2、1、0，再变为 1、2、0。
                 yield (1, 0)
         elif count == 2:
-            # [0, 2, 1]
-            # [1, 0, 2]
-            # [2, 1, 0]
+            # 两个错位时直接交换错位位置，可覆盖 0、2、1、1、0、2 和 2、1、0。
             yield tuple(np.nonzero(diff)[0])
         elif count == 0:
-            # [0, 1, 2]
-            # Target is the same as origin. Do nothing
+            # 目标顺序与原始顺序相同，不需要交换。
             pass
 
     def hp_balance(self):
