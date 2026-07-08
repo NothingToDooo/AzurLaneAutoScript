@@ -178,6 +178,57 @@ class AzurLaneAutoScript:
                 return False
         return False
 
+    def _release_during_task_wait(self) -> None:
+        release_resources()
+        self.device.release_during_wait()
+
+    def _wait_with_game_closed(self, task) -> bool:
+        logger.info("Close game during wait")
+        self.device.app_stop()
+        self._release_during_task_wait()
+        if not self.wait_until(task.next_run):
+            del_cached_property(self, "config")
+            return False
+        if task.command != "Restart":
+            self.config.task_call("Restart")
+            del_cached_property(self, "config")
+            return False
+        return True
+
+    def _wait_on_main_page(self, task) -> bool:
+        logger.info("Goto main page during wait")
+        self.run("goto_main")
+        self._release_during_task_wait()
+        if not self.wait_until(task.next_run):
+            del_cached_property(self, "config")
+            return False
+        return True
+
+    def _wait_in_place(self, task) -> bool:
+        self._release_during_task_wait()
+        if not self.wait_until(task.next_run):
+            del_cached_property(self, "config")
+            return False
+        return True
+
+    def _wait_for_next_task(self, task) -> bool:
+        """等待未到运行时间的任务，返回当前任务是否可以继续执行。"""
+        if task.next_run <= datetime.now():
+            return True
+
+        logger.info(f"Wait until {task.next_run} for task `{task.command}`")
+        self.is_first_task = False
+        method = self.config.Optimization_WhenTaskQueueEmpty
+        if method == "close_game":
+            return self._wait_with_game_closed(task)
+        if method == "goto_main":
+            return self._wait_on_main_page(task)
+        if method == "stay_there":
+            logger.info("Stay there during wait")
+        else:
+            logger.warning(f"Invalid Optimization_WhenTaskQueueEmpty: {method}, fallback to stay_there")
+        return self._wait_in_place(task)
+
     def get_next_task(self) -> str:
         """返回下一个任务名称。"""
         while 1:
@@ -188,44 +239,8 @@ class AzurLaneAutoScript:
             if self.config.task.command != "Alas":
                 release_resources(next_task=task.command)
 
-            if task.next_run > datetime.now():
-                logger.info(f"Wait until {task.next_run} for task `{task.command}`")
-                self.is_first_task = False
-                method = self.config.Optimization_WhenTaskQueueEmpty
-                if method == "close_game":
-                    logger.info("Close game during wait")
-                    self.device.app_stop()
-                    release_resources()
-                    self.device.release_during_wait()
-                    if not self.wait_until(task.next_run):
-                        del_cached_property(self, "config")
-                        continue
-                    if task.command != "Restart":
-                        self.config.task_call("Restart")
-                        del_cached_property(self, "config")
-                        continue
-                elif method == "goto_main":
-                    logger.info("Goto main page during wait")
-                    self.run("goto_main")
-                    release_resources()
-                    self.device.release_during_wait()
-                    if not self.wait_until(task.next_run):
-                        del_cached_property(self, "config")
-                        continue
-                elif method == "stay_there":
-                    logger.info("Stay there during wait")
-                    release_resources()
-                    self.device.release_during_wait()
-                    if not self.wait_until(task.next_run):
-                        del_cached_property(self, "config")
-                        continue
-                else:
-                    logger.warning(f"Invalid Optimization_WhenTaskQueueEmpty: {method}, fallback to stay_there")
-                    release_resources()
-                    self.device.release_during_wait()
-                    if not self.wait_until(task.next_run):
-                        del_cached_property(self, "config")
-                        continue
+            if not self._wait_for_next_task(task):
+                continue
             break
 
         AzurLaneConfig.is_hoarding_task = False
