@@ -15,9 +15,9 @@ class CampaignBase(CampaignBase_):
         super().handle_clear_mode_config_cover()
         self.config.MAP_HAS_MISSILE_ATTACK = True
 
-    def round_battle(self, after_battle=True):
+    def round_battle(self):
         """
-        Call this method after cleared an enemy.
+        清理敌人后更新敌方行动轮次。
         """
         super().round_battle()
         # new = {0: 0}

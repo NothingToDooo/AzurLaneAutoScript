@@ -117,9 +117,9 @@ class Fleet(Camera, AmbushHandler):
         logger.info(f"Round: {self.round}, enemy_round: {self.enemy_round}")
         return True
 
-    def round_battle(self, after_battle=True):
+    def round_battle(self):
         """
-        Call this method after cleared an enemy.
+        清理敌人后更新敌方行动轮次。
         """
         if not self.config.MAP_HAS_MOVABLE_ENEMY:
             return False
@@ -322,7 +322,7 @@ class Fleet(Camera, AmbushHandler):
                     elif self.map[location].may_enemy:
                         self.map[location].is_cleared = True
 
-                    if self.catch_camera_repositioning(self.map[location]):
+                    if self.catch_camera_repositioning():
                         self.handle_boss_appear_refocus()
                         if sum(self.hp) < 0.01:
                             logger.warning("Empty HP on all slots, trying hp_get again")
@@ -442,7 +442,7 @@ class Fleet(Camera, AmbushHandler):
         if result_mystery == "get_carrier":
             self.full_scan_carrier()
         if result == "combat":
-            self.round_battle(after_battle=True)
+            self.round_battle()
             self.predict()
         self.round_next()
         if self.round_is_new:
@@ -902,7 +902,7 @@ class Fleet(Camera, AmbushHandler):
         self.find_path_initial()
         self.map.show_cost()
         self.round_reset()
-        self.round_battle(after_battle=False)
+        self.round_battle()
 
     def handle_clear_mode_config_cover(self):
         if not self.map_is_clear_mode:
@@ -1030,11 +1030,8 @@ class Fleet(Camera, AmbushHandler):
         logger.warning("Enemy roadblock try exhausted.")
         return SelectedGrids([])
 
-    def catch_camera_repositioning(self, destination):
-        """
-        Args:
-            destination (GridInfo): Globe map grid.
-        """
+    def catch_camera_repositioning(self):
+        """检测 Boss 出现后是否触发了地图镜头重定位。"""
         appear = False
         for data in self.map.spawn_data:
             if data.get("battle") == self.battle_count and data.get("boss", 0):
