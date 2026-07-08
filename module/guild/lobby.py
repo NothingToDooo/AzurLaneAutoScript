@@ -49,39 +49,50 @@ class GuildLobby(GuildBase):
             else:
                 self.device.screenshot()
 
-            if click_timer.reached() and self.appear(GUILD_CHECK, offset=(20, 20)):
-                button = self.guild_lobby_get_report()
-                if button is not None:
-                    self.device.click(button)
-                    click_timer.reset()
-
-            if self.appear_then_click(GUILD_REPORT_CLAIM, threshold=30, interval=3):
-                confirm_timer.reset()
+            self._guild_lobby_open_report(click_timer)
+            if self._guild_lobby_handle_report_rewards(confirm_timer):
                 continue
 
-            if self.appear_then_click(GET_ITEMS_1, offset=(30, 30), interval=2):
-                confirm_timer.reset()
-                continue
+            if self._guild_lobby_collect_finished(confirm_timer):
+                break
 
-            if self.appear_then_click(GET_ITEMS_2, offset=(30, 30), interval=2):
-                confirm_timer.reset()
-                continue
+    def _guild_lobby_open_report(self, click_timer):
+        if not click_timer.reached():
+            return False
+        if not self.appear(GUILD_CHECK, offset=(20, 20)):
+            return False
 
-            if self.appear_then_click(GET_ITEMS_3, offset=(30, 30), interval=2):
-                confirm_timer.reset()
-                continue
+        button = self.guild_lobby_get_report()
+        if button is None:
+            return False
 
-            if self.appear(GUILD_REPORT_CLAIMED, threshold=30, interval=3):
-                self.device.click(GUILD_REPORT_CLOSE)
-                confirm_timer.reset()
-                continue
+        self.device.click(button)
+        click_timer.reset()
+        return True
 
-            # End
-            if self.appear(GUILD_CHECK, offset=(20, 20)):
-                if confirm_timer.reached():
-                    break
-            else:
+    def _guild_lobby_handle_report_rewards(self, confirm_timer):
+        if self.appear_then_click(GUILD_REPORT_CLAIM, threshold=30, interval=3):
+            confirm_timer.reset()
+            return True
+
+        for button in (GET_ITEMS_1, GET_ITEMS_2, GET_ITEMS_3):
+            if self.appear_then_click(button, offset=(30, 30), interval=2):
                 confirm_timer.reset()
+                return True
+
+        if not self.appear(GUILD_REPORT_CLAIMED, threshold=30, interval=3):
+            return False
+
+        self.device.click(GUILD_REPORT_CLOSE)
+        confirm_timer.reset()
+        return True
+
+    def _guild_lobby_collect_finished(self, confirm_timer):
+        if self.appear(GUILD_CHECK, offset=(20, 20)):
+            return confirm_timer.reached()
+
+        confirm_timer.reset()
+        return False
 
     def guild_lobby(self):
         """
