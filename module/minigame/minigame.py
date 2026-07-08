@@ -195,8 +195,8 @@ class Minigame(UI):
         specific_game_name = "new_year_challenge"
         minigame_instance = None
         if specific_game_name == "new_year_challenge":
-            NewYearChallenge = import_module("module.minigame.new_year_challenge").NewYearChallenge
-            minigame_instance = NewYearChallenge(config=self.config, device=self.device)
+            new_year_challenge_class = import_module("module.minigame.new_year_challenge").NewYearChallenge
+            minigame_instance = new_year_challenge_class(config=self.config, device=self.device)
 
         while 1:
             # 游玩次数上限。

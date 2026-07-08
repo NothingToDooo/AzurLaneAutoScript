@@ -256,8 +256,8 @@ class DossierReward(Combat, UI):
         return received
 
     def run(self):
-        OpsiAshBeacon = import_module("module.os_ash.meta").OpsiAshBeacon
-        OpsiAshBeacon(self.config, self.device).ensure_dossier_page()
+        opsi_ash_beacon_class = import_module("module.os_ash.meta").OpsiAshBeacon
+        opsi_ash_beacon_class(self.config, self.device).ensure_dossier_page()
         if self.meta_reward_notice_appear():
             self.meta_reward_enter()
             self.meta_reward_receive()

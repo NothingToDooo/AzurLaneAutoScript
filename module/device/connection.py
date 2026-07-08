@@ -662,13 +662,13 @@ class Connection(ConnectionAttr):
                 2：HOME 键在顶部。
                 3：HOME 键在左侧。
         """
-        _DISPLAY_RE = re.compile(
+        display_re = re.compile(
             r".*DisplayViewport{.*valid=true, .*orientation=(?P<orientation>\d+), "
             r".*deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*"
         )
         output = self.adb_shell(["dumpsys", "display"])
 
-        res = _DISPLAY_RE.search(output, 0)
+        res = display_re.search(output, 0)
 
         if res:
             o = int(res.group("orientation"))
@@ -709,8 +709,8 @@ class Connection(ConnectionAttr):
 
     def _brute_force_connect_emulators(self):
         logger.info("Brute force connect")
-        EmulatorManager = import_module("module.device.platform.emulator_windows").EmulatorManager
-        self.adb_brute_force_connect(EmulatorManager().all_emulator_serials)
+        emulator_manager_class = import_module("module.device.platform.emulator_windows").EmulatorManager
+        self.adb_brute_force_connect(emulator_manager_class().all_emulator_serials)
 
     @staticmethod
     def _log_available_devices(available):

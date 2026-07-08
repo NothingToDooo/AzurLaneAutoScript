@@ -56,8 +56,8 @@ class AzurLaneAutoScript:
     @cached_property
     def device(self):
         try:
-            Device = _load_attr("module.device.device", "Device")
-            return Device(config=self.config)
+            device_class = _load_attr("module.device.device", "Device")
+            return device_class(config=self.config)
         except RequestHumanTakeover:
             logger.critical("Request human takeover")
             sys.exit(1)
@@ -157,24 +157,24 @@ class AzurLaneAutoScript:
                 f.writelines(lines)
 
     def restart(self) -> None:
-        LoginHandler = _load_attr("module.handler.login", "LoginHandler")
-        LoginHandler(self.config, device=self.device).app_restart()
+        login_handler_class = _load_attr("module.handler.login", "LoginHandler")
+        login_handler_class(self.config, device=self.device).app_restart()
 
     def start(self) -> None:
-        LoginHandler = _load_attr("module.handler.login", "LoginHandler")
-        LoginHandler(self.config, device=self.device).app_start()
+        login_handler_class = _load_attr("module.handler.login", "LoginHandler")
+        login_handler_class(self.config, device=self.device).app_start()
 
     def goto_main(self) -> None:
-        LoginHandler = _load_attr("module.handler.login", "LoginHandler")
-        UI = _load_attr("module.ui.ui", "UI")
+        login_handler_class = _load_attr("module.handler.login", "LoginHandler")
+        ui_class = _load_attr("module.ui.ui", "UI")
 
         if self.device.app_is_running():
             logger.info("App is already running, goto main page")
-            UI(self.config, device=self.device).ui_goto_main()
+            ui_class(self.config, device=self.device).ui_goto_main()
         else:
             logger.info("App is not running, start app and goto main page")
-            LoginHandler(self.config, device=self.device).app_start()
-            UI(self.config, device=self.device).ui_goto_main()
+            login_handler_class(self.config, device=self.device).app_start()
+            ui_class(self.config, device=self.device).ui_goto_main()
 
     def wait_until(self, future: datetime) -> bool:
         """等待到指定时间；如果配置变化则提前返回。"""

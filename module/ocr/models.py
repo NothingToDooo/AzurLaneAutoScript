@@ -19,8 +19,8 @@ class OcrModel:
         # Font: Impact, AgencyFB-Regular, MStiffHeiHK-UltraBold
         # Charset: 0123456789ABCDEFGHIJKLMNPQRSTUVWXYZ:/- (Letter 'O' and <space> is not included)
         # _num_classes: 39
-        AlOcr = _al_ocr_class()
-        return AlOcr(model_name="densenet-lite-gru", root="./bin/cnocr_models/azur_lane")
+        al_ocr_class = _al_ocr_class()
+        return al_ocr_class(model_name="densenet-lite-gru", root="./bin/cnocr_models/azur_lane")
 
     @cached_property
     def cnocr(self):
@@ -32,8 +32,8 @@ class OcrModel:
         # Font: Various
         # Charset: Number, English character, Chinese character, symbols, <space>
         # _num_classes: 6426
-        AlOcr = _al_ocr_class()
-        return AlOcr(model_name="densenet-lite-gru", root="./bin/cnocr_models/cnocr")
+        al_ocr_class = _al_ocr_class()
+        return al_ocr_class(model_name="densenet-lite-gru", root="./bin/cnocr_models/cnocr")
 
 
 OCR_MODEL = OcrModel()

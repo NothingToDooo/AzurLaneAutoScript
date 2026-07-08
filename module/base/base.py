@@ -90,8 +90,8 @@ class ModuleBase:
                 time.sleep(0.01)
 
             logger.info("early_ocr_import start")
-            AlOcr = import_module("module.ocr.al_ocr").AlOcr
-            _ = AlOcr
+            al_ocr_class = import_module("module.ocr.al_ocr").AlOcr
+            _ = al_ocr_class
             logger.info("early_ocr_import finish")
 
         logger.info("early_ocr_import call")
