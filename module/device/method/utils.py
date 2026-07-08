@@ -2,44 +2,9 @@ import random
 import socket
 import time
 
-from adbutils import AdbTimeout
+from adbutils import AdbConnection, AdbTimeout
 
 from module.device.method.remove_warning import remove_shell_warning
-
-try:
-    # adbutils 0.x
-    from adbutils import _AdbStreamConnection as AdbConnection
-except ImportError:
-    # adbutils >= 1.0
-    import subprocess
-
-    # Patch list2cmdline back to subprocess.list2cmdline
-    # We expect `screencap | nc 192.168.0.1 20298` instead of `screencap '|' nc 192.168.80.1 20298`
-    import adbutils
-    from adbutils import AdbConnection
-
-    adbutils._utils.list2cmdline = subprocess.list2cmdline
-    adbutils._device.list2cmdline = subprocess.list2cmdline
-
-    # BaseDevice.shell() is missing a check_okay() call before reading output,
-    # resulting in an `OKAY` prefix in output.
-    def shell(
-        self, cmdargs: str | list | tuple, stream: bool = False, timeout: float | None = None, rstrip=True
-    ) -> AdbConnection | str:
-        if isinstance(cmdargs, (list, tuple)):
-            cmdargs = subprocess.list2cmdline(cmdargs)
-        if stream:
-            timeout = None
-        c = self.open_transport(timeout=timeout)
-        c.send_command("shell:" + cmdargs)
-        c.check_okay()  # check_okay() is missing here
-        if stream:
-            return c
-        output = c.read_until_close()
-        return output.rstrip() if rstrip else output
-
-    adbutils._device.BaseDevice.shell = shell
-
 from module.logger import logger
 
 RETRY_TRIES = 5

@@ -53,7 +53,7 @@ from module.webui import lang
 from module.webui.base import Frame
 from module.webui.fastapi import asgi_app
 from module.webui.lang import t
-from module.webui.patch import patch_executor, patch_mimetype
+from module.webui.patch import patch_executor
 from module.webui.pin import put_input, put_select
 from module.webui.process_manager import ProcessManager
 from module.webui.setting import State
@@ -83,7 +83,6 @@ from module.webui.widgets import (
 )
 
 patch_executor()
-patch_mimetype()
 task_handler = TaskHandler()
 
 

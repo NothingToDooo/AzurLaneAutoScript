@@ -1,5 +1,4 @@
 import asyncio
-import mimetypes
 from concurrent.futures.thread import ThreadPoolExecutor
 from functools import partial, wraps
 from importlib.util import find_spec
@@ -47,21 +46,3 @@ def patch_executor():
 
     loop = get_or_create_event_loop()
     loop.set_default_executor(CachedThreadPoolExecutor.executor)
-
-
-def patch_mimetype():
-    """
-    强制 mimetype 使用内置表，避免读取用户环境里的自定义表。
-
-    个人版运行在本机环境，用户环境变量可能被其他软件污染；这里固定成 Python 内置表。
-    """
-    # 标记为已初始化。
-    mimetypes.inited = True
-    # 创建干净的数据库实例。
-    db = mimetypes.MimeTypes(filenames=())
-    mimetypes._db = db
-    # 覆盖全局映射。
-    mimetypes.encodings_map = db.encodings_map
-    mimetypes.suffix_map = db.suffix_map
-    mimetypes.types_map = db.types_map[True]
-    mimetypes.common_types = db.types_map[False]

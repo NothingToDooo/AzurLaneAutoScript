@@ -346,10 +346,7 @@ class Connection(ConnectionAttr):
             local (str)：例如 'tcp:2437'。
         """
         try:
-            with self.adb_client._connect() as c:
-                list_cmd = f"host-serial:{self.serial}:killforward:{local}"
-                c.send_command(list_cmd)
-                c.check_okay()
+            self.adb.forward_remove(local)
         except AdbError as e:
             # 移除不存在的 forward 时不抛错。
             # adbutils.errors.AdbError: listener 'tcp:8888' not found
@@ -631,16 +628,9 @@ class Connection(ConnectionAttr):
         """
         devices = []
         try:
-            with self.adb_client._connect() as c:
-                c.send_command("host:devices")
-                c.check_okay()
-                output = c.read_string_block()
-                for line in output.splitlines():
-                    parts = line.strip().split("\t")
-                    if len(parts) != 2:
-                        continue
-                    device = AdbDeviceWithStatus(self.adb_client, parts[0], parts[1])
-                    devices.append(device)
+            devices.extend(
+                AdbDeviceWithStatus(self.adb_client, info.serial, info.state) for info in self.adb_client.list()
+            )
         except ConnectionResetError as e:
             # 通常只发生在国内网络环境。
             # ConnectionResetError: [WinError 10054] 远程主机强迫关闭了一个现有的连接。

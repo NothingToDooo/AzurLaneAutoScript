@@ -1,6 +1,7 @@
 """基于 pywebio.platform.fastapi 精简出的本地 WebUI 服务。"""
 
 import asyncio
+import mimetypes
 import os
 
 import uvicorn
@@ -13,16 +14,30 @@ from pywebio.platform.fastapi import (
     webio_routes,
 )
 from starlette.applications import Starlette
+from starlette.datastructures import Headers
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import FileResponse
 from starlette.routing import Mount
-from starlette.staticfiles import StaticFiles
+from starlette.staticfiles import NotModifiedResponse, StaticFiles
 
 
 class HeaderMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
         response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
+class LocalStaticFiles(StaticFiles):
+    _mimetypes = mimetypes.MimeTypes(filenames=())
+
+    def file_response(self, full_path, stat_result, scope, status_code=200):
+        request_headers = Headers(scope=scope)
+        media_type = self._mimetypes.guess_type(os.fspath(full_path))[0] or "application/octet-stream"
+        response = FileResponse(full_path, status_code=status_code, stat_result=stat_result, media_type=media_type)
+        if self.is_not_modified(response.headers, request_headers):
+            return NotModifiedResponse(response.headers)
         return response
 
 
@@ -40,11 +55,11 @@ def asgi_app(
         check_origin=check_origin,
     )
     if static_dir:
-        routes.append(Mount("/static", app=StaticFiles(directory=static_dir), name="static"))
+        routes.append(Mount("/static", app=LocalStaticFiles(directory=static_dir), name="static"))
     routes.append(
         Mount(
             "/pywebio_static",
-            app=StaticFiles(directory=STATIC_PATH),
+            app=LocalStaticFiles(directory=STATIC_PATH),
             name="pywebio_static",
         )
     )

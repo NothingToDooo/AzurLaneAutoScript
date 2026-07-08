@@ -49,6 +49,10 @@ class RichRenderableHandler(RichHandler):
         super().__init__(*args, **kwargs)
         self._func = func
 
+    def emit_renderable(self, renderable: ConsoleRenderable) -> None:
+        if self._func is not None:
+            self._func(renderable)
+
     def emit(self, record: logging.LogRecord) -> None:
         message = self.format(record)
         traceback = None
@@ -79,7 +83,7 @@ class RichRenderableHandler(RichHandler):
         log_renderable = self.render(record=record, traceback=traceback, message_renderable=message_renderable)
 
         # 直接把 renderable 交给回调函数。
-        self._func(log_renderable)
+        self.emit_renderable(log_renderable)
 
     def handle(self, record: logging.LogRecord) -> bool:
         if not self._func:
@@ -270,7 +274,7 @@ def print(*objects: ConsoleRenderable, **kwargs):  # noqa: A001 - 作为 logger.
     for hdlr in logger.handlers:
         if isinstance(hdlr, RichRenderableHandler):
             for renderable in _get_renderables(hdlr.console, *objects, **kwargs):
-                hdlr._func(renderable)
+                hdlr.emit_renderable(renderable)
         elif isinstance(hdlr, RichHandler):
             hdlr.console.print(*objects)
 
