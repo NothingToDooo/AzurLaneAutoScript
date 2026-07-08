@@ -27,7 +27,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
             self.globe.load_globe_map()
 
     def globe_update(self):
-        # Handle random black screenshots
+        # 处理偶发黑屏截图。
         timeout = Timer(5, count=10).start()
         while 1:
             if timeout.reached():
@@ -35,50 +35,58 @@ class GlobeCamera(GlobeOperation, ZoneManager):
 
             self.device.screenshot()
 
-            # End
             if self.is_in_globe():
                 break
 
-            # A copy of os_map_goto_globe()
-            # May accidentally enter map
-            if self.appear_then_click(MAP_GOTO_GLOBE, offset=(200, 5), interval=3):
-                # Just to initialize interval timer of MAP_GOTO_GLOBE_FOG
-                self.appear(MAP_GOTO_GLOBE_FOG, interval=3)
-                timeout.reset()
-                continue
-            # Encountered only in strongholds; AL will not prevent
-            # zone exit even with left over exploration rewards in map
-            if self.appear_then_click(MAP_GOTO_GLOBE_FOG, interval=3):
-                self.interval_reset(MAP_GOTO_GLOBE)
-                timeout.reset()
-                continue
-            if self.handle_map_event():
-                timeout.reset()
-                continue
-            # Popup: AUTO_SEARCH_REWARD appears slowly
-            if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
-                timeout.reset()
-                continue
-            # Popup: Leaving current zone will terminate meowfficer searching.
-            # Popup: Leaving current zone will retreat submarines
-            # Searching reward will be shown after entering another zone.
-            if self.handle_popup_confirm("GOTO_GLOBE"):
-                timeout.reset()
-                continue
-            # Don't know why but AL just entered META page
-            if self.appear(ASH_SHOWDOWN, offset=(20, 20), interval=3):
-                self.device.click(ASH_QUIT)
-                timeout.reset()
-                continue
-            # Action point popup
-            if self.appear(ACTION_POINT_USE, offset=(20, 20), interval=3):
-                self.device.click(ACTION_POINT_CANCEL)
+            if self._globe_update_handle_blocker():
                 timeout.reset()
                 continue
 
             logger.warning("Trying to do globe_update(), but not in os globe map")
             continue
 
+        self._globe_update_load_camera()
+
+    def _globe_update_handle_blocker(self):
+        if self._globe_update_handle_goto():
+            return True
+        if self._globe_update_handle_popup():
+            return True
+        return self._globe_update_leave_wrong_page()
+
+    def _globe_update_handle_goto(self):
+        # 逻辑来自 os_map_goto_globe()；这里也可能误入地图。
+        if self.appear_then_click(MAP_GOTO_GLOBE, offset=(200, 5), interval=3):
+            # 只用于初始化 MAP_GOTO_GLOBE_FOG 的 interval timer。
+            self.appear(MAP_GOTO_GLOBE_FOG, interval=3)
+            return True
+        # 强敌据点里可能遇到；有探索奖励残留时，游戏不会阻止离开当前区域。
+        if self.appear_then_click(MAP_GOTO_GLOBE_FOG, interval=3):
+            self.interval_reset(MAP_GOTO_GLOBE)
+            return True
+        return False
+
+    def _globe_update_handle_popup(self):
+        if self.handle_map_event():
+            return True
+        # AUTO_SEARCH_REWARD 弹窗出现较慢。
+        if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
+            return True
+        # 离开当前区域时，猫指挥搜索和潜艇可能被终止；搜索奖励会在进入新区后出现。
+        return self.handle_popup_confirm("GOTO_GLOBE")
+
+    def _globe_update_leave_wrong_page(self):
+        # 不明原因误入 META 页面时退回。
+        if self.appear(ASH_SHOWDOWN, offset=(20, 20), interval=3):
+            self.device.click(ASH_QUIT)
+            return True
+        # 行动力弹窗直接取消。
+        if self.appear(ACTION_POINT_USE, offset=(20, 20), interval=3):
+            self.device.click(ACTION_POINT_CANCEL)
+            return True
+        return False
+
+    def _globe_update_load_camera(self):
         self._globe_init()
         self.globe.load(self.device.image)
         self.globe_camera = self.globe.center_loca
