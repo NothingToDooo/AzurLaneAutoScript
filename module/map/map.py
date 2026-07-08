@@ -101,6 +101,39 @@ class Map(Fleet):
         return False
 
     @staticmethod
+    def _select_basic_grids(grids, nearby, is_accessible, ignore):
+        if nearby:
+            grids = grids.select(is_nearby=True)
+        if is_accessible:
+            grids = grids.select(is_accessible=True)
+        if ignore is not None:
+            grids = grids.delete(grids=ignore)
+        return grids
+
+    @staticmethod
+    def _normalize_enemy_genre(raw_enemy_genre):
+        if raw_enemy_genre[0].islower():
+            return raw_enemy_genre[0].upper() + raw_enemy_genre[1:]
+        return raw_enemy_genre
+
+    @staticmethod
+    def _select_by_ordered_values(grids, attr, values):
+        selected = SelectedGrids([])
+        for value in values:
+            selected = selected.add(grids.select(**{attr: value}))
+            if isinstance(values, list) and selected:
+                break
+        return selected
+
+    @staticmethod
+    def _select_by_scale_priority(grids, order):
+        for candidate_scale in order:
+            selected = grids.select(enemy_scale=candidate_scale)
+            if selected:
+                return selected
+        return grids
+
+    @staticmethod
     def select_grids(
         grids,
         nearby=False,
@@ -127,44 +160,16 @@ class Map(Fleet):
         Returns:
             SelectedGrids:
         """
-        if nearby:
-            grids = grids.select(is_nearby=True)
-        if is_accessible:
-            grids = grids.select(is_accessible=True)
-        if ignore is not None:
-            grids = grids.delete(grids=ignore)
+        grids = Map._select_basic_grids(grids, nearby, is_accessible, ignore)
         if len(scale):
-            enemy = SelectedGrids([])
-            for enemy_scale in scale:
-                enemy = enemy.add(grids.select(enemy_scale=enemy_scale))
-                if isinstance(scale, list) and enemy:
-                    break
-            grids = enemy
+            grids = Map._select_by_ordered_values(grids, "enemy_scale", scale)
         if len(genre):
-            enemy = SelectedGrids([])
-            for raw_enemy_genre in genre:
-                # enemy_genre should be camel case
-                enemy_genre = (
-                    raw_enemy_genre[0].upper() + raw_enemy_genre[1:]
-                    if raw_enemy_genre[0].islower()
-                    else raw_enemy_genre
-                )
-                enemy = enemy.add(grids.select(enemy_genre=enemy_genre))
-                if isinstance(genre, list) and enemy:
-                    break
-            grids = enemy
+            normalized_genre = [Map._normalize_enemy_genre(item) for item in genre]
+            grids = Map._select_by_ordered_values(grids, "enemy_genre", normalized_genre)
         if strongest:
-            for candidate_scale in [3, 2, 1, 0]:
-                enemy = grids.select(enemy_scale=candidate_scale)
-                if enemy:
-                    grids = enemy
-                    break
+            grids = Map._select_by_scale_priority(grids, [3, 2, 1, 0])
         if weakest:
-            for candidate_scale in [1, 2, 3, 0]:
-                enemy = grids.select(enemy_scale=candidate_scale)
-                if enemy:
-                    grids = enemy
-                    break
+            grids = Map._select_by_scale_priority(grids, [1, 2, 3, 0])
 
         if grids:
             grids = grids.sort(*sort)

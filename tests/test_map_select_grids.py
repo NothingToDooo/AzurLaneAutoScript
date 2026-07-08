@@ -1,0 +1,95 @@
+from module.map.map import Map
+from module.map.map_grids import SelectedGrids
+
+
+class _Grid:
+    def __init__(
+        self,
+        name,
+        *,
+        enemy_scale=1,
+        enemy_genre="Light",
+        is_nearby=True,
+        is_accessible=True,
+        weight=0,
+        cost=0,
+    ) -> None:
+        self.name = name
+        self.enemy_scale = enemy_scale
+        self.enemy_genre = enemy_genre
+        self.is_nearby = is_nearby
+        self.is_accessible = is_accessible
+        self.weight = weight
+        self.cost = cost
+
+    def __str__(self) -> str:
+        return self.name
+
+
+def _names(grids):
+    return [grid.name for grid in grids]
+
+
+def test_select_grids_applies_basic_filters_and_ignore() -> None:
+    kept = _Grid("kept", is_nearby=True, is_accessible=True)
+    far = _Grid("far", is_nearby=False, is_accessible=True)
+    blocked = _Grid("blocked", is_nearby=True, is_accessible=False)
+    ignored = _Grid("ignored", is_nearby=True, is_accessible=True)
+    grids = SelectedGrids([kept, far, blocked, ignored])
+
+    result = Map.select_grids(grids, nearby=True, ignore=SelectedGrids([ignored]))
+
+    assert _names(result) == ["kept"]
+
+
+def test_select_grids_scale_tuple_collects_all_requested_scales() -> None:
+    grids = SelectedGrids(
+        [
+            _Grid("scale-1", enemy_scale=1, weight=2),
+            _Grid("scale-2", enemy_scale=2, weight=1),
+            _Grid("scale-3", enemy_scale=3, weight=3),
+        ]
+    )
+
+    result = Map.select_grids(grids, scale=(2, 1), sort=("weight",))
+
+    assert _names(result) == ["scale-2", "scale-1"]
+
+
+def test_select_grids_scale_list_stops_after_first_available_scale() -> None:
+    grids = SelectedGrids(
+        [
+            _Grid("scale-1", enemy_scale=1, weight=1),
+            _Grid("scale-2", enemy_scale=2, weight=2),
+        ]
+    )
+
+    result = Map.select_grids(grids, scale=[2, 1], sort=("weight",))
+
+    assert _names(result) == ["scale-2"]
+
+
+def test_select_grids_genre_normalizes_lowercase_and_keeps_list_priority() -> None:
+    grids = SelectedGrids(
+        [
+            _Grid("light", enemy_genre="Light", weight=1),
+            _Grid("main", enemy_genre="Main", weight=2),
+        ]
+    )
+
+    result = Map.select_grids(grids, genre=["main", "light"], sort=("weight",))
+
+    assert _names(result) == ["main"]
+
+
+def test_select_grids_strongest_and_weakest_pick_scale_priority() -> None:
+    grids = SelectedGrids(
+        [
+            _Grid("small", enemy_scale=1),
+            _Grid("middle", enemy_scale=2),
+            _Grid("large", enemy_scale=3),
+        ]
+    )
+
+    assert _names(Map.select_grids(grids, strongest=True)) == ["large"]
+    assert _names(Map.select_grids(grids, weakest=True)) == ["small"]
