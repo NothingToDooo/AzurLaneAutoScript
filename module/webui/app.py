@@ -50,6 +50,12 @@ from module.logger import logger
 from module.submodule.submodule import load_config
 from module.submodule.utils import get_config_mod
 from module.webui import lang
+from module.webui.app_manage_utils import (
+    format_export_config_filename,
+    next_alas_instance_name,
+    parse_import_config_name,
+    validate_new_config_name,
+)
 from module.webui.base import Frame
 from module.webui.fastapi import asgi_app
 from module.webui.lang import t
@@ -924,12 +930,7 @@ def app_manage():
         file: bytes = resp["content"]
         file_name: str = resp["filename"]
 
-        if len(file_name.split(".")) == 2:
-            config_name, _ = file_name.split(".")
-            mod_name = "alas"
-        else:
-            config_name, mod_name, _ = file_name.rsplit(".", maxsplit=2)
-
+        config_name, mod_name = parse_import_config_name(file_name)
         config = json.loads(file.decode(encoding="utf-8"))
         State.config_updater.write_file(config_name, config, mod_name)
         toast(t("Gui.AppManage.ImportSuccess"), color="success")
@@ -938,27 +939,14 @@ def app_manage():
 
     def _export(config_name: str):
         mod_name = get_config_mod(config_name)
-        suffix = "" if mod_name == "alas" else f".{mod_name}"
-        filename = f"{config_name}{suffix}.json"
+        filename = format_export_config_filename(config_name, mod_name)
         with Path(filepath_config(config_name, mod_name)).open("rb") as f:
             download(filename, f.read())
 
     def _new():
-        def get_unused_name():
-            all_name = alas_instance()
-            for i in range(2, 100):
-                if f"alas{i}" not in all_name:
-                    return f"alas{i}"
-            return ""
-
         def validate(s: str):
-            if s in alas_instance():
-                return t("Gui.AppManage.NameExist")
-            if set(s) & set(".\\/:*?\"'<>|"):
-                return t("Gui.AppManage.InvalidChar")
-            if s.lower().startswith("template"):
-                return t("Gui.AppManage.InvalidPrefixTemplate")
-            return None
+            key = validate_new_config_name(s, alas_instance())
+            return t(key) if key else None
 
         resp = input_group(
             label=t("Gui.AppManage.TitleNew"),
@@ -966,7 +954,7 @@ def app_manage():
                 pywebio_input(
                     label=t("Gui.AppManage.NewName"),
                     name="config_name",
-                    value=get_unused_name(),
+                    value=next_alas_instance_name(alas_instance()),
                     validate=validate,
                 ),
                 select(
