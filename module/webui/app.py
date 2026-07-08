@@ -42,8 +42,6 @@ from module.config.utils import (
     read_file,
 )
 from module.logger import logger
-from module.submodule.submodule import load_config
-from module.submodule.utils import get_config_mod
 from module.webui import lang
 from module.webui.app_manage_utils import (
     format_export_config_filename,
@@ -93,8 +91,8 @@ class AlasGUI(Frame):
     theme = "default"
 
     def initial(self) -> None:
-        self.ALAS_MENU = read_file(filepath_args("menu", self.alas_mod))
-        self.ALAS_ARGS = read_file(filepath_args("args", self.alas_mod))
+        self.ALAS_MENU = read_file(filepath_args("menu"))
+        self.ALAS_ARGS = read_file(filepath_args("args"))
         self._init_alas_config_watcher()
 
     def __init__(self) -> None:
@@ -103,7 +101,6 @@ class AlasGUI(Frame):
         self.modified_config_queue = queue.Queue()
         # Alas 配置名。
         self.alas_name = ""
-        self.alas_mod = "alas"
         self.alas_config = AzurLaneConfig("template")
         self.initial()
         # 渲染状态缓存。
@@ -689,9 +686,8 @@ class AlasGUI(Frame):
         self.init_aside(name=config_name)
         clear("content")
         self.alas_name = config_name
-        self.alas_mod = get_config_mod(config_name)
         self.alas = ProcessManager.get_manager(config_name)
-        self.alas_config = load_config(config_name)
+        self.alas_config = AzurLaneConfig(config_name)
         self.state_switch.switch()
         self.initial()
         self.alas_set_menu()
@@ -724,8 +720,8 @@ class AlasGUI(Frame):
                     put_error(t(err), scope=s)
                     return
 
-                r = load_config(origin).read_file(origin)
-                State.config_updater.write_file(name, r, get_config_mod(origin))
+                r = State.config_updater.read_file(origin, is_template=origin == "template")
+                State.config_updater.write_file(name, r)
                 self.set_aside()
                 self.active_button("aside", self.alas_name)
                 close_popup()
@@ -741,7 +737,7 @@ class AlasGUI(Frame):
                     name="AddAlas_copyfrom",
                     label=t("Gui.AddAlas.CopyFrom"),
                     options=alas_template() + alas_instance(),
-                    value=origin or "template-alas",
+                    value=origin or "template",
                     scope=s,
                 )
                 put_buttons(
@@ -877,17 +873,16 @@ def app_manage():
         file: bytes = resp["content"]
         file_name: str = resp["filename"]
 
-        config_name, mod_name = parse_import_config_name(file_name)
+        config_name = parse_import_config_name(file_name)
         config = json.loads(file.decode(encoding="utf-8"))
-        State.config_updater.write_file(config_name, config, mod_name)
+        State.config_updater.write_file(config_name, config)
         toast(t("Gui.AppManage.ImportSuccess"), color="success")
 
         _show_table()
 
     def _export(config_name: str):
-        mod_name = get_config_mod(config_name)
-        filename = format_export_config_filename(config_name, mod_name)
-        with Path(filepath_config(config_name, mod_name)).open("rb") as f:
+        filename = format_export_config_filename(config_name)
+        with Path(filepath_config(config_name)).open("rb") as f:
             download(filename, f.read())
 
     def _new():
@@ -908,7 +903,7 @@ def app_manage():
                     label=t("Gui.AppManage.CopyFrom"),
                     name="copy_from",
                     options=alas_template() + alas_instance(),
-                    value="template-alas",
+                    value="template",
                 ),
             ],
             cancelable=True,
@@ -920,8 +915,8 @@ def app_manage():
         config_name = resp["config_name"]
         origin = resp["copy_from"]
 
-        r = load_config(origin).read_file(origin)
-        State.config_updater.write_file(config_name, r, get_config_mod(origin))
+        r = State.config_updater.read_file(origin, is_template=origin == "template")
+        State.config_updater.write_file(config_name, r)
         toast(t("Gui.AppManage.NewSuccess"), color="success")
         _show_table()
 
@@ -931,7 +926,6 @@ def app_manage():
             tdata=[
                 (
                     name,
-                    get_config_mod(name),
                     put_buttons(
                         buttons=[
                             {"label": t("Gui.AppManage.Export"), "value": name},
@@ -947,7 +941,6 @@ def app_manage():
             ],
             header=[
                 t("Gui.AppManage.Name"),
-                t("Gui.AppManage.Mod"),
                 t("Gui.AppManage.Actions"),
             ],
             scope="config_table",

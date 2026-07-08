@@ -9,7 +9,6 @@ from yaml.representer import SafeRepresenter
 
 from module.base.atomic import atomic_read_bytes, atomic_read_text, atomic_write
 from module.logger import logger
-from module.submodule.utils import get_mod_filepath, list_mod_instance, list_mod_template
 
 LANGUAGES = ["zh-CN"]
 DEFAULT_TIME = datetime(2020, 1, 1, 0, 0)
@@ -26,26 +25,20 @@ yaml.add_representer(str, str_presenter)
 SafeRepresenter.add_representer(str, str_presenter)
 
 
-def filepath_args(filename="args", mod_name="alas"):
-    if mod_name == "alas":
-        return f"./module/config/argument/{filename}.json"
-    return (Path(get_mod_filepath(mod_name)) / "module/config/argument" / f"{filename}.json").as_posix()
+def filepath_args(filename="args"):
+    return f"./module/config/argument/{filename}.json"
 
 
 def filepath_argument(filename):
     return f"./module/config/argument/{filename}.yaml"
 
 
-def filepath_i18n(lang, mod_name="alas"):
-    if mod_name == "alas":
-        return (Path("./module/config/i18n") / f"{lang}.json").as_posix()
-    return (Path(get_mod_filepath(mod_name)) / "module/config/i18n" / f"{lang}.json").as_posix()
+def filepath_i18n(lang):
+    return (Path("./module/config/i18n") / f"{lang}.json").as_posix()
 
 
-def filepath_config(filename, mod_name="alas"):
-    if mod_name == "alas":
-        return (Path("./config") / f"{filename}.json").as_posix()
-    return (Path("./config") / f"{filename}.{mod_name}.json").as_posix()
+def filepath_config(filename):
+    return (Path("./config") / f"{filename}.json").as_posix()
 
 
 def filepath_code():
@@ -133,15 +126,7 @@ def alas_template():
     Returns:
         list[str]: Name of all Alas instances, except `template`.
     """
-    out = []
-    for path in Path("./config").iterdir():
-        name = path.stem
-        if name == "template" and path.suffix == ".json":
-            out.append(f"{name}-alas")
-
-    out.extend(list_mod_template())
-
-    return out
+    return ["template"] if Path("./config/template.json").exists() else []
 
 
 def alas_instance():
@@ -157,8 +142,6 @@ def alas_instance():
         mod_name = mod_name[1:]
         if name != "template" and extension == ".json" and mod_name == "":
             out.append(name)
-
-    out.extend(list_mod_instance())
 
     if not out:
         out = ["alas"]

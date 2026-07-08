@@ -6,15 +6,14 @@ from module.webui.app_manage_utils import (
 )
 
 
-def test_parse_import_config_name_keeps_existing_suffix_semantics() -> None:
-    assert parse_import_config_name("alas.json") == ("alas", "alas")
-    assert parse_import_config_name("daily.mod.json") == ("daily", "mod")
-    assert parse_import_config_name("daily.extra.mod.json") == ("daily.extra", "mod")
+def test_parse_import_config_name_uses_plain_json_stem() -> None:
+    assert parse_import_config_name("alas.json") == "alas"
+    assert parse_import_config_name("daily.extra.json") == "daily.extra"
 
 
-def test_format_export_config_filename_omits_default_alas_suffix() -> None:
-    assert format_export_config_filename("alas", "alas") == "alas.json"
-    assert format_export_config_filename("daily", "mod") == "daily.mod.json"
+def test_format_export_config_filename_uses_plain_json_name() -> None:
+    assert format_export_config_filename("alas") == "alas.json"
+    assert format_export_config_filename("daily") == "daily.json"
 
 
 def test_next_alas_instance_name_uses_first_available_number() -> None:

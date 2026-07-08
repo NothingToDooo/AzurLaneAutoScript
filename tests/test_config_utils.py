@@ -1,10 +1,14 @@
 from datetime import datetime, timedelta
 
-from module.config.utils import parse_value, server_time_offset
+from module.config.utils import alas_template, parse_value, server_time_offset
 
 
 def test_cn_personal_branch_uses_local_time_as_server_time() -> None:
     assert server_time_offset() == timedelta()
+
+
+def test_alas_template_uses_plain_template_name() -> None:
+    assert alas_template() == ["template"]
 
 
 def test_parse_value_uses_default_when_option_is_invalid() -> None:

@@ -271,14 +271,14 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         logger.critical("Please enable at least one task")
         raise RequestHumanTakeover
 
-    def save(self, mod_name="alas"):
+    def save(self):
         if not self.modified:
             return False
 
         for path, value in self.modified.items():
             deep_set(self.data, keys=path, value=value)
 
-        logger.info(f"Save config {filepath_config(self.config_name, mod_name)}, {dict_to_kv(self.modified)}")
+        logger.info(f"Save config {filepath_config(self.config_name)}, {dict_to_kv(self.modified)}")
         # 不要用 self.modified = {}，否则会创建新对象。
         self.modified.clear()
         self.write_file(self.config_name, data=self.data)

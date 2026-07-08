@@ -9,20 +9,20 @@ from alas import AzurLaneAutoScript
 from module.base.naming import camel_to_snake
 from module.config.config import AzurLaneConfig
 from module.logger import logger, set_file_logger, set_func_logger
-from module.submodule.submodule import load_mod
-from module.submodule.utils import (
-    get_available_func,
-    get_available_mod,
-    get_available_mod_func,
-    get_config_mod,
-    get_func_mod,
-    list_mod_instance,
-)
 from module.webui.fake_pil_module import remove_fake_pil_module
 from module.webui.setting import State
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+_AVAILABLE_WEBUI_TASKS = (
+    "Daemon",
+    "OpsiDaemon",
+    "EventStory",
+    "AzurLaneUncensored",
+    "Benchmark",
+    "GameManager",
+)
 
 
 class ProcessManager:
@@ -41,7 +41,7 @@ class ProcessManager:
     def start(self, func, ev: threading.Event | None = None) -> None:
         if not self.alive:
             if func is None:
-                func = get_config_mod(self.config_name)
+                func = "alas"
             self._process = Process(
                 target=ProcessManager.run_process,
                 args=(
@@ -137,16 +137,8 @@ class ProcessManager:
                 if stop_event is not None:
                     AzurLaneAutoScript.stop_event = stop_event
                 AzurLaneAutoScript(config_name=config_name).loop()
-            elif func in get_available_func():
+            elif func in _AVAILABLE_WEBUI_TASKS:
                 AzurLaneAutoScript(config_name=config_name).run(camel_to_snake(func), skip_first_screenshot=True)
-            elif func in get_available_mod():
-                mod = load_mod(func)
-
-                if stop_event is not None:
-                    mod.set_stop_event(stop_event)
-                mod.loop(config_name)
-            elif func in get_available_mod_func():
-                getattr(load_mod(get_func_mod(func)), camel_to_snake(func))(config_name)
             else:
                 logger.critical(f"No function matched: {func}")
             logger.info(f"[{config_name}] exited. Reason: Finish\n")
@@ -173,9 +165,6 @@ class ProcessManager:
         """
         logger.hr("Restart alas")
 
-        # Load MOD_CONFIG_DICT
-        list_mod_instance()
-
         if instances is None:
             instances = []
 
@@ -189,6 +178,6 @@ class ProcessManager:
 
         for process in _instances:
             logger.info(f"Starting [{process.config_name}]")
-            process.start(func=get_config_mod(process.config_name), ev=ev)
+            process.start(func="alas", ev=ev)
 
         logger.info("Start alas complete")
