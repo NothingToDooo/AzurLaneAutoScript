@@ -1,7 +1,5 @@
 import copy
 import json
-import random
-import string
 from typing import TYPE_CHECKING, Any
 
 from pywebio.exceptions import SessionException
@@ -40,48 +38,6 @@ if TYPE_CHECKING:
     from module.webui.process_manager import ProcessManager
 
 
-class ScrollableCode:
-    """
-    https://github.com/pywebio/PyWebIO/discussions/21
-    Deprecated
-    """
-
-    def __init__(self, keep_bottom: bool = True) -> None:
-        self.keep_bottom = keep_bottom
-
-        self.id = "".join(random.choice(string.ascii_letters) for _ in range(10))
-        self.html = (
-            f"""<pre id="{self.id}" class="container-log"><code style="white-space:break-spaces;"></code></pre>"""
-        )
-
-    def output(self):
-        # .style("display: grid; overflow-y: auto;")
-        return put_html(self.html)
-
-    def append(self, text: str) -> None:
-        if text:
-            run_js(
-                f"""$("#{self.id}>code").append(text);
-            """,
-                text=str(text),
-            )
-            if self.keep_bottom:
-                self.scroll()
-
-    def scroll(self) -> None:
-        run_js(
-            rf"""$("\#{self.id}").animate({{scrollTop: $("\#{self.id}").prop("scrollHeight")}}, 0);
-        """
-        )
-
-    def reset(self) -> None:
-        run_js(rf"""$("\#{self.id}>code").empty();""")
-
-    def set_scroll(self, b: bool) -> None:
-        # use for lambda callback function
-        self.keep_bottom = b
-
-
 class RichLog:
     def __init__(self, scope, font_width="0.559") -> None:
         self.scope = scope
@@ -97,10 +53,6 @@ class RichLog:
             highlighter=Highlighter(),
             theme=WEB_THEME,
         )
-        # self.callback_id = output_register_callback(
-        #     self._callback_set_width, serial_mode=True)
-        # self._callback_thread = None
-        # self._width = 80
         self.keep_bottom = True
         if State.theme == "dark":
             self.terminal_theme = DARK_TERMINAL_THEME
@@ -157,35 +109,6 @@ class RichLog:
         """
         width = eval_js(js)
         return 80 if width is None else 128 if width > 128 else int(width)
-
-    # def _register_resize_callback(self):
-    #     js = """
-    #     WebIO.pushData(
-    #         ($('#pywebio-scope-log').width()-16)/$('#pywebio-scope-log').css('font-size').slice(0, -2)/0.55,
-    #         {callback_id}
-    #     )""".format(callback_id=self.callback_id)
-
-    # def _callback_set_width(self, width):
-    #     self._width = width
-    #     if self._callback_thread is None:
-    #         self._callback_thread = Thread(target=self._callback_width_checker)
-    #         self._callback_thread.start()
-
-    # def _callback_width_checker(self):
-    #     last_modify = time.time()
-    #     _width = self._width
-    #     while True:
-    #         if time.time() - last_modify > 1:
-    #             break
-    #         if self._width == _width:
-    #             time.sleep(0.1)
-    #             continue
-    #         else:
-    #             _width = self._width
-    #             last_modify = time.time()
-
-    #     self._callback_thread = None
-    #     self.console.width = int(_width)
 
     def put_log(self, pm: ProcessManager) -> Generator:
         yield
@@ -478,8 +401,7 @@ def put_arg_storage(kwargs: T_Output_Kwargs) -> Output | None:
     def clear_callback():
         alasgui: AlasGUI = local.gui
         alasgui.modified_config_queue.put({"name": ".".join(name.split("_")), "value": {}})
-        # https://github.com/pywebio/PyWebIO/issues/459
-        # pin[name] = "{}"
+        # 不直接写 pin[name]，见 PyWebIO issue 459。
 
     return put_scope(
         f"arg_container-storage-{name}",
