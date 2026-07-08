@@ -1,4 +1,4 @@
-from module.statistics.item import ItemGrid
+from module.statistics.item import ItemGrid, ItemGridAreas, ItemPredictOptions, item_grid_areas
 
 
 class FakeOcr:
@@ -61,7 +61,7 @@ def test_item_grid_predict_runs_enabled_stages_and_filters_invalid_price() -> No
     items = [FakeItem("a"), FakeItem("b"), FakeItem("c")]
     grid = FakeItemGrid(items, costs={"a": "Gem", "b": None, "c": "Coin"}, prices=[5, 0])
 
-    result = grid.predict("screen", name=True, amount=True, cost=True, price=True, tag=True)
+    result = grid.predict("screen", options=ItemPredictOptions(cost=True, price=True, tag=True))
 
     assert result == [items[0]]
     assert items[0].name == "Oil_2"
@@ -83,3 +83,10 @@ def test_item_grid_predict_keeps_disabled_stages_untouched() -> None:
     assert item.cost == "DefaultCost"
     assert item.price == 0
     assert item.tag is None
+
+
+def test_item_grid_area_settings_override_options() -> None:
+    areas = item_grid_areas(ItemGridAreas(amount_area=(1, 2, 3, 4)), {"price_area": (5, 6, 7, 8)})
+
+    assert areas.amount_area == (1, 2, 3, 4)
+    assert areas.price_area == (5, 6, 7, 8)

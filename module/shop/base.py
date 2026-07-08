@@ -9,7 +9,7 @@ from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_3, GET_SHIP
 from module.logger import logger
 from module.shop.assets import SHOP_CLICK_SAFE_AREA
-from module.statistics.item import Item, ItemGrid
+from module.statistics.item import Item, ItemGrid, item_predict_options
 from module.tactical.tactical_class import Book
 from module.ui.ui import UI
 
@@ -55,17 +55,17 @@ class ShopItem_250814(Item):
 
 
 class ShopItemGrid(ItemGrid):
-    def predict(self, image, name=True, amount=True, cost=False, price=False, tag=False):
+    def predict(self, image, options=None, **settings):
         """
-        Define new attributes to predicted Item obj for shop item filtering
+        给商品补充过滤用属性。
         """
-        super().predict(image, name, amount, cost, price, tag)
+        options = item_predict_options(options, settings)
+        super().predict(image, options=options)
         for item in self.items:
-            # Set defaults
+            # 设置默认过滤属性。
             item.group, item.sub_genre, item.tier = None, None, None
 
-            # Can use regular expression to quickly populate
-            # the new attributes
+            # 正则可以快速填充过滤字段。
             name = item.name
             result = re.search(FILTER_REGEX, name)
             if result:

@@ -1,3 +1,4 @@
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import cv2
@@ -117,40 +118,61 @@ class Item:
         return hash(self.name)
 
 
+@dataclass(frozen=True, slots=True)
+class ItemGridAreas:
+    template_area: tuple[int, int, int, int] = (40, 21, 89, 70)
+    amount_area: tuple[int, int, int, int] = (60, 71, 91, 92)
+    cost_area: tuple[int, int, int, int] = (6, 123, 84, 166)
+    price_area: tuple[int, int, int, int] = (52, 132, 132, 156)
+    tag_area: tuple[int, int, int, int] = (81, 4, 91, 8)
+
+
+def item_grid_areas(areas=None, settings=None) -> ItemGridAreas:
+    areas = ItemGridAreas() if areas is None else areas
+    if settings:
+        areas = replace(areas, **settings)
+    return areas
+
+
+@dataclass(frozen=True, slots=True)
+class ItemPredictOptions:
+    name: bool = True
+    amount: bool = True
+    cost: bool = False
+    price: bool = False
+    tag: bool = False
+
+
+def item_predict_options(options=None, settings=None) -> ItemPredictOptions:
+    options = ItemPredictOptions() if options is None else options
+    if settings:
+        options = replace(options, **settings)
+    return options
+
+
 class ItemGrid:
     item_class = Item
     similarity = 0.92
     extract_similarity = 0.92
     cost_similarity = 0.75
 
-    def __init__(
-        self,
-        grids,
-        templates,
-        template_area=(40, 21, 89, 70),
-        amount_area=(60, 71, 91, 92),
-        cost_area=(6, 123, 84, 166),
-        price_area=(52, 132, 132, 156),
-        tag_area=(81, 4, 91, 8),
-    ):
+    def __init__(self, grids, templates, areas=None, **area_settings):
         """
         Args:
-            grids (ButtonGrid):
-            templates (dict): Key: str, item_name, value: Template image.
-            template_area (tuple):
-            amount_area (tuple):
-            cost_area (tuple):
-            price_area (tuple):
-            tag_area (tuple):
+            grids (ButtonGrid): 商品网格。
+            templates (dict): Key 为商品名，value 为模板图片。
+            areas (ItemGridAreas): 商品识别裁剪区域。
+            **area_settings: 覆盖 `ItemGridAreas` 中的字段。
         """
+        areas = item_grid_areas(areas, area_settings)
         self.amount_ocr = AMOUNT_OCR
         self.price_ocr = PRICE_OCR
         self.grids = grids
-        self.template_area = template_area
-        self.amount_area = amount_area
-        self.cost_area = cost_area
-        self.price_area = price_area
-        self.tag_area = tag_area
+        self.template_area = areas.template_area
+        self.amount_area = areas.amount_area
+        self.cost_area = areas.cost_area
+        self.price_area = areas.price_area
+        self.tag_area = areas.tag_area
 
         self.colors = {}
         self.templates = {}
@@ -360,32 +382,30 @@ class ItemGrid:
             logger.warning(f"Ignore {diff} items, because price <= 0")
             self.items = items
 
-    def predict(self, image, name=True, amount=True, cost=False, price=False, tag=False):
+    def predict(self, image, options=None, **settings):
         """
         Args:
-            image (np.ndarray):
-            name (bool): If predict item name.
-            amount (bool): If predict item amount.
-            cost (bool): If predict the cost to buy item.
-            price (bool): If predict item price.
-            tag (bool): If predict item tag. Tags are like `catchup`, `bonus`.
+            image (np.ndarray): 待识别截图。
+            options (ItemPredictOptions): 本次需要识别的商品字段。
+            **settings: 覆盖 `ItemPredictOptions` 中的字段。
 
         Returns:
             list[Item]:
         """
+        options = item_predict_options(options, settings)
         self._load_image(image)
-        if amount:
+        if options.amount:
             self._predict_amounts()
-        if name:
+        if options.name:
             self._predict_names()
-        if cost:
+        if options.cost:
             self._predict_costs()
-        if price:
+        if options.price:
             self._predict_prices()
-        if tag:
+        if options.tag:
             self._predict_tags()
 
-        if price:
+        if options.price:
             self._discard_invalid_prices()
 
         return self.items

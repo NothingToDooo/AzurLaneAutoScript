@@ -1,5 +1,6 @@
 import re
 import time
+from dataclasses import dataclass, replace
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
@@ -16,26 +17,42 @@ if TYPE_CHECKING:
     from module.ocr.al_ocr import AlOcr
 
 
+@dataclass(frozen=True, slots=True)
+class OcrOptions:
+    lang: str = "azur_lane"
+    letter: tuple[int, int, int] | list[int] = (255, 255, 255)
+    threshold: int = 128
+    alphabet: str | None = None
+    name: str | None = None
+
+
+def ocr_options(options=None, settings=None, *, alphabet=None) -> OcrOptions:
+    options = OcrOptions(alphabet=alphabet) if options is None else options
+    if alphabet is not None and options.alphabet is None:
+        options = replace(options, alphabet=alphabet)
+    if settings:
+        options = replace(options, **settings)
+    return options
+
+
 class Ocr:
     SHOW_LOG = True
     SHOW_REVISE_WARNING = False
 
-    def __init__(self, buttons, lang="azur_lane", letter=(255, 255, 255), threshold=128, alphabet=None, name=None):
+    def __init__(self, buttons, options=None, **settings):
         """
         Args:
-            buttons (Button, tuple, list[Button], list[tuple]): OCR area.
-            lang (str): 'azur_lane' or 'cnocr'.
-            letter (tuple(int)): Letter RGB.
-            threshold (int):
-            alphabet: Alphabet white list.
-            name (str):
+            buttons (Button, tuple, list[Button], list[tuple]): OCR 区域。
+            options (OcrOptions): OCR 识别配置。
+            **settings: 覆盖 `OcrOptions` 中的字段。
         """
-        self.name = str(buttons) if isinstance(buttons, Button) else name
+        options = ocr_options(options, settings)
+        self.name = str(buttons) if isinstance(buttons, Button) else options.name
         self._buttons = buttons
-        self.letter = letter
-        self.threshold = threshold
-        self.alphabet = alphabet
-        self.lang = lang
+        self.letter = options.letter
+        self.threshold = options.threshold
+        self.alphabet = options.alphabet
+        self.lang = options.lang
 
     @property
     def cnocr(self) -> AlOcr:
@@ -133,10 +150,8 @@ class Digit(Ocr):
     Method ocr() returns int, or a list of int.
     """
 
-    def __init__(
-        self, buttons, lang="azur_lane", letter=(255, 255, 255), threshold=128, alphabet="0123456789IDSB", name=None
-    ):
-        super().__init__(buttons, lang=lang, letter=letter, threshold=threshold, alphabet=alphabet, name=name)
+    def __init__(self, buttons, options=None, **settings):
+        super().__init__(buttons, options=ocr_options(options, settings, alphabet="0123456789IDSB"))
 
     def after_process(self, result):
         result = super().after_process(result)
@@ -156,10 +171,8 @@ class DigitYuv(Digit, OcrYuv):
 
 
 class DigitCounter(Ocr):
-    def __init__(
-        self, buttons, lang="azur_lane", letter=(255, 255, 255), threshold=128, alphabet="0123456789/IDSB", name=None
-    ):
-        super().__init__(buttons, lang=lang, letter=letter, threshold=threshold, alphabet=alphabet, name=name)
+    def __init__(self, buttons, options=None, **settings):
+        super().__init__(buttons, options=ocr_options(options, settings, alphabet="0123456789/IDSB"))
 
     def after_process(self, result):
         result = super().after_process(result)
@@ -197,10 +210,8 @@ class DigitCounterYuv(DigitCounter, OcrYuv):
 
 
 class Duration(Ocr):
-    def __init__(
-        self, buttons, lang="azur_lane", letter=(255, 255, 255), threshold=128, alphabet="0123456789:IDSB", name=None
-    ):
-        super().__init__(buttons, lang=lang, letter=letter, threshold=threshold, alphabet=alphabet, name=name)
+    def __init__(self, buttons, options=None, **settings):
+        super().__init__(buttons, options=ocr_options(options, settings, alphabet="0123456789:IDSB"))
 
     def after_process(self, result):
         result = super().after_process(result)

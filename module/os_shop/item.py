@@ -1,6 +1,6 @@
 from module.logger import logger
-from module.ocr.ocr import DigitYuv, Ocr
-from module.statistics.item import Item, ItemGrid
+from module.ocr.ocr import DigitYuv, Ocr, ocr_options
+from module.statistics.item import Item, ItemGrid, item_grid_areas
 
 
 class PriceOcr(DigitYuv):
@@ -17,10 +17,8 @@ class PriceOcr(DigitYuv):
 
 
 class CounterOcr(Ocr):
-    def __init__(
-        self, buttons, lang="azur_lane", letter=(255, 255, 255), threshold=128, alphabet="0123456789/IDSB", name=None
-    ):
-        super().__init__(buttons, lang=lang, letter=letter, threshold=threshold, alphabet=alphabet, name=name)
+    def __init__(self, buttons, options=None, **settings):
+        super().__init__(buttons, options=ocr_options(options, settings, alphabet="0123456789/IDSB"))
 
     def after_process(self, result):
         result = super().after_process(result)
@@ -120,18 +118,9 @@ class OSShopItem(Item):
 class OSShopItemGrid(ItemGrid):
     item_class = OSShopItem
 
-    def __init__(
-        self,
-        grids,
-        templates,
-        template_area=(40, 21, 89, 70),
-        amount_area=(60, 71, 91, 92),
-        cost_area=(6, 123, 84, 166),
-        price_area=(52, 132, 132, 156),
-        tag_area=(81, 4, 91, 8),
-        counter_area=(85, 170, 134, 186),
-    ):
-        super().__init__(grids, templates, template_area, amount_area, cost_area, price_area, tag_area)
+    def __init__(self, grids, templates, areas=None, **area_settings):
+        counter_area = area_settings.pop("counter_area", (85, 170, 134, 186))
+        super().__init__(grids, templates, areas=item_grid_areas(areas, area_settings))
         self.counter_ocr = COUNTER_OCR
         self.price_ocr = PRICE_OCR
         self.counter_area = counter_area

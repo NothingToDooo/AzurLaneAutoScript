@@ -6,7 +6,7 @@ from module.base.filter import Filter
 from module.logger import logger
 from module.private_quarters.clerk import PQShopClerk
 from module.private_quarters.status import OCR_SHOP_PRICE, PQStatus
-from module.statistics.item import ItemGrid
+from module.statistics.item import ItemGrid, item_predict_options
 
 FILTER_REGEX = re.compile("^(gift|furn|misc)(sirius|cake|roses)([1-9]+)?$", flags=re.IGNORECASE)
 FILTER_ATTR = ("group", "sub_genre", "tier")
@@ -14,18 +14,18 @@ FILTER = Filter(FILTER_REGEX, FILTER_ATTR)
 
 
 class PQShopItemGrid(ItemGrid):
-    def predict(self, image, name=True, amount=True, cost=False, price=False, tag=False):
+    def predict(self, image, options=None, **settings):
         """
-        Define new attributes to predicted Item obj for shop item filtering
+        给商品补充过滤用属性。
         """
-        super().predict(image, name, amount, cost, price, tag)
+        options = item_predict_options(options, settings)
+        super().predict(image, options=options)
 
         for item in self.items:
-            # Set defaults
+            # 设置默认过滤属性。
             item.group, item.sub_genre, item.tier = None, None, None
 
-            # Can use regular expression to quickly populate
-            # the new attributes
+            # 正则可以快速填充过滤字段。
             name = item.name
             result = re.search(FILTER_REGEX, name)
             if result:
