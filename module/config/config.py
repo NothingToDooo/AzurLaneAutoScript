@@ -441,6 +441,77 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         else:
             raise ScriptError("Missing argument in delay_next_run, should set at least one")
 
+    def _delay_opsi_tasks(self, task_list, minutes, kv) -> None:
+        next_run = datetime.now().replace(microsecond=0) + timedelta(minutes=minutes)
+        for task in task_list:
+            keys = f"{task}.Scheduler.NextRun"
+            current = deep_get(self.data, keys=keys, default=DEFAULT_TIME)
+            if current < next_run:
+                logger.info(f"Delay task `{task}` to {next_run} ({kv})")
+                self.modified[keys] = next_run
+
+    def _is_opsi_submarine_call(self, task):
+        return (
+            deep_get(self.data, keys=f"{task}.OpsiFleet.Submarine", default=False)
+            or "submarine" in deep_get(self.data, keys=f"{task}.OpsiFleetFilter.Filter", default="").lower()
+        )
+
+    def _is_opsi_force_run(self, task):
+        return (
+            deep_get(self.data, keys=f"{task}.OpsiExplore.ForceRun", default=False)
+            or deep_get(self.data, keys=f"{task}.OpsiObscure.ForceRun", default=False)
+            or deep_get(self.data, keys=f"{task}.OpsiAbyssal.ForceRun", default=False)
+            or deep_get(self.data, keys=f"{task}.OpsiStronghold.ForceRun", default=False)
+        )
+
+    def _is_opsi_special_radar(self, task):
+        return deep_get(self.data, keys=f"{task}.OpsiExplore.SpecialRadar", default=False)
+
+    def _opsi_recon_scan_tasks(self):
+        tasks = SelectedGrids(["OpsiExplore", "OpsiObscure", "OpsiStronghold"])
+        return tasks.delete(tasks.filter(self._is_opsi_force_run)).delete(tasks.filter(self._is_opsi_special_radar))
+
+    def _opsi_submarine_call_tasks(self):
+        tasks = SelectedGrids(
+            [
+                "OpsiExplore",
+                "OpsiDaily",
+                "OpsiObscure",
+                "OpsiAbyssal",
+                "OpsiArchive",
+                "OpsiStronghold",
+                "OpsiMeowfficerFarming",
+                "OpsiMonthBoss",
+            ]
+        )
+        return tasks.filter(self._is_opsi_submarine_call).delete(tasks.filter(self._is_opsi_force_run))
+
+    @staticmethod
+    def _opsi_ap_limit_tasks():
+        return SelectedGrids(
+            [
+                "OpsiExplore",
+                "OpsiDaily",
+                "OpsiObscure",
+                "OpsiAbyssal",
+                "OpsiStronghold",
+                # 延迟 OpsiArchive，因为 OpsiArchive 和 OpsiDaily 共用任务列表。
+                "OpsiArchive",
+                "OpsiMeowfficerFarming",
+            ]
+        )
+
+    @staticmethod
+    def _opsi_cl1_preserve_tasks():
+        return SelectedGrids(
+            [
+                "OpsiObscure",
+                "OpsiAbyssal",
+                "OpsiStronghold",
+                "OpsiMeowfficerFarming",
+            ]
+        )
+
     def opsi_task_delay(self, recon_scan=False, submarine_call=False, ap_limit=False, cl1_preserve=False):
         """
         Delay the NextRun of all OpSi tasks.
@@ -462,80 +533,18 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             }
         )
 
-        def delay_tasks(task_list, minutes):
-            next_run = datetime.now().replace(microsecond=0) + timedelta(minutes=minutes)
-            for task in task_list:
-                keys = f"{task}.Scheduler.NextRun"
-                current = deep_get(self.data, keys=keys, default=DEFAULT_TIME)
-                if current < next_run:
-                    logger.info(f"Delay task `{task}` to {next_run} ({kv})")
-                    self.modified[keys] = next_run
-
-        def is_submarine_call(task):
-            return (
-                deep_get(self.data, keys=f"{task}.OpsiFleet.Submarine", default=False)
-                or "submarine" in deep_get(self.data, keys=f"{task}.OpsiFleetFilter.Filter", default="").lower()
-            )
-
-        def is_force_run(task):
-            return (
-                deep_get(self.data, keys=f"{task}.OpsiExplore.ForceRun", default=False)
-                or deep_get(self.data, keys=f"{task}.OpsiObscure.ForceRun", default=False)
-                or deep_get(self.data, keys=f"{task}.OpsiAbyssal.ForceRun", default=False)
-                or deep_get(self.data, keys=f"{task}.OpsiStronghold.ForceRun", default=False)
-            )
-
-        def is_special_radar(task):
-            return deep_get(self.data, keys=f"{task}.OpsiExplore.SpecialRadar", default=False)
-
         if recon_scan:
-            tasks = SelectedGrids(["OpsiExplore", "OpsiObscure", "OpsiStronghold"])
-            tasks = tasks.delete(tasks.filter(is_force_run)).delete(tasks.filter(is_special_radar))
-            delay_tasks(tasks, minutes=27)
+            self._delay_opsi_tasks(self._opsi_recon_scan_tasks(), minutes=27, kv=kv)
         if submarine_call:
-            tasks = SelectedGrids(
-                [
-                    "OpsiExplore",
-                    "OpsiDaily",
-                    "OpsiObscure",
-                    "OpsiAbyssal",
-                    "OpsiArchive",
-                    "OpsiStronghold",
-                    "OpsiMeowfficerFarming",
-                    "OpsiMonthBoss",
-                ]
-            )
-            tasks = tasks.filter(is_submarine_call).delete(tasks.filter(is_force_run))
-            delay_tasks(tasks, minutes=60)
+            self._delay_opsi_tasks(self._opsi_submarine_call_tasks(), minutes=60, kv=kv)
         if ap_limit:
-            tasks = SelectedGrids(
-                [
-                    "OpsiExplore",
-                    "OpsiDaily",
-                    "OpsiObscure",
-                    "OpsiAbyssal",
-                    "OpsiStronghold",
-                    # Delay OpsiArchive, since OpsiArchive and OpsiDaily share the same mission list,
-                    # although it does not requires any AP to enter.
-                    "OpsiArchive",
-                    "OpsiMeowfficerFarming",
-                ]
-            )
             if get_os_reset_remain() > 0:
-                delay_tasks(tasks, minutes=360)
+                self._delay_opsi_tasks(self._opsi_ap_limit_tasks(), minutes=360, kv=kv)
             else:
                 logger.info("Just less than 1 day to OpSi reset, delay 2.5 hours")
-                delay_tasks(tasks, minutes=150)
+                self._delay_opsi_tasks(self._opsi_ap_limit_tasks(), minutes=150, kv=kv)
         if cl1_preserve:
-            tasks = SelectedGrids(
-                [
-                    "OpsiObscure",
-                    "OpsiAbyssal",
-                    "OpsiStronghold",
-                    "OpsiMeowfficerFarming",
-                ]
-            )
-            delay_tasks(tasks, minutes=360)
+            self._delay_opsi_tasks(self._opsi_cl1_preserve_tasks(), minutes=360, kv=kv)
 
         self.update()
 
