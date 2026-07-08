@@ -13,6 +13,11 @@ from module.ui.page import page_dock, page_main
 if TYPE_CHECKING:
     from module.base.button import Button
 
+UNEXPECTED_AWAKEN_COST_RESULT_TEMPLATE = "Unexpected _get_awaken_cost result: {result}"
+UNEXPECTED_AWAKEN_ONCE_RESULT_TEMPLATE = "Unexpected awaken_once result: {result}"
+UNEXPECTED_AWAKEN_SHIP_RESULT_TEMPLATE = "Unexpected awaken_ship result: {result}"
+UNKNOWN_AWAKEN_LEVEL_CAP_TEMPLATE = "Unknown Awaken_LevelCap={level_cap}"
+
 
 class ShipLevel(Digit):
     def after_process(self, result):
@@ -189,7 +194,8 @@ class Awaken(Dock):
             self.awaken_popup_close()
             return "insufficient"
         if result != "invalid":
-            raise ScriptError(f"Unexpected _get_awaken_cost result: {result}")
+            message = UNEXPECTED_AWAKEN_COST_RESULT_TEMPLATE.format(result=result)
+            raise ScriptError(message)
 
         # invalid 结果会重试，同时继续检查超时。
         if timeout.reached():
@@ -305,7 +311,8 @@ class Awaken(Dock):
                 if result == "timeout":
                     # 获取资源超时，重试通常可以恢复。
                     continue
-                raise ScriptError(f"Unexpected awaken_once result: {result}")
+                message = UNEXPECTED_AWAKEN_ONCE_RESULT_TEMPLATE.format(result=result)
+                raise ScriptError(message)
             # 获取等级超时，要求退出。
             return "timeout"
 
@@ -392,7 +399,8 @@ class Awaken(Dock):
             if result == "timeout":
                 logger.info(f"awaken_run finished, result={result}")
                 break
-            raise ScriptError(f"Unexpected awaken_ship result: {result}")
+            message = UNEXPECTED_AWAKEN_SHIP_RESULT_TEMPLATE.format(result=result)
+            raise ScriptError(message)
 
         return result
 
@@ -409,7 +417,8 @@ class Awaken(Dock):
             # 使用心智单元。
             self.awaken_run(favourite=favourite)
         else:
-            raise ScriptError(f"Unknown Awaken_LevelCap={self.config.Awaken_LevelCap}")
+            message = UNKNOWN_AWAKEN_LEVEL_CAP_TEMPLATE.format(level_cap=self.config.Awaken_LevelCap)
+            raise ScriptError(message)
 
         # 重置船坞筛选。
         logger.hr("Awaken run exit", level=1)
