@@ -59,6 +59,7 @@ from module.webui.app_manage_utils import (
 from module.webui.base import Frame
 from module.webui.fastapi import asgi_app
 from module.webui.lang import t
+from module.webui.overview_utils import split_overview_tasks
 from module.webui.pin import put_input, put_select
 from module.webui.process_manager import ProcessManager
 from module.webui.setting import State
@@ -501,60 +502,44 @@ class AlasGUI(Frame):
             logger.exception(e)
             toast("设置保存失败", duration=3, position="right", color="error")
 
+    def put_overview_task(self, func: Function) -> None:
+        with use_scope(f"overview-task_{func.command}"):
+            put_column(
+                [
+                    put_text(t(f"Task.{func.command}.name")).style("--arg-title--"),
+                    put_text(str(func.next_run)).style("--arg-help--"),
+                ],
+                size="auto auto",
+            )
+            put_button(
+                label=t("Gui.Button.Setting"),
+                onclick=lambda: self.alas_set_group(func.command),
+                color="off",
+            )
+
+    def put_overview_task_section(self, scope: str, tasks) -> None:
+        clear(scope)
+        with use_scope(scope):
+            if not tasks:
+                put_text(t("Gui.Overview.NoTask")).style("--overview-notask-text--")
+                return
+            for task in tasks:
+                self.put_overview_task(task)
+
     def alas_update_overview_task(self) -> None:
         if not self.visible:
             return
         self.alas_config.load()
         self.alas_config.get_next_task()
 
-        if len(self.alas_config.pending_task) >= 1:
-            if self.alas.alive:
-                running = self.alas_config.pending_task[:1]
-                pending = self.alas_config.pending_task[1:]
-            else:
-                running = []
-                pending = self.alas_config.pending_task[:]
-        else:
-            running = []
-            pending = []
-        waiting = self.alas_config.waiting_task
-
-        def put_task(func: Function):
-            with use_scope(f"overview-task_{func.command}"):
-                put_column(
-                    [
-                        put_text(t(f"Task.{func.command}.name")).style("--arg-title--"),
-                        put_text(str(func.next_run)).style("--arg-help--"),
-                    ],
-                    size="auto auto",
-                )
-                put_button(
-                    label=t("Gui.Button.Setting"),
-                    onclick=lambda: self.alas_set_group(func.command),
-                    color="off",
-                )
-
-        clear("running_tasks")
-        clear("pending_tasks")
-        clear("waiting_tasks")
-        with use_scope("running_tasks"):
-            if running:
-                for task in running:
-                    put_task(task)
-            else:
-                put_text(t("Gui.Overview.NoTask")).style("--overview-notask-text--")
-        with use_scope("pending_tasks"):
-            if pending:
-                for task in pending:
-                    put_task(task)
-            else:
-                put_text(t("Gui.Overview.NoTask")).style("--overview-notask-text--")
-        with use_scope("waiting_tasks"):
-            if waiting:
-                for task in waiting:
-                    put_task(task)
-            else:
-                put_text(t("Gui.Overview.NoTask")).style("--overview-notask-text--")
+        running, pending, waiting = split_overview_tasks(
+            self.alas_config.pending_task,
+            self.alas_config.waiting_task,
+            is_alive=self.alas.alive,
+        )
+        self.put_overview_task_section("running_tasks", running)
+        self.put_overview_task_section("pending_tasks", pending)
+        self.put_overview_task_section("waiting_tasks", waiting)
 
     @use_scope("content", clear=True)
     def alas_daemon_overview(self, task: str) -> None:
