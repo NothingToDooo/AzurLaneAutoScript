@@ -37,13 +37,7 @@ class FleetEquipment(EquipmentChange):
                 self.device.multi_click(button, n=abs(diff), interval=interval)
                 retry.reset()
 
-    def fleet_equipment_take_on_preset(
-        self,
-        preset_record,
-        enter=equipment_assets.FLEET_DETAIL_ENTER_FLAGSHIP,
-        long_click=False,
-        out=equipment_assets.FLEET_DETAIL_CHECK,
-    ):
+    def fleet_equipment_take_on_preset(self, preset_record):
         self.ui_click(
             equipment_assets.FLEET_DETAIL,
             appear_button=page_fleet.check_button,

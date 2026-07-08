@@ -277,17 +277,17 @@ class ShopClerk(ShopBase, Retirement):
         self.interval_clear(SHOP_BACK_ARROW)
         self.interval_clear(SHOP_BUY_CONFIRM)
 
-    def shop_buy_handle(self, item):
+    def shop_buy_handle(self, _item):
         """
-        Override in variant class
-        for specific buy handle
-        actions
+        商店购买流程中的变体处理钩子。
+
+        变体类可覆写该方法处理特殊购买弹窗。
 
         Args:
-            item (Item):
+            _item (Item): 当前购买的商品；默认实现不需要。
 
         Returns:
-            bool:
+            bool: 是否识别并处理了特殊界面。
         """
         return False
 

@@ -141,19 +141,18 @@ class ShopBase(UI):
         """
         return self._currency
 
-    def shop_has_loaded(self, items):
+    def shop_has_loaded(self, _items):
         """
-        Custom steps for variant shop
-        if needed to ensure shop has
-        loaded completely
-        ShopMedal for example will initially
-        display default items at default prices
+        变体商店的加载完成检查钩子。
+
+        例如勋章商店刚打开时会先显示默认物品和默认价格，
+        变体类可覆写该方法继续等待真实商品加载。
 
         Args:
-            items: list[Item]
+            _items: 当前识别到的商品列表；默认实现不需要。
 
         Returns:
-            bool:
+            bool: 是否已加载完成。
         """
         return True
 
@@ -290,17 +289,17 @@ class ShopBase(UI):
         """返回当前货币是否足够购买物品。"""
         return item.price <= self._currency
 
-    def shop_check_custom_item(self, item):
+    def shop_check_custom_item(self, _item):
         """
-        Override in variant class
-        for specific check custom item
-        actions; no restriction to filter string
+        自定义商品检查钩子。
+
+        变体类可覆写该方法处理不适合通过过滤字符串描述的商品。
 
         Args:
-            item (Item):
+            _item (Item): 待检查商品；默认实现不需要。
 
         Returns:
-            bool:
+            bool: 是否命中自定义购买条件。
         """
         return False
 

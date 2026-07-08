@@ -360,7 +360,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
             is_limit = self.config.StopCondition_RunCount
 
             try:
-                super().run(name=name, folder=folder, total=total)
+                super().run(name=name, folder=folder, mode=mode, total=total)
             except CampaignEnd as e:
                 if e.args[0] == "Emotion withdraw":
                     self._trigger_emotion = True

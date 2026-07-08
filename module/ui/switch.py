@@ -113,13 +113,15 @@ class Switch:
 
         raise ScriptError(f"Switch {self.name} received an invalid state: {state}")
 
-    def handle_additional(self, main):
+    def handle_additional(self, _main):
         """
+        额外弹窗处理钩子。
+
         Args:
-            main (ModuleBase):
+            _main (ModuleBase): 调用开关的模块；默认实现不需要。
 
         Returns:
-            bool: If handled
+            bool: 是否已处理。
         """
         return False
 
@@ -155,7 +157,7 @@ class Switch:
                 return changed
 
             # Handle additional popups
-            if self.handle_additional(main=main):
+            if self.handle_additional(main):
                 continue
 
             # Warning
@@ -216,6 +218,6 @@ class Switch:
                 return False
 
             # Handle additional popups
-            if self.handle_additional(main=main):
+            if self.handle_additional(main):
                 continue
         return False

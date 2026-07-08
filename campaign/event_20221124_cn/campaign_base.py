@@ -79,14 +79,12 @@ class CampaignBase(CampaignBase_):
             self.map_has_clear_mode = appear
             self.map_show_info()
 
-    def handle_mystery_items(self, button=None, drop=None):
-        # Handle a different GET_ITEMS_1
-        if super().handle_mystery_items(button, drop=drop):
+    def handle_mystery_items(self, button=None):
+        # 处理该活动使用的特殊 GET_ITEMS_1。
+        if super().handle_mystery_items(button):
             return True
         if self.appear(GET_ITEMS_1_RYZA, offset=(-20, -100, 20, 20)):
             logger.attr("Mystery", "Get item")
-            if drop:
-                drop.add(self.device.image)
             self.device.click(MYSTERY_ITEM)
             self.device.sleep(0.5)
             self.device.screenshot()

@@ -27,11 +27,11 @@ class CampaignBase(CampaignBase_):
         self.picked_light_house = []
         self.picked_flare = []
 
-    def handle_mystery_items(self, button=None, drop=None):
+    def handle_mystery_items(self, button=None):
         """
-        Handle get flares, but not counted as mystery.
+        处理照明弹获得弹窗，但不把它算作常规 mystery。
         """
-        super().handle_mystery_items(button=button, drop=None)
+        super().handle_mystery_items(button=button)
         return False
 
     def pick_up_flare(self, grid):
