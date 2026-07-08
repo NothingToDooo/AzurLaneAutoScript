@@ -1,5 +1,8 @@
 import traceback
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator, ValuesView
 
 from module.coalition import assets as coalition_assets
 from module.event_hospital.assets import HOSIPITAL_CHECK
@@ -15,12 +18,12 @@ class Page:
     all_pages: ClassVar[dict[str, Page]] = {}
 
     @classmethod
-    def clear_connection(cls):
+    def clear_connection(cls) -> None:
         for page in cls.all_pages.values():
             page.parent = None
 
     @classmethod
-    def init_connection(cls, destination):
+    def init_connection(cls, destination) -> None:
         """
         Initialize an A* path finding among pages.
 
@@ -45,11 +48,11 @@ class Page:
             visited = new
 
     @classmethod
-    def iter_pages(cls):
+    def iter_pages(cls) -> ValuesView[Page]:
         return cls.all_pages.values()
 
     @classmethod
-    def iter_check_buttons(cls):
+    def iter_check_buttons(cls) -> Iterator[object]:
         for page in cls.all_pages.values():
             yield page.check_button
 

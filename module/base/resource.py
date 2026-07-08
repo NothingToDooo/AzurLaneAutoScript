@@ -49,13 +49,13 @@ class Resource:
             del_cached_property(self, cache)
 
     @classmethod
-    def is_loaded(cls, obj):
+    def is_loaded(cls, obj) -> bool:
         missing = object()
         unloaded = getattr(obj, "_image", missing) is None or getattr(obj, "image", missing) is None
         return not unloaded
 
     @classmethod
-    def resource_show(cls):
+    def resource_show(cls) -> None:
         logger.hr("Show resource")
         for key, obj in cls.instances.items():
             if cls.is_loaded(obj):

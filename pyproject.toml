@@ -43,6 +43,7 @@ target-version = "py314"
 [tool.ruff.lint]
 select = [
     "A",
+    "ANN206",
     "ANN401",
     "ASYNC",
     "ARG001",

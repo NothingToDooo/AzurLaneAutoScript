@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from functools import wraps
 from time import sleep, time
+from typing import Self
 
 from module.logger import logger
 
@@ -82,7 +83,7 @@ class Timer:
         self._access = 0
 
     @classmethod
-    def from_seconds(cls, limit, speed=0.5):
+    def from_seconds(cls, limit, speed=0.5) -> Self:
         """
         Create timer from given seconds
 

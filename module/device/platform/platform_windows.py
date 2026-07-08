@@ -48,7 +48,7 @@ def flash_window(hwnd, flash=True):
 
 class PlatformWindows(PlatformBase, EmulatorManager):
     @classmethod
-    def execute(cls, command):
+    def execute(cls, command) -> psutil.Popen:
         """
         Args:
             command (list[str]):

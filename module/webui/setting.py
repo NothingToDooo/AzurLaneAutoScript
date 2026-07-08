@@ -59,12 +59,12 @@ class State:
     theme: str = "default"
 
     @classmethod
-    def init(cls):
+    def init(cls) -> None:
         cls.manager = multiprocessing.Manager()
         cls._init = True
 
     @classmethod
-    def clearup(cls):
+    def clearup(cls) -> None:
         cls.manager.shutdown()
         cls._clearup = True
 

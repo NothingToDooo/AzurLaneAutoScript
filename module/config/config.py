@@ -148,7 +148,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             items.insert(0, item)
 
     @classmethod
-    def task_bind_chain(cls, func, func_list=None):
+    def task_bind_chain(cls, func, func_list=None) -> list[str]:
         task = cls._task_name(func)
         tasks = [] if func_list is None else func_list
 

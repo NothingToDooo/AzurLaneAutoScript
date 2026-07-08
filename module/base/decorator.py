@@ -1,5 +1,6 @@
 import random
 import re
+from collections.abc import Callable
 from contextlib import suppress
 from functools import cached_property, wraps
 from typing import ClassVar
@@ -33,7 +34,7 @@ class Config:
     func_list: ClassVar[dict[str, list[dict[str, object]]]] = {}
 
     @classmethod
-    def when(cls, **kwargs):
+    def when[DecoratedFunc: Callable[..., object]](cls, **kwargs) -> Callable[[DecoratedFunc], DecoratedFunc]:
         """
         Args:
             **kwargs: Any option in AzurLaneConfig.

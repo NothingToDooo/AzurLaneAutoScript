@@ -30,7 +30,7 @@ class AlOcr(CnOcr):
         self._model_loaded = False
 
     @classmethod
-    def _normalize_model_name(cls, model_name):
+    def _normalize_model_name(cls, model_name) -> str:
         return cls.MODEL_NAME_ALIASES.get(model_name, model_name)
 
     @staticmethod
