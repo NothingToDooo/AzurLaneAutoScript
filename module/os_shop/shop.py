@@ -129,8 +129,7 @@ class OSShop(PortShop, AkashiShop):
                 self.device.click(SHOP_CLICK_SAFE_AREA)
 
     def shop_buy_amount_handler(self, item, skip_first_screenshot=True):
-        """
-        Handler item amount to buy.
+        """处理商店购买数量。
 
         Args:
             item
@@ -138,7 +137,27 @@ class OSShop(PortShop, AkashiShop):
         Raises:
             ScriptError: OCR_SHOP_AMOUNT
         """
-        limit = -1
+        limit = self._shop_buy_amount_read_limit(skip_first_screenshot=skip_first_screenshot)
+        if limit == 0:
+            return False
+
+        count = self._shop_buy_amount_available_count(item)
+        if count == 1:
+            return True
+
+        total_count = self._shop_buy_amount_total_count(item)
+        limit, set_to_max = self._shop_buy_amount_target(count=count, total_count=total_count)
+
+        self.interval_clear(AMOUNT_MAX)
+        if set_to_max:
+            self._shop_buy_amount_set_to_max()
+
+        self.ui_ensure_index(
+            limit, letter=OCR_SHOP_AMOUNT, prev_button=AMOUNT_MINUS, next_button=AMOUNT_PLUS, skip_first_screenshot=True
+        )
+        return True
+
+    def _shop_buy_amount_read_limit(self, skip_first_screenshot=True) -> int:
         retry = Timer(0, count=3)
         retry.start()
         while True:
@@ -151,25 +170,25 @@ class OSShop(PortShop, AkashiShop):
             if limit == 0:
                 logger.warning("OCR_SHOP_AMOUNT resulted 0, retrying")
                 self.close_shop_buy_confirm_amount()
-                return False
+                return 0
 
             if limit > 0:
-                break
+                return limit
 
             if retry.reached():
                 logger.critical("OCR_SHOP_AMOUNT resulted error; asset may be compromised")
                 raise ScriptError
-        retry.reset()
 
+    def _shop_buy_amount_available_count(self, item) -> int:
         currency = self.get_currency_coins(item)
-        count = min(int(currency // item.price), item.count)
+        return min(int(currency // item.price), item.count)
 
-        if count == 1:
-            return True
-
+    def _shop_buy_amount_total_count(self, item) -> int:
         coins = self.get_coins_no_limit(item)
-        total_count = min(int(coins // item.price), item.count)
+        return min(int(coins // item.price), item.count)
 
+    @staticmethod
+    def _shop_buy_amount_target(*, count: int, total_count: int) -> tuple[int, bool]:
         set_to_max = False
         # Avg count of all items(no PurpleCoins) is 8.9, so use 10.
         if count <= 10:
@@ -184,9 +203,11 @@ class OSShop(PortShop, AkashiShop):
             limit = total_count - 10
         else:
             limit = 10
+        return limit, set_to_max
 
-        self.interval_clear(AMOUNT_MAX)
-        while set_to_max:
+    def _shop_buy_amount_set_to_max(self) -> None:
+        skip_first_screenshot = False
+        while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
             else:
@@ -197,11 +218,6 @@ class OSShop(PortShop, AkashiShop):
 
             if OCR_SHOP_AMOUNT.ocr(self.device.image) > 1:
                 break
-
-        self.ui_ensure_index(
-            limit, letter=OCR_SHOP_AMOUNT, prev_button=AMOUNT_MINUS, next_button=AMOUNT_PLUS, skip_first_screenshot=True
-        )
-        return True
 
     def handle_port_supply_buy(self) -> bool:
         """
