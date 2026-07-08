@@ -20,6 +20,24 @@ fleet_lock = FleetLockSwitch("Fleet_Lock", offset=(10, 120))
 fleet_lock.add_state("on", check_button=os_assets.OS_FLEET_LOCKED)
 fleet_lock.add_state("off", check_button=os_assets.OS_FLEET_UNLOCKED)
 
+_MAP_GET_ITEM_BUTTONS = (
+    GET_ITEMS_1,
+    GET_ITEMS_2,
+    GET_ITEMS_3,
+    os_assets.GET_ADAPTABILITY,
+    os_assets.GET_MEOWFFICER_ITEMS_1,
+    os_assets.GET_MEOWFFICER_ITEMS_2,
+)
+_MAP_EVENT_HANDLERS = (
+    ("handle_map_get_items", "map_get_items"),
+    ("handle_os_game_tips", "os_game_tips"),
+    ("handle_map_archives", "map_archives"),
+    ("handle_guild_popup_cancel", "guild_popup_cancel"),
+    ("handle_ash_popup", "ash_popup"),
+    ("handle_urgent_commission", "urgent_commission"),
+    ("handle_story_skip", "story_skip"),
+)
+
 
 class MapEventHandler(EnemySearchingHandler):
     ash_popup_canceled = False
@@ -28,30 +46,11 @@ class MapEventHandler(EnemySearchingHandler):
         if self.is_in_map():
             return False
 
-        if self.appear(GET_ITEMS_1, interval=interval):
-            logger.info(f"{GET_ITEMS_1} -> {os_assets.CLICK_SAFE_AREA}")
-            self.device.click(os_assets.CLICK_SAFE_AREA)
-            return True
-        if self.appear(GET_ITEMS_2, interval=interval):
-            logger.info(f"{GET_ITEMS_2} -> {os_assets.CLICK_SAFE_AREA}")
-            self.device.click(os_assets.CLICK_SAFE_AREA)
-            return True
-        if self.appear(GET_ITEMS_3, interval=interval):
-            logger.info(f"{GET_ITEMS_3} -> {os_assets.CLICK_SAFE_AREA}")
-            self.device.click(os_assets.CLICK_SAFE_AREA)
-            return True
-        if self.appear(os_assets.GET_ADAPTABILITY, interval=interval):
-            logger.info(f"{os_assets.GET_ADAPTABILITY} -> {os_assets.CLICK_SAFE_AREA}")
-            self.device.click(os_assets.CLICK_SAFE_AREA)
-            return True
-        if self.appear(os_assets.GET_MEOWFFICER_ITEMS_1, interval=interval):
-            logger.info(f"{os_assets.GET_MEOWFFICER_ITEMS_1} -> {os_assets.CLICK_SAFE_AREA}")
-            self.device.click(os_assets.CLICK_SAFE_AREA)
-            return True
-        if self.appear(os_assets.GET_MEOWFFICER_ITEMS_2, interval=interval):
-            logger.info(f"{os_assets.GET_MEOWFFICER_ITEMS_2} -> {os_assets.CLICK_SAFE_AREA}")
-            self.device.click(os_assets.CLICK_SAFE_AREA)
-            return True
+        for button in _MAP_GET_ITEM_BUTTONS:
+            if self.appear(button, interval=interval):
+                logger.info(f"{button} -> {os_assets.CLICK_SAFE_AREA}")
+                self.device.click(os_assets.CLICK_SAFE_AREA)
+                return True
 
         return False
 
@@ -87,20 +86,9 @@ class MapEventHandler(EnemySearchingHandler):
         Returns:
             str: Event that handled
         """
-        if self.handle_map_get_items():
-            return "map_get_items"
-        if self.handle_os_game_tips():
-            return "os_game_tips"
-        if self.handle_map_archives():
-            return "map_archives"
-        if self.handle_guild_popup_cancel():
-            return "guild_popup_cancel"
-        if self.handle_ash_popup():
-            return "ash_popup"
-        if self.handle_urgent_commission():
-            return "urgent_commission"
-        if self.handle_story_skip():
-            return "story_skip"
+        for handler, event in _MAP_EVENT_HANDLERS:
+            if getattr(self, handler)():
+                return event
 
         return ""
 
