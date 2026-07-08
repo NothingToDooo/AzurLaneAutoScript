@@ -80,7 +80,6 @@ class Navbar:
                 total.append(index)
 
         if len(active) == 0:
-            # logger.warning(f'No active nav item found in {self.name}')
             active = None
         elif len(active) == 1:
             active = active[0]
@@ -149,6 +148,52 @@ class Navbar:
 
         return False
 
+    def _format_set_target(self, left, right, upper, bottom):
+        return " ".join(
+            f"{key}={value}"
+            for key, value in [
+                ("left", left),
+                ("right", right),
+                ("upper", upper),
+                ("bottom", bottom),
+            ]
+            if value is not None
+        )
+
+    def _resolve_set_target(self, left, right, upper, bottom):
+        if left is None and right is None and upper is None and bottom is None:
+            logger.warning("Invalid index to set, must set an index from 1 direction")
+            return None
+
+        if left is None and upper is not None:
+            left = upper
+        if right is None and bottom is not None:
+            right = bottom
+
+        text = self._format_set_target(left=left, right=right, upper=upper, bottom=bottom)
+        return left, right, text
+
+    def _index_from_visible_range(self, minimum, maximum, left, right):
+        if minimum is None or maximum is None:
+            return None
+        if left is not None:
+            return minimum + left - 1
+        if right is not None:
+            return maximum - right + 1
+        return None
+
+    def _target_index_to_set(self, minimum, maximum, left, right, text):
+        index = self._index_from_visible_range(minimum=minimum, maximum=maximum, left=left, right=right)
+        if index is None:
+            return None
+        if not minimum <= index <= maximum:
+            logger.warning(
+                f"{self.name} target {text} resolved to index ({index}) "
+                f"outside nav items that appear ({minimum}, {maximum})"
+            )
+            return None
+        return index
+
     def set(self, main, left=None, right=None, upper=None, bottom=None, skip_first_screenshot=True):
         """
         Set nav bar from 1 direction.
@@ -164,18 +209,11 @@ class Navbar:
         Returns:
             bool: If success
         """
-        if left is None and right is None and upper is None and bottom is None:
-            logger.warning("Invalid index to set, must set an index from 1 direction")
+        target = self._resolve_set_target(left=left, right=right, upper=upper, bottom=bottom)
+        if target is None:
             return False
-        text = ""
-        if left is None and upper is not None:
-            left = upper
-        if right is None and bottom is not None:
-            right = bottom
-        for k in ["left", "right", "upper", "bottom"]:
-            if locals().get(k, None) is not None:
-                text += f"{k}={locals().get(k, None)} "
-        logger.info(f"{self.name} set to {text.strip()}")
+        left, right, text = target
+        logger.info(f"{self.name} set to {text}")
 
         interval = Timer(2, count=4)
         timeout = Timer(10, count=20).start()
@@ -196,19 +234,12 @@ class Navbar:
 
             active, minimum, maximum = self.get_info(main=main)
             logger.info(f"Nav item active: {active} from range ({minimum}, {maximum})")
-            # Get None when receiving a pure black screenshot.
-            # Active is None could be because of slow animation
-            if active is None or minimum is None or maximum is None:
+            # 纯黑截图或动画期间会识别不到导航项。
+            index = self._target_index_to_set(minimum=minimum, maximum=maximum, left=left, right=right, text=text)
+            if active is None or index is None:
                 continue
 
-            index = minimum + left - 1 if left is not None else maximum - right + 1
-            if not minimum <= index <= maximum:
-                logger.warning(
-                    f"Index to set ({index}) is not within the nav items that appears ({minimum}, {maximum})"
-                )
-                continue
-
-            # End
+            # 已到目标项。
             if active == index:
                 return True
 
