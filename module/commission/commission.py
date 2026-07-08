@@ -319,8 +319,7 @@ class RewardCommission(UI, InfoHandler):
         return daily, urgent
 
     def _commission_start_click(self, comm, is_urgent=False, skip_first_screenshot=True):
-        """
-        Start a commission.
+        """启动一个委托。
 
         Args:
             comm (Commission):
@@ -345,57 +344,96 @@ class RewardCommission(UI, InfoHandler):
             else:
                 self.device.screenshot()
 
-            # 结束。
-            if self.info_bar_count():
+            if self._commission_start_finished():
                 break
-            if count >= 3:
-                # 重启游戏以处理委托推荐 bug：点击“推荐”后舰船短暂出现又消失，同时委托图标闪烁。
-                logger.warning("Triggered commission list flashing bug")
-                raise GameStuckError("Triggered commission list flashing bug")
 
-            # 点击开始。
-            if self.match_template_color(commission_assets.COMMISSION_START, offset=(5, 20), interval=7):
-                self.device.click(commission_assets.COMMISSION_START)
-                self.interval_reset(commission_assets.COMMISSION_ADVICE)
-                comm_timer.reset()
+            self._raise_if_commission_advice_flashing(count)
+
+            if self._handle_commission_start_button(comm_timer):
                 continue
-            if self.handle_popup_confirm("COMMISSION_START"):
-                self.interval_reset(commission_assets.COMMISSION_ADVICE)
-                comm_timer.reset()
+            if self._handle_commission_dock_back(comm_timer):
                 continue
-            # 意外进入船坞。
-            if self.appear(DOCK_CHECK, offset=(20, 20), interval=3):
-                logger.info(f"equip_enter {DOCK_CHECK} -> {BACK_ARROW}")
-                self.device.click(BACK_ARROW)
-                comm_timer.reset()
-                continue
-            # 检查是否选中了目标委托。
-            if self.appear(commission_assets.COMMISSION_ADVICE, offset=(5, 20), interval=7):
-                area = (0, 0, image_size(self.device.image)[0], commission_assets.COMMISSION_ADVICE.button[1])
-                current = self.commission_detect(area=area)
-                if is_urgent:
-                    current.call("convert_to_night")  # 将额外委托转换为夜间委托。
-                if current.count >= 1:
-                    current = current[0]
-                    if current == comm:
-                        logger.info("Selected to the correct commission")
-                    else:
-                        logger.warning("Selected to the wrong commission")
-                        return False
-                else:
-                    logger.warning("No selected commission detected, assuming correct")
-                self.device.click(commission_assets.COMMISSION_ADVICE)
+
+            advice_result = self._handle_commission_advice(comm, is_urgent=is_urgent, comm_timer=comm_timer)
+            if advice_result is False:
+                return False
+            if advice_result is True:
                 count += 1
-                self.interval_reset(commission_assets.COMMISSION_ADVICE)
-                self.interval_clear(commission_assets.COMMISSION_START)
-                comm_timer.reset()
                 continue
-            # 进入委托。
-            if comm_timer.reached():
-                self.device.click(comm.button)
-                self.device.sleep(0.3)
-                comm_timer.reset()
 
+            self._handle_commission_entry(comm, comm_timer)
+
+        return True
+
+    def _commission_start_finished(self) -> bool:
+        return bool(self.info_bar_count())
+
+    @staticmethod
+    def _raise_if_commission_advice_flashing(count: int) -> None:
+        if count < 3:
+            return
+        # 重启游戏以处理委托推荐 bug：点击“推荐”后舰船短暂出现又消失，同时委托图标闪烁。
+        logger.warning("Triggered commission list flashing bug")
+        raise GameStuckError("Triggered commission list flashing bug")
+
+    def _handle_commission_start_button(self, comm_timer) -> bool:
+        if self.match_template_color(commission_assets.COMMISSION_START, offset=(5, 20), interval=7):
+            self.device.click(commission_assets.COMMISSION_START)
+            self.interval_reset(commission_assets.COMMISSION_ADVICE)
+            comm_timer.reset()
+            return True
+        if self.handle_popup_confirm("COMMISSION_START"):
+            self.interval_reset(commission_assets.COMMISSION_ADVICE)
+            comm_timer.reset()
+            return True
+        return False
+
+    def _handle_commission_dock_back(self, comm_timer) -> bool:
+        if not self.appear(DOCK_CHECK, offset=(20, 20), interval=3):
+            return False
+
+        logger.info(f"equip_enter {DOCK_CHECK} -> {BACK_ARROW}")
+        self.device.click(BACK_ARROW)
+        comm_timer.reset()
+        return True
+
+    def _handle_commission_advice(self, comm, *, is_urgent: bool, comm_timer) -> bool | None:
+        if not self.appear(commission_assets.COMMISSION_ADVICE, offset=(5, 20), interval=7):
+            return None
+
+        if not self._commission_advice_matches(comm, is_urgent=is_urgent):
+            return False
+
+        self.device.click(commission_assets.COMMISSION_ADVICE)
+        self.interval_reset(commission_assets.COMMISSION_ADVICE)
+        self.interval_clear(commission_assets.COMMISSION_START)
+        comm_timer.reset()
+        return True
+
+    def _commission_advice_matches(self, comm, *, is_urgent: bool) -> bool:
+        area = (0, 0, image_size(self.device.image)[0], commission_assets.COMMISSION_ADVICE.button[1])
+        current = self.commission_detect(area=area)
+        if is_urgent:
+            current.call("convert_to_night")  # 将额外委托转换为夜间委托。
+        if current.count < 1:
+            logger.warning("No selected commission detected, assuming correct")
+            return True
+
+        current = current[0]
+        if current == comm:
+            logger.info("Selected to the correct commission")
+            return True
+
+        logger.warning("Selected to the wrong commission")
+        return False
+
+    def _handle_commission_entry(self, comm, comm_timer) -> bool:
+        if not comm_timer.reached():
+            return False
+
+        self.device.click(comm.button)
+        self.device.sleep(0.3)
+        comm_timer.reset()
         return True
 
     def _commission_find_and_start(self, comm, is_urgent=False):
