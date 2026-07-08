@@ -58,6 +58,48 @@ class BattlePass(Combat, UI):
             skip_first_screenshot=True,
         )
 
+    def _handle_battle_pass_reward_button(self, confirm_timer):
+        if self.appear_then_click(REWARD_RECEIVE, offset=(20, 20), interval=3):
+            confirm_timer.reset()
+            return True
+        if self.match_template_color(REWARD_RECEIVE_SP, offset=(20, 20), interval=3, threshold=15):
+            self.device.click(REWARD_RECEIVE_SP)
+            confirm_timer.reset()
+            return True
+        if self.appear_then_click(REWARD_RECEIVE_WHITE, offset=(20, 20), interval=3):
+            confirm_timer.reset()
+            return True
+        return False
+
+    def _handle_battle_pass_confirm_popup(self, confirm_timer):
+        if self.handle_battle_pass_popup():
+            confirm_timer.reset()
+            return True
+        if self.appear_then_click(POPUP_CONFIRM_WHITE_BATTLEPASS, offset=(20, 20), interval=3):
+            confirm_timer.reset()
+            return True
+        # 新 META 舰船锁定确认。
+        if self.handle_popup_confirm("BATTLE_PASS"):
+            confirm_timer.reset()
+            return True
+        return False
+
+    def _handle_battle_pass_reward_result(self, confirm_timer):
+        if self.handle_get_items() or self.handle_get_ship() or self.handle_get_skin():
+            confirm_timer.reset()
+            return True
+        return False
+
+    def _battle_pass_receive_finished(self, confirm_timer):
+        if (
+            self.appear(BATTLE_PASS_CHECK, offset=(20, 20))
+            and not self.appear(REWARD_RECEIVE, offset=(20, 20))
+            and not self.appear(REWARD_RECEIVE_WHITE, offset=(20, 20))
+        ):
+            return confirm_timer.reached()
+        confirm_timer.reset()
+        return False
+
     def battle_pass_receive(self, skip_first_screenshot=True):
         """
         Returns:
@@ -77,49 +119,16 @@ class BattlePass(Combat, UI):
             else:
                 self.device.screenshot()
 
-            if self.appear_then_click(REWARD_RECEIVE, offset=(20, 20), interval=3):
-                confirm_timer.reset()
+            if self._handle_battle_pass_reward_button(confirm_timer):
                 continue
-            if self.match_template_color(REWARD_RECEIVE_SP, offset=(20, 20), interval=3, threshold=15):
-                self.device.click(REWARD_RECEIVE_SP)
-                confirm_timer.reset()
+            if self._handle_battle_pass_confirm_popup(confirm_timer):
                 continue
-            if self.appear_then_click(REWARD_RECEIVE_WHITE, offset=(20, 20), interval=3):
-                confirm_timer.reset()
-                continue
-            if self.handle_battle_pass_popup():
-                confirm_timer.reset()
-                continue
-            if self.appear_then_click(POPUP_CONFIRM_WHITE_BATTLEPASS, offset=(20, 20), interval=3):
-                confirm_timer.reset()
-                continue
-            if self.handle_popup_confirm("BATTLE_PASS"):
-                # Lock new META ships
-                confirm_timer.reset()
-                continue
-            if self.handle_get_items():
+            if self._handle_battle_pass_reward_result(confirm_timer):
                 received = True
-                confirm_timer.reset()
-                continue
-            if self.handle_get_ship():
-                received = True
-                confirm_timer.reset()
-                continue
-            if self.handle_get_skin():
-                received = True
-                confirm_timer.reset()
                 continue
 
-            # End
-            if (
-                self.appear(BATTLE_PASS_CHECK, offset=(20, 20))
-                and not self.appear(REWARD_RECEIVE, offset=(20, 20))
-                and not self.appear(REWARD_RECEIVE_WHITE, offset=(20, 20))
-            ):
-                if confirm_timer.reached():
-                    break
-            else:
-                confirm_timer.reset()
+            if self._battle_pass_receive_finished(confirm_timer):
+                break
 
         logger.info(f"Battle pass receive finished, received={received}")
         return received
