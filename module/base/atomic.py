@@ -302,6 +302,23 @@ def atomic_remove(file: FilePath) -> None:
         raise last_error from None
 
 
+def _remove_not_directory(path: FilePath) -> bool:
+    file_remove(path)
+    return True
+
+
+def _remove_empty_folder(path: Path) -> bool:
+    try:
+        path.rmdir()
+    except FileNotFoundError:
+        return True
+    except NotADirectoryError:
+        return _remove_not_directory(path)
+    except OSError:
+        return False
+    return True
+
+
 def folder_rmtree(folder: FilePath, may_symlinks: bool = True) -> bool:
     try:
         path = _as_path(folder)
@@ -318,19 +335,9 @@ def folder_rmtree(folder: FilePath, may_symlinks: bool = True) -> bool:
     except FileNotFoundError:
         return True
     except NotADirectoryError:
-        file_remove(folder)
-        return True
+        return _remove_not_directory(folder)
 
-    try:
-        _as_path(folder).rmdir()
-    except FileNotFoundError:
-        return True
-    except NotADirectoryError:
-        file_remove(folder)
-        return True
-    except OSError:
-        return False
-    return True
+    return _remove_empty_folder(path)
 
 
 def atomic_rmtree(folder: FilePath) -> None:
