@@ -118,45 +118,51 @@ class Emulator(EmulatorBase):
             EmulatorInstance: Emulator instances found in this emulator
         """
         if self == Emulator.MuMuPlayer:
-            # MuMu has no multi instances, on 7555 only
-            yield EmulatorInstance(
-                serial="127.0.0.1:7555",
-                name="",
+            yield self._default_mumu_instance()
+            return
+        if self == Emulator.MuMuPlayerX:
+            yield from self._iter_vbox_instances()
+            return
+        if self == Emulator.MuMuPlayer12:
+            yield from self._iter_vbox_instances(allow_mumu12_default_serial=True)
+
+    def _default_mumu_instance(self):
+        # MuMu 单开版固定使用 7555。
+        return EmulatorInstance(
+            serial="127.0.0.1:7555",
+            name="",
+            path=self.path,
+        )
+
+    def _iter_vbox_instances(self, allow_mumu12_default_serial=False):
+        for folder in self.list_folder("../vms", is_dir=True):
+            yield from self._iter_vbox_folder_instances(folder, allow_mumu12_default_serial=allow_mumu12_default_serial)
+
+    def _iter_vbox_folder_instances(self, folder, allow_mumu12_default_serial=False):
+        name = Path(folder).name
+        for file in iter_folder(folder, ext=".nemu"):
+            serial = Emulator.vbox_file_to_serial(file)
+            if serial:
+                yield EmulatorInstance(
+                    serial=serial,
+                    name=name,
+                    path=self.path,
+                )
+                continue
+
+            instance = EmulatorInstance(
+                serial=serial,
+                name=name,
                 path=self.path,
             )
-        elif self == Emulator.MuMuPlayerX:
-            # vms/nemu-12.0-x64-default
-            for folder in self.list_folder("../vms", is_dir=True):
-                for file in iter_folder(folder, ext=".nemu"):
-                    serial = Emulator.vbox_file_to_serial(file)
-                    if serial:
-                        yield EmulatorInstance(
-                            serial=serial,
-                            name=Path(folder).name,
-                            path=self.path,
-                        )
-        elif self == Emulator.MuMuPlayer12:
-            # vms/MuMuPlayer-12.0-0
-            for folder in self.list_folder("../vms", is_dir=True):
-                for file in iter_folder(folder, ext=".nemu"):
-                    serial = Emulator.vbox_file_to_serial(file)
-                    name = Path(folder).name
-                    if serial:
-                        yield EmulatorInstance(
-                            serial=serial,
-                            name=name,
-                            path=self.path,
-                        )
-                    # Fix for MuMu12 v4.0.4, default instance of which has no forward record in vbox config
-                    else:
-                        instance = EmulatorInstance(
-                            serial=serial,
-                            name=name,
-                            path=self.path,
-                        )
-                        if instance.MuMuPlayer12_id:
-                            instance.serial = f"127.0.0.1:{16384 + 32 * instance.MuMuPlayer12_id}"
-                            yield instance
+            if allow_mumu12_default_serial and instance.MuMuPlayer12_id:
+                instance.serial = self._mumu12_default_serial(instance)
+                yield instance
+
+    @staticmethod
+    def _mumu12_default_serial(instance):
+        # MuMu12 v4.0.4 默认实例的 vbox 配置可能没有转发记录。
+        return f"127.0.0.1:{16384 + 32 * instance.MuMuPlayer12_id}"
 
     def iter_adb_binaries(self) -> t.Iterable[str]:
         """
