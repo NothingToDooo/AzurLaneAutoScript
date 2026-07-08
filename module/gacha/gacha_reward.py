@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from module.base.timer import Timer
 from module.campaign.campaign_status import OCR_COIN
 from module.combat.assets import GET_SHIP
@@ -15,6 +17,13 @@ OCR_BUILD_CUBE_COUNT = Digit(gacha_assets.BUILD_CUBE_COUNT, letter=(255, 247, 24
 OCR_BUILD_TICKET_COUNT = Digit(gacha_assets.BUILD_TICKET_COUNT, letter=(255, 247, 247), threshold=64)
 OCR_BUILD_SUBMIT_COUNT = Digit(gacha_assets.BUILD_SUBMIT_COUNT, letter=(255, 247, 247), threshold=64)
 OCR_BUILD_SUBMIT_WW_COUNT = Digit(gacha_assets.BUILD_SUBMIT_WW_COUNT, letter=(255, 247, 247), threshold=64)
+
+
+@dataclass(slots=True)
+class _GachaFlushState:
+    confirm_timer: object
+    confirm_mode: bool = True
+    queue_clean: bool = True
 
 
 class RewardGacha(GachaUI, Retirement):
@@ -199,60 +208,85 @@ class RewardGacha(GachaUI, Retirement):
         self.gacha_side_navbar_ensure(bottom=3)
 
         # 处理各类过渡页面，最终回到建造页。
-        confirm_timer = Timer(1, count=2).start()
-        confirm_mode = True  # 快速完成、锁定舰船。
+        state = _GachaFlushState(confirm_timer=Timer(1, count=2).start())
         # 清除按钮偏移，否则可能点到钻石加号或 HOME。
         STORY_SKIP.clear_offset()
-        queue_clean = True
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
             else:
                 self.device.screenshot()
 
-            if self.appear(gacha_assets.BUILD_QUEUE_EMPTY, offset=(20, 20)) and queue_clean:
-                self.gacha_side_navbar_ensure(upper=1)
+            if self._gacha_queue_already_empty(state):
                 break
-            queue_clean = False
-
-            if self.appear_then_click(gacha_assets.BUILD_FINISH_ORDERS, interval=3):
-                confirm_timer.reset()
-                continue
-
-            if self.handle_retirement():
-                confirm_timer.reset()
-                continue
-
-            if self.handle_popup_confirm("FINISH_ORDERS"):
-                if confirm_mode:
-                    self.device.sleep((0.5, 0.8))
-                    self.device.click(gacha_assets.BUILD_FINISH_ORDERS)  # 跳过动画的安全区域。
-                    confirm_mode = False
-                confirm_timer.reset()
-                continue
-
-            if self.appear(GET_SHIP, interval=1):
-                self.device.click(STORY_SKIP)  # 多订单时快进。
-                confirm_timer.reset()
-                continue
-            if self.handle_get_items_ship():
-                continue
-
-            if self.appear(gacha_assets.BUILD_FINISH_RESULTS, offset=(20, 150), interval=3):
-                self.device.click(gacha_assets.BUILD_FINISH_ORDERS)  # 安全区域。
-                confirm_timer.reset()
+            if self._gacha_flush_queue_step(state):
                 continue
 
             # 结束：队列清空后点击会回到池子页面。
-            if (
-                self.appear(gacha_assets.BUILD_SUBMIT_ORDERS) or self.appear(gacha_assets.BUILD_SUBMIT_WW_ORDERS)
-            ) and confirm_timer.reached():
+            if self._gacha_flush_submit_ready(state):
                 break
 
         # 许愿池不再显示金币，回到普通池。
-        if self.appear(gacha_assets.BUILD_SUBMIT_WW_ORDERS):
-            logger.info("In wishing pool, go back to normal pools")
+        self._gacha_leave_wishing_pool()
+
+    def _gacha_queue_already_empty(self, state):
+        if self.appear(gacha_assets.BUILD_QUEUE_EMPTY, offset=(20, 20)) and state.queue_clean:
             self.gacha_side_navbar_ensure(upper=1)
+            return True
+
+        state.queue_clean = False
+        return False
+
+    def _gacha_flush_queue_step(self, state):
+        if self.appear_then_click(gacha_assets.BUILD_FINISH_ORDERS, interval=3):
+            state.confirm_timer.reset()
+            return True
+        if self.handle_retirement():
+            state.confirm_timer.reset()
+            return True
+        if self._gacha_handle_finish_popup(state):
+            return True
+        if self._gacha_handle_ship_rewards(state):
+            return True
+        return self._gacha_handle_finish_results(state)
+
+    def _gacha_handle_finish_popup(self, state):
+        if not self.handle_popup_confirm("FINISH_ORDERS"):
+            return False
+
+        if state.confirm_mode:
+            self.device.sleep((0.5, 0.8))
+            self.device.click(gacha_assets.BUILD_FINISH_ORDERS)  # 跳过动画的安全区域。
+            state.confirm_mode = False
+        state.confirm_timer.reset()
+        return True
+
+    def _gacha_handle_ship_rewards(self, state):
+        if self.appear(GET_SHIP, interval=1):
+            self.device.click(STORY_SKIP)  # 多订单时快进。
+            state.confirm_timer.reset()
+            return True
+        return self.handle_get_items_ship()
+
+    def _gacha_handle_finish_results(self, state):
+        if not self.appear(gacha_assets.BUILD_FINISH_RESULTS, offset=(20, 150), interval=3):
+            return False
+
+        self.device.click(gacha_assets.BUILD_FINISH_ORDERS)  # 安全区域。
+        state.confirm_timer.reset()
+        return True
+
+    def _gacha_flush_submit_ready(self, state):
+        if not (self.appear(gacha_assets.BUILD_SUBMIT_ORDERS) or self.appear(gacha_assets.BUILD_SUBMIT_WW_ORDERS)):
+            return False
+        return state.confirm_timer.reached()
+
+    def _gacha_leave_wishing_pool(self):
+        if not self.appear(gacha_assets.BUILD_SUBMIT_WW_ORDERS):
+            return
+
+        logger.info("In wishing pool, go back to normal pools")
+        self.gacha_side_navbar_ensure(upper=1)
 
     def gacha_submit(self, skip_first_screenshot=True):
         """
