@@ -62,6 +62,7 @@ from module.webui.lang import t
 from module.webui.pin import put_input, put_select
 from module.webui.process_manager import ProcessManager
 from module.webui.setting import State
+from module.webui.setting_form_utils import iter_group_output_kwargs
 from module.webui.utils import (
     Icon,
     Switch,
@@ -80,7 +81,6 @@ from module.webui.utils import (
 from module.webui.widgets import (
     BinarySwitchButton,
     RichLog,
-    T_Output_Kwargs,
     put_icon_buttons,
     put_loading_text,
     put_none,
@@ -294,57 +294,13 @@ class AlasGUI(Frame):
         group_name = group[0]
 
         output_list: list[Output] = []
-        for arg, arg_config in deep_iter(arg_dict, depth=1):
-            output_kwargs: T_Output_Kwargs = arg_config.copy()
-
-            # 跳过隐藏项。
-            display: str | None = output_kwargs.pop("display", None)
-            if display == "hide":
-                continue
-            # 禁用项。
-            if display == "disabled":
-                output_kwargs["disabled"] = True
-            # 输出类型。
-            output_kwargs["widget_type"] = output_kwargs.pop("type")
-
-            arg_name = arg[0]  # [arg_name,]
-            # 内部 pin 组件名。
-            output_kwargs["name"] = f"{task}_{group_name}_{arg_name}"
-            # 显示标题。
-            output_kwargs["title"] = t(f"{group_name}.{arg_name}.name")
-
-            # 从配置中读取值。
-            value = deep_get(config, [task, group_name, arg_name], output_kwargs["value"])
-            # datetime 需要先转成字符串才能给 pin 使用。
-            value = str(value) if isinstance(value, datetime) else value
-            # 默认值。
-            output_kwargs["value"] = value
-            # 可选项。
-            options = output_kwargs.pop("option", [])
-            output_kwargs["options"] = options
-            if (
-                task == "GemsFarming"
-                and group_name == "Campaign"
-                and arg_name == "Event"
-                and output_kwargs["widget_type"] == "select"
-                and len(options) == 1
-            ):
-                continue
-            if output_kwargs["widget_type"] == "select" and len(options) == 1:
-                only_option = options[0]
-                if only_option in output_kwargs.get("option_bold", []):
-                    output_kwargs["widget_type"] = "state"
-            # 可选项标签。
-            options_label = [t(f"{group_name}.{arg_name}.{opt}") for opt in options]
-            output_kwargs["options_label"] = options_label
-            # 帮助文本。
-            arg_help = t(f"{group_name}.{arg_name}.help")
-            if arg_help == "" or not arg_help:
-                arg_help = None
-            output_kwargs["help"] = arg_help
-            # 无效输入反馈。
-            output_kwargs["invalid_feedback"] = t("Gui.Text.InvalidFeedBack", value)
-
+        for output_kwargs in iter_group_output_kwargs(
+            task=task,
+            group_name=group_name,
+            arg_dict=arg_dict,
+            config=config,
+            translate=t,
+        ):
             o = put_output(output_kwargs)
             if o is not None:
                 # output 创建时会继承当前 scope，这里手动覆盖。
