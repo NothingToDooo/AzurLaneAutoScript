@@ -769,90 +769,127 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
     def map_rescan_current(self):
         """
+        检查当前视野内可处理的随机地图事件。
+
         Returns:
             bool: If solved a map random event
         """
-        grids = self.view.select(is_exploration_reward=True)
-        if "is_exploration_reward" not in self._solved_map_event and grids and grids[0].is_exploration_reward:
-            grid = grids[0]
-            logger.info(f"Found exploration reward on {grid}")
-            result = self.wait_until_walk_stable(walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
-            if "event" in result:
-                self._solved_map_event.add("is_exploration_reward")
-                return True
-            return False
-
-        grids = self.view.select(is_akashi=True)
-        if "is_akashi" not in self._solved_map_event and grids and grids[0].is_akashi:
-            grid = grids[0]
-            logger.info(f"Found Akashi on {grid}")
-            fleet = self.convert_radar_to_local((0, 0))
-            if fleet.distance_to(grid) > 1:
-                self.device.click(grid)
-                with self.config.temporary(STORY_ALLOW_SKIP=False):
-                    result = self.wait_until_walk_stable(walk_out_of_step=False)
-                if "akashi" in result:
-                    self._solved_map_event.add("is_akashi")
-                    return True
-                return False
-            logger.info(f"Akashi ({grid}) is near current fleet ({fleet})")
-            self.handle_akashi_supply_buy(grid)
-            self._solved_map_event.add("is_akashi")
-            return True
-
-        grids = self.view.select(is_scanning_device=True)
-        if "is_scanning_device" not in self._solved_map_event and grids and grids[0].is_scanning_device:
-            grid = grids[0]
-            logger.info(f"Found scanning device on {grid}")
-            if self.is_in_task_cl1_leveling:
-                logger.info("In CL1 leveling, mark scanning device as solved")
-                self._solved_map_event.add("is_scanning_device")
-                return True
-
-            self.device.click(grid)
-            with self.config.temporary(STORY_ALLOW_SKIP=False):
-                result = self.wait_until_walk_stable(walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
-            self.os_auto_search_run()
-            if "event" in result:
-                self._solved_map_event.add("is_scanning_device")
-                return True
-            return False
-
-        grids = self.view.select(is_logging_tower=True)
-        if "is_logging_tower" not in self._solved_map_event and grids and grids[0].is_logging_tower:
-            grid = grids[0]
-            logger.info(f"Found logging tower on {grid}")
-            self.device.click(grid)
-            with self.config.temporary(STORY_ALLOW_SKIP=False):
-                result = self.wait_until_walk_stable(walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
-            if "event" in result:
-                self._solved_map_event.add("is_logging_tower")
-                return True
-            return False
-
-        grids = self.view.select(is_fleet_mechanism=True)
-        if (
-            self.is_in_task_explore
-            and "is_fleet_mechanism" not in self._solved_map_event
-            and grids
-            and grids[0].is_fleet_mechanism
-        ):
-            grid = grids[0]
-            logger.info(f"Found fleet mechanism on {grid}")
-            self.device.click(grid)
-            self.wait_until_walk_stable(walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
-
-            if self._solved_fleet_mechanism:
-                logger.info("All fleet mechanism are solved")
-                self.os_auto_search_run()
-                self._solved_map_event.add("is_fleet_mechanism")
-                return True
-            logger.info("One of the fleet mechanism is solved")
-            self._solved_fleet_mechanism = True
-            return True
+        handlers = (
+            self._map_rescan_exploration_reward,
+            self._map_rescan_akashi,
+            self._map_rescan_scanning_device,
+            self._map_rescan_logging_tower,
+            self._map_rescan_fleet_mechanism,
+        )
+        for handler in handlers:
+            result = handler()
+            if result is not None:
+                return result
 
         logger.info("No map event")
         return False
+
+    def _map_rescan_first_grid(self, event):
+        if event in self._solved_map_event:
+            return None
+
+        grids = self.view.select(**{event: True})
+        if not grids:
+            return None
+
+        grid = grids[0]
+        if not getattr(grid, event):
+            return None
+        return grid
+
+    def _map_rescan_exploration_reward(self):
+        grid = self._map_rescan_first_grid("is_exploration_reward")
+        if grid is None:
+            return None
+
+        logger.info(f"Found exploration reward on {grid}")
+        result = self.wait_until_walk_stable(walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
+        if "event" in result:
+            self._solved_map_event.add("is_exploration_reward")
+            return True
+        return False
+
+    def _map_rescan_akashi(self):
+        grid = self._map_rescan_first_grid("is_akashi")
+        if grid is None:
+            return None
+
+        logger.info(f"Found Akashi on {grid}")
+        fleet = self.convert_radar_to_local((0, 0))
+        if fleet.distance_to(grid) > 1:
+            self.device.click(grid)
+            with self.config.temporary(STORY_ALLOW_SKIP=False):
+                result = self.wait_until_walk_stable(walk_out_of_step=False)
+            if "akashi" in result:
+                self._solved_map_event.add("is_akashi")
+                return True
+            return False
+
+        logger.info(f"Akashi ({grid}) is near current fleet ({fleet})")
+        self.handle_akashi_supply_buy(grid)
+        self._solved_map_event.add("is_akashi")
+        return True
+
+    def _map_rescan_scanning_device(self):
+        grid = self._map_rescan_first_grid("is_scanning_device")
+        if grid is None:
+            return None
+
+        logger.info(f"Found scanning device on {grid}")
+        if self.is_in_task_cl1_leveling:
+            logger.info("In CL1 leveling, mark scanning device as solved")
+            self._solved_map_event.add("is_scanning_device")
+            return True
+
+        self.device.click(grid)
+        with self.config.temporary(STORY_ALLOW_SKIP=False):
+            result = self.wait_until_walk_stable(walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
+        self.os_auto_search_run()
+        if "event" in result:
+            self._solved_map_event.add("is_scanning_device")
+            return True
+        return False
+
+    def _map_rescan_logging_tower(self):
+        grid = self._map_rescan_first_grid("is_logging_tower")
+        if grid is None:
+            return None
+
+        logger.info(f"Found logging tower on {grid}")
+        self.device.click(grid)
+        with self.config.temporary(STORY_ALLOW_SKIP=False):
+            result = self.wait_until_walk_stable(walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
+        if "event" in result:
+            self._solved_map_event.add("is_logging_tower")
+            return True
+        return False
+
+    def _map_rescan_fleet_mechanism(self):
+        if not self.is_in_task_explore:
+            return None
+
+        grid = self._map_rescan_first_grid("is_fleet_mechanism")
+        if grid is None:
+            return None
+
+        logger.info(f"Found fleet mechanism on {grid}")
+        self.device.click(grid)
+        self.wait_until_walk_stable(walk_out_of_step=False, confirm_timer=Timer(1.5, count=4))
+
+        if self._solved_fleet_mechanism:
+            logger.info("All fleet mechanism are solved")
+            self.os_auto_search_run()
+            self._solved_map_event.add("is_fleet_mechanism")
+            return True
+
+        logger.info("One of the fleet mechanism is solved")
+        self._solved_fleet_mechanism = True
+        return True
 
     def map_rescan_once(self, rescan_mode="full"):
         """
