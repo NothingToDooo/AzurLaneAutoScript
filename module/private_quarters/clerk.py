@@ -26,46 +26,60 @@ class PQShopClerk(ShopClerk, PQShopUI):
         Returns:
             None: 正常退出即表示购买成功。
         """
+        self._pq_shop_prepare_buy()
+        self._pq_shop_enter_purchase_confirm(item)
+        self._pq_shop_finish_purchase_confirm()
 
-        # 确认购买前后需要等待的状态。
-        def after_confirm_state():
-            return self.appear(pq_assets.PRIVATE_QUARTERS_SHOP_WEEKLY_ROSES_GET, offset=(20, 20)) or self.appear(
-                pq_assets.PRIVATE_QUARTERS_SHOP_WEEKLY_CAKES_GET, offset=(20, 20)
-            )
-
-        def after_purchase_state():
-            return (
-                not self.appear(pq_assets.PRIVATE_QUARTERS_SHOP_WEEKLY_ROSES_GET, offset=(20, 20))
-                and not self.appear(pq_assets.PRIVATE_QUARTERS_SHOP_WEEKLY_CAKES_GET, offset=(20, 20))
-                and self.appear(pq_assets.PRIVATE_QUARTERS_SHOP_CHECK)
-            )
-
+    def _pq_shop_prepare_buy(self):
         self.shop_interval_clear()
         pq_assets.PRIVATE_QUARTERS_SHOP_CHECK.clear_offset()
 
+    def _pq_shop_after_confirm_state(self):
+        return self.appear(pq_assets.PRIVATE_QUARTERS_SHOP_WEEKLY_ROSES_GET, offset=(20, 20)) or self.appear(
+            pq_assets.PRIVATE_QUARTERS_SHOP_WEEKLY_CAKES_GET, offset=(20, 20)
+        )
+
+    def _pq_shop_after_purchase_state(self):
+        return (
+            not self.appear(pq_assets.PRIVATE_QUARTERS_SHOP_WEEKLY_ROSES_GET, offset=(20, 20))
+            and not self.appear(pq_assets.PRIVATE_QUARTERS_SHOP_WEEKLY_CAKES_GET, offset=(20, 20))
+            and self.appear(pq_assets.PRIVATE_QUARTERS_SHOP_CHECK)
+        )
+
+    def _pq_shop_enter_purchase_confirm(self, item):
         for _ in self.loop():
-            # 已进入确认后状态。
-            if after_confirm_state():
+            if self._pq_shop_after_confirm_state():
                 break
 
-            if self.appear(pq_assets.PRIVATE_QUARTERS_SHOP_CHECK, interval=3):
-                self.device.click(item)
-                continue
-            if self.appear_then_click(pq_assets.PRIVATE_QUARTERS_SHOP_AMOUNT_MAX, offset=(20, 20), interval=1):
-                continue
-            if self.appear_then_click(pq_assets.PRIVATE_QUARTERS_SHOP_CONFIRM_AMOUNT, offset=(20, 20), interval=1):
+            if self._pq_shop_handle_purchase_confirm_step(item):
                 continue
 
+    def _pq_shop_handle_purchase_confirm_step(self, item):
+        if self.appear(pq_assets.PRIVATE_QUARTERS_SHOP_CHECK, interval=3):
+            self.device.click(item)
+            return True
+        if self.appear_then_click(pq_assets.PRIVATE_QUARTERS_SHOP_AMOUNT_MAX, offset=(20, 20), interval=1):
+            return True
+        return self.appear_then_click(pq_assets.PRIVATE_QUARTERS_SHOP_CONFIRM_AMOUNT, offset=(20, 20), interval=1)
+
+    def _pq_shop_finish_purchase_confirm(self):
         click_timer = Timer(3, count=6)
         for _ in self.loop():
-            # 购买完成。
-            if after_purchase_state():
+            if self._pq_shop_after_purchase_state():
                 break
 
-            if click_timer.reached() and after_confirm_state():
-                self.device.click(pq_assets.PRIVATE_QUARTERS_SHOP_CHECK)
-                click_timer.reset()
+            if self._pq_shop_click_confirm_when_ready(click_timer):
                 continue
+
+    def _pq_shop_click_confirm_when_ready(self, click_timer):
+        if not click_timer.reached():
+            return False
+        if not self._pq_shop_after_confirm_state():
+            return False
+
+        self.device.click(pq_assets.PRIVATE_QUARTERS_SHOP_CHECK)
+        click_timer.reset()
+        return True
 
     def shop_buy(self):
         """
