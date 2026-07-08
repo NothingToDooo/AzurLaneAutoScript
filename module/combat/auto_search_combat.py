@@ -175,6 +175,40 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
                 logger.warning("Wait in_map after retirement timeout, assume it is in_map")
                 break
 
+    def _watch_auto_search_resources(self, checked_fleet, checked_oil, checked_coin):
+        if not self.is_auto_search_running():
+            return checked_fleet, checked_oil, checked_coin
+
+        checked_fleet = self.auto_search_watch_fleet(checked_fleet)
+        if not checked_oil or not checked_coin:
+            checked_oil = self.auto_search_watch_oil(checked_oil)
+            checked_coin = self.auto_search_watch_coin(checked_coin)
+        return checked_fleet, checked_oil, checked_coin
+
+    def _handle_auto_search_moving_event(self):
+        if self.handle_retirement():
+            self.map_offensive_auto_search()
+            return True, True
+        if self.handle_auto_search_map_option():
+            return True, False
+        if self.handle_combat_low_emotion():
+            self._auto_search_status_confirm = True
+            return True, False
+        for handler in (self.handle_story_skip, self.handle_map_cat_attack, self.handle_vote_popup):
+            if handler():
+                return True, False
+        return False, False
+
+    def _is_auto_search_moving_finished(self):
+        if self.is_combat_loading():
+            return True
+        if self.is_combat_executing():
+            logger.info("is_combat_executing")
+            return True
+        if self.is_in_auto_search_menu() or self._handle_auto_search_menu_missing():
+            raise CampaignEnd
+        return False
+
     def auto_search_moving(self):
         """
         Pages:
@@ -187,46 +221,19 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         checked_oil = False
         checked_coin = False
         for _ in self.loop():
-            if self.is_auto_search_running():
-                checked_fleet = self.auto_search_watch_fleet(checked_fleet)
-                if not checked_oil or not checked_coin:
-                    checked_oil = self.auto_search_watch_oil(checked_oil)
-                    checked_coin = self.auto_search_watch_coin(checked_coin)
-            if self.handle_retirement():
-                self.map_offensive_auto_search()
-                # Map offensive ends at is_combat_loading
+            checked_fleet, checked_oil, checked_coin = self._watch_auto_search_resources(
+                checked_fleet, checked_oil, checked_coin
+            )
+            handled, should_break = self._handle_auto_search_moving_event()
+            if should_break:
                 break
-            if self.handle_auto_search_map_option():
-                continue
-            if self.handle_combat_low_emotion():
-                self._auto_search_status_confirm = True
-                continue
-            if self.handle_story_skip():
-                continue
-            if self.handle_map_cat_attack():
-                continue
-            if self.handle_vote_popup():
+            if handled:
                 continue
 
-            # End
-            if self.is_combat_loading():
+            if self._is_auto_search_moving_finished():
                 break
-            if self.is_combat_executing():
-                logger.info("is_combat_executing")
-                break
-            if self.is_in_auto_search_menu() or self._handle_auto_search_menu_missing():
-                raise CampaignEnd
 
-    def auto_search_combat_execute(self, emotion_reduce, fleet_index):
-        """
-        Args:
-            emotion_reduce (bool):
-            fleet_index (int):
-
-        Pages:
-            in: is_combat_loading()
-            out: combat status
-        """
+    def _wait_auto_search_combat_execute(self):
         logger.info("Auto search combat loading")
         self.device.stuck_record_clear()
         self.device.click_record_clear()
@@ -247,11 +254,15 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
                 logger.attr("BattleUI", pause)
                 break
 
+    def _get_submarine_mode(self):
+        if self.config.Submarine_Fleet:
+            return self.config.Submarine_Mode
+        return "do_not_use"
+
+    def _prepare_auto_search_combat_execute(self, emotion_reduce, fleet_index):
         logger.info("Auto Search combat execute")
         self.submarine_call_reset()
-        submarine_mode = "do_not_use"
-        if self.config.Submarine_Fleet:
-            submarine_mode = self.config.Submarine_Mode
+        submarine_mode = self._get_submarine_mode()
         self.combat_auto_reset()
         self.combat_manual_reset()
         self.device.stuck_record_clear()
@@ -259,46 +270,112 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         if emotion_reduce:
             self.emotion.reduce(fleet_index)
         auto = self.config.Fleet_Fleet1Mode if fleet_index == 1 else self.config.Fleet_Fleet2Mode
+        return submarine_mode, auto
+
+    def _handle_auto_search_combat_controls(self, submarine_mode, auto):
+        if self.handle_submarine_call(submarine_mode):
+            return True
+        if self.handle_combat_auto(auto):
+            return True
+        if self.handle_combat_manual(auto):
+            return True
+        return (
+            auto != "combat_auto"
+            and self.auto_mode_checked
+            and self.is_combat_executing()
+            and self.handle_combat_weapon_release()
+        )
+
+    def _handle_auto_search_combat_execute_popups(self):
+        if self.handle_popup_confirm("AUTO_SEARCH_COMBAT_EXECUTE"):
+            return True
+        if self.handle_urgent_commission():
+            return True
+        if self.handle_story_skip():
+            return True
+        if self.handle_guild_popup_cancel():
+            return True
+        if self.handle_vote_popup():
+            return True
+        return self.handle_mission_popup_ack()
+
+    def _handle_auto_search_combat_execute_end(self):
+        if self.is_in_auto_search_menu() or self._handle_auto_search_menu_missing():
+            self.device.screenshot_interval_set()
+            raise CampaignEnd
+        if self.is_combat_executing():
+            return True, False
+        if self.handle_get_ship():
+            return True, False
+        if any(self.appear(button) for button in AUTO_SEARCH_COMBAT_END_CHECKS) or self.is_auto_search_running():
+            self.device.screenshot_interval_set()
+            return True, True
+        return False, False
+
+    def auto_search_combat_execute(self, emotion_reduce, fleet_index):
+        """
+        Args:
+            emotion_reduce (bool):
+            fleet_index (int):
+
+        Pages:
+            in: is_combat_loading()
+            out: combat status
+        """
+        self._wait_auto_search_combat_execute()
+        submarine_mode, auto = self._prepare_auto_search_combat_execute(emotion_reduce, fleet_index)
 
         for _ in self.loop():
-            if self.handle_submarine_call(submarine_mode):
+            if self._handle_auto_search_combat_controls(submarine_mode, auto):
                 continue
-            if self.handle_combat_auto(auto):
-                continue
-            if self.handle_combat_manual(auto):
-                continue
-            if (
-                auto != "combat_auto"
-                and self.auto_mode_checked
-                and self.is_combat_executing()
-                and self.handle_combat_weapon_release()
-            ):
-                continue
-            # bunch of popup handlers
-            if self.handle_popup_confirm("AUTO_SEARCH_COMBAT_EXECUTE"):
-                continue
-            if self.handle_urgent_commission():
-                continue
-            if self.handle_story_skip():
-                continue
-            if self.handle_guild_popup_cancel():
-                continue
-            if self.handle_vote_popup():
-                continue
-            if self.handle_mission_popup_ack():
+            if self._handle_auto_search_combat_execute_popups():
                 continue
 
-            # End
-            if self.is_in_auto_search_menu() or self._handle_auto_search_menu_missing():
-                self.device.screenshot_interval_set()
-                raise CampaignEnd
-            if self.is_combat_executing():
-                continue
-            if self.handle_get_ship():
-                continue
-            if any(self.appear(button) for button in AUTO_SEARCH_COMBAT_END_CHECKS) or self.is_auto_search_running():
-                self.device.screenshot_interval_set()
+            handled, should_break = self._handle_auto_search_combat_execute_end()
+            if should_break:
                 break
+            if handled:
+                continue
+
+    def _is_auto_search_combat_status_finished(self):
+        if self.is_auto_search_running():
+            self._auto_search_status_confirm = False
+            return True
+        if self.is_in_auto_search_menu() or self._handle_auto_search_menu_missing():
+            raise CampaignEnd
+        return False
+
+    def _handle_auto_search_combat_status_popups(self):
+        if self.handle_get_ship():
+            return True
+        if self.handle_auto_search_map_option():
+            self._auto_search_status_confirm = False
+            return True
+        handlers = (
+            lambda: self.handle_popup_confirm("AUTO_SEARCH_COMBAT_STATUS"),
+            self.handle_urgent_commission,
+            self.handle_story_skip,
+            self.handle_guild_popup_cancel,
+            self.handle_vote_popup,
+            self.handle_mission_popup_ack,
+        )
+        return any(handler() for handler in handlers)
+
+    def _handle_auto_search_status_confirm(self, exp_info):
+        if not self._auto_search_status_confirm:
+            return False, exp_info
+        if not exp_info and self.handle_get_ship():
+            return True, exp_info
+        for handler in (
+            self.handle_get_items,
+            self.handle_battle_status,
+            lambda: self.handle_popup_confirm("combat_status"),
+        ):
+            if handler():
+                return True, exp_info
+        if self.handle_exp_info():
+            return True, True
+        return False, exp_info
 
     def auto_search_combat_status(self):
         """
@@ -309,50 +386,18 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         logger.info("Auto Search combat status")
         self.device.stuck_record_clear()
         self.device.click_record_clear()
-        exp_info = False  # This is for the white screen bug in game
+        exp_info = False  # 处理游戏白屏问题。
 
         for _ in self.loop():
-            # End
-            if self.is_auto_search_running():
-                self._auto_search_status_confirm = False
+            if self._is_auto_search_combat_status_finished():
                 break
-            if self.is_in_auto_search_menu() or self._handle_auto_search_menu_missing():
-                raise CampaignEnd
 
-            # Combat status
-            if self.handle_get_ship():
-                continue
-            if self.handle_auto_search_map_option():
-                self._auto_search_status_confirm = False
-                continue
-            # bunch of popup handlers
-            if self.handle_popup_confirm("AUTO_SEARCH_COMBAT_STATUS"):
-                continue
-            if self.handle_urgent_commission():
-                continue
-            if self.handle_story_skip():
-                continue
-            if self.handle_guild_popup_cancel():
-                continue
-            if self.handle_vote_popup():
-                continue
-            if self.handle_mission_popup_ack():
+            if self._handle_auto_search_combat_status_popups():
                 continue
 
-            # Handle low emotion combat
-            # Combat status
-            if self._auto_search_status_confirm:
-                if not exp_info and self.handle_get_ship():
-                    continue
-                if self.handle_get_items():
-                    continue
-                if self.handle_battle_status():
-                    continue
-                if self.handle_popup_confirm("combat_status"):
-                    continue
-                if self.handle_exp_info():
-                    exp_info = True
-                    continue
+            handled, exp_info = self._handle_auto_search_status_confirm(exp_info)
+            if handled:
+                continue
 
     def auto_search_combat(self, emotion_reduce=None, fleet_index=1):
         """
