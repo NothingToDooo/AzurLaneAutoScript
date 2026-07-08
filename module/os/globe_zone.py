@@ -79,6 +79,24 @@ class ZoneManager:
         zones = zones.sort_by_camera_distance(camera=camera)
         return zones[0]
 
+    @staticmethod
+    def _zone_id_from_name(name):
+        if isinstance(name, int):
+            return name
+        if isinstance(name, str) and name.isdigit():
+            return int(name)
+        return None
+
+    @staticmethod
+    def _normalize_zone_name(name):
+        return str(name).replace(" ", "").lower()
+
+    def _zone_by_id(self, zone_id, name):
+        try:
+            return self.zones.select(zone_id=zone_id)[0]
+        except IndexError as e:
+            raise ScriptError(f"Unable to find OS globe zone: {name}") from e
+
     def name_to_zone(self, name):
         """
         Convert a zone id or CN name to zone instance.
@@ -94,30 +112,20 @@ class ZoneManager:
         """
         if isinstance(name, Zone):
             return name
-        if isinstance(name, int):
-            try:
-                return self.zones.select(zone_id=name)[0]
-            except IndexError as e:
-                raise ScriptError(f"Unable to find OS globe zone: {name}") from e
-        elif isinstance(name, str) and name.isdigit():
-            try:
-                return self.zones.select(zone_id=int(name))[0]
-            except IndexError as e:
-                raise ScriptError(f"Unable to find OS globe zone: {name}") from e
-        else:
 
-            def parse_name(n):
-                return str(n).replace(" ", "").lower()
+        zone_id = self._zone_id_from_name(name)
+        if zone_id is not None:
+            return self._zone_by_id(zone_id, name)
 
-            name = parse_name(name)
-            for zone in self.zones:
-                if name == parse_name(zone.cn):
-                    return zone
-            # 普通难度：仲裁者·XXX, 困难难度：仲裁者·XXX, 困难模拟战：仲裁机关
-            for keyword in ["普通", "困难", "仲裁"]:
-                if keyword in name:
-                    return self.name_to_zone(154)
-            raise ScriptError(f"Unable to find OS globe zone: {name}")
+        parsed_name = self._normalize_zone_name(name)
+        for zone in self.zones:
+            if parsed_name == self._normalize_zone_name(zone.cn):
+                return zone
+
+        # 普通难度：仲裁者·XXX, 困难难度：仲裁者·XXX, 困难模拟战：仲裁机关。
+        if any(keyword in parsed_name for keyword in ("普通", "困难", "仲裁")):
+            return self.name_to_zone(154)
+        raise ScriptError(f"Unable to find OS globe zone: {parsed_name}")
 
     def zone_nearest_azur_port(self, zone):
         """

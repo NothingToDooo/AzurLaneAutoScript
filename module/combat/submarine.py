@@ -8,6 +8,8 @@ from module.combat.assets import (
 )
 from module.logger import logger
 
+_SUBMARINE_SKIP_MODES = {"do_not_use", "hunt_only", "hunt_and_boss"}
+
 
 class SubmarineCall(ModuleBase):
     submarine_call_flag = False
@@ -21,33 +23,35 @@ class SubmarineCall(ModuleBase):
         self.submarine_call_timer.reset()
         self.submarine_call_flag = False
 
-    def handle_submarine_call(self, submarine="do_not_use"):
-        """
-        Returns:
-            str: If call.
-        """
+    def _submarine_call_should_wait(self, submarine):
         if self.submarine_call_flag:
-            return False
-        if submarine in ["do_not_use", "hunt_only", "hunt_and_boss"]:
+            return True
+        if submarine in _SUBMARINE_SKIP_MODES:
             self.submarine_call_flag = True
-            return False
+            return True
         if self.submarine_call_timer.reached():
             logger.info("Submarine call timer reached")
             self.submarine_call_flag = True
-            return False
-
+            return True
         if not self.appear(SUBMARINE_AVAILABLE_CHECK_1) or not self.appear(SUBMARINE_AVAILABLE_CHECK_2):
-            return False
-
+            return True
         if self.appear(SUBMARINE_CALLED):
             logger.info("Submarine called")
             self.submarine_call_flag = True
-            return False
-        if self.submarine_call_click_timer.reached():
-            if not self.appear_then_click(SUBMARINE_READY):
-                logger.info("Incorrect submarine icon")
-                self.device.click(SUBMARINE_READY)
-            logger.info("Call submarine")
-            self.submarine_call_click_timer.reset()
             return True
         return False
+
+    def handle_submarine_call(self, submarine="do_not_use"):
+        """
+        Returns:
+            bool: 是否执行了潜艇呼叫。
+        """
+        if self._submarine_call_should_wait(submarine) or not self.submarine_call_click_timer.reached():
+            return False
+
+        if not self.appear_then_click(SUBMARINE_READY):
+            logger.info("Incorrect submarine icon")
+            self.device.click(SUBMARINE_READY)
+        logger.info("Call submarine")
+        self.submarine_call_click_timer.reset()
+        return True

@@ -25,36 +25,34 @@ class CombatAuto(ModuleBase):
         self.auto_mode_checked = False
         self.auto_mode_switched = False
 
-    def handle_combat_auto(self, auto):
-        """
-        Args:
-            auto (str): Combat auto mode.
-
-        Returns:
-            bool: If executed
-        """
+    def _combat_auto_should_wait(self):
         if self.auto_mode_checked:
-            return False
+            return True
         if self.auto_mode_click_timer.reached():
             logger.info("Combat auto check timer reached")
             self.auto_mode_checked = True
-            return False
-        if not self.auto_skip_timer.reached():
-            return False
-        if not self.auto_click_interval_timer.reached():
+            return True
+        return not self.auto_skip_timer.reached() or not self.auto_click_interval_timer.reached()
+
+    def _combat_auto_click_switch(self):
+        self.device.click(COMBAT_AUTO_SWITCH)
+        self.auto_click_interval_timer.reset()
+        self.auto_mode_switched = True
+
+    def handle_combat_auto(self, auto):
+        """
+        Args:
+            auto (str): 战斗自动模式。
+
+        Returns:
+            bool: 是否执行了开关点击。
+        """
+        if self._combat_auto_should_wait():
             return False
 
-        auto = auto == "combat_auto"
-        if self.combat_joystick_appear():
-            if auto:
-                self.device.click(COMBAT_AUTO_SWITCH)
-                self.auto_click_interval_timer.reset()
-                self.auto_mode_switched = True
-                return True
-        elif not auto:
-            self.device.click(COMBAT_AUTO_SWITCH)
-            self.auto_click_interval_timer.reset()
-            self.auto_mode_switched = True
+        auto_enabled = auto == "combat_auto"
+        if self.combat_joystick_appear() == auto_enabled:
+            self._combat_auto_click_switch()
             return True
 
         return False

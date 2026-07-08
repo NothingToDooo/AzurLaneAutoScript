@@ -15,29 +15,25 @@ RESEARCH_SCALING = [
     491 / 558,
     424 / 558,
 ]
+RESEARCH_SERIES_TEMPLATES = (
+    (research_assets.TEMPLATE_S8, 8),
+    (research_assets.TEMPLATE_S7, 7),
+    (research_assets.TEMPLATE_S6, 6),
+    (research_assets.TEMPLATE_S4_2, 4),
+    (research_assets.TEMPLATE_S4, 4),
+    (research_assets.TEMPLATE_S5, 5),
+    (research_assets.TEMPLATE_S3, 3),
+    (research_assets.TEMPLATE_S2, 2),
+    (research_assets.TEMPLATE_S1, 1),
+)
 
 
 def match_series(image, scaling):
     image = rgb2gray(image)
 
-    if research_assets.TEMPLATE_S8.match(image, scaling=scaling):
-        return 8
-    if research_assets.TEMPLATE_S7.match(image, scaling=scaling):
-        return 7
-    if research_assets.TEMPLATE_S6.match(image, scaling=scaling):
-        return 6
-    if research_assets.TEMPLATE_S4_2.match(image, scaling=scaling):
-        return 4
-    if research_assets.TEMPLATE_S4.match(image, scaling=scaling):
-        return 4
-    if research_assets.TEMPLATE_S5.match(image, scaling=scaling):
-        return 5
-    if research_assets.TEMPLATE_S3.match(image, scaling=scaling):
-        return 3
-    if research_assets.TEMPLATE_S2.match(image, scaling=scaling):
-        return 2
-    if research_assets.TEMPLATE_S1.match(image, scaling=scaling):
-        return 1
+    for template, series in RESEARCH_SERIES_TEMPLATES:
+        if template.match(image, scaling=scaling):
+            return series
     return 0
 
 
