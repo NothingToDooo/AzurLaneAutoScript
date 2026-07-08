@@ -69,17 +69,20 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
         )
         logger.info(f"Enemy remain: {remain}")
         if remain.count > 0:
-            if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
-                if self.clear_any_enemy(sort=("cost_2",)):
-                    return True
-                return self.battle_default()
-            if self.clear_bouncing_enemy():
-                return True
-            if self.clear_siren():
-                return True
-            self.clear_mechanism()
-            return self.battle_default()
+            return self._clear_remaining_enemy_for_clear_all()
         return self.battle_boss()
+
+    def _clear_remaining_enemy_for_clear_all(self):
+        if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
+            if self.clear_any_enemy(sort=("cost_2",)):
+                return True
+            return self.battle_default()
+        if self.clear_bouncing_enemy():
+            return True
+        if self.clear_siren():
+            return True
+        self.clear_mechanism()
+        return self.battle_default()
 
     @Config.when(MAP_CLEAR_ALL_THIS_TIME=False, POOR_MAP_DATA=False)
     def battle_function(self):  # noqa: F811
