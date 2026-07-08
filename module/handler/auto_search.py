@@ -192,18 +192,13 @@ class AutoSearchHandler(EnemySearchingHandler):
             handler_assets.AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset, interval=2
         )
 
-    def handle_auto_search_exit(self, drop=None):
+    def handle_auto_search_exit(self):
         """
-        Args:
-            drop (DropImage):
-
         Returns:
             bool
         """
         if self.appear(handler_assets.AUTO_SEARCH_MENU_EXIT, offset=self._auto_search_menu_offset, interval=2):
             # 这里仍是较粗糙的处理，先保留原行为。
-            if drop:
-                drop.handle_add(main=self, before=4)
             self.device.click(handler_assets.AUTO_SEARCH_MENU_EXIT)
             self.interval_reset(handler_assets.AUTO_SEARCH_MENU_EXIT)
             return True

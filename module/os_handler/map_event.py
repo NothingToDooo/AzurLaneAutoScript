@@ -24,53 +24,39 @@ fleet_lock.add_state("off", check_button=os_assets.OS_FLEET_UNLOCKED)
 class MapEventHandler(EnemySearchingHandler):
     ash_popup_canceled = False
 
-    def handle_map_get_items(self, interval=2, drop=None):
+    def handle_map_get_items(self, interval=2):
         if self.is_in_map():
             return False
 
         if self.appear(GET_ITEMS_1, interval=interval):
-            if drop:
-                drop.handle_add(main=self, before=2)
             logger.info(f"{GET_ITEMS_1} -> {os_assets.CLICK_SAFE_AREA}")
             self.device.click(os_assets.CLICK_SAFE_AREA)
             return True
         if self.appear(GET_ITEMS_2, interval=interval):
-            if drop:
-                drop.handle_add(main=self, before=2)
             logger.info(f"{GET_ITEMS_2} -> {os_assets.CLICK_SAFE_AREA}")
             self.device.click(os_assets.CLICK_SAFE_AREA)
             return True
         if self.appear(GET_ITEMS_3, interval=interval):
-            if drop:
-                drop.handle_add(main=self, before=2)
             logger.info(f"{GET_ITEMS_3} -> {os_assets.CLICK_SAFE_AREA}")
             self.device.click(os_assets.CLICK_SAFE_AREA)
             return True
         if self.appear(os_assets.GET_ADAPTABILITY, interval=interval):
-            if drop:
-                drop.handle_add(main=self, before=2)
             logger.info(f"{os_assets.GET_ADAPTABILITY} -> {os_assets.CLICK_SAFE_AREA}")
             self.device.click(os_assets.CLICK_SAFE_AREA)
             return True
         if self.appear(os_assets.GET_MEOWFFICER_ITEMS_1, interval=interval):
-            if drop:
-                drop.handle_add(main=self, before=2)
             logger.info(f"{os_assets.GET_MEOWFFICER_ITEMS_1} -> {os_assets.CLICK_SAFE_AREA}")
             self.device.click(os_assets.CLICK_SAFE_AREA)
             return True
         if self.appear(os_assets.GET_MEOWFFICER_ITEMS_2, interval=interval):
-            if drop:
-                drop.handle_add(main=self, before=2)
             logger.info(f"{os_assets.GET_MEOWFFICER_ITEMS_2} -> {os_assets.CLICK_SAFE_AREA}")
             self.device.click(os_assets.CLICK_SAFE_AREA)
             return True
 
         return False
 
-    def handle_map_archives(self, drop=None):
+    def handle_map_archives(self):
         if self.appear(os_assets.MAP_ARCHIVES, interval=5):
-            if drop:
-                drop.add(self.device.image)
             logger.info(f"{os_assets.MAP_ARCHIVES} -> {os_assets.CLICK_SAFE_AREA}")
             self.device.click(os_assets.CLICK_SAFE_AREA)
             return True
@@ -96,25 +82,22 @@ class MapEventHandler(EnemySearchingHandler):
             return True
         return False
 
-    def handle_map_event(self, drop=None):
+    def handle_map_event(self):
         """
-        Args:
-            drop (DropImage):
-
         Returns:
             str: Event that handled
         """
-        if self.handle_map_get_items(drop=drop):
+        if self.handle_map_get_items():
             return "map_get_items"
         if self.handle_os_game_tips():
             return "os_game_tips"
-        if self.handle_map_archives(drop=drop):
+        if self.handle_map_archives():
             return "map_archives"
         if self.handle_guild_popup_cancel():
             return "guild_popup_cancel"
         if self.handle_ash_popup():
             return "ash_popup"
-        if self.handle_urgent_commission(drop=drop):
+        if self.handle_urgent_commission():
             return "urgent_commission"
         if self.handle_story_skip():
             return "story_skip"
@@ -140,11 +123,8 @@ class MapEventHandler(EnemySearchingHandler):
             if self.handle_os_in_map():
                 break
 
-    def os_auto_search_quit(self, drop=None):
+    def os_auto_search_quit(self):
         """
-        Args:
-            drop (DropImage):
-
         Returns:
             bool: True if current map cleared
         """
@@ -154,8 +134,6 @@ class MapEventHandler(EnemySearchingHandler):
             if self.appear(os_assets.AUTO_SEARCH_REWARD, offset=(50, 50), interval=2):
                 if self.ensure_no_info_bar():
                     cleared = True
-                if drop:
-                    drop.handle_add(main=self, before=4)
                 self.device.click(os_assets.AUTO_SEARCH_REWARD)
                 self.interval_reset(
                     [
@@ -191,10 +169,9 @@ class MapEventHandler(EnemySearchingHandler):
 
         return cleared
 
-    def handle_os_auto_search_map_option(self, drop=None, enable=True):
+    def handle_os_auto_search_map_option(self, enable=True):
         """
         Args:
-            drop (DropImage):
             enable (bool): True/False, or None for doing nothing.
 
         Returns:
@@ -205,18 +182,18 @@ class MapEventHandler(EnemySearchingHandler):
             and self.info_bar_count() >= 2
         ):
             self.device.screenshot_interval_set()
-            self.os_auto_search_quit(drop=drop)
+            self.os_auto_search_quit()
             raise CampaignEnd
         if (
             self.match_template_color(os_assets.AUTO_SEARCH_OS_MAP_OPTION_OFF_DISABLED, offset=(5, 120))
             and self.info_bar_count() >= 2
         ):
             self.device.screenshot_interval_set()
-            self.os_auto_search_quit(drop=drop)
+            self.os_auto_search_quit()
             raise CampaignEnd
         if self.appear(os_assets.AUTO_SEARCH_REWARD, offset=(50, 50)):
             self.device.screenshot_interval_set()
-            if self.os_auto_search_quit(drop=drop):
+            if self.os_auto_search_quit():
                 # 当前地图没有更多道具。
                 raise CampaignEnd
             # 自动搜索已停止，但地图尚未清空。

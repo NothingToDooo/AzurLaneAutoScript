@@ -45,10 +45,9 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             return True
         return False
 
-    def research_reset(self, drop=None, skip_first_screenshot=True):
+    def research_reset(self, skip_first_screenshot=True):
         """
         Args:
-            drop (DropImage):
             skip_first_screenshot (bool):
 
         Returns:
@@ -59,7 +58,6 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             return False
 
         logger.info("Research reset")
-        drop.add(self.device.image)
         executed = False
         while 1:
             if skip_first_screenshot:
@@ -82,25 +80,23 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         self._research_project_offset = 0
         return True
 
-    def research_enforce(self, drop=None, add_queue=True):
+    def research_enforce(self, add_queue=True):
         """
         Args:
-            drop (DropImage):
             add_queue (bool): Whether to add into queue.
                 The 6th project can't be added into queue, so here's the toggle.
         """
         if not self.enforce:
             logger.info("Enforce choosing research project")
             self.enforce = True
-            return self.research_select(self.research_sort_filter(self.enforce), drop=drop, add_queue=add_queue)
+            return self.research_select(self.research_sort_filter(self.enforce), add_queue=add_queue)
         return True
 
-    def research_select(self, priority, drop=None, add_queue=True):
+    def research_select(self, priority, add_queue=True):
         """
         Args:
             priority (list): A list of ResearchProject objects and preset strings,
                 such as [object, object, object, 'reset']
-            drop (DropImage):
             add_queue (bool): Whether to add into queue.
                 The 6th project can't be added into queue, so here's the toggle.
 
@@ -109,25 +105,25 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         """
         if not len(priority):
             logger.info("No research project satisfies current filter")
-            return self.research_enforce(drop=drop, add_queue=add_queue)
+            return self.research_enforce(add_queue=add_queue)
         for project in priority:
             # 优先级示例：['reset', 'shortest']。
             if project == "reset":
-                if self.research_reset(drop=drop):
+                if self.research_reset():
                     return False
                 continue
 
             if isinstance(project, str):
                 # 优先级示例：['shortest']。
                 if project == "shortest":
-                    self.research_select(self.research_sort_shortest(self.enforce), drop=drop, add_queue=add_queue)
+                    self.research_select(self.research_sort_shortest(self.enforce), add_queue=add_queue)
                 elif project == "cheapest":
-                    self.research_select(self.research_sort_cheapest(self.enforce), drop=drop, add_queue=add_queue)
+                    self.research_select(self.research_sort_cheapest(self.enforce), add_queue=add_queue)
                 else:
                     logger.warning(f"Unknown select method: {project}")
                 return True
             if project.genre.upper() in ["C", "T"] and not self.enforce:
-                return self.research_enforce(drop=drop, add_queue=add_queue)
+                return self.research_enforce(add_queue=add_queue)
             # 优先级示例：[ResearchProject, ResearchProject]。
             ret = self.research_project_start_with_requirements(project, add_queue=add_queue)
             if ret:
@@ -138,7 +134,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             continue
 
         logger.info("No research project started")
-        return self.research_enforce(drop=drop, add_queue=add_queue)
+        return self.research_enforce(add_queue=add_queue)
 
     def research_delay_check(self):
         """

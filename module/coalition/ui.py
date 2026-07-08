@@ -292,14 +292,11 @@ class CoalitionUI(Combat):
         if event == "coalition_20230323" and stage in ["tc1", "sp"]:
             return False
         # easy 是单舰队，SP 和 EX 必须使用多舰队。
-        if (
-            event in [
-                "coalition_20240627",
-                "coalition_20250626",
-                "coalition_20260122",
-            ]
-            and stage in ["easy", "sp", "ex"]
-        ):
+        if event in [
+            "coalition_20240627",
+            "coalition_20250626",
+            "coalition_20260122",
+        ] and stage in ["easy", "sp", "ex"]:
             return False
 
         clicked = self.coalition_set_fleet(event, mode)
@@ -436,7 +433,7 @@ class CoalitionUI(Combat):
                 continue
 
             # Urgent commission
-            if self.handle_urgent_commission(drop=None):
+            if self.handle_urgent_commission():
                 continue
 
             # Story skip

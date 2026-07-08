@@ -76,7 +76,7 @@ class EnemySearchingHandler(InfoHandler):
         """
         return False
 
-    def handle_auto_search_exit(self, drop=None):
+    def handle_auto_search_exit(self):
         """
         A placeholder, will be override in AutoSearchHandler.
         AutoSearchHandler inherits EnemySearchingHandler,
@@ -84,11 +84,8 @@ class EnemySearchingHandler(InfoHandler):
         """
         return False
 
-    def handle_in_map_with_enemy_searching(self, drop=None):
+    def handle_in_map_with_enemy_searching(self):
         """
-        Args:
-            drop (DropImage):
-
         Returns:
             bool: If handled.
         """
@@ -114,7 +111,7 @@ class EnemySearchingHandler(InfoHandler):
             if hasattr(self, "is_combat_loading") and self.is_combat_loading():
                 logger.warning("Entered map with is_combat_loading appeared")
                 break
-            if self.handle_auto_search_exit(drop=drop):
+            if self.handle_auto_search_exit():
                 timeout.limit = 10
                 timeout.reset()
                 continue
@@ -132,7 +129,7 @@ class EnemySearchingHandler(InfoHandler):
                 timeout.limit = 10
                 timeout.reset()
                 continue
-            if self.handle_urgent_commission(drop=drop):
+            if self.handle_urgent_commission():
                 timeout.limit = 10
                 timeout.reset()
                 continue
@@ -154,11 +151,8 @@ class EnemySearchingHandler(InfoHandler):
 
         return True
 
-    def handle_in_map_no_enemy_searching(self, drop=None):
+    def handle_in_map_no_enemy_searching(self):
         """
-        Args:
-            drop (DropImage):
-
         Returns:
             bool: If handled.
         """
@@ -176,7 +170,7 @@ class EnemySearchingHandler(InfoHandler):
             # although here expects an enemy searching animation.
             if self.handle_in_stage():
                 return True
-            if self.handle_auto_search_exit(drop=drop):
+            if self.handle_auto_search_exit():
                 timeout.reset()
                 continue
 
@@ -190,7 +184,7 @@ class EnemySearchingHandler(InfoHandler):
             if self.handle_guild_popup_cancel():
                 timeout.reset()
                 continue
-            if self.handle_urgent_commission(drop=drop):
+            if self.handle_urgent_commission():
                 timeout.reset()
                 continue
 

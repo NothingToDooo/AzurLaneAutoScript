@@ -69,31 +69,27 @@ class Combat(Combat_, MapEventHandler):
     def handle_exp_info(self):
         if self.is_combat_executing():
             return False
-        sleep = (1.5, 2) if self.__os_combat_drop else (0.25, 0.5)
         if self.appear_then_click(combat_assets.EXP_INFO_S):
-            self.device.sleep(sleep)
+            self.device.sleep((0.25, 0.5))
             return True
         if self.appear_then_click(combat_assets.EXP_INFO_A):
-            self.device.sleep(sleep)
+            self.device.sleep((0.25, 0.5))
             return True
         if self.appear_then_click(combat_assets.EXP_INFO_B):
-            self.device.sleep(sleep)
+            self.device.sleep((0.25, 0.5))
             return True
         if self.appear_then_click(combat_assets.EXP_INFO_C):
-            self.device.sleep(sleep)
+            self.device.sleep((0.25, 0.5))
             return True
         if self.appear_then_click(combat_assets.EXP_INFO_D):
-            self.device.sleep(sleep)
+            self.device.sleep((0.25, 0.5))
             return True
 
         return False
 
-    def handle_get_items(self, drop=None):
+    def handle_get_items(self):
         """
         Click CLICK_SAFE_AREA instead of button itself.
-
-        Args:
-            drop (DropImage):
 
         Returns:
             bool:
@@ -101,24 +97,18 @@ class Combat(Combat_, MapEventHandler):
         if getattr(self, "_disable_handle_get_items", False):
             return False
         if self.appear(combat_assets.GET_ITEMS_1, offset=5, interval=self.battle_status_click_interval):
-            if drop:
-                drop.handle_add(self, before=2)
             self.device.click(os_assets.CLICK_SAFE_AREA)
             self.interval_reset(combat_assets.BATTLE_STATUS_S)
             self.interval_reset(combat_assets.BATTLE_STATUS_A)
             self.interval_reset(combat_assets.BATTLE_STATUS_B)
             return True
         if self.appear(combat_assets.GET_ITEMS_2, offset=5, interval=self.battle_status_click_interval):
-            if drop:
-                drop.handle_add(self, before=2)
             self.device.click(os_assets.CLICK_SAFE_AREA)
             self.interval_reset(combat_assets.BATTLE_STATUS_S)
             self.interval_reset(combat_assets.BATTLE_STATUS_A)
             self.interval_reset(combat_assets.BATTLE_STATUS_B)
             return True
         if self.appear(os_assets.GET_ADAPTABILITY, offset=5, interval=self.battle_status_click_interval):
-            if drop:
-                drop.handle_add(self, before=2)
             self.device.click(os_assets.CLICK_SAFE_AREA)
             self.interval_reset(combat_assets.BATTLE_STATUS_S)
             self.interval_reset(combat_assets.BATTLE_STATUS_A)
@@ -128,23 +118,20 @@ class Combat(Combat_, MapEventHandler):
         return False
 
     def _os_combat_expected_end(self):
-        if self.handle_map_event(drop=self.__os_combat_drop):
+        if self.handle_map_event():
             return False
         if self.combat_appear():
             raise ContinuousCombat
 
         return self.handle_os_in_map()
 
-    __os_combat_drop = None
-
-    def combat_status(self, drop=None, expected_end=None):
-        self.__os_combat_drop = drop
+    def combat_status(self, expected_end=None):
         if expected_end is None:
             expected_end = self._os_combat_expected_end
         # 禁用普通掉落处理，只使用地图掉落处理。
         self._disable_handle_get_items = True
         try:
-            super().combat_status(drop=drop, expected_end=expected_end)
+            super().combat_status(expected_end=expected_end)
         finally:
             self._disable_handle_get_items = False
 
@@ -166,23 +153,17 @@ class Combat(Combat_, MapEventHandler):
                 logger.info("Continuous combat detected")
                 continue
 
-    def handle_auto_search_battle_status(self, drop=None):
+    def handle_auto_search_battle_status(self):
         if self.appear(combat_assets.BATTLE_STATUS_C, interval=self.battle_status_click_interval):
             logger.warning("Battle Status C")
             # raise GameStuckError("Battle status C")
-            if drop:
-                drop.handle_add(self)
-            else:
-                self.device.sleep((0.25, 0.5))
+            self.device.sleep((0.25, 0.5))
             self.device.click(combat_assets.BATTLE_STATUS_C)
             return True
         if self.appear(combat_assets.BATTLE_STATUS_D, interval=self.battle_status_click_interval):
             logger.warning("Battle Status D")
             # raise GameStuckError("Battle Status D")
-            if drop:
-                drop.handle_add(self)
-            else:
-                self.device.sleep((0.25, 0.5))
+            self.device.sleep((0.25, 0.5))
             self.device.click(combat_assets.BATTLE_STATUS_D)
             return True
 
@@ -198,11 +179,8 @@ class Combat(Combat_, MapEventHandler):
 
         return False
 
-    def auto_search_combat(self, drop=None):
+    def auto_search_combat(self):
         """
-        Args:
-            drop (DropImage):
-
         Returns:
             bool: True if enemy cleared, False if fleet died.
 
@@ -221,7 +199,7 @@ class Combat(Combat_, MapEventHandler):
                 continue
 
             # 结束。
-            if self.handle_os_auto_search_map_option(drop=drop):
+            if self.handle_os_auto_search_map_option():
                 break
             pause = self.is_combat_executing()
             if pause:
@@ -246,7 +224,7 @@ class Combat(Combat_, MapEventHandler):
                 continue
             # 失败时不要改变自动搜索选项。
             enable = success if success is not None else None
-            if self.handle_os_auto_search_map_option(drop=drop, enable=enable):
+            if self.handle_os_auto_search_map_option(enable=enable):
                 continue
 
             # 结束。

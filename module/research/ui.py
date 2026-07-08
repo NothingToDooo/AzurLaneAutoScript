@@ -75,27 +75,6 @@ class ResearchUI(UI):
             return GET_ITEMS_1
         return None
 
-    def drop_record(self, drop):
-        """
-        Args:
-            drop (DropRecord):
-        """
-        if not drop:
-            return
-        button = self.get_items()
-        if button in (GET_ITEMS_1, GET_ITEMS_2):
-            drop.add(self.device.image)
-        elif button == GET_ITEMS_3:
-            self.device.sleep(1.5)
-            self.device.screenshot()
-            drop.add(self.device.image)
-            self.device.swipe_vector(
-                (0, 250), box=research_assets.ITEMS_3_SWIPE.area, random_range=(-10, -10, 10, 10), padding=0
-            )
-            self.device.sleep(2)
-            self.device.screenshot()
-            drop.add(self.device.image)
-
     def get_research_status(self, image):
         """
         Args:

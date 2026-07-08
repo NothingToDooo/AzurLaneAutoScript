@@ -3,37 +3,28 @@ from module.guild.assets import BATTLE_STATUS_CF, EXP_INFO_CF
 
 
 class GuildCombat(Combat):
-    def handle_battle_status(self, drop=None):
+    def handle_battle_status(self):
         """
-        Args:
-            drop (DropImage):
-
         Returns:
             bool:
         """
         if self.is_combat_executing():
             return False
-        if super().handle_battle_status(drop=drop):
+        if super().handle_battle_status():
             return True
         if self.appear(BATTLE_STATUS_CF, interval=self.battle_status_click_interval):
-            if drop:
-                drop.handle_add(self)
-            else:
-                self.device.sleep((0.25, 0.5))
+            self.device.sleep((0.25, 0.5))
             self.device.click(BATTLE_STATUS_CF)
             return True
 
         return False
 
-    def handle_get_items(self, drop=None):
+    def handle_get_items(self):
         """
-        Args:
-            drop (DropImage):
-
         Returns:
             bool:
         """
-        if super().handle_get_items(drop=drop):
+        if super().handle_get_items():
             self.interval_reset(BATTLE_STATUS_CF)
             return True
         return False

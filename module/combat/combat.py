@@ -338,12 +338,11 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
         return False
 
-    def combat_execute(self, auto="combat_auto", submarine="do_not_use", drop=None):
+    def combat_execute(self, auto="combat_auto", submarine="do_not_use"):
         """
         Args:
             auto (str): ['combat_auto', 'combat_manual', 'stand_still_in_the_middle', 'hide_in_bottom_left']
             submarine (str): ['do_not_use', 'hunt_only', 'every_combat']
-            drop (DropImage):
         """
         logger.info("Combat execute")
         self.submarine_call_reset()
@@ -386,90 +385,63 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
                 continue
 
             # End
-            if self.handle_battle_status(drop=drop) or self.handle_get_items(drop=drop):
+            if self.handle_battle_status() or self.handle_get_items():
                 break
 
-    def handle_battle_status(self, drop=None):
+    def handle_battle_status(self):
         """
-        Args:
-            drop (DropImage):
-
         Returns:
             bool:
         """
         if self.is_combat_executing():
             return False
         if self.appear(combat_assets.BATTLE_STATUS_S, interval=self.battle_status_click_interval):
-            if drop:
-                drop.handle_add(self)
-            else:
-                self.device.sleep((0.25, 0.5))
+            self.device.sleep((0.25, 0.5))
             self.device.click(combat_assets.BATTLE_STATUS_S)
             return True
         if self.appear(combat_assets.BATTLE_STATUS_A, interval=self.battle_status_click_interval):
             logger.warning("Battle status A")
-            if drop:
-                drop.handle_add(self)
-            else:
-                self.device.sleep((0.25, 0.5))
+            self.device.sleep((0.25, 0.5))
             self.device.click(combat_assets.BATTLE_STATUS_A)
             return True
         if self.appear(combat_assets.BATTLE_STATUS_B, interval=self.battle_status_click_interval):
             logger.warning("Battle Status B")
-            if drop:
-                drop.handle_add(self)
-            else:
-                self.device.sleep((0.25, 0.5))
+            self.device.sleep((0.25, 0.5))
             self.device.click(combat_assets.BATTLE_STATUS_B)
             return True
         if self.appear(combat_assets.BATTLE_STATUS_C, interval=self.battle_status_click_interval):
             logger.warning("Battle Status C")
             # raise GameStuckError('Battle status C')
-            if drop:
-                drop.handle_add(self)
-            else:
-                self.device.sleep((0.25, 0.5))
+            self.device.sleep((0.25, 0.5))
             self.device.click(combat_assets.BATTLE_STATUS_C)
             return True
         if self.appear(combat_assets.BATTLE_STATUS_D, interval=self.battle_status_click_interval):
             logger.warning("Battle Status D")
             # raise GameStuckError('Battle Status D')
-            if drop:
-                drop.handle_add(self)
-            else:
-                self.device.sleep((0.25, 0.5))
+            self.device.sleep((0.25, 0.5))
             self.device.click(combat_assets.BATTLE_STATUS_D)
             return True
 
         return False
 
-    def handle_get_items(self, drop=None):
+    def handle_get_items(self):
         """
-        Args:
-            drop (DropImage):
-
         Returns:
             bool:
         """
         if self.appear(combat_assets.GET_ITEMS_1, offset=5, interval=self.battle_status_click_interval):
-            if drop:
-                drop.handle_add(self)
             self.device.click(combat_assets.GET_ITEMS_1)
             self.interval_reset(combat_assets.BATTLE_STATUS_S)
             self.interval_reset(combat_assets.BATTLE_STATUS_A)
             self.interval_reset(combat_assets.BATTLE_STATUS_B)
             return True
         if self.appear(combat_assets.GET_ITEMS_2, offset=5, interval=self.battle_status_click_interval):
-            if drop:
-                drop.handle_add(self)
             self.device.click(combat_assets.GET_ITEMS_1)
             self.interval_reset(combat_assets.BATTLE_STATUS_S)
             self.interval_reset(combat_assets.BATTLE_STATUS_A)
             self.interval_reset(combat_assets.BATTLE_STATUS_B)
             return True
         if self.appear(combat_assets.GET_ITEMS_3, offset=5, interval=self.battle_status_click_interval):
-            if drop:
-                drop.handle_add(self)
             self.device.click(combat_assets.GET_ITEMS_1)
             self.interval_reset(combat_assets.BATTLE_STATUS_S)
             self.interval_reset(combat_assets.BATTLE_STATUS_A)
@@ -497,19 +469,14 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
         return False
 
-    def handle_get_ship(self, drop=None):
+    def handle_get_ship(self):
         """
-        Args:
-            drop (DropImage):
-
         Returns:
             bool:
         """
         if self.appear_then_click(combat_assets.GET_SHIP, interval=1):
             if self.appear(combat_assets.NEW_SHIP):
                 logger.info("Get a new SHIP")
-                if drop:
-                    drop.handle_add(self)
                 self.config.GET_SHIP_TRIGGERED = True
             return True
 
@@ -531,10 +498,9 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
         return False
 
-    def combat_status(self, drop=None, expected_end=None):
+    def combat_status(self, expected_end=None):
         """
         Args:
-            drop (DropImage):
             expected_end (str, callable): with_searching, no_searching, in_stage.
         """
         logger.info("Combat status")
@@ -549,21 +515,21 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             if isinstance(expected_end, str):
                 if expected_end == "in_stage" and self.handle_in_stage():
                     break
-                if expected_end == "with_searching" and self.handle_in_map_with_enemy_searching(drop=drop):
+                if expected_end == "with_searching" and self.handle_in_map_with_enemy_searching():
                     break
-                if expected_end == "no_searching" and self.handle_in_map_no_enemy_searching(drop=drop):
+                if expected_end == "no_searching" and self.handle_in_map_no_enemy_searching():
                     break
                 if expected_end == "in_ui" and self.appear(BACK_ARROW, offset=(30, 30)):
                     break
             if callable(expected_end) and expected_end():
                 break
 
-            if self.handle_story_skip(drop=drop):
+            if self.handle_story_skip():
                 continue
             # Combat status
-            if not exp_info and self.handle_get_ship(drop=drop):
+            if not exp_info and self.handle_get_ship():
                 continue
-            if self.handle_get_items(drop=drop):
+            if self.handle_get_items():
                 continue
             if self.handle_popup_confirm("COMBAT_STATUS"):
                 if battle_status and not exp_info:
@@ -571,7 +537,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
                     self.config.GET_SHIP_TRIGGERED = True
                 continue
             if not battle_status:
-                if not exp_info and self.handle_battle_status(drop=drop):
+                if not exp_info and self.handle_battle_status():
                     battle_status = True
                     continue
                 if self.handle_exp_info():
@@ -582,13 +548,13 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
                 if self.handle_exp_info():
                     exp_info = True
                     continue
-                if not exp_info and self.handle_battle_status(drop=drop):
+                if not exp_info and self.handle_battle_status():
                     battle_status = True
                     continue
             # bunch of popup handlers
             if self.handle_popup_confirm("COMBAT_STATUS"):
                 continue
-            if self.handle_urgent_commission(drop=drop):
+            if self.handle_urgent_commission():
                 continue
             if self.handle_guild_popup_cancel():
                 continue
@@ -597,7 +563,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             if self.handle_mission_popup_ack():
                 continue
             # additional handlers in combat
-            if self.handle_auto_search_exit(drop=drop):
+            if self.handle_auto_search_exit():
                 continue
             if self.handle_combat_mis_click():
                 continue
@@ -605,7 +571,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             # End
             if self.handle_in_stage():
                 break
-            if expected_end is None and self.handle_in_map_with_enemy_searching(drop=drop):
+            if expected_end is None and self.handle_in_map_with_enemy_searching():
                 break
 
     def combat(

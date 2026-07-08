@@ -24,27 +24,21 @@ class AshBeaconFinished(Exception):
 
 
 class AshCombat(Combat):
-    def handle_battle_status(self, drop=None):
+    def handle_battle_status(self):
         """
-        Args:
-            drop (DropImage):
-
         Returns:
             bool:
         """
         if self.is_combat_executing():
             return False
         if self.appear(ash_assets.BATTLE_STATUS, offset=(120, 20), interval=self.battle_status_click_interval):
-            if drop:
-                drop.handle_add(self)
-            else:
-                self.device.sleep((0.25, 0.5))
+            self.device.sleep((0.25, 0.5))
             self.device.click(ash_assets.BATTLE_STATUS)
             return True
         if self.appear(BATTLE_PREPARATION, offset=(30, 30), interval=2):
             self.device.click(BACK_ARROW)
             return True
-        return bool(super().handle_battle_status(drop=drop))
+        return bool(super().handle_battle_status())
 
     def handle_exp_info(self):
         """

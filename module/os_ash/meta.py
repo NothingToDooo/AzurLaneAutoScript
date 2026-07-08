@@ -57,8 +57,8 @@ class Meta(UI, MapEventHandler):
         point, _, _ = point_ocr.ocr(self.device.image)
         return point >= check_number
 
-    def handle_map_event(self, drop=None):
-        if super().handle_map_event(drop):
+    def handle_map_event(self):
+        if super().handle_map_event():
             return True
         if self.appear_then_click(ash_assets.META_AUTO_CONFIRM, offset=(20, 20), interval=2):
             logger.info("Find auto attack complete")

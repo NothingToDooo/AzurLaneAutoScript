@@ -240,7 +240,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
 
         logger.info("Camera stabled")
 
-    def wait_until_walk_stable(self, confirm_timer=None, skip_first_screenshot=False, walk_out_of_step=True, drop=None):
+    def wait_until_walk_stable(self, confirm_timer=None, skip_first_screenshot=False, walk_out_of_step=True):
         """
         Wait until homo_loca stabled.
         DETECTION_BACKEND must be 'homography'.
@@ -250,7 +250,6 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             skip_first_screenshot (bool):
             walk_out_of_step (bool): If catch walk_out_of_step error.
                 Default to True, use False in abyssal zones.
-            drop (DropImage):
 
         Returns：
             str: Things that fleet met on its way,
@@ -274,14 +273,14 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         confirm_timer.reset()
 
         def abyssal_expected_end():
-            # add handle_map_event() because OSCombat.combat_status() removes get_items
-            if self.handle_map_event(drop=drop):
+            # OSCombat.combat_status() 会禁用普通掉落处理，这里补充地图事件处理。
+            if self.handle_map_event():
                 return False
             return self.is_in_map()
 
         for _ in self.loop(skip_first=skip_first_screenshot):
             # Map event
-            event = self.handle_map_event(drop=drop)
+            event = self.handle_map_event()
             if event:
                 confirm_timer.reset()
                 stuck_timer.reset()
@@ -342,7 +341,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             if self.combat_appear():
                 # Use ui_back() for testing, because there are too few abyssal loggers every month.
                 # self.ui_back(check_button=self.is_in_map)
-                self.combat(expected_end=abyssal_expected_end, fleet_index=self.fleet_show_index, save_get_items=drop)
+                self.combat(expected_end=abyssal_expected_end, fleet_index=self.fleet_show_index)
                 confirm_timer.reset()
                 stuck_timer.reset()
                 result.add("event")
@@ -603,7 +602,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             # Having new screenshots
             self.wait_until_walk_stable(confirm_timer=Timer(1.5, count=4), walk_out_of_step=False)
 
-    def month_boss_goto_additional(self, location=(0, 0), has_fleet_step=False, drop=None):
+    def month_boss_goto_additional(self, location=(0, 0), has_fleet_step=False):
         self.update_os()
         self.predict()
         self.predict_radar()
@@ -624,13 +623,13 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             self.device.click(grid)
         else:
             logger.info("No boss to goto, stop")
-        self.wait_until_walk_stable(confirm_timer=Timer(1.5, count=4), walk_out_of_step=False, drop=drop)
+        self.wait_until_walk_stable(confirm_timer=Timer(1.5, count=4), walk_out_of_step=False)
 
-    def boss_goto(self, location=(0, 0), has_fleet_step=False, drop=None, is_month=False):
+    def boss_goto(self, location=(0, 0), has_fleet_step=False, is_month=False):
         logger.hr("BOSS goto")
 
         if is_month:
-            self.month_boss_goto_additional(location=location, has_fleet_step=has_fleet_step, drop=drop)
+            self.month_boss_goto_additional(location=location, has_fleet_step=has_fleet_step)
 
         while 1:
             # Update local view
@@ -658,7 +657,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
 
             # Wait until arrived
             # Having new screenshots
-            self.wait_until_walk_stable(confirm_timer=Timer(4, count=6), walk_out_of_step=False, drop=drop)
+            self.wait_until_walk_stable(confirm_timer=Timer(4, count=6), walk_out_of_step=False)
 
     def get_boss_leave_button(self):
         for grid in self.view:

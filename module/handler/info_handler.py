@@ -153,20 +153,14 @@ class InfoHandler(ModuleBase):
 
     _hot_fix_check_wait = Timer(6)
 
-    def handle_urgent_commission(self, drop=None):
+    def handle_urgent_commission(self):
         """
-        Args:
-            drop (DropImage):
-
         Returns:
             bool:
         """
         appear = self.appear(handler_assets.GET_MISSION, offset=True, interval=2)
         if appear:
             logger.info("Get urgent commission")
-            if drop:
-                self.handle_info_bar()
-                drop.add(self.device.image)
             self.device.click(handler_assets.GET_MISSION)
             self._hot_fix_check_wait.reset()
 
@@ -255,19 +249,14 @@ class InfoHandler(ModuleBase):
         """
         return self.appear_then_click(handler_assets.GET_SKIN, offset=(20, 20), interval=2)
 
-    def handle_get_items_ship(self, drop=None):
+    def handle_get_items_ship(self):
         """
         2026.06.12 added different GET_ITEMS popup when getting ship
-
-        Args:
-            drop (DropImage):
 
         Returns:
             bool:
         """
         if self.appear(handler_assets.GET_ITEMS_SHIP_1, offset=5, interval=2):
-            if drop:
-                drop.handle_add(self)
             self.device.click(handler_assets.GET_ITEMS_SHIP_1)
             return True
 
@@ -426,7 +415,7 @@ class InfoHandler(ModuleBase):
         # 黑色背景、少量文字的剧情。
         return color_similar(color, (0, 0, 0), threshold=10)
 
-    def story_skip(self, drop=None):
+    def story_skip(self):
         """
         2023.09.14 剧情选项改为屏幕中部的大块白色选项，
         需要检查 STORY_SKIP_3，但实际点击旧的 STORY_SKIP。
@@ -475,8 +464,6 @@ class InfoHandler(ModuleBase):
             # 这次点击会中断自动搜索。
             self.interval_reset([handler_assets.STORY_SKIP_3])
             if self._story_confirm.reached():
-                if drop:
-                    drop.handle_add(self, before=2)
                 if self.config.STORY_ALLOW_SKIP:
                     logger.info(f"{handler_assets.STORY_SKIP_3} -> {handler_assets.STORY_SKIP}")
                     self.device.click(handler_assets.STORY_SKIP)
@@ -499,14 +486,14 @@ class InfoHandler(ModuleBase):
         self.interval_clear(handler_assets.STORY_SKIP_3)
         self.interval_clear(handler_assets.STORY_LETTERS_ONLY)
 
-    def handle_story_skip(self, drop=None):
+    def handle_story_skip(self):
         # 复刻活动在 clear mode 下仍可能有剧情。
         # clear mode 通常没有剧情，但 B3/D3 在威胁安全前仍有剧情。
         # 威胁安全后不再有剧情。
         if self.map_is_threat_safe and self.config.Campaign_Event != "event_20201012_cn":
             return False
 
-        return self.story_skip(drop=drop)
+        return self.story_skip()
 
     def ensure_no_story(self, skip_first_screenshot=True):
         logger.info("Ensure no story")

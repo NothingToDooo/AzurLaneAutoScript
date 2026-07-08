@@ -26,12 +26,11 @@ class MysteryHandler(StrategyHandler, EnemySearchingHandler):
 
         return False
 
-    def handle_mystery_items(self, button=None, drop=None):
+    def handle_mystery_items(self, button=None):
         """
         Args:
             button: Button to click when get_items.
                 Can be destination grid which makes the bot more like human.
-            drop (DropImage):
 
         Returns:
             bool: If handled.
@@ -43,8 +42,6 @@ class MysteryHandler(StrategyHandler, EnemySearchingHandler):
 
         if self.appear(GET_ITEMS_1, offset=5):
             logger.attr("Mystery", "Get item")
-            if drop:
-                drop.add(self.device.image)
             self.device.click(button)
             self.device.sleep(0.5)
             self.device.screenshot()
@@ -53,36 +50,26 @@ class MysteryHandler(StrategyHandler, EnemySearchingHandler):
 
         return False
 
-    def handle_mystery_ammo(self, drop=None):
+    def handle_mystery_ammo(self):
         """
-        Args:
-            drop (DropImage):
-
         Returns:
             bool: 是否已处理。
         """
         if self.info_bar_count() and self._get_ammo_log_timer.reached() and self.appear(GET_AMMO):
             logger.attr("Mystery", "Get ammo")
             self._get_ammo_log_timer.reset()
-            if drop:
-                drop.add(self.device.image)
             return True
 
         return False
 
-    def handle_mystery_carrier(self, drop=None):
+    def handle_mystery_carrier(self):
         """
-        Args:
-            drop (DropImage):
-
         Returns:
             bool: 是否已处理。
         """
         if self.config.MAP_MYSTERY_HAS_CARRIER and self.is_in_map() and self.enemy_searching_appear():
             logger.attr("Mystery", "Get carrier")
             self.carrier_count += 1
-            if drop:
-                drop.add(self.device.image)
             self.handle_in_map_with_enemy_searching()
             return True
 
