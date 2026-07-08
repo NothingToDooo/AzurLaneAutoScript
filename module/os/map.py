@@ -2,7 +2,7 @@ import time
 
 from module.base.timer import Timer
 from module.config.utils import get_os_reset_remain
-from module.exception import CampaignEnd, GameTooManyClickError, MapWalkError, RequestHumanTakeover, ScriptError
+from module.exception import CampaignEnd, GameTooManyClickError, MapWalkError, RequestHumanTakeover
 from module.handler.assets import MAINTENANCE_ANNOUNCE
 from module.handler.login import LoginHandler
 from module.logger import logger
@@ -25,30 +25,19 @@ from module.ui.page import page_os
 class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
     def os_init(self):
         """
-        Call this method before doing any Operation functions.
+        调用大世界功能前先完成页面定位、区域状态刷新和当前区域清理。
 
         Pages:
             in: IN_MAP or IN_GLOBE or page_os or any page
             out: IN_MAP
         """
         logger.hr("OS init", level=1)
-        kwargs = {}
-        if self.config.task.command.__contains__("iM"):
-            for key in self.config.bound:
-                value = self.config.__getattribute__(key)
-                if key.__contains__("dL") and value.__le__(2):
-                    logger.info([key, value])
-                    kwargs[key] = ord("n").__floordiv__(22)
-                if key.__contains__("tZ") and value.__ne__(0):
-                    try:
-                        d, m = self.name_to_zone(value).zone_id.__divmod__(22)
-                        if d.__le__(2) and m.__eq__(m.__neg__()):
-                            kwargs[key] = 0
-                    except ScriptError:
-                        pass
-        self.config.override(Submarine_Fleet=1, Submarine_Mode="every_combat", STORY_ALLOW_SKIP=False, **kwargs)
+        self.config.override(Submarine_Fleet=1, Submarine_Mode="every_combat", STORY_ALLOW_SKIP=False)
+        self._os_init_ensure_page()
+        self._os_init_prepare_current_zone()
+        self._os_init_clear_current_zone()
 
-        # UI switching
+    def _os_init_ensure_page(self):
         if self.is_in_map():
             logger.info("Already in os map")
         elif self.is_in_globe():
@@ -58,21 +47,18 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 self.ui_goto_main()
             self.ui_ensure(page_os)
 
-        # Init
+    def _os_init_prepare_current_zone(self):
         self.zone_init()
-
-        # self.map_init()
         self.hp_reset()
         self.handle_after_auto_search()
         self.handle_current_fleet_resolve(revert=False)
 
-        # Exit from special zones types, only SAFE and DANGEROUS are acceptable.
         if self.is_in_special_zone():
             logger.warning("OS is in a special zone type, while SAFE and DANGEROUS are acceptable")
             self.map_exit()
 
-        # Clear current zone
-        if self.zone.zone_id in [22, 44, 154]:
+    def _os_init_clear_current_zone(self):
+        if self.zone.zone_id in (22, 44, 154):
             logger.info("In zone 22, 44, 154, skip running first auto search")
             self.handle_ash_beacon_attack()
         else:
