@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from importlib import import_module
 
 from module.combat.assets import GET_ITEMS_1
@@ -11,6 +12,12 @@ from module.ui.ui import UI
 
 OCR_COIN = Digit(minigame_assets.COIN_HOLDER, name="OCR_COIN", letter=(255, 235, 115), threshold=128)
 MINIGAME_SCROLL = Scroll(minigame_assets.MINIGAME_SCROLL_AREA, color=(247, 247, 247), name="MINIGAME_SCROLL")
+
+
+@dataclass(slots=True)
+class _MinigameRunState:
+    coin_collected: bool = False
+    play_count: int = 0
 
 
 class MinigameRun(UI):
@@ -173,6 +180,15 @@ class Minigame(UI):
             in: Any page
             out: page_game_room
         """
+        self._minigame_enter_game_room()
+        self.go_to_main_page()
+
+        specific_game_name = "new_year_challenge"
+        minigame_instance = self._create_minigame_instance(specific_game_name)
+        self._spend_minigame_coins(minigame_instance, specific_game_name)
+        self.config.task_delay(server_update=True)
+
+    def _minigame_enter_game_room(self):
         self.ui_ensure(page_academy)
         # 学院页 -> 游戏室。
         for _ in self.loop():
@@ -186,42 +202,49 @@ class Minigame(UI):
             if self.handle_popup_confirm("MINIGAME_ENTER"):
                 continue
 
-        # 游戏室和选择游戏页共用同一个页头，先回到游戏室主页。
-        self.go_to_main_page()
-        coin_collected = False
-        play_count = 0
-
-        # 选择具体小游戏。
-        specific_game_name = "new_year_challenge"
-        minigame_instance = None
+    def _create_minigame_instance(self, specific_game_name):
         if specific_game_name == "new_year_challenge":
             new_year_challenge_class = import_module("module.minigame.new_year_challenge").NewYearChallenge
-            minigame_instance = new_year_challenge_class(config=self.config, device=self.device)
+            return new_year_challenge_class(config=self.config, device=self.device)
+        return None
 
-        while 1:
-            # 游玩次数上限。
-            if play_count >= 10:
-                break
+    def _spend_minigame_coins(self, minigame_instance, specific_game_name):
+        state = _MinigameRunState()
+        while state.play_count < 10:
             # OCR 获取代币数量。
             coin_count = self.get_coin_amount()
             logger.info(f"coin count : {coin_count}")
-            # 收取代币。
-            if coin_count <= 30 and not coin_collected:
-                coin_collected = True
-                if self.collect_coin():
-                    continue
-            # 没有代币时结束。
-            if coin_count == 0:
-                logger.info(f"coin count : {coin_count}, finished")
-                break
-            logger.info("coin count > 0, spend")
-            # 执行具体小游戏逻辑。
-            if minigame_instance is not None and minigame_instance.minigame_run():
-                play_count += 1
+
+            if self._collect_minigame_coin_if_needed(state, coin_count):
                 continue
-            if minigame_instance is None:
-                logger.error(f"unknown game name {specific_game_name}")
+            if self._minigame_coin_empty(coin_count):
                 break
+            if self._play_minigame_once(minigame_instance, specific_game_name, state):
+                continue
             break
 
-        self.config.task_delay(server_update=True)
+    def _collect_minigame_coin_if_needed(self, state, coin_count):
+        if coin_count > 30 or state.coin_collected:
+            return False
+
+        state.coin_collected = True
+        return self.collect_coin()
+
+    @staticmethod
+    def _minigame_coin_empty(coin_count):
+        if coin_count == 0:
+            logger.info(f"coin count : {coin_count}, finished")
+            return True
+        return False
+
+    @staticmethod
+    def _play_minigame_once(minigame_instance, specific_game_name, state):
+        logger.info("coin count > 0, spend")
+        if minigame_instance is None:
+            logger.error(f"unknown game name {specific_game_name}")
+            return False
+        if not minigame_instance.minigame_run():
+            return False
+
+        state.play_count += 1
+        return True
