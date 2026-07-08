@@ -6,6 +6,8 @@ from module.raid.assets import RAID_REWARDS
 from module.raid.raid import Raid, raid_ocr
 from module.ui.page import page_campaign_menu, page_raid, page_rpg_stage
 
+RAID_RUN_ARGUMENTS_UNFILLED_TEMPLATE = "RaidRun arguments unfilled. name={name}, mode={mode}"
+
 
 class RaidRun(Raid, CampaignEvent):
     run_count: int
@@ -98,7 +100,8 @@ class RaidRun(Raid, CampaignEvent):
         name = name or self.config.Campaign_Event
         mode = mode or self.config.Raid_Mode
         if not name or not mode:
-            raise ScriptError(f"RaidRun arguments unfilled. name={name}, mode={mode}")
+            message = RAID_RUN_ARGUMENTS_UNFILLED_TEMPLATE.format(name=name, mode=mode)
+            raise ScriptError(message)
         return name, mode
 
     def _raid_run_total_reached(self, total):

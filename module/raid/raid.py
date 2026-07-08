@@ -115,6 +115,11 @@ RAID_PT_OCR_CONFIG = {
     "CHANGWU": (Digit, {"letter": (255, 239, 215), "threshold": 128}),
 }
 
+UNKNOWN_RAID_NAME_TEMPLATE = "Unknown raid name: {name}"
+MISSING_RAID_ASSET_TEMPLATE = "Raid asset not exists: {key}"
+RAID_OCR_NOT_CONFIGURED_TEMPLATE = "Raid OCR is not configured: {raid}, mode={mode}"
+RAID_PT_OCR_NOT_CONFIGURED_TEMPLATE = "Raid PT OCR is not configured: {raid}"
+
 
 def raid_name_shorten(name):
     """
@@ -126,7 +131,8 @@ def raid_name_shorten(name):
     """
     if prefix := RAID_NAME_PREFIX.get(name):
         return prefix
-    raise ScriptError(f"Unknown raid name: {name}")
+    message = UNKNOWN_RAID_NAME_TEMPLATE.format(name=name)
+    raise ScriptError(message)
 
 
 def raid_entrance(raid, mode):
@@ -146,7 +152,8 @@ def _raid_asset(key):
     try:
         return getattr(raid_assets, key)
     except AttributeError as e:
-        raise ScriptError(f"Raid asset not exists: {key}") from e
+        message = MISSING_RAID_ASSET_TEMPLATE.format(key=key)
+        raise ScriptError(message) from e
 
 
 def raid_ocr(raid, mode):
@@ -166,7 +173,8 @@ def raid_ocr(raid, mode):
     if counter_config is not None:
         counter, kwargs = counter_config
         return counter(button, **kwargs)
-    raise ScriptError(f"Raid OCR is not configured: {raid}, mode={mode}")
+    message = RAID_OCR_NOT_CONFIGURED_TEMPLATE.format(raid=raid, mode=mode)
+    raise ScriptError(message)
 
 
 def pt_ocr(raid):
@@ -186,7 +194,8 @@ def pt_ocr(raid):
     if ocr_config is not None:
         counter, kwargs = ocr_config
         return counter(button, **kwargs)
-    raise ScriptError(f"Raid PT OCR is not configured: {raid}")
+    message = RAID_PT_OCR_NOT_CONFIGURED_TEMPLATE.format(raid=raid)
+    raise ScriptError(message)
 
 
 class Raid(MapOperation, RaidCombat, CampaignEvent):
