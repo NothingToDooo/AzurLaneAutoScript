@@ -260,54 +260,68 @@ class Enhancement(Dock):
         logger.hr("Enhancement by type")
         total = 0
 
-        # Process ENHANCE_ORDER_STRING if any into ship_types
-        if self.config.Enhance_Filter is not None:
-            ship_types = [s.strip().lower() for s in self.config.Enhance_Filter.split(">")]
-            ship_types = list(filter("".__ne__, ship_types))
-            if len(ship_types) == 0:
-                ship_types = [None]
-        else:
-            ship_types = [None]
+        ship_types = self._enhance_ship_types()
         logger.attr("Enhance Order", ship_types)
 
-        # Process available ship types for choice randomization
-        # Removing types that have already been specified by
-        # ENHANCE_ORDER_STRING
-        available_ship_types = VALID_SHIP_TYPES.copy()
-        [available_ship_types.remove(s) for s in ship_types if s in available_ship_types]
-
+        available_ship_types = self._available_enhance_ship_types(ship_types)
         for requested_ship_type in ship_types:
-            ship_type = requested_ship_type
-            # None check, do not execute if is None
-            # Otherwise, select a type at random since
-            # user has specified an unrecognized type
-            if ship_type is not None and ship_type not in VALID_SHIP_TYPES:
-                if len(available_ship_types) == 0:
-                    logger.info("No more ship types for ALAS to choose from, skipping iteration")
-                    continue
-                ship_type = choice(available_ship_types)
-                available_ship_types.remove(ship_type)
-
-            logger.info(f"Favourite={favourite}, Ship Type={ship_type}")
-
-            # Continue if at least 1 CARD_GRID is selectable
-            # otherwise skip to next ship type
-            if not self._enhance_enter(favourite=favourite, ship_type=ship_type):
-                logger.hr(f"Dock Empty by ship type {ship_type}")
+            ship_type = self._resolve_enhance_ship_type(requested_ship_type, available_ship_types)
+            if ship_type is False:
                 continue
 
-            current_count = self.config.Enhance_CheckPerCategory
-            while 1:
-                choose_result, current_count = self._enhance_choose(ship_count=current_count)
-                if not choose_result:
-                    break
-                total += 10
-                if total >= self._retire_amount:
-                    break
-            self.ui_back(retire_assets.DOCK_CHECK)
+            total += self._enhance_ship_type(favourite=favourite, ship_type=ship_type, total=total)
 
         self._enhance_quit()
         return total
+
+    def _enhance_ship_types(self):
+        if self.config.Enhance_Filter is None:
+            return [None]
+
+        ship_types = [ship_type.strip().lower() for ship_type in self.config.Enhance_Filter.split(">")]
+        ship_types = list(filter("".__ne__, ship_types))
+        if not ship_types:
+            return [None]
+        return ship_types
+
+    @staticmethod
+    def _available_enhance_ship_types(ship_types):
+        available_ship_types = VALID_SHIP_TYPES.copy()
+        for ship_type in ship_types:
+            if ship_type in available_ship_types:
+                available_ship_types.remove(ship_type)
+        return available_ship_types
+
+    @staticmethod
+    def _resolve_enhance_ship_type(requested_ship_type, available_ship_types):
+        if requested_ship_type is None or requested_ship_type in VALID_SHIP_TYPES:
+            return requested_ship_type
+        if not available_ship_types:
+            logger.info("No more ship types for ALAS to choose from, skipping iteration")
+            return False
+
+        ship_type = choice(available_ship_types)
+        available_ship_types.remove(ship_type)
+        return ship_type
+
+    def _enhance_ship_type(self, favourite, ship_type, total):
+        logger.info(f"Favourite={favourite}, Ship Type={ship_type}")
+
+        if not self._enhance_enter(favourite=favourite, ship_type=ship_type):
+            logger.hr(f"Dock Empty by ship type {ship_type}")
+            return 0
+
+        enhanced = 0
+        current_count = self.config.Enhance_CheckPerCategory
+        while 1:
+            choose_result, current_count = self._enhance_choose(ship_count=current_count)
+            if not choose_result:
+                break
+            enhanced += 10
+            if total + enhanced >= self._retire_amount:
+                break
+        self.ui_back(retire_assets.DOCK_CHECK)
+        return enhanced
 
     def _enhance_handler(self):
         """
