@@ -26,6 +26,13 @@ class NemuIpcError(Exception):
     pass
 
 
+NEMU_IPC_MIN_VERSION_MESSAGE = "NemuIpc requires MuMu12 version >= 3.8.13, please check your version"
+NEMU_IPC_INSTANCE_DEAD_MESSAGE = "Emulator instance is probably dead"
+NEMU_IPC_CONNECT_FAILED_MESSAGE = "Connection failed, please check if nemu_folder is correct and emulator is running"
+NEMU_IPC_GET_RESOLUTION_FAILED_MESSAGE = "nemu_capture_display failed during get_resolution()"
+NEMU_IPC_SCREENSHOT_FAILED_MESSAGE = "nemu_capture_display failed during screenshot()"
+
+
 class CaptureStd:
     """
     Capture stdout and stderr from both python and C library
@@ -133,13 +140,13 @@ class CaptureNemuIpc(CaptureStd):
 
         # 旧 MuMu12 3.4.0/3.7.3 会分别返回 rpc error 1783/1745。
         if b"error: 1783" in self.stderr or b"error: 1745" in self.stderr:
-            raise NemuIpcIncompatible("NemuIpc requires MuMu12 version >= 3.8.13, please check your version")
+            raise NemuIpcIncompatible(NEMU_IPC_MIN_VERSION_MESSAGE)
         # 连接 id 错误时会提示找不到 rpc connection。
         if b"cannot find rpc connection" in self.stderr:
             raise NemuIpcError(self.stderr)
         # 模拟器进程退出时可能返回 rpc error 1722/1726。
         if b"error: 1722" in self.stderr or b"error: 1726" in self.stderr:
-            raise NemuIpcError("Emulator instance is probably dead")
+            raise NemuIpcError(NEMU_IPC_INSTANCE_DEAD_MESSAGE)
 
 
 def _noop_recovery():
@@ -235,10 +242,8 @@ class NemuIpcImpl:
                 continue
         if self.lib is None:
             # not found
-            raise NemuIpcIncompatible(
-                f"NemuIpc requires MuMu12 version >= 3.8.13, please check your version. "
-                f"None of the following path exists: {list_dll}"
-            )
+            message = f"{NEMU_IPC_MIN_VERSION_MESSAGE}. None of the following path exists: {list_dll}"
+            raise NemuIpcIncompatible(message)
         # success
         logger.info(
             f"NemuIpcImpl init, "
@@ -260,7 +265,7 @@ class NemuIpcImpl:
         else:
             connect_id = self.lib.nemu_connect(self.nemu_folder, self.instance_id)
         if connect_id == 0:
-            raise NemuIpcError("Connection failed, please check if nemu_folder is correct and emulator is running")
+            raise NemuIpcError(NEMU_IPC_CONNECT_FAILED_MESSAGE)
 
         self.connect_id = connect_id
 
@@ -346,7 +351,7 @@ class NemuIpcImpl:
             on_thread=on_thread,
         )
         if ret > 0:
-            raise NemuIpcError("nemu_capture_display failed during get_resolution()")
+            raise NemuIpcError(NEMU_IPC_GET_RESOLUTION_FAILED_MESSAGE)
         self.width = width_ptr.contents.value
         self.height = height_ptr.contents.value
 
@@ -369,7 +374,7 @@ class NemuIpcImpl:
             pixels_pointer,
         )
         if ret > 0:
-            raise NemuIpcError("nemu_capture_display failed during screenshot()")
+            raise NemuIpcError(NEMU_IPC_SCREENSHOT_FAILED_MESSAGE)
 
         # Return pixels_pointer instead of image to avoid passing image through jobs
         return pixels_pointer

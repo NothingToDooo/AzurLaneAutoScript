@@ -195,8 +195,10 @@ class Device(Screenshot, Control, AppControl):
         self.stuck_record_clear()
 
         if self.app_is_running():
-            raise GameStuckError("Wait too long")
-        raise GameNotRunningError("Game died")
+            message = "Wait too long"
+            raise GameStuckError(message)
+        message = "Game died"
+        raise GameNotRunningError(message)
 
     def handle_control_check(self, button):
         self.stuck_record_clear()
@@ -241,13 +243,15 @@ class Device(Screenshot, Control, AppControl):
             logger.warning(f"Too many click for a button: {count[0][0]}")
             logger.warning(f"History click: {[str(prev) for prev in self.click_record]}")
             self.click_record_clear()
-            raise GameTooManyClickError(f"Too many click for a button: {count[0][0]}")
+            message = f"Too many click for a button: {count[0][0]}"
+            raise GameTooManyClickError(message)
         if len(count) >= 2 and count[0][1] >= 6 and count[1][1] >= 6:
             show_function_call()
             logger.warning(f"Too many click between 2 buttons: {count[0][0]}, {count[1][0]}")
             logger.warning(f"History click: {[str(prev) for prev in self.click_record]}")
             self.click_record_clear()
-            raise GameTooManyClickError(f"Too many click between 2 buttons: {count[0][0]}, {count[1][0]}")
+            message = f"Too many click between 2 buttons: {count[0][0]}, {count[1][0]}"
+            raise GameTooManyClickError(message)
 
     def disable_stuck_detection(self):
         """

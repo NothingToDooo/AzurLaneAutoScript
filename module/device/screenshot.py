@@ -77,7 +77,8 @@ class Screenshot(NemuIpc):
         elif self.orientation == 3:
             image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
         else:
-            raise ScriptError(f"Invalid device orientation: {self.orientation}")
+            message = f"Invalid device orientation: {self.orientation}"
+            raise ScriptError(message)
 
         return image
 
@@ -122,7 +123,8 @@ class Screenshot(NemuIpc):
             pass
         else:
             logger.warning(f"Unknown screenshot interval: {interval}")
-            raise ScriptError(f"Unknown screenshot interval: {interval}")
+            message = f"Unknown screenshot interval: {interval}"
+            raise ScriptError(message)
         if interval != self._screenshot_interval.limit:
             logger.info(f"Screenshot interval set to {interval}s")
             self._screenshot_interval.limit = interval

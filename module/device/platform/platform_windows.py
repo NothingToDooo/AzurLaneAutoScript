@@ -100,7 +100,8 @@ class PlatformWindows(PlatformBase, EmulatorManager):
                 logger.warning(f"Cannot get MuMu instance index from name {instance.name}")
             self.execute([Emulator.single_to_console(exe), "api", "-v", str(instance.MuMuPlayer12_id), "launch_player"])
         else:
-            raise EmulatorUnknown(f"Cannot start an unknown emulator instance: {instance}")
+            message = f"Cannot start an unknown emulator instance: {instance}"
+            raise EmulatorUnknown(message)
 
     def _emulator_stop(self, instance: EmulatorInstance):
         """
@@ -140,7 +141,8 @@ class PlatformWindows(PlatformBase, EmulatorManager):
                 [Emulator.single_to_console(exe), "api", "-v", str(instance.MuMuPlayer12_id), "shutdown_player"]
             )
         else:
-            raise EmulatorUnknown(f"Cannot stop an unknown emulator instance: {instance}")
+            message = f"Cannot stop an unknown emulator instance: {instance}"
+            raise EmulatorUnknown(message)
 
     def _emulator_function_wrapper(self, func: callable):
         """

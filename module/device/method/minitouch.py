@@ -180,7 +180,8 @@ class CommandBuilder:
             x, y = y, 1280 - x
             max_x, max_y = max_y, max_x
         else:
-            raise ScriptError(f"Invalid device orientation: {orientation}")
+            message = f"Invalid device orientation: {orientation}"
+            raise ScriptError(message)
 
         self.max_x, self.max_y = max_x, max_y
         # minitouch 的最大坐标可能和显示分辨率不同，需要按真实范围缩放。
@@ -257,6 +258,12 @@ class MinitouchNotInstalledError(Exception):
 
 class MinitouchOccupiedError(Exception):
     pass
+
+
+MINITOUCH_OCCUPIED_MESSAGE = (
+    "Timeout when connecting to minitouch, probably because another connection has been established"
+)
+MINITOUCH_EMPTY_DATA_MESSAGE = "Received empty data from minitouch, probably because minitouch is not installed"
 
 
 def _reset_minitouch_after_adb_reconnect(self):
@@ -385,9 +392,8 @@ class Minitouch(Connection):
         state = self.adb_shell(f"if [ -x {path} ]; then echo ok; else echo missing; fi").strip()
         if state == "ok":
             return
-        raise MinitouchNotInstalledError(
-            f"未找到可执行的 minitouch：{path}。请先把 MuMu 当前 ABI 对应的 minitouch 推送到这个路径。"
-        )
+        message = f"未找到可执行的 minitouch：{path}。请先把 MuMu 当前 ABI 对应的 minitouch 推送到这个路径。"
+        raise MinitouchNotInstalledError(message)
 
     def _start_minitouch_service(self):
         if self._minitouch_stream is not None:
@@ -478,9 +484,7 @@ class Minitouch(Connection):
                 out = socket_out.readline().replace("\n", "").replace("\r", "")
             except TimeoutError as e:
                 client.close()
-                raise MinitouchOccupiedError(
-                    "Timeout when connecting to minitouch, probably because another connection has been established"
-                ) from e
+                raise MinitouchOccupiedError(MINITOUCH_OCCUPIED_MESSAGE) from e
             logger.info(out)
 
             # ^ <max-contacts> <max-x> <max-y> <max-pressure>
@@ -492,9 +496,7 @@ class Minitouch(Connection):
             except ValueError as e:
                 client.close()
                 if retry_timeout.reached():
-                    raise MinitouchNotInstalledError(
-                        "Received empty data from minitouch, probably because minitouch is not installed"
-                    ) from e
+                    raise MinitouchNotInstalledError(MINITOUCH_EMPTY_DATA_MESSAGE) from e
                 # minitouch 可能还没启动完成。
                 self.sleep(1)
                 continue
