@@ -43,6 +43,22 @@ MAP.spawn_data_loop = [
     {"battle": 4, "enemy": 2},
     {"battle": 5, "enemy": 1, "boss": 1},
 ]
+
+_ENEMY_CLEAR_PRIORITY = (
+    ((2,), ("LightInvertedOrthant", "MainInvertedOrthant")),
+    ((3,), ("LightInvertedOrthant", "MainInvertedOrthant")),
+    ((2,), ("Enemy", "CarrierInvertedOrthant")),
+    ((3,), ("Enemy", "CarrierInvertedOrthant")),
+)
+
+
+def clear_event_priority_enemy(campaign, include_scale_1=False):
+    if include_scale_1 and campaign.clear_enemy(scale=(1,)):
+        return True
+
+    return any(campaign.clear_enemy(scale=scale, genre=list(genre)) for scale, genre in _ENEMY_CLEAR_PRIORITY)
+
+
 (
     A1,
     B1,
@@ -166,15 +182,7 @@ class Campaign(CampaignBase):
     def battle_0(self):
         if self.clear_siren():
             return True
-        if self.clear_enemy(scale=(1,)):
-            return True
-        if self.clear_enemy(scale=(2,), genre=["LightInvertedOrthant", "MainInvertedOrthant"]):
-            return True
-        if self.clear_enemy(scale=(3,), genre=["LightInvertedOrthant", "MainInvertedOrthant"]):
-            return True
-        if self.clear_enemy(scale=(2,), genre=["Enemy", "CarrierInvertedOrthant"]):
-            return True
-        if self.clear_enemy(scale=(3,), genre=["Enemy", "CarrierInvertedOrthant"]):
+        if clear_event_priority_enemy(self, include_scale_1=True):
             return True
 
         return self.battle_default()

@@ -20,51 +20,76 @@ class CampaignBase(CampaignBase_):
     def campaign_set_chapter(self, name, mode="normal"):
         """
         Args:
-            name (str): Campaign name, such as '7-2', 'd3', 'sp3'.
-            mode (str): 'normal' or 'hard'.
+            name (str): 关卡名称，例如 '7-2'、'd3'、'sp3'。
+            mode (str): 'normal' 或 'hard'。
         """
         chapter, stage = self.campaign_separate_name(name)
-        name = chapter + stage
 
-        if chapter.isdigit():
-            self.ui_goto_campaign()
+        if (
+            self.campaign_set_chapter_main(chapter, mode)
+            or self.campaign_set_chapter_event(chapter)
+            or self.campaign_set_chapter_sp(chapter)
+            or self.campaign_set_chapter_ball(chapter, stage)
+        ):
+            return
+
+        logger.warning(f"Unknown campaign chapter: {chapter}{stage}")
+
+    def campaign_set_chapter_main(self, chapter, mode="normal"):
+        if not chapter.isdigit():
+            return False
+
+        self.ui_goto_campaign()
+        self.campaign_ensure_mode("normal")
+        self.campaign_ensure_chapter(chapter)
+        if mode == "hard":
+            self.campaign_ensure_mode("hard")
+        return True
+
+    def campaign_set_chapter_event(self, chapter):
+        mode_by_chapter = {
+            "a": "normal",
+            "b": "normal",
+            "c": "hard",
+            "d": "hard",
+            "ex_sp": "ex",
+        }
+        campaign_mode = mode_by_chapter.get(chapter)
+        if campaign_mode is None:
+            return False
+
+        self.ui_goto_event()
+        self.campaign_ensure_mode(campaign_mode)
+        self.campaign_ensure_chapter(chapter)
+        return True
+
+    def campaign_set_chapter_sp(self, chapter):
+        if chapter != "sp":
+            return False
+
+        self.ui_goto_sp()
+        self.campaign_ensure_chapter(chapter)
+        return True
+
+    def campaign_set_chapter_ball(self, chapter, stage):
+        if chapter not in {"t", "ts", "ht", "hts"}:
+            return False
+
+        self.ui_goto_event()
+        self._campaign_ball_set(self._campaign_ball_status(stage))
+        self._campaign_ensure_ball_mode(chapter)
+        self.campaign_ensure_chapter(1)
+        return True
+
+    @staticmethod
+    def _campaign_ball_status(stage):
+        return "blue" if stage in {"1", "6"} else "red"
+
+    def _campaign_ensure_ball_mode(self, chapter):
+        if chapter in {"t", "ts"}:
             self.campaign_ensure_mode("normal")
-            self.campaign_ensure_chapter(chapter)
-            if mode == "hard":
-                self.campaign_ensure_mode("hard")
-
-        elif chapter in "abcd" or chapter == "ex_sp":
-            self.ui_goto_event()
-            if chapter in "ab":
-                self.campaign_ensure_mode("normal")
-            elif chapter in "cd":
-                self.campaign_ensure_mode("hard")
-            elif chapter == "ex_sp":
-                self.campaign_ensure_mode("ex")
-            self.campaign_ensure_chapter(chapter)
-
-        elif chapter == "sp":
-            self.ui_goto_sp()
-            self.campaign_ensure_chapter(chapter)
-
-        elif chapter in ["t", "ts", "ht", "hts"]:
-            self.ui_goto_event()
-            # Campaign ball
-            if stage in ["1", "6"]:
-                self._campaign_ball_set("blue")
-            else:
-                self._campaign_ball_set("red")
-            # Campaign mode
-            if chapter in ["t", "ts"]:
-                self.campaign_ensure_mode("normal")
-            if chapter in ["ht", "hts"]:
-                self.campaign_ensure_mode("hard")
-            if chapter == "ex_sp":
-                self.campaign_ensure_mode("ex")
-            # Get stage
-            self.campaign_ensure_chapter(1)
-        else:
-            logger.warning(f"Unknown campaign chapter: {name}")
+            return
+        self.campaign_ensure_mode("hard")
 
     @staticmethod
     def campaign_get_chapter_index(name):

@@ -4,6 +4,7 @@ from module.map.map_base import CampaignMap
 
 from ..campaign_war_archives.campaign_base import CampaignBase
 from .d1 import Config as ConfigBase
+from .d1 import clear_event_priority_enemy
 
 MAP = CampaignMap("D3")
 MAP.shape = "J10"
@@ -184,13 +185,7 @@ class Campaign(CampaignBase):
 
         if self.clear_siren():
             return True
-        if self.clear_enemy(scale=(2,), genre=["LightInvertedOrthant", "MainInvertedOrthant"]):
-            return True
-        if self.clear_enemy(scale=(3,), genre=["LightInvertedOrthant", "MainInvertedOrthant"]):
-            return True
-        if self.clear_enemy(scale=(2,), genre=["Enemy", "CarrierInvertedOrthant"]):
-            return True
-        if self.clear_enemy(scale=(3,), genre=["Enemy", "CarrierInvertedOrthant"]):
+        if clear_event_priority_enemy(self):
             return True
 
         return self.battle_default()
@@ -201,15 +196,7 @@ class Campaign(CampaignBase):
 
         if self.clear_siren():
             return True
-        if self.clear_enemy(scale=(1,)):
-            return True
-        if self.clear_enemy(scale=(2,), genre=["LightInvertedOrthant", "MainInvertedOrthant"]):
-            return True
-        if self.clear_enemy(scale=(3,), genre=["LightInvertedOrthant", "MainInvertedOrthant"]):
-            return True
-        if self.clear_enemy(scale=(2,), genre=["Enemy", "CarrierInvertedOrthant"]):
-            return True
-        if self.clear_enemy(scale=(3,), genre=["Enemy", "CarrierInvertedOrthant"]):
+        if clear_event_priority_enemy(self, include_scale_1=True):
             return True
 
         return self.battle_default()
