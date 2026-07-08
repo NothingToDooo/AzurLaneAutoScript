@@ -3,6 +3,7 @@ import argparse
 import uvicorn
 
 from module.logger import logger
+from module.webui.bootstrap import prepare_pywebio_imports
 from module.webui.setting import State
 
 
@@ -39,6 +40,7 @@ def func() -> None:
     logger.hr("启动配置")
     logger.attr("Host", host)
     logger.attr("Port", port)
+    prepare_pywebio_imports()
     uvicorn.run("module.webui.app:app", host=host, port=port, factory=True, log_config=None)
 
 

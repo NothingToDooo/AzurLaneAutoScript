@@ -3,9 +3,6 @@ from pathlib import Path
 
 import numpy as np
 
-# os.chdir('../')
-print(Path.cwd())
-
 from module.config.config import AzurLaneConfig
 from module.device.device import Device
 
@@ -38,5 +35,11 @@ class Config:
     Emulator_ControlMethod = "minitouch"
 
 
-az = EmulatorChecker(AzurLaneConfig("template").merge(Config()))
-az.stress_test()
+def main() -> None:
+    print(Path.cwd())
+    az = EmulatorChecker(AzurLaneConfig("template").merge(Config()))
+    az.stress_test()
+
+
+if __name__ == "__main__":
+    main()

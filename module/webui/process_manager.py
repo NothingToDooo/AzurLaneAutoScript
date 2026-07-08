@@ -5,15 +5,6 @@ from typing import TYPE_CHECKING, ClassVar, cast
 
 from rich.console import Console, ConsoleRenderable
 
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-# 这个文件不会运行在 app.py 的同一进程或子进程中，下面的初始化需要重复执行。
-# 先导入伪 PIL 模块，避免 pywebio 拉起不需要的 PIL。
-from module.webui.fake_pil_module import import_fake_pil_module, remove_fake_pil_module
-
-import_fake_pil_module()
-
 from alas import AzurLaneAutoScript
 from module.base.naming import camel_to_snake
 from module.config.config import AzurLaneConfig
@@ -27,7 +18,11 @@ from module.submodule.utils import (
     get_func_mod,
     list_mod_instance,
 )
+from module.webui.fake_pil_module import remove_fake_pil_module
 from module.webui.setting import State
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class ProcessManager:

@@ -7,11 +7,6 @@ from datetime import datetime
 from functools import partial
 from pathlib import Path
 
-# 先导入伪 PIL 模块，避免 pywebio 拉起不需要的 PIL。
-from module.webui.fake_pil_module import import_fake_pil_module
-
-import_fake_pil_module()
-
 from pywebio import config as webconfig
 from pywebio.input import file_upload, input_group, select
 from pywebio.input import input as pywebio_input

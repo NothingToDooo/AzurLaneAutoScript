@@ -2,15 +2,14 @@ from typing import ClassVar
 
 import cv2
 import numpy as np
+from cnocr import CnOcr
+from cnocr.utils import data_dir
 from PIL import Image
 
 from module.logger import logger
 
-logger.info("Loading OCR dependencies")
-from cnocr import CnOcr
-from cnocr.utils import data_dir
-
 _DEFAULT_OCR_ROOT = data_dir()
+logger.info("OCR dependencies loaded")
 
 
 class AlOcr(CnOcr):
