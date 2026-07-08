@@ -102,21 +102,12 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         """
         Remove non-exist things like strategy, round.
         """
-        # self.handle_strategy(index=1 if not self.fleets_reversed() else 2)
         self.update()
-        # if self.handle_fleet_reverse():
-        #     self.handle_strategy(index=1)
         self.hp_reset()
         self.hp_get()
         self.lv_reset()
         self.lv_get()
         self.ensure_edge_insight(preset=self.map.in_map_swipe_preset_data, swipe_limit=(6, 5))
-        # self.full_scan(must_scan=self.map.camera_data_spawn_point)
-        # self.find_current_fleet()
-        # self.find_path_initial()
-        # self.map.show_cost()
-        # self.round_reset()
-        # self.round_battle()
 
     def find_current_fleet(self):
         self.fleet_1 = self.camera
@@ -219,7 +210,6 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         for local in self.view:
             if not local.predict_sea() or local.predict_current_fleet():
                 continue
-            # local = np.array(location) - self.camera + self.view.center_loca
             location = np.array(local.location) + self.camera - self.view.center_loca
             location = tuple(location.tolist())
             if location == self.fleet_current or location not in self.map:

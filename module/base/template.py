@@ -135,7 +135,6 @@ class Template(Resource):
             for template in self.image:
                 res = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
                 _, sim, _, _ = cv2.minMaxLoc(res)
-                # print(self.file, sim)
                 if sim > similarity:
                     return True
 
@@ -143,7 +142,6 @@ class Template(Resource):
 
         res = cv2.matchTemplate(image, self.image, cv2.TM_CCOEFF_NORMED)
         _, sim, _, _ = cv2.minMaxLoc(res)
-        # print(self.file, sim)
         return sim > similarity
 
     def match_binary(self, image, similarity=0.85):
@@ -166,7 +164,6 @@ class Template(Resource):
                 # template matching
                 res = cv2.matchTemplate(template, image_binary, cv2.TM_CCOEFF_NORMED)
                 _, sim, _, _ = cv2.minMaxLoc(res)
-                # print(self.file, sim)
                 if sim > similarity:
                     return True
 
@@ -179,7 +176,6 @@ class Template(Resource):
         # template matching
         res = cv2.matchTemplate(self.image_binary, image_binary, cv2.TM_CCOEFF_NORMED)
         _, sim, _, _ = cv2.minMaxLoc(res)
-        # print(self.file, sim)
         return sim > similarity
 
     def match_luma(self, image, similarity=0.85):
@@ -188,7 +184,6 @@ class Template(Resource):
             for template in self.image_luma:
                 res = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
                 _, sim, _, _ = cv2.minMaxLoc(res)
-                # print(self.file, sim)
                 if sim > similarity:
                     return True
 
@@ -196,7 +191,6 @@ class Template(Resource):
 
         res = cv2.matchTemplate(image, self.image, cv2.TM_CCOEFF_NORMED)
         _, sim, _, _ = cv2.minMaxLoc(res)
-        # print(self.file, sim)
         return sim > similarity
 
     def _point_to_button(self, point, image=None, name=None):
@@ -229,7 +223,6 @@ class Template(Resource):
         """
         res = cv2.matchTemplate(image, self.image, cv2.TM_CCOEFF_NORMED)
         _, sim, _, point = cv2.minMaxLoc(res)
-        # print(self.file, sim)
 
         button = self._point_to_button(point, image=image, name=name)
         return sim, button
@@ -238,7 +231,6 @@ class Template(Resource):
         image = rgb2luma(image)
         res = cv2.matchTemplate(image, self.image_luma, cv2.TM_CCOEFF_NORMED)
         _, sim, _, point = cv2.minMaxLoc(res)
-        # print(self.file, sim)
 
         button = self._point_to_button(point, image=image, name=name)
         return sim, button

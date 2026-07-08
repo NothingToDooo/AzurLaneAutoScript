@@ -106,10 +106,6 @@ class OSGridInfo(GridInfo):
         if self._merge_enemy(info):
             return True
 
-        # if info.is_fleet:
-        #     self.is_fleet = True
-        #     return True
-
         return True
 
     def _merge_direct_marker(self, info):
@@ -163,10 +159,7 @@ class OSGridInfo(GridInfo):
 class OSGridPredictor(GridPredictor):
     def predict(self):
         self.enemy_genre = self.predict_enemy_genre()
-        # self.enemy_scale = self.predict_enemy_scale()
-        # self.is_resource = self.predict_resource()
-        # self.is_meowfficer = self.predict_meowfficer()  # This will increase the overall time cost about 100ms
-        # self.is_ally = self.predict_ally()
+        # 暂不识别资源点、指挥喵和友军，避免增加整体识别耗时。
         self.is_akashi = self.enemy_genre == "Akashi"
         self.is_scanning_device = self.enemy_genre == "ScanningDevice"
         self.is_logging_tower = self.enemy_genre == "LoggingTower"
@@ -179,8 +172,6 @@ class OSGridPredictor(GridPredictor):
             self.is_enemy = True
         if self.enemy_scale:
             self.is_enemy = True
-        # if not self.is_enemy:
-        #     self.is_enemy = self.predict_static_red_border()
         if self.is_enemy and not self.enemy_genre:
             self.enemy_genre = "Enemy"
         if self.config.MAP_HAS_SIREN and self.enemy_genre is not None and self.enemy_genre.startswith("Siren"):
@@ -246,8 +237,6 @@ class OSGridPredictor(GridPredictor):
             scale = 2
         # 禁用 1 三角敌人识别。
         # 大世界地图上的灯塔会被识别成 1 三角敌人。
-        # elif TEMPLATE_ENEMY_S.match(yellow):
-        #     scale = 1
         else:
             scale = 0
 
@@ -300,16 +289,6 @@ class OSGridPredictor(GridPredictor):
         count = image[image > 221].shape[0]
         if count < 30:
             return False
-        # 不应该包含绿色或黄色，绿色是岛，黄色是路径带。
-        # image = cv2.cvtColor(crop(self.image, area), cv2.COLOR_RGB2HSV)
-        # h = (0, 180)
-        # s = (30, 90)
-        # v = (30, 100)
-        # lower = (h[0] / 2, s[0] * 2.55, v[0] * 2.55)
-        # upper = (h[1] / 2 + 1, s[1] * 2.55 + 1, v[1] * 2.55 + 1)
-        # image_in_range = cv2.inRange(image, lower, upper)
-        # if image_in_range[image_in_range > 0].shape[0] > 30:
-        #     return False
         # 应该匹配数字“2”。
         image = rgb2gray(self.image_trans)
         sim, button = os_assets.TEMPLATE_FleetMechanism.match_result(image)

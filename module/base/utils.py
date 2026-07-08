@@ -566,8 +566,6 @@ def save_image(image, file):
         image (np.ndarray):
         file (str):
     """
-    # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-    # cv2.imwrite(file, image)
     Image.fromarray(image).save(file)
 
 
@@ -707,17 +705,12 @@ def rgb2gray(image):
     Returns:
         np.ndarray: Shape (height, width)
     """
-    # r, g, b = cv2.split(image)
-    # return cv2.add(
-    #     cv2.multiply(cv2.max(cv2.max(r, g), b), 0.5),
-    #     cv2.multiply(cv2.min(cv2.min(r, g), b), 0.5)
-    # )
     r, g, b = cv2.split(image)
     maximum = cv2.max(r, g)
     cv2.min(r, g, dst=r)
     cv2.max(maximum, b, dst=maximum)
     cv2.min(r, b, dst=r)
-    # minimum = r
+    # 此时 r 保存最小通道值。
     cv2.convertScaleAbs(maximum, alpha=0.5, dst=maximum)
     cv2.convertScaleAbs(r, alpha=0.5, dst=r)
     cv2.add(maximum, r, dst=maximum)
@@ -910,9 +903,6 @@ def color_similarity(color1, color2):
     Returns:
         int:
     """
-    # print(color1, color2)
-    # diff = np.array(color1).astype(int) - np.array(color2).astype(int)
-    # diff = np.max(np.maximum(diff, 0)) - np.min(np.minimum(diff, 0))
     diff_r = color1[0] - color2[0]
     diff_g = color1[1] - color2[1]
     diff_b = color1[2] - color2[2]
@@ -949,9 +939,6 @@ def color_similar(color1, color2, threshold=10):
     Returns:
         bool: True if two colors are similar.
     """
-    # print(color1, color2)
-    # diff = np.array(color1).astype(int) - np.array(color2).astype(int)
-    # diff = np.max(np.maximum(diff, 0)) - np.min(np.minimum(diff, 0))
     diff_r = color1[0] - color2[0]
     diff_g = color1[1] - color2[1]
     diff_b = color1[2] - color2[2]
@@ -999,11 +986,6 @@ def color_similarity_2d(image, color):
     Returns:
         np.ndarray: uint8
     """
-    # r, g, b = cv2.split(cv2.subtract(image, (*color, 0)))
-    # positive = cv2.max(cv2.max(r, g), b)
-    # r, g, b = cv2.split(cv2.subtract((*color, 0), image))
-    # negative = cv2.max(cv2.max(r, g), b)
-    # return cv2.subtract(255, cv2.add(positive, negative))
     diff = cv2.subtract(image, (*color, 0))
     r, g, b = cv2.split(diff)
     cv2.max(r, g, dst=r)
@@ -1030,11 +1012,6 @@ def extract_letters(image, letter=(255, 255, 255), threshold=128):
     Returns:
         np.ndarray: Shape (height, width)
     """
-    # r, g, b = cv2.split(cv2.subtract(image, (*letter, 0)))
-    # positive = cv2.max(cv2.max(r, g), b)
-    # r, g, b = cv2.split(cv2.subtract((*letter, 0), image))
-    # negative = cv2.max(cv2.max(r, g), b)
-    # return cv2.multiply(cv2.add(positive, negative), 255.0 / threshold)
     diff = cv2.subtract(image, (*letter, 0))
     r, g, b = cv2.split(diff)
     cv2.max(r, g, dst=r)
@@ -1062,15 +1039,12 @@ def extract_white_letters(image, threshold=128):
     Returns:
         np.ndarray: Shape (height, width)
     """
-    # minimum = cv2.min(cv2.min(r, g), b)
-    # maximum = cv2.max(cv2.max(r, g), b)
-    # return cv2.multiply(cv2.add(maximum, cv2.subtract(maximum, minimum)), 255.0 / threshold)
     r, g, b = cv2.split(cv2.subtract((255, 255, 255, 0), image))
     maximum = cv2.max(r, g)
     cv2.min(r, g, dst=r)
     cv2.max(maximum, b, dst=maximum)
     cv2.min(r, b, dst=r)
-    # minimum = r
+    # 此时 r 保存最小通道值。
 
     cv2.convertScaleAbs(maximum, alpha=0.5, dst=maximum)
     cv2.convertScaleAbs(r, alpha=0.5, dst=r)
@@ -1097,7 +1071,6 @@ def color_mapping(image, max_multiply=2):
     low, high = np.min(image), np.max(image)
     multiply = min(255 / (high - low), max_multiply)
     add = (255 - multiply * (low + high)) / 2
-    # image = cv2.add(cv2.multiply(image, multiply), add)
     cv2.multiply(image, multiply, dst=image)
     cv2.add(image, add, dst=image)
     image[image > 255] = 255

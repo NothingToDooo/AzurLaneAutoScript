@@ -1158,19 +1158,6 @@ class Fleet(Camera, AmbushHandler):
                 logger.info("Catch camera re-positioning after boss appear")
                 appear = True
 
-        # if self.config.POOR_MAP_DATA:
-        #     self.device.screenshot()
-        #     grids = Grids(self.device.image, config=self.config)
-        #     grids.predict()
-        #     grids.show()
-        #     for grid in grids:
-        #         if grid.is_boss:
-        #             logger.info('Catch camera re-positioning after boss appear')
-        #             appear = True
-        #             for g in self.map:
-        #                 g.wipe_out()
-        #             break
-
         return appear
 
     def handle_boss_appear_refocus(self, preset=None):

@@ -128,24 +128,6 @@ class GlobeOperation(ActionPointHandler):
         Returns:
             bool: If current zone has switch.
         """
-        # image = self.image_crop(ZONE_SWITCH)
-        # center = np.array(image.size) / 2
-        # count = 0
-        # for corner in area2corner((0, 0, *image.size)):
-        #     area = (min(corner[0], center[0]), min(corner[1], center[1]),
-        #             max(corner[0], center[0]), max(corner[1], center[1]))
-        #     area = area_pad(area, pad=2)
-        #     color = np.mean(get_color(image, area))
-        #     if color > 235:
-        #         count += 1
-        #
-        # if count == 1:
-        #     return True
-        # elif count == 0:
-        #     return False
-        # else:
-        #     logger.warning(f'Unexpected zone switch, white block: {count}')
-
         return self.appear(os_assets.ZONE_SWITCH, offset=(5, 5))
 
     _zone_select_offset = (20, 200)
