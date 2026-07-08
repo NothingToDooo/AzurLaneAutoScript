@@ -39,7 +39,7 @@ def func() -> None:
     logger.hr("启动配置")
     logger.attr("Host", host)
     logger.attr("Port", port)
-    uvicorn.run("module.webui.app:app", host=host, port=port, factory=True)
+    uvicorn.run("module.webui.app:app", host=host, port=port, factory=True, log_config=None)
 
 
 if __name__ == "__main__":

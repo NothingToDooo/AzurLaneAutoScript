@@ -1,6 +1,7 @@
+import asyncio
 import mimetypes
 
-from module.webui.fastapi import LocalStaticFiles
+from module.webui.fastapi import LocalStaticFiles, asgi_app
 
 
 def test_local_static_files_uses_builtin_mime_table(tmp_path, monkeypatch):
@@ -11,3 +12,24 @@ def test_local_static_files_uses_builtin_mime_table(tmp_path, monkeypatch):
     response = LocalStaticFiles(directory=tmp_path).file_response(file, file.stat(), {"type": "http", "headers": []})
 
     assert response.headers["content-type"] == "text/javascript; charset=utf-8"
+
+
+def test_asgi_app_runs_legacy_lifespan_callbacks():
+    events = []
+
+    def index():
+        return None
+
+    async def exercise():
+        app = asgi_app(
+            applications=[index],
+            on_startup=[lambda: events.append("start")],
+            on_shutdown=[lambda: events.append("stop")],
+        )
+
+        async with app.router.lifespan_context(app):
+            assert events == ["start"]
+
+        assert events == ["start", "stop"]
+
+    asyncio.run(exercise())

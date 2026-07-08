@@ -1,8 +1,10 @@
 """基于 pywebio.platform.fastapi 精简出的本地 WebUI 服务。"""
 
 import asyncio
+import inspect
 import mimetypes
 import os
+from contextlib import asynccontextmanager
 
 import uvicorn
 from pywebio.platform.fastapi import (
@@ -41,6 +43,35 @@ class LocalStaticFiles(StaticFiles):
         return response
 
 
+async def _run_lifespan_callbacks(callbacks):
+    for callback in callbacks or []:
+        result = callback()
+        if inspect.isawaitable(result):
+            await result
+
+
+def _build_lifespan(starlette_settings):
+    on_startup = starlette_settings.pop("on_startup", None)
+    on_shutdown = starlette_settings.pop("on_shutdown", None)
+    lifespan = starlette_settings.pop("lifespan", None)
+    if lifespan is not None:
+        if on_startup or on_shutdown:
+            raise ValueError("lifespan 不能和 on_startup/on_shutdown 同时使用。")
+        return lifespan
+    if not on_startup and not on_shutdown:
+        return None
+
+    @asynccontextmanager
+    async def lifespan_context(_app):
+        await _run_lifespan_callbacks(on_startup)
+        try:
+            yield
+        finally:
+            await _run_lifespan_callbacks(on_shutdown)
+
+    return lifespan_context
+
+
 def asgi_app(
     applications, cdn=True, static_dir=None, debug=False, allowed_origins=None, check_origin=None, **starlette_settings
 ):
@@ -64,7 +95,8 @@ def asgi_app(
         )
     )
     middleware = [Middleware(HeaderMiddleware)]
-    return Starlette(routes=routes, middleware=middleware, debug=debug, **starlette_settings)
+    lifespan = _build_lifespan(starlette_settings)
+    return Starlette(routes=routes, middleware=middleware, debug=debug, lifespan=lifespan, **starlette_settings)
 
 
 def start_server(
@@ -98,4 +130,5 @@ def start_server(
     if port == 0:
         port = get_free_port()
 
+    uvicorn_settings.setdefault("log_config", None)
     uvicorn.run(app, host=host, port=port, **uvicorn_settings)

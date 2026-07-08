@@ -19,6 +19,7 @@ dependencies = [
     "starlette",
     "onnxruntime>=1.27.0",
     "uvicorn>=0.50.2",
+    "websockets>=16.0",
 ]
 
 [tool.uv]
