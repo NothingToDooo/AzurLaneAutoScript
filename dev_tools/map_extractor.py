@@ -321,87 +321,12 @@ class MapData:
         self.map_id = data["id"]
 
         try:
-            self.event_enemy_data = None
-            self.event_enemy_data_loop = None
-            if self.map_id in MAP_EVENT_LIST:
-                self.event_enemy_data = self.extract_event_enemy_data(MAP_EVENT_LIST[self.map_id]["event_list"])
-                if data_loop is not None:
-                    self.event_enemy_data_loop = self.extract_event_enemy_data(
-                        MAP_EVENT_LIST[self.map_id]["event_list_loop"]
-                    )
-                else:
-                    self.event_enemy_data_loop = None
-
-            self.spawn_data = self.parse_spawn_data(data, self.event_enemy_data)
-            if data_loop is not None:
-                self.spawn_data_loop = self.parse_spawn_data(data_loop, self.event_enemy_data_loop)
-                if len(self.spawn_data) == len(self.spawn_data_loop) and all(
-                    s1 == s2 for s1, s2 in zip(self.spawn_data, self.spawn_data_loop, strict=True)
-                ):
-                    self.spawn_data_loop = None
-            else:
-                self.spawn_data_loop = None
-
-            # map_data
-            # {0: {0: 6, 1: 8, 2: False, 3: 0}, ...}
-            self.map_data = self.parse_map_data(data["grids"], self.event_enemy_data)
-            self.shape = tuple(np.max(list(self.map_data.keys()), axis=0))
-            if self.data_loop is not None:
-                self.map_data_loop = self.parse_map_data(data_loop["grids"], self.event_enemy_data_loop)
-                if all(d1 == d2 for d1, d2 in zip(self.map_data.values(), self.map_data_loop.values(), strict=True)):
-                    self.map_data_loop = None
-            else:
-                self.map_data_loop = None
-
-            # portal
-            self.portal = []
-            # if self.map_id in MAP_EVENT_LIST:
-            #     for event_id in MAP_EVENT_LIST[self.map_id]['event_list'].values():
-            #         event = MAP_EVENT_TEMPLATE[event_id]
-            #         for effect in event['effect'].values():
-            #             if effect[0] == 'jump':
-            #                 address = event['address']
-            #                 address = location2node((address[1], address[0]))
-            #                 target = location2node((effect[2], effect[1]))
-            #                 self.portal.append((address, target))
-
-            # land_based
-            # land_based = {{6, 7, 1}, ...}
-            # Format: {y, x, rotation}
-            land_based_rotation_dict = {1: "up", 2: "down", 3: "left", 4: "right"}
-            self.land_based = []
-            if isinstance(data["land_based"], dict):
-                for lb in data["land_based"].values():
-                    y, x, r = lb.values()
-                    if r not in land_based_rotation_dict:
-                        continue
-                    self.land_based.append([location2node((x, y)), land_based_rotation_dict[r]])
-
-            # config
-            self.MAP_SIREN_TEMPLATE = []
-            self.MOVABLE_ENEMY_TURN = set()
-            # Aquilifers Ballade (event_20220728_cn) has different sirens in clear mode
-            sirens = list(data["ai_expedition_list"].values())
-            if data_loop is not None and data_loop["ai_expedition_list"] is not None:
-                sirens += list(data_loop["ai_expedition_list"].values())
-            for siren_id in sirens:
-                if siren_id == 1:
-                    continue
-                exped_data = EXPECTATION_DATA.get(siren_id, {})
-                name = exped_data.get("icon", str(siren_id))
-                name = DIC_SIREN_NAME_CHI_TO_ENG.get(name, name)
-                if name not in self.MAP_SIREN_TEMPLATE:
-                    self.MAP_SIREN_TEMPLATE.append(name)
-                self.MOVABLE_ENEMY_TURN.add(int(exped_data.get("ai_mov", 2)))
-            self.MAP_HAS_MOVABLE_ENEMY = bool(len(self.MOVABLE_ENEMY_TURN))
-            self.MAP_HAS_MAP_STORY = len(data["story_refresh_boss"]) > 0
-            self.MAP_HAS_FLEET_STEP = bool(data["is_limit_move"])
-            self.MAP_HAS_AMBUSH = bool(data["is_ambush"]) or bool(data["is_air_attack"])
-            self.MAP_HAS_MYSTERY = sum([b.get("mystery", 0) for b in self.spawn_data]) > 0
-            self.MAP_HAS_PORTAL = bool(len(self.portal))
-            self.MAP_HAS_LAND_BASED = bool(len(self.land_based))
-            for n in range(1, 4):
-                self.__setattr__(f"STAR_REQUIRE_{n}", data[f"star_require_{n}"])
+            self._set_event_enemy_data()
+            self._set_spawn_data()
+            self._set_map_data()
+            self._set_portal_data()
+            self._set_land_based_data()
+            self._set_config_data()
         except Exception:
             for k, v in data.items():
                 print(f"{k} = {v}")
@@ -411,6 +336,89 @@ class MapData:
         return f"{self.map_id} {self.chapter_name} {self.name}"
 
     __repr__ = __str__
+
+    def _set_event_enemy_data(self):
+        self.event_enemy_data = None
+        self.event_enemy_data_loop = None
+        if self.map_id not in MAP_EVENT_LIST:
+            return
+
+        event_list = MAP_EVENT_LIST[self.map_id]
+        self.event_enemy_data = self.extract_event_enemy_data(event_list["event_list"])
+        if self.data_loop is not None:
+            self.event_enemy_data_loop = self.extract_event_enemy_data(event_list["event_list_loop"])
+
+    def _set_spawn_data(self):
+        self.spawn_data = self.parse_spawn_data(self.data, self.event_enemy_data)
+        if self.data_loop is None:
+            self.spawn_data_loop = None
+            return
+
+        self.spawn_data_loop = self.parse_spawn_data(self.data_loop, self.event_enemy_data_loop)
+        if len(self.spawn_data) == len(self.spawn_data_loop) and all(
+            s1 == s2 for s1, s2 in zip(self.spawn_data, self.spawn_data_loop, strict=True)
+        ):
+            self.spawn_data_loop = None
+
+    def _set_map_data(self):
+        self.map_data = self.parse_map_data(self.data["grids"], self.event_enemy_data)
+        self.shape = tuple(np.max(list(self.map_data.keys()), axis=0))
+        if self.data_loop is None:
+            self.map_data_loop = None
+            return
+
+        self.map_data_loop = self.parse_map_data(self.data_loop["grids"], self.event_enemy_data_loop)
+        if all(d1 == d2 for d1, d2 in zip(self.map_data.values(), self.map_data_loop.values(), strict=True)):
+            self.map_data_loop = None
+
+    def _set_portal_data(self):
+        self.portal = []
+
+    def _set_land_based_data(self):
+        land_based_rotation_dict = {1: "up", 2: "down", 3: "left", 4: "right"}
+        self.land_based = []
+        if not isinstance(self.data["land_based"], dict):
+            return
+
+        for lb in self.data["land_based"].values():
+            y, x, r = lb.values()
+            if r not in land_based_rotation_dict:
+                continue
+            self.land_based.append([location2node((x, y)), land_based_rotation_dict[r]])
+
+    def _iter_siren_ids(self):
+        # 部分活动的普通/循环模式海妖配置不同，需要合并。
+        sirens = list(self.data["ai_expedition_list"].values())
+        if self.data_loop is not None and self.data_loop["ai_expedition_list"] is not None:
+            sirens += list(self.data_loop["ai_expedition_list"].values())
+        return sirens
+
+    def _add_siren_config(self, siren_id):
+        if siren_id == 1:
+            return
+
+        exped_data = EXPECTATION_DATA.get(siren_id, {})
+        name = exped_data.get("icon", str(siren_id))
+        name = DIC_SIREN_NAME_CHI_TO_ENG.get(name, name)
+        if name not in self.MAP_SIREN_TEMPLATE:
+            self.MAP_SIREN_TEMPLATE.append(name)
+        self.MOVABLE_ENEMY_TURN.add(int(exped_data.get("ai_mov", 2)))
+
+    def _set_config_data(self):
+        self.MAP_SIREN_TEMPLATE = []
+        self.MOVABLE_ENEMY_TURN = set()
+        for siren_id in self._iter_siren_ids():
+            self._add_siren_config(siren_id)
+
+        self.MAP_HAS_MOVABLE_ENEMY = bool(self.MOVABLE_ENEMY_TURN)
+        self.MAP_HAS_MAP_STORY = bool(self.data["story_refresh_boss"])
+        self.MAP_HAS_FLEET_STEP = bool(self.data["is_limit_move"])
+        self.MAP_HAS_AMBUSH = bool(self.data["is_ambush"]) or bool(self.data["is_air_attack"])
+        self.MAP_HAS_MYSTERY = sum([b.get("mystery", 0) for b in self.spawn_data]) > 0
+        self.MAP_HAS_PORTAL = bool(self.portal)
+        self.MAP_HAS_LAND_BASED = bool(self.land_based)
+        for n in range(1, 4):
+            setattr(self, f"STAR_REQUIRE_{n}", self.data[f"star_require_{n}"])
 
     def parse_map_data(self, grids, event_enemy_data=None):
         map_data = {}
@@ -431,36 +439,37 @@ class MapData:
         return map_data
 
     @staticmethod
-    def parse_spawn_data(data, event_enemy_data=None):
+    def _add_spawn_count(spawn_data, index, field, count):
+        if count:
+            spawn = spawn_data[index]
+            spawn[field] = spawn.get(field, 0) + count
+
+    @staticmethod
+    def _add_refresh_counts(spawn_data, refresh_data, field):
+        for index, count in refresh_data.items():
+            MapData._add_spawn_count(spawn_data, index, field, count)
+
+    @staticmethod
+    def _get_battle_count(data):
         try:
             enemy_refresh_max = max(data["enemy_refresh"].keys())
-            battle_count = max(data["boss_refresh"], enemy_refresh_max)
         except ValueError:
-            battle_count = 0
+            return 0
+        return max(data["boss_refresh"], enemy_refresh_max)
+
+    @staticmethod
+    def parse_spawn_data(data, event_enemy_data=None):
+        battle_count = MapData._get_battle_count(data)
         spawn_data = [{"battle": index} for index in range(battle_count + 1)]
 
-        for index, count in data["enemy_refresh"].items():
-            if count:
-                spawn = spawn_data[index]
-                spawn["enemy"] = spawn.get("enemy", 0) + count
+        MapData._add_refresh_counts(spawn_data, data["enemy_refresh"], "enemy")
         if isinstance(event_enemy_data, list):
             for index, wave in enumerate(event_enemy_data):
-                if len(wave):
-                    spawn = spawn_data[index]
-                    spawn["enemy"] = spawn.get("enemy", 0) + len(wave)
-        if "".join([str(item) for item in data["elite_refresh"].values()]) != "100":  # Some data is incorrect
-            for index, count in data["elite_refresh"].items():
-                if count:
-                    spawn = spawn_data[index]
-                    spawn["enemy"] = spawn.get("enemy", 0) + count
-        for index, count in data["ai_refresh"].items():
-            if count:
-                spawn = spawn_data[index]
-                spawn["siren"] = spawn.get("siren", 0) + count
-        for index, count in data["box_refresh"].items():
-            if count:
-                spawn = spawn_data[index]
-                spawn["mystery"] = spawn.get("mystery", 0) + count
+                MapData._add_spawn_count(spawn_data, index, "enemy", len(wave))
+        if "".join([str(item) for item in data["elite_refresh"].values()]) != "100":  # 部分原始数据有误。
+            MapData._add_refresh_counts(spawn_data, data["elite_refresh"], "enemy")
+        MapData._add_refresh_counts(spawn_data, data["ai_refresh"], "siren")
+        MapData._add_refresh_counts(spawn_data, data["box_refresh"], "mystery")
         with suppress(IndexError):
             spawn_data[data["boss_refresh"]]["boss"] = 1
 
@@ -479,35 +488,53 @@ class MapData:
             name = f"campaign_{name}"
         return name + ".py"
 
-    def get_file_lines(self, has_modified_campaign_base):
-        """
-        Args:
-            has_modified_campaign_base (bool): If target folder has modified campaign_base.py
-
-        Returns:
-            list(str): Python code in map file.
-        """
+    def _get_base_import(self, has_modified_campaign_base):
         if IS_WAR_ARCHIVES:
-            base_import = "from ..campaign_war_archives.campaign_base import CampaignBase"
-        elif has_modified_campaign_base:
-            base_import = "from .campaign_base import CampaignBase"
-        else:
-            base_import = "from module.campaign.campaign_base import CampaignBase"
+            return "from ..campaign_war_archives.campaign_base import CampaignBase"
+        if has_modified_campaign_base:
+            return "from .campaign_base import CampaignBase"
+        return "from module.campaign.campaign_base import CampaignBase"
 
-        lines = []
-
-        # Import
-        lines.append(base_import)
-        lines.append("from module.map.map_base import CampaignMap")
+    def _get_import_lines(self, has_modified_campaign_base):
+        lines = [
+            self._get_base_import(has_modified_campaign_base),
+            "from module.map.map_base import CampaignMap",
+        ]
         if self.chapter_name[-1].isdigit():
             chap, stage = self.chapter_name[:-1], self.chapter_name[-1]
             if stage != "1":
                 lines.append(f"from .{chap.lower()}1 import Config as ConfigBase")
         lines.append("")
+        return lines
 
-        # Map
-        lines.append(f"MAP = CampaignMap('{self.chapter_name}')")
-        lines.append(f"MAP.shape = '{location2node(self.shape)}'")
+    def _get_map_data_rows(self):
+        return [
+            "    " + " ".join(self.map_data.get((x, y), "??") for x in range(self.shape[0] + 1))
+            for y in range(self.shape[1] + 1)
+        ]
+
+    def _get_map_data_loop_rows(self):
+        return [
+            "    " + " ".join(self.map_data_loop[(x, y)] for x in range(self.shape[0] + 1))
+            for y in range(self.shape[1] + 1)
+        ]
+
+    def _get_flatten_lines(self):
+        return [
+            *(
+                ", ".join(location2node((x, y)) for x in range(self.shape[0] + 1)) + ", \\"
+                for y in range(self.shape[1] + 1)
+            ),
+            "    = MAP.flatten()",
+            "",
+            "",
+        ]
+
+    def _get_map_lines(self):
+        lines = [
+            f"MAP = CampaignMap('{self.chapter_name}')",
+            f"MAP.shape = '{location2node(self.shape)}'",
+        ]
         camera_data = camera_2d(get_map_active_area(self.map_data), sight=(-3, -1, 3, 2))
         lines.append(f"MAP.camera_data = {[location2node(loca) for loca in camera_data]}")
         camera_sp = camera_spawn_point(camera_data, sp_list=[k for k, v in self.map_data.items() if v == "SP"])
@@ -515,17 +542,11 @@ class MapData:
         if self.MAP_HAS_PORTAL:
             lines.append(f"MAP.portal_data = {self.portal}")
         lines.append('MAP.map_data = """')
-        lines.extend(
-            "    " + " ".join([self.map_data.get((x, y), "??") for x in range(self.shape[0] + 1)])
-            for y in range(self.shape[1] + 1)
-        )
+        lines.extend(self._get_map_data_rows())
         lines.append('"""')
         if self.map_data_loop is not None:
             lines.append('MAP.map_data_loop = """')
-            lines.extend(
-                "    " + " ".join([self.map_data_loop[(x, y)] for x in range(self.shape[0] + 1)])
-                for y in range(self.shape[1] + 1)
-            )
+            lines.extend(self._get_map_data_loop_rows())
             lines.append('"""')
         lines.append('MAP.weight_data = """')
         lines.extend("    " + " ".join(["50"] * (self.shape[0] + 1)) for _y in range(self.shape[1] + 1))
@@ -539,25 +560,22 @@ class MapData:
             lines.append("MAP.spawn_data_loop = [")
             lines.extend("    " + str(battle) + "," for battle in self.spawn_data_loop)
             lines.append("]")
-        lines.extend(
-            ", ".join([location2node((x, y)) for x in range(self.shape[0] + 1)]) + ", \\"
-            for y in range(self.shape[1] + 1)
-        )
-        lines.append("    = MAP.flatten()")
-        lines.append("")
-        lines.append("")
+        lines.extend(self._get_flatten_lines())
+        return lines
 
-        # Config
+    def _get_config_class_line(self):
         if self.chapter_name[-1].isdigit():
-            chap, stage = self.chapter_name[:-1], self.chapter_name[-1]
+            _chap, stage = self.chapter_name[:-1], self.chapter_name[-1]
             if stage != "1":
-                lines.append("class Config(ConfigBase):")
-            else:
-                lines.append("class Config:")
-        else:
-            lines.append("class Config:")
-        lines.append("    # ===== Start of generated config =====")
-        if len(self.MAP_SIREN_TEMPLATE):
+                return "class Config(ConfigBase):"
+        return "class Config:"
+
+    def _get_config_lines(self):
+        lines = [
+            self._get_config_class_line(),
+            "    # ===== Start of generated config =====",
+        ]
+        if self.MAP_SIREN_TEMPLATE:
             lines.append(f"    MAP_SIREN_TEMPLATE = {self.MAP_SIREN_TEMPLATE}")
             lines.append(f"    MOVABLE_ENEMY_TURN = {tuple(self.MOVABLE_ENEMY_TURN)}")
             lines.append("    MAP_HAS_SIREN = True")
@@ -576,41 +594,54 @@ class MapData:
         lines.append("    # ===== End of generated config =====")
         lines.append("")
         lines.append("")
+        return lines
 
-        # Campaign
-        battle = self.data["boss_refresh"]
-        lines.append("class Campaign(CampaignBase):")
-        lines.append("    MAP = MAP")
-        lines.append(f"    ENEMY_FILTER = '{ENEMY_FILTER}'")
-        lines.append("")
-        lines.append("    def battle_0(self):")
-        if len(self.MAP_SIREN_TEMPLATE):
+    def _get_clear_enemy_battle_lines(self, battle_name, preserve):
+        lines = [f"    def {battle_name}(self):"]
+        if self.MAP_SIREN_TEMPLATE:
             lines.append("        if self.clear_siren():")
             lines.append("            return True")
-        preserve = self.data["boss_refresh"] - 5 if battle >= 5 else 0
         lines.append(f"        if self.clear_filter_enemy(self.ENEMY_FILTER, preserve={preserve}):")
         lines.append("            return True")
         lines.append("")
         lines.append("        return self.battle_default()")
         lines.append("")
+        return lines
+
+    def _get_campaign_lines(self):
+        battle = self.data["boss_refresh"]
+        preserve = self.data["boss_refresh"] - 5 if battle >= 5 else 0
+        lines = [
+            "class Campaign(CampaignBase):",
+            "    MAP = MAP",
+            f"    ENEMY_FILTER = '{ENEMY_FILTER}'",
+            "",
+            *self._get_clear_enemy_battle_lines("battle_0", preserve=preserve),
+        ]
         if battle >= 6:
-            lines.append("    def battle_5(self):")
-            if len(self.MAP_SIREN_TEMPLATE):
-                lines.append("        if self.clear_siren():")
-                lines.append("            return True")
-            preserve = 0
-            lines.append(f"        if self.clear_filter_enemy(self.ENEMY_FILTER, preserve={preserve}):")
-            lines.append("            return True")
-            lines.append("")
-            lines.append("        return self.battle_default()")
-            lines.append("")
+            lines.extend(self._get_clear_enemy_battle_lines("battle_5", preserve=0))
         lines.append(f"    def battle_{self.data['boss_refresh']}(self):")
         if battle >= 5:
             lines.append("        return self.fleet_boss.clear_boss()")
         else:
             lines.append("        return self.clear_boss()")
-
         return lines
+
+    def get_file_lines(self, has_modified_campaign_base):
+        """生成地图文件源码行。
+
+        Args:
+            has_modified_campaign_base (bool): 目标目录是否有自定义 campaign_base.py。
+
+        Returns:
+            list(str): 地图文件的 Python 源码行。
+        """
+        return [
+            *self._get_import_lines(has_modified_campaign_base),
+            *self._get_map_lines(),
+            *self._get_config_lines(),
+            *self._get_campaign_lines(),
+        ]
 
     def write(self, path):
         file = Path(path) / self.map_file_name()
@@ -636,79 +667,91 @@ class ChapterTemplate:
     def __init__(self):
         pass
 
-    def get_chapter_by_name(self, name, select=False):
-        """
-        11004 (map id) --> 10-4 Hard
-        ↑-- ↑
-        | | +-- stage index
-        | +---- chapter index
-        +------ 1 for hard, 0 for normal
+    @staticmethod
+    def _is_extra_chapter(name):
+        name = name.lower().replace(".", "")
+        return name in ["extra", "ex"]
 
-        1140017 (map id) --> Iris of Light and Dark D2
-        ---  ↑↑
-         ↑   |+-- stage index
-         |   +--- chapter index
-         +------- event index, >=210 for war achieve
+    @staticmethod
+    def _get_event_id(map_id):
+        return (map_id - 2100000) // 20 + 21000 if map_id // 10000 == 210 else map_id // 10000
+
+    @staticmethod
+    def _iter_chapter_data():
+        for map_id, raw_data in DATA.items():
+            if not isinstance(map_id, int) or ChapterTemplate._is_extra_chapter(raw_data["chapter_name"]):
+                continue
+            yield map_id, raw_data
+
+    @staticmethod
+    def _create_map_data(map_id, raw_data):
+        return MapData(raw_data, DATA_LOOP.get(map_id, None))
+
+    def _find_maps_by_name(self, name):
+        maps = []
+        for map_id, raw_data in self._iter_chapter_data():
+            if not re.search(name, raw_data["name"]):
+                continue
+            data = self._create_map_data(map_id, raw_data)
+            print(f"Found map: {data}")
+            maps.append(data)
+        return maps
+
+    def _find_maps_by_id(self, map_id):
+        data = MapData(DATA[map_id], DATA_LOOP.get(map_id, None))
+        print(f"Found map: {data}")
+        return [data]
+
+    def _select_event_maps(self, map_id):
+        event_id = self._get_event_id(map_id)
+        maps = []
+        for current_map_id, raw_data in self._iter_chapter_data():
+            if self._get_event_id(raw_data["id"]) != event_id:
+                continue
+            data = self._create_map_data(current_map_id, raw_data)
+            print(f"Selected: {data}")
+            maps.append(data)
+        return maps
+
+    def _select_maps(self, maps, select):
+        print("<<< SELECT MAP >>>")
+        if select:
+            selected_maps = self._select_event_maps(maps[0].map_id)
+        else:
+            selected_maps = maps[:1]
+            print(f"Selected: {selected_maps[0]}")
+        print()
+        return selected_maps
+
+    def _find_maps(self, name):
+        if isinstance(name, str):
+            return self._find_maps_by_name(name)
+        return self._find_maps_by_id(name)
+
+    def get_chapter_by_name(self, name, select=False):
+        """按地图名关键词或地图 ID 查找地图。
+
+        地图 ID 形如 11004 表示第 10 章困难 4 图，1140017 表示活动图 D2。
 
         Args:
-            name (str, int): A keyword from chapter name, such as '短兵相接', '正义的怒吼'
-                Or map_id such as 702, 1140017
-            select (bool): False means only extract this map, True means all maps from this event
+            name (str, int): 地图名称关键词，例如 '短兵相接'；也可以是地图 ID，例如 702、1140017。
+            select (bool): False 只抽取命中的第一张图，True 抽取同活动全部地图。
 
         Returns:
             list(MapData):
         """
-
-        def is_extra(name):
-            name = name.lower().replace(".", "")
-            return name in ["extra", "ex"]
-
         print("<<< SEARCH MAP >>>")
         name = name.strip()
         name = int(name) if name.isdigit() else name
         print(f"Searching: {name}")
-        if isinstance(name, str):
-            maps = []
-            for map_id, raw_data in DATA.items():
-                if not isinstance(map_id, int) or is_extra(raw_data["chapter_name"]):
-                    continue
-                if not re.search(name, raw_data["name"]):
-                    continue
-                data = MapData(raw_data, DATA_LOOP.get(map_id, None))
-                print(f"Found map: {data}")
-                maps.append(data)
-        else:
-            data = MapData(DATA[name], DATA_LOOP.get(name, None))
-            print(f"Found map: {data}")
-            maps = [data]
+        maps = self._find_maps(name)
 
         if not maps:
             print("No maps found")
             return []
         print()
 
-        print("<<< SELECT MAP >>>")
-
-        def get_event_id(map_id):
-            return (map_id - 2100000) // 20 + 21000 if map_id // 10000 == 210 else map_id // 10000
-
-        if select:
-            event_id = get_event_id(maps[0].map_id)
-            new = []
-            for map_id, raw_data in DATA.items():
-                if not isinstance(map_id, int) or is_extra(raw_data["chapter_name"]):
-                    continue
-                if get_event_id(raw_data["id"]) == event_id:
-                    data = MapData(raw_data, DATA_LOOP.get(map_id, None))
-                    print(f"Selected: {data}")
-                    new.append(data)
-            maps = new
-        else:
-            maps = maps[:1]
-            print(f"Selected: {maps[0]}")
-
-        print()
-        return maps
+        return self._select_maps(maps, select)
 
     def extract(self, maps, folder):
         """
