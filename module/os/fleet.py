@@ -692,41 +692,14 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         click_timer = Timer(3)
         pause_interval = Timer(0.5, count=1)
         for _ in self.loop():
-            # End
-            if self.is_in_map():
-                self.predict_radar()
-                if self.radar.select(is_enemy=True):
-                    logger.info("Fleet left boss, boss found")
-                    break
-
-            # Re-enter boss accidentally
-            if pause_interval.reached():
-                if self.appear(os_combat_assets.BATTLE_PREPARATION):
-                    logger.info(f"{os_combat_assets.BATTLE_PREPARATION} -> {BACK_ARROW}")
-                    self.device.click(BACK_ARROW)
-                    pause_interval.reset()
-                    continue
-                if self.appear(os_combat_assets.SIREN_PREPARATION, offset=(20, 20)):
-                    logger.info(f"{os_combat_assets.SIREN_PREPARATION} -> {BACK_ARROW}")
-                    self.device.click(BACK_ARROW)
-                    pause_interval.reset()
-                    continue
-                pause = self.is_combat_executing()
-                if pause:
-                    self.device.click(pause)
-                    self.interval_reset(MAINTENANCE_ANNOUNCE)
-                    pause_interval.reset()
-                    continue
-            if self.handle_combat_quit():
-                self.interval_reset(MAINTENANCE_ANNOUNCE)
-                pause_interval.reset()
+            if self._boss_leave_finished():
+                break
+            if self._boss_leave_handle_reentry(pause_interval):
                 continue
-            if self.handle_combat_quit_reconfirm():
-                self.interval_reset(MAINTENANCE_ANNOUNCE)
-                pause_interval.reset()
+            if self._boss_leave_handle_quit(pause_interval):
                 continue
 
-            # Click leave button
+            # 点击离开按钮。
             if self.is_in_map() and click_timer.reached():
                 button = self.get_boss_leave_button()
                 if button is not None:
@@ -735,6 +708,50 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
                     continue
                 logger.info("Fleet left boss, current fleet found")
                 break
+
+    def _boss_leave_finished(self):
+        if not self.is_in_map():
+            return False
+        self.predict_radar()
+        if self.radar.select(is_enemy=True):
+            logger.info("Fleet left boss, boss found")
+            return True
+        return False
+
+    def _boss_leave_handle_reentry(self, pause_interval):
+        if not pause_interval.reached():
+            return False
+        if self._boss_leave_back_from_preparation(pause_interval):
+            return True
+        pause = self.is_combat_executing()
+        if pause:
+            self.device.click(pause)
+            self._boss_leave_reset_pause(pause_interval)
+            return True
+        return False
+
+    def _boss_leave_back_from_preparation(self, pause_interval):
+        if self.appear(os_combat_assets.BATTLE_PREPARATION):
+            logger.info(f"{os_combat_assets.BATTLE_PREPARATION} -> {BACK_ARROW}")
+            self.device.click(BACK_ARROW)
+            pause_interval.reset()
+            return True
+        if self.appear(os_combat_assets.SIREN_PREPARATION, offset=(20, 20)):
+            logger.info(f"{os_combat_assets.SIREN_PREPARATION} -> {BACK_ARROW}")
+            self.device.click(BACK_ARROW)
+            pause_interval.reset()
+            return True
+        return False
+
+    def _boss_leave_handle_quit(self, pause_interval):
+        if self.handle_combat_quit() or self.handle_combat_quit_reconfirm():
+            self._boss_leave_reset_pause(pause_interval)
+            return True
+        return False
+
+    def _boss_leave_reset_pause(self, pause_interval):
+        self.interval_reset(MAINTENANCE_ANNOUNCE)
+        pause_interval.reset()
 
     def boss_clear(self, has_fleet_step=True, is_month=False):
         """
