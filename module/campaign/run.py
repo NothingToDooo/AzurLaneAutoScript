@@ -17,6 +17,185 @@ if TYPE_CHECKING:
     from module.config.config import AzurLaneConfig
 
 
+SP_STAGE_ALIASES = {
+    "event_20201126_cn": {"vsp": "sp"},
+    "event_20210723_cn": {"vsp": "sp"},
+    "event_20220324_cn": {"esp": "sp"},
+    "event_20220818_cn": {"esp": "sp"},
+    "event_20221124_cn": {"asp": "sp", "a.sp": "sp"},
+    "event_20240724_cn": {"ysp": "sp", "y.sp": "sp"},
+}
+
+CHAPTER_T_EVENTS = {
+    "event_20211125_cn",
+    "event_20231026_cn",
+    "event_20241024_cn",
+    "event_20250424_cn",
+    "event_20250724_cn",
+    "event_20250814_cn",
+    "event_20251023_cn",
+    "event_20260326_cn",
+    "event_20260625_cn",
+    "war_archives_20230525_cn",
+    "war_archives_20231026_cn",
+    "war_archives_20240725_cn",
+}
+
+CHAPTER_T_STAGE_ALIASES = {
+    "a1": "t1",
+    "a2": "t2",
+    "a3": "t3",
+    "a4": "t4",
+    "a5": "t5",
+    "a6": "t6",
+    "sp1": "t1",
+    "sp2": "t2",
+    "sp3": "t3",
+    "sp4": "t4",
+    "sp5": "t5",
+    "sp6": "t6",
+}
+
+CHAPTER_ABCD_EVENTS = {
+    "event_20200917_cn",
+    "event_20221124_cn",
+    "event_20230525_cn",
+    "war_archives_20200917_cn",
+    "event_20211125_cn",
+    "event_20231026_cn",
+    "event_20231123_cn",
+    "event_20240725_cn",
+    "event_20240829_cn",
+    "event_20241024_cn",
+    "event_20241121_cn",
+    "event_20250424_cn",
+    "event_20250724_cn",
+    "event_20250814_cn",
+    "event_20251023_cn",
+    "event_20260326_cn",
+    "event_20260625_cn",
+    "war_archives_20230525_cn",
+    "war_archives_20231026_cn",
+    "war_archives_20240725_cn",
+}
+
+CHAPTER_ABCD_STAGE_ALIASES = {
+    "a1": "t1",
+    "a2": "t2",
+    "a3": "t3",
+    "b1": "t4",
+    "b2": "t5",
+    "b3": "t6",
+    "c1": "ht1",
+    "c2": "ht2",
+    "c3": "ht3",
+    "d1": "ht4",
+    "d2": "ht5",
+    "d3": "ht6",
+}
+
+CHAPTER_ABCD_STAGE_REVERSED_ALIASES = {value: key for key, value in CHAPTER_ABCD_STAGE_ALIASES.items()}
+
+
+def _normalize_stage_alias(name: str, folder: str) -> str:
+    """归一化地图文件名里的活动别名。"""
+    name = SP_STAGE_ALIASES.get(folder, {}).get(name, name)
+
+    if folder == "event_20240425_cn":
+        if name in ["μsp", "usp", "iisp"]:
+            name = "sp"
+        name = name.replace("lsp", "isp").replace("1sp", "isp")
+        if name == "isp":
+            name = "isp1"
+
+    if folder in CHAPTER_T_EVENTS:
+        name = CHAPTER_T_STAGE_ALIASES.get(name, name)
+
+    if folder in CHAPTER_ABCD_EVENTS:
+        name = CHAPTER_ABCD_STAGE_ALIASES.get(name, name)
+    else:
+        name = CHAPTER_ABCD_STAGE_REVERSED_ALIASES.get(name, name)
+
+    # event_20221124_cn 的地图文件使用 th 前缀。
+    if folder == "event_20221124_cn":
+        name = name.replace("ht", "th")
+
+    if folder == "event_20230817_cn" and name.startswith("e0"):
+        name = "a1"
+
+    if folder == "event_20240829_cn" and name == "tp":
+        name = "sp"
+
+    return name
+
+
+def _resolve_stage_loop_alias(name: str, folder: str, config: AzurLaneConfig) -> tuple[str, bool]:
+    """处理循环关卡别名，返回实际关卡名和是否命中循环。"""
+    for alias_key, stages_value in config.STAGE_LOOP_ALIAS.items():
+        alias_folder, alias = alias_key
+        if folder != alias_folder or name != alias.lower():
+            continue
+
+        stages = [i.strip(" \t\r\n") for i in stages_value.split(">")]
+        cycle = len(stages)
+        count = int(config.StopCondition_RunCount)
+        if count == 0:
+            stage = random.choice(stages)
+            logger.info(f"Loop stages in {name.upper()}, run random stage: {stage}")
+        else:
+            index = count % cycle
+            index = 0 if index == 0 else cycle - index
+            stage = stages[index]
+            logger.info(f"Loop stages in {name.upper()} with remain run_count={count}, run ordered stage: {stage}")
+
+        logger.info("disable continuous clear")
+        config.override(StopCondition_MapAchievement="non_stop")
+        config.override(StopCondition_StageIncrease=False)
+        return stage.lower(), True
+
+    return name, False
+
+
+def _apply_stage_alias_policies(name: str, folder: str, config: AzurLaneConfig) -> None:
+    """应用依赖归一化关卡名的运行策略。"""
+    if folder == "event_20221124_cn" and name.startswith("th") and config.StopCondition_MapAchievement != "non_stop":
+        logger.info(
+            "When running chapter TH of event_20221124_cn, "
+            "StopCondition.MapAchievement is forced set to threat_safe"
+        )
+        config.override(StopCondition_MapAchievement="threat_safe")
+
+    if folder == "event_20250724_cn" and name.startswith("ts") and config.StopCondition_MapAchievement != "non_stop":
+        logger.info(
+            "When running chapter TS of event_20250724_cn, "
+            "StopCondition.MapAchievement is forced set to threat_safe"
+        )
+        config.override(StopCondition_MapAchievement="threat_safe")
+
+    if folder == "event_20211125_cn" and "tss" in name:
+        config.override(
+            StopCondition_OilLimit=0,  # 无油耗。
+            StopCondition_MapAchievement="100_percent_clear",
+            StopCondition_StageIncrease=True,
+            Emotion_Mode="ignore",  # 无心情消耗。
+            Fleet_Fleet2=0,  # 只有一队。
+            Submarine_Fleet=0,  # 无潜艇。
+        )
+
+
+def _apply_campaign_folder_policies(folder: str, config: AzurLaneConfig) -> None:
+    """应用只依赖活动目录的运行策略。"""
+    if folder != "event_20240912_cn":
+        return
+
+    if config.StopCondition_MapAchievement == "threat_safe":
+        logger.info("In event_20240912_cn, MapAchievement=threat_safe fallback to map_3_stars")
+        config.override(StopCondition_MapAchievement="map_3_stars")
+    if config.StopCondition_MapAchievement == "threat_safe_without_3_stars":
+        logger.info("In event_20240912_cn, MapAchievement=threat_safe_without_3_stars fallback to 100_percent_clear")
+        config.override(StopCondition_MapAchievement="100_percent_clear")
+
+
 class CampaignRun(CampaignEvent):
     folder: str
     name: str
@@ -163,174 +342,14 @@ class CampaignRun(CampaignEvent):
                 else:
                     logger.warning("Cannot get the latest event, fallback to campaign_main")
                     folder = "campaign_main"
-        # Handle special names SP maps
-        if folder == "event_20201126_cn" and name == "vsp":
-            name = "sp"
-        if folder == "event_20210723_cn" and name == "vsp":
-            name = "sp"
-        if folder == "event_20220324_cn" and name == "esp":
-            name = "sp"
-        if folder == "event_20220818_cn" and name == "esp":
-            name = "sp"
-        if folder == "event_20221124_cn" and name in ["asp", "a.sp"]:
-            name = "sp"
-        if folder == "event_20240425_cn":
-            if name in ["μsp", "usp", "iisp"]:
-                name = "sp"
-            name = name.replace("lsp", "isp").replace("1sp", "isp")
-            if name == "isp":
-                name = "isp1"
-        if folder == "event_20240724_cn" and name in ["ysp", "y.sp"]:
-            name = "sp"
-        # Convert to chapter T
-        convert = {
-            "a1": "t1",
-            "a2": "t2",
-            "a3": "t3",
-            "a4": "t4",
-            "a5": "t5",
-            "a6": "t6",
-            "sp1": "t1",
-            "sp2": "t2",
-            "sp3": "t3",
-            "sp4": "t4",
-            "sp5": "t5",
-            "sp6": "t6",
-        }
-        if folder in [
-            "event_20211125_cn",
-            "event_20231026_cn",
-            "event_20241024_cn",
-            "event_20250424_cn",
-            "event_20250724_cn",
-            "event_20250814_cn",
-            "event_20251023_cn",
-            "event_20260326_cn",
-            "event_20260625_cn",
-            "war_archives_20230525_cn",
-            "war_archives_20231026_cn",
-            "war_archives_20240725_cn",
-        ]:
-            name = convert.get(name, name)
-        # Convert between A/B/C/D and T/HT
-        convert = {
-            "a1": "t1",
-            "a2": "t2",
-            "a3": "t3",
-            "b1": "t4",
-            "b2": "t5",
-            "b3": "t6",
-            "c1": "ht1",
-            "c2": "ht2",
-            "c3": "ht3",
-            "d1": "ht4",
-            "d2": "ht5",
-            "d3": "ht6",
-        }
-        if folder in [
-            "event_20200917_cn",
-            "event_20221124_cn",
-            "event_20230525_cn",
-            "war_archives_20200917_cn",
-            # chapter T
-            "event_20211125_cn",
-            "event_20231026_cn",
-            "event_20231123_cn",
-            "event_20240725_cn",
-            "event_20240829_cn",
-            "event_20241024_cn",
-            "event_20241121_cn",
-            "event_20250424_cn",
-            "event_20250724_cn",
-            "event_20250814_cn",
-            "event_20251023_cn",
-            "event_20260326_cn",
-            "event_20260625_cn",
-            "war_archives_20230525_cn",
-            "war_archives_20231026_cn",
-            "war_archives_20240725_cn",
-        ]:
-            name = convert.get(name, name)
-        else:
-            reverse = {v: k for k, v in convert.items()}
-            name = reverse.get(name, name)
-        # The Alchemist and the Archipelago of Secrets
-        # Handle typo
-        if folder == "event_20221124_cn":
-            name = name.replace("ht", "th")
-        # Chapter TH has no map_percentage and no 3_stars
-        if (
-            folder == "event_20221124_cn"
-            and name.startswith("th")
-            and self.config.StopCondition_MapAchievement != "non_stop"
-        ):
-            logger.info(
-                "When running chapter TH of event_20221124_cn, "
-                "StopCondition.MapAchievement is forced set to threat_safe"
-            )
-            self.config.override(StopCondition_MapAchievement="threat_safe")
-        if (
-            folder == "event_20250724_cn"
-            and name.startswith("ts")
-            and self.config.StopCondition_MapAchievement != "non_stop"
-        ):
-            logger.info(
-                "When running chapter TS of event_20250724_cn, "
-                "StopCondition.MapAchievement is forced set to threat_safe"
-            )
-            self.config.override(StopCondition_MapAchievement="threat_safe")
-        # event_20211125_cn, TSS maps are on time maps
-        if folder == "event_20211125_cn" and "tss" in name:
-            self.config.override(
-                StopCondition_OilLimit=0,  # No oil cost
-                StopCondition_MapAchievement="100_percent_clear",
-                StopCondition_StageIncrease=True,
-                Emotion_Mode="ignore",  # No emotion cost
-                Fleet_Fleet2=0,  # Has only one fleet
-                Submarine_Fleet=0,  # No submarine
-            )
-        # event_20230817_cn story states
-        if folder == "event_20230817_cn" and name.startswith("e0"):
-            name = "a1"
-        # event_20240829_cn, TP -> SP
-        if folder == "event_20240829_cn" and name == "tp":
-            name = "sp"
-        # Stage loop
-        for alias_key, stages_value in self.config.STAGE_LOOP_ALIAS.items():
-            alias_folder, alias = alias_key
-            if folder == alias_folder and name == alias.lower():
-                stages = [i.strip(" \t\r\n") for i in stages_value.split(">")]
-                cycle = len(stages)
-                count = int(self.config.StopCondition_RunCount)
-                if count == 0:
-                    stage = random.choice(stages)
-                    logger.info(f"Loop stages in {name.upper()}, run random stage: {stage}")
-                else:
-                    index = count % cycle
-                    index = 0 if index == 0 else cycle - index
-                    stage = stages[index]
-                    logger.info(
-                        f"Loop stages in {name.upper()} with remain run_count={count}, run ordered stage: {stage}"
-                    )
-                name = stage.lower()
-                self.is_stage_loop = True
-                # disable continuous clear
-                logger.info("disable continuous clear")
-                self.config.override(StopCondition_MapAchievement="non_stop")
-                self.config.override(StopCondition_StageIncrease=False)
+        name = _normalize_stage_alias(name, folder)
+        _apply_stage_alias_policies(name, folder, self.config)
+        name, is_stage_loop = _resolve_stage_loop_alias(name, folder, self.config)
+        self.is_stage_loop = self.is_stage_loop or is_stage_loop
         # Convert campaign_main to campaign hard if mode is hard and file exists
         if mode == "hard" and folder == "campaign_main" and name in map_files("campaign_hard"):
             folder = "campaign_hard"
-        # event_20240912_cn does not have "Threat: Safe" indicator, fallback MapAchievement
-        if folder == "event_20240912_cn":
-            if self.config.StopCondition_MapAchievement == "threat_safe":
-                logger.info("In event_20240912_cn, MapAchievement=threat_safe fallback to map_3_stars")
-                self.config.override(StopCondition_MapAchievement="map_3_stars")
-            if self.config.StopCondition_MapAchievement == "threat_safe_without_3_stars":
-                logger.info(
-                    "In event_20240912_cn, MapAchievement=threat_safe_without_3_stars fallback to 100_percent_clear"
-                )
-                self.config.override(StopCondition_MapAchievement="100_percent_clear")
+        _apply_campaign_folder_policies(folder, self.config)
         if folder == "event_20260417_cn" and name == "vsp":
             name = "sp"
         return name, folder
