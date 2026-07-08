@@ -131,22 +131,13 @@ class CaptureNemuIpc(CaptureStd):
             return
         logger.error(f"NemuIpc stderr: {self.stderr}")
 
-        # Calling an old MuMu12 player
-        # Tested on 3.4.0
-        # b'nemu_capture_display rpc error: 1783\r\n'
-        # Tested on 3.7.3
-        # b'nemu_capture_display rpc error: 1745\r\n'
+        # 旧 MuMu12 3.4.0/3.7.3 会分别返回 rpc error 1783/1745。
         if b"error: 1783" in self.stderr or b"error: 1745" in self.stderr:
             raise NemuIpcIncompatible("NemuIpc requires MuMu12 version >= 3.8.13, please check your version")
-        # contact_id incorrect
-        # b'nemu_capture_display cannot find rpc connection\r\n'
+        # 连接 id 错误时会提示找不到 rpc connection。
         if b"cannot find rpc connection" in self.stderr:
             raise NemuIpcError(self.stderr)
-        # Emulator died
-        # b'nemu_capture_display rpc error: 1722\r\n'
-        # MuMuVMMSVC.exe died
-        # b'nemu_capture_display rpc error: 1726\r\n'
-        # No idea how to handle yet
+        # 模拟器进程退出时可能返回 rpc error 1722/1726。
         if b"error: 1722" in self.stderr or b"error: 1726" in self.stderr:
             raise NemuIpcError("Emulator instance is probably dead")
 
@@ -272,7 +263,6 @@ class NemuIpcImpl:
             raise NemuIpcError("Connection failed, please check if nemu_folder is correct and emulator is running")
 
         self.connect_id = connect_id
-        # logger.info(f'NemuIpc connected: {self.connect_id}')
 
     @retry
     def connect_with_retry(self, on_thread=True):
@@ -284,7 +274,6 @@ class NemuIpcImpl:
 
         self.run_func(self.lib.nemu_disconnect, self.connect_id)
 
-        # logger.info(f'NemuIpc disconnected: {self.connect_id}')
         self.connect_id = 0
 
     def reconnect(self):
@@ -401,7 +390,6 @@ class NemuIpcImpl:
 
         pixels_pointer = self.run_func(self._screenshot, timeout=timeout)
 
-        # image = np.ctypeslib.as_array(pixels_pointer, shape=(self.height, self.width, 4))
         return np.ctypeslib.as_array(pixels_pointer.contents).reshape((self.height, self.width, 4))
 
     @staticmethod
