@@ -22,6 +22,7 @@ _OS_DIRECT_MERGE_FLAGS = (
     "is_exclamation",
     "is_resource",
 )
+NORMAL_SCAN_MODE_ONLY_MESSAGE = "OS grid merge only supports normal scan mode"
 
 
 class OSGridInfo(GridInfo):
@@ -95,7 +96,8 @@ class OSGridInfo(GridInfo):
             bool: 是否合并成功。
         """
         if mode != "normal":
-            raise ValueError(f"OS grid merge only supports normal scan mode: {mode}")
+            message = f"{NORMAL_SCAN_MODE_ONLY_MESSAGE}: {mode}"
+            raise ValueError(message)
 
         if isinstance(info, RadarGrid):
             self.is_radar_scanned = True

@@ -13,6 +13,9 @@ from module.map_detection.grid import Grid
 from module.map_detection.utils import corner2area
 from module.map_detection.utils_assets import ASSETS
 
+NO_MAP_GRIDS_MESSAGE = "No map grids found"
+CAMERA_OUTSIDE_MAP_MESSAGE = "Camera outside map"
+
 
 class View(MapDetector):
     grids: dict
@@ -70,7 +73,7 @@ class View(MapDetector):
         # Handle grids offset
         offset = list(grids.keys())
         if not offset:
-            raise MapDetectionError("No map grids found")
+            raise MapDetectionError(NO_MAP_GRIDS_MESSAGE)
         offset = np.min(offset, axis=0)
         if np.sum(np.abs(offset)) > 0:
             logger.attr_align("grids_offset", tuple(offset.tolist()))
@@ -96,7 +99,8 @@ class View(MapDetector):
                 x = max(self.center_loca[0] - self.shape[0], 0) if self.center_loca[0] > 0 else self.center_loca[0]
                 y = max(self.center_loca[1] - self.shape[1], 0) if self.center_loca[1] > 0 else self.center_loca[1]
                 self.center_offset = offset - self.center_loca
-                raise MapDetectionError(f"Camera outside map: offset=({x}, {y})")
+                message = f"{CAMERA_OUTSIDE_MAP_MESSAGE}: offset=({x}, {y})"
+                raise MapDetectionError(message)
             break
 
     def predict(self):

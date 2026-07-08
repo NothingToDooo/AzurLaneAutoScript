@@ -19,6 +19,10 @@ if TYPE_CHECKING:
 
 warnings.filterwarnings("ignore")
 
+NO_HORIZONTAL_LINE_MESSAGE = "No horizontal line detected"
+NO_VERTICAL_LINE_MESSAGE = "No vertical line detected"
+VANISH_POINT_TOO_CLOSE_MESSAGE = "Vanish point and distant point too close"
+
 
 @dataclass(frozen=True, slots=True)
 class LineDetectionOptions:
@@ -135,9 +139,9 @@ class Perspective:
         self.horizontal = horizontal
         self.vertical = vertical
         if not self.horizontal:
-            raise MapDetectionError("No horizontal line detected")
+            raise MapDetectionError(NO_HORIZONTAL_LINE_MESSAGE)
         if not self.vertical:
-            raise MapDetectionError("No vertical line detected")
+            raise MapDetectionError(NO_VERTICAL_LINE_MESSAGE)
 
         # Calculate perspective
         self.crossings = self.horizontal.cross(self.vertical)
@@ -147,7 +151,7 @@ class Perspective:
         logger.attr_align("vanish_point", point2str(*self.vanish_point, length=5))
         logger.attr_align("distant_point", point2str(*self.distant_point, length=5))
         if np.linalg.norm(np.subtract(self.vanish_point, self.distant_point)) < 10:
-            raise MapDetectionError("Vanish point and distant point too close")
+            raise MapDetectionError(VANISH_POINT_TOO_CLOSE_MESSAGE)
 
         # Lines cleansing
         self.map_inner = get_map_inner(self.crossings.points)

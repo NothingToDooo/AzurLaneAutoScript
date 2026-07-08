@@ -9,6 +9,10 @@ from module.map_detection.utils import area2corner, corner2area, perspective_tra
 from module.map_detection.utils_assets import ASSETS, DETECTING_AREA, UI_MASK, UI_MASK_OS
 from module.template import assets as template_assets
 
+MISSING_ENEMY_TEMPLATE_DETAIL = (
+    "Enemy detection template asset is missing. Update checked-in assets/<server>/template before running this map."
+)
+
 
 class GridPredictor:
     def __init__(self, location, image, corner, config):
@@ -203,12 +207,10 @@ class GridPredictor:
     def _ensure_enemy_genre_template(self, name, template):
         if template is not None:
             return
-        logger.warning(f"Enemy detection template not found: {name}")
-        logger.warning(
-            "Enemy detection template asset is missing. "
-            "Update checked-in assets/<server>/template before running this map."
-        )
-        raise ScriptError(f"Enemy detection template not found: {name}")
+        message = f"Enemy detection template not found: {name}"
+        logger.warning(message)
+        logger.warning(MISSING_ENEMY_TEMPLATE_DETAIL)
+        raise ScriptError(message)
 
     def _enemy_genre_scaling(self, name):
         short_name = name.removeprefix("Siren_")

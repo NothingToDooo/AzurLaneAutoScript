@@ -25,6 +25,9 @@ from module.map_detection.utils_assets import ASSETS
 if TYPE_CHECKING:
     from module.config.config import AzurLaneConfig
 
+NO_HOMOGRAPHY_INPUT_MESSAGE = "No data feed to load_homography, please input at least one."
+FREE_TILE_NOT_FOUND_MESSAGE = "Failed to find a free tile"
+
 
 class Homography:
     """
@@ -129,7 +132,7 @@ class Homography:
             perspective_.load(image_)
             self.load_homography(perspective=perspective_)
         else:
-            raise MapDetectionError("No data feed to load_homography, please input at least one.")
+            raise MapDetectionError(NO_HOMOGRAPHY_INPUT_MESSAGE)
 
     def find_homography(self, size, src_pts, overflow=True):
         """
@@ -199,7 +202,7 @@ class Homography:
         ):
             pass
         else:
-            raise MapDetectionError("Failed to find a free tile")
+            raise MapDetectionError(FREE_TILE_NOT_FOUND_MESSAGE)
 
         self.homo_loca %= self.config.HOMO_TILE
 
