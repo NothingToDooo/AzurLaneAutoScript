@@ -17,7 +17,6 @@ dependencies = [
     "pyyaml",
     "inflection",
     "pydantic",
-    "aiofiles",
     "cnocr",
     "pywebio",
     "starlette",
