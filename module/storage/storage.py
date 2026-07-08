@@ -278,7 +278,8 @@ class StorageHandler(StorageUI):
         return used
 
     def _storage_disassemble_equipment_execute_once(self, amount=40):
-        """
+        """执行一轮装备拆解。
+
         Returns:
             int: amount of equipments disassembled
 
@@ -286,7 +287,6 @@ class StorageHandler(StorageUI):
             in: DISASSEMBLE_CANCEL
             out: DISASSEMBLE_CANCEL
         """
-        success = False
         amount = min(amount, 40)
         self.interval_clear(
             [
@@ -299,19 +299,7 @@ class StorageHandler(StorageUI):
         )
         logger.info(f"Disassemble once, expected amount: {amount}")
 
-        for _ in self.loop():
-            if self.appear(GET_ITEMS_1, offset=(5, 5), interval=3):
-                logger.info(f"{GET_ITEMS_1} -> {storage_assets.DISASSEMBLE_CONFIRM}")
-                self.device.click(storage_assets.DISASSEMBLE_CONFIRM)
-                continue
-            if self.appear(GET_ITEMS_2, offset=(5, 5), interval=3):
-                logger.info(f"{GET_ITEMS_2} -> {storage_assets.DISASSEMBLE_CONFIRM}")
-                self.device.click(storage_assets.DISASSEMBLE_CONFIRM)
-                continue
-            if self.handle_info_bar():
-                continue
-            if self.appear(storage_assets.DISASSEMBLE_CANCEL, offset=(20, 20)):
-                break
+        self._clear_disassemble_reward_popups()
         self.interval_clear(
             [
                 GET_ITEMS_1,
@@ -320,6 +308,36 @@ class StorageHandler(StorageUI):
         )
         self.wait_until_stable(storage_assets.MATERIAL_STABLE_CHECK)
 
+        amount = self._select_disassemble_equipment(amount)
+        if amount <= 0:
+            return 0
+
+        disassembled = self._wait_disassemble_count(amount)
+        logger.info(f"Disassemble once, actual amount: {disassembled}")
+        if disassembled <= 0:
+            logger.warning("No items selected to disassemble")
+            return 0
+
+        return self._confirm_disassemble_equipment(disassembled)
+
+    def _clear_disassemble_reward_popups(self) -> None:
+        for _ in self.loop():
+            if self._handle_disassemble_get_items():
+                continue
+            if self.handle_info_bar():
+                continue
+            if self.appear(storage_assets.DISASSEMBLE_CANCEL, offset=(20, 20)):
+                break
+
+    def _handle_disassemble_get_items(self) -> bool:
+        for button in (GET_ITEMS_1, GET_ITEMS_2):
+            if self.appear(button, offset=(5, 5), interval=3):
+                logger.info(f"{button} -> {storage_assets.DISASSEMBLE_CONFIRM}")
+                self.device.click(storage_assets.DISASSEMBLE_CONFIRM)
+                return True
+        return False
+
+    def _select_disassemble_equipment(self, amount: int) -> int:
         items = EQUIPMENT_ITEMS.predict(self.device.image, name=False, amount=True)
         if not len(items):
             logger.warning("No items in storage to disassemble")
@@ -333,9 +351,9 @@ class StorageHandler(StorageUI):
             if total >= amount:
                 amount = total
                 break
-        amount = min(cumsum[-1], amount)
+        return int(min(cumsum[-1], amount))
 
-        # 等待装备选中数量稳定。
+    def _wait_disassemble_count(self, amount: int) -> int:
         logger.info(f"Disassemble once, in_storage amount: {amount}")
         timeout = Timer(1, count=2).start()
         prev_disassemble = 0
@@ -351,14 +369,12 @@ class StorageHandler(StorageUI):
             if disassembled > prev_disassemble:
                 prev_disassemble = disassembled
                 timeout.reset()
+        return disassembled
 
-        logger.info(f"Disassemble once, actual amount: {disassembled}")
-        if disassembled <= 0:
-            logger.warning("No items selected to disassemble")
-            return 0
-
+    def _confirm_disassemble_equipment(self, disassembled: int) -> int:
         skip_first_screenshot = True
         click_count = 0
+        success = False
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -383,14 +399,7 @@ class StorageHandler(StorageUI):
                 continue
             if self.handle_popup_confirm("DISASSEMBLE"):
                 continue
-            if self.appear(GET_ITEMS_1, offset=(5, 5), interval=3):
-                logger.info(f"{GET_ITEMS_1} -> {storage_assets.DISASSEMBLE_CONFIRM}")
-                self.device.click(storage_assets.DISASSEMBLE_CONFIRM)
-                success = True
-                continue
-            if self.appear(GET_ITEMS_2, offset=(5, 5), interval=3):
-                logger.info(f"{GET_ITEMS_2} -> {storage_assets.DISASSEMBLE_CONFIRM}")
-                self.device.click(storage_assets.DISASSEMBLE_CONFIRM)
+            if self._handle_disassemble_get_items():
                 success = True
                 continue
 
