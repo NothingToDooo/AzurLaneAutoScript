@@ -542,6 +542,51 @@ class ConfigUpdater:
     def args(self):
         return read_file(filepath_args())
 
+    @staticmethod
+    def _should_reset_config_value(value, data, is_template):
+        typ = data["type"]
+        display = data.get("display")
+        return (
+            is_template
+            or value is None
+            or value == ""
+            or typ in ["lock", "state"]
+            or (display == "hide" and typ != "stored")
+        )
+
+    def _rebuild_config_from_args(self, old, is_template):
+        new = {}
+        for keys, data in deep_iter(self.args, depth=3):
+            value = deep_get(old, keys=keys, default=data["value"])
+            if self._should_reset_config_value(value, data, is_template):
+                value = data["value"]
+            value = parse_value(value, data=data)
+            deep_set(new, keys=keys, value=value)
+        return new
+
+    @staticmethod
+    def _migrate_opsi_hazard_leveling_enable(new):
+        if deep_get(new, keys="OpsiHazard1Leveling.Scheduler.Enable"):
+            deep_set(new, keys="OpsiMeowfficerFarming.Scheduler.Enable", value=True)
+
+    def _refresh_latest_campaign_event(self, new, tasks):
+        for task in tasks:
+            opts = deep_get(self.args, keys=f"{task}.Campaign.Event.option", default=[])
+            if opts and deep_get(new, keys=f"{task}.Campaign.Event", default="campaign_main") not in opts:
+                deep_set(new, keys=f"{task}.Campaign.Event", value=opts[0])
+
+    def _keep_war_archives_away_from_campaign_main(self, new):
+        for task in WAR_ARCHIVES:
+            opts = deep_get(self.args, keys=f"{task}.Campaign.Event.option", default=[])
+            if opts and deep_get(new, keys=f"{task}.Campaign.Event", default="campaign_main") == "campaign_main":
+                deep_set(new, keys=f"{task}.Campaign.Event", value=opts[0])
+
+    @staticmethod
+    def _replace_default_campaign_stage(new, tasks, stage):
+        for task in tasks:
+            if deep_get(new, keys=f"{task}.Campaign.Name", default="12-4") in ["7-2", "12-4"]:
+                deep_set(new, keys=f"{task}.Campaign.Name", value=stage)
+
     def config_update(self, old, is_template=False):
         """
         Args:
@@ -551,55 +596,20 @@ class ConfigUpdater:
         Returns:
             dict:
         """
-        new = {}
+        new = self._rebuild_config_from_args(old, is_template=is_template)
+        self._migrate_opsi_hazard_leveling_enable(new)
 
-        for keys, data in deep_iter(self.args, depth=3):
-            value = deep_get(old, keys=keys, default=data["value"])
-            typ = data["type"]
-            display = data.get("display")
-            if (
-                is_template
-                or value is None
-                or value == ""
-                or typ in ["lock", "state"]
-                or (display == "hide" and typ != "stored")
-            ):
-                value = data["value"]
-            value = parse_value(value, data=data)
-            deep_set(new, keys=keys, value=value)
-
-        if deep_get(new, keys="OpsiHazard1Leveling.Scheduler.Enable"):
-            deep_set(new, keys="OpsiMeowfficerFarming.Scheduler.Enable", value=True)
         # 更新到最新活动。
         if not is_template:
-            for task in EVENTS + RAIDS + COALITIONS:
-                opts = deep_get(self.args, keys=f"{task}.Campaign.Event.option", default=[])
-                if opts and deep_get(new, keys=f"{task}.Campaign.Event", default="campaign_main") not in opts:
-                    deep_set(new, keys=f"{task}.Campaign.Event", value=opts[0])
-
-            for task in ["GemsFarming"]:
-                opts = deep_get(self.args, keys=f"{task}.Campaign.Event.option", default=[])
-                if opts and deep_get(new, keys=f"{task}.Campaign.Event", default="campaign_main") not in opts:
-                    deep_set(new, keys=f"{task}.Campaign.Event", value=opts[0])
+            self._refresh_latest_campaign_event(new, EVENTS + RAIDS + COALITIONS + GEMS_FARMINGS)
         # 作战档案不允许使用 campaign_main。
-        for task in WAR_ARCHIVES:
-            opts = deep_get(self.args, keys=f"{task}.Campaign.Event.option", default=[])
-            if opts and deep_get(new, keys=f"{task}.Campaign.Event", default="campaign_main") == "campaign_main":
-                deep_set(new, keys=f"{task}.Campaign.Event", value=opts[0])
+        self._keep_war_archives_away_from_campaign_main(new)
 
         # 活动任务不允许默认关卡 12-4。
-        def default_stage(t, stage):
-            if deep_get(new, keys=f"{t}.Campaign.Name", default="12-4") in ["7-2", "12-4"]:
-                deep_set(new, keys=f"{t}.Campaign.Name", value=stage)
+        self._replace_default_campaign_stage(new, EVENTS + WAR_ARCHIVES, "D3")
+        self._replace_default_campaign_stage(new, COALITIONS, "area1-normal")
 
-        for task in EVENTS + WAR_ARCHIVES:
-            default_stage(task, "D3")
-        for task in COALITIONS:
-            default_stage(task, "area1-normal")
-
-        new = self._override(new)
-
-        return new
+        return self._override(new)
 
     def _override(self, data):
         return data
