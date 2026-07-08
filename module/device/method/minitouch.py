@@ -273,6 +273,55 @@ class MinitouchOccupiedError(Exception):
     pass
 
 
+def _reset_minitouch_after_adb_reconnect(self):
+    self.adb_reconnect()
+    self._reset_minitouch_connection()
+
+
+def _restart_adb_server_and_reset_minitouch(self):
+    self.adb_start_server()
+    self.adb_reconnect()
+    self._reset_minitouch_connection()
+
+
+def _restart_minitouch_service_and_reset(self):
+    self._restart_minitouch_service()
+    self._reset_minitouch_connection()
+
+
+def _reset_minitouch_without_forward(self):
+    self._reset_minitouch_connection(remove_forward=False)
+
+
+def _minitouch_adb_error_recovery(self, error):
+    if handle_adb_error(error):
+        return lambda: _reset_minitouch_after_adb_reconnect(self)
+    if handle_unknown_host_service(error):
+        return lambda: _restart_adb_server_and_reset_minitouch(self)
+    return None
+
+
+def _minitouch_error_recovery(self, error):
+    if isinstance(error, (ConnectionResetError, ConnectionAbortedError)):
+        logger.error(error)
+        return lambda: _reset_minitouch_after_adb_reconnect(self)
+    if isinstance(error, MinitouchNotInstalledError):
+        logger.critical(error)
+        raise RequestHumanTakeover from error
+    if isinstance(error, MinitouchOccupiedError):
+        logger.error(error)
+        return lambda: _restart_minitouch_service_and_reset(self)
+    if isinstance(error, AdbError):
+        return _minitouch_adb_error_recovery(self, error)
+    if isinstance(error, BrokenPipeError):
+        logger.error(error)
+        return lambda: _reset_minitouch_without_forward(self)
+    if isinstance(error, OSError):
+        logger.error(error)
+        return self._reset_minitouch_connection
+    return None
+
+
 def retry(func):
     @wraps(func)
     def retry_wrapper(self, *args, **kwargs):
@@ -280,67 +329,20 @@ def retry(func):
         Args:
             self (Minitouch):
         """
-        init = None
+        recovery = None
         for _ in range(RETRY_TRIES):
             try:
-                if callable(init):
+                if callable(recovery):
                     time.sleep(retry_sleep(_))
-                    init()
+                    recovery()
                 return func(self, *args, **kwargs)
             # 无法自动处理。
             except RequestHumanTakeover:
                 break
-            # ADB server 被杀掉。
-            except ConnectionResetError as e:
-                logger.error(e)
-
-                def init():
-                    self.adb_reconnect()
-                    self._reset_minitouch_connection()
-            # 模拟器已关闭。
-            except ConnectionAbortedError as e:
-                logger.error(e)
-
-                def init():
-                    self.adb_reconnect()
-                    self._reset_minitouch_connection()
-            # minitouch 返回空数据，通常是没有安装。
-            except MinitouchNotInstalledError as e:
-                logger.critical(e)
-                raise RequestHumanTakeover from e
-            # 连接 minitouch 超时，通常是已有连接占用。
-            except MinitouchOccupiedError as e:
-                logger.error(e)
-
-                def init():
-                    self._restart_minitouch_service()
-                    self._reset_minitouch_connection()
-            # ADB 错误。
-            except AdbError as e:
-                if handle_adb_error(e):
-
-                    def init():
-                        self.adb_reconnect()
-                        self._reset_minitouch_connection()
-                elif handle_unknown_host_service(e):
-
-                    def init():
-                        self.adb_start_server()
-                        self.adb_reconnect()
-                        self._reset_minitouch_connection()
-                else:
+            except (AdbError, MinitouchNotInstalledError, MinitouchOccupiedError, OSError) as e:
+                recovery = _minitouch_error_recovery(self, e)
+                if recovery is None:
                     break
-            except BrokenPipeError as e:
-                logger.error(e)
-
-                def init():
-                    self._reset_minitouch_connection(remove_forward=False)
-            # minitouch socket 或 ADB forward 的 I/O 失败。
-            except OSError as e:
-                logger.error(e)
-
-                def init():
-                    self._reset_minitouch_connection()
 
         logger.critical(f"Retry {func.__name__}() failed")
         raise RequestHumanTakeover
