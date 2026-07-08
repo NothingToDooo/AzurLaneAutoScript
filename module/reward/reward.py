@@ -105,6 +105,35 @@ class Reward(UI):
                     return clicked
         return clicked
 
+    def _reward_mission_receive_state(self, timeout):
+        if not self.ui_page_appear(page_mission):
+            timeout.reset()
+            return None
+
+        state = self._reward_get_state()
+        if state:
+            return state
+        if timeout.reached():
+            logger.warning("Wait mission receive timeout")
+            return "timeout"
+        return None
+
+    def _handle_reward_mission_receive_popup(self):
+        if self._appear_then_click_any(
+            [
+                (combat_assets.GET_ITEMS_1, {"offset": (30, 30), "interval": 1}),
+                (combat_assets.GET_ITEMS_2, {"offset": (30, 30), "interval": 1}),
+                (combat_assets.GET_SHIP, {"interval": 1}),
+            ]
+        ):
+            return True
+        return (
+            self.handle_mission_popup_ack()
+            or self.handle_vote_popup()
+            or self.handle_story_skip()
+            or self.handle_popup_confirm("MISSION_REWARD")
+        )
+
     def _reward_mission_claim_receive(self):
         """
         Returns:
@@ -117,30 +146,10 @@ class Reward(UI):
         logger.info("Mission claim receive")
         timeout = Timer(2, count=6).start()
         for _ in self.loop():
-            if self.ui_page_appear(page_mission):
-                state = self._reward_get_state()
-                if state:
-                    return state
-                if timeout.reached():
-                    logger.warning("Wait mission receive timeout")
-                    return "timeout"
-            else:
-                timeout.reset()
-
-            # 点击领取弹窗。
-            if self.appear_then_click(combat_assets.GET_ITEMS_1, offset=(30, 30), interval=1):
-                continue
-            if self.appear_then_click(combat_assets.GET_ITEMS_2, offset=(30, 30), interval=1):
-                continue
-            if self.appear_then_click(combat_assets.GET_SHIP, interval=1):
-                continue
-            if self.handle_mission_popup_ack():
-                continue
-            if self.handle_vote_popup():
-                continue
-            if self.handle_story_skip():
-                continue
-            if self.handle_popup_confirm("MISSION_REWARD"):
+            state = self._reward_mission_receive_state(timeout)
+            if state:
+                return state
+            if self._handle_reward_mission_receive_popup():
                 continue
         return "timeout"
 
