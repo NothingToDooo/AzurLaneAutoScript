@@ -399,22 +399,11 @@ class Connection(ConnectionAttr):
 
         return False
 
-    def adb_connect(self, wait_device=True):
+    def _cleanup_adb_device_statuses(self, devices):
         """
-        连接指定 serial，最多尝试 3 次。
-
-        国产模拟器里经常有旧 ADB server 和当前 ADB 抢占，第一次连接可能只是杀掉旧进程，
-        第二次才是真正连接。
-
         参数：
-            serial (str):
-            wait_device：是否等待 emulator-* 和 Android 真机出现。
-
-        返回：
-            bool：是否连接成功。
+            devices (list[AdbDeviceWithStatus]): 当前 ADB 设备列表。
         """
-        # 连接前先断开 offline 设备。
-        devices = self.list_device()
         for device in devices:
             if device.status == "offline":
                 logger.warning(f"Device {device.serial} is offline, disconnect it before connecting")
@@ -428,25 +417,91 @@ class Connection(ConnectionAttr):
             else:
                 logger.warning(f"Device {device.serial} is is having a unknown status: {device.status}")
 
-        # emulator-* 和 Android 真机通常会自动连接，不需要 adb connect。
-        if "emulator-" in self.serial:
-            if wait_device:
-                if self._wait_device_appear(self.serial, first_devices=devices):
-                    logger.info(f"Serial {self.serial} connected")
-                    return True
-                logger.info(f"Serial {self.serial} is not connected")
-            logger.info(f'"{self.serial}" is a `emulator-*` serial, skip adb connect')
-            return True
-        if re.match(r"^[a-zA-Z0-9]+$", self.serial):
-            if wait_device:
-                if self._wait_device_appear(self.serial, first_devices=devices):
-                    logger.info(f"Serial {self.serial} connected")
-                    return True
-                logger.info(f"Serial {self.serial} is not connected")
-            logger.info(f'"{self.serial}" seems to be a Android serial, skip adb connect')
-            return True
+    def _skip_adb_connect_for_waited_serial(self, wait_device, devices, skip_message):
+        """
+        等待由 ADB 自动维护的 serial，并跳过 `adb connect`。
 
-        # 尝试连接。
+        参数：
+            wait_device (bool): 是否先等待设备出现。
+            devices (list[AdbDeviceWithStatus]): 初始设备列表。
+            skip_message (str): 未等待到设备时输出的跳过原因。
+
+        返回：
+            bool：True 表示该 serial 已完成处理。
+        """
+        if wait_device:
+            if self._wait_device_appear(self.serial, first_devices=devices):
+                logger.info(f"Serial {self.serial} connected")
+                return True
+            logger.info(f"Serial {self.serial} is not connected")
+        logger.info(skip_message)
+        return True
+
+    def _skip_adb_connect_for_auto_serial(self, wait_device, devices):
+        """
+        emulator-* 和 Android 真机通常由 ADB 自动维护，不需要 `adb connect`。
+
+        参数：
+            wait_device (bool): 是否先等待设备出现。
+            devices (list[AdbDeviceWithStatus]): 初始设备列表。
+
+        返回：
+            bool：True 表示已跳过 TCP 连接流程。
+        """
+        if "emulator-" in self.serial:
+            return self._skip_adb_connect_for_waited_serial(
+                wait_device,
+                devices,
+                f'"{self.serial}" is a `emulator-*` serial, skip adb connect',
+            )
+        if re.match(r"^[a-zA-Z0-9]+$", self.serial):
+            return self._skip_adb_connect_for_waited_serial(
+                wait_device,
+                devices,
+                f'"{self.serial}" seems to be a Android serial, skip adb connect',
+            )
+        return False
+
+    def _recover_mumu12_shifted_port(self):
+        """
+        MuMu12 端口被占用时可能切换 serial，这里尝试连接相邻端口。
+
+        返回：
+            bool：是否通过相邻端口找到了新的 serial。
+        """
+        if not self.is_mumu12_family:
+            return False
+
+        before = self.serial
+        serial_list = [self.serial.replace(str(self.port), str(self.port + offset)) for offset in [1, -1, 2, -2]]
+        self.adb_brute_force_connect(serial_list)
+        self.detect_device()
+        return self.serial != before
+
+    def _handle_adb_connect_refused(self):
+        """
+        处理 TCP 连接被拒绝。
+
+        返回：
+            bool：True 表示 MuMu12 已通过相邻端口恢复连接。
+        """
+        if self._recover_mumu12_shifted_port():
+            return True
+        run_once(self.check_mumu_bridge_network)()
+        # 设备不存在。
+        logger.warning("No such device exists, please restart the emulator or set a correct serial")
+        raise EmulatorNotRunningError
+
+    def _connect_adb_tcp_serial(self):
+        """
+        对 TCP serial 执行 `adb connect`，最多尝试 3 次。
+
+        国产模拟器里经常有旧 ADB server 和当前 ADB 抢占，第一次连接可能只是杀掉旧进程，
+        第二次才是真正连接。
+
+        返回：
+            bool：是否连接成功。
+        """
         for _ in range(3):
             msg = self.adb_client.connect(self.serial)
             logger.info(msg)
@@ -460,24 +515,30 @@ class Connection(ConnectionAttr):
                 raise RequestHumanTakeover
             # cannot connect to 127.0.0.1:55555:
             # No connection could be made because the target machine actively refused it. (10061)
-            if "(10061)" in msg:
-                # MuMu12 端口被占用时可能切换 serial。
-                # 这里尝试连接相邻端口来处理动态切换。
-                if self.is_mumu12_family:
-                    before = self.serial
-                    serial_list = [
-                        self.serial.replace(str(self.port), str(self.port + offset)) for offset in [1, -1, 2, -2]
-                    ]
-                    self.adb_brute_force_connect(serial_list)
-                    self.detect_device()
-                    if self.serial != before:
-                        return True
-                run_once(self.check_mumu_bridge_network)()
-                # 设备不存在。
-                logger.warning("No such device exists, please restart the emulator or set a correct serial")
-                raise EmulatorNotRunningError
+            if "(10061)" in msg and self._handle_adb_connect_refused():
+                return True
 
-        # 连接失败。
+        return False
+
+    def adb_connect(self, wait_device=True):
+        """
+        连接指定 serial。
+
+        参数：
+            wait_device：是否等待 emulator-* 和 Android 真机出现。
+
+        返回：
+            bool：是否连接成功。
+        """
+        devices = self.list_device()
+        self._cleanup_adb_device_statuses(devices)
+
+        if self._skip_adb_connect_for_auto_serial(wait_device, devices):
+            return True
+
+        if self._connect_adb_tcp_serial():
+            return True
+
         logger.warning(f"Failed to connect {self.serial} after 3 trial, assume connected")
         self.detect_device()
         return False
