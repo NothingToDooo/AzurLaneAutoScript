@@ -194,8 +194,10 @@ class Equipment(StorageHandler):
                 bar_timer.reset()
                 continue
 
-            if off_timer.reached() and not self.info_bar_count() and self.appear_then_click(
-                equipment_assets.EQUIP_OFF, offset=(20, 20)
+            if (
+                off_timer.reached()
+                and not self.info_bar_count()
+                and self.appear_then_click(equipment_assets.EQUIP_OFF, offset=(20, 20))
             ):
                 off_timer.reset()
                 bar_timer.reset()

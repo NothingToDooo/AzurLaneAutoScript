@@ -39,9 +39,7 @@ class _FakeShopClerk(ShopClerk):
     def __init__(self, *, currency=0, appear_results=None) -> None:
         self.device = _FakeDevice()
         self._currency = currency
-        self.appear_results = {
-            id(button): list(results) for button, results in (appear_results or {}).items()
-        }
+        self.appear_results = {id(button): list(results) for button, results in (appear_results or {}).items()}
         self.ensure_calls = []
         self.ensure_letter_result = None
         self.selected_items = []

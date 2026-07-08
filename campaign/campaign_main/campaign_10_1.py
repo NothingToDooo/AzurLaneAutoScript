@@ -100,11 +100,7 @@ class Campaign(CampaignBase):
 
     def battle_6(self):
         boss = self.map.select(is_boss=True)
-        if (
-            boss
-            and not self.check_accessibility(boss[0], fleet="boss")
-            and self.clear_roadblocks([road_main])
-        ):
+        if boss and not self.check_accessibility(boss[0], fleet="boss") and self.clear_roadblocks([road_main]):
             return True
 
         return self.fleet_boss.clear_boss()

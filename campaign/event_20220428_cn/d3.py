@@ -144,7 +144,12 @@ class Config(ConfigBase):
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 13, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
+        "height": (255 - 13, 255),
+        "prominence": 10,
+        "distance": 50,
+        "wlen": 1000,
+    }
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 35
     EDGE_LINES_HOUGHLINES_THRESHOLD = 35
     HOMO_CANNY_THRESHOLD = (50, 100)

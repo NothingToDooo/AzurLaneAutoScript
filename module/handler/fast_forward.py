@@ -248,7 +248,6 @@ class FastForwardHandler(AutoSearchHandler):
         state = "on" if enable else "off"
         return FLEET_LOCK.set(state, main=self)
 
-
     def map_wait_auto_search(self):
         """
         When enabling clear mode (FAST_FORWARD), AUTO_SEARCH has an animation to appear
@@ -287,7 +286,6 @@ class FastForwardHandler(AutoSearchHandler):
 
         state = "on" if self.map_is_auto_search else "off"
         return AUTO_SEARCH.set(state, main=self)
-
 
     def handle_auto_search_setting(self):
         """

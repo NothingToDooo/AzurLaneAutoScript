@@ -40,9 +40,7 @@ class _FakeDevice:
 class _FakeSupplyPack(SupplyPack):
     def __init__(self, *, appear_results=None, appear_then_click_results=None, popup_results=None) -> None:
         self.device = _FakeDevice()
-        self.appear_results = {
-            id(button): list(results) for button, results in (appear_results or {}).items()
-        }
+        self.appear_results = {id(button): list(results) for button, results in (appear_results or {}).items()}
         self.appear_then_click_results = {
             id(button): list(results) for button, results in (appear_then_click_results or {}).items()
         }

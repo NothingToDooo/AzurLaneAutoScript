@@ -103,11 +103,7 @@ class RadarGrid:
         #     self.is_enemy = self.predict_static_red_border()
         if self.is_enemy and not self.enemy_genre:
             self.enemy_genre = "Enemy"
-        if (
-            self.config.MAP_HAS_SIREN
-            and self.enemy_genre is not None
-            and self.enemy_genre.startswith("Siren")
-        ):
+        if self.config.MAP_HAS_SIREN and self.enemy_genre is not None and self.enemy_genre.startswith("Siren"):
             self.is_siren = True
             self.enemy_scale = 0
 

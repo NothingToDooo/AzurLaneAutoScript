@@ -187,7 +187,12 @@ class Config:
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 16, 255), "prominence": 2, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
+        "height": (255 - 16, 255),
+        "prominence": 2,
+        "distance": 50,
+        "wlen": 1000,
+    }
     MAP_SWIPE_PREDICT_WITH_SEA_GRIDS = False
 
 

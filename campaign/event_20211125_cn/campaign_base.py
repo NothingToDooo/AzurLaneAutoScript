@@ -6,8 +6,10 @@ MASK_MAP_UI_20211125 = Mask(file="./assets/mask/MASK_MAP_UI_20211125.png")
 
 
 class CampaignBase(CampaignBase_):
-    STAGE_INCREASE = ("T1 > T2 > T3 > T4",
-        "TSS1 > TSS2 > TSS3 > TSS4 > TSS5",)
+    STAGE_INCREASE = (
+        "T1 > T2 > T3 > T4",
+        "TSS1 > TSS2 > TSS3 > TSS4 > TSS5",
+    )
 
     def map_data_init(self, map_):
         super().map_data_init(map_)

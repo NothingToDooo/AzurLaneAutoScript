@@ -316,9 +316,8 @@ class ActionPointHandler(UI, MapEventHandler):
         for _ in self.loop():
             # 结束。
             # 行动力弹窗有时没有黑色模糊背景，此时 ACTION_POINT_CANCEL 和 OS_CHECK 会同时出现。
-            if (
-                not self.appear(os_assets.ACTION_POINT_CANCEL, offset=(20, 20))
-                and self.appear(OS_CHECK, offset=(20, 20))
+            if not self.appear(os_assets.ACTION_POINT_CANCEL, offset=(20, 20)) and self.appear(
+                OS_CHECK, offset=(20, 20)
             ):
                 break
             # 点击。

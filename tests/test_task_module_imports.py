@@ -25,7 +25,12 @@ def _local_module_imports() -> list[str]:
             self._scope_depth -= 1
 
         def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-            if self._scope_depth > 0 and node.module and node.module.startswith("module.") and node.module not in imports:
+            if (
+                self._scope_depth > 0
+                and node.module
+                and node.module.startswith("module.")
+                and node.module not in imports
+            ):
                 imports.append(node.module)
 
     alas_path = Path(__file__).resolve().parents[1] / "alas.py"

@@ -77,7 +77,9 @@ class ProcessManager:
                 process = self._process
                 if process is not None:
                     process.kill()
-                self.renderables.append(cast("ConsoleRenderable", f"[{self.config_name}] exited. Reason: Manual stop\n"))
+                self.renderables.append(
+                    cast("ConsoleRenderable", f"[{self.config_name}] exited. Reason: Manual stop\n")
+                )
             if self.thd_log_queue_handler is not None:
                 self.thd_log_queue_handler.join(timeout=1)
                 if self.thd_log_queue_handler.is_alive():

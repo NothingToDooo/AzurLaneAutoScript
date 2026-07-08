@@ -245,8 +245,7 @@ class RewardGacha(GachaUI, Retirement):
 
             # 结束：队列清空后点击会回到池子页面。
             if (
-                self.appear(gacha_assets.BUILD_SUBMIT_ORDERS)
-                or self.appear(gacha_assets.BUILD_SUBMIT_WW_ORDERS)
+                self.appear(gacha_assets.BUILD_SUBMIT_ORDERS) or self.appear(gacha_assets.BUILD_SUBMIT_WW_ORDERS)
             ) and confirm_timer.reached():
                 break
 

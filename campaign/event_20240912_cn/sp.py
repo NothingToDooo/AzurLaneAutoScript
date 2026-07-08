@@ -115,7 +115,12 @@ class Config:
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 49, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
+        "height": (255 - 49, 255),
+        "prominence": 10,
+        "distance": 50,
+        "wlen": 1000,
+    }
     HOMO_CANNY_THRESHOLD = (75, 100)
     MAP_SWIPE_MULTIPLY = (1.194, 1.217)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.155, 1.176)

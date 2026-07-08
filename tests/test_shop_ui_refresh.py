@@ -20,9 +20,7 @@ class _FakeDevice:
 class _FakeShopUI(ShopUI):
     def __init__(self, *, appear_results=None, color_results=None, popup_results=None) -> None:
         self.device = _FakeDevice()
-        self.appear_results = {
-            id(button): list(results) for button, results in (appear_results or {}).items()
-        }
+        self.appear_results = {id(button): list(results) for button, results in (appear_results or {}).items()}
         self.color_results = {color: list(results) for color, results in (color_results or {}).items()}
         self.popup_results = list(popup_results or [])
         self.interval_cleared = []

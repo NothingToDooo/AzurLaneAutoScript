@@ -142,6 +142,7 @@ def function_drop(rate=0.5, default=None):
         70% possibility:
         INFO | Click (1091,  628) @ REWARD_GOTO_MAIN
     """
+
     def decorate(func):
         @wraps(func)
         def wrapper(*args, **kwargs):

@@ -113,7 +113,12 @@ class Config:
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 24, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
+        "height": (255 - 24, 255),
+        "prominence": 10,
+        "distance": 50,
+        "wlen": 1000,
+    }
     HOMO_EDGE_COLOR_RANGE = (0, 24)
     MAP_ENSURE_EDGE_INSIGHT_CORNER = "bottom"
     MAP_ENEMY_GENRE_DETECTION_SCALING: ClassVar[dict[str, object]] = {

@@ -135,9 +135,7 @@ TASK_REGISTRY: dict[str, TaskSpec | FunctionTaskSpec] = {
     "daemon": _task("module.daemon.daemon", "AzurLaneDaemon", task_name="Daemon"),
     "opsi_daemon": _task("module.daemon.os_daemon", "AzurLaneDaemon", task_name="OpsiDaemon"),
     "event_story": _task("module.eventstory.eventstory", "EventStory", task_name="EventStory"),
-    "azur_lane_uncensored": _task(
-        "module.daemon.uncensored", "AzurLaneUncensored", task_name="AzurLaneUncensored"
-    ),
+    "azur_lane_uncensored": _task("module.daemon.uncensored", "AzurLaneUncensored", task_name="AzurLaneUncensored"),
     "game_manager": _task("module.daemon.game_manager", "GameManager", task_name="GameManager"),
     "benchmark": FunctionTaskSpec(module_name="module.daemon.benchmark", function_name="run_benchmark"),
 }

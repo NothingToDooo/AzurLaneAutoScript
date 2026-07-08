@@ -509,9 +509,7 @@ class CampaignMap:
             bool: 是否匹配到需要忽略的错误预测。
         """
         for wrong_globe, wrong_local in self._ignore_prediction:
-            if wrong_globe == globe and all(
-                local.__getattribute__(k) == v for k, v in wrong_local.items()
-            ):
+            if wrong_globe == globe and all(local.__getattribute__(k) == v for k, v in wrong_local.items()):
                 return True
 
         return False
@@ -806,12 +804,7 @@ class CampaignMap:
                 if upper.__getattribute__("may_" + attr) and missing[attr] > 0 and missing[attr] == may[attr]:
                     logger.info(f"Predict {location2node(upper.location)} to be {attr}")
                     upper.__setattr__("is_" + attr, True)
-            if (
-                carrier_count
-                and upper.may_carrier
-                and missing["carrier"] > 0
-                and missing["carrier"] == may["carrier"]
-            ):
+            if carrier_count and upper.may_carrier and missing["carrier"] > 0 and missing["carrier"] == may["carrier"]:
                 logger.info(f"Predict {location2node(upper.location)} to be enemy")
                 upper.__setattr__("is_enemy", True)
 

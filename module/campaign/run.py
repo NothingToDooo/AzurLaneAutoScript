@@ -160,15 +160,13 @@ def _apply_stage_alias_policies(name: str, folder: str, config: AzurLaneConfig) 
     """应用依赖归一化关卡名的运行策略。"""
     if folder == "event_20221124_cn" and name.startswith("th") and config.StopCondition_MapAchievement != "non_stop":
         logger.info(
-            "When running chapter TH of event_20221124_cn, "
-            "StopCondition.MapAchievement is forced set to threat_safe"
+            "When running chapter TH of event_20221124_cn, StopCondition.MapAchievement is forced set to threat_safe"
         )
         config.override(StopCondition_MapAchievement="threat_safe")
 
     if folder == "event_20250724_cn" and name.startswith("ts") and config.StopCondition_MapAchievement != "non_stop":
         logger.info(
-            "When running chapter TS of event_20250724_cn, "
-            "StopCondition.MapAchievement is forced set to threat_safe"
+            "When running chapter TS of event_20250724_cn, StopCondition.MapAchievement is forced set to threat_safe"
         )
         config.override(StopCondition_MapAchievement="threat_safe")
 
@@ -307,7 +305,9 @@ class CampaignRun(CampaignEvent):
         return True
 
     def _triggered_task_balancer_limit(self, oil_check=True) -> bool:
-        if not (oil_check and self.run_count >= 1 and self.config.TaskBalancer_Enable and self.triggered_task_balancer()):
+        if not (
+            oil_check and self.run_count >= 1 and self.config.TaskBalancer_Enable and self.triggered_task_balancer()
+        ):
             return False
 
         logger.hr("Triggered stop condition: Coin limit")

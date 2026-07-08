@@ -150,7 +150,12 @@ class Config:
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 33, 255), "prominence": 10, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
+        "height": (255 - 33, 255),
+        "prominence": 10,
+        "distance": 50,
+        "wlen": 1000,
+    }
     MAP_ENSURE_EDGE_INSIGHT_CORNER = "bottom"
     HOMO_STORAGE = ((8, 6), [(146.885, 86.89), (1029.321, 86.89), (-24.037, 613.962), (1148.33, 613.962)])
 

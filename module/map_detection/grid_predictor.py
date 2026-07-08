@@ -191,9 +191,7 @@ class GridPredictor:
                 return ""
             image = self.relative_crop((-0.55, -0.2, 0.45, 0.2), shape=(50, 20))
             image = color_similarity_2d(image, color=(255, 150, 24))
-            if image[image > 221].shape[0] > 200 and template_assets.TEMPLATE_ENEMY_BOSS.match(
-                image, similarity=0.6
-            ):
+            if image[image > 221].shape[0] > 200 and template_assets.TEMPLATE_ENEMY_BOSS.match(image, similarity=0.6):
                 return "Siren_Siren"
         if (
             self.config.MAP_SIREN_HAS_BOSS_ICON_SMALL

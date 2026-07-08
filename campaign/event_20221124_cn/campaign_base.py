@@ -9,8 +9,10 @@ from module.ui.page import page_campaign_menu, page_event
 
 
 class CampaignBase(CampaignBase_):
-    STAGE_INCREASE = ("T1 > T2 > T3 > TS1 > T4 > T5",
-        "TH1 > TH2 > TH3 > TH4 > TH5",)
+    STAGE_INCREASE = (
+        "T1 > T2 > T3 > TS1 > T4 > T5",
+        "TH1 > TH2 > TH3 > TH4 > TH5",
+    )
 
     def ui_goto_event(self):
         if self.appear(EVENT_20221124_PT_ICON, offset=(20, 20)) and self.ui_page_appear(page_event):

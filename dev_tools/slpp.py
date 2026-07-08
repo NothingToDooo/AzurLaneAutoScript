@@ -89,8 +89,7 @@ class SLPP:
             self.depth += 1
             if len(obj) == 0 or (
                 not isinstance(obj, dict)
-                and len([x for x in obj if isinstance(x, Number) or (isinstance(x, str) and len(x) < 10)])
-                == len(obj)
+                and len([x for x in obj if isinstance(x, Number) or (isinstance(x, str) and len(x) < 10)]) == len(obj)
             ):
                 newline = tab = ""
             dp = tab * self.depth

@@ -193,7 +193,6 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
             if template.match(self.image_crop(ship.button, copy=False), similarity=SIM_VALUE)
         ]
 
-
     def get_common_rarity_dd(self):
         """
         Get a common rarity dd with level is 100 (70 for servers except CN) and emotion > 10

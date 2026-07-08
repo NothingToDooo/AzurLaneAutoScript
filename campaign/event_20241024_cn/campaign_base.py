@@ -25,9 +25,11 @@ class EventGrid(Grid):
 
 
 class CampaignBase(CampaignBase_):
-    STAGE_INCREASE = ("""
+    STAGE_INCREASE = (
+        """
         T1 > T2 > T3 > T4 > T5 > T6
-        """,)
+        """,
+    )
 
     def campaign_set_chapter_20241219(self, chapter, stage, mode="combat"):
         if chapter == "t":

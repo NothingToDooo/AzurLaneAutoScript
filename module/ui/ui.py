@@ -170,13 +170,16 @@ class UI(InfoHandler):
 
     def _handle_unknown_current_page(self):
         logger.info("Unknown ui page")
-        return self._appear_then_click_any(
-            [
-                (ui_assets.GOTO_MAIN, {"offset": (30, 30), "interval": 2}),
-                (ui_white_assets.GOTO_MAIN_WHITE, {"offset": (30, 30), "interval": 2}),
-                (raid_assets.RPG_HOME, {"offset": (30, 30), "interval": 2}),
-            ]
-        ) or self.ui_additional()
+        return (
+            self._appear_then_click_any(
+                [
+                    (ui_assets.GOTO_MAIN, {"offset": (30, 30), "interval": 2}),
+                    (ui_white_assets.GOTO_MAIN_WHITE, {"offset": (30, 30), "interval": 2}),
+                    (raid_assets.RPG_HOME, {"offset": (30, 30), "interval": 2}),
+                ]
+            )
+            or self.ui_additional()
+        )
 
     def _raise_unknown_current_page_error(self):
         logger.warning("Unknown ui page")

@@ -131,7 +131,12 @@ class Config:
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 24, 255), "prominence": 2, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
+        "height": (255 - 24, 255),
+        "prominence": 2,
+        "distance": 50,
+        "wlen": 1000,
+    }
     VANISH_POINT_RANGE = ((540, 740), (-4000, -2000))
     DISTANCE_POINT_X_RANGE = ((-2000, -1000),)
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 50

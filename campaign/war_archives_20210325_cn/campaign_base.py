@@ -4,12 +4,14 @@ from ..campaign_war_archives.campaign_base import CampaignBase as CampaignBase_
 
 
 class CampaignBase(CampaignBase_):
-    STAGE_INCREASE = ("A1 > AS1 > A2 > AS2 > A3",
+    STAGE_INCREASE = (
+        "A1 > AS1 > A2 > AS2 > A3",
         "B1 > BS1 > B2 > BS2 > B3",
         "C1 > CS1 > C2 > CS2 > C3",
         "D1 > DS1 > D2 > DS2 > D3",
         "SP1 > SP2 > SP3 > SP4",
-        "T1 > T2 > T3 > T4",)
+        "T1 > T2 > T3 > T4",
+    )
 
     """
     In Ashen Simulacrum chapter BD, there will be siren dace.

@@ -145,7 +145,12 @@ class Config(ConfigBase):
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {"height": (255 - 24, 255), "prominence": 2, "distance": 50, "wlen": 1000}
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
+        "height": (255 - 24, 255),
+        "prominence": 2,
+        "distance": 50,
+        "wlen": 1000,
+    }
     MID_DIFF_RANGE_H = (144 - 3, 144 + 3)
     MID_DIFF_RANGE_V = (144 - 3, 144 + 3)
     # Grid have 1.2x width, images on the grid still remain the same.

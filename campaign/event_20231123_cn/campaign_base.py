@@ -2,12 +2,14 @@ from module.campaign.campaign_base import CampaignBase as CampaignBase_
 
 
 class CampaignBase(CampaignBase_):
-    STAGE_INCREASE = ("""
+    STAGE_INCREASE = (
+        """
         T1 > T2 > T3 > T4 > T5
         """,
         """
         TSK1 > TSK2 > TSK3 > TSK4 > TSK5
-        """,)
+        """,
+    )
 
     def campaign_set_chapter_event(self, chapter, mode="normal"):
         del mode

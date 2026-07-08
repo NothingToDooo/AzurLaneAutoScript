@@ -729,8 +729,7 @@ class Connection(ConnectionAttr):
 
     def _list_and_log_detected_devices(self):
         logger.info(
-            "Here are the available devices, "
-            'copy to Alas.Emulator.Serial to use it or set Alas.Emulator.Serial="auto"'
+            'Here are the available devices, copy to Alas.Emulator.Serial to use it or set Alas.Emulator.Serial="auto"'
         )
         devices = self.list_device()
         available = devices.select(status="device")

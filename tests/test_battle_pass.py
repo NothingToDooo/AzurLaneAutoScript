@@ -47,9 +47,7 @@ class _FakeBattlePass(BattlePass):
         get_skin_results=(),
     ) -> None:
         self.device = _FakeDevice()
-        self.appear_results = {
-            id(button): list(results) for button, results in (appear_results or {}).items()
-        }
+        self.appear_results = {id(button): list(results) for button, results in (appear_results or {}).items()}
         self.appear_then_click_results = {
             id(button): list(results) for button, results in (appear_then_click_results or {}).items()
         }
