@@ -17,7 +17,6 @@ from module.config.server import to_package
 from module.device.device import Device
 from module.logger import logger
 from module.map_detection.utils import fit_points
-from module.statistics.drop_record import DropRecorder
 from module.webui.setting import cached_class_property
 
 
@@ -63,10 +62,6 @@ class ModuleBase:
 
         self.interval_timer = {}
         self.early_ocr_import()
-
-    @cached_property
-    def stat(self) -> DropRecorder:
-        return DropRecorder(config=self.config)
 
     @cached_property
     def emotion(self) -> Emotion:

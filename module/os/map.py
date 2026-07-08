@@ -1,7 +1,5 @@
 import time
 
-import inflection
-
 from module.base.timer import Timer
 from module.config.utils import get_os_reset_remain
 from module.exception import CampaignEnd, GameTooManyClickError, MapWalkError, RequestHumanTakeover, ScriptError
@@ -716,35 +714,26 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
         logger.info(f"Run auto search, question={question}, rescan={rescan}")
         finished_combat = 0
-        with self.stat.new(
-            genre=inflection.underscore(self.config.task.command), method=self.config.DropRecord_OpsiRecord
-        ) as drop:
-            while 1:
-                combat = self.os_auto_search_run(drop)
-                finished_combat += combat
+        while 1:
+            combat = self.os_auto_search_run()
+            finished_combat += combat
 
-                # Record current zone, skip this if no rewards from auto search.
-                drop.add(self.device.image)
+            self.hp_reset()
+            self.hp_get()
+            if after_auto_search and self.is_in_task_explore and not self.zone.is_port:
+                prev = self.zone
+                if self.handle_after_auto_search():
+                    self.globe_goto(prev, types="DANGEROUS")
+                    continue
+            break
 
-                self.hp_reset()
-                self.hp_get()
-                if after_auto_search and self.is_in_task_explore and not self.zone.is_port:
-                    prev = self.zone
-                    if self.handle_after_auto_search():
-                        self.globe_goto(prev, types="DANGEROUS")
-                        continue
-                break
-
-            # Rescan
-            self._solved_map_event = set()
-            self._solved_fleet_mechanism = False
-            if question:
-                self.clear_question(drop=drop)
-            if rescan:
-                self.map_rescan(rescan_mode=rescan, drop=drop)
-
-            if drop.count == 1:
-                drop.clear()
+        # Rescan
+        self._solved_map_event = set()
+        self._solved_fleet_mechanism = False
+        if question:
+            self.clear_question()
+        if rescan:
+            self.map_rescan(rescan_mode=rescan)
 
         return finished_combat
 

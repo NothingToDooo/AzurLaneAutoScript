@@ -17,15 +17,14 @@ class MysteryHandler(StrategyHandler, EnemySearchingHandler):
             button (optional): Button to click when get_items.
                 Can be destination grid which makes the bot more like human.
         """
-        with self.stat.new(genre=self.config.campaign_name, method=self.config.DropRecord_CombatRecord) as drop:
-            if self.handle_mystery_items(button=button, drop=drop):
-                return "get_item"
-            if self.handle_mystery_ammo(drop=drop):
-                return "get_ammo"
-            if self.handle_mystery_carrier(drop=drop):
-                return "get_carrier"
+        if self.handle_mystery_items(button=button):
+            return "get_item"
+        if self.handle_mystery_ammo():
+            return "get_ammo"
+        if self.handle_mystery_carrier():
+            return "get_carrier"
 
-            return False
+        return False
 
     def handle_mystery_items(self, button=None, drop=None):
         """
@@ -62,11 +61,7 @@ class MysteryHandler(StrategyHandler, EnemySearchingHandler):
         Returns:
             bool: 是否已处理。
         """
-        if (
-            self.info_bar_count()
-            and self._get_ammo_log_timer.reached()
-            and self.appear(GET_AMMO)
-        ):
+        if self.info_bar_count() and self._get_ammo_log_timer.reached() and self.appear(GET_AMMO):
             logger.attr("Mystery", "Get ammo")
             self._get_ammo_log_timer.reset()
             if drop:
@@ -83,11 +78,7 @@ class MysteryHandler(StrategyHandler, EnemySearchingHandler):
         Returns:
             bool: 是否已处理。
         """
-        if (
-            self.config.MAP_MYSTERY_HAS_CARRIER
-            and self.is_in_map()
-            and self.enemy_searching_appear()
-        ):
+        if self.config.MAP_MYSTERY_HAS_CARRIER and self.is_in_map() and self.enemy_searching_appear():
             logger.attr("Mystery", "Get carrier")
             self.carrier_count += 1
             if drop:

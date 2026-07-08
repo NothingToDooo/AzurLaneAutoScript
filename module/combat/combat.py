@@ -13,7 +13,6 @@ from module.handler.auto_search import AutoSearchHandler
 from module.logger import logger
 from module.map.assets import MAP_OFFENSIVE
 from module.retire.retirement import Retirement
-from module.statistics.drop_record import DropImage
 from module.template.assets import TEMPLATE_COMBAT_LOADING
 from module.ui.assets import BACK_ARROW, EXERCISE_CHECK, MUNITIONS_CHECK
 
@@ -628,7 +627,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             emotion_reduce (bool):
             auto_mode (str): combat_auto, combat_manual, stand_still_in_the_middle, hide_in_bottom_left
             submarine_mode (str): do_not_use, hunt_only, every_combat
-            save_get_items (bool, DropImage):
+            save_get_items:
             expected_end (str, callable):
             fleet_index (int): 1 or 2
         """
@@ -645,17 +644,11 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         # if not hasattr(self, 'emotion'):
         #     self.emotion = Emotion(config=self.config)
 
-        with self.stat.new(genre=self.config.campaign_name, method=self.config.DropRecord_CombatRecord) as drop_record:
-            drop = drop_record
-            if save_get_items is False:
-                drop = None
-            elif isinstance(save_get_items, DropImage):
-                drop = save_get_items
-            self.combat_preparation(
-                balance_hp=balance_hp, emotion_reduce=emotion_reduce, auto=auto_mode, fleet_index=fleet_index
-            )
-            self.combat_execute(auto=auto_mode, submarine=submarine_mode, drop=drop)
-            self.combat_status(drop=drop, expected_end=expected_end)
-            # self.handle_map_after_combat_story()
+        self.combat_preparation(
+            balance_hp=balance_hp, emotion_reduce=emotion_reduce, auto=auto_mode, fleet_index=fleet_index
+        )
+        self.combat_execute(auto=auto_mode, submarine=submarine_mode)
+        self.combat_status(expected_end=expected_end)
+        # self.handle_map_after_combat_story()
 
         logger.info("Combat end.")

@@ -69,38 +69,9 @@ class MeowfficerCollect(MeowfficerBase):
             meow_assets.MEOWFFICER_TRAIN_START, offset=(20, 20)
         )
 
-    def _meow_talent_cap_handle(self, btn, drop=None):
+    def _meow_is_special_talented(self):
         """
-        Handle talent screen capture drop record
-
-        Args:
-            btn (Button):
-            drop (DropImage):
-        """
-        self.ui_click(
-            btn,
-            check_button=meow_assets.MEOWFFICER_TALENT_CLOSE,
-            appear_button=meow_assets.MEOWFFICER_GET_CHECK,
-            offset=(40, 40),
-            skip_first_screenshot=True,
-        )
-        drop.add(self.device.image)
-        self.ui_click(
-            meow_assets.MEOWFFICER_TALENT_CLOSE,
-            check_button=self._meow_check_popup_exit,
-            appear_button=meow_assets.MEOWFFICER_TALENT_CLOSE,
-            skip_first_screenshot=True,
-        )
-        self.device.click_record.pop()
-        self.device.click_record.pop()
-
-    def _meow_is_special_talented(self, drop=None):
-        """
-        Validate if meowfficer has at least
-        one special talent
-
-        Args:
-            drop (DropImage):
+        检查指挥喵是否至少有一个特殊天赋。
 
         Returns:
             bool
@@ -110,9 +81,6 @@ class MeowfficerCollect(MeowfficerBase):
 
         special_talent = False
         grid = MEOWFFICER_TALENT_GRID_2 if self._meow_detect_shift() else MEOWFFICER_TALENT_GRID_1
-        handle_drop = self.config.DropRecord_MeowfficerTalent != "do_not"
-        if handle_drop:
-            drop.add(self.device.image)
 
         for btn in grid.buttons:
             # Empty slot; check for many white pixels
@@ -122,13 +90,9 @@ class MeowfficerCollect(MeowfficerBase):
             # Non-empty slot; check for few white pixels
             # i.e. roman numerals
             if self.image_color_count(btn, color=(255, 255, 255), threshold=221, count=25):
-                if handle_drop:
-                    self._meow_talent_cap_handle(btn, drop)
                 continue
 
             # Detected special talent
-            if handle_drop:
-                self._meow_talent_cap_handle(btn, drop)
             special_talent = True
 
         log_insert = "Found" if special_talent else "No"
@@ -200,9 +164,8 @@ class MeowfficerCollect(MeowfficerBase):
 
             # 下一个指挥喵的 MEOWFFICER_APPLY_LOCK 比 MEOWFFICER_GET_CHECK 加载更快，
             # 退出前需要确保已有完整截图。
-            if (
-                self.appear(meow_assets.MEOWFFICER_GET_CHECK, offset=(40, 40))
-                and self.appear(meow_assets.MEOWFFICER_APPLY_LOCK, offset=(40, 40))
+            if self.appear(meow_assets.MEOWFFICER_GET_CHECK, offset=(40, 40)) and self.appear(
+                meow_assets.MEOWFFICER_APPLY_LOCK, offset=(40, 40)
             ):
                 break
             # 意外退出领取队列。
@@ -278,29 +241,28 @@ class MeowfficerCollect(MeowfficerBase):
 
                 count += 1
                 logger.attr("Meow_get", count)
-                with self.stat.new(genre="meowfficer_talent", method=self.config.DropRecord_MeowfficerTalent) as drop:
-                    special_talent = self._meow_is_special_talented(drop=drop)
-                    if self.appear(meow_assets.MEOWFFICER_GOLD_CHECK, offset=(40, 40)):
-                        if not self.config.MeowfficerTrain_RetainTalentedGold or not special_talent:
-                            self._meow_skip_lock()
-                            skip_first_screenshot = True
-                            confirm_timer.reset()
-                            continue
-                        self._meow_apply_lock()
+                special_talent = self._meow_is_special_talented()
+                if self.appear(meow_assets.MEOWFFICER_GOLD_CHECK, offset=(40, 40)):
+                    if not self.config.MeowfficerTrain_RetainTalentedGold or not special_talent:
+                        self._meow_skip_lock()
+                        skip_first_screenshot = True
+                        confirm_timer.reset()
+                        continue
+                    self._meow_apply_lock()
 
-                    if (
-                        self.appear(meow_assets.MEOWFFICER_PURPLE_CHECK, offset=(40, 40))
-                        and self.config.MeowfficerTrain_RetainTalentedPurple
-                        and special_talent
-                    ):
-                        self._meow_apply_lock()
+                if (
+                    self.appear(meow_assets.MEOWFFICER_PURPLE_CHECK, offset=(40, 40))
+                    and self.config.MeowfficerTrain_RetainTalentedPurple
+                    and special_talent
+                ):
+                    self._meow_apply_lock()
 
-                    # 多次领取时容易触发异常，通过弹出 click_record 缓解。
-                    self.device.click(meow_assets.MEOWFFICER_TRAIN_CLICK_SAFE_AREA)
-                    self.device.click_record.pop()
-                    confirm_timer.reset()
-                    self.interval_reset(meow_assets.MEOWFFICER_GET_CHECK)
-                    continue
+                # 多次领取时容易触发异常，通过弹出 click_record 缓解。
+                self.device.click(meow_assets.MEOWFFICER_TRAIN_CLICK_SAFE_AREA)
+                self.device.click_record.pop()
+                confirm_timer.reset()
+                self.interval_reset(meow_assets.MEOWFFICER_GET_CHECK)
+                continue
 
             # 点击 MEOWFFICER_TRAIN_FINISH_ALL 后会进入评价页面。
             if self.appear(meow_assets.MEOWFFICER_TRAIN_EVALUATE, offset=(20, 20), interval=3):

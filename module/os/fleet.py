@@ -1,6 +1,5 @@
 import re
 
-import inflection
 import numpy as np
 
 from module.base.button import Button
@@ -758,68 +757,57 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         logger.hr("BOSS clear", level=1)
 
         fleets = self.parse_fleet_filter()
-        with self.stat.new(
-            genre=inflection.underscore(self.config.task.command), method=self.config.DropRecord_OpsiRecord
-        ) as drop:
-            for fleet in fleets:
-                logger.hr(f"Turn: {fleet}", level=2)
-                if not isinstance(fleet, BossFleet):
-                    self.os_order_execute(recon_scan=False, submarine_call=True)
-                    continue
+        for fleet in fleets:
+            logger.hr(f"Turn: {fleet}", level=2)
+            if not isinstance(fleet, BossFleet):
+                self.os_order_execute(recon_scan=False, submarine_call=True)
+                continue
 
-                # Switch fleet
-                if self.fleet_set(fleet.fleet_index):
-                    pass
+            # Switch fleet
+            if self.fleet_set(fleet.fleet_index):
+                pass
+            else:
+                # Refocus camera if fleet not
+                others = [f for f in fleets if isinstance(f, BossFleet) and f != fleet]
+                if others:
+                    other: BossFleet = others[0]
+                    self.fleet_set(other.fleet_index)
+                    self.fleet_set(fleet.fleet_index)
                 else:
-                    # Refocus camera if fleet not
-                    others = [f for f in fleets if isinstance(f, BossFleet) and f != fleet]
-                    if others:
-                        other: BossFleet = others[0]
-                        self.fleet_set(other.fleet_index)
-                        self.fleet_set(fleet.fleet_index)
-                    else:
-                        logger.warning(f"No other fleets from {fleets}, skip refocus")
+                    logger.warning(f"No other fleets from {fleets}, skip refocus")
 
-                # Check fleet
-                self.handle_os_map_fleet_lock(enable=False)
-                if self.fleet_low_resolve_appear():
-                    logger.warning("Skip using current fleet because of the low resolve debuff")
-                    self.boss_goto(
-                        location=fleet.standby_loca, has_fleet_step=has_fleet_step, drop=drop, is_month=is_month
-                    )
-                    continue
+            # Check fleet
+            self.handle_os_map_fleet_lock(enable=False)
+            if self.fleet_low_resolve_appear():
+                logger.warning("Skip using current fleet because of the low resolve debuff")
+                self.boss_goto(location=fleet.standby_loca, has_fleet_step=has_fleet_step, is_month=is_month)
+                continue
 
-                # Ensure boss is appear
-                if is_month:
-                    while not self.radar.select(is_enemy=True):
-                        self.relative_goto(has_fleet_step=True, is_question=True, relative_position=(1, -6), index=0)
-                        try:
-                            self.relative_goto(has_fleet_step=True, is_question=True, index=1)
-                        except IndexError:
-                            self.relative_goto(
-                                has_fleet_step=True, is_question=True, relative_position=(1, -7), index=0
-                            )
+            # Ensure boss is appear
+            if is_month:
+                while not self.radar.select(is_enemy=True):
+                    self.relative_goto(has_fleet_step=True, is_question=True, relative_position=(1, -6), index=0)
+                    try:
+                        self.relative_goto(has_fleet_step=True, is_question=True, index=1)
+                    except IndexError:
+                        self.relative_goto(has_fleet_step=True, is_question=True, relative_position=(1, -7), index=0)
 
-                # Attack
-                self.boss_goto(location=(0, 0), has_fleet_step=has_fleet_step, drop=drop, is_month=is_month)
+            # Attack
+            self.boss_goto(location=(0, 0), has_fleet_step=has_fleet_step, is_month=is_month)
 
-                # End
-                self.predict_radar()
-                if self.radar.select(is_question=True):
-                    logger.info("BOSS clear")
-                    if drop.count:
-                        drop.add(self.device.image)
-                    self.map_exit()
-                    return True
+            # End
+            self.predict_radar()
+            if self.radar.select(is_question=True):
+                logger.info("BOSS clear")
+                self.map_exit()
+                return True
 
-                # Standby
-                self.boss_leave()
-                if fleet.standby_loca != (0, 0):
-                    self.boss_goto(location=fleet.standby_loca, has_fleet_step=has_fleet_step, drop=drop)
-                else:
-                    if drop.count:
-                        drop.add(self.device.image)
-                    break
+            # Standby
+            self.boss_leave()
+            if fleet.standby_loca != (0, 0):
+                self.boss_goto(location=fleet.standby_loca, has_fleet_step=has_fleet_step)
+            else:
+                break
 
         logger.critical("Unable to clear boss, fleets exhausted")
         return False

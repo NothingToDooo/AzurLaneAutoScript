@@ -140,42 +140,36 @@ class MeowfficerBuy(MeowfficerBase):
         # 这里用简单点击，避免重复点击 MEOWFFICER_BUY。
         logger.hr("Meow confirm")
         executed = False
-        with self.stat.new(
-            genre="meowfficer_buy",
-            method=self.config.DropRecord_MeowfficerBuy,
-        ) as drop:
-            while 1:
-                if skip_first_screenshot:
-                    skip_first_screenshot = False
+        while 1:
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
+
+            if self.appear(meow_assets.MEOWFFICER_BUY, offset=(20, 20), interval=3):
+                if executed:
+                    self.device.click(MEOWFFICER_GOTO_DORMMENU)
                 else:
-                    self.device.screenshot()
+                    self.device.click(meow_assets.MEOWFFICER_BUY)
+                continue
+            if self.handle_meow_popup_confirm():
+                executed = True
+                continue
+            if self.appear_then_click(meow_assets.MEOWFFICER_BUY_SKIP, interval=3):
+                executed = True
+                continue
+            if self.appear(GET_ITEMS_1, offset=5, interval=3):
+                self.device.click(meow_assets.MEOWFFICER_BUY_SKIP)
+                self.interval_clear(meow_assets.MEOWFFICER_BUY)
+                executed = True
+                continue
+            # 少见情况下这里会弹出 MEOWFFICER_INFO。
+            if self.meow_additional():
+                continue
 
-                if self.appear(meow_assets.MEOWFFICER_BUY, offset=(20, 20), interval=3):
-                    if executed:
-                        self.device.click(MEOWFFICER_GOTO_DORMMENU)
-                    else:
-                        self.device.click(meow_assets.MEOWFFICER_BUY)
-                    continue
-                if self.handle_meow_popup_confirm():
-                    executed = True
-                    continue
-                if self.appear_then_click(meow_assets.MEOWFFICER_BUY_SKIP, interval=3):
-                    executed = True
-                    continue
-                if self.appear(GET_ITEMS_1, offset=5, interval=3):
-                    if drop.save is True:
-                        drop.handle_add(self, before=2)
-                    self.device.click(meow_assets.MEOWFFICER_BUY_SKIP)
-                    self.interval_clear(meow_assets.MEOWFFICER_BUY)
-                    executed = True
-                    continue
-                # 少见情况下这里会弹出 MEOWFFICER_INFO。
-                if self.meow_additional():
-                    continue
-
-                # 结束。
-                if self.match_template_color(meow_assets.MEOWFFICER_BUY_ENTER, offset=(20, 20)):
-                    break
+            # 结束。
+            if self.match_template_color(meow_assets.MEOWFFICER_BUY_ENTER, offset=(20, 20)):
+                break
 
     def meow_buy(self) -> None:
         """

@@ -496,78 +496,68 @@ class RewardCommission(UI, InfoHandler):
 
         reward = False
         click_timer = Timer(1)
-        with self.stat.new("commission", method=self.config.DropRecord_CommissionRecord) as drop:
-            while 1:
-                if skip_first_screenshot:
-                    skip_first_screenshot = False
-                else:
-                    self.device.screenshot()
+        while 1:
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
 
-                # 结束。
-                if self.ui_page_appear(page_commission, offset=(20, 20)):
-                    # 留在委托页时，委托奖励可能弹出过慢，导致 UI 切换卡住。
-                    break
+            # 结束。
+            if self.ui_page_appear(page_commission, offset=(20, 20)):
+                # 留在委托页时，委托奖励可能弹出过慢，导致 UI 切换卡住。
+                break
 
-                for button in [
-                    commission_assets.EXP_INFO_S_REWARD,
-                    combat_assets.GET_ITEMS_1,
-                    combat_assets.GET_ITEMS_2,
-                    combat_assets.GET_ITEMS_3,
-                ]:
-                    if self.appear(button, interval=1):
-                        if drop:
-                            self.ensure_no_info_bar(timeout=1)
-                            drop.add(self.device.image)
-
-                        commission_assets.REWARD_SAVE_CLICK.name = button.name
-                        self.device.click(commission_assets.REWARD_SAVE_CLICK)
-                        click_timer.reset()
-                        reward = True
-                        continue
-                if click_timer.reached() and self.appear_then_click(
-                    commission_assets.REWARD_1, offset=(20, 20), interval=1
-                ):
-                    self.interval_reset(combat_assets.GET_SHIP)
+            for button in [
+                commission_assets.EXP_INFO_S_REWARD,
+                combat_assets.GET_ITEMS_1,
+                combat_assets.GET_ITEMS_2,
+                combat_assets.GET_ITEMS_3,
+            ]:
+                if self.appear(button, interval=1):
+                    commission_assets.REWARD_SAVE_CLICK.name = button.name
+                    self.device.click(commission_assets.REWARD_SAVE_CLICK)
                     click_timer.reset()
                     reward = True
                     continue
-                if click_timer.reached() and self.appear_then_click(REWARD_1_WHITE, offset=(20, 20), interval=1):
-                    self.interval_reset(combat_assets.GET_SHIP)
+            if click_timer.reached() and self.appear_then_click(
+                commission_assets.REWARD_1, offset=(20, 20), interval=1
+            ):
+                self.interval_reset(combat_assets.GET_SHIP)
+                click_timer.reset()
+                reward = True
+                continue
+            if click_timer.reached() and self.appear_then_click(REWARD_1_WHITE, offset=(20, 20), interval=1):
+                self.interval_reset(combat_assets.GET_SHIP)
+                click_timer.reset()
+                reward = True
+                continue
+            if click_timer.reached() and self.appear_then_click(REWARD_GOTO_COMMISSION, offset=(20, 20)):
+                self.interval_reset(combat_assets.GET_SHIP)
+                click_timer.reset()
+                continue
+            if click_timer.reached() and self.appear_then_click(REWARD_GOTO_COMMISSION_WHITE, offset=(20, 20)):
+                self.interval_reset(combat_assets.GET_SHIP)
+                click_timer.reset()
+                continue
+            if self.ui_main_appear_then_click(page_reward, interval=3):
+                self.interval_reset(combat_assets.GET_SHIP)
+                # 不需要重置 click_timer，直接立即点击 REWARD_1。
+                # click_timer.reset()
+                continue
+            # 处理石油已满。
+            if self.config.SERVER == "cn" and self.appear(commission_assets.OIL_MAXED, offset=(20, 20), interval=3):
+                raise OilMaxed
+            # 最后检查 GET_SHIP，以处理主界面随机白底。
+            for button in [combat_assets.GET_SHIP]:
+                if click_timer.reached() and self.appear(button, interval=1):
+                    commission_assets.REWARD_SAVE_CLICK.name = button.name
+                    self.device.click(commission_assets.REWARD_SAVE_CLICK)
                     click_timer.reset()
                     reward = True
                     continue
-                if click_timer.reached() and self.appear_then_click(REWARD_GOTO_COMMISSION, offset=(20, 20)):
-                    self.interval_reset(combat_assets.GET_SHIP)
-                    click_timer.reset()
-                    continue
-                if click_timer.reached() and self.appear_then_click(REWARD_GOTO_COMMISSION_WHITE, offset=(20, 20)):
-                    self.interval_reset(combat_assets.GET_SHIP)
-                    click_timer.reset()
-                    continue
-                if self.ui_main_appear_then_click(page_reward, interval=3):
-                    self.interval_reset(combat_assets.GET_SHIP)
-                    # 不需要重置 click_timer，直接立即点击 REWARD_1。
-                    # click_timer.reset()
-                    continue
-                # 处理石油已满。
-                if self.config.SERVER == "cn" and self.appear(
-                    commission_assets.OIL_MAXED, offset=(20, 20), interval=3
-                ):
-                    raise OilMaxed
-                # 最后检查 GET_SHIP，以处理主界面随机白底。
-                for button in [combat_assets.GET_SHIP]:
-                    if click_timer.reached() and self.appear(button, interval=1):
-                        self.ensure_no_info_bar(timeout=1)
-                        drop.add(self.device.image)
-
-                        commission_assets.REWARD_SAVE_CLICK.name = button.name
-                        self.device.click(commission_assets.REWARD_SAVE_CLICK)
-                        click_timer.reset()
-                        reward = True
-                        continue
-                if click_timer.reached() and self.ui_additional():
-                    click_timer.reset()
-                    continue
+            if click_timer.reached() and self.ui_additional():
+                click_timer.reset()
+                continue
 
         return reward
 

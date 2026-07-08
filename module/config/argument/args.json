@@ -130,60 +130,6 @@
         ]
       }
     },
-    "DropRecord": {
-      "SaveFolder": {
-        "type": "input",
-        "value": "./screenshots"
-      },
-      "ResearchRecord": {
-        "type": "select",
-        "value": "do_not",
-        "option": [
-          "do_not",
-          "save"
-        ]
-      },
-      "CommissionRecord": {
-        "type": "select",
-        "value": "do_not",
-        "option": [
-          "do_not",
-          "save"
-        ]
-      },
-      "CombatRecord": {
-        "type": "select",
-        "value": "do_not",
-        "option": [
-          "do_not",
-          "save"
-        ]
-      },
-      "OpsiRecord": {
-        "type": "select",
-        "value": "do_not",
-        "option": [
-          "do_not",
-          "save"
-        ]
-      },
-      "MeowfficerBuy": {
-        "type": "select",
-        "value": "do_not",
-        "option": [
-          "do_not",
-          "save"
-        ]
-      },
-      "MeowfficerTalent": {
-        "type": "select",
-        "value": "do_not",
-        "option": [
-          "do_not",
-          "save"
-        ]
-      }
-    },
     "Storage": {
       "Storage": {
         "type": "storage",

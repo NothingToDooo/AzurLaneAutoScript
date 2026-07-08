@@ -444,52 +444,6 @@
       "close_game": "关闭游戏"
     }
   },
-  "DropRecord": {
-    "_info": {
-      "name": "掉落记录",
-      "help": ""
-    },
-    "SaveFolder": {
-      "name": "掉落保存目录",
-      "help": ""
-    },
-    "ResearchRecord": {
-      "name": "科研截图",
-      "help": "",
-      "do_not": "无操作",
-      "save": "保存"
-    },
-    "CommissionRecord": {
-      "name": "委托截图",
-      "help": "",
-      "do_not": "无操作",
-      "save": "保存"
-    },
-    "CombatRecord": {
-      "name": "战斗掉落截图",
-      "help": "启用后会放缓结算时的点击速度\n在自律寻敌下不生效",
-      "do_not": "无操作",
-      "save": "保存"
-    },
-    "OpsiRecord": {
-      "name": "大世界掉落截图",
-      "help": "",
-      "do_not": "无操作",
-      "save": "保存"
-    },
-    "MeowfficerBuy": {
-      "name": "指挥喵购买截图",
-      "help": "",
-      "do_not": "无操作",
-      "save": "保存"
-    },
-    "MeowfficerTalent": {
-      "name": "指挥喵天赋截图",
-      "help": "",
-      "do_not": "无操作",
-      "save": "保存"
-    }
-  },
   "Retirement": {
     "_info": {
       "name": "退役设置",

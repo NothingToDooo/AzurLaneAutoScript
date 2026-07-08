@@ -613,8 +613,6 @@ class ConfigUpdater:
                 or (display == "hide" and typ != "stored")
             ):
                 value = data["value"]
-            if len(keys) >= 3 and keys[-2] == "DropRecord" and value in {"upload", "save_and_upload"}:
-                value = "save" if value == "save_and_upload" else "do_not"
             value = parse_value(value, data=data)
             deep_set(new, keys=keys, value=value)
 

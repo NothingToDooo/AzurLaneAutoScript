@@ -117,127 +117,126 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         self.map_clear_percentage_prev = -1
         self.map_clear_percentage_timer.reset()
 
-        with self.stat.new(genre=self.config.campaign_name, method=self.config.DropRecord_CombatRecord) as drop:
-            while 1:
-                if skip_first_screenshot:
-                    skip_first_screenshot = False
-                else:
-                    self.device.screenshot()
+        while 1:
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
 
-                # 检查异常。
-                if campaign_click > 5:
-                    logger.critical(f"Failed to enter {button}, too many click on {button}")
-                    logger.critical("Possible reason #1: You haven't reached the commander level to unlock this stage.")
-                    raise RequestHumanTakeover
-                if fleet_click > 5:
-                    logger.critical(f"Failed to enter {button}, too many click on FLEET_PREPARATION")
-                    logger.critical(
-                        "Possible reason #1: Your fleets haven't satisfied the stat restrictions of this stage."
-                    )
-                    logger.critical(
-                        "Possible reason #2: "
-                        "This stage can only be farmed once a day, "
-                        "but it's the second time that you are entering"
-                    )
-                    raise RequestHumanTakeover
+            # 检查异常。
+            if campaign_click > 5:
+                logger.critical(f"Failed to enter {button}, too many click on {button}")
+                logger.critical("Possible reason #1: You haven't reached the commander level to unlock this stage.")
+                raise RequestHumanTakeover
+            if fleet_click > 5:
+                logger.critical(f"Failed to enter {button}, too many click on FLEET_PREPARATION")
+                logger.critical(
+                    "Possible reason #1: Your fleets haven't satisfied the stat restrictions of this stage."
+                )
+                logger.critical(
+                    "Possible reason #2: "
+                    "This stage can only be farmed once a day, "
+                    "but it's the second time that you are entering"
+                )
+                raise RequestHumanTakeover
 
-                # 已经在地图内。
-                if not checked_in_map and self.is_in_map():
-                    logger.info("Already in map, skip enter_map.")
-                    return False
-                checked_in_map = True
+            # 已经在地图内。
+            if not checked_in_map and self.is_in_map():
+                logger.info("Already in map, skip enter_map.")
+                return False
+            checked_in_map = True
 
-                # 误点击。
-                if self.appear(DAILY_CHECK, offset=(20, 20), interval=3):
-                    logger.info(f"{DAILY_CHECK} -> {BACK_ARROW}")
-                    self.device.click(BACK_ARROW)
-                    continue
+            # 误点击。
+            if self.appear(DAILY_CHECK, offset=(20, 20), interval=3):
+                logger.info(f"{DAILY_CHECK} -> {BACK_ARROW}")
+                self.device.click(BACK_ARROW)
+                continue
 
-                # 地图准备。
-                if map_timer.reached() and self.handle_map_mode_switch(mode) and self.handle_map_preparation():
-                    self.map_get_info()
-                    self.handle_map_walk_speedup()
-                    self.handle_fast_forward()
-                    self.handle_auto_search()
-                    if self.triggered_map_stop():
-                        self.enter_map_cancel()
-                        self.handle_map_stop()
-                        raise ScriptEnd(f"Reach condition: {self.config.StopCondition_MapAchievement}")
-                    self.device.click(map_assets.MAP_PREPARATION)
-                    map_click += 1
-                    map_timer.reset()
-                    campaign_timer.reset()
-                    continue
+            # 地图准备。
+            if map_timer.reached() and self.handle_map_mode_switch(mode) and self.handle_map_preparation():
+                self.map_get_info()
+                self.handle_map_walk_speedup()
+                self.handle_fast_forward()
+                self.handle_auto_search()
+                if self.triggered_map_stop():
+                    self.enter_map_cancel()
+                    self.handle_map_stop()
+                    raise ScriptEnd(f"Reach condition: {self.config.StopCondition_MapAchievement}")
+                self.device.click(map_assets.MAP_PREPARATION)
+                map_click += 1
+                map_timer.reset()
+                campaign_timer.reset()
+                continue
 
-                # 舰队准备。
-                if fleet_timer.reached() and self.appear(map_assets.FLEET_PREPARATION, offset=(20, 50)):
-                    if mode in {"normal", "hard"}:
-                        self.handle_2x_book_setting(mode="prep")
-                        self.fleet_preparation()
-                        self.handle_auto_submarine_call_disable()
-                        self.handle_auto_search_setting()
-                        self.map_fleet_checked = True
-                    self.device.click(map_assets.FLEET_PREPARATION)
-                    fleet_click += 1
-                    fleet_timer.reset()
-                    campaign_timer.reset()
-                    continue
+            # 舰队准备。
+            if fleet_timer.reached() and self.appear(map_assets.FLEET_PREPARATION, offset=(20, 50)):
+                if mode in {"normal", "hard"}:
+                    self.handle_2x_book_setting(mode="prep")
+                    self.fleet_preparation()
+                    self.handle_auto_submarine_call_disable()
+                    self.handle_auto_search_setting()
+                    self.map_fleet_checked = True
+                self.device.click(map_assets.FLEET_PREPARATION)
+                fleet_click += 1
+                fleet_timer.reset()
+                campaign_timer.reset()
+                continue
 
-                # 继续自律寻敌。
-                if self.handle_auto_search_continue():
-                    campaign_timer.reset()
-                    continue
+            # 继续自律寻敌。
+            if self.handle_auto_search_continue():
+                campaign_timer.reset()
+                continue
 
-                # 退役。
-                if self.handle_retirement():
-                    continue
+            # 退役。
+            if self.handle_retirement():
+                continue
 
-                # 使用数据密钥。
-                if self.handle_use_data_key():
-                    continue
+            # 使用数据密钥。
+            if self.handle_use_data_key():
+                continue
 
-                # 16-1/16-2 潜艇支援弹窗。
-                if self.handle_submarine_support_popup():
-                    continue
+            # 16-1/16-2 潜艇支援弹窗。
+            if self.handle_submarine_support_popup():
+                continue
 
-                # 心情。
-                if self.handle_combat_low_emotion():
-                    continue
+            # 心情。
+            if self.handle_combat_low_emotion():
+                continue
 
-                # 紧急委托。
-                if self.handle_urgent_commission(drop=drop):
-                    continue
+            # 紧急委托。
+            if self.handle_urgent_commission():
+                continue
 
-                # 2 倍书弹窗。
-                if self.handle_2x_book_popup():
-                    continue
+            # 2 倍书弹窗。
+            if self.handle_2x_book_popup():
+                continue
 
-                # 剧情跳过。
-                if self.handle_story_skip():
-                    campaign_timer.reset()
-                    continue
+            # 剧情跳过。
+            if self.handle_story_skip():
+                campaign_timer.reset()
+                continue
 
-                # 进入关卡。
-                if campaign_timer.reached() and self.appear_then_click(button):
-                    campaign_click += 1
-                    campaign_timer.reset()
-                    continue
+            # 进入关卡。
+            if campaign_timer.reached() and self.appear_then_click(button):
+                campaign_click += 1
+                campaign_timer.reset()
+                continue
 
-                # 结束。
-                if self.map_is_auto_search:
-                    if self.is_auto_search_running():
-                        logger.info("is_auto_search_running appeared")
-                        break
-                    if hasattr(self, "is_combat_loading") and self.is_combat_loading():
-                        logger.warning("Entered map with is_combat_loading appeared")
-                        break
-                else:
-                    if hasattr(self, "is_combat_loading") and self.is_combat_loading():
-                        logger.warning("Entered map with is_combat_loading appeared")
-                        break
-                    if self.handle_in_map_with_enemy_searching():
-                        # self.handle_map_after_combat_story()
-                        break
+            # 结束。
+            if self.map_is_auto_search:
+                if self.is_auto_search_running():
+                    logger.info("is_auto_search_running appeared")
+                    break
+                if hasattr(self, "is_combat_loading") and self.is_combat_loading():
+                    logger.warning("Entered map with is_combat_loading appeared")
+                    break
+            else:
+                if hasattr(self, "is_combat_loading") and self.is_combat_loading():
+                    logger.warning("Entered map with is_combat_loading appeared")
+                    break
+                if self.handle_in_map_with_enemy_searching():
+                    # self.handle_map_after_combat_story()
+                    break
 
         return True
 

@@ -293,47 +293,37 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
                   False if project requirements are not satisfied.
         """
         logger.hr("Research receive", level=3)
-        with self.stat.new(genre="research", method=self.config.DropRecord_ResearchRecord) as record:
-            # Take screenshots of project list
-            record.add(self.device.image)
+        # 点击完成项目，进入 GET_ITEMS_*。
+        confirm_timer = Timer(1.5, count=5)
+        record_button = None
+        while 1:
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
 
-            # Click finished project, to GET_ITEMS_*
-            confirm_timer = Timer(1.5, count=5)
-            record_button = None
-            while 1:
-                if skip_first_screenshot:
-                    skip_first_screenshot = False
+            if self.appear(RESEARCH_CHECK, offset=(20, 20), interval=10) and self.research_has_finished():
+                self.device.click(RESEARCH_ENTRANCE[self._research_finished_index])
+
+            if self.appear(research_assets.RESEARCH_STOP, offset=(20, 20)):
+                logger.info("The research time is up, but requirements are not satisfied")
+                self.research_project_started = None
+                self.research_detail_quit()
+                return False
+            # 误入其他科研项目。
+            if self.appear(research_assets.RESEARCH_START, offset=(20, 20), interval=5):
+                self.device.click(research_assets.RESEARCH_DETAIL_QUIT)
+                continue
+
+            appear_button = self.get_items()
+            if appear_button is not None:
+                if appear_button == record_button:
+                    if confirm_timer.reached():
+                        break
                 else:
-                    self.device.screenshot()
-
-                if (
-                    self.appear(RESEARCH_CHECK, offset=(20, 20), interval=10)
-                    and self.research_has_finished()
-                ):
-                    self.device.click(RESEARCH_ENTRANCE[self._research_finished_index])
-
-                if self.appear(research_assets.RESEARCH_STOP, offset=(20, 20)):
-                    logger.info("The research time is up, but requirements are not satisfied")
-                    self.research_project_started = None
-                    self.research_detail_quit()
-                    return False
-                # Entered another project accidentally
-                if self.appear(research_assets.RESEARCH_START, offset=(20, 20), interval=5):
-                    self.device.click(research_assets.RESEARCH_DETAIL_QUIT)
-                    continue
-
-                appear_button = self.get_items()
-                if appear_button is not None:
-                    if appear_button == record_button:
-                        if confirm_timer.reached():
-                            break
-                    else:
-                        logger.info(f"{appear_button} appeared")
-                        record_button = appear_button
-                        confirm_timer.reset()
-
-            # Take screenshots of items
-            self.drop_record(drop=record)
+                    logger.info(f"{appear_button} appeared")
+                    record_button = appear_button
+                    confirm_timer.reset()
 
         # Close GET_ITEMS_*, to project list
         self.ui_click(
@@ -358,64 +348,34 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         """
         logger.hr("Queue receive", level=1)
         total = 0
-        with self.stat.new(genre="research", method=self.config.DropRecord_ResearchRecord) as drop:
-            # Take screenshots of project list
-            drop.add(self.device.image)
+        end_confirm = Timer(1, count=3)
+        item_interval = Timer(0.2, count=0)
+        while 1:
+            if skip_first_screenshot:
+                skip_first_screenshot = False
+            else:
+                self.device.screenshot()
 
-            end_confirm = Timer(1, count=3)
-            item_confirm = Timer(1.5, count=5)
-            item_interval = Timer(0.2, count=0)
-            record_button = None
-            while 1:
-                if skip_first_screenshot:
-                    skip_first_screenshot = False
-                else:
-                    self.device.screenshot()
+            # 结束。
+            # 不加 offset，只做颜色检测。
+            if self.is_in_queue() and not self.appear(research_assets.QUEUE_CLAIM_REWARD, offset=None):
+                if end_confirm.reached():
+                    break
+            else:
+                end_confirm.reset()
 
-                # 结束。
-                # 不加 offset，只做颜色检测。
-                if self.is_in_queue() and not self.appear(research_assets.QUEUE_CLAIM_REWARD, offset=None):
-                    if end_confirm.reached():
-                        break
-                else:
-                    end_confirm.reset()
-
-                # Get items
-                if drop:
-                    # record item drop
-                    appear_button = self.get_items()
-                    if appear_button is not None:
-                        if appear_button == record_button:
-                            if item_confirm.reached():
-                                # 记录掉落并关闭掉落弹窗。
-                                self.drop_record(drop=drop)
-                                self.device.click(research_assets.GET_ITEMS_RESEARCH_SAVE)
-                                item_confirm.reset()
-                                record_button = None
-                                total += 1
-                                continue
-                        else:
-                            logger.info(f"{appear_button} appeared")
-                            record_button = appear_button
-                            item_confirm.reset()
-                    else:
-                        item_confirm.reset()
-                        record_button = None
-                # 不保存掉落，直接点击。
-                elif item_interval.reached():
-                    appear_button = self.get_items()
-                    if appear_button is not None:
-                        self.device.click(research_assets.GET_ITEMS_RESEARCH_SAVE)
-                        item_interval.reset()
-                        total += 1
-                        continue
-
-                # 领取奖励。
-                if self.appear_then_click(research_assets.QUEUE_CLAIM_REWARD, offset=None, interval=5):
+            # 关闭掉落弹窗。
+            if item_interval.reached():
+                appear_button = self.get_items()
+                if appear_button is not None:
+                    self.device.click(research_assets.GET_ITEMS_RESEARCH_SAVE)
+                    item_interval.reset()
+                    total += 1
                     continue
 
-            if total <= 0:
-                drop.clear()
+            # 领取奖励。
+            if self.appear_then_click(research_assets.QUEUE_CLAIM_REWARD, offset=None, interval=5):
+                continue
 
         logger.info(f"Received rewards from {total} projects")
         return total
@@ -440,10 +400,9 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             self.ensure_research_center_stable()
         self.research_detect()
 
-    def research_queue_append(self, drop=None, add_queue=True):
+    def research_queue_append(self, add_queue=True):
         """
         Args:
-            drop (DropImage):
             add_queue (bool): Whether to add into queue.
                 The 6th project can't be added into queue, so here's the toggle.
 
@@ -451,21 +410,15 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             bool: If success to start a project
         """
         self.research_project_started = None
-        project_record = None
         for _ in range(2):
             logger.hr("Research select", level=2)
             self.research_project_list_init(from_queue=True)
-            project_record = self.device.image
             priority = self.research_sort_filter()
-            result = self.research_select(priority, drop=drop, add_queue=add_queue)
+            result = self.research_select(priority, add_queue=add_queue)
             if result:
                 break
 
-        if self.research_project_started is not None:
-            if project_record is not None:
-                drop.add(project_record)
-            return True
-        return False
+        return self.research_project_started is not None
 
     def research_fill_queue(self):
         """
@@ -479,28 +432,27 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         """
         logger.hr("Research fill queue", level=1)
         total = 0
-        with self.stat.new(genre="research", method=self.config.DropRecord_ResearchRecord) as drop:
-            for _ in range(5):
-                if self.get_queue_slot() > 0:
-                    success = self.research_queue_append(drop=drop)
-                    if success:
-                        total += 1
-                    else:
-                        logger.info(f"Unable to start a project, stop filling queue, queue added: {total}")
-                        return total
+        for _ in range(5):
+            if self.get_queue_slot() > 0:
+                success = self.research_queue_append()
+                if success:
+                    total += 1
                 else:
-                    break
-
-            # Run the 6th project
-            status = self.get_research_status(self.device.image)
-            if "waiting" not in status:
-                logger.info("Select the 6th research")
-                self.research_queue_append(drop=drop, add_queue=False)
+                    logger.info(f"Unable to start a project, stop filling queue, queue added: {total}")
+                    return total
             else:
-                logger.info("6th research already waiting")
+                break
 
-            logger.info(f"Research queue full filled, queue added: {total}")
-            return total
+        # Run the 6th project
+        status = self.get_research_status(self.device.image)
+        if "waiting" not in status:
+            logger.info("Select the 6th research")
+            self.research_queue_append(add_queue=False)
+        else:
+            logger.info("6th research already waiting")
+
+        logger.info(f"Research queue full filled, queue added: {total}")
+        return total
 
     def receive_6th_research(self, skip_first_screenshot=True):
         """
