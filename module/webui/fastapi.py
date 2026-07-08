@@ -51,6 +51,8 @@ def _patch_pywebio_coroutine_checker() -> None:
 
 _patch_pywebio_coroutine_checker()
 
+LIFESPAN_CALLBACKS_CONFLICT_MESSAGE = "lifespan 不能和 on_startup/on_shutdown 同时使用。"
+
 
 @dataclass(slots=True)
 class AsgiAppOptions:
@@ -94,7 +96,7 @@ def _build_lifespan(starlette_settings):
     lifespan = starlette_settings.pop("lifespan", None)
     if lifespan is not None:
         if on_startup or on_shutdown:
-            raise ValueError("lifespan 不能和 on_startup/on_shutdown 同时使用。")
+            raise ValueError(LIFESPAN_CALLBACKS_CONFLICT_MESSAGE)
         return lifespan
     if not on_startup and not on_shutdown:
         return None

@@ -513,12 +513,15 @@ class WebUITestError(Exception):
     pass
 
 
+WEBUI_TEST_ERROR_MESSAGE = "quq"
+
+
 def raise_exception(x=3):
     """用于手动测试 WebUI 异常展示。"""
     if x > 0:
         raise_exception(x - 1)
     else:
-        raise WebUITestError("quq")
+        raise WebUITestError(WEBUI_TEST_ERROR_MESSAGE)
 
 
 def get_alas_config_listen_path(args):

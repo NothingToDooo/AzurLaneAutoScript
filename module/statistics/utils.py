@@ -13,6 +13,9 @@ class ImageInvalidResolution(ImageError):
     """图片不是 1280x720 或其纵向拼接尺寸。"""
 
 
+UNEXPECTED_IMAGE_SIZE_TEMPLATE = "Unexpected image size: {size}"
+
+
 def load_folder(folder, ext=".png"):
     """
     Args:
@@ -63,5 +66,6 @@ def unpack(image):
     if size == (1280, 720):
         return [image]
     if size[0] != 1280 or size[1] % 720 != 0:
-        raise ImageInvalidResolution(f"Unexpected image size: {size}")
+        message = UNEXPECTED_IMAGE_SIZE_TEMPLATE.format(size=size)
+        raise ImageInvalidResolution(message)
     return [crop(image, (0, n * 720, 1280, (n + 1) * 720)) for n in range(size[1] // 720)]

@@ -28,6 +28,9 @@ class StorageFull(Exception):
     pass
 
 
+UNKNOWN_BOX_TEMPLATE_RARITY_TEMPLATE = "Unknown box template rarity: {rarity}"
+
+
 class StorageHandler(StorageUI):
     storage_has_boxes = True
 
@@ -41,7 +44,8 @@ class StorageHandler(StorageUI):
             return storage_assets.TEMPLATE_BOX_T3
         if rarity == 4:
             return storage_assets.TEMPLATE_BOX_T4
-        raise ScriptError(f"Unknown box template rarity: {rarity}")
+        message = UNKNOWN_BOX_TEMPLATE_RARITY_TEMPLATE.format(rarity=rarity)
+        raise ScriptError(message)
 
     def _handle_use_box_amount(self, amount):
         """设置单次开箱数量。

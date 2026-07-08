@@ -318,6 +318,9 @@ class LoggerDemoError(Exception):
     pass
 
 
+LOGGER_DEMO_ERROR_MESSAGE = "Exception"
+
+
 def show():
     logger.info("INFO")
     logger.warning("WARNING")
@@ -332,7 +335,7 @@ def show():
     logger.info(r"True, False, None")
     logger.info(r"F:/alas/gui.py, F:/alas/alas.py, ./relative/path/log.txt")
     # Line before exception
-    raise LoggerDemoError("Exception")
+    raise LoggerDemoError(LOGGER_DEMO_ERROR_MESSAGE)
     # Line below exception
 
 
