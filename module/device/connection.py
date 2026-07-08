@@ -702,42 +702,42 @@ class Connection(ConnectionAttr):
                 )
         return SelectedGrids(devices)
 
-    def detect_device(self):
-        """
-        查找可用设备。
+    def _brute_force_connect_emulators(self):
+        logger.info("Brute force connect")
+        EmulatorManager = import_module("module.device.platform.emulator_windows").EmulatorManager
+        self.adb_brute_force_connect(EmulatorManager().all_emulator_serials)
 
-        如果 serial=='auto' 且只检测到 1 个设备，则使用它。
-        """
-        logger.hr("Detect device")
+    @staticmethod
+    def _log_available_devices(available):
+        for device in available:
+            logger.info(device.serial)
+        if not len(available):
+            logger.info("No available devices")
+
+    @staticmethod
+    def _log_unavailable_devices(devices, available):
+        unavailable = devices.delete(available)
+        if len(unavailable):
+            logger.info("Here are the devices detected but unavailable")
+            for device in unavailable:
+                logger.info(f"{device.serial} ({device.status})")
+
+    def _list_and_log_detected_devices(self):
+        logger.info(
+            "Here are the available devices, "
+            'copy to Alas.Emulator.Serial to use it or set Alas.Emulator.Serial="auto"'
+        )
+        devices = self.list_device()
+        available = devices.select(status="device")
+        self._log_available_devices(available)
+        self._log_unavailable_devices(devices, available)
+        return devices, available
+
+    def _detect_available_devices(self, brute_force_connect):
         available = SelectedGrids([])
         devices = SelectedGrids([])
-
-        @run_once
-        def brute_force_connect():
-            logger.info("Brute force connect")
-            EmulatorManager = import_module("module.device.platform.emulator_windows").EmulatorManager
-            self.adb_brute_force_connect(EmulatorManager().all_emulator_serials)
-
         for _ in range(2):
-            logger.info(
-                "Here are the available devices, "
-                'copy to Alas.Emulator.Serial to use it or set Alas.Emulator.Serial="auto"'
-            )
-            devices = self.list_device()
-
-            # 显示可用设备。
-            available = devices.select(status="device")
-            for device in available:
-                logger.info(device.serial)
-            if not len(available):
-                logger.info("No available devices")
-
-            # 显示不可用设备。
-            unavailable = devices.delete(available)
-            if len(unavailable):
-                logger.info("Here are the devices detected but unavailable")
-                for device in unavailable:
-                    logger.info(f"{device.serial} ({device.status})")
+            devices, available = self._list_and_log_detected_devices()
 
             # 暴力尝试连接 MuMu 实例。
             if self.config.Emulator_Serial == "auto" and available.count == 0:
@@ -745,85 +745,123 @@ class Connection(ConnectionAttr):
                 brute_force_connect()
                 continue
             break
+        return devices, available
+
+    def _apply_auto_detected_device(self, available):
+        """
+        根据可用设备处理 `auto` serial。
+        """
+        if self.config.Emulator_Serial != "auto":
+            return
+        if available.count == 0:
+            logger.critical(
+                "No available device found, auto device detection cannot work, "
+                'please set an exact serial in Alas.Emulator.Serial instead of using "auto"'
+            )
+            raise RequestHumanTakeover
+        if available.count == 1:
+            logger.info("Auto device detection found only one device, using it")
+            self.config.Emulator_Serial = self.serial = available[0].serial
+            del_cached_property(self, "adb")
+            return
+        if (
+            available.count == 2
+            and available.select(serial="127.0.0.1:7555")
+            and available.select(may_mumu12_family=True)
+        ):
+            logger.info("Auto device detection found MuMu12 device, using it")
+            # 对 127.0.0.1:7555 和 127.0.0.1:16384 这类 MuMu12 serial，
+            # 忽略 7555，使用 16384。
+            remain = available.select(may_mumu12_family=True).first_or_none()
+            self.config.Emulator_Serial = self.serial = remain.serial
+            del_cached_property(self, "adb")
+            return
+
+        logger.critical(
+            "Multiple devices found, auto device detection cannot decide which to choose, "
+            "please copy one of the available devices listed above to Alas.Emulator.Serial"
+        )
+        raise RequestHumanTakeover
+
+    def _redirect_mumu12_from_7555(self, available, brute_force_connect):
+        """
+        将 MuMu12 从 127.0.0.1:7555 重定向到 127.0.0.1:16xxx。
+
+        返回：
+            SelectedGrids：可能刷新过的可用设备列表。
+        """
+        if self.serial != "127.0.0.1:7555":
+            return available
+
+        for _ in range(2):
+            mumu12 = available.select(may_mumu12_family=True)
+            if mumu12.count == 1:
+                emu_serial = mumu12.first_or_none().serial
+                logger.warning(f"Redirect MuMu12 {self.serial} to {emu_serial}")
+                self.config.Emulator_Serial = self.serial = emu_serial
+                break
+            if mumu12.count >= 2:
+                logger.warning("Multiple MuMu12 serial found, cannot redirect")
+                break
+            # 只有 127.0.0.1:7555。
+            if self.is_mumu_over_version_356:
+                # is_mumu_over_version_356 和 nemud_app_keep_alive 已被缓存。
+                # 这里仍是同一个设备，可以接受。
+                logger.warning(f"Device {self.serial} is MuMu12 but corresponding port not found")
+                brute_force_connect()
+                devices = self.list_device()
+                available = devices.select(status="device")
+                self._log_available_devices(available)
+                continue
+            # MuMu6
+            break
+        return available
+
+    def _redirect_shifted_mumu12_port(self, available):
+        """
+        如果 MuMu12 动态端口发生小范围切换，只更新运行时 serial。
+        """
+        if not self.is_mumu12_family:
+            return
+
+        matched = False
+        for device in available.select(may_mumu12_family=True):
+            if device.port == self.port:
+                # 精确匹配。
+                matched = True
+                break
+        if matched:
+            return
+
+        for device in available.select(may_mumu12_family=True):
+            if -2 <= device.port - self.port <= 2:
+                # 端口发生切换。
+                logger.info(f"MuMu12 serial switched {self.serial} -> {device.serial}")
+                del_cached_property(self, "port")
+                del_cached_property(self, "is_mumu12_family")
+                del_cached_property(self, "is_mumu_family")
+                self.serial = device.serial
+                break
+
+    def detect_device(self):
+        """
+        查找可用设备。
+
+        如果 serial=='auto' 且只检测到 1 个设备，则使用它。
+        """
+        logger.hr("Detect device")
+        brute_force_connect = run_once(self._brute_force_connect_emulators)
+        _, available = self._detect_available_devices(brute_force_connect)
 
         # 自动检测设备。
-        if self.config.Emulator_Serial == "auto":
-            if available.count == 0:
-                logger.critical(
-                    "No available device found, auto device detection cannot work, "
-                    'please set an exact serial in Alas.Emulator.Serial instead of using "auto"'
-                )
-                raise RequestHumanTakeover
-            if available.count == 1:
-                logger.info("Auto device detection found only one device, using it")
-                self.config.Emulator_Serial = self.serial = available[0].serial
-                del_cached_property(self, "adb")
-            elif (
-                available.count == 2
-                and available.select(serial="127.0.0.1:7555")
-                and available.select(may_mumu12_family=True)
-            ):
-                logger.info("Auto device detection found MuMu12 device, using it")
-                # 对 127.0.0.1:7555 和 127.0.0.1:16384 这类 MuMu12 serial，
-                # 忽略 7555，使用 16384。
-                remain = available.select(may_mumu12_family=True).first_or_none()
-                self.config.Emulator_Serial = self.serial = remain.serial
-                del_cached_property(self, "adb")
-            else:
-                logger.critical(
-                    "Multiple devices found, auto device detection cannot decide which to choose, "
-                    "please copy one of the available devices listed above to Alas.Emulator.Serial"
-                )
-                raise RequestHumanTakeover
+        self._apply_auto_detected_device(available)
 
         # 将 MuMu12 从 127.0.0.1:7555 重定向到 127.0.0.1:16xxx。
-        if self.serial == "127.0.0.1:7555":
-            for _ in range(2):
-                mumu12 = available.select(may_mumu12_family=True)
-                if mumu12.count == 1:
-                    emu_serial = mumu12.first_or_none().serial
-                    logger.warning(f"Redirect MuMu12 {self.serial} to {emu_serial}")
-                    self.config.Emulator_Serial = self.serial = emu_serial
-                    break
-                if mumu12.count >= 2:
-                    logger.warning("Multiple MuMu12 serial found, cannot redirect")
-                    break
-                # 只有 127.0.0.1:7555。
-                if self.is_mumu_over_version_356:
-                    # is_mumu_over_version_356 和 nemud_app_keep_alive 已被缓存。
-                    # 这里仍是同一个设备，可以接受。
-                    logger.warning(f"Device {self.serial} is MuMu12 but corresponding port not found")
-                    brute_force_connect()
-                    devices = self.list_device()
-                    # 显示可用设备。
-                    available = devices.select(status="device")
-                    for device in available:
-                        logger.info(device.serial)
-                    if not len(available):
-                        logger.info("No available devices")
-                    continue
-                # MuMu6
-                break
+        available = self._redirect_mumu12_from_7555(available, brute_force_connect)
 
         # 如果 16384 被占用，MuMu12 会使用 16385，这里自动重定向。
         # 这是动态端口，不写回配置。
-        if self.is_mumu12_family:
-            matched = False
-            for device in available.select(may_mumu12_family=True):
-                if device.port == self.port:
-                    # 精确匹配。
-                    matched = True
-                    break
-            if not matched:
-                for device in available.select(may_mumu12_family=True):
-                    if -2 <= device.port - self.port <= 2:
-                        # 端口发生切换。
-                        logger.info(f"MuMu12 serial switched {self.serial} -> {device.serial}")
-                        del_cached_property(self, "port")
-                        del_cached_property(self, "is_mumu12_family")
-                        del_cached_property(self, "is_mumu_family")
-                        self.serial = device.serial
-                        break
+        self._redirect_shifted_mumu12_port(available)
 
     @retry
     def list_package(self, show_log=True):
