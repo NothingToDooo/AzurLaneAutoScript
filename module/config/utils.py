@@ -166,6 +166,36 @@ def alas_instance():
     return out
 
 
+def _parse_numeric_value(value: str):
+    parser = float if "." in value else int
+    try:
+        return parser(value)
+    except ValueError:
+        return value
+
+
+def _parse_datetime_value(value: str):
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return value
+
+
+def _parse_string_value(value: str):
+    if value == "":
+        return None
+    if value in {"true", "True"}:
+        return True
+    if value in {"false", "False"}:
+        return False
+
+    parsed = _parse_numeric_value(value)
+    if parsed != value:
+        return parsed
+
+    return _parse_datetime_value(value)
+
+
 def parse_value(value, data):
     """
     尽量把配置字符串转换成 bool、int、float 或 datetime。
@@ -179,29 +209,9 @@ def parse_value(value, data):
     """
     if "option" in data and value not in data["option"]:
         return data["value"]
-    if isinstance(value, str):
-        if value == "":
-            return None
-        if value in {"true", "True"}:
-            return True
-        if value in {"false", "False"}:
-            return False
-        if "." in value:
-            try:
-                return float(value)
-            except ValueError:
-                pass
-        else:
-            try:
-                return int(value)
-            except ValueError:
-                pass
-        try:
-            return datetime.fromisoformat(value)
-        except ValueError:
-            pass
-
-    return value
+    if not isinstance(value, str):
+        return value
+    return _parse_string_value(value)
 
 
 def data_to_type(data, **kwargs):
