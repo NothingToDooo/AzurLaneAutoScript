@@ -410,6 +410,29 @@ class CampaignRun(CampaignEvent):
             self.config.task_call("Commission", force_call=True)
             self.config.task_stop("Commission notice found")
 
+    def _ensure_campaign_run_ui(self, mode) -> None:
+        self.device.stuck_record_clear()
+        self.device.click_record_clear()
+        if not self.device.has_cached_image:
+            self.device.screenshot()
+        self.campaign.device.image = self.device.image
+        if self.campaign.is_in_map():
+            logger.info("Already in map, retreating.")
+            with suppress(CampaignEnd):
+                self.campaign.withdraw()
+            self.campaign.ensure_campaign_ui(name=self.stage, mode=mode)
+        elif self.campaign.is_in_auto_search_menu():
+            if self.can_use_auto_search_continue():
+                logger.info("In auto search menu, skip ensure_campaign_ui.")
+            else:
+                logger.info("In auto search menu, closing.")
+                # event_20240725 的任务平衡器会移除当前 campaign，只重新进入活动 UI。
+                self.campaign.ensure_campaign_ui(name=self.stage, mode=mode)
+        else:
+            self.campaign.ensure_campaign_ui(name=self.stage, mode=mode)
+        self.disable_raid_on_event()
+        self.handle_commission_notice()
+
     def _handle_campaign_after_run(self) -> bool:
         self.run_count += 1
         if self.config.StopCondition_RunCount:
@@ -456,28 +479,7 @@ class CampaignRun(CampaignEvent):
             else:
                 logger.info(f"Count: {self.run_count}")
 
-            # UI ensure
-            self.device.stuck_record_clear()
-            self.device.click_record_clear()
-            if not self.device.has_cached_image:
-                self.device.screenshot()
-            self.campaign.device.image = self.device.image
-            if self.campaign.is_in_map():
-                logger.info("Already in map, retreating.")
-                with suppress(CampaignEnd):
-                    self.campaign.withdraw()
-                self.campaign.ensure_campaign_ui(name=self.stage, mode=mode)
-            elif self.campaign.is_in_auto_search_menu():
-                if self.can_use_auto_search_continue():
-                    logger.info("In auto search menu, skip ensure_campaign_ui.")
-                else:
-                    logger.info("In auto search menu, closing.")
-                    # Because event_20240725 task balancer delete self.campaign.ensure_auto_search_exit()
-                    self.campaign.ensure_campaign_ui(name=self.stage, mode=mode)
-            else:
-                self.campaign.ensure_campaign_ui(name=self.stage, mode=mode)
-            self.disable_raid_on_event()
-            self.handle_commission_notice()
+            self._ensure_campaign_run_ui(mode)
 
             # if in hard mode, check remain times
             if self.ui_page_appear(page_campaign) and MODE_SWITCH_1.get(main=self) == "normal":
