@@ -352,6 +352,82 @@ class ConfigGenerator:
         with Path(filepath_code()).open("w", encoding="utf-8", newline="") as f:
             f.writelines(f"{text}\n" for text in lines)
 
+    @staticmethod
+    def _load_i18n_words(new, old, keys, default=True, words=("name", "help")) -> None:
+        for word in words:
+            key = [*keys, str(word)]
+            fallback = ".".join(key) if default else str(word)
+            value = deep_get(old, keys=key, default=fallback)
+            deep_set(new, keys=key, value=value)
+
+    def _generate_task_i18n(self, new, old) -> None:
+        # 菜单。
+        for path, _data in deep_iter(self.task, depth=3):
+            if "tasks" not in path:
+                continue
+            task_group, _, task = path
+            self._load_i18n_words(new, old, ["Menu", task_group])
+            self._load_i18n_words(new, old, ["Task", task])
+
+    def _generate_argument_i18n(self, new, old) -> None:
+        visited_group = set()
+        for path, data in deep_iter(self.argument, depth=2):
+            if path[0] not in visited_group:
+                self._load_i18n_words(new, old, [path[0], "_info"])
+                visited_group.add(path[0])
+            self._load_i18n_words(new, old, path)
+            if "option" in data:
+                self._load_i18n_words(new, old, path, words=data["option"], default=False)
+
+    def _event_names_by_directory(self):
+        # 只保留国服名称，其他服务器分支不再参与生成。
+        events = {}
+        for event in self.event:
+            name = event.cn
+            if name:
+                deep_default(events, keys=event.directory, value=name)
+        return events
+
+    def _generate_event_i18n(self, new) -> None:
+        events = self._event_names_by_directory()
+        for event in sorted(self.event):
+            name = events.get(event.directory, event.directory)
+            deep_set(new, keys=f"Campaign.Event.{event.directory}", value=name)
+
+    @staticmethod
+    def _generate_package_i18n(new) -> None:
+        for package, server in VALID_PACKAGE.items():
+            path = ["Emulator", "PackageName", package]
+            if deep_get(new, keys=path) == package:
+                deep_set(new, keys=path, value=server.upper())
+
+    @staticmethod
+    def _server_i18n_prefix(server):
+        prefix = server.split("_")[0].upper()
+        return "国服" if prefix == "CN" else prefix
+
+    def _generate_server_i18n(self, new) -> None:
+        for server, server_list in VALID_SERVER_LIST.items():
+            for index, name in enumerate(server_list):
+                path = ["Emulator", "ServerName", f"{server}-{index}"]
+                prefix = self._server_i18n_prefix(server)
+                deep_set(new, keys=path, value=f"[{prefix}] {name}")
+
+    def _generate_gui_i18n(self, new, old) -> None:
+        for path, _ in deep_iter(self.gui, depth=2):
+            group, key = path
+            self._load_i18n_words(new, old, keys=["Gui", group], words=(key,))
+
+    def generate_i18n_data(self, old):
+        new = {}
+        self._generate_task_i18n(new, old)
+        self._generate_argument_i18n(new, old)
+        self._generate_event_i18n(new)
+        self._generate_package_i18n(new)
+        self._generate_server_i18n(new)
+        self._generate_gui_i18n(new, old)
+        return new
+
     @timer
     def generate_i18n(self, lang):
         """
@@ -361,60 +437,8 @@ class ConfigGenerator:
         (old) i18n/<lang>.json ---+
 
         """
-        new = {}
         old = read_file(filepath_i18n(lang))
-
-        def deep_load(keys, default=True, words=("name", "help")):
-            for word in words:
-                k = [*keys, str(word)]
-                d = ".".join(k) if default else str(word)
-                v = deep_get(old, keys=k, default=d)
-                deep_set(new, keys=k, value=v)
-
-        # 菜单。
-        for path, _data in deep_iter(self.task, depth=3):
-            if "tasks" not in path:
-                continue
-            task_group, _, task = path
-            deep_load(["Menu", task_group])
-            deep_load(["Task", task])
-        # 参数。
-        visited_group = set()
-        for path, data in deep_iter(self.argument, depth=2):
-            if path[0] not in visited_group:
-                deep_load([path[0], "_info"])
-                visited_group.add(path[0])
-            deep_load(path)
-            if "option" in data:
-                deep_load(path, words=data["option"], default=False)
-        # 活动名称。
-        # 只保留国服名称，其他服务器分支不再参与生成。
-        events = {}
-        for event in self.event:
-            name = event.cn
-            if name:
-                deep_default(events, keys=event.directory, value=name)
-        for event in sorted(self.event):
-            name = events.get(event.directory, event.directory)
-            deep_set(new, keys=f"Campaign.Event.{event.directory}", value=name)
-        # 包名。
-        for package, server in VALID_PACKAGE.items():
-            path = ["Emulator", "PackageName", package]
-            if deep_get(new, keys=path) == package:
-                deep_set(new, keys=path, value=server.upper())
-
-        # 游戏服务器名称。
-        for server, _list in VALID_SERVER_LIST.items():
-            for index in range(len(_list)):
-                path = ["Emulator", "ServerName", f"{server}-{index}"]
-                prefix = server.split("_")[0].upper()
-                prefix = "国服" if prefix == "CN" else prefix
-                deep_set(new, keys=path, value=f"[{prefix}] {_list[index]}")
-        # GUI 翻译。
-        for path, _ in deep_iter(self.gui, depth=2):
-            group, key = path
-            deep_load(keys=["Gui", group], words=(key,))
-        write_file(filepath_i18n(lang), new)
+        write_file(filepath_i18n(lang), self.generate_i18n_data(old))
 
     @cached_property
     def menu(self):
