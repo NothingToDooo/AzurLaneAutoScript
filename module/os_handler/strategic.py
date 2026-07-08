@@ -61,6 +61,16 @@ class StrategicSearchHandler(MapEventHandler):
             If success. False if strategic settings closed for unknown reason.
         """
         logger.info("Strategic search set option")
+        self._strategic_search_set_zone_and_merchant()
+        if not self._strategic_search_scroll_to_device():
+            return False
+        self._strategic_search_set_device()
+        if not self._strategic_search_scroll_to_submit():
+            return False
+        self._strategic_search_set_submit()
+        return True
+
+    def _strategic_search_set_zone_and_merchant(self):
         selected = self._strategy_option_selected
         for _ in self.loop():
             if selected(os_assets.STRATEGIC_SEARCH_ZONEMODE_REPEAT) and selected(
@@ -78,15 +88,15 @@ class StrategicSearchHandler(MapEventHandler):
                 self.device.click(os_assets.STRATEGIC_SEARCH_MERCHANT_STOP)
                 continue
 
+    def _strategic_search_scroll_to_device(self):
         STRATEGIC_SEARCH_SCROLL.drag_threshold = 0.1
         STRATEGIC_SEARCH_SCROLL.set(0.5, main=self)
-        if not self._strategy_search_scroll_appear():
-            return False
+        return self._strategy_search_scroll_appear()
 
+    def _strategic_search_set_device(self):
+        selected = self._strategy_option_selected
         for _ in self.loop():
-            self.appear(os_assets.STRATEGIC_SEARCH_DEVICE_CHECK, offset=(20, 200), similarity=0.7)
-            os_assets.STRATEGIC_SEARCH_DEVICE_STOP.load_offset(os_assets.STRATEGIC_SEARCH_DEVICE_CHECK)
-            os_assets.STRATEGIC_SEARCH_DEVICE_CONTINUE.load_offset(os_assets.STRATEGIC_SEARCH_DEVICE_CHECK)
+            self._strategic_search_refresh_device_offsets()
 
             if selected(os_assets.STRATEGIC_SEARCH_DEVICE_STOP):
                 logger.attr("encounter_device", "stop")
@@ -96,16 +106,21 @@ class StrategicSearchHandler(MapEventHandler):
                 self.device.click(os_assets.STRATEGIC_SEARCH_DEVICE_STOP)
                 continue
 
+    def _strategic_search_refresh_device_offsets(self):
+        self.appear(os_assets.STRATEGIC_SEARCH_DEVICE_CHECK, offset=(20, 200), similarity=0.7)
+        os_assets.STRATEGIC_SEARCH_DEVICE_STOP.load_offset(os_assets.STRATEGIC_SEARCH_DEVICE_CHECK)
+        os_assets.STRATEGIC_SEARCH_DEVICE_CONTINUE.load_offset(os_assets.STRATEGIC_SEARCH_DEVICE_CHECK)
+
+    def _strategic_search_scroll_to_submit(self):
         STRATEGIC_SEARCH_SCROLL.drag_threshold = 0.05
         STRATEGIC_SEARCH_SCROLL.edge_add = (0.5, 0.8)
         STRATEGIC_SEARCH_SCROLL.set_bottom(main=self)
-        if not self._strategy_search_scroll_appear():
-            return False
+        return self._strategy_search_scroll_appear()
 
+    def _strategic_search_set_submit(self):
+        selected = self._strategy_option_selected
         for _ in self.loop():
-            self.appear(os_assets.STRATEGIC_SEARCH_SUBMIT_CHECK, offset=(20, 20), similarity=0.7)
-            os_assets.STRATEGIC_SEARCH_SUBMIT_OFF.load_offset(os_assets.STRATEGIC_SEARCH_SUBMIT_CHECK)
-            os_assets.STRATEGIC_SEARCH_SUBMIT_ON.load_offset(os_assets.STRATEGIC_SEARCH_SUBMIT_CHECK)
+            self._strategic_search_refresh_submit_offsets()
 
             if selected(os_assets.STRATEGIC_SEARCH_SUBMIT_ON):
                 logger.attr("auto_submit", "on")
@@ -115,7 +130,10 @@ class StrategicSearchHandler(MapEventHandler):
                 self.device.click(os_assets.STRATEGIC_SEARCH_SUBMIT_ON)
                 continue
 
-        return True
+    def _strategic_search_refresh_submit_offsets(self):
+        self.appear(os_assets.STRATEGIC_SEARCH_SUBMIT_CHECK, offset=(20, 20), similarity=0.7)
+        os_assets.STRATEGIC_SEARCH_SUBMIT_OFF.load_offset(os_assets.STRATEGIC_SEARCH_SUBMIT_CHECK)
+        os_assets.STRATEGIC_SEARCH_SUBMIT_ON.load_offset(os_assets.STRATEGIC_SEARCH_SUBMIT_CHECK)
 
     def strategic_search_confirm(self):
         logger.info("Strategic search confirm")
