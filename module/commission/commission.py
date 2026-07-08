@@ -111,7 +111,8 @@ class RewardCommission(UI, InfoHandler):
         return commissions
 
     def _commission_choose(self, daily, urgent):
-        """
+        """选择本轮要执行的委托。
+
         Args:
             daily (SelectedGrids):
             urgent (SelectedGrids):
@@ -120,70 +121,91 @@ class RewardCommission(UI, InfoHandler):
             SelectedGrids, SelectedGrids: Chosen daily commission, Chosen urgent commission
         """
         self.comm_choose = SelectedGrids([])
-        # 合并委托。
-        total = daily.add_by_eq(urgent)
-        # 后缀更大的委托总是在后缀更小的委托下方，反转后优先选择高后缀委托。
-        total = total[::-1]
-        self.max_commission = 4
-        for comm in total:
-            if comm.genre == "daily_event":
-                self.max_commission = 5
-        running_count = int(np.sum([1 for c in total if c.status == "running"]))
+        total = self._commission_merge_candidates(daily, urgent)
+        running_count = self._commission_running_count(total)
         logger.attr("Running", f"{running_count}/{self.max_commission}")
 
-        # 加载筛选字符串。
-        preset = self.config.Commission_PresetFilter
-        if preset == "custom":
-            string = self.config.Commission_CustomFilter
-        else:
-            if f"{preset}_night" in DICT_FILTER_PRESET:
-                start_time = get_server_last_update("02:00")
-                end_time = get_server_last_update("21:00")
-                if start_time < end_time:
-                    preset = f"{preset}_night"
-            if preset not in DICT_FILTER_PRESET:
-                logger.warning(f"Preset not found: {preset}, use default preset")
-                preset = GeneratedConfig.Commission_PresetFilter
-            string = DICT_FILTER_PRESET[preset]
-        logger.attr("Commission Filter", preset)
-
-        # 执行筛选。
-        COMMISSION_FILTER.load(string)
-        run = COMMISSION_FILTER.apply(total.grids, func=self._commission_check)
-        logger.attr("Filter_sort", " > ".join([str(c) for c in run]))
-        run = SelectedGrids(run)
-
-        # 不足时补最短委托。
-        no_shortest = run.delete(SelectedGrids(["shortest"]))
-        if no_shortest.count + running_count < self.max_commission:
-            if daily.count:
-                logger.info("Not enough commissions to run, add shortest daily commissions")
-                COMMISSION_FILTER.load(SHORTEST_FILTER)
-                shortest = COMMISSION_FILTER.apply(daily[::-1], func=self._commission_check)
-                # 反转日常委托列表，优先选择更好的委托。
-                run = no_shortest.add_by_eq(SelectedGrids(shortest))
-                logger.attr("Filter_sort", " > ".join([str(c) for c in run]))
-            else:
-                logger.info("Not enough commissions to run")
-
+        preset, string = self._commission_filter_string()
+        run = self._commission_apply_filter(total, preset=preset, string=string)
+        run = self._commission_fill_shortest(run, daily=daily, running_count=running_count)
         self.comm_choose = run
+
         if running_count >= self.max_commission:
             return SelectedGrids([]), SelectedGrids([])
 
-        # 分离日常委托和紧急委托。
+        return self._commission_split_choices(run, daily=daily, urgent=urgent, running_count=running_count)
+
+    def _commission_merge_candidates(self, daily, urgent):
+        total = daily.add_by_eq(urgent)
+        # 后缀更大的委托总是在后缀更小的委托下方，反转后优先选择高后缀委托。
+        total = total[::-1]
+        self.max_commission = 5 if any(comm.genre == "daily_event" for comm in total) else 4
+        return total
+
+    @staticmethod
+    def _commission_running_count(total) -> int:
+        return sum(1 for comm in total if comm.status == "running")
+
+    def _commission_filter_string(self):
+        preset = self.config.Commission_PresetFilter
+        if preset == "custom":
+            return preset, self.config.Commission_CustomFilter
+
+        preset = self._commission_resolve_filter_preset(preset)
+        return preset, DICT_FILTER_PRESET[preset]
+
+    @staticmethod
+    def _commission_resolve_filter_preset(preset):
+        if f"{preset}_night" in DICT_FILTER_PRESET:
+            start_time = get_server_last_update("02:00")
+            end_time = get_server_last_update("21:00")
+            if start_time < end_time:
+                preset = f"{preset}_night"
+        if preset in DICT_FILTER_PRESET:
+            return preset
+
+        logger.warning(f"Preset not found: {preset}, use default preset")
+        return GeneratedConfig.Commission_PresetFilter
+
+    def _commission_apply_filter(self, total, *, preset: str, string: str):
+        logger.attr("Commission Filter", preset)
+        COMMISSION_FILTER.load(string)
+        run = COMMISSION_FILTER.apply(total.grids, func=self._commission_check)
+        logger.attr("Filter_sort", " > ".join([str(c) for c in run]))
+        return SelectedGrids(run)
+
+    def _commission_fill_shortest(self, run, *, daily, running_count: int):
+        no_shortest = run.delete(SelectedGrids(["shortest"]))
+        if no_shortest.count + running_count >= self.max_commission:
+            return run
+        if not daily.count:
+            logger.info("Not enough commissions to run")
+            return run
+
+        logger.info("Not enough commissions to run, add shortest daily commissions")
+        COMMISSION_FILTER.load(SHORTEST_FILTER)
+        shortest = COMMISSION_FILTER.apply(daily[::-1], func=self._commission_check)
+        # 反转日常委托列表，优先选择更好的委托。
+        run = no_shortest.add_by_eq(SelectedGrids(shortest))
+        logger.attr("Filter_sort", " > ".join([str(c) for c in run]))
+        return run
+
+    def _commission_split_choices(self, run, *, daily, urgent, running_count: int):
         run = run[: self.max_commission - running_count]
         daily_choose = run.intersect_by_eq(daily)
         urgent_choose = run.intersect_by_eq(urgent)
-        if daily_choose:
-            logger.info("Choose daily commission")
-            for comm in daily_choose:
-                logger.info(comm)
-        if urgent_choose:
-            logger.info("Choose urgent commission")
-            for comm in urgent_choose:
-                logger.info(comm)
-
+        self._log_commission_choices("daily", daily_choose)
+        self._log_commission_choices("urgent", urgent_choose)
         return daily_choose, urgent_choose
+
+    @staticmethod
+    def _log_commission_choices(name: str, choices) -> None:
+        if not choices:
+            return
+
+        logger.info(f"Choose {name} commission")
+        for comm in choices:
+            logger.info(comm)
 
     def _commission_check(self, commission):
         """返回委托是否可执行。"""
