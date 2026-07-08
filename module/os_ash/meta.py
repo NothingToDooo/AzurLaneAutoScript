@@ -82,6 +82,25 @@ class OpsiAshBeacon(Meta):
         self._meta_category = "undefined"
         super().__init__(*args, **kwargs)
 
+    def _handle_attacking_meta_state(self):
+        if not self._pre_attack():
+            return
+        if self._satisfy_attack_condition():
+            self._make_an_attack()
+
+    def _set_completed_meta_category(self):
+        if self.appear(ash_assets.BEACON_LIST, offset=(20, 20)):
+            self._meta_category = "beacon"
+        elif self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20)):
+            self._meta_category = "dossier"
+
+    def _handle_completed_meta_state(self):
+        self._set_completed_meta_category()
+        self._handle_ash_beacon_reward()
+        if self._meta_category not in self._meta_receive:
+            self._meta_receive.append(self._meta_category)
+        self.config.check_task_switch()
+
     def _attack_meta(self, skip_first_screenshot=True):
         """
         Handle all META attack events.
@@ -103,26 +122,14 @@ class OpsiAshBeacon(Meta):
             if state == MetaState.UNDEFINED:
                 continue
             if state == MetaState.INIT:
-                if self._begin_meta():
-                    continue
-                # 正常结束。
-                break
+                if not self._begin_meta():
+                    break
+                continue
             if state == MetaState.ATTACKING:
-                if not self._pre_attack():
-                    continue
-                if self._satisfy_attack_condition():
-                    self._make_an_attack()
-                    continue
+                self._handle_attacking_meta_state()
+                continue
             if state == MetaState.COMPLETE:
-                if self.appear(ash_assets.BEACON_LIST, offset=(20, 20)):
-                    self._meta_category = "beacon"
-                elif self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20)):
-                    self._meta_category = "dossier"
-                self._handle_ash_beacon_reward()
-                if self._meta_category not in self._meta_receive:
-                    self._meta_receive.append(self._meta_category)
-                # Check other tasks after kill a meta
-                self.config.check_task_switch()
+                self._handle_completed_meta_state()
                 continue
 
     def _make_an_attack(self):
@@ -261,18 +268,20 @@ class OpsiAshBeacon(Meta):
         return False
 
     def _ask_for_help(self):
-        """
-        Request help from friends, guild and world.
+        """向好友、舰队和世界请求支援。
 
         Returns:
-            bool: Whether success to call assist.
-                False if META finished just after calling assist.
+            bool: 是否成功请求支援；如果刚请求完 META 就被击杀，返回 False。
 
         Pages:
             in: is_in_meta
             out: is_in_meta
         """
-        # Enter help page
+        self._enter_help_page()
+        self._send_help_requests()
+        return self._confirm_help_request()
+
+    def _enter_help_page(self):
         skip_first_screenshot = True
         while 1:
             if skip_first_screenshot:
@@ -280,24 +289,23 @@ class OpsiAshBeacon(Meta):
             else:
                 self.device.screenshot()
 
-            # End
             if self.appear(ash_assets.HELP_CONFIRM, offset=(20, 20)):
                 break
-            # Click
             if self.appear_then_click(ash_assets.HELP_ENTER, offset=(20, 20), interval=3):
                 continue
-            # Wrongly entered BATTLE_PREPARATION
             if self.appear(BATTLE_PREPARATION, offset=(30, 30), interval=2):
                 self.device.click(BACK_ARROW)
                 continue
 
-        # Here use simple clicks. Dropping some clicks is acceptable, no need to confirm they are selected.
+    def _send_help_requests(self):
+        # 简单点击即可，漏点几次也不影响最终确认。
         self.device.click(ash_assets.HELP_3)
         self.device.sleep((0.1, 0.3))
         self.device.click(ash_assets.HELP_2)
         self.device.sleep((0.1, 0.3))
         self.device.click(ash_assets.HELP_1)
 
+    def _confirm_help_request(self):
         skip_first_screenshot = True
         while 1:
             if skip_first_screenshot:
@@ -305,16 +313,13 @@ class OpsiAshBeacon(Meta):
             else:
                 self.device.screenshot()
 
-            # End
-            # sometimes you have help popup without black-blurred background
-            # HELP_CONFIRM and HELP_ENTER appears
+            # 有时支援弹窗没有黑色模糊背景，HELP_CONFIRM 和 HELP_ENTER 会同时出现。
             if not self.appear(ash_assets.HELP_CONFIRM, offset=(30, 30)):
                 if self.appear(ash_assets.HELP_ENTER, offset=(30, 30)):
                     return True
                 if self.appear(ash_assets.BEACON_REWARD, offset=(30, 30)):
                     logger.info("META finished just after calling assist, ignore meta assist")
                     return False
-            # Click
             if self.appear_then_click(ash_assets.HELP_CONFIRM, offset=(30, 30), interval=3):
                 continue
         return False
@@ -359,44 +364,53 @@ class OpsiAshBeacon(Meta):
                 continue
         return False
 
-    def _begin_meta(self):
-        """
-        No matter which meta page you are in, start or select a meta.
-        In meta main:
-            select beacon or dossier entrance into if needed, or end task
-        In beacon or dossier:
-            begin a new meta if needed, or back to meta main page
-        """
-        # Page meta main
-        if self.appear(ash_assets.ASH_SHOWDOWN, offset=(30, 30), interval=2):
-            # Beacon
-            if self._check_beacon_point():
-                self.device.click(ash_assets.META_MAIN_BEACON_ENTRANCE)
-                logger.info("Select beacon entrance into")
+    def _begin_meta_from_main_page(self):
+        if not self.appear(ash_assets.ASH_SHOWDOWN, offset=(30, 30), interval=2):
+            return None
+        if self._check_beacon_point():
+            self.device.click(ash_assets.META_MAIN_BEACON_ENTRANCE)
+            logger.info("Select beacon entrance into")
+            return True
+        if self.config.OpsiAshBeacon_AttackMode == "current_dossier" and self._check_dossier_point():
+            if self.appear_then_click(ash_assets.META_MAIN_DOSSIER_ENTRANCE, offset=(20, 20), interval=2):
+                logger.info("Select dossier entrance into")
                 return True
-            # Dossier
-            if self.config.OpsiAshBeacon_AttackMode == "current_dossier" and self._check_dossier_point():
-                if self.appear_then_click(ash_assets.META_MAIN_DOSSIER_ENTRANCE, offset=(20, 20), interval=2):
-                    logger.info("Select dossier entrance into")
-                    return True
-                logger.info("None dossier has been selected")
-            return False
-        # 信标页。
-        if self.appear(ash_assets.BEACON_LIST, offset=(20, 20), interval=2):
-            if self._check_beacon_point():
-                self.device.click(ash_assets.META_BEGIN_ENTRANCE)
-                logger.info("Begin a beacon")
-            return True
-        # 档案页。
-        if self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20), interval=2):
-            if self.config.OpsiAshBeacon_AttackMode == "current_dossier" and self._check_dossier_point():
-                if self.appear_then_click(ash_assets.META_BEGIN_ENTRANCE, offset=(20, 20), interval=2):
-                    logger.info("Begin a dossier")
-                    return True
-                logger.info("None dossier has been selected")
-            self.appear_then_click(ash_assets.ASH_QUIT, offset=(10, 10), interval=2)
-            return True
-        # 未知页面。
+            logger.info("None dossier has been selected")
+        return False
+
+    def _begin_meta_from_beacon_page(self):
+        if not self.appear(ash_assets.BEACON_LIST, offset=(20, 20), interval=2):
+            return None
+        if self._check_beacon_point():
+            self.device.click(ash_assets.META_BEGIN_ENTRANCE)
+            logger.info("Begin a beacon")
+        return True
+
+    def _begin_meta_from_dossier_page(self):
+        if not self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20), interval=2):
+            return None
+        if self.config.OpsiAshBeacon_AttackMode == "current_dossier" and self._check_dossier_point():
+            if self.appear_then_click(ash_assets.META_BEGIN_ENTRANCE, offset=(20, 20), interval=2):
+                logger.info("Begin a dossier")
+                return True
+            logger.info("None dossier has been selected")
+        self.appear_then_click(ash_assets.ASH_QUIT, offset=(10, 10), interval=2)
+        return True
+
+    def _begin_meta(self):
+        """根据当前 META 页面选择或开始一个目标。
+
+        META 主页会按配置进入信标或档案；信标页和档案页会尝试开始目标，
+        没有可用目标时回到 META 主页或结束任务。
+        """
+        for handler in (
+            self._begin_meta_from_main_page,
+            self._begin_meta_from_beacon_page,
+            self._begin_meta_from_dossier_page,
+        ):
+            result = handler()
+            if result is not None:
+                return result
         return True
 
     def _check_beacon_point(self) -> bool:
