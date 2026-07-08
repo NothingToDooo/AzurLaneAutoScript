@@ -5,6 +5,7 @@ import inspect
 import mimetypes
 import os
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
 
 import uvicorn
 from pywebio.platform.fastapi import (
@@ -29,6 +30,23 @@ class HeaderMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         response.headers["Cache-Control"] = "no-cache"
         return response
+
+
+@dataclass(slots=True)
+class AsgiAppOptions:
+    cdn: object = True
+    static_dir: object = None
+    debug: bool = False
+    allowed_origins: object = None
+    check_origin: object = None
+
+
+@dataclass(slots=True)
+class ServerOptions:
+    port: int = 0
+    host: str = ""
+    auto_open_webbrowser: bool = False
+    asgi_options: AsgiAppOptions = field(default_factory=AsgiAppOptions)
 
 
 class LocalStaticFiles(StaticFiles):
@@ -72,21 +90,32 @@ def _build_lifespan(starlette_settings):
     return lifespan_context
 
 
-def asgi_app(
-    applications, cdn=True, static_dir=None, debug=False, allowed_origins=None, check_origin=None, **starlette_settings
-):
-    debug = Session.debug = os.environ.get("PYWEBIO_DEBUG", debug)
-    cdn = cdn_validation(cdn, "warn")
+def _asgi_options_from_settings(options, settings):
+    if options is not None:
+        return options
+    return AsgiAppOptions(
+        cdn=settings.pop("cdn", True),
+        static_dir=settings.pop("static_dir", None),
+        debug=settings.pop("debug", False),
+        allowed_origins=settings.pop("allowed_origins", None),
+        check_origin=settings.pop("check_origin", None),
+    )
+
+
+def asgi_app(applications, options=None, **starlette_settings):
+    options = _asgi_options_from_settings(options, starlette_settings)
+    debug = Session.debug = os.environ.get("PYWEBIO_DEBUG", options.debug)
+    cdn = cdn_validation(options.cdn, "warn")
     if cdn is False:
         cdn = "pywebio_static"
     routes = webio_routes(
         applications,
         cdn=cdn,
-        allowed_origins=allowed_origins,
-        check_origin=check_origin,
+        allowed_origins=options.allowed_origins,
+        check_origin=options.check_origin,
     )
-    if static_dir:
-        routes.append(Mount("/static", app=LocalStaticFiles(directory=static_dir), name="static"))
+    if options.static_dir:
+        routes.append(Mount("/static", app=LocalStaticFiles(directory=options.static_dir), name="static"))
     routes.append(
         Mount(
             "/pywebio_static",
@@ -99,33 +128,32 @@ def asgi_app(
     return Starlette(routes=routes, middleware=middleware, debug=debug, lifespan=lifespan, **starlette_settings)
 
 
-def start_server(
-    applications,
-    port=0,
-    host="",
-    cdn=True,
-    static_dir=None,
-    debug=False,
-    allowed_origins=None,
-    check_origin=None,
-    auto_open_webbrowser=False,
-    **uvicorn_settings,
-):
-
-    app = asgi_app(
-        applications,
-        cdn=cdn,
-        static_dir=static_dir,
-        debug=debug,
-        allowed_origins=allowed_origins,
-        check_origin=check_origin,
+def _server_options_from_settings(options, settings):
+    if options is not None:
+        return options
+    return ServerOptions(
+        port=settings.pop("port", 0),
+        host=settings.pop("host", ""),
+        auto_open_webbrowser=settings.pop("auto_open_webbrowser", False),
+        asgi_options=AsgiAppOptions(
+            cdn=settings.pop("cdn", True),
+            static_dir=settings.pop("static_dir", None),
+            debug=settings.pop("debug", False),
+            allowed_origins=settings.pop("allowed_origins", None),
+            check_origin=settings.pop("check_origin", None),
+        ),
     )
 
-    if auto_open_webbrowser:
-        asyncio.get_event_loop().create_task(open_webbrowser_on_server_started("localhost", port))
 
-    if not host:
-        host = "127.0.0.1"
+def start_server(applications, options=None, **uvicorn_settings):
+    options = _server_options_from_settings(options, uvicorn_settings)
+    app = asgi_app(applications, options=options.asgi_options)
+
+    if options.auto_open_webbrowser:
+        asyncio.get_event_loop().create_task(open_webbrowser_on_server_started("localhost", options.port))
+
+    host = options.host or "127.0.0.1"
+    port = options.port
 
     if port == 0:
         port = get_free_port()

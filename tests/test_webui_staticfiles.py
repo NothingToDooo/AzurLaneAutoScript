@@ -1,7 +1,7 @@
 import asyncio
 import mimetypes
 
-from module.webui.fastapi import LocalStaticFiles, asgi_app
+from module.webui.fastapi import AsgiAppOptions, LocalStaticFiles, asgi_app
 
 
 def test_local_static_files_uses_builtin_mime_table(tmp_path, monkeypatch):
@@ -33,3 +33,12 @@ def test_asgi_app_runs_legacy_lifespan_callbacks():
         assert events == ["start", "stop"]
 
     asyncio.run(exercise())
+
+
+def test_asgi_app_accepts_options_object():
+    def index():
+        return None
+
+    app = asgi_app([index], options=AsgiAppOptions(cdn=False, debug=True))
+
+    assert app.debug is True

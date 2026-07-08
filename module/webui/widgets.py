@@ -1,5 +1,6 @@
 import copy
 import json
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from pywebio.exceptions import SessionException
@@ -133,20 +134,24 @@ class RichLog:
             pass
 
 
+@dataclass(slots=True)
+class BinarySwitchOptions:
+    get_state: object
+    label_on: str
+    label_off: str
+    onclick_on: object
+    onclick_off: object
+    scope: str
+    color_on: str = "success"
+    color_off: str = "secondary"
+
+
 class BinarySwitchButton(Switch):
-    def __init__(
-        self,
-        get_state,
-        label_on,
-        label_off,
-        onclick_on,
-        onclick_off,
-        scope,
-        color_on="success",
-        color_off="secondary",
-    ):
+    def __init__(self, options: BinarySwitchOptions):
         """
         Args:
+            options:
+                二元开关的标签、回调、颜色和 scope。
             get_state:
                 (Callable):
                     return True to represent state `ON`
@@ -162,26 +167,26 @@ class BinarySwitchButton(Switch):
             color_off:
             scope: scope for button, just for button **only**
         """
-        self.scope = scope
+        self.scope = options.scope
         status = {
             0: {
                 "func": self.update_button,
                 "args": (
-                    label_off,
-                    onclick_off,
-                    color_off,
+                    options.label_off,
+                    options.onclick_off,
+                    options.color_off,
                 ),
             },
             1: {
                 "func": self.update_button,
                 "args": (
-                    label_on,
-                    onclick_on,
-                    color_on,
+                    options.label_on,
+                    options.onclick_on,
+                    options.color_on,
                 ),
             },
         }
-        super().__init__(status=status, get_state=get_state, name=scope)
+        super().__init__(status=status, get_state=options.get_state, name=options.scope)
 
     def update_button(self, label, onclick, color):
         clear(self.scope)

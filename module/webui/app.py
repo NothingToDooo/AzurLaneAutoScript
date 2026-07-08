@@ -58,7 +58,7 @@ from module.webui.overview_utils import split_overview_tasks
 from module.webui.pin import put_input, put_select
 from module.webui.process_manager import ProcessManager
 from module.webui.setting import State
-from module.webui.setting_form_utils import iter_group_output_kwargs
+from module.webui.setting_form_utils import GroupOutputContext, iter_group_output_kwargs
 from module.webui.utils import (
     Icon,
     Switch,
@@ -76,6 +76,7 @@ from module.webui.utils import (
 )
 from module.webui.widgets import (
     BinarySwitchButton,
+    BinarySwitchOptions,
     RichLog,
     put_icon_buttons,
     put_loading_text,
@@ -291,11 +292,13 @@ class AlasGUI(Frame):
 
         output_list: list[Output] = []
         for output_kwargs in iter_group_output_kwargs(
-            task=task,
-            group_name=group_name,
-            arg_dict=arg_dict,
-            config=config,
-            translate=t,
+            GroupOutputContext(
+                task=task,
+                group_name=group_name,
+                arg_dict=arg_dict,
+                config=config,
+                translate=t,
+            )
         ):
             o = put_output(output_kwargs)
             if o is not None:
@@ -372,14 +375,16 @@ class AlasGUI(Frame):
             )
 
         switch_scheduler = BinarySwitchButton(
-            label_on=t("Gui.Button.Stop"),
-            label_off=t("Gui.Button.Start"),
-            onclick_on=self.alas.stop,
-            onclick_off=lambda: self.alas.start(None),
-            get_state=lambda: self.alas.alive,
-            color_on="off",
-            color_off="on",
-            scope="scheduler_btn",
+            BinarySwitchOptions(
+                label_on=t("Gui.Button.Stop"),
+                label_off=t("Gui.Button.Start"),
+                onclick_on=self.alas.stop,
+                onclick_off=lambda: self.alas.start(None),
+                get_state=lambda: self.alas.alive,
+                color_on="off",
+                color_off="on",
+                scope="scheduler_btn",
+            )
         )
 
         log = RichLog("log")
@@ -402,14 +407,16 @@ class AlasGUI(Frame):
         log.console.width = log.get_width()
 
         switch_log_scroll = BinarySwitchButton(
-            label_on=t("Gui.Button.ScrollON"),
-            label_off=t("Gui.Button.ScrollOFF"),
-            onclick_on=lambda: log.set_scroll(keep_bottom=False),
-            onclick_off=lambda: log.set_scroll(keep_bottom=True),
-            get_state=lambda: log.keep_bottom,
-            color_on="on",
-            color_off="off",
-            scope="log_scroll_btn",
+            BinarySwitchOptions(
+                label_on=t("Gui.Button.ScrollON"),
+                label_off=t("Gui.Button.ScrollOFF"),
+                onclick_on=lambda: log.set_scroll(keep_bottom=False),
+                onclick_off=lambda: log.set_scroll(keep_bottom=True),
+                get_state=lambda: log.keep_bottom,
+                color_on="on",
+                color_off="off",
+                scope="log_scroll_btn",
+            )
         )
 
         self.task_handler.add(switch_scheduler.g(), 1, pending_delete=True)
@@ -580,14 +587,16 @@ class AlasGUI(Frame):
             put_scope("scheduler_btn")
 
         switch_scheduler = BinarySwitchButton(
-            label_on=t("Gui.Button.Stop"),
-            label_off=t("Gui.Button.Start"),
-            onclick_on=self.alas.stop,
-            onclick_off=lambda: self.alas.start(task),
-            get_state=lambda: self.alas.alive,
-            color_on="off",
-            color_off="on",
-            scope="scheduler_btn",
+            BinarySwitchOptions(
+                label_on=t("Gui.Button.Stop"),
+                label_off=t("Gui.Button.Start"),
+                onclick_on=self.alas.stop,
+                onclick_off=lambda: self.alas.start(task),
+                get_state=lambda: self.alas.alive,
+                color_on="off",
+                color_off="on",
+                scope="scheduler_btn",
+            )
         )
 
         with use_scope("log-bar"):
@@ -600,14 +609,16 @@ class AlasGUI(Frame):
             )
 
         switch_log_scroll = BinarySwitchButton(
-            label_on=t("Gui.Button.ScrollON"),
-            label_off=t("Gui.Button.ScrollOFF"),
-            onclick_on=lambda: log.set_scroll(keep_bottom=False),
-            onclick_off=lambda: log.set_scroll(keep_bottom=True),
-            get_state=lambda: log.keep_bottom,
-            color_on="on",
-            color_off="off",
-            scope="log_scroll_btn",
+            BinarySwitchOptions(
+                label_on=t("Gui.Button.ScrollON"),
+                label_off=t("Gui.Button.ScrollOFF"),
+                onclick_on=lambda: log.set_scroll(keep_bottom=False),
+                onclick_off=lambda: log.set_scroll(keep_bottom=True),
+                get_state=lambda: log.keep_bottom,
+                color_on="on",
+                color_off="off",
+                scope="log_scroll_btn",
+            )
         )
 
         config = self.alas_config.read_file(self.alas_name)
