@@ -186,7 +186,6 @@ class Homography:
         cv2.bitwise_and(image_edge, self.ui_mask_homo_stroke, dst=image_edge)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         cv2.morphologyEx(image_edge, cv2.MORPH_CLOSE, kernel, dst=image_edge)
-        # Image.fromarray(image_edge, mode='L').show()
 
         # Find free tile
         if (
@@ -208,9 +207,6 @@ class Homography:
         self.lower_edge, self.upper_edge, self.left_edge, self.right_edge = False, False, False, False
         self._map_edge_count = (0, 0)
         if self.config.HOMO_EDGE_DETECT:
-            # image_edge = cv2.bitwise_and(cv2.dilate(image_edge, kernel),
-            #                              cv2.inRange(image_trans, *self.config.HOMO_EDGE_COLOR_RANGE))
-            # image_edge = cv2.bitwise_and(image_edge, self.ui_mask_homo_stroke)
             cv2.dilate(image_edge, kernel, dst=image_edge)
             cv2.inRange(image_trans, *self.config.HOMO_EDGE_COLOR_RANGE, dst=image_trans)
             cv2.bitwise_and(image_edge, image_trans, dst=image_edge)
@@ -260,7 +256,6 @@ class Homography:
         else:
             message = "bad match"
 
-        # print(self.homo_loca % self.config.HOMO_TILE)
         logger.attr_align("tile_center", f"{float2str(similarity)} ({message})")
         return message != "bad match"
 
@@ -296,7 +291,6 @@ class Homography:
         else:
             message = "bad match"
 
-        # print(self.homo_loca % self.config.HOMO_TILE)
         logger.attr_align("tile_corner", f"{float2str(similarity)} ({message})")
         return message != "bad match"
 
@@ -341,7 +335,6 @@ class Homography:
         else:
             message = "bad match"
 
-        # print(self.homo_loca % self.config.HOMO_TILE)
         logger.attr_align("tile_rectangle", f"{len(location)} rectangles ({message})")
         return message != "bad match"
 

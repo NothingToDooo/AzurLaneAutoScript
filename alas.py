@@ -313,7 +313,6 @@ class AzurLaneAutoScript:
                 del_cached_property(self, "config")
                 continue
             if self.config.Error_HandleError:
-                # self.config.task_delay(success=False)
                 del_cached_property(self, "config")
                 continue
             break

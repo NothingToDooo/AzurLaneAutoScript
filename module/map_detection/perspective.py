@@ -149,15 +149,7 @@ class Perspective:
         if np.linalg.norm(np.subtract(self.vanish_point, self.distant_point)) < 10:
             raise MapDetectionError("Vanish point and distant point too close")
 
-        # Re-generate lines. Useless after mid_cleanse function added.
-        # self.horizontal = self.crossings.link(None, is_horizontal=True).group()
-        # self.vertical = self.crossings.link(self.vanish_point).group()
-        # self.draw(self.crossings.link(self.distant_point))
-        # print(edge_h)
-        # print(inner_h.group())
-
         # Lines cleansing
-        # self.draw()
         self.map_inner = get_map_inner(self.crossings.points)
         self.horizontal, self.lower_edge, self.upper_edge = self.line_cleanse(
             self.horizontal, inner=inner_h.group(), edge=edge_h
@@ -165,12 +157,6 @@ class Perspective:
         self.vertical, self.left_edge, self.right_edge = self.line_cleanse(
             self.vertical, inner=inner_v.group(), edge=edge_v
         )
-
-        # self.draw()
-        # print(self.horizontal)
-        # print(self.lower_edge, self.upper_edge)
-        # print(self.vertical)
-        # print(self.left_edge, self.right_edge)
 
         # Log
         time_cost = round(time.time() - start_time, 3)
@@ -252,8 +238,6 @@ class Perspective:
         else:
             lines = lines[(lines[:, 1] < np.deg2rad(theta)) | (np.deg2rad(180 - theta) < lines[:, 1])]
             lines = [[-rho, theta - np.pi] if rho < 0 else [rho, theta] for rho, theta in lines]
-        # if len(lines) > 0:
-        #     return Lines(lines, is_horizontal=is_horizontal)
         return Lines(lines, is_horizontal=is_horizontal)
 
     def detect_lines(self, image, options):
@@ -298,7 +282,6 @@ class Perspective:
             draw.line([x1, y1, x2, y2], "white")
 
         image.show()
-        # image.save('123.png')
 
     def _vanish_point_value(self, point):
         """衡量候选点接近透视消失点的程度，值越小越好。"""
@@ -341,12 +324,9 @@ class Perspective:
             """衡量候选点接近重合点的程度，值越小越好。"""
             x, y = point
             # 不要直接使用到点距离。
-            # distance = coincident.distance_to_point(point)
             distance = np.abs(x - coincident.get_x(y))
-            # print((distance * 1).astype(int).reshape(len(mids), np.diff(self.config.ERROR_LINES_TOLERANCE)[0]+1))
 
             # 激活函数。
-            # distance = 1 / (1 + np.exp(16 / distance - distance))
             distance = 1 / (1 + np.exp(encourage / distance) / distance)
             return np.sum(distance)
 
@@ -362,11 +342,9 @@ class Perspective:
                 lines.append([rho, theta])
         # Fitting mid
         coincident = Lines(np.vstack(lines), is_horizontal=False)
-        # print(np.round(np.sort(coincident.get_x(128))).astype(int))
         mid_diff_range = self.config.MID_DIFF_RANGE_H if is_horizontal else self.config.MID_DIFF_RANGE_V
         coincident_point_range = ((-abs(self.config.ERROR_LINES_TOLERANCE[0]) * mid_diff_range[1], 200), mid_diff_range)
         coincident_point = optimize.brute(coincident_point_value, coincident_point_range)
-        # print(coincident_point, is_horizontal)
 
         diff = np.max([mid_diff_range[0] - coincident_point[1], coincident_point[1] - mid_diff_range[1]])
         if diff > 0:
@@ -393,12 +371,9 @@ class Perspective:
             )
 
         left, right = border
-        # print(mids)
-        # print(np.diff(mids))
         # Filling mid
         mids = np.arange(-25, 25) * coincident_point[1] + coincident_point[0]
         mids = mids[(mids > left - threshold) & (mids < right + threshold)]
-        # print(mids)
         if is_horizontal:
             mids = convert_to_y(mids)
 

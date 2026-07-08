@@ -14,31 +14,6 @@ class Config:
 
 
 class Campaign(CampaignBase, HardEquipment):
-    # def run(self):
-    #     logger.hr(self.ENTRANCE, level=2)
-    #     self.enter_map(self.ENTRANCE, mode='hard')
-    #     self.map = self.MAP
-    #     self.map.reset()
-    #     self.hp_reset()
-    #     self.hp_get()
-    #
-    #     if self.config.FLEET_HARD == 1:
-    #         self.ensure_edge_insight(reverse=True)
-    #         self.full_scan_find_boss()
-    #     else:
-    #         self.fleet_switch_click()
-    #         self.ensure_no_info_bar()
-    #         self.ensure_edge_insight()
-    #         self.full_scan_find_boss()
-    #
-    #     try:
-    #         self.clear_boss()
-    #     except CampaignEnd:
-    #         logger.hr('Campaign end')
-
-    # def fleet_preparation(self):
-    #     self.equipment_take_on()
-
     def _expected_end(self, _expected):
         return "in_stage"
 
@@ -48,7 +23,6 @@ class Campaign(CampaignBase, HardEquipment):
         logger.info(f"May boss: {self.map.select(may_boss=True)}")
         logger.info(f"May boss and is enemy: {self.map.select(may_boss=True, is_enemy=True)}")
         logger.info(f"Is boss: {self.map.select(is_boss=True)}")
-        # logger.info('Grids: %s' % grids)
         if grids:
             logger.hr("Clear BOSS")
             grids = grids.sort("weight", "cost")

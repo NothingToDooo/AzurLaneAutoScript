@@ -118,8 +118,6 @@ class Frame(Base):
         js = "".join([f"""$(".form-control[name='{key}']").addClass('is-invalid');""" for key in keys])
         if js:
             run_js(js)
-        # for key in keys:
-        #     pin_update(key, valid_status=False)
 
     @staticmethod
     def pin_remove_invalid_mark(keys) -> None:
@@ -129,5 +127,3 @@ class Frame(Base):
         js = "".join([f"""$(".form-control[name='{key}']").removeClass('is-invalid');""" for key in keys])
         if js:
             run_js(js)
-        # for key in keys:
-        # pin_update(key, valid_status=0)
