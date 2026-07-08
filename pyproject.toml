@@ -148,7 +148,7 @@ select = [
     "SLOT",
     "T10",
     "T20",
-    "TCH",
+    "TC",
     "TRY002",
     "TRY003",
     "TRY201",
