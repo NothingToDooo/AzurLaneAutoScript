@@ -158,7 +158,6 @@ dependencies = [
     { name = "rich" },
     { name = "scipy" },
     { name = "starlette" },
-    { name = "tqdm" },
     { name = "uvicorn" },
 ]
 
@@ -166,6 +165,7 @@ dependencies = [
 dev = [
     { name = "pytest" },
     { name = "ruff" },
+    { name = "tqdm" },
     { name = "ty" },
 ]
 
@@ -184,7 +184,6 @@ requires-dist = [
     { name = "rich" },
     { name = "scipy" },
     { name = "starlette" },
-    { name = "tqdm" },
     { name = "uvicorn", specifier = ">=0.50.2" },
 ]
 
@@ -192,6 +191,7 @@ requires-dist = [
 dev = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "ruff" },
+    { name = "tqdm", specifier = ">=4.68.3" },
     { name = "ty" },
 ]
 

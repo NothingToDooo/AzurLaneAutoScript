@@ -13,7 +13,6 @@ dependencies = [
     "adbutils",
     "psutil",
     "rich",
-    "tqdm",
     "pyyaml",
     "cnocr",
     "pywebio",
@@ -29,6 +28,7 @@ package = false
 dev = [
     "pytest>=9.1.1",
     "ruff",
+    "tqdm>=4.68.3",
     "ty",
 ]
 
