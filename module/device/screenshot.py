@@ -24,7 +24,6 @@ class Screenshot(NemuIpc):
     def __init__(self, *args, **kwargs):
         self._screen_size_checked = False
         self._screen_black_checked = False
-        self._minicap_uninstalled = False
         self._screenshot_interval = Timer(0.1)
         self._last_save_time: dict[str, float] = {}
         super().__init__(*args, **kwargs)
