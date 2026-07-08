@@ -442,6 +442,58 @@ class ResearchProject:
 
     __hash__ = None
 
+    def _normalize_project_number(self, prefix, number):
+        number = number.replace("D", "0").replace("O", "0").replace("S", "5")
+        # E-316-MI -> E-315-MI
+        number = number.replace("316", "315")
+        # [TW] S5 D-349-MI -> S5 D-319-MI
+        if prefix == "D" and number == "349" and self.raw_series == 5:
+            return "319"
+        return number
+
+    @staticmethod
+    def _normalize_project_suffix(suffix):
+        # S3 D-022-MI (S3-Drake-0.5) detected as 'D-022-ML', because of Drake's white cloth.
+        suffix = suffix.replace("ML", "MI").replace("MIL", "MI").replace("M1", "MI")
+        # S4 D-063-UL (S4-hakuryu-0.5) detected as 'D-063-0C'
+        # D-057-DC -> D-057-UL
+        suffix = suffix.replace("0C", "UL").replace("UC", "UL")
+        suffix = suffix.replace("DC5", "UL").replace("DC3", "UL").replace("DC", "UL")
+        # D-075-UL1 -> D-075-UL
+        suffix = suffix.replace("UL1", "UL").replace("ULI", "UL").replace("UL5", "UL")
+        if suffix == "U":
+            return "UL"
+        return suffix
+
+    @classmethod
+    def _normalize_project_prefix(cls, prefix, number, suffix) -> str:
+        if prefix in ["I1", "U"]:
+            prefix = "D"
+        prefix = prefix.strip("I1")
+        # LC-038-RF -> C-038-RF
+        prefix = prefix.replace("LC", "C")
+
+        # TW ocr errors, convert B to D
+        if prefix == "B" and number in cls.D_PROJECT_NUMBERS:
+            # Keep B-397-RF, S7 D-397-MI and S* B-397-RF shares 397
+            if number == "397" and suffix == "RF":
+                return prefix
+            return "D"
+        # I-483-RF revised to -483-RF -> D-483-RF
+        if prefix == "" and number in cls.D_PROJECT_NUMBERS:
+            return "D"
+        # L-153-MI -> C-153-MI
+        if prefix == "L" and number in cls.C_PROJECT_NUMBERS:
+            return "C"
+        return prefix
+
+    def _check_three_part_name(self, parts):
+        prefix, number, suffix = parts
+        number = self._normalize_project_number(prefix, number)
+        suffix = self._normalize_project_suffix(suffix)
+        prefix = self._normalize_project_prefix(prefix, number, suffix)
+        return f"{prefix}-{number}-{suffix}"
+
     def check_name(self, name):
         """
         Args:
@@ -460,50 +512,32 @@ class ResearchProject:
         parts = name.split("-")
         parts = [i for i in parts if i]
         if len(parts) == 3:
-            prefix, number, suffix = parts
-
-            number = number.replace("D", "0").replace("O", "0").replace("S", "5")
-            # E-316-MI -> E-315-MI
-            number = number.replace("316", "315")
-            # [TW] S5 D-349-MI -> S5 D-319-MI
-            if prefix == "D" and number == "349" and self.raw_series == 5:
-                number = "319"
-
-            if prefix in ["I1", "U"]:
-                prefix = "D"
-            prefix = prefix.strip("I1")
-            # LC-038-RF -> C-038-RF
-            prefix = prefix.replace("LC", "C")
-
-            # S3 D-022-MI (S3-Drake-0.5) detected as 'D-022-ML', because of Drake's white cloth.
-            suffix = suffix.replace("ML", "MI").replace("MIL", "MI").replace("M1", "MI")
-            # S4 D-063-UL (S4-hakuryu-0.5) detected as 'D-063-0C'
-            # D-057-DC -> D-057-UL
-            suffix = suffix.replace("0C", "UL").replace("UC", "UL")
-            suffix = suffix.replace("DC5", "UL").replace("DC3", "UL").replace("DC", "UL")
-            # D-075-UL1 -> D-075-UL
-            suffix = suffix.replace("UL1", "UL").replace("ULI", "UL").replace("UL5", "UL")
-
-            if suffix == "U":
-                suffix = "UL"
-            # TW ocr errors, convert B to D
-            if prefix == "B" and number in ResearchProject.D_PROJECT_NUMBERS:
-                # Keep B-397-RF, S7 D-397-MI and S* B-397-RF shares 397
-                if number == "397" and suffix == "RF":
-                    pass
-                else:
-                    prefix = "D"
-            # I-483-RF revised to -483-RF -> D-483-RF
-            if prefix == "" and number in ResearchProject.D_PROJECT_NUMBERS:
-                prefix = "D"
-            # L-153-MI -> C-153-MI
-            if prefix == "L" and number in ResearchProject.C_PROJECT_NUMBERS:
-                prefix = "C"
-            return f"{prefix}-{number}-{suffix}"
+            return self._check_three_part_name(parts)
         # 尝试插入 '-'，处理 H339-MI 这类结果。
         if len(parts) == 2 and name[0].isalpha() and name[1].isdigit():
             return self.check_name(f"{name[0]}-{name[1:]}")
         return name
+
+    @staticmethod
+    def _iter_research_data(name, series):
+        for data in LIST_RESEARCH_PROJECT:
+            if (data["series"] == series) and (data["name"] == name):
+                yield data
+
+    def _iter_similar_research_names(self, name):
+        if len(name) and name[0].isdigit():
+            for prefix in "QGE":
+                yield f"{prefix}-{self.name}"
+        if name.startswith("D"):
+            # Letter 'C' may recognized as 'D', because project card is shining.
+            yield "C" + self.name[1:]
+
+    @staticmethod
+    def _iter_research_data_by_trimmed_suffix(name, series):
+        trimmed_name = name.rstrip("MIRFUL-")
+        for data in LIST_RESEARCH_PROJECT:
+            if (data["series"] == series) and (data["name"].rstrip("MIRFUL-") == trimmed_name):
+                yield data
 
     def get_data(self, name, series):
         """
@@ -514,31 +548,15 @@ class ResearchProject:
         Yields:
             dict:
         """
-        for data in LIST_RESEARCH_PROJECT:
-            if (data["series"] == series) and (data["name"] == name):
+        yield from self._iter_research_data(name, series)
+
+        for candidate in self._iter_similar_research_names(name):
+            logger.info(f"Testing the most similar candidate {candidate}")
+            for data in self._iter_research_data(candidate, series):
+                self.name = candidate
                 yield data
 
-        if len(name) and name[0].isdigit():
-            for t in "QGE":
-                name1 = f"{t}-{self.name}"
-                logger.info(f"Testing the most similar candidate {name1}")
-                for data in LIST_RESEARCH_PROJECT:
-                    if (data["series"] == series) and (data["name"] == name1):
-                        self.name = name1
-                        yield data
-
-        if name.startswith("D"):
-            # Letter 'C' may recognized as 'D', because project card is shining.
-            name1 = "C" + self.name[1:]
-            for data in LIST_RESEARCH_PROJECT:
-                if (data["series"] == series) and (data["name"] == name1):
-                    self.name = name1
-                    yield data
-
-        for data in LIST_RESEARCH_PROJECT:
-            if (data["series"] == series) and (data["name"].rstrip("MIRFUL-") == name.rstrip("MIRFUL-")):
-                yield data
-
+        yield from self._iter_research_data_by_trimmed_suffix(name, series)
         return False
 
     @cached_property
