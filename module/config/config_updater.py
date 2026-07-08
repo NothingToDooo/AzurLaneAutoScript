@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from module.base.decorator import cached_property
 from module.base.timer import timer
 from module.config.deep import deep_default, deep_get, deep_iter, deep_set
-from module.config.server import VALID_PACKAGE, VALID_SERVER_LIST
+from module.config.server import VALID_PACKAGE
 from module.config.utils import (
     LANGUAGES,
     data_to_type,
@@ -401,18 +401,6 @@ class ConfigGenerator:
             if deep_get(new, keys=path) == package:
                 deep_set(new, keys=path, value=server.upper())
 
-    @staticmethod
-    def _server_i18n_prefix(server):
-        prefix = server.split("_")[0].upper()
-        return "国服" if prefix == "CN" else prefix
-
-    def _generate_server_i18n(self, new) -> None:
-        for server, server_list in VALID_SERVER_LIST.items():
-            for index, name in enumerate(server_list):
-                path = ["Emulator", "ServerName", f"{server}-{index}"]
-                prefix = self._server_i18n_prefix(server)
-                deep_set(new, keys=path, value=f"[{prefix}] {name}")
-
     def _generate_gui_i18n(self, new, old) -> None:
         for path, _ in deep_iter(self.gui, depth=2):
             group, key = path
@@ -424,7 +412,6 @@ class ConfigGenerator:
         self._generate_argument_i18n(new, old)
         self._generate_event_i18n(new)
         self._generate_package_i18n(new)
-        self._generate_server_i18n(new)
         self._generate_gui_i18n(new, old)
         return new
 
@@ -582,15 +569,6 @@ class ConfigGenerator:
         deep_set(self.argument, keys="Emulator.PackageName.option", value=option)
         deep_set(self.args, keys="Alas.Emulator.PackageName.option", value=option)
 
-    def insert_server(self):
-        option = deep_get(self.argument, keys="Emulator.ServerName.option")
-        server_list = []
-        for server, _list in VALID_SERVER_LIST.items():
-            server_list.extend(f"{server}-{index}" for index in range(len(_list)))
-        option += server_list
-        deep_set(self.argument, keys="Emulator.ServerName.option", value=option)
-        deep_set(self.args, keys="Alas.Emulator.ServerName.option", value=option)
-
     @timer
     def generate(self):
         _ = self.args
@@ -598,7 +576,6 @@ class ConfigGenerator:
         _ = self.event
         self.insert_event()
         self.insert_package()
-        self.insert_server()
         write_file(filepath_args(), self.args)
         write_file(filepath_args("menu"), self.menu)
         self.generate_code()

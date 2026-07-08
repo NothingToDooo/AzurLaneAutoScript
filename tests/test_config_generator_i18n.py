@@ -1,6 +1,6 @@
 from module.config.config_updater import ConfigGenerator, Event
 from module.config.deep import deep_get
-from module.config.server import VALID_PACKAGE, VALID_SERVER_LIST
+from module.config.server import VALID_PACKAGE
 
 
 def _event(date: str, directory: str, name: str) -> Event:
@@ -71,11 +71,8 @@ def test_generate_i18n_data_uses_cn_event_name_and_directory_fallback() -> None:
     assert deep_get(data, keys="Campaign.Event.event_missing") == "event_missing"
 
 
-def test_generate_i18n_data_generates_package_and_server_names() -> None:
+def test_generate_i18n_data_generates_package_name() -> None:
     package, package_server = next(iter(VALID_PACKAGE.items()))
-    cn_server, cn_server_names = next(
-        (server, server_names) for server, server_names in VALID_SERVER_LIST.items() if server.startswith("cn")
-    )
     generator = _generator(
         task={},
         argument={
@@ -88,4 +85,3 @@ def test_generate_i18n_data_generates_package_and_server_names() -> None:
     data = generator.generate_i18n_data({})
 
     assert deep_get(data, keys=["Emulator", "PackageName", package]) == package_server.upper()
-    assert deep_get(data, keys=f"Emulator.ServerName.{cn_server}-0") == f"[国服] {cn_server_names[0]}"

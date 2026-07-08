@@ -3,7 +3,6 @@
     "Emulator": {
       "Serial": "auto",
       "PackageName": "auto",
-      "ServerName": "disabled",
       "ScreenshotMethod": "nemu_ipc",
       "ControlMethod": "minitouch",
       "ScreenshotDedithering": false,

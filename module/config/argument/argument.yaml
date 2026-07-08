@@ -27,9 +27,6 @@ Emulator:
   PackageName:
     value: auto
     option: [ auto, ]
-  ServerName:
-    value: disabled
-    option: [ disabled, ]
   ScreenshotMethod:
     value: nemu_ipc
     option: [

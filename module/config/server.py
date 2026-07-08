@@ -14,39 +14,6 @@ INVALID_SERVER_MESSAGE = "Server invalid"
 DICT_PACKAGE_TO_ACTIVITY = {
     "com.bilibili.azurlane": "com.manjuu.azurlane.MainActivity",
 }
-VALID_SERVER_LIST = {
-    "cn_android": [
-        "莱茵演习",
-        "巴巴罗萨",
-        "霸王行动",
-        "冰山行动",
-        "彩虹计划",
-        "发电机计划",
-        "瞭望台行动",
-        "十字路口行动",
-        "朱诺行动",
-        "杜立特空袭",
-        "地狱犬行动",
-        "开罗宣言",
-        "奥林匹克行动",
-        "小王冠行动",
-        "波茨坦公告",
-        "白色方案",
-        "瓦尔基里行动",
-        "曼哈顿计划",
-        "八月风暴",
-        "秋季旅行",
-        "水星行动",
-        "莱茵河卫兵",
-        "北极光计划",
-        "长戟计划",
-        "暴雨行动",
-        "水仙行动",
-        "冬月计划",
-        "长弓计划",
-        "裁决协议",
-    ],
-}
 
 
 def to_server(package_or_server: str) -> str:
