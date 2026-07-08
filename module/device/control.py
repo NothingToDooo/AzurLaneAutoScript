@@ -11,11 +11,10 @@ from module.base.utils import (
 )
 from module.device.control_options import SwipeVectorOptions
 from module.device.method.minitouch import Minitouch
-from module.device.method.nemu_ipc import NemuIpc
 from module.logger import logger
 
 
-class Control(Minitouch, NemuIpc):
+class Control(Minitouch):
     def handle_control_check(self, button):
         # Device 会覆盖这个检查入口。
         pass

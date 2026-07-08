@@ -92,7 +92,7 @@ class Device(Screenshot, Control, AppControl):
         self.screenshot_interval_set()
 
         # 提前初始化 minitouch，避免第一次点击时才启动服务。
-        if self.config.is_actual_task and self.config.Emulator_ControlMethod == "minitouch":
+        if self.config.is_actual_task:
             self.early_minitouch_init()
 
     def run_simple_screenshot_benchmark(self):
@@ -157,8 +157,7 @@ class Device(Screenshot, Control, AppControl):
         return self.image
 
     def release_during_wait(self):
-        if self.config.Emulator_ScreenshotMethod == "nemu_ipc":
-            self.nemu_ipc_release()
+        self.nemu_ipc_release()
 
     def get_orientation(self):
         """

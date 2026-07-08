@@ -109,9 +109,8 @@ class Screenshot(NemuIpc):
             if interval != origin:
                 logger.warning(f"Optimization.ScreenshotInterval {origin} is revised to {interval}")
                 self.config.Optimization_ScreenshotInterval = interval
-            # nemu_ipc 可以使用更低的默认截图间隔。
-            if self.config.Emulator_ScreenshotMethod == "nemu_ipc":
-                interval = limit_in(origin, 0.1, 0.2)
+            # 当前个人版固定使用 nemu_ipc 截图，可以使用更低的默认截图间隔。
+            interval = limit_in(origin, 0.1, 0.2)
         elif interval == "combat":
             origin = self.config.Optimization_CombatScreenshotInterval
             interval = limit_in(origin, 0.3, 1.0)
