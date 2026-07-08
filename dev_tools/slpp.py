@@ -154,53 +154,70 @@ class SLPP:
                 s += self.ch
         raise ParseError(ERRORS["unexp_end_string"])
 
+    def _consume_empty_object(self):
+        if self.ch != "}":
+            return False
+        self.depth -= 1
+        self.next_chr()
+        return True
+
+    def _object_as_sequence(self, data):
+        if any(isinstance(key, SORTABLE_KEY_TYPES) for key in data):
+            return data
+        keys = sorted(data)
+        if not sequential(keys):
+            return data
+        result = []
+        for key, value in data.items():
+            result.insert(key, value)
+        return result
+
+    def _close_object(self, data, pending_key, index):
+        self.depth -= 1
+        self.next_chr()
+        if pending_key is not None:
+            data[index] = pending_key
+        return self._object_as_sequence(data)
+
+    def _read_object_item(self, data, index):
+        key = self.value()
+        if self.ch == "]":
+            self.next_chr()
+        self.white()
+
+        separator = self.ch
+        if separator not in ("=", ","):
+            return key, index
+
+        self.next_chr()
+        self.white()
+        if separator == "=":
+            data[key] = self.value()
+        else:
+            data[index] = key
+        return None, index + 1
+
     def object(self):
-        o = {}
-        k = None
-        idx = 0
+        data = {}
+        pending_key = None
+        index = 0
         self.depth += 1
         self.next_chr()
         self.white()
-        if self.ch and self.ch == "}":
-            self.depth -= 1
-            self.next_chr()
-            return o  # 空表直接结束。
+        if self._consume_empty_object():
+            return data
         while self.ch:
             self.white()
             if self.ch == "{":
-                o[idx] = self.object()
-                idx += 1
+                data[index] = self.object()
+                index += 1
                 continue
             if self.ch == "}":
-                self.depth -= 1
-                self.next_chr()
-                if k is not None:
-                    o[idx] = k
-                if not any(isinstance(key, SORTABLE_KEY_TYPES) for key in o):
-                    so = sorted(o)
-                    if sequential(so):
-                        ar = []
-                        for key, value in o.items():
-                            ar.insert(key, value)
-                        o = ar
-                return o  # 表对象解析完成。
+                return self._close_object(data, pending_key, index)
             if self.ch == ",":
                 self.next_chr()
                 continue
-            k = self.value()
-            if self.ch == "]":
-                self.next_chr()
-            self.white()
-            ch = self.ch
-            if ch in ("=", ","):
-                self.next_chr()
-                self.white()
-                if ch == "=":
-                    o[k] = self.value()
-                else:
-                    o[idx] = k
-                idx += 1
-                k = None
+            pending_key, index = self._read_object_item(data, index)
         raise ParseError(ERRORS["unexp_end_table"])  # 表未正常结束。
 
     words: ClassVar[dict[str, object]] = {"true": True, "false": False, "nil": None}
