@@ -32,6 +32,38 @@ from module.logger import logger
 from module.map.map_grids import SelectedGrids
 
 
+def _noop_recovery():
+    pass
+
+
+def _restart_adb_server_and_reconnect(device):
+    device.adb_start_server()
+    device.adb_reconnect()
+
+
+def _adb_error_recovery(device, error):
+    if handle_adb_error(error):
+        return device.adb_reconnect
+    if handle_unknown_host_service(error):
+        return lambda: _restart_adb_server_and_reconnect(device)
+    return None
+
+
+def _connection_error_recovery(device, error):
+    if isinstance(error, ConnectionResetError):
+        logger.error(error)
+        return device.adb_reconnect
+    if isinstance(error, AdbError):
+        return _adb_error_recovery(device, error)
+    if isinstance(error, PackageNotInstalled):
+        logger.error(error)
+        return device.detect_package
+    if isinstance(error, OSError):
+        logger.error(error)
+        return _noop_recovery
+    return None
+
+
 def retry(func):
     @wraps(func)
     def retry_wrapper(self, *args, **kwargs):
@@ -39,47 +71,20 @@ def retry(func):
         Args:
             self (Adb):
         """
-        init = None
+        recovery = None
         for _ in range(RETRY_TRIES):
             try:
-                if callable(init):
+                if callable(recovery):
                     time.sleep(retry_sleep(_))
-                    init()
+                    recovery()
                 return func(self, *args, **kwargs)
             # 无法自动处理。
             except RequestHumanTakeover:
                 break
-            # ADB server 被杀掉。
-            except ConnectionResetError as e:
-                logger.error(e)
-
-                def init():
-                    self.adb_reconnect()
-            # ADB 错误。
-            except AdbError as e:
-                if handle_adb_error(e):
-
-                    def init():
-                        self.adb_reconnect()
-                elif handle_unknown_host_service(e):
-
-                    def init():
-                        self.adb_start_server()
-                        self.adb_reconnect()
-                else:
+            except (AdbError, PackageNotInstalled, OSError) as e:
+                recovery = _connection_error_recovery(self, e)
+                if recovery is None:
                     break
-            # 游戏包未安装。
-            except PackageNotInstalled as e:
-                logger.error(e)
-
-                def init():
-                    self.detect_package()
-            # ADB 底层连接可能抛出 socket/pipe 类 I/O 错误。
-            except OSError as e:
-                logger.error(e)
-
-                def init():
-                    pass
 
         logger.critical(f"Retry {func.__name__}() failed")
         raise RequestHumanTakeover
