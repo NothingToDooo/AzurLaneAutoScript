@@ -17,7 +17,8 @@ from module.ui.ui import UI
 
 class LoginHandler(UI):
     def _handle_app_login(self):
-        """
+        """处理从任意页面回到主界面的登录流程。
+
         Pages:
             in: Any page
             out: page_main
@@ -45,59 +46,95 @@ class LoginHandler(UI):
             self.device.screenshot()
 
             # 结束。
-            if self.is_in_main():
-                if confirm_timer.reached():
-                    logger.info("Login to main confirm")
-                    break
-            else:
-                confirm_timer.reset()
+            if self._login_main_confirmed(confirm_timer):
+                break
 
             # 登录。
-            if self.match_template_color(handler_assets.LOGIN_CHECK, offset=(30, 30), interval=5):
-                self.device.click(handler_assets.LOGIN_CHECK)
-                if not login_success:
-                    logger.info("Login success")
-                    login_success = True
-            if self.appear(handler_assets.ANDROID_NO_RESPOND, offset=(30, 30), interval=5):
-                logger.warning("Emulator no respond")
-                self.device.click_record_add(handler_assets.ANDROID_NO_RESPOND)
-                self.device.click_record_check()
-                self.device.click(handler_assets.ANDROID_NO_RESPOND, control_check=False)
-                continue
-            if self.appear_then_click(handler_assets.LOGIN_ANNOUNCE, offset=(30, 30), interval=5):
-                continue
-            if self.appear_then_click(handler_assets.LOGIN_ANNOUNCE_2, offset=(30, 30), interval=5):
-                continue
-            if self.appear(EVENT_LIST_CHECK, offset=(30, 30), interval=5):
-                self.device.click(BACK_ARROW)
-                continue
-            # 更新和维护公告。
-            if self.appear_then_click(handler_assets.MAINTENANCE_ANNOUNCE, offset=(30, 30), interval=5):
-                continue
-            if self.appear_then_click(handler_assets.LOGIN_GAME_UPDATE, offset=(30, 30), interval=5):
-                continue
-            if not login_success and self.handle_cn_user_agreement():
-                continue
-            # 回归玩家。
-            if self.appear_then_click(handler_assets.LOGIN_RETURN_SIGN, offset=(30, 30), interval=5):
-                continue
-            if self.appear_then_click(handler_assets.LOGIN_RETURN_INFO, offset=(30, 30), interval=5):
-                continue
-            if self.appear_then_click(handler_assets.AVATAR_EXPIRED, offset=(30, 30), interval=5):
-                continue
-            # 弹窗。
-            if self.handle_popup_confirm("LOGIN"):
-                continue
-            if self.handle_urgent_commission():
-                continue
-            # page_main 上出现的弹窗。
-            if self.ui_page_main_popups(get_ship=login_success):
+            login_success = self._handle_login_button(login_success)
+            action = self._handle_login_screen_actions(login_success)
+            if action == "success":
                 return True
-            # 始终回到 page_main。
-            if self.appear_then_click(GOTO_MAIN, offset=(30, 30), interval=5):
+            if action == "continue":
                 continue
 
         return True
+
+    def _login_main_confirmed(self, confirm_timer):
+        if self.is_in_main():
+            if confirm_timer.reached():
+                logger.info("Login to main confirm")
+                return True
+        else:
+            confirm_timer.reset()
+        return False
+
+    def _handle_login_button(self, login_success):
+        if not self.match_template_color(handler_assets.LOGIN_CHECK, offset=(30, 30), interval=5):
+            return login_success
+
+        self.device.click(handler_assets.LOGIN_CHECK)
+        if not login_success:
+            logger.info("Login success")
+        return True
+
+    def _handle_android_no_respond(self):
+        if not self.appear(handler_assets.ANDROID_NO_RESPOND, offset=(30, 30), interval=5):
+            return False
+
+        logger.warning("Emulator no respond")
+        self.device.click_record_add(handler_assets.ANDROID_NO_RESPOND)
+        self.device.click_record_check()
+        self.device.click(handler_assets.ANDROID_NO_RESPOND, control_check=False)
+        return True
+
+    def _handle_login_screen_actions(self, login_success):
+        handlers = (
+            self._handle_android_no_respond,
+            self._handle_login_announcements,
+            lambda: self._handle_pre_login_user_agreement(login_success),
+            self._handle_return_player_popups,
+            self._handle_login_popups,
+        )
+        for handler in handlers:
+            if handler():
+                return "continue"
+        # page_main 上出现的弹窗。
+        if self.ui_page_main_popups(get_ship=login_success):
+            return "success"
+        # 始终回到 page_main。
+        if self._handle_goto_main():
+            return "continue"
+        return None
+
+    def _handle_login_announcements(self):
+        if self.appear_then_click(handler_assets.LOGIN_ANNOUNCE, offset=(30, 30), interval=5):
+            return True
+        if self.appear_then_click(handler_assets.LOGIN_ANNOUNCE_2, offset=(30, 30), interval=5):
+            return True
+        if self.appear(EVENT_LIST_CHECK, offset=(30, 30), interval=5):
+            self.device.click(BACK_ARROW)
+            return True
+        # 更新和维护公告。
+        if self.appear_then_click(handler_assets.MAINTENANCE_ANNOUNCE, offset=(30, 30), interval=5):
+            return True
+        return bool(self.appear_then_click(handler_assets.LOGIN_GAME_UPDATE, offset=(30, 30), interval=5))
+
+    def _handle_pre_login_user_agreement(self, login_success):
+        return bool(not login_success and self.handle_cn_user_agreement())
+
+    def _handle_return_player_popups(self):
+        # 回归玩家。
+        return (
+            self.appear_then_click(handler_assets.LOGIN_RETURN_SIGN, offset=(30, 30), interval=5)
+            or self.appear_then_click(handler_assets.LOGIN_RETURN_INFO, offset=(30, 30), interval=5)
+            or self.appear_then_click(handler_assets.AVATAR_EXPIRED, offset=(30, 30), interval=5)
+        )
+
+    def _handle_login_popups(self):
+        return self.handle_popup_confirm("LOGIN") or self.handle_urgent_commission()
+
+    def _handle_goto_main(self):
+        return self.appear_then_click(GOTO_MAIN, offset=(30, 30), interval=5)
 
     _user_agreement_timer = Timer(1, count=2)
 
