@@ -42,6 +42,27 @@ ASIDE_SWITCH_20241219.add_state("ex", campaign_assets.CHAPTER_20241219_EX)
 # 游戏 bug 可能导致关卡撤退或结束后侧边指示器消失。
 ASIDE_SWITCH_20241219.set_unknown_timer = Timer(0.6, count=2)
 
+_CHAPTER_SWITCH_20241219_ASIDE = {
+    "a": "part1",
+    "c": "part1",
+    "t": "part1",
+    "b": "part2",
+    "d": "part2",
+    "ttl": "part2",
+    "ex_sp": "sp",
+    "ex_ex": "ex",
+}
+_CHAPTER_SWITCH_20241219_SP_ASIDE = {
+    "sp": "part2",
+    "t": "part2",
+    "ht": "part2",
+    "ex_sp": "sp",
+}
+_CHAPTER_SWITCH_20241219_SPEX_ASIDE = {
+    **_CHAPTER_SWITCH_20241219_SP_ASIDE,
+    "ex_ex": "ex",
+}
+
 
 def is_digit_chapter(chapter):
     """
@@ -263,79 +284,38 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
             return True
         return False
 
+    def _set_20241219_hard_mode(self, chapter, stage) -> None:
+        if self._campaign_name_is_hard(f"{chapter}{stage}"):
+            self.config.override(Campaign_Mode="hard")
+
+    def _campaign_set_chapter_20241219_aside(self, chapter, aside_by_chapter):
+        aside = aside_by_chapter.get(chapter)
+        if aside is None:
+            return False
+
+        self.ui_goto_event()
+        self.campaign_ensure_mode_20241219("combat")
+        self.campaign_ensure_aside_20241219(aside)
+        self.campaign_ensure_chapter(chapter)
+        return True
+
     def campaign_set_chapter_20241219(self, chapter, stage, mode="combat"):
         if self.config.MAP_CHAPTER_SWITCH_20241219:
-            if self._campaign_name_is_hard(f"{chapter}{stage}"):
-                self.config.override(Campaign_Mode="hard")
-            # part1、part2、sp、ex。
+            self._set_20241219_hard_mode(chapter, stage)
             if mode == "story":
                 self.campaign_ensure_mode_20241219("story")
                 return True
-            if chapter in ["a", "c", "t"]:
-                self.ui_goto_event()
-                self.campaign_ensure_mode_20241219("combat")
-                self.campaign_ensure_aside_20241219("part1")
-                self.campaign_ensure_chapter(chapter)
-                return True
-            if chapter in ["b", "d", "ttl"]:
-                self.ui_goto_event()
-                self.campaign_ensure_mode_20241219("combat")
-                self.campaign_ensure_aside_20241219("part2")
-                self.campaign_ensure_chapter(chapter)
-                return True
-            if chapter == "ex_sp":
-                self.ui_goto_event()
-                self.campaign_ensure_mode_20241219("combat")
-                self.campaign_ensure_aside_20241219("sp")
-                self.campaign_ensure_chapter(chapter)
-                return True
-            if chapter == "ex_ex":
-                self.ui_goto_event()
-                self.campaign_ensure_mode_20241219("combat")
-                self.campaign_ensure_aside_20241219("ex")
-                self.campaign_ensure_chapter(chapter)
+            if self._campaign_set_chapter_20241219_aside(chapter, _CHAPTER_SWITCH_20241219_ASIDE):
                 return True
         if self.config.MAP_CHAPTER_SWITCH_20241219_SP:
-            if self._campaign_name_is_hard(f"{chapter}{stage}"):
-                self.config.override(Campaign_Mode="hard")
-            # 空、normal、sp、空。
-            if chapter in ["sp", "t", "ht"]:
-                self.ui_goto_event()
-                self.campaign_ensure_mode_20241219("combat")
-                # normal 位于 part2 的位置。
-                self.campaign_ensure_aside_20241219("part2")
-                self.campaign_ensure_chapter(chapter)
-                return True
-            if chapter == "ex_sp":
-                self.ui_goto_event()
-                self.campaign_ensure_mode_20241219("combat")
-                self.campaign_ensure_aside_20241219("sp")
-                self.campaign_ensure_chapter(chapter)
+            self._set_20241219_hard_mode(chapter, stage)
+            if self._campaign_set_chapter_20241219_aside(chapter, _CHAPTER_SWITCH_20241219_SP_ASIDE):
                 return True
         if self.config.MAP_CHAPTER_SWITCH_20241219_SPEX:
-            if self._campaign_name_is_hard(f"{chapter}{stage}"):
-                self.config.override(Campaign_Mode="hard")
-            # normal、sp、ex。
+            self._set_20241219_hard_mode(chapter, stage)
             try:
                 ASIDE_SWITCH_20241219.offset = area_offset((-20, -20, 20, 20), (0, -37))
-                if chapter in ["sp", "t", "ht"]:
-                    self.ui_goto_event()
-                    self.campaign_ensure_mode_20241219("combat")
-                    # normal 位于 part2 的位置。
-                    self.campaign_ensure_aside_20241219("part2")
-                    self.campaign_ensure_chapter(chapter)
-                    return True
-                if chapter == "ex_sp":
-                    self.ui_goto_event()
-                    self.campaign_ensure_mode_20241219("combat")
-                    self.campaign_ensure_aside_20241219("sp")
-                    self.campaign_ensure_chapter(chapter)
-                    return True
-                if chapter == "ex_ex":
-                    self.ui_goto_event()
-                    self.campaign_ensure_mode_20241219("combat")
-                    self.campaign_ensure_aside_20241219("ex")
-                    self.campaign_ensure_chapter(chapter)
+                if self._campaign_set_chapter_20241219_aside(chapter, _CHAPTER_SWITCH_20241219_SPEX_ASIDE):
                     return True
             finally:
                 ASIDE_SWITCH_20241219.offset = (20, 20)
