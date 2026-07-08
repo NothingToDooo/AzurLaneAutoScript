@@ -1,7 +1,6 @@
 import time
 from collections import deque
 from datetime import datetime
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import cv2
@@ -25,7 +24,6 @@ class Screenshot(NemuIpc):
         self._screen_size_checked = False
         self._screen_black_checked = False
         self._screenshot_interval = Timer(0.1)
-        self._last_save_time: dict[str, float] = {}
         super().__init__(*args, **kwargs)
 
     def screenshot(self):
@@ -93,40 +91,6 @@ class Screenshot(NemuIpc):
         # 限制在 1~300。
         length = max(1, min(length, 300))
         return deque(maxlen=length)
-
-    def save_screenshot(self, genre="items", interval=None, to_base_folder=False):
-        """Save a screenshot. Use millisecond timestamp as file name.
-
-        Args:
-            genre (str, optional): Screenshot type.
-            interval (int, float): Seconds between two save. Saves in the interval will be dropped.
-            to_base_folder (bool): If save to base folder.
-
-        Returns:
-            bool: True if save succeed.
-        """
-        now = time.time()
-        if interval is None:
-            interval = self.config.SCREEN_SHOT_SAVE_INTERVAL
-
-        if now - self._last_save_time.get(genre, 0) > interval:
-            fmt = "png"
-            file = f"{int(now * 1000)}.{fmt}"
-
-            folder = self.config.SCREEN_SHOT_SAVE_FOLDER_BASE if to_base_folder else self.config.SCREEN_SHOT_SAVE_FOLDER
-            folder = Path(folder) / genre
-            if not folder.exists():
-                folder.mkdir()
-
-            file = folder / file
-            self.image_save(str(file))
-            self._last_save_time[genre] = now
-            return True
-        self._last_save_time[genre] = now
-        return False
-
-    def screenshot_last_save_time_reset(self, genre):
-        self._last_save_time[genre] = 0
 
     def screenshot_interval_clear(self) -> None:
         self._screenshot_interval.clear()

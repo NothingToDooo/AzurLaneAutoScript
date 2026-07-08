@@ -42,7 +42,6 @@ class ManualConfig:
     module.base
     """
     BUTTON_OFFSET = 30
-    WAIT_BEFORE_SAVING_SCREEN_SHOT = 1
 
     """
     module.campaign

@@ -241,15 +241,9 @@ class ModuleBase:
 
         return appear
 
-    def appear_then_click(
-        self, button, screenshot=False, genre="items", offset=0, interval=0, similarity=0.85, threshold=30
-    ):
+    def appear_then_click(self, button, offset=0, interval=0, similarity=0.85, threshold=30):
         appear = self.appear(button, offset=offset, interval=interval, similarity=similarity, threshold=threshold)
         if appear:
-            if screenshot:
-                self.device.sleep(self.config.WAIT_BEFORE_SAVING_SCREEN_SHOT)
-                self.device.screenshot()
-                self.device.save_screenshot(genre=genre)
             self.device.click(button)
         return appear
 
