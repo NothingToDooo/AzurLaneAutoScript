@@ -1,10 +1,10 @@
 import json
 import re
 import textwrap
-import typing as t
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from module.base.decorator import cached_property
 from module.base.timer import timer
@@ -24,6 +24,9 @@ from module.config.utils import (
     write_file,
 )
 from module.logger import logger
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 CONFIG_IMPORT = '''
 import datetime
@@ -535,57 +538,6 @@ class ConfigGenerator:
 
 
 class ConfigUpdater:
-    # source、target、可选转换函数。
-    redirection: t.ClassVar[tuple[tuple[object, ...], ...]] = (
-        # ('OpsiDaily.OpsiDaily.BuySupply', 'OpsiShop.Scheduler.Enable'),
-        # ('OpsiDaily.Scheduler.Enable', 'OpsiDaily.OpsiDaily.DoMission'),
-        # ('OpsiShop.Scheduler.Enable', 'OpsiShop.OpsiShop.BuySupply'),
-        # ('ShopOnce.GuildShop.Filter', 'ShopOnce.GuildShop.Filter', bp_redirect),
-        # ('ShopOnce.MedalShop2.Filter', 'ShopOnce.MedalShop2.Filter', bp_redirect),
-        # ('Alas.RestartEmulator.Enable', 'Alas.RestartEmulator.ErrorRestart'),
-        # (
-        #     'OpsiGeneral.OpsiGeneral.BuyActionPoint',
-        #     'OpsiGeneral.OpsiGeneral.BuyActionPointLimit',
-        #     action_point_redirect,
-        # ),
-        # ('BattlePass.BattlePass.BattlePassReward', 'Freebies.BattlePass.Collect'),
-        # ('DataKey.Scheduler.Enable', 'Freebies.DataKey.Collect'),
-        # ('DataKey.DataKey.ForceGet', 'Freebies.DataKey.ForceCollect'),
-        # ('SupplyPack.SupplyPack.WeeklyFreeSupplyPack', 'Freebies.SupplyPack.Collect'),
-        # ('Commission.Commission.CommissionFilter', 'Commission.Commission.CustomFilter'),
-        # 2023.02.17
-        # ('OpsiAshBeacon.OpsiDossierBeacon.Enable', 'OpsiAshBeacon.OpsiAshBeacon.AttackMode', dossier_redirect),
-        # ('General.Retirement.EnhanceFavourite', 'General.Enhance.ShipToEnhance', enhance_favourite_redirect),
-        # ('General.Retirement.EnhanceFilter', 'General.Enhance.Filter'),
-        # ('General.Retirement.EnhanceCheckPerCategory', 'General.Enhance.CheckPerCategory', enhance_check_redirect),
-        # ('General.Retirement.OldRetireN', 'General.OldRetire.N'),
-        # ('General.Retirement.OldRetireR', 'General.OldRetire.R'),
-        # ('General.Retirement.OldRetireSR', 'General.OldRetire.SR'),
-        # ('General.Retirement.OldRetireSSR', 'General.OldRetire.SSR'),
-        # (('GemsFarming.GemsFarming.FlagshipChange', 'GemsFarming.GemsFarming.FlagshipEquipChange'),
-        #  'GemsFarming.GemsFarming.ChangeFlagship',
-        #  change_ship_redirect),
-        # (('GemsFarming.GemsFarming.VanguardChange', 'GemsFarming.GemsFarming.VanguardEquipChange'),
-        #  'GemsFarming.GemsFarming.ChangeVanguard',
-        #  change_ship_redirect),
-        # 2025.04.17
-        # ('Coalition.Coalition.Mode', 'Coalition.Coalition.Mode', coalition_to_frostfall),
-        # 2025.06.26
-        # ('Coalition.Coalition.Mode', 'Coalition.Coalition.Mode', coalition_to_little_academy),
-    )
-
-    # redirection += [
-    #     (
-    #         (f'{task}.Emotion.CalculateEmotion', f'{task}.Emotion.IgnoreLowEmotionWarn'),
-    #         f'{task}.Emotion.Mode',
-    #         emotion_mode_redirect
-    #     ) for task in [
-    #         'Main', 'Main2', 'Main3', 'GemsFarming',
-    #         'Event', 'Event2', 'EventA', 'EventB', 'EventC', 'EventD', 'EventSp', 'Raid', 'RaidDaily',
-    #         'Sos', 'WarArchives',
-    #     ]
-    # ]
-
     @cached_property
     def args(self):
         return read_file(filepath_args())
@@ -645,65 +597,14 @@ class ConfigUpdater:
         for task in COALITIONS:
             default_stage(task, "area1-normal")
 
-        if not is_template:
-            new = self.config_redirect(old, new)
         new = self._override(new)
-
-        return new
-
-    def config_redirect(self, old, new):
-        """
-        将旧配置迁移到新配置。
-
-        Args:
-            old (dict):
-            new (dict):
-
-        Returns:
-            dict:
-        """
-        for row in self.redirection:
-            if len(row) == 2:
-                source, target = row
-                update_func = None
-            elif len(row) == 3:
-                source, target, update_func = row
-            else:
-                continue
-
-            if isinstance(source, tuple):
-                value = []
-                error = False
-                for attribute in source:
-                    tmp = deep_get(old, keys=attribute)
-                    if tmp is None:
-                        error = True
-                        continue
-                    value.append(tmp)
-                if error:
-                    continue
-            else:
-                value = deep_get(old, keys=source)
-                if value is None:
-                    continue
-
-            if update_func is not None:
-                value = update_func(value)
-
-            if isinstance(target, tuple):
-                for k, v in zip(target, value, strict=True):
-                    # 允许更新同一个键。
-                    if (deep_get(old, keys=k) is None) or (source == target):
-                        deep_set(new, keys=k, value=v)
-            elif (deep_get(old, keys=target) is None) or (source == target):
-                deep_set(new, keys=target, value=value)
 
         return new
 
     def _override(self, data):
         return data
 
-    def save_callback(self, key: str, _value: object) -> t.Iterable[tuple[str, object]]:
+    def save_callback(self, key: str, _value: object) -> Iterable[tuple[str, object]]:
         """
         Args:
             key：配置 json 中的键路径，例如 "Main.Emotion.Fleet1Value"。

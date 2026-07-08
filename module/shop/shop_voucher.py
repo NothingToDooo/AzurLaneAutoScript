@@ -1,8 +1,9 @@
+import re
+
 from module.base.button import ButtonGrid
 from module.base.decorator import cached_property, del_cached_property
 from module.base.template import Template
 from module.base.timer import Timer
-from module.config.redirect_utils.shop_filter import voucher_redirect
 from module.handler.assets import POPUP_CANCEL, POPUP_CONFIRM
 from module.logger import logger
 from module.map_detection.utils import Points
@@ -22,6 +23,28 @@ from module.ui.scroll import Scroll
 PRICE_OCR = DigitYuv([], letter=(255, 223, 57), threshold=128, name="Price_ocr")
 VOUCHER_SHOP_SCROLL = Scroll(VOUCHER_SHOP_SCROLL_AREA, color=(255, 255, 255))
 TEMPLATE_VOUCHER_ICON = Template("./assets/shop/cost/Voucher.png")
+FILTER_REGEX_VOUCHER = re.compile("(logger)(archive|unlock)?(t[1-6])?", flags=re.IGNORECASE)
+
+
+def voucher_redirect(value):
+    """过滤兑换券商店中不应该由用户直接配置的 Logger 关键字。"""
+    matches = re.findall(FILTER_REGEX_VOUCHER, value)
+    if not matches:
+        return value
+
+    for match in matches:
+        flat = "".join(match)
+        pattern = rf"\b{flat}\b"
+        if (match[2] and match[1]) or match[1]:
+            value = re.sub(pattern, "", value)
+            value = re.sub(r"\>\s*\>", ">", value)
+            value = re.sub(r"\>\s*$", "", value)
+        elif match[2]:
+            value = re.sub(pattern, f"LoggerAbyssal{match[2].upper()} > LoggerObscure{match[2].upper()}", value)
+        else:
+            value = re.sub(pattern, "LoggerAbyssal > LoggerObscure", value)
+
+    return value
 
 
 class VoucherShop(ShopClerk, ShopStatus):
