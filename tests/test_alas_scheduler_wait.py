@@ -7,6 +7,14 @@ from alas import AzurLaneAutoScript
 WAIT_METHOD = "_wait_for_next_task"
 
 
+def _record_deleted_cache(deleted: list[str]):
+    def record(obj, name) -> None:
+        del obj
+        deleted.append(name)
+
+    return record
+
+
 class _WaitDevice:
     def __init__(self) -> None:
         self.app_stop_calls = 0
@@ -61,7 +69,7 @@ def test_wait_for_next_task_runs_ready_task(monkeypatch) -> None:
     release_calls: list[str] = []
     deleted: list[str] = []
     monkeypatch.setattr(alas_module, "release_resources", lambda: release_calls.append("release"))
-    monkeypatch.setattr(alas_module, "del_cached_property", lambda obj, name: deleted.append(name))
+    monkeypatch.setattr(alas_module, "del_cached_property", _record_deleted_cache(deleted))
     runner = _make_runner()
     task = _task("Main", datetime.now() - timedelta(seconds=1))
 
@@ -75,7 +83,7 @@ def test_wait_for_next_task_reloads_config_when_wait_is_interrupted(monkeypatch)
     release_calls: list[str] = []
     deleted: list[str] = []
     monkeypatch.setattr(alas_module, "release_resources", lambda: release_calls.append("release"))
-    monkeypatch.setattr(alas_module, "del_cached_property", lambda obj, name: deleted.append(name))
+    monkeypatch.setattr(alas_module, "del_cached_property", _record_deleted_cache(deleted))
     runner = _make_runner(method="stay_there", wait_result=False)
     task = _task("Main", datetime.now() + timedelta(minutes=1))
 
@@ -89,7 +97,7 @@ def test_wait_for_next_task_closes_game_and_schedules_restart(monkeypatch) -> No
     release_calls: list[str] = []
     deleted: list[str] = []
     monkeypatch.setattr(alas_module, "release_resources", lambda: release_calls.append("release"))
-    monkeypatch.setattr(alas_module, "del_cached_property", lambda obj, name: deleted.append(name))
+    monkeypatch.setattr(alas_module, "del_cached_property", _record_deleted_cache(deleted))
     runner = _make_runner(method="close_game", wait_result=True)
     task = _task("Main", datetime.now() + timedelta(minutes=1))
 
@@ -105,7 +113,7 @@ def test_wait_for_next_task_allows_scheduled_restart_after_close_game(monkeypatc
     release_calls: list[str] = []
     deleted: list[str] = []
     monkeypatch.setattr(alas_module, "release_resources", lambda: release_calls.append("release"))
-    monkeypatch.setattr(alas_module, "del_cached_property", lambda obj, name: deleted.append(name))
+    monkeypatch.setattr(alas_module, "del_cached_property", _record_deleted_cache(deleted))
     runner = _make_runner(method="close_game", wait_result=True)
     task = _task("Restart", datetime.now() + timedelta(minutes=1))
 
@@ -118,7 +126,7 @@ def test_wait_for_next_task_can_return_to_main_page(monkeypatch) -> None:
     release_calls: list[str] = []
     deleted: list[str] = []
     monkeypatch.setattr(alas_module, "release_resources", lambda: release_calls.append("release"))
-    monkeypatch.setattr(alas_module, "del_cached_property", lambda obj, name: deleted.append(name))
+    monkeypatch.setattr(alas_module, "del_cached_property", _record_deleted_cache(deleted))
     runner = _make_runner(method="goto_main", wait_result=True)
     task = _task("Main", datetime.now() + timedelta(minutes=1))
 

@@ -99,7 +99,7 @@ def _patch_windows_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(platform_windows, "get_focused_window", lambda: 0)
     monkeypatch.setattr(platform_windows, "set_focus_window", lambda _hwnd: None)
     monkeypatch.setattr(platform_windows, "minimize_window", lambda _hwnd: None)
-    monkeypatch.setattr(platform_windows, "flash_window", lambda _hwnd, flash=True: None)
+    monkeypatch.setattr(platform_windows, "flash_window", lambda _hwnd, *_args, **_kwargs: None)
 
 
 def test_emulator_start_watch_succeeds_when_device_shell_and_package_are_ready() -> None:

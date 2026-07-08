@@ -6,6 +6,10 @@ from module.daemon.os_daemon import ContinuousCombat
 from module.exception import CampaignEnd
 
 
+def _ignore_expected_end(expected_end) -> None:
+    del expected_end
+
+
 def test_handle_daemon_combat_prepares_and_finishes_battle_status() -> None:
     calls = []
     daemon = SimpleNamespace(
@@ -29,7 +33,7 @@ def test_handle_daemon_combat_treats_campaign_end_as_handled() -> None:
         combat_appear=lambda: False,
         combat_preparation=lambda: None,
         handle_battle_status=raise_campaign_end,
-        combat_status=lambda expected_end: None,
+        combat_status=_ignore_expected_end,
     )
 
     assert AzurLaneDaemon.handle_daemon_combat(daemon) is True
@@ -38,7 +42,7 @@ def test_handle_daemon_combat_treats_campaign_end_as_handled() -> None:
 def test_handle_daemon_map_operation_sleeps_after_ambush_evade() -> None:
     sleep_calls = []
     daemon = SimpleNamespace(
-        appear_then_click=lambda *args, **kwargs: True,
+        appear_then_click=lambda *_args, **_kwargs: True,
         device=SimpleNamespace(sleep=sleep_calls.append),
         handle_mystery_items=lambda: False,
     )
@@ -68,7 +72,7 @@ def test_handle_os_daemon_combat_treats_continuous_combat_as_handled() -> None:
         combat_appear=lambda: False,
         combat_preparation=lambda: None,
         handle_battle_status=raise_continuous_combat,
-        combat_status=lambda expected_end: None,
+        combat_status=_ignore_expected_end,
     )
 
     assert OpsiDaemon.handle_os_daemon_combat(daemon) is True
@@ -89,7 +93,7 @@ def test_handle_os_daemon_port_repair_runs_repair_sequence() -> None:
     calls = []
     daemon = SimpleNamespace(
         config=SimpleNamespace(OpsiDaemon_RepairShip=True),
-        appear=lambda *args, **kwargs: True,
+        appear=lambda *_args, **_kwargs: True,
         port_enter=lambda: calls.append("enter"),
         port_dock_repair=lambda: calls.append("repair"),
         port_quit=lambda: calls.append("quit"),
