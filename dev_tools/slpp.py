@@ -1,7 +1,7 @@
 import re
 from contextlib import suppress
 from numbers import Number
-from typing import ClassVar
+from typing import Any, ClassVar
 
 """
 SLPP is a simple lua-python data structures parser.
@@ -40,7 +40,7 @@ class ParseError(Exception):
 class SLPP:
     def __init__(self):
         self.text = ""
-        self.ch = ""
+        self.ch: str | None = ""
         self.at = 0
         self.len = 0
         self.depth = 0
@@ -148,8 +148,12 @@ class SLPP:
                         return s
                 if self.ch == "\\" and start == end:
                     self.next_chr()
+                    if self.ch is None:
+                        break
                     if self.ch != end:
                         s += "\\"
+                if self.ch is None:
+                    break
                 s += self.ch
         raise ParseError(ERRORS["unexp_end_string"])
 
@@ -219,15 +223,21 @@ class SLPP:
             pending_key, index = self._read_object_item(data, index)
         raise ParseError(ERRORS["unexp_end_table"])  # 表未正常结束。
 
-    words: ClassVar[dict[str, object]] = {"true": True, "false": False, "nil": None}
+    words: ClassVar[dict[str, Any]] = {"true": True, "false": False, "nil": None}
 
     def word(self):
         s = ""
-        if self.ch != "\n":
-            s = self.ch
+        ch = self.ch
+        if ch is None:
+            return s
+        if ch != "\n":
+            s = ch
         self.next_chr()
-        while self.ch is not None and self.alnum.match(self.ch) and s not in self.words:
-            s += self.ch
+        while True:
+            ch = self.ch
+            if ch is None or not self.alnum.match(ch) or s in self.words:
+                break
+            s += ch
             self.next_chr()
         return self.words.get(s, s)
 

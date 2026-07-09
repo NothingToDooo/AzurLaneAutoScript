@@ -28,8 +28,8 @@ class CampaignBase(CampaignBase_):
 
         if (
             self.campaign_set_chapter_main(chapter, mode)
-            or self.campaign_set_chapter_event(chapter)
-            or self.campaign_set_chapter_sp(chapter)
+            or self.campaign_set_chapter_event(chapter, mode)
+            or self.campaign_set_chapter_sp(chapter, mode)
             or self.campaign_set_chapter_ball(chapter, stage)
         ):
             return
@@ -47,7 +47,8 @@ class CampaignBase(CampaignBase_):
             self.campaign_ensure_mode("hard")
         return True
 
-    def campaign_set_chapter_event(self, chapter):
+    def campaign_set_chapter_event(self, chapter, mode="normal"):
+        del mode
         mode_by_chapter = {
             "a": "normal",
             "b": "normal",
@@ -64,7 +65,8 @@ class CampaignBase(CampaignBase_):
         self.campaign_ensure_chapter(chapter)
         return True
 
-    def campaign_set_chapter_sp(self, chapter):
+    def campaign_set_chapter_sp(self, chapter, mode="normal"):
+        del mode
         if chapter != "sp":
             return False
 

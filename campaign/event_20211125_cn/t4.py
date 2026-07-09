@@ -154,9 +154,12 @@ class Campaign(CampaignBase):
 
         return self.fleet_boss.clear_boss()
 
-    def catch_camera_repositioning(self, destination):
-        if super().catch_camera_repositioning(destination):
+    def catch_camera_repositioning(self):
+        if super().catch_camera_repositioning():
             return True
+        destination = getattr(self, "fleet_destination", None)
+        if destination is None:
+            return False
         if not self.map_is_clear_mode and destination.is_fortress:
             logger.info("Catch camera re-positioning after fortress cleared")
             # Poor implementation to wait camera move

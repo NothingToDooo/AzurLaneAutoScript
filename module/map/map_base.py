@@ -13,7 +13,7 @@ from module.map_detection.grid_info import GridInfo
 class CampaignMap:
     def __init__(self, name=None):
         self.name = name
-        self.grid_class = GridInfo
+        self.grid_class: type[GridInfo] = GridInfo
         self.grids = {}
         self._shape = (0, 0)
         self._map_data = ""

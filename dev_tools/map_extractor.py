@@ -1,4 +1,5 @@
 import re
+from collections.abc import Sized
 from contextlib import suppress
 from pathlib import Path
 from typing import ClassVar
@@ -465,7 +466,8 @@ class MapData:
         MapData._add_refresh_counts(spawn_data, data["enemy_refresh"], "enemy")
         if isinstance(event_enemy_data, list):
             for index, wave in enumerate(event_enemy_data):
-                MapData._add_spawn_count(spawn_data, index, "enemy", len(wave))
+                if isinstance(wave, Sized):
+                    MapData._add_spawn_count(spawn_data, index, "enemy", len(wave))
         if "".join([str(item) for item in data["elite_refresh"].values()]) != "100":  # 部分原始数据有误。
             MapData._add_refresh_counts(spawn_data, data["elite_refresh"], "enemy")
         MapData._add_refresh_counts(spawn_data, data["ai_refresh"], "siren")
@@ -514,9 +516,11 @@ class MapData:
         ]
 
     def _get_map_data_loop_rows(self):
+        map_data_loop = self.map_data_loop
+        if map_data_loop is None:
+            return []
         return [
-            "    " + " ".join(self.map_data_loop[(x, y)] for x in range(self.shape[0] + 1))
-            for y in range(self.shape[1] + 1)
+            "    " + " ".join(map_data_loop[(x, y)] for x in range(self.shape[0] + 1)) for y in range(self.shape[1] + 1)
         ]
 
     def _get_flatten_lines(self):

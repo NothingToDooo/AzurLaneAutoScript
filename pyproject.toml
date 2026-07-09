@@ -184,9 +184,3 @@ classmethod-decorators = ["cached_class_property"]
 
 [tool.ty.environment]
 python-version = "3.14"
-
-[tool.ty.src]
-exclude = [
-    "campaign/**",
-    "dev_tools/**",
-]

@@ -16,7 +16,8 @@ class Config:
 
 
 class Campaign(CampaignBase, HardEquipment):
-    def _expected_end(self, _expected):
+    def _expected_end(self, expected):
+        del expected
         return "in_stage"
 
     def clear_boss(self):

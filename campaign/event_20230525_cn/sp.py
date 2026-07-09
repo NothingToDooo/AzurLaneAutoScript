@@ -1,3 +1,5 @@
+from typing import cast
+
 from module.base.utils import location2node
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
@@ -240,7 +242,9 @@ class Campaign(CampaignBase):
             return self.battle_default()
 
         if not self.action:
-            self.action = actions[self.fleet_1_location[0]]
+            fleet_1_location = cast("tuple[int, int]", self.fleet_1_location)
+            fleet_1_x = fleet_1_location[0]
+            self.action = actions[fleet_1_x]
         return self.execute_actions(self.battle_count)
 
     def battle_7(self):

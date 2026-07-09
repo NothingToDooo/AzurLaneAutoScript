@@ -98,8 +98,7 @@ class ImageExtractor:
 
 
 class TemplateExtractor(ImageExtractor):
-    @staticmethod
-    def extract(file):
+    def extract(self, file):
         image = load_image(file)
         bbox = get_bbox(image)
         mean = get_color(image=image, area=bbox)
