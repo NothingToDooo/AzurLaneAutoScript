@@ -43,7 +43,7 @@ def strip_code(string):
 @dataclass
 class Field:
     formatter: Callable[..., object]
-    default: str
+    default: int | float | str | None
     regex: str
 
 

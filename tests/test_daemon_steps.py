@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import cast
 
 from module.daemon.daemon import AzurLaneDaemon
 from module.daemon.os_daemon import AzurLaneDaemon as OpsiDaemon
@@ -8,6 +9,14 @@ from module.exception import CampaignEnd
 
 def _ignore_expected_end(expected_end) -> None:
     del expected_end
+
+
+def _as_daemon(daemon: SimpleNamespace) -> AzurLaneDaemon:
+    return cast("AzurLaneDaemon", daemon)
+
+
+def _as_opsi_daemon(daemon: SimpleNamespace) -> OpsiDaemon:
+    return cast("OpsiDaemon", daemon)
 
 
 def test_handle_daemon_combat_prepares_and_finishes_battle_status() -> None:
@@ -20,7 +29,7 @@ def test_handle_daemon_combat_prepares_and_finishes_battle_status() -> None:
         combat_status=lambda expected_end: calls.append(("combat_status", expected_end)),
     )
 
-    assert AzurLaneDaemon.handle_daemon_combat(daemon) is True
+    assert AzurLaneDaemon.handle_daemon_combat(_as_daemon(daemon)) is True
     assert calls == ["preparation", ("combat_status", "no_searching")]
 
 
@@ -36,7 +45,7 @@ def test_handle_daemon_combat_treats_campaign_end_as_handled() -> None:
         combat_status=_ignore_expected_end,
     )
 
-    assert AzurLaneDaemon.handle_daemon_combat(daemon) is True
+    assert AzurLaneDaemon.handle_daemon_combat(_as_daemon(daemon)) is True
 
 
 def test_handle_daemon_map_operation_sleeps_after_ambush_evade() -> None:
@@ -47,7 +56,7 @@ def test_handle_daemon_map_operation_sleeps_after_ambush_evade() -> None:
         handle_mystery_items=lambda: False,
     )
 
-    assert AzurLaneDaemon.handle_daemon_map_operation(daemon) is True
+    assert AzurLaneDaemon.handle_daemon_map_operation(_as_daemon(daemon)) is True
     assert sleep_calls == [1]
 
 
@@ -61,7 +70,7 @@ def test_handle_daemon_map_preparation_skips_clicks_when_disabled() -> None:
         appear_then_click=unexpected_click,
     )
 
-    assert AzurLaneDaemon.handle_daemon_map_preparation(daemon) is False
+    assert AzurLaneDaemon.handle_daemon_map_preparation(_as_daemon(daemon)) is False
 
 
 def test_handle_os_daemon_combat_treats_continuous_combat_as_handled() -> None:
@@ -76,7 +85,7 @@ def test_handle_os_daemon_combat_treats_continuous_combat_as_handled() -> None:
         combat_status=_ignore_expected_end,
     )
 
-    assert OpsiDaemon.handle_os_daemon_combat(daemon) is True
+    assert OpsiDaemon.handle_os_daemon_combat(_as_opsi_daemon(daemon)) is True
 
 
 def test_handle_os_daemon_map_event_clears_nearest_object_timer() -> None:
@@ -86,7 +95,7 @@ def test_handle_os_daemon_map_event_clears_nearest_object_timer() -> None:
         _nearest_object_click_timer=SimpleNamespace(clear=lambda: calls.append("clear")),
     )
 
-    assert OpsiDaemon.handle_os_daemon_map_event(daemon) is True
+    assert OpsiDaemon.handle_os_daemon_map_event(_as_opsi_daemon(daemon)) is True
     assert calls == ["clear"]
 
 
@@ -101,6 +110,6 @@ def test_handle_os_daemon_port_repair_runs_repair_sequence() -> None:
         interval_reset=lambda target: calls.append(("reset", target)),
     )
 
-    assert OpsiDaemon.handle_os_daemon_port_repair(daemon) is True
+    assert OpsiDaemon.handle_os_daemon_port_repair(_as_opsi_daemon(daemon)) is True
     assert calls[:3] == ["enter", "repair", "quit"]
     assert calls[3][0] == "reset"

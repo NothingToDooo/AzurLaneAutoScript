@@ -210,7 +210,9 @@ class Device(Screenshot, Control, AppControl):
             int: Number of button removed
         """
         removed = 0
-        for _ in range(self.click_record.maxlen):
+        maxlen = self.click_record.maxlen
+        limit = maxlen if maxlen is not None else len(self.click_record)
+        for _ in range(limit):
             try:
                 self.click_record.remove(str(button))
                 removed += 1

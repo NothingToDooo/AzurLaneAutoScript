@@ -3,7 +3,7 @@ import importlib
 import random
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, cast
 
 from module.campaign.campaign_event import CampaignEvent
 from module.campaign.campaign_ui import MODE_SWITCH_1
@@ -15,6 +15,19 @@ from module.ui.page import page_campaign
 if TYPE_CHECKING:
     from module.campaign.campaign_base import CampaignBase
     from module.config.config import AzurLaneConfig
+
+
+class StageLoopConfig(Protocol):
+    STAGE_LOOP_ALIAS: dict[tuple[str, str], str]
+    StopCondition_RunCount: int
+
+    def override(self, **kwargs: object) -> None: ...
+
+
+class StagePolicyConfig(Protocol):
+    StopCondition_MapAchievement: str
+
+    def override(self, **kwargs: object) -> None: ...
 
 
 SP_STAGE_ALIASES = {
@@ -129,7 +142,7 @@ def _normalize_stage_alias(name: str, folder: str) -> str:
     return name
 
 
-def _resolve_stage_loop_alias(name: str, folder: str, config: AzurLaneConfig) -> tuple[str, bool]:
+def _resolve_stage_loop_alias(name: str, folder: str, config: StageLoopConfig) -> tuple[str, bool]:
     """处理循环关卡别名，返回实际关卡名和是否命中循环。"""
     for alias_key, stages_value in config.STAGE_LOOP_ALIAS.items():
         alias_folder, alias = alias_key
@@ -156,7 +169,7 @@ def _resolve_stage_loop_alias(name: str, folder: str, config: AzurLaneConfig) ->
     return name, False
 
 
-def _apply_stage_alias_policies(name: str, folder: str, config: AzurLaneConfig) -> None:
+def _apply_stage_alias_policies(name: str, folder: str, config: StagePolicyConfig) -> None:
     """应用依赖归一化关卡名的运行策略。"""
     if folder == "event_20221124_cn" and name.startswith("th") and config.StopCondition_MapAchievement != "non_stop":
         logger.info(
@@ -181,7 +194,7 @@ def _apply_stage_alias_policies(name: str, folder: str, config: AzurLaneConfig) 
         )
 
 
-def _apply_campaign_folder_policies(folder: str, config: AzurLaneConfig) -> None:
+def _apply_campaign_folder_policies(folder: str, config: StagePolicyConfig) -> None:
     """应用只依赖活动目录的运行策略。"""
     if folder != "event_20240912_cn":
         return
@@ -375,13 +388,14 @@ class CampaignRun(CampaignEvent):
                     logger.warning("Cannot get the latest event, fallback to campaign_main")
                     folder = "campaign_main"
         name = _normalize_stage_alias(name, folder)
-        _apply_stage_alias_policies(name, folder, self.config)
-        name, is_stage_loop = _resolve_stage_loop_alias(name, folder, self.config)
+        policy_config = cast("StagePolicyConfig", self.config)
+        _apply_stage_alias_policies(name, folder, policy_config)
+        name, is_stage_loop = _resolve_stage_loop_alias(name, folder, cast("StageLoopConfig", self.config))
         self.is_stage_loop = self.is_stage_loop or is_stage_loop
         # Convert campaign_main to campaign hard if mode is hard and file exists
         if mode == "hard" and folder == "campaign_main" and name in map_files("campaign_hard"):
             folder = "campaign_hard"
-        _apply_campaign_folder_policies(folder, self.config)
+        _apply_campaign_folder_policies(folder, policy_config)
         if folder == "event_20260417_cn" and name == "vsp":
             name = "sp"
         return name, folder

@@ -1,4 +1,4 @@
-from types import SimpleNamespace
+import queue
 
 import module.webui.process_manager as process_manager_module
 from module.webui.process_manager import ProcessManager
@@ -36,7 +36,7 @@ def test_run_process_runs_alas_loop(monkeypatch) -> None:
 
     monkeypatch.setattr(process_manager_module, "AzurLaneAutoScript", _Alas)
 
-    ProcessManager.run_process("alas", "alas", SimpleNamespace(put=lambda item: item))
+    ProcessManager.run_process("alas", "alas", queue.Queue())
 
     assert ("init", "alas") in calls
     assert ("loop",) in calls
@@ -56,7 +56,7 @@ def test_run_process_runs_builtin_task(monkeypatch) -> None:
 
     monkeypatch.setattr(process_manager_module, "AzurLaneAutoScript", _Alas)
 
-    ProcessManager.run_process("alas", "Benchmark", SimpleNamespace(put=lambda item: item))
+    ProcessManager.run_process("alas", "Benchmark", queue.Queue())
 
     assert ("run", "benchmark", True) in calls
 
@@ -65,6 +65,6 @@ def test_run_process_rejects_unknown_func(monkeypatch) -> None:
     calls = []
     _patch_process_boundary(monkeypatch, calls)
 
-    ProcessManager.run_process("alas", "MissingMod", SimpleNamespace(put=lambda item: item))
+    ProcessManager.run_process("alas", "MissingMod", queue.Queue())
 
     assert ("critical", "No function matched: MissingMod") in calls

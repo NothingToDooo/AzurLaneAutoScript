@@ -29,6 +29,8 @@ from module.webui.utils import (
     Switch,
 )
 
+type ButtonSpec = dict[str, Any] | tuple[str, Any] | list[Any] | str
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
 
@@ -198,10 +200,11 @@ class BinarySwitchButton(Switch):
 
 def put_icon_buttons(
     icon_html: str,
-    buttons: list[dict[str, str]],
+    buttons: list[ButtonSpec],
     onclick: list[Callable[..., None]] | Callable[..., None],
 ) -> Output:
-    value = buttons[0]["value"]
+    first = buttons[0]
+    value = first.get("value", "") if isinstance(first, dict) else ""
     return put_column(
         [
             output(put_html(icon_html)).style("z-index: 1; margin-left: 8px;text-align: center"),

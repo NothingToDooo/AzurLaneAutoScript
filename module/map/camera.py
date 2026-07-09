@@ -1,5 +1,6 @@
 import copy
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -23,6 +24,9 @@ from module.os_handler.assets import MISSION_CHECK as OPSI_MISSION_CHECK
 from module.os_shop.assets import PORT_SUPPLY_CHECK
 from module.ui.assets import BACK_ARROW
 
+if TYPE_CHECKING:
+    from module.map.map_grids import SelectedGrids
+
 _EARLY_CLICK_RECOVERY_OVERLAYS = (
     (GET_ITEMS_1, 5, GET_ITEMS_1, "Perspective error caused by get_items"),
     (GET_ITEMS_1_RYZA, (-20, -100, 20, 20), GET_ITEMS_1_RYZA, "Perspective error caused by GET_ITEMS_1_RYZA"),
@@ -41,8 +45,8 @@ IMAGE_IN_AUTO_SEARCH_MENU_MESSAGE = "Image is in auto search menu"
 
 @dataclass(slots=True)
 class FullScanOptions:
-    queue: object = None
-    must_scan: object = None
+    queue: SelectedGrids | None = None
+    must_scan: SelectedGrids | None = None
     battle_count: int = 0
     mystery_count: int = 0
     siren_count: int = 0

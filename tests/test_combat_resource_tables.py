@@ -1,3 +1,5 @@
+from typing import cast
+
 from module.combat import combat, combat_auto, submarine
 
 
@@ -76,13 +78,17 @@ class _FakeCombatContext:
         self.interval_resets.append(button)
 
 
+def _as_combat(context: _FakeCombatContext) -> combat.Combat:
+    return cast("combat.Combat", context)
+
+
 def test_is_combat_executing_uses_ordered_button_table(monkeypatch) -> None:
     miss = _FakeButton("miss")
     hit = _FakeButton("hit", color=True)
     context = _FakeCombatContext()
     monkeypatch.setattr(combat, "_COMBAT_EXECUTING_BUTTONS", ((miss, "match_luma"), (hit, "match_template_color")))
 
-    assert combat.Combat.is_combat_executing(context) is hit
+    assert combat.Combat.is_combat_executing(_as_combat(context)) is hit
     assert context.device.stuck_records == [combat.combat_ui_assets.PAUSE]
     assert miss.calls == [("match_luma", "image", (10, 10))]
     assert hit.calls == [("match_template_color", "image", (10, 10))]
@@ -94,7 +100,7 @@ def test_handle_combat_quit_clicks_first_matching_quit_button(monkeypatch) -> No
     context = _FakeCombatContext()
     monkeypatch.setattr(combat, "_COMBAT_QUIT_BUTTONS", (miss, hit))
 
-    assert combat.Combat.handle_combat_quit(context, offset=(3, 4), interval=9) is True
+    assert combat.Combat.handle_combat_quit(_as_combat(context), offset=(3, 4), interval=9) is True
     assert context.timer_args == (combat.combat_ui_assets.QUIT, 9)
     assert context.device.clicks == [hit]
     assert context.timer.reset_count == 1
@@ -106,7 +112,7 @@ def test_handle_battle_status_clicks_first_visible_status(monkeypatch) -> None:
     context = _FakeCombatContext(appearing=(hit,))
     monkeypatch.setattr(combat, "_BATTLE_STATUS_BUTTONS", ((miss, ""), (hit, "warn")))
 
-    assert combat.Combat.handle_battle_status(context) is True
+    assert combat.Combat.handle_battle_status(_as_combat(context)) is True
     assert context.device.sleeps == [(0.25, 0.5)]
     assert context.device.clicks == [hit]
     assert context.appear_calls == [
@@ -121,7 +127,7 @@ def test_handle_get_items_resets_battle_status_intervals(monkeypatch) -> None:
     context = _FakeCombatContext(appearing=(hit,))
     monkeypatch.setattr(combat, "_GET_ITEM_CHECKS", (miss, hit))
 
-    assert combat.Combat.handle_get_items(context) is True
+    assert combat.Combat.handle_get_items(_as_combat(context)) is True
     assert context.device.clicks == [combat.combat_assets.GET_ITEMS_1]
     assert context.interval_resets == [
         combat.combat_assets.BATTLE_STATUS_S,

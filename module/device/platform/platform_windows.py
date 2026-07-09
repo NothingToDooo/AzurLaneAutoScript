@@ -97,6 +97,9 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         if instance is None:
             logger.error("未找到可启动或停止的模拟器实例")
             return False
+        if not isinstance(instance, EmulatorInstance):
+            logger.error(f"不支持的模拟器实例类型：{instance}")
+            return False
 
         try:
             func(instance)

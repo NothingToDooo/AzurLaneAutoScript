@@ -4,9 +4,9 @@ import os
 import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Literal
 
-from rich.console import Console, ConsoleOptions, ConsoleRenderable, NewLine
+from rich.console import Console, ConsoleOptions, ConsoleRenderable, NewLine, RenderableType
 from rich.highlighter import NullHighlighter, RegexHighlighter
 from rich.logging import RichHandler
 from rich.rule import Rule
@@ -233,10 +233,10 @@ def set_func_logger(func):
 class RenderOptions:
     sep: str = " "
     end: str = "\n"
-    justify: object = None
-    emoji: object = None
-    markup: object = None
-    highlight: object = None
+    justify: Literal["default", "left", "center", "right", "full"] | None = None
+    emoji: bool | None = None
+    markup: bool | None = None
+    highlight: bool | None = None
 
 
 def render_options(options=None, settings=None) -> RenderOptions:
@@ -273,7 +273,7 @@ def _get_renderables(
     return renderables
 
 
-def print(*objects: ConsoleRenderable, **kwargs):  # noqa: A001 - 作为 logger.print 兼容 API 暴露。
+def print(*objects: RenderableType, **kwargs):  # noqa: A001 - 作为 logger.print 兼容 API 暴露。
     for hdlr in logger.handlers:
         if isinstance(hdlr, RichRenderableHandler):
             for renderable in _get_renderables(hdlr.console, *objects, **kwargs):

@@ -16,7 +16,7 @@ class _ActionPointContext(ActionPointHandler):
             OpsiGeneral_OilLimit=1000,
         )
         self.calls = []
-        self.last_button = None
+        self.last_button: int | None = None
 
     @property
     def current_ap(self):
@@ -45,8 +45,10 @@ class _ActionPointContext(ActionPointHandler):
 
     def action_point_use(self):
         self.calls.append(("use", self.last_button))
-        self._action_point_box[self.last_button] -= 1
-        self._action_point_current += ACTION_POINT_BOX[self.last_button]
+        index = self.last_button
+        assert index is not None
+        self._action_point_box[index] -= 1
+        self._action_point_current += ACTION_POINT_BOX[index]
         box_total = sum(amount * ACTION_POINT_BOX[index] for index, amount in enumerate(self._action_point_box))
         self._action_point_total = self._action_point_current + box_total
 

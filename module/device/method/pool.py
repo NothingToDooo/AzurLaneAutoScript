@@ -265,7 +265,11 @@ class WorkerThread:
             bool: If success to kill the thread
         """
         # Send SystemExit to thread
-        thread_id = ctypes.c_long(self.thread.ident)
+        ident = self.thread.ident
+        if ident is None:
+            logger.error(f"Failed to kill thread {ident} from job {self.job}")
+            return False
+        thread_id = ctypes.c_long(ident)
         res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, ctypes.py_object(_JobKill))
         if res <= 1:
             self.thread_pool.all_workers.pop(self, None)

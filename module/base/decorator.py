@@ -57,7 +57,7 @@ class Config:
 
         def decorate(func):
             name = func.__name__
-            data = {"options": options, "func": func}
+            data: ConfigRecord = {"options": options, "func": func}
             if name not in cls.func_list:
                 cls.func_list[name] = [data]
             else:

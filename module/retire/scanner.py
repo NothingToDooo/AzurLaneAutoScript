@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from module.base.button import ButtonGrid
 
 type ScannerLimitValue = int | str
+type ShipLimitValue = ScannerLimitValue | tuple[int, int] | list[ScannerLimitValue] | None
 
 
 class EmotionDigit(Digit):
@@ -47,7 +48,7 @@ class Ship:
     status: str = ""
     button: Any = None
 
-    def satisfy_limitation(self, limitaion) -> bool:
+    def satisfy_limitation(self, limitaion: dict[str, ShipLimitValue]) -> bool:
         for key in self.__dict__:
             value = limitaion.get(key)
             if self.__dict__[key] is not None and value is not None:
@@ -287,25 +288,25 @@ class ShipScanner(Scanner):
     To keep them and ignore limitations, use set_limitation(property=None)
 
     Args:
-        rarity (str, list): ['any', 'common', 'rare', 'elite', 'super_rare'].
-        level (tuple): (lower, upper). Will be limited in range [1, 125]
-        emotion (tuple): (lower, upper). Will be limited in range [0, 150]
-        fleet (int): 0 means not in any fleet. Will be limited in range [0, 6]
-        status (str, list): ['any', 'commission', 'battle']
+        rarity (str, list): 稀有度，支持 ['any', 'common', 'rare', 'elite', 'super_rare']。
+        level (tuple): 等级范围，会限制在 [1, 125]。
+        emotion (tuple): 心情范围，会限制在 [0, 150]。
+        fleet (int, list): 舰队编号，0 表示不在舰队中，会限制在 [0, 6]。
+        status (str, list): 状态，支持 ['any', 'commission', 'battle']。
     """
 
     def __init__(
         self,
-        rarity: str = "any",
+        rarity: str | list[str] = "any",
         level: tuple[int, int] = (1, 125),
         emotion: tuple[int, int] = (0, 150),
-        fleet: int = 0,
-        status: str = "any",
+        fleet: int | list[int] = 0,
+        status: str | list[str] = "any",
     ) -> None:
         super().__init__()
         self._results = []
         self.grids = CARD_GRIDS
-        self.limitaion: dict[str, str | int | tuple[int, int]] = {
+        self.limitaion: dict[str, ShipLimitValue] = {
             "level": (1, 125),
             "emotion": (0, 150),
             "rarity": "any",

@@ -189,7 +189,8 @@ class TaskHandler:
             self.pending_remove_tasks = []
 
     def remove_current_task(self) -> None:
-        self.remove_task(self._task, nowait=True)
+        if self._task is not None:
+            self.remove_task(self._task, nowait=True)
 
     def set_current_task_delay(self, delay: float) -> None:
         if self._task is not None:
