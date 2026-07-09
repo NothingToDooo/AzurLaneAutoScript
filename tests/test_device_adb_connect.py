@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from module.device.connection import Connection
-from module.exception import RequestHumanTakeover
+from module.exception import EmulatorNotRunningError, RequestHumanTakeover
 
 
 class _AdbClient:
@@ -23,6 +23,13 @@ class _AdbClient:
         return f"disconnected {serial}"
 
 
+class _DiagnosticConnection(Connection):
+    refused_diagnose_calls: int
+
+    def _diagnose_adb_connect_refused(self) -> None:
+        self.refused_diagnose_calls += 1
+
+
 def _device(serial: str, status: str):
     return SimpleNamespace(serial=serial, status=status)
 
@@ -34,13 +41,13 @@ def _make_connection(
     connect_messages: list[str] | None = None,
     detect_serial: str | None = None,
 ):
-    connection = object.__new__(Connection)
+    connection = object.__new__(_DiagnosticConnection)
     connection.serial = serial
     connection.adb_client = _AdbClient(connect_messages)
     connection.devices = devices or []
     connection.detect_calls = 0
     connection.brute_force_calls = []
-    connection.bridge_check_calls = 0
+    connection.refused_diagnose_calls = 0
 
     def list_device():
         return connection.devices
@@ -53,14 +60,9 @@ def _make_connection(
     def adb_brute_force_connect(serial_list: list[str]) -> None:
         connection.brute_force_calls.append(serial_list)
 
-    def check_mumu_bridge_network() -> bool:
-        connection.bridge_check_calls += 1
-        return True
-
     connection.list_device = list_device
     connection.detect_device = detect_device
     connection.adb_brute_force_connect = adb_brute_force_connect
-    connection.check_mumu_bridge_network = check_mumu_bridge_network
     return connection
 
 
@@ -124,6 +126,19 @@ def test_adb_connect_recovers_mumu12_shifted_port() -> None:
             "127.0.0.1:16382",
         ]
     ]
+    assert connection.detect_calls == 1
+    assert connection.refused_diagnose_calls == 0
+
+
+def test_adb_connect_runs_refused_diagnostics_before_reporting_missing_device() -> None:
+    connection = _make_connection(
+        connect_messages=["cannot connect to 127.0.0.1:16384: (10061)"],
+    )
+
+    with pytest.raises(EmulatorNotRunningError):
+        connection.adb_connect()
+
+    assert connection.refused_diagnose_calls == 1
     assert connection.detect_calls == 1
 
 

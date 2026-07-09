@@ -1,6 +1,10 @@
+import json
 from types import SimpleNamespace
 
+import pytest
+
 from module.device.platform.platform_base import PlatformBase, serial_to_id
+from module.exception import RequestHumanTakeover
 
 
 def _instance(
@@ -17,6 +21,7 @@ def _instance(
         path=path,
         type=emulator_type,
         MuMuPlayer12_id=mumu_id,
+        mumu_vms_config=lambda _: "",
     )
 
 
@@ -107,3 +112,32 @@ def test_find_emulator_instance_falls_back_to_single_running_path() -> None:
     )
 
     assert platform.find_emulator_instance("127.0.0.1:16384") is expected
+
+
+def test_check_mumu_bridge_network_allows_disabled_bridge(tmp_path) -> None:
+    config_file = tmp_path / "customer_config.json"
+    config_file.write_text(json.dumps({"customer": {"network_bridge_opened": False}}), encoding="utf-8")
+    instance = _instance()
+    instance.mumu_vms_config = lambda _: config_file.as_posix()
+    platform = _make_platform(
+        instances=[
+            instance,
+        ],
+    )
+
+    assert platform.check_mumu_bridge_network()
+
+
+def test_check_mumu_bridge_network_rejects_enabled_bridge(tmp_path) -> None:
+    config_file = tmp_path / "customer_config.json"
+    config_file.write_text(json.dumps({"customer": {"network_bridge_opened": True}}), encoding="utf-8")
+    instance = _instance()
+    instance.mumu_vms_config = lambda _: config_file.as_posix()
+    platform = _make_platform(
+        instances=[
+            instance,
+        ],
+    )
+
+    with pytest.raises(RequestHumanTakeover):
+        platform.check_mumu_bridge_network()

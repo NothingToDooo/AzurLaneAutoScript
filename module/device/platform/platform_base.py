@@ -1,4 +1,8 @@
+import json
+from pathlib import Path
+
 from module.base.decorator import cached_property
+from module.config.deep import deep_get
 from module.device.connection import Connection
 from module.device.mumu import mumu12_serial_to_id
 from module.device.platform.emulator_base import (
@@ -6,6 +10,7 @@ from module.device.platform.emulator_base import (
     EmulatorManagerBase,
     remove_duplicated_path,
 )
+from module.exception import RequestHumanTakeover
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
 
@@ -37,6 +42,41 @@ class PlatformBase(Connection, EmulatorManagerBase):
             EmulatorInstanceBase：模拟器实例；找不到时返回 None。
         """
         return self.find_emulator_instance(serial=self.serial)
+
+    def _diagnose_adb_connect_refused(self) -> None:
+        """
+        ADB TCP 连接被拒绝时检查 MuMu 实例配置。
+        """
+        self.check_mumu_bridge_network()
+
+    def check_mumu_bridge_network(self) -> bool:
+        """
+        返回：
+            bool：True 表示检查通过，False 表示跳过检查。
+        """
+        if not self.is_mumu12_family:
+            return True
+
+        instance = self.find_emulator_instance(serial=self.serial)
+        if instance is None:
+            logger.warning("Failed to check check_mumu_bridge_network, emulator instance not found")
+            return False
+
+        file = instance.mumu_vms_config("customer_config.json")
+        try:
+            with Path(file).open(encoding="utf-8") as f:
+                data = json.loads(f.read())
+        except FileNotFoundError:
+            logger.warning(f"Failed to check check_mumu_bridge_network, file {file} not exists")
+            return False
+
+        value = deep_get(data, keys="customer.network_bridge_opened", default=None)
+        logger.attr("customer.network_bridge_opened", value)
+        if str(value).lower() == "true":
+            logger.critical('Please turn off "Network Bridging" in the settings of MuMuPlayer')
+            logger.critical("请在MuMU模拟器设置中关闭 网络桥接")
+            raise RequestHumanTakeover
+        return True
 
     @staticmethod
     def _log_emulator_instances(instances: SelectedGrids) -> None:

@@ -1,16 +1,13 @@
-import json
 import re
 import time
 from functools import wraps
-from pathlib import Path
 from typing import ClassVar
 
 from adbutils import AdbClient, AdbDevice, ForwardItem
 from adbutils.errors import AdbError
 
-from module.base.decorator import cached_property, del_cached_property, run_once
+from module.base.decorator import cached_property, del_cached_property
 from module.base.utils import ensure_time
-from module.config.deep import deep_get
 from module.config.server import CN_PACKAGE
 from module.device.connection_attr import ConnectionAttr
 from module.device.method.pool import WORKER_POOL
@@ -432,10 +429,15 @@ class Connection(ConnectionAttr):
         """
         if self._recover_mumu12_shifted_port():
             return True
-        run_once(self.check_mumu_bridge_network)()
+        self._diagnose_adb_connect_refused()
         # 设备不存在。
         logger.warning("No such device exists, please restart the emulator or set a correct serial")
         raise EmulatorNotRunningError
+
+    def _diagnose_adb_connect_refused(self) -> None:
+        """
+        连接拒绝后由平台层补充诊断。
+        """
 
     def _connect_adb_tcp_serial(self):
         """
@@ -500,39 +502,6 @@ class Connection(ConnectionAttr):
         with WORKER_POOL.wait_jobs() as pool:
             for serial in serial_list:
                 pool.start_thread_soon(connect, serial)
-
-    def check_mumu_bridge_network(self):
-        """
-        返回：
-            bool：True 表示检查通过，False 表示跳过检查。
-        """
-        if not self.is_mumu12_family:
-            return True
-        find_emulator_instance = getattr(self, "find_emulator_instance", None)
-        if not callable(find_emulator_instance):
-            return False
-        # 该方法在继承了 PlatformBase 的实例上可用。
-        instance = find_emulator_instance(
-            serial=self.serial,
-        )
-        if instance is None:
-            logger.warning("Failed to check check_mumu_bridge_network, emulator instance not found")
-            return False
-        file = instance.mumu_vms_config("customer_config.json")
-        try:
-            with Path(file).open(encoding="utf-8") as f:
-                s = f.read()
-                data = json.loads(s)
-        except FileNotFoundError:
-            logger.warning(f"Failed to check check_mumu_bridge_network, file {file} not exists")
-            return False
-        value = deep_get(data, keys="customer.network_bridge_opened", default=None)
-        logger.attr("customer.network_bridge_opened", value)
-        if str(value).lower() == "true":
-            logger.critical('Please turn off "Network Bridging" in the settings of MuMuPlayer')
-            logger.critical("请在MuMU模拟器设置中关闭 网络桥接")
-            raise RequestHumanTakeover
-        return True
 
     def release_resource(self):
         del_cached_property(self, "_minitouch_builder")
