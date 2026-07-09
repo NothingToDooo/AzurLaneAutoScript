@@ -106,9 +106,13 @@ class AdbDeviceWithStatus(AdbDevice):
 
     @cached_property
     def port(self) -> int:
+        serial = self.serial or ""
+        _, sep, port = serial.partition(":")
+        if not sep:
+            return 0
         try:
-            return int(self.serial.split(":")[1])
-        except IndexError, ValueError:
+            return int(port)
+        except ValueError:
             return 0
 
     @cached_property

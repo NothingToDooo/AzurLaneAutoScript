@@ -111,7 +111,7 @@ class Scanner(metaclass=ABCMeta):
                 logger.info(f"{result}")
 
         if cached:
-            self._results.extend(results)
+            self.results.extend(results)
         else:
             return results
         return None
@@ -120,7 +120,10 @@ class Scanner(metaclass=ABCMeta):
         """
         Call ButtonGrid.move for property grids.
         """
-        self.grids = self.grids.move(vector)
+        grids = self.grids
+        if grids is None:
+            raise RuntimeError
+        self.grids = grids.move(vector)
 
     def enable(self) -> None:
         self._enabled = True
@@ -189,6 +192,8 @@ class RarityScanner(Scanner):
         return "unknown"
 
     def _scan(self, image) -> list:
+        if self.grids is None:
+            raise RuntimeError
         return [self.color_to_rarity(get_color(image, button.area)) for button in self.grids.buttons]
 
     def limit_value(self, value) -> str:
@@ -241,6 +246,8 @@ class FleetScanner(Scanner):
 
     def _scan(self, image) -> list:
         image = self.pre_process(image)
+        if self.grids is None:
+            raise RuntimeError
         image_list = [crop(image, button.area) for button in self.grids.buttons]
 
         return [self._match(image) for image in image_list]
@@ -269,6 +276,8 @@ class StatusScanner(Scanner):
         return "free"
 
     def _scan(self, image) -> list:
+        if self.grids is None:
+            raise RuntimeError
         image_list = [crop(image, button.area) for button in self.grids.buttons]
 
         return [self._match(image) for image in image_list]
@@ -331,6 +340,9 @@ class ShipScanner(Scanner):
         for scanner in self.sub_scanners.values():
             scanner.scan(image, cached=True)
 
+        grids = self.grids
+        if grids is None:
+            raise RuntimeError
         candidates: list[Ship] = [
             Ship(level=level, emotion=emotion, rarity=rarity, fleet=fleet, status=status, button=button)
             for level, emotion, rarity, fleet, status, button in zip(
@@ -339,7 +351,7 @@ class ShipScanner(Scanner):
                 self.sub_scanners["rarity"].results,
                 self.sub_scanners["fleet"].results,
                 self.sub_scanners["status"].results,
-                self.grids.buttons,
+                grids.buttons,
                 strict=True,
             )
         ]

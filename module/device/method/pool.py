@@ -206,6 +206,8 @@ class WorkerThread:
         # Convert to local variable, `self.job` will be another
         # value if new job is assigned
         job = self.job
+        if job is None:
+            raise RuntimeError
         del self.job
         func, args, kwargs = job.func_args_kwargs
 

@@ -229,21 +229,22 @@ class NemuIpcImpl:
             # MuMuPlayer12 6.0
             str((nemu_path / "nx_main/sdk/external_renderer_ipc.dll").resolve()),
         ]
-        self.lib = None
+        lib: ctypes.CDLL | None = None
         for ipc_dll in list_dll:
             if not Path(ipc_dll).exists():
                 continue
             try:
-                self.lib = ctypes.CDLL(ipc_dll)
+                lib = ctypes.CDLL(ipc_dll)
                 break
             except OSError as e:
                 logger.error(e)
                 logger.error(f"ipc_dll={ipc_dll} exists, but cannot be loaded")
                 continue
-        if self.lib is None:
+        if lib is None:
             # not found
             message = f"{NEMU_IPC_MIN_VERSION_MESSAGE}. None of the following path exists: {list_dll}"
             raise NemuIpcIncompatible(message)
+        self.lib = lib
         # success
         logger.info(
             f"NemuIpcImpl init, "

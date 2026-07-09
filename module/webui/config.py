@@ -7,6 +7,15 @@ from module.base.atomic import atomic_write
 
 
 class WebUIConfig:
+    file: Path
+    config: dict[str, Any]
+    AdbExecutable: str
+    WebuiHost: str
+    WebuiPort: int
+    Theme: str
+    Password: str | None
+    Run: str | None
+
     CONFIG_FILE = Path("./config/webui.yaml")
     DEFAULTS: ClassVar[dict[str, Any]] = {
         "AdbExecutable": "./.venv/Lib/site-packages/adbutils/binaries/adb.exe",
@@ -25,7 +34,7 @@ class WebUIConfig:
         if not self.file.exists():
             self.write()
 
-    def __setattr__(self, key: str, value):
+    def __setattr__(self, key: str, value: object) -> None:
         object.__setattr__(self, key, value)
         config = self.__dict__.get("config")
         if key[:1].isupper() and isinstance(config, dict) and key in config and config[key] != value:
@@ -50,6 +59,6 @@ class WebUIConfig:
                 config[key] = data[key]
         return config
 
-    def write(self):
+    def write(self) -> None:
         text = yaml.safe_dump(self.config, allow_unicode=True, sort_keys=False)
         atomic_write(self.file, text)

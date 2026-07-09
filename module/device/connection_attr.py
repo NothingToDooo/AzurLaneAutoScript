@@ -34,8 +34,12 @@ class ConnectionAttr:
 
         # 初始化 ADB 客户端。
         logger.attr("AdbBinary", self.adb_binary)
+
         # 让 adbutils 使用自定义 ADB。
-        adbutils.adb_path = lambda: self.adb_binary
+        def adb_path() -> str:
+            return self.adb_binary
+
+        adbutils.adb_path = adb_path
         # 预热 adb_client 缓存。
         _ = self.adb_client
 
@@ -98,9 +102,12 @@ class ConnectionAttr:
 
     @cached_property
     def port(self) -> int:
+        _, sep, port = self.serial.partition(":")
+        if not sep:
+            return 0
         try:
-            return int(self.serial.split(":")[1])
-        except IndexError, ValueError:
+            return int(port)
+        except ValueError:
             return 0
 
     @cached_property

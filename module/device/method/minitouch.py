@@ -516,8 +516,12 @@ class Minitouch(Connection):
     def minitouch_send(self, builder: CommandBuilder):
         content = builder.to_minitouch()
         byte_content = content.encode("utf-8")
-        self._minitouch_client.sendall(byte_content)
-        self._minitouch_client.recv(0)
+        client = self._minitouch_client
+        if client is None:
+            logger.critical("minitouch socket is not connected")
+            raise RequestHumanTakeover
+        client.sendall(byte_content)
+        client.recv(0)
         time.sleep(self.minitouch_builder.delay / 1000 + builder.DEFAULT_DELAY)
         builder.clear()
 
