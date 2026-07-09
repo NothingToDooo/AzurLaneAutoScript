@@ -53,7 +53,7 @@ class _ShipyardUI(ShipyardUI):
     def buy_confirm(self, text: str) -> None:
         self._shipyard_buy_confirm(text)
 
-    def _next_result(self, results: list, *, default: object) -> object:
+    def _next_result[T](self, results: list[T], *, default: T) -> T:
         if results:
             return results.pop(0)
         return default

@@ -38,13 +38,13 @@ class _FakeDevice:
 
 @dataclass(frozen=True, slots=True)
 class _FakeBattlePassOptions:
-    appear_results: object = None
-    appear_then_click_results: object = None
-    match_results: object = None
-    popup_results: object = None
-    get_items_results: tuple = ()
-    get_ship_results: tuple = ()
-    get_skin_results: tuple = ()
+    appear_results: dict[object, tuple[bool, ...]] | None = None
+    appear_then_click_results: dict[object, tuple[bool, ...]] | None = None
+    match_results: dict[object, tuple[bool, ...]] | None = None
+    popup_results: tuple[bool, ...] | None = None
+    get_items_results: tuple[bool, ...] = ()
+    get_ship_results: tuple[bool, ...] = ()
+    get_skin_results: tuple[bool, ...] = ()
 
 
 def _fake_battle_pass_options(options=None, settings=None) -> _FakeBattlePassOptions:

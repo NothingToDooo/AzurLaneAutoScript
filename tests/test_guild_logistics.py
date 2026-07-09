@@ -66,7 +66,7 @@ class _GuildLogistics(GuildLogistics):
     def collect(self) -> bool:
         return self._guild_logistics_collect()
 
-    def _next_result(self, results: list, *, default: object) -> object:
+    def _next_result[T](self, results: list[T], *, default: T) -> T:
         if results:
             return results.pop(0)
         return default

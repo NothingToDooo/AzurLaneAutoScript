@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timedelta
 from importlib import import_module
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn
 
 from module.base.decorator import cached_property, del_cached_property
 from module.base.naming import camel_to_snake
@@ -96,7 +96,7 @@ class AzurLaneAutoScript:
         self.device.sleep(10)
         return False
 
-    def _exit_on_fatal_run_error(self, error: GamePageUnknownError | ScriptError | RequestHumanTakeover) -> None:
+    def _exit_on_fatal_run_error(self, error: GamePageUnknownError | ScriptError | RequestHumanTakeover) -> NoReturn:
         if isinstance(error, GamePageUnknownError):
             logger.critical("Game page unknown")
             self.save_error_log()
@@ -107,7 +107,7 @@ class AzurLaneAutoScript:
             logger.critical("Request human takeover")
         sys.exit(1)
 
-    def _exit_on_unexpected_run_error(self, error: Exception) -> None:
+    def _exit_on_unexpected_run_error(self, error: Exception) -> NoReturn:
         # 任务崩溃边界：保存现场并退出，避免调度循环继续运行在未知状态。
         logger.exception(error)
         self.save_error_log()

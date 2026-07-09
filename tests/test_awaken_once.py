@@ -66,7 +66,7 @@ class _Awaken(Awaken):
         self.finish_results: list[bool] = []
         self.in_awaken_results: list[bool] = []
 
-    def _next_result(self, results: list, *, default: object) -> object:
+    def _next_result[T](self, results: list[T], *, default: T) -> T:
         if results:
             return results.pop(0)
         return default

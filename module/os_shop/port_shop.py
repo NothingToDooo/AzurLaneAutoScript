@@ -96,7 +96,7 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
 
         return []
 
-    def os_shop_get_items_to_buy(self, name, price) -> Item:
+    def os_shop_get_items_to_buy(self, name, price) -> Item | None:
         """
         Args:
             name (str): Item name.

@@ -53,7 +53,7 @@ class AkashiShop(OSStatus, OSShopUI, Selector, MapEventHandler):
         logger.info("No shop items found")
         return []
 
-    def os_shop_get_item_to_buy_in_akashi(self) -> Item:
+    def os_shop_get_item_to_buy_in_akashi(self) -> Item | None:
         """
         Returns:
             list[Item]:

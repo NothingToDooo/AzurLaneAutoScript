@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, overload
 
 import psutil
 
@@ -21,7 +21,13 @@ class cached_property[T]:
     def __init__(self, func: Callable[..., T]):
         self.func = func
 
-    def __get__(self, obj, cls) -> T:
+    @overload
+    def __get__(self, obj: None, cls: type[Any] | None = None) -> cached_property[T]: ...
+
+    @overload
+    def __get__(self, obj: object, cls: type[Any] | None = None) -> T: ...
+
+    def __get__(self, obj, cls=None):
         if obj is None:
             return self
 

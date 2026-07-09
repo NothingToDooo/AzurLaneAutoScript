@@ -195,7 +195,7 @@ class TaskHandler:
         if self._task is not None:
             self._task.delay = delay
 
-    def get_task(self, name) -> Task:
+    def get_task(self, name) -> Task | None:
         with self._lock:
             for task in self.tasks:
                 if task.name == name:

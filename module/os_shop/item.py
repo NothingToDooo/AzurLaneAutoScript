@@ -117,6 +117,7 @@ class OSShopItem(Item):
 
 class OSShopItemGrid(ItemGrid):
     item_class = OSShopItem
+    items: list[OSShopItem]
 
     def __init__(self, grids, templates, areas=None, **area_settings):
         counter_area = area_settings.pop("counter_area", (85, 170, 134, 186))

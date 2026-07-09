@@ -54,7 +54,7 @@ class _FakeUI(UI):
         self.popup_confirm = options.popup_confirm
         self.urgent_commission = options.urgent_commission
         self.main_popups = options.main_popups
-        self.story_skip = options.story_skip
+        self.story_skip_result = options.story_skip
         self.idle_page = options.idle_page
         self.main_popup_get_ship_values = []
         self.popup_confirm_names = []
@@ -78,7 +78,7 @@ class _FakeUI(UI):
         return self.main_popups
 
     def handle_story_skip(self) -> bool:
-        return self.story_skip
+        return self.story_skip_result
 
     def handle_idle_page(self) -> bool:
         return self.idle_page
