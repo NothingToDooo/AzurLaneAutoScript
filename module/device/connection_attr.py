@@ -1,5 +1,4 @@
 import os
-import re
 import sys
 from pathlib import Path
 
@@ -8,7 +7,7 @@ from adbutils import AdbClient, AdbDevice
 
 from module.base.decorator import cached_property
 from module.config.config import AzurLaneConfig
-from module.device.mumu import MUMU12_SERIAL_EXAMPLE, is_mumu12_serial
+from module.device.mumu import MUMU12_SERIAL_EXAMPLE, is_mumu12_serial, revise_mumu12_serial
 from module.exception import RequestHumanTakeover
 from module.logger import logger
 from module.webui.setting import State
@@ -49,54 +48,12 @@ class ConnectionAttr:
         self.serial = str(self.config.Emulator_Serial)
         self.serial_check()
 
-    @staticmethod
-    def revise_serial(serial: str):
-        """
-        修正常见手填 serial 错误。
-
-        用法：
-            serial = SerialStr.revise_serial(serial)
-        """
-        serial = serial.strip().replace(" ", "")
-        # 127。0。0。1：5555
-        serial = serial.replace("。", ".").replace("，", ".").replace(",", ".").replace("：", ":")
-        # 127.0.0.1.5555
-        serial = serial.replace("127.0.0.1.", "127.0.0.1:")
-        # 5555,16384。逗号已被替换为点，实际形态是 5555.16384。
-        if "." in serial:
-            left, _, right = serial.partition(".")
-            try:
-                left = int(left)
-                right = int(right)
-                if 5500 < left < 6000 and 16300 < right < 20000:
-                    serial = str(right)
-            except ValueError:
-                pass
-        # 16384
-        if serial.isdigit():
-            try:
-                port = int(serial)
-                if 1000 < port < 65536:
-                    serial = f"127.0.0.1:{port}"
-            except ValueError:
-                pass
-        # MuMu模拟器12127.0.0.1:16384
-        if "模拟" in serial:
-            res = re.search(r"(127\.\d+\.\d+\.\d+:\d+)", serial)
-            if res:
-                serial = res.group(1)
-        # 12127.0.0.1:16384
-        serial = serial.replace("12127.0.0.1", "127.0.0.1")
-        # auto127.0.0.1:16384
-        serial = serial.replace("auto127.0.0.1", "127.0.0.1").replace("autoemulator", "emulator")
-        return str(serial)
-
     def serial_check(self):
         """
         检查并修正 serial。
         """
         # 兼容常见手填错误。
-        new = self.revise_serial(self.serial)
+        new = revise_mumu12_serial(self.serial)
         if new != self.serial:
             logger.warning(f'Serial "{self.config.Emulator_Serial}" is revised to "{new}"')
             self.config.Emulator_Serial = new

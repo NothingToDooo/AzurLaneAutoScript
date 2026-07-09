@@ -22,7 +22,7 @@ from module.device.method.utils import (
     recv_all,
     retry_sleep,
 )
-from module.device.mumu import MUMU12_SERIAL_EXAMPLE, is_mumu12_serial
+from module.device.mumu import MUMU12_SERIAL_EXAMPLE, is_mumu12_serial, mumu12_shifted_serials
 from module.exception import EmulatorNotRunningError, RequestHumanTakeover
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
@@ -368,7 +368,7 @@ class Connection(ConnectionAttr):
             return False
 
         before = self.serial
-        serial_list = [self.serial.replace(str(self.port), str(self.port + offset)) for offset in [1, -1, 2, -2]]
+        serial_list = mumu12_shifted_serials(self.serial)
         self.adb_brute_force_connect(serial_list)
         self.detect_device()
         return self.serial != before
