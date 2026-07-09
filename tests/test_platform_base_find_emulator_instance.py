@@ -45,8 +45,10 @@ def _make_platform(
     return platform
 
 
-def _make_keep_alive_platform(*, app_keep_alive: str, player_version: str = "3.8.27.2950"):
-    platform = _make_platform(instances=[])
+def _make_keep_alive_platform(
+    *, app_keep_alive: str, player_version: str = "3.8.27.2950", instances: list[object] | None = None
+):
+    platform = _make_platform(instances=instances or [])
     props = {
         "nemud.app_keep_alive": app_keep_alive,
         "nemud.player_version": player_version,
@@ -174,3 +176,24 @@ def test_is_mumu_over_version_400_uses_empty_player_version() -> None:
     platform = _make_keep_alive_platform(app_keep_alive="", player_version="")
 
     assert platform.is_mumu_over_version_400
+
+
+def test_check_mumu_app_keep_alive_400_accepts_disabled_config(tmp_path) -> None:
+    config_file = tmp_path / "customer_config.json"
+    config_file.write_text(json.dumps({"customer": {"app_keptlive": False}}), encoding="utf-8")
+    instance = _instance()
+    instance.mumu_vms_config = lambda _: config_file.as_posix()
+    platform = _make_keep_alive_platform(app_keep_alive="", player_version="", instances=[instance])
+
+    assert platform.check_mumu_app_keep_alive()
+
+
+def test_check_mumu_app_keep_alive_400_rejects_enabled_config(tmp_path) -> None:
+    config_file = tmp_path / "customer_config.json"
+    config_file.write_text(json.dumps({"customer": {"app_keptlive": True}}), encoding="utf-8")
+    instance = _instance()
+    instance.mumu_vms_config = lambda _: config_file.as_posix()
+    platform = _make_keep_alive_platform(app_keep_alive="", player_version="", instances=[instance])
+
+    with pytest.raises(RequestHumanTakeover):
+        platform.check_mumu_app_keep_alive()

@@ -67,6 +67,8 @@ class PlatformBase(Connection, EmulatorManagerBase):
     def check_mumu_app_keep_alive(self) -> bool:
         if not self.is_mumu_family:
             return False
+        if self.is_mumu_over_version_400:
+            return self.check_mumu_app_keep_alive_400()
 
         value = self.nemud_app_keep_alive
         if value == "":
@@ -81,6 +83,32 @@ class PlatformBase(Connection, EmulatorManagerBase):
             raise RequestHumanTakeover
         logger.warning(f"Invalid nemud.app_keep_alive value: {value}")
         return False
+
+    def check_mumu_app_keep_alive_400(self) -> bool:
+        """
+        检查 MuMu 4.0+ 配置中的后台保活。
+        """
+        instance = self.emulator_instance
+        if instance is None:
+            logger.warning("Failed to check check_mumu_app_keep_alive as emulator_instance is None")
+            return False
+
+        file = instance.mumu_vms_config("customer_config.json")
+        try:
+            with Path(file).open(encoding="utf-8") as f:
+                data = json.loads(f.read())
+        except FileNotFoundError:
+            logger.warning(f"Failed to check check_mumu_app_keep_alive, file {file} not exists")
+            return False
+
+        value = deep_get(data, keys="customer.app_keptlive", default=None)
+        logger.attr("customer.app_keptlive", value)
+        if str(value).lower() == "true":
+            # https://mumu.163.com/help/20230802/35047_1102450.html
+            logger.critical('Please turn off "Keep alive in the background" in the settings or MuMuPlayer')
+            logger.critical('请在MuMu模拟器设置内关闭 "后台挂机时保活运行"')
+            raise RequestHumanTakeover
+        return True
 
     @cached_property
     def is_mumu_over_version_400(self) -> bool:

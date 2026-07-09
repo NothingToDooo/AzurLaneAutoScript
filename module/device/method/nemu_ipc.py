@@ -1,5 +1,4 @@
 import ctypes
-import json
 import os
 import sys
 import time
@@ -10,7 +9,6 @@ import cv2
 import numpy as np
 
 from module.base.decorator import cached_property, del_cached_property, has_cached_property
-from module.config.deep import deep_get
 from module.device.method.pool import WORKER_POOL, JobTimeout
 from module.device.method.utils import RETRY_TRIES, retry_sleep
 from module.device.platform import Platform
@@ -428,47 +426,6 @@ class NemuIpc(Platform):
             raise RequestHumanTakeover from e
         else:
             return impl
-
-    @staticmethod
-    def check_mumu_app_keep_alive_400(file):
-        """
-        Check app_keep_alive from emulator config if version >= 4.0
-
-        Args:
-            file: E:/ProgramFiles/MuMuPlayer-12.0/vms/MuMuPlayer-12.0-1/config/customer_config.json
-
-        Returns:
-            bool: If success to read file
-        """
-        # with E:\ProgramFiles\MuMuPlayer-12.0\shell\MuMuPlayer.exe
-        # config is E:\ProgramFiles\MuMuPlayer-12.0\vms\MuMuPlayer-12.0-1\config\customer_config.json
-        try:
-            with Path(file).open(encoding="utf-8") as f:
-                s = f.read()
-                data = json.loads(s)
-        except FileNotFoundError:
-            logger.warning(f"Failed to check check_mumu_app_keep_alive, file {file} not exists")
-            return False
-        value = deep_get(data, keys="customer.app_keptlive", default=None)
-        logger.attr("customer.app_keptlive", value)
-        if str(value).lower() == "true":
-            # https://mumu.163.com/help/20230802/35047_1102450.html
-            logger.critical('Please turn off "Keep alive in the background" in the settings or MuMuPlayer')
-            logger.critical('请在MuMu模拟器设置内关闭 "后台挂机时保活运行"')
-            raise RequestHumanTakeover
-        return True
-
-    def check_mumu_app_keep_alive(self):
-        if not self.is_mumu_over_version_400:
-            return super().check_mumu_app_keep_alive()
-
-        # Search emulator instance
-        instance = self.emulator_instance
-        if instance is None:
-            logger.warning("Failed to check check_mumu_app_keep_alive as emulator_instance is None")
-            return False
-        file = instance.mumu_vms_config("customer_config.json")
-        return bool(self.check_mumu_app_keep_alive_400(file))
 
     def nemu_ipc_release(self):
         if has_cached_property(self, "nemu_ipc"):
