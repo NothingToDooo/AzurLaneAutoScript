@@ -1,7 +1,7 @@
 import pytest
 from adbutils.errors import AdbError
 
-from module.device import connection as connection_module
+from module.device import adb_session as adb_session_module
 from module.device.method.utils import PackageNotInstalled
 from module.exception import RequestHumanTakeover
 
@@ -35,18 +35,18 @@ class _Connection:
 
 def _patch_retry_runtime(monkeypatch):
     logger = _Logger()
-    monkeypatch.setattr(connection_module, "logger", logger)
-    monkeypatch.setattr(connection_module, "time", type("_Time", (), {"sleep": lambda _delay: None}))
+    monkeypatch.setattr(adb_session_module, "logger", logger)
+    monkeypatch.setattr(adb_session_module, "time", type("_Time", (), {"sleep": lambda _delay: None}))
     return logger
 
 
 def _run_retry(monkeypatch, error: Exception, *, retryable_adb=True, unknown_host=False):
     logger = _patch_retry_runtime(monkeypatch)
     device = _Connection()
-    monkeypatch.setattr(connection_module, "handle_adb_error", lambda _error: retryable_adb)
-    monkeypatch.setattr(connection_module, "handle_unknown_host_service", lambda _error: unknown_host)
+    monkeypatch.setattr(adb_session_module, "handle_adb_error", lambda _error: retryable_adb)
+    monkeypatch.setattr(adb_session_module, "handle_unknown_host_service", lambda _error: unknown_host)
 
-    @connection_module.retry
+    @adb_session_module.retry
     def flaky(target):
         target.calls.append("run")
         target.run_count += 1
@@ -84,10 +84,10 @@ def test_connection_retry_recovers_unknown_host_service(monkeypatch) -> None:
 def test_connection_retry_stops_on_unhandled_adb_error(monkeypatch) -> None:
     logger = _patch_retry_runtime(monkeypatch)
     device = _Connection()
-    monkeypatch.setattr(connection_module, "handle_adb_error", lambda _error: False)
-    monkeypatch.setattr(connection_module, "handle_unknown_host_service", lambda _error: False)
+    monkeypatch.setattr(adb_session_module, "handle_adb_error", lambda _error: False)
+    monkeypatch.setattr(adb_session_module, "handle_unknown_host_service", lambda _error: False)
 
-    @connection_module.retry
+    @adb_session_module.retry
     def always_boom(target):
         target.calls.append("run")
         message = "boom"
