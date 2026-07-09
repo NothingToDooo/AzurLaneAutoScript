@@ -468,7 +468,7 @@ class WaitJobsWrapper:
 
     def __init__(self, pool: WorkerPool):
         self.pool: WorkerPool = pool
-        self.jobs: list[Job[ResultT]] = []
+        self.jobs: list[Job[object]] = []
 
     def get(self):
         for job in self.jobs:
@@ -507,7 +507,7 @@ class GatherJobsWrapper(WaitJobsWrapper):
 
     def __init__(self, pool: WorkerPool):
         super().__init__(pool)
-        self.results: list[ResultT] = []
+        self.results: list[object] = []
 
     def get(self):
         for job in self.jobs:

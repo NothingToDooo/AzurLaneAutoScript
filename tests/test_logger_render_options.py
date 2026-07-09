@@ -1,6 +1,6 @@
 from rich.console import Console
 
-from module.logger import RenderOptions, _get_renderables, render_options
+from module.logger import RenderOptions, RichRenderableHandler, logger, render_options
 
 
 def test_render_options_override_existing_options() -> None:
@@ -10,9 +10,23 @@ def test_render_options_override_existing_options() -> None:
     assert options.end == ""
 
 
-def test_get_renderables_accepts_print_keyword_settings() -> None:
+def test_print_accepts_keyword_settings() -> None:
     console = Console(no_color=True, width=80)
+    renderables = []
+    handler = RichRenderableHandler(
+        console=console,
+        func=renderables.append,
+        show_time=False,
+        show_level=False,
+        show_path=False,
+    )
 
-    renderables = _get_renderables(console, "a", "b", sep="|", end="")
+    previous_handlers = logger.handlers
+    try:
+        logger.handlers = [handler]
+        logger.print("a", "b", sep="|", end="")
+    finally:
+        logger.handlers = previous_handlers
+        handler.close()
 
     assert renderables

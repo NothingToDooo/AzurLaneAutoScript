@@ -127,12 +127,14 @@ class EmulatorBase:
         Yields:
             EmulatorInstance: Emulator instances found in this emulator
         """
+        return []
 
     def iter_adb_binaries(self) -> t.Iterable[str]:
         """
         Yields:
             str: Filepath to adb binaries found in this emulator
         """
+        return []
 
     def __init__(self, path):
         # Path to .exe file

@@ -9,6 +9,32 @@ from rich.theme import Theme
 class HTMLConsole(Console): ...
 class Highlighter(RegexHighlighter): ...
 
+class RichRenderableHandler(RichHandler):
+    def __init__(
+        self,
+        *args,
+        func: Callable[[ConsoleRenderable], None] | None = ...,
+        **kwargs,
+    ) -> None: ...
+    def emit_renderable(self, renderable: ConsoleRenderable) -> None: ...
+
+class RenderOptions:
+    sep: str
+    end: str
+    justify: object
+    emoji: object
+    markup: object
+    highlight: object
+    def __init__(
+        self,
+        sep: str = ...,
+        end: str = ...,
+        justify: object = ...,
+        emoji: object = ...,
+        markup: object = ...,
+        highlight: object = ...,
+    ) -> None: ...
+
 WEB_THEME: Theme
 
 logger_debug: bool
@@ -27,6 +53,10 @@ def set_file_logger(
 def set_func_logger(
     func: Callable[[ConsoleRenderable], None],
 ) -> None: ...
+def render_options(
+    options: RenderOptions | None = ...,
+    settings: dict[str, object] | None = ...,
+) -> RenderOptions: ...
 
 class __logger(logging.Logger):
     def rule(

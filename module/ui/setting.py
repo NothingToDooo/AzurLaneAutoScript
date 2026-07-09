@@ -14,10 +14,10 @@ INVALID_DEFAULT_OPTION_TEMPLATE = 'Define option_default="{default}", but defaul
 
 
 class Setting:
-    def __init__(self, name="Setting", main: ModuleBase = None):
+    def __init__(self, name="Setting", main: ModuleBase | None = None):
         self.name = name
         # ALAS 模块对象。
-        self.main: ModuleBase = main
+        self.main: ModuleBase | None = main
         # 设置选项前是否先重置。
         self.reset_first = True
         # 是否取消已启用但不需要的选项。

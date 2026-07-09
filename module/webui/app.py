@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 from functools import partial
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pywebio import config as webconfig
 from pywebio.input import file_upload, input_group, select
@@ -81,6 +82,10 @@ from module.webui.widgets import (
     put_none,
     put_output,
 )
+
+if TYPE_CHECKING:
+    from module.config.config_updater import ConfigUpdater
+
 
 task_handler = TaskHandler()
 
@@ -452,7 +457,7 @@ class AlasGUI(Frame):
         self,
         modified: dict[str, str],
         config_name: str,
-        config_updater: AzurLaneConfig = State.config_updater,
+        config_updater: ConfigUpdater = State.config_updater,
     ) -> None:
         try:
             valid = []

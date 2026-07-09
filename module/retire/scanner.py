@@ -491,6 +491,7 @@ class DockScanner(ShipScanner):
         扫描指定舰队中的所有舰船。
         如果未指定舰队，则使用 self.fleet。
         """
+        raise NotImplementedError
 
     def scan_whole_dock(self) -> list[Ship]:
-        pass
+        raise NotImplementedError

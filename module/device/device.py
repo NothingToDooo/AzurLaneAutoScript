@@ -65,6 +65,7 @@ class Device(Screenshot, Control, AppControl):
     def __init__(self, *args, **kwargs):
         self.detect_record: set[str] = set()
         self.click_record: collections.deque[str] = collections.deque(maxlen=15)
+        self.stuck_detection_enabled = True
         self.stuck_timer = Timer(60, count=60).start()
         self.stuck_timer_long = Timer(180, count=180).start()
 
@@ -163,6 +164,9 @@ class Device(Screenshot, Control, AppControl):
         Raises:
             GameStuckError:
         """
+        if not self.stuck_detection_enabled:
+            return False
+
         reached = self.stuck_timer.reached()
         reached_long = self.stuck_timer_long.reached()
 
@@ -221,7 +225,12 @@ class Device(Screenshot, Control, AppControl):
         Raises:
             GameTooManyClickError:
         """
+        if not self.stuck_detection_enabled:
+            return False
+
         count = collections.Counter(self.click_record).most_common(2)
+        if not count:
+            return False
         if count[0][1] >= 12:
             show_function_call()
             logger.warning(f"Too many click for a button: {count[0][0]}")
@@ -236,18 +245,14 @@ class Device(Screenshot, Control, AppControl):
             self.click_record_clear()
             message = f"Too many click between 2 buttons: {count[0][0]}, {count[1][0]}"
             raise GameTooManyClickError(message)
+        return False
 
     def disable_stuck_detection(self):
         """
         Disable stuck detection and its handler. Usually uses in semi auto and debugging.
         """
         logger.info("Disable stuck detection")
-
-        def empty_function(*_args, **_kwargs):
-            return False
-
-        self.click_record_check = empty_function
-        self.stuck_record_check = empty_function
+        self.stuck_detection_enabled = False
 
     def app_start(self):
         if not self.config.Error_HandleError:
