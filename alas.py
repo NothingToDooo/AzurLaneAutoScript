@@ -24,7 +24,7 @@ from module.logger import get_log_file, logger
 from module.task_registry import get_task_spec
 
 if TYPE_CHECKING:
-    import threading
+    from module.base.stop_event import StopEvent
 
 
 def _load_attr(module_name: str, attr_name: str):
@@ -34,7 +34,7 @@ def _load_attr(module_name: str, attr_name: str):
 
 
 class AzurLaneAutoScript:
-    stop_event: threading.Event | None = None
+    stop_event: StopEvent | None = None
 
     def __init__(self, config_name: str = "alas") -> None:
         logger.hr("Start", level=0)

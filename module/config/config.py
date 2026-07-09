@@ -5,9 +5,6 @@ from typing import TYPE_CHECKING
 
 import pywebio
 
-if TYPE_CHECKING:
-    import threading
-
 from module.base.filter import Filter
 from module.config.config_generated import GeneratedConfig
 from module.config.config_manual import ManualConfig, OutputConfig
@@ -27,6 +24,9 @@ from module.config.watcher import ConfigWatcher
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
+
+if TYPE_CHECKING:
+    from module.base.stop_event import StopEvent
 
 MISSING_DELAY_ARGUMENT_MESSAGE = "Missing argument in delay_next_run, should set at least one"
 TASK_CALL_MISSING_TEMPLATE = "Task to call: `{task}` does not exist in user config"
@@ -72,7 +72,7 @@ def name_to_function(name):
 
 
 class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher):
-    stop_event: threading.Event | None = None
+    stop_event: StopEvent | None = None
 
     # 类级开关。
     is_hoarding_task = True

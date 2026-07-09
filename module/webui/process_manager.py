@@ -1,6 +1,6 @@
 import queue
 import threading
-from multiprocessing import Process
+from multiprocessing import Event, Process
 from typing import TYPE_CHECKING, ClassVar, cast
 
 from rich.console import Console, ConsoleRenderable
@@ -15,6 +15,8 @@ from module.webui.setting import State
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from module.base.stop_event import StopEvent
+
 _AVAILABLE_WEBUI_TASKS = (
     "Daemon",
     "OpsiDaemon",
@@ -23,6 +25,9 @@ _AVAILABLE_WEBUI_TASKS = (
     "Benchmark",
     "GameManager",
 )
+
+STOP_GRACE_SECONDS = 5
+KILL_JOIN_SECONDS = 1
 
 
 class ProcessManager:
@@ -35,20 +40,22 @@ class ProcessManager:
         self.renderables_max_length = 400
         self.renderables_reduce_length = 80
         self._process: Process | None = None
-        self._process_locks: dict[str, threading.Lock] = {}
+        self._stop_event: StopEvent | None = None
+        self._stop_lock = threading.Lock()
         self.thd_log_queue_handler: threading.Thread | None = None
 
-    def start(self, func, ev: threading.Event | None = None) -> None:
+    def start(self, func: str | None, ev: StopEvent | None = None) -> None:
         if not self.alive:
             if func is None:
                 func = "alas"
+            self._stop_event = Event() if ev is None else ev
             self._process = Process(
                 target=ProcessManager.run_process,
                 args=(
                     self.config_name,
                     func,
                     self._renderable_queue,
-                    ev,
+                    self._stop_event,
                 ),
             )
             self._process.start()
@@ -60,21 +67,28 @@ class ProcessManager:
         self.thd_log_queue_handler = threading.Thread(target=self._thread_log_queue_handler)
         self.thd_log_queue_handler.start()
 
-    def stop(self) -> None:
-        try:
-            lock = self._process_locks[self.config_name]
-        except KeyError:
-            lock = threading.Lock()
-            self._process_locks[self.config_name] = lock
+    def _stop_process(self) -> None:
+        process = self._process
+        if process is None or not process.is_alive():
+            return
 
-        with lock:
+        if self._stop_event is not None:
+            self._stop_event.set()
+            process.join(timeout=STOP_GRACE_SECONDS)
+
+        if process.is_alive():
+            logger.warning(f"[{self.config_name}] did not stop gracefully, killing process")
+            process.kill()
+            process.join(timeout=KILL_JOIN_SECONDS)
+
+        self.renderables.append(cast("ConsoleRenderable", f"[{self.config_name}] exited. Reason: Manual stop\n"))
+
+    def stop(self) -> None:
+        with self._stop_lock:
             if self.alive:
-                process = self._process
-                if process is not None:
-                    process.kill()
-                self.renderables.append(
-                    cast("ConsoleRenderable", f"[{self.config_name}] exited. Reason: Manual stop\n")
-                )
+                self._stop_process()
+                if self._process is not None and not self._process.is_alive():
+                    self._stop_event = None
             if self.thd_log_queue_handler is not None:
                 self.thd_log_queue_handler.join(timeout=1)
                 if self.thd_log_queue_handler.is_alive():
@@ -122,7 +136,7 @@ class ProcessManager:
         return cls._processes[config_name]
 
     @staticmethod
-    def run_process(config_name, func: str, q: queue.Queue, stop_event: threading.Event | None = None) -> None:
+    def run_process(config_name, func: str, q: queue.Queue, stop_event: StopEvent | None = None) -> None:
         # 初始化子进程 logger。
         set_file_logger(name=config_name)
         set_func_logger(func=q.put)
@@ -130,7 +144,7 @@ class ProcessManager:
         # 子进程会使用真实 PIL，需要移除 WebUI 进程里的伪模块。
         remove_fake_pil_module()
 
-        AzurLaneConfig.stop_event = cast("threading.Event", stop_event)
+        AzurLaneConfig.stop_event = stop_event
         try:
             # 运行指定入口。
             if func == "alas":
@@ -158,7 +172,7 @@ class ProcessManager:
     @staticmethod
     def restart_processes(
         instances: Sequence[ProcessManager | str] | None = None,
-        ev: threading.Event | None = None,
+        ev: StopEvent | None = None,
     ) -> None:
         """
         Start configured alas instances when the web service starts.
