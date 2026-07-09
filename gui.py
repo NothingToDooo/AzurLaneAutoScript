@@ -22,11 +22,6 @@ def func() -> None:
     )
     parser.add_argument("-k", "--key", type=str, help="WebUI 密码，默认不启用。")
     parser.add_argument(
-        "--cdn",
-        action="store_true",
-        help="使用 jsdelivr 加载 pywebio 静态文件，默认本地提供。",
-    )
-    parser.add_argument(
         "--run",
         nargs="+",
         type=str,

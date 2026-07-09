@@ -42,7 +42,7 @@ def test_asgi_app_accepts_options_object():
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always", DeprecationWarning)
-        app = asgi_app([index], options=AsgiAppOptions(cdn=False, debug=True))
+        app = asgi_app([index], options=AsgiAppOptions(debug=True))
 
     assert app.debug is True
     deprecation_warnings = [item.message for item in caught if issubclass(item.category, DeprecationWarning)]

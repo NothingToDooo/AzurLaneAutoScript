@@ -13,7 +13,6 @@ from pywebio.platform import page as pywebio_page
 from pywebio.platform.fastapi import (
     STATIC_PATH,
     Session,
-    cdn_validation,
     webio_routes,
 )
 from starlette.applications import Starlette
@@ -52,7 +51,6 @@ LIFESPAN_CALLBACKS_CONFLICT_MESSAGE = "lifespan 不能和 on_startup/on_shutdown
 
 @dataclass(slots=True)
 class AsgiAppOptions:
-    cdn: object = True
     static_dir: object = None
     debug: bool = False
     allowed_origins: object = None
@@ -104,7 +102,6 @@ def _asgi_options_from_settings(options, settings):
     if options is not None:
         return options
     return AsgiAppOptions(
-        cdn=settings.pop("cdn", True),
         static_dir=settings.pop("static_dir", None),
         debug=settings.pop("debug", False),
         allowed_origins=settings.pop("allowed_origins", None),
@@ -115,12 +112,9 @@ def _asgi_options_from_settings(options, settings):
 def asgi_app(applications, options=None, **starlette_settings):
     options = _asgi_options_from_settings(options, starlette_settings)
     debug = Session.debug = os.environ.get("PYWEBIO_DEBUG", options.debug)
-    cdn = cdn_validation(options.cdn, "warn")
-    if cdn is False:
-        cdn = "pywebio_static"
     routes = webio_routes(
         applications,
-        cdn=cdn,
+        cdn="pywebio_static",
         allowed_origins=options.allowed_origins,
         check_origin=options.check_origin,
     )

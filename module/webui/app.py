@@ -1002,11 +1002,6 @@ def app():
     parser = argparse.ArgumentParser(description="Alas WebUI 服务")
     parser.add_argument("-k", "--key", type=str, help="WebUI 密码，默认不启用。")
     parser.add_argument(
-        "--cdn",
-        action="store_true",
-        help="使用 jsdelivr 加载 pywebio 静态文件，默认本地提供。",
-    )
-    parser.add_argument(
         "--run",
         nargs="+",
         type=str,
@@ -1017,7 +1012,6 @@ def app():
     # 应用配置。
     AlasGUI.set_theme(theme=State.webui_config.Theme)
     key = args.key or State.webui_config.Password
-    cdn = args.cdn or State.webui_config.CDN
     runs: list[str] = []
     if args.run:
         runs = args.run
@@ -1029,7 +1023,6 @@ def app():
     logger.hr("Webui configs")
     logger.attr("Theme", State.webui_config.Theme)
     logger.attr("Password", bool(key))
-    logger.attr("CDN", cdn)
 
     atomic_failure_cleanup("./config")
 
@@ -1053,7 +1046,6 @@ def app():
 
     return asgi_app(
         applications=[index, manage],
-        cdn=cdn,
         static_dir=None,
         debug=True,
         on_startup=[

@@ -3,5 +3,4 @@ WebuiHost: 127.0.0.1
 WebuiPort: 22267
 Theme: default
 Password: null
-CDN: false
 Run: null

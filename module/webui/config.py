@@ -14,7 +14,6 @@ class WebUIConfig:
         "WebuiPort": 22267,
         "Theme": "default",
         "Password": None,
-        "CDN": False,
         "Run": None,
     }
 
