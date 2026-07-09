@@ -20,6 +20,7 @@ class cached_property[T]:
 
     def __init__(self, func: Callable[..., T]):
         self.func = func
+        self.func_name = getattr(func, "__name__", type(func).__name__)
 
     @overload
     def __get__(self, obj: None, cls: type[Any] | None = None) -> cached_property[T]: ...
@@ -31,7 +32,7 @@ class cached_property[T]:
         if obj is None:
             return self
 
-        value = obj.__dict__[self.func.__name__] = self.func(obj)
+        value = obj.__dict__[self.func_name] = self.func(obj)
         return value
 
 

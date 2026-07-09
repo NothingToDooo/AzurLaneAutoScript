@@ -105,7 +105,7 @@ class Task:
         g.send(None)
         self.delay = delay
         self.next_run = next_run if next_run is not None else time.time()
-        self.name = name if name is not None else self.g.__name__
+        self.name = name if name is not None else getattr(self.g, "__name__", type(self.g).__name__)
 
     def __str__(self) -> str:
         return f"<{self.name} (delay={self.delay})>"
@@ -352,7 +352,7 @@ class Switch:
 
     def g(self) -> Generator:
         g = get_generator(self.switch)
-        name = self.name or self.get_state.__name__
+        name = self.name or getattr(self.get_state, "__name__", type(self.get_state).__name__)
         g.__name__ = f"Switch_{name}_refresh"
         return g
 
@@ -364,7 +364,7 @@ def get_generator(func: Callable):
             yield func()
 
     g = _g()
-    g.__name__ = func.__name__
+    g.__name__ = getattr(func, "__name__", type(func).__name__)
     return g
 
 

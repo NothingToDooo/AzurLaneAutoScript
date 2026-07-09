@@ -31,7 +31,7 @@ class HeaderMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def _iscoroutinefunction(obj):
+def _iscoroutinefunction(obj: object) -> bool:
     while isinstance(obj, functools.partial):
         obj = obj.func
     return inspect.iscoroutinefunction(obj)
@@ -39,9 +39,9 @@ def _iscoroutinefunction(obj):
 
 def _patch_pywebio_coroutine_checker() -> None:
     # pywebio 在导入时缓存了旧协程判断函数，统一收口到 WebUI 依赖边界。
-    pywebio_utils.iscoroutinefunction = _iscoroutinefunction
-    pywebio_page.iscoroutinefunction = _iscoroutinefunction
-    pywebio_session.iscoroutinefunction = _iscoroutinefunction
+    vars(pywebio_utils)["iscoroutinefunction"] = _iscoroutinefunction
+    vars(pywebio_page)["iscoroutinefunction"] = _iscoroutinefunction
+    vars(pywebio_session)["iscoroutinefunction"] = _iscoroutinefunction
 
 
 _patch_pywebio_coroutine_checker()

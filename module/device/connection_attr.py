@@ -39,7 +39,7 @@ class ConnectionAttr:
         def adb_path() -> str:
             return self.adb_binary
 
-        adbutils.adb_path = adb_path
+        vars(adbutils)["adb_path"] = adb_path
         # 预热 adb_client 缓存。
         _ = self.adb_client
 

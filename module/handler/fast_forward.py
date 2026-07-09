@@ -158,7 +158,7 @@ class FastForwardHandler(AutoSearchHandler):
         if self.map_achieved_star_1:
             # Boss 刷新前剧情，对应 chapter_template.lua 中的 "story_refresh_boss"。
             self.config.MAP_HAS_MAP_STORY = False
-        self.config.MAP_CLEAR_ALL_THIS_TIME = (
+        self.config.MAP_CLEAR_ALL_THIS_TIME = bool(
             self.config.STAR_REQUIRE_3
             and not self.__getattribute__(f"map_achieved_star_{self.config.STAR_REQUIRE_3}")
             and (self.config.StopCondition_MapAchievement in ["map_3_stars", "threat_safe"])

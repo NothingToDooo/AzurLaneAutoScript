@@ -49,6 +49,9 @@ class Item:
         self._cost = "DefaultCost"
         self.price = 0
         self.tag = None
+        self.group: str | None = None
+        self.sub_genre: str | None = None
+        self.tier: str | None = None
 
     @property
     def name(self):
@@ -151,7 +154,7 @@ def item_predict_options(options=None, settings=None) -> ItemPredictOptions:
 
 
 class ItemGrid:
-    item_class = Item
+    item_class: type[Item] = Item
     similarity = 0.92
     extract_similarity = 0.92
     cost_similarity = 0.75

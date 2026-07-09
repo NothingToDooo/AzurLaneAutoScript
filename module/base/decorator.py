@@ -191,12 +191,13 @@ def run_once(f):
         while 1:
             action()
     """
+    has_run = False
 
     def wrapper(*args, **kwargs):
-        if not wrapper.has_run:
-            wrapper.has_run = True
+        nonlocal has_run
+        if not has_run:
+            has_run = True
             return f(*args, **kwargs)
         return None
 
-    wrapper.has_run = False
     return wrapper

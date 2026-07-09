@@ -115,7 +115,8 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         else:
             return True
 
-        logger.error(f"Emulator function {func.__name__}() failed")
+        func_name = getattr(func, "__name__", type(func).__name__)
+        logger.error(f"Emulator function {func_name}() failed")
         return False
 
     def _adb_connect_for_start_watch(self) -> bool:
@@ -198,7 +199,11 @@ class PlatformWindows(PlatformBase, EmulatorManager):
         """
         logger.hr("Emulator start", level=2)
         current_window = get_focused_window()
-        serial = self.emulator_instance.serial
+        instance = self.emulator_instance
+        if instance is None:
+            logger.error("未找到可监听启动状态的模拟器实例")
+            return False
+        serial = instance.serial
         logger.info(f"Current window: {current_window}")
 
         show_online = run_once(self._log_emulator_online)

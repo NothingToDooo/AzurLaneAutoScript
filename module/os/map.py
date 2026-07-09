@@ -421,11 +421,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 self.config.task_stop()
 
     _auto_search_battle_count = 0
-    _auto_search_round_timer = 0
+    _auto_search_round_timer: float = 0.0
 
     def on_auto_search_battle_count_reset(self):
         self._auto_search_battle_count = 0
-        self._auto_search_round_timer = 0
+        self._auto_search_round_timer = 0.0
 
     def on_auto_search_battle_count_add(self):
         self._auto_search_battle_count += 1

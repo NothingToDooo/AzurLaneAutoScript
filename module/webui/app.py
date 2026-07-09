@@ -455,7 +455,7 @@ class AlasGUI(Frame):
 
     def _save_config(
         self,
-        modified: dict[str, str],
+        modified: dict[str, object],
         config_name: str,
         config_updater: ConfigUpdater = State.config_updater,
     ) -> None:

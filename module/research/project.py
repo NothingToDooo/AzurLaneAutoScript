@@ -531,9 +531,10 @@ class ResearchProject:
 
     @staticmethod
     def _iter_research_data_by_trimmed_suffix(name, series):
+        name = str(name)
         trimmed_name = name.rstrip("MIRFUL-")
         for data in LIST_RESEARCH_PROJECT:
-            if (data["series"] == series) and (data["name"].rstrip("MIRFUL-") == trimmed_name):
+            if (data["series"] == series) and (str(data["name"]).rstrip("MIRFUL-") == trimmed_name):
                 yield data
 
     def get_data(self, name, series):
