@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from module.base.button import ButtonGrid
 
 type ScannerLimitValue = int | str
-type ShipLimitValue = ScannerLimitValue | tuple[int, int] | list[ScannerLimitValue] | None
+type ShipLimitValue = ScannerLimitValue | tuple[ScannerLimitValue, ScannerLimitValue] | list[ScannerLimitValue] | None
 
 
 class EmotionDigit(Digit):
@@ -71,13 +71,15 @@ class Ship:
 
 
 class Scanner(metaclass=ABCMeta):
-    _results: list = None
+    _results: list | None = None
     _enabled: bool = True
     _disabled_value: list[None] = [None] * 14
-    grids: ButtonGrid = None
+    grids: ButtonGrid | None = None
 
     @property
     def results(self) -> list:
+        if self._results is None:
+            self._results = []
         return self._results
 
     @abstractmethod
@@ -92,7 +94,7 @@ class Scanner(metaclass=ABCMeta):
         """
         Clear all cached results.
         """
-        self._results.clear()
+        self.results.clear()
 
     def scan(self, image, cached=False, output=False) -> list | None:
         """

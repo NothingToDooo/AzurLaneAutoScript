@@ -222,8 +222,8 @@ T_Output_Kwargs = dict[str, Any]
 
 
 def get_title_help(kwargs: T_Output_Kwargs) -> Output:
-    title: str = kwargs.get("title")
-    help_text: str = kwargs.get("help")
+    title = str(kwargs.get("title") or "")
+    help_text = str(kwargs.get("help") or "")
 
     if help_text:
         res = put_column(
@@ -242,8 +242,8 @@ def get_title_help(kwargs: T_Output_Kwargs) -> Output:
 # args input widget
 def put_arg_input(kwargs: T_Output_Kwargs) -> Output:
     name: str = kwargs["name"]
-    options: list = kwargs.get("options")
-    if options is not None:
+    options = kwargs.get("options")
+    if isinstance(options, list):
         kwargs.setdefault("datalist", options)
 
     return put_scope(

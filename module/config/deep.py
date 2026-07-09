@@ -115,6 +115,13 @@ def deep_exist(d, keys):
         return True
 
 
+def _replace_parent_with_dict(prev_d, prev_k2, prev_k, value) -> bool:
+    if prev_d is None or prev_k2 is None:
+        return False
+    prev_d[prev_k2] = {prev_k: value}
+    return True
+
+
 def deep_set(d, keys, value):
     """
     Set value into nested dict safely, imitating deep_get().
@@ -150,7 +157,8 @@ def deep_set(d, keys, value):
                 # `d` 不是字典。
                 exist = False
                 d = {}
-                prev_d[prev_k2] = {prev_k: d}
+                if not _replace_parent_with_dict(prev_d, prev_k2, prev_k, d):
+                    return
 
             prev_k2 = prev_k
             prev_k = k
@@ -163,7 +171,7 @@ def deep_set(d, keys, value):
         d[prev_k] = value
     # 最后一层的 `d` 不是字典。
     except TypeError:
-        prev_d[prev_k2] = {prev_k: value}
+        _replace_parent_with_dict(prev_d, prev_k2, prev_k, value)
         return
     else:
         return
@@ -204,7 +212,8 @@ def deep_default(d, keys, value):
                 # `d` 不是字典。
                 exist = False
                 d = {}
-                prev_d[prev_k2] = {prev_k: d}
+                if not _replace_parent_with_dict(prev_d, prev_k2, prev_k, d):
+                    return
 
             prev_k2 = prev_k
             prev_k = k
@@ -217,7 +226,7 @@ def deep_default(d, keys, value):
         d.setdefault(prev_k, value)
     # 最后一层的 `d` 不是字典。
     except AttributeError:
-        prev_d[prev_k2] = {prev_k: value}
+        _replace_parent_with_dict(prev_d, prev_k2, prev_k, value)
         return
     else:
         return
