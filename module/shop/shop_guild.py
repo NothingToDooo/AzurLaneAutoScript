@@ -70,7 +70,7 @@ class GuildShop_250814(ShopClerk, ShopUI, ShopStatus):
         super().shop_interval_clear()
         self.interval_clear(SHOP_BUY_CONFIRM_SELECT)
 
-    def shop_buy_handle(self, item):
+    def shop_buy_handle(self, _item):
         """
         Handle shop_guild buy interface if detected
 
@@ -81,7 +81,7 @@ class GuildShop_250814(ShopClerk, ShopUI, ShopStatus):
             bool: whether interface was detected and handled
         """
         if self.appear(SHOP_BUY_CONFIRM_SELECT, offset=(20, 20), interval=3):
-            self.shop_buy_select_execute(item)
+            self.shop_buy_select_execute(_item)
             self.interval_reset(SHOP_BUY_CONFIRM_SELECT)
             return True
 

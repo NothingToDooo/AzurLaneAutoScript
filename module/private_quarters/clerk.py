@@ -18,7 +18,7 @@ class PQShopClerk(ShopClerk, PQShopUI):
             ]
         )
 
-    def shop_buy_execute(self, item):
+    def shop_buy_execute(self, item, skip_first_screenshot=True):
         """
         Args:
             item: 要购买的商品。
@@ -26,6 +26,7 @@ class PQShopClerk(ShopClerk, PQShopUI):
         Returns:
             None: 正常退出即表示购买成功。
         """
+        _ = skip_first_screenshot
         self._pq_shop_prepare_buy()
         self._pq_shop_enter_purchase_confirm(item)
         self._pq_shop_finish_purchase_confirm()

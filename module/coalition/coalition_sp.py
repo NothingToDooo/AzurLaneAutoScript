@@ -5,9 +5,9 @@ from module.config.config import TaskEnd
 
 
 class CoalitionSP(Coalition):
-    def run(self):
+    def run(self, event="", mode="", fleet="", total=0):
         with suppress(TaskEnd):
-            super().run(mode="sp", total=1)
+            super().run(event=event, mode=mode or "sp", fleet=fleet, total=total or 1)
         if self.run_count > 0:
             self.config.task_delay(server_update=True)
         else:

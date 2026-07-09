@@ -69,7 +69,7 @@ class CoreShop_250814(ShopClerk, ShopStatus):
         super().shop_interval_clear()
         self.interval_clear(SHOP_BUY_CONFIRM_AMOUNT)
 
-    def shop_buy_handle(self, item):
+    def shop_buy_handle(self, _item):
         """
         Handle shop_core buy interface if detected
 
@@ -80,7 +80,7 @@ class CoreShop_250814(ShopClerk, ShopStatus):
             bool: whether interface was detected and handled
         """
         if self.appear(SHOP_BUY_CONFIRM_AMOUNT, offset=(20, 20), interval=3):
-            self.shop_buy_amount_execute(item)
+            self.shop_buy_amount_execute(_item)
             self.interval_reset(SHOP_BUY_CONFIRM_AMOUNT)
             return True
 

@@ -20,11 +20,12 @@ STAGE_FILTER = Filter(regex=re.compile(r"(\w+)"), attr=["name"])
 
 
 class RaidDaily(RaidRun):
-    def run(self, name=""):
+    def run(self, name="", mode="", total=0):
         """
         Args:
             name (str): Raid name, such as 'raid_20200624'
         """
+        _ = (mode, total)
         if self.is_raid_rpg():
             logger.info("RPG raid has no dailies")
             self.config.Scheduler_Enable = False

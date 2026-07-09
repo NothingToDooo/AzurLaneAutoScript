@@ -1,6 +1,6 @@
 from module.logger import logger
 from module.ocr.ocr import DigitYuv, Ocr, ocr_options
-from module.statistics.item import Item, ItemGrid, item_grid_areas
+from module.statistics.item import Item, ItemGrid, item_grid_areas, item_predict_options
 
 
 class PriceOcr(DigitYuv):
@@ -126,18 +126,21 @@ class OSShopItemGrid(ItemGrid):
         self.price_ocr = PRICE_OCR
         self.counter_area = counter_area
 
-    def predict(self, image, counter=False, shop_index=None, scroll_pos=None) -> list[OSShopItem]:
+    def predict(self, image, options=None, **settings) -> list[OSShopItem]:
         """
         Args:
             image (np.ndarray):
-            counter (bool): If predict item counter.
-            shop_index (bool): If predict shop index.
-            scroll_pos (bool): If predict scroll position.
+            options: 本次需要识别的商品字段。
+            **settings: 额外识别选项，支持 counter、shop_index 和 scroll_pos。
 
         Returns:
             list[Item]:
         """
-        super().predict(image, name=True, amount=True, cost=True, price=True)
+        counter = settings.pop("counter", False)
+        shop_index = settings.pop("shop_index", None)
+        scroll_pos = settings.pop("scroll_pos", None)
+        options = item_predict_options(options, {"name": True, "amount": True, "cost": True, "price": True} | settings)
+        super().predict(image, options=options)
         if counter and len(self.items):
             counter_list = [item.crop(self.counter_area) for item in self.items]
             counter_list = self.counter_ocr.ocr(counter_list, direct_ocr=True)

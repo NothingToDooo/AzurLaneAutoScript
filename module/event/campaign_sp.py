@@ -7,7 +7,8 @@ from module.logger import logger
 
 
 class CampaignSP(EventBase):
-    def run(self):
+    def run(self, name="", folder="campaign_main", mode="normal", total=0):
+        _ = (name, folder, mode, total)
         if not Path(f"./campaign/{self.config.Campaign_Event}/sp.py").exists():
             logger.info(f"./campaign/{self.config.Campaign_Event}/sp.py not exists")
             logger.info("This event do not have SP, skip")

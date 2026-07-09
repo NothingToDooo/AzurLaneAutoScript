@@ -483,7 +483,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             # Wait until arrived
             self.wait_until_walk_stable()
 
-    def fleet_set(self, index=1):
+    def fleet_set(self, index=None, skip_first_screenshot=True):
         """
         Args:
             index (int): 目标舰队编号。
@@ -491,6 +491,9 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         Returns:
             bool: 是否切换成功。
         """
+        _ = skip_first_screenshot
+        if index is None:
+            index = 1
         logger.hr(f"Fleet set to {index}")
         if self.fleet_selector.ensure_to_be(index):
             self.wait_until_camera_stable()

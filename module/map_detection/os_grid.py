@@ -120,7 +120,8 @@ class OSGridInfo(GridInfo):
                 return True
         return False
 
-    def _merge_enemy(self, info):
+    def _merge_enemy(self, info, mode=None):
+        _ = mode
         if not getattr(info, "is_enemy", False):
             return False
 

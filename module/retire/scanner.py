@@ -376,7 +376,10 @@ class ShipScanner(Scanner):
 
         super().move(vector)
 
-    def limit_value(self, key, value) -> None:
+    def limit_value(self, value) -> ScannerLimitValue:
+        return value
+
+    def _set_limitation_value(self, key, value) -> None:
         if value is None:
             self.limitaion[key] = None
         elif isinstance(value, tuple):
@@ -422,7 +425,7 @@ class ShipScanner(Scanner):
         """
         for attr in self.limitaion:
             value = kwargs.get(attr, self.limitaion[attr])
-            self.limit_value(key=attr, value=value)
+            self._set_limitation_value(key=attr, value=value)
 
         logger.info(f"Limitaions set to {self.limitaion}")
 

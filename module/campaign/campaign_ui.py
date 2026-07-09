@@ -17,8 +17,8 @@ CAMPAIGN_NAME_ERROR_MESSAGE = "Campaign name error"
 
 
 class ModeSwitch(Switch):
-    def handle_additional(self, main):
-        if main.appear(WITHDRAW, offset=(30, 30)):
+    def handle_additional(self, _main):
+        if _main.appear(WITHDRAW, offset=(30, 30)):
             logger.warning("ModeSwitch: WITHDRAW appears")
             raise CampaignNameError
 

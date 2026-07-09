@@ -86,7 +86,7 @@ class GeneralShop_250814(ShopClerk, ShopUI, ShopStatus):
 
         return False
 
-    def shop_check_custom_item(self, item):
+    def shop_check_custom_item(self, _item):
         """
         判断物品是否符合需要强制购买的自定义规则。
 
@@ -96,17 +96,17 @@ class GeneralShop_250814(ShopClerk, ShopUI, ShopStatus):
         Returns:
             bool: 是否命中自定义购买规则。
         """
-        if self.config.GeneralShop_ConsumeCoins and self._currency >= 550000 and item.cost == "Coins":
+        if self.config.GeneralShop_ConsumeCoins and self._currency >= 550000 and _item.cost == "Coins":
             return True
 
         if not self.config.GeneralShop_BuySkinBox:
             return False
-        if item.is_known_item() or item.amount != 1 or item.cost != "Coins" or item.price != 7000:
+        if _item.is_known_item() or _item.amount != 1 or _item.cost != "Coins" or _item.price != 7000:
             return False
 
         # 装备皮肤箱无法用颜色模板稳定匹配，而且外观设计经常变化。
-        logger.info(f"Item {item} is considered to be an equip skin box")
-        return self._currency >= item.price
+        logger.info(f"Item {_item} is considered to be an equip skin box")
+        return self._currency >= _item.price
 
     def run(self):
         """

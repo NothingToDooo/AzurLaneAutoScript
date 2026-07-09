@@ -62,17 +62,25 @@ class AlOcr(CnOcr):
             self.init(*self._args)
             self._model_loaded = True
 
-    def ocr(self, img_fp):
+    def ocr(self, img_fp, rec_batch_size=1, return_cropped_image=False, **det_kwargs):
         self.ensure_loaded()
-        return [self._extract_text(item) for item in super().ocr(img_fp)]
+        return [
+            self._extract_text(item)
+            for item in super().ocr(
+                img_fp,
+                rec_batch_size=rec_batch_size,
+                return_cropped_image=return_cropped_image,
+                **det_kwargs,
+            )
+        ]
 
     def ocr_for_single_line(self, img_fp):
         self.ensure_loaded()
         return self._extract_text(super().ocr_for_single_line(img_fp))
 
-    def ocr_for_single_lines(self, img_list):
+    def ocr_for_single_lines(self, img_list, batch_size=1):
         self.ensure_loaded()
-        return [self._extract_text(item) for item in super().ocr_for_single_lines(img_list)]
+        return [self._extract_text(item) for item in super().ocr_for_single_lines(img_list, batch_size=batch_size)]
 
     def set_cand_alphabet(self, cand_alphabet):
         self.ensure_loaded()

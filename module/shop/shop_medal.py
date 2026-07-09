@@ -195,7 +195,7 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
         logger.info(f"Medal: {self._currency}")
         return self._currency
 
-    def shop_has_loaded(self, items):
+    def shop_has_loaded(self, _items):
         """
         If any item parsed with a default
         price of 5000; then shop cannot
@@ -204,7 +204,7 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
         Returns:
             bool
         """
-        return all(int(item.price) != 5000 for item in items)
+        return all(int(item.price) != 5000 for item in _items)
 
     def shop_interval_clear(self):
         """
@@ -215,7 +215,7 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
         self.interval_clear(SHOP_BUY_CONFIRM_SELECT)
         self.interval_clear(SHOP_BUY_CONFIRM_AMOUNT)
 
-    def shop_buy_handle(self, item):
+    def shop_buy_handle(self, _item):
         """
         Handle shop_medal buy interface if detected
 
@@ -226,11 +226,11 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
             bool: whether interface was detected and handled
         """
         if self.appear(SHOP_BUY_CONFIRM_SELECT, offset=(20, 20), interval=3):
-            self.shop_buy_select_execute(item)
+            self.shop_buy_select_execute(_item)
             self.interval_reset(SHOP_BUY_CONFIRM_SELECT)
             return True
         if self.appear(SHOP_BUY_CONFIRM_AMOUNT, offset=(20, 20), interval=3):
-            self.shop_buy_amount_execute(item)
+            self.shop_buy_amount_execute(_item)
             self.interval_reset(SHOP_BUY_CONFIRM_AMOUNT)
             return True
 

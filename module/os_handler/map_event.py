@@ -11,9 +11,9 @@ from module.ui.switch import Switch
 
 
 class FleetLockSwitch(Switch):
-    def handle_additional(self, main):
+    def handle_additional(self, _main):
         # 上一个已清理海域的自动搜索奖励有时会延迟弹出。
-        return main.appear_then_click(os_assets.AUTO_SEARCH_REWARD, offset=(50, 50), interval=3)
+        return _main.appear_then_click(os_assets.AUTO_SEARCH_REWARD, offset=(50, 50), interval=3)
 
 
 fleet_lock = FleetLockSwitch("Fleet_Lock", offset=(10, 120))

@@ -619,11 +619,9 @@ class Fleet(Camera, AmbushHandler):
     def show_submarine(self):
         logger.info(f"Submarine: {location2node(self.fleet_submarine_location)}")
 
-    def full_scan(self, queue=None, must_scan=None, mode="normal"):
-        if self.config.MAP_HAS_DECOY_ENEMY and mode == "normal":
-            mode = "decoy"
-        super().full_scan(
-            FullScanOptions(
+    def full_scan(self, options=None, queue=None, must_scan=None, mode="normal"):
+        if options is None:
+            options = FullScanOptions(
                 queue=queue,
                 must_scan=must_scan,
                 battle_count=self.battle_count,
@@ -632,7 +630,9 @@ class Fleet(Camera, AmbushHandler):
                 carrier_count=self.carrier_count,
                 mode=mode,
             )
-        )
+        if self.config.MAP_HAS_DECOY_ENEMY and options.mode == "normal":
+            options.mode = "decoy"
+        super().full_scan(options)
 
         if self.config.FLEET_2 and not self.fleet_2_location:
             fleets = self.map.select(is_fleet=True, is_current_fleet=False)
