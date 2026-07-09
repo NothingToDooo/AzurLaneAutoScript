@@ -6,17 +6,6 @@
         "value": "auto",
         "valuetype": "str"
       },
-      "PackageName": {
-        "type": "select",
-        "value": "com.bilibili.azurlane",
-        "option": [
-          "com.bilibili.azurlane"
-        ]
-      },
-      "ScreenshotDedithering": {
-        "type": "checkbox",
-        "value": false
-      },
       "AdbRestart": {
         "type": "checkbox",
         "value": false
@@ -24,19 +13,19 @@
     },
     "EmulatorInfo": {
       "Emulator": {
-        "type": "select",
+        "type": "stored",
         "value": "MuMuPlayer12",
-        "option": [
-          "MuMuPlayer12"
-        ]
+        "display": "hide"
       },
       "name": {
-        "type": "textarea",
-        "value": null
+        "type": "stored",
+        "value": null,
+        "display": "hide"
       },
       "path": {
-        "type": "textarea",
-        "value": null
+        "type": "stored",
+        "value": null,
+        "display": "hide"
       }
     },
     "Error": {

@@ -16,7 +16,6 @@ if __name__ == "__main__" and __package__ in {None, ""}:
 from module.base.decorator import cached_property
 from module.base.timer import timer
 from module.config.deep import deep_default, deep_get, deep_iter, deep_set
-from module.config.server import VALID_PACKAGE
 from module.config.utils import (
     LANGUAGES,
     data_to_type,
@@ -49,6 +48,7 @@ class GeneratedConfig:
     """
 '''.strip().split("\n")
 GENERATED_INDENT = "    "
+GENERATED_LINE_LENGTH = 120
 ARCHIVES_PREFIX = {"cn": "档案 "}
 MAINS = ["Main", "Main2", "Main3"]
 EVENTS = ["Event", "Event2", "EventA", "EventB", "EventC", "EventD", "EventSp"]
@@ -72,6 +72,10 @@ def _generated_comment(text: str, prefix: str = "") -> list[str]:
     ]
 
 
+def _generated_string(value: str) -> str:
+    return json.dumps(value, ensure_ascii=False)
+
+
 def _generated_string_segments(value: str) -> list[str]:
     wrapper = textwrap.TextWrapper(
         width=100,
@@ -91,12 +95,12 @@ def _generated_string_segments(value: str) -> list[str]:
     return segments
 
 
-def _generated_string(value: str) -> str:
-    return json.dumps(value, ensure_ascii=False)
-
-
 def _generated_value(name: str, value) -> list[str]:
-    if isinstance(value, str) and "\n" in value:
+    if isinstance(value, str):
+        line = f"{GENERATED_INDENT}{name} = {_generated_string(value)}"
+        if "\n" not in value or len(line) <= GENERATED_LINE_LENGTH:
+            return [line]
+
         lines = [f"{GENERATED_INDENT}{name} = ("]
         lines.extend(
             f"{GENERATED_INDENT * 2}{_generated_string(segment)}" for segment in _generated_string_segments(value)
@@ -109,8 +113,6 @@ def _generated_value(name: str, value) -> list[str]:
         return [f"{GENERATED_INDENT}{name}: ClassVar[list[object]] = {value!r}"]
     if isinstance(value, set):
         return [f"{GENERATED_INDENT}{name}: ClassVar[set[object]] = {value!r}"]
-    if isinstance(value, str):
-        return [f"{GENERATED_INDENT}{name} = {_generated_string(value)}"]
     return [f"{GENERATED_INDENT}{name} = {value!r}"]
 
 
@@ -401,13 +403,6 @@ class ConfigGenerator:
             name = events.get(event.directory, event.directory)
             deep_set(new, keys=f"Campaign.Event.{event.directory}", value=name)
 
-    @staticmethod
-    def _generate_package_i18n(new) -> None:
-        for package, server in VALID_PACKAGE.items():
-            path = ["Emulator", "PackageName", package]
-            if deep_get(new, keys=path) == package:
-                deep_set(new, keys=path, value=server.upper())
-
     def _generate_gui_i18n(self, new, old) -> None:
         for path, _ in deep_iter(self.gui, depth=2):
             group, key = path
@@ -418,7 +413,6 @@ class ConfigGenerator:
         self._generate_task_i18n(new, old)
         self._generate_argument_i18n(new, old)
         self._generate_event_i18n(new)
-        self._generate_package_i18n(new)
         self._generate_gui_i18n(new, old)
         return new
 
@@ -504,7 +498,7 @@ class ConfigGenerator:
             )
             if i == 0:
                 lines.append("| " + " | ".join([":" + "-" * (width - 1) for width in column_width]) + " |\n")
-        with Path("./campaign/Readme.md").open("w", encoding="utf-8") as f:
+        with Path("./campaign/Readme.md").open("w", encoding="utf-8", newline="") as f:
             f.writelines(lines)
         return events[::-1]
 

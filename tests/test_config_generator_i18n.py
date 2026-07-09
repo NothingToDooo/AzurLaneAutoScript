@@ -1,6 +1,5 @@
 from module.config.config_updater import ConfigGenerator, Event
 from module.config.deep import deep_get
-from module.config.server import VALID_PACKAGE
 
 
 def _event(date: str, directory: str, name: str) -> Event:
@@ -69,19 +68,3 @@ def test_generate_i18n_data_uses_cn_event_name_and_directory_fallback() -> None:
 
     assert deep_get(data, keys="Campaign.Event.event_same") == "新活动"
     assert deep_get(data, keys="Campaign.Event.event_missing") == "event_missing"
-
-
-def test_generate_i18n_data_generates_package_name() -> None:
-    package, package_server = next(iter(VALID_PACKAGE.items()))
-    generator = _generator(
-        task={},
-        argument={
-            "Emulator": {
-                "PackageName": {"value": package, "option": [package]},
-            },
-        },
-    )
-
-    data = generator.generate_i18n_data({})
-
-    assert deep_get(data, keys=["Emulator", "PackageName", package]) == package_server.upper()

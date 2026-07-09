@@ -37,9 +37,6 @@ class Screenshot(NemuIpc):
         for _ in range(2):
             self.image = self.screenshot_nemu_ipc()
 
-            if self.config.Emulator_ScreenshotDedithering:
-                # 这里通常会额外花费 40-60ms。
-                cv2.fastNlMeansDenoising(self.image, self.image, h=17, templateWindowSize=1, searchWindowSize=2)
             self.image = self._handle_orientated_image(self.image)
 
             if self.config.Error_SaveError:

@@ -6,10 +6,6 @@ CN_SERVER = "cn"
 CN_PACKAGE = "com.bilibili.azurlane"
 CN_ACTIVITY = "com.manjuu.azurlane.MainActivity"
 
-VALID_PACKAGE = {
-    CN_PACKAGE: CN_SERVER,
-}
-
 
 def to_package(package_or_server: str) -> str:
     """

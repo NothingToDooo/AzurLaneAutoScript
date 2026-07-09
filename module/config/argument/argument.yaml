@@ -24,23 +24,20 @@ Emulator:
   Serial:
     value: auto
     valuetype: str
-  PackageName:
-    value: com.bilibili.azurlane
-    option: [ com.bilibili.azurlane ]
-  ScreenshotDedithering: false
   AdbRestart: false
 EmulatorInfo:
   Emulator:
     value: MuMuPlayer12
-    option: [
-      MuMuPlayer12,
-    ]
+    type: stored
+    display: hide
   name:
     value: null
-    type: textarea
+    type: stored
+    display: hide
   path:
     value: null
-    type: textarea
+    type: stored
+    display: hide
 Error:
   HandleError: true
   SaveError: true

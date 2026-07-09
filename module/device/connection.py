@@ -12,7 +12,7 @@ from adbutils.errors import AdbError
 from module.base.decorator import cached_property, del_cached_property, run_once
 from module.base.utils import ensure_time
 from module.config.deep import deep_get
-from module.config.server import VALID_PACKAGE
+from module.config.server import CN_PACKAGE
 from module.device.connection_attr import ConnectionAttr
 from module.device.method.pool import WORKER_POOL
 from module.device.method.remove_warning import remove_shell_warning
@@ -134,10 +134,9 @@ class Connection(ConnectionAttr):
         self.adb_connect()
         logger.attr("AdbDevice", self.adb)
 
-        # 确认游戏包名。
-        self.package = self.config.Emulator_PackageName
-        if self.package == "auto":
-            self.detect_package()
+        # 确认固定国服客户端包名。
+        self.package = CN_PACKAGE
+        self.ensure_package_installed()
         logger.attr("PackageName", self.package)
         logger.attr("Server", self.config.SERVER)
 
@@ -834,40 +833,24 @@ class Connection(ConnectionAttr):
         返回：
             list[str]：包名列表。
         """
-        return [p for p in self.list_package(show_log=show_log) if p in VALID_PACKAGE]
+        packages = self.list_package(show_log=show_log)
+        return [CN_PACKAGE] if CN_PACKAGE in packages else []
 
-    def detect_package(self, set_config=True):
+    def ensure_package_installed(self, show_log=True) -> None:
         """
-        显示设备上的所有游戏客户端。
+        确认固定国服客户端已经安装。
         """
-        logger.hr("Detect package")
-        packages = self.list_known_packages()
+        if self.list_known_packages(show_log=show_log):
+            return
 
-        # 显示包名。
-        logger.info(
-            f'Here are the available packages in device "{self.serial}", copy to Alas.Emulator.PackageName to use it'
-        )
-        if len(packages):
-            for package in packages:
-                logger.info(package)
-        else:
-            logger.info(f'No available packages on device "{self.serial}"')
+        logger.critical(f'未在设备 "{self.serial}" 上找到国服客户端包名 "{CN_PACKAGE}"，请确认碧蓝航线国服已安装')
+        raise RequestHumanTakeover
 
-        # 自动检测包名。
-        if len(packages) == 0:
-            logger.critical(
-                f'No AzurLane package found, please confirm AzurLane has been installed on device "{self.serial}"'
-            )
-            raise RequestHumanTakeover
-        if len(packages) == 1:
-            logger.info("Auto package detection found only one package, using it")
-            self.package = packages[0]
-            # 写入配置。
-            if set_config:
-                self.config.Emulator_PackageName = self.package
-        else:
-            logger.critical(
-                "Multiple AzurLane packages found, auto package detection cannot decide which to choose, "
-                "please copy one of the available devices listed above to Alas.Emulator.PackageName"
-            )
-            raise RequestHumanTakeover
+    def detect_package(self):
+        """
+        重新检查固定国服客户端包名。
+        """
+        logger.hr("Check package")
+        self.ensure_package_installed()
+        self.package = CN_PACKAGE
+        logger.info(f'找到固定国服客户端包名 "{self.package}"')

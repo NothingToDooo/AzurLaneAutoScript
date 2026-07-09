@@ -2,8 +2,6 @@
   "Alas": {
     "Emulator": {
       "Serial": "auto",
-      "PackageName": "com.bilibili.azurlane",
-      "ScreenshotDedithering": false,
       "AdbRestart": false
     },
     "EmulatorInfo": {
