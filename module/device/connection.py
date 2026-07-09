@@ -1,10 +1,8 @@
-import re
-
 from adbutils.errors import AdbError
 
 from module.base.decorator import del_cached_property
-from module.config.server import CN_PACKAGE
-from module.device.adb_session import AdbDeviceWithStatus, AdbSession, retry
+from module.device.adb_session import AdbDeviceWithStatus, retry
+from module.device.app_package import AppPackage
 from module.device.method.pool import WORKER_POOL
 from module.device.method.utils import possible_reasons
 from module.device.mumu import MUMU12_SERIAL_EXAMPLE, is_mumu12_serial, mumu12_shifted_serials
@@ -14,7 +12,7 @@ from module.logger import logger
 __all__ = ["AdbDeviceWithStatus", "Connection", "retry"]
 
 
-class Connection(AdbSession):
+class Connection(AppPackage):
     def __init__(self, config):
         """
         参数：
@@ -27,10 +25,7 @@ class Connection(AdbSession):
         self.adb_connect()
         logger.attr("AdbDevice", self.adb)
 
-        # 确认固定国服客户端包名。
-        self.package = CN_PACKAGE
-        self.ensure_package_installed()
-        logger.attr("PackageName", self.package)
+        self.confirm_fixed_package()
         logger.attr("Server", self.config.SERVER)
 
         self._check_after_connected()
@@ -268,54 +263,3 @@ class Connection(AdbSession):
         # 如果 16384 被占用，MuMu12 会使用 16385，这里自动重定向。
         # 这是动态端口，不写回配置。
         self._redirect_shifted_mumu12_port(available)
-
-    @retry
-    def list_package(self, show_log=True):
-        """
-        查找设备上的所有包。
-
-        优先使用更快的 dumpsys。
-        """
-        # 80ms
-        if show_log:
-            logger.info("Get package list")
-        output = self.adb_shell(r'dumpsys package | grep "Package \["')
-        packages = re.findall(r"Package \[([^\s]+)\]", output)
-        if len(packages):
-            return packages
-
-        # 200ms
-        if show_log:
-            logger.info("Get package list")
-        output = self.adb_shell(["pm", "list", "packages"])
-        return re.findall(r"package:([^\s]+)", output)
-
-    def list_known_packages(self, show_log=True):
-        """
-        参数：
-            show_log:
-
-        返回：
-            list[str]：包名列表。
-        """
-        packages = self.list_package(show_log=show_log)
-        return [CN_PACKAGE] if CN_PACKAGE in packages else []
-
-    def ensure_package_installed(self, show_log=True) -> None:
-        """
-        确认固定国服客户端已经安装。
-        """
-        if self.list_known_packages(show_log=show_log):
-            return
-
-        logger.critical(f'未在设备 "{self.serial}" 上找到国服客户端包名 "{CN_PACKAGE}"，请确认碧蓝航线国服已安装')
-        raise RequestHumanTakeover
-
-    def detect_package(self):
-        """
-        重新检查固定国服客户端包名。
-        """
-        logger.hr("Check package")
-        self.ensure_package_installed()
-        self.package = CN_PACKAGE
-        logger.info(f'找到固定国服客户端包名 "{self.package}"')
