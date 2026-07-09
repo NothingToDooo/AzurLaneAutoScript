@@ -1,6 +1,6 @@
 import re
 
-from module.config.server import DICT_PACKAGE_TO_ACTIVITY
+from module.config.server import CN_ACTIVITY
 from module.device.connection import Connection, retry
 from module.device.method.utils import PackageNotInstalled
 from module.logger import logger
@@ -34,12 +34,11 @@ class AppControl(Connection):
 
     def app_start(self):
         logger.info(f"App start: {self.package}")
-        activity_name = DICT_PACKAGE_TO_ACTIVITY.get(self.package)
-        if activity_name and self._app_start_adb_am(self.package, activity_name, allow_failure=True):
+        if self._app_start_adb_am(self.package, CN_ACTIVITY, allow_failure=True):
             return
         if self._app_start_adb_monkey(self.package, allow_failure=True):
             return
-        if activity_name and self._app_start_adb_am(self.package, activity_name, allow_failure=False):
+        if self._app_start_adb_am(self.package, CN_ACTIVITY, allow_failure=False):
             return
 
         logger.error("app_start: All trials failed")

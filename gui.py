@@ -7,7 +7,7 @@ from module.webui.bootstrap import prepare_pywebio_imports
 from module.webui.setting import State
 
 
-def func() -> None:
+def main() -> None:
     parser = argparse.ArgumentParser(description="Alas WebUI 服务")
     parser.add_argument(
         "--host",
@@ -40,4 +40,4 @@ def func() -> None:
 
 
 if __name__ == "__main__":
-    func()
+    main()
