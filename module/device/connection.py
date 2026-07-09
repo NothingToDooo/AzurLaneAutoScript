@@ -2,17 +2,17 @@ from adbutils.errors import AdbError
 
 from module.base.decorator import del_cached_property
 from module.device.adb_session import AdbDeviceWithStatus, retry
-from module.device.app_package import AppPackage
 from module.device.method.pool import WORKER_POOL
 from module.device.method.utils import possible_reasons
 from module.device.mumu import MUMU12_SERIAL_EXAMPLE, is_mumu12_serial, mumu12_shifted_serials
+from module.device.mumu_discovery import MumuDeviceDiscovery
 from module.exception import EmulatorNotRunningError, RequestHumanTakeover
 from module.logger import logger
 
 __all__ = ["AdbDeviceWithStatus", "Connection", "retry"]
 
 
-class Connection(AppPackage):
+class Connection(MumuDeviceDiscovery):
     def __init__(self, config):
         """
         参数：
@@ -159,7 +159,7 @@ class Connection(AppPackage):
         def connect(s):
             try:
                 msg = self.adb_client.connect(s)
-            except AdbError, OSError:
+            except (AdbError, OSError):
                 return ""
             logger.info(msg)
             return msg
@@ -203,63 +203,3 @@ class Connection(AppPackage):
             self.adb_disconnect()
             self.adb_connect()
             self.detect_device()
-
-    @staticmethod
-    def _log_available_devices(available):
-        for device in available:
-            logger.info(device.serial)
-        if not len(available):
-            logger.info("No available devices")
-
-    @staticmethod
-    def _log_unavailable_devices(devices, available):
-        unavailable = devices.delete(available)
-        if len(unavailable):
-            logger.info("Here are the devices detected but unavailable")
-            for device in unavailable:
-                logger.info(f"{device.serial} ({device.status})")
-
-    def _list_and_log_detected_devices(self):
-        logger.info("Here are the available MuMu12 TCP serials, copy one to Alas.Emulator.Serial")
-        devices = self.list_device()
-        available = devices.select(status="device", may_mumu12_family=True)
-        self._log_available_devices(available)
-        self._log_unavailable_devices(devices, available)
-        return devices, available
-
-    def _redirect_shifted_mumu12_port(self, available):
-        """
-        如果 MuMu12 动态端口发生小范围切换，只更新运行时 serial。
-        """
-        if not self.is_mumu12_family:
-            return
-
-        matched = False
-        for device in available.select(may_mumu12_family=True):
-            if device.port == self.port:
-                # 精确匹配。
-                matched = True
-                break
-        if matched:
-            return
-
-        for device in available.select(may_mumu12_family=True):
-            if -2 <= device.port - self.port <= 2:
-                # 端口发生切换。
-                logger.info(f"MuMu12 serial switched {self.serial} -> {device.serial}")
-                del_cached_property(self, "port")
-                del_cached_property(self, "is_mumu12_family")
-                del_cached_property(self, "is_mumu_family")
-                self.serial = device.serial
-                break
-
-    def detect_device(self):
-        """
-        查找当前可用的 MuMu12 TCP serial。
-        """
-        logger.hr("Detect device")
-        _, available = self._list_and_log_detected_devices()
-
-        # 如果 16384 被占用，MuMu12 会使用 16385，这里自动重定向。
-        # 这是动态端口，不写回配置。
-        self._redirect_shifted_mumu12_port(available)
