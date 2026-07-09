@@ -8,9 +8,8 @@
       },
       "PackageName": {
         "type": "select",
-        "value": "auto",
+        "value": "com.bilibili.azurlane",
         "option": [
-          "auto",
           "com.bilibili.azurlane"
         ]
       },
@@ -26,9 +25,8 @@
     "EmulatorInfo": {
       "Emulator": {
         "type": "select",
-        "value": "auto",
+        "value": "MuMuPlayer12",
         "option": [
-          "auto",
           "MuMuPlayer12"
         ]
       },

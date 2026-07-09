@@ -25,15 +25,14 @@ Emulator:
     value: auto
     valuetype: str
   PackageName:
-    value: auto
-    option: [ auto, com.bilibili.azurlane ]
+    value: com.bilibili.azurlane
+    option: [ com.bilibili.azurlane ]
   ScreenshotDedithering: false
   AdbRestart: false
 EmulatorInfo:
   Emulator:
-    value: auto
+    value: MuMuPlayer12
     option: [
-      auto,
       MuMuPlayer12,
     ]
   name:

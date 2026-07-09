@@ -323,7 +323,6 @@
     "PackageName": {
       "name": "游戏服务器",
       "help": "",
-      "auto": "自动检测",
       "com.bilibili.azurlane": "国服"
     },
     "ScreenshotDedithering": {
@@ -343,7 +342,6 @@
     "Emulator": {
       "name": "模拟器类型",
       "help": "",
-      "auto": "自动检测",
       "MuMuPlayer12": "MuMu模拟器12"
     },
     "name": {

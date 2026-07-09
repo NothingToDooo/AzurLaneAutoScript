@@ -21,14 +21,14 @@ class GeneratedConfig:
 
     # 配置组 `Emulator`
     Emulator_Serial = "auto"
-    # 可选项：auto, com.bilibili.azurlane
-    Emulator_PackageName = "auto"
+    # 可选项：com.bilibili.azurlane
+    Emulator_PackageName = "com.bilibili.azurlane"
     Emulator_ScreenshotDedithering = False
     Emulator_AdbRestart = False
 
     # 配置组 `EmulatorInfo`
-    # 可选项：auto, MuMuPlayer12
-    EmulatorInfo_Emulator = "auto"
+    # 可选项：MuMuPlayer12
+    EmulatorInfo_Emulator = "MuMuPlayer12"
     EmulatorInfo_name = None
     EmulatorInfo_path = None
 
