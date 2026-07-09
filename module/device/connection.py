@@ -136,7 +136,12 @@ class Connection(ConnectionAttr):
         logger.attr("PackageName", self.package)
         logger.attr("Server", self.config.SERVER)
 
-        self.check_mumu_app_keep_alive()
+        self._check_after_connected()
+
+    def _check_after_connected(self) -> None:
+        """
+        ADB 连接建立后由平台层补充检查。
+        """
 
     def adb_start_server(self):
         """
@@ -245,58 +250,6 @@ class Connection(ConnectionAttr):
             logger.error(f"SDK version invalid: {sdk}")
 
         return 0
-
-    @cached_property
-    @retry
-    def nemud_app_keep_alive(self) -> str:
-        res = self.adb_getprop("nemud.app_keep_alive")
-        logger.attr("nemud.app_keep_alive", res)
-        return res
-
-    @cached_property
-    @retry
-    def nemud_player_version(self) -> str:
-        # [nemud.player_product_version]: [3.8.27.2950]
-        res = self.adb_getprop("nemud.player_version")
-        logger.attr("nemud.player_version", res)
-        return res
-
-    def check_mumu_app_keep_alive(self):
-        if not self.is_mumu_family:
-            return False
-
-        res = self.nemud_app_keep_alive
-        if res == "":
-            # 旧版 MuMu 无法通过该属性判断后台保活。
-            return True
-        if res == "false":
-            # 已关闭。
-            return True
-        if res == "true":
-            # https://mumu.163.com/help/20230802/35047_1102450.html
-            logger.critical('请在MuMu模拟器设置内关闭 "后台挂机时保活运行"')
-            raise RequestHumanTakeover
-        logger.warning(f"Invalid nemud.app_keep_alive value: {res}")
-        return False
-
-    @cached_property
-    def is_mumu_over_version_400(self) -> bool:
-        if not self.is_mumu_family:
-            return False
-        # 4.0 及以上版本没有 getprop 信息。
-        return self.nemud_player_version == ""
-
-    @cached_property
-    def is_mumu_over_version_356(self) -> bool:
-        """
-        返回：
-            bool：MuMu12 版本是否不低于 3.5.6。
-        """
-        if not self.is_mumu_family:
-            return False
-        if self.is_mumu_over_version_400:
-            return True
-        return self.nemud_app_keep_alive != ""
 
     def adb_forward(self, remote):
         """

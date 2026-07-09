@@ -45,6 +45,20 @@ def _make_platform(
     return platform
 
 
+def _make_keep_alive_platform(*, app_keep_alive: str, player_version: str = "3.8.27.2950"):
+    platform = _make_platform(instances=[])
+    props = {
+        "nemud.app_keep_alive": app_keep_alive,
+        "nemud.player_version": player_version,
+    }
+
+    def adb_getprop(name: str) -> str:
+        return props[name]
+
+    platform.adb_getprop = adb_getprop
+    return platform
+
+
 def test_serial_to_id_accepts_mumu12_neighbor_ports() -> None:
     assert serial_to_id("127.0.0.1:16384") == 0
     assert serial_to_id("127.0.0.1:16385") == 0
@@ -141,3 +155,22 @@ def test_check_mumu_bridge_network_rejects_enabled_bridge(tmp_path) -> None:
 
     with pytest.raises(RequestHumanTakeover):
         platform.check_mumu_bridge_network()
+
+
+def test_check_mumu_app_keep_alive_accepts_disabled_getprop() -> None:
+    platform = _make_keep_alive_platform(app_keep_alive="false")
+
+    assert platform.check_mumu_app_keep_alive()
+
+
+def test_check_mumu_app_keep_alive_rejects_enabled_getprop() -> None:
+    platform = _make_keep_alive_platform(app_keep_alive="true")
+
+    with pytest.raises(RequestHumanTakeover):
+        platform.check_mumu_app_keep_alive()
+
+
+def test_is_mumu_over_version_400_uses_empty_player_version() -> None:
+    platform = _make_keep_alive_platform(app_keep_alive="", player_version="")
+
+    assert platform.is_mumu_over_version_400
