@@ -13,7 +13,6 @@ from module.base.decorator import cached_property, del_cached_property, has_cach
 from module.config.deep import deep_get
 from module.device.method.pool import WORKER_POOL, JobTimeout
 from module.device.method.utils import RETRY_TRIES, retry_sleep
-from module.device.mumu import mumu12_serial_to_id
 from module.device.platform import Platform
 from module.exception import RequestHumanTakeover
 from module.logger import logger
@@ -399,21 +398,6 @@ class NemuIpcImpl:
 
         return np.ctypeslib.as_array(pixels_pointer.contents).reshape((self.height, self.width, 4))
 
-    @staticmethod
-    def serial_to_id(serial: str):
-        """
-        从 MuMu12 TCP serial 推算实例 ID。
-
-        例如：
-            "127.0.0.1:16384" -> 0
-            "127.0.0.1:16416" -> 1
-            16414 到 16418 端口 -> 1
-
-        Returns:
-            int: 实例 ID；无法推算时返回 None
-        """
-        return mumu12_serial_to_id(serial)
-
 
 class NemuIpc(Platform):
     @cached_property
@@ -421,30 +405,20 @@ class NemuIpc(Platform):
         """
         Initialize a nemu ipc implementation
         """
-        # Try existing settings first
-        if self.config.EmulatorInfo_path:
-            folder = str((Path(self.config.EmulatorInfo_path) / "../../").resolve())
-            index = NemuIpcImpl.serial_to_id(self.serial)
-            if index is not None:
-                try:
-                    return NemuIpcImpl(nemu_folder=folder, instance_id=index, display_id=0).__enter__()
-                except (NemuIpcIncompatible, NemuIpcError, JobTimeout) as e:
-                    logger.error(e)
-                    logger.error("Emulator info incorrect")
-
         # Search emulator instance
         # with E:\ProgramFiles\MuMuPlayer-12.0\shell\MuMuPlayer.exe
         # installation path is E:\ProgramFiles\MuMuPlayer-12.0
-        if self.emulator_instance is None:
+        instance = self.emulator_instance
+        if instance is None:
             logger.error("Unable to use NemuIpc because emulator instance not found")
             raise RequestHumanTakeover
-        if "MuMuPlayerGlobal" in self.emulator_instance.path:
-            logger.info(f"当前个人版不支持 MuMuPlayerGlobal：{self.emulator_instance.path}")
+        if "MuMuPlayerGlobal" in instance.path:
+            logger.info(f"当前个人版不支持 MuMuPlayerGlobal：{instance.path}")
             raise RequestHumanTakeover
         try:
             impl = NemuIpcImpl(
-                nemu_folder=self.emulator_instance.emulator.abspath("../"),
-                instance_id=self.emulator_instance.MuMuPlayer12_id,
+                nemu_folder=instance.emulator.abspath("../"),
+                instance_id=instance.MuMuPlayer12_id,
                 display_id=0,
             )
             impl.connect_with_retry()
@@ -488,24 +462,12 @@ class NemuIpc(Platform):
         if not self.is_mumu_over_version_400:
             return super().check_mumu_app_keep_alive()
 
-        # Try existing settings first
-        if self.config.EmulatorInfo_path:
-            index = NemuIpcImpl.serial_to_id(self.serial)
-            if index is not None:
-                file = str(
-                    (
-                        Path(self.config.EmulatorInfo_path)
-                        / f"../../vms/MuMuPlayer-12.0-{index}/configs/customer_config.json"
-                    ).resolve()
-                )
-                if self.check_mumu_app_keep_alive_400(file):
-                    return True
-
         # Search emulator instance
-        if self.emulator_instance is None:
+        instance = self.emulator_instance
+        if instance is None:
             logger.warning("Failed to check check_mumu_app_keep_alive as emulator_instance is None")
             return False
-        file = self.emulator_instance.mumu_vms_config("customer_config.json")
+        file = instance.mumu_vms_config("customer_config.json")
         return bool(self.check_mumu_app_keep_alive_400(file))
 
     def nemu_ipc_release(self):

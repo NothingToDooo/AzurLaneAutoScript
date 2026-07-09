@@ -1,6 +1,5 @@
 from types import SimpleNamespace
 
-from module.device.platform.emulator_base import EmulatorBase
 from module.device.platform.platform_base import PlatformBase, serial_to_id
 
 
@@ -49,21 +48,6 @@ def test_serial_to_id_accepts_mumu12_neighbor_ports() -> None:
     assert serial_to_id("127.0.0.1:7555") is None
 
 
-def test_emulator_info_normalizes_internal_state_to_mumu12() -> None:
-    platform = object.__new__(PlatformBase)
-    platform.config = SimpleNamespace(
-        EmulatorInfo_Emulator="auto",
-        EmulatorInfo_name="None",
-        EmulatorInfo_path=None,
-    )
-
-    info = platform.emulator_info
-
-    assert info.emulator == EmulatorBase.MuMuPlayer12
-    assert info.name == ""
-    assert info.path == ""
-
-
 def test_find_emulator_instance_returns_unique_serial_match() -> None:
     expected = _instance(serial="127.0.0.1:16384")
     platform = _make_platform(
@@ -101,41 +85,15 @@ def test_find_emulator_instance_uses_mumu12_id_to_disambiguate_duplicate_serial(
     assert platform.find_emulator_instance("127.0.0.1:16416") is expected
 
 
-def test_find_emulator_instance_uses_type_before_weaker_hints() -> None:
-    expected = _instance(serial="127.0.0.1:16384", emulator_type="MuMuPlayer12", path="C:/B/MuMuPlayer.exe")
+def test_emulator_instance_uses_runtime_discovery_without_config_cache() -> None:
+    expected = _instance(serial="127.0.0.1:16384")
     platform = _make_platform(
         instances=[
-            _instance(
-                serial="127.0.0.1:16384",
-                emulator_type="MuMuPlayer",
-                name="Default",
-                path="C:/A/NemuPlayer.exe",
-            ),
             expected,
-        ]
+        ],
     )
 
-    assert (
-        platform.find_emulator_instance(
-            "127.0.0.1:16384",
-            name="Default",
-            path="C:/A/NemuPlayer.exe",
-            emulator="MuMuPlayer12",
-        )
-        is expected
-    )
-
-
-def test_find_emulator_instance_falls_back_from_invalid_type_to_name() -> None:
-    expected = _instance(serial="127.0.0.1:16384", name="ArkNights")
-    platform = _make_platform(
-        instances=[
-            _instance(serial="127.0.0.1:16384", name="Default"),
-            expected,
-        ]
-    )
-
-    assert platform.find_emulator_instance("127.0.0.1:16384", name="ArkNights", emulator="Missing") is expected
+    assert platform.emulator_instance is expected
 
 
 def test_find_emulator_instance_falls_back_to_single_running_path() -> None:

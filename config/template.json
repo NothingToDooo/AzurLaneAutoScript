@@ -3,11 +3,6 @@
     "Emulator": {
       "Serial": "127.0.0.1:16384"
     },
-    "EmulatorInfo": {
-      "Emulator": "MuMuPlayer12",
-      "name": null,
-      "path": null
-    },
     "Error": {
       "HandleError": true,
       "SaveError": true,

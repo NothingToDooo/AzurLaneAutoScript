@@ -321,24 +321,6 @@
       "help": ""
     }
   },
-  "EmulatorInfo": {
-    "_info": {
-      "name": "模拟器设置",
-      "help": ""
-    },
-    "Emulator": {
-      "name": "模拟器类型",
-      "help": ""
-    },
-    "name": {
-      "name": "模拟器实例名称",
-      "help": ""
-    },
-    "path": {
-      "name": "模拟器安装路径",
-      "help": ""
-    }
-  },
   "Error": {
     "_info": {
       "name": "调试设置",

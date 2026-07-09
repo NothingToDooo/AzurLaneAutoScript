@@ -24,19 +24,6 @@ Emulator:
   Serial:
     value: 127.0.0.1:16384
     valuetype: str
-EmulatorInfo:
-  Emulator:
-    value: MuMuPlayer12
-    type: stored
-    display: hide
-  name:
-    value: null
-    type: stored
-    display: hide
-  path:
-    value: null
-    type: stored
-    display: hide
 Error:
   HandleError: true
   SaveError: true

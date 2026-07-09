@@ -7,23 +7,6 @@
         "valuetype": "str"
       }
     },
-    "EmulatorInfo": {
-      "Emulator": {
-        "type": "stored",
-        "value": "MuMuPlayer12",
-        "display": "hide"
-      },
-      "name": {
-        "type": "stored",
-        "value": null,
-        "display": "hide"
-      },
-      "path": {
-        "type": "stored",
-        "value": null,
-        "display": "hide"
-      }
-    },
     "Error": {
       "HandleError": {
         "type": "checkbox",

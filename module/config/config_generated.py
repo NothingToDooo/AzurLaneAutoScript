@@ -22,11 +22,6 @@ class GeneratedConfig:
     # 配置组 `Emulator`
     Emulator_Serial = "127.0.0.1:16384"
 
-    # 配置组 `EmulatorInfo`
-    EmulatorInfo_Emulator = "MuMuPlayer12"
-    EmulatorInfo_name = None
-    EmulatorInfo_path = None
-
     # 配置组 `Error`
     Error_HandleError = True
     Error_SaveError = True

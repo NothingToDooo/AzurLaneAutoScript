@@ -162,12 +162,12 @@ class EmulatorManager(EmulatorManagerBase):
     def iter_configured_emulator(self):
         """
         Yields:
-            str: 当前配置里明确填写的 MuMu 可执行文件路径。
+            str: 调试或测试时显式注入的 MuMu 可执行文件路径。
         """
-        emulator_info = getattr(self, "emulator_info", None)
-        if emulator_info is None or not emulator_info.path:
+        path = getattr(self, "configured_emulator_path", "")
+        if not path:
             return
-        for file in Emulator.multi_to_single(emulator_info.path.replace("\\", "/")):
+        for file in Emulator.multi_to_single(path.replace("\\", "/")):
             if Emulator.is_emulator(file) and Path(file).exists():
                 yield file
 

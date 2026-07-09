@@ -6,14 +6,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-class _EmulatorInfo:
-    def __init__(self, path: Path) -> None:
-        self.path = path.as_posix()
-
-
 class _ConfiguredEmulatorManager(EmulatorManager):
     def __init__(self, path: Path) -> None:
-        self.emulator_info = _EmulatorInfo(path)
+        self.configured_emulator_path = path.as_posix()
 
     @staticmethod
     def iter_running_emulator():
