@@ -9,7 +9,7 @@ import numpy as np
 
 from module.base.button import Button
 from module.base.decorator import cached_property
-from module.base.utils import crop, extract_letters, float2str, rgb2luma
+from module.base.utils import _cv_scalar, crop, extract_letters, float2str, rgb2luma
 from module.logger import logger
 from module.ocr.models import OCR_MODEL
 
@@ -138,7 +138,7 @@ class OcrYuv(Ocr):
         y = rgb2luma(image)
         letter_y = (np.ones(y.shape) * self.letter_y).astype(np.uint8)
         diff = cv2.absdiff(y, letter_y)
-        return cv2.multiply(diff, 255.0 / self.threshold)
+        return cv2.multiply(diff, _cv_scalar((255.0 / self.threshold,) * 4))
 
 
 class Digit(Ocr):

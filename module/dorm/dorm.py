@@ -8,7 +8,7 @@ from module.base.decorator import cached_property
 from module.base.filter import Filter
 from module.base.mask import Mask
 from module.base.timer import Timer
-from module.base.utils import color_similarity_2d, random_rectangle_point, rgb2gray
+from module.base.utils import _cv_scalar, color_similarity_2d, random_rectangle_point, rgb2gray
 from module.dorm import assets as dorm_assets
 from module.dorm.buy_furniture import BuyFurniture
 from module.handler.assets import POPUP_CONFIRM
@@ -32,8 +32,8 @@ class OcrDormFood(DigitCounter):
     def pre_process(self, image):
         orange = color_similarity_2d(image, color=(239, 158, 49))
         gray = color_similarity_2d(image, color=(99, 97, 99))
-        image = cv2.subtract(255, cv2.max(orange, gray))
-        return cv2.multiply(image, 2)
+        image = cv2.subtract(_cv_scalar((255, 255, 255, 255)), cv2.max(orange, gray))
+        return cv2.multiply(image, _cv_scalar((2, 2, 2, 2)))
 
     def after_process(self, result):
         result = super().after_process(result)

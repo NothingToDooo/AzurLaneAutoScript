@@ -3,6 +3,7 @@ import numpy as np
 
 from module.base.base import ModuleBase
 from module.base.button import ButtonGrid
+from module.base.utils import _cv_scalar
 from module.logger import logger
 from module.ocr.ocr import Digit
 
@@ -116,8 +117,11 @@ class LevelOcr(Digit):
         # BT.601
         luma_trans = (0.299, 0.587, 0.114)
         luma_bg = np.dot(bg, luma_trans)
-        image = cv2.subtract(image, (*bg, 0)).dot(luma_trans).round().astype(np.uint8)
-        image = cv2.subtract(255, cv2.multiply(image, 255 / (255 - luma_bg)))
+        image = cv2.subtract(image, _cv_scalar((*bg, 0))).dot(luma_trans).round().astype(np.uint8)
+        image = cv2.subtract(
+            _cv_scalar((255, 255, 255, 255)),
+            cv2.multiply(image, _cv_scalar((255 / (255 - luma_bg),) * 4)),
+        )
         # Find 'L' to strip 'LV.'.
         # Return an empty image if 'L' is not found.
         letter_l = np.nonzero(image[9:15, :].max(axis=0) < 127)[0]

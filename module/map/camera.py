@@ -346,7 +346,8 @@ class Camera(MapOperation):
         return False, swiped
 
     def _update_view_data(self):
-        if self._prev_view is not None and np.linalg.norm(self._prev_swipe) > 0:
+        prev_swipe = np.asarray(self._prev_swipe)
+        if self._prev_view is not None and np.linalg.norm(prev_swipe) > 0:
             if self.config.MAP_SWIPE_PREDICT:
                 swipe = self._prev_view.predict_swipe(
                     self.view,
@@ -354,8 +355,9 @@ class Camera(MapOperation):
                     with_sea_grids=self.config.MAP_SWIPE_PREDICT_WITH_SEA_GRIDS,
                 )
                 if swipe is not None:
+                    prev_swipe = np.asarray(swipe)
                     self._prev_swipe = swipe
-            self.camera = tuple(np.add(self.camera, self._prev_swipe))
+            self.camera = tuple(np.add(self.camera, prev_swipe))
             self._prev_view = None
             self._prev_swipe = None
             self.show_camera()

@@ -10,6 +10,8 @@ class RuntimeRandom:
         self._generator = np.random.default_rng(seed)
 
     def uniform(self, low=0.0, high=None, size=None):
+        if high is None:
+            return self._generator.uniform(low=low, size=size)
         return self._generator.uniform(low=low, high=high, size=size)
 
     def chance(self, probability: float = 0.5) -> bool:

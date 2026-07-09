@@ -25,6 +25,10 @@ class ColorBarOptions:
     threshold: int = 30
 
 
+def _cv_scalar(value) -> np.ndarray:
+    return np.asarray(value)
+
+
 def random_normal_distribution_int(a, b, n=3):
     """
     Generate a normal distribution int within the interval.
@@ -578,7 +582,7 @@ def copy_image(src):
         copy_image(image) 0.639ms
     """
     dst = np.empty_like(src)
-    cv2.copyTo(src, None, dst)
+    np.copyto(dst, src)
     return dst
 
 
@@ -729,7 +733,7 @@ def rgb2hsv(image):
         np.ndarray: Hue (0~360), Saturation (0~100), Value (0~100).
     """
     image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV).astype(float)
-    cv2.multiply(image, (360 / 180, 100 / 255, 100 / 255, 0), dst=image)
+    cv2.multiply(image, _cv_scalar((360 / 180, 100 / 255, 100 / 255, 0)), dst=image)
     return image
 
 
@@ -995,18 +999,18 @@ def color_similarity_2d(image, color):
     Returns:
         np.ndarray: uint8
     """
-    diff = cv2.subtract(image, (*color, 0))
+    diff = cv2.subtract(image, _cv_scalar((*color, 0)))
     r, g, b = cv2.split(diff)
     cv2.max(r, g, dst=r)
     cv2.max(r, b, dst=r)
     positive = r
-    cv2.subtract((*color, 0), image, dst=diff)
+    cv2.subtract(_cv_scalar((*color, 0)), image, dst=diff)
     r, g, b = cv2.split(diff)
     cv2.max(r, g, dst=r)
     cv2.max(r, b, dst=r)
     negative = r
     cv2.add(positive, negative, dst=positive)
-    cv2.subtract(255, positive, dst=positive)
+    cv2.subtract(_cv_scalar((255, 255, 255, 255)), positive, dst=positive)
     return positive
 
 
@@ -1021,12 +1025,12 @@ def extract_letters(image, letter=(255, 255, 255), threshold=128):
     Returns:
         np.ndarray: Shape (height, width)
     """
-    diff = cv2.subtract(image, (*letter, 0))
+    diff = cv2.subtract(image, _cv_scalar((*letter, 0)))
     r, g, b = cv2.split(diff)
     cv2.max(r, g, dst=r)
     cv2.max(r, b, dst=r)
     positive = r
-    cv2.subtract((*letter, 0), image, dst=diff)
+    cv2.subtract(_cv_scalar((*letter, 0)), image, dst=diff)
     r, g, b = cv2.split(diff)
     cv2.max(r, g, dst=r)
     cv2.max(r, b, dst=r)
@@ -1048,7 +1052,7 @@ def extract_white_letters(image, threshold=128):
     Returns:
         np.ndarray: Shape (height, width)
     """
-    r, g, b = cv2.split(cv2.subtract((255, 255, 255, 0), image))
+    r, g, b = cv2.split(cv2.subtract(_cv_scalar((255, 255, 255, 0)), image))
     maximum = cv2.max(r, g)
     cv2.min(r, g, dst=r)
     cv2.max(maximum, b, dst=maximum)
@@ -1080,7 +1084,7 @@ def color_mapping(image, max_multiply=2):
     low, high = np.min(image), np.max(image)
     multiply = min(255 / (high - low), max_multiply)
     add = (255 - multiply * (low + high)) / 2
-    cv2.multiply(image, multiply, dst=image)
+    cv2.multiply(image, _cv_scalar((multiply, multiply, multiply, multiply)), dst=image)
     cv2.add(image, add, dst=image)
     image[image > 255] = 255
     image[image < 0] = 0

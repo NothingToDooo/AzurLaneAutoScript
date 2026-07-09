@@ -1,7 +1,12 @@
+from typing import TYPE_CHECKING, cast
+
 import cv2
 
 from module.base.template import Template
 from module.base.utils import image_channel, load_image, rgb2gray
+
+if TYPE_CHECKING:
+    import numpy as np
 
 
 class Mask(Template):
@@ -31,10 +36,10 @@ class Mask(Template):
         if channel == 0:
             if mask_channel == 0:
                 return False
-            self._image, _, _ = cv2.split(self._image)
+            self._image, _, _ = cv2.split(cast("np.ndarray", self._image))
             return True
         if mask_channel == 0:
-            self._image = cv2.merge([self._image] * 3)
+            self._image = cv2.merge([cast("np.ndarray", self._image)] * 3)
             return True
         return False
 

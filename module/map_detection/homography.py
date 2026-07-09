@@ -277,7 +277,7 @@ class Homography:
             bool: If success.
         """
         similarity = 0
-        location = np.array([])
+        location = np.empty((0, 2))
         for index in range(4):
             template = ASSETS.tile_corner_image_list[index]
             result = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
@@ -312,7 +312,7 @@ class Homography:
         Returns:
             bool: If success.
         """
-        location = np.array([])
+        location = np.empty((0, 2))
         for kernel_size in close_kernel:
             # Re-creating closed image
             kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
@@ -327,9 +327,9 @@ class Homography:
                 shape = rectangle[:, 2:]
                 diff = np.abs(shape - np.round(shape / self.config.HOMO_TILE) * self.config.HOMO_TILE)
                 rectangle = rectangle[np.all(diff < encourage, axis=1)]
-                location = np.append(location, rectangle[:, :2], axis=0) if len(location) else rectangle[:, :2]
+                location = np.append(location, rectangle[:, :2], axis=0)
             except IndexError:
-                location = []
+                location = np.empty((0, 2))
 
         if len(location) > threshold:
             self.homo_loca = fit_points(location, mod=self.config.HOMO_TILE, encourage=encourage)

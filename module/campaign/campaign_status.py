@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 
 from module.base.timer import Timer
-from module.base.utils import color_similar, get_color
+from module.base.utils import _cv_scalar, color_similar, get_color
 from module.campaign.assets import OCR_COIN, OCR_EVENT_PT, OCR_OIL, OCR_OIL_CHECK
 from module.logger import logger
 from module.ocr.ocr import Digit, Ocr
@@ -26,10 +26,10 @@ class PtOcr(Ocr):
             np.ndarray: Shape (width, height)
         """
         # Use MAX(r, g, b)
-        r, g, b = cv2.split(cv2.subtract((255, 255, 255, 0), image))
+        r, g, b = cv2.split(cv2.subtract(_cv_scalar((255, 255, 255, 0)), image))
         image = cv2.min(cv2.min(r, g), b)
         # Remove background, 0-192 => 0-255
-        image = cv2.multiply(image, 255 / 192)
+        image = cv2.multiply(image, _cv_scalar((255 / 192, 255 / 192, 255 / 192, 255 / 192)))
 
         return image.astype(np.uint8)
 

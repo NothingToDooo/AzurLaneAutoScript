@@ -215,7 +215,7 @@ def put_none() -> Output:
     return put_html("<div></div>")
 
 
-T_Output_Kwargs = dict[str, str | dict[str, Any]]
+T_Output_Kwargs = dict[str, Any]
 
 
 def get_title_help(kwargs: T_Output_Kwargs) -> Output:

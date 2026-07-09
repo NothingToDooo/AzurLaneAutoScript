@@ -1,4 +1,5 @@
 import time
+from typing import cast
 
 import cv2
 import numpy as np
@@ -122,7 +123,7 @@ class GlobeDetection:
         local = local.astype(np.uint8)
         local = cv2.resize(local, None, fx=self.config.OS_GLOBE_IMAGE_RESIZE, fy=self.config.OS_GLOBE_IMAGE_RESIZE)
 
-        result = cv2.matchTemplate(self.globe, local, cv2.TM_CCOEFF_NORMED)
+        result = cv2.matchTemplate(cast("np.ndarray", self.globe), local, cv2.TM_CCOEFF_NORMED)
         _, similarity, _, loca = cv2.minMaxLoc(result)
         loca = np.array(loca) / self.config.OS_GLOBE_IMAGE_RESIZE
         loca = tuple(self.homo_center + loca - self.config.OS_GLOBE_IMAGE_PAD)

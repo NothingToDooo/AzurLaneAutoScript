@@ -202,7 +202,7 @@ class Button(Resource):
                     _, image_binary = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
                     self.image_binary.append(image_binary)
             else:
-                image_gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+                image_gray = cv2.cvtColor(cast("np.ndarray", self.image), cv2.COLOR_BGR2GRAY)
                 _, self.image_binary = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
             self._match_binary_init = True
 
@@ -250,7 +250,7 @@ class Button(Resource):
                 if sim > similarity:
                     return True
             return False
-        res = cv2.matchTemplate(self.image, image, cv2.TM_CCOEFF_NORMED)
+        res = cv2.matchTemplate(cast("np.ndarray", self.image), image, cv2.TM_CCOEFF_NORMED)
         _, sim, _, point = cv2.minMaxLoc(res)
         self._button_offset = area_offset(self._button, offset[:2] + np.array(point))
         return sim > similarity
@@ -291,7 +291,7 @@ class Button(Resource):
         # binarization
         _, image_binary = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
         # template matching
-        res = cv2.matchTemplate(self.image_binary, image_binary, cv2.TM_CCOEFF_NORMED)
+        res = cv2.matchTemplate(cast("np.ndarray", self.image_binary), image_binary, cv2.TM_CCOEFF_NORMED)
         _, sim, _, point = cv2.minMaxLoc(res)
         self._button_offset = area_offset(self._button, offset[:2] + np.array(point))
         return sim > similarity
@@ -325,7 +325,7 @@ class Button(Resource):
             return False
 
         image_luma = rgb2luma(image)
-        res = cv2.matchTemplate(self.image_luma, image_luma, cv2.TM_CCOEFF_NORMED)
+        res = cv2.matchTemplate(cast("np.ndarray", self.image_luma), image_luma, cv2.TM_CCOEFF_NORMED)
         _, sim, _, point = cv2.minMaxLoc(res)
         self._button_offset = area_offset(self._button, offset[:2] + np.array(point))
         return sim > similarity
