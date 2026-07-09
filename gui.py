@@ -4,7 +4,9 @@ import uvicorn
 
 from module.logger import logger
 from module.webui.bootstrap import prepare_pywebio_imports
-from module.webui.setting import State
+
+DEFAULT_WEBUI_HOST = "127.0.0.1"
+DEFAULT_WEBUI_PORT = 22267
 
 
 def main() -> None:
@@ -12,13 +14,13 @@ def main() -> None:
     parser.add_argument(
         "--host",
         type=str,
-        help="监听地址，默认使用 WebUI 配置里的 WebuiHost。",
+        help=f"监听地址，默认 {DEFAULT_WEBUI_HOST}。",
     )
     parser.add_argument(
         "-p",
         "--port",
         type=int,
-        help="监听端口，默认使用 WebUI 配置里的 WebuiPort。",
+        help=f"监听端口，默认 {DEFAULT_WEBUI_PORT}。",
     )
     parser.add_argument("-k", "--key", type=str, help="WebUI 密码，默认不启用。")
     parser.add_argument(
@@ -29,8 +31,8 @@ def main() -> None:
     )
     args, _ = parser.parse_known_args()
 
-    host = args.host or State.webui_config.WebuiHost or "127.0.0.1"
-    port = args.port or int(State.webui_config.WebuiPort) or 22267
+    host = args.host or DEFAULT_WEBUI_HOST
+    port = args.port or DEFAULT_WEBUI_PORT
 
     logger.hr("启动配置")
     logger.attr("Host", host)

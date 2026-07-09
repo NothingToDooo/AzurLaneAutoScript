@@ -23,7 +23,7 @@ class EmulatorChecker(Device):
 
 
 class Config:
-    SERIAL = "127.0.0.1:5555"
+    Emulator_Serial = "127.0.0.1:16384"
 
 
 def main() -> None:

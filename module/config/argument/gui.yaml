@@ -2,24 +2,17 @@
 # 这些内容会写入 `config/i18n/{lang}.json` 的 `Gui` 节点。
 
 Aside:
-  Install:
   Home:
-  Develop:
-  Performance:
-  Setting:
-  AddAlas:
 
 Button:
   Start:
   Stop:
   ScrollON:
   ScrollOFF:
-  ClearLog:
   Setting:
 
 Toast:
   ConfigSaved:
-  AlasIsRunning:
 
 Status:
   Running:
@@ -28,7 +21,6 @@ Status:
 
 MenuAlas:
   Overview:
-  Log:
 
 MenuDevelop:
   HomePage:
@@ -64,12 +56,10 @@ AppManage:
   New:
   Import:
   Export:
-  Delete:
   OverrideWarning:
   ImportSuccess:
   NewSuccess:
   Name:
-  Mod:
   Actions:
 
 Text:

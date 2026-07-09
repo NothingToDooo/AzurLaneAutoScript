@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import ClassVar
 
 import yaml
 
@@ -8,22 +8,12 @@ from module.base.atomic import atomic_write
 
 class WebUIConfig:
     file: Path
-    config: dict[str, Any]
+    config: dict[str, str]
     AdbExecutable: str
-    WebuiHost: str
-    WebuiPort: int
-    Theme: str
-    Password: str | None
-    Run: str | None
 
     CONFIG_FILE = Path("./config/webui.yaml")
-    DEFAULTS: ClassVar[dict[str, Any]] = {
+    DEFAULTS: ClassVar[dict[str, str]] = {
         "AdbExecutable": "./.venv/Lib/site-packages/adbutils/binaries/adb.exe",
-        "WebuiHost": "127.0.0.1",
-        "WebuiPort": 22267,
-        "Theme": "default",
-        "Password": None,
-        "Run": None,
     }
 
     def __init__(self, file: str | Path = CONFIG_FILE):
@@ -31,7 +21,7 @@ class WebUIConfig:
         object.__setattr__(self, "config", self._read())
         for key, value in self.config.items():
             object.__setattr__(self, key, value)
-        if not self.file.exists():
+        if self._read_yaml(self.file) != self.config:
             self.write()
 
     def __setattr__(self, key: str, value: object) -> None:
@@ -41,7 +31,7 @@ class WebUIConfig:
             config[key] = value
             self.write()
 
-    def _read_yaml(self, file: Path) -> dict[str, Any]:
+    def _read_yaml(self, file: Path) -> dict[str, object]:
         try:
             with file.open(encoding="utf-8") as handle:
                 data = yaml.safe_load(handle) or {}
@@ -51,12 +41,13 @@ class WebUIConfig:
             return {}
         return data
 
-    def _read(self) -> dict[str, Any]:
+    def _read(self) -> dict[str, str]:
         config = self.DEFAULTS.copy()
         data = self._read_yaml(self.file)
         for key in config:
-            if key in data:
-                config[key] = data[key]
+            value = data.get(key)
+            if isinstance(value, str) and value:
+                config[key] = value
         return config
 
     def write(self) -> None:

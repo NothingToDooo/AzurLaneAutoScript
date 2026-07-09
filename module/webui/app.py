@@ -204,7 +204,6 @@ class AlasGUI(Frame):
     @classmethod
     def set_theme(cls, theme="default") -> None:
         cls.theme = theme
-        State.webui_config.Theme = theme
         State.theme = theme
         webconfig(theme=theme)
 
@@ -1014,19 +1013,13 @@ def app():
     )
     args, _ = parser.parse_known_args()
 
-    # 应用配置。
-    AlasGUI.set_theme(theme=State.webui_config.Theme)
-    key = args.key or State.webui_config.Password
-    runs: list[str] = []
-    if args.run:
-        runs = args.run
-    elif State.webui_config.Run:
-        tmp = State.webui_config.Run.split(",")
-        runs = [entry.strip(" ['\"]") for entry in tmp if entry]
-    instances = runs
+    # 应用启动参数。
+    AlasGUI.set_theme()
+    key = args.key
+    instances = args.run or []
 
     logger.hr("Webui configs")
-    logger.attr("Theme", State.webui_config.Theme)
+    logger.attr("Theme", AlasGUI.theme)
     logger.attr("Password", bool(key))
 
     atomic_failure_cleanup("./config")
