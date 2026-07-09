@@ -504,7 +504,7 @@ class Connection(ConnectionAttr):
                 pool.start_thread_soon(connect, serial)
 
     def release_resource(self):
-        del_cached_property(self, "_minitouch_builder")
+        pass
 
     def adb_disconnect(self):
         msg = self.adb_client.disconnect(self.serial)

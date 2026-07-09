@@ -2,7 +2,7 @@ import pytest
 from adbutils.errors import AdbError
 
 from module.device.method import minitouch as minitouch_module
-from module.device.method.minitouch import MinitouchNotInstalledError, MinitouchOccupiedError
+from module.device.method.minitouch import Minitouch, MinitouchNotInstalledError, MinitouchOccupiedError
 from module.exception import RequestHumanTakeover
 
 
@@ -150,3 +150,12 @@ def test_minitouch_retry_hands_over_when_minitouch_missing(monkeypatch) -> None:
 
     assert device.calls == ["run"]
     assert logger.criticals == ["missing"]
+
+
+def test_minitouch_release_resource_clears_cached_builder() -> None:
+    device = object.__new__(Minitouch)
+    device.__dict__["_minitouch_builder"] = object()
+
+    device.release_resource()
+
+    assert "_minitouch_builder" not in device.__dict__

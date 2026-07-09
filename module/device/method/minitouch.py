@@ -354,6 +354,7 @@ class Minitouch(Connection):
 
     def release_resource(self):
         super().release_resource()
+        del_cached_property(self, "_minitouch_builder")
         self._close_minitouch_client()
         self._close_minitouch_stream()
 
