@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
 
@@ -7,6 +7,9 @@ from module.base.utils import area_offset, color_similarity_2d, crop, point_limi
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
 from module.map_detection.utils import fit_points
+
+if TYPE_CHECKING:
+    import builtins
 
 MASK_RADAR = Mask("./assets/mask/MASK_OS_RADAR.png")
 
@@ -27,7 +30,7 @@ class RadarGrid:
 
     is_fleet = False
 
-    dic_encode: ClassVar[dict[str, str]] = {
+    dic_encode: ClassVar[dict[builtins.str, builtins.str]] = {
         "EN": "is_enemy",
         "RE": "is_resource",
         "AR": "is_archive",

@@ -349,7 +349,7 @@ class ShipScanner(Scanner):
     def scan(self, image, cached=False, output=True) -> list | None:
         ships = super().scan(image, cached, output)
         if not cached:
-            return [ship for ship in ships if ship.satisfy_limitation(self.limitaion)]
+            return [ship for ship in ships or [] if ship.satisfy_limitation(self.limitaion)]
         return None
 
     def move(self, vector) -> None:

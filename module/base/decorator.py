@@ -3,7 +3,7 @@ import re
 from collections.abc import Callable
 from contextlib import suppress
 from functools import cached_property, wraps
-from typing import ClassVar
+from typing import ClassVar, TypedDict
 
 from module.logger import logger
 
@@ -16,6 +16,11 @@ __all__ = (
     "run_once",
     "set_cached_property",
 )
+
+
+class ConfigRecord(TypedDict):
+    options: dict[str, object]
+    func: Callable[..., object]
 
 
 class Config:
@@ -31,7 +36,7 @@ class Config:
     }
     """
 
-    func_list: ClassVar[dict[str, list[dict[str, object]]]] = {}
+    func_list: ClassVar[dict[str, list[ConfigRecord]]] = {}
 
     @classmethod
     def when[DecoratedFunc: Callable[..., object]](cls, **kwargs) -> Callable[[DecoratedFunc], DecoratedFunc]:

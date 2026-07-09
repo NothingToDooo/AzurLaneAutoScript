@@ -257,8 +257,9 @@ class Camera(MapOperation):
             return False
 
         logger.warning("Perspective error caused by AUTO_SEARCH_REWARD")
-        if hasattr(self, "os_auto_search_quit"):
-            self.os_auto_search_quit()
+        os_auto_search_quit = getattr(self, "os_auto_search_quit", None)
+        if callable(os_auto_search_quit):
+            os_auto_search_quit()
             return True
 
         logger.warning("Cannot find method os_auto_search_quit(), use ui_click() instead")
@@ -276,8 +277,9 @@ class Camera(MapOperation):
             return False
 
         logger.warning("Perspective error caused by OPSI_MISSION_CHECK")
-        if hasattr(self, "os_mission_quit"):
-            self.os_mission_quit()
+        os_mission_quit = getattr(self, "os_mission_quit", None)
+        if callable(os_mission_quit):
+            os_mission_quit()
             return True
 
         logger.warning("Cannot find method os_mission_quit(), use ui_click() instead")

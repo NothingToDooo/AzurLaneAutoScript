@@ -237,16 +237,20 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
             Button:
         """
         entrance_name = name
+        stage_entrance = self.stage_entrance
+        if not isinstance(stage_entrance, dict):
+            logger.warning("Stage entrance not initialized")
+            raise CampaignNameError
         if self.config.MAP_HAS_MODE_SWITCH:
             for mode_name in self.campaign_get_mode_names(name):
-                if mode_name in self.stage_entrance:
+                if mode_name in stage_entrance:
                     name = mode_name
 
-        if name not in self.stage_entrance:
+        if name not in stage_entrance:
             logger.warning(f"Stage not found: {name}")
             raise CampaignNameError
 
-        entrance = self.stage_entrance[name]
+        entrance = stage_entrance[name]
         entrance.name = entrance_name
         return entrance
 

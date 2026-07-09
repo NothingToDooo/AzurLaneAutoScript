@@ -164,7 +164,8 @@ class Screenshot(NemuIpc):
                     logger.info("Unable to handle orientated screenshot, continue for now")
                     return True
                 continue
-            if hasattr(self, "app_is_running") and not self.app_is_running():
+            app_is_running = getattr(self, "app_is_running", None)
+            if callable(app_is_running) and not app_is_running():
                 logger.warning("Received orientated screenshot, game not running")
                 return True
             logger.critical(f"Resolution not supported: {width}x{height}")

@@ -506,10 +506,11 @@ class Connection(ConnectionAttr):
         """
         if not self.is_mumu12_family:
             return True
-        if not hasattr(self, "find_emulator_instance"):
+        find_emulator_instance = getattr(self, "find_emulator_instance", None)
+        if not callable(find_emulator_instance):
             return False
         # 该方法在继承了 PlatformBase 的实例上可用。
-        instance = self.find_emulator_instance(
+        instance = find_emulator_instance(
             serial=self.serial,
         )
         if instance is None:

@@ -39,7 +39,7 @@ def _make_connection(
     connection.adb_client = _AdbClient(connect_messages)
     connection.devices = devices or []
     connection.detect_calls = 0
-    connection.brute_force_calls: list[list[str]] = []
+    connection.brute_force_calls = []
     connection.bridge_check_calls = 0
 
     def list_device():

@@ -399,4 +399,7 @@ class GridInfo:
         """
         l1 = self.location
         l2 = other.location
+        if l1 is None or l2 is None:
+            msg = "Grid location is required to calculate distance"
+            raise ValueError(msg)
         return abs(l1[0] - l2[0]) + abs(l1[1] - l2[1])

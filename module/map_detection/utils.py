@@ -8,7 +8,7 @@ class Points:
     def __init__(self, points):
         if points is None or len(points) == 0:
             self._bool = False
-            self.points = None
+            self.points = np.empty((0, 2))
         else:
             self._bool = True
             self.points = np.array(points)
@@ -75,7 +75,9 @@ class Lines:
     def __init__(self, lines, is_horizontal):
         if lines is None or len(lines) == 0:
             self._bool = False
-            self.lines = None
+            self.lines = np.empty((0, 2))
+            self.rho = np.array([])
+            self.theta = np.array([])
         else:
             self._bool = True
             self.lines = np.array(lines)

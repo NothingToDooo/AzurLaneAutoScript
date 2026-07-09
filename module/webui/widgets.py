@@ -254,7 +254,8 @@ def put_arg_input(kwargs: T_Output_Kwargs) -> Output:
 
 def product_stored_row(kwargs: T_Output_Kwargs, key, value):
     kwargs = copy.copy(kwargs)
-    kwargs["name"] += f"_{key}"
+    name = str(kwargs["name"])
+    kwargs["name"] = f"{name}_{key}"
     kwargs["value"] = value
     return put_input(**kwargs).style("--input--")
 
@@ -263,7 +264,7 @@ def put_arg_stored(kwargs: T_Output_Kwargs) -> Output:
     name: str = kwargs["name"]
     kwargs["disabled"] = True
 
-    values = kwargs.pop("value", {})
+    values = dict(kwargs.pop("value", {}))
     time_ = values.pop("time", "")
 
     rows = [product_stored_row(kwargs, key, value) for key, value in values.items() if value]

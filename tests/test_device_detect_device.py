@@ -30,9 +30,9 @@ def _make_connection(
     connection.serial = serial
     connection.config = SimpleNamespace(Emulator_Serial=emulator_serial or serial)
     connection.device_batches = list(device_batches)
-    connection.last_devices: list[object] = []
+    connection.last_devices = []
     connection.list_calls = 0
-    connection.brute_force_calls: list[list[str]] = []
+    connection.brute_force_calls = []
 
     def list_device():
         connection.list_calls += 1

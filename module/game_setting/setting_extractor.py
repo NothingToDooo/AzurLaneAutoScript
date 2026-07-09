@@ -3,10 +3,14 @@ import re
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from tqdm import tqdm
 
 from module.base.decorator import cached_property
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 REGEX_SETTING = re.compile(r"PlayerPrefs.Get(\w{1,10})\((.*)\)")
 REGEX_SETTING_KEY = re.compile(r'"(.*?)"')
@@ -38,7 +42,7 @@ def strip_code(string):
 
 @dataclass
 class Field:
-    formatter: callable
+    formatter: Callable[..., object]
     default: str
     regex: str
 

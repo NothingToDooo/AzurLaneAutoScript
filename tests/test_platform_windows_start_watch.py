@@ -63,7 +63,7 @@ def _make_platform(
     platform.emulator_instance = SimpleNamespace(serial=serial)
     platform.adb_client = _AdbClient(connect_messages)
     platform.device_batches = list(device_batches)
-    platform.last_devices: list[object] = []
+    platform.last_devices = []
     platform.shell_results = shell_results or ["pong"]
     platform.package_results = package_results or [["com.bilibili.azurlane"]]
     platform.shell_calls = 0

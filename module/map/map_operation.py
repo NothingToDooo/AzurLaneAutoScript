@@ -183,7 +183,8 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         return True
 
     def _is_combat_loading_appeared(self):
-        if hasattr(self, "is_combat_loading") and self.is_combat_loading():
+        is_combat_loading = getattr(self, "is_combat_loading", None)
+        if callable(is_combat_loading) and is_combat_loading():
             logger.warning("Entered map with is_combat_loading appeared")
             return True
         return False

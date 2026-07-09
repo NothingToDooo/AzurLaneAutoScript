@@ -25,7 +25,7 @@ class _FakeShopUI(ShopUI):
         self.popup_results = list(popup_results or [])
         self.interval_cleared = []
         self.ui_click_calls = []
-        self.info_bar_count = 0
+        self.info_bar_handle_count = 0
 
     def loop(self):
         return range(6)
@@ -57,7 +57,7 @@ class _FakeShopUI(ShopUI):
         self.ui_click_calls.append((args, kwargs))
 
     def handle_info_bar(self) -> None:
-        self.info_bar_count += 1
+        self.info_bar_handle_count += 1
 
 
 def test_shop_refresh_clicks_available_refresh_and_confirms() -> None:
@@ -74,7 +74,7 @@ def test_shop_refresh_clicks_available_refresh_and_confirms() -> None:
 
     assert ui.shop_refresh()
     assert ui.device.clicked == [SHOP_REFRESH]
-    assert ui.info_bar_count == 1
+    assert ui.info_bar_handle_count == 1
 
 
 def test_shop_refresh_handles_buy_confirm_mistake() -> None:
@@ -98,7 +98,7 @@ def test_shop_refresh_handles_buy_confirm_mistake() -> None:
             },
         )
     ]
-    assert ui.info_bar_count == 1
+    assert ui.info_bar_handle_count == 1
 
 
 def test_shop_refresh_clears_interval_when_refresh_state_unknown() -> None:
@@ -116,4 +116,4 @@ def test_shop_refresh_clears_interval_when_refresh_state_unknown() -> None:
 
     assert not ui.shop_refresh()
     assert ui.interval_cleared == [SHOP_REFRESH]
-    assert ui.info_bar_count == 1
+    assert ui.info_bar_handle_count == 1

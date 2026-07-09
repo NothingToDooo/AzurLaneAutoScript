@@ -202,7 +202,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         scanner.set_limitation(fleet=0)
         candidates = [
             ship
-            for ship in scanner.scan(self.device.image, output=False)
+            for ship in scanner.scan(self.device.image, output=False) or []
             if template.match(self.image_crop(ship.button, copy=False), similarity=SIM_VALUE)
         ]
 
@@ -215,7 +215,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
 
         return [
             ship
-            for ship in scanner.scan(self.device.image)
+            for ship in scanner.scan(self.device.image) or []
             if template.match(self.image_crop(ship.button, copy=False), similarity=SIM_VALUE)
         ]
 

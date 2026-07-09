@@ -4,6 +4,9 @@ from module.map_detection.homography import Homography
 from module.map_detection.perspective import Perspective
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+    from typing import Any
+
     import numpy as np
 
     from module.config.config import AzurLaneConfig
@@ -22,7 +25,7 @@ class MapDetector:
     lower_edge: bool
     upper_edge: bool
 
-    generate: callable
+    generate: Callable[..., Iterable[tuple[tuple[int, int], Any]]]
 
     def __init__(self, config):
         """

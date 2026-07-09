@@ -11,6 +11,8 @@ from module.device.platform.platform_base import PlatformBase
 from module.logger import logger
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from module.device.connection import AdbDeviceWithStatus
 
 
@@ -83,7 +85,7 @@ class PlatformWindows(PlatformBase, EmulatorManager):
             logger.warning(f"Cannot get MuMu instance index from name {instance.name}")
         self.execute([Emulator.single_to_console(exe), "api", "-v", str(instance.MuMuPlayer12_id), "shutdown_player"])
 
-    def _emulator_function_wrapper(self, func: callable):
+    def _emulator_function_wrapper(self, func: Callable[[EmulatorInstance], None]):
         """
         参数：
             func：_emulator_start 或 _emulator_stop。

@@ -15,7 +15,7 @@ COALITION_ARGUMENTS_UNFILLED_TEMPLATE = "Coalition arguments unfilled. name={eve
 class AcademyPtOcr(Digit):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.alphabet += ":"
+        self.alphabet = (self.alphabet or "") + ":"
 
     def after_process(self, result):
         logger.attr(self.name, result)
@@ -28,7 +28,7 @@ class AcademyPtOcr(Digit):
 class DALPtOcr(Digit):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.alphabet += "X"
+        self.alphabet = (self.alphabet or "") + "X"
 
     def after_process(self, result):
         logger.attr(self.name, result)

@@ -1,6 +1,6 @@
 import traceback
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, cast
 
 import cv2
 import imageio
@@ -197,7 +197,7 @@ class Button(Resource):
         if not self._match_binary_init:
             if self.is_gif:
                 self.image_binary = []
-                for image in self.image:
+                for image in cast("list[np.ndarray]", self.image):
                     image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
                     _, image_binary = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
                     self.image_binary.append(image_binary)
@@ -210,7 +210,7 @@ class Button(Resource):
         if not self._match_luma_init:
             if self.is_gif:
                 self.image_luma = []
-                for image in self.image:
+                for image in cast("list[np.ndarray]", self.image):
                     luma = rgb2luma(image)
                     self.image_luma.append(luma)
             else:
@@ -243,7 +243,7 @@ class Button(Resource):
         image = crop(image, offset + self.area, copy=False)
 
         if self.is_gif:
-            for template in self.image:
+            for template in cast("list[np.ndarray]", self.image):
                 res = cv2.matchTemplate(template, image, cv2.TM_CCOEFF_NORMED)
                 _, sim, _, point = cv2.minMaxLoc(res)
                 self._button_offset = area_offset(self._button, offset[:2] + np.array(point))
@@ -274,7 +274,7 @@ class Button(Resource):
         image = crop(image, offset + self.area, copy=False)
 
         if self.is_gif:
-            for template in self.image_binary:
+            for template in cast("list[np.ndarray]", self.image_binary):
                 # graying
                 image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
                 # binarization
@@ -316,7 +316,7 @@ class Button(Resource):
 
         if self.is_gif:
             image_luma = rgb2luma(image)
-            for template in self.image_luma:
+            for template in cast("list[np.ndarray]", self.image_luma):
                 res = cv2.matchTemplate(template, image_luma, cv2.TM_CCOEFF_NORMED)
                 _, sim, _, point = cv2.minMaxLoc(res)
                 self._button_offset = area_offset(self._button, offset[:2] + np.array(point))

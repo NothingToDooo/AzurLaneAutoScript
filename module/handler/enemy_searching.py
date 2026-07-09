@@ -51,10 +51,11 @@ class EnemySearchingHandler(InfoHandler):
         """
         # campaign_extract_name_image in CampaignOcr.
         try:
-            if hasattr(self, "campaign_extract_name_image"):
+            campaign_extract_name_image = getattr(self, "campaign_extract_name_image", None)
+            if callable(campaign_extract_name_image):
                 del_cached_property(self, "_stage_image")
                 del_cached_property(self, "_stage_image_gray")
-                if not len(self.campaign_extract_name_image(self.device.image)):
+                if not len(campaign_extract_name_image(self.device.image)):
                     return False
         except IndexError:
             return False
@@ -146,7 +147,8 @@ class EnemySearchingHandler(InfoHandler):
             if self.handle_in_stage():
                 return True
             # immediately enter submarine combat in W16
-            if hasattr(self, "is_combat_loading") and self.is_combat_loading():
+            is_combat_loading = getattr(self, "is_combat_loading", None)
+            if callable(is_combat_loading) and is_combat_loading():
                 logger.warning("Entered map with is_combat_loading appeared")
                 break
             if self._handle_enemy_searching_interrupts(timeout, extend_timeout=True):

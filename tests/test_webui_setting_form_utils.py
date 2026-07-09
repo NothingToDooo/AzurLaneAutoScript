@@ -84,6 +84,7 @@ def test_build_setting_output_kwargs_marks_disabled_and_single_bold_select_as_st
         )
     )
 
+    assert output is not None
     assert output["disabled"] is True
     assert output["widget_type"] == "state"
 

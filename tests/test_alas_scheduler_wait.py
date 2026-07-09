@@ -41,8 +41,8 @@ def _make_runner(*, method: str = "stay_there", wait_result: bool = True):
     runner.config = _WaitConfig(method)
     runner.device = _WaitDevice()
     runner.is_first_task = True
-    runner.wait_calls: list[datetime] = []
-    runner.run_calls: list[str] = []
+    runner.wait_calls = []
+    runner.run_calls = []
 
     def wait_until(future: datetime) -> bool:
         runner.wait_calls.append(future)
