@@ -26,7 +26,7 @@ class _GuildDispatchEntrances:
 
 @dataclass(slots=True)
 class _GuildOperationsEnsureState:
-    confirm_timer: object
+    confirm_timer: Timer
     join_confirm_count: int = 0
 
 

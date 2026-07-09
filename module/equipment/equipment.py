@@ -13,7 +13,7 @@ from module.ui.navbar import Navbar, NavbarColorRule, NavbarTarget, NavbarVisual
 SWIPE_DISTANCE = 250
 SWIPE_RANDOM_RANGE = (-40, -20, 40, 20)
 # 同时兼容蓝色（收起）和橙色（展开）按钮。
-equipment_assets.EQUIPMENT_OPEN.match = equipment_assets.EQUIPMENT_OPEN.match_luma
+vars(equipment_assets.EQUIPMENT_OPEN)["match"] = equipment_assets.EQUIPMENT_OPEN.match_luma
 
 
 class Equipment(StorageHandler):

@@ -1,4 +1,12 @@
+from typing import TypedDict
+
 from module.base.button import ButtonGrid
+
+
+class SelectItemInfo(TypedDict):
+    grid: ButtonGrid | dict[str, ButtonGrid]
+    choices: dict[str, int]
+
 
 # Known Secondary Grid Sizes
 SELECT_GRID_3X1 = ButtonGrid(
@@ -20,7 +28,7 @@ SELECT_GRID_6X1 = ButtonGrid(
 # Consolidated Select Item Information Map
 # Applicable shops (Guild and Medal)
 # Placeholder entry 'DR'; not valid atm
-SELECT_ITEM_INFO_MAP = {
+SELECT_ITEM_INFO_MAP: dict[str, SelectItemInfo] = {
     "book": {
         "grid": SELECT_GRID_3X1,
         "choices": {

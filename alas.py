@@ -20,7 +20,7 @@ from module.exception import (
     RequestHumanTakeover,
     ScriptError,
 )
-from module.logger import logger
+from module.logger import get_log_file, logger
 from module.task_registry import get_task_spec
 
 if TYPE_CHECKING:
@@ -144,7 +144,7 @@ class AzurLaneAutoScript:
                 image_time = datetime.strftime(data["time"], "%Y-%m-%d_%H-%M-%S-%f")
                 image = handle_sensitive_image(data["image"])
                 save_image(image, str(folder / f"{image_time}.png"))
-            with Path(logger.log_file).open(encoding="utf-8") as f:
+            with Path(get_log_file()).open(encoding="utf-8") as f:
                 lines = f.readlines()
                 start = 0
                 for index, raw_line in enumerate(lines):

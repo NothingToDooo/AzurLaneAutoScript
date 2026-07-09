@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import cv2
 import numpy as np
 
@@ -8,6 +10,9 @@ from module.logger import logger
 from module.map_detection.utils import area2corner, corner2area, perspective_transform
 from module.map_detection.utils_assets import ASSETS, DETECTING_AREA, UI_MASK, UI_MASK_OS
 from module.template import assets as template_assets
+
+if TYPE_CHECKING:
+    from module.base.template import Template
 
 MISSING_ENEMY_TEMPLATE_DETAIL = (
     "Enemy detection template asset is missing. Update checked-in assets/<server>/template before running this map."
@@ -36,7 +41,7 @@ class GridPredictor:
         self._image_center = np.array([x, y, x, y])
         self._image_a = (-x0 * x2 + x0 * x3 + x1 * x2 - x1 * x3) / divisor * self.config.GRID_IMAGE_A_MULTIPLY
 
-        self.template_enemy_genre = {}
+        self.template_enemy_genre: dict[str, Template | None] = {}
         for name in self.config.MAP_ENEMY_TEMPLATE:
             self.template_enemy_genre[name] = getattr(template_assets, f"TEMPLATE_ENEMY_{name}", None)
         if self.config.MAP_HAS_SIREN:
@@ -204,9 +209,9 @@ class GridPredictor:
         image = color_similarity_2d(image, color=(255, 150, 33))
         return template_assets.TEMPLATE_ENEMY_BOSS.match(image, similarity=0.7)
 
-    def _ensure_enemy_genre_template(self, name, template):
+    def _ensure_enemy_genre_template(self, name, template) -> Template:
         if template is not None:
-            return
+            return template
         message = f"Enemy detection template not found: {name}"
         logger.warning(message)
         logger.warning(MISSING_ENEMY_TEMPLATE_DETAIL)
@@ -229,9 +234,9 @@ class GridPredictor:
 
         image_dic = {}
         for name, template in self.template_enemy_genre.items():
-            self._ensure_enemy_genre_template(name, template)
+            resolved_template = self._ensure_enemy_genre_template(name, template)
             for scale in self._enemy_genre_scaling(name):
-                if template.match(
+                if resolved_template.match(
                     self._enemy_genre_image(image_dic, scale), similarity=self.config.MAP_ENEMY_GENRE_SIMILARITY
                 ):
                     return name

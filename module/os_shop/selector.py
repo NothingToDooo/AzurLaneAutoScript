@@ -6,6 +6,7 @@ from module.config.config_generated import GeneratedConfig
 from module.os_shop.preset import OS_SHOP
 
 if TYPE_CHECKING:
+    from module.config.config import AzurLaneConfig
     from module.os_shop.item import OSShopItem as Item
 
 FILTER_REGEX = re.compile(
@@ -24,6 +25,14 @@ FILTER = Filter(FILTER_REGEX, FILTER_ATTR)
 
 
 class Selector:
+    if TYPE_CHECKING:
+        config: AzurLaneConfig
+        _shop_yellow_coins: int
+        _shop_purple_coins: int
+
+        @property
+        def is_cl1_enabled(self) -> bool: ...
+
     def pretreatment(self, items) -> list[Item]:
         """
         Pretreatment items.

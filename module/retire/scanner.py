@@ -428,6 +428,8 @@ class ShipScanner(Scanner):
 
 
 class DockScanner(ShipScanner):
+    scan_grids: ButtonGrid
+
     """
     Dock Scanner support multi-page scan.
 

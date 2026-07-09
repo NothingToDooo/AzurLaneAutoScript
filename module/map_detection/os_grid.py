@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 import cv2
 import numpy as np
@@ -9,6 +9,9 @@ from module.map_detection.utils_assets import ASSETS
 from module.os import assets as os_assets
 from module.os.radar import RadarGrid
 from module.template import assets as template_assets
+
+if TYPE_CHECKING:
+    from module.base.template import Template
 
 _OS_DIRECT_MERGE_FLAGS = (
     "is_ally",
@@ -196,13 +199,13 @@ class OSGridPredictor(GridPredictor):
         _, sim, _, _ = cv2.minMaxLoc(res)
         return sim > 0.8
 
-    _os_template_enemy: ClassVar[dict[str, object]] = {
+    _os_template_enemy: ClassVar[dict[str, Template]] = {
         "Akashi": template_assets.TEMPLATE_SIREN_Akashi,
         "ScanningDevice": os_assets.TEMPLATE_ScanningDevice,
         "LoggingTower": os_assets.TEMPLATE_LoggingTower,
         "ExplorationReward": os_assets.TEMPLATE_ExplorationReward,
     }
-    _os_template_enemy_upper: ClassVar[dict[str, object]] = {
+    _os_template_enemy_upper: ClassVar[dict[str, Template]] = {
         "ScanningDevice": os_assets.TEMPLATE_ScanningDeviceUpper,
         "LoggingTower": os_assets.TEMPLATE_LoggingTowerUpper,
     }

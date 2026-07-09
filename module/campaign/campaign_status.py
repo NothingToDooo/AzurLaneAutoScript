@@ -5,12 +5,13 @@ import numpy as np
 
 from module.base.timer import Timer
 from module.base.utils import _cv_scalar, color_similar, get_color
-from module.campaign.assets import OCR_COIN, OCR_EVENT_PT, OCR_OIL, OCR_OIL_CHECK
+from module.campaign.assets import OCR_COIN as OCR_COIN_BUTTON
+from module.campaign.assets import OCR_EVENT_PT, OCR_OIL, OCR_OIL_CHECK
 from module.logger import logger
 from module.ocr.ocr import Digit, Ocr
 from module.ui.ui import UI
 
-OCR_COIN = Digit(OCR_COIN, name="OCR_COIN", letter=(239, 239, 239), threshold=128)
+OCR_COIN = Digit(OCR_COIN_BUTTON, name="OCR_COIN", letter=(239, 239, 239), threshold=128)
 
 
 class PtOcr(Ocr):

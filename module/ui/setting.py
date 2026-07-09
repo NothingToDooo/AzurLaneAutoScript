@@ -17,7 +17,7 @@ class Setting:
     def __init__(self, name="Setting", main: ModuleBase | None = None):
         self.name = name
         # ALAS 模块对象。
-        self.main: ModuleBase | None = main
+        self._main: ModuleBase | None = main
         # 设置选项前是否先重置。
         self.reset_first = True
         # 是否取消已启用但不需要的选项。
@@ -26,6 +26,18 @@ class Setting:
         self.settings: dict[tuple[str, str], Button] = {}
         # 记录每个设置项的默认选项。
         self.settings_default: dict[str, str] = {}
+
+    @property
+    def main(self) -> ModuleBase:
+        """返回绑定的 ALAS 模块对象。"""
+        if self._main is None:
+            msg = f"{self.name} setting is not bound to a module"
+            raise ScriptError(msg)
+        return self._main
+
+    @main.setter
+    def main(self, value: ModuleBase | None) -> None:
+        self._main = value
 
     def add_setting(self, setting, option_buttons, option_names, option_default):
         """

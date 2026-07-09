@@ -4,7 +4,7 @@ import os
 import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal, cast
 
 from rich.console import Console, ConsoleOptions, ConsoleRenderable, NewLine, RenderableType
 from rich.highlighter import NullHighlighter, RegexHighlighter
@@ -17,6 +17,23 @@ from rich.traceback import Traceback
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    class AlasLogger(logging.Logger):
+        log_file: str
+
+        def hr(self, title, level=3) -> None: ...
+
+        def attr(self, name, text) -> None: ...
+
+        def attr_align(self, name, text, front="", align=22) -> None: ...
+
+        def set_file_logger(self, name=...) -> None: ...
+
+        def set_func_logger(self, func: Callable[[ConsoleRenderable], None]) -> None: ...
+
+        def rule(self, title="", *, characters="─", style="rule.line", end="\n", align="center") -> None: ...
+
+        def print(self, *objects: RenderableType, **kwargs) -> None: ...
+
 
 def empty_function(*args, **kwargs):
     pass
@@ -24,7 +41,7 @@ def empty_function(*args, **kwargs):
 
 # cnocr will set root logger in cnocr.utils
 # Delete logging.basicConfig to avoid logging the same message twice.
-logging.basicConfig = empty_function
+vars(logging)["basicConfig"] = empty_function
 logging.raiseExceptions = True  # Set True if wanna see encode errors on console
 
 # Remove HTTP keywords (GET, POST etc.)
@@ -141,8 +158,9 @@ WEB_THEME = Theme(
 
 # 初始化日志。
 logger_debug = False
-logger = logging.getLogger("alas")
+logger = cast("AlasLogger", logging.getLogger("alas"))
 logger.setLevel(logging.DEBUG if logger_debug else logging.INFO)
+_logger_state: dict[str, str | None] = {"log_file": None}
 file_formatter = logging.Formatter(
     fmt="%(asctime)s.%(msecs)03d | %(levelname)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
 )
@@ -199,7 +217,17 @@ def set_file_logger(name=pyw_name):
             logger.removeHandler(handler)
             handler.close()
     logger.addHandler(hdlr)
-    logger.log_file = log_file
+    _logger_state["log_file"] = log_file
+    vars(logger)["log_file"] = log_file
+
+
+def get_log_file() -> str:
+    """返回当前文件日志路径。"""
+    log_file = _logger_state["log_file"]
+    if log_file is None:
+        msg = "File logger is not initialized"
+        raise RuntimeError(msg)
+    return log_file
 
 
 def set_func_logger(func):
@@ -348,14 +376,14 @@ def error_convert(func):
     return error_wrapper
 
 
-logger.error = error_convert(logger.error)
-logger.hr = hr
-logger.attr = attr
-logger.attr_align = attr_align
-logger.set_file_logger = set_file_logger
-logger.set_func_logger = set_func_logger
-logger.rule = rule
-logger.print = print
+vars(logger)["error"] = error_convert(logger.error)
+vars(logger)["hr"] = hr
+vars(logger)["attr"] = attr
+vars(logger)["attr_align"] = attr_align
+vars(logger)["set_file_logger"] = set_file_logger
+vars(logger)["set_func_logger"] = set_func_logger
+vars(logger)["rule"] = rule
+vars(logger)["print"] = print
 
 logger.set_file_logger()
 logger.hr("Start", level=0)

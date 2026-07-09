@@ -55,10 +55,10 @@ class Homography:
     image: np.ndarray
     config: AzurLaneConfig
     # Four edges in bool, or has attribute __bool__
-    left_edge: int
-    right_edge: int
-    lower_edge: int
-    upper_edge: int
+    left_edge: int | None
+    right_edge: int | None
+    lower_edge: int | None
+    upper_edge: int | None
 
     """
     Private

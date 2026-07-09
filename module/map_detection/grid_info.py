@@ -1,4 +1,9 @@
+from typing import TYPE_CHECKING
+
 from module.base.utils import location2node
+
+if TYPE_CHECKING:
+    from module.map.map_grids import SelectedGrids
 
 _PRIMARY_GRID_CODES = {
     "++": "is_land",
@@ -77,8 +82,8 @@ class GridInfo:
     is_movable = False  # Is movable enemy
     is_mechanism_trigger = False  # Mechanism has triggered
     is_mechanism_block = False  # Blocked by mechanism
-    mechanism_trigger = None  # SelectedGrids
-    mechanism_block = None  # SelectedGrids
+    mechanism_trigger: SelectedGrids | None = None
+    mechanism_block: SelectedGrids | None = None
     mechanism_wait = 2  # Seconds to wait the mechanism unlock animation
     is_fortress = False  # Machine fortress
     is_flare = False
@@ -358,8 +363,13 @@ class GridInfo:
         self.is_carrier = False
         self.is_movable = False
         if self.is_mechanism_trigger:
-            self.mechanism_trigger.set(is_mechanism_trigger=False)
-            self.mechanism_block.set(is_mechanism_block=False)
+            mechanism_trigger = self.mechanism_trigger
+            mechanism_block = self.mechanism_block
+            if mechanism_trigger is None or mechanism_block is None:
+                msg = "机关格缺少关联格子状态"
+                raise RuntimeError(msg)
+            mechanism_trigger.set(is_mechanism_trigger=False)
+            mechanism_block.set(is_mechanism_block=False)
 
     def reset(self):
         """

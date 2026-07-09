@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 
     from module.config.config import AzurLaneConfig
 
+type DetectionBackend = Homography | Perspective
+
 
 class MapDetector:
     """
@@ -24,6 +26,7 @@ class MapDetector:
     right_edge: bool
     lower_edge: bool
     upper_edge: bool
+    backend: DetectionBackend
 
     generate: Callable[..., Iterable[tuple[tuple[int, int], Any]]]
 
@@ -33,7 +36,6 @@ class MapDetector:
             config (AzurLaneConfig):
         """
         self.config = config
-        self.backend = None
         self.detector_set_backend()
 
     def detector_set_backend(self, name=""):

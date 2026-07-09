@@ -10,9 +10,9 @@ from module.template.assets import (
     TEMPLATE_MAP_WALK_OUT_OF_STEP,
 )
 
-TEMPLATE_AMBUSH_EVADE_SUCCESS.pre_process = info_letter_preprocess
-TEMPLATE_AMBUSH_EVADE_FAILED.pre_process = info_letter_preprocess
-TEMPLATE_MAP_WALK_OUT_OF_STEP.pre_process = info_letter_preprocess
+vars(TEMPLATE_AMBUSH_EVADE_SUCCESS)["pre_process"] = info_letter_preprocess
+vars(TEMPLATE_AMBUSH_EVADE_FAILED)["pre_process"] = info_letter_preprocess
+vars(TEMPLATE_MAP_WALK_OUT_OF_STEP)["pre_process"] = info_letter_preprocess
 
 
 class AmbushHandler(Combat):

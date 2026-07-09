@@ -131,16 +131,32 @@ class ShopClerk(ShopBase, Retirement):
         try:
             item_info = SELECT_ITEM_INFO_MAP[group]
             index = item_info["choices"][choice]
-            if group == "pr":
-                for idx, btn in enumerate(SHOP_SELECT_PR):
-                    if self.appear(btn, offset=(20, 20)):
-                        series_key = f"s{idx + 1}"
-                        return item_info["grid"][series_key].buttons[index]
-            else:
-                return item_info["grid"].buttons[index]
         except Exception as e:
             logger.critical(f"SELECT_ITEM_INFO_MAP may be malformed; item group '{group}' entry is compromised")
             raise ScriptError from e
+
+        grid = item_info["grid"]
+        if group == "pr":
+            if not isinstance(grid, dict):
+                logger.critical(f"SELECT_ITEM_INFO_MAP for item group '{group}' should define series grids")
+                raise ScriptError
+            try:
+                for idx, btn in enumerate(SHOP_SELECT_PR):
+                    if self.appear(btn, offset=(20, 20)):
+                        series_key = f"s{idx + 1}"
+                        return grid[series_key].buttons[index]
+            except Exception as e:
+                logger.critical(f"SELECT_ITEM_INFO_MAP may be malformed; item group '{group}' entry is compromised")
+                raise ScriptError from e
+        else:
+            if isinstance(grid, dict):
+                logger.critical(f"SELECT_ITEM_INFO_MAP for item group '{group}' should define a single grid")
+                raise ScriptError
+            try:
+                return grid.buttons[index]
+            except Exception as e:
+                logger.critical(f"SELECT_ITEM_INFO_MAP may be malformed; item group '{group}' entry is compromised")
+                raise ScriptError from e
 
     def shop_buy_select_execute(self, item):
         """

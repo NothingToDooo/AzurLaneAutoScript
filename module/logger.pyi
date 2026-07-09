@@ -50,6 +50,7 @@ console_hdlr: RichHandler
 def set_file_logger(
     name: str = ...,
 ) -> None: ...
+def get_log_file() -> str: ...
 def set_func_logger(
     func: Callable[[ConsoleRenderable], None],
 ) -> None: ...
@@ -59,6 +60,8 @@ def render_options(
 ) -> RenderOptions: ...
 
 class __logger(logging.Logger):
+    log_file: str
+
     def rule(
         self,
         title: str = "",

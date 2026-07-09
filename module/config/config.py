@@ -72,10 +72,17 @@ def name_to_function(name):
 
 
 class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher):
-    stop_event: threading.Event = None
+    stop_event: threading.Event | None = None
 
     # 类级开关。
     is_hoarding_task = True
+
+    # 旧装备切换任务在运行期注入的舰队和装备记录。
+    FLEET_DAILY: int | list[int]
+    FLEET_DAILY_EQUIPMENT: list[int] | None
+    FLEET_HARD_EQUIPMENT: list[int] | None
+    EXERCISE_FLEET_EQUIPMENT: list[int] | None
+    EventDaily_LastStage: int | str
 
     def __setattr__(self, key, value):
         bound = self.__dict__.get("bound")
@@ -719,8 +726,8 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         return backup
 
 
-pywebio.output.Output = OutputConfig
-pywebio.pin.Output = OutputConfig
+vars(pywebio.output)["Output"] = OutputConfig
+vars(pywebio.pin)["Output"] = OutputConfig
 
 
 class ConfigBackup:

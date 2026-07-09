@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from module.config.utils import get_nearest_weekday_date
 from module.logger import logger
 from module.os.map import OSMap
@@ -6,6 +8,10 @@ from module.shop.shop_voucher import VoucherShop
 
 
 class OpsiArchive(OSMap):
+    if TYPE_CHECKING:
+
+        def os_finish_daily_mission(self, question=True, rescan=None) -> int: ...
+
     def _os_voucher_enter(self):
         self.os_map_goto_globe(unpin=False)
         self.ui_click(

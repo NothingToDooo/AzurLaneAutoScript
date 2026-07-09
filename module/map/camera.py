@@ -59,7 +59,7 @@ class Camera(MapOperation):
     map: CampaignMap
     camera = (0, 0)
     grid_class = Grid
-    _prev_view = None
+    _prev_view: View | None = None
     _prev_swipe = None
 
     def _map_swipe(self, vector, box=(123, 159, 1175, 628)):
@@ -312,11 +312,12 @@ class Camera(MapOperation):
         if not wait_swipe:
             return None
 
-        try:
-            prev_center_offset = self._prev_view.center_offset
-        except AttributeError:
+        prev_view = self._prev_view
+        if prev_view is None:
             logger.warning("Camera.update(wait_swipe=True) but camera has no _prev_view")
             prev_center_offset = None
+        else:
+            prev_center_offset = prev_view.center_offset
         logger.attr("prev.center_offset", prev_center_offset)
         return prev_center_offset
 

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, cast
 
 from module.base.decorator import cached_property
 from module.base.timer import Timer
@@ -15,19 +16,32 @@ from module.shop.assets import SHOP_BUY_CONFIRM as OS_SHOP_BUY_CONFIRM
 from module.shop.clerk import OCR_SHOP_AMOUNT
 from module.ui.ui import UiIndexControls
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Protocol
+
+    class OSShopBuyItem(Protocol):
+        name: str
+
+    class OSShopAmountItem(OSShopBuyItem, Protocol):
+        cost: str
+        price: int
+        count: int
+
+
 UNKNOWN_OS_SHOP_CURRENCY_TEMPLATE = "Unknown OS shop currency: {cost}"
 
 
 @dataclass(slots=True)
 class _OSShopBuyState:
-    button: object
+    button: OSShopBuyItem
     amount_finish: bool = False
     success: bool = False
     set_amount_retry: int = 0
 
 
 class OSShop(PortShop, AkashiShop):
-    def os_shop_buy_execute(self, button, skip_first_screenshot=True) -> bool:
+    def os_shop_buy_execute(self, button: OSShopBuyItem, skip_first_screenshot=True) -> bool:
         """
         Args:
             button: Item to buy
@@ -130,7 +144,7 @@ class OSShop(PortShop, AkashiShop):
     def _os_shop_buy_finished(self, state: _OSShopBuyState) -> bool:
         return state.success and self.appear(PORT_SUPPLY_CHECK, offset=(20, 20))
 
-    def os_shop_buy(self, select_func) -> int:
+    def os_shop_buy(self, select_func: Callable[[], OSShopBuyItem | None]) -> int:
         """
         Args:
             select_func:
@@ -175,7 +189,15 @@ class OSShop(PortShop, AkashiShop):
             if self.appear(SHOP_BUY_CONFIRM_AMOUNT, offset=(20, 20), interval=3):
                 self.device.click(SHOP_CLICK_SAFE_AREA)
 
-    def shop_buy_amount_handler(self, item, skip_first_screenshot=True):
+    @staticmethod
+    def _require_amount_item(item: OSShopBuyItem) -> OSShopAmountItem:
+        for attr in ("cost", "price", "count"):
+            if not hasattr(item, attr):
+                msg = f"OS shop item {item.name} lacks amount field: {attr}"
+                raise ScriptError(msg)
+        return cast("OSShopAmountItem", item)
+
+    def shop_buy_amount_handler(self, item: OSShopBuyItem, skip_first_screenshot=True):
         """处理商店购买数量。
 
         Args:
@@ -184,15 +206,16 @@ class OSShop(PortShop, AkashiShop):
         Raises:
             ScriptError: OCR_SHOP_AMOUNT
         """
+        amount_item = self._require_amount_item(item)
         limit = self._shop_buy_amount_read_limit(skip_first_screenshot=skip_first_screenshot)
         if limit == 0:
             return False
 
-        count = self._shop_buy_amount_available_count(item)
+        count = self._shop_buy_amount_available_count(amount_item)
         if count == 1:
             return True
 
-        total_count = self._shop_buy_amount_total_count(item)
+        total_count = self._shop_buy_amount_total_count(amount_item)
         limit, set_to_max = self._shop_buy_amount_target(count=count, total_count=total_count)
 
         self.interval_clear(AMOUNT_MAX)
@@ -228,11 +251,11 @@ class OSShop(PortShop, AkashiShop):
                 logger.critical("OCR_SHOP_AMOUNT resulted error; asset may be compromised")
                 raise ScriptError
 
-    def _shop_buy_amount_available_count(self, item) -> int:
+    def _shop_buy_amount_available_count(self, item: OSShopAmountItem) -> int:
         currency = self.get_currency_coins(item)
         return min(int(currency // item.price), item.count)
 
-    def _shop_buy_amount_total_count(self, item) -> int:
+    def _shop_buy_amount_total_count(self, item: OSShopAmountItem) -> int:
         coins = self.get_coins_no_limit(item)
         return min(int(coins // item.price), item.count)
 
@@ -347,7 +370,7 @@ class OSShop(PortShop, AkashiShop):
             return 100000
         return 35000
 
-    def get_currency_coins(self, item):
+    def get_currency_coins(self, item: OSShopAmountItem):
         if item.cost == "YellowCoins":
             if get_os_reset_remain() == 0:
                 return self._shop_yellow_coins - 100
@@ -360,7 +383,7 @@ class OSShop(PortShop, AkashiShop):
         message = UNKNOWN_OS_SHOP_CURRENCY_TEMPLATE.format(cost=item.cost)
         raise ScriptError(message)
 
-    def get_coins_no_limit(self, item):
+    def get_coins_no_limit(self, item: OSShopAmountItem):
         if item.cost == "YellowCoins":
             return self._shop_yellow_coins
         if item.cost == "PurpleCoins":

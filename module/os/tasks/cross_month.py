@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 from module.config.utils import get_os_next_reset
 from module.exception import ScriptError
@@ -10,6 +11,10 @@ INVALID_OPSI_NEXT_RESET_TEMPLATE = "Invalid OpsiNextReset: {next_reset} < {now}"
 
 
 class OpsiCrossMonth(OSMap):
+    if TYPE_CHECKING:
+
+        def os_finish_daily_mission(self, question=True, rescan=None) -> int: ...
+
     def os_cross_month_end(self):
         self.config.task_delay(target=get_os_next_reset() - timedelta(minutes=10))
         self.config.task_stop()
@@ -60,8 +65,8 @@ class OpsiCrossMonth(OSMap):
         def false_func(*_args, **_kwargs):
             return False
 
-        self.is_in_opsi_explore = false_func
-        self.config.task_switched = false_func
+        vars(self)["is_in_opsi_explore"] = false_func
+        vars(self.config)["task_switched"] = false_func
 
     def _clear_opsi_daily_after_reset(self):
         logger.hr("OpSi clear daily", level=1)

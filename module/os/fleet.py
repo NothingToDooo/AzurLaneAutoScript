@@ -32,10 +32,10 @@ WALK_OUT_OF_STEP_MESSAGE = "walk_out_of_step"
 
 @dataclass(slots=True)
 class _WalkStableContext:
-    confirm_timer: object
-    stuck_timer: object
+    confirm_timer: Timer
+    stuck_timer: Timer
     walk_out_of_step: bool
-    record: object = None
+    record: np.ndarray | None = None
     enemy_searching_appear: bool = False
     clicked_story: bool = False
     result: set[str] = field(default_factory=set)
@@ -141,6 +141,8 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         """
         After handle_ambush, if fleet has arrived, treat it as mystery, otherwise just ambush.
         """
+        if button is None:
+            return False
         if self._os_map_event_handled and button.predict_fleet() and button.predict_current_fleet():
             return "get_item"
         return False
@@ -231,7 +233,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
         confirm_timer = Timer(0.6, count=2).start()
         for _ in self.loop(skip_first=skip_first_screenshot):
             self.update_os()
-            current = self.view.backend.homo_loca
+            current = self._homography_loca(self.view)
             logger.attr("homo_loca", current)
             if record is None or (current is not None and np.linalg.norm(np.subtract(current, record)) < 3):
                 if confirm_timer.reached():
@@ -355,7 +357,7 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
             self._walk_stable_reset(context)
             return False
         self.update_os()
-        current = self.view.backend.homo_loca
+        current = self._homography_loca(self.view)
         logger.attr("homo_loca", current)
         # Max known distance is 4.48px, homo_loca between ( 56,  60) and ( 52,  58)
         if context.record is None or (

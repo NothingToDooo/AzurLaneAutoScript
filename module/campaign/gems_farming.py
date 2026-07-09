@@ -29,6 +29,7 @@ SIM_VALUE = 0.92
 EMOTION_WITHDRAW_MESSAGE = "Emotion withdraw"
 INVALID_GEMS_FARMING_COMMON_DD_MESSAGE = "Invalid GemsFarming_CommonDD"
 INVALID_COMMON_DD_SETTING_TEMPLATE = "Invalid CommonDD setting: {common_dd}"
+GEMS_FARMING_CAMPAIGN_MODULE_MISSING_MESSAGE = "Gems farming campaign module is not loaded"
 
 
 class GemsCampaignOverride(CampaignBase):
@@ -104,7 +105,12 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
     def load_campaign(self, name, folder="campaign_main"):
         super().load_campaign(name, folder)
 
-        class GemsCampaign(GemsCampaignOverride, self.module.Campaign):
+        campaign_module = self.module
+        if campaign_module is None:
+            raise ScriptError(GEMS_FARMING_CAMPAIGN_MODULE_MISSING_MESSAGE)
+        campaign_class = vars(campaign_module)["Campaign"]
+
+        class GemsCampaign(GemsCampaignOverride, campaign_class):
             pass
 
         self.campaign = GemsCampaign(device=self.campaign.device, config=self.campaign.config)
