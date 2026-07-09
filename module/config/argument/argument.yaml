@@ -24,7 +24,6 @@ Emulator:
   Serial:
     value: auto
     valuetype: str
-  AdbRestart: false
 EmulatorInfo:
   Emulator:
     value: MuMuPlayer12
@@ -677,9 +676,6 @@ EventStory:
     value: false
     option: [ true, false ]
 Benchmark:
-  DeviceType:
-    value: emulator
-    option: [ emulator ]
   TestScene:
     value: screenshot_click
     option: [ screenshot_click, screenshot, click ]

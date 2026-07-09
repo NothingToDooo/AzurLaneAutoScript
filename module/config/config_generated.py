@@ -21,7 +21,6 @@ class GeneratedConfig:
 
     # 配置组 `Emulator`
     Emulator_Serial = "auto"
-    Emulator_AdbRestart = False
 
     # 配置组 `EmulatorInfo`
     EmulatorInfo_Emulator = "MuMuPlayer12"
@@ -586,8 +585,6 @@ class GeneratedConfig:
     EventStory_SkipBattle = False
 
     # 配置组 `Benchmark`
-    # 可选项：emulator
-    Benchmark_DeviceType = "emulator"
     # 可选项：screenshot_click, screenshot, click
     Benchmark_TestScene = "screenshot_click"
 

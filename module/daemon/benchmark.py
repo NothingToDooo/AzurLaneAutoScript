@@ -147,18 +147,18 @@ class Benchmark(DaemonBase, CampaignUI):
         if screenshot_result:
             self.show(test="Screenshot", data=screenshot_result, evaluate_func=self.evaluate_screenshot)
             fastest = sorted(screenshot_result, key=compare)[0]
-            logger.info(f"Recommend screenshot method: {fastest[0]} ({float2str(fastest[1])})")
+            logger.info(f"Fixed screenshot method: {fastest[0]} ({float2str(fastest[1])})")
             fastest_screenshot = fastest[0]
         if click_result:
             self.show(test="Control", data=click_result, evaluate_func=self.evaluate_click)
             fastest = sorted(click_result, key=compare)[0]
-            logger.info(f"Recommend control method: {fastest[0]} ({float2str(fastest[1])})")
+            logger.info(f"Fixed control method: {fastest[0]} ({float2str(fastest[1])})")
             fastest_click = fastest[0]
 
         return fastest_screenshot, fastest_click
 
     def get_test_methods(self) -> tuple[tuple[str, ...], tuple[str, ...]]:
-        screenshot = ["nemu_ipc"] if self.device.nemu_ipc_available() else []
+        screenshot = ["nemu_ipc"]
         click = ["minitouch"]
 
         scene = self.config.Benchmark_TestScene
@@ -172,7 +172,6 @@ class Benchmark(DaemonBase, CampaignUI):
     def run(self):
         self.ensure_campaign_ui("7-2", mode="normal")
 
-        logger.attr("DeviceType", self.config.Benchmark_DeviceType)
         logger.attr("TestScene", self.config.Benchmark_TestScene)
         screenshot, click = self.get_test_methods()
         self.benchmark(screenshot, click)

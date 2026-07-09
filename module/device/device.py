@@ -86,10 +86,6 @@ class Device(Screenshot, Control, AppControl):
                     )
                     raise RequestHumanTakeover from e
 
-        # 自动补全模拟器信息。
-        if self.config.EmulatorInfo_Emulator == "auto":
-            _ = self.emulator_instance
-
         self.method_check()
         self.screenshot_interval_set()
 

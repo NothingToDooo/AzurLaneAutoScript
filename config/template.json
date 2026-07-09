@@ -1,8 +1,7 @@
 {
   "Alas": {
     "Emulator": {
-      "Serial": "auto",
-      "AdbRestart": false
+      "Serial": "auto"
     },
     "EmulatorInfo": {
       "Emulator": "MuMuPlayer12",
@@ -1918,7 +1917,6 @@
   },
   "Benchmark": {
     "Benchmark": {
-      "DeviceType": "emulator",
       "TestScene": "screenshot_click"
     },
     "Storage": {

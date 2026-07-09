@@ -319,10 +319,6 @@
     "Serial": {
       "name": "模拟器 Serial",
       "help": ""
-    },
-    "AdbRestart": {
-      "name": "在检测不到设备的时候尝试重启adb",
-      "help": ""
     }
   },
   "EmulatorInfo": {
@@ -2377,12 +2373,7 @@
   "Benchmark": {
     "_info": {
       "name": "性能测试",
-      "help": "测试哪个截图方案和控制方案速度更快，速度因模拟器和电脑配置而异\n测试完成后，在 \"Alas\" - \"模拟器设置\" 内选择最快的截图和控制方案"
-    },
-    "DeviceType": {
-      "name": "设备类型",
-      "help": "",
-      "emulator": "模拟器"
+      "help": "测试当前个人版固定设备栈的速度：MuMu + nemu_ipc 截图 + minitouch 控制"
     },
     "TestScene": {
       "name": "测试场景",

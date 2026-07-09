@@ -5,10 +5,6 @@
         "type": "input",
         "value": "auto",
         "valuetype": "str"
-      },
-      "AdbRestart": {
-        "type": "checkbox",
-        "value": false
       }
     },
     "EmulatorInfo": {
@@ -8709,13 +8705,6 @@
   },
   "Benchmark": {
     "Benchmark": {
-      "DeviceType": {
-        "type": "select",
-        "value": "emulator",
-        "option": [
-          "emulator"
-        ]
-      },
       "TestScene": {
         "type": "select",
         "value": "screenshot_click",

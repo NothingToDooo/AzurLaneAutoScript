@@ -1,11 +1,7 @@
-import pytest
-
-from module.config.server import CN_PACKAGE, CN_SERVER, to_package
+from module.config.server import CN_ACTIVITY, CN_PACKAGE, CN_SERVER
 
 
-def test_to_package_accepts_only_cn_identifier() -> None:
-    assert to_package(CN_SERVER) == CN_PACKAGE
-    assert to_package(CN_PACKAGE) == CN_PACKAGE
-
-    with pytest.raises(ValueError, match="Package/server invalid"):
-        to_package("com.example.other")
+def test_personal_server_constants_are_fixed_cn() -> None:
+    assert CN_SERVER == "cn"
+    assert CN_PACKAGE == "com.bilibili.azurlane"
+    assert CN_ACTIVITY == "com.manjuu.azurlane.MainActivity"

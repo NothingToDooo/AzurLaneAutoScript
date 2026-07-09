@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 
 from module.daemon.benchmark import Benchmark
@@ -33,3 +35,20 @@ def test_evaluate_screenshot(cost, expected: str) -> None:
 )
 def test_evaluate_click(cost, expected: str) -> None:
     assert Benchmark.evaluate_click(cost).plain == expected
+
+
+@pytest.mark.parametrize(
+    ("scene", "expected"),
+    [
+        ("screenshot_click", (("nemu_ipc",), ("minitouch",))),
+        ("screenshot", (("nemu_ipc",), ())),
+        ("click", ((), ("minitouch",))),
+    ],
+)
+def test_get_test_methods_uses_fixed_personal_stack(
+    scene: str, expected: tuple[tuple[str, ...], tuple[str, ...]]
+) -> None:
+    benchmark = object.__new__(Benchmark)
+    benchmark.config = SimpleNamespace(Benchmark_TestScene=scene)
+
+    assert benchmark.get_test_methods() == expected

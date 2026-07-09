@@ -13,7 +13,6 @@ from module.base.timer import Timer
 from module.base.utils import area_offset, color_similarity_2d, crop, ensure_int, get_color, image_size, load_image
 from module.combat.emotion import Emotion
 from module.config.config import AzurLaneConfig
-from module.config.server import to_package
 from module.device.device import Device
 from module.logger import logger
 from module.map_detection.utils import fit_points
@@ -411,13 +410,3 @@ class ModuleBase:
             value = load_image(value)
 
         self.device.image = value
-
-    def set_server(self, server):
-        """
-        开发调试时切换包名。
-
-        个人分支固定国服，不再修改全局服务器状态。
-        """
-        package = to_package(server)
-        self.device.package = package
-        logger.attr("Server", self.config.SERVER)

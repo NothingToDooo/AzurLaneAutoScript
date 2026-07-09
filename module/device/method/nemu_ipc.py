@@ -461,22 +461,6 @@ class NemuIpc(Platform):
         else:
             return impl
 
-    def nemu_ipc_available(self) -> bool:
-        if not self.is_mumu_family:
-            return False
-        if self.nemud_player_version == "":
-            # >= 4.0 has no info in getprop
-            # Try initializing nemu_ipc for final check
-            pass
-        # 有版本号时，用 app_keep_alive 属性判断 nemu_ipc 所需的 MuMu12 能力。
-        elif self.nemud_app_keep_alive == "":
-            return False
-        try:
-            _ = self.nemu_ipc
-        except RequestHumanTakeover:
-            return False
-        return True
-
     @staticmethod
     def check_mumu_app_keep_alive_400(file):
         """

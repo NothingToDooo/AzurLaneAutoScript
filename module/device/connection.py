@@ -560,7 +560,7 @@ class Connection(ConnectionAttr):
         """
         如果找不到设备则重启 ADB，否则尝试重连设备。
         """
-        if self.config.Emulator_AdbRestart and len(self.list_device()) == 0:
+        if len(self.list_device()) == 0:
             # 重启 ADB。
             self.adb_restart()
             # 重新连接设备。

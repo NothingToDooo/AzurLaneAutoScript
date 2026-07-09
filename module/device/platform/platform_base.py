@@ -2,7 +2,12 @@ from dataclasses import dataclass
 
 from module.base.decorator import cached_property, del_cached_property
 from module.device.connection import Connection
-from module.device.platform.emulator_base import EmulatorInstanceBase, EmulatorManagerBase, remove_duplicated_path
+from module.device.platform.emulator_base import (
+    EmulatorBase,
+    EmulatorInstanceBase,
+    EmulatorManagerBase,
+    remove_duplicated_path,
+)
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
 
@@ -44,18 +49,15 @@ class PlatformBase(Connection, EmulatorManagerBase):
 
     @cached_property
     def emulator_info(self) -> EmulatorInfo:
-        emulator = self.config.EmulatorInfo_Emulator
-        if emulator == "auto":
-            emulator = ""
-
         def parse_info(value):
             if isinstance(value, str):
                 value = value.strip().replace("\n", "")
-                if value in ["None", "False", "True"]:
+                if value in ["None", "False", "True", "auto"]:
                     value = ""
                 return value
             return ""
 
+        emulator = parse_info(self.config.EmulatorInfo_Emulator) or EmulatorBase.MuMuPlayer12
         name = parse_info(self.config.EmulatorInfo_name)
         path = parse_info(self.config.EmulatorInfo_path)
 

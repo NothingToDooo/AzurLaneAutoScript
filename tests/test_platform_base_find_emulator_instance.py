@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+from module.device.platform.emulator_base import EmulatorBase
 from module.device.platform.platform_base import PlatformBase, serial_to_id
 
 
@@ -45,6 +46,21 @@ def test_serial_to_id_accepts_mumu12_neighbor_ports() -> None:
     assert serial_to_id("127.0.0.1:16385") == 0
     assert serial_to_id("127.0.0.1:16416") == 1
     assert serial_to_id("emulator-5554") is None
+
+
+def test_emulator_info_normalizes_internal_state_to_mumu12() -> None:
+    platform = object.__new__(PlatformBase)
+    platform.config = SimpleNamespace(
+        EmulatorInfo_Emulator="auto",
+        EmulatorInfo_name="None",
+        EmulatorInfo_path=None,
+    )
+
+    info = platform.emulator_info
+
+    assert info.emulator == EmulatorBase.MuMuPlayer12
+    assert info.name == ""
+    assert info.path == ""
 
 
 def test_find_emulator_instance_returns_unique_serial_match() -> None:

@@ -114,3 +114,49 @@ def test_adb_connect_recovers_mumu12_shifted_port() -> None:
         ]
     ]
     assert connection.detect_calls == 1
+
+
+def _make_reconnect_connection(devices: list[object]):
+    connection = object.__new__(Connection)
+    connection.devices = devices
+    connection.calls = []
+
+    def list_device():
+        connection.calls.append("list_device")
+        return connection.devices
+
+    def adb_restart() -> None:
+        connection.calls.append("adb_restart")
+
+    def adb_disconnect() -> None:
+        connection.calls.append("adb_disconnect")
+
+    def adb_connect() -> bool:
+        connection.calls.append("adb_connect")
+        return True
+
+    def detect_device() -> None:
+        connection.calls.append("detect_device")
+
+    connection.list_device = list_device
+    connection.adb_restart = adb_restart
+    connection.adb_disconnect = adb_disconnect
+    connection.adb_connect = adb_connect
+    connection.detect_device = detect_device
+    return connection
+
+
+def test_adb_reconnect_restarts_adb_when_no_device_is_listed() -> None:
+    connection = _make_reconnect_connection([])
+
+    connection.adb_reconnect()
+
+    assert connection.calls == ["list_device", "adb_restart", "adb_connect", "detect_device"]
+
+
+def test_adb_reconnect_disconnects_current_serial_when_device_exists() -> None:
+    connection = _make_reconnect_connection([object()])
+
+    connection.adb_reconnect()
+
+    assert connection.calls == ["list_device", "adb_disconnect", "adb_connect", "detect_device"]
