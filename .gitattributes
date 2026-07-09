@@ -1,11 +1,11 @@
-* text=auto
+* text=auto eol=lf
 *.jpg -text
 *.png -text
 *.txt text eol=lf
 *.sh text eol=lf
 *.js text eol=lf
 *.ts text eol=lf
-*.py  eol=lf
+*.py text eol=lf
 *.vue text eol=lf
 *.css text eol=lf
 *.yml text eol=lf
