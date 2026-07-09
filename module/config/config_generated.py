@@ -20,7 +20,7 @@ class GeneratedConfig:
     Scheduler_ServerUpdate = "00:00"
 
     # 配置组 `Emulator`
-    Emulator_Serial = "auto"
+    Emulator_Serial = "127.0.0.1:16384"
 
     # 配置组 `EmulatorInfo`
     EmulatorInfo_Emulator = "MuMuPlayer12"

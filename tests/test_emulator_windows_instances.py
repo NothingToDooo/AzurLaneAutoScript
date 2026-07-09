@@ -57,10 +57,23 @@ def test_all_emulator_serials_keeps_only_mumu_tcp_serials() -> None:
     manager = object.__new__(EmulatorManagerBase)
     manager.all_emulator_instances = [
         SimpleNamespace(serial="127.0.0.1:5555"),
+        SimpleNamespace(serial="emulator-5554"),
         SimpleNamespace(serial="127.0.0.1:16384"),
     ]
 
-    assert manager.all_emulator_serials == ["127.0.0.1:5555", "127.0.0.1:16384"]
+    assert manager.all_emulator_serials == ["127.0.0.1:16384"]
+
+
+def test_iter_instances_normalizes_legacy_hostport_to_mumu12_default_serial(tmp_path: Path) -> None:
+    exe = _touch_exe(tmp_path / "shell" / "MuMuPlayer.exe")
+    _write_nemu(tmp_path / "vms" / "MuMuPlayer-12.0-1", hostport="7555")
+    emulator = Emulator(exe.as_posix())
+
+    instances = list(emulator.iter_instances())
+
+    assert len(instances) == 1
+    assert instances[0].serial == "127.0.0.1:16416"
+    assert instances[0].name == "MuMuPlayer-12.0-1"
 
 
 def test_mumu_global_name_is_not_supported(tmp_path: Path) -> None:

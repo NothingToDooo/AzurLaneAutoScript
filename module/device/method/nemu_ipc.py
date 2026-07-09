@@ -13,6 +13,7 @@ from module.base.decorator import cached_property, del_cached_property, has_cach
 from module.config.deep import deep_get
 from module.device.method.pool import WORKER_POOL, JobTimeout
 from module.device.method.utils import RETRY_TRIES, retry_sleep
+from module.device.mumu import mumu12_serial_to_id
 from module.device.platform import Platform
 from module.exception import RequestHumanTakeover
 from module.logger import logger
@@ -401,24 +402,17 @@ class NemuIpcImpl:
     @staticmethod
     def serial_to_id(serial: str):
         """
-        Predict instance ID from serial
-        E.g.
+        从 MuMu12 TCP serial 推算实例 ID。
+
+        例如：
             "127.0.0.1:16384" -> 0
             "127.0.0.1:16416" -> 1
-            Port from 16414 to 16418 -> 1
+            16414 到 16418 端口 -> 1
 
         Returns:
-            int: instance_id, or None if failed to predict
+            int: 实例 ID；无法推算时返回 None
         """
-        try:
-            port = int(serial.split(":")[1])
-        except IndexError, ValueError:
-            return None
-        index, offset = divmod(port - 16384 + 16, 32)
-        offset -= 16
-        if 0 <= index < 32 and offset in [-2, -1, 0, 1, 2]:
-            return index
-        return None
+        return mumu12_serial_to_id(serial)
 
 
 class NemuIpc(Platform):

@@ -8,6 +8,8 @@ from adbutils import AdbClient, AdbDevice
 
 from module.base.decorator import cached_property
 from module.config.config import AzurLaneConfig
+from module.device.mumu import MUMU12_SERIAL_EXAMPLE, is_mumu12_serial
+from module.exception import RequestHumanTakeover
 from module.logger import logger
 from module.webui.setting import State
 
@@ -99,6 +101,10 @@ class ConnectionAttr:
             logger.warning(f'Serial "{self.config.Emulator_Serial}" is revised to "{new}"')
             self.config.Emulator_Serial = new
             self.serial = new
+        if is_mumu12_serial(self.serial):
+            return
+        logger.critical(f'当前个人分支只支持 MuMu12 TCP serial，例如 "{MUMU12_SERIAL_EXAMPLE}"，当前为 "{self.serial}"')
+        raise RequestHumanTakeover
 
     @cached_property
     def port(self) -> int:
@@ -112,14 +118,11 @@ class ConnectionAttr:
 
     @cached_property
     def is_mumu12_family(self):
-        # 127.0.0.1:16384 + 32*n，最多按 32 个实例估算。
-        return 16384 <= self.port <= 17408
+        return is_mumu12_serial(self.serial)
 
     @cached_property
     def is_mumu_family(self):
-        # 127.0.0.1:7555
-        # 127.0.0.1:16384 + 32*n
-        return self.serial == "127.0.0.1:7555" or self.is_mumu12_family
+        return self.is_mumu12_family
 
     @cached_property
     def adb_binary(self):

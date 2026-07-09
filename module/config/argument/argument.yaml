@@ -22,7 +22,7 @@ Scheduler:
     display: hide
 Emulator:
   Serial:
-    value: auto
+    value: 127.0.0.1:16384
     valuetype: str
 EmulatorInfo:
   Emulator:

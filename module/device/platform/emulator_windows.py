@@ -7,6 +7,7 @@ import psutil
 # module/device/platform/emulator_base.py
 # module/device/platform/emulator_windows.py
 # 会被独立安装流程使用，因此这里不要导入 Alas 业务模块。
+from module.device.mumu import is_mumu12_serial
 from module.device.platform.emulator_base import (
     EmulatorBase,
     EmulatorInstanceBase,
@@ -86,7 +87,7 @@ class Emulator(EmulatorBase):
             file: Path to vbox file
 
         Returns:
-            str: serial such as `127.0.0.1:5555`
+            str: serial，例如 `127.0.0.1:16384`
         """
         regex = re.compile('<*?hostport="(.*?)".*?guestport="5555"/>')
         serial = ""
@@ -122,19 +123,14 @@ class Emulator(EmulatorBase):
 
         for file in iter_folder(folder, ext=".nemu"):
             serial = Emulator.vbox_file_to_serial(file)
-            if serial:
-                yield EmulatorInstance(
-                    serial=serial,
-                    name=name,
-                    path=self.path,
-                )
-                continue
-
             instance = EmulatorInstance(
                 serial=serial,
                 name=name,
                 path=self.path,
             )
+            if is_mumu12_serial(serial):
+                yield instance
+                continue
             if instance.MuMuPlayer12_id is not None:
                 instance.serial = self._mumu12_default_serial(instance)
                 yield instance

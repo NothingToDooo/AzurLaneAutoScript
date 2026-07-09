@@ -75,7 +75,18 @@ def test_adb_connect_disconnects_offline_devices_before_connecting() -> None:
     assert connection.adb_client.connect_calls == ["127.0.0.1:16384"]
 
 
-@pytest.mark.parametrize("serial", ["emulator-5554", "abcdef123456", "auto", "192.168.1.2:5555"])
+@pytest.mark.parametrize(
+    "serial",
+    [
+        "emulator-5554",
+        "abcdef123456",
+        "auto",
+        "192.168.1.2:5555",
+        "127.0.0.1:5555",
+        "127.0.0.1:7555",
+        "127.0.0.1:17408",
+    ],
+)
 def test_adb_connect_rejects_non_mumu_tcp_serial(serial: str) -> None:
     connection = _make_connection(serial=serial)
 

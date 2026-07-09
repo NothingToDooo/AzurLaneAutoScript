@@ -3,6 +3,7 @@ import typing as t
 from dataclasses import dataclass
 from pathlib import Path
 
+from module.device.mumu import is_mumu12_serial
 from module.device.platform.utils import cached_property, iter_folder
 
 
@@ -222,7 +223,7 @@ class EmulatorManagerBase:
         """
         返回当前个人版可尝试连接的 MuMu TCP serial。
         """
-        return [emulator.serial for emulator in self.all_emulator_instances if emulator.serial]
+        return [emulator.serial for emulator in self.all_emulator_instances if is_mumu12_serial(emulator.serial)]
 
     @cached_property
     def all_adb_binaries(self) -> list[str]:

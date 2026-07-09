@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from module.base.decorator import cached_property, del_cached_property
 from module.device.connection import Connection
+from module.device.mumu import mumu12_serial_to_id
 from module.device.platform.emulator_base import (
     EmulatorBase,
     EmulatorInstanceBase,
@@ -31,15 +32,7 @@ def serial_to_id(serial: str):
     返回：
         int：实例 ID；无法推算时返回 None。
     """
-    try:
-        port = int(serial.split(":")[1])
-    except IndexError, ValueError:
-        return None
-    index, offset = divmod(port - 16384 + 16, 32)
-    offset -= 16
-    if 0 <= index < 32 and offset in [-2, -1, 0, 1, 2]:
-        return index
-    return None
+    return mumu12_serial_to_id(serial)
 
 
 class PlatformBase(Connection, EmulatorManagerBase):
@@ -182,7 +175,7 @@ class PlatformBase(Connection, EmulatorManagerBase):
     ) -> EmulatorInstanceBase | None:
         """
         参数：
-            serial：类似 "127.0.0.1:5555" 的 serial。
+            serial：类似 "127.0.0.1:16384" 的 serial。
             name：类似 "Nougat64" 的实例名称。
             path：类似 "C:/Program Files/MuMuPlayer-12.0/shell/MuMuPlayer.exe" 的模拟器安装路径。
             emulator：Emulator 类中定义的模拟器类型，例如 "MuMuPlayer12"。
@@ -203,9 +196,7 @@ class PlatformBase(Connection, EmulatorManagerBase):
         if select.count == 1:
             return self._log_found_emulator_instance(select[0])
 
-        # MuMu12 额外修正。
-        # MuMu12 的 vbox 配置中可能是 127.0.0.1:7555，但用户配置 serial=127.0.0.1:16xxx。
-        # 遇到这种情况时，检查 serial 是否能和实例 ID 对应。
+        # MuMu12 额外修正：serial 对应多个候选时，检查实例 ID。
         instance = self._find_mumu12_instance_by_serial_id(instances)
         if instance is not None:
             return instance
