@@ -39,7 +39,7 @@ uv run python alas.py
 常用检查命令：
 
 ```powershell
-uv run ruff check . --no-cache
+uv run ruff check .
 uv run ty check
 uv run pytest
 ```
@@ -52,6 +52,6 @@ uv run pytest
 uv run python -m module.config.config_updater
 ```
 
-不要用脚本路径方式运行 `module/config/config_updater.py`，否则 Python 不会把仓库根目录加入导入路径，可能找不到顶层 `module` 包。
+脚本路径入口 `uv run python module/config/config_updater.py` 也会自动补仓库根目录；日常仍推荐用 `-m` 入口，保持模块导入语义一致。
 
 这个分支会继续小步清理旧结构。清理优先级是：先删已经不可达的分发、语言、资源和设备后端，再把仍然有运行职责的代码迁到更合适的位置。

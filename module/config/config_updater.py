@@ -1,10 +1,17 @@
 import json
 import re
+import sys
 import textwrap
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+if __name__ == "__main__" and __package__ in {None, ""}:
+    # 脚本路径运行时，先补仓库根目录，后面的绝对导入才可用。
+    sys.path.insert(0, str(REPO_ROOT))
 
 from module.base.decorator import cached_property
 from module.base.timer import timer
@@ -726,7 +733,7 @@ if __name__ == "__main__":
     # 确保在 Alas 根目录运行。
     import os
 
-    os.chdir(Path(__file__).resolve().parents[2])
+    os.chdir(REPO_ROOT)
 
     ConfigGenerator().generate()
     ConfigUpdater().update_file("template", is_template=True)

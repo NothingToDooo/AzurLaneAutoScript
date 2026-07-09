@@ -173,7 +173,11 @@ ignore = [
     # 点击、等待和重试抖动不是安全用途，保留非安全随机数。
     "S311",
 ]
-per-file-ignores = { "dev_tools/**/*.py" = ["T201"], "tests/**/*.py" = ["S101"] }
+[tool.ruff.lint.per-file-ignores]
+"dev_tools/**/*.py" = ["T201"]
+"tests/**/*.py" = ["S101"]
+# 脚本路径入口必须先补仓库根目录，才能导入顶层 module 包。
+"module/config/config_updater.py" = ["E402"]
 
 [tool.ruff.lint.pep8-naming]
 classmethod-decorators = ["cached_class_property"]
