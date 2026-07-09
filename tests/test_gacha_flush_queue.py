@@ -52,6 +52,8 @@ class _Device:
 
 
 class _RewardGacha(RewardGacha):
+    device: _Device
+
     def __init__(self) -> None:
         self.device = _Device()
         self.calls: list[tuple[object, ...]] = []

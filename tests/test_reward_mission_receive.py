@@ -5,10 +5,10 @@ from module.reward.reward import Reward
 
 
 class _FakeTimer:
-    reached_results = ()
+    default_reached_results: tuple[bool, ...] = ()
 
     def __init__(self, *_args, **_kwargs) -> None:
-        self.reached_results = list(self.__class__.reached_results)
+        self.reached_results: list[bool] = list(self.__class__.default_reached_results)
 
     def start(self):
         return self
@@ -76,7 +76,7 @@ class _FakeReward(Reward):
 
 
 def test_reward_mission_claim_receive_returns_current_state(monkeypatch) -> None:
-    _FakeTimer.reached_results = ()
+    _FakeTimer.default_reached_results = ()
     monkeypatch.setattr(reward_module, "Timer", _FakeTimer)
     reward = _FakeReward(page_results=[True], state_results=[reward_assets.MISSION_EMPTY])
 
@@ -84,7 +84,7 @@ def test_reward_mission_claim_receive_returns_current_state(monkeypatch) -> None
 
 
 def test_reward_mission_claim_receive_handles_reward_popup(monkeypatch) -> None:
-    _FakeTimer.reached_results = ()
+    _FakeTimer.default_reached_results = ()
     monkeypatch.setattr(reward_module, "Timer", _FakeTimer)
     reward = _FakeReward(
         page_results=[False, True],
@@ -98,7 +98,7 @@ def test_reward_mission_claim_receive_handles_reward_popup(monkeypatch) -> None:
 
 
 def test_reward_mission_claim_receive_times_out_on_empty_mission_page(monkeypatch) -> None:
-    _FakeTimer.reached_results = (True,)
+    _FakeTimer.default_reached_results = (True,)
     monkeypatch.setattr(reward_module, "Timer", _FakeTimer)
     reward = _FakeReward(page_results=[True], state_results=[None])
 

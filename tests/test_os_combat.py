@@ -36,6 +36,7 @@ class _FakeDevice:
 
 class _ExpInfoContext(os_combat.Combat):
     battle_status_click_interval = 3
+    device: _FakeDevice
 
     def __init__(self, *, appearing) -> None:
         self.device = _FakeDevice()
@@ -56,6 +57,9 @@ class _ExpInfoContext(os_combat.Combat):
 
 
 class _AutoSearchCombatContext(os_combat.Combat):
+    config: SimpleNamespace
+    device: _FakeDevice
+
     def __init__(self) -> None:
         self.device = _FakeDevice()
         self.config = SimpleNamespace(Submarine_Fleet=False)

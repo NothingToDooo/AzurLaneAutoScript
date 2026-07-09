@@ -79,6 +79,8 @@ class _Selection:
 
 
 class _CommissionUI(RewardCommission):
+    device: _Device
+
     def __init__(self) -> None:
         self.device = _Device()
         self.calls: list[tuple[object, ...]] = []

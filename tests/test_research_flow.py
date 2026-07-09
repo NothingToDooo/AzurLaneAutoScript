@@ -1,22 +1,27 @@
-from types import SimpleNamespace
-
 from module.research.research import RewardResearch
 
 
+class _Device:
+    image = "screen"
+
+    def __init__(self) -> None:
+        self.screenshots = 0
+
+    def screenshot(self) -> None:
+        self.screenshots += 1
+
+
 class _Receive6thContext(RewardResearch):
+    device: _Device
+
     def __init__(self, *, status, finished=False, receive_result=True, queue_slot=1) -> None:
-        self.device = SimpleNamespace(image="screen", screenshots=0)
+        self.device = _Device()
         self.status = status
         self.finished = finished
         self.receive_result = receive_result
         self.queue_slot = queue_slot
         self.calls = []
         self._research_finished_index = 2
-
-        def screenshot():
-            self.device.screenshots += 1
-
-        self.device.screenshot = screenshot
 
     def get_research_status(self, image):
         assert image == "screen"

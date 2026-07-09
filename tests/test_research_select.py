@@ -38,6 +38,8 @@ class _ResearchSelectContext(RewardResearch):
 
 
 class _ResearchCheckContext(ResearchSelector):
+    config: SimpleNamespace
+
     def __init__(self) -> None:
         self.config = SimpleNamespace(
             Research_UseCube="always_use",

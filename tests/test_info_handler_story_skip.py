@@ -54,6 +54,13 @@ class _Device:
 
 
 class _InfoHandler(InfoHandler):
+    config: _Config
+    device: _Device
+    story_popup_timeout: _Timer
+    _story_option_timer: _Timer
+    _story_option_confirm: _Timer
+    _story_confirm: _Timer
+
     def __init__(self) -> None:
         self.config = _Config()
         self.device = _Device()

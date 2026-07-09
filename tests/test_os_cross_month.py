@@ -79,6 +79,10 @@ class _ZoneSet:
 
 
 class _CrossMonthRunner(OpsiCrossMonth):
+    config: _Config
+    device: _Device
+    zone: _Zone
+
     def __init__(self) -> None:
         self.config = _Config()
         self.device = _Device()

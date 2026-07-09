@@ -40,6 +40,7 @@ def test_scheduler_task_name_maps_to_runtime_command(task_name: str) -> None:
 
 def test_campaign_args_are_resolved_at_runtime() -> None:
     spec = TASK_REGISTRY["main"]
+    assert not isinstance(spec, FunctionTaskSpec)
     runner = SimpleNamespace(
         config=SimpleNamespace(
             Campaign_Name="12-4",

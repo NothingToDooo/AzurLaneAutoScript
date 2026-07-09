@@ -80,6 +80,9 @@ class _ZoneSet:
 
 
 class _MeowfficerFarming(OpsiMeowfficerFarming):
+    config: _Config
+    zone: _Zone
+
     def __init__(self) -> None:
         self.config = _Config()
         self.calls: list[tuple[object, ...]] = []

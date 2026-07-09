@@ -54,6 +54,9 @@ class _Config:
 
 
 class _InterruptMap(OSMap):
+    config: _Config
+    device: _Device
+
     def __init__(self) -> None:
         self.device = _Device()
         self.config = _Config()

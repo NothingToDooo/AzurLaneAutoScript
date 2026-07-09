@@ -48,6 +48,9 @@ class _Grid:
 
 
 class _Campaign(CampaignBase):
+    device: _Device
+    view: _View
+
     def __init__(self):
         self.device = _Device()
         self.view = _View()

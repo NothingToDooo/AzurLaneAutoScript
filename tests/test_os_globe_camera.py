@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, TypeVar, cast
+from typing import ClassVar, TypeVar
 
 import pytest
 
@@ -64,6 +64,9 @@ class _Globe:
 
 
 class _GlobeCamera(GlobeCamera):
+    device: _Device
+    globe: _Globe
+
     def __init__(self) -> None:
         self.device = _Device()
         self.calls: list[tuple[object, ...]] = []
@@ -84,7 +87,7 @@ class _GlobeCamera(GlobeCamera):
     def _globe_init(self) -> None:
         self.calls.append(("_globe_init",))
         if not hasattr(self, "globe"):
-            self.globe = cast("Any", _Globe())
+            self.globe = _Globe()
 
     def is_in_globe(self) -> bool:
         self.calls.append(("is_in_globe",))

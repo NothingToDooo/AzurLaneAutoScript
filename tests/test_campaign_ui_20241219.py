@@ -22,6 +22,8 @@ class _Config:
 
 
 class _CampaignUI(CampaignUI):
+    config: _Config
+
     def __init__(
         self,
         *,

@@ -21,6 +21,8 @@ class _Map:
 
 
 class _Campaign(Campaign):
+    map: _Map
+
     def __init__(self, *, boss=None, boss_accessible=True, clear_mode=False, support_fleet=False):
         self.calls = []
         self.map = _Map(boss)

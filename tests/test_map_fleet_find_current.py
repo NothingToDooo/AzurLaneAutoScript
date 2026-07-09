@@ -1,5 +1,8 @@
 from module.map.fleet import Fleet
 
+_Location = tuple[int, int]
+_MaybeLocation = _Location | tuple[()]
+
 
 class _Config:
     POOR_MAP_DATA = False
@@ -9,7 +12,7 @@ class _Config:
 class _Grid:
     def __init__(
         self,
-        location: tuple[int, int],
+        location: _Location,
         *,
         is_current_fleet: object = False,
         is_spawn_point: object = True,
@@ -46,7 +49,7 @@ class _Selected(list[_Grid]):
 class _Map:
     def __init__(self) -> None:
         self.select_results: dict[tuple[tuple[str, object], ...], _Selected] = {}
-        self.cover_results: dict[tuple[int, int], _Selected] = {}
+        self.cover_results: dict[_Location, _Selected] = {}
 
     def set_select(self, kwargs: dict[str, object], grids: _Selected) -> None:
         self.select_results[tuple(sorted(kwargs.items()))] = grids
@@ -59,6 +62,12 @@ class _Map:
 
 
 class _Fleet(Fleet):
+    config: _Config
+    map: _Map
+    camera: _Location
+    fleet_1_location: _MaybeLocation
+    fleet_2_location: _MaybeLocation
+
     def __init__(self) -> None:
         self.config = _Config()
         self.map = _Map()

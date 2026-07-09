@@ -13,6 +13,8 @@ class _FakeDevice:
 
 
 class _FakeUI(UI):
+    device: _FakeDevice
+
     def __init__(self, *, appear_buttons=(), appear_then_click_buttons=(), guild_popup=False) -> None:
         self.device = _FakeDevice()
         self.appear_buttons = list(appear_buttons)

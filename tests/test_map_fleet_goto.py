@@ -54,6 +54,9 @@ class _Map:
 
 
 class _Fleet(Fleet):
+    config: _Config
+    map: _Map
+
     def __init__(self) -> None:
         self.config = _Config()
         self.map = _Map()

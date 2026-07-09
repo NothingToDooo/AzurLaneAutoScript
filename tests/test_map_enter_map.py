@@ -40,6 +40,10 @@ class _Device:
 
 
 class _MapOperation(MapOperation):
+    config: SimpleNamespace
+    device: _Device
+    map_clear_percentage_timer: _Resettable
+
     def __init__(self, *, auto_search: bool = False) -> None:
         self.calls = []
         self.device = _Device(self.calls)

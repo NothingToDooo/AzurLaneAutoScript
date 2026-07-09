@@ -77,6 +77,10 @@ class _View:
 
 
 class _MapRescan(OSMap):
+    config: _Config
+    device: _Device
+    view: _View
+
     def __init__(self) -> None:
         self.config = _Config()
         self.device = _Device()

@@ -46,6 +46,9 @@ class _Device:
 
 class _Camera(Camera):
     _auto_search_menu_offset = (1, 2, 3, 4)
+    device: _Device
+    view: _View
+    config: SimpleNamespace
 
     def __init__(self, *, view_error: MapDetectionError | None = None, command: str = "Main") -> None:
         self.device = _Device()

@@ -33,6 +33,8 @@ class _Device:
 
 
 class _Hospital(Hospital):
+    device: _Device
+
     def __init__(self) -> None:
         self.device = _Device()
         self.calls: list[tuple[object, ...]] = []

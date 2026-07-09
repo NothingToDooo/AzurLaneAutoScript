@@ -17,6 +17,9 @@ class _Device:
 
 
 class _Daily(Daily):
+    config: SimpleNamespace
+    device: _Device
+
     def __init__(self, *, use_skip: bool = True) -> None:
         self.config = SimpleNamespace(Daily_UseDailySkip=use_skip)
         self.device = _Device()

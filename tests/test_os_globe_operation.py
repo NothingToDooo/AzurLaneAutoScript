@@ -50,6 +50,8 @@ class _Device:
 
 
 class _GlobeOperation(GlobeOperation):
+    device: _Device
+
     def __init__(self) -> None:
         self.has_switch = True
         self.pinned_name = ""

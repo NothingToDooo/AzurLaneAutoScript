@@ -6,10 +6,10 @@ from module.ui.page import page_supply_pack
 
 
 class _FakeTimer:
-    reached_results = ()
+    default_reached_results: tuple[bool, ...] = ()
 
     def __init__(self, *_args, **_kwargs) -> None:
-        self.reached_results = list(self.__class__.reached_results)
+        self.reached_results: list[bool] = list(self.__class__.default_reached_results)
         self.reset_count = 0
 
     def start(self):
@@ -38,6 +38,8 @@ class _FakeDevice:
 
 
 class _FakeSupplyPack(SupplyPack):
+    device: _FakeDevice
+
     def __init__(self, *, appear_results=None, appear_then_click_results=None, popup_results=None) -> None:
         self.device = _FakeDevice()
         self.appear_results = {id(button): list(results) for button, results in (appear_results or {}).items()}
@@ -74,7 +76,7 @@ class _FakeSupplyPack(SupplyPack):
 
 def test_supply_pack_buy_executes_purchase(monkeypatch) -> None:
     supply_button = object()
-    _FakeTimer.reached_results = (True,)
+    _FakeTimer.default_reached_results = (True,)
     monkeypatch.setattr(supply_pack_module, "Timer", _FakeTimer)
     supply_pack = _FakeSupplyPack(
         appear_results={
@@ -97,7 +99,7 @@ def test_supply_pack_buy_executes_purchase(monkeypatch) -> None:
 
 def test_supply_pack_buy_stops_after_three_failed_clicks(monkeypatch) -> None:
     supply_button = object()
-    _FakeTimer.reached_results = ()
+    _FakeTimer.default_reached_results = ()
     monkeypatch.setattr(supply_pack_module, "Timer", _FakeTimer)
     supply_pack = _FakeSupplyPack(
         appear_results={

@@ -56,6 +56,8 @@ class _Device:
 
 
 class _Awaken(Awaken):
+    device: _Device
+
     def __init__(self) -> None:
         self.device = _Device()
         self.calls: list[tuple[object, ...]] = []
@@ -103,7 +105,7 @@ class _Awaken(Awaken):
 
 
 @pytest.fixture(autouse=True)
-def _patch_awaken_assets(monkeypatch: pytest.MonkeyPatch) -> dict[str, _Asset]:
+def awaken_assets(monkeypatch: pytest.MonkeyPatch) -> dict[str, _Asset]:
     _Timer.next_index = 0
     _Timer.reached_results = {}
     monkeypatch.setattr(awaken_module, "Timer", _Timer)
@@ -117,8 +119,10 @@ def _patch_awaken_assets(monkeypatch: pytest.MonkeyPatch) -> dict[str, _Asset]:
     return assets
 
 
-def test_awaken_once_returns_no_exp_when_level_up_visible() -> None:
-    awaken_module.awaken_assets.LEVEL_UP.match_results = [True]
+def test_awaken_once_returns_no_exp_when_level_up_visible(
+    awaken_assets: dict[str, _Asset],
+) -> None:
+    awaken_assets["LEVEL_UP"].match_results = [True]
     awaken = _Awaken()
     awaken.appear_results = {"AWAKEN_CONFIRM": [False]}
 

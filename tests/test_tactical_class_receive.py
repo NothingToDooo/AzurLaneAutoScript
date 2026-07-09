@@ -31,6 +31,8 @@ class _Device:
 
 class _Tactical(RewardTacticalClass):
     _popup_offset = (0, 0)
+    config: SimpleNamespace
+    device: _Device
 
     def __init__(self, *, add_new_student: bool = False) -> None:
         self.config = SimpleNamespace(

@@ -19,6 +19,8 @@ class _Device:
 
 
 class _EquipmentChange(EquipmentChange):
+    device: _Device
+
     def __init__(self) -> None:
         self.device = _Device()
 

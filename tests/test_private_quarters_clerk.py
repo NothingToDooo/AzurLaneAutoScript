@@ -45,6 +45,8 @@ class _Item:
 
 
 class _Shop(PQShopClerk):
+    device: _Device
+
     def __init__(self) -> None:
         self.device = _Device()
         self.calls: list[tuple[object, ...]] = []

@@ -20,7 +20,7 @@ class _Zone:
 class _Config:
     def __init__(self) -> None:
         self.OS_EXPLORE_FILTER = "1 > 2"
-        self.OpsiExplore_LastZone = 0
+        self.OpsiExplore_LastZone: int | str = 0
         self.OpsiExplore_SpecialRadar = True
         self.OpsiFleet_Fleet = 1
         self.OpsiFleet_Submarine = False
@@ -58,6 +58,8 @@ class _Config:
 
 
 class _Explore(OpsiExplore):
+    config: _Config
+
     def __init__(self, *, globe_results, combat_results) -> None:
         self.config = _Config()
         self.globe_results = globe_results

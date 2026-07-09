@@ -41,6 +41,8 @@ class _Device:
 
 
 class _ExerciseCombat(ExerciseCombat):
+    device: _Device
+
     def __init__(self) -> None:
         self.device = _Device()
         self.exercise_results = []

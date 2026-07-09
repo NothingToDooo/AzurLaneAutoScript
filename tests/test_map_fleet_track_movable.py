@@ -3,9 +3,12 @@ import pytest
 from module.map import fleet as fleet_module
 from module.map.fleet import Fleet
 
+_Location = tuple[int, int]
+_MaybeLocation = _Location | tuple[()]
+
 
 class _Grid:
-    def __init__(self, location: tuple[int, int], *, may_siren: object = True) -> None:
+    def __init__(self, location: _Location, *, may_siren: object = True) -> None:
         self.location = location
         self.may_siren = may_siren
         self.is_siren = False
@@ -24,7 +27,7 @@ class _Grid:
 
 class _Selected(list[_Grid]):
     @property
-    def location(self) -> list[tuple[int, int]]:
+    def location(self) -> list[_Location]:
         return [grid.location for grid in self]
 
     def delete(self, other: _Selected) -> _Selected:
@@ -63,7 +66,7 @@ class _Config:
 
 class _Map:
     def __init__(self) -> None:
-        self.grids: dict[tuple[int, int], _Grid] = {}
+        self.grids: dict[_Location, _Grid] = {}
         self.select_results: dict[tuple[tuple[str, object], ...], _Selected] = {}
         self.manual_map_covered = _Selected([])
         self.covered_result = _Selected([])
@@ -71,7 +74,7 @@ class _Map:
         self.find_path_initial_calls: list[tuple[object, object]] = []
         self.grid_connection_calls: list[dict[str, object]] = []
 
-    def add_grid(self, location: tuple[int, int], *, may_siren: object = True) -> _Grid:
+    def add_grid(self, location: _Location, *, may_siren: object = True) -> _Grid:
         grid = _Grid(location, may_siren=may_siren)
         self.grids[location] = grid
         return grid
@@ -82,7 +85,7 @@ class _Map:
     def select(self, **kwargs: object) -> _Selected:
         return self.select_results.get(tuple(sorted(kwargs.items())), _Selected([]))
 
-    def to_selected(self, locations: list[tuple[int, int]]) -> _Selected:
+    def to_selected(self, locations: list[_Location]) -> _Selected:
         return _Selected([self.grids[location] for location in locations])
 
     def missing_get(self, *_args: object, **_kwargs: object) -> tuple[None, dict[str, int]]:
@@ -99,11 +102,18 @@ class _Map:
     def grid_connection_initial(self, **kwargs: object) -> None:
         self.grid_connection_calls.append(kwargs)
 
-    def __getitem__(self, location: tuple[int, int]) -> _Grid:
+    def __getitem__(self, location: _Location) -> _Grid:
         return self.grids[location]
 
 
 class _Fleet(Fleet):
+    config: _Config
+    map: _Map
+    fleet_1_location: _Location
+    fleet_2_location: _MaybeLocation
+    movable_before: _Selected
+    movable_before_normal: _Selected
+
     def __init__(self) -> None:
         self.config = _Config()
         self.map = _Map()

@@ -45,6 +45,8 @@ def _fake_ui_options(options=None, settings=None) -> _FakeUIOptions:
 
 
 class _FakeUI(UI):
+    device: _FakeDevice
+
     def __init__(self, options=None, **settings) -> None:
         options = _fake_ui_options(options, settings)
         self.device = _FakeDevice()

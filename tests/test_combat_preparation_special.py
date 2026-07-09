@@ -66,6 +66,8 @@ class _SpecialCombatBase:
 
 
 class _HospitalCombat(_SpecialCombatBase, HospitalCombat):
+    config: SimpleNamespace
+
     def __init__(self) -> None:
         super().__init__()
         self.config = SimpleNamespace(
@@ -104,6 +106,8 @@ class _HospitalCombat(_SpecialCombatBase, HospitalCombat):
 
 
 class _Raid(_SpecialCombatBase, Raid):
+    config: SimpleNamespace
+
     def __init__(self, *, has_oil_icon: bool) -> None:
         _SpecialCombatBase.__init__(self)
         self.config = SimpleNamespace(task_stop=self._task_stop)

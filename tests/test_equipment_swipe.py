@@ -54,6 +54,8 @@ class _Device:
 
 
 class _Equipment(Equipment):
+    device: _Device
+
     def __init__(self) -> None:
         self.device = _Device()
         self.calls: list[tuple[object, ...]] = []

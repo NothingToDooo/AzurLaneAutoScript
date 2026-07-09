@@ -12,6 +12,8 @@ class _FakeDevice:
 
 
 class _MapGetItemsContext(MapEventHandler):
+    device: _FakeDevice
+
     def __init__(self, *, in_map=False, appearing=()) -> None:
         self._in_map = in_map
         self.appearing = set(appearing)

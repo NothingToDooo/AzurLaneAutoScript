@@ -5,6 +5,7 @@ import pytest
 from module.os_shop import shop as shop_module
 from module.os_shop.shop import OSShop
 from module.shop.assets import AMOUNT_MAX
+from module.ui.ui import UiIndexControls
 
 _T = TypeVar("_T")
 
@@ -70,6 +71,8 @@ class _BuyItem:
 
 
 class _Shop(OSShop):
+    device: _Device
+
     def __init__(self) -> None:
         self.device = _Device()
         self.calls: list[tuple[object, ...]] = []
@@ -109,6 +112,8 @@ class _Shop(OSShop):
 
 
 class _BuyShop(OSShop):
+    device: _Device
+
     def __init__(self) -> None:
         self.device = _Device()
         self.calls: list[tuple[object, ...]] = []
@@ -201,9 +206,11 @@ def test_shop_buy_amount_handler_sets_max_before_target_amount(monkeypatch: pyte
     assert shop.device.screenshot_count == 2
     ensure_call = next(call for call in shop.calls if call[0] == "ui_ensure_index")
     assert ensure_call[1] == 25
-    assert ensure_call[2].letter is fake_ocr
-    assert ensure_call[2].prev_button == shop_module.AMOUNT_MINUS
-    assert ensure_call[2].next_button == shop_module.AMOUNT_PLUS
+    controls = ensure_call[2]
+    assert isinstance(controls, UiIndexControls)
+    assert controls.letter is fake_ocr
+    assert controls.prev_button == shop_module.AMOUNT_MINUS
+    assert controls.next_button == shop_module.AMOUNT_PLUS
     assert ensure_call[3] == {"skip_first_screenshot": True}
 
 

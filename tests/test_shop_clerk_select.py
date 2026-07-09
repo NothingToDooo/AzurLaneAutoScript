@@ -36,6 +36,8 @@ class _FakeStockOcr:
 
 
 class _FakeShopClerk(ShopClerk):
+    device: _FakeDevice
+
     def __init__(self, *, currency=0, appear_results=None) -> None:
         self.device = _FakeDevice()
         self._currency = currency

@@ -57,6 +57,10 @@ def _fake_ui_options(options=None, settings=None) -> _FakeUIOptions:
 
 
 class _FakeUI(UI):
+    config: SimpleNamespace
+    device: _FakeDevice
+    ui_current: Page | None
+
     def __init__(self, options=None, **settings) -> None:
         options = _fake_ui_options(options, settings)
         self.device = _FakeDevice(has_cached_image=options.has_cached_image, app_running=options.app_running)

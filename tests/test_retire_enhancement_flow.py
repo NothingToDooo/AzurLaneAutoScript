@@ -11,6 +11,8 @@ class _Config:
 
 
 class _Enhancement(Enhancement):
+    config: _Config
+
     def __init__(self, *, enhance_filter=None, empty_ship_types=(), choose_results=()):
         self.config = _Config(enhance_filter=enhance_filter)
         self.calls = []

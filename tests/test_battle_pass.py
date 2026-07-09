@@ -7,10 +7,10 @@ from module.ui.assets import BATTLE_PASS_CHECK
 
 
 class _FakeTimer:
-    reached_results = ()
+    default_reached_results: tuple[bool, ...] = ()
 
     def __init__(self, *_args, **_kwargs) -> None:
-        self.reached_results = list(self.__class__.reached_results)
+        self.reached_results: list[bool] = list(self.__class__.default_reached_results)
 
     def start(self):
         return self
@@ -55,6 +55,8 @@ def _fake_battle_pass_options(options=None, settings=None) -> _FakeBattlePassOpt
 
 
 class _FakeBattlePass(BattlePass):
+    device: _FakeDevice
+
     def __init__(self, options=None, **settings) -> None:
         options = _fake_battle_pass_options(options, settings)
         self.device = _FakeDevice()
@@ -105,7 +107,7 @@ class _FakeBattlePass(BattlePass):
 
 
 def test_battle_pass_receive_marks_received_after_get_items(monkeypatch) -> None:
-    _FakeTimer.reached_results = (True,)
+    _FakeTimer.default_reached_results = (True,)
     monkeypatch.setattr(battle_pass_module, "Timer", _FakeTimer)
     battle_pass = _FakeBattlePass(
         appear_results={
@@ -128,7 +130,7 @@ def test_battle_pass_receive_marks_received_after_get_items(monkeypatch) -> None
 
 
 def test_battle_pass_receive_returns_false_without_rewards(monkeypatch) -> None:
-    _FakeTimer.reached_results = (True,)
+    _FakeTimer.default_reached_results = (True,)
     monkeypatch.setattr(battle_pass_module, "Timer", _FakeTimer)
     battle_pass = _FakeBattlePass(
         appear_results={

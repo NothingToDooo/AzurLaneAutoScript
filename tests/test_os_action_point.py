@@ -6,6 +6,8 @@ from module.os_handler.action_point import ACTION_POINT_BOX, ActionPointHandler,
 
 
 class _ActionPointContext(ActionPointHandler):
+    config: SimpleNamespace
+
     def __init__(self, *, current, total, boxes, preserve=0, buy_limit=0) -> None:
         self._action_point_current = current
         self._action_point_total = total

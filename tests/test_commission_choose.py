@@ -50,6 +50,8 @@ class _Filter:
 
 
 class _CommissionUI(RewardCommission):
+    config: _Config
+
     def __init__(self) -> None:
         self.config = _Config()
 

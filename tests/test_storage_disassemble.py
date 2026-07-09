@@ -75,6 +75,8 @@ class _Ocr:
 
 
 class _Storage(StorageHandler):
+    device: _Device
+
     def __init__(self) -> None:
         self.device = _Device()
         self.calls: list[tuple[object, ...]] = []

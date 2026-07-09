@@ -5,13 +5,16 @@ from module.combat import combat
 
 class _FakeDevice:
     def __init__(self) -> None:
-        self.clicks = []
+        self.clicks: list[object] = []
 
     def click(self, button) -> None:
         self.clicks.append(button)
 
 
 class _EmergencyRepairContext(combat.Combat):
+    config: SimpleNamespace
+    device: _FakeDevice
+
     def __init__(self, *, hp, appearing=(), confirm=False) -> None:
         self.config = SimpleNamespace(
             HpControl_UseEmergencyRepair=True,
@@ -43,6 +46,8 @@ class _EmergencyRepairContext(combat.Combat):
 
 
 class _CombatLoopContext(combat.Combat):
+    device: SimpleNamespace
+
     def __init__(self, *, iterations) -> None:
         self.iterations = iterations
         self.device = SimpleNamespace(
@@ -110,6 +115,8 @@ class _CombatExecuteContext(_CombatLoopContext):
 
 
 class _CombatStatusContext(_CombatLoopContext):
+    config: SimpleNamespace
+
     def __init__(self, *, iterations=1) -> None:
         super().__init__(iterations=iterations)
         self.config = SimpleNamespace(GET_SHIP_TRIGGERED=False)
@@ -184,6 +191,8 @@ class _CombatStatusContext(_CombatLoopContext):
 
 
 class _CombatOrchestrationContext(combat.Combat):
+    config: SimpleNamespace
+
     def __init__(self) -> None:
         self.config = SimpleNamespace(
             HpControl_UseHpBalance=True,
@@ -192,7 +201,7 @@ class _CombatOrchestrationContext(combat.Combat):
             Submarine_Fleet=True,
             Submarine_Mode="every_combat",
         )
-        self.emotion = SimpleNamespace(is_calculate=False)
+        vars(self)["emotion"] = SimpleNamespace(is_calculate=False)
         self.preparation_calls = []
         self.execute_calls = []
         self.status_calls = []

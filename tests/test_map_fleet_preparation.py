@@ -54,6 +54,9 @@ class _FakeFleetOperator:
 
 
 class _FleetPreparation(FleetPreparation):
+    config: SimpleNamespace
+    device: _Device
+
     def __init__(
         self,
         *,

@@ -45,6 +45,9 @@ class _FakeShopItems:
 
 
 class _FakeShopBase(ShopBase):
+    config: SimpleNamespace
+    device: _FakeDevice
+
     def __init__(self, shop_items, *, extract_template=False, obstruct_results=()) -> None:
         self.device = _FakeDevice()
         self.config = SimpleNamespace(SHOP_EXTRACT_TEMPLATE=extract_template)

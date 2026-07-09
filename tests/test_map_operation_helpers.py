@@ -29,6 +29,12 @@ class _Timer:
 
 
 class _MapOperation(MapOperation):
+    config: _Config
+    device: _Device
+    map_clear_percentage_prev: float
+    map_clear_percentage: float
+    map_clear_percentage_timer: _Timer
+
     def __init__(self):
         self.calls = []
         self.config = _Config()

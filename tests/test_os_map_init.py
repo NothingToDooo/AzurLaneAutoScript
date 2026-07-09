@@ -24,6 +24,9 @@ class _Zone:
 
 
 class _Map(OSMap):
+    config: _Config
+    zone: _Zone
+
     def __init__(
         self,
         *,

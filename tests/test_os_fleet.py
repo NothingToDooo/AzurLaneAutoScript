@@ -62,6 +62,8 @@ class _Radar:
 
 
 class _Fleet(OSFleet):
+    device: _Device
+
     def __init__(self) -> None:
         self.device = _Device()
         self.radar = _Radar(self)

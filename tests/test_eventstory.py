@@ -39,6 +39,8 @@ class _EventStoryStateContext(EventStory):
 
 
 class _EventStoryLoopContext(_EventStoryStateContext):
+    device: _FakeDevice
+
     def __init__(self) -> None:
         super().__init__(clicking=(eventstory_assets.STORY_FIRST,))
         self.device = _FakeDevice()

@@ -33,6 +33,9 @@ class _Device:
 
 
 class _Coalition(Coalition):
+    config: _Config
+    device: _Device
+
     def __init__(self):
         self.calls = []
         self.config = _Config()

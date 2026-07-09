@@ -49,6 +49,9 @@ class _Device:
 
 
 class _GuildLogistics(GuildLogistics):
+    config: _Config
+    device: _Device
+
     def __init__(self) -> None:
         self.config = _Config()
         self.device = _Device()

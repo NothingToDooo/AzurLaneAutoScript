@@ -65,6 +65,9 @@ class _View:
 
 
 class _WalkStableFleet(OSFleet):
+    device: _Device
+    view: _View
+
     def __init__(self) -> None:
         self.device = _Device()
         self.view = _View(self)

@@ -36,6 +36,8 @@ class _Device:
 
 
 class _EnemySearching(EnemySearchingHandler):
+    device: _Device
+
     def __init__(self) -> None:
         self.device = _Device()
         self.in_map_results = []

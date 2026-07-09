@@ -34,6 +34,8 @@ class _Scroll:
 
 
 class _Campaign(CampaignBase):
+    device: _Device
+
     def __init__(self):
         self.device = _Device()
         self.calls = []

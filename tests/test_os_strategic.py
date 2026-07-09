@@ -44,6 +44,8 @@ class _Scroll:
 
 
 class _StrategicSearch(StrategicSearchHandler):
+    device: _Device
+
     def __init__(self) -> None:
         self.device = _Device()
         self.selected_results: dict[str, list[bool]] = {}

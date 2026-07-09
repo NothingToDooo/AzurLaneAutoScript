@@ -30,6 +30,8 @@ class _Device:
 
 
 class _Coalition(CoalitionUI):
+    device: _Device
+
     def __init__(self) -> None:
         self.device = _Device()
         self.battle_results = []
