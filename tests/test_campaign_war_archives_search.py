@@ -43,11 +43,11 @@ class _Campaign(CampaignBase):
         self.entrance_results = []
         self.loading_results = []
 
-    def appear(self, button):
+    def appear(self, button, *_args: object, **_kwargs: object):
         self.calls.append(("appear", button))
         return self.page_results.pop(0)
 
-    def ui_ensure(self, destination):
+    def ui_ensure(self, destination, *_args: object, **_kwargs: object):
         self.calls.append(("ui_ensure", destination))
 
     def _get_archives_entrance(self, name):

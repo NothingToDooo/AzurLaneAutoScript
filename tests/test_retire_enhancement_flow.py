@@ -30,8 +30,9 @@ class _Enhancement(Enhancement):
             return self.choose_results.pop(0)
         return False, ship_count
 
-    def ui_back(self, button):
-        self.calls.append(("ui_back", button.name))
+    def ui_back(self, check_button, appear_button=None, offset=(30, 30), retry_wait=10, skip_first_screenshot=False):
+        _ = (appear_button, offset, retry_wait, skip_first_screenshot)
+        self.calls.append(("ui_back", check_button.name))
 
     def _enhance_quit(self):
         self.calls.append(("enhance_quit",))

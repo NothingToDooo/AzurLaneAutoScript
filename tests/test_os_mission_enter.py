@@ -55,33 +55,33 @@ class _MissionHandler(MissionHandler):
             return results.pop(0)
         return default
 
-    def loop(self):
+    def loop(self, *_args: object, **_kwargs: object):
         return range(5)
 
     def is_in_os_mission(self) -> bool:
         self.calls.append(("is_in_os_mission",))
         return self._next_result(self.in_mission_results, default=False)
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def match_template_color(self, button: object, **kwargs: object) -> bool:
+    def match_template_color(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("match_template_color", key, kwargs))
         return self._next_result(self.match_results.get(key, []), default=False)
 
-    def appear_then_click(self, button: object, **kwargs: object) -> bool:
+    def appear_then_click(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)
 
-    def handle_popup_confirm(self, name: str) -> bool:
+    def handle_popup_confirm(self, name: str = "", *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 
-    def handle_map_get_items(self) -> bool:
+    def handle_map_get_items(self, *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_map_get_items",))
         return self._next_result(self.get_items_results, default=False)
 

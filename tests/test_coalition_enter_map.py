@@ -54,10 +54,10 @@ class _Coalition(CoalitionUI):
             return results.pop(0)
         return False
 
-    def loop(self):
+    def loop(self, *_args: object, **_kwargs: object):
         yield from range(8)
 
-    def appear(self, button, **_kwargs):
+    def appear(self, button, *_args: object, **_kwargs):
         if button == BATTLE_PREPARATION:
             return self._next(self.battle_results)
         if button in {
@@ -98,8 +98,9 @@ class _Coalition(CoalitionUI):
     def handle_combat_automation_confirm(self):
         return self._next(self.automation_confirm_results)
 
-    def handle_popup_confirm(self, popup):
-        assert popup == "COALITION"
+    def handle_popup_confirm(self, name="", offset=None, interval=2):
+        _ = (name, offset, interval)
+        assert name == "COALITION"
         return self._next(self.popup_results)
 
 

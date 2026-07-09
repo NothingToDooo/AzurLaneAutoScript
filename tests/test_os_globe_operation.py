@@ -87,7 +87,7 @@ class _GlobeOperation(GlobeOperation):
             return results.pop(0)
         return default
 
-    def loop(self):
+    def loop(self, *_args: object, **_kwargs: object):
         return range(self.loop_count)
 
     def zone_has_switch(self) -> bool:
@@ -117,17 +117,17 @@ class _GlobeOperation(GlobeOperation):
         self.calls.append(("is_in_map",))
         return self._next_result(self.in_map_results, default=False)
 
-    def appear_then_click(self, button: object, **kwargs: object) -> bool:
+    def appear_then_click(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def interval_reset(self, button: object) -> None:
+    def interval_reset(self, button: object, *_args: object, **_kwargs: object) -> None:
         key = button_key(button)
         self.calls.append(("interval_reset", key))
         self.interval_resets.append(key)
@@ -136,11 +136,11 @@ class _GlobeOperation(GlobeOperation):
         self.calls.append(("handle_map_event",))
         return self._next_result(self.map_event_results, default=False)
 
-    def handle_popup_confirm(self, name: str) -> bool:
+    def handle_popup_confirm(self, name: str = "", *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 
-    def handle_action_point(self, **kwargs: object) -> bool:
+    def handle_action_point(self, *_args: object, **kwargs: object) -> bool:
         self.calls.append(("handle_action_point", kwargs))
         return self._next_result(self.action_point_results, default=False)
 

@@ -15,7 +15,7 @@ class _FakeUI(UI):
         self.reset_buttons = []
         self.interval_timer = {}
 
-    def interval_reset(self, button) -> None:
+    def interval_reset(self, button, *_args: object, **_kwargs: object) -> None:
         self.reset_buttons.append(button)
 
 

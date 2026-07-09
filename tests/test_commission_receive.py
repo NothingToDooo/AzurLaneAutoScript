@@ -72,29 +72,29 @@ class _CommissionUI(RewardCommission):
             return results.pop(0)
         return default
 
-    def ui_page_appear(self, page: object, **kwargs: object) -> bool:
+    def ui_page_appear(self, page: object, *_args: object, **kwargs: object) -> bool:
         self.calls.append(("ui_page_appear", page, kwargs))
         return self._next_result(self.page_results, default=False)
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def appear_then_click(self, button: object, **kwargs: object) -> bool:
+    def appear_then_click(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)
 
-    def ui_main_appear_then_click(self, page: object, **kwargs: object) -> bool:
+    def ui_main_appear_then_click(self, page: object, *_args: object, **kwargs: object) -> bool:
         self.calls.append(("ui_main_appear_then_click", page, kwargs))
         return self._next_result(self.main_results, default=False)
 
-    def ui_additional(self) -> bool:
+    def ui_additional(self, *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("ui_additional",))
         return self._next_result(self.additional_results, default=False)
 
-    def interval_reset(self, button: object) -> None:
+    def interval_reset(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_reset", button))
 
 

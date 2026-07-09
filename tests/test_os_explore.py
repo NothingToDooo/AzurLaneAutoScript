@@ -77,26 +77,28 @@ class _Explore(OpsiExplore):
     def run_explore(self):
         return self._os_explore()
 
-    def name_to_zone(self, zone):
-        if zone == "bad":
+    def name_to_zone(self, name, *_args: object, **_kwargs: object):
+        if name == "bad":
             message = "bad zone"
             raise ScriptError(message)
-        return _Zone(zone)
+        return _Zone(name)
 
-    def globe_goto(self, zone, stop_if_safe=False):
+    def globe_goto(self, zone, types=("SAFE", "DANGEROUS"), refresh=False, stop_if_safe=False):
+        _ = (types, refresh)
         self.calls.append(("globe_goto", zone, stop_if_safe))
         return self.globe_results[zone]
 
     def tuning_sample_use(self):
         self.calls.append(("tuning_sample_use", None))
 
-    def fleet_set(self, fleet):
-        self.calls.append(("fleet_set", fleet))
+    def fleet_set(self, index=None, skip_first_screenshot=True):
+        _ = skip_first_screenshot
+        self.calls.append(("fleet_set", index))
 
-    def os_order_execute(self, **kwargs):
+    def os_order_execute(self, *_args: object, **kwargs):
         self.calls.append(("os_order_execute", kwargs))
 
-    def run_auto_search(self):
+    def run_auto_search(self, *_args: object, **_kwargs: object):
         self.calls.append(("run_auto_search", None))
         return self.combat_results.pop(0)
 

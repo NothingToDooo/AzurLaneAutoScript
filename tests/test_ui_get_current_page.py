@@ -76,18 +76,19 @@ class _FakeUI(UI):
         self.additional_results = list(options.additional_results)
         self.additional_calls = 0
 
-    def ui_page_appear(self, page, **_kwargs) -> bool:
+    def ui_page_appear(self, page, *_args: object, **_kwargs) -> bool:
         self.page_check_count += 1
         return page is self.visible_page and self.page_check_count > self.visible_after_checks
 
-    def appear_then_click(self, button, **_kwargs) -> bool:
+    def appear_then_click(self, button, *_args: object, **_kwargs) -> bool:
         self.appear_then_click_calls.append(button)
         if self.recover_buttons and button == self.recover_buttons[0]:
             self.recover_buttons.pop(0)
             return True
         return False
 
-    def ui_additional(self, _get_ship=True) -> bool:
+    def ui_additional(self, get_ship=True, *_args: object, **_kwargs: object) -> bool:
+        _ = get_ship
         self.additional_calls += 1
         if self.additional_results:
             return self.additional_results.pop(0)

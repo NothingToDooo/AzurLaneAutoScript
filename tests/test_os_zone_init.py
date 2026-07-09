@@ -50,7 +50,7 @@ class _OSMapOperation(OSMapOperation):
             return results.pop(0)
         return False
 
-    def loop(self):
+    def loop(self, *_args: object, **_kwargs: object):
         yield from range(3)
 
     def wait_os_map_buttons(self) -> None:
@@ -61,7 +61,7 @@ class _OSMapOperation(OSMapOperation):
         self.calls.append(("handle_map_event", result))
         return result
 
-    def appear_then_click(self, button, **kwargs):
+    def appear_then_click(self, button, *_args: object, **kwargs):
         self.calls.append(("appear_then_click", button, kwargs))
         return self._next(self.reward_results)
 
@@ -70,10 +70,10 @@ class _OSMapOperation(OSMapOperation):
         self.calls.append(("is_in_globe", result))
         return result
 
-    def os_globe_goto_map(self) -> None:
+    def os_globe_goto_map(self, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("os_globe_goto_map",))
 
-    def appear(self, button, **kwargs):
+    def appear(self, button, *_args: object, **kwargs):
         self.calls.append(("appear", button, kwargs))
         if button == os_map_operation.EXCHANGE_CHECK:
             return self._next(self.exchange_results)
@@ -86,7 +86,7 @@ class _OSMapOperation(OSMapOperation):
         self.calls.append(("is_in_map", result))
         return result
 
-    def wait_until_appear(self, button) -> None:
+    def wait_until_appear(self, button, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("wait_until_appear", button))
 
     def get_current_zone(self):

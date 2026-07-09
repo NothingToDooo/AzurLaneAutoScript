@@ -82,12 +82,12 @@ class _HospitalCombat(_SpecialCombatBase, HospitalCombat):
         self.fleet_recommend_results = []
         self.interval_clears = []
 
-    def appear(self, button, **_kwargs):
+    def appear(self, button, *_args: object, **_kwargs):
         if button == BATTLE_PREPARATION:
             return self._next(self.appear_results)
         return False
 
-    def get_oil(self):
+    def get_oil(self, *_args: object, **_kwargs: object):
         return 1000
 
     def triggered_task_balancer(self):
@@ -97,11 +97,11 @@ class _HospitalCombat(_SpecialCombatBase, HospitalCombat):
     def handle_task_balancer(self):
         self.handle_task_balancer_count += 1
 
-    def handle_fleet_recommend(self, *, recommend):
+    def handle_fleet_recommend(self, recommend=True, **_kwargs: object):
         assert recommend is True
         return self._next(self.fleet_recommend_results)
 
-    def interval_clear(self, button) -> None:
+    def interval_clear(self, button, *_args: object, **_kwargs: object) -> None:
         self.interval_clears.append(button)
 
 
@@ -124,7 +124,7 @@ class _Raid(_SpecialCombatBase, Raid):
     def _task_stop(self) -> None:
         self.task_stop_count += 1
 
-    def appear(self, button, **_kwargs):
+    def appear(self, button, *_args: object, **_kwargs):
         if button == BATTLE_PREPARATION:
             return self._next(self.appear_results)
         return False
@@ -132,7 +132,7 @@ class _Raid(_SpecialCombatBase, Raid):
     def handle_raid_ticket_use(self):
         return False
 
-    def triggered_stop_condition(self, **kwargs):
+    def triggered_stop_condition(self, *_args: object, **kwargs):
         self.stop_condition_calls.append(kwargs)
         return self._next(self.stop_condition_results)
 

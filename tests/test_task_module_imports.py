@@ -12,17 +12,19 @@ def _local_module_imports() -> list[str]:
         def __init__(self) -> None:
             self._scope_depth = 0
 
-        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        def _visit_scoped(self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) -> None:
             self._scope_depth += 1
             self.generic_visit(node)
             self._scope_depth -= 1
 
-        visit_AsyncFunctionDef = visit_FunctionDef
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            self._visit_scoped(node)
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+            self._visit_scoped(node)
 
         def visit_ClassDef(self, node: ast.ClassDef) -> None:
-            self._scope_depth += 1
-            self.generic_visit(node)
-            self._scope_depth -= 1
+            self._visit_scoped(node)
 
         def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
             if (

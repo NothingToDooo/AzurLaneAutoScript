@@ -53,8 +53,9 @@ class _Coalition(Coalition):
         self.calls.append(("triggered_stop_condition", oil_check, pt_check))
         return (oil_check and self.stop_on_oil) or (pt_check and self.stop_on_pt)
 
-    def ui_goto(self, page):
-        self.calls.append(("ui_goto", page.name))
+    def ui_goto(self, destination, get_ship=True, offset=(30, 30), skip_first_screenshot=True):
+        _ = (get_ship, offset, skip_first_screenshot)
+        self.calls.append(("ui_goto", destination.name))
 
     def ui_goto_coalition(self):
         self.calls.append(("ui_goto_coalition",))

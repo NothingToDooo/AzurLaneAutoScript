@@ -80,7 +80,7 @@ class _MapOperation(MapOperation):
         self.calls.append(("is_in_map",))
         return self._next(self.in_map_results)
 
-    def appear(self, button, **_kwargs):
+    def appear(self, button, *_args: object, **_kwargs):
         self.calls.append(("appear", button))
         if button == map_operation_module.DAILY_CHECK:
             return self._next(self.daily_misclick_results)
@@ -99,7 +99,7 @@ class _MapOperation(MapOperation):
     def map_get_info(self) -> None:
         self.calls.append(("map_get_info",))
 
-    def handle_map_walk_speedup(self) -> None:
+    def handle_map_walk_speedup(self, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("handle_map_walk_speedup",))
 
     def handle_fast_forward(self) -> None:
@@ -112,7 +112,7 @@ class _MapOperation(MapOperation):
         self.calls.append(("triggered_map_stop",))
         return self._next(self.map_stop_results)
 
-    def handle_2x_book_setting(self, *, mode) -> None:
+    def handle_2x_book_setting(self, mode="prep", **_kwargs: object) -> None:
         self.calls.append(("handle_2x_book_setting", mode))
 
     def fleet_preparation(self) -> None:
@@ -148,7 +148,7 @@ class _MapOperation(MapOperation):
     def handle_story_skip(self):
         return self._next(self.story_results)
 
-    def appear_then_click(self, button):
+    def appear_then_click(self, button, *_args: object, **_kwargs: object):
         result = self._next(self.stage_click_results)
         if result:
             self.device.click(button)

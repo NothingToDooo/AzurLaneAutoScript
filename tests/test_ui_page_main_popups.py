@@ -29,18 +29,19 @@ class _FakeUI(UI):
     def handle_guild_popup_cancel(self) -> bool:
         return self.guild_popup
 
-    def appear_then_click(self, button, **_kwargs) -> bool:
+    def appear_then_click(self, button, *_args: object, **_kwargs) -> bool:
         self.appear_then_click_calls.append(button)
         return self._has_button(self.appear_then_click_buttons, button)
 
-    def appear(self, button, **_kwargs) -> bool:
+    def appear(self, button, *_args: object, **_kwargs) -> bool:
         self.appear_calls.append(button)
         return self._has_button(self.appear_buttons, button)
 
-    def handle_popup_single(self, **_kwargs) -> bool:
+    def handle_popup_single(self, name="", offset=None, interval=2) -> bool:
+        _ = (name, offset, interval)
         return False
 
-    def handle_popup_single_white(self) -> bool:
+    def handle_popup_single_white(self, *_args: object, **_kwargs: object) -> bool:
         return False
 
 

@@ -44,10 +44,10 @@ class _Daily(Daily):
     def set_appear_then_click(self, button, *, results: list[bool]) -> None:
         self.appear_then_click_results[button.name] = results
 
-    def appear(self, button, **_kwargs):
+    def appear(self, button, *_args: object, **_kwargs):
         return self._next(self.appear_results.setdefault(button.name, []))
 
-    def appear_then_click(self, button, **_kwargs):
+    def appear_then_click(self, button, *_args: object, **_kwargs):
         result = self._next(self.appear_then_click_results.setdefault(button.name, []))
         if result:
             self.device.click(button)
@@ -62,8 +62,9 @@ class _Daily(Daily):
     def handle_daily_additional(self):
         return self._next(self.additional_results)
 
-    def handle_popup_confirm(self, popup):
-        assert popup == "DAILY_SKIP"
+    def handle_popup_confirm(self, name="", offset=None, interval=2):
+        _ = (name, offset, interval)
+        assert name == "DAILY_SKIP"
         return self._next(self.popup_results)
 
     def info_bar_count(self):

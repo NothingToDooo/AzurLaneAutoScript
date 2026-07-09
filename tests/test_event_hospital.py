@@ -55,7 +55,10 @@ class _Hospital(Hospital):
         self.calls.append(("is_in_daily_reward", interval))
         return self.in_daily_results.pop(0)
 
-    def ui_page_appear(self, page: object, interval: float = 0) -> bool:
+    def ui_page_appear(
+        self, page: object, offset=(30, 30), interval: float = 0, *_args: object, **_kwargs: object
+    ) -> bool:
+        _ = offset
         self.calls.append(("ui_page_appear", page, interval))
         return self.page_results.pop(0)
 

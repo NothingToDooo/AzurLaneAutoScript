@@ -63,11 +63,11 @@ class _Campaign(CampaignBase):
         self.calls.append(("is_in_strategy_mob_move",))
         return self.in_mob_move_results.pop(0)
 
-    def appear(self, button, offset=(0, 0)):
+    def appear(self, button, offset=(0, 0), *_args: object, **_kwargs: object):
         self.calls.append(("appear", button, offset))
         return self.strategy_open_results.pop(0)
 
-    def handle_popup_confirm(self, name):
+    def handle_popup_confirm(self, name="", *_args: object, **_kwargs: object):
         self.calls.append(("handle_popup_confirm", name))
         return self.popup_results.pop(0)
 

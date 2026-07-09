@@ -93,29 +93,32 @@ class _GlobeCamera(GlobeCamera):
         self.calls.append(("is_in_globe",))
         return self._next_result(self.in_globe_results, default=False)
 
-    def appear_then_click(self, button: object, **kwargs: object) -> bool:
+    def appear_then_click(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def interval_reset(self, button: object) -> None:
+    def interval_reset(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_reset", button_key(button)))
 
     def handle_map_event(self) -> bool:
         self.calls.append(("handle_map_event",))
         return self._next_result(self.map_event_results, default=False)
 
-    def handle_popup_confirm(self, name: str) -> bool:
+    def handle_popup_confirm(self, name: str = "", *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 
-    def camera_to_zone(self, location: object) -> _Zone:
-        self.calls.append(("camera_to_zone", location))
+    def camera_to_zone(self, camera: object, region=None) -> _Zone:
+        if region is None:
+            self.calls.append(("camera_to_zone", camera))
+        else:
+            self.calls.append(("camera_to_zone", camera, region))
         return _Zone()
 
 

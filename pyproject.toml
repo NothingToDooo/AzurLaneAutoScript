@@ -190,7 +190,3 @@ exclude = [
     "campaign/**",
     "dev_tools/**",
 ]
-
-[tool.ty.rules]
-# 当前动态历史代码的初始基线；后续按模块逐步收紧。
-invalid-method-override = "ignore"

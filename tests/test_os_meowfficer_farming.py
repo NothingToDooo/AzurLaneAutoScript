@@ -119,27 +119,28 @@ class _MeowfficerFarming(OpsiMeowfficerFarming):
         self.calls.append(("is_in_opsi_explore",))
         return self.in_opsi_explore
 
-    def action_point_set(self, **kwargs: object) -> None:
+    def action_point_set(self, *_args: object, **kwargs: object) -> None:
         self.calls.append(("action_point_set", kwargs))
 
-    def name_to_zone(self, zone_id: int) -> _Zone:
-        self.calls.append(("name_to_zone", zone_id))
-        return _Zone(zone_id=zone_id, location=(9, 9))
+    def name_to_zone(self, name: int, *_args: object, **_kwargs: object) -> _Zone:
+        self.calls.append(("name_to_zone", name))
+        return _Zone(zone_id=name, location=(9, 9))
 
     def zone_select(self, hazard_level: int) -> _ZoneSet:
         self.calls.append(("zone_select", hazard_level))
         return _ZoneSet([_Zone(zone_id=44, location=(4, 4))])
 
-    def globe_goto(self, zone: _Zone, **kwargs: object) -> None:
+    def globe_goto(self, zone: _Zone, *_args: object, **kwargs: object) -> None:
         self.calls.append(("globe_goto", zone.zone_id, kwargs))
 
-    def fleet_set(self, fleet: str) -> None:
-        self.calls.append(("fleet_set", fleet))
+    def fleet_set(self, index=None, skip_first_screenshot=True) -> None:
+        _ = skip_first_screenshot
+        self.calls.append(("fleet_set", index))
 
-    def os_order_execute(self, **kwargs: object) -> None:
+    def os_order_execute(self, *_args: object, **kwargs: object) -> None:
         self.calls.append(("os_order_execute", kwargs))
 
-    def run_auto_search(self) -> None:
+    def run_auto_search(self, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("run_auto_search",))
 
     def handle_after_auto_search(self) -> None:

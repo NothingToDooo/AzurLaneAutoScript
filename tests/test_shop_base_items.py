@@ -66,8 +66,8 @@ class _FakeShopBase(ShopBase):
             return self.obstruct_results.pop(0)
         return False
 
-    def shop_has_loaded(self, items) -> bool:
-        self.has_loaded_calls.append(list(items))
+    def shop_has_loaded(self, _items, *_args: object, **_kwargs: object) -> bool:
+        self.has_loaded_calls.append(list(_items))
         return True
 
 

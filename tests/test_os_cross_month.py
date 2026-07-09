@@ -103,10 +103,10 @@ class _CrossMonthRunner(OpsiCrossMonth):
         self.calls.append(("os_mission_overview_accept",))
         return self.daily_accept_results.pop(0)
 
-    def zone_init(self) -> None:
+    def zone_init(self, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("zone_init",))
 
-    def os_finish_daily_mission(self) -> int:
+    def os_finish_daily_mission(self, *_args: object, **_kwargs: object) -> int:
         self.calls.append(("os_finish_daily_mission",))
         return self.daily_finish_results.pop(0)
 
@@ -126,14 +126,16 @@ class _CrossMonthRunner(OpsiCrossMonth):
     def fleet_repair(self, revert: bool = True) -> None:
         self.calls.append(("fleet_repair", revert))
 
-    def fleet_set(self, fleet: str) -> None:
-        self.calls.append(("fleet_set", fleet))
+    def fleet_set(self, index=None, skip_first_screenshot=True) -> None:
+        _ = skip_first_screenshot
+        self.calls.append(("fleet_set", index))
 
     @override
-    def os_order_execute(self, recon_scan: bool, submarine_call: bool) -> None:
+    def os_order_execute(self, recon_scan=True, submarine_call=True) -> None:
         self.calls.append(("os_order_execute", recon_scan, submarine_call))
 
-    def run_auto_search(self, rescan: str | None = None) -> None:
+    def run_auto_search(self, question=True, rescan=None, after_auto_search=True) -> None:
+        _ = (question, after_auto_search)
         self.calls.append(("run_auto_search", rescan))
 
     def handle_after_auto_search(self) -> None:
@@ -146,7 +148,7 @@ class _CrossMonthRunner(OpsiCrossMonth):
         self.calls.append(("zone_select", hazard_level))
         return _ZoneSet([_Zone(zone_id=44, location=(4, 4))])
 
-    def globe_goto(self, zone: _Zone) -> None:
+    def globe_goto(self, zone: _Zone, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("globe_goto", zone.zone_id))
 
 

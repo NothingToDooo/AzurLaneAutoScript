@@ -84,12 +84,13 @@ class _Fleet(Fleet):
     def show_fleet(self) -> None:
         self.calls.append(("show_fleet", self.fleet_1_location, self.fleet_2_location))
 
-    def in_sight(self, grid: _Grid, **kwargs: object) -> None:
-        self.calls.append(("in_sight", grid.location, kwargs))
+    def in_sight(self, location: _Grid, sight=None, **kwargs: object) -> bool:
+        self.calls.append(("in_sight", location.location, sight, kwargs))
+        return False
 
-    def convert_global_to_local(self, grid: _Grid) -> _LocalGrid:
-        self.calls.append(("convert_global_to_local", grid.location))
-        return _LocalGrid(self.local_current_results.get(grid.location, False))
+    def convert_global_to_local(self, location: _Grid, *_args: object, **_kwargs: object) -> _LocalGrid:
+        self.calls.append(("convert_global_to_local", location.location))
+        return _LocalGrid(self.local_current_results.get(location.location, False))
 
 
 def test_find_current_fleet_uses_single_detected_fleet_without_second_fleet() -> None:

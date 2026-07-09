@@ -41,10 +41,11 @@ class _FakeReward(Reward):
     def receive(self):
         return self._reward_mission_claim_receive()
 
-    def loop(self):
+    def loop(self, *_args: object, **_kwargs: object):
         return range(6)
 
-    def ui_page_appear(self, _page) -> bool:
+    def ui_page_appear(self, page, offset=(30, 30), interval=0) -> bool:
+        _ = (page, offset, interval)
         if self.page_results:
             return self.page_results.pop(0)
         return False
@@ -54,7 +55,7 @@ class _FakeReward(Reward):
             return self.state_results.pop(0)
         return None
 
-    def appear_then_click(self, button, **_kwargs) -> bool:
+    def appear_then_click(self, button, *_args: object, **_kwargs) -> bool:
         results = self.appear_then_click_results.get(id(button), [])
         if results:
             return results.pop(0)
@@ -71,7 +72,8 @@ class _FakeReward(Reward):
     def handle_story_skip(self) -> bool:
         return False
 
-    def handle_popup_confirm(self, _name) -> bool:
+    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+        _ = (name, offset, interval)
         return False
 
 

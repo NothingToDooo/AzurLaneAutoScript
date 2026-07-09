@@ -44,8 +44,8 @@ class _Map(OSMap):
         self.special_zone = special_zone
         self.calls: list[tuple[object, ...]] = []
 
-    def name_to_zone(self, value: object) -> object:
-        message = f"legacy zone override should not run: {value}"
+    def name_to_zone(self, name: object, *_args: object, **_kwargs: object) -> object:
+        message = f"legacy zone override should not run: {name}"
         raise AssertionError(message)
 
     def is_in_map(self) -> bool:
@@ -56,20 +56,21 @@ class _Map(OSMap):
         self.calls.append(("is_in_globe",))
         return self.in_globe
 
-    def os_globe_goto_map(self) -> None:
+    def os_globe_goto_map(self, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("os_globe_goto_map",))
 
-    def ui_page_appear(self, page: object) -> bool:
+    def ui_page_appear(self, page: object, *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("ui_page_appear", page))
         return self.os_page_visible
 
     def ui_goto_main(self) -> None:
         self.calls.append(("ui_goto_main",))
 
-    def ui_ensure(self, page: object) -> None:
-        self.calls.append(("ui_ensure", page))
+    def ui_ensure(self, destination: object, skip_first_screenshot=True) -> None:
+        _ = skip_first_screenshot
+        self.calls.append(("ui_ensure", destination))
 
-    def zone_init(self) -> None:
+    def zone_init(self, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("zone_init",))
 
     def hp_reset(self) -> None:
@@ -79,7 +80,7 @@ class _Map(OSMap):
         self.calls.append(("handle_after_auto_search",))
         return False
 
-    def handle_current_fleet_resolve(self, *, revert: bool = False) -> bool:
+    def handle_current_fleet_resolve(self, revert=False, **_kwargs: object) -> bool:
         self.calls.append(("handle_current_fleet_resolve", revert))
         return False
 
@@ -93,7 +94,7 @@ class _Map(OSMap):
     def handle_ash_beacon_attack(self) -> None:
         self.calls.append(("handle_ash_beacon_attack",))
 
-    def run_auto_search(self, **kwargs: object) -> None:
+    def run_auto_search(self, *_args: object, **kwargs: object) -> None:
         self.calls.append(("run_auto_search", kwargs))
 
 

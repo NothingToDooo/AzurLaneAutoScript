@@ -78,7 +78,7 @@ class _AutoSearchMap(OSMap):
             return results.pop(0)
         return default
 
-    def loop(self) -> range:
+    def loop(self, *_args: object, **_kwargs: object) -> range:
         return range(self.loop_count)
 
     def hp_reset(self) -> None:
@@ -88,7 +88,7 @@ class _AutoSearchMap(OSMap):
         self.calls.append(("is_in_map",))
         return self._next_result(self.in_map_results, default=True)
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)

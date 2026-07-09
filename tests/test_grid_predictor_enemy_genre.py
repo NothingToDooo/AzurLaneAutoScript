@@ -34,12 +34,14 @@ class FakePredictor(GridPredictor):
         self.crops = []
         self.hsv_kwargs = None
 
-    def relative_crop(self, area, shape):
+    def relative_crop(self, area, shape=None, *_args: object, **_kwargs: object):
+        if shape is None:
+            shape = ()
         normalized_shape = tuple(int(value) for value in shape)
         self.crops.append((area, normalized_shape))
         return normalized_shape
 
-    def relative_hsv_count(self, **kwargs):
+    def relative_hsv_count(self, *_args: object, **kwargs):
         self.hsv_kwargs = kwargs
         return self.hsv_count
 

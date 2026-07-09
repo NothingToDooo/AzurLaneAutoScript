@@ -25,13 +25,13 @@ class _EventStoryStateContext(EventStory):
         self.clicking = set(clicking)
         self.alchemist = alchemist
 
-    def match_template_color(self, button, **_kwargs):
+    def match_template_color(self, button, *_args: object, **_kwargs):
         return button in self.matching
 
-    def appear(self, button, **_kwargs):
+    def appear(self, button, *_args: object, **_kwargs):
         return button in self.appearing
 
-    def appear_then_click(self, button, **_kwargs):
+    def appear_then_click(self, button, *_args: object, **_kwargs):
         return button in self.clicking
 
     def get_event_20250724_button(self):
@@ -60,11 +60,11 @@ class _EventStoryLoopContext(_EventStoryStateContext):
     def handle_get_items(self):
         return False
 
-    def handle_event_20250724(self):
+    def handle_event_20250724(self, *_args: object, **_kwargs: object):
         return False
 
-    def interval_clear(self, _button) -> None:
-        pass
+    def interval_clear(self, button, *_args: object, **_kwargs: object) -> None:
+        _ = button
 
     def story_skip_interval_clear(self) -> None:
         self.story_skip_clears += 1

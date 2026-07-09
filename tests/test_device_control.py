@@ -10,7 +10,7 @@ class _Control(Control):
     def __init__(self) -> None:
         self.swipes: list[tuple[object, ...]] = []
 
-    def swipe(self, p1, p2, *, duration=(0.1, 0.2), name="SWIPE", distance_check=True) -> None:
+    def swipe(self, p1, p2, duration=(0.1, 0.2), name="SWIPE", distance_check=True, **_kwargs: object) -> None:
         self.swipes.append((p1, p2, duration, name, distance_check))
 
 

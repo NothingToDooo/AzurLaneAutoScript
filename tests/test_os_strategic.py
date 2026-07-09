@@ -55,7 +55,8 @@ class _StrategicSearch(StrategicSearchHandler):
     def set_option(self) -> bool:
         return self.strategic_search_set_option()
 
-    def loop(self, timeout: int | None = None) -> range:
+    def loop(self, skip_first=True, timeout: int | None = None, *_args: object, **_kwargs: object) -> range:
+        _ = skip_first
         self.loop_timeouts.append(timeout)
         return range(5)
 
@@ -67,7 +68,7 @@ class _StrategicSearch(StrategicSearchHandler):
     def _strategy_option_selected(self, button: object) -> bool:
         return self._next_result(self.selected_results.get(button_key(button), []), default=False)
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         self.appear_calls.append((button_key(button), kwargs))
         return True
 

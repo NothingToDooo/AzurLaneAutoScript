@@ -60,7 +60,7 @@ class _MapOrder(MapOrderHandler):
             return results.pop(0)
         return default
 
-    def loop(self):
+    def loop(self, *_args: object, **_kwargs: object):
         return range(5)
 
     def order_enter(self) -> None:
@@ -71,8 +71,8 @@ class _MapOrder(MapOrderHandler):
         self.calls.append(("order_quit",))
         self.quit_count += 1
 
-    def name_to_zone(self, zone_id: int) -> _Zone:
-        self.calls.append(("name_to_zone", zone_id))
+    def name_to_zone(self, name: int, *_args: object, **_kwargs: object) -> _Zone:
+        self.calls.append(("name_to_zone", name))
         return _Zone()
 
     def is_in_map(self) -> bool:
@@ -83,15 +83,15 @@ class _MapOrder(MapOrderHandler):
         self.calls.append(("is_in_map_order",))
         return self._next_result(self.in_order_results, default=False)
 
-    def appear(self, button: object, **_kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("appear", button))
         return self._next_result(self.appear_results, default=False)
 
-    def appear_then_click(self, button: object, **kwargs: object) -> bool:
+    def appear_then_click(self, button: object, *_args: object, **kwargs: object) -> bool:
         self.calls.append(("appear_then_click", button, kwargs))
         return self._next_result(self.click_results, default=False)
 
-    def handle_popup_confirm(self, name: str) -> bool:
+    def handle_popup_confirm(self, name: str = "", *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 
@@ -103,7 +103,7 @@ class _MapOrder(MapOrderHandler):
         self.calls.append(("handle_map_cat_attack",))
         return self._next_result(self.cat_attack_results, default=False)
 
-    def handle_action_point(self, **kwargs: object) -> bool:
+    def handle_action_point(self, *_args: object, **kwargs: object) -> bool:
         self.calls.append(("handle_action_point", kwargs))
         return self._next_result(self.action_point_results, default=False)
 

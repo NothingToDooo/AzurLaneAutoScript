@@ -100,26 +100,27 @@ class _InfoHandler(InfoHandler):
             return results.pop(0)
         return default
 
-    def handle_popup_confirm(self, text: str) -> bool:
-        self.calls.append(("handle_popup_confirm", text))
+    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+        _ = (name, offset, interval)
+        self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 
-    def interval_reset(self, button: object, **kwargs: object) -> None:
+    def interval_reset(self, button: object, *_args: object, **kwargs: object) -> None:
         self.calls.append(("interval_reset", button, kwargs))
 
-    def interval_clear(self, button: object) -> None:
+    def interval_clear(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_clear", button))
 
     def _is_story_black(self) -> bool:
         self.calls.append(("_is_story_black",))
         return self._next_result(self.story_black_results, default=False)
 
-    def appear_then_click(self, button: object, **kwargs: object) -> bool:
+    def appear_then_click(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)

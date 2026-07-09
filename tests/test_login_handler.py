@@ -82,21 +82,21 @@ class _LoginHandler(LoginHandler):
     def _button_name(self, button: object) -> str:
         return getattr(button, "name", repr(button))
 
-    def is_in_main(self) -> bool:
+    def is_in_main(self, *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("is_in_main",))
         return self._next_result(self.main_results, default=False)
 
-    def match_template_color(self, button: object, **kwargs: object) -> bool:
+    def match_template_color(self, button: object, *_args: object, **kwargs: object) -> bool:
         name = self._button_name(button)
         self.calls.append(("match_template_color", name, kwargs))
         return self._next_result(self.match_results.get(name, []), default=False)
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         name = self._button_name(button)
         self.calls.append(("appear", name, kwargs))
         return self._next_result(self.appear_results.get(name, []), default=False)
 
-    def appear_then_click(self, button: object, **kwargs: object) -> bool:
+    def appear_then_click(self, button: object, *_args: object, **kwargs: object) -> bool:
         name = self._button_name(button)
         self.calls.append(("appear_then_click", name, kwargs))
         return self._next_result(self.appear_then_click_results.get(name, []), default=False)
@@ -105,7 +105,7 @@ class _LoginHandler(LoginHandler):
         self.calls.append(("handle_cn_user_agreement",))
         return self._next_result(self.user_agreement_results, default=False)
 
-    def handle_popup_confirm(self, name: str) -> bool:
+    def handle_popup_confirm(self, name: str = "", *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 

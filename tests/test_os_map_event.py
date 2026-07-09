@@ -23,7 +23,7 @@ class _MapGetItemsContext(MapEventHandler):
     def is_in_map(self):
         return self._in_map
 
-    def appear(self, button, **kwargs):
+    def appear(self, button, *_args: object, **kwargs):
         self.appear_calls.append((button, kwargs))
         return button in self.appearing
 
@@ -37,7 +37,7 @@ class _MapEventContext(MapEventHandler):
         self.calls.append(name)
         return self.results.get(name, False)
 
-    def handle_map_get_items(self):
+    def handle_map_get_items(self, *_args: object, **_kwargs: object):
         return self._handle("map_get_items")
 
     def handle_os_game_tips(self):

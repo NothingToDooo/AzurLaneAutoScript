@@ -16,7 +16,7 @@ class _ResearchSelectContext(RewardResearch):
         self.calls.append(("enforce", add_queue))
         return "enforced"
 
-    def research_reset(self):
+    def research_reset(self, *_args: object, **_kwargs: object):
         self.calls.append(("reset", None))
         return self.reset_result
 

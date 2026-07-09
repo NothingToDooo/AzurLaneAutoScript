@@ -56,21 +56,22 @@ class _FakeSupplyPack(SupplyPack):
             return results.pop(0)
         return False
 
-    def appear(self, button, **_kwargs) -> bool:
+    def appear(self, button, *_args: object, **_kwargs) -> bool:
         return self._pop_button_result(self.appear_results, button)
 
-    def appear_then_click(self, button, **_kwargs) -> bool:
+    def appear_then_click(self, button, *_args: object, **_kwargs) -> bool:
         return self._pop_button_result(self.appear_then_click_results, button)
 
-    def handle_popup_confirm(self, _name) -> bool:
+    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+        _ = (name, offset, interval)
         if self.popup_results:
             return self.popup_results.pop(0)
         return False
 
-    def interval_clear(self, button) -> None:
+    def interval_clear(self, button, *_args: object, **_kwargs: object) -> None:
         self.interval_cleared.append(button)
 
-    def interval_reset(self, button) -> None:
+    def interval_reset(self, button, *_args: object, **_kwargs: object) -> None:
         self.interval_reset_buttons.append(button)
 
 

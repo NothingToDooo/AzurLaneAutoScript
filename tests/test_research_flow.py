@@ -32,7 +32,7 @@ class _Receive6thContext(RewardResearch):
         self.calls.append(("finished", None))
         return self.finished
 
-    def research_receive(self):
+    def research_receive(self, *_args: object, **_kwargs: object):
         self.calls.append(("receive", None))
         return self.receive_result
 

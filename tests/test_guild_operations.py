@@ -93,12 +93,12 @@ class _GuildOperations(GuildOperations):
             return results.pop(0)
         return default
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def appear_then_click(self, button: object, **kwargs: object) -> bool:
+    def appear_then_click(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)
@@ -107,7 +107,7 @@ class _GuildOperations(GuildOperations):
         self.calls.append(("_guild_operations_get_entrance",))
         return self._next_result(self.entrance_results, default=([], []))
 
-    def image_color_count(self, button: object, **kwargs: object) -> bool:
+    def image_color_count(self, button: object, *_args: object, **kwargs: object) -> bool:
         self.calls.append(("image_color_count", button, kwargs))
         return self._next_result(self.color_results, default=False)
 
@@ -119,11 +119,11 @@ class _GuildOperations(GuildOperations):
         self.calls.append(("_handle_guild_operations_start",))
         return self._next_result(self.start_results, default=False)
 
-    def handle_popup_confirm(self, name: str) -> bool:
+    def handle_popup_confirm(self, name: str = "", *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_confirm_results, default=False)
 
-    def handle_popup_single(self, name: str) -> bool:
+    def handle_popup_single(self, name: str = "", *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_popup_single", name))
         return self._next_result(self.popup_single_results, default=False)
 

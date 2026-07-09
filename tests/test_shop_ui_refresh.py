@@ -29,7 +29,7 @@ class _FakeShopUI(ShopUI):
         self.ui_click_calls = []
         self.info_bar_handle_count = 0
 
-    def loop(self):
+    def loop(self, *_args: object, **_kwargs: object):
         return range(6)
 
     def _pop_button_result(self, button) -> bool:
@@ -38,19 +38,21 @@ class _FakeShopUI(ShopUI):
             return results.pop(0)
         return False
 
-    def appear(self, button, **_kwargs) -> bool:
+    def appear(self, button, *_args: object, **_kwargs) -> bool:
         return self._pop_button_result(button)
 
-    def image_color_count(self, _button, *, color, **_kwargs) -> bool:
+    def image_color_count(self, button, color, threshold=221, count=50) -> bool:
+        _ = (button, threshold, count)
         results = self.color_results.get(color, [])
         if results:
             return results.pop(0)
         return False
 
-    def interval_clear(self, button) -> None:
+    def interval_clear(self, button, *_args: object, **_kwargs: object) -> None:
         self.interval_cleared.append(button)
 
-    def handle_popup_confirm(self, _name) -> bool:
+    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+        _ = (name, offset, interval)
         if self.popup_results:
             return self.popup_results.pop(0)
         return False

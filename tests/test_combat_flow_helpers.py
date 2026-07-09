@@ -29,19 +29,19 @@ class _EmergencyRepairContext(combat.Combat):
         self.wait_stable_calls = []
         self.interval_clears = []
 
-    def appear_then_click(self, button, **_kwargs):
+    def appear_then_click(self, button, *_args: object, **_kwargs):
         return button == combat.combat_assets.EMERGENCY_REPAIR_CONFIRM and self.confirm
 
-    def appear(self, button, **_kwargs):
+    def appear(self, button, *_args: object, **_kwargs):
         return button in self.appearing
 
-    def wait_until_disappear(self, button, **kwargs) -> None:
+    def wait_until_disappear(self, button, *_args: object, **kwargs) -> None:
         self.wait_disappear_calls.append((button, kwargs))
 
-    def wait_until_stable(self, button) -> None:
+    def wait_until_stable(self, button, *_args: object, **_kwargs: object) -> None:
         self.wait_stable_calls.append(button)
 
-    def interval_clear(self, button) -> None:
+    def interval_clear(self, button, *_args: object, **_kwargs: object) -> None:
         self.interval_clears.append(button)
 
 
@@ -56,7 +56,7 @@ class _CombatLoopContext(combat.Combat):
             click_record_clear=lambda: None,
         )
 
-    def loop(self):
+    def loop(self, *_args: object, **_kwargs: object):
         yield from range(self.iterations)
 
 
@@ -81,17 +81,21 @@ class _CombatExecuteContext(_CombatLoopContext):
     def handle_story_skip(self):
         return False
 
-    def handle_combat_auto(self, _auto):
+    def handle_combat_auto(self, auto, *_args: object, **_kwargs: object):
+        _ = auto
         return False
 
-    def handle_combat_manual(self, _auto):
+    def handle_combat_manual(self, auto, *_args: object, **_kwargs: object):
+        _ = auto
         return False
 
-    def handle_submarine_call(self, _submarine):
+    def handle_submarine_call(self, submarine="do_not_use", *_args: object, **_kwargs: object):
+        _ = submarine
         return False
 
-    def handle_popup_confirm(self, popup):
-        self.popup_calls.append(popup)
+    def handle_popup_confirm(self, name="", offset=None, interval=2):
+        _ = (name, offset, interval)
+        self.popup_calls.append(name)
         return len(self.popup_calls) == 1
 
     def handle_urgent_commission(self):
@@ -148,7 +152,8 @@ class _CombatStatusContext(_CombatLoopContext):
     def handle_get_items(self):
         return self._next(self.get_items_results)
 
-    def handle_popup_confirm(self, _popup):
+    def handle_popup_confirm(self, name="", offset=None, interval=2):
+        _ = (name, offset, interval)
         return self._next(self.popup_results)
 
     def handle_battle_status(self):
@@ -185,7 +190,7 @@ class _CombatStatusContext(_CombatLoopContext):
     def handle_in_map_no_enemy_searching(self):
         return False
 
-    def appear(self, button, **kwargs):
+    def appear(self, button, *_args: object, **kwargs):
         self.appear_calls.append((button, kwargs))
         return button == combat.BACK_ARROW and kwargs == {"offset": (30, 30)}
 
@@ -206,13 +211,13 @@ class _CombatOrchestrationContext(combat.Combat):
         self.execute_calls = []
         self.status_calls = []
 
-    def combat_preparation(self, **kwargs) -> None:
+    def combat_preparation(self, *_args: object, **kwargs) -> None:
         self.preparation_calls.append(kwargs)
 
-    def combat_execute(self, **kwargs) -> None:
+    def combat_execute(self, *_args: object, **kwargs) -> None:
         self.execute_calls.append(kwargs)
 
-    def combat_status(self, **kwargs) -> None:
+    def combat_status(self, *_args: object, **kwargs) -> None:
         self.status_calls.append(kwargs)
 
 

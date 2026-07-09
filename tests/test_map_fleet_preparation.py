@@ -78,7 +78,8 @@ class _FleetPreparation(FleetPreparation):
         self.operators = {}
         self.calls = []
 
-    def appear(self, _button, **_kwargs):
+    def appear(self, button, *_args: object, **_kwargs):
+        _ = button
         return False
 
 

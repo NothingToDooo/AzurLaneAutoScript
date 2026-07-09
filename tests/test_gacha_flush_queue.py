@@ -71,15 +71,15 @@ class _RewardGacha(RewardGacha):
             return results.pop(0)
         return default
 
-    def gacha_side_navbar_ensure(self, **kwargs: object) -> None:
+    def gacha_side_navbar_ensure(self, *_args: object, **kwargs: object) -> None:
         self.calls.append(("gacha_side_navbar_ensure", kwargs))
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def appear_then_click(self, button: object, **kwargs: object) -> bool:
+    def appear_then_click(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)
@@ -88,7 +88,7 @@ class _RewardGacha(RewardGacha):
         self.calls.append(("handle_retirement",))
         return self._next_result(self.retirement_results, default=False)
 
-    def handle_popup_confirm(self, name: str) -> bool:
+    def handle_popup_confirm(self, name: str = "", *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 

@@ -9,10 +9,19 @@ class _Config:
     MAP_HAS_AMBUSH = False
 
 
-class _GridList(list[object]):
+class _GridList:
     def __init__(self, items: list[object], *, non_enemy: object = True) -> None:
-        super().__init__(items)
+        self.items = items
         self.non_enemy = non_enemy
+
+    def __iter__(self):
+        return iter(self.items)
+
+    def __len__(self) -> int:
+        return len(self.items)
+
+    def __getitem__(self, index: int) -> object:
+        return self.items[index]
 
     def delete(self, _other: object) -> _GridList:
         return self
@@ -22,7 +31,7 @@ class _GridList(list[object]):
             return self
         return _GridList([])
 
-    def sort(self, _key: str) -> _GridList:
+    def sort(self, _key: str, *_args: object, **_kwargs: object) -> _GridList:
         return self
 
 
@@ -81,7 +90,7 @@ class _Fleet(Fleet):
     def predict(self) -> None:
         self.calls.append(("predict",))
 
-    def ensure_edge_insight(self) -> None:
+    def ensure_edge_insight(self, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("ensure_edge_insight",))
 
 

@@ -54,32 +54,32 @@ class _Minigame(Minigame):
             return results.pop(0)
         return default
 
-    def loop(self):
+    def loop(self, *_args: object, **_kwargs: object):
         return range(5)
 
-    def ui_ensure(self, destination: object) -> None:
+    def ui_ensure(self, destination: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("ui_ensure", destination))
 
-    def ui_page_appear(self, page: object, **kwargs: object) -> bool:
+    def ui_page_appear(self, page: object, *_args: object, **kwargs: object) -> bool:
         self.calls.append(("ui_page_appear", page, kwargs))
         return self._next_result(self.page_results.get(page, []), default=False)
 
-    def handle_popup_confirm(self, name: str) -> bool:
+    def handle_popup_confirm(self, name: str = "", *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 
-    def go_to_main_page(self) -> None:
+    def go_to_main_page(self, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("go_to_main_page",))
 
     def _create_minigame_instance(self, specific_game_name: str) -> _MinigameInstance | None:
         self.calls.append(("_create_minigame_instance", specific_game_name))
         return self.minigame_instance
 
-    def get_coin_amount(self) -> int:
+    def get_coin_amount(self, *_args: object, **_kwargs: object) -> int:
         self.calls.append(("get_coin_amount",))
         return self._next_result(self.coin_results, default=0)
 
-    def collect_coin(self) -> bool:
+    def collect_coin(self, *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("collect_coin",))
         return self._next_result(self.collect_results, default=False)
 

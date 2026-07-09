@@ -90,7 +90,8 @@ class _WalkStableFleet(OSFleet):
             return results.pop(0)
         return default
 
-    def loop(self, *, skip_first: bool = False) -> range:
+    def loop(self, skip_first=True, timeout=None, **_kwargs: object) -> range:
+        _ = timeout
         self.loop_skip_first_values.append(skip_first)
         return range(self.loop_count)
 
@@ -103,13 +104,14 @@ class _WalkStableFleet(OSFleet):
     def handle_walk_out_of_step(self) -> bool:
         return False
 
-    def handle_popup_confirm(self, _name: str) -> bool:
+    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+        _ = (name, offset, interval)
         return False
 
     def is_in_globe(self) -> bool:
         return False
 
-    def os_globe_goto_map(self) -> None:
+    def os_globe_goto_map(self, *_args: object, **_kwargs: object) -> None:
         raise AssertionError(UNEXPECTED_GLOBE_RECOVERY_MESSAGE)
 
     def is_in_storage(self) -> bool:
@@ -136,10 +138,12 @@ class _WalkStableFleet(OSFleet):
     def combat_appear(self) -> bool:
         return False
 
-    def appear(self, _button: object, **_kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **_kwargs: object) -> bool:
+        _ = button
         return False
 
-    def appear_then_click(self, _button: object, **_kwargs: object) -> bool:
+    def appear_then_click(self, button: object, *_args: object, **_kwargs: object) -> bool:
+        _ = button
         return False
 
     def enemy_searching_appear(self) -> bool:
@@ -154,7 +158,8 @@ class _WalkStableFleet(OSFleet):
     def enemy_searching_color_initial(self) -> None:
         self.enemy_searching_color_initial_count += 1
 
-    def match_template_color(self, _button: object, **_kwargs: object) -> bool:
+    def match_template_color(self, button: object, *_args: object, **_kwargs: object) -> bool:
+        _ = button
         self.match_template_color_count += 1
         return self._next_result(self.match_template_color_results, default=True)
 

@@ -38,33 +38,33 @@ class _Campaign(Campaign):
     def fleet_boss(self):
         return self.boss_fleet
 
-    def check_accessibility(self, boss, fleet=None):
-        self.calls.append(("check_accessibility", boss, fleet))
+    def check_accessibility(self, grid, fleet=None, *_args: object, **_kwargs: object):
+        self.calls.append(("check_accessibility", grid, fleet))
         return self.boss_accessible
 
-    def clear_roadblocks(self, roadblocks):
-        del roadblocks
+    def clear_roadblocks(self, roads, *_args: object, **_kwargs: object):
+        del roads
         self.calls.append(("clear_roadblocks",))
         return self.roadblocks_result
 
-    def clear_potential_roadblocks(self, roadblocks):
-        del roadblocks
+    def clear_potential_roadblocks(self, roads, *_args: object, **_kwargs: object):
+        del roads
         self.calls.append(("clear_potential_roadblocks",))
         return self.potential_roadblocks_result
 
-    def clear_filter_enemy(self, enemy_filter, preserve=0):
-        self.calls.append(("clear_filter_enemy", enemy_filter, preserve))
+    def clear_filter_enemy(self, string, preserve=0, *_args: object, **_kwargs: object):
+        self.calls.append(("clear_filter_enemy", string, preserve))
         return self.filter_enemy_result
 
     def battle_default(self):
         self.calls.append(("battle_default",))
         return "default"
 
-    def goto(self, grid):
-        self.calls.append(("goto", grid.location))
+    def goto(self, location, *_args: object, **_kwargs: object):
+        self.calls.append(("goto", location.location))
 
-    def air_strike(self, grid):
-        self.calls.append(("air_strike", grid.location))
+    def air_strike(self, location, *_args: object, **_kwargs: object):
+        self.calls.append(("air_strike", location.location))
 
 
 def test_battle_4_clear_mode_clears_boss_directly() -> None:

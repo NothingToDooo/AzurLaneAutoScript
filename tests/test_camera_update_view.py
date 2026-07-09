@@ -74,7 +74,7 @@ class _Camera(Camera):
     def handle_info_bar(self) -> None:
         self.calls.append(("handle_info_bar",))
 
-    def appear(self, button, offset=0) -> bool:
+    def appear(self, button, offset=0, *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("appear", button, offset))
         return any(button is visible for visible in self.visible_assets)
 
@@ -82,27 +82,32 @@ class _Camera(Camera):
         self.calls.append(("handle_story_skip",))
         return self.story_visible
 
-    def ensure_no_story(self, *, skip_first_screenshot=True) -> None:
+    def ensure_no_story(self, skip_first_screenshot=True, **_kwargs: object) -> None:
         self.calls.append(("ensure_no_story", skip_first_screenshot))
 
     def is_in_stage(self) -> bool:
         self.calls.append(("is_in_stage",))
         return self.stage_visible
 
-    def enter_map_cancel(self) -> None:
+    def enter_map_cancel(self, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("enter_map_cancel",))
 
-    def ensure_auto_search_exit(self) -> None:
+    def ensure_auto_search_exit(self, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("ensure_auto_search_exit",))
 
     def is_in_map(self) -> bool:
         self.calls.append(("is_in_map",))
         return True
 
-    def ui_click(self, button, **kwargs) -> None:
-        self.calls.append(("ui_click", button, kwargs))
+    def ui_click(self, click_button, check_button=None, options=None, **settings) -> None:
+        kwargs = dict(settings)
+        if check_button is not None:
+            kwargs["check_button"] = check_button
+        if options is not None:
+            kwargs["options"] = options
+        self.calls.append(("ui_click", click_button, kwargs))
 
-    def handle_popup_confirm(self, name) -> bool:
+    def handle_popup_confirm(self, name="", *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_popup_confirm", name))
         return self.popup_confirmed
 

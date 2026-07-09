@@ -74,8 +74,9 @@ class _RaidRun(RaidRun):
         self.calls.append(("event_time_limit",))
         return False
 
-    def ui_ensure(self, page):
-        self.calls.append(("ui_ensure", page))
+    def ui_ensure(self, destination, skip_first_screenshot=True):
+        _ = skip_first_screenshot
+        self.calls.append(("ui_ensure", destination))
 
     def triggered_stop_condition(self, oil_check=False, pt_check=False, coin_check=False):
         self.calls.append(("stop_condition", oil_check, pt_check, coin_check))
@@ -87,7 +88,7 @@ class _RaidRun(RaidRun):
         self.calls.append(("is_raid_rpg",))
         return self.is_rpg
 
-    def raid_rpg_swipe(self):
+    def raid_rpg_swipe(self, *_args: object, **_kwargs: object):
         self.calls.append(("raid_rpg_swipe",))
 
     def disable_event_on_raid(self):

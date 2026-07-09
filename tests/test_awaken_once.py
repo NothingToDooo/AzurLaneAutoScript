@@ -73,11 +73,13 @@ class _Awaken(Awaken):
             return results.pop(0)
         return default
 
-    def appear(self, button: _Asset, **kwargs: object) -> bool:
+    def appear(self, button: _Asset, *args: object, **kwargs: object) -> bool:
+        _ = args
         self.calls.append(("appear", button.name, kwargs))
         return self._next_result(self.appear_results.get(button.name, []), default=False)
 
-    def appear_then_click(self, button: _Asset, **kwargs: object) -> bool:
+    def appear_then_click(self, button: _Asset, *args: object, **kwargs: object) -> bool:
+        _ = args
         self.calls.append(("appear_then_click", button.name, kwargs))
         return self._next_result(self.appear_then_click_results.get(button.name, []), default=False)
 
@@ -88,10 +90,12 @@ class _Awaken(Awaken):
     def awaken_popup_close(self, skip_first_screenshot=True):
         self.calls.append(("awaken_popup_close", skip_first_screenshot))
 
-    def interval_clear(self, button: object) -> None:
+    def interval_clear(self, button: object, *args: object, **kwargs: object) -> None:
+        _ = (args, kwargs)
         self.calls.append(("interval_clear", button))
 
-    def handle_popup_confirm(self, name: str) -> bool:
+    def handle_popup_confirm(self, name: str = "", *args: object, **kwargs: object) -> bool:
+        _ = (args, kwargs)
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 

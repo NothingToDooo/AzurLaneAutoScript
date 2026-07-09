@@ -98,31 +98,32 @@ class _CommissionUI(RewardCommission):
             return results.pop(0)
         return default
 
-    def interval_clear(self, button: object) -> None:
+    def interval_clear(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_clear", button))
 
-    def interval_reset(self, button: object) -> None:
+    def interval_reset(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_reset", button))
 
     def info_bar_count(self) -> bool:
         self.calls.append(("info_bar_count",))
         return self._next_result(self.info_bar_results, default=False)
 
-    def match_template_color(self, button: object, **kwargs: object) -> bool:
+    def match_template_color(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("match_template_color", key, kwargs))
         return self._next_result(self.match_results.get(key, []), default=False)
 
-    def handle_popup_confirm(self, text: str) -> bool:
-        self.calls.append(("handle_popup_confirm", text))
+    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+        _ = (name, offset, interval)
+        self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def commission_detect(self, **kwargs: object) -> _Selection:
+    def commission_detect(self, *_args: object, **kwargs: object) -> _Selection:
         self.calls.append(("commission_detect", kwargs))
         return self.detect_results.pop(0)
 

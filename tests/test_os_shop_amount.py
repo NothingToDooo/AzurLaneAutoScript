@@ -88,26 +88,26 @@ class _Shop(OSShop):
             return results.pop(0)
         return default
 
-    def close_shop_buy_confirm_amount(self, *, skip_first_screenshot: bool = True) -> None:
+    def close_shop_buy_confirm_amount(self, skip_first_screenshot=True, **_kwargs: object) -> None:
         self.calls.append(("close_shop_buy_confirm_amount", skip_first_screenshot))
 
-    def get_currency_coins(self, item: _Item) -> int:
+    def get_currency_coins(self, item, *_args: object, **_kwargs: object) -> int:
         self.calls.append(("get_currency_coins", item))
         return self.currency
 
-    def get_coins_no_limit(self, item: _Item) -> int:
+    def get_coins_no_limit(self, item, *_args: object, **_kwargs: object) -> int:
         self.calls.append(("get_coins_no_limit", item))
         return self.coins
 
-    def interval_clear(self, button: object) -> None:
+    def interval_clear(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_clear", button))
 
-    def appear_then_click(self, button: object, **kwargs: object) -> bool:
+    def appear_then_click(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)
 
-    def ui_ensure_index(self, index: int, controls: object, **kwargs: object) -> None:
+    def ui_ensure_index(self, index: int, controls: object, *_args: object, **kwargs: object) -> None:
         self.calls.append(("ui_ensure_index", index, controls, kwargs))
 
 
@@ -131,31 +131,33 @@ class _BuyShop(OSShop):
             return results.pop(0)
         return default
 
-    def handle_map_get_items(self, **kwargs: object) -> bool:
+    def handle_map_get_items(self, *_args: object, **kwargs: object) -> bool:
         self.calls.append(("handle_map_get_items", kwargs))
         return self._next_result(self.get_items_results, default=False)
 
-    def interval_clear(self, button: object) -> None:
+    def interval_clear(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_clear", button))
 
-    def interval_reset(self, button: object) -> None:
+    def interval_reset(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_reset", button))
 
-    def appear_then_click(self, button: object, **kwargs: object) -> bool:
+    def appear_then_click(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def handle_popup_confirm(self, text: str) -> bool:
-        self.calls.append(("handle_popup_confirm", text))
+    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+        _ = (name, offset, interval)
+        self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 
-    def shop_buy_amount_handler(self, item: _BuyItem) -> bool:
+    def shop_buy_amount_handler(self, item, skip_first_screenshot=True) -> bool:
+        _ = skip_first_screenshot
         self.calls.append(("shop_buy_amount_handler", item))
         return self._next_result(self.amount_results, default=False)
 

@@ -65,16 +65,16 @@ class _Meowfficer(MeowfficerBase):
             return results.pop(0)
         return default
 
-    def match_template_color(self, button: object, **kwargs: object) -> bool:
+    def match_template_color(self, button: object, *_args: object, **kwargs: object) -> bool:
         self.calls.append(("match_template_color", button_key(button), kwargs))
         return self._next_result(self.match_results, default=False)
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def appear_then_click(self, button: object, **kwargs: object) -> bool:
+    def appear_then_click(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)

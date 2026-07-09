@@ -81,7 +81,7 @@ class _EnemySearching(EnemySearchingHandler):
     def handle_story_skip(self):
         return self._next(self.story_results)
 
-    def ensure_no_story(self):
+    def ensure_no_story(self, *_args: object, **_kwargs: object):
         self.ensure_no_story_count += 1
 
     def handle_guild_popup_cancel(self):

@@ -58,10 +58,11 @@ class _Tactical(RewardTacticalClass):
     def set_appear(self, button, *, results: list[bool]) -> None:
         self.appear_results[button.name] = results
 
-    def appear(self, button, **_kwargs):
+    def appear(self, button, *_args: object, **_kwargs):
         return self._next(self.appear_results.setdefault(button.name, []))
 
-    def appear_then_click(self, _button, **_kwargs):
+    def appear_then_click(self, button, *_args: object, **_kwargs):
+        _ = button
         return False
 
     def handle_rapid_training(self):
@@ -70,16 +71,18 @@ class _Tactical(RewardTacticalClass):
     def _tactical_get_finish(self):
         return False
 
-    def ui_main_appear_then_click(self, _page, **_kwargs):
+    def ui_main_appear_then_click(self, page, offset=(30, 30), interval=3):
+        _ = (page, offset, interval)
         return False
 
-    def handle_popup_confirm(self, _popup):
+    def handle_popup_confirm(self, name="", offset=None, interval=2):
+        _ = (name, offset, interval)
         return False
 
     def handle_urgent_commission(self):
         return False
 
-    def ui_page_main_popups(self):
+    def ui_page_main_popups(self, *_args: object, **_kwargs: object):
         return False
 
     def _tactical_books_choose(self):
@@ -88,7 +91,7 @@ class _Tactical(RewardTacticalClass):
     def handle_game_tips(self):
         return self._next(self.game_tips_results)
 
-    def dock_selected(self):
+    def dock_selected(self, *_args: object, **_kwargs: object):
         return self._next(self.dock_selected_results)
 
     def select_suitable_ship(self):

@@ -76,16 +76,17 @@ class _FakeBattlePass(BattlePass):
             return results.pop(0)
         return False
 
-    def appear(self, button, **_kwargs) -> bool:
+    def appear(self, button, *_args: object, **_kwargs) -> bool:
         return self._pop_button_result(self.appear_results, button)
 
-    def appear_then_click(self, button, **_kwargs) -> bool:
+    def appear_then_click(self, button, *_args: object, **_kwargs) -> bool:
         return self._pop_button_result(self.appear_then_click_results, button)
 
-    def match_template_color(self, button, **_kwargs) -> bool:
+    def match_template_color(self, button, *_args: object, **_kwargs) -> bool:
         return self._pop_button_result(self.match_results, button)
 
-    def handle_popup_confirm(self, _name) -> bool:
+    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+        _ = (name, offset, interval)
         if self.popup_results:
             return self.popup_results.pop(0)
         return False

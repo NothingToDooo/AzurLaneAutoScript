@@ -83,25 +83,25 @@ class _Storage(StorageHandler):
             return results.pop(0)
         return default
 
-    def loop(self):
+    def loop(self, *_args: object, **_kwargs: object):
         yield from range(20)
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def appear_then_click(self, button: object, **kwargs: object) -> bool:
+    def appear_then_click(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)
 
-    def match_template_color(self, button: object, **kwargs: object) -> bool:
+    def match_template_color(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("match_template_color", key, kwargs))
         return self._next_result(self.match_template_results.get(key, []), default=False)
 
-    def _storage_in_material(self, **kwargs: object) -> bool:
+    def _storage_in_material(self, *_args: object, **kwargs: object) -> bool:
         self.calls.append(("_storage_in_material", kwargs))
         return self._next_result(self.storage_in_material_results, default=False)
 
@@ -110,14 +110,14 @@ class _Storage(StorageHandler):
             return self.box_amount_results.pop(0)
         return super()._handle_use_box_amount(amount)
 
-    def interval_clear(self, buttons: object) -> None:
-        self.calls.append(("interval_clear", buttons))
+    def interval_clear(self, button: object, *_args: object, **_kwargs: object) -> None:
+        self.calls.append(("interval_clear", button))
 
-    def interval_reset(self, button: object) -> None:
+    def interval_reset(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_reset", button))
 
-    def ui_click(self, button: object, **kwargs: object) -> None:
-        self.calls.append(("ui_click", button, kwargs))
+    def ui_click(self, click_button: object, check_button=None, options=None, **settings: object) -> None:
+        self.calls.append(("ui_click", click_button, check_button, options, settings))
 
 
 @pytest.fixture(autouse=True)

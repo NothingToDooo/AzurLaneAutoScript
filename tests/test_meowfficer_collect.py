@@ -81,7 +81,7 @@ class _MeowfficerCollect(MeowfficerCollect):
             return results.pop(0)
         return default
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
@@ -94,7 +94,7 @@ class _MeowfficerCollect(MeowfficerCollect):
         self.calls.append(("_meow_is_special_talented",))
         return self._next_result(self.special_results, default=False)
 
-    def _meow_skip_popup_after_locking(self, **kwargs: object) -> None:
+    def _meow_skip_popup_after_locking(self, *_args: object, **kwargs: object) -> None:
         self.calls.append(("_meow_skip_popup_after_locking", kwargs))
 
     def _meow_skip_lock(self) -> None:
@@ -103,7 +103,7 @@ class _MeowfficerCollect(MeowfficerCollect):
     def _meow_apply_lock(self, lock: object = True) -> None:
         self.calls.append(("_meow_apply_lock", lock))
 
-    def interval_reset(self, button: object) -> None:
+    def interval_reset(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_reset", button))
 
 

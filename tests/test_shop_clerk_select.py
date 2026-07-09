@@ -50,13 +50,13 @@ class _FakeShopClerk(ShopClerk):
         self.selected_items.append(item)
         return "select_button"
 
-    def appear(self, button, **_kwargs) -> bool:
+    def appear(self, button, *_args: object, **_kwargs) -> bool:
         results = self.appear_results.get(id(button), [])
         if results:
             return results.pop(0)
         return False
 
-    def ui_ensure_index(self, index, controls, **kwargs) -> None:
+    def ui_ensure_index(self, index, controls, *_args: object, **kwargs) -> None:
         self.ensure_calls.append((index, controls, kwargs))
         self.ensure_letter_result = controls.letter(self.device.image)
 

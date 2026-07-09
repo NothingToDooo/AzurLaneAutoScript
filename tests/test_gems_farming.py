@@ -53,22 +53,22 @@ class _GemsCampaign(GemsCampaignOverride):
             return results.pop(0)
         return default
 
-    def handle_popup_confirm(self, name: str) -> bool:
+    def handle_popup_confirm(self, name: str = "", *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.confirm_results, default=False)
 
-    def handle_popup_cancel(self, name: str) -> bool:
+    def handle_popup_cancel(self, name: str = "", *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_popup_cancel", name))
         return self._next_result(self.cancel_results, default=False)
 
-    def interval_reset(self, button: object) -> None:
+    def interval_reset(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_reset", button))
 
     def handle_story_skip(self) -> bool:
         self.calls.append(("handle_story_skip",))
         return self._next_result(self.story_results, default=False)
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
@@ -85,10 +85,10 @@ class _GemsCampaign(GemsCampaignOverride):
         self.calls.append(("is_in_map",))
         return self._next_result(self.map_results, default=False)
 
-    def withdraw(self) -> None:
+    def withdraw(self, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("withdraw",))
 
-    def enter_map_cancel(self) -> None:
+    def enter_map_cancel(self, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("enter_map_cancel",))
 
 

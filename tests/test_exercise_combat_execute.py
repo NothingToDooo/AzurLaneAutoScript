@@ -57,7 +57,7 @@ class _ExerciseCombat(ExerciseCombat):
             return results.pop(0)
         return False
 
-    def appear(self, button, **_kwargs):
+    def appear(self, button, *_args: object, **_kwargs):
         if button == EXERCISE_CHECK:
             return self._next(self.exercise_results)
         if button == BATTLE_PREPARATION:
@@ -71,23 +71,25 @@ class _ExerciseCombat(ExerciseCombat):
     def is_combat_executing(self):
         return self._next(self.executing_results)
 
-    def appear_then_click(self, _button, **_kwargs):
+    def appear_then_click(self, button, *_args: object, **_kwargs):
+        _ = button
         return False
 
-    def handle_combat_quit(self):
+    def handle_combat_quit(self, *_args: object, **_kwargs: object):
         return False
 
-    def handle_combat_quit_reconfirm(self):
+    def handle_combat_quit_reconfirm(self, *_args: object, **_kwargs: object):
         return False
 
-    def _at_low_hp(self, *, image: object, pause: object):
+    def _at_low_hp(self, image: object, pause=None, **_kwargs: object):
         del image, pause
         return False
 
-    def _show_hp(self) -> None:
+    def _show_hp(self, *_args: object, **_kwargs: object) -> None:
         pass
 
-    def handle_popup_confirm(self, _popup):
+    def handle_popup_confirm(self, name="", offset=None, interval=2):
+        _ = (name, offset, interval)
         return False
 
     def handle_urgent_commission(self):

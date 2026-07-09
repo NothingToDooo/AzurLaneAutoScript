@@ -118,7 +118,7 @@ class _MapRescan(OSMap):
     def mark_fleet_mechanism_partly_solved(self) -> None:
         self._solved_fleet_mechanism = True
 
-    def wait_until_walk_stable(self, **kwargs: object) -> str:
+    def wait_until_walk_stable(self, *_args: object, **kwargs: object) -> str:
         self.calls.append(("wait_until_walk_stable", kwargs))
         return self._next_result(self.wait_results, default="")
 
@@ -129,7 +129,7 @@ class _MapRescan(OSMap):
     def handle_akashi_supply_buy(self, grid: _Grid) -> None:
         self.calls.append(("handle_akashi_supply_buy", grid))
 
-    def os_auto_search_run(self) -> int:
+    def os_auto_search_run(self, *_args: object, **_kwargs: object) -> int:
         self.calls.append(("os_auto_search_run",))
         return 0
 

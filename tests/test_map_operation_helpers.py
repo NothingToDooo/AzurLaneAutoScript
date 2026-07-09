@@ -48,7 +48,7 @@ class _MapOperation(MapOperation):
         self.map_clear_percentage = 0
         self.map_clear_percentage_timer = _Timer()
 
-    def match_template_color(self, button, offset=(0, 0), interval=0):
+    def match_template_color(self, button, offset=(0, 0), interval=0, *_args: object, **_kwargs: object):
         self.calls.append(("match_template_color", button.name, offset, interval))
         return self.normal_switch_visible
 
@@ -58,10 +58,10 @@ class _MapOperation(MapOperation):
             return self.hard_switch_active
         return self.hard_switch_visible
 
-    def interval_reset(self, button):
+    def interval_reset(self, button, *_args: object, **_kwargs: object):
         self.calls.append(("interval_reset", button.name))
 
-    def appear(self, button, offset=(0, 0)):
+    def appear(self, button, offset=(0, 0), *_args: object, **_kwargs: object):
         self.calls.append(("appear", button.name, offset))
         return self.map_preparation_visible
 

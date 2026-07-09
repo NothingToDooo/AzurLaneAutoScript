@@ -95,7 +95,7 @@ class _Fleet(OSFleet):
             return results.pop(0)
         return default
 
-    def loop(self) -> range:
+    def loop(self, *_args: object, **_kwargs: object) -> range:
         return range(5)
 
     def update_os(self) -> None:
@@ -111,7 +111,7 @@ class _Fleet(OSFleet):
         self.calls.append(("is_in_map",))
         return self._next_result(self.in_map_results, default=False)
 
-    def appear(self, button: object, **kwargs: object) -> bool:
+    def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
@@ -120,15 +120,15 @@ class _Fleet(OSFleet):
         self.calls.append(("is_combat_executing",))
         return self._next_result(self.combat_executing_results, default=None)
 
-    def interval_reset(self, button: object) -> None:
+    def interval_reset(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_reset", button))
         self.interval_resets.append(button)
 
-    def handle_combat_quit(self) -> bool:
+    def handle_combat_quit(self, *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_combat_quit",))
         return self._next_result(self.combat_quit_results, default=False)
 
-    def handle_combat_quit_reconfirm(self) -> bool:
+    def handle_combat_quit_reconfirm(self, *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_combat_quit_reconfirm",))
         return self._next_result(self.combat_quit_reconfirm_results, default=False)
 
@@ -140,25 +140,25 @@ class _Fleet(OSFleet):
         self.calls.append(("parse_fleet_filter",))
         return self.fleet_filter_results
 
-    def os_order_execute(self, **kwargs: object) -> None:
+    def os_order_execute(self, *_args: object, **kwargs: object) -> None:
         self.calls.append(("os_order_execute", kwargs))
 
-    def fleet_set(self, index: int = 1) -> bool:
+    def fleet_set(self, index: int = 1, *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("fleet_set", index))
         return self._next_result(self.fleet_set_results, default=True)
 
-    def handle_os_map_fleet_lock(self, **kwargs: object) -> None:
+    def handle_os_map_fleet_lock(self, *_args: object, **kwargs: object) -> None:
         self.calls.append(("handle_os_map_fleet_lock", kwargs))
 
     def fleet_low_resolve_appear(self) -> bool:
         self.calls.append(("fleet_low_resolve_appear",))
         return self._next_result(self.low_resolve_results, default=False)
 
-    def boss_goto(self, **kwargs: object) -> None:
+    def boss_goto(self, *_args: object, **kwargs: object) -> None:
         self.calls.append(("boss_goto", kwargs))
         self.boss_goto_calls.append(kwargs)
 
-    def relative_goto(self, **kwargs: object) -> None:
+    def relative_goto(self, *_args: object, **kwargs: object) -> None:
         self.calls.append(("relative_goto", kwargs))
 
     def map_exit(self) -> None:

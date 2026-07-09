@@ -68,7 +68,7 @@ class _FakeUI(UI):
     def ui_page_os_popups(self) -> bool:
         return self.os_popups
 
-    def handle_popup_confirm(self, name) -> bool:
+    def handle_popup_confirm(self, name="", *_args: object, **_kwargs: object) -> bool:
         self.popup_confirm_names.append(name)
         return self.popup_confirm
 
@@ -85,13 +85,13 @@ class _FakeUI(UI):
     def handle_idle_page(self) -> bool:
         return self.idle_page
 
-    def appear(self, button, **_kwargs) -> bool:
+    def appear(self, button, *_args: object, **_kwargs) -> bool:
         return self._has_button(self.appear_buttons, button)
 
-    def appear_then_click(self, button, **_kwargs) -> bool:
+    def appear_then_click(self, button, *_args: object, **_kwargs) -> bool:
         return self._has_button(self.appear_then_click_buttons, button)
 
-    def interval_reset(self, button) -> None:
+    def interval_reset(self, button, *_args: object, **_kwargs: object) -> None:
         self.reset_buttons.append(button)
 
 

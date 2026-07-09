@@ -80,19 +80,19 @@ class _InterruptMap(OSMap):
             return results.pop(0)
         return default
 
-    def loop(self) -> range:
+    def loop(self, *_args: object, **_kwargs: object) -> range:
         return range(self.loop_count)
 
-    def is_in_main(self) -> bool:
+    def is_in_main(self, *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("is_in_main",))
         return self._next_result(self.in_main_results, default=False)
 
-    def appear_then_click(self, button: object, **kwargs: object) -> bool:
+    def appear_then_click(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)
 
-    def interval_clear(self, button: object) -> None:
+    def interval_clear(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_clear", button))
         self.interval_clears.append(button)
 
@@ -100,19 +100,19 @@ class _InterruptMap(OSMap):
         self.calls.append(("is_combat_executing",))
         return self._next_result(self.combat_executing_results, default=None)
 
-    def interval_reset(self, button: object) -> None:
+    def interval_reset(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_reset", button))
         self.interval_resets.append(button)
 
-    def handle_combat_quit(self) -> bool:
+    def handle_combat_quit(self, *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_combat_quit",))
         return self._next_result(self.combat_quit_results, default=False)
 
-    def handle_combat_quit_reconfirm(self) -> bool:
+    def handle_combat_quit_reconfirm(self, *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_combat_quit_reconfirm",))
         return self._next_result(self.combat_quit_reconfirm_results, default=False)
 
-    def ui_additional(self) -> bool:
+    def ui_additional(self, *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("ui_additional",))
         return self._next_result(self.ui_additional_results, default=False)
 

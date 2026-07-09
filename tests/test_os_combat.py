@@ -47,11 +47,11 @@ class _ExpInfoContext(os_combat.Combat):
     def is_combat_executing(self):
         return False
 
-    def appear_then_click(self, button):
+    def appear_then_click(self, button, *_args: object, **_kwargs: object):
         self.appear_then_click_calls.append(button)
         return button in self.appearing
 
-    def appear(self, button, **kwargs):
+    def appear(self, button, *_args: object, **kwargs):
         self.appear_calls.append((button, kwargs))
         return button in self.appearing
 
@@ -83,8 +83,8 @@ class _AutoSearchCombatContext(os_combat.Combat):
     def submarine_call_reset(self) -> None:
         self.submarine_resets += 1
 
-    def handle_submarine_call(self, mode):
-        self.submarine_modes.append(mode)
+    def handle_submarine_call(self, submarine="do_not_use", *_args: object, **_kwargs: object):
+        self.submarine_modes.append(submarine)
         return False
 
     def handle_auto_search_battle_status(self):
