@@ -34,7 +34,7 @@ class CampaignHard(CampaignRun):
         # campaign/campaign_hard/campaign_hard.py Campaign.fleet_preparation()
 
         # Initial
-        self.load_campaign(name="campaign_hard", folder="campaign_hard")  # Load campaign file
+        self.load_campaign_helper(name="campaign_hard", folder="campaign_hard")  # Load campaign helper
         module = importlib.import_module("." + name, "campaign.campaign_main")  # Load map from normal mode.
         self.campaign.MAP = module.MAP
 

@@ -1,12 +1,18 @@
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar, cast
 
 import pytest
 
 from module.campaign import gems_farming as gems_module
-from module.campaign.gems_farming import GemsCampaignOverride
+from module.campaign.gems_farming import GemsCampaignOverride, GemsFarming
+from module.campaign.run import CampaignRun
+from module.content import LoadedStage
 from module.exception import CampaignEnd
 from module.handler.assets import AUTO_SEARCH_MAP_OPTION_OFF
+from module.map.map_base import CampaignMap
 from module.ui.assets import BACK_ARROW
+
+if TYPE_CHECKING:
+    from typing import Any
 
 _T = TypeVar("_T")
 
@@ -90,6 +96,55 @@ class _GemsCampaign(GemsCampaignOverride):
 
     def enter_map_cancel(self, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("enter_map_cancel",))
+
+
+class _OverrideRoot:
+    pass
+
+
+class _TestGemsOverride(_OverrideRoot):
+    pass
+
+
+class _TestLoadedCampaign(_OverrideRoot):
+    def __init__(self, *, config: object, device: object) -> None:
+        self.config = config
+        self.device = device
+
+
+class _MergedCampaignConfig:
+    def __init__(self) -> None:
+        self.overrides: list[dict[str, object]] = []
+
+    def override(self, **kwargs: object) -> None:
+        self.overrides.append(kwargs)
+
+
+def test_gems_farming_uses_loaded_stage_campaign_class(monkeypatch: pytest.MonkeyPatch) -> None:
+    runner = object.__new__(GemsFarming)
+    merged_config = _MergedCampaignConfig()
+    device = object()
+    runner.module = None
+
+    def load_stage(self: object, name: str, folder: str = "campaign_main") -> bool:
+        _ = (name, folder)
+        runner_state = cast("Any", self)
+        runner_state.loaded_stage = LoadedStage(_Config, _TestLoadedCampaign, CampaignMap("TEST"))
+        runner_state.campaign = _TestLoadedCampaign(config=merged_config, device=device)
+        return True
+
+    monkeypatch.setattr(CampaignRun, "load_campaign", load_stage)
+    monkeypatch.setattr(gems_module, "GemsCampaignOverride", _TestGemsOverride)
+
+    runner.load_campaign("t1", folder="event_test")
+
+    assert isinstance(runner.campaign, _TestLoadedCampaign)
+    assert runner.campaign.device is device
+    assert runner.campaign.config is merged_config
+    assert merged_config.overrides == [
+        {"Emotion_Mode": "ignore"},
+        {"EnemyPriority_EnemyScaleBalanceWeight": "S1_enemy_first"},
+    ]
 
 
 def test_low_emotion_disabled_confirms_ignore() -> None:

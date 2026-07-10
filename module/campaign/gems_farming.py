@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, cast
+
 from module.campaign.campaign_base import CampaignBase
 from module.campaign.run import CampaignRun
 from module.combat.assets import BATTLE_PREPARATION
@@ -24,6 +26,9 @@ from module.retire.dock import Dock
 from module.retire.scanner import ShipScanner
 from module.ui.assets import BACK_ARROW
 from module.ui.page import page_fleet
+
+if TYPE_CHECKING:
+    from typing import Any
 
 SIM_VALUE = 0.92
 EMOTION_WITHDRAW_MESSAGE = "Emotion withdraw"
@@ -105,10 +110,10 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
     def load_campaign(self, name, folder="campaign_main"):
         super().load_campaign(name, folder)
 
-        campaign_module = self.module
-        if campaign_module is None:
+        loaded_stage = self.loaded_stage
+        if loaded_stage is None:
             raise ScriptError(GEMS_FARMING_CAMPAIGN_MODULE_MISSING_MESSAGE)
-        campaign_class = vars(campaign_module)["Campaign"]
+        campaign_class = cast("Any", loaded_stage.campaign_class)
 
         class GemsCampaign(GemsCampaignOverride, campaign_class):
             pass

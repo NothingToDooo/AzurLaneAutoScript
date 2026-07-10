@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Protocol, cast
 
 from module.campaign.campaign_event import CampaignEvent
 from module.campaign.campaign_ui import MODE_SWITCH_1
+from module.content.legacy_stage import LegacyStageModuleAdapter, LoadedCampaignModule, LoadedStage
+from module.content.models import StageRef
 from module.exception import CampaignEnd, RequestHumanTakeover, ScriptEnd
 from module.handler.fast_forward import map_files, to_map_file_name
 from module.logger import logger
@@ -211,22 +213,16 @@ class CampaignRun(CampaignEvent):
     folder: str
     name: str
     stage: str
-    module = None
+    stage_adapter = LegacyStageModuleAdapter()
+    loaded_campaign: LoadedCampaignModule
+    loaded_stage: LoadedStage | None = None
     config: AzurLaneConfig
     campaign: CampaignBase
     run_count: int
     run_limit: int
     is_stage_loop = False
 
-    def load_campaign(self, name, folder="campaign_main"):
-        """
-        Args:
-            name (str): Name of .py file under module.campaign.
-            folder (str): Name of the file folder under campaign.
-
-        Returns:
-            bool: If load.
-        """
+    def _prepare_campaign_reference(self, name: str, folder: str) -> bool:
         if hasattr(self, "name") and name == self.name:
             return False
 
@@ -238,27 +234,59 @@ class CampaignRun(CampaignEvent):
         if folder.startswith(("event", "war_archives")):
             self.stage = name
 
+        return True
+
+    @staticmethod
+    def _raise_campaign_not_found(ref: StageRef, error: ModuleNotFoundError) -> None:
+        folder = ref.pack_id
+        name = ref.stage_id
+        logger.warning(f"Map file not found: campaign.{folder}.{name}")
+        if not Path(f"./campaign/{folder}").exists():
+            logger.warning(f"Folder not exists: ./campaign/{folder}")
+        else:
+            files = map_files(folder)
+            logger.warning(f"Existing files: {files}")
+
+        logger.critical(f"Possible reason #1: This event ({folder}) does not have {name}")
+        logger.critical(
+            "Possible reason #2: You are using an old Alas, "
+            "please check for update, or make map files yourself using dev_tools/map_extractor.py"
+        )
+        raise RequestHumanTakeover from error
+
+    def _activate_campaign(self, loaded: LoadedCampaignModule) -> None:
+        config = copy.deepcopy(self.config).merge(loaded.config_class())
+        campaign = loaded.campaign_class(config=config, device=self.device)
+        self.campaign = cast("CampaignBase", campaign)
+        self.loaded_campaign = loaded
+
+    def load_campaign(self, name: str, folder: str = "campaign_main") -> bool:
+        if not self._prepare_campaign_reference(name, folder):
+            return False
+
+        ref = StageRef(pack_id=folder, stage_id=name)
         try:
-            self.module = importlib.import_module("." + name, f"campaign.{folder}")
-        except ModuleNotFoundError as e:
-            logger.warning(f"Map file not found: campaign.{folder}.{name}")
-            if not Path(f"./campaign/{folder}").exists():
-                logger.warning(f"Folder not exists: ./campaign/{folder}")
-            else:
-                files = map_files(folder)
-                logger.warning(f"Existing files: {files}")
+            loaded = self.stage_adapter.load(ref)
+        except ModuleNotFoundError as error:
+            self._raise_campaign_not_found(ref, error)
 
-            logger.critical(f"Possible reason #1: This event ({folder}) does not have {name}")
-            logger.critical(
-                "Possible reason #2: You are using an old Alas, "
-                "please check for update, or make map files yourself using dev_tools/map_extractor.py"
-            )
-            raise RequestHumanTakeover from e
+        self.loaded_stage = loaded
+        self._activate_campaign(loaded)
+        return True
 
-        config = copy.deepcopy(self.config).merge(self.module.Config())
-        device = self.device
-        self.campaign = self.module.Campaign(config=config, device=device)
+    def load_campaign_helper(self, name: str, folder: str) -> bool:
+        """装载不带地图的历史战役辅助模块。"""
+        if not self._prepare_campaign_reference(name, folder):
+            return False
 
+        ref = StageRef(pack_id=folder, stage_id=name)
+        try:
+            loaded = self.stage_adapter.load_campaign_helper(ref)
+        except ModuleNotFoundError as error:
+            self._raise_campaign_not_found(ref, error)
+
+        self.loaded_stage = None
+        self._activate_campaign(loaded)
         return True
 
     def _triggered_run_count_limit(self) -> bool:
