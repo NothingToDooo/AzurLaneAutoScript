@@ -115,7 +115,7 @@ class ExpOnSkillSelect(Ocr):
 SKILL_EXP = ExpOnBookSelect(buttons=OCR_SKILL_EXP)
 BOOKS_GRID = ButtonGrid(origin=(213, 292), delta=(147, 117), button_shape=(98, 98), grid_shape=(6, 2))
 BOOK_FILTER = Filter(
-    regex=re.compile("(same)?(red|blue|yellow)?-?(t[1234])?"),
+    regex=re.compile(r"(same)?(red|blue|yellow)?-?(t[1234])?"),
     attr=("same_str", "genre_str", "tier_str"),
     preset=("first",),
 )

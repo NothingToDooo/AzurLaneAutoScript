@@ -8,7 +8,7 @@ from module.private_quarters.clerk import PQShopClerk
 from module.private_quarters.status import OCR_SHOP_PRICE, PQStatus
 from module.statistics.item import ItemGrid, item_predict_options
 
-FILTER_REGEX = re.compile("^(gift|furn|misc)(sirius|cake|roses)([1-9]+)?$", flags=re.IGNORECASE)
+FILTER_REGEX = re.compile(r"^(gift|furn|misc)(sirius|cake|roses)([1-9]+)?$", flags=re.IGNORECASE)
 FILTER_ATTR = ("group", "sub_genre", "tier")
 FILTER = Filter(FILTER_REGEX, FILTER_ATTR)
 

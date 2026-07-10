@@ -23,7 +23,7 @@ from module.ui.scroll import Scroll
 PRICE_OCR = DigitYuv([], letter=(255, 223, 57), threshold=128, name="Price_ocr")
 VOUCHER_SHOP_SCROLL = Scroll(VOUCHER_SHOP_SCROLL_AREA, color=(255, 255, 255))
 TEMPLATE_VOUCHER_ICON = Template("./assets/shop/cost/Voucher.png")
-FILTER_REGEX_VOUCHER = re.compile("(logger)(archive|unlock)?(t[1-6])?", flags=re.IGNORECASE)
+FILTER_REGEX_VOUCHER = re.compile(r"(logger)(archive|unlock)?(t[1-6])?", flags=re.IGNORECASE)
 
 
 def voucher_redirect(value):

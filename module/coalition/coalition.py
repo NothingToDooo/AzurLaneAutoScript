@@ -150,7 +150,7 @@ class Coalition(CoalitionCombat, CampaignEvent):
 
     @staticmethod
     def handle_stage_name(event, stage):
-        stage = re.sub("[ \t\n]", "", str(stage)).lower()
+        stage = re.sub(r"[ \t\n]", "", str(stage)).lower()
         if event == "coalition_20230323":
             stage = stage.replace("-", "")
 

@@ -3,7 +3,7 @@ import re
 from module.base.filter import Filter
 from module.campaign.run import CampaignRun
 
-STAGE_FILTER = Filter(regex=re.compile("^(.*?)$"), attr=("stage",))
+STAGE_FILTER = Filter(regex=re.compile(r"^(.*?)$"), attr=("stage",))
 
 
 class EventStage:

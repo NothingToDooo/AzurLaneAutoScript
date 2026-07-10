@@ -157,7 +157,7 @@ def function_drop(rate=0.5, default=None):
             cls = ""
             arguments = [str(arg) for arg in args]
             if arguments:
-                matched = re.search("<(.*?) object at", arguments[0])
+                matched = re.search(r"<(.*?) object at", arguments[0])
                 if matched:
                     cls = matched.group(1) + "."
                     arguments.pop(0)

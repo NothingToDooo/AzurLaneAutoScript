@@ -17,10 +17,10 @@ URGENT_BOX_TAGS = ("NYB", "BIW")
 
 COMMISSION_FILTER = Filter(
     regex=re.compile(
-        "(major|daily|extra|urgent|night)?"
-        "-?"
-        "(resource|chip|event|drill|part|cube|oil|book|retrofit|box|gem|ship)?"
-        "-?"
+        r"(major|daily|extra|urgent|night)?"
+        r"-?"
+        r"(resource|chip|event|drill|part|cube|oil|book|retrofit|box|gem|ship)?"
+        r"-?"
         r"(\d\d?:\d\d)?"
         r"(\d\d?.\d\d?|\d\d?)?"
     ),

@@ -29,7 +29,7 @@ EXCHANGE_GRIDS = ButtonGrid(
 EXCHANGE_BUTTONS = ButtonGrid(
     origin=(440, 609), delta=(198.5, 0), button_shape=(144, 31), grid_shape=(3, 1), name="EXCHANGE_BUTTONS"
 )
-EXCHANGE_FILTER = Filter(regex=re.compile("^(.*?)$"), attr=("name",))
+EXCHANGE_FILTER = Filter(regex=re.compile(r"^(.*?)$"), attr=("name",))
 GUILD_LOGISTICS_REFRESH_BUG_MESSAGE = "Triggered guild logistics refresh bug"
 
 

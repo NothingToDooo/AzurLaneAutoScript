@@ -89,7 +89,7 @@ class Emulator(EmulatorBase):
         Returns:
             str: serial，例如 `127.0.0.1:16384`
         """
-        regex = re.compile('<*?hostport="(.*?)".*?guestport="5555"/>')
+        regex = re.compile(r'<*?hostport="(.*?)".*?guestport="5555"/>')
         serial = ""
         try:
             with Path(file).open(encoding="utf-8", errors="ignore") as f:

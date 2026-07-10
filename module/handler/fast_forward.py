@@ -60,7 +60,7 @@ def to_map_input_name(name: str) -> str:
     d3 -> D3
     """
     # Remove whitespaces
-    name = re.sub("[ \t\n]", "", name).lower()
+    name = re.sub(r"[ \t\n]", "", name).lower()
     # B-1 -> B1
     res = re.match(r"([a-zA-Z])+[- ]+(\d+)", name)
     if res:
@@ -81,7 +81,7 @@ def to_map_file_name(name: str) -> str:
     """
     name = str(name).lower()
     # Remove whitespaces
-    name = re.sub("[ \t\n]", "", name).lower()
+    name = re.sub(r"[ \t\n]", "", name).lower()
     # B-1 -> B1
     res = re.match(r"([a-zA-Z])+[- ]+(\d+)", name)
     if res:

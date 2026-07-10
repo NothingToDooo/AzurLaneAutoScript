@@ -9,7 +9,7 @@ from module.logger import logger
 from module.map.fleet import Fleet
 from module.map.map_grids import SelectedGrids
 
-ENEMY_FILTER = Filter(regex=re.compile("^(.*?)$"), attr=("str",))
+ENEMY_FILTER = Filter(regex=re.compile(r"^(.*?)$"), attr=("str",))
 UNKNOWN_GRID_SELECTION_SETTINGS_TEMPLATE = "Unknown grid selection settings: {settings}"
 
 
