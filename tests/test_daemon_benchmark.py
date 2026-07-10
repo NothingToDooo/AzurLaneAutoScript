@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import module.daemon.benchmark as benchmark_module
 from module.daemon.benchmark import Benchmark
 
 
@@ -52,3 +53,23 @@ def test_get_test_methods_uses_fixed_personal_stack(
     benchmark.config = SimpleNamespace(Benchmark_TestScene=scene)
 
     assert benchmark.get_test_methods() == expected
+
+
+def test_benchmark_keeps_first_result_when_costs_tie(monkeypatch) -> None:
+    class TieCost(float):
+        pass
+
+    first = TieCost(0.1)
+    second = TieCost(0.1)
+    costs = iter((first, second))
+    benchmark = object.__new__(Benchmark)
+    benchmark.device = SimpleNamespace(screenshot_nemu_ipc=lambda: None, click_minitouch=lambda *_: None)
+    benchmark.benchmark_test = lambda _: next(costs)
+    benchmark.show = lambda **_: None
+    messages = []
+
+    monkeypatch.setattr(benchmark_module.logger, "info", messages.append)
+    monkeypatch.setattr(benchmark_module, "float2str", lambda value: "first" if value is first else "second")
+
+    assert benchmark.benchmark(screenshot=("nemu_ipc", "nemu_ipc")) == ("nemu_ipc", "minitouch")
+    assert "Fixed screenshot method: nemu_ipc (first)" in messages

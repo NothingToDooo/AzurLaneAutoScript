@@ -355,6 +355,9 @@ def get_server_next_update(daily_trigger):
     """
     if isinstance(daily_trigger, str):
         daily_trigger = daily_trigger.replace(" ", "").split(",")
+    if not daily_trigger:
+        msg = "daily_trigger must not be empty"
+        raise ValueError(msg)
 
     diff = server_time_offset()
     local_now = datetime.now()
@@ -365,7 +368,7 @@ def get_server_next_update(daily_trigger):
         s = (future - local_now).total_seconds() % 86400
         future = local_now + timedelta(seconds=s)
         trigger.append(future)
-    return sorted(trigger)[0]
+    return min(trigger)
 
 
 def get_server_last_update(daily_trigger):
@@ -378,6 +381,9 @@ def get_server_last_update(daily_trigger):
     """
     if isinstance(daily_trigger, str):
         daily_trigger = daily_trigger.replace(" ", "").split(",")
+    if not daily_trigger:
+        msg = "daily_trigger must not be empty"
+        raise ValueError(msg)
 
     diff = server_time_offset()
     local_now = datetime.now()
@@ -388,7 +394,7 @@ def get_server_last_update(daily_trigger):
         s = (future - local_now).total_seconds() % 86400 - 86400
         future = local_now + timedelta(seconds=s)
         trigger.append(future)
-    return sorted(trigger)[-1]
+    return max(trigger)
 
 
 def nearest_future(future, interval=120):

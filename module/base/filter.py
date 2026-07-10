@@ -59,7 +59,7 @@ class Filter:
                 if preset not in out:
                     out.append(preset)
             else:
-                for _index, obj in enumerate(objs):
+                for obj in objs:
                     if self.apply_filter_to_obj(obj=obj, filter_value=parsed_filter) and obj not in out:
                         out.append(obj)
 
