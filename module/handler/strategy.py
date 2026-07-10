@@ -177,10 +177,8 @@ class StrategyHandler(InfoHandler):
             else:
                 self.device.screenshot()
 
-            if self.appear_then_click(handler_assets.SUBMARINE_MOVE_CONFIRM, offset=(20, 20), interval=5):
-                pass
-            if self.handle_popup_confirm("SUBMARINE_MOVE"):
-                pass
+            self.appear_then_click(handler_assets.SUBMARINE_MOVE_CONFIRM, offset=(20, 20), interval=5)
+            self.handle_popup_confirm("SUBMARINE_MOVE")
 
             if self.appear(handler_assets.SUBMARINE_MOVE_ENTER, offset=200):
                 break
@@ -198,10 +196,8 @@ class StrategyHandler(InfoHandler):
             else:
                 self.device.screenshot()
 
-            if self.appear_then_click(handler_assets.SUBMARINE_MOVE_CANCEL, offset=(20, 20), interval=5):
-                pass
-            if self.handle_popup_confirm("SUBMARINE_MOVE"):
-                pass
+            self.appear_then_click(handler_assets.SUBMARINE_MOVE_CANCEL, offset=(20, 20), interval=5)
+            self.handle_popup_confirm("SUBMARINE_MOVE")
 
             if self.appear(handler_assets.SUBMARINE_MOVE_ENTER, offset=200):
                 break
