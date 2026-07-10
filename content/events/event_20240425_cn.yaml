@@ -12,8 +12,20 @@ releases:
 policy:
   aliases:
     1sp: isp1
+    1sp1: isp1
+    1sp2: isp2
+    1sp3: isp3
+    1sp4: isp4
+    1sp5: isp5
+    1sp6: isp6
     iisp: sp
     isp: isp1
     lsp: isp1
+    lsp1: isp1
+    lsp2: isp2
+    lsp3: isp3
+    lsp4: isp4
+    lsp5: isp5
+    lsp6: isp6
     usp: sp
     μsp: sp

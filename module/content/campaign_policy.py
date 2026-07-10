@@ -2,6 +2,7 @@ import random
 from dataclasses import dataclass
 from typing import Protocol
 
+from module.content.errors import ContentValidationError
 from module.logger import logger
 
 
@@ -28,11 +29,23 @@ class CampaignPolicy:
     map_achievement_fallbacks: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "aliases", tuple((source, target) for source, target in self.aliases))
+        aliases = tuple((source, target) for source, target in self.aliases)
+        if len({source for source, _ in aliases}) != len(aliases):
+            message = "duplicate alias key"
+            raise ContentValidationError(message)
+        loops = tuple((alias, tuple(stages)) for alias, stages in self.loops)
+        if len({alias for alias, _ in loops}) != len(loops):
+            message = "duplicate loop key"
+            raise ContentValidationError(message)
+        if any(not stages for _, stages in loops):
+            message = "loop stages must not be empty"
+            raise ContentValidationError(message)
+
+        object.__setattr__(self, "aliases", aliases)
         object.__setattr__(
             self,
             "loops",
-            tuple((alias, tuple(stages)) for alias, stages in self.loops),
+            loops,
         )
         object.__setattr__(self, "force_threat_safe_stages", tuple(self.force_threat_safe_stages))
         object.__setattr__(self, "resource_free_stages", tuple(self.resource_free_stages))

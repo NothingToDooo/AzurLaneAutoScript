@@ -10,12 +10,19 @@ from yaml.resolver import BaseResolver
 
 from module.content.campaign_policy import CampaignPolicy
 from module.content.errors import ContentValidationError
-from module.content.models import AssetRef, ContentId, EventPack, EventRelease, StageRef, StageSpec
+from module.content.models import (
+    EVENT_KINDS,
+    EVENT_UI_PROFILES,
+    AssetRef,
+    ContentId,
+    EventPack,
+    EventRelease,
+    StageRef,
+    StageSpec,
+)
 
 SCHEMA_VERSION = 1
 DEFAULT_EVENT_MANIFEST_PATH = Path(__file__).resolve().parents[2] / "content" / "events"
-EVENT_KINDS = ("event", "raid", "coalition", "war_archives")
-UI_PROFILES = ("legacy_python",)
 _TOP_LEVEL_FIELDS = {"schema_version", "id", "kind", "ui_profile", "releases", "stages", "policy"}
 _RELEASE_FIELDS = {"opened_on", "name_cn", "order"}
 _STAGE_FIELDS = {"id", "source", "assets"}
@@ -100,6 +107,13 @@ def _exact_integer(value: object, path: Path, location: str) -> int:
     return value
 
 
+def _safe_stage_id(value: object, path: Path, location: str) -> str:
+    stage_id = _string(value, path, location)
+    if stage_id in {".", ".."} or any(character in stage_id for character in ("/", "\\", ":")):
+        raise _fail(path, location, "must be a safe stage id without path semantics")
+    return stage_id
+
+
 def _load_yaml(path: Path) -> Mapping[str, object]:
     try:
         loader = _StrictLoader(path.read_text(encoding="utf-8"))
@@ -138,6 +152,18 @@ def _load_releases(raw: object, path: Path) -> tuple[EventRelease, ...]:
     if not releases:
         raise _fail(path, "releases", "must not be empty")
     return tuple(releases)
+
+
+def _resolve_pack_root(path: Path, pack_id: str) -> Path:
+    manifest_root = path.parent.resolve()
+    pack_root = (path.parent / pack_id).resolve()
+    try:
+        relative = pack_root.relative_to(manifest_root)
+    except ValueError as error:
+        raise _fail(path, "stages", "pack content directory must stay inside the manifest root") from error
+    if relative.parts != (pack_id,):
+        raise _fail(path, "stages", "pack content directory must be the pack's direct directory")
+    return pack_root
 
 
 def _safe_pack_file(raw: object, path: Path, location: str, pack_root: Path) -> str:
@@ -181,7 +207,7 @@ def _load_stages(raw: object, path: Path, pack_id: str, pack_root: Path) -> tupl
         required = {"id", "source"}
         if not required.issubset(item):
             raise _fail(path, location, f"required fields are {sorted(required)}")
-        stage_id = _string(item["id"], path, f"{location}.id")
+        stage_id = _safe_stage_id(item["id"], path, f"{location}.id")
         if stage_id in seen:
             raise _fail(path, f"{location}.id", f"duplicate stage id: {stage_id}")
         seen.add(stage_id)
@@ -248,14 +274,40 @@ def _validate_policy_targets(
     repository_root: Path,
 ) -> None:
     native_stage_ids = {stage.ref.stage_id for stage in stages}
+    repository_root = repository_root.resolve()
+    campaign_parent = (repository_root / "campaign").resolve()
+    campaign_root = (repository_root / "campaign" / pack_id).resolve()
+    try:
+        campaign_parent_relative = campaign_parent.relative_to(repository_root)
+        campaign_relative = campaign_root.relative_to(campaign_parent)
+    except ValueError:
+        campaign_parent_relative = None
+        campaign_relative = None
+    legacy_root_is_safe = (
+        campaign_parent_relative is not None
+        and campaign_parent_relative.parts == ("campaign",)
+        and campaign_relative is not None
+        and campaign_relative.parts == (pack_id,)
+    )
 
     def target_exists(target: str) -> bool:
-        return target in native_stage_ids or (repository_root / "campaign" / pack_id / f"{target}.py").is_file()
+        if target in native_stage_ids:
+            return True
+        if not legacy_root_is_safe:
+            raise _fail(path, "policy", "legacy campaign directory must stay inside its pack root")
+        legacy_path = (campaign_root / f"{target}.py").resolve()
+        try:
+            legacy_path.relative_to(campaign_root)
+        except ValueError:
+            return False
+        return legacy_path.is_file()
 
     targets = [target for _, target in policy.aliases]
     targets.extend(stage for _, loop in policy.loops for stage in loop)
     targets.extend(policy.force_threat_safe_stages)
     targets.extend(policy.resource_free_stages)
+    for target in targets:
+        _safe_stage_id(target, path, "policy target")
     dangling = sorted({target for target in targets if not target_exists(target)})
     if dangling:
         raise _fail(path, "policy", f"dangling stage targets: {dangling}")
@@ -278,10 +330,10 @@ def _load_pack(path: Path, repository_root: Path) -> EventPack:
     if not pack_id.startswith(f"{kind}_"):
         raise _fail(path, "kind", "must match the pack id prefix")
     ui_profile = _string(data["ui_profile"], path, "ui_profile")
-    if ui_profile not in UI_PROFILES:
-        raise _fail(path, "ui_profile", f"must be one of {UI_PROFILES}")
+    if ui_profile not in EVENT_UI_PROFILES:
+        raise _fail(path, "ui_profile", f"must be one of {EVENT_UI_PROFILES}")
     releases = _load_releases(data["releases"], path)
-    pack_root = path.parent / pack_id
+    pack_root = _resolve_pack_root(path, pack_id)
     stages = _load_stages(data.get("stages", ()), path, pack_id, pack_root)
     policy = _load_policy(data.get("policy", {}), path)
     _validate_policy_targets(policy, stages, path, pack_id, repository_root)
@@ -303,6 +355,9 @@ def load_event_manifests(path: Path) -> tuple[EventPack, ...]:
         raise ContentValidationError(message)
     repository_root = root.parent.parent
     files = sorted((*root.glob("*.yaml"), *root.glob("*.yml")), key=lambda item: item.name)
+    if not files:
+        message = f"manifest directory must contain at least one YAML file: {root}"
+        raise ContentValidationError(message)
     packs = tuple(_load_pack(file, repository_root) for file in files)
     seen_ids: set[str] = set()
     seen_orders: set[int] = set()

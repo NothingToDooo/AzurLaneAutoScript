@@ -12,6 +12,7 @@ if __name__ == "__main__" and __package__ in {None, ""}:
     # 脚本路径运行时，先补仓库根目录，后面的绝对导入才可用。
     sys.path.insert(0, str(REPO_ROOT))
 
+from module.base.atomic import atomic_write
 from module.base.decorator import cached_property
 from module.base.timer import timer
 from module.config.deep import deep_default, deep_get, deep_iter, deep_set
@@ -491,17 +492,17 @@ class ConfigGenerator:
         self._set_event_options(COALITIONS, self._latest_named_options(packs, "coalition"), bold=True)
         self._set_event_options(WAR_ARCHIVES, self._war_archive_options(packs), bold=False)
 
+    @staticmethod
+    def write_campaign_readme(packs: tuple[EventPack, ...]) -> None:
+        atomic_write(REPO_ROOT / "campaign" / "Readme.md", render_campaign_readme(packs))
+
     @timer
     def generate(self):
         _ = self.args
         _ = self.menu
         packs = self.event_packs
         self.insert_event()
-        (REPO_ROOT / "campaign" / "Readme.md").write_text(
-            render_campaign_readme(packs),
-            encoding="utf-8",
-            newline="\n",
-        )
+        self.write_campaign_readme(packs)
         write_file(filepath_args(), self.args)
         write_file(filepath_args("menu"), self.menu)
         self.generate_code()

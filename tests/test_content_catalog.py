@@ -68,14 +68,10 @@ def test_catalog_public_annotations_are_runtime_resolvable() -> None:
 
 def test_catalog_rejects_objects_outside_content_model_contracts() -> None:
     invalid_pack = cast("Any", object())
-    invalid_stage = cast("Any", object())
-    pack_with_invalid_stage = EventPack(pack_id=ContentId("event_invalid"), stages=(invalid_stage,))
     catalog = ContentCatalog((_pack("event_known", "t1"),))
 
     with pytest.raises(TypeError, match="EventPack"):
         ContentCatalog((invalid_pack,))
-    with pytest.raises(TypeError, match="StageSpec"):
-        ContentCatalog((pack_with_invalid_stage,))
     with pytest.raises(TypeError, match="StageRef"):
         catalog.resolve_stage(cast("Any", object()))
 

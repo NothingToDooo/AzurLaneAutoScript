@@ -59,11 +59,27 @@ class _HandleConfig(_PolicyConfig):
         ("event_20221124_cn", "d1", "th4"),
         ("campaign_main", "t1", "a1"),
         ("event_20230817_cn", "e01", "a1"),
+        ("event_20230817_cn", "e02", "a1"),
+        ("event_20230817_cn", "e03", "a1"),
+        ("event_20230817_cn", "e0-1", "a1"),
+        ("event_20230817_cn", "e0-2", "a1"),
+        ("event_20230817_cn", "e0-3", "a1"),
         ("event_20240829_cn", "tp", "sp"),
     ],
 )
 def test_stage_alias_normalization(folder: str, name: str, expected: str) -> None:
     assert _normalize_stage_alias(name, folder) == expected
+
+
+@pytest.mark.parametrize(
+    ("alias", "expected"),
+    [
+        *((f"lsp{index}", f"isp{index}") for index in range(1, 7)),
+        *((f"1sp{index}", f"isp{index}") for index in range(1, 7)),
+    ],
+)
+def test_music_event_numbered_sp_aliases(alias: str, expected: str) -> None:
+    assert _normalize_stage_alias(alias, "event_20240425_cn") == expected
 
 
 def test_stage_loop_alias_uses_remaining_run_count() -> None:

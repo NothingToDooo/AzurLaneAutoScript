@@ -6,6 +6,9 @@ from module.content.campaign_policy import CampaignPolicy
 from module.content.errors import ContentValidationError
 from module.content.validation import require_non_empty_identifier
 
+EVENT_KINDS = ("event", "raid", "coalition", "war_archives")
+EVENT_UI_PROFILES = ("legacy_python",)
+
 
 @dataclass(frozen=True, slots=True)
 class ContentId:
@@ -72,7 +75,7 @@ class EventRelease:
 
 @dataclass(frozen=True, slots=True)
 class EventPack:
-    pack_id: ContentId
+    pack_id: ContentId | str
     stages: tuple[StageSpec, ...] = ()
     kind: str = "event"
     ui_profile: str = "legacy_python"
@@ -80,5 +83,32 @@ class EventPack:
     policy: CampaignPolicy = field(default_factory=CampaignPolicy)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "stages", tuple(self.stages))
-        object.__setattr__(self, "releases", tuple(self.releases))
+        pack_id = self.pack_id
+        if isinstance(pack_id, str):
+            pack_id = ContentId(pack_id)
+            object.__setattr__(self, "pack_id", pack_id)
+        elif not isinstance(pack_id, ContentId):
+            message = "pack_id must be a ContentId or string"
+            raise TypeError(message)
+
+        if self.kind not in EVENT_KINDS:
+            message = f"kind must be one of {EVENT_KINDS}"
+            raise ContentValidationError(message)
+        if self.ui_profile not in EVENT_UI_PROFILES:
+            message = f"ui_profile must be one of {EVENT_UI_PROFILES}"
+            raise ContentValidationError(message)
+
+        stages = tuple(self.stages)
+        if any(not isinstance(stage, StageSpec) for stage in stages):
+            message = "stages must contain StageSpec instances"
+            raise TypeError(message)
+        releases = tuple(self.releases)
+        if any(not isinstance(release, EventRelease) for release in releases):
+            message = "releases must contain EventRelease instances"
+            raise TypeError(message)
+        if not isinstance(self.policy, CampaignPolicy):
+            message = "policy must be a CampaignPolicy"
+            raise TypeError(message)
+
+        object.__setattr__(self, "stages", stages)
+        object.__setattr__(self, "releases", releases)

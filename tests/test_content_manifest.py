@@ -1,12 +1,15 @@
 import ast
 import inspect
+import os
 import re
 from datetime import date
 from pathlib import Path
 from typing import get_type_hints
 
+import psutil
 import pytest
 
+from module.config import config_updater as config_updater_module
 from module.config.config_updater import ConfigGenerator
 from module.content.campaign_policy import CampaignPolicy
 from module.content.errors import ContentValidationError
@@ -39,6 +42,17 @@ def _set_attribute(instance: object, name: str, value: object) -> None:
     setattr(instance, name, value)
 
 
+def _create_directory_link(link: Path, target: Path) -> None:
+    if os.name == "nt":
+        command = Path(os.environ.get("COMSPEC", "C:/Windows/System32/cmd.exe"))
+        process = psutil.Popen([str(command), "/d", "/c", "mklink", "/J", str(link), str(target)])
+        if process.wait() != 0:
+            message = f"failed to create junction: {link}"
+            raise OSError(message)
+        return
+    link.symlink_to(target, target_is_directory=True)
+
+
 def _minimal_manifest(**replacements: str) -> str:
     values = {
         "schema_version": "1",
@@ -60,6 +74,10 @@ def _minimal_manifest(**replacements: str) -> str:
             name_cn: {values["name_cn"]}
             order: {values["order"]}
     """
+
+
+def _manifest_with(extra: str, **replacements: str) -> str:
+    return inspect.cleandoc(_minimal_manifest(**replacements)) + "\n" + extra.strip()
 
 
 def test_event_models_keep_the_old_constructor_and_expose_immutable_manifest_data() -> None:
@@ -101,6 +119,14 @@ def test_load_minimal_manifest(tmp_path: Path) -> None:
     assert pack.releases == (EventRelease(date(2026, 6, 25), "美梦巡演奇妙夜", 10),)
     assert pack.stages == ()
     assert pack.policy == CampaignPolicy()
+
+
+def test_manifest_rejects_empty_directory(tmp_path: Path) -> None:
+    root = tmp_path / "content" / "events"
+    root.mkdir(parents=True)
+
+    with pytest.raises(ContentValidationError, match="must contain"):
+        load_event_manifests(root)
 
 
 @pytest.mark.parametrize(
@@ -213,6 +239,70 @@ def test_manifest_rejects_unsafe_native_paths(tmp_path: Path, unsafe_path: str) 
         load_event_manifests(root)
 
 
+@pytest.mark.parametrize("stage_id", ["../t1", "folder/t1", "folder\\t1", "C:t1", ".", ".."])
+def test_manifest_rejects_path_like_native_stage_ids(tmp_path: Path, stage_id: str) -> None:
+    root = tmp_path / "content" / "events"
+    pack_root = root / "event_20260625_cn"
+    (pack_root / "stages").mkdir(parents=True)
+    (pack_root / "stages" / "t1.yaml").write_text("map: t1\n", encoding="utf-8")
+    body = _manifest_with(f"stages:\n  - id: {stage_id}\n    source: stages/t1.yaml")
+    _write_manifest(root, "event_20260625_cn.yaml", body)
+
+    with pytest.raises(ContentValidationError, match="safe stage id"):
+        load_event_manifests(root)
+
+
+@pytest.mark.parametrize("target", ["../event_other/a1", "folder/a1", "folder\\a1", "C:a1", ".", ".."])
+def test_manifest_rejects_path_like_policy_targets(tmp_path: Path, target: str) -> None:
+    root = tmp_path / "content" / "events"
+    other = tmp_path / "campaign" / "event_other"
+    other.mkdir(parents=True)
+    (other / "a1.py").write_text("", encoding="utf-8")
+    body = _manifest_with(f"policy:\n  aliases:\n    shortcut: {target}")
+    _write_manifest(root, "event_20260625_cn.yaml", body)
+
+    with pytest.raises(ContentValidationError, match="safe stage id"):
+        load_event_manifests(root)
+
+
+def test_manifest_rejects_pack_root_junction_outside_events_directory(tmp_path: Path) -> None:
+    root = tmp_path / "content" / "events"
+    root.mkdir(parents=True)
+    outside = tmp_path / "outside_pack"
+    (outside / "stages").mkdir(parents=True)
+    (outside / "stages" / "t1.yaml").write_text("map: t1\n", encoding="utf-8")
+    link = root / "event_20260625_cn"
+    _create_directory_link(link, outside)
+
+    try:
+        body = _manifest_with("stages:\n  - id: t1\n    source: stages/t1.yaml")
+        _write_manifest(root, "event_20260625_cn.yaml", body)
+        with pytest.raises(ContentValidationError, match="pack content directory"):
+            load_event_manifests(root)
+    finally:
+        link.rmdir()
+
+
+def test_manifest_rejects_legacy_campaign_junction_outside_repository_root(tmp_path: Path) -> None:
+    root = tmp_path / "content" / "events"
+    campaign_root = tmp_path / "campaign"
+    root.mkdir(parents=True)
+    campaign_root.mkdir()
+    outside = tmp_path / "outside_campaign"
+    outside.mkdir()
+    (outside / "a1.py").write_text("", encoding="utf-8")
+    link = campaign_root / "event_20260625_cn"
+    _create_directory_link(link, outside)
+
+    try:
+        body = _manifest_with("policy:\n  aliases:\n    shortcut: a1")
+        _write_manifest(root, "event_20260625_cn.yaml", body)
+        with pytest.raises(ContentValidationError, match="legacy campaign directory"):
+            load_event_manifests(root)
+    finally:
+        link.rmdir()
+
+
 def test_manifest_loads_native_stage_and_assets_only_from_its_pack_root(tmp_path: Path) -> None:
     root = tmp_path / "content" / "events"
     pack_root = root / "event_20260625_cn"
@@ -298,6 +388,30 @@ def test_readme_renderer_matches_checked_in_output() -> None:
 def test_config_generator_manifest_annotations_are_runtime_resolvable() -> None:
     event_packs_property = ConfigGenerator.__dict__["event_packs"]
     assert get_type_hints(event_packs_property.func)["return"] == tuple[EventPack, ...]
+
+
+def test_config_generator_writes_readme_through_atomic_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    writes: list[tuple[Path, str]] = []
+    pack = EventPack(
+        pack_id=ContentId("event_demo"),
+        releases=(EventRelease(date(2026, 1, 1), "演示活动", 10),),
+    )
+    monkeypatch.setattr(
+        config_updater_module,
+        "atomic_write",
+        lambda path, content: writes.append((Path(path), content)),
+    )
+
+    ConfigGenerator.write_campaign_readme((pack,))
+
+    assert writes == [
+        (
+            config_updater_module.REPO_ROOT / "campaign" / "Readme.md",
+            render_campaign_readme((pack,)),
+        )
+    ]
 
 
 def test_stable_core_contains_no_dated_event_string_literals() -> None:

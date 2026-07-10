@@ -1,13 +1,38 @@
 from dataclasses import FrozenInstanceError
 from pathlib import Path
+from typing import cast
 
 import pytest
 
-from module.content import AssetRef, ContentId, EventPack, StageRef, StageSpec, ValidationIssue
+from module.content import (
+    AssetRef,
+    CampaignPolicy,
+    ContentId,
+    EventPack,
+    EventRelease,
+    StageRef,
+    StageSpec,
+    ValidationIssue,
+)
+from module.content.errors import ContentValidationError
 
 
 def _set_attribute(instance: object, attribute: str, value: object) -> None:
     setattr(instance, attribute, value)
+
+
+def _event_pack_with_finite_value(field: str, value: str) -> EventPack:
+    if field == "kind":
+        return EventPack(pack_id=ContentId("event_pack"), kind=value)
+    return EventPack(pack_id=ContentId("event_pack"), ui_profile=value)
+
+
+def _event_pack_with_invalid_member(field: str, value: object) -> EventPack:
+    if field == "stages":
+        return EventPack(pack_id=ContentId("event_pack"), stages=cast("tuple[StageSpec, ...]", value))
+    if field == "releases":
+        return EventPack(pack_id=ContentId("event_pack"), releases=cast("tuple[EventRelease, ...]", value))
+    return EventPack(pack_id=ContentId("event_pack"), policy=cast("CampaignPolicy", value))
 
 
 @pytest.mark.parametrize("value", ["", " ", "\t\n"])
@@ -39,6 +64,50 @@ def test_event_pack_exposes_stage_specs_in_declared_order() -> None:
 
     assert pack.stages == (stage_t2, stage_t1)
     assert isinstance(pack.stages, tuple)
+
+
+def test_event_pack_converts_string_pack_id() -> None:
+    pack = EventPack(pack_id="event_compatible")
+
+    assert pack.pack_id == ContentId("event_compatible")
+
+
+@pytest.mark.parametrize("pack_id", [None, 1, Path("event")])
+def test_event_pack_rejects_invalid_pack_id_type(pack_id: object) -> None:
+    with pytest.raises(TypeError, match="pack_id"):
+        EventPack(pack_id=cast("ContentId | str", pack_id))
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("kind", "unknown"),
+        ("ui_profile", "plugin"),
+    ],
+)
+def test_event_pack_rejects_unknown_finite_values(field: str, value: str) -> None:
+    with pytest.raises(ContentValidationError, match=field):
+        _event_pack_with_finite_value(field, value)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("stages", (object(),)),
+        ("releases", (object(),)),
+        ("policy", object()),
+    ],
+)
+def test_event_pack_rejects_members_outside_public_contract(field: str, value: object) -> None:
+    with pytest.raises(TypeError, match=field):
+        _event_pack_with_invalid_member(field, value)
+
+
+def test_campaign_policy_rejects_duplicate_keys_and_empty_loops() -> None:
+    with pytest.raises(ContentValidationError, match="duplicate alias"):
+        CampaignPolicy(aliases=(("a1", "t1"), ("a1", "t2")))
+    with pytest.raises(ContentValidationError, match="loop stages"):
+        CampaignPolicy(loops=(("t", ()),))
 
 
 def test_stage_spec_carries_only_reference_source_and_assets() -> None:
