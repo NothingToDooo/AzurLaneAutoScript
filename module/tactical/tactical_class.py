@@ -688,7 +688,11 @@ class RewardTacticalClass(Dock):
 
         # reset filter; naturally skip meta ships this way
         self.dock_filter_set(
-            faction=[v for k, v in self.dock_filter.settings if k == "faction" and v not in ["all", "meta"]]
+            faction=[
+                value
+                for setting, value in self.dock_filter.settings
+                if setting == "faction" and value not in {"all", "meta", "not_available"}
+            ]
         )
 
         # No ship in dock
