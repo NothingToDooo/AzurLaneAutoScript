@@ -96,8 +96,10 @@ Commit: `fix: 适配新版船坞筛选布局`
 - Produces: selector 支持 `s9` 和 `valparaiso/maximmelmann/duncan/takahashi/orage`。
 - Produces: 紧凑项目数据新增 65 个 S9 项目和 10 个 S8 E 类项目。
 - Produces: S9 舰船映射，其中 `valparaiso`、`maximmelmann` 为 DR，其余三艘为 PRY。
+- Produces: OCR 使用的 C/D 项目编号从 `LIST_RESEARCH_PROJECT` 派生，不再维护第二份手写编号表。
 - Produces: `series_9_blueprint_ta152`、`series_9_blueprint_only`、`series_9_ta152_only` 及 cube 版本。
 - Produces: 默认科研预设更新为 `series_9_blueprint_ta152`，自定义默认筛选更新为 S9。
+- Guarantees: `dev_tools/research_extractor.py` 只在脚本入口执行写文件，导入常量和纯函数不会读取外部 Lua 或覆盖项目数据。
 - Excludes: 全仓无运行时引用的 `assets/research_blueprint/*.png` 不移植。
 
 - [ ] **Step 1: 写 S9 模板注册、selector、项目数据完整性、舰船稀有度和预设映射测试**
@@ -140,7 +142,7 @@ Run: `uv run pytest tests/test_research_s9.py tests/test_research_project.py tes
 
 - [ ] **Step 6: 修改 `argument.yaml` 后通过现有生成器刷新 CN-only 派生文件**
 
-Run: `uv run module/config/config_updater.py`
+Run: `uv run python -m module.config.config_updater`
 
 - [ ] **Step 7: 运行科研、配置生成、Ruff 和 ty 检查**
 

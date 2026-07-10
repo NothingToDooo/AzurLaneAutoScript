@@ -20,7 +20,7 @@ from module.research.ui import ResearchUI
 
 RESEARCH_ENTRANCE = [ENTRANCE_1, ENTRANCE_2, ENTRANCE_3, ENTRANCE_4, ENTRANCE_5]
 FILTER_REGEX = re.compile(
-    r"(s[12345678])?"
+    r"(s[123456789])?"
     r"-?"
     r"(neptune|monarch|ibuki|izumo|roon|saintlouis"
     r"|seattle|georgia|kitakaze|azuma|friedrich"
@@ -29,7 +29,8 @@ FILTER_REGEX = re.compile(
     r"|plymouth|rupprecht|harbin|chkalov|brest"
     r"|kearsarge|hindenburg|shimanto|schultz|flandre"
     r"|napoli|nakhimov|halford|bayard|daisen"
-    r"|goudenleeuw|mecklenburg|dmitri|kansas|vittorio)?"
+    r"|goudenleeuw|mecklenburg|dmitri|kansas|vittorio"
+    r"|valparaiso|maximmelmann|duncan|takahashi|orage)?"
     r"(dr|pry)?"
     r"([bcdeghqt])?"
     r"-?"

@@ -16,6 +16,7 @@ RESEARCH_SCALING = [
     424 / 558,
 ]
 RESEARCH_SERIES_TEMPLATES = (
+    (research_assets.TEMPLATE_S9, 9),
     (research_assets.TEMPLATE_S8, 8),
     (research_assets.TEMPLATE_S7, 7),
     (research_assets.TEMPLATE_S6, 6),
