@@ -228,16 +228,11 @@ def test_generated_stage_yaml_is_accepted_by_native_loader(
     assert vars(loaded.config_class)["MAP_SIREN_TEMPLATE"] == ("SirenOne",)
 
 
-def _make_early_boss(stage) -> None:
+def _make_early_boss(stage, *, boss_battle: int = 4) -> None:
     stage.chapter_name = "T1"
-    stage.data["boss_refresh"] = 4
-    stage.spawn_data = [
-        {"battle": 0, "enemy": 2},
-        {"battle": 1},
-        {"battle": 2},
-        {"battle": 3},
-        {"battle": 4, "boss": 1},
-    ]
+    stage.data["boss_refresh"] = boss_battle
+    stage.spawn_data = [{"battle": battle} for battle in range(boss_battle + 1)]
+    stage.spawn_data[-1]["boss"] = 1
 
 
 def test_early_boss_generation_requires_explicit_pack_strategy(
@@ -259,8 +254,26 @@ def test_early_boss_generation_requires_explicit_pack_strategy(
     assert not (stages_root.parent / "strategy.py").exists()
 
 
+def test_early_boss_after_zero_keeps_only_clear_policy_before_strategy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _module, stage = _map_data(monkeypatch)
+    _make_early_boss(stage, boss_battle=4)
+
+    document = stage.stage_document(strategy="campaign.event_early_cn.strategy:EarlyBossStrategy")
+
+    assert document["battles"] == {
+        0: {"policy": "siren_then_filtered_enemy", "preserve": 0},
+    }
+
+
 class _EarlyBossStrategy(CampaignBase):
     def battle_4(self):
+        return self.clear_boss()
+
+
+class _BossZeroStrategy(CampaignBase):
+    def battle_0(self):
         return self.clear_boss()
 
 
@@ -278,7 +291,7 @@ def test_early_boss_generation_uses_manifest_pack_strategy_without_touching_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _module, stage = _map_data(monkeypatch)
-    _make_early_boss(stage)
+    _make_early_boss(stage, boss_battle=0)
     repository_root = tmp_path
     events_root = repository_root / "content" / "events"
     pack_id = "event_early_cn"
@@ -315,15 +328,53 @@ stages:
     assert strategy_path.read_bytes() == strategy_bytes
     module = ModuleType(f"campaign.{pack_id}.strategy")
     module.__file__ = str(strategy_path)
-    module.__dict__["EarlyBossStrategy"] = _EarlyBossStrategy
+    module.__dict__["EarlyBossStrategy"] = _BossZeroStrategy
     monkeypatch.setattr("module.content.stage_loader.importlib.import_module", lambda _name: module)
 
     loaded = StageSpecLoader(content_root=events_root, campaign_root=repository_root / "campaign").load(spec)
     campaign = _ClearBossCampaign()
 
-    assert cast("Any", loaded.campaign_class).battle_4(campaign) == "boss"
+    assert "\nbattles: {}\n" in stage_path.read_text(encoding="utf-8")
+    assert cast("Any", loaded.campaign_class).battle_0(campaign) == "boss"
     assert campaign.calls == ["clear_boss"]
     assert strategy_path.read_bytes() == strategy_bytes
+
+
+def test_write_rejects_strategy_from_another_pack_without_touching_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _module, stage = _map_data(monkeypatch)
+    _make_early_boss(stage)
+    stages_root = tmp_path / "event_early_cn" / "stages"
+    stages_root.parent.mkdir(parents=True)
+    strategy_path = stages_root.parent / "strategy.py"
+    strategy_bytes = b"# current pack strategy\n"
+    strategy_path.write_bytes(strategy_bytes)
+    wrong_strategy = "campaign.event_other_cn.strategy:EarlyBossStrategy"
+
+    assert stage.render_stage_yaml(strategy=wrong_strategy)
+    with pytest.raises(ContentValidationError, match=r"event_early_cn.*strategy|strategy.*event_early_cn"):
+        stage.write_stage(stages_root, strategy=wrong_strategy)
+
+    assert not (stages_root / "t1.yaml").exists()
+    assert strategy_path.read_bytes() == strategy_bytes
+
+
+def test_chapter_extract_rejects_cross_pack_strategy_before_prompt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module, stage = _map_data(monkeypatch)
+    _make_early_boss(stage)
+    stages_root = tmp_path / "event_early_cn" / "stages"
+    wrong_strategy = "campaign.event_other_cn.strategy:EarlyBossStrategy"
+    monkeypatch.setattr("builtins.input", lambda: pytest.fail("跨 pack strategy 应在确认提示前失败"))
+
+    with pytest.raises(ContentValidationError, match=r"event_early_cn.*strategy|strategy.*event_early_cn"):
+        module.ChapterTemplate().extract([stage], stages_root, strategy=wrong_strategy)
+
+    assert not stages_root.exists()
 
 
 def test_extractor_unknown_grid_sentinel_is_rejected_by_native_loader(

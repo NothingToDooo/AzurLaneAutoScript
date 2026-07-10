@@ -281,9 +281,37 @@ def _battle_policies(
         except ContentValidationError as error:
             raise _fail(path, f"battles.{battle}", str(error)) from error
         result[battle] = policy
-    if not result:
-        raise _fail(path, "battles", "must not be empty")
     return result
+
+
+def _validate_battle_handlers(
+    path: Path,
+    spawn_battles: set[int],
+    boss_battles: set[int],
+    policies: dict[int, BattlePolicy],
+    strategy_base: type[CampaignBase],
+) -> None:
+    strategy_battles = {
+        battle for battle in spawn_battles if callable(getattr(strategy_base, f"battle_{battle}", None))
+    }
+    for battle in sorted(set(policies) & strategy_battles):
+        raise _fail(
+            path,
+            f"battles.{battle}",
+            f"policy and pack-local strategy define the same battle_{battle}",
+        )
+    for battle in sorted(boss_battles):
+        policy = policies.get(battle)
+        if policy is not None and policy.name != "fleet_boss":
+            raise _fail(path, f"battles.{battle}", "boss battle policy must be fleet_boss")
+        if policy is None and battle not in strategy_battles:
+            raise _fail(
+                path,
+                f"battles.{battle}",
+                f"boss battle requires fleet_boss policy or pack-local strategy battle_{battle}",
+            )
+    if not policies and not strategy_battles:
+        raise _fail(path, "battles", "stage requires at least one policy or pack-local strategy battle handler")
 
 
 def _build_map(value: object, path: Path) -> tuple[CampaignMap, set[int], set[int], str]:
@@ -441,14 +469,7 @@ class StageSpecLoader:
         enemy_filter = _string(data["enemy_filter"], path, "enemy_filter")
         policies = _battle_policies(data["battles"], path, spawn_battles)
         strategy_base = _strategy_base(spec, self.campaign_root, path)
-        for battle in sorted(boss_battles):
-            strategy_method = getattr(strategy_base, f"battle_{battle}", None)
-            if battle not in policies and not callable(strategy_method):
-                raise _fail(
-                    path,
-                    f"battles.{battle}",
-                    f"boss battle requires a policy or pack-local strategy battle_{battle}",
-                )
+        _validate_battle_handlers(path, spawn_battles, boss_battles, policies, strategy_base)
 
         module_name = f"campaign.{spec.ref.pack_id}.{spec.ref.stage_id}"
         config_class = cast(

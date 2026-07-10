@@ -417,6 +417,115 @@ def test_loader_accepts_policy_declared_only_for_loop_boss(tmp_path: Path) -> No
     assert "battle_1" in vars(loaded.campaign_class)
 
 
+class _BossZeroStrategy(CampaignBase):
+    def battle_0(self):
+        return self.clear_boss()
+
+
+class _BossOneStrategy(CampaignBase):
+    def battle_1(self):
+        return self.clear_boss()
+
+
+def _write_stage_with_strategy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    body: str,
+    strategy_class: type[CampaignBase],
+) -> tuple[StageSpecLoader, StageSpec]:
+    reference = f"campaign.{PACK_ID}.strategy:CampaignStrategy"
+    loader, spec = _write_stage(tmp_path / "events", body, strategy=reference)
+    strategy_path = tmp_path / "campaign" / PACK_ID / "strategy.py"
+    strategy_path.parent.mkdir(parents=True)
+    strategy_path.write_text("# test strategy\n", encoding="utf-8", newline="\n")
+    module = ModuleType(f"campaign.{PACK_ID}.strategy")
+    module.__file__ = str(strategy_path)
+    module.__dict__["CampaignStrategy"] = strategy_class
+    monkeypatch.setattr("module.content.stage_loader.importlib.import_module", lambda _name: module)
+    return loader, spec
+
+
+def _boss_zero_filtered_stage() -> str:
+    return _minimal_stage(
+        battles="""0:
+  policy: filtered_enemy_then_default
+  preserve: 0""",
+    )
+
+
+def test_loader_rejects_filtered_policy_for_boss_zero_without_strategy(tmp_path: Path) -> None:
+    loader, spec = _write_stage(tmp_path / "events", _boss_zero_filtered_stage())
+
+    with pytest.raises(ContentValidationError, match=r"battles\.0.*fleet_boss"):
+        loader.load(spec)
+
+
+def test_loader_rejects_policy_and_strategy_for_same_boss_zero(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loader, spec = _write_stage_with_strategy(
+        tmp_path,
+        monkeypatch,
+        _boss_zero_filtered_stage(),
+        _BossZeroStrategy,
+    )
+
+    with pytest.raises(ContentValidationError, match=r"battles\.0.*strategy.*same|same.*battle_0"):
+        loader.load(spec)
+
+
+def test_loader_accepts_strategy_only_boss_zero_and_calls_clear_boss(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loader, spec = _write_stage_with_strategy(
+        tmp_path,
+        monkeypatch,
+        _minimal_stage(battles="{}"),
+        _BossZeroStrategy,
+    )
+
+    loaded = loader.load(spec)
+    campaign = _BattleCampaign(boss_result="boss")
+
+    assert _call_battle(loaded.campaign_class, 0, campaign) == "boss"
+    assert campaign.calls == ["clear_boss"]
+    assert "battle_0" not in vars(loaded.campaign_class)
+
+
+def test_loader_rejects_empty_policies_without_any_strategy_handler(tmp_path: Path) -> None:
+    loader, spec = _write_stage(tmp_path / "events", _minimal_stage(battles="{}"))
+
+    with pytest.raises(ContentValidationError, match=r"battles.*policy.*strategy"):
+        loader.load(spec)
+
+
+def test_loader_rejects_loop_policy_and_strategy_for_same_battle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    loader, spec = _write_stage_with_strategy(
+        tmp_path,
+        monkeypatch,
+        _stage_with_loop_only_boss(declare_boss_policy=True),
+        _BossOneStrategy,
+    )
+
+    with pytest.raises(ContentValidationError, match=r"battles\.1.*strategy.*same|same.*battle_1"):
+        loader.load(spec)
+
+
+def test_loader_accepts_fleet_boss_policy_without_strategy(tmp_path: Path) -> None:
+    loader, spec = _write_stage(tmp_path / "events", _minimal_stage())
+
+    loaded = loader.load(spec)
+    campaign = _BattleCampaign(boss_result="boss")
+
+    assert _call_battle(loaded.campaign_class, 0, campaign) == "boss"
+    assert campaign.calls == ["fleet_boss.clear_boss"]
+
+
 def test_loader_preserves_loop_portal_and_land_based_map_data(tmp_path: Path) -> None:
     body = """
         schema_version: 1

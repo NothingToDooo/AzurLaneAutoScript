@@ -54,6 +54,34 @@ def _represent_literal(dumper, value):
 
 _StageDumper.add_representer(_LiteralString, _represent_literal)
 
+
+def _validate_strategy_reference(strategy, *, pack_id=None):
+    if strategy is None:
+        return
+    module_name, separator, export_name = strategy.partition(":") if isinstance(strategy, str) else ("", "", "")
+    if (
+        separator != ":"
+        or not module_name.startswith("campaign.")
+        or any(not part.isidentifier() for part in module_name.split("."))
+        or not export_name.isidentifier()
+    ):
+        message = "strategy must be a campaign.<pack_id>.<module>:<class> reference"
+        raise ContentValidationError(message)
+    if pack_id is not None and not module_name.startswith(f"campaign.{pack_id}."):
+        message = f"output pack {pack_id} requires strategy inside campaign.{pack_id}"
+        raise ContentValidationError(message)
+
+
+def _validate_output_strategy(path, strategy):
+    output_root = Path(path)
+    if strategy is None:
+        return
+    if output_root.name != "stages" or not output_root.parent.name:
+        message = "strategy output path must be <pack_id>/stages"
+        raise ContentValidationError(message)
+    _validate_strategy_reference(strategy, pack_id=output_root.parent.name)
+
+
 """
 This an auto-tool to extract map files used in Alas.
 """
@@ -741,18 +769,14 @@ class MapData:
     def _stage_battle_document(self, *, strategy=None):
         boss_battle = self.data["boss_refresh"]
         if boss_battle < 5:
-            module_name, separator, export_name = strategy.partition(":") if isinstance(strategy, str) else ("", "", "")
-            if (
-                separator != ":"
-                or not module_name.startswith("campaign.")
-                or any(not part.isidentifier() for part in module_name.split("."))
-                or not export_name.isidentifier()
-            ):
+            if strategy is None:
                 message = (
                     f"boss_refresh={boss_battle} requires an explicit pack-local strategy reference; "
                     "add the same reference to the event manifest"
                 )
                 raise ContentValidationError(message)
+            if boss_battle == 0:
+                return {}
         preserve = boss_battle - 5 if boss_battle >= 5 else 0
         clear_policy = "siren_then_filtered_enemy" if self.MAP_SIREN_TEMPLATE else "filtered_enemy_then_default"
         battles = {0: {"policy": clear_policy, "preserve": preserve}}
@@ -763,6 +787,7 @@ class MapData:
         return battles
 
     def stage_document(self, *, strategy=None):
+        _validate_strategy_reference(strategy)
         return {
             "schema_version": 1,
             "map": self._stage_map_document(),
@@ -781,6 +806,7 @@ class MapData:
         )
 
     def write_stage(self, path, *, strategy=None, overwrite=False, check=False):
+        _validate_output_strategy(path, strategy)
         file = Path(path) / self.stage_file_name()
         content = self.render_stage_yaml(strategy=strategy)
         if check:
@@ -909,6 +935,7 @@ class ChapterTemplate:
             maps (list[MapData]):
             folder (str):
         """
+        _validate_output_strategy(folder, strategy)
         print("<<< CONFIRM >>>")
         print("Please confirm selected the correct maps before extracting.\nInput any key and press ENTER to continue")
         input()
