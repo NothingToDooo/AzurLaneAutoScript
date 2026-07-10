@@ -50,6 +50,8 @@ _SPAWN_FIELDS = {"battle", "enemy", "siren", "mystery", "boss"}
 _BATTLE_FIELDS = {"policy", "preserve"}
 _CONFIG_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 _GRID_NODE = re.compile(r"^[A-Z]+[1-9][0-9]*$")
+# SI 是历史关卡由自定义 map_data_init 补状态的已知占位。
+_MAP_DATA_TOKENS = frozenset({"--", "++", "SP", "ME", "MB", "MS", "MM", "MA", "__", "SI"})
 
 
 class _StrictLoader(yaml.SafeLoader):
@@ -154,8 +156,6 @@ def _map_text(
     path: Path,
     location: str,
     shape: tuple[int, int],
-    *,
-    numeric: bool = False,
 ) -> str:
     text = _string(value, path, location)
     rows = [row.split() for row in text.splitlines() if row.strip()]
@@ -163,13 +163,25 @@ def _map_text(
     expected_width = shape[0] + 1
     if len(rows) != expected_height or any(len(row) != expected_width for row in rows):
         raise _fail(path, location, f"must contain {expected_height} rows of {expected_width} values")
-    if numeric:
-        try:
-            numbers = [float(item) for row in rows for item in row]
-        except ValueError as error:
-            raise _fail(path, location, "must contain only numeric weights") from error
-        if any(not math.isfinite(number) for number in numbers):
-            raise _fail(path, location, "must contain only finite weights")
+    return text
+
+
+def _map_data_text(value: object, path: Path, location: str, shape: tuple[int, int]) -> str:
+    text = _map_text(value, path, location, shape)
+    unknown = sorted({token for token in text.split() if token.upper() not in _MAP_DATA_TOKENS})
+    if unknown:
+        raise _fail(path, location, f"unknown map data tokens: {unknown}")
+    return text
+
+
+def _weight_text(value: object, path: Path, location: str, shape: tuple[int, int]) -> str:
+    text = _map_text(value, path, location, shape)
+    try:
+        numbers = [float(item) for item in text.split()]
+    except ValueError as error:
+        raise _fail(path, location, "must contain only numeric weights") from error
+    if any(not math.isfinite(number) for number in numbers):
+        raise _fail(path, location, "must contain only finite weights")
     return text
 
 
@@ -274,7 +286,7 @@ def _battle_policies(
     return result
 
 
-def _build_map(value: object, path: Path) -> tuple[CampaignMap, set[int], str]:
+def _build_map(value: object, path: Path) -> tuple[CampaignMap, set[int], set[int], str]:
     data = _fields_mapping(value, path, "map", _MAP_FIELDS)
     missing = _REQUIRED_MAP_FIELDS - set(data)
     if missing:
@@ -284,9 +296,12 @@ def _build_map(value: object, path: Path) -> tuple[CampaignMap, set[int], str]:
     if _GRID_NODE.fullmatch(shape_name) is None:
         raise _fail(path, "map.shape", "must be a valid uppercase shape")
     shape = node2location(shape_name)
-    map_data = _map_text(data["map_data"], path, "map.map_data", shape)
-    weight_data = _map_text(data["weight_data"], path, "map.weight_data", shape, numeric=True)
+    map_data = _map_data_text(data["map_data"], path, "map.map_data", shape)
+    weight_data = _weight_text(data["weight_data"], path, "map.weight_data", shape)
     spawn_data = _spawn_data(data["spawn_data"], path, "map.spawn_data")
+    spawn_data_loop = None
+    if "spawn_data_loop" in data:
+        spawn_data_loop = _spawn_data(data["spawn_data_loop"], path, "map.spawn_data_loop")
 
     campaign_map = CampaignMap(name)
     campaign_map.shape = shape_name
@@ -301,7 +316,12 @@ def _build_map(value: object, path: Path) -> tuple[CampaignMap, set[int], str]:
         campaign_map.portal_data = _portal_data(data["portal_data"], path, "map.portal_data", shape)
     campaign_map.map_data = map_data
     if "map_data_loop" in data:
-        campaign_map.map_data_loop = _map_text(data["map_data_loop"], path, "map.map_data_loop", shape)
+        campaign_map.map_data_loop = _map_data_text(
+            data["map_data_loop"],
+            path,
+            "map.map_data_loop",
+            shape,
+        )
     campaign_map.weight_data = weight_data
     if "land_based_data" in data:
         campaign_map.land_based_data = _land_based_data(
@@ -311,9 +331,15 @@ def _build_map(value: object, path: Path) -> tuple[CampaignMap, set[int], str]:
             shape,
         )
     campaign_map.spawn_data = spawn_data
-    if "spawn_data_loop" in data:
-        campaign_map.spawn_data_loop = _spawn_data(data["spawn_data_loop"], path, "map.spawn_data_loop")
-    return campaign_map, {item["battle"] for item in spawn_data}, name
+    if spawn_data_loop is not None:
+        campaign_map.spawn_data_loop = spawn_data_loop
+    all_spawn_data = [*spawn_data, *(spawn_data_loop or ())]
+    return (
+        campaign_map,
+        {item["battle"] for item in all_spawn_data},
+        {item["battle"] for item in all_spawn_data if "boss" in item},
+        name,
+    )
 
 
 def _safe_direct_child(root: Path, child_name: str, path: Path, location: str) -> Path:
@@ -408,13 +434,21 @@ class StageSpecLoader:
         version = _exact_integer(data["schema_version"], path, "schema_version", minimum=1)
         if version != SCHEMA_VERSION:
             raise _fail(path, "schema_version", f"must be {SCHEMA_VERSION}")
-        campaign_map, spawn_battles, map_name = _build_map(data["map"], path)
+        campaign_map, spawn_battles, boss_battles, map_name = _build_map(data["map"], path)
         if map_name.casefold() != spec.ref.stage_id.casefold():
             raise _fail(path, "map.name", f"must match manifest stage id {spec.ref.stage_id!r}")
         config_values = _config_values(data["config"], path)
         enemy_filter = _string(data["enemy_filter"], path, "enemy_filter")
         policies = _battle_policies(data["battles"], path, spawn_battles)
         strategy_base = _strategy_base(spec, self.campaign_root, path)
+        for battle in sorted(boss_battles):
+            strategy_method = getattr(strategy_base, f"battle_{battle}", None)
+            if battle not in policies and not callable(strategy_method):
+                raise _fail(
+                    path,
+                    f"battles.{battle}",
+                    f"boss battle requires a policy or pack-local strategy battle_{battle}",
+                )
 
         module_name = f"campaign.{spec.ref.pack_id}.{spec.ref.stage_id}"
         config_class = cast(

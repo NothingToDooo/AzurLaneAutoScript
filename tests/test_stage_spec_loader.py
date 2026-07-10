@@ -334,6 +334,89 @@ def test_loader_rejects_duplicate_yaml_keys(tmp_path: Path) -> None:
         loader.load(spec)
 
 
+@pytest.mark.parametrize("token", ["--", "++", "SP", "ME", "Me", "me", "MB", "MS", "MM", "MA", "__", "SI"])
+def test_loader_accepts_every_repository_map_token(tmp_path: Path, token: str) -> None:
+    loader, spec = _write_stage(tmp_path / "events", _minimal_stage(map_data=token))
+
+    loaded = loader.load(spec)
+
+    assert _normalized_rows(loaded.map.map_data) == (token,)
+
+
+def test_loader_rejects_unknown_map_data_token_with_location(tmp_path: Path) -> None:
+    loader, spec = _write_stage(tmp_path / "events", _minimal_stage(map_data="??"))
+
+    with pytest.raises(ContentValidationError, match=r"map\.map_data:.*unknown.*\?\?"):
+        loader.load(spec)
+
+
+def test_loader_rejects_unknown_map_data_loop_token_with_location(tmp_path: Path) -> None:
+    body = _minimal_stage().replace(
+        "  weight_data: |-\n    50",
+        "  map_data_loop: |-\n    ??\n  weight_data: |-\n    50",
+    )
+    loader, spec = _write_stage(tmp_path / "events", body)
+
+    with pytest.raises(ContentValidationError, match=r"map\.map_data_loop:.*unknown.*\?\?"):
+        loader.load(spec)
+
+
+def test_loader_rejects_boss_battle_without_policy_or_pack_strategy(tmp_path: Path) -> None:
+    body = _minimal_stage(
+        spawn_data="""- battle: 0
+- battle: 1
+- battle: 2
+- battle: 3
+- battle: 4
+  boss: 1""",
+        battles="""0:
+  policy: filtered_enemy_then_default
+  preserve: 0""",
+    )
+    loader, spec = _write_stage(tmp_path / "events", body)
+
+    with pytest.raises(ContentValidationError, match=r"battles\.4.*strategy|strategy.*battle_4"):
+        loader.load(spec)
+
+
+def _stage_with_loop_only_boss(*, declare_boss_policy: bool) -> str:
+    battles = """0:
+  policy: filtered_enemy_then_default
+  preserve: 0"""
+    if declare_boss_policy:
+        battles += """
+1:
+  policy: fleet_boss"""
+    body = _minimal_stage(spawn_data="- battle: 0", battles=battles)
+    return body.replace(
+        "config:\n",
+        "  spawn_data_loop:\n  - battle: 0\n  - battle: 1\n    boss: 1\nconfig:\n",
+    )
+
+
+def test_loader_rejects_loop_only_boss_without_handler(tmp_path: Path) -> None:
+    loader, spec = _write_stage(
+        tmp_path / "events",
+        _stage_with_loop_only_boss(declare_boss_policy=False),
+    )
+
+    with pytest.raises(ContentValidationError, match=r"battles\.1.*strategy|strategy.*battle_1"):
+        loader.load(spec)
+
+
+def test_loader_accepts_policy_declared_only_for_loop_boss(tmp_path: Path) -> None:
+    loader, spec = _write_stage(
+        tmp_path / "events",
+        _stage_with_loop_only_boss(declare_boss_policy=True),
+    )
+
+    loaded = loader.load(spec)
+
+    assert loaded.map.spawn_data == [{"battle": 0}]
+    assert loaded.map.spawn_data_loop == [{"battle": 0}, {"battle": 1, "boss": 1}]
+    assert "battle_1" in vars(loaded.campaign_class)
+
+
 def test_loader_preserves_loop_portal_and_land_based_map_data(tmp_path: Path) -> None:
     body = """
         schema_version: 1

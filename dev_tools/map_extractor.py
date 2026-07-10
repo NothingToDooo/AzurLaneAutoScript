@@ -10,6 +10,7 @@ import yaml
 import module.logger
 from dev_tools.utils import LuaLoader
 from module.base.utils import location2node
+from module.content.errors import ContentValidationError
 from module.map.utils import camera_2d, camera_spawn_point, get_map_active_area
 
 # 导入 module.logger 会切换到项目根目录。
@@ -21,6 +22,7 @@ KEYWORD = "2020001"
 SELECT = True
 OVERWRITE = True
 IS_WAR_ARCHIVES = False
+STRATEGY = None
 ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
 
@@ -736,8 +738,21 @@ class MapData:
                 document[f"STAR_REQUIRE_{number}"] = 0
         return document
 
-    def _stage_battle_document(self):
+    def _stage_battle_document(self, *, strategy=None):
         boss_battle = self.data["boss_refresh"]
+        if boss_battle < 5:
+            module_name, separator, export_name = strategy.partition(":") if isinstance(strategy, str) else ("", "", "")
+            if (
+                separator != ":"
+                or not module_name.startswith("campaign.")
+                or any(not part.isidentifier() for part in module_name.split("."))
+                or not export_name.isidentifier()
+            ):
+                message = (
+                    f"boss_refresh={boss_battle} requires an explicit pack-local strategy reference; "
+                    "add the same reference to the event manifest"
+                )
+                raise ContentValidationError(message)
         preserve = boss_battle - 5 if boss_battle >= 5 else 0
         clear_policy = "siren_then_filtered_enemy" if self.MAP_SIREN_TEMPLATE else "filtered_enemy_then_default"
         battles = {0: {"policy": clear_policy, "preserve": preserve}}
@@ -747,27 +762,27 @@ class MapData:
             battles[boss_battle] = {"policy": "fleet_boss"}
         return battles
 
-    def stage_document(self):
+    def stage_document(self, *, strategy=None):
         return {
             "schema_version": 1,
             "map": self._stage_map_document(),
             "config": self._stage_config_document(),
             "enemy_filter": ENEMY_FILTER,
-            "battles": self._stage_battle_document(),
+            "battles": self._stage_battle_document(strategy=strategy),
         }
 
-    def render_stage_yaml(self):
+    def render_stage_yaml(self, *, strategy=None):
         return yaml.dump(
-            self.stage_document(),
+            self.stage_document(strategy=strategy),
             Dumper=_StageDumper,
             allow_unicode=True,
             sort_keys=False,
             width=120,
         )
 
-    def write_stage(self, path, *, overwrite=False, check=False):
+    def write_stage(self, path, *, strategy=None, overwrite=False, check=False):
         file = Path(path) / self.stage_file_name()
-        content = self.render_stage_yaml()
+        content = self.render_stage_yaml(strategy=strategy)
         if check:
             return file.is_file() and file.read_text(encoding="utf-8") == content
         if file.exists() and not overwrite:
@@ -888,7 +903,7 @@ class ChapterTemplate:
 
         return self._select_maps(maps, select)
 
-    def extract(self, maps, folder):
+    def extract(self, maps, folder, *, strategy=None):
         """
         Args:
             maps (list[MapData]):
@@ -901,7 +916,7 @@ class ChapterTemplate:
         if not Path(folder).exists():
             Path(folder).mkdir()
         for data in maps:
-            data.write_stage(folder, overwrite=OVERWRITE)
+            data.write_stage(folder, strategy=strategy, overwrite=OVERWRITE)
 
 
 """
@@ -915,6 +930,7 @@ Arguments:
     SELECT:          是否选择同活动的全部地图
     OVERWRITE:       是否覆盖已有文件
     IS_WAR_ARCHIVES: 是否按作战档案用法适配
+    STRATEGY:        Boss 在第 5 战前出现时，必须填写并同步到活动清单的 pack-local strategy 引用
 """
 
 
@@ -927,7 +943,11 @@ def main():
     _LUA_DATA.expectation = loader.load("./sharecfgdata/expedition_data_template.lua")
 
     chapter = ChapterTemplate()
-    chapter.extract(chapter.get_chapter_by_name(KEYWORD, select=SELECT), folder=FOLDER)
+    chapter.extract(
+        chapter.get_chapter_by_name(KEYWORD, select=SELECT),
+        folder=FOLDER,
+        strategy=STRATEGY,
+    )
 
 
 if __name__ == "__main__":
