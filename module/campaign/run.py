@@ -64,39 +64,52 @@ MAIN_CAMPAIGN_STAGE_ALIASES = {
 
 
 @lru_cache(maxsize=1)
-def _campaign_policies() -> dict[str, CampaignPolicy]:
-    return {str(pack.pack_id): pack.policy for pack in load_default_event_manifests()}
-
-
-@lru_cache(maxsize=1)
 def _content_catalog() -> ContentCatalog:
     return ContentCatalog(load_default_event_manifests())
 
 
-def _campaign_policy(folder: str) -> CampaignPolicy:
-    return _campaign_policies().get(folder, CampaignPolicy())
+def _campaign_policy(folder: str, catalog: ContentCatalog | None = None) -> CampaignPolicy:
+    effective_catalog = catalog if catalog is not None else _content_catalog()
+    try:
+        return effective_catalog.get_pack(folder).policy
+    except UnknownPackError:
+        return CampaignPolicy()
 
 
-def _normalize_stage_alias(name: str, folder: str) -> str:
+def _normalize_stage_alias(name: str, folder: str, catalog: ContentCatalog | None = None) -> str:
     """归一化地图文件名里的活动别名。"""
     if folder == "campaign_main":
         return MAIN_CAMPAIGN_STAGE_ALIASES.get(name, name)
-    return _campaign_policy(folder).resolve_alias(name)
+    return _campaign_policy(folder, catalog).resolve_alias(name)
 
 
-def _resolve_stage_loop_alias(name: str, folder: str, config: StageLoopConfig) -> tuple[str, bool]:
+def _resolve_stage_loop_alias(
+    name: str,
+    folder: str,
+    config: StageLoopConfig,
+    catalog: ContentCatalog | None = None,
+) -> tuple[str, bool]:
     """处理循环关卡别名，返回实际关卡名和是否命中循环。"""
-    return resolve_stage_loop(name, folder, _campaign_policy(folder), config)
+    return resolve_stage_loop(name, folder, _campaign_policy(folder, catalog), config)
 
 
-def _apply_stage_alias_policies(name: str, folder: str, config: StagePolicyConfig) -> None:
+def _apply_stage_alias_policies(
+    name: str,
+    folder: str,
+    config: StagePolicyConfig,
+    catalog: ContentCatalog | None = None,
+) -> None:
     """应用依赖归一化关卡名的运行策略。"""
-    apply_stage_policy(name, folder, _campaign_policy(folder), config)
+    apply_stage_policy(name, folder, _campaign_policy(folder, catalog), config)
 
 
-def _apply_campaign_folder_policies(folder: str, config: StagePolicyConfig) -> None:
+def _apply_campaign_folder_policies(
+    folder: str,
+    config: StagePolicyConfig,
+    catalog: ContentCatalog | None = None,
+) -> None:
     """应用只依赖活动目录的运行策略。"""
-    apply_pack_policy(folder, _campaign_policy(folder), config)
+    apply_pack_policy(folder, _campaign_policy(folder, catalog), config)
 
 
 class CampaignRun(CampaignEvent):
@@ -114,6 +127,9 @@ class CampaignRun(CampaignEvent):
     run_limit: int
     is_stage_loop = False
 
+    def _effective_content_catalog(self) -> ContentCatalog:
+        return self.content_catalog if self.content_catalog is not None else _content_catalog()
+
     def _campaign_identity_matches(self, name: str, folder: str, *, is_stage: bool) -> bool:
         return (
             getattr(self, "name", None) == name
@@ -129,7 +145,7 @@ class CampaignRun(CampaignEvent):
         return name
 
     def _native_stage_spec(self, ref: StageRef) -> StageSpec | None:
-        catalog = self.content_catalog or _content_catalog()
+        catalog = self._effective_content_catalog()
         try:
             return catalog.resolve_stage(ref)
         except UnknownPackError, UnknownStageError:
@@ -338,15 +354,21 @@ class CampaignRun(CampaignEvent):
                 else:
                     logger.warning("Cannot get the latest event, fallback to campaign_main")
                     folder = "campaign_main"
-        name = _normalize_stage_alias(name, folder)
+        catalog = self._effective_content_catalog()
+        name = _normalize_stage_alias(name, folder, catalog)
         policy_config = cast("StagePolicyConfig", self.config)
-        _apply_stage_alias_policies(name, folder, policy_config)
-        name, is_stage_loop = _resolve_stage_loop_alias(name, folder, cast("StageLoopConfig", self.config))
+        _apply_stage_alias_policies(name, folder, policy_config, catalog)
+        name, is_stage_loop = _resolve_stage_loop_alias(
+            name,
+            folder,
+            cast("StageLoopConfig", self.config),
+            catalog,
+        )
         self.is_stage_loop = self.is_stage_loop or is_stage_loop
         # Convert campaign_main to campaign hard if mode is hard and file exists
         if mode == "hard" and folder == "campaign_main" and name in map_files("campaign_hard"):
             folder = "campaign_hard"
-        _apply_campaign_folder_policies(folder, policy_config)
+        _apply_campaign_folder_policies(folder, policy_config, catalog)
         return name, folder
 
     def can_use_auto_search_continue(self):

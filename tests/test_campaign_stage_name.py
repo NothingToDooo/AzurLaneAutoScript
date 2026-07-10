@@ -12,7 +12,10 @@ from module.campaign.run import (
     _resolve_stage_loop_alias,
 )
 from module.config.config_manual import ManualConfig
+from module.content.campaign_policy import CampaignPolicy
+from module.content.catalog import ContentCatalog
 from module.content.manifest import load_event_manifests
+from module.content.models import EventPack
 
 PACKS = load_event_manifests(Path("content/events"))
 
@@ -44,6 +47,27 @@ class _HandleConfig(_PolicyConfig):
         self.task = SimpleNamespace(command="Event")
 
 
+class _HandleRunner(CampaignRun):
+    config: _HandleConfig
+
+
+def _handle_runner(
+    catalog: ContentCatalog,
+    *,
+    run_count: int = 1,
+    map_achievement: str = "100_percent_clear",
+) -> _HandleRunner:
+    runner = object.__new__(_HandleRunner)
+    runner.config = _HandleConfig(run_count=run_count, map_achievement=map_achievement)
+    runner.content_catalog = catalog
+    runner.is_stage_loop = False
+    return runner
+
+
+def _catalog(pack_id: str, policy: CampaignPolicy) -> ContentCatalog:
+    return ContentCatalog((EventPack(pack_id=pack_id, policy=policy),))
+
+
 @pytest.mark.parametrize(
     ("folder", "name", "expected"),
     [
@@ -64,6 +88,7 @@ class _HandleConfig(_PolicyConfig):
         ("event_20230817_cn", "e0-1", "a1"),
         ("event_20230817_cn", "e0-2", "a1"),
         ("event_20230817_cn", "e0-3", "a1"),
+        ("event_20230817_cn", "e0", "a1"),
         ("event_20240829_cn", "tp", "sp"),
     ],
 )
@@ -152,6 +177,79 @@ def test_handle_stage_name_keeps_alias_then_stage_policy_order() -> None:
 
     assert (name, folder) == ("th4", "event_20221124_cn")
     assert runner.config.overrides == [{"StopCondition_MapAchievement": "threat_safe"}]
+
+
+def test_handle_stage_name_preserves_event_20230817_bare_story_alias() -> None:
+    runner = object.__new__(CampaignRun)
+    runner.config = _HandleConfig()
+    runner.is_stage_loop = False
+
+    name, folder = runner.handle_stage_name("E0", "event_20230817_cn")
+
+    assert (name, folder) == ("a1", "event_20230817_cn")
+
+
+def test_handle_stage_name_uses_injected_catalog_aliases_without_same_pack_leakage() -> None:
+    pack_id = "event_20221124_cn"
+    first = _handle_runner(_catalog(pack_id, CampaignPolicy(aliases=(("d1", "a1"),))))
+    second = _handle_runner(_catalog(pack_id, CampaignPolicy(aliases=(("d1", "b1"),))))
+
+    assert first.handle_stage_name("D1", pack_id) == ("a1", pack_id)
+    assert second.handle_stage_name("D1", pack_id) == ("b1", pack_id)
+
+
+def test_handle_stage_name_uses_injected_catalog_loop_policy() -> None:
+    pack_id = "event_custom_loop"
+    policy = CampaignPolicy(loops=(("cycle", ("a1", "a2")),))
+    runner = _handle_runner(_catalog(pack_id, policy), run_count=1)
+
+    name, folder = runner.handle_stage_name("CYCLE", pack_id)
+
+    assert (name, folder) == ("a2", pack_id)
+    assert runner.is_stage_loop
+    assert runner.config.overrides == [
+        {"StopCondition_MapAchievement": "non_stop"},
+        {"StopCondition_StageIncrease": False},
+    ]
+
+
+def test_handle_stage_name_uses_injected_catalog_stage_policy() -> None:
+    pack_id = "event_custom_stage_policy"
+    policy = CampaignPolicy(force_threat_safe_stages=("a1",))
+    runner = _handle_runner(_catalog(pack_id, policy))
+
+    name, folder = runner.handle_stage_name("A1", pack_id)
+
+    assert (name, folder) == ("a1", pack_id)
+    assert runner.config.overrides == [{"StopCondition_MapAchievement": "threat_safe"}]
+
+
+def test_handle_stage_name_uses_injected_catalog_pack_policy() -> None:
+    pack_id = "event_custom_pack_policy"
+    policy = CampaignPolicy(map_achievement_fallbacks=(("threat_safe", "map_3_stars"),))
+    runner = _handle_runner(_catalog(pack_id, policy), map_achievement="threat_safe")
+
+    name, folder = runner.handle_stage_name("A1", pack_id)
+
+    assert (name, folder) == ("a1", pack_id)
+    assert runner.config.overrides == [{"StopCondition_MapAchievement": "map_3_stars"}]
+
+
+def test_injected_catalog_treats_absent_default_pack_as_unknown() -> None:
+    runner = _handle_runner(ContentCatalog())
+
+    name, folder = runner.handle_stage_name("D1", "event_20221124_cn")
+
+    assert (name, folder) == ("d1", "event_20221124_cn")
+    assert runner.config.overrides == []
+
+
+def test_injected_catalog_keeps_campaign_main_special_aliases() -> None:
+    runner = _handle_runner(ContentCatalog())
+
+    name, folder = runner.handle_stage_name("T1", "campaign_main")
+
+    assert (name, folder) == ("a1", "campaign_main")
 
 
 def test_handle_stage_name_keeps_loop_state_sticky() -> None:

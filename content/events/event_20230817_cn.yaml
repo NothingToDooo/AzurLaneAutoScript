@@ -14,6 +14,7 @@ releases:
   order: 2330
 policy:
   aliases:
+    e0: a1
     e0-1: a1
     e0-2: a1
     e0-3: a1
