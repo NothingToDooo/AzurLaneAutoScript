@@ -1,4 +1,3 @@
-from module.base.decorator import del_cached_property
 from module.device.app_package import AppPackage
 from module.logger import logger
 
@@ -47,10 +46,7 @@ class MumuDeviceDiscovery(AppPackage):
             if -2 <= device.port - self.port <= 2:
                 # 端口发生切换。
                 logger.info(f"MuMu12 serial switched {self.serial} -> {device.serial}")
-                del_cached_property(self, "port")
-                del_cached_property(self, "is_mumu12_family")
-                del_cached_property(self, "is_mumu_family")
-                self.serial = device.serial
+                self.bind_serial(device.serial)
                 break
 
     def detect_device(self):

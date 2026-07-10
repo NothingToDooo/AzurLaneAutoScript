@@ -5,7 +5,7 @@ from pathlib import Path
 import adbutils
 from adbutils import AdbClient, AdbDevice
 
-from module.base.decorator import cached_property
+from module.base.decorator import cached_property, del_cached_property
 from module.config.config import AzurLaneConfig
 from module.device.mumu import MUMU12_SERIAL_EXAMPLE, is_mumu12_serial, revise_mumu12_serial
 from module.exception import RequestHumanTakeover
@@ -16,6 +16,20 @@ from module.webui.setting import State
 class ConnectionAttr:
     config: AzurLaneConfig
     serial: str
+
+    _serial_bound_cached_properties = (
+        "port",
+        "is_mumu12_family",
+        "is_mumu_family",
+        "adb",
+        "emulator_instance",
+        "nemud_app_keep_alive",
+        "nemud_player_version",
+        "is_mumu_over_version_400",
+        "is_mumu_over_version_356",
+        "nemu_ipc",
+        "_minitouch_builder",
+    )
 
     adb_binary_list = (
         "./bin/adb/adb.exe",
@@ -48,6 +62,23 @@ class ConnectionAttr:
         self.serial = str(self.config.Emulator_Serial)
         self.serial_check()
 
+    def bind_serial(self, serial: str, *, persist: bool = False) -> bool:
+        """释放旧连接状态并发布新的 serial。"""
+        if serial == self.serial:
+            return False
+
+        release_resource = getattr(self, "release_resource", None)
+        if callable(release_resource):
+            release_resource()
+
+        for name in self._serial_bound_cached_properties:
+            del_cached_property(self, name)
+
+        if persist:
+            self.config.Emulator_Serial = serial
+        self.serial = serial
+        return True
+
     def serial_check(self):
         """
         检查并修正 serial。
@@ -56,8 +87,7 @@ class ConnectionAttr:
         new = revise_mumu12_serial(self.serial)
         if new != self.serial:
             logger.warning(f'Serial "{self.config.Emulator_Serial}" is revised to "{new}"')
-            self.config.Emulator_Serial = new
-            self.serial = new
+            self.bind_serial(new, persist=True)
         if is_mumu12_serial(self.serial):
             return
         logger.critical(f'当前个人分支只支持 MuMu12 TCP serial，例如 "{MUMU12_SERIAL_EXAMPLE}"，当前为 "{self.serial}"')
