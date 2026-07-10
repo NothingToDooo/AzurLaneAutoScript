@@ -14,6 +14,7 @@ from module.content import (
     StageSpec,
     ValidationIssue,
 )
+from module.content.campaign_policy import apply_pack_policy
 from module.content.errors import ContentValidationError
 
 
@@ -33,6 +34,18 @@ def _event_pack_with_invalid_member(field: str, value: object) -> EventPack:
     if field == "releases":
         return EventPack(pack_id=ContentId("event_pack"), releases=cast("tuple[EventRelease, ...]", value))
     return EventPack(pack_id=ContentId("event_pack"), policy=cast("CampaignPolicy", value))
+
+
+class _MapAchievementConfig:
+    def __init__(self, value: str) -> None:
+        self.StopCondition_MapAchievement = value
+        self.overrides: list[str] = []
+
+    def override(self, **kwargs: object) -> None:
+        value = kwargs.get("StopCondition_MapAchievement")
+        if isinstance(value, str):
+            self.StopCondition_MapAchievement = value
+            self.overrides.append(value)
 
 
 @pytest.mark.parametrize("value", ["", " ", "\t\n"])
@@ -162,6 +175,33 @@ def test_campaign_policy_rejects_unsupported_map_achievement_fallbacks(
 ) -> None:
     with pytest.raises(ContentValidationError, match="MapAchievement"):
         CampaignPolicy(map_achievement_fallbacks=fallbacks)
+
+
+@pytest.mark.parametrize(
+    "fallbacks",
+    [
+        (("threat_safe", "map_3_stars"), ("threat_safe", "100_percent_clear")),
+        (("threat_safe", "map_3_stars"), ("map_3_stars", "100_percent_clear")),
+        (("threat_safe", "map_3_stars"), ("map_3_stars", "threat_safe")),
+        (("threat_safe", "threat_safe"),),
+    ],
+)
+def test_campaign_policy_rejects_ambiguous_or_multistep_map_achievement_fallbacks(
+    fallbacks: tuple[tuple[str, str], ...],
+) -> None:
+    with pytest.raises(ContentValidationError, match="map_achievement_fallbacks"):
+        CampaignPolicy(map_achievement_fallbacks=fallbacks)
+
+
+def test_apply_pack_policy_is_stable_after_one_fallback() -> None:
+    policy = CampaignPolicy(map_achievement_fallbacks=(("threat_safe", "map_3_stars"),))
+    config = _MapAchievementConfig("threat_safe")
+
+    apply_pack_policy("event_pack", policy, config)
+    apply_pack_policy("event_pack", policy, config)
+
+    assert config.StopCondition_MapAchievement == "map_3_stars"
+    assert config.overrides == ["map_3_stars"]
 
 
 @pytest.mark.parametrize("strategy", ["", " ", "\t\n"])

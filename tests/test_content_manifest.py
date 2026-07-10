@@ -272,6 +272,9 @@ def test_manifest_rejects_path_like_policy_targets(tmp_path: Path, target: str) 
         ("stages:\n  - id: t1\n    source: stages/t1.yaml\npolicy:\n  aliases:\n    SHORTCUT: t1"),
         ("stages:\n  - id: t1\n    source: stages/t1.yaml\npolicy:\n  loops:\n    DAILY: [t1]"),
         ("stages:\n  - id: t1\n    source: stages/t1.yaml\npolicy:\n  aliases:\n    shortcut: T1"),
+        ("stages:\n  - id: t1\n    source: stages/t1.yaml\npolicy:\n  loops:\n    daily: [T1]"),
+        ("stages:\n  - id: t1\n    source: stages/t1.yaml\npolicy:\n  force_threat_safe_stages: [T1]"),
+        ("stages:\n  - id: t1\n    source: stages/t1.yaml\npolicy:\n  resource_free_stages: [T1]"),
     ],
 )
 def test_manifest_rejects_noncanonical_stage_identifiers(tmp_path: Path, extra: str) -> None:
@@ -298,6 +301,25 @@ def test_manifest_rejects_unsupported_map_achievement_fallbacks(tmp_path: Path, 
     _write_manifest(root, "event_20260625_cn.yaml", body)
 
     with pytest.raises(ContentValidationError, match="MapAchievement"):
+        load_event_manifests(root)
+
+
+@pytest.mark.parametrize(
+    "fallbacks",
+    [
+        "threat_safe: map_3_stars\n    map_3_stars: 100_percent_clear",
+        "threat_safe: map_3_stars\n    map_3_stars: threat_safe",
+    ],
+)
+def test_manifest_rejects_multistep_or_cyclic_map_achievement_fallbacks(
+    tmp_path: Path,
+    fallbacks: str,
+) -> None:
+    root = tmp_path / "content" / "events"
+    body = _manifest_with(f"policy:\n  map_achievement_fallbacks:\n    {fallbacks}")
+    _write_manifest(root, "event_20260625_cn.yaml", body)
+
+    with pytest.raises(ContentValidationError, match="map_achievement_fallbacks"):
         load_event_manifests(root)
 
 

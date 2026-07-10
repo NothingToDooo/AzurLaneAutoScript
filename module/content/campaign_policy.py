@@ -56,6 +56,14 @@ class CampaignPolicy:
         ):
             message = f"map_achievement_fallbacks must use supported MapAchievement values: {MAP_ACHIEVEMENT_VALUES}"
             raise ContentValidationError(message)
+        fallback_sources = {source for source, _ in map_achievement_fallbacks}
+        if len(fallback_sources) != len(map_achievement_fallbacks):
+            message = "map_achievement_fallbacks must have unique sources for single-step idempotence"
+            raise ContentValidationError(message)
+        fallback_targets = {target for _, target in map_achievement_fallbacks}
+        if not fallback_sources.isdisjoint(fallback_targets):
+            message = "map_achievement_fallbacks source and target sets must be disjoint for single-step idempotence"
+            raise ContentValidationError(message)
 
         object.__setattr__(self, "aliases", aliases)
         object.__setattr__(
