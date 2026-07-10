@@ -26,7 +26,7 @@ def _generator(task: dict, argument: dict, gui: dict | None = None, packs: list[
 
 def test_generate_i18n_data_preserves_existing_words_and_adds_fallbacks() -> None:
     generator = _generator(
-        task={"Main": {"tasks": {"Demo": {"groups": ["Settings"]}}}},
+        task={"Main": {"tasks": {"General": {"groups": ["Settings"]}}}},
         argument={
             "Settings": {
                 "Mode": {"value": "a", "option": ["a", "b"]},
@@ -38,7 +38,7 @@ def test_generate_i18n_data_preserves_existing_words_and_adds_fallbacks() -> Non
     data = generator.generate_i18n_data(
         {
             "Menu": {"Main": {"name": "主菜单"}},
-            "Task": {"Demo": {"help": "旧帮助"}},
+            "Task": {"General": {"help": "旧帮助"}},
             "Settings": {
                 "_info": {"name": "设置组"},
                 "Mode": {
@@ -52,8 +52,8 @@ def test_generate_i18n_data_preserves_existing_words_and_adds_fallbacks() -> Non
 
     assert deep_get(data, keys="Menu.Main.name") == "主菜单"
     assert deep_get(data, keys="Menu.Main.help") == "Menu.Main.help"
-    assert deep_get(data, keys="Task.Demo.name") == "Task.Demo.name"
-    assert deep_get(data, keys="Task.Demo.help") == "旧帮助"
+    assert deep_get(data, keys="Task.General.name") == "Task.General.name"
+    assert deep_get(data, keys="Task.General.help") == "旧帮助"
     assert deep_get(data, keys="Settings._info.name") == "设置组"
     assert deep_get(data, keys="Settings.Mode.name") == "模式"
     assert deep_get(data, keys="Settings.Mode.help") == "Settings.Mode.help"

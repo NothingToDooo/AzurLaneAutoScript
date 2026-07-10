@@ -2,6 +2,7 @@ import importlib
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
@@ -17,8 +18,10 @@ from module.task_registry import (
     TASK_REGISTRY,
     ClassTaskExecutor,
     FunctionTaskExecutor,
+    LaunchMode,
     RunnerMethodExecutor,
     TaskDefinition,
+    TaskExecutor,
     TaskSpec,
     command_to_config_name,
     get_direct_task_command,
@@ -144,6 +147,25 @@ def _render_generated_config_files(folder: Path) -> dict[str, bytes]:
     return outputs
 
 
+def _schema_generator(task: dict, *argument_groups: str) -> ConfigGenerator:
+    generator = object.__new__(ConfigGenerator)
+    generator.task = task
+    generator.argument = {group: {} for group in (*argument_groups, "Storage")}
+    generator.default = {}
+    generator.override = {}
+    return generator
+
+
+def _task_group(nodes: dict, *, page: str = "setting") -> dict:
+    return {
+        "Section": {
+            "menu": "collapse",
+            "page": page,
+            "tasks": nodes,
+        }
+    }
+
+
 def test_task_definition_is_frozen_slotted_and_compatibility_is_derived() -> None:
     definition = TASK_CATALOG["main"]
 
@@ -155,6 +177,74 @@ def test_task_definition_is_frozen_slotted_and_compatibility_is_derived() -> Non
     assert not hasattr(definition, "__dict__")
     with pytest.raises(FrozenInstanceError):
         definition.priority = 999  # type: ignore[misc]
+
+
+@pytest.mark.parametrize(
+    "command",
+    ["bad space", "bad-name", "bad.name", "123", "_main", "main_", "main__two", "Main"],
+)
+def test_task_definition_rejects_non_ascii_snake_case_commands(command: str) -> None:
+    with pytest.raises(ValueError, match="invalid task command"):
+        TaskDefinition(
+            command=command,
+            executor=RunnerMethodExecutor("restart"),
+            config_scopes=(),
+            priority=0,
+            launch_mode="scheduled",
+        )
+
+
+def test_task_definition_rejects_unknown_executor_type() -> None:
+    with pytest.raises(TypeError, match="invalid task executor"):
+        TaskDefinition(
+            command="main",
+            executor=cast("TaskExecutor", object()),
+            config_scopes=(),
+            priority=0,
+            launch_mode="scheduled",
+        )
+
+
+@pytest.mark.parametrize(
+    "config_scopes",
+    [["General"], ("",), ("General", "General"), ("General", 1)],
+)
+def test_task_definition_rejects_invalid_config_scopes(config_scopes: object) -> None:
+    with pytest.raises((TypeError, ValueError), match="config scopes"):
+        TaskDefinition(
+            command="main",
+            executor=RunnerMethodExecutor("restart"),
+            config_scopes=cast("tuple[str, ...]", config_scopes),
+            priority=0,
+            launch_mode="scheduled",
+        )
+
+
+@pytest.mark.parametrize(
+    ("priority", "error"),
+    [(True, TypeError), (1.0, TypeError), ("1", TypeError), (-1, ValueError)],
+)
+def test_task_definition_rejects_invalid_priority(priority: object, error: type[Exception]) -> None:
+    with pytest.raises(error, match="task priority"):
+        TaskDefinition(
+            command="main",
+            executor=RunnerMethodExecutor("restart"),
+            config_scopes=(),
+            priority=cast("int | None", priority),
+            launch_mode="scheduled",
+        )
+
+
+@pytest.mark.parametrize("launch_mode", ["scheduled-direct", "", None])
+def test_task_definition_rejects_invalid_launch_mode(launch_mode: object) -> None:
+    with pytest.raises((TypeError, ValueError), match="launch mode"):
+        TaskDefinition(
+            command="main",
+            executor=RunnerMethodExecutor("restart"),
+            config_scopes=(),
+            priority=0,
+            launch_mode=cast("LaunchMode", launch_mode),
+        )
 
 
 def test_task_yaml_commands_are_unique_catalog_entries_with_matching_modes() -> None:
@@ -236,11 +326,74 @@ def test_config_generator_rejects_unknown_and_duplicate_commands() -> None:
 
     duplicate = object.__new__(ConfigGenerator)
     duplicate.task = {
-        "One": {"tasks": {"Main": {"command": "main", "groups": []}}},
-        "Two": {"tasks": {"Main": {"command": "main", "groups": []}}},
+        "One": {"tasks": {"Main": {"command": "main", "groups": ["Scheduler"]}}},
+        "Two": {"tasks": {"Main": {"command": "main", "groups": ["Scheduler"]}}},
     }
     with pytest.raises(ValueError, match="duplicate task command"):
         _ = duplicate.menu
+
+
+@pytest.mark.parametrize(
+    ("task", "page", "message"),
+    [
+        ({"Ghost": {"groups": ["Scheduler"]}}, "setting", "scope-only task"),
+        ({"General": {"groups": ["Scheduler"]}}, "setting", "scope-only task.*Scheduler"),
+        ({"General": {"groups": ["Emulator"]}}, "tool", "scope-only task.*tool"),
+        (
+            {"Benchmark": {"command": "benchmark", "groups": ["Scheduler"]}},
+            "setting",
+            "launch mode",
+        ),
+        ({"Main": {"command": "main", "groups": []}}, "tool", "launch mode"),
+        (
+            {"Main": {"command": "main", "groups": ["Campaign"]}},
+            "setting",
+            "must be scheduled or tool",
+        ),
+    ],
+)
+def test_config_generator_rejects_invalid_task_placement(task: dict, page: str, message: str) -> None:
+    generator = _schema_generator(
+        _task_group(task, page=page),
+        "Scheduler",
+        "Emulator",
+        "Campaign",
+    )
+
+    with pytest.raises(ValueError, match=message):
+        _ = generator.menu
+
+
+def test_config_generator_rejects_duplicate_task_name_across_groups() -> None:
+    generator = _schema_generator(
+        {
+            "One": {"page": "setting", "tasks": {"General": {"groups": ["Emulator"]}}},
+            "Two": {"page": "setting", "tasks": {"General": {"groups": ["Emulator"]}}},
+        },
+        "Emulator",
+    )
+
+    with pytest.raises(ValueError, match="duplicate task name"):
+        _ = generator.menu
+
+
+@pytest.mark.parametrize(
+    ("groups", "message"),
+    [
+        ([""], "non-empty strings"),
+        (["Scheduler", "Scheduler"], "duplicate task group"),
+        (["Schedulre"], "unknown task group"),
+        (["Storage"], "must not declare Storage"),
+    ],
+)
+def test_config_generator_rejects_invalid_argument_groups(groups: list[str], message: str) -> None:
+    generator = _schema_generator(
+        _task_group({"Main": {"command": "main", "groups": groups}}),
+        "Scheduler",
+    )
+
+    with pytest.raises((TypeError, ValueError), match=message):
+        _ = generator.args
 
 
 def test_priority_matches_legacy_filter_first_match_order() -> None:

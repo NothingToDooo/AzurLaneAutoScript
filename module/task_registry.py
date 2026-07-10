@@ -1,3 +1,4 @@
+import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from importlib import import_module
@@ -64,6 +65,8 @@ class RunnerMethodExecutor:
 
 
 type TaskExecutor = ClassTaskExecutor | FunctionTaskExecutor | RunnerMethodExecutor
+TASK_EXECUTOR_TYPES = (ClassTaskExecutor, FunctionTaskExecutor, RunnerMethodExecutor)
+TASK_COMMAND_PATTERN = re.compile(r"[a-z][a-z0-9]*(?:_[a-z][a-z0-9]*)*", flags=re.ASCII)
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,15 +78,48 @@ class TaskDefinition:
     launch_mode: LaunchMode
 
     def __post_init__(self) -> None:
-        if not self.command or camel_to_snake(command_to_config_name(self.command)) != self.command:
+        self._validate_command()
+        self._validate_executor()
+        self._validate_config_scopes()
+        self._validate_priority()
+        self._validate_launch_mode()
+
+    def _validate_command(self) -> None:
+        if not isinstance(self.command, str):
+            message = f"task command must be a string: {self.command!r}"
+            raise TypeError(message)
+        if TASK_COMMAND_PATTERN.fullmatch(self.command) is None:
             message = f"invalid task command: {self.command!r}"
             raise ValueError(message)
-        if any(not scope for scope in self.config_scopes):
-            message = f"empty config scope in task: {self.command}"
+
+    def _validate_executor(self) -> None:
+        if not isinstance(self.executor, TASK_EXECUTOR_TYPES):
+            message = f"invalid task executor: {type(self.executor).__name__}"
+            raise TypeError(message)
+
+    def _validate_config_scopes(self) -> None:
+        if not isinstance(self.config_scopes, tuple):
+            message = f"config scopes must be a tuple: {self.command}"
+            raise TypeError(message)
+        if any(not isinstance(scope, str) or not scope for scope in self.config_scopes):
+            message = f"config scopes must contain non-empty strings: {self.command}"
+            raise TypeError(message)
+        if len(set(self.config_scopes)) != len(self.config_scopes):
+            message = f"config scopes must not contain duplicates: {self.command}"
             raise ValueError(message)
+
+    def _validate_priority(self) -> None:
+        if self.priority is not None and type(self.priority) is not int:
+            message = f"task priority must be an integer or None: {self.command}"
+            raise TypeError(message)
         if self.priority is not None and self.priority < 0:
-            message = f"negative task priority: {self.command}"
+            message = f"task priority must not be negative: {self.command}"
             raise ValueError(message)
+
+    def _validate_launch_mode(self) -> None:
+        if not isinstance(self.launch_mode, str):
+            message = f"launch mode must be a string: {self.command}"
+            raise TypeError(message)
         if self.launch_mode not in {"scheduled", "direct", "both"}:
             message = f"invalid launch mode for task {self.command}: {self.launch_mode}"
             raise ValueError(message)
@@ -103,7 +139,10 @@ FunctionTaskSpec = FunctionTaskExecutor
 
 def command_to_config_name(command: str) -> str:
     """把 catalog 命令转换成配置节点名。"""
-    if not command or any(not part for part in command.split("_")):
+    if not isinstance(command, str):
+        message = f"task command must be a string: {command!r}"
+        raise TypeError(message)
+    if TASK_COMMAND_PATTERN.fullmatch(command) is None:
         message = f"invalid task command: {command!r}"
         raise ValueError(message)
     return "".join(part.capitalize() for part in command.split("_"))

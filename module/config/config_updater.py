@@ -32,7 +32,7 @@ from module.config.utils import (
 from module.content.manifest import load_default_event_manifests, render_campaign_readme
 from module.content.models import EventPack, EventRelease
 from module.logger import logger
-from module.task_registry import command_to_config_name, get_task_spec
+from module.task_registry import TASK_CATALOG, command_to_config_name, get_task_spec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
@@ -61,6 +61,9 @@ WAR_ARCHIVES = ["WarArchives"]
 COALITIONS = ["Coalition", "CoalitionSp"]
 MARITIME_ESCORTS = ["MaritimeEscort"]
 HOSPITAL = ["Hospital"]
+CONFIG_SCOPE_TASKS = frozenset(
+    {"Alas", "General"} | {scope for definition in TASK_CATALOG.values() for scope in definition.config_scopes}
+)
 
 
 def _generated_comment(text: str, prefix: str = "") -> list[str]:
@@ -195,33 +198,78 @@ class ConfigGenerator:
         """
         return read_file(filepath_argument("gui"))
 
-    @staticmethod
-    def _parse_task_node(task: str, node: object) -> tuple[str | None, tuple[str, ...]]:
+    def _parse_task_groups(self, task: str, groups: object) -> tuple[str, ...]:
+        if not isinstance(groups, list) or any(not isinstance(group, str) or not group for group in groups):
+            message = f"task groups must contain non-empty strings: {task}"
+            raise TypeError(message)
+        parsed_groups = tuple(group for group in groups if isinstance(group, str))
+        if len(set(parsed_groups)) != len(parsed_groups):
+            message = f"duplicate task group: {task}"
+            raise ValueError(message)
+        if "Storage" in parsed_groups:
+            message = f"task must not declare Storage: {task}"
+            raise ValueError(message)
+        unknown_groups = tuple(group for group in parsed_groups if group not in self.argument)
+        if unknown_groups:
+            message = f"unknown task group: {task}.{unknown_groups[0]}"
+            raise ValueError(message)
+        return parsed_groups
+
+    def _parse_task_node(self, task: str, node: object) -> tuple[str | None, tuple[str, ...]]:
         if not isinstance(node, dict):
             message = f"task node must be a mapping: {task}"
             raise TypeError(message)
         if set(node) - {"command", "groups"}:
             message = f"invalid task node: {task}"
             raise ValueError(message)
-        groups = node.get("groups")
-        if not isinstance(groups, list) or any(not isinstance(group, str) for group in groups):
-            message = f"invalid task groups: {task}"
-            raise TypeError(message)
-        parsed_groups = tuple(group for group in groups if isinstance(group, str))
+        groups = self._parse_task_groups(task, node.get("groups"))
 
         command = node.get("command")
         if command is None:
-            return None, parsed_groups
+            return None, groups
         if not isinstance(command, str) or get_task_spec(command) is None:
             message = f"unknown task command: {command}"
             raise ValueError(message)
         if command_to_config_name(command) != task:
             message = f"task command does not match config node: {command} != {task}"
             raise ValueError(message)
-        return command, parsed_groups
+        return command, groups
+
+    @staticmethod
+    def _validate_task_placement(task: str, command: str | None, groups: tuple[str, ...], *, is_tool: bool) -> None:
+        if command is None:
+            if task not in CONFIG_SCOPE_TASKS:
+                message = f"unknown scope-only task: {task}"
+                raise ValueError(message)
+            if "Scheduler" in groups:
+                message = f"scope-only task must not contain Scheduler: {task}"
+                raise ValueError(message)
+            if is_tool:
+                message = f"scope-only task must not be on a tool page: {task}"
+                raise ValueError(message)
+            return
+
+        definition = get_task_spec(command)
+        if definition is None:
+            message = f"unknown task command: {command}"
+            raise ValueError(message)
+        is_scheduled = "Scheduler" in groups
+        if is_scheduled:
+            if is_tool or definition.launch_mode not in {"scheduled", "both"}:
+                message = f"task launch mode does not allow Scheduler: {task}"
+                raise ValueError(message)
+            return
+        if is_tool:
+            if definition.launch_mode not in {"direct", "both"}:
+                message = f"task launch mode does not allow tool page: {task}"
+                raise ValueError(message)
+            return
+        message = f"executable task must be scheduled or tool: {task}"
+        raise ValueError(message)
 
     def _iter_task_nodes(self) -> Iterator[tuple[str, str, str | None, tuple[str, ...]]]:
         commands: dict[str, str] = {}
+        task_names: dict[str, str] = {}
         for task_group, group_data in self.task.items():
             if not isinstance(group_data, dict):
                 message = f"task group must contain a task mapping: {task_group}"
@@ -231,12 +279,20 @@ class ConfigGenerator:
                 message = f"task group must contain a task mapping: {task_group}"
                 raise TypeError(message)
             for task, node in tasks.items():
+                if not isinstance(task, str):
+                    message = f"task name must be a string: {task!r}"
+                    raise TypeError(message)
                 command, groups = self._parse_task_node(task, node)
                 if command is not None and command in commands:
                     message = f"duplicate task command: {command} ({commands[command]}, {task})"
                     raise ValueError(message)
+                if task in task_names:
+                    message = f"duplicate task name: {task} ({task_names[task]}, {task_group})"
+                    raise ValueError(message)
+                self._validate_task_placement(task, command, groups, is_tool=group_data.get("page") == "tool")
                 if command is not None:
                     commands[command] = task
+                task_names[task] = task_group
                 yield task_group, task, command, groups
 
     def _iter_task_argument_groups(self):
@@ -248,9 +304,6 @@ class ConfigGenerator:
         data = {}
         for task, groups in self._iter_task_argument_groups():
             for group in groups:
-                if group not in self.argument:
-                    logger.warning(f"`{task}.{group}` is not related to any argument group")
-                    continue
                 deep_set(data, keys=[task, group], value=deepcopy(self.argument[group]))
         return data
 
