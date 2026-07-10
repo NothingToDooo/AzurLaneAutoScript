@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING, ClassVar, cast
 from rich.console import Console, ConsoleRenderable
 
 from alas import AzurLaneAutoScript
-from module.base.naming import camel_to_snake
 from module.config.config import AzurLaneConfig
 from module.logger import logger, set_file_logger, set_func_logger
+from module.task_registry import get_direct_task_command
 from module.webui.fake_pil_module import remove_fake_pil_module
 from module.webui.setting import State
 
@@ -16,15 +16,6 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from module.base.stop_event import StopEvent
-
-_AVAILABLE_WEBUI_TASKS = (
-    "Daemon",
-    "OpsiDaemon",
-    "EventStory",
-    "AzurLaneUncensored",
-    "Benchmark",
-    "GameManager",
-)
 
 STOP_GRACE_SECONDS = 5
 KILL_JOIN_SECONDS = 1
@@ -151,10 +142,12 @@ class ProcessManager:
                 if stop_event is not None:
                     AzurLaneAutoScript.stop_event = stop_event
                 AzurLaneAutoScript(config_name=config_name).loop()
-            elif func in _AVAILABLE_WEBUI_TASKS:
-                AzurLaneAutoScript(config_name=config_name).run(camel_to_snake(func), skip_first_screenshot=True)
             else:
-                logger.critical(f"No function matched: {func}")
+                command = get_direct_task_command(func)
+                if command is None:
+                    logger.critical(f"No function matched: {func}")
+                else:
+                    AzurLaneAutoScript(config_name=config_name).run(command, skip_first_screenshot=True)
             logger.info(f"[{config_name}] exited. Reason: Finish\n")
         # WebUI 子进程边界：把未知异常写入 renderable 队列，否则页面看不到堆栈。
         except Exception as error:  # noqa: BLE001

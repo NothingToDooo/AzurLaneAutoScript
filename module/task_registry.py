@@ -1,7 +1,10 @@
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from importlib import import_module
-from typing import Protocol
+from types import MappingProxyType
+from typing import Literal, Protocol
+
+from module.base.naming import camel_to_snake
 
 
 class CampaignConfig(Protocol):
@@ -16,10 +19,11 @@ class TaskRunner(Protocol):
 
 
 type TaskArgsFactory = Callable[[TaskRunner], tuple[tuple[object, ...], dict[str, object]]]
+type LaunchMode = Literal["scheduled", "direct", "both"]
 
 
 @dataclass(frozen=True, slots=True)
-class TaskSpec:
+class ClassTaskExecutor:
     module_name: str
     class_name: str
     method_name: str = "run"
@@ -41,7 +45,7 @@ class TaskSpec:
 
 
 @dataclass(frozen=True, slots=True)
-class FunctionTaskSpec:
+class FunctionTaskExecutor:
     module_name: str
     function_name: str
 
@@ -49,6 +53,65 @@ class FunctionTaskSpec:
         module = import_module(self.module_name)
         function = getattr(module, self.function_name)
         function(config=runner.config)
+
+
+@dataclass(frozen=True, slots=True)
+class RunnerMethodExecutor:
+    method_name: str
+
+    def execute(self, runner: TaskRunner) -> None:
+        getattr(runner, self.method_name)()
+
+
+type TaskExecutor = ClassTaskExecutor | FunctionTaskExecutor | RunnerMethodExecutor
+
+
+@dataclass(frozen=True, slots=True)
+class TaskDefinition:
+    command: str
+    executor: TaskExecutor
+    config_scopes: tuple[str, ...]
+    priority: int | None
+    launch_mode: LaunchMode
+
+    def __post_init__(self) -> None:
+        if not self.command or camel_to_snake(command_to_config_name(self.command)) != self.command:
+            message = f"invalid task command: {self.command!r}"
+            raise ValueError(message)
+        if any(not scope for scope in self.config_scopes):
+            message = f"empty config scope in task: {self.command}"
+            raise ValueError(message)
+        if self.priority is not None and self.priority < 0:
+            message = f"negative task priority: {self.command}"
+            raise ValueError(message)
+        if self.launch_mode not in {"scheduled", "direct", "both"}:
+            message = f"invalid launch mode for task {self.command}: {self.launch_mode}"
+            raise ValueError(message)
+
+    @property
+    def config_name(self) -> str:
+        return command_to_config_name(self.command)
+
+    def execute(self, runner: TaskRunner) -> None:
+        self.executor.execute(runner)
+
+
+# 历史调用方只依赖名字和 execute()；别名避免复制另一份目录。
+TaskSpec = TaskDefinition
+FunctionTaskSpec = FunctionTaskExecutor
+
+
+def command_to_config_name(command: str) -> str:
+    """把 catalog 命令转换成配置节点名。"""
+    if not command or any(not part for part in command.split("_")):
+        message = f"invalid task command: {command!r}"
+        raise ValueError(message)
+    return "".join(part.capitalize() for part in command.split("_"))
+
+
+def config_name_to_command(config_name: str) -> str:
+    """把配置节点名转换成 catalog 命令。"""
+    return camel_to_snake(config_name)
 
 
 def _campaign_args(runner: TaskRunner) -> tuple[tuple[object, ...], dict[str, object]]:
@@ -63,83 +126,322 @@ def _campaign_args(runner: TaskRunner) -> tuple[tuple[object, ...], dict[str, ob
     )
 
 
-def _task(module_name: str, class_name: str, method_name: str = "run", task_name: str | None = None) -> TaskSpec:
-    return TaskSpec(module_name=module_name, class_name=class_name, method_name=method_name, task_name=task_name)
+def _class_executor(
+    module_name: str,
+    class_name: str,
+    method_name: str = "run",
+    args_factory: TaskArgsFactory | None = None,
+    task_name: str | None = None,
+) -> ClassTaskExecutor:
+    return ClassTaskExecutor(
+        module_name=module_name,
+        class_name=class_name,
+        method_name=method_name,
+        args_factory=args_factory,
+        task_name=task_name,
+    )
 
 
-def _campaign_args_task(module_name: str, class_name: str) -> TaskSpec:
-    return TaskSpec(module_name=module_name, class_name=class_name, args_factory=_campaign_args)
+def _campaign_executor(module_name: str, class_name: str) -> ClassTaskExecutor:
+    return _class_executor(module_name, class_name, args_factory=_campaign_args)
 
 
-TASK_REGISTRY: dict[str, TaskSpec | FunctionTaskSpec] = {
-    # 普通任务：构造任务类后直接调用 run()。
-    "research": _task("module.research.research", "RewardResearch"),
-    "commission": _task("module.commission.commission", "RewardCommission"),
-    "tactical": _task("module.tactical.tactical_class", "RewardTacticalClass"),
-    "dorm": _task("module.dorm.dorm", "RewardDorm"),
-    "meowfficer": _task("module.meowfficer.meowfficer", "RewardMeowfficer"),
-    "guild": _task("module.guild.guild_reward", "RewardGuild"),
-    "reward": _task("module.reward.reward", "Reward"),
-    "awaken": _task("module.awaken.awaken", "Awaken"),
-    "shipyard": _task("module.shipyard.shipyard_reward", "RewardShipyard"),
-    "gacha": _task("module.gacha.gacha_reward", "RewardGacha"),
-    "freebies": _task("module.freebies.freebies", "Freebies"),
-    "minigame": _task("module.minigame.minigame", "Minigame"),
-    "private_quarters": _task("module.private_quarters.private_quarters", "PrivateQuarters"),
-    "daily": _task("module.daily.daily", "Daily"),
-    "hard": _task("module.hard.hard", "CampaignHard"),
-    "exercise": _task("module.exercise.exercise", "Exercise"),
-    "sos": _task("module.sos.sos", "CampaignSos"),
-    "raid_daily": _task("module.raid.daily", "RaidDaily"),
-    "event_sp": _task("module.event.campaign_sp", "CampaignSP"),
-    "maritime_escort": _task("module.event.maritime_escort", "MaritimeEscort"),
-    "opsi_ash_assist": _task("module.os_ash.meta", "AshBeaconAssist"),
-    "opsi_ash_beacon": _task("module.os_ash.meta", "OpsiAshBeacon"),
-    "raid": _task("module.raid.run", "RaidRun"),
-    "hospital": _task("module.event_hospital.hospital", "Hospital"),
-    "coalition": _task("module.coalition.coalition", "Coalition"),
-    "coalition_sp": _task("module.coalition.coalition_sp", "CoalitionSP"),
+def _task(
+    command: str,
+    executor: TaskExecutor,
+    *,
+    priority: int | None,
+    config_scopes: tuple[str, ...] = (),
+    launch_mode: LaunchMode = "scheduled",
+) -> TaskDefinition:
+    return TaskDefinition(
+        command=command,
+        executor=executor,
+        config_scopes=config_scopes,
+        priority=priority,
+        launch_mode=launch_mode,
+    )
+
+
+def _build_catalog(*definitions: TaskDefinition) -> Mapping[str, TaskDefinition]:
+    catalog: dict[str, TaskDefinition] = {}
+    config_names: dict[str, str] = {}
+    priorities: set[int] = set()
+    for definition in definitions:
+        if definition.command in catalog:
+            message = f"duplicate task command: {definition.command}"
+            raise ValueError(message)
+        config_name = definition.config_name
+        if config_name in config_names:
+            message = f"task config name collision: {config_names[config_name]} and {definition.command}"
+            raise ValueError(message)
+        if definition.priority is not None:
+            if definition.priority in priorities:
+                message = f"duplicate task priority: {definition.priority}"
+                raise ValueError(message)
+            priorities.add(definition.priority)
+        catalog[definition.command] = definition
+        config_names[config_name] = definition.command
+
+    if sorted(priorities) != list(range(len(priorities))):
+        message = "task priorities must be contiguous from zero"
+        raise ValueError(message)
+    return MappingProxyType(catalog)
+
+
+EVENT_SCOPES = ("TaskBalancer", "EventGeneral")
+OPSI_SCOPES = ("OpsiGeneral",)
+
+
+TASK_CATALOG: Mapping[str, TaskDefinition] = _build_catalog(
+    _task("restart", RunnerMethodExecutor(method_name="restart"), priority=0),
+    # 普通任务：构造任务类后直接调用指定方法。
+    _task("research", _class_executor("module.research.research", "RewardResearch"), priority=4),
+    _task("commission", _class_executor("module.commission.commission", "RewardCommission"), priority=2),
+    _task("tactical", _class_executor("module.tactical.tactical_class", "RewardTacticalClass"), priority=3),
+    _task("dorm", _class_executor("module.dorm.dorm", "RewardDorm"), priority=6),
+    _task("meowfficer", _class_executor("module.meowfficer.meowfficer", "RewardMeowfficer"), priority=7),
+    _task("guild", _class_executor("module.guild.guild_reward", "RewardGuild"), priority=8),
+    _task("reward", _class_executor("module.reward.reward", "Reward"), priority=10),
+    _task("awaken", _class_executor("module.awaken.awaken", "Awaken"), priority=18),
+    _task("shipyard", _class_executor("module.shipyard.shipyard_reward", "RewardShipyard"), priority=13),
+    _task("gacha", _class_executor("module.gacha.gacha_reward", "RewardGacha"), priority=9),
+    _task("freebies", _class_executor("module.freebies.freebies", "Freebies"), priority=14),
+    _task("minigame", _class_executor("module.minigame.minigame", "Minigame"), priority=17),
+    _task(
+        "private_quarters", _class_executor("module.private_quarters.private_quarters", "PrivateQuarters"), priority=15
+    ),
+    _task("daily", _class_executor("module.daily.daily", "Daily"), priority=27),
+    _task("hard", _class_executor("module.hard.hard", "CampaignHard"), priority=28),
+    _task("exercise", _class_executor("module.exercise.exercise", "Exercise"), priority=5),
+    _task("sos", _class_executor("module.sos.sos", "CampaignSos"), priority=31),
+    _task("raid_daily", _class_executor("module.raid.daily", "RaidDaily"), priority=37, config_scopes=EVENT_SCOPES),
+    _task(
+        "event_sp", _class_executor("module.event.campaign_sp", "CampaignSP"), priority=32, config_scopes=EVENT_SCOPES
+    ),
+    _task(
+        "maritime_escort",
+        _class_executor("module.event.maritime_escort", "MaritimeEscort"),
+        priority=40,
+        config_scopes=EVENT_SCOPES,
+    ),
+    _task(
+        "opsi_ash_assist",
+        _class_executor("module.os_ash.meta", "AshBeaconAssist"),
+        priority=29,
+        config_scopes=OPSI_SCOPES,
+    ),
+    _task(
+        "opsi_ash_beacon",
+        _class_executor("module.os_ash.meta", "OpsiAshBeacon"),
+        priority=19,
+        config_scopes=OPSI_SCOPES,
+    ),
+    _task("raid", _class_executor("module.raid.run", "RaidRun"), priority=43, config_scopes=EVENT_SCOPES),
+    _task("hospital", _class_executor("module.event_hospital.hospital", "Hospital"), priority=44),
+    _task(
+        "coalition", _class_executor("module.coalition.coalition", "Coalition"), priority=45, config_scopes=EVENT_SCOPES
+    ),
+    _task(
+        "coalition_sp",
+        _class_executor("module.coalition.coalition_sp", "CoalitionSP"),
+        priority=38,
+        config_scopes=EVENT_SCOPES,
+    ),
     # 商店任务共用 RewardShop，只切换执行方法。
-    "shop_frequent": _task("module.shop.shop_reward", "RewardShop", "run_frequent"),
-    "shop_once": _task("module.shop.shop_reward", "RewardShop", "run_once"),
-    # 活动 ABCD 入口共用同一个任务类，具体章节由配置决定。
-    "event_a": _task("module.event.campaign_abcd", "CampaignABCD"),
-    "event_b": _task("module.event.campaign_abcd", "CampaignABCD"),
-    "event_c": _task("module.event.campaign_abcd", "CampaignABCD"),
-    "event_d": _task("module.event.campaign_abcd", "CampaignABCD"),
-    # 大世界任务已经集中在 OSCampaignRun，注册表只负责分发到对应方法。
-    "opsi_explore": _task("module.campaign.os_run", "OSCampaignRun", "opsi_explore"),
-    "opsi_shop": _task("module.campaign.os_run", "OSCampaignRun", "opsi_shop"),
-    "opsi_voucher": _task("module.campaign.os_run", "OSCampaignRun", "opsi_voucher"),
-    "opsi_daily": _task("module.campaign.os_run", "OSCampaignRun", "opsi_daily"),
-    "opsi_obscure": _task("module.campaign.os_run", "OSCampaignRun", "opsi_obscure"),
-    "opsi_month_boss": _task("module.campaign.os_run", "OSCampaignRun", "opsi_month_boss"),
-    "opsi_abyssal": _task("module.campaign.os_run", "OSCampaignRun", "opsi_abyssal"),
-    "opsi_archive": _task("module.campaign.os_run", "OSCampaignRun", "opsi_archive"),
-    "opsi_stronghold": _task("module.campaign.os_run", "OSCampaignRun", "opsi_stronghold"),
-    "opsi_meowfficer_farming": _task("module.campaign.os_run", "OSCampaignRun", "opsi_meowfficer_farming"),
-    "opsi_hazard1_leveling": _task("module.campaign.os_run", "OSCampaignRun", "opsi_hazard1_leveling"),
-    "opsi_cross_month": _task("module.campaign.os_run", "OSCampaignRun", "opsi_cross_month"),
-    # 这些入口都是 CampaignRun，只在运行时读取当前战役配置。
-    "main": _campaign_args_task("module.campaign.run", "CampaignRun"),
-    "main2": _campaign_args_task("module.campaign.run", "CampaignRun"),
-    "main3": _campaign_args_task("module.campaign.run", "CampaignRun"),
-    "event": _campaign_args_task("module.campaign.run", "CampaignRun"),
-    "event2": _campaign_args_task("module.campaign.run", "CampaignRun"),
-    "c72_mystery_farming": _campaign_args_task("module.campaign.run", "CampaignRun"),
-    "c122_medium_leveling": _campaign_args_task("module.campaign.run", "CampaignRun"),
-    "c124_large_leveling": _campaign_args_task("module.campaign.run", "CampaignRun"),
-    "war_archives": _campaign_args_task("module.war_archives.war_archives", "CampaignWarArchives"),
-    "gems_farming": _campaign_args_task("module.campaign.gems_farming", "GemsFarming"),
-    # 常驻/工具入口需要保留原始任务名绑定。
-    "daemon": _task("module.daemon.daemon", "AzurLaneDaemon", task_name="Daemon"),
-    "opsi_daemon": _task("module.daemon.os_daemon", "AzurLaneDaemon", task_name="OpsiDaemon"),
-    "event_story": _task("module.eventstory.eventstory", "EventStory", task_name="EventStory"),
-    "azur_lane_uncensored": _task("module.daemon.uncensored", "AzurLaneUncensored", task_name="AzurLaneUncensored"),
-    "game_manager": _task("module.daemon.game_manager", "GameManager", task_name="GameManager"),
-    "benchmark": FunctionTaskSpec(module_name="module.daemon.benchmark", function_name="run_benchmark"),
-}
+    _task(
+        "shop_frequent",
+        _class_executor("module.shop.shop_reward", "RewardShop", method_name="run_frequent"),
+        priority=11,
+    ),
+    _task("shop_once", _class_executor("module.shop.shop_reward", "RewardShop", method_name="run_once"), priority=12),
+    # 活动 ABCD 入口共用一个任务类，具体章节由配置决定。
+    _task(
+        "event_a",
+        _class_executor("module.event.campaign_abcd", "CampaignABCD"),
+        priority=33,
+        config_scopes=EVENT_SCOPES,
+    ),
+    _task(
+        "event_b",
+        _class_executor("module.event.campaign_abcd", "CampaignABCD"),
+        priority=34,
+        config_scopes=EVENT_SCOPES,
+    ),
+    _task(
+        "event_c",
+        _class_executor("module.event.campaign_abcd", "CampaignABCD"),
+        priority=35,
+        config_scopes=EVENT_SCOPES,
+    ),
+    _task(
+        "event_d",
+        _class_executor("module.event.campaign_abcd", "CampaignABCD"),
+        priority=36,
+        config_scopes=EVENT_SCOPES,
+    ),
+    # 大世界任务集中在 OSCampaignRun，这里只声明调用的方法。
+    _task(
+        "opsi_explore",
+        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_explore"),
+        priority=16,
+        config_scopes=OPSI_SCOPES,
+    ),
+    _task(
+        "opsi_shop",
+        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_shop"),
+        priority=21,
+        config_scopes=OPSI_SCOPES,
+    ),
+    _task(
+        "opsi_voucher",
+        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_voucher"),
+        priority=22,
+        config_scopes=OPSI_SCOPES,
+    ),
+    _task(
+        "opsi_daily",
+        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_daily"),
+        priority=20,
+        config_scopes=OPSI_SCOPES,
+    ),
+    _task(
+        "opsi_obscure",
+        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_obscure"),
+        priority=25,
+        config_scopes=OPSI_SCOPES,
+    ),
+    _task(
+        "opsi_month_boss",
+        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_month_boss"),
+        priority=30,
+        config_scopes=OPSI_SCOPES,
+    ),
+    _task(
+        "opsi_abyssal",
+        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_abyssal"),
+        priority=23,
+        config_scopes=OPSI_SCOPES,
+    ),
+    _task(
+        "opsi_archive",
+        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_archive"),
+        priority=26,
+        config_scopes=OPSI_SCOPES,
+    ),
+    _task(
+        "opsi_stronghold",
+        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_stronghold"),
+        priority=24,
+        config_scopes=OPSI_SCOPES,
+    ),
+    _task(
+        "opsi_meowfficer_farming",
+        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_meowfficer_farming"),
+        priority=49,
+        config_scopes=OPSI_SCOPES,
+    ),
+    _task(
+        "opsi_hazard1_leveling",
+        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_hazard1_leveling"),
+        priority=51,
+        config_scopes=OPSI_SCOPES,
+    ),
+    _task(
+        "opsi_cross_month",
+        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_cross_month"),
+        priority=1,
+        config_scopes=OPSI_SCOPES,
+    ),
+    # 这些入口都是 CampaignRun，只在执行时读取当前战役配置。
+    _task("main", _campaign_executor("module.campaign.run", "CampaignRun"), priority=46),
+    _task("main2", _campaign_executor("module.campaign.run", "CampaignRun"), priority=47),
+    _task("main3", _campaign_executor("module.campaign.run", "CampaignRun"), priority=48),
+    _task("event", _campaign_executor("module.campaign.run", "CampaignRun"), priority=41, config_scopes=EVENT_SCOPES),
+    _task("event2", _campaign_executor("module.campaign.run", "CampaignRun"), priority=42, config_scopes=EVENT_SCOPES),
+    _task("c72_mystery_farming", _campaign_executor("module.campaign.run", "CampaignRun"), priority=None),
+    _task("c122_medium_leveling", _campaign_executor("module.campaign.run", "CampaignRun"), priority=None),
+    _task("c124_large_leveling", _campaign_executor("module.campaign.run", "CampaignRun"), priority=None),
+    _task("war_archives", _campaign_executor("module.war_archives.war_archives", "CampaignWarArchives"), priority=39),
+    _task(
+        "gems_farming",
+        _campaign_executor("module.campaign.gems_farming", "GemsFarming"),
+        priority=50,
+        config_scopes=EVENT_SCOPES,
+    ),
+    # WebUI 工具保留原任务名绑定，但只允许直接启动。
+    _task(
+        "daemon",
+        _class_executor("module.daemon.daemon", "AzurLaneDaemon", task_name="Daemon"),
+        priority=None,
+        launch_mode="direct",
+    ),
+    _task(
+        "opsi_daemon",
+        _class_executor("module.daemon.os_daemon", "AzurLaneDaemon", task_name="OpsiDaemon"),
+        priority=None,
+        config_scopes=OPSI_SCOPES,
+        launch_mode="direct",
+    ),
+    _task(
+        "event_story",
+        _class_executor("module.eventstory.eventstory", "EventStory", task_name="EventStory"),
+        priority=None,
+        config_scopes=EVENT_SCOPES,
+        launch_mode="direct",
+    ),
+    _task(
+        "azur_lane_uncensored",
+        _class_executor("module.daemon.uncensored", "AzurLaneUncensored", task_name="AzurLaneUncensored"),
+        priority=None,
+        launch_mode="direct",
+    ),
+    _task(
+        "game_manager",
+        _class_executor("module.daemon.game_manager", "GameManager", task_name="GameManager"),
+        priority=None,
+        launch_mode="direct",
+    ),
+    _task(
+        "benchmark",
+        FunctionTaskExecutor(module_name="module.daemon.benchmark", function_name="run_benchmark"),
+        priority=None,
+        launch_mode="direct",
+    ),
+)
+
+# 兼容旧名字；与 catalog 共用同一只读映射，不维护第二份目录。
+TASK_REGISTRY = TASK_CATALOG
 
 
-def get_task_spec(command: str) -> TaskSpec | FunctionTaskSpec | None:
-    return TASK_REGISTRY.get(command)
+def get_task_spec(command: str) -> TaskDefinition | None:
+    return TASK_CATALOG.get(command)
+
+
+def get_task_by_config_name(config_name: str) -> TaskDefinition | None:
+    command = config_name_to_command(config_name)
+    definition = get_task_spec(command)
+    if definition is None or definition.config_name != config_name:
+        return None
+    return definition
+
+
+def get_direct_task_command(config_name: str) -> str | None:
+    definition = get_task_by_config_name(config_name)
+    if definition is None or definition.launch_mode not in {"direct", "both"}:
+        return None
+    return definition.command
+
+
+def _scheduler_priority_filter() -> str:
+    definitions = sorted(
+        (definition for definition in TASK_CATALOG.values() if definition.priority is not None),
+        key=lambda definition: definition.priority,
+    )
+    return "\n".join(
+        definition.config_name if index == 0 else f"> {definition.config_name}"
+        for index, definition in enumerate(definitions)
+    )
+
+
+SCHEDULER_PRIORITY_FILTER = _scheduler_priority_filter()

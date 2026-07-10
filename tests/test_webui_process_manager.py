@@ -1,5 +1,8 @@
+import inspect
 import queue
 import threading
+
+import pytest
 
 import module.webui.process_manager as process_manager_module
 from module.webui.process_manager import KILL_JOIN_SECONDS, STOP_GRACE_SECONDS, ProcessManager
@@ -127,7 +130,18 @@ def test_run_process_wires_stop_event(monkeypatch) -> None:
     assert ("config_stop_event", True) in calls
 
 
-def test_run_process_runs_builtin_task(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("config_name", "command"),
+    [
+        ("Daemon", "daemon"),
+        ("OpsiDaemon", "opsi_daemon"),
+        ("EventStory", "event_story"),
+        ("AzurLaneUncensored", "azur_lane_uncensored"),
+        ("Benchmark", "benchmark"),
+        ("GameManager", "game_manager"),
+    ],
+)
+def test_run_process_runs_direct_catalog_task(monkeypatch, config_name: str, command: str) -> None:
     calls = []
     _patch_process_boundary(monkeypatch, calls)
 
@@ -140,9 +154,18 @@ def test_run_process_runs_builtin_task(monkeypatch) -> None:
 
     monkeypatch.setattr(process_manager_module, "AzurLaneAutoScript", _Alas)
 
-    ProcessManager.run_process("alas", "Benchmark", queue.Queue())
+    ProcessManager.run_process("alas", config_name, queue.Queue())
 
-    assert ("run", "benchmark", True) in calls
+    assert ("run", command, True) in calls
+
+
+def test_run_process_rejects_scheduled_task(monkeypatch) -> None:
+    calls = []
+    _patch_process_boundary(monkeypatch, calls)
+
+    ProcessManager.run_process("alas", "Main", queue.Queue())
+
+    assert ("critical", "No function matched: Main") in calls
 
 
 def test_run_process_rejects_unknown_func(monkeypatch) -> None:
@@ -152,6 +175,11 @@ def test_run_process_rejects_unknown_func(monkeypatch) -> None:
     ProcessManager.run_process("alas", "MissingMod", queue.Queue())
 
     assert ("critical", "No function matched: MissingMod") in calls
+
+
+def test_process_manager_source_has_no_direct_task_allowlist() -> None:
+    source = inspect.getsource(process_manager_module)
+    assert "_AVAILABLE_WEBUI_TASKS" not in source
 
 
 def test_start_creates_stop_event_and_passes_it_to_child(monkeypatch) -> None:

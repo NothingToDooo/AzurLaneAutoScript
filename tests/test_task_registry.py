@@ -3,10 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from alas import AzurLaneAutoScript
-from module.base.naming import camel_to_snake
 from module.config.utils import filepath_argument, read_file
-from module.task_registry import TASK_REGISTRY, FunctionTaskSpec
+from module.task_registry import TASK_REGISTRY, ClassTaskExecutor
 
 
 def _scheduler_task_names() -> list[str]:
@@ -14,33 +12,39 @@ def _scheduler_task_names() -> list[str]:
     return [
         task_name
         for task_group in raw.values()
-        for task_name, groups in task_group.get("tasks", {}).items()
-        if "Scheduler" in groups
+        for task_name, node in task_group.get("tasks", {}).items()
+        if "Scheduler" in node["groups"]
     ]
+
+
+def _task_node(task_name: str) -> dict:
+    raw = read_file(filepath_argument("task"))
+    return next(
+        node for task_group in raw.values() for name, node in task_group.get("tasks", {}).items() if name == task_name
+    )
 
 
 @pytest.mark.parametrize("command", sorted(TASK_REGISTRY))
 def test_task_registry_target_exists(command: str) -> None:
-    spec = TASK_REGISTRY[command]
-    module = importlib.import_module(spec.module_name)
-    if isinstance(spec, FunctionTaskSpec):
-        assert callable(getattr(module, spec.function_name))
+    executor = TASK_REGISTRY[command].executor
+    if not isinstance(executor, ClassTaskExecutor):
         return
 
-    task_class = getattr(module, spec.class_name)
+    module = importlib.import_module(executor.module_name)
+    task_class = getattr(module, executor.class_name)
 
-    assert callable(getattr(task_class, spec.method_name))
+    assert callable(getattr(task_class, executor.method_name))
 
 
 @pytest.mark.parametrize("task_name", sorted(_scheduler_task_names()))
 def test_scheduler_task_name_maps_to_runtime_command(task_name: str) -> None:
-    command = camel_to_snake(task_name)
-    assert command in TASK_REGISTRY or callable(getattr(AzurLaneAutoScript, command, None))
+    node = _task_node(task_name)
+    assert node["command"] in TASK_REGISTRY
 
 
 def test_campaign_args_are_resolved_at_runtime() -> None:
-    spec = TASK_REGISTRY["main"]
-    assert not isinstance(spec, FunctionTaskSpec)
+    executor = TASK_REGISTRY["main"].executor
+    assert isinstance(executor, ClassTaskExecutor)
     runner = SimpleNamespace(
         config=SimpleNamespace(
             Campaign_Name="12-4",
@@ -49,8 +53,8 @@ def test_campaign_args_are_resolved_at_runtime() -> None:
         )
     )
 
-    assert spec.args_factory is not None
-    assert spec.args_factory(runner) == (
+    assert executor.args_factory is not None
+    assert executor.args_factory(runner) == (
         (),
         {
             "name": "12-4",

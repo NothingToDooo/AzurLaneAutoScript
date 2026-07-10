@@ -9,16 +9,20 @@ Alas:
   page: 'setting'
   tasks:
     Alas:
-      - Emulator
-      - Error
-      - Optimization
+      groups:
+        - Emulator
+        - Error
+        - Optimization
     General:
-      - Retirement
-      - OneClickRetire
-      - Enhance
-      - OldRetire
+      groups:
+        - Retirement
+        - OneClickRetire
+        - Enhance
+        - OldRetire
     Restart:
-      - Scheduler
+      command: restart
+      groups:
+        - Scheduler
 
 # ==================== Farm ====================
 
@@ -27,38 +31,46 @@ Farm:
   page: 'setting'
   tasks:
     Main:
-      - Scheduler
-      - Campaign
-      - StopCondition
-      - Fleet
-      - Submarine
-      - Emotion
-      - HpControl
-      - EnemyPriority
+      command: main
+      groups:
+        - Scheduler
+        - Campaign
+        - StopCondition
+        - Fleet
+        - Submarine
+        - Emotion
+        - HpControl
+        - EnemyPriority
     Main2:
-      - Scheduler
-      - Campaign
-      - StopCondition
-      - Fleet
-      - Submarine
-      - Emotion
-      - HpControl
-      - EnemyPriority
+      command: main2
+      groups:
+        - Scheduler
+        - Campaign
+        - StopCondition
+        - Fleet
+        - Submarine
+        - Emotion
+        - HpControl
+        - EnemyPriority
     Main3:
-      - Scheduler
-      - Campaign
-      - StopCondition
-      - Fleet
-      - Submarine
-      - Emotion
-      - HpControl
-      - EnemyPriority
+      command: main3
+      groups:
+        - Scheduler
+        - Campaign
+        - StopCondition
+        - Fleet
+        - Submarine
+        - Emotion
+        - HpControl
+        - EnemyPriority
     GemsFarming:
-      - Scheduler
-      - GemsFarming
-      - Campaign
-      - StopCondition
-      - Fleet
+      command: gems_farming
+      groups:
+        - Scheduler
+        - GemsFarming
+        - Campaign
+        - StopCondition
+        - Fleet
 
 # ==================== Event ====================
 
@@ -67,55 +79,70 @@ Event:
   page: 'setting'
   tasks:
     EventGeneral:
-      - EventGeneral
-      - TaskBalancer
+      groups:
+        - EventGeneral
+        - TaskBalancer
     Event:
-      - Scheduler
-      - Campaign
-      - StopCondition
-      - Fleet
-      - Submarine
-      - Emotion
-      - HpControl
-      - EnemyPriority
+      command: event
+      groups:
+        - Scheduler
+        - Campaign
+        - StopCondition
+        - Fleet
+        - Submarine
+        - Emotion
+        - HpControl
+        - EnemyPriority
     Event2:
-      - Scheduler
-      - Campaign
-      - StopCondition
-      - Fleet
-      - Submarine
-      - Emotion
-      - HpControl
-      - EnemyPriority
+      command: event2
+      groups:
+        - Scheduler
+        - Campaign
+        - StopCondition
+        - Fleet
+        - Submarine
+        - Emotion
+        - HpControl
+        - EnemyPriority
     Raid:
-      - Scheduler
-      - Raid
-      - Campaign
-      - StopCondition
-      - Emotion
+      command: raid
+      groups:
+        - Scheduler
+        - Raid
+        - Campaign
+        - StopCondition
+        - Emotion
     Hospital:
-      - Scheduler
-      - Hospital
-      - StopCondition
-      - Emotion
+      command: hospital
+      groups:
+        - Scheduler
+        - Hospital
+        - StopCondition
+        - Emotion
     Coalition:
-      - Scheduler
-      - Campaign
-      - Coalition
-      - StopCondition
-      - Emotion
+      command: coalition
+      groups:
+        - Scheduler
+        - Campaign
+        - Coalition
+        - StopCondition
+        - Emotion
     MaritimeEscort:
-      - Scheduler
-      - MaritimeEscort
+      command: maritime_escort
+      groups:
+        - Scheduler
+        - MaritimeEscort
     WarArchives:
-      - Scheduler
-      - Campaign
-      - StopCondition
-      - Fleet
-      - Submarine
-      - Emotion
-      - HpControl
-      - EnemyPriority
+      command: war_archives
+      groups:
+        - Scheduler
+        - Campaign
+        - StopCondition
+        - Fleet
+        - Submarine
+        - Emotion
+        - HpControl
+        - EnemyPriority
 
 
 # ==================== EventDaily ====================
@@ -125,66 +152,80 @@ EventDaily:
   page: 'setting'
   tasks:
     EventA:
-      - Scheduler
-      - EventDaily
-      - Campaign
-      - StopCondition
-      - Fleet
-      - Submarine
-      - Emotion
-      - HpControl
-      - EnemyPriority
+      command: event_a
+      groups:
+        - Scheduler
+        - EventDaily
+        - Campaign
+        - StopCondition
+        - Fleet
+        - Submarine
+        - Emotion
+        - HpControl
+        - EnemyPriority
     EventB:
-      - Scheduler
-      - EventDaily
-      - Campaign
-      - StopCondition
-      - Fleet
-      - Submarine
-      - Emotion
-      - HpControl
-      - EnemyPriority
+      command: event_b
+      groups:
+        - Scheduler
+        - EventDaily
+        - Campaign
+        - StopCondition
+        - Fleet
+        - Submarine
+        - Emotion
+        - HpControl
+        - EnemyPriority
     EventC:
-      - Scheduler
-      - EventDaily
-      - Campaign
-      - StopCondition
-      - Fleet
-      - Submarine
-      - Emotion
-      - HpControl
-      - EnemyPriority
+      command: event_c
+      groups:
+        - Scheduler
+        - EventDaily
+        - Campaign
+        - StopCondition
+        - Fleet
+        - Submarine
+        - Emotion
+        - HpControl
+        - EnemyPriority
     EventD:
-      - Scheduler
-      - EventDaily
-      - Campaign
-      - StopCondition
-      - Fleet
-      - Submarine
-      - Emotion
-      - HpControl
-      - EnemyPriority
+      command: event_d
+      groups:
+        - Scheduler
+        - EventDaily
+        - Campaign
+        - StopCondition
+        - Fleet
+        - Submarine
+        - Emotion
+        - HpControl
+        - EnemyPriority
     EventSp:
-      - Scheduler
-      - Campaign
-      - StopCondition
-      - Fleet
-      - Submarine
-      - Emotion
-      - HpControl
-      - EnemyPriority
+      command: event_sp
+      groups:
+        - Scheduler
+        - Campaign
+        - StopCondition
+        - Fleet
+        - Submarine
+        - Emotion
+        - HpControl
+        - EnemyPriority
     RaidDaily:
-      - Scheduler
-      - RaidDaily
-      - Campaign
-      - StopCondition
-      - Emotion
+      command: raid_daily
+      groups:
+        - Scheduler
+        - RaidDaily
+        - Campaign
+        - StopCondition
+        - Emotion
     CoalitionSp:
-      - Scheduler
-      - Campaign
-      - Coalition
-      - StopCondition
-      - Emotion
+      command: coalition_sp
+      groups:
+        - Scheduler
+        - Campaign
+        - Coalition
+        - StopCondition
+        - Emotion
 
 # ==================== Reward ====================
 
@@ -193,34 +234,50 @@ Reward:
   page: 'setting'
   tasks:
     Commission:
-      - Scheduler
-      - Commission
+      command: commission
+      groups:
+        - Scheduler
+        - Commission
     Tactical:
-      - Scheduler
-      - Tactical
-      - ControlExpOverflow
-      - AddNewStudent
+      command: tactical
+      groups:
+        - Scheduler
+        - Tactical
+        - ControlExpOverflow
+        - AddNewStudent
     Research:
-      - Scheduler
-      - Research
+      command: research
+      groups:
+        - Scheduler
+        - Research
     Dorm:
-      - Scheduler
-      - Dorm
-      - BuyFurniture
+      command: dorm
+      groups:
+        - Scheduler
+        - Dorm
+        - BuyFurniture
     Meowfficer:
-      - Scheduler
-      - Meowfficer
-      - MeowfficerTrain
+      command: meowfficer
+      groups:
+        - Scheduler
+        - Meowfficer
+        - MeowfficerTrain
     Guild:
-      - Scheduler
-      - GuildLogistics
-      - GuildOperation
+      command: guild
+      groups:
+        - Scheduler
+        - GuildLogistics
+        - GuildOperation
     Reward:
-      - Scheduler
-      - Reward
+      command: reward
+      groups:
+        - Scheduler
+        - Reward
     Awaken:
-      - Scheduler
-      - Awaken
+      command: awaken
+      groups:
+        - Scheduler
+        - Awaken
 
 # ==================== DailyMission ====================
 
@@ -229,41 +286,61 @@ DailyMission:
   page: 'setting'
   tasks:
     Daily:
-      - Scheduler
-      - Daily
+      command: daily
+      groups:
+        - Scheduler
+        - Daily
     Hard:
-      - Scheduler
-      - Hard
+      command: hard
+      groups:
+        - Scheduler
+        - Hard
     Exercise:
-      - Scheduler
-      - Exercise
+      command: exercise
+      groups:
+        - Scheduler
+        - Exercise
     ShopFrequent:
-      - Scheduler
-      - GeneralShop
+      command: shop_frequent
+      groups:
+        - Scheduler
+        - GeneralShop
     ShopOnce:
-      - Scheduler
-      - GuildShop
-      - MedalShop2
-      - MeritShop
-      - CoreShop
+      command: shop_once
+      groups:
+        - Scheduler
+        - GuildShop
+        - MedalShop2
+        - MeritShop
+        - CoreShop
     Shipyard:
-      - Scheduler
-      - ShipyardDr
-      - Shipyard
+      command: shipyard
+      groups:
+        - Scheduler
+        - ShipyardDr
+        - Shipyard
     Gacha:
-      - Scheduler
-      - Gacha
+      command: gacha
+      groups:
+        - Scheduler
+        - Gacha
     Freebies:
-      - Scheduler
-      - BattlePass
-      - DataKey
-      - Mail
-      - SupplyPack
+      command: freebies
+      groups:
+        - Scheduler
+        - BattlePass
+        - DataKey
+        - Mail
+        - SupplyPack
     Minigame:
-      - Scheduler
+      command: minigame
+      groups:
+        - Scheduler
     PrivateQuarters:
-      - Scheduler
-      - PrivateQuarters
+      command: private_quarters
+      groups:
+        - Scheduler
+        - PrivateQuarters
 
 # ==================== Opsi ====================
 
@@ -272,56 +349,85 @@ Opsi:
   page: 'setting'
   tasks:
     OpsiGeneral:
-      - OpsiGeneral
+      groups:
+        - OpsiGeneral
     OpsiAshBeacon:
-      - Scheduler
-      - OpsiAshBeacon
+      command: opsi_ash_beacon
+      groups:
+        - Scheduler
+        - OpsiAshBeacon
     OpsiAshAssist:
-      - Scheduler
-      - OpsiAshAssist
+      command: opsi_ash_assist
+      groups:
+        - Scheduler
+        - OpsiAshAssist
     OpsiExplore:
-      - Scheduler
-      - OpsiExplore
-      - OpsiFleet
+      command: opsi_explore
+      groups:
+        - Scheduler
+        - OpsiExplore
+        - OpsiFleet
     OpsiShop:
-      - Scheduler
-      - OpsiShop
+      command: opsi_shop
+      groups:
+        - Scheduler
+        - OpsiShop
     OpsiVoucher:
-      - Scheduler
-      - OpsiVoucher
+      command: opsi_voucher
+      groups:
+        - Scheduler
+        - OpsiVoucher
     OpsiDaily:
-      - Scheduler
-      - OpsiDaily
-      - OpsiFleet
+      command: opsi_daily
+      groups:
+        - Scheduler
+        - OpsiDaily
+        - OpsiFleet
     OpsiObscure:
-      - Scheduler
-      - OpsiObscure
-      - OpsiFleet
+      command: opsi_obscure
+      groups:
+        - Scheduler
+        - OpsiObscure
+        - OpsiFleet
     OpsiAbyssal:
-      - Scheduler
-      - OpsiAbyssal
-      - OpsiFleetFilter
+      command: opsi_abyssal
+      groups:
+        - Scheduler
+        - OpsiAbyssal
+        - OpsiFleetFilter
     OpsiArchive:
-      - Scheduler
-      - OpsiFleet
+      command: opsi_archive
+      groups:
+        - Scheduler
+        - OpsiFleet
     OpsiStronghold:
-      - Scheduler
-      - OpsiStronghold
-      - OpsiFleetFilter
+      command: opsi_stronghold
+      groups:
+        - Scheduler
+        - OpsiStronghold
+        - OpsiFleetFilter
     OpsiMonthBoss:
-      - Scheduler
-      - OpsiMonthBoss
-      - OpsiFleetFilter
+      command: opsi_month_boss
+      groups:
+        - Scheduler
+        - OpsiMonthBoss
+        - OpsiFleetFilter
     OpsiMeowfficerFarming:
-      - Scheduler
-      - OpsiMeowfficerFarming
-      - OpsiFleet
+      command: opsi_meowfficer_farming
+      groups:
+        - Scheduler
+        - OpsiMeowfficerFarming
+        - OpsiFleet
     OpsiHazard1Leveling:
-      - Scheduler
-      - OpsiHazard1Leveling
-      - OpsiFleet
+      command: opsi_hazard1_leveling
+      groups:
+        - Scheduler
+        - OpsiHazard1Leveling
+        - OpsiFleet
     OpsiCrossMonth:
-      - Scheduler
+      command: opsi_cross_month
+      groups:
+        - Scheduler
 
 # ==================== Tool ====================
 
@@ -330,13 +436,25 @@ Tool:
   page: 'tool'
   tasks:
     Daemon:
-      - Daemon
+      command: daemon
+      groups:
+        - Daemon
     OpsiDaemon:
-      - OpsiDaemon
+      command: opsi_daemon
+      groups:
+        - OpsiDaemon
     EventStory:
-      - EventStory
+      command: event_story
+      groups:
+        - EventStory
     Benchmark:
-      - Benchmark
-    AzurLaneUncensored: []
+      command: benchmark
+      groups:
+        - Benchmark
+    AzurLaneUncensored:
+      command: azur_lane_uncensored
+      groups: []
     GameManager:
-      - GameManager
+      command: game_manager
+      groups:
+        - GameManager

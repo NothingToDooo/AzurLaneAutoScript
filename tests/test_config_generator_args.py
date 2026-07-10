@@ -22,7 +22,7 @@ def _generator(task: dict, argument: dict, default: dict | None = None, override
 
 
 def test_args_adds_storage_without_mutating_task_groups() -> None:
-    task = {"Main": {"tasks": {"Demo": ["Scheduler"]}}}
+    task = {"Main": {"tasks": {"Demo": {"groups": ["Scheduler"]}}}}
     original_task = deepcopy(task)
     generator = _generator(
         task=task,
@@ -45,7 +45,7 @@ def test_args_adds_storage_without_mutating_task_groups() -> None:
 
 def test_args_applies_default_and_plain_override_values() -> None:
     generator = _generator(
-        task={"Main": {"tasks": {"Demo": ["Settings"]}}},
+        task={"Main": {"tasks": {"Demo": {"groups": ["Settings"]}}}},
         argument={
             "Settings": {
                 "Mode": _arg("a", typ="select", option=["a", "b"]),
@@ -68,7 +68,7 @@ def test_args_applies_dict_override_without_mutating_override_data() -> None:
     override = {"Demo": {"Settings": {"Mode": {"value": "b", "option": ["b"]}}}}
     original_override = deepcopy(override)
     generator = _generator(
-        task={"Main": {"tasks": {"Demo": ["Settings"]}}},
+        task={"Main": {"tasks": {"Demo": {"groups": ["Settings"]}}}},
         argument={
             "Settings": {
                 "Mode": _arg("a", typ="select", option=["a", "b"]),
@@ -88,7 +88,7 @@ def test_args_applies_dict_override_without_mutating_override_data() -> None:
 
 def test_args_ignores_invalid_default_and_override_values() -> None:
     generator = _generator(
-        task={"Main": {"tasks": {"Demo": ["Settings"]}}},
+        task={"Main": {"tasks": {"Demo": {"groups": ["Settings"]}}}},
         argument={
             "Settings": {
                 "Choice": _arg("a", typ="select", option=["a", "b"]),

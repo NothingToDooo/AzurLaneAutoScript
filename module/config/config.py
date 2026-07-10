@@ -24,6 +24,7 @@ from module.config.watcher import ConfigWatcher
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
+from module.task_registry import get_task_by_config_name
 
 if TYPE_CHECKING:
     from module.base.stop_event import StopEvent
@@ -163,11 +164,10 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         tasks = [] if func_list is None else func_list
 
         cls._prepend_missing(tasks, task)
-        if task.startswith("Opsi"):
-            cls._prepend_missing(tasks, "OpsiGeneral")
-        if task.startswith(("Event", "Raid", "Coalition")) or task in ["MaritimeEscort", "GemsFarming"]:
-            cls._prepend_missing(tasks, "EventGeneral")
-            cls._prepend_missing(tasks, "TaskBalancer")
+        definition = get_task_by_config_name(task)
+        if definition is not None:
+            for scope in reversed(definition.config_scopes):
+                cls._prepend_missing(tasks, scope)
         cls._prepend_missing(tasks, "Alas")
         cls._prepend_missing(tasks, "General")
         return tasks

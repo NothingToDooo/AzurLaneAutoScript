@@ -32,9 +32,10 @@ from module.config.utils import (
 from module.content.manifest import load_default_event_manifests, render_campaign_readme
 from module.content.models import EventPack, EventRelease
 from module.logger import logger
+from module.task_registry import command_to_config_name, get_task_spec
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Iterator
 
 CONFIG_IMPORT = '''
 import datetime
@@ -163,7 +164,8 @@ class ConfigGenerator:
         """
         <task_group>:
             <task>:
-                <group>:
+                command: <catalog command>
+                groups: <argument groups>
         """
         return read_file(filepath_argument("task"))
 
@@ -193,11 +195,52 @@ class ConfigGenerator:
         """
         return read_file(filepath_argument("gui"))
 
+    @staticmethod
+    def _parse_task_node(task: str, node: object) -> tuple[str | None, tuple[str, ...]]:
+        if not isinstance(node, dict):
+            message = f"task node must be a mapping: {task}"
+            raise TypeError(message)
+        if set(node) - {"command", "groups"}:
+            message = f"invalid task node: {task}"
+            raise ValueError(message)
+        groups = node.get("groups")
+        if not isinstance(groups, list) or any(not isinstance(group, str) for group in groups):
+            message = f"invalid task groups: {task}"
+            raise TypeError(message)
+        parsed_groups = tuple(group for group in groups if isinstance(group, str))
+
+        command = node.get("command")
+        if command is None:
+            return None, parsed_groups
+        if not isinstance(command, str) or get_task_spec(command) is None:
+            message = f"unknown task command: {command}"
+            raise ValueError(message)
+        if command_to_config_name(command) != task:
+            message = f"task command does not match config node: {command} != {task}"
+            raise ValueError(message)
+        return command, parsed_groups
+
+    def _iter_task_nodes(self) -> Iterator[tuple[str, str, str | None, tuple[str, ...]]]:
+        commands: dict[str, str] = {}
+        for task_group, group_data in self.task.items():
+            if not isinstance(group_data, dict):
+                message = f"task group must contain a task mapping: {task_group}"
+                raise TypeError(message)
+            tasks = group_data.get("tasks", {})
+            if not isinstance(tasks, dict):
+                message = f"task group must contain a task mapping: {task_group}"
+                raise TypeError(message)
+            for task, node in tasks.items():
+                command, groups = self._parse_task_node(task, node)
+                if command is not None and command in commands:
+                    message = f"duplicate task command: {command} ({commands[command]}, {task})"
+                    raise ValueError(message)
+                if command is not None:
+                    commands[command] = task
+                yield task_group, task, command, groups
+
     def _iter_task_argument_groups(self):
-        for path, groups in deep_iter(self.task, depth=3):
-            if "tasks" not in path:
-                continue
-            task = path[2]
+        for _task_group, task, _command, groups in self._iter_task_nodes():
             # 给所有任务加入存储组，但不修改 task.yaml 的缓存数据。
             yield task, (*groups, "Storage")
 
@@ -346,10 +389,7 @@ class ConfigGenerator:
 
     def _generate_task_i18n(self, new, old) -> None:
         # 菜单。
-        for path, _data in deep_iter(self.task, depth=3):
-            if "tasks" not in path:
-                continue
-            task_group, _, task = path
+        for task_group, task, _command, _groups in self._iter_task_nodes():
             self._load_i18n_words(new, old, ["Menu", task_group])
             self._load_i18n_words(new, old, ["Task", task])
 
@@ -418,6 +458,7 @@ class ConfigGenerator:
 
         """
         data = {}
+        task_nodes = tuple(self._iter_task_nodes())
         for task_group in self.task:
             value = deep_get(self.task, keys=[task_group, "menu"])
             if value not in ["collapse", "list"]:
@@ -427,8 +468,7 @@ class ConfigGenerator:
             if value not in ["setting", "tool"]:
                 value = "setting"
             deep_set(data, keys=[task_group, "page"], value=value)
-            tasks = deep_get(self.task, keys=[task_group, "tasks"], default={})
-            tasks = list(tasks.keys())
+            tasks = [task for group, task, _command, _groups in task_nodes if group == task_group]
             deep_set(data, keys=[task_group, "tasks"], value=tasks)
 
         return data

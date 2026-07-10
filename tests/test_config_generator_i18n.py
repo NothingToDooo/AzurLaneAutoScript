@@ -26,7 +26,7 @@ def _generator(task: dict, argument: dict, gui: dict | None = None, packs: list[
 
 def test_generate_i18n_data_preserves_existing_words_and_adds_fallbacks() -> None:
     generator = _generator(
-        task={"Main": {"tasks": {"Demo": ["Settings"]}}},
+        task={"Main": {"tasks": {"Demo": {"groups": ["Settings"]}}}},
         argument={
             "Settings": {
                 "Mode": {"value": "a", "option": ["a", "b"]},

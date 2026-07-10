@@ -3,33 +3,13 @@ from typing import ClassVar
 from pywebio.io_ctrl import Output
 
 from module.config.server import CN_SERVER
+from module.task_registry import SCHEDULER_PRIORITY_FILTER
 
 
 class ManualConfig:
     SERVER = CN_SERVER
 
-    SCHEDULER_PRIORITY = """
-    Restart
-    > OpsiCrossMonth
-    > Commission > Tactical > Research
-    > Exercise
-    > Dorm > Meowfficer > Guild > Gacha
-    > Reward
-    > ShopFrequent > ShopOnce > Shipyard > Freebies
-    > PrivateQuarters
-    > OpsiExplore
-    > Minigame > Awaken
-    > OpsiAshBeacon
-    > OpsiDaily > OpsiShop > OpsiVoucher
-    > OpsiAbyssal > OpsiStronghold > OpsiObscure > OpsiArchive
-    > Daily > Hard > OpsiAshBeacon > OpsiAshAssist > OpsiMonthBoss
-    > Sos > EventSp > EventA > EventB > EventC > EventD
-    > RaidDaily > CoalitionSp > WarArchives > MaritimeEscort
-    > Event > Event2 > Raid > Hospital > Coalition > Main > Main2 > Main3
-    > OpsiMeowfficerFarming
-    > GemsFarming
-    > OpsiHazard1Leveling
-    """
+    SCHEDULER_PRIORITY = SCHEDULER_PRIORITY_FILTER
 
     """
     module.assets
