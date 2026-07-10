@@ -2,6 +2,16 @@ import re
 
 from module.logger import logger
 
+TENRAI_NAME_BY_SERIES = {
+    2: "457",
+    3: "234",
+    4: "tenrai",
+    5: "152",
+    6: "203",
+    7: "la9",
+    8: "305",
+}
+
 
 def split_filter(string):
     if isinstance(string, list):
@@ -81,21 +91,7 @@ def translate(string: str, target="series_4_tenrai_only_cube", for_simulate=Fals
 
 def convert_name(name, series):
     name = re.sub(r"series_\d", f"series_{series}", name)
-    if "series_8" in name:
-        name = name.replace("tenrai", "305")
-    if "series_7" in name:
-        name = name.replace("tenrai", "la9")
-    if "series_6" in name:
-        name = name.replace("tenrai", "203")
-    if "series_5" in name:
-        name = name.replace("tenrai", "152")
-    if "series_4" in name:
-        pass
-    if "series_3" in name:
-        name = name.replace("tenrai", "234")
-    if "series_2" in name:
-        name = name.replace("tenrai", "457")
-    return name
+    return name.replace("tenrai", TENRAI_NAME_BY_SERIES.get(series, "tenrai"))
 
 
 if __name__ == "__main__":
