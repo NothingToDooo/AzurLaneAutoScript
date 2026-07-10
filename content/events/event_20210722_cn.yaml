@@ -1,0 +1,14 @@
+schema_version: 1
+id: event_20210722_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2021-07-22'
+  name_cn: 响彻碧海的偶像歌
+  order: 720
+- opened_on: '2021-08-26'
+  name_cn: null
+  order: 760
+policy:
+  aliases:
+    vsp: sp

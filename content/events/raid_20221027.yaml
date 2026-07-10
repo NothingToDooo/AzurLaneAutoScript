@@ -1,0 +1,11 @@
+schema_version: 1
+id: raid_20221027
+kind: raid
+ui_profile: legacy_python
+releases:
+- opened_on: '2022-10-27'
+  name_cn: 战斗！皇家女仆队3rd
+  order: 1130
+- opened_on: '2023-10-19'
+  name_cn: null
+  order: 1510

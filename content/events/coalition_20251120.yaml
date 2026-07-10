@@ -1,0 +1,11 @@
+schema_version: 1
+id: coalition_20251120
+kind: coalition
+ui_profile: legacy_python
+releases:
+- opened_on: '2025-11-20'
+  name_cn: DATE A LANE
+  order: 2390
+- opened_on: '2025-11-27'
+  name_cn: null
+  order: 2400

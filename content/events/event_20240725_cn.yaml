@@ -1,0 +1,21 @@
+schema_version: 1
+id: event_20240725_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2024-07-25'
+  name_cn: 幻梦间奏曲
+  order: 1850
+- opened_on: '2025-02-27'
+  name_cn: null
+  order: 2100
+policy:
+  aliases:
+    a1: t1
+    a2: t2
+    a3: t3
+    c1: ht1
+    c2: ht2
+    c3: ht3
+    y.sp: sp
+    ysp: sp

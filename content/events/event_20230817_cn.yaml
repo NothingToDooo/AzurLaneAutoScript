@@ -1,0 +1,29 @@
+schema_version: 1
+id: event_20230817_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2023-08-17'
+  name_cn: 愚者的天平
+  order: 1450
+- opened_on: '2024-04-25'
+  name_cn: null
+  order: 1740
+- opened_on: '2025-10-16'
+  name_cn: 复刻愚者的天平
+  order: 2330
+policy:
+  aliases:
+    e01: a1
+    ht1: c1
+    ht2: c2
+    ht3: c3
+    ht4: d1
+    ht5: d2
+    ht6: d3
+    t1: a1
+    t2: a2
+    t3: a3
+    t4: b1
+    t5: b2
+    t6: b3

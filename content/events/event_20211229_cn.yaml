@@ -1,0 +1,17 @@
+schema_version: 1
+id: event_20211229_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2021-12-29'
+  name_cn: 逆转彩虹之塔
+  order: 860
+- opened_on: '2022-12-22'
+  name_cn: null
+  order: 1200
+- opened_on: '2024-01-11'
+  name_cn: 复刻逆转彩虹之塔
+  order: 1610
+- opened_on: '2024-07-11'
+  name_cn: null
+  order: 1830

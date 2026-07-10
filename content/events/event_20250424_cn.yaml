@@ -1,0 +1,25 @@
+schema_version: 1
+id: event_20250424_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2025-04-24'
+  name_cn: 扬起郁金之旗
+  order: 2150
+- opened_on: '2025-07-03'
+  name_cn: null
+  order: 2210
+- opened_on: '2026-04-17'
+  name_cn: 复刻扬起郁金之旗
+  order: 2580
+policy:
+  aliases:
+    a1: t1
+    a2: t2
+    a3: t3
+    c1: ht1
+    c2: ht2
+    c3: ht3
+    sp1: t1
+    sp2: t2
+    sp3: t3

@@ -6,13 +6,8 @@ import pytest
 from module.campaign import run as campaign_run_module
 from module.campaign.campaign_base import CampaignBase
 from module.campaign.run import CampaignRun
-from module.content import (
-    LegacyStageContractError,
-    LegacyStageModuleAdapter,
-    LoadedCampaignModule,
-    LoadedStage,
-    StageRef,
-)
+from module.content import LegacyStageContractError, StageRef
+from module.content.legacy_stage import LegacyStageModuleAdapter, LoadedCampaignModule, LoadedStage
 from module.exception import RequestHumanTakeover
 from module.hard import hard as hard_module
 from module.hard.hard import CampaignHard

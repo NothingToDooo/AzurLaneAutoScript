@@ -1,0 +1,49 @@
+schema_version: 1
+id: event_20221124_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2022-11-24'
+  name_cn: 炼金术士与秘密遗迹群岛
+  order: 1170
+- opened_on: '2022-12-01'
+  name_cn: null
+  order: 1180
+- opened_on: '2025-07-24'
+  name_cn: 复刻炼金术士与秘密遗迹群岛
+  order: 2240
+- opened_on: '2025-08-07'
+  name_cn: null
+  order: 2260
+policy:
+  aliases:
+    a.sp: sp
+    a1: t1
+    a2: t2
+    a3: t3
+    asp: sp
+    b1: t4
+    b2: t5
+    c1: th1
+    c2: th2
+    c3: th3
+    d1: th4
+    d2: th5
+    ht1: th1
+    ht2: th2
+    ht3: th3
+    ht4: th4
+    ht5: th5
+  loops:
+    th:
+    - th1
+    - th2
+    - th3
+    - th4
+    - th5
+  force_threat_safe_stages:
+  - th1
+  - th2
+  - th3
+  - th4
+  - th5

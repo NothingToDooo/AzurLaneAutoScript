@@ -1,0 +1,20 @@
+schema_version: 1
+id: event_20201012_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2020-10-12'
+  name_cn: 划破海空之翼
+  order: 590
+- opened_on: '2020-11-12'
+  name_cn: null
+  order: 610
+- opened_on: '2021-10-08'
+  name_cn: null
+  order: 790
+- opened_on: '2022-06-16'
+  name_cn: 复刻划破海空之翼
+  order: 1000
+- opened_on: '2024-06-13'
+  name_cn: null
+  order: 1790

@@ -1,0 +1,11 @@
+schema_version: 1
+id: coalition_20240627
+kind: coalition
+ui_profile: legacy_python
+releases:
+- opened_on: '2024-06-27'
+  name_cn: 欢迎来到童心学院
+  order: 1820
+- opened_on: '2024-10-17'
+  name_cn: null
+  order: 1940

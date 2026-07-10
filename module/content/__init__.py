@@ -1,3 +1,4 @@
+from module.content.campaign_policy import CampaignPolicy
 from module.content.catalog import ContentCatalog
 from module.content.errors import (
     ContentCatalogError,
@@ -7,22 +8,20 @@ from module.content.errors import (
     UnknownPackError,
     UnknownStageError,
 )
-from module.content.legacy_stage import LegacyStageModuleAdapter, LoadedCampaignModule, LoadedStage
-from module.content.models import AssetRef, ContentId, EventPack, StageRef, StageSpec
+from module.content.models import AssetRef, ContentId, EventPack, EventRelease, StageRef, StageSpec
 from module.content.validation import ValidationIssue
 
 __all__ = [
     "AssetRef",
+    "CampaignPolicy",
     "ContentCatalog",
     "ContentCatalogError",
     "ContentId",
     "ContentValidationError",
     "EventPack",
+    "EventRelease",
     "LegacyStageContractError",
-    "LegacyStageModuleAdapter",
     "LegacyStageReferenceError",
-    "LoadedCampaignModule",
-    "LoadedStage",
     "StageRef",
     "StageSpec",
     "UnknownPackError",

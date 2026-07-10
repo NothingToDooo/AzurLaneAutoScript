@@ -1,0 +1,38 @@
+schema_version: 1
+id: event_20250724_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2025-07-24'
+  name_cn: 优米雅的炼金工房
+  order: 2230
+- opened_on: '2025-08-07'
+  name_cn: null
+  order: 2250
+policy:
+  aliases:
+    a1: t1
+    a2: t2
+    a3: t3
+    a4: t4
+    a5: t5
+    b1: t4
+    b2: t5
+    sp1: t1
+    sp2: t2
+    sp3: t3
+    sp4: t4
+    sp5: t5
+  loops:
+    ts:
+    - ts1
+    - ts2
+    - ts3
+    - ts4
+    - ts5
+  force_threat_safe_stages:
+  - ts1
+  - ts2
+  - ts3
+  - ts4
+  - ts5

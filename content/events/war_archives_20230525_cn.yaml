@@ -1,0 +1,31 @@
+schema_version: 1
+id: war_archives_20230525_cn
+kind: war_archives
+ui_profile: legacy_python
+releases:
+- opened_on: '2026-06-12'
+  name_cn: 空相交汇点
+  order: 470
+policy:
+  aliases:
+    a1: t1
+    a2: t2
+    a3: t3
+    a4: t4
+    a5: t5
+    a6: t6
+    b1: t4
+    b2: t5
+    b3: t6
+    c1: ht1
+    c2: ht2
+    c3: ht3
+    d1: ht4
+    d2: ht5
+    d3: ht6
+    sp1: t1
+    sp2: t2
+    sp3: t3
+    sp4: t4
+    sp5: t5
+    sp6: t6

@@ -1,0 +1,31 @@
+schema_version: 1
+id: event_20200917_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2020-09-17'
+  name_cn: 蝶海梦花
+  order: 580
+- opened_on: '2021-09-23'
+  name_cn: null
+  order: 780
+- opened_on: '2022-07-14'
+  name_cn: 复刻蝶海梦花
+  order: 1050
+- opened_on: '2023-07-27'
+  name_cn: null
+  order: 1420
+policy:
+  aliases:
+    a1: t1
+    a2: t2
+    a3: t3
+    b1: t4
+    b2: t5
+    b3: t6
+    c1: ht1
+    c2: ht2
+    c3: ht3
+    d1: ht4
+    d2: ht5
+    d3: ht6

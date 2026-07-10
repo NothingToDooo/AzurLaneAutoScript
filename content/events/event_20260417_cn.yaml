@@ -1,0 +1,14 @@
+schema_version: 1
+id: event_20260417_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2026-04-17'
+  name_cn: 假日航线闪耀海滨
+  order: 2560
+- opened_on: '2026-04-17'
+  name_cn: null
+  order: 2590
+policy:
+  aliases:
+    vsp: sp

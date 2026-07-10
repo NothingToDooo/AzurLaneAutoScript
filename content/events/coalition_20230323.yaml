@@ -1,0 +1,17 @@
+schema_version: 1
+id: coalition_20230323
+kind: coalition
+ui_profile: legacy_python
+releases:
+- opened_on: '2023-03-23'
+  name_cn: 极地风暴
+  order: 1300
+- opened_on: '2023-08-24'
+  name_cn: null
+  order: 1470
+- opened_on: '2025-04-17'
+  name_cn: 极地风暴
+  order: 2140
+- opened_on: '2026-07-03'
+  name_cn: null
+  order: 2680

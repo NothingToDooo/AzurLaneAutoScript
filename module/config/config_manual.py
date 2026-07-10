@@ -57,12 +57,6 @@ class ManualConfig:
     #       DOA has smaller stage icon, right half of '%' is out of the original area.
     # 可选：normal、blue、half。
     STAGE_ENTRANCE: ClassVar[tuple[str, ...]] = ("normal",)
-    # Set stage='TH' and run_count=100, to run TH1~TH5 in cycle
-    STAGE_LOOP_ALIAS: ClassVar[dict[tuple[str, str], str]] = {
-        ("event_20221124_cn", "TH"): "TH1 > TH2 > TH3 > TH4 > TH5",
-        ("event_20250724_cn", "TS"): "TS1 > TS2 > TS3 > TS4 > TS5",
-    }
-
     """
     module.combat.level
     """

@@ -1,0 +1,19 @@
+schema_version: 1
+id: event_20240425_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2024-04-25'
+  name_cn: 共鸣的PASSION
+  order: 1750
+- opened_on: '2024-08-15'
+  name_cn: null
+  order: 1880
+policy:
+  aliases:
+    1sp: isp1
+    iisp: sp
+    isp: isp1
+    lsp: isp1
+    usp: sp
+    μsp: sp

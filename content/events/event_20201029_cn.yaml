@@ -1,0 +1,11 @@
+schema_version: 1
+id: event_20201029_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2020-10-29'
+  name_cn: 激唱的UNIVERSE
+  order: 600
+- opened_on: '2022-07-14'
+  name_cn: null
+  order: 1040

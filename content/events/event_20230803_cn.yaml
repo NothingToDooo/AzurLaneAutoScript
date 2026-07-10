@@ -1,0 +1,14 @@
+schema_version: 1
+id: event_20230803_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2023-08-03'
+  name_cn: 奏响鸢尾之歌
+  order: 1440
+- opened_on: '2024-01-11'
+  name_cn: null
+  order: 1620
+- opened_on: '2025-11-06'
+  name_cn: 复刻奏响鸢尾之歌
+  order: 2350

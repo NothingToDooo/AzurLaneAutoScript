@@ -1,0 +1,17 @@
+schema_version: 1
+id: event_20200326_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2020-03-26'
+  name_cn: 微层混合
+  order: 490
+policy:
+  aliases:
+    ht6: d3
+    t1: a1
+    t2: a2
+    t3: a3
+    t4: b1
+    t5: b2
+    t6: b3

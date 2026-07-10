@@ -1,0 +1,11 @@
+schema_version: 1
+id: coalition_20260122
+kind: coalition
+ui_profile: legacy_python
+releases:
+- opened_on: '2026-01-22'
+  name_cn: 光影风尚-拍摄进行时
+  order: 2450
+- opened_on: '2026-01-29'
+  name_cn: null
+  order: 2470

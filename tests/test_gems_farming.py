@@ -6,7 +6,7 @@ from module.campaign import gems_farming as gems_module
 from module.campaign.campaign_base import CampaignBase
 from module.campaign.gems_farming import GemsCampaignOverride, GemsFarming
 from module.campaign.run import CampaignRun
-from module.content import LoadedStage
+from module.content.legacy_stage import LoadedStage
 from module.exception import CampaignEnd
 from module.handler.assets import AUTO_SEARCH_MAP_OPTION_OFF
 from module.map.map_base import CampaignMap

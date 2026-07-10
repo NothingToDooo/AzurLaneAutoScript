@@ -1,0 +1,17 @@
+schema_version: 1
+id: event_20200806_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2020-08-06'
+  name_cn: 复刻最重要的宝物
+  order: 560
+- opened_on: '2020-12-10'
+  name_cn: null
+  order: 630
+- opened_on: '2021-08-12'
+  name_cn: null
+  order: 740
+- opened_on: '2023-02-02'
+  name_cn: null
+  order: 1240

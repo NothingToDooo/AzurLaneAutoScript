@@ -1,0 +1,20 @@
+schema_version: 1
+id: event_20220818_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2022-08-18'
+  name_cn: 远汇点作战
+  order: 1090
+- opened_on: '2023-07-13'
+  name_cn: null
+  order: 1400
+- opened_on: '2025-02-06'
+  name_cn: 复刻远汇点作战
+  order: 2070
+- opened_on: '2026-05-28'
+  name_cn: null
+  order: 2630
+policy:
+  aliases:
+    esp: sp

@@ -1,0 +1,8 @@
+schema_version: 1
+id: war_archives_20200507_cn
+kind: war_archives
+ui_profile: legacy_python
+releases:
+- opened_on: '2023-03-09'
+  name_cn: 夜幕下的归途
+  order: 230

@@ -1,0 +1,11 @@
+schema_version: 1
+id: raid_20220127
+kind: raid
+ui_profile: legacy_python
+releases:
+- opened_on: '2022-01-27'
+  name_cn: 演习神秘事件调查
+  order: 880
+- opened_on: '2023-01-18'
+  name_cn: null
+  order: 1230

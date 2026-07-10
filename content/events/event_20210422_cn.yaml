@@ -1,0 +1,17 @@
+schema_version: 1
+id: event_20210422_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2021-04-22'
+  name_cn: 复兴的赞美诗
+  order: 680
+- opened_on: '2022-03-24'
+  name_cn: null
+  order: 940
+- opened_on: '2023-03-09'
+  name_cn: 复刻复兴的赞美诗
+  order: 1280
+- opened_on: '2024-03-14'
+  name_cn: null
+  order: 1680

@@ -1,0 +1,25 @@
+schema_version: 1
+id: event_20250912_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2025-09-12'
+  name_cn: 起舞于天原之上
+  order: 2300
+- opened_on: '2025-09-19'
+  name_cn: null
+  order: 2310
+policy:
+  aliases:
+    ht1: c1
+    ht2: c2
+    ht3: c3
+    ht4: d1
+    ht5: d2
+    ht6: d3
+    t1: a1
+    t2: a2
+    t3: a3
+    t4: b1
+    t5: b2
+    t6: b3

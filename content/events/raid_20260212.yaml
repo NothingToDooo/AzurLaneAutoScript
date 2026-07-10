@@ -1,0 +1,8 @@
+schema_version: 1
+id: raid_20260212
+kind: raid
+ui_profile: legacy_python
+releases:
+- opened_on: '2026-02-12'
+  name_cn: 春宴怀玉香满庭
+  order: 2490

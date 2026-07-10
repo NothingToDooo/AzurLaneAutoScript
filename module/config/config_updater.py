@@ -1,5 +1,4 @@
 import json
-import re
 import sys
 import textwrap
 from copy import deepcopy
@@ -29,6 +28,8 @@ from module.config.utils import (
     read_file,
     write_file,
 )
+from module.content.manifest import load_default_event_manifests, render_campaign_readme
+from module.content.models import EventPack, EventRelease
 from module.logger import logger
 
 if TYPE_CHECKING:
@@ -114,33 +115,6 @@ def _generated_value(name: str, value) -> list[str]:
     if isinstance(value, set):
         return [f"{GENERATED_INDENT}{name}: ClassVar[set[object]] = {value!r}"]
     return [f"{GENERATED_INDENT}{name} = {value!r}"]
-
-
-class Event:
-    def __init__(self, text):
-        self.date, self.directory, self.cn = [x.strip() for x in text.strip("| \n").split("|")]
-
-        self.directory = self.directory.replace(" ", "_")
-        self.cn = self.cn.replace("、", "")
-        self.is_war_archives = self.directory.startswith("war_archives")
-        self.is_raid = self.directory.startswith("raid_")
-        self.is_coalition = self.directory.startswith("coalition_")
-        if self.cn == "-":
-            self.cn = None
-        elif self.is_war_archives:
-            self.cn = f"{ARCHIVES_PREFIX['cn']}{self.cn}"
-
-    def __str__(self):
-        return self.directory
-
-    def __eq__(self, other):
-        return str(self) == str(other)
-
-    def __lt__(self, other):
-        return str(self) < str(other)
-
-    def __hash__(self):
-        return hash(str(self))
 
 
 class ConfigGenerator:
@@ -391,17 +365,23 @@ class ConfigGenerator:
     def _event_names_by_directory(self):
         # 只保留国服名称，其他服务器分支不再参与生成。
         events = {}
-        for event in self.event:
-            name = event.cn
-            if name:
-                deep_default(events, keys=event.directory, value=name)
+        for pack in self.event_packs:
+            names = [release for release in pack.releases if release.name_cn]
+            if names:
+                name = max(names, key=lambda release: release.order).name_cn
+                if name is not None:
+                    name = name.replace("、", "")
+                    if pack.kind == "war_archives":
+                        name = f"{ARCHIVES_PREFIX['cn']}{name}"
+                    events[str(pack.pack_id)] = name
         return events
 
     def _generate_event_i18n(self, new) -> None:
         events = self._event_names_by_directory()
-        for event in sorted(self.event):
-            name = events.get(event.directory, event.directory)
-            deep_set(new, keys=f"Campaign.Event.{event.directory}", value=name)
+        for pack in sorted(self.event_packs, key=lambda item: str(item.pack_id)):
+            pack_id = str(pack.pack_id)
+            name = events.get(pack_id, pack_id)
+            deep_set(new, keys=f"Campaign.Event.{pack_id}", value=name)
 
     def _generate_gui_i18n(self, new, old) -> None:
         for path, _ in deep_iter(self.gui, depth=2):
@@ -454,122 +434,74 @@ class ConfigGenerator:
 
     @cached_property
     @timer
-    def event(self):
-        """
-        返回：
-            list[Event]：从新到旧排列的活动列表。
-        """
-
-        def calc_width(text):
-            return len(text) + len(re.findall(r"[\u3000-\u30ff\u3400-\u4dbf\u4e00-\u9fff、！（）]", text))
-
-        lines = []
-        data_lines = []
-        data_widths = []
-        column_width = [4] * 3  # `:---`
-        events = []
-        with Path("./campaign/Readme.md").open(encoding="utf-8") as f:
-            for text in f:
-                if not re.search(r"^\|.+\|$", text):
-                    # 不是表格行。
-                    lines.append(text)
-                elif re.search(r"^.*\-{3,}.*$", text):
-                    # 是表格分隔行。
-                    continue
-                else:
-                    line_entries = [x.strip() for x in text.strip("| \n").split("|")]
-                    data_lines.append(line_entries)
-                    data_width = [calc_width(string) for string in line_entries]
-                    data_widths.append(data_width)
-                    column_width = [max(l1, l2) for l1, l2 in zip(column_width, data_width, strict=True)]
-                    if re.search(r"\d{8}", text):
-                        event = Event(text)
-                        events.append(event)
-        for i, (line, old_width) in enumerate(zip(data_lines, data_widths, strict=True)):
-            lines.append(
-                "| "
-                + " | ".join(
-                    [
-                        cell + " " * (width - length)
-                        for cell, width, length in zip(line, column_width, old_width, strict=True)
-                    ]
-                )
-                + " |\n"
-            )
-            if i == 0:
-                lines.append("| " + " | ".join([":" + "-" * (width - 1) for width in column_width]) + " |\n")
-        with Path("./campaign/Readme.md").open("w", encoding="utf-8", newline="") as f:
-            f.writelines(lines)
-        return events[::-1]
+    def event_packs(self) -> tuple[EventPack, ...]:
+        """返回按 manifest 文件名确定性加载的活动包。"""
+        return load_default_event_manifests()
 
     @staticmethod
-    def _event_insert_tasks(event) -> tuple[str, ...]:
-        if event.is_raid:
-            return tuple(RAIDS)
-        if event.is_war_archives:
-            return tuple(WAR_ARCHIVES)
-        if event.is_coalition:
-            return tuple(COALITIONS)
-        return tuple(EVENTS + GEMS_FARMINGS)
-
-    def _event_latest_date_key(self, event) -> str | None:
-        if event.is_war_archives:
-            return None
-        if event.is_raid:
-            return "_latest_raid_date"
-        if event.is_coalition:
-            return "_latest_coalition_date"
-        return "_latest_event_date"
-
-    def _is_latest_event(self, event) -> bool:
-        date_key = self._event_latest_date_key(event)
-        if date_key is None:
-            return True
-        if not hasattr(self, date_key):
-            setattr(self, date_key, int(event.date))
-        return int(event.date) == getattr(self, date_key)
-
-    def _append_event_option(self, task, event) -> None:
-        opts = deep_get(self.args, keys=f"{task}.Campaign.Event.option", default=[])
-        if event not in opts:
-            opts.append(event)
-        deep_set(self.args, keys=f"{task}.Campaign.Event.option", value=opts)
-
-    def _insert_campaign_event(self, event) -> None:
-        if not event.cn or not self._is_latest_event(event):
-            return
-        for task in self._event_insert_tasks(event):
-            self._append_event_option(task, event)
-
-    def _clean_campaign_event_options(self, task) -> None:
-        options = []
-        for option in deep_get(self.args, keys=f"{task}.Campaign.Event.option", default=[]):
-            if option == "campaign_main" or option in options:
+    def _latest_named_options(packs: tuple[EventPack, ...], kind: str) -> list[str]:
+        releases: list[tuple[EventRelease, str]] = []
+        for pack in packs:
+            if not isinstance(pack, EventPack):
+                message = "event_packs must contain EventPack instances"
+                raise TypeError(message)
+            if pack.kind != kind:
                 continue
-            options.append(option)
-        if task not in WAR_ARCHIVES:
-            deep_set(self.args, keys=f"{task}.Campaign.Event.option_bold", value=options)
-        deep_set(self.args, keys=f"{task}.Campaign.Event.option", value=options)
+            for release in pack.releases:
+                if not isinstance(release, EventRelease):
+                    message = "pack releases must contain EventRelease instances"
+                    raise TypeError(message)
+                if release.name_cn is not None:
+                    releases.append((release, str(pack.pack_id)))
+        if not releases:
+            return []
+        latest_date = max(release.opened_on for release, _ in releases)
+        latest = sorted(
+            ((release.order, pack_id) for release, pack_id in releases if release.opened_on == latest_date),
+            reverse=True,
+        )
+        return list(dict.fromkeys(pack_id for _, pack_id in latest))
+
+    @staticmethod
+    def _war_archive_options(packs: tuple[EventPack, ...]) -> list[str]:
+        archives = []
+        for pack in packs:
+            if not isinstance(pack, EventPack):
+                message = "event_packs must contain EventPack instances"
+                raise TypeError(message)
+            named = [release.order for release in pack.releases if release.name_cn is not None]
+            if pack.kind == "war_archives" and named:
+                archives.append((max(named), str(pack.pack_id)))
+        archives.sort(reverse=True)
+        return [pack_id for _, pack_id in archives]
+
+    def _set_event_options(self, tasks: list[str], options: list[str], *, bold: bool) -> None:
+        for task in tasks:
+            deep_set(self.args, keys=f"{task}.Campaign.Event.option", value=options.copy())
+            if bold:
+                deep_set(self.args, keys=f"{task}.Campaign.Event.option_bold", value=options.copy())
 
     def insert_event(self):
         """
-        将活动信息写入 `self.args`。
-
-        ./campaign/Readme.md -----+
-                                  v
-                   args.json -----+-----> args.json
+        将 manifest 中的活动信息写入 `self.args`。
         """
-        for event in self.event:
-            self._insert_campaign_event(event)
-        for task in EVENTS + GEMS_FARMINGS + WAR_ARCHIVES + RAIDS + COALITIONS:
-            self._clean_campaign_event_options(task)
+        packs = tuple(self.event_packs)
+        self._set_event_options(EVENTS + GEMS_FARMINGS, self._latest_named_options(packs, "event"), bold=True)
+        self._set_event_options(RAIDS, self._latest_named_options(packs, "raid"), bold=True)
+        self._set_event_options(COALITIONS, self._latest_named_options(packs, "coalition"), bold=True)
+        self._set_event_options(WAR_ARCHIVES, self._war_archive_options(packs), bold=False)
 
     @timer
     def generate(self):
         _ = self.args
         _ = self.menu
-        _ = self.event
+        packs = self.event_packs
         self.insert_event()
+        (REPO_ROOT / "campaign" / "Readme.md").write_text(
+            render_campaign_readme(packs),
+            encoding="utf-8",
+            newline="\n",
+        )
         write_file(filepath_args(), self.args)
         write_file(filepath_args("menu"), self.menu)
         self.generate_code()

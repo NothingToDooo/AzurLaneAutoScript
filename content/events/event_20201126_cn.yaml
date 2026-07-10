@@ -1,0 +1,20 @@
+schema_version: 1
+id: event_20201126_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2020-11-26'
+  name_cn: 假日航线
+  order: 620
+- opened_on: '2023-04-27'
+  name_cn: 假日航线
+  order: 1330
+- opened_on: '2026-04-17'
+  name_cn: 复刻假日航线
+  order: 2570
+- opened_on: '2026-04-17'
+  name_cn: null
+  order: 2600
+policy:
+  aliases:
+    vsp: sp

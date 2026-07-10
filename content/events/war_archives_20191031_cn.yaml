@@ -1,0 +1,22 @@
+schema_version: 1
+id: war_archives_20191031_cn
+kind: war_archives
+ui_profile: legacy_python
+releases:
+- opened_on: '2017-08-02'
+  name_cn: 异色格
+  order: 20
+policy:
+  aliases:
+    ht1: c1
+    ht2: c2
+    ht3: c3
+    ht4: d1
+    ht5: d2
+    ht6: d3
+    t1: a1
+    t2: a2
+    t3: a3
+    t4: b1
+    t5: b2
+    t6: b3

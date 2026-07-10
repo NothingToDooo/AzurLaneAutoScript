@@ -1,0 +1,8 @@
+schema_version: 1
+id: war_archives_20220324_cn
+kind: war_archives
+ui_profile: legacy_python
+releases:
+- opened_on: '2025-03-20'
+  name_cn: 虚像构筑之塔
+  order: 370

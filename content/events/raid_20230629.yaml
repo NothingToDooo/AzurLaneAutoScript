@@ -1,0 +1,11 @@
+schema_version: 1
+id: raid_20230629
+kind: raid
+ui_profile: legacy_python
+releases:
+- opened_on: '2023-06-29'
+  name_cn: 绿洲往事
+  order: 1390
+- opened_on: '2024-03-21'
+  name_cn: null
+  order: 1700

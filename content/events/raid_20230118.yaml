@@ -1,0 +1,11 @@
+schema_version: 1
+id: raid_20230118
+kind: raid
+ui_profile: legacy_python
+releases:
+- opened_on: '2023-01-18'
+  name_cn: 冬日的寻路人
+  order: 1220
+- opened_on: '2024-02-06'
+  name_cn: null
+  order: 1650

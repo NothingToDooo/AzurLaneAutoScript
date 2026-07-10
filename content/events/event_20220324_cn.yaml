@@ -1,0 +1,20 @@
+schema_version: 1
+id: event_20220324_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2022-03-24'
+  name_cn: 虚像构筑之塔
+  order: 930
+- opened_on: '2022-08-18'
+  name_cn: null
+  order: 1080
+- opened_on: '2024-03-14'
+  name_cn: 复刻虚像构筑之塔
+  order: 1690
+- opened_on: '2024-08-29'
+  name_cn: null
+  order: 1900
+policy:
+  aliases:
+    esp: sp

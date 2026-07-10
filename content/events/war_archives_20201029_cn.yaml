@@ -1,0 +1,8 @@
+schema_version: 1
+id: war_archives_20201029_cn
+kind: war_archives
+ui_profile: legacy_python
+releases:
+- opened_on: '2022-10-13'
+  name_cn: 激唱的UNIVERSE
+  order: 190

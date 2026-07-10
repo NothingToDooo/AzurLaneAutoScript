@@ -1,0 +1,8 @@
+schema_version: 1
+id: war_archives_20200603_cn
+kind: war_archives
+ui_profile: legacy_python
+releases:
+- opened_on: '2023-07-13'
+  name_cn: 峡湾间的反击
+  order: 260

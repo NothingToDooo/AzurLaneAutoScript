@@ -1,0 +1,31 @@
+schema_version: 1
+id: event_20220428_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2022-04-28'
+  name_cn: 虹彩的终幕曲
+  order: 960
+- opened_on: '2023-06-29'
+  name_cn: null
+  order: 1380
+- opened_on: '2024-06-20'
+  name_cn: 复刻虹彩的终幕曲
+  order: 1800
+- opened_on: '2025-11-21'
+  name_cn: null
+  order: 2380
+policy:
+  aliases:
+    ht1: c1
+    ht2: c2
+    ht3: c3
+    ht4: d1
+    ht5: d2
+    ht6: d3
+    t1: a1
+    t2: a2
+    t3: a3
+    t4: b1
+    t5: b2
+    t6: b3

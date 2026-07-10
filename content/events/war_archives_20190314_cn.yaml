@@ -1,0 +1,8 @@
+schema_version: 1
+id: war_archives_20190314_cn
+kind: war_archives
+ui_profile: legacy_python
+releases:
+- opened_on: '2018-07-17'
+  name_cn: 月光下的序曲
+  order: 90

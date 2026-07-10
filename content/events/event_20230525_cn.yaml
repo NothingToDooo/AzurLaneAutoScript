@@ -1,0 +1,28 @@
+schema_version: 1
+id: event_20230525_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2023-05-25'
+  name_cn: 空相交汇点
+  order: 1350
+- opened_on: '2024-05-23'
+  name_cn: null
+  order: 1780
+- opened_on: '2025-06-19'
+  name_cn: 复刻空相交汇点
+  order: 2190
+policy:
+  aliases:
+    a1: t1
+    a2: t2
+    a3: t3
+    b1: t4
+    b2: t5
+    b3: t6
+    c1: ht1
+    c2: ht2
+    c3: ht3
+    d1: ht4
+    d2: ht5
+    d3: ht6

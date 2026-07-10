@@ -1,0 +1,11 @@
+schema_version: 1
+id: raid_20250116
+kind: raid
+ui_profile: legacy_python
+releases:
+- opened_on: '2025-01-16'
+  name_cn: 华裳巧展喜事长
+  order: 2050
+- opened_on: '2025-01-23'
+  name_cn: null
+  order: 2060

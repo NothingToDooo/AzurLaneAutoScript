@@ -1,0 +1,17 @@
+schema_version: 1
+id: event_20211111_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2021-11-11'
+  name_cn: 杰诺瓦的焰火
+  order: 820
+- opened_on: '2022-11-03'
+  name_cn: null
+  order: 1140
+- opened_on: '2023-04-13'
+  name_cn: 复刻杰诺瓦的焰火
+  order: 1310
+- opened_on: '2024-04-03'
+  name_cn: null
+  order: 1720

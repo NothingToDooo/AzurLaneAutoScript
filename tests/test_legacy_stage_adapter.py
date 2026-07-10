@@ -8,12 +8,10 @@ import pytest
 from module.campaign.campaign_base import CampaignBase
 from module.content import (
     LegacyStageContractError,
-    LegacyStageModuleAdapter,
     LegacyStageReferenceError,
-    LoadedCampaignModule,
-    LoadedStage,
     StageRef,
 )
+from module.content.legacy_stage import LegacyStageModuleAdapter, LoadedCampaignModule, LoadedStage
 from module.map.map_base import CampaignMap
 
 if TYPE_CHECKING:

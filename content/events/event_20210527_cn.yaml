@@ -1,0 +1,31 @@
+schema_version: 1
+id: event_20210527_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2021-05-27'
+  name_cn: 镜位螺旋
+  order: 690
+- opened_on: '2022-05-26'
+  name_cn: null
+  order: 990
+- opened_on: '2023-06-21'
+  name_cn: 复刻镜位螺旋
+  order: 1370
+- opened_on: '2024-01-25'
+  name_cn: null
+  order: 1630
+policy:
+  aliases:
+    ht1: c1
+    ht2: c2
+    ht3: c3
+    ht4: d1
+    ht5: d2
+    ht6: d3
+    t1: a1
+    t2: a2
+    t3: a3
+    t4: b1
+    t5: b2
+    t6: b3

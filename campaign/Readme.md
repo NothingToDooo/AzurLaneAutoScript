@@ -2,7 +2,7 @@
 
 `/campaign` 目录用于存放主线、活动和作战档案地图文件。
 
-新增活动时，在这里添加一行，然后运行 `uv run python -m module.config.config_updater` 重新生成配置。部分目录日期不等于首发日期，因为它们复用了旧活动地图文件。
+新增活动时，编辑 `content/events/*.yaml`，然后运行 `uv run python -m module.config.config_updater` 重新生成配置。部分目录日期不等于首发日期，因为它们复用了旧活动地图文件。
 
 **开放日期**：活动第一次开放的日期。
 

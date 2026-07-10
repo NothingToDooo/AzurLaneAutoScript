@@ -1,0 +1,11 @@
+schema_version: 1
+id: coalition_20250626
+kind: coalition
+ui_profile: legacy_python
+releases:
+- opened_on: '2025-06-26'
+  name_cn: 迷彩都市的寻踪者
+  order: 2200
+- opened_on: '2025-10-09'
+  name_cn: null
+  order: 2320

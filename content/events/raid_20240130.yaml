@@ -1,0 +1,11 @@
+schema_version: 1
+id: raid_20240130
+kind: raid
+ui_profile: legacy_python
+releases:
+- opened_on: '2024-01-30'
+  name_cn: 寰昌宇定家事忙
+  order: 1640
+- opened_on: '2025-01-02'
+  name_cn: null
+  order: 2030

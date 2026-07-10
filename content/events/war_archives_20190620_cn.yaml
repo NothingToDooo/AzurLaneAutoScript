@@ -1,0 +1,8 @@
+schema_version: 1
+id: war_archives_20190620_cn
+kind: war_archives
+ui_profile: legacy_python
+releases:
+- opened_on: '2017-10-26'
+  name_cn: 光荣的一战
+  order: 40

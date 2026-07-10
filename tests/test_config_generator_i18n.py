@@ -1,17 +1,26 @@
-from module.config.config_updater import ConfigGenerator, Event
+from datetime import date
+
+from module.config.config_updater import ConfigGenerator
 from module.config.deep import deep_get
+from module.config.utils import filepath_i18n, read_file
+from module.content.manifest import load_default_event_manifests
+from module.content.models import ContentId, EventPack, EventRelease
 
 
-def _event(date: str, directory: str, name: str) -> Event:
-    return Event(f"| {date} | {directory} | {name} |")
+def _pack(pack_id: str, kind: str, *releases: tuple[str, str | None, int]) -> EventPack:
+    return EventPack(
+        pack_id=ContentId(pack_id),
+        kind=kind,
+        releases=tuple(EventRelease(date.fromisoformat(opened), name, order) for opened, name, order in releases),
+    )
 
 
-def _generator(task: dict, argument: dict, gui: dict | None = None, events: list[Event] | None = None):
+def _generator(task: dict, argument: dict, gui: dict | None = None, packs: list[EventPack] | None = None):
     generator = object.__new__(ConfigGenerator)
     generator.task = task
     generator.argument = argument
     generator.gui = gui or {}
-    generator.event = events or []
+    generator.event_packs = tuple(packs or [])
     return generator
 
 
@@ -57,10 +66,10 @@ def test_generate_i18n_data_uses_cn_event_name_and_directory_fallback() -> None:
     generator = _generator(
         task={},
         argument={},
-        events=[
-            _event("20260101", "event_same", "新活动"),
-            _event("20250101", "event_same", "旧活动"),
-            _event("20240101", "event_missing", "-"),
+        packs=[
+            _pack("event_same", "event", ("2026-01-01", "新、活动", 20), ("2025-01-01", "旧活动", 10)),
+            _pack("event_missing", "event", ("2024-01-01", None, 30)),
+            _pack("war_archives_demo", "war_archives", ("2023-01-01", "档案名", 40)),
         ],
     )
 
@@ -68,3 +77,16 @@ def test_generate_i18n_data_uses_cn_event_name_and_directory_fallback() -> None:
 
     assert deep_get(data, keys="Campaign.Event.event_same") == "新活动"
     assert deep_get(data, keys="Campaign.Event.event_missing") == "event_missing"
+    assert deep_get(data, keys="Campaign.Event.war_archives_demo") == "档案 档案名"
+
+
+def test_real_manifest_i18n_matches_checked_in_chinese_names() -> None:
+    generator = _generator(task={}, argument={}, packs=list(load_default_event_manifests()))
+
+    generated = deep_get(generator.generate_i18n_data({}), keys="Campaign.Event")
+    checked_in = deep_get(read_file(filepath_i18n("zh-CN")), keys="Campaign.Event")
+    checked_in_packs = {pack_id: checked_in[pack_id] for pack_id in generated}
+
+    assert generated == checked_in_packs
+    assert len(generated) == 132
+    assert list(generated) == sorted(generated)

@@ -1,0 +1,8 @@
+schema_version: 1
+id: event_20200507_cn
+kind: event
+ui_profile: legacy_python
+releases:
+- opened_on: '2020-05-07'
+  name_cn: 夜幕下的归途
+  order: 510
