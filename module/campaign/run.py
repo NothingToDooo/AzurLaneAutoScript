@@ -2,6 +2,7 @@ import copy
 import importlib
 import random
 from contextlib import suppress
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast
 
@@ -30,6 +31,16 @@ class StagePolicyConfig(Protocol):
     StopCondition_MapAchievement: str
 
     def override(self, **kwargs: object) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class _CampaignLoadState:
+    name: str
+    folder: str
+    stage: str
+    loaded: LoadedCampaignModule
+    loaded_stage: LoadedStage | None
+    campaign: CampaignBase
 
 
 SP_STAGE_ALIASES = {
@@ -222,19 +233,15 @@ class CampaignRun(CampaignEvent):
     run_limit: int
     is_stage_loop = False
 
-    def _prepare_campaign_reference(self, name: str, folder: str) -> bool:
-        if hasattr(self, "name") and name == self.name:
-            return False
+    def _campaign_identity_matches(self, name: str, folder: str) -> bool:
+        return getattr(self, "name", None) == name and getattr(self, "folder", None) == folder
 
-        self.name = name
-        self.folder = folder
-
+    def _stage_for_reference(self, name: str, folder: str) -> str:
         if folder.startswith("campaign_"):
-            self.stage = "-".join(name.split("_")[1:3])
+            return "-".join(name.split("_")[1:3])
         if folder.startswith(("event", "war_archives")):
-            self.stage = name
-
-        return True
+            return name
+        return name
 
     @staticmethod
     def _raise_campaign_not_found(ref: StageRef, error: ModuleNotFoundError) -> None:
@@ -254,14 +261,34 @@ class CampaignRun(CampaignEvent):
         )
         raise RequestHumanTakeover from error
 
-    def _activate_campaign(self, loaded: LoadedCampaignModule) -> None:
+    def _build_campaign_load(
+        self,
+        name: str,
+        folder: str,
+        loaded: LoadedCampaignModule,
+        loaded_stage: LoadedStage | None,
+    ) -> _CampaignLoadState:
         config = copy.deepcopy(self.config).merge(loaded.config_class())
         campaign = loaded.campaign_class(config=config, device=self.device)
-        self.campaign = cast("CampaignBase", campaign)
-        self.loaded_campaign = loaded
+        return _CampaignLoadState(
+            name=name,
+            folder=folder,
+            stage=self._stage_for_reference(name, folder),
+            loaded=loaded,
+            loaded_stage=loaded_stage,
+            campaign=campaign,
+        )
+
+    def _commit_campaign_load(self, state: _CampaignLoadState) -> None:
+        self.name = state.name
+        self.folder = state.folder
+        self.stage = state.stage
+        self.loaded_campaign = state.loaded
+        self.loaded_stage = state.loaded_stage
+        self.campaign = state.campaign
 
     def load_campaign(self, name: str, folder: str = "campaign_main") -> bool:
-        if not self._prepare_campaign_reference(name, folder):
+        if self._campaign_identity_matches(name, folder):
             return False
 
         ref = StageRef(pack_id=folder, stage_id=name)
@@ -270,13 +297,13 @@ class CampaignRun(CampaignEvent):
         except ModuleNotFoundError as error:
             self._raise_campaign_not_found(ref, error)
 
-        self.loaded_stage = loaded
-        self._activate_campaign(loaded)
+        state = self._build_campaign_load(name, folder, loaded, loaded)
+        self._commit_campaign_load(state)
         return True
 
     def load_campaign_helper(self, name: str, folder: str) -> bool:
         """装载不带地图的历史战役辅助模块。"""
-        if not self._prepare_campaign_reference(name, folder):
+        if self._campaign_identity_matches(name, folder):
             return False
 
         ref = StageRef(pack_id=folder, stage_id=name)
@@ -285,8 +312,8 @@ class CampaignRun(CampaignEvent):
         except ModuleNotFoundError as error:
             self._raise_campaign_not_found(ref, error)
 
-        self.loaded_stage = None
-        self._activate_campaign(loaded)
+        state = self._build_campaign_load(name, folder, loaded, None)
+        self._commit_campaign_load(state)
         return True
 
     def _triggered_run_count_limit(self) -> bool:

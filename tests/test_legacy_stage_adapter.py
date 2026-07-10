@@ -1,9 +1,11 @@
 import ast
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType
+from typing import TYPE_CHECKING, cast, get_type_hints
 
 import pytest
 
+from module.campaign.campaign_base import CampaignBase
 from module.content import (
     LegacyStageContractError,
     LegacyStageModuleAdapter,
@@ -14,19 +16,22 @@ from module.content import (
 )
 from module.map.map_base import CampaignMap
 
+if TYPE_CHECKING:
+    from typing import Any
+
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 CAMPAIGN_ROOT = REPOSITORY_ROOT / "campaign"
 LEGACY_HELPER_MODULES = {
-    Path("campaign/campaign_hard/campaign_hard.py"),
-    Path("campaign/campaign_main/campaign_14_base.py"),
-    Path("campaign/campaign_main/campaign_15_base.py"),
-    Path("campaign/campaign_main/campaign_16_base_aircraft.py"),
-    Path("campaign/campaign_main/campaign_16_base_submarine.py"),
-    Path("campaign/campaign_main/campaign_2_base.py"),
-    Path("campaign/campaign_main/campaign_3_base.py"),
-    Path("campaign/campaign_main/campaign_support_fleet.py"),
-    Path("campaign/event_20230525_cn/config_base.py"),
-    Path("campaign/war_archives_20230525_cn/config_base.py"),
+    Path("campaign_hard/campaign_hard.py"),
+    Path("campaign_main/campaign_14_base.py"),
+    Path("campaign_main/campaign_15_base.py"),
+    Path("campaign_main/campaign_16_base_aircraft.py"),
+    Path("campaign_main/campaign_16_base_submarine.py"),
+    Path("campaign_main/campaign_2_base.py"),
+    Path("campaign_main/campaign_3_base.py"),
+    Path("campaign_main/campaign_support_fleet.py"),
+    Path("event_20230525_cn/config_base.py"),
+    Path("war_archives_20230525_cn/config_base.py"),
 }
 
 
@@ -34,24 +39,27 @@ class _Config:
     pass
 
 
-class _Campaign:
+class _Campaign(CampaignBase):
     pass
 
 
-def _module_with_exports(**overrides: object) -> SimpleNamespace:
+def _module_with_exports(**overrides: object) -> ModuleType:
     exports: dict[str, object] = {
         "Config": _Config,
         "Campaign": _Campaign,
         "MAP": CampaignMap("TEST"),
     }
     exports.update(overrides)
-    return SimpleNamespace(**exports)
+    module = ModuleType("campaign.event_test.t1")
+    for name, value in exports.items():
+        setattr(module, name, value)
+    return module
 
 
 def test_adapter_maps_stage_ref_to_legacy_module(monkeypatch: pytest.MonkeyPatch) -> None:
     imported: list[str] = []
 
-    def import_module(name: str) -> SimpleNamespace:
+    def import_module(name: str) -> ModuleType:
         imported.append(name)
         return _module_with_exports()
 
@@ -93,6 +101,35 @@ def test_adapter_preserves_module_not_found_error() -> None:
         LegacyStageModuleAdapter().load(StageRef("event_missing", "t1"))
 
     assert exc_info.value.name == "campaign.event_missing"
+
+
+def test_adapter_rejects_campaign_class_outside_campaign_base(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "module.content.legacy_stage.importlib.import_module",
+        lambda _name: _module_with_exports(Campaign=int),
+    )
+
+    with pytest.raises(LegacyStageContractError, match="CampaignBase"):
+        LegacyStageModuleAdapter().load(StageRef("event_test", "t1"))
+
+
+def test_adapter_public_annotations_are_runtime_resolvable() -> None:
+    helper_hints = get_type_hints(LegacyStageModuleAdapter.load_campaign_helper)
+    stage_hints = get_type_hints(LegacyStageModuleAdapter.load)
+
+    assert helper_hints == {"ref": StageRef, "return": LoadedCampaignModule}
+    assert stage_hints == {"ref": StageRef, "return": LoadedStage}
+
+
+def test_adapter_rejects_values_outside_import_contract(monkeypatch: pytest.MonkeyPatch) -> None:
+    adapter = LegacyStageModuleAdapter()
+
+    with pytest.raises(LegacyStageReferenceError, match="StageRef"):
+        adapter.load(cast("Any", object()))
+
+    monkeypatch.setattr("module.content.legacy_stage.importlib.import_module", lambda _name: object())
+    with pytest.raises(LegacyStageContractError, match="module object"):
+        adapter.load(StageRef("event_test", "t1"))
 
 
 @pytest.mark.parametrize(
@@ -175,17 +212,26 @@ def _bound_top_level_names(path: Path) -> set[str]:
     return names
 
 
-def _legacy_stage_paths() -> tuple[Path, ...]:
+def _legacy_stage_paths(campaign_root: Path = CAMPAIGN_ROOT) -> tuple[Path, ...]:
     paths = []
-    for path in sorted(CAMPAIGN_ROOT.glob("*/*.py")):
-        relative = path.relative_to(REPOSITORY_ROOT)
+    for path in sorted(campaign_root.rglob("*.py")):
+        relative = path.relative_to(campaign_root)
         if path.name in {"__init__.py", "campaign_base.py"} or relative in LEGACY_HELPER_MODULES:
             continue
         paths.append(path)
     return tuple(paths)
 
 
-def test_all_legacy_stage_modules_declare_static_exports() -> None:
+def test_legacy_stage_discovery_includes_nested_python_files(tmp_path: Path) -> None:
+    campaign_root = tmp_path / "campaign"
+    nested_stage = campaign_root / "event_future" / "chapter" / "t1.py"
+    nested_stage.parent.mkdir(parents=True)
+    nested_stage.write_text("MAP = None\nclass Config: pass\nclass Campaign: pass\n", encoding="utf-8")
+
+    assert _legacy_stage_paths(campaign_root) == (nested_stage,)
+
+
+def test_all_legacy_stage_modules_declare_top_level_static_export_names() -> None:
     required = {"Config", "Campaign", "MAP"}
     stage_paths = _legacy_stage_paths()
     missing = {}

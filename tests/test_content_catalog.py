@@ -1,3 +1,6 @@
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, cast, get_type_hints
+
 import pytest
 
 from module.content import (
@@ -10,6 +13,13 @@ from module.content import (
     UnknownPackError,
     UnknownStageError,
 )
+
+if TYPE_CHECKING:
+    from typing import Any
+
+
+def _set_attribute(instance: object, name: str, value: object) -> None:
+    setattr(instance, name, value)
 
 
 def _stage(pack_id: str, stage_id: str) -> StageSpec:
@@ -35,6 +45,39 @@ def test_catalog_preserves_explicit_pack_order_and_resolves_stages() -> None:
     assert catalog.packs == (first, second)
     assert catalog.get_pack("event_first") is first
     assert catalog.resolve_stage(StageRef("event_first", "t1")) is first.stages[1]
+
+
+def test_catalog_pack_view_cannot_be_rebound() -> None:
+    catalog = ContentCatalog((_pack("event_first", "t1"),))
+
+    with pytest.raises(AttributeError):
+        _set_attribute(catalog, "packs", ())
+
+    assert catalog.get_pack("event_first") is catalog.packs[0]
+
+
+def test_catalog_public_annotations_are_runtime_resolvable() -> None:
+    init_hints = get_type_hints(ContentCatalog.__init__)
+    get_pack_hints = get_type_hints(ContentCatalog.get_pack)
+    resolve_stage_hints = get_type_hints(ContentCatalog.resolve_stage)
+
+    assert init_hints["packs"] == Iterable[EventPack]
+    assert get_pack_hints["return"] is EventPack
+    assert resolve_stage_hints == {"ref": StageRef, "return": StageSpec}
+
+
+def test_catalog_rejects_objects_outside_content_model_contracts() -> None:
+    invalid_pack = cast("Any", object())
+    invalid_stage = cast("Any", object())
+    pack_with_invalid_stage = EventPack(pack_id=ContentId("event_invalid"), stages=(invalid_stage,))
+    catalog = ContentCatalog((_pack("event_known", "t1"),))
+
+    with pytest.raises(TypeError, match="EventPack"):
+        ContentCatalog((invalid_pack,))
+    with pytest.raises(TypeError, match="StageSpec"):
+        ContentCatalog((pack_with_invalid_stage,))
+    with pytest.raises(TypeError, match="StageRef"):
+        catalog.resolve_stage(cast("Any", object()))
 
 
 def test_catalog_rejects_duplicate_pack_ids() -> None:

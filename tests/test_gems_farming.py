@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, TypeVar, cast
 import pytest
 
 from module.campaign import gems_farming as gems_module
+from module.campaign.campaign_base import CampaignBase
 from module.campaign.gems_farming import GemsCampaignOverride, GemsFarming
 from module.campaign.run import CampaignRun
 from module.content import LoadedStage
@@ -98,18 +99,16 @@ class _GemsCampaign(GemsCampaignOverride):
         self.calls.append(("enter_map_cancel",))
 
 
-class _OverrideRoot:
+class _TestGemsOverride(CampaignBase):
     pass
 
 
-class _TestGemsOverride(_OverrideRoot):
-    pass
-
-
-class _TestLoadedCampaign(_OverrideRoot):
+class _TestLoadedCampaign(CampaignBase):
     def __init__(self, *, config: object, device: object) -> None:
-        self.config = config
-        self.device = device
+        self.test_config = config
+        self.test_device = device
+        vars(self)["config"] = config
+        vars(self)["device"] = device
 
 
 class _MergedCampaignConfig:
@@ -139,8 +138,8 @@ def test_gems_farming_uses_loaded_stage_campaign_class(monkeypatch: pytest.Monke
     runner.load_campaign("t1", folder="event_test")
 
     assert isinstance(runner.campaign, _TestLoadedCampaign)
-    assert runner.campaign.device is device
-    assert runner.campaign.config is merged_config
+    assert runner.campaign.test_device is device
+    assert runner.campaign.test_config is merged_config
     assert merged_config.overrides == [
         {"Emotion_Mode": "ignore"},
         {"EnemyPriority_EnemyScaleBalanceWeight": "S1_enemy_first"},

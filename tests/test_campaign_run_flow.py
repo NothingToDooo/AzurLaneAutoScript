@@ -1,14 +1,25 @@
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import pytest
 
 from module.campaign import run as campaign_run_module
+from module.campaign.campaign_base import CampaignBase
 from module.campaign.run import CampaignRun
-from module.content import LoadedCampaignModule, LoadedStage, StageRef
+from module.content import (
+    LegacyStageContractError,
+    LegacyStageModuleAdapter,
+    LoadedCampaignModule,
+    LoadedStage,
+    StageRef,
+)
 from module.exception import RequestHumanTakeover
 from module.hard import hard as hard_module
 from module.hard.hard import CampaignHard
 from module.map.map_base import CampaignMap
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 AFTER_RUN_METHOD = "_handle_campaign_after_run"
 ENSURE_UI_METHOD = "_ensure_campaign_run_ui"
@@ -25,19 +36,45 @@ class _LoadedConfig:
 class _RunnerConfig:
     def __init__(self) -> None:
         self.merged: list[object] = []
+        self.merge_hook: Callable[[], None] | None = None
 
     def merge(self, config: object):
+        if self.merge_hook is not None:
+            self.merge_hook()
         self.merged.append(config)
         return self
 
 
-class _LoadedCampaign:
+class _LoadedCampaign(CampaignBase):
     def __init__(self, *, config: _RunnerConfig, device: object) -> None:
-        self.config = config
-        self.device = device
+        self.test_config = config
+        self.test_device = device
+        vars(self)["config"] = config
+        vars(self)["device"] = device
 
 
-class _StageAdapter:
+class _FailOnceLoadedConfig:
+    failures_remaining = 0
+
+    def __init__(self) -> None:
+        if self.failures_remaining:
+            type(self).failures_remaining -= 1
+            message = "config construction failed"
+            raise RuntimeError(message)
+
+
+class _FailOnceLoadedCampaign(_LoadedCampaign):
+    failures_remaining = 0
+
+    def __init__(self, *, config: _RunnerConfig, device: object) -> None:
+        if self.failures_remaining:
+            type(self).failures_remaining -= 1
+            message = "campaign construction failed"
+            raise RuntimeError(message)
+        super().__init__(config=config, device=device)
+
+
+class _StageAdapter(LegacyStageModuleAdapter):
     def __init__(self, loaded_stage: LoadedStage) -> None:
         self.loaded_stage = loaded_stage
         self.stage_refs: list[StageRef] = []
@@ -54,8 +91,40 @@ class _StageAdapter:
 
 class _MissingStageAdapter(_StageAdapter):
     def load(self, ref: StageRef) -> LoadedStage:
+        self.stage_refs.append(ref)
         module_name = f"campaign.{ref.pack_id}.{ref.stage_id}"
         raise ModuleNotFoundError(module_name)
+
+
+class _TransactionalAdapter(LegacyStageModuleAdapter):
+    def __init__(
+        self,
+        stage: LoadedStage,
+        helper: LoadedCampaignModule,
+        *,
+        failures_remaining: int = 0,
+    ) -> None:
+        self.stage = stage
+        self.helper = helper
+        self.failures_remaining = failures_remaining
+        self.stage_refs: list[StageRef] = []
+        self.helper_refs: list[StageRef] = []
+
+    def _fail_once(self) -> None:
+        if self.failures_remaining:
+            self.failures_remaining -= 1
+            message = "adapter failed"
+            raise LegacyStageContractError(message)
+
+    def load(self, ref: StageRef) -> LoadedStage:
+        self.stage_refs.append(ref)
+        self._fail_once()
+        return self.stage
+
+    def load_campaign_helper(self, ref: StageRef) -> LoadedCampaignModule:
+        self.helper_refs.append(ref)
+        self._fail_once()
+        return self.helper
 
 
 def _make_load_runner() -> tuple[CampaignRun, _StageAdapter]:
@@ -66,6 +135,37 @@ def _make_load_runner() -> tuple[CampaignRun, _StageAdapter]:
     adapter = _StageAdapter(loaded)
     runner.stage_adapter = adapter
     return runner, adapter
+
+
+def _load_state(runner: CampaignRun) -> tuple[object, ...]:
+    return (
+        runner.name,
+        runner.folder,
+        runner.stage,
+        runner.loaded_campaign,
+        runner.loaded_stage,
+        runner.campaign,
+    )
+
+
+def _assert_load_state_unchanged(runner: CampaignRun, previous: tuple[object, ...]) -> None:
+    assert (runner.name, runner.folder, runner.stage) == previous[:3]
+    assert runner.loaded_campaign is previous[3]
+    assert runner.loaded_stage is previous[4]
+    assert runner.campaign is previous[5]
+
+
+def _merge_failure_once() -> Callable[[], None]:
+    failures_remaining = 1
+
+    def fail() -> None:
+        nonlocal failures_remaining
+        if failures_remaining:
+            failures_remaining -= 1
+            message = "config merge failed"
+            raise RuntimeError(message)
+
+    return fail
 
 
 class _HardConfig:
@@ -239,20 +339,89 @@ def test_load_campaign_uses_stage_adapter_and_preserves_construction_semantics()
     assert runner.folder == "event_20260625_cn"
     assert runner.stage == "t1"
     assert isinstance(runner.campaign, _LoadedCampaign)
-    assert runner.campaign.device is runner.device
-    assert runner.campaign.config is not runner.config
-    assert len(runner.campaign.config.merged) == 1
-    assert isinstance(runner.campaign.config.merged[0], _LoadedConfig)
+    assert runner.campaign.test_device is runner.device
+    assert runner.campaign.test_config is not runner.config
+    assert len(runner.campaign.test_config.merged) == 1
+    assert isinstance(runner.campaign.test_config.merged[0], _LoadedConfig)
 
 
-def test_load_campaign_keeps_existing_same_name_shortcut() -> None:
+def test_load_campaign_identity_includes_folder_and_name() -> None:
     runner, adapter = _make_load_runner()
 
-    assert runner.load_campaign("campaign_7_2", folder="campaign_main") is True
-    assert runner.stage == "7-2"
-    assert runner.load_campaign("campaign_7_2", folder="another_folder") is False
-    assert adapter.stage_refs == [StageRef("campaign_main", "campaign_7_2")]
-    assert runner.folder == "campaign_main"
+    assert runner.load_campaign("sp", folder="event_first") is True
+    first_campaign = runner.campaign
+    assert runner.load_campaign("sp", folder="event_second") is True
+    assert runner.load_campaign("sp", folder="event_second") is False
+
+    assert adapter.stage_refs == [StageRef("event_first", "sp"), StageRef("event_second", "sp")]
+    assert runner.folder == "event_second"
+    assert runner.stage == "sp"
+    assert runner.campaign is not first_campaign
+
+
+def test_load_campaign_unknown_folder_uses_current_name_as_stage() -> None:
+    runner, _ = _make_load_runner()
+    assert runner.load_campaign("sp", folder="event_original") is True
+
+    assert runner.load_campaign("custom_stage", folder="custom_pack") is True
+
+    assert (runner.folder, runner.name, runner.stage) == ("custom_pack", "custom_stage", "custom_stage")
+
+
+@pytest.mark.parametrize("load_kind", ["stage", "helper"])
+@pytest.mark.parametrize("failure_phase", ["adapter", "config", "merge", "campaign"])
+def test_campaign_load_builds_locally_then_commits_and_can_retry(
+    load_kind: str,
+    failure_phase: str,
+) -> None:
+    runner, _ = _make_load_runner()
+    assert runner.load_campaign("sp", folder="event_original") is True
+    previous_state = _load_state(runner)
+
+    config_class: type[object] = _LoadedConfig
+    campaign_class: type[CampaignBase] = _LoadedCampaign
+    failures_remaining = 0
+    if failure_phase == "adapter":
+        failures_remaining = 1
+    elif failure_phase == "config":
+        _FailOnceLoadedConfig.failures_remaining = 1
+        config_class = _FailOnceLoadedConfig
+    elif failure_phase == "merge":
+        runner.config.merge_hook = _merge_failure_once()
+    elif failure_phase == "campaign":
+        _FailOnceLoadedCampaign.failures_remaining = 1
+        campaign_class = _FailOnceLoadedCampaign
+
+    stage = LoadedStage(config_class, campaign_class, CampaignMap("RETRY"))
+    helper = LoadedCampaignModule(config_class, campaign_class)
+    adapter = _TransactionalAdapter(stage, helper, failures_remaining=failures_remaining)
+    runner.stage_adapter = adapter
+
+    def load_target() -> bool:
+        if load_kind == "stage":
+            return runner.load_campaign("sp", folder="event_retry")
+        return runner.load_campaign_helper("campaign_hard", folder="campaign_hard")
+
+    expected_error = LegacyStageContractError if failure_phase == "adapter" else RuntimeError
+    with pytest.raises(expected_error):
+        load_target()
+
+    _assert_load_state_unchanged(runner, previous_state)
+
+    assert load_target() is True
+    if load_kind == "stage":
+        assert adapter.stage_refs == [StageRef("event_retry", "sp"), StageRef("event_retry", "sp")]
+        assert runner.loaded_stage is stage
+        assert (runner.folder, runner.name, runner.stage) == ("event_retry", "sp", "sp")
+    else:
+        assert adapter.helper_refs == [
+            StageRef("campaign_hard", "campaign_hard"),
+            StageRef("campaign_hard", "campaign_hard"),
+        ]
+        assert runner.loaded_stage is None
+        assert (runner.folder, runner.name, runner.stage) == ("campaign_hard", "campaign_hard", "hard")
+    assert runner.loaded_campaign is (stage if load_kind == "stage" else helper)
+    assert runner.campaign is not previous_state[5]
 
 
 def test_load_campaign_helper_uses_explicit_non_stage_contract() -> None:
@@ -269,6 +438,8 @@ def test_load_campaign_helper_uses_explicit_non_stage_contract() -> None:
 
 def test_load_campaign_preserves_missing_module_diagnostics(monkeypatch: pytest.MonkeyPatch) -> None:
     runner, adapter = _make_load_runner()
+    assert runner.load_campaign("sp", folder="event_original") is True
+    previous_state = _load_state(runner)
     warnings: list[str] = []
     criticals: list[str] = []
     monkeypatch.setattr(runner, "stage_adapter", _MissingStageAdapter(adapter.loaded_stage))
@@ -279,6 +450,7 @@ def test_load_campaign_preserves_missing_module_diagnostics(monkeypatch: pytest.
         runner.load_campaign("t1", folder="event_missing")
 
     assert isinstance(exc_info.value.__cause__, ModuleNotFoundError)
+    _assert_load_state_unchanged(runner, previous_state)
     assert warnings == [
         "Map file not found: campaign.event_missing.t1",
         "Folder not exists: ./campaign/event_missing",
