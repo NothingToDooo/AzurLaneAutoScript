@@ -1,5 +1,4 @@
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, cast
@@ -61,8 +60,8 @@ def read_trace(trace_path: Path) -> tuple[ReplayFrame, ...]:
     payload: object = json.loads(trace_path.read_text(encoding="utf-8"))
     root = _require_mapping(payload, location="trace")
     version = root.get("version")
-    if version != TRACE_VERSION:
-        message = f"unsupported replay trace version: {version!r}"
+    if not isinstance(version, int) or isinstance(version, bool) or version != TRACE_VERSION:
+        message = f"replay trace version must be integer {TRACE_VERSION}"
         raise ValueError(message)
     raw_frames = root.get("frames")
     if not isinstance(raw_frames, list):
@@ -83,12 +82,12 @@ def _normalize_point(point: tuple[int, int], *, field_name: str) -> tuple[int, i
 
 
 def _portable_image_path(image_path: Path, trace_path: Path) -> str:
-    if not image_path.is_absolute():
-        return image_path.as_posix()
-    try:
-        relative_path = Path(os.path.relpath(image_path.resolve(), trace_path.parent.resolve()))
-    except ValueError:
-        return image_path.as_posix()
+    trace_directory = trace_path.parent.resolve()
+    resolved_path = image_path.resolve() if image_path.is_absolute() else (trace_directory / image_path).resolve()
+    if not resolved_path.is_relative_to(trace_directory):
+        message = f"replay image path must be inside trace directory: {image_path}"
+        raise ValueError(message)
+    relative_path = resolved_path.relative_to(trace_directory)
     return relative_path.as_posix()
 
 
@@ -114,9 +113,7 @@ def _parse_frame(value: object, trace_path: Path, index: int) -> ReplayFrame:
     if not isinstance(raw_image_path, str) or not raw_image_path:
         message = f"trace.frames[{index}].image_path must be a non-empty string"
         raise ValueError(message)
-    image_path = Path(raw_image_path)
-    if not image_path.is_absolute():
-        image_path = (trace_path.parent / image_path).resolve()
+    image_path = _parse_image_path(raw_image_path, trace_path, index)
 
     raw_actions = frame.get("expected_actions")
     if not isinstance(raw_actions, list):
@@ -124,6 +121,24 @@ def _parse_frame(value: object, trace_path: Path, index: int) -> ReplayFrame:
         raise TypeError(message)
     actions = tuple(_parse_action(action, index, action_index) for action_index, action in enumerate(raw_actions))
     return ReplayFrame(image_path=image_path, expected_actions=actions)
+
+
+def _parse_image_path(raw_image_path: str, trace_path: Path, frame_index: int) -> Path:
+    location = f"trace.frames[{frame_index}].image_path"
+    relative_path = Path(raw_image_path)
+    if relative_path.is_absolute() or relative_path.anchor:
+        message = f"{location} must be a relative path"
+        raise ValueError(message)
+
+    trace_directory = trace_path.parent.resolve()
+    resolved_path = (trace_directory / relative_path).resolve()
+    if not resolved_path.is_relative_to(trace_directory):
+        message = f"{location} must resolve inside trace directory"
+        raise ValueError(message)
+    if ".." in relative_path.parts or raw_image_path != relative_path.as_posix():
+        message = f"{location} must be a canonical relative path"
+        raise ValueError(message)
+    return resolved_path
 
 
 def _parse_action(value: object, frame_index: int, action_index: int) -> RecordedAction:

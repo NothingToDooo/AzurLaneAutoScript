@@ -55,6 +55,39 @@ uv run pytest tests/test_content_models.py tests/test_replay_device.py -q
 19 passed in 0.38s
 ```
 
+## Review-fix TDD 证据
+
+独立审查指出 trace 路径边界、Python 3.14 运行时注解与 JSON version 类型仍不够严格。修复前先增加九个回归用例，然后运行：
+
+```text
+uv run pytest tests/test_replay_device.py -q
+9 failed, 9 passed in 0.55s
+```
+
+RED 分别证明：
+
+- `write_trace()` 没有规范化相对路径，也会接受 trace 目录外的绝对路径和 `..` 逃逸路径；
+- `read_trace()` 会接受绝对、逃逸及带非规范 `..` 组件的图片路径；
+- JSON 中的 `true` 和 `1.0` 会因 Python 相等语义被当作 version 1；
+- `typing.get_type_hints(ReplayDevice)` 会因 `np` 只在 `TYPE_CHECKING` 下导入而抛出 `NameError`。
+
+完成最小修复后，同一回归集转为 GREEN：
+
+```text
+uv run pytest tests/test_replay_device.py -q
+18 passed in 0.38s
+
+uv run pytest tests/test_content_models.py tests/test_replay_device.py -q
+28 passed in 0.43s
+```
+
+修复后的边界为：
+
+- 写入前使用 `Path.resolve()` 与 `is_relative_to()` 确认图片位于 trace 父目录内，再用 `relative_to()` 生成规范 POSIX 相对路径；包外、逃逸和跨盘路径均抛出 `ValueError`；
+- 读取时拒绝绝对或带 anchor 的路径，拒绝解析到 trace 父目录外的路径，并拒绝非规范 `..`、反斜杠或冗余组件；
+- version 必须是精确的非布尔 `int` 1，`true`、`1.0` 和其他类型均被拒绝；
+- `ImageArray` 与 `PointInput` 使用有运行时依赖的显式类型别名，`ReplayDevice` 的类、截图和滑动注解均可由 `get_type_hints()` 求值。
+
 ## 契约说明
 
 ### 内容模型
@@ -88,7 +121,7 @@ uv run pytest tests/test_content_models.py tests/test_replay_device.py -q
 
 ```text
 uv run pytest -q
-907 passed, 1 skipped in 5.68s
+916 passed, 1 skipped in 5.68s
 ```
 
 全仓质量门禁：
@@ -113,4 +146,6 @@ forbidden_loaded= []
 
 其中 forbidden 集合为 `module.webui`、`module.device`、`module.campaign`。静态文本扫描也未发现 ADB、`nemu_ipc`、`minitouch`、Pydantic、动态 entry point 或包发现依赖。
 
-提交主题：`feat: 建立内容与截图回放契约`
+初始提交主题：`feat: 建立内容与截图回放契约`
+
+审查修复提交主题：`fix: 收紧截图回放边界`

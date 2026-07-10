@@ -1,5 +1,6 @@
 import json
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import get_type_hints
 
 import pytest
 from PIL import Image
@@ -17,9 +18,6 @@ from module.replay import (
     write_trace,
 )
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
 
 class _Button:
     def __init__(self, name: str) -> None:
@@ -32,6 +30,10 @@ class _Button:
 def _make_image(path: Path, color: tuple[int, int, int]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (1280, 720), color).save(path)
+
+
+def _write_trace_payload(trace_path: Path, payload: object) -> None:
+    trace_path.write_text(json.dumps(payload), encoding="utf-8")
 
 
 def test_trace_round_trip_is_deterministic_and_uses_relative_image_paths(tmp_path: Path) -> None:
@@ -57,6 +59,95 @@ def test_trace_round_trip_is_deterministic_and_uses_relative_image_paths(tmp_pat
     assert payload["version"] == 1
     assert payload["frames"][0]["image_path"] == "frames/frame-001.png"
     assert read_trace(trace_path) == frames
+
+
+def test_write_trace_canonicalizes_relative_image_path(tmp_path: Path) -> None:
+    trace_directory = tmp_path / "bundle"
+    trace_directory.mkdir()
+    image_path = trace_directory / "frame.png"
+    trace_path = trace_directory / "trace.json"
+    _make_image(image_path, (10, 20, 30))
+
+    write_trace(trace_path, (ReplayFrame(Path("frames/../frame.png")),))
+
+    payload = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert payload["frames"][0]["image_path"] == "frame.png"
+
+
+def test_write_trace_rejects_absolute_image_outside_trace_directory(tmp_path: Path) -> None:
+    trace_directory = tmp_path / "bundle"
+    trace_directory.mkdir()
+    outside_image = tmp_path / "outside.png"
+    _make_image(outside_image, (10, 20, 30))
+
+    with pytest.raises(ValueError, match="inside trace directory"):
+        write_trace(trace_directory / "trace.json", (ReplayFrame(outside_image),))
+
+
+def test_write_trace_rejects_escaping_relative_image_path(tmp_path: Path) -> None:
+    trace_directory = tmp_path / "bundle"
+    trace_directory.mkdir()
+
+    with pytest.raises(ValueError, match="inside trace directory"):
+        write_trace(trace_directory / "trace.json", (ReplayFrame(Path("../outside.png")),))
+
+
+def test_read_trace_rejects_absolute_image_path(tmp_path: Path) -> None:
+    trace_path = tmp_path / "trace.json"
+    outside_image = tmp_path.parent / "outside.png"
+    _write_trace_payload(
+        trace_path,
+        {
+            "version": 1,
+            "frames": [{"image_path": outside_image.as_posix(), "expected_actions": []}],
+        },
+    )
+
+    with pytest.raises(ValueError, match="relative"):
+        read_trace(trace_path)
+
+
+def test_read_trace_rejects_escaping_image_path(tmp_path: Path) -> None:
+    trace_path = tmp_path / "trace.json"
+    _write_trace_payload(
+        trace_path,
+        {
+            "version": 1,
+            "frames": [{"image_path": "../outside.png", "expected_actions": []}],
+        },
+    )
+
+    with pytest.raises(ValueError, match="inside trace directory"):
+        read_trace(trace_path)
+
+
+def test_read_trace_rejects_noncanonical_parent_component(tmp_path: Path) -> None:
+    trace_path = tmp_path / "trace.json"
+    _write_trace_payload(
+        trace_path,
+        {
+            "version": 1,
+            "frames": [{"image_path": "frames/../frame.png", "expected_actions": []}],
+        },
+    )
+
+    with pytest.raises(ValueError, match="canonical"):
+        read_trace(trace_path)
+
+
+@pytest.mark.parametrize("version", [True, 1.0])
+def test_read_trace_rejects_non_integer_version(tmp_path: Path, version: object) -> None:
+    trace_path = tmp_path / "trace.json"
+    _write_trace_payload(trace_path, {"version": version, "frames": []})
+
+    with pytest.raises(ValueError, match="integer 1"):
+        read_trace(trace_path)
+
+
+def test_replay_device_public_annotations_can_be_resolved() -> None:
+    assert "image" in get_type_hints(ReplayDevice)
+    assert "return" in get_type_hints(ReplayDevice.screenshot)
+    assert {"start", "end", "return"} <= get_type_hints(ReplayDevice.swipe).keys()
 
 
 def test_screenshot_activates_next_frame_and_sets_image(tmp_path: Path) -> None:

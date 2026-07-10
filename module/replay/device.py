@@ -1,13 +1,12 @@
-from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 import cv2
+import numpy as np
 
 from module.replay.trace import ClickAction, RecordedAction, ReplayFrame, SwipeAction
 
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    import numpy as np
+type ImageArray = np.ndarray
+type PointInput = Sequence[int | float]
 
 
 class ReplayError(RuntimeError):
@@ -41,7 +40,7 @@ class ReplayImageLoadError(ReplayError):
 class ReplayDevice:
     __slots__ = ("_active_frame_index", "_frames", "_next_action_index", "_next_frame_index", "image")
 
-    image: np.ndarray
+    image: ImageArray
 
     def __init__(self, frames: tuple[ReplayFrame, ...]) -> None:
         self._frames = tuple(frames)
@@ -49,7 +48,7 @@ class ReplayDevice:
         self._active_frame_index: int | None = None
         self._next_action_index = 0
 
-    def screenshot(self) -> np.ndarray:
+    def screenshot(self) -> ImageArray:
         self._reject_incomplete_active_frame()
         if self._next_frame_index >= len(self._frames):
             message = "Replay frames exhausted"
@@ -75,7 +74,7 @@ class ReplayDevice:
             self._raise_action_mismatch(expected=expected, actual=f"click {target!r}")
         self._next_action_index += 1
 
-    def swipe(self, start: Sequence[int | float], end: Sequence[int | float]) -> None:
+    def swipe(self, start: PointInput, end: PointInput) -> None:
         normalized_start = _normalize_point(start, field_name="start")
         normalized_end = _normalize_point(end, field_name="end")
         actual_action = SwipeAction(start=normalized_start, end=normalized_end)
@@ -128,7 +127,7 @@ class ReplayDevice:
         raise ReplayActionMismatchError(message)
 
 
-def _normalize_point(point: Sequence[int | float], *, field_name: str) -> tuple[int, int]:
+def _normalize_point(point: PointInput, *, field_name: str) -> tuple[int, int]:
     if len(point) != 2:
         message = f"{field_name} must contain exactly two coordinates"
         raise ValueError(message)
