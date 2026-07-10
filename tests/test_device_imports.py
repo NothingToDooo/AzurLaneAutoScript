@@ -1,4 +1,8 @@
 import importlib
+import subprocess
+import sys
+
+import pytest
 
 from module.device.connection import Connection
 
@@ -27,16 +31,26 @@ def test_legacy_device_services_do_not_inherit_connection() -> None:
     assert all(Connection not in cls.__mro__ for cls in classes)
 
 
-def test_device_modules_import_in_independent_orders() -> None:
-    names = (
-        "module.device.services",
-        "module.device.runtime",
-        "module.device.method.minitouch",
-        "module.device.method.nemu_ipc",
-        "module.device.platform.platform_base",
-        "module.device.platform.platform_windows",
-        "module.device.device",
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "import module.device.services",
+        "import module.device.runtime",
+        "import module.device.method.minitouch",
+        "import module.device.method.nemu_ipc",
+        "import module.device.platform.platform_base",
+        "import module.device.platform.platform_windows",
+        "import module.device.device",
+        "from module.device.platform import Platform",
+    ],
+)
+def test_device_modules_import_in_cold_interpreters(statement: str) -> None:
+    result = subprocess.run(  # noqa: S603
+        [sys.executable, "-c", statement],
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=20,
     )
 
-    for name in names:
-        assert importlib.import_module(name).__name__ == name
+    assert result.returncode == 0, result.stderr

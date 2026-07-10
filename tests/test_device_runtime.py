@@ -2,7 +2,10 @@ import threading
 from types import SimpleNamespace
 
 import pytest
+from adbutils.errors import AdbError
 
+from module.base.decorator import cached_property
+from module.device import connection as connection_module
 from module.device.app_control import AppControl
 from module.device.connection import Connection
 from module.device.control import Control
@@ -242,3 +245,90 @@ def test_adb_restart_releases_services_before_killing_server() -> None:
     connection.adb_restart()
 
     assert calls[:3] == ["release", "client", "server_kill"]
+
+
+class _RecoveryLogger:
+    def __init__(self) -> None:
+        self.exceptions: list[Exception] = []
+
+    def exception(self, error: Exception) -> None:
+        self.exceptions.append(error)
+
+    def info(self, _message: object) -> None:
+        pass
+
+
+def _failing_runtime(calls: list[str], error: Exception):
+    def release_serial() -> None:
+        calls.append("release")
+        raise error
+
+    return SimpleNamespace(release_serial=release_serial)
+
+
+def test_adb_disconnect_continues_after_runtime_cleanup_error(monkeypatch) -> None:
+    calls: list[str] = []
+    error = AdbError("old forward")
+    logger = _RecoveryLogger()
+    connection = object.__new__(Connection)
+    connection.serial = "127.0.0.1:16384"
+    vars(connection)["_runtime"] = _failing_runtime(calls, error)
+    vars(connection)["adb_client"] = SimpleNamespace(disconnect=lambda _serial: calls.append("disconnect") or "")
+    monkeypatch.setattr(connection_module, "logger", logger)
+
+    connection.adb_disconnect()
+
+    assert calls == ["release", "disconnect"]
+    assert logger.exceptions == [error]
+
+
+def test_adb_restart_rebuilds_client_after_runtime_cleanup_error(monkeypatch) -> None:
+    calls: list[str] = []
+    error = AdbError("old forward")
+    logger = _RecoveryLogger()
+    old_client = SimpleNamespace(server_kill=lambda: calls.append("server_kill"))
+    new_client = object()
+
+    class _RestartConnection(Connection):
+        @cached_property
+        def adb_client(self):
+            calls.append("rebuild_client")
+            return new_client
+
+    connection = object.__new__(_RestartConnection)
+    vars(connection).update(
+        _runtime=_failing_runtime(calls, error),
+        adb_client=old_client,
+    )
+    monkeypatch.setattr(connection_module, "logger", logger)
+
+    connection.adb_restart()
+
+    assert calls == ["release", "server_kill", "rebuild_client"]
+    assert connection.adb_client is new_client
+    assert logger.exceptions == [error]
+
+
+def test_bind_serial_publishes_new_serial_after_runtime_cleanup_error(monkeypatch) -> None:
+    calls: list[str] = []
+    error = AdbError("old forward")
+    logger = _RecoveryLogger()
+    old_serial = "127.0.0.1:16384"
+    new_serial = "127.0.0.1:16385"
+    connection = object.__new__(Connection)
+    connection.serial = old_serial
+    connection.config = SimpleNamespace(Emulator_Serial=old_serial)
+    vars(connection).update(
+        _runtime=_failing_runtime(calls, error),
+        port=16384,
+        adb=object(),
+    )
+    monkeypatch.setattr(connection_module, "logger", logger)
+
+    assert connection.bind_serial(new_serial)
+
+    assert calls == ["release"]
+    assert connection.serial == new_serial
+    assert "port" not in vars(connection)
+    assert "adb" not in vars(connection)
+    assert logger.exceptions == [error]

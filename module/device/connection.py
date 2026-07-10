@@ -33,7 +33,11 @@ class Connection(MumuTcpConnection):
         """释放当前 serial 关联的截图与控制资源。"""
         runtime = self.__dict__.get("_runtime")
         if runtime is not None:
-            runtime.release_serial()
+            try:
+                runtime.release_serial()
+            except Exception as error:  # noqa: BLE001
+                # 资源回收失败不能截断 ADB 主状态迁移或新 serial 发布。
+                logger.exception(error)
 
     def adb_disconnect(self):
         self.release_resource()

@@ -20,17 +20,22 @@ class _Logger:
         self.criticals.append(str(message))
 
 
-class _Minitouch:
-    def __init__(self) -> None:
-        self.calls: list[str] = []
-        self.run_count = 0
-        self.session = self
+class _Session:
+    def __init__(self, calls: list[str]) -> None:
+        self.calls = calls
 
     def adb_reconnect(self) -> None:
         self.calls.append("adb_reconnect")
 
     def adb_start_server(self) -> None:
         self.calls.append("adb_start_server")
+
+
+class _Minitouch:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+        self.run_count = 0
+        self.session = _Session(self.calls)
 
     def _reset_minitouch_connection(self, remove_forward=True) -> None:
         self.calls.append(f"reset:{remove_forward}")
