@@ -3,7 +3,7 @@ import re
 import numpy as np
 
 from module.base.button import ButtonGrid
-from module.base.decorator import Config, cached_property
+from module.base.decorator import cached_property
 from module.base.filter import Filter
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_3, GET_SHIP
@@ -119,7 +119,6 @@ class ShopBase(UI):
         return ""
 
     @cached_property
-    @Config.when(SERVER=None)
     def shop_grid(self):
         """2025-08-14 新版商店 UI 的商品网格。"""
         return ButtonGrid(

@@ -193,9 +193,7 @@ class Campaign(CampaignBase):
             return self.battle_0()
 
         if self.config.MAP_CLEAR_ALL_THIS_TIME:
-            # From
-            #     @Config.when(MAP_CLEAR_ALL_THIS_TIME=True)
-            #     def battle_function(self):
+            # 清理 Boss 以外的剩余敌人，再访问被遮挡的地格。
             remain = (
                 self.map.select(is_enemy=True)
                 .add(self.map.select(is_siren=True))

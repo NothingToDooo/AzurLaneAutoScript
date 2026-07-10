@@ -1,7 +1,7 @@
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
-from module.base.decorator import Config, cached_property
+from module.base.decorator import cached_property
 from module.campaign.campaign_ui import CampaignUI
 from module.combat.auto_search_combat import AutoSearchCombat
 from module.exception import CampaignEnd, MapEnemyMoved, ScriptError
@@ -33,8 +33,14 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
         logger.warning("No battle executed.")
         return False
 
-    @Config.when(POOR_MAP_DATA=True, MAP_CLEAR_ALL_THIS_TIME=False)
     def battle_function(self):
+        if self.config.MAP_CLEAR_ALL_THIS_TIME:
+            return self._battle_clear_all()
+        if self.config.POOR_MAP_DATA:
+            return self._battle_with_poor_map_data()
+        return self._battle_by_count()
+
+    def _battle_with_poor_map_data(self):
         logger.info("Using function: battle_with_poor_map_data")
         if self.fleet_2_break_siren_caught():
             return True
@@ -53,9 +59,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
 
         return False
 
-    # Config.when 通过同名函数注册不同配置下的实现。
-    @Config.when(MAP_CLEAR_ALL_THIS_TIME=True)
-    def battle_function(self):  # noqa: F811
+    def _battle_clear_all(self):
         logger.info("Using function: clear_all")
         if self.fleet_2_break_siren_caught():
             return True
@@ -87,18 +91,16 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
         self.clear_mechanism()
         return self.battle_default()
 
-    @Config.when(MAP_CLEAR_ALL_THIS_TIME=False, POOR_MAP_DATA=False)
-    def battle_function(self):  # noqa: F811
-        func = self.FUNCTION_NAME_BASE + "default"
+    def _battle_by_count(self):
+        func_name = self.FUNCTION_NAME_BASE + "default"
         for extra_battle in range(10):
-            if hasattr(self, self.FUNCTION_NAME_BASE + str(self.battle_count - extra_battle)):
-                func = self.FUNCTION_NAME_BASE + str(self.battle_count - extra_battle)
+            candidate = self.FUNCTION_NAME_BASE + str(self.battle_count - extra_battle)
+            if hasattr(self, candidate):
+                func_name = candidate
                 break
 
-        logger.info(f"Using function: {func}")
-        func = self.__getattribute__(func)
-
-        return func()
+        logger.info(f"Using function: {func_name}")
+        return self.__getattribute__(func_name)()
 
     def execute_a_battle(self):
         logger.hr(f"{self.FUNCTION_NAME_BASE}{self.battle_count}", level=2)

@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import numpy as np
+
 from module.shop.base import ShopBase
 
 
@@ -69,6 +71,20 @@ class _FakeShopBase(ShopBase):
     def shop_has_loaded(self, _items, *_args: object, **_kwargs: object) -> bool:
         self.has_loaded_calls.append(list(_items))
         return True
+
+
+def test_shop_grid_is_the_fixed_cn_layout_and_cached() -> None:
+    shop = _FakeShopBase(None)
+
+    grid = shop.shop_grid
+
+    np.testing.assert_array_equal(grid.origin, (265, 238))
+    np.testing.assert_array_equal(grid.delta, (169, 223))
+    np.testing.assert_array_equal(grid.button_shape, (64, 64))
+    np.testing.assert_array_equal(grid.grid_shape, (5, 2))
+    assert grid[0, 0].button == (265, 238, 329, 302)
+    assert grid.name == "SHOP_GRID"
+    assert shop.shop_grid is grid
 
 
 def test_shop_get_items_returns_empty_without_item_grid() -> None:
