@@ -31,8 +31,12 @@ def _make_platform(
     serial: str = "127.0.0.1:16384",
     running: list[str] | None = None,
 ):
-    platform = object.__new__(PlatformBase)
-    platform.serial = serial
+    session = SimpleNamespace(
+        serial=serial,
+        is_mumu_family=True,
+        is_mumu12_family=True,
+    )
+    platform = PlatformBase(session)
     manager = SimpleNamespace(
         all_emulator_instances=instances,
         running=running or [],
@@ -44,7 +48,7 @@ def _make_platform(
         return iter(manager.running)
 
     manager.iter_running_emulator = iter_running_emulator
-    platform.emulator_manager = manager
+    vars(platform)["emulator_manager"] = manager
     return platform
 
 
@@ -60,7 +64,7 @@ def _make_keep_alive_platform(
     def adb_getprop(name: str) -> str:
         return props[name]
 
-    platform.adb_getprop = adb_getprop
+    platform.session.adb_getprop = adb_getprop
     return platform
 
 

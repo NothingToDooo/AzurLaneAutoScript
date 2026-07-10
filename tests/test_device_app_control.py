@@ -1,10 +1,12 @@
+from types import SimpleNamespace
+
 from module.config.server import CN_ACTIVITY, CN_PACKAGE
-from module.device.app_control import AppControl
+from module.device.app_service import AppController
 
 
-class _AppControl(AppControl):
+class _AppControl(AppController):
     def __init__(self, am_results: list[bool], *, monkey_result: bool) -> None:
-        self.package = CN_PACKAGE
+        super().__init__(SimpleNamespace(package=CN_PACKAGE))
         self.am_results = am_results
         self.monkey_result = monkey_result
         self.calls: list[tuple[str, str | None, str | None, bool]] = []

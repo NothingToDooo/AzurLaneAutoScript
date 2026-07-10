@@ -2,9 +2,9 @@ import ctypes
 
 import pytest
 
-from module.device.method import nemu_ipc as nemu_ipc_module
-from module.device.method.nemu_ipc import NemuIpcError, NemuIpcIncompatible
+from module.device import nemu_ipc_service as nemu_ipc_module
 from module.device.method.pool import JobTimeout
+from module.device.nemu_ipc_service import NemuIpcError, NemuIpcIncompatible
 from module.exception import RequestHumanTakeover
 
 

@@ -1,7 +1,7 @@
 import time
 from collections import deque
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import cv2
 from PIL import Image
@@ -9,16 +9,23 @@ from PIL import Image
 from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.base.utils import get_color, image_size, limit_in, save_image
-from module.device.method.nemu_ipc import NemuIpc
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import numpy as np
 
 
-class Screenshot(NemuIpc):
+class Screenshot:
     image: np.ndarray
+    app_is_running: Callable[[], bool]
+    capture: Any
+    config: Any
+    get_orientation: Callable[[], object]
+    orientation: int
+    serial: str
 
     def __init__(self, *args, **kwargs):
         self._screen_size_checked = False
@@ -35,7 +42,7 @@ class Screenshot(NemuIpc):
         self._screenshot_interval.reset()
 
         for _ in range(2):
-            self.image = self.screenshot_nemu_ipc()
+            self.image = self.capture.screenshot()
 
             self.image = self._handle_orientated_image(self.image)
 
@@ -161,8 +168,7 @@ class Screenshot(NemuIpc):
                     logger.info("Unable to handle orientated screenshot, continue for now")
                     return True
                 continue
-            app_is_running = getattr(self, "app_is_running", None)
-            if callable(app_is_running) and not app_is_running():
+            if not self.app_is_running():
                 logger.warning("Received orientated screenshot, game not running")
                 return True
             logger.critical(f"Resolution not supported: {width}x{height}")

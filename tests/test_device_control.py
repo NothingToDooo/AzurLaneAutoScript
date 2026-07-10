@@ -2,8 +2,6 @@ from module.device import control as control_module
 from module.device.control import Control
 from module.device.control_options import SwipeVectorOptions
 from module.device.device import Device
-from module.device.method.minitouch import Minitouch
-from module.device.method.nemu_ipc import NemuIpc
 
 
 class _Control(Control):
@@ -14,19 +12,19 @@ class _Control(Control):
         self.swipes.append((p1, p2, duration, name, distance_check))
 
 
-def test_control_stack_uses_minitouch_without_nemu_ipc() -> None:
-    assert Control.__bases__ == (Minitouch,)
-    assert NemuIpc not in Control.__mro__
+def test_control_uses_explicit_controller_without_device_service_bases() -> None:
+    assert Control.__bases__ == (object,)
 
 
 def test_release_during_wait_releases_nemu_ipc() -> None:
     calls: list[str] = []
     device = object.__new__(Device)
 
-    def release() -> None:
-        calls.append("released")
-
-    device.nemu_ipc_release = release
+    vars(device)["_runtime"] = type(
+        "_Runtime",
+        (),
+        {"capture": type("_Capture", (), {"release": lambda _capture: calls.append("released")})()},
+    )()
 
     device.release_during_wait()
 

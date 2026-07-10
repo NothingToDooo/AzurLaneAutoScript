@@ -12,6 +12,7 @@ def _device_context(
 ):
     device = object.__new__(Device)
     device.config = SimpleNamespace()
+    vars(device)["_runtime"] = SimpleNamespace(mumu_runtime=SimpleNamespace())
     device.emulator_instance = None if emulator_type is None else SimpleNamespace(type=emulator_type)
     return device
 

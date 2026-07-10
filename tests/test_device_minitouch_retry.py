@@ -3,8 +3,8 @@ from types import SimpleNamespace
 import pytest
 from adbutils.errors import AdbError
 
-from module.device.method import minitouch as minitouch_module
-from module.device.method.minitouch import Minitouch, MinitouchNotInstalledError, MinitouchOccupiedError
+from module.device import minitouch_service as minitouch_module
+from module.device.minitouch_service import MinitouchController, MinitouchNotInstalledError, MinitouchOccupiedError
 from module.exception import RequestHumanTakeover
 
 
@@ -24,6 +24,7 @@ class _Minitouch:
     def __init__(self) -> None:
         self.calls: list[str] = []
         self.run_count = 0
+        self.session = self
 
     def adb_reconnect(self) -> None:
         self.calls.append("adb_reconnect")
@@ -155,7 +156,7 @@ def test_minitouch_retry_hands_over_when_minitouch_missing(monkeypatch) -> None:
 
 
 def test_minitouch_release_resource_clears_cached_builder() -> None:
-    device = object.__new__(Minitouch)
+    device = MinitouchController(SimpleNamespace())
     device.__dict__["_minitouch_builder"] = object()
 
     device.release_resource()
@@ -166,28 +167,23 @@ def test_minitouch_release_resource_clears_cached_builder() -> None:
 def test_minitouch_rebind_excludes_old_pid_from_new_device_restart() -> None:
     old_serial = "127.0.0.1:16384"
     new_serial = "127.0.0.1:16385"
-    device = object.__new__(Minitouch)
-    device.serial = old_serial
-    device.config = SimpleNamespace(Emulator_Serial=old_serial)
-    device.__dict__.update(
-        _minitouch_port=0,
-        _minitouch_client=None,
-        _minitouch_stream=None,
-        _minitouch_pid="4312",
-    )
+    session = SimpleNamespace(serial=old_serial, config=SimpleNamespace(Emulator_Serial=old_serial))
+    device = MinitouchController(session)
+    vars(device)["_minitouch_pid"] = "4312"
     adb_calls: list[tuple[str, object]] = []
 
     def adb_shell(command, **_kwargs):
-        adb_calls.append((device.serial, command))
+        adb_calls.append((session.serial, command))
         if isinstance(command, str):
             return "u0_a123 9821 1 S minitouch"
         return ""
 
-    device.__dict__["adb_shell"] = adb_shell
+    session.adb_shell = adb_shell
     device.__dict__["_start_minitouch_service"] = lambda: None
 
-    device.bind_serial(new_serial)
-    restart_minitouch_service = vars(Minitouch)["_restart_minitouch_service"]
+    device.release()
+    session.serial = new_serial
+    restart_minitouch_service = vars(MinitouchController)["_restart_minitouch_service"]
     restart_minitouch_service(device)
 
     killed_pids = {command[1] for _, command in adb_calls if isinstance(command, list) and command[:1] == ["kill"]}

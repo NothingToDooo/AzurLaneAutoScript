@@ -5,6 +5,7 @@ import pytest
 from module.device import connection_attr as connection_attr_module
 from module.device.connection_attr import ConnectionAttr
 from module.device.device import Device
+from module.device.runtime import DeviceRuntime
 from module.exception import RequestHumanTakeover
 
 
@@ -27,14 +28,15 @@ class _NemuIpc:
 
 
 class _MinitouchInitThread:
-    def __init__(self, connection: Device, builder: object):
+    def __init__(self, connection: Device, controller, builder: object):
         self.connection = connection
+        self.controller = controller
         self.builder = builder
         self.joined_at: list[str] = []
 
     def join(self) -> None:
         self.joined_at.append(self.connection.serial)
-        self.connection.__dict__["_minitouch_builder"] = self.builder
+        self.controller.__dict__["_minitouch_builder"] = self.builder
 
 
 def _make_attr(serial: str):
@@ -48,6 +50,7 @@ def _make_connection(serial: str) -> Device:
     connection = object.__new__(Device)
     connection.config = SimpleNamespace(Emulator_Serial=serial)
     connection.serial = serial
+    vars(connection)["_runtime"] = DeviceRuntime.create(connection)
     return connection
 
 
@@ -57,14 +60,15 @@ def _prime_serial_bound_state(connection: Device):
     nemu_ipc = _NemuIpc(connection)
     forward_removals: list[tuple[str, str]] = []
 
-    connection.__dict__.update(
-        nemu_ipc=nemu_ipc,
+    controller = connection.controller
+    controller.__dict__.update(
         _minitouch_port=23456,
         _minitouch_client=client,
         _minitouch_stream=stream,
         _minitouch_pid="4312",
         _minitouch_builder=object(),
     )
+    connection.capture.__dict__["nemu_ipc"] = nemu_ipc
     connection.__dict__["adb_forward_remove"] = lambda local: forward_removals.append((local, connection.serial))
     return SimpleNamespace(
         client=client,
@@ -75,12 +79,13 @@ def _prime_serial_bound_state(connection: Device):
 
 
 def _assert_serial_bound_state_released(connection: Device, state, *, old_serial: str) -> None:
-    assert connection.__dict__["_minitouch_port"] == 0
-    assert connection.__dict__["_minitouch_client"] is None
-    assert connection.__dict__["_minitouch_stream"] is None
-    assert connection.__dict__["_minitouch_pid"] == ""
-    assert "_minitouch_builder" not in connection.__dict__
-    assert "nemu_ipc" not in connection.__dict__
+    controller = connection.controller
+    assert vars(controller)["_minitouch_port"] == 0
+    assert vars(controller)["_minitouch_client"] is None
+    assert vars(controller)["_minitouch_stream"] is None
+    assert vars(controller)["_minitouch_pid"] == ""
+    assert "_minitouch_builder" not in controller.__dict__
+    assert "nemu_ipc" not in connection.capture.__dict__
     assert state.client.closed_at == [old_serial]
     assert state.stream.closed_at == [old_serial]
     assert state.nemu_ipc.disconnected_at == [old_serial]
@@ -143,7 +148,7 @@ def test_bind_serial_recomputes_each_layer_from_new_serial(monkeypatch) -> None:
     monkeypatch.setattr(connection_attr_module, "is_mumu12_serial", is_mumu12_serial)
     connection.__dict__["adb_client"] = object()
     connection.__dict__["adb_getprop"] = lambda name: properties[connection.serial][name]
-    connection.__dict__["find_emulator_instance"] = lambda serial: SimpleNamespace(serial=serial)
+    connection.mumu_runtime.__dict__["find_emulator_instance"] = lambda serial: SimpleNamespace(serial=serial)
 
     old_adb = connection.adb
     assert connection.port == 16384
@@ -196,16 +201,16 @@ def test_bind_serial_joins_old_minitouch_initialization_before_releasing_builder
     old_serial = "127.0.0.1:16384"
     connection = _make_connection(old_serial)
     state = _prime_serial_bound_state(connection)
-    connection.__dict__.pop("_minitouch_builder")
+    connection.controller.__dict__.pop("_minitouch_builder")
     old_builder = object()
-    init_thread = _MinitouchInitThread(connection, old_builder)
-    connection.__dict__["_minitouch_init_thread"] = init_thread
+    init_thread = _MinitouchInitThread(connection, connection.controller, old_builder)
+    vars(connection.controller)["_minitouch_init_thread"] = init_thread
 
     connection.bind_serial("127.0.0.1:16385")
 
     assert init_thread.joined_at == [old_serial]
-    assert connection.__dict__["_minitouch_init_thread"] is None
-    assert "_minitouch_builder" not in connection.__dict__
+    assert vars(connection.controller)["_minitouch_init_thread"] is None
+    assert "_minitouch_builder" not in connection.controller.__dict__
     _assert_serial_bound_state_released(connection, state, old_serial=old_serial)
 
 

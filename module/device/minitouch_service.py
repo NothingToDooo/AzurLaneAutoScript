@@ -1,0 +1,627 @@
+import socket
+import threading
+import time
+from dataclasses import dataclass
+from functools import wraps
+
+import numpy as np
+from adbutils.errors import AdbError
+
+from module.base.decorator import cached_property, del_cached_property, has_cached_property
+from module.base.runtime_random import runtime_random
+from module.base.timer import Timer
+from module.base.utils import random_rectangle_point
+from module.device.method.utils import RETRY_TRIES, handle_adb_error, handle_unknown_host_service, retry_sleep
+from module.exception import RequestHumanTakeover, ScriptError
+from module.logger import logger
+
+
+def random_normal_distribution(a, b, n=5):
+    return np.mean(runtime_random.uniform(a, b, size=n))
+
+
+def random_theta():
+    theta = runtime_random.uniform(0, 2 * np.pi)
+    return np.array([np.sin(theta), np.cos(theta)])
+
+
+def random_rho(dis):
+    return random_normal_distribution(-dis, dis)
+
+
+def insert_swipe(p0, p3, speed=15, min_distance=10):
+    """
+    在起点和终点之间插入路径点。
+
+    先生成一条三阶贝塞尔曲线。
+
+    Args:
+        p0：起点。
+        p3：终点。
+        speed：平均移动速度，单位为每 10ms 的像素数。
+        min_distance:
+
+    Returns:
+        list[list[int]]：路径点列表。
+
+    示例：
+        > insert_swipe((400, 400), (600, 600), speed=20)
+        [[400, 400], [406, 406], [416, 415], [429, 428], [444, 442], [462, 459], [481, 478], [504, 500], [527, 522],
+        [545, 540], [560, 557], [573, 570], [584, 582], [592, 590], [597, 596], [600, 600]]
+    """
+    p0 = np.array(p0)
+    p3 = np.array(p3)
+
+    # 在贝塞尔曲线上随机控制点。
+    distance = np.linalg.norm(p3 - p0)
+    p1 = 2 / 3 * p0 + 1 / 3 * p3 + random_theta() * random_rho(distance * 0.1)
+    p2 = 1 / 3 * p0 + 2 / 3 * p3 + random_theta() * random_rho(distance * 0.1)
+
+    # 在贝塞尔曲线上随机采样 t，中段稀疏，起终点密集。
+    segments = max(int(distance / speed) + 1, 5)
+    lower = random_normal_distribution(-85, -60)
+    upper = random_normal_distribution(80, 90)
+    theta = np.arange(lower + 0.0, upper + 0.0001, (upper - lower) / segments)
+    ts = np.sin(theta / 180 * np.pi)
+    ts = np.sign(ts) * abs(ts) ** 0.9
+    ts = (ts - min(ts)) / (max(ts) - min(ts))
+
+    # 生成三阶贝塞尔曲线。
+    points = []
+    prev = (-100, -100)
+    for t in ts:
+        point = p0 * (1 - t) ** 3 + 3 * p1 * t * (1 - t) ** 2 + 3 * p2 * t**2 * (1 - t) + p3 * t**3
+        point = point.astype(int).tolist()
+        if np.linalg.norm(np.subtract(point, prev)) < min_distance:
+            continue
+
+        points.append(point)
+        prev = point
+
+    # 删除过近的路径点。
+    if len(points[1:]):
+        distance = np.linalg.norm(np.subtract(points[1:], points[0]), axis=1)
+        mask = np.append(True, distance > min_distance)
+        points = np.array(points)[mask].tolist()
+        if len(points) <= 1:
+            points = [p0, p3]
+    else:
+        points = [p0, p3]
+
+    return points
+
+
+@dataclass(slots=True)
+class Command:
+    """
+    参考 https://github.com/openstf/minitouch#writable-to-the-socket。
+    """
+
+    operation: str
+    contact: int = 0
+    position: tuple[int, int] = (0, 0)
+    ms: int = 10
+    pressure: int = 100
+
+    def to_minitouch(self) -> str:
+        """
+        写入 minitouch socket 的协议字符串。
+        """
+        if self.operation in {"c", "r"}:
+            return f"{self.operation}\n"
+        if self.operation in {"d", "m"}:
+            x, y = self.position
+            return f"{self.operation} {self.contact} {x} {y} {self.pressure}\n"
+        if self.operation == "u":
+            return f"{self.operation} {self.contact}\n"
+        if self.operation == "w":
+            return f"{self.operation} {self.ms}\n"
+        return ""
+
+
+class CommandBuilder:
+    """构建 minitouch 命令字符串。
+
+    可用它按需构造自定义动作：
+
+        with safe_connection(_DEVICE_ID) as connection:
+            builder = CommandBuilder()
+            builder.down(0, 400, 400, 50)
+            builder.commit()
+            builder.move(0, 500, 500, 50)
+            builder.commit()
+            builder.move(0, 800, 400, 50)
+            builder.commit()
+            builder.up(0)
+            builder.commit()
+            builder.publish(connection)
+
+    """
+
+    DEFAULT_DELAY = 0.05
+    max_x = 1280
+    max_y = 720
+
+    def __init__(
+        self,
+        controller,
+        contact=0,
+        handle_orientation=True,
+    ):
+        """
+        Args:
+            controller：持有 minitouch 状态的控制服务。
+        """
+        self.controller = controller
+        self.commands = []
+        self.delay = 0
+        self.contact = contact
+        self.handle_orientation = handle_orientation
+
+    @property
+    def orientation(self):
+        if self.handle_orientation:
+            return self.controller.orientation
+        return 0
+
+    def convert(self, x, y):
+        max_x, max_y = self.controller.max_x, self.controller.max_y
+        orientation = self.orientation
+
+        if orientation == 0:
+            pass
+        elif orientation == 1:
+            x, y = 720 - y, x
+            max_x, max_y = max_y, max_x
+        elif orientation == 2:
+            x, y = 1280 - x, 720 - y
+        elif orientation == 3:
+            x, y = y, 1280 - x
+            max_x, max_y = max_y, max_x
+        else:
+            message = f"Invalid device orientation: {orientation}"
+            raise ScriptError(message)
+
+        self.max_x, self.max_y = max_x, max_y
+        # minitouch 的最大坐标可能和显示分辨率不同，需要按真实范围缩放。
+        x, y = int(x / 1280 * max_x), int(y / 720 * max_y)
+        return x, y
+
+    def commit(self):
+        r"""添加 minitouch 命令：'c\n'。"""
+        self.commands.append(Command("c"))
+        return self
+
+    def reset(self):
+        r"""添加 minitouch 命令：'r\n'。"""
+        self.commands.append(Command("r"))
+        return self
+
+    def wait(self, ms=10):
+        r"""添加 minitouch 命令：'w <ms>\n'。"""
+        self.commands.append(Command("w", ms=ms))
+        self.delay += ms
+        return self
+
+    def up(self):
+        r"""添加 minitouch 命令：'u <contact>\n'。"""
+        self.commands.append(Command("u", contact=self.contact))
+        return self
+
+    def down(self, x, y, pressure=100):
+        r"""添加 minitouch 命令：'d <contact> <x> <y> <pressure>\n'。"""
+        x, y = self.convert(x, y)
+        self.commands.append(Command("d", contact=self.contact, position=(x, y), pressure=pressure))
+        return self
+
+    def move(self, x, y, pressure=100):
+        r"""添加 minitouch 命令：'m <contact> <x> <y> <pressure>\n'。"""
+        x, y = self.convert(x, y)
+        self.commands.append(Command("m", contact=self.contact, position=(x, y), pressure=pressure))
+        return self
+
+    def clear(self):
+        """清空当前命令。"""
+        self.commands = []
+        self.delay = 0
+        return self
+
+    def to_minitouch(self) -> str:
+        out = "".join([command.to_minitouch() for command in self.commands])
+        self._check_empty(out)
+        return out
+
+    def send(self):
+        return self.controller.minitouch_send(builder=self)
+
+    def _check_empty(self, text=None):
+        """
+        有效命令列表必须包含实际操作，不能只有 commit。
+
+        Returns:
+            bool：命令是否为空。
+        """
+        empty = True
+        for command in self.commands:
+            if command.operation not in ["c", "w", "s"]:
+                empty = False
+                break
+        if empty:
+            logger.warning(f"Command list empty, sending it may cause unexpected behaviour: {text}")
+        return empty
+
+
+class MinitouchNotInstalledError(Exception):
+    pass
+
+
+class MinitouchOccupiedError(Exception):
+    pass
+
+
+MINITOUCH_OCCUPIED_MESSAGE = (
+    "Timeout when connecting to minitouch, probably because another connection has been established"
+)
+MINITOUCH_EMPTY_DATA_MESSAGE = "Received empty data from minitouch, probably because minitouch is not installed"
+
+
+def _reset_minitouch_after_adb_reconnect(self):
+    self.session.adb_reconnect()
+    self._reset_minitouch_connection()
+
+
+def _restart_adb_server_and_reset_minitouch(self):
+    self.session.adb_start_server()
+    self.session.adb_reconnect()
+    self._reset_minitouch_connection()
+
+
+def _restart_minitouch_service_and_reset(self):
+    self._restart_minitouch_service()
+    self._reset_minitouch_connection()
+
+
+def _reset_minitouch_without_forward(self):
+    self._reset_minitouch_connection(remove_forward=False)
+
+
+def _minitouch_adb_error_recovery(self, error):
+    if handle_adb_error(error):
+        return lambda: _reset_minitouch_after_adb_reconnect(self)
+    if handle_unknown_host_service(error):
+        return lambda: _restart_adb_server_and_reset_minitouch(self)
+    return None
+
+
+def _minitouch_error_recovery(self, error):
+    if isinstance(error, (ConnectionResetError, ConnectionAbortedError)):
+        logger.error(error)
+        return lambda: _reset_minitouch_after_adb_reconnect(self)
+    if isinstance(error, MinitouchNotInstalledError):
+        logger.critical(error)
+        raise RequestHumanTakeover from error
+    if isinstance(error, MinitouchOccupiedError):
+        logger.error(error)
+        return lambda: _restart_minitouch_service_and_reset(self)
+    if isinstance(error, AdbError):
+        return _minitouch_adb_error_recovery(self, error)
+    if isinstance(error, BrokenPipeError):
+        logger.error(error)
+        return lambda: _reset_minitouch_without_forward(self)
+    if isinstance(error, OSError):
+        logger.error(error)
+        return self._reset_minitouch_connection
+    return None
+
+
+def retry(func):
+    @wraps(func)
+    def retry_wrapper(self, *args, **kwargs):
+        """
+        Args:
+            self (Minitouch):
+        """
+        recovery = None
+        for _ in range(RETRY_TRIES):
+            try:
+                if callable(recovery):
+                    time.sleep(retry_sleep(_))
+                    recovery()
+                return func(self, *args, **kwargs)
+            # 无法自动处理。
+            except RequestHumanTakeover:
+                break
+            except (AdbError, MinitouchNotInstalledError, MinitouchOccupiedError, OSError) as e:
+                recovery = _minitouch_error_recovery(self, e)
+                if recovery is None:
+                    break
+
+        logger.critical(f"Retry {func.__name__}() failed")
+        raise RequestHumanTakeover
+
+    return retry_wrapper
+
+
+class MinitouchController:
+    """持有 minitouch 连接、转发、线程与命令构建器。"""
+
+    def __init__(self, session) -> None:
+        self.session = session
+        self._minitouch_port = 0
+        self._minitouch_client: socket.socket | None = None
+        self._minitouch_pid = ""
+        self._minitouch_stream = None
+        self.max_x = 1280
+        self.max_y = 720
+        self._minitouch_init_thread: threading.Thread | None = None
+
+    @property
+    def config(self):
+        return self.session.config
+
+    @property
+    def orientation(self):
+        return self.session.orientation
+
+    def release(self) -> None:
+        """在旧 serial 仍有效时按依赖顺序释放控制资源。"""
+        first_error: Exception | None = None
+        init_thread = self._minitouch_init_thread
+        if init_thread is not None and init_thread is not threading.current_thread():
+            try:
+                init_thread.join()
+            except Exception as error:  # noqa: BLE001
+                first_error = error
+        self._minitouch_init_thread = None
+        self._close_minitouch_client()
+        if self._minitouch_port:
+            try:
+                self.session.adb_forward_remove(f"tcp:{self._minitouch_port}")
+            except Exception as error:  # noqa: BLE001
+                if first_error is None:
+                    first_error = error
+            finally:
+                self._minitouch_port = 0
+        self._close_minitouch_stream()
+        self._minitouch_pid = ""
+        del_cached_property(self, "_minitouch_builder")
+        if first_error is not None:
+            raise first_error
+
+    def release_resource(self) -> None:
+        self.release()
+
+    def _close_minitouch_client(self):
+        client = self._minitouch_client
+        if client is None:
+            return
+        try:
+            client.close()
+        except OSError as e:
+            logger.error(e)
+        self._minitouch_client = None
+
+    def _close_minitouch_stream(self):
+        stream = self._minitouch_stream
+        if stream is None:
+            return
+        close = getattr(stream, "close", None)
+        if callable(close):
+            try:
+                close()
+            except OSError as e:
+                logger.error(e)
+        self._minitouch_stream = None
+
+    def _reset_minitouch_connection(self, remove_forward=True):
+        self._close_minitouch_client()
+        if remove_forward and self._minitouch_port:
+            self.session.adb_forward_remove(f"tcp:{self._minitouch_port}")
+            self._minitouch_port = 0
+        self._minitouch_pid = ""
+        del_cached_property(self, "_minitouch_builder")
+
+    def _ensure_minitouch_executable(self):
+        path = self.config.MINITOUCH_FILEPATH_REMOTE
+        self.session.adb_shell(["chmod", "755", path])
+        state = self.session.adb_shell(f"if [ -x {path} ]; then echo ok; else echo missing; fi").strip()
+        if state == "ok":
+            return
+        message = f"未找到可执行的 minitouch：{path}。请先把 MuMu 当前 ABI 对应的 minitouch 推送到这个路径。"
+        raise MinitouchNotInstalledError(message)
+
+    def _start_minitouch_service(self):
+        if self._minitouch_stream is not None:
+            return
+        path = self.config.MINITOUCH_FILEPATH_REMOTE
+        self._ensure_minitouch_executable()
+        logger.info(f"Start minitouch: {path}")
+        self._minitouch_stream = self.session.adb_shell([path], stream=True, recvall=False)
+
+    def _find_minitouch_pids(self) -> set[str]:
+        pids = {self._minitouch_pid} if self._minitouch_pid else set()
+        output = self.session.adb_shell("(ps -A; ps) 2>/dev/null | grep '[m]initouch'", timeout=5)
+        for line in output.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[1].isdigit():
+                pids.add(parts[1])
+        return pids
+
+    def _restart_minitouch_service(self):
+        logger.info("Restart minitouch")
+        self._close_minitouch_client()
+        self._close_minitouch_stream()
+        for pid in self._find_minitouch_pids():
+            logger.info(f"Kill minitouch pid: {pid}")
+            self.session.adb_shell(["kill", pid])
+        self._minitouch_pid = ""
+        self._start_minitouch_service()
+
+    @cached_property
+    @retry
+    def _minitouch_builder(self):
+        self.minitouch_init()
+        return CommandBuilder(self)
+
+    @property
+    def minitouch_builder(self):
+        # 等待初始化线程结束。
+        if self._minitouch_init_thread is not None:
+            if self._minitouch_init_thread is not threading.current_thread():
+                self._minitouch_init_thread.join()
+            self._minitouch_init_thread = None
+
+        return self._minitouch_builder
+
+    def early_minitouch_init(self):
+        """
+        Alas 开始截图时提前开线程初始化 minitouch 连接。
+
+        这样可以让第一次点击快约 0.05 秒。
+        """
+        if has_cached_property(self, "_minitouch_builder"):
+            return
+
+        def early_minitouch_init_func():
+            _ = self._minitouch_builder
+
+        thread = threading.Thread(target=early_minitouch_init_func, daemon=True)
+        self._minitouch_init_thread = thread
+        thread.start()
+
+    def early_init(self) -> None:
+        self.early_minitouch_init()
+
+    def minitouch_init(self):
+        logger.hr("MiniTouch init")
+        max_x, max_y = 1280, 720
+        max_contacts = 2
+        max_pressure = 50
+
+        # 尝试关闭已有连接。
+        self._close_minitouch_client()
+
+        self.session.get_orientation()
+
+        self._start_minitouch_service()
+        self._minitouch_port = self.session.adb_forward("localabstract:minitouch")
+
+        retry_timeout = Timer(2).start()
+        while 1:
+            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client.settimeout(1)
+            client.connect(("127.0.0.1", self._minitouch_port))
+            self._minitouch_client = client
+
+            # 读取 minitouch server 信息。
+            socket_out = client.makefile()
+
+            # v <version>
+            # 协议版本，通常是 1，这里不用。
+            try:
+                out = socket_out.readline().replace("\n", "").replace("\r", "")
+            except TimeoutError as e:
+                client.close()
+                raise MinitouchOccupiedError(MINITOUCH_OCCUPIED_MESSAGE) from e
+            logger.info(out)
+
+            # ^ <max-contacts> <max-x> <max-y> <max-pressure>
+            out = socket_out.readline().replace("\n", "").replace("\r", "")
+            logger.info(out)
+            try:
+                _, max_contacts, max_x, max_y, max_pressure, *_ = out.split(" ")
+                break
+            except ValueError as e:
+                client.close()
+                if retry_timeout.reached():
+                    raise MinitouchNotInstalledError(MINITOUCH_EMPTY_DATA_MESSAGE) from e
+                # minitouch 可能还没启动完成。
+                self.session.sleep(1)
+                continue
+
+        self.max_x = int(max_x)
+        self.max_y = int(max_y)
+
+        # $ <pid>
+        out = socket_out.readline().replace("\n", "").replace("\r", "")
+        logger.info(out)
+        _, pid = out.split(" ")
+        self._minitouch_pid = pid
+
+        logger.info(f"minitouch running on port: {self._minitouch_port}, pid: {self._minitouch_pid}")
+        logger.info(f"max_contact: {max_contacts}; max_x: {max_x}; max_y: {max_y}; max_pressure: {max_pressure}")
+
+    def minitouch_send(self, builder: CommandBuilder):
+        content = builder.to_minitouch()
+        byte_content = content.encode("utf-8")
+        client = self._minitouch_client
+        if client is None:
+            logger.critical("minitouch socket is not connected")
+            raise RequestHumanTakeover
+        client.sendall(byte_content)
+        client.recv(0)
+        time.sleep(builder.delay / 1000 + builder.DEFAULT_DELAY)
+        builder.clear()
+
+    @retry
+    def click_minitouch(self, x, y):
+        builder = self.minitouch_builder
+        builder.down(x, y).commit()
+        builder.up().commit()
+        builder.send()
+
+    def click(self, x, y):
+        return self.click_minitouch(x, y)
+
+    @retry
+    def long_click_minitouch(self, x, y, duration=1.0):
+        duration = int(duration * 1000)
+        builder = self.minitouch_builder
+        builder.down(x, y).commit().wait(duration)
+        builder.up().commit()
+        builder.send()
+
+    def long_click(self, x, y, duration=1.0):
+        return self.long_click_minitouch(x, y, duration)
+
+    @retry
+    def swipe_minitouch(self, p1, p2):
+        points = insert_swipe(p0=p1, p3=p2)
+        builder = self.minitouch_builder
+
+        builder.down(*points[0]).commit().wait(10)
+        builder.send()
+
+        for point in points[1:]:
+            builder.move(*point).commit().wait(10)
+        builder.send()
+
+        builder.up().commit()
+        builder.send()
+
+    def swipe(self, p1, p2):
+        return self.swipe_minitouch(p1, p2)
+
+    @retry
+    def drag_minitouch(self, p1, p2, point_random=(-10, -10, 10, 10)):
+        p1 = np.array(p1) - random_rectangle_point(point_random)
+        p2 = np.array(p2) - random_rectangle_point(point_random)
+        points = insert_swipe(p0=p1, p3=p2, speed=20)
+        builder = self.minitouch_builder
+
+        builder.down(*points[0]).commit().wait(10)
+        builder.send()
+
+        for point in points[1:]:
+            builder.move(*point).commit().wait(10)
+        builder.send()
+
+        builder.move(*p2).commit().wait(140)
+        builder.move(*p2).commit().wait(140)
+        builder.send()
+
+        builder.up().commit()
+        builder.send()
+
+    def drag(self, p1, p2, point_random=(-10, -10, 10, 10)):
+        return self.drag_minitouch(p1, p2, point_random=point_random)

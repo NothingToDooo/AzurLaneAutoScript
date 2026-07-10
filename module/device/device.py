@@ -6,9 +6,10 @@ from typing import ClassVar
 
 from module.base.timer import Timer
 from module.config.utils import get_server_next_update
-from module.device.app_control import AppControl
+from module.device.connection import Connection
 from module.device.control import Control
 from module.device.platform.emulator_base import EmulatorBase
+from module.device.runtime import DeviceRuntime
 from module.device.screenshot import Screenshot
 from module.exception import (
     EmulatorNotRunningError,
@@ -59,7 +60,7 @@ def show_function_call():
     logger.info("Function calls:" + "".join(func_list))
 
 
-class Device(Screenshot, Control, AppControl):
+class Device(Screenshot, Control, Connection):
     stuck_long_wait_list: ClassVar[tuple[str, ...]] = ("BATTLE_STATUS_S", "PAUSE", "LOGIN_CHECK")
 
     def __init__(self, *args, **kwargs):
@@ -68,6 +69,7 @@ class Device(Screenshot, Control, AppControl):
         self.stuck_detection_enabled = True
         self.stuck_timer = Timer(60, count=60).start()
         self.stuck_timer_long = Timer(180, count=180).start()
+        self._runtime = DeviceRuntime.create(self)
 
         for trial in range(4):
             try:
@@ -92,6 +94,80 @@ class Device(Screenshot, Control, AppControl):
         # 提前初始化 minitouch，避免第一次点击时才启动服务。
         if self.config.is_actual_task:
             self.early_minitouch_init()
+
+    @property
+    def runtime(self) -> DeviceRuntime:
+        return self._runtime
+
+    @property
+    def mumu_runtime(self):
+        return self.runtime.mumu_runtime
+
+    @property
+    def capture(self):
+        return self.runtime.capture
+
+    @property
+    def controller(self):
+        return self.runtime.controller
+
+    @property
+    def app_controller(self):
+        return self.runtime.app_controller
+
+    @property
+    def emulator_manager(self):
+        return self.mumu_runtime.emulator_manager
+
+    @property
+    def emulator_instance(self):
+        return self.mumu_runtime.emulator_instance
+
+    @emulator_instance.setter
+    def emulator_instance(self, value) -> None:
+        self.mumu_runtime.__dict__["emulator_instance"] = value
+
+    def find_emulator_instance(self, serial: str):
+        return self.mumu_runtime.find_emulator_instance(serial)
+
+    def emulator_start(self):
+        return self.mumu_runtime.emulator_start()
+
+    def emulator_stop(self):
+        return self.mumu_runtime.emulator_stop()
+
+    def emulator_start_watch(self):
+        return self.mumu_runtime.emulator_start_watch()
+
+    def check_mumu_app_keep_alive(self):
+        return self.mumu_runtime.check_mumu_app_keep_alive()
+
+    def check_mumu_bridge_network(self):
+        return self.mumu_runtime.check_mumu_bridge_network()
+
+    def _check_after_connected(self) -> None:
+        self.mumu_runtime.check_after_connected()
+
+    def _diagnose_adb_connect_refused(self) -> None:
+        self.mumu_runtime.diagnose_adb_connect_refused()
+
+    def screenshot_nemu_ipc(self):
+        return self.capture.screenshot()
+
+    def nemu_ipc_release(self) -> None:
+        self.capture.release()
+
+    def app_current(self) -> str:
+        return self.app_controller.current()
+
+    def app_is_running(self) -> bool:
+        return self.app_controller.is_running()
+
+    def _app_start_service(self):
+        return self.app_controller.start()
+
+    def _app_stop_service(self):
+        return self.app_controller.stop()
 
     def method_check(self):
         """
@@ -139,7 +215,7 @@ class Device(Screenshot, Control, AppControl):
         return self.image
 
     def release_during_wait(self):
-        self.nemu_ipc_release()
+        self.capture.release()
 
     def get_orientation(self):
         """
@@ -257,15 +333,17 @@ class Device(Screenshot, Control, AppControl):
             logger.critical("No app stop/start, because HandleError disabled")
             logger.critical("Please enable Alas.Error.HandleError or manually login to AzurLane")
             raise RequestHumanTakeover
-        super().app_start()
+        result = self._app_start_service()
         self.stuck_record_clear()
         self.click_record_clear()
+        return result
 
     def app_stop(self):
         if not self.config.Error_HandleError:
             logger.critical("No app stop/start, because HandleError disabled")
             logger.critical("Please enable Alas.Error.HandleError or manually login to AzurLane")
             raise RequestHumanTakeover
-        super().app_stop()
+        result = self._app_stop_service()
         self.stuck_record_clear()
         self.click_record_clear()
+        return result

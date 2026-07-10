@@ -1,5 +1,3 @@
-from threading import current_thread
-
 from module.base.decorator import del_cached_property
 from module.device.adb_session import AdbDeviceWithStatus, retry
 from module.device.mumu_connection import MumuTcpConnection
@@ -33,35 +31,26 @@ class Connection(MumuTcpConnection):
 
     def release_resource(self):
         """释放当前 serial 关联的截图与控制资源。"""
-        init_thread = getattr(self, "_minitouch_init_thread", None)
-        if init_thread is not None and init_thread is not current_thread():
-            init_thread.join()
-            self._minitouch_init_thread = None
-
-        reset_minitouch = getattr(self, "_reset_minitouch_connection", None)
-        if callable(reset_minitouch):
-            reset_minitouch()
-
-        release_nemu_ipc = getattr(self, "nemu_ipc_release", None)
-        if callable(release_nemu_ipc):
-            release_nemu_ipc()
+        runtime = self.__dict__.get("_runtime")
+        if runtime is not None:
+            runtime.release_serial()
 
     def adb_disconnect(self):
+        self.release_resource()
         msg = self.adb_client.disconnect(self.serial)
         if msg:
             logger.info(msg)
-        self.release_resource()
 
     def adb_restart(self):
         """
         重启 ADB client。
         """
         logger.info("Restart adb")
+        self.release_resource()
         # 杀掉当前 client。
         self.adb_client.server_kill()
         # 重新初始化 ADB client。
         del_cached_property(self, "adb_client")
-        self.release_resource()
         _ = self.adb_client
 
     def adb_reconnect(self):

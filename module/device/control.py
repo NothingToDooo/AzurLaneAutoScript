@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, Any
+
 import numpy as np
 
 from module.base.timer import Timer
@@ -10,14 +12,40 @@ from module.base.utils import (
     random_rectangle_vector_opted,
 )
 from module.device.control_options import SwipeVectorOptions
-from module.device.method.minitouch import Minitouch
 from module.logger import logger
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
-class Control(Minitouch):
+    from module.device.minitouch_service import MinitouchController
+
+
+class Control:
+    controller: MinitouchController
+    sleep: Callable[[Any], None]
+
     def handle_control_check(self, button):
         # Device 会覆盖这个检查入口。
         pass
+
+    @property
+    def minitouch_builder(self):
+        return self.controller.minitouch_builder
+
+    def early_minitouch_init(self):
+        return self.controller.early_init()
+
+    def click_minitouch(self, x, y):
+        return self.controller.click(x, y)
+
+    def long_click_minitouch(self, x, y, duration=1.0):
+        return self.controller.long_click(x, y, duration)
+
+    def swipe_minitouch(self, p1, p2):
+        return self.controller.swipe(p1, p2)
+
+    def drag_minitouch(self, p1, p2, point_random=(-10, -10, 10, 10)):
+        return self.controller.drag(p1, p2, point_random=point_random)
 
     def click(self, button, control_check=True):
         """Method to click a button.
