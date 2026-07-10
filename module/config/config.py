@@ -31,6 +31,11 @@ if TYPE_CHECKING:
 
 MISSING_DELAY_ARGUMENT_MESSAGE = "Missing argument in delay_next_run, should set at least one"
 TASK_CALL_MISSING_TEMPLATE = "Task to call: `{task}` does not exist in user config"
+RUNTIME_OVERLAY_INTERNALS = {
+    "_published_config_fields",
+    "_runtime_overlay",
+    "_runtime_overlay_values",
+}
 
 
 class TaskEnd(Exception):
@@ -122,6 +127,9 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         self.modified = {}
         # Key: Argument name in GeneratedConfig. Value: Path in `data`.
         self.bound = {}
+        # 关卡和大世界等仅在当前运行会话生效的配置覆盖。
+        self._runtime_overlay: dict[str, object] = {}
+        self._published_config_fields: set[str] = set()
         # If write after every variable modification.
         self.auto_update = True
         # Force override variables
@@ -190,20 +198,34 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         cls._prepend_missing(tasks, "General")
         return tasks
 
+    def _runtime_overlay_values(self) -> dict[str, object]:
+        overlay = self.__dict__.get("_runtime_overlay")
+        if isinstance(overlay, dict):
+            return overlay
+        overlay = {}
+        self.__dict__["_runtime_overlay"] = overlay
+        return overlay
+
     def _publish_resolved(self, snapshot: ResolvedTaskConfig) -> None:
         fields = snapshot.fields
+        runtime_overlay = self._runtime_overlay_values()
+        forced_values = self.__dict__.get("overridden", {})
         old_snapshot = self.__dict__.get("resolved")
-        old_names = set(self.__dict__.get("bound", {}))
+        old_names = set(self.__dict__.get("_published_config_fields", ()))
+        old_names.update(self.__dict__.get("bound", {}))
         if isinstance(old_snapshot, ResolvedTaskConfig):
             old_names.update(old_snapshot.field_names)
 
         published = {name: field.value for name, field in fields.items()}
+        published.update(copy.deepcopy(runtime_overlay))
+        published.update(copy.deepcopy(forced_values))
         instance_state = self.__dict__
         for name in old_names - set(published):
             instance_state.pop(name, None)
         instance_state.update(published)
         instance_state["bound"] = snapshot.bound_paths
         instance_state["resolved"] = snapshot
+        instance_state["_published_config_fields"] = set(published)
 
     def bind(self, func, func_list=None):
         """
@@ -685,14 +707,24 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         """
         # 运行期覆盖不属于持久解析结果，也不能触发配置写回。
         config = self
+        runtime_overlay = config._runtime_overlay_values()
 
         for attr in dir(config):
-            if attr.endswith("__"):
+            if attr.endswith("__") or attr in RUNTIME_OVERLAY_INTERNALS:
                 continue
             if hasattr(other, attr):
                 value = other.__getattribute__(attr)
                 if value is not None:
-                    config.__dict__[attr] = copy.deepcopy(value)
+                    runtime_overlay[attr] = copy.deepcopy(value)
+
+        snapshot = config.__dict__.get("resolved")
+        if isinstance(snapshot, ResolvedTaskConfig):
+            config._publish_resolved(snapshot)
+        else:
+            published = copy.deepcopy(runtime_overlay)
+            published.update(copy.deepcopy(config.__dict__.get("overridden", {})))
+            config.__dict__.update(published)
+            config.__dict__["_published_config_fields"] = set(published)
 
         return config
 

@@ -1,9 +1,11 @@
 import copy
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
 from module.config.config import AzurLaneConfig, name_to_function
+from module.os.config import OSConfig
 
 
 def _config(data: dict, overridden: dict | None = None):
@@ -14,6 +16,10 @@ def _config(data: dict, overridden: dict | None = None):
     config.modified = {}
     config.auto_update = False
     return config
+
+
+def _runtime_overlay(config: AzurLaneConfig) -> dict[str, object]:
+    return cast("dict[str, object]", config.__dict__["_runtime_overlay"])
 
 
 def test_task_bind_chain_adds_event_defaults_in_existing_order() -> None:
@@ -156,6 +162,87 @@ def test_deepcopy_merge_is_runtime_overlay_not_persistent_resolution() -> None:
     assert merged.modified == {}
     assert config.Campaign_Name == "D3"
     assert update_calls == []
+
+
+def test_runtime_overlay_survives_multiple_force_overrides() -> None:
+    config = _config({"TaskA": {"Campaign": {"Name": "D3"}}})
+    config.bind("TaskA")
+    merged = copy.deepcopy(config).merge(SimpleNamespace(Campaign_Name="SP"))
+    merged.is_task_enabled = lambda _task: True
+    merged.args = {}
+
+    merged.override(Runtime_First="first")
+    merged.override(Runtime_Second="second")
+
+    assert merged.Campaign_Name == "SP"
+    assert merged.resolved.Campaign_Name == "D3"
+    assert merged.Runtime_First == "first"
+    assert merged.Runtime_Second == "second"
+    assert _runtime_overlay(merged)["Campaign_Name"] == "SP"
+    assert merged.modified == {}
+
+
+def test_runtime_overlay_survives_update_and_rebind_without_writing() -> None:
+    stored = {"TaskA": {"Campaign": {"Name": "D3"}}}
+    config = _config(copy.deepcopy(stored))
+    config.bind("TaskA")
+    config.merge(SimpleNamespace(Campaign_Name="SP"))
+    config.config_name = "alas"
+    config.task = name_to_function("TaskA")
+    config.read_file = lambda _name: copy.deepcopy(stored)
+    config.config_override = lambda: None
+    config.write_file = lambda *_args, **_kwargs: pytest.fail("runtime overlay must not write config")
+
+    config.update()
+    config.bind("TaskA")
+
+    assert config.Campaign_Name == "SP"
+    assert config.resolved.Campaign_Name == "D3"
+    assert config.modified == {}
+
+
+def test_force_override_has_priority_over_same_runtime_overlay_field() -> None:
+    config = _config({"TaskA": {"Campaign": {"Name": "D3"}}})
+    config.bind("TaskA")
+    config.merge(SimpleNamespace(Campaign_Name="SP"))
+    config.is_task_enabled = lambda _task: True
+    config.args = {}
+
+    config.override(Campaign_Name="FORCED")
+    config.merge(SimpleNamespace(Campaign_Name="HT"))
+
+    assert config.Campaign_Name == "FORCED"
+    assert config.resolved.Campaign_Name == "FORCED"
+    assert _runtime_overlay(config)["Campaign_Name"] == "HT"
+    assert config.modified == {}
+
+
+def test_runtime_overlay_is_deepcopy_isolated() -> None:
+    config = _config({"TaskA": {"Campaign": {"Name": "D3"}}})
+    config.bind("TaskA")
+    merged = copy.deepcopy(config).merge(SimpleNamespace(Campaign_Name=["SP"]))
+
+    cloned = copy.deepcopy(merged)
+    merged_overlay = _runtime_overlay(merged)
+    cloned_overlay = _runtime_overlay(cloned)
+    cast("list[str]", cloned_overlay["Campaign_Name"]).append("clone")
+
+    assert merged.Campaign_Name == ["SP"]
+    assert merged_overlay == {"Campaign_Name": ["SP"]}
+    assert cloned_overlay == {"Campaign_Name": ["SP", "clone"]}
+    assert cloned_overlay is not merged_overlay
+
+
+def test_cleared_runtime_overlay_does_not_leave_stale_facade_fields() -> None:
+    config = _config({"TaskA": {"Campaign": {"Name": "D3"}}})
+    config.bind("TaskA")
+    config.merge(OSConfig())
+    assert config.MAP_HAS_SIREN is True
+
+    _runtime_overlay(config).clear()
+    config.bind("TaskA")
+
+    assert config.MAP_HAS_SIREN is False
 
 
 def test_update_applies_config_override_only_once() -> None:
