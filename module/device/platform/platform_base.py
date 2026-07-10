@@ -30,10 +30,12 @@ def serial_to_id(serial: str):
     return mumu12_serial_to_id(serial)
 
 
-class PlatformBase(Connection, EmulatorManagerBase):
+class PlatformBase(Connection):
     """
     Windows 模拟器平台的基类。
     """
+
+    emulator_manager: EmulatorManagerBase
 
     @cached_property
     def emulator_instance(self) -> EmulatorInstanceBase | None:
@@ -220,7 +222,7 @@ class PlatformBase(Connection, EmulatorManagerBase):
         返回：
             EmulatorInstanceBase：找到的实例；找不到唯一实例时返回 None。
         """
-        running = remove_duplicated_path(list(self.iter_running_emulator()))
+        running = remove_duplicated_path(list(self.emulator_manager.iter_running_emulator()))
         logger.info("Running emulators")
         for exe in running:
             logger.info(exe)
@@ -240,7 +242,7 @@ class PlatformBase(Connection, EmulatorManagerBase):
             EmulatorInstance：模拟器实例；找不到时返回 None。
         """
         logger.hr("Find emulator instance", level=2)
-        instances = SelectedGrids(self.all_emulator_instances)
+        instances = SelectedGrids(self.emulator_manager.all_emulator_instances)
         self._log_emulator_instances(instances)
         search_args = {"serial": serial}
 

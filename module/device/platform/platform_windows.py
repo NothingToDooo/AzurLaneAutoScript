@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 import psutil
 from adbutils.errors import AdbError
 
-from module.base.decorator import run_once
+from module.base.decorator import cached_property, run_once
 from module.base.timer import Timer
 from module.device.platform.emulator_windows import Emulator, EmulatorInstance, EmulatorManager
 from module.device.platform.platform_base import PlatformBase
@@ -46,7 +46,11 @@ def flash_window(hwnd, flash=True):
     ctypes.windll.user32.FlashWindow(hwnd, flash)
 
 
-class PlatformWindows(PlatformBase, EmulatorManager):
+class PlatformWindows(PlatformBase):
+    @cached_property
+    def emulator_manager(self) -> EmulatorManager:
+        return EmulatorManager()
+
     @classmethod
     def execute(cls, command) -> psutil.Popen:
         """

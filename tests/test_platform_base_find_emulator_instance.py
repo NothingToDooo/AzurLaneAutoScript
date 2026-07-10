@@ -33,15 +33,18 @@ def _make_platform(
 ):
     platform = object.__new__(PlatformBase)
     platform.serial = serial
-    platform.all_emulator_instances = instances
-    platform.running = running or []
-    platform.running_calls = 0
+    manager = SimpleNamespace(
+        all_emulator_instances=instances,
+        running=running or [],
+        running_calls=0,
+    )
 
     def iter_running_emulator():
-        platform.running_calls += 1
-        return iter(platform.running)
+        manager.running_calls += 1
+        return iter(manager.running)
 
-    platform.iter_running_emulator = iter_running_emulator
+    manager.iter_running_emulator = iter_running_emulator
+    platform.emulator_manager = manager
     return platform
 
 
@@ -90,7 +93,7 @@ def test_find_emulator_instance_returns_none_when_serial_missing() -> None:
     )
 
     assert platform.find_emulator_instance("127.0.0.1:16384") is None
-    assert platform.running_calls == 0
+    assert platform.emulator_manager.running_calls == 0
 
 
 def test_find_emulator_instance_uses_mumu12_id_to_disambiguate_duplicate_serial() -> None:
