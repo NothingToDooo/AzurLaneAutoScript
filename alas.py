@@ -25,6 +25,7 @@ from module.task_registry import get_task_spec
 
 if TYPE_CHECKING:
     from module.base.stop_event import StopEvent
+    from module.config.schedule import ScheduleDecision
 
 
 def _load_attr(module_name: str, attr_name: str):
@@ -198,68 +199,73 @@ class AzurLaneAutoScript:
         release_resources()
         self.device.release_during_wait()
 
-    def _wait_with_game_closed(self, task) -> bool:
+    def _wait_with_game_closed(self, decision: ScheduleDecision, wake_at: datetime) -> bool:
         logger.info("Close game during wait")
         self.device.app_stop()
         self._release_during_task_wait()
-        if not self.wait_until(task.next_run):
+        if not self.wait_until(wake_at):
             del_cached_property(self, "config")
             return False
-        if task.command != "Restart":
+        if decision.command != "Restart":
             self.config.task_call("Restart")
             del_cached_property(self, "config")
             return False
         return True
 
-    def _wait_on_main_page(self, task) -> bool:
+    def _wait_on_main_page(self, wake_at: datetime) -> bool:
         logger.info("Goto main page during wait")
         self.run("goto_main")
         self._release_during_task_wait()
-        if not self.wait_until(task.next_run):
+        if not self.wait_until(wake_at):
             del_cached_property(self, "config")
             return False
         return True
 
-    def _wait_in_place(self, task) -> bool:
+    def _wait_in_place(self, wake_at: datetime) -> bool:
         self._release_during_task_wait()
-        if not self.wait_until(task.next_run):
+        if not self.wait_until(wake_at):
             del_cached_property(self, "config")
             return False
         return True
 
-    def _wait_for_next_task(self, task) -> bool:
+    def _wait_for_next_task(self, decision: ScheduleDecision) -> bool:
         """等待未到运行时间的任务，返回当前任务是否可以继续执行。"""
-        if task.next_run <= datetime.now():
+        if decision.state in {"ready", "error"}:
             return True
+        wake_at = decision.wake_at
+        if decision.state != "waiting" or wake_at is None:
+            message = f"Invalid schedule decision: {decision.state}"
+            raise ScriptError(message)
 
-        logger.info(f"Wait until {task.next_run} for task `{task.command}`")
+        logger.info(f"Wait until {wake_at} for task `{decision.command}`")
         self.is_first_task = False
         method = self.config.Optimization_WhenTaskQueueEmpty
         if method == "close_game":
-            return self._wait_with_game_closed(task)
+            return self._wait_with_game_closed(decision, wake_at)
         if method == "goto_main":
-            return self._wait_on_main_page(task)
+            return self._wait_on_main_page(wake_at)
         if method == "stay_there":
             logger.info("Stay there during wait")
         else:
             logger.warning(f"Invalid Optimization_WhenTaskQueueEmpty: {method}, fallback to stay_there")
-        return self._wait_in_place(task)
+        return self._wait_in_place(wake_at)
 
     def get_next_task(self) -> str:
         """返回下一个任务名称。"""
         while 1:
-            task = self.config.get_next()
+            decision = self.config.get_next_decision()
+            task = self.config.function_from_decision(decision)
             self.config.task = task
             self.config.bind(task)
 
             if self.config.task.command != "Alas":
                 release_resources(next_task=task.command)
 
-            if not self._wait_for_next_task(task):
+            if not self._wait_for_next_task(decision):
                 continue
+            self.config.mark_task_started()
             break
 
-        AzurLaneConfig.is_hoarding_task = False
         return task.command
 
     def loop(self) -> None:

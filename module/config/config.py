@@ -1,15 +1,16 @@
 import copy
-import operator
+from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 import pywebio
 
-from module.base.filter import Filter
 from module.config.config_generated import GeneratedConfig
 from module.config.config_manual import ManualConfig, OutputConfig
 from module.config.config_updater import ConfigUpdater
 from module.config.deep import deep_get, deep_set
+from module.config.resolved import ResolvedTaskConfig, resolve_task_config
+from module.config.schedule import ScheduleDecision, ScheduleEntry, SchedulePlanner
 from module.config.utils import (
     DEFAULT_TIME,
     dict_to_kv,
@@ -18,13 +19,12 @@ from module.config.utils import (
     get_os_reset_remain,
     get_server_next_update,
     nearest_future,
-    path_to_arg,
 )
 from module.config.watcher import ConfigWatcher
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
-from module.task_registry import get_task_by_config_name
+from module.task_registry import TASK_CATALOG, get_task_by_config_name
 
 if TYPE_CHECKING:
     from module.base.stop_event import StopEvent
@@ -56,6 +56,22 @@ class Function:
         return self.command == other.command and self.next_run == other.next_run
 
     __hash__ = None
+
+
+def _function_from_entry(entry: ScheduleEntry, *, next_run: object | None = None) -> Function:
+    function = Function({})
+    function.enable = entry.enable
+    function.command = entry.command
+    function.next_run = entry.next_run if next_run is None else next_run
+    return function
+
+
+def _schedule_priority() -> dict[str, int]:
+    return {
+        definition.config_name: definition.priority
+        for definition in TASK_CATALOG.values()
+        if definition.priority is not None
+    }
 
 
 def name_to_function(name):
@@ -116,6 +132,8 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         # waiting_task: Run time haven't been reached, wait needed.
         self.pending_task = []
         self.waiting_task = []
+        # 兼容保留类属性默认值，实际调度状态始终由当前配置实例持有。
+        self.is_hoarding_task = type(self).is_hoarding_task
         # Task to run and bind.
         # Task means the name of the function to run in AzurLaneAutoScript class.
         self.task: Function
@@ -161,7 +179,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
     @classmethod
     def task_bind_chain(cls, func, func_list=None) -> list[str]:
         task = cls._task_name(func)
-        tasks = [] if func_list is None else func_list
+        tasks = [] if func_list is None else list(func_list)
 
         cls._prepend_missing(tasks, task)
         definition = get_task_by_config_name(task)
@@ -172,39 +190,38 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         cls._prepend_missing(tasks, "General")
         return tasks
 
-    def _iter_bound_arguments(self, func_list):
-        visited = set()
-        for func in func_list:
-            func_data = self.data.get(func, {})
-            for group, group_data in func_data.items():
-                for arg_name, value in group_data.items():
-                    path = f"{group}.{arg_name}"
-                    if path in visited:
-                        continue
-                    visited.add(path)
-                    yield path_to_arg(path), f"{func}.{path}", value
+    def _publish_resolved(self, snapshot: ResolvedTaskConfig) -> None:
+        fields = snapshot.fields
+        old_snapshot = self.__dict__.get("resolved")
+        old_names = set(self.__dict__.get("bound", {}))
+        if isinstance(old_snapshot, ResolvedTaskConfig):
+            old_names.update(old_snapshot.field_names)
 
-    def _bind_arguments(self, func_list) -> None:
-        self.bound.clear()
-        for arg, path, value in self._iter_bound_arguments(func_list):
-            super().__setattr__(arg, value)
-            self.bound[arg] = path
-
-    def _apply_overridden_arguments(self) -> None:
-        for arg, value in self.overridden.items():
-            super().__setattr__(arg, value)
+        published = {name: field.value for name, field in fields.items()}
+        instance_state = self.__dict__
+        for name in old_names - set(published):
+            instance_state.pop(name, None)
+        instance_state.update(published)
+        instance_state["bound"] = snapshot.bound_paths
+        instance_state["resolved"] = snapshot
 
     def bind(self, func, func_list=None):
         """
         Args:
-            func (str, Function): Function to run
-            func_list (list[str]): List of tasks to be bound
+            func：将要运行的任务。
+            func_list：调用方追加的配置作用域。
         """
         # 绑定顺序：General、Alas、任务通用配置、当前任务、额外任务。
-        func_list = self.task_bind_chain(func, func_list=func_list)
-        logger.info(f"Bind task {func_list}")
-        self._bind_arguments(func_list)
-        self._apply_overridden_arguments()
+        task_name = self._task_name(func)
+        bind_chain = self.task_bind_chain(func, func_list=func_list)
+        logger.info(f"Bind task {bind_chain}")
+        snapshot = resolve_task_config(
+            task_name=task_name,
+            bind_chain=bind_chain,
+            data=self.data,
+            overrides=self.overridden,
+        )
+        self._publish_resolved(snapshot)
 
     @property
     def hoarding(self):
@@ -219,64 +236,66 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
     def is_actual_task(self):
         return self.task.command.lower() not in ["alas", "template"]
 
-    def get_next_task(self):
-        """
-        Calculate tasks, set pending_task and waiting_task
-        """
-        pending = []
-        waiting = []
-        error = []
-        now = datetime.now()
-        if AzurLaneConfig.is_hoarding_task:
-            now -= self.hoarding
-        for func_data in self.data.values():
-            func = Function(func_data)
-            if not func.enable:
-                continue
-            if not isinstance(func.next_run, datetime):
-                error.append(func)
-            elif func.next_run < now:
-                pending.append(func)
-            else:
-                waiting.append(func)
+    def get_next_task(self, *, now: datetime | None = None) -> ScheduleDecision:
+        """计算任务队列，并保留 WebUI 依赖的旧式 Function 视图。"""
+        current_time = datetime.now() if now is None else now
+        if self.is_hoarding_task:
+            current_time -= self.hoarding
+        entries = tuple(
+            ScheduleEntry(enable=func.enable, command=func.command, next_run=func.next_run)
+            for func in (Function(func_data) for func_data in self.data.values())
+        )
+        decision = SchedulePlanner.select(
+            entries,
+            now=current_time,
+            priority=_schedule_priority(),
+        )
+        self.pending_task = [
+            *(_function_from_entry(entry) for entry in decision.errors),
+            *(_function_from_entry(entry) for entry in decision.pending),
+        ]
+        self.waiting_task = [_function_from_entry(entry) for entry in decision.waiting]
+        return decision
 
-        f = Filter(regex=r"(.*)", attr=["command"])
-        f.load(self.SCHEDULER_PRIORITY)
-        if pending:
-            pending = f.apply(pending)
-        if waiting:
-            waiting = f.apply(waiting)
-            waiting = sorted(waiting, key=operator.attrgetter("next_run"))
-        if error:
-            pending = error + pending
-
-        self.pending_task = pending
-        self.waiting_task = waiting
-
-    def get_next(self):
-        """
-        Returns:
-            Function: Command to run
-        """
-        self.get_next_task()
-
-        if self.pending_task:
-            AzurLaneConfig.is_hoarding_task = False
-            logger.info(f"Pending tasks: {[f.command for f in self.pending_task]}")
-            task = self.pending_task[0]
-            logger.attr("Task", task)
-            return task
-        AzurLaneConfig.is_hoarding_task = True
-
-        if self.waiting_task:
+    def get_next_decision(self, *, now: datetime | None = None) -> ScheduleDecision:
+        decision = self.get_next_task(now=now)
+        if decision.state in {"ready", "error"}:
+            entry = decision.entry
+            if entry is None:
+                raise RequestHumanTakeover
+            self.is_hoarding_task = False
+            logger.info(f"Pending tasks: {[func.command for func in self.pending_task]}")
+            logger.attr("Task", _function_from_entry(entry))
+            return decision
+        if decision.state == "waiting":
+            entry = decision.entry
+            wake_time = decision.wake_at
+            if entry is None or wake_time is None:
+                raise RequestHumanTakeover
+            self.is_hoarding_task = True
+            wake_at = (wake_time + self.hoarding).replace(microsecond=0)
+            waiting = replace(decision, wake_at=wake_at)
             logger.info("No task pending")
-            task = copy.deepcopy(self.waiting_task[0])
-            task.next_run = (task.next_run + self.hoarding).replace(microsecond=0)
-            logger.attr("Task", task)
-            return task
+            logger.attr("Task", _function_from_entry(entry, next_run=wake_at))
+            return waiting
+
         logger.critical("No task waiting or pending")
         logger.critical("Please enable at least one task")
         raise RequestHumanTakeover
+
+    def mark_task_started(self) -> None:
+        self.is_hoarding_task = False
+
+    @staticmethod
+    def function_from_decision(decision: ScheduleDecision) -> Function:
+        if decision.entry is None:
+            raise RequestHumanTakeover
+        next_run = decision.wake_at if decision.state == "waiting" else decision.entry.next_run
+        return _function_from_entry(decision.entry, next_run=next_run)
+
+    def get_next(self):
+        """返回兼容旧调用方的下一个 Function。"""
+        return self.function_from_decision(self.get_next_decision())
 
     def save(self):
         if not self.modified:
@@ -293,7 +312,6 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
 
     def update(self):
         self.load()
-        self.config_override()
         self.bind(self.task)
         self.save()
 
@@ -339,6 +357,15 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         for arg, value in kwargs.items():
             self.overridden[arg] = value
             super().__setattr__(arg, value)
+        previous = self.__dict__.get("resolved")
+        if kwargs and isinstance(previous, ResolvedTaskConfig):
+            snapshot = resolve_task_config(
+                task_name=previous.task_name,
+                bind_chain=previous.bind_chain,
+                data=self.data,
+                overrides=self.overridden,
+            )
+            self._publish_resolved(snapshot)
 
     config_override = override
 
@@ -651,12 +678,12 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
     def merge(self, other):
         """
         Args:
-            other (AzurLaneConfig, Config):
+            other：关卡或任务在运行期提供的配置覆盖。
 
         Returns:
-            AzurLaneConfig
+            当前配置门面。
         """
-        # 所有任务独立运行，直接复用当前配置对象。
+        # 运行期覆盖不属于持久解析结果，也不能触发配置写回。
         config = self
 
         for attr in dir(config):
@@ -665,7 +692,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             if hasattr(other, attr):
                 value = other.__getattribute__(attr)
                 if value is not None:
-                    config.__setattr__(attr, value)
+                    config.__dict__[attr] = copy.deepcopy(value)
 
         return config
 
