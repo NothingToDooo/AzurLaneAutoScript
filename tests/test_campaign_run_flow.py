@@ -7,7 +7,10 @@ from module.campaign import run as campaign_run_module
 from module.campaign.campaign_base import CampaignBase
 from module.campaign.run import CampaignRun
 from module.content import LegacyStageContractError, StageRef
+from module.content.catalog import ContentCatalog
+from module.content.errors import ContentValidationError
 from module.content.legacy_stage import LegacyStageModuleAdapter, LoadedCampaignModule, LoadedStage
+from module.content.models import EventPack, StageSpec
 from module.exception import RequestHumanTakeover
 from module.hard import hard as hard_module
 from module.hard.hard import CampaignHard
@@ -85,6 +88,19 @@ class _StageAdapter(LegacyStageModuleAdapter):
         return LoadedCampaignModule(_LoadedConfig, _LoadedCampaign)
 
 
+class _NativeStageLoader:
+    def __init__(self, loaded_stage: LoadedStage, *, error: Exception | None = None) -> None:
+        self.loaded_stage = loaded_stage
+        self.error = error
+        self.specs: list[StageSpec] = []
+
+    def load(self, spec: StageSpec) -> LoadedStage:
+        self.specs.append(spec)
+        if self.error is not None:
+            raise self.error
+        return self.loaded_stage
+
+
 class _MissingStageAdapter(_StageAdapter):
     def load(self, ref: StageRef) -> LoadedStage:
         self.stage_refs.append(ref)
@@ -130,7 +146,13 @@ def _make_load_runner() -> tuple[CampaignRun, _StageAdapter]:
     loaded = LoadedStage(_LoadedConfig, _LoadedCampaign, CampaignMap("TEST"))
     adapter = _StageAdapter(loaded)
     runner.stage_adapter = adapter
+    runner.content_catalog = ContentCatalog()
     return runner, adapter
+
+
+def _native_catalog(folder: str, name: str) -> tuple[ContentCatalog, StageSpec]:
+    spec = StageSpec(StageRef(folder, name), f"stages/{name}.yaml")
+    return ContentCatalog((EventPack(pack_id=folder, stages=(spec,)),)), spec
 
 
 def _load_state(runner: CampaignRun) -> tuple[object, ...]:
@@ -365,6 +387,48 @@ def test_load_campaign_uses_stage_adapter_and_preserves_construction_semantics()
     assert runner.campaign.test_config is not runner.config
     assert len(runner.campaign.test_config.merged) == 1
     assert isinstance(runner.campaign.test_config.merged[0], _LoadedConfig)
+
+
+def test_load_campaign_prefers_registered_native_stage() -> None:
+    runner, adapter = _make_load_runner()
+    catalog, spec = _native_catalog("event_native", "t1")
+    native_loader = _NativeStageLoader(adapter.loaded_stage)
+    runner.content_catalog = catalog
+    runner.stage_loader = native_loader
+
+    assert runner.load_campaign("t1", folder="event_native") is True
+
+    assert native_loader.specs == [spec]
+    assert adapter.stage_refs == []
+    assert runner.loaded_stage is adapter.loaded_stage
+
+
+def test_registered_native_stage_failure_does_not_fall_back_or_commit() -> None:
+    runner, adapter = _make_load_runner()
+    assert runner.load_campaign("sp", folder="event_original") is True
+    previous_state = _load_state(runner)
+    catalog, spec = _native_catalog("event_native", "t1")
+    error = ContentValidationError("invalid native stage")
+    native_loader = _NativeStageLoader(adapter.loaded_stage, error=error)
+    runner.content_catalog = catalog
+    runner.stage_loader = native_loader
+
+    with pytest.raises(ContentValidationError, match="invalid native stage"):
+        runner.load_campaign("t1", folder="event_native")
+
+    assert native_loader.specs == [spec]
+    assert adapter.stage_refs == [StageRef("event_original", "sp")]
+    _assert_load_state_unchanged(runner, previous_state)
+
+
+def test_unregistered_stage_in_known_pack_still_uses_legacy_adapter() -> None:
+    runner, adapter = _make_load_runner()
+    catalog, _spec = _native_catalog("event_mixed", "t1")
+    runner.content_catalog = catalog
+
+    assert runner.load_campaign("sp", folder="event_mixed") is True
+
+    assert adapter.stage_refs == [StageRef("event_mixed", "sp")]
 
 
 def test_load_campaign_identity_includes_folder_and_name() -> None:

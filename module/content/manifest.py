@@ -25,7 +25,7 @@ SCHEMA_VERSION = 1
 DEFAULT_EVENT_MANIFEST_PATH = Path(__file__).resolve().parents[2] / "content" / "events"
 _TOP_LEVEL_FIELDS = {"schema_version", "id", "kind", "ui_profile", "releases", "stages", "policy"}
 _RELEASE_FIELDS = {"opened_on", "name_cn", "order"}
-_STAGE_FIELDS = {"id", "source", "assets"}
+_STAGE_FIELDS = {"id", "source", "assets", "strategy"}
 _ASSET_FIELDS = {"id", "path"}
 _POLICY_FIELDS = {
     "aliases",
@@ -213,7 +213,17 @@ def _load_stages(raw: object, path: Path, pack_id: str, pack_root: Path) -> tupl
         seen.add(stage_id)
         source = _safe_pack_file(item["source"], path, f"{location}.source", pack_root)
         assets = _load_assets(item.get("assets", ()), path, f"{location}.assets", pack_root)
-        stages.append(StageSpec(ref=StageRef(pack_id=pack_id, stage_id=stage_id), source=source, assets=assets))
+        strategy = item.get("strategy")
+        if strategy is not None:
+            strategy = _string(strategy, path, f"{location}.strategy")
+        stages.append(
+            StageSpec(
+                ref=StageRef(pack_id=pack_id, stage_id=stage_id),
+                source=source,
+                assets=assets,
+                strategy=strategy,
+            )
+        )
     return tuple(stages)
 
 

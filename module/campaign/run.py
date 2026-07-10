@@ -17,9 +17,12 @@ from module.content.campaign_policy import (
     apply_stage_policy,
     resolve_stage_loop,
 )
+from module.content.catalog import ContentCatalog
+from module.content.errors import UnknownPackError, UnknownStageError
 from module.content.legacy_stage import LegacyStageModuleAdapter, LoadedCampaignModule, LoadedStage
 from module.content.manifest import load_default_event_manifests
-from module.content.models import StageRef
+from module.content.models import StageRef, StageSpec
+from module.content.stage_loader import StageLoader, StageSpecLoader
 from module.exception import CampaignEnd, RequestHumanTakeover, ScriptEnd
 from module.handler.fast_forward import map_files, to_map_file_name
 from module.logger import logger
@@ -65,6 +68,11 @@ def _campaign_policies() -> dict[str, CampaignPolicy]:
     return {str(pack.pack_id): pack.policy for pack in load_default_event_manifests()}
 
 
+@lru_cache(maxsize=1)
+def _content_catalog() -> ContentCatalog:
+    return ContentCatalog(load_default_event_manifests())
+
+
 def _campaign_policy(folder: str) -> CampaignPolicy:
     return _campaign_policies().get(folder, CampaignPolicy())
 
@@ -96,6 +104,8 @@ class CampaignRun(CampaignEvent):
     name: str
     stage: str
     stage_adapter = LegacyStageModuleAdapter()
+    stage_loader: StageLoader = StageSpecLoader()
+    content_catalog: ContentCatalog | None = None
     loaded_campaign: LoadedCampaignModule
     loaded_stage: LoadedStage | None = None
     config: AzurLaneConfig
@@ -117,6 +127,13 @@ class CampaignRun(CampaignEvent):
         if folder.startswith(("event", "war_archives")):
             return name
         return name
+
+    def _native_stage_spec(self, ref: StageRef) -> StageSpec | None:
+        catalog = self.content_catalog or _content_catalog()
+        try:
+            return catalog.resolve_stage(ref)
+        except UnknownPackError, UnknownStageError:
+            return None
 
     @staticmethod
     def _raise_campaign_not_found(ref: StageRef, error: ModuleNotFoundError) -> None:
@@ -167,10 +184,14 @@ class CampaignRun(CampaignEvent):
             return False
 
         ref = StageRef(pack_id=folder, stage_id=name)
-        try:
-            loaded = self.stage_adapter.load(ref)
-        except ModuleNotFoundError as error:
-            self._raise_campaign_not_found(ref, error)
+        spec = self._native_stage_spec(ref)
+        if spec is not None:
+            loaded = self.stage_loader.load(spec)
+        else:
+            try:
+                loaded = self.stage_adapter.load(ref)
+            except ModuleNotFoundError as error:
+                self._raise_campaign_not_found(ref, error)
 
         state = self._build_campaign_load(name, folder, loaded, loaded)
         self._commit_campaign_load(state)

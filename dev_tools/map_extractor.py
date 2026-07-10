@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import ClassVar
 
 import numpy as np
+import yaml
 
 import module.logger
 from dev_tools.utils import LuaLoader
@@ -13,6 +14,43 @@ from module.map.utils import camera_2d, camera_spawn_point, get_map_active_area
 
 # 导入 module.logger 会切换到项目根目录。
 _ = module.logger
+
+FILE = "../AzurLaneLuaScripts"
+FOLDER = "./content/events/event_20260417_cn/stages"
+KEYWORD = "2020001"
+SELECT = True
+OVERWRITE = True
+IS_WAR_ARCHIVES = False
+ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
+
+
+class _LuaDataStore:
+    __slots__ = ("chapter", "chapter_loop", "expectation", "map_event_list", "map_event_template")
+
+    def __init__(self):
+        self.chapter = {}
+        self.chapter_loop = {}
+        self.map_event_list = {}
+        self.map_event_template = {}
+        self.expectation = {}
+
+
+_LUA_DATA = _LuaDataStore()
+
+
+class _LiteralString(str):
+    __slots__ = ()
+
+
+class _StageDumper(yaml.SafeDumper):
+    pass
+
+
+def _represent_literal(dumper, value):
+    return dumper.represent_scalar("tag:yaml.org,2002:str", value, style="|")
+
+
+_StageDumper.add_representer(_LiteralString, _represent_literal)
 
 """
 This an auto-tool to extract map files used in Alas.
@@ -341,10 +379,10 @@ class MapData:
     def _set_event_enemy_data(self):
         self.event_enemy_data = None
         self.event_enemy_data_loop = None
-        if self.map_id not in MAP_EVENT_LIST:
+        if self.map_id not in _LUA_DATA.map_event_list:
             return
 
-        event_list = MAP_EVENT_LIST[self.map_id]
+        event_list = _LUA_DATA.map_event_list[self.map_id]
         self.event_enemy_data = self.extract_event_enemy_data(event_list["event_list"])
         if self.data_loop is not None:
             self.event_enemy_data_loop = self.extract_event_enemy_data(event_list["event_list_loop"])
@@ -398,7 +436,7 @@ class MapData:
         if siren_id == 1:
             return
 
-        exped_data = EXPECTATION_DATA.get(siren_id, {})
+        exped_data = _LUA_DATA.expectation.get(siren_id, {})
         name = exped_data.get("icon", str(siren_id))
         name = DIC_SIREN_NAME_CHI_TO_ENG.get(name, name)
         if name not in self.MAP_SIREN_TEMPLATE:
@@ -480,7 +518,7 @@ class MapData:
     def extract_event_enemy_data(self, data):
         extracted_data = []
         for event_id in data.values():
-            event = MAP_EVENT_TEMPLATE[event_id]
+            event = _LUA_DATA.map_event_template[event_id]
             extracted_data.extend(effect[1] for effect in event["effect"].values() if effect[0] == "enemy")
         return extracted_data
 
@@ -647,6 +685,99 @@ class MapData:
             *self._get_campaign_lines(),
         ]
 
+    def stage_file_name(self):
+        return Path(self.map_file_name()).with_suffix(".yaml").name
+
+    def _stage_map_document(self):
+        camera_data = camera_2d(get_map_active_area(self.map_data), sight=(-3, -1, 3, 2))
+        camera_sp = camera_spawn_point(
+            camera_data,
+            sp_list=[key for key, value in self.map_data.items() if value == "SP"],
+        )
+        document = {
+            "name": self.chapter_name,
+            "shape": location2node(self.shape),
+            "camera_data": [location2node(location) for location in camera_data],
+            "camera_data_spawn_point": [location2node(location) for location in camera_sp],
+            "map_data": _LiteralString("\n".join(row.strip() for row in self._get_map_data_rows())),
+            "weight_data": _LiteralString(
+                "\n".join(" ".join(["50"] * (self.shape[0] + 1)) for _row in range(self.shape[1] + 1))
+            ),
+            "spawn_data": self.spawn_data,
+        }
+        if self.MAP_HAS_PORTAL:
+            document["portal_data"] = self.portal
+        if self.map_data_loop is not None:
+            document["map_data_loop"] = _LiteralString("\n".join(row.strip() for row in self._get_map_data_loop_rows()))
+        if self.MAP_HAS_LAND_BASED:
+            document["land_based_data"] = self.land_based
+        if self.spawn_data_loop is not None:
+            document["spawn_data_loop"] = self.spawn_data_loop
+        return document
+
+    def _stage_config_document(self):
+        document = {}
+        if self.MAP_SIREN_TEMPLATE:
+            document["MAP_SIREN_TEMPLATE"] = list(self.MAP_SIREN_TEMPLATE)
+            document["MOVABLE_ENEMY_TURN"] = sorted(self.MOVABLE_ENEMY_TURN)
+            document["MAP_HAS_SIREN"] = True
+            document["MAP_HAS_MOVABLE_ENEMY"] = self.MAP_HAS_MOVABLE_ENEMY
+        document["MAP_HAS_MAP_STORY"] = self.MAP_HAS_MAP_STORY
+        document["MAP_HAS_FLEET_STEP"] = self.MAP_HAS_FLEET_STEP
+        document["MAP_HAS_AMBUSH"] = self.MAP_HAS_AMBUSH
+        document["MAP_HAS_MYSTERY"] = self.MAP_HAS_MYSTERY
+        if self.MAP_HAS_PORTAL:
+            document["MAP_HAS_PORTAL"] = True
+        if self.MAP_HAS_LAND_BASED:
+            document["MAP_HAS_LAND_BASED"] = True
+        for number in range(1, 4):
+            requirement = getattr(self, f"STAR_REQUIRE_{number}")
+            if requirement != number:
+                document[f"STAR_REQUIRE_{number}"] = 0
+        return document
+
+    def _stage_battle_document(self):
+        boss_battle = self.data["boss_refresh"]
+        preserve = boss_battle - 5 if boss_battle >= 5 else 0
+        clear_policy = "siren_then_filtered_enemy" if self.MAP_SIREN_TEMPLATE else "filtered_enemy_then_default"
+        battles = {0: {"policy": clear_policy, "preserve": preserve}}
+        if boss_battle >= 6:
+            battles[5] = {"policy": clear_policy, "preserve": 0}
+        if boss_battle >= 5:
+            battles[boss_battle] = {"policy": "fleet_boss"}
+        return battles
+
+    def stage_document(self):
+        return {
+            "schema_version": 1,
+            "map": self._stage_map_document(),
+            "config": self._stage_config_document(),
+            "enemy_filter": ENEMY_FILTER,
+            "battles": self._stage_battle_document(),
+        }
+
+    def render_stage_yaml(self):
+        return yaml.dump(
+            self.stage_document(),
+            Dumper=_StageDumper,
+            allow_unicode=True,
+            sort_keys=False,
+            width=120,
+        )
+
+    def write_stage(self, path, *, overwrite=False, check=False):
+        file = Path(path) / self.stage_file_name()
+        content = self.render_stage_yaml()
+        if check:
+            return file.is_file() and file.read_text(encoding="utf-8") == content
+        if file.exists() and not overwrite:
+            print(f"File exists: {file}")
+            return False
+        file.parent.mkdir(parents=True, exist_ok=True)
+        print(f"Extract: {file}")
+        file.write_text(content, encoding="utf-8", newline="\n")
+        return True
+
     def write(self, path):
         file = Path(path) / self.map_file_name()
         has_modified_campaign_base = Path(path, "campaign_base.py").exists()
@@ -682,14 +813,14 @@ class ChapterTemplate:
 
     @staticmethod
     def _iter_chapter_data():
-        for map_id, raw_data in DATA.items():
+        for map_id, raw_data in _LUA_DATA.chapter.items():
             if not isinstance(map_id, int) or ChapterTemplate._is_extra_chapter(raw_data["chapter_name"]):
                 continue
             yield map_id, raw_data
 
     @staticmethod
     def _create_map_data(map_id, raw_data):
-        return MapData(raw_data, DATA_LOOP.get(map_id, None))
+        return MapData(raw_data, _LUA_DATA.chapter_loop.get(map_id))
 
     def _find_maps_by_name(self, name):
         maps = []
@@ -702,7 +833,7 @@ class ChapterTemplate:
         return maps
 
     def _find_maps_by_id(self, map_id):
-        data = MapData(DATA[map_id], DATA_LOOP.get(map_id, None))
+        data = MapData(_LUA_DATA.chapter[map_id], _LUA_DATA.chapter_loop.get(map_id))
         print(f"Found map: {data}")
         return [data]
 
@@ -770,7 +901,7 @@ class ChapterTemplate:
         if not Path(folder).exists():
             Path(folder).mkdir()
         for data in maps:
-            data.write(folder)
+            data.write_stage(folder, overwrite=OVERWRITE)
 
 
 """
@@ -785,20 +916,19 @@ Arguments:
     OVERWRITE:       是否覆盖已有文件
     IS_WAR_ARCHIVES: 是否按作战档案用法适配
 """
-FILE = "../AzurLaneLuaScripts"
-FOLDER = "./campaign/event_20260417_cn"
-KEYWORD = "2020001"
-SELECT = True
-OVERWRITE = True
-IS_WAR_ARCHIVES = False
-ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
-LOADER = LuaLoader(FILE, server="CN")
-DATA = LOADER.load("./sharecfgdata/chapter_template.lua")
-DATA_LOOP = LOADER.load("./sharecfgdata/chapter_template_loop.lua")
-MAP_EVENT_LIST = LOADER.load("./sharecfg/map_event_list.lua")
-MAP_EVENT_TEMPLATE = LOADER.load("./sharecfg/map_event_template.lua")
-EXPECTATION_DATA = LOADER.load("./sharecfgdata/expedition_data_template.lua")
 
-ct = ChapterTemplate()
-ct.extract(ct.get_chapter_by_name(KEYWORD, select=SELECT), folder=FOLDER)
+def main():
+    loader = LuaLoader(FILE, server="CN")
+    _LUA_DATA.chapter = loader.load("./sharecfgdata/chapter_template.lua")
+    _LUA_DATA.chapter_loop = loader.load("./sharecfgdata/chapter_template_loop.lua")
+    _LUA_DATA.map_event_list = loader.load("./sharecfg/map_event_list.lua")
+    _LUA_DATA.map_event_template = loader.load("./sharecfg/map_event_template.lua")
+    _LUA_DATA.expectation = loader.load("./sharecfgdata/expedition_data_template.lua")
+
+    chapter = ChapterTemplate()
+    chapter.extract(chapter.get_chapter_by_name(KEYWORD, select=SELECT), folder=FOLDER)
+
+
+if __name__ == "__main__":
+    main()

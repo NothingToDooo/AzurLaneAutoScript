@@ -379,6 +379,16 @@ def test_real_manifests_preserve_all_readme_releases_and_profiles() -> None:
     assert sum(len(pack.releases) > 1 for pack in packs) == 77
 
 
+def test_20260625_manifest_registers_native_stages_and_pack_local_strategy() -> None:
+    packs = load_event_manifests(EVENTS_PATH)
+    pack = next(pack for pack in packs if str(pack.pack_id) == "event_20260625_cn")
+
+    assert tuple(stage.ref.stage_id for stage in pack.stages) == ("t1", "t2", "t3", "ht1", "ht2", "ht3", "sp")
+    assert pack.stages[0].strategy == "campaign.event_20260625_cn.strategy:EarlyBossStrategy"
+    assert pack.stages[1].strategy == "campaign.event_20260625_cn.strategy:EarlyBossStrategy"
+    assert all(stage.strategy is None for stage in pack.stages[2:])
+
+
 def test_readme_renderer_matches_checked_in_output() -> None:
     packs = load_event_manifests(EVENTS_PATH)
 

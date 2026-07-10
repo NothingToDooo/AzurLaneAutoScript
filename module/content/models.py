@@ -45,9 +45,17 @@ class StageSpec:
     ref: StageRef
     source: str
     assets: tuple[AssetRef, ...] = ()
+    strategy: str | None = None
 
     def __post_init__(self) -> None:
         require_non_empty_identifier(self.source, field_name="source")
+        if self.strategy is not None:
+            if not isinstance(self.strategy, str):
+                message = "strategy must be a string or None"
+                raise TypeError(message)
+            if not self.strategy.strip():
+                message = "strategy must not be empty or whitespace"
+                raise ContentValidationError(message)
         object.__setattr__(self, "assets", tuple(self.assets))
 
 

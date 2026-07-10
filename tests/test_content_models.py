@@ -110,17 +110,25 @@ def test_campaign_policy_rejects_duplicate_keys_and_empty_loops() -> None:
         CampaignPolicy(loops=(("t", ()),))
 
 
-def test_stage_spec_carries_only_reference_source_and_assets() -> None:
+def test_stage_spec_carries_reference_source_assets_and_optional_strategy() -> None:
     asset = AssetRef(asset_id=ContentId("map"), path=Path("stages/t1.yaml"))
     stage = StageSpec(
         ref=StageRef(pack_id="event_20260625_cn", stage_id="t1"),
         source="campaign.event_20260625_cn.t1",
         assets=(asset,),
+        strategy="campaign.event_20260625_cn.strategy:CampaignStrategy",
     )
 
     assert stage.ref.stage_id == "t1"
     assert stage.source == "campaign.event_20260625_cn.t1"
     assert stage.assets == (asset,)
+    assert stage.strategy == "campaign.event_20260625_cn.strategy:CampaignStrategy"
+
+
+@pytest.mark.parametrize("strategy", ["", " ", "\t\n"])
+def test_stage_spec_rejects_empty_strategy(strategy: str) -> None:
+    with pytest.raises(ContentValidationError, match="strategy"):
+        StageSpec(StageRef("event_pack", "t1"), "stages/t1.yaml", strategy=strategy)
 
 
 def test_content_models_are_frozen_and_slotted() -> None:

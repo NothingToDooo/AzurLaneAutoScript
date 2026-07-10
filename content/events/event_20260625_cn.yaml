@@ -6,6 +6,23 @@ releases:
 - opened_on: '2026-06-25'
   name_cn: 美梦巡演奇妙夜
   order: 2670
+stages:
+- id: t1
+  source: stages/t1.yaml
+  strategy: campaign.event_20260625_cn.strategy:EarlyBossStrategy
+- id: t2
+  source: stages/t2.yaml
+  strategy: campaign.event_20260625_cn.strategy:EarlyBossStrategy
+- id: t3
+  source: stages/t3.yaml
+- id: ht1
+  source: stages/ht1.yaml
+- id: ht2
+  source: stages/ht2.yaml
+- id: ht3
+  source: stages/ht3.yaml
+- id: sp
+  source: stages/sp.yaml
 policy:
   aliases:
     a1: t1

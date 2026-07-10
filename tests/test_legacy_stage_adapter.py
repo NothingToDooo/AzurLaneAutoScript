@@ -214,7 +214,7 @@ def _legacy_stage_paths(campaign_root: Path = CAMPAIGN_ROOT) -> tuple[Path, ...]
     paths = []
     for path in sorted(campaign_root.rglob("*.py")):
         relative = path.relative_to(campaign_root)
-        if path.name in {"__init__.py", "campaign_base.py"} or relative in LEGACY_HELPER_MODULES:
+        if path.name in {"__init__.py", "campaign_base.py", "strategy.py"} or relative in LEGACY_HELPER_MODULES:
             continue
         paths.append(path)
     return tuple(paths)
