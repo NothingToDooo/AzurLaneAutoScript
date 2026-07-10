@@ -3,18 +3,6 @@ from types import SimpleNamespace
 from module.device.connection import Connection
 from module.map.map_grids import SelectedGrids
 
-_SERIAL_BOUND_CACHES = {
-    "port",
-    "is_mumu12_family",
-    "is_mumu_family",
-    "adb",
-    "emulator_instance",
-    "nemud_app_keep_alive",
-    "nemud_player_version",
-    "is_mumu_over_version_400",
-    "is_mumu_over_version_356",
-}
-
 
 def _device(serial: str, *, status: str = "device", may_mumu12_family: bool = False, port: int = 0):
     return SimpleNamespace(
@@ -81,24 +69,28 @@ def test_detect_device_keeps_configured_serial_when_multiple_mumu12_ports_are_vi
 
 
 def test_detect_device_updates_runtime_serial_for_shifted_mumu12_port_only() -> None:
+    old_serial = "127.0.0.1:16384"
+    new_serial = "127.0.0.1:16385"
     connection = _make_connection(
-        serial="127.0.0.1:16384",
-        device_batches=[[_mumu12("127.0.0.1:16385")]],
+        serial=old_serial,
+        device_batches=[[_mumu12(new_serial)]],
     )
-    connection.__dict__.update(
-        port=16384,
-        is_mumu12_family=True,
-        is_mumu_family=True,
-        adb=object(),
-        emulator_instance=object(),
-        nemud_app_keep_alive="false",
-        nemud_player_version="3.8.27.2950",
-        is_mumu_over_version_400=False,
-        is_mumu_over_version_356=True,
-    )
+    properties = {
+        old_serial: {"ro.product.cpu.abi": "arm64-v8a", "ro.build.version.sdk": "28"},
+        new_serial: {"ro.product.cpu.abi": "x86_64", "ro.build.version.sdk": "35"},
+    }
+    connection.__dict__["adb_client"] = object()
+    connection.__dict__["adb_getprop"] = lambda name: properties[connection.serial][name]
+    old_adb = connection.adb
+    assert connection.cpu_abi == "arm64-v8a"
+    assert connection.sdk_ver == 28
 
     connection.detect_device()
 
-    assert connection.config.Emulator_Serial == "127.0.0.1:16384"
-    assert connection.serial == "127.0.0.1:16385"
-    assert _SERIAL_BOUND_CACHES.isdisjoint(connection.__dict__)
+    assert connection.config.Emulator_Serial == old_serial
+    assert connection.serial == new_serial
+    assert connection.adb is not old_adb
+    assert connection.adb.serial == new_serial
+    assert connection.port == 16385
+    assert connection.cpu_abi == "x86_64"
+    assert connection.sdk_ver == 35

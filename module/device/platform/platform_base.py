@@ -35,6 +35,14 @@ class PlatformBase(Connection):
     Windows 模拟器平台的基类。
     """
 
+    _serial_bound_cached_properties = (
+        "emulator_instance",
+        "nemud_app_keep_alive",
+        "nemud_player_version",
+        "is_mumu_over_version_400",
+        "is_mumu_over_version_356",
+    )
+
     emulator_manager: EmulatorManagerBase
 
     @cached_property

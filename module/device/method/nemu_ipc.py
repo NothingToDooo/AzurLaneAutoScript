@@ -398,6 +398,8 @@ class NemuIpcImpl:
 
 
 class NemuIpc(Platform):
+    _serial_bound_cached_properties = ("nemu_ipc",)
+
     @cached_property
     def nemu_ipc(self) -> NemuIpcImpl:
         """

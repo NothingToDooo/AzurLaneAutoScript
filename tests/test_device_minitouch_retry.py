@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 from adbutils.errors import AdbError
 
@@ -159,3 +161,35 @@ def test_minitouch_release_resource_clears_cached_builder() -> None:
     device.release_resource()
 
     assert "_minitouch_builder" not in device.__dict__
+
+
+def test_minitouch_rebind_excludes_old_pid_from_new_device_restart() -> None:
+    old_serial = "127.0.0.1:16384"
+    new_serial = "127.0.0.1:16385"
+    device = object.__new__(Minitouch)
+    device.serial = old_serial
+    device.config = SimpleNamespace(Emulator_Serial=old_serial)
+    device.__dict__.update(
+        _minitouch_port=0,
+        _minitouch_client=None,
+        _minitouch_stream=None,
+        _minitouch_pid="4312",
+    )
+    adb_calls: list[tuple[str, object]] = []
+
+    def adb_shell(command, **_kwargs):
+        adb_calls.append((device.serial, command))
+        if isinstance(command, str):
+            return "u0_a123 9821 1 S minitouch"
+        return ""
+
+    device.__dict__["adb_shell"] = adb_shell
+    device.__dict__["_start_minitouch_service"] = lambda: None
+
+    device.bind_serial(new_serial)
+    restart_minitouch_service = vars(Minitouch)["_restart_minitouch_service"]
+    restart_minitouch_service(device)
+
+    killed_pids = {command[1] for _, command in adb_calls if isinstance(command, list) and command[:1] == ["kill"]}
+    assert killed_pids == {"9821"}
+    assert {serial for serial, _ in adb_calls} == {new_serial}

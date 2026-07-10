@@ -2,23 +2,10 @@ from types import SimpleNamespace
 
 import pytest
 
+from module.device import connection_attr as connection_attr_module
 from module.device.connection_attr import ConnectionAttr
 from module.device.device import Device
 from module.exception import RequestHumanTakeover
-
-_SERIAL_BOUND_CACHES = {
-    "port",
-    "is_mumu12_family",
-    "is_mumu_family",
-    "adb",
-    "emulator_instance",
-    "nemud_app_keep_alive",
-    "nemud_player_version",
-    "is_mumu_over_version_400",
-    "is_mumu_over_version_356",
-    "nemu_ipc",
-    "_minitouch_builder",
-}
 
 
 class _Closeable:
@@ -71,19 +58,11 @@ def _prime_serial_bound_state(connection: Device):
     forward_removals: list[tuple[str, str]] = []
 
     connection.__dict__.update(
-        port=int(connection.serial.rsplit(":", 1)[-1]),
-        is_mumu12_family=True,
-        is_mumu_family=True,
-        adb=SimpleNamespace(serial=connection.serial),
-        emulator_instance=object(),
-        nemud_app_keep_alive="false",
-        nemud_player_version="3.8.27.2950",
-        is_mumu_over_version_400=False,
-        is_mumu_over_version_356=True,
         nemu_ipc=nemu_ipc,
         _minitouch_port=23456,
         _minitouch_client=client,
         _minitouch_stream=stream,
+        _minitouch_pid="4312",
         _minitouch_builder=object(),
     )
     connection.__dict__["adb_forward_remove"] = lambda local: forward_removals.append((local, connection.serial))
@@ -96,10 +75,12 @@ def _prime_serial_bound_state(connection: Device):
 
 
 def _assert_serial_bound_state_released(connection: Device, state, *, old_serial: str) -> None:
-    assert _SERIAL_BOUND_CACHES.isdisjoint(connection.__dict__)
     assert connection.__dict__["_minitouch_port"] == 0
     assert connection.__dict__["_minitouch_client"] is None
     assert connection.__dict__["_minitouch_stream"] is None
+    assert connection.__dict__["_minitouch_pid"] == ""
+    assert "_minitouch_builder" not in connection.__dict__
+    assert "nemu_ipc" not in connection.__dict__
     assert state.client.closed_at == [old_serial]
     assert state.stream.closed_at == [old_serial]
     assert state.nemu_ipc.disconnected_at == [old_serial]
@@ -143,6 +124,48 @@ def test_bind_serial_persists_explicit_change() -> None:
     assert changed is True
     assert connection.serial == "127.0.0.1:16385"
     assert connection.config.Emulator_Serial == "127.0.0.1:16385"
+
+
+def test_bind_serial_recomputes_each_layer_from_new_serial(monkeypatch) -> None:
+    old_serial = "127.0.0.1:16384"
+    new_serial = "127.0.0.1:16385"
+    connection = _make_connection(old_serial)
+    family_checks: list[str] = []
+    properties = {
+        old_serial: {"ro.product.cpu.abi": "arm64-v8a", "ro.build.version.sdk": "28"},
+        new_serial: {"ro.product.cpu.abi": "x86_64", "ro.build.version.sdk": "35"},
+    }
+
+    def is_mumu12_serial(serial: str) -> bool:
+        family_checks.append(serial)
+        return True
+
+    monkeypatch.setattr(connection_attr_module, "is_mumu12_serial", is_mumu12_serial)
+    connection.__dict__["adb_client"] = object()
+    connection.__dict__["adb_getprop"] = lambda name: properties[connection.serial][name]
+    connection.__dict__["find_emulator_instance"] = lambda serial: SimpleNamespace(serial=serial)
+
+    old_adb = connection.adb
+    assert connection.port == 16384
+    assert connection.is_mumu_family is True
+    assert connection.cpu_abi == "arm64-v8a"
+    assert connection.sdk_ver == 28
+    old_instance = connection.emulator_instance
+    assert old_instance is not None
+    assert old_instance.serial == old_serial
+
+    connection.bind_serial(new_serial)
+
+    assert connection.adb is not old_adb
+    assert connection.adb.serial == new_serial
+    assert connection.port == 16385
+    assert connection.is_mumu_family is True
+    assert connection.cpu_abi == "x86_64"
+    assert connection.sdk_ver == 35
+    new_instance = connection.emulator_instance
+    assert new_instance is not None
+    assert new_instance.serial == new_serial
+    assert family_checks == [old_serial, new_serial]
 
 
 def test_serial_check_revises_through_persistent_rebinding() -> None:

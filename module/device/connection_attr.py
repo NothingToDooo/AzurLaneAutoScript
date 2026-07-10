@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import adbutils
 from adbutils import AdbClient, AdbDevice
@@ -12,6 +13,9 @@ from module.exception import RequestHumanTakeover
 from module.logger import logger
 from module.webui.setting import State
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 
 class ConnectionAttr:
     config: AzurLaneConfig
@@ -22,13 +26,6 @@ class ConnectionAttr:
         "is_mumu12_family",
         "is_mumu_family",
         "adb",
-        "emulator_instance",
-        "nemud_app_keep_alive",
-        "nemud_player_version",
-        "is_mumu_over_version_400",
-        "is_mumu_over_version_356",
-        "nemu_ipc",
-        "_minitouch_builder",
     )
 
     adb_binary_list = (
@@ -62,6 +59,17 @@ class ConnectionAttr:
         self.serial = str(self.config.Emulator_Serial)
         self.serial_check()
 
+    def _iter_serial_bound_cached_properties(self) -> Iterator[str]:
+        """按 MRO 顺序收集各层声明的 serial 派生缓存。"""
+        seen: set[str] = set()
+        for owner in type(self).__mro__:
+            names = owner.__dict__.get("_serial_bound_cached_properties", ())
+            for name in names:
+                if name in seen:
+                    continue
+                seen.add(name)
+                yield name
+
     def bind_serial(self, serial: str, *, persist: bool = False) -> bool:
         """释放旧连接状态并发布新的 serial。"""
         if serial == self.serial:
@@ -71,7 +79,7 @@ class ConnectionAttr:
         if callable(release_resource):
             release_resource()
 
-        for name in self._serial_bound_cached_properties:
+        for name in self._iter_serial_bound_cached_properties():
             del_cached_property(self, name)
 
         if persist:

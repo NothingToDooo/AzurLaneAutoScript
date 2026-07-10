@@ -344,6 +344,8 @@ def retry(func):
 
 
 class Minitouch(Connection):
+    _serial_bound_cached_properties = ("_minitouch_builder",)
+
     _minitouch_port: int = 0
     _minitouch_client: socket.socket | None = None
     _minitouch_pid: str = ""
@@ -385,6 +387,7 @@ class Minitouch(Connection):
         if remove_forward and self._minitouch_port:
             self.adb_forward_remove(f"tcp:{self._minitouch_port}")
             self._minitouch_port = 0
+        self._minitouch_pid = ""
         del_cached_property(self, "_minitouch_builder")
 
     def _ensure_minitouch_executable(self):

@@ -115,6 +115,8 @@ class AdbDeviceWithStatus(AdbDevice):
 
 
 class AdbSession(ConnectionAttr):
+    _serial_bound_cached_properties = ("cpu_abi", "sdk_ver")
+
     def adb_start_server(self):
         """
         触发 adbutils 启动 ADB server。
