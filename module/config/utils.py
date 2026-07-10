@@ -284,7 +284,7 @@ def random_normal_distribution_int(a, b, n=3):
         int
     """
     if a < b:
-        output = sum([random.randint(a, b) for _ in range(n)]) / n
+        output = sum(random.randint(a, b) for _ in range(n)) / n
         return round(output)
     return b
 

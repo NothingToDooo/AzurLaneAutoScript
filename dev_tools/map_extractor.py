@@ -415,7 +415,7 @@ class MapData:
         self.MAP_HAS_MAP_STORY = bool(self.data["story_refresh_boss"])
         self.MAP_HAS_FLEET_STEP = bool(self.data["is_limit_move"])
         self.MAP_HAS_AMBUSH = bool(self.data["is_ambush"]) or bool(self.data["is_air_attack"])
-        self.MAP_HAS_MYSTERY = sum([b.get("mystery", 0) for b in self.spawn_data]) > 0
+        self.MAP_HAS_MYSTERY = sum(b.get("mystery", 0) for b in self.spawn_data) > 0
         self.MAP_HAS_PORTAL = bool(self.portal)
         self.MAP_HAS_LAND_BASED = bool(self.land_based)
         for n in range(1, 4):
@@ -423,8 +423,8 @@ class MapData:
 
     def parse_map_data(self, grids, event_enemy_data=None):
         map_data = {}
-        offset_y = min([grid[0] for grid in grids.values()])
-        offset_x = min([grid[1] for grid in grids.values()])
+        offset_y = min(grid[0] for grid in grids.values())
+        offset_x = min(grid[1] for grid in grids.values())
         for grid in grids.values():
             loca = (grid[1] - offset_x, grid[0] - offset_y)
             info = "++" if not grid[2] else self.dic_grid_info.get(grid[3], "??")

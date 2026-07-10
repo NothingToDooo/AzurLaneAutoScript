@@ -45,8 +45,8 @@ def show_function_call():
         filename = Path(filename).name
         # /tasks/character/switch.py:64 character_update()
         func_list.append([filename, str(line_number), function_name])
-    max_filename = max([len(row[0]) for row in func_list])
-    max_linenum = max([len(row[1]) for row in func_list]) + 1
+    max_filename = max(len(row[0]) for row in func_list)
+    max_linenum = max(len(row[1]) for row in func_list) + 1
 
     def format_(file, line, func):
         file = file.rjust(max_filename, " ")

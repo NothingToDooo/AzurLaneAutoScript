@@ -281,7 +281,7 @@ class RewardDorm(UI):
             food, fill = self.dorm_food_get()
             if fill == -1:
                 continue
-            if sum([f.amount for f in food]) > 0:
+            if sum(f.amount for f in food) > 0:
                 break
         fill = max(fill, 0)
 

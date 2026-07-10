@@ -80,7 +80,7 @@ class ResearchSelector(ResearchUI):
                 logger.warning("Failed to OCR research name after 3 trial, assume correct")
                 break
 
-            if sum([p.valid for p in projects]) < 5:
+            if sum(p.valid for p in projects) < 5:
                 # Leftmost research series covered by battle pass info, see #1037
                 logger.info("Invalid project detected")
                 logger.info("Probably because of battle pass info or too fast screenshot")
