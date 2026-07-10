@@ -86,8 +86,7 @@ class LuaSetting:
     # "AUTOFIGHT_BATTERY_SAVEMODE, 0"
     # "world_help_progress"
     code: str
-
-    duplicate = False
+    duplicate: bool = False
 
     @cached_property
     def setting_code(self):
@@ -165,8 +164,7 @@ class SettingExtractor:
     def iter_file_from_folder(folder):
         for path, _folders, files in os.walk(folder):
             for filename in files:
-                file = f"{path}/{filename}"
-                yield file
+                yield f"{path}/{filename}"
 
     def iter_generated_lines(self, folder):
         dic_settings = set()
