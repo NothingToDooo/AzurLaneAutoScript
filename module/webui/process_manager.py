@@ -182,15 +182,15 @@ class ProcessManager:
         if instances is None:
             instances = []
 
-        _instances = set()
+        resolved_instances = set()
 
         for instance in instances:
             if isinstance(instance, str):
-                _instances.add(ProcessManager.get_manager(instance))
+                resolved_instances.add(ProcessManager.get_manager(instance))
             elif isinstance(instance, ProcessManager):
-                _instances.add(instance)
+                resolved_instances.add(instance)
 
-        for process in _instances:
+        for process in resolved_instances:
             logger.info(f"Starting [{process.config_name}]")
             process.start(func="alas", ev=ev)
 

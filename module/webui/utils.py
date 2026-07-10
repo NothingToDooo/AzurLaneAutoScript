@@ -324,13 +324,13 @@ class Switch:
         Predefined generator when `get_state` is an callable
         Customize it if you have multiple criteria on state
         """
-        _status = self.get_state()
-        yield _status
+        previous_status = self.get_state()
+        yield previous_status
         while True:
             status = self.get_state()
-            if _status != status:
-                _status = status
-                yield _status
+            if previous_status != status:
+                previous_status = status
+                yield previous_status
                 continue
             yield -1
 
@@ -377,14 +377,12 @@ def filepath_icon(filename):
 
 
 def add_css(filepath):
-    with Path(filepath).open(encoding="utf-8") as f:
-        css = f.read().replace("\n", "")
-        run_js(f"""$('head').append('<style>{css}</style>')""")
+    css = Path(filepath).read_text(encoding="utf-8").replace("\n", "")
+    run_js(f"""$('head').append('<style>{css}</style>')""")
 
 
 def _read(path):
-    with Path(path).open(encoding="utf-8") as f:
-        return f.read()
+    return Path(path).read_text(encoding="utf-8")
 
 
 class Icon:

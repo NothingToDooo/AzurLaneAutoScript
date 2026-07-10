@@ -224,7 +224,7 @@ class AlasGUI(Frame):
         ).style("--menu-Overview--")
 
         for menu, task_data in self.ALAS_MENU.items():
-            _onclick = self.alas_daemon_overview if task_data.get("page") == "tool" else self.alas_set_group
+            onclick = self.alas_daemon_overview if task_data.get("page") == "tool" else self.alas_set_group
 
             if task_data.get("menu") == "collapse":
                 task_btn_list = [
@@ -236,7 +236,7 @@ class AlasGUI(Frame):
                                 "color": "menu",
                             }
                         ],
-                        onclick=_onclick,
+                        onclick=onclick,
                     ).style(f"--menu-{task}--")
                     for task in task_data.get("tasks", [])
                 ]
@@ -259,7 +259,7 @@ class AlasGUI(Frame):
                                 "color": "menu",
                             }
                         ],
-                        onclick=_onclick,
+                        onclick=onclick,
                     ).style(f"--menu-{task}--").style("padding-left: 0.75rem")
 
         self.alas_overview()
@@ -824,9 +824,9 @@ class AlasGUI(Frame):
         self._init_alas_config_watcher()
 
         # 保存配置。
-        _thread_save_config = threading.Thread(target=self._alas_thread_update_config)
-        register_thread(_thread_save_config)
-        _thread_save_config.start()
+        save_config_thread = threading.Thread(target=self._alas_thread_update_config)
+        register_thread(save_config_thread)
+        save_config_thread.start()
 
         visibility_state_switch = Switch(
             status={
@@ -886,8 +886,7 @@ def app_manage():
 
     def _export(config_name: str):
         filename = format_export_config_filename(config_name)
-        with Path(filepath_config(config_name)).open("rb") as f:
-            download(filename, f.read())
+        download(filename, Path(filepath_config(config_name)).read_bytes())
 
     def _new():
         def validate(s: str):
