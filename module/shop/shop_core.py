@@ -38,16 +38,7 @@ class CoreShop_250814(ShopClerk, ShopStatus):
         return shop_core_items
 
     def shop_items(self):
-        """
-        Shared alias for all shops
-        If there are server-lang
-        differences, reference
-        shop_guild/medal for @Config
-        example
-
-        Returns:
-            ShopItemGrid:
-        """
+        """覆盖统一接口，返回当前商店专用的商品识别网格。"""
         return self.shop_core_items
 
     def shop_currency(self):

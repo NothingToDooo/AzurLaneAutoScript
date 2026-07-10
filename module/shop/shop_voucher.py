@@ -148,14 +148,7 @@ class VoucherShop(ShopClerk, ShopStatus):
         return shop_voucher_items
 
     def shop_items(self):
-        """
-        Shared alias name for all shops,
-        so to use  @Config must define
-        a unique alias as cover
-
-        Returns:
-            ShopItemGrid:
-        """
+        """覆盖统一接口，返回当前商店专用的商品识别网格。"""
         return self.shop_voucher_items
 
     def shop_currency(self):

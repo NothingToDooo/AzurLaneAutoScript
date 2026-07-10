@@ -40,14 +40,7 @@ class GuildShop_250814(ShopClerk, ShopUI, ShopStatus):
         return shop_guild_items
 
     def shop_items(self):
-        """
-        Shared alias for all shops,
-        so for @Config must define
-        a unique alias as cover
-
-        Returns:
-            ShopItemGrid:
-        """
+        """覆盖统一接口，返回当前商店专用的商品识别网格。"""
         return self.shop_guild_items
 
     def shop_currency(self):

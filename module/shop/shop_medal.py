@@ -170,17 +170,7 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
         return shop_medal_items
 
     def shop_items(self) -> ShopItemGrid_250814:
-        """
-        Shared alias name for all shops,
-        so to use  @Config must define
-        a unique alias as cover
-        Overriding to add type hint to
-        accommodate unique func,
-        get_soldout_count in run()
-
-        Returns:
-            ShopItemGrid_250814:
-        """
+        """覆盖统一接口，返回当前商店专用的商品识别网格。"""
         return self.shop_medal_items
 
     def shop_currency(self):
