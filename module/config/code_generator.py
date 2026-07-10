@@ -47,8 +47,7 @@ class CodeGenerator:
 
     def write(self, file: str):
         lines = "".join(self.lines)
-        with Path(file).open("w", encoding="utf-8", newline="") as f:
-            f.write(lines)
+        Path(file).write_text(lines, encoding="utf-8", newline="")
 
     def _line_with_tabs(self, line, comment=False, newline=True):
         if comment:

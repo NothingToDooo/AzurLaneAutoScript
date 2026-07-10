@@ -97,8 +97,7 @@ class PlatformBase(Connection):
 
         file = instance.mumu_vms_config("customer_config.json")
         try:
-            with Path(file).open(encoding="utf-8") as f:
-                data = json.loads(f.read())
+            data = json.loads(Path(file).read_text(encoding="utf-8"))
         except FileNotFoundError:
             logger.warning(f"Failed to check check_mumu_app_keep_alive, file {file} not exists")
             return False
@@ -152,8 +151,7 @@ class PlatformBase(Connection):
 
         file = instance.mumu_vms_config("customer_config.json")
         try:
-            with Path(file).open(encoding="utf-8") as f:
-                data = json.loads(f.read())
+            data = json.loads(Path(file).read_text(encoding="utf-8"))
         except FileNotFoundError:
             logger.warning(f"Failed to check check_mumu_bridge_network, file {file} not exists")
             return False

@@ -92,8 +92,7 @@ class LuaLoader:
         Returns:
             dict:
         """
-        with Path(self.filepath(file)).open(encoding="utf-8") as f:
-            text = f.read()
+        text = Path(self.filepath(file)).read_text(encoding="utf-8")
 
         if "pg.base." in text:
             base_name = self._infer_base_name(file, keyword)
