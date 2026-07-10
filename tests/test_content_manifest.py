@@ -265,6 +265,42 @@ def test_manifest_rejects_path_like_policy_targets(tmp_path: Path, target: str) 
         load_event_manifests(root)
 
 
+@pytest.mark.parametrize(
+    "extra",
+    [
+        "stages:\n  - id: T1\n    source: stages/t1.yaml",
+        ("stages:\n  - id: t1\n    source: stages/t1.yaml\npolicy:\n  aliases:\n    SHORTCUT: t1"),
+        ("stages:\n  - id: t1\n    source: stages/t1.yaml\npolicy:\n  loops:\n    DAILY: [t1]"),
+        ("stages:\n  - id: t1\n    source: stages/t1.yaml\npolicy:\n  aliases:\n    shortcut: T1"),
+    ],
+)
+def test_manifest_rejects_noncanonical_stage_identifiers(tmp_path: Path, extra: str) -> None:
+    root = tmp_path / "content" / "events"
+    pack_root = root / "event_20260625_cn"
+    (pack_root / "stages").mkdir(parents=True)
+    (pack_root / "stages" / "t1.yaml").write_text("map: t1\n", encoding="utf-8")
+    _write_manifest(root, "event_20260625_cn.yaml", _manifest_with(extra))
+
+    with pytest.raises(ContentValidationError, match="canonical lowercase"):
+        load_event_manifests(root)
+
+
+@pytest.mark.parametrize(
+    "fallback",
+    [
+        "completionist: map_3_stars",
+        "threat_safe: completionist",
+    ],
+)
+def test_manifest_rejects_unsupported_map_achievement_fallbacks(tmp_path: Path, fallback: str) -> None:
+    root = tmp_path / "content" / "events"
+    body = _manifest_with(f"policy:\n  map_achievement_fallbacks:\n    {fallback}")
+    _write_manifest(root, "event_20260625_cn.yaml", body)
+
+    with pytest.raises(ContentValidationError, match="MapAchievement"):
+        load_event_manifests(root)
+
+
 def test_manifest_rejects_pack_root_junction_outside_events_directory(tmp_path: Path) -> None:
     root = tmp_path / "content" / "events"
     root.mkdir(parents=True)

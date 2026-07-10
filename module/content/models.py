@@ -37,6 +37,9 @@ class AssetRef:
     path: Path
 
     def __post_init__(self) -> None:
+        if not isinstance(self.asset_id, ContentId):
+            message = "asset_id must be a ContentId"
+            raise TypeError(message)
         object.__setattr__(self, "path", Path(self.path))
 
 
@@ -48,7 +51,14 @@ class StageSpec:
     strategy: str | None = None
 
     def __post_init__(self) -> None:
+        if not isinstance(self.ref, StageRef):
+            message = "ref must be a StageRef"
+            raise TypeError(message)
         require_non_empty_identifier(self.source, field_name="source")
+        assets = tuple(self.assets)
+        if any(not isinstance(asset, AssetRef) for asset in assets):
+            message = "assets must contain AssetRef instances"
+            raise TypeError(message)
         if self.strategy is not None:
             if not isinstance(self.strategy, str):
                 message = "strategy must be a string or None"
@@ -56,7 +66,7 @@ class StageSpec:
             if not self.strategy.strip():
                 message = "strategy must not be empty or whitespace"
                 raise ContentValidationError(message)
-        object.__setattr__(self, "assets", tuple(self.assets))
+        object.__setattr__(self, "assets", assets)
 
 
 @dataclass(frozen=True, slots=True)

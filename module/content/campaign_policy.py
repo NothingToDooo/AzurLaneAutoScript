@@ -5,6 +5,14 @@ from typing import Protocol
 from module.content.errors import ContentValidationError
 from module.logger import logger
 
+MAP_ACHIEVEMENT_VALUES = (
+    "non_stop",
+    "100_percent_clear",
+    "map_3_stars",
+    "threat_safe",
+    "threat_safe_without_3_stars",
+)
+
 
 class PolicyConfig(Protocol):
     def override(self, **kwargs: object) -> None: ...
@@ -40,6 +48,14 @@ class CampaignPolicy:
         if any(not stages for _, stages in loops):
             message = "loop stages must not be empty"
             raise ContentValidationError(message)
+        map_achievement_fallbacks = tuple((source, target) for source, target in self.map_achievement_fallbacks)
+        if any(
+            not isinstance(value, str) or value not in MAP_ACHIEVEMENT_VALUES
+            for pair in map_achievement_fallbacks
+            for value in pair
+        ):
+            message = f"map_achievement_fallbacks must use supported MapAchievement values: {MAP_ACHIEVEMENT_VALUES}"
+            raise ContentValidationError(message)
 
         object.__setattr__(self, "aliases", aliases)
         object.__setattr__(
@@ -49,7 +65,7 @@ class CampaignPolicy:
         )
         object.__setattr__(self, "force_threat_safe_stages", tuple(self.force_threat_safe_stages))
         object.__setattr__(self, "resource_free_stages", tuple(self.resource_free_stages))
-        object.__setattr__(self, "map_achievement_fallbacks", tuple(self.map_achievement_fallbacks))
+        object.__setattr__(self, "map_achievement_fallbacks", map_achievement_fallbacks)
 
     def resolve_alias(self, stage: str) -> str:
         return dict(self.aliases).get(stage, stage)

@@ -8,7 +8,7 @@ from typing import cast
 import yaml
 from yaml.resolver import BaseResolver
 
-from module.content.campaign_policy import CampaignPolicy
+from module.content.campaign_policy import MAP_ACHIEVEMENT_VALUES, CampaignPolicy
 from module.content.errors import ContentValidationError
 from module.content.models import (
     EVENT_KINDS,
@@ -111,6 +111,8 @@ def _safe_stage_id(value: object, path: Path, location: str) -> str:
     stage_id = _string(value, path, location)
     if stage_id in {".", ".."} or any(character in stage_id for character in ("/", "\\", ":")):
         raise _fail(path, location, "must be a safe stage id without path semantics")
+    if stage_id != stage_id.lower():
+        raise _fail(path, location, "must use canonical lowercase")
     return stage_id
 
 
@@ -237,18 +239,38 @@ def _string_mapping(raw: object, path: Path, location: str) -> tuple[tuple[str, 
     return tuple(result)
 
 
+def _stage_mapping(raw: object, path: Path, location: str) -> tuple[tuple[str, str], ...]:
+    data = _free_mapping(raw, path, location)
+    result = []
+    for key, value in data.items():
+        source = _safe_stage_id(key, path, f"{location}.<key>")
+        target = _safe_stage_id(value, path, f"{location}.{source}")
+        result.append((source, target))
+    return tuple(result)
+
+
+def _map_achievement_mapping(raw: object, path: Path, location: str) -> tuple[tuple[str, str], ...]:
+    values = _string_mapping(raw, path, location)
+    for source, target in values:
+        if source not in MAP_ACHIEVEMENT_VALUES:
+            raise _fail(path, f"{location}.<key>", "must be a supported MapAchievement value")
+        if target not in MAP_ACHIEVEMENT_VALUES:
+            raise _fail(path, f"{location}.{source}", "must be a supported MapAchievement value")
+    return values
+
+
 def _stage_list(raw: object, path: Path, location: str) -> tuple[str, ...]:
     values = _sequence(raw, path, location)
-    return tuple(_string(value, path, f"{location}[{index}]") for index, value in enumerate(values))
+    return tuple(_safe_stage_id(value, path, f"{location}[{index}]") for index, value in enumerate(values))
 
 
 def _load_policy(raw: object, path: Path) -> CampaignPolicy:
     data = _mapping(raw, path, "policy", _POLICY_FIELDS)
-    aliases = _string_mapping(data.get("aliases", {}), path, "policy.aliases")
+    aliases = _stage_mapping(data.get("aliases", {}), path, "policy.aliases")
     loops_raw = _free_mapping(data.get("loops", {}), path, "policy.loops")
     loops = tuple(
         (
-            _string(alias, path, "policy.loops.<key>"),
+            _safe_stage_id(alias, path, "policy.loops.<key>"),
             _stage_list(stages, path, f"policy.loops.{alias}"),
         )
         for alias, stages in loops_raw.items()
@@ -268,7 +290,7 @@ def _load_policy(raw: object, path: Path) -> CampaignPolicy:
             path,
             "policy.resource_free_stages",
         ),
-        map_achievement_fallbacks=_string_mapping(
+        map_achievement_fallbacks=_map_achievement_mapping(
             data.get("map_achievement_fallbacks", {}),
             path,
             "policy.map_achievement_fallbacks",

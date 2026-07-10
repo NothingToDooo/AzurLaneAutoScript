@@ -125,6 +125,45 @@ def test_stage_spec_carries_reference_source_assets_and_optional_strategy() -> N
     assert stage.strategy == "campaign.event_20260625_cn.strategy:CampaignStrategy"
 
 
+def test_asset_ref_requires_content_id() -> None:
+    with pytest.raises(TypeError, match="asset_id"):
+        AssetRef(asset_id=cast("ContentId", "map"), path=Path("assets/map.yaml"))
+
+
+def test_stage_spec_requires_stage_ref() -> None:
+    with pytest.raises(TypeError, match="ref"):
+        StageSpec(ref=cast("StageRef", "t1"), source="stages/t1.yaml")
+
+
+def test_stage_spec_converts_assets_to_tuple_and_rejects_invalid_members() -> None:
+    ref = StageRef("event_pack", "t1")
+    asset = AssetRef(ContentId("map"), Path("assets/map.yaml"))
+
+    stage = StageSpec(ref=ref, source="stages/t1.yaml", assets=cast("tuple[AssetRef, ...]", [asset]))
+
+    assert stage.assets == (asset,)
+    with pytest.raises(TypeError, match="assets"):
+        StageSpec(
+            ref=ref,
+            source="stages/t1.yaml",
+            assets=cast("tuple[AssetRef, ...]", [asset, object()]),
+        )
+
+
+@pytest.mark.parametrize(
+    "fallbacks",
+    [
+        (("completionist", "map_3_stars"),),
+        (("threat_safe", "completionist"),),
+    ],
+)
+def test_campaign_policy_rejects_unsupported_map_achievement_fallbacks(
+    fallbacks: tuple[tuple[str, str], ...],
+) -> None:
+    with pytest.raises(ContentValidationError, match="MapAchievement"):
+        CampaignPolicy(map_achievement_fallbacks=fallbacks)
+
+
 @pytest.mark.parametrize("strategy", ["", " ", "\t\n"])
 def test_stage_spec_rejects_empty_strategy(strategy: str) -> None:
     with pytest.raises(ContentValidationError, match="strategy"):
