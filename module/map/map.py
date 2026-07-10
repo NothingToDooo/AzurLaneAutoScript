@@ -405,7 +405,6 @@ class Map(Fleet):
 
         for grid in grids:
             logger.hr("Clear potential BOSS")
-            grids = grids.sort("weight", "cost")
             logger.info(f"Grid: {grid}")
             self.fleet_boss.clear_chosen_enemy(grid, expected=expected)
             if self.battle_count > battle_count:
