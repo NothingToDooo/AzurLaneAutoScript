@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast, get_type_hints
 
 import pytest
 
@@ -20,6 +20,7 @@ from module.map.map_base import CampaignMap
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from typing import Any
 
 AFTER_RUN_METHOD = "_handle_campaign_after_run"
 ENSURE_UI_METHOD = "_ensure_campaign_run_ui"
@@ -328,6 +329,32 @@ def _ensure_run_ui(runner, mode: str = "normal") -> None:
     getattr(runner, ENSURE_UI_METHOD)(mode)
 
 
+def _campaign_load_state_class() -> type[Any]:
+    return cast("type[Any]", vars(campaign_run_module)["_CampaignLoadState"])
+
+
+def test_campaign_load_state_annotations_are_runtime_resolvable() -> None:
+    load_state_class = _campaign_load_state_class()
+
+    hints = get_type_hints(load_state_class)
+
+    assert hints["campaign"] is CampaignBase
+
+
+def test_campaign_load_state_rejects_non_campaign_instance() -> None:
+    _, adapter = _make_load_runner()
+
+    with pytest.raises(TypeError, match="CampaignBase"):
+        _campaign_load_state_class()(
+            name="t1",
+            folder="event_test",
+            stage="t1",
+            loaded=adapter.loaded_stage,
+            loaded_stage=adapter.loaded_stage,
+            campaign=cast("CampaignBase", object()),
+        )
+
+
 def test_load_campaign_uses_stage_adapter_and_preserves_construction_semantics() -> None:
     runner, adapter = _make_load_runner()
 
@@ -366,6 +393,30 @@ def test_load_campaign_unknown_folder_uses_current_name_as_stage() -> None:
     assert runner.load_campaign("custom_stage", folder="custom_pack") is True
 
     assert (runner.folder, runner.name, runner.stage) == ("custom_pack", "custom_stage", "custom_stage")
+
+
+@pytest.mark.parametrize("first_kind", ["stage", "helper"])
+def test_load_campaign_identity_includes_stage_or_helper_kind(first_kind: str) -> None:
+    runner, adapter = _make_load_runner()
+    name = "same"
+    folder = "event_same"
+
+    if first_kind == "stage":
+        assert runner.load_campaign(name, folder=folder) is True
+        first_campaign = runner.campaign
+        assert runner.load_campaign_helper(name, folder=folder) is True
+        assert runner.load_campaign_helper(name, folder=folder) is False
+        assert runner.loaded_stage is None
+    else:
+        assert runner.load_campaign_helper(name, folder=folder) is True
+        first_campaign = runner.campaign
+        assert runner.load_campaign(name, folder=folder) is True
+        assert runner.load_campaign(name, folder=folder) is False
+        assert runner.loaded_stage is adapter.loaded_stage
+
+    assert adapter.stage_refs == [StageRef(folder, name)]
+    assert adapter.helper_refs == [StageRef(folder, name)]
+    assert runner.campaign is not first_campaign
 
 
 @pytest.mark.parametrize("load_kind", ["stage", "helper"])

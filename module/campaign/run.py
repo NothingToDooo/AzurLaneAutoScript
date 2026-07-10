@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast
 
+from module.campaign.campaign_base import CampaignBase
 from module.campaign.campaign_event import CampaignEvent
 from module.campaign.campaign_ui import MODE_SWITCH_1
 from module.content.legacy_stage import LegacyStageModuleAdapter, LoadedCampaignModule, LoadedStage
@@ -16,7 +17,6 @@ from module.logger import logger
 from module.ui.page import page_campaign
 
 if TYPE_CHECKING:
-    from module.campaign.campaign_base import CampaignBase
     from module.config.config import AzurLaneConfig
 
 
@@ -41,6 +41,11 @@ class _CampaignLoadState:
     loaded: LoadedCampaignModule
     loaded_stage: LoadedStage | None
     campaign: CampaignBase
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.campaign, CampaignBase):
+            message = "campaign load state requires a CampaignBase instance"
+            raise TypeError(message)
 
 
 SP_STAGE_ALIASES = {
@@ -233,8 +238,12 @@ class CampaignRun(CampaignEvent):
     run_limit: int
     is_stage_loop = False
 
-    def _campaign_identity_matches(self, name: str, folder: str) -> bool:
-        return getattr(self, "name", None) == name and getattr(self, "folder", None) == folder
+    def _campaign_identity_matches(self, name: str, folder: str, *, is_stage: bool) -> bool:
+        return (
+            getattr(self, "name", None) == name
+            and getattr(self, "folder", None) == folder
+            and (self.loaded_stage is not None) == is_stage
+        )
 
     def _stage_for_reference(self, name: str, folder: str) -> str:
         if folder.startswith("campaign_"):
@@ -288,7 +297,7 @@ class CampaignRun(CampaignEvent):
         self.campaign = state.campaign
 
     def load_campaign(self, name: str, folder: str = "campaign_main") -> bool:
-        if self._campaign_identity_matches(name, folder):
+        if self._campaign_identity_matches(name, folder, is_stage=True):
             return False
 
         ref = StageRef(pack_id=folder, stage_id=name)
@@ -303,7 +312,7 @@ class CampaignRun(CampaignEvent):
 
     def load_campaign_helper(self, name: str, folder: str) -> bool:
         """装载不带地图的历史战役辅助模块。"""
-        if self._campaign_identity_matches(name, folder):
+        if self._campaign_identity_matches(name, folder, is_stage=False):
             return False
 
         ref = StageRef(pack_id=folder, stage_id=name)
