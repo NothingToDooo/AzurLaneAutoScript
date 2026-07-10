@@ -377,13 +377,13 @@ def filepath_icon(filename):
 
 
 def add_css(filepath):
-    with Path(filepath).open() as f:
+    with Path(filepath).open(encoding="utf-8") as f:
         css = f.read().replace("\n", "")
         run_js(f"""$('head').append('<style>{css}</style>')""")
 
 
 def _read(path):
-    with Path(path).open() as f:
+    with Path(path).open(encoding="utf-8") as f:
         return f.read()
 
 
