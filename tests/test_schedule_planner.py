@@ -1,5 +1,6 @@
 from dataclasses import FrozenInstanceError
 from datetime import UTC, datetime, timedelta
+from typing import get_type_hints
 
 import pytest
 
@@ -43,6 +44,12 @@ def test_planner_treats_exact_now_as_waiting() -> None:
     assert decision.wake_at == NOW
     assert decision.pending == ()
     assert decision.waiting == (_entry("Main", NOW),)
+
+
+def test_planner_public_annotations_can_be_resolved() -> None:
+    hints = get_type_hints(SchedulePlanner.select)
+
+    assert {"entries", "now", "priority", "return"} == hints.keys()
 
 
 def test_planner_orders_pending_only_by_stable_priority() -> None:

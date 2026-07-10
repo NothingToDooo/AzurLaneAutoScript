@@ -147,7 +147,7 @@ def test_read_trace_rejects_non_integer_version(tmp_path: Path, version: object)
 def test_replay_device_public_annotations_can_be_resolved() -> None:
     assert "image" in get_type_hints(ReplayDevice)
     assert "return" in get_type_hints(ReplayDevice.screenshot)
-    assert {"start", "end", "return"} <= get_type_hints(ReplayDevice.swipe).keys()
+    assert {"p1", "p2", "return"} <= get_type_hints(ReplayDevice.swipe).keys()
 
 
 def test_screenshot_activates_next_frame_and_sets_image(tmp_path: Path) -> None:
@@ -177,6 +177,69 @@ def test_click_and_swipe_consume_semantic_actions_in_order(tmp_path: Path) -> No
     device.click(_Button("BATTLE_PREPARATION"))
     device.swipe((100.9, 200.1), (300.8, 400.2))
 
+    device.assert_complete()
+
+
+def test_click_accepts_device_control_check_argument(tmp_path: Path) -> None:
+    image_path = tmp_path / "frame.png"
+    _make_image(image_path, (1, 2, 3))
+    device = ReplayDevice(
+        (
+            ReplayFrame(
+                image_path=image_path,
+                expected_actions=(ClickAction(target="CONTINUE"),),
+            ),
+        )
+    )
+    device.screenshot()
+
+    device.click(_Button("CONTINUE"), control_check=False)
+
+    device.assert_complete()
+
+
+def test_swipe_accepts_scroll_call_keywords(tmp_path: Path) -> None:
+    image_path = tmp_path / "frame.png"
+    _make_image(image_path, (1, 2, 3))
+    device = ReplayDevice(
+        (
+            ReplayFrame(
+                image_path=image_path,
+                expected_actions=(SwipeAction(start=(100, 200), end=(300, 400)),),
+            ),
+        )
+    )
+    device.screenshot()
+
+    device.swipe(
+        p1=(100, 200),
+        p2=(300, 400),
+        duration=(0.1, 0.2),
+        name="SHOP_SCROLL",
+        distance_check=True,
+    )
+
+    device.assert_complete()
+
+
+def test_short_swipe_only_consumes_action_when_distance_check_is_disabled(tmp_path: Path) -> None:
+    image_path = tmp_path / "frame.png"
+    _make_image(image_path, (1, 2, 3))
+    device = ReplayDevice(
+        (
+            ReplayFrame(
+                image_path=image_path,
+                expected_actions=(SwipeAction(start=(100, 200), end=(105, 205)),),
+            ),
+        )
+    )
+    device.screenshot()
+
+    device.swipe((100, 200), (105, 205), distance_check=True)
+    with pytest.raises(ReplayIncompleteError, match="unconsumed action"):
+        device.assert_complete()
+
+    device.swipe((100, 200), (105, 205), distance_check=False)
     device.assert_complete()
 
 
@@ -214,7 +277,7 @@ def test_action_kind_must_follow_recorded_order(tmp_path: Path) -> None:
     device.screenshot()
 
     with pytest.raises(ReplayActionMismatchError, match="click"):
-        device.swipe((1, 2), (3, 4))
+        device.swipe((1, 2), (3, 4), distance_check=False)
 
 
 def test_screenshot_rejects_incomplete_previous_frame(tmp_path: Path) -> None:

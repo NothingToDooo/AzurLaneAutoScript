@@ -1,9 +1,8 @@
+# Python 3.14 会在 get_type_hints() 中运行时解析惰性注解，不能移入 TYPE_CHECKING。
+import collections.abc  # noqa: TC003
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal, cast
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
+from typing import Literal, cast
 
 NAIVE_CLOCK_MESSAGE = "now must be a naive local datetime"
 
@@ -36,10 +35,10 @@ def _is_aware(value: datetime) -> bool:
 
 
 def _partition_entries(
-    entries: Iterable[ScheduleEntry],
+    entries: collections.abc.Iterable[ScheduleEntry],
     *,
     now: datetime,
-    priority: Mapping[str, int],
+    priority: collections.abc.Mapping[str, int],
 ) -> tuple[list[ScheduleEntry], list[ScheduleEntry], list[ScheduleEntry]]:
     pending: list[ScheduleEntry] = []
     waiting: list[ScheduleEntry] = []
@@ -63,10 +62,10 @@ def _partition_entries(
 class SchedulePlanner:
     @staticmethod
     def select(
-        entries: Iterable[ScheduleEntry],
+        entries: collections.abc.Iterable[ScheduleEntry],
         *,
         now: datetime,
-        priority: Mapping[str, int],
+        priority: collections.abc.Mapping[str, int],
     ) -> ScheduleDecision:
         if _is_aware(now):
             raise ValueError(NAIVE_CLOCK_MESSAGE)

@@ -67,16 +67,29 @@ class ReplayDevice:
         self._next_action_index = 0
         return image
 
-    def click(self, button: object) -> None:
+    # 与真实 Device 保持位置参数兼容，回放对象才能直接注入现有流程。
+    def click(self, button: object, control_check: bool = True) -> None:  # noqa: FBT001
+        del control_check
         target = str(button)
         expected = self._next_expected_action(actual=f"click {target!r}")
         if not isinstance(expected, ClickAction) or expected.target != target:
             self._raise_action_mismatch(expected=expected, actual=f"click {target!r}")
         self._next_action_index += 1
 
-    def swipe(self, start: PointInput, end: PointInput) -> None:
-        normalized_start = _normalize_point(start, field_name="start")
-        normalized_end = _normalize_point(end, field_name="end")
+    # 与真实 Device 保持位置参数兼容，包括 Scroll 使用的可选参数。
+    def swipe(
+        self,
+        p1: PointInput,
+        p2: PointInput,
+        duration: float | tuple[float, float] = (0.1, 0.2),
+        name: str = "SWIPE",
+        distance_check: bool = True,  # noqa: FBT001
+    ) -> None:
+        del duration, name
+        normalized_start = _normalize_point(p1, field_name="p1")
+        normalized_end = _normalize_point(p2, field_name="p2")
+        if distance_check and np.linalg.norm(np.subtract(normalized_start, normalized_end)) < 10:
+            return
         actual_action = SwipeAction(start=normalized_start, end=normalized_end)
         expected = self._next_expected_action(actual=_describe_action(actual_action))
         if not isinstance(expected, SwipeAction) or expected != actual_action:
