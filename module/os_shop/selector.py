@@ -10,14 +10,14 @@ if TYPE_CHECKING:
     from module.os_shop.item import OSShopItem as Item
 
 FILTER_REGEX = re.compile(
-    "^(actionpoint|crystallizedheatresistantsteel|developmentmaterial"
-    "|energystoragedevice|geardesignplan|gearpart|logger|metaredbook"
-    "|nanoceramicalloy|neuroplasticprostheticarm|ordnancetestingreport"
-    "|platerandom|purplecoins|repairpack|supercavitationgenerator|tuningsample"
-    "|tuning)"
-    "(20|50|100|prototype|specialized|abyssal|obscure|full2|full|triple2|triple|2"
-    "|combat|offence|survival)?"
-    "(t[1-6])?$",
+    r"^(actionpoint|crystallizedheatresistantsteel|developmentmaterial"
+    r"|energystoragedevice|geardesignplan|gearpart|logger|metaredbook"
+    r"|nanoceramicalloy|neuroplasticprostheticarm|ordnancetestingreport"
+    r"|platerandom|purplecoins|repairpack|supercavitationgenerator|tuningsample"
+    r"|tuning)"
+    r"(20|50|100|prototype|specialized|abyssal|obscure|full2|full|triple2|triple|2"
+    r"|combat|offence|survival)?"
+    r"(t[1-6])?$",
     flags=re.IGNORECASE,
 )
 FILTER_ATTR = ("group", "sub_genre", "tier")
@@ -43,7 +43,7 @@ class Selector:
         Returns:
             list[Item]:
         """
-        _items = []
+        matching_items = []
         for item in items:
             item.group, item.sub_genre, item.tier = None, None, None
             result = re.search(FILTER_REGEX, item.name.lower())
@@ -51,9 +51,9 @@ class Selector:
                 item.group, item.sub_genre, item.tier = [
                     group.lower() if group is not None else None for group in result.groups()
                 ]
-                _items.append(item)
+                matching_items.append(item)
 
-        return _items
+        return matching_items
 
     def enough_coins_in_akashi(self, item) -> bool:
         """返回明石商店货币是否足够购买物品。"""

@@ -310,10 +310,10 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
 
         # transfer N R SR SSR to filter name
         correspond_name = {"N": "common", "R": "rare", "SR": "elite", "SSR": "super_rare"}
-        _rarity = [correspond_name[i] for i in rarity]
+        rarity_filters = [correspond_name[i] for i in rarity]
         self.dock_sort_method_dsc_set(enable=False, wait_loading=False)
         self.dock_favourite_set(enable=False, wait_loading=False)
-        self.dock_filter_set(sort="level", index="all", faction="all", rarity=_rarity, extra="no_limit")
+        self.dock_filter_set(sort="level", index="all", faction="all", rarity=rarity_filters, extra="no_limit")
 
         total = 0
 

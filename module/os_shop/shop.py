@@ -326,21 +326,21 @@ class OSShop(PortShop, AkashiShop):
             logger.info(f"Buying item: {item.name}. In shop {item.shop_index + 1}. At pos {item.scroll_pos:.2f}.")
             self.os_shop_side_navbar_ensure(upper=item.shop_index + 1)
             OS_SHOP_SCROLL.set(item.scroll_pos, main=self, skip_first_screenshot=False)
-            _item = self.os_shop_get_items_to_buy(name=item.name, price=item.price)
-            if _item is None:
+            found_item = self.os_shop_get_items_to_buy(name=item.name, price=item.price)
+            if found_item is None:
                 logger.warning(
                     f"Item {item.name} not found in shop {item.shop_index + 1} at pos {item.scroll_pos:.2f}, skip."
                 )
                 continue
-            if not self.check_item_count(_item):
-                logger.warning(f"Get {_item.name} count error, skip.")
+            if not self.check_item_count(found_item):
+                logger.warning(f"Get {found_item.name} count error, skip.")
                 continue
-            if self.os_shop_buy_execute(_item):
-                logger.info(f"Bought item: {_item.name}.")
+            if self.os_shop_buy_execute(found_item):
+                logger.info(f"Bought item: {found_item.name}.")
                 skip_get_coins = False
                 count += 1
             else:
-                logger.warning(f"Item {_item.name} cant be bought, skip.")
+                logger.warning(f"Item {found_item.name} cant be bought, skip.")
             self.device.click_record.clear()
         logger.info(f"Bought {f'{count} items' if count else 'nothing'} in port.")
         return True

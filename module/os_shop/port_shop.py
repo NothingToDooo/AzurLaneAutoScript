@@ -113,9 +113,9 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
                 self.device.screenshot()
                 items = self.os_shop_get_items()
                 continue
-            _items = [item for item in items if item.name == name and item.price == price]
-            if _items:
-                return _items.pop()
+            matching_items = [item for item in items if item.name == name and item.price == price]
+            if matching_items:
+                return matching_items.pop()
 
         return None
 
@@ -135,19 +135,19 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
             while True:
                 pre_pos = self.pre_scroll(pre_pos, cur_pos)
 
-                _items = []
+                page_items = []
                 for _ in range(3):
-                    _items = self.os_shop_get_items(i, cur_pos)
-                    if not len(_items) or any(not item.is_known_item() for item in _items):
+                    page_items = self.os_shop_get_items(i, cur_pos)
+                    if not len(page_items) or any(not item.is_known_item() for item in page_items):
                         logger.warning("Empty OS shop or empty items, confirming")
                         self.device.sleep((0.3, 0.5))
                         self.device.screenshot()
                         continue
-                    logger.info(f"Found {len(_items)} items in shop {i + 1} at pos {cur_pos:.2f}")
+                    logger.info(f"Found {len(page_items)} items in shop {i + 1} at pos {cur_pos:.2f}")
                     break
                 # always add items, even if last item list contains unknown items
                 # so any known items can be scanned
-                items += _items
+                items += page_items
 
                 if OS_SHOP_SCROLL.at_bottom(main=self):
                     logger.info("OS shop reach bottom, stop")
