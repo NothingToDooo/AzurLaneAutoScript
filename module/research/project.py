@@ -555,7 +555,6 @@ class ResearchProject:
                 yield data
 
         yield from self._iter_research_data_by_trimmed_suffix(name, series)
-        return False
 
     @cached_property
     def equipment_amount(self):
