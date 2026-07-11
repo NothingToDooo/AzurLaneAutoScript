@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
@@ -15,6 +16,17 @@ from module.storage.storage import StorageHandler
 from module.ui.assets import RESEARCH_CHECK
 from module.ui.page import page_research
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from typing import Never
+
+    from module.research.project import ResearchProject
+    from module.research.selector import ResearchPriority
+    from module.research.ui import ResearchStatus
+
+type QueuedResearchState = Literal["waiting", "running"]
+type ResearchProjectInput = ResearchProject | int
+
 OCR_DURATION = Duration(
     research_assets.RESEARCH_LAB_DURATION_REMAIN,
     letter=(255, 255, 255),
@@ -24,13 +36,13 @@ OCR_DURATION = Duration(
 
 
 class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
-    _research_project_offset = 0
-    _research_finished_index = 2
-    research_project_started = None
-    enforce = False
-    end_time = None
+    _research_project_offset: int = 0
+    _research_finished_index: int = 2
+    research_project_started: ResearchProjectInput | None = None
+    enforce: bool = False
+    end_time: datetime | None = None
 
-    def research_has_finished(self):
+    def research_has_finished(self) -> bool:
         """兼容游戏偶尔未把已完成科研自动居中的问题。"""
         index = get_research_finished(self.device.image)
         if index is not None:
@@ -39,7 +51,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             return True
         return False
 
-    def research_reset(self, skip_first_screenshot=True):
+    def research_reset(self, *, skip_first_screenshot: bool = True) -> bool:
         if not self.appear(research_assets.RESET_AVAILABLE, threshold=10):
             logger.info("Research reset unavailable")
             return False
@@ -66,24 +78,29 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         self._research_project_offset = 0
         return True
 
-    def research_enforce(self, add_queue=True):
+    def research_enforce(self, *, add_queue: bool = True) -> bool:
         """强制选择项目；第六个项目不能加入队列。"""
         if not self.enforce:
             logger.info("Enforce choosing research project")
             self.enforce = True
-            return self.research_select(self.research_sort_filter(self.enforce), add_queue=add_queue)
+            return self.research_select(self.research_sort_filter(enforce=self.enforce), add_queue=add_queue)
         return True
 
-    def _research_select_priority(self, project, add_queue):
+    def _research_select_priority(
+        self,
+        project: ResearchProject | str,
+        *,
+        add_queue: bool,
+    ) -> bool | None:
         result = None
         if project == "reset":
             if self.research_reset():
                 result = False
         elif isinstance(project, str):
             if project == "shortest":
-                self.research_select(self.research_sort_shortest(self.enforce), add_queue=add_queue)
+                self.research_select(self.research_sort_shortest(enforce=self.enforce), add_queue=add_queue)
             elif project == "cheapest":
-                self.research_select(self.research_sort_cheapest(self.enforce), add_queue=add_queue)
+                self.research_select(self.research_sort_cheapest(enforce=self.enforce), add_queue=add_queue)
             else:
                 logger.warning(f"Unknown select method: {project}")
             result = True
@@ -98,7 +115,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
                 result = True
         return result
 
-    def research_select(self, priority, add_queue=True):
+    def research_select(self, priority: ResearchPriority, *, add_queue: bool = True) -> bool:
         """按项目或预设字符串优先级选择；重置后返回 False，第六个项目不能入队。"""
         if not len(priority):
             logger.info("No research project satisfies current filter")
@@ -111,7 +128,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         logger.info("No research project started")
         return self.research_enforce(add_queue=add_queue)
 
-    def research_delay_check(self):
+    def research_delay_check(self) -> bool:
         """判断资源不足时能否延后科研。"""
         if self.config.Research_AllowDelay:
             slot = self.get_queue_slot()
@@ -125,7 +142,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
 
         return False
 
-    def _research_project_index(self, project):
+    def _research_project_index(self, project: ResearchProjectInput) -> int | None:
         if isinstance(project, int):
             return project
         if project in self.projects:
@@ -133,10 +150,10 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         logger.warning(f"The project to start: {project} is not in known projects")
         return None
 
-    def _research_project_unavailable_max_rgb(self):
-        return np.max(rgb2gray(self.image_crop(research_assets.RESEARCH_UNAVAILABLE, copy=False)))
+    def _research_project_unavailable_max_rgb(self) -> int:
+        return int(np.max(rgb2gray(self.image_crop(research_assets.RESEARCH_UNAVAILABLE, copy=False))))
 
-    def _click_research_project_if_ready(self, index, click_timer):
+    def _click_research_project_if_ready(self, index: int, click_timer: Timer) -> bool:
         # 这里不要用 interval，RESEARCH_CHECK 早在 5 秒前就出现了。
         if not (click_timer.reached() and self.is_in_research()):
             return False
@@ -148,10 +165,16 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         click_timer.reset()
         return True
 
-    def _click_research_start_if_available(self, max_rgb):
+    def _click_research_start_if_available(self, max_rgb: int) -> bool:
         return max_rgb > 235 and self.appear_then_click(research_assets.RESEARCH_START, offset=(5, 20), interval=10)
 
-    def _finish_research_project_start(self, project, index, add_queue):
+    def _finish_research_project_start(
+        self,
+        project: ResearchProjectInput,
+        index: int,
+        *,
+        add_queue: bool,
+    ) -> bool:
         # RESEARCH_STOP 是半透明按钮，颜色会随背景变化。
         if add_queue:
             self.research_queue_add()
@@ -161,7 +184,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         self._research_project_offset = (index - 2) % 5
         return True
 
-    def _finish_research_project_unavailable(self, index):
+    def _finish_research_project_unavailable(self, index: int) -> bool:
         logger.info("Not enough resources to start this project")
         self.research_detail_quit()
         self.research_project_started = None
@@ -169,7 +192,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         return False
 
     @staticmethod
-    def _raise_research_start_too_many_click():
+    def _raise_research_start_too_many_click() -> Never:
         logger.error(
             "Unable to start a research project after 3 trail, "
             "probably because there is a research running but requirements not satisfied, "
@@ -177,7 +200,13 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         )
         raise GameTooManyClickError
 
-    def research_project_start(self, project, add_queue=True, skip_first_screenshot=True):
+    def research_project_start(
+        self,
+        project: ResearchProjectInput,
+        *,
+        add_queue: bool = True,
+        skip_first_screenshot: bool = True,
+    ) -> bool | None:
         """启动项目对象或 0～4 索引；未知项目返回 None，第六个项目不能入队。"""
         logger.hr("Research project start")
         logger.info(f"Research project: {project}")
@@ -210,12 +239,17 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             if click_count >= 3:
                 self._raise_research_start_too_many_click()
             if self.appear(research_assets.RESEARCH_STOP, offset=(20, 20)):
-                return self._finish_research_project_start(project, index, add_queue)
+                return self._finish_research_project_start(project, index, add_queue=add_queue)
             if not available and max_rgb <= 235 and self.appear(research_assets.RESEARCH_UNAVAILABLE, offset=(5, 20)):
                 return self._finish_research_project_unavailable(index)
         return False
 
-    def research_project_start_with_requirements(self, project, add_queue=True):
+    def research_project_start_with_requirements(
+        self,
+        project: ResearchProjectInput,
+        *,
+        add_queue: bool = True,
+    ) -> bool | None:
         """处理要求后启动；成功、资源不足、未知项目分别返回 True、False、None。
 
         E 类项目可能先拆解装备。
@@ -236,7 +270,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             return result
         return self.research_project_start(project, add_queue=add_queue)
 
-    def research_receive(self, skip_first_screenshot=True):
+    def research_receive(self, *, skip_first_screenshot: bool = True) -> bool:
         """在稳定科研页领取完成项目；要求不满足时返回 False。"""
         logger.hr("Research receive", level=3)
         confirm_timer = Timer(1.5, count=5)
@@ -270,14 +304,14 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
                     confirm_timer.reset()
 
         self.ui_click(
-            appear_button=self.get_items,
+            appear_button=self.has_items,
             click_button=research_assets.GET_ITEMS_RESEARCH_SAVE,
             check_button=self.is_in_research,
             skip_first_screenshot=True,
         )
         return True
 
-    def queue_receive(self, skip_first_screenshot=True):
+    def queue_receive(self, *, skip_first_screenshot: bool = True) -> int:
         """在队列页领取奖励，返回领取的项目数。"""
         logger.hr("Queue receive", level=1)
         total = 0
@@ -310,11 +344,11 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         logger.info(f"Received rewards from {total} projects")
         return total
 
-    def queue_quit(self, *args, **kwargs):
-        super().queue_quit(*args, **kwargs)
+    def queue_quit(self) -> None:
+        super().queue_quit()
         self._research_project_offset = 0
 
-    def research_project_list_init(self, from_queue=False):
+    def research_project_list_init(self, *, from_queue: bool = False) -> None:
         """重置项目偏移并检测列表；从队列返回时页面已稳定。"""
         self._research_project_offset = 0
         # info_bar 消失后再截图一次，等待残影清除。
@@ -324,7 +358,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             self.ensure_research_center_stable()
         self.research_detect()
 
-    def research_queue_append(self, add_queue=True):
+    def research_queue_append(self, *, add_queue: bool = True) -> bool:
         """选择并启动项目；add_queue=False 用于不入队的第六项目。"""
         self.research_project_started = None
         for _ in range(2):
@@ -337,7 +371,7 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
 
         return self.research_project_started is not None
 
-    def research_fill_queue(self):
+    def research_fill_queue(self) -> int:
         """从科研页填满队列，返回新入队数量。"""
         logger.hr("Research fill queue", level=1)
         total = 0
@@ -363,14 +397,14 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
         return total
 
     @staticmethod
-    def _is_6th_research_stable(status):
+    def _is_6th_research_stable(status: Sequence[ResearchStatus]) -> bool:
         if "unknown" in status:
             return False
         if "waiting" in status:
             return status.index("waiting") == 2
         return sum(s == "detail" for s in status) == 5
 
-    def _wait_6th_research_stable(self, skip_first_screenshot):
+    def _wait_6th_research_stable(self, *, skip_first_screenshot: bool) -> None:
         # 等待项目卡片加载和队列动画结束。
         timeout = Timer(2, count=6).start()
         while 1:
@@ -387,14 +421,18 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             if self._is_6th_research_stable(status):
                 break
 
-    def _receive_finished_6th_research(self):
+    def _receive_finished_6th_research(self) -> bool:
         if self.research_has_finished():
             logger.info(f"6th research finished at: {self._research_finished_index}")
             return self.research_receive()
         logger.info("No research has finished")
         return True
 
-    def _append_6th_research_if_possible(self, status, state):
+    def _append_6th_research_if_possible(
+        self,
+        status: Sequence[ResearchStatus],
+        state: QueuedResearchState,
+    ) -> None:
         if state not in status:
             return
         if self.get_queue_slot() > 0:
@@ -402,20 +440,20 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             return
         logger.info(f"Queue full, stop appending {state} research")
 
-    def _append_6th_research_from_status(self):
+    def _append_6th_research_from_status(self) -> None:
         status = self.get_research_status(self.device.image)
         self._append_6th_research_if_possible(status, "waiting")
         self._append_6th_research_if_possible(status, "running")
 
-    def receive_6th_research(self, skip_first_screenshot=True):
+    def receive_6th_research(self, *, skip_first_screenshot: bool = True) -> bool:
         logger.hr("Receive 6th research", level=2)
-        self._wait_6th_research_stable(skip_first_screenshot)
+        self._wait_6th_research_stable(skip_first_screenshot=skip_first_screenshot)
         if not self._receive_finished_6th_research():
             return False
         self._append_6th_research_from_status()
         return True
 
-    def run(self):
+    def run(self) -> None:
         """从任意页面执行科研，结束于科研项目页或主页。"""
         self.ui_ensure(page_research)
 

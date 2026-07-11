@@ -431,9 +431,9 @@ def crop(image: ImageArray, area: Area, *, copy: bool = True) -> ImageArray:
     return image
 
 
-def resize(image: ImageArray, size: Size) -> ImageArray:
-    """按最近邻插值缩放，size 为 (width, height)。"""
-    resized = cv2.resize(image, (int(size[0]), int(size[1])), interpolation=cv2.INTER_NEAREST)
+def resize(image: ImageArray, size: Size, *, interpolation: int = cv2.INTER_NEAREST) -> ImageArray:
+    """按指定插值缩放，size 为 (width, height)。"""
+    resized = cv2.resize(image, (int(size[0]), int(size[1])), interpolation=interpolation)
     return cast("ImageArray", resized)
 
 

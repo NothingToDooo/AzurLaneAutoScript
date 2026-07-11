@@ -1,5 +1,13 @@
+from typing import TYPE_CHECKING
+
 from module.base.utils import area_pad, crop, rgb2gray
 from module.research import assets as research_assets
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from module.base.button import Button
+    from module.base.type_alias import ImageArray
 
 RESEARCH_SERIES = (
     research_assets.SERIES_1,
@@ -29,7 +37,7 @@ RESEARCH_SERIES_TEMPLATES = (
 )
 
 
-def match_series(image, scaling):
+def match_series(image: ImageArray, scaling: float) -> int:
     image = rgb2gray(image)
 
     for template, series in RESEARCH_SERIES_TEMPLATES:
@@ -38,12 +46,15 @@ def match_series(image, scaling):
     return 0
 
 
-def get_research_series_3(image, series_button=RESEARCH_SERIES):
+def get_research_series_3(
+    image: ImageArray,
+    series_button: Sequence[Button] = RESEARCH_SERIES,
+) -> list[int]:
     return [
         match_series(crop(image, area_pad(button.area, pad=-10), copy=False), scaling)
         for scaling, button in zip(RESEARCH_SCALING, series_button, strict=True)
     ]
 
 
-def get_detail_series(image):
+def get_detail_series(image: ImageArray) -> int:
     return match_series(crop(image, area_pad(research_assets.SERIES_DETAIL.area, pad=-30), copy=False), scaling=1.0)

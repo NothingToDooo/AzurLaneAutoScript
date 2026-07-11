@@ -1,6 +1,10 @@
 import re
+from typing import TYPE_CHECKING
 
 from module.logger import logger
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 TENRAI_NAME_BY_SERIES = {
     2: "457",
@@ -14,19 +18,19 @@ TENRAI_NAME_BY_SERIES = {
 }
 
 
-def split_filter(string):
+def split_filter(string: str | list[str]) -> list[str]:
     if isinstance(string, list):
         return string
     return [f.strip(" \t\r\n") for f in string.split(">")]
 
 
-def join_filter(selection):
+def join_filter(selection: str | Sequence[str]) -> str:
     if isinstance(selection, str):
         return selection
     return " > ".join(selection)
 
 
-def beautify_filter(list_filter):
+def beautify_filter(list_filter: str | Sequence[str]) -> str:
     if isinstance(list_filter, str):
         list_filter = split_filter(list_filter)
 
@@ -41,7 +45,12 @@ def beautify_filter(list_filter):
     return " > ".join(out).strip("\n >").replace(" > \n", "\n").replace("\n ", "\n")
 
 
-def translate(string: str, target="series_4_tenrai_only_cube", for_simulate=False):
+def translate(
+    string: str,
+    *,
+    target: str = "series_4_tenrai_only_cube",
+    for_simulate: bool = False,
+) -> str | None:
     res = re.search(r"series_?(\d)", target)
     if res:
         series = res.group(1)
@@ -90,7 +99,7 @@ def translate(string: str, target="series_4_tenrai_only_cube", for_simulate=Fals
     return beautify_filter(string)
 
 
-def convert_name(name, series):
+def convert_name(name: str, series: int) -> str:
     name = re.sub(r"series_\d", f"series_{series}", name)
     return name.replace("tenrai", TENRAI_NAME_BY_SERIES.get(series, "tenrai"))
 
@@ -107,7 +116,7 @@ if __name__ == "__main__":
     with dict_("DICT_FILTER_PRESET"):
         for series in [9, 8, 7, 6, 5, 4, 3, 2]:
 
-            def new_filter(series=series, **kwargs):
+            def new_filter(series: int = series, **kwargs: str) -> None:
                 for raw_key, raw_value in kwargs.items():
                     key = convert_name(raw_key, series)
                     value = translate(raw_value, target=key)

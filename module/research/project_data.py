@@ -1,7 +1,13 @@
 # 此文件由 dev_tools/research_extractor.py 自动生成。
 # 不要手动修改。
 
-LIST_RESEARCH_PROJECT = [
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from module.research.types import ResearchProjectData
+
+
+LIST_RESEARCH_PROJECT: list[ResearchProjectData] = [
     {
         "name": "C-153-MI",
         "series": 1,
