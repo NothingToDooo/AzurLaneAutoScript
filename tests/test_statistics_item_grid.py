@@ -50,6 +50,7 @@ class FakeItemGrid(ItemGrid[FakeItem]):
     ) -> None:
         self.source_items = list(items)
         self.items: list[FakeItem] = []
+        self.names = _NAME_BY_CODE
         self.costs = costs
         self.prices = prices
         self.amount_area: Area = (0, 0, 4, 4)
@@ -62,7 +63,7 @@ class FakeItemGrid(ItemGrid[FakeItem]):
 
     def match_template(self, image: ImageArray, similarity: float | None = None) -> str:
         assert similarity is None
-        return _NAME_BY_CODE[int(image[0, 0, 0])]
+        return self.names[int(image[0, 0, 0])]
 
     def match_cost_template(self, item: FakeItem) -> str | None:
         return self.costs[item.label]
