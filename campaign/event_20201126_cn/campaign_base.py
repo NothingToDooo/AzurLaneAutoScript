@@ -19,7 +19,7 @@ EVENT_ANIMATION = Button(
 class CampaignBase(CampaignBase_):
     """DOA 联动图分章：第 1 章 SP1～SP4，第 2 章 VSP，第 3 章 EX；模式切换无意义。"""
 
-    def ui_goto_event(self):
+    def ui_goto_event(self) -> bool:
         if self.appear(EVENT_20201126_PT_ICON, offset=(40, 20)) and self.ui_page_appear(page_event):
             logger.info("Already at EVENT_20201126")
             return True
@@ -47,7 +47,7 @@ class CampaignBase(CampaignBase_):
         return CampaignBase_.campaign_separate_name(name)
 
     @staticmethod
-    def campaign_get_chapter_index(name):
+    def campaign_get_chapter_index(name: str | int) -> int:
         """将整数或章节名转换为章节序号。"""
         if isinstance(name, int):
             return name
@@ -61,18 +61,18 @@ class CampaignBase(CampaignBase_):
             return 3
         raise CampaignNameError
 
-    def campaign_set_chapter_event(self, chapter, mode="normal"):
+    def campaign_set_chapter_event(self, chapter: str, mode: str = "normal") -> bool:
         del mode
         self.ui_goto_event()
         self.campaign_ensure_chapter(chapter)
         return True
 
-    def campaign_get_entrance(self, name):
+    def campaign_get_entrance(self, name: str) -> Button:
         if name == "sp":
             name = "vsp"
         return super().campaign_get_entrance(name)
 
-    def is_event_animation(self):
+    def is_event_animation(self) -> bool:
         """返回活动战斗后动画是否出现。"""
         appear = self.appear(EVENT_ANIMATION)
         if appear:

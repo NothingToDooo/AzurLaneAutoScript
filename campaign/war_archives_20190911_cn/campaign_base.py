@@ -14,7 +14,7 @@ class CampaignBase(CampaignBase_):
         "T1 > T2 > T3 > T4",
     )
 
-    def campaign_set_chapter(self, name, mode="normal"):
+    def campaign_set_chapter(self, name: str, mode: str = "normal") -> None:
         """按关卡名和 normal/hard 模式切换章节。"""
         chapter, _ = self.campaign_separate_name(name)
 
@@ -44,7 +44,7 @@ class CampaignBase(CampaignBase_):
             logger.warning(f"Unknown campaign chapter: {name}")
 
     @staticmethod
-    def campaign_get_chapter_index(name):
+    def campaign_get_chapter_index(name: str | int) -> int:
         """将整数或章节名转换为章节序号。"""
         if isinstance(name, int):
             return name

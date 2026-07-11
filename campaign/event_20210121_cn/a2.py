@@ -103,7 +103,7 @@ class Config(ConfigBase):
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def get_map_clear_percentage(self):
+    def get_map_clear_percentage(self) -> float:
         """该活动进度条最多约显示 70%，乘以 1.4 校正后返回 0～1。"""
         return super().get_map_clear_percentage() * 1.4
 

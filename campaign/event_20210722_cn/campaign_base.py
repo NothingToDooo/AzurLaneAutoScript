@@ -1,7 +1,14 @@
+from typing import TYPE_CHECKING, Unpack
+
 from module.base.button import Button
 from module.campaign.campaign_base import CampaignBase as CampaignBase_
 from module.exception import CampaignNameError
 from module.logger import logger
+
+if TYPE_CHECKING:
+    from module.base.template import Template
+    from module.base.type_alias import ImageArray
+    from module.campaign.campaign_ocr import StageMatchOptions, StageMatchSettings
 
 ANIMATION_PINK = Button(
     area=(1186, 446, 1272, 493), color=(255, 153, 172), button=(1186, 446, 1272, 493), name="ANIMATION_PINK"
@@ -35,7 +42,7 @@ class CampaignBase(CampaignBase_):
         return CampaignBase_.campaign_separate_name(name)
 
     @staticmethod
-    def campaign_get_chapter_index(name):
+    def campaign_get_chapter_index(name: str | int) -> int:
         """将整数或章节名转换为章节序号。"""
         if isinstance(name, int):
             return name
@@ -47,7 +54,7 @@ class CampaignBase(CampaignBase_):
             return 2
         raise CampaignNameError
 
-    def campaign_set_chapter(self, name, mode="normal"):
+    def campaign_set_chapter(self, name: str, mode: str = "normal") -> None:
         """按关卡名和 normal/hard 模式切换章节。"""
         chapter, _ = self.campaign_separate_name(name)
 
@@ -78,12 +85,12 @@ class CampaignBase(CampaignBase_):
         else:
             logger.warning(f"Unknown campaign chapter: {name}")
 
-    def campaign_get_entrance(self, name):
+    def campaign_get_entrance(self, name: str) -> Button:
         if name == "sp":
             name = "vsp"
         return super().campaign_get_entrance(name)
 
-    def is_event_animation(self):
+    def is_event_animation(self) -> bool:
         """返回活动战斗后动画是否出现。"""
         for button in [ANIMATION_PINK, ANIMATION_ORANGE, ANIMATION_BLUE]:
             if self.appear(button):
@@ -92,7 +99,14 @@ class CampaignBase(CampaignBase_):
 
         return False
 
-    def campaign_match_multi(self, *args, **kwargs):
+    def campaign_match_multi(
+        self,
+        template: Template,
+        image: ImageArray,
+        stage_image: ImageArray | None = None,
+        options: StageMatchOptions | None = None,
+        **settings: Unpack[StageMatchSettings],
+    ) -> list[Button]:
         # Lower campaign match threshold to 0.8, in order to detect 50% clear SP3
-        kwargs["similarity"] = 0.8
-        return super().campaign_match_multi(*args, **kwargs)
+        settings["similarity"] = 0.8
+        return super().campaign_match_multi(template, image, stage_image, options, **settings)
