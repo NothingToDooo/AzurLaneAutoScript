@@ -8,8 +8,9 @@ from module.war_archives.assets import OCR_DATA_KEY_CAMPAIGN, WAR_ARCHIVES_CAMPA
 
 
 class OcrDataKey(DigitCounter):
-    def after_process(self, result: str) -> str:
-        result = super().after_process(result)
+    @staticmethod
+    def normalize_text(result: str) -> str:
+        result = DigitCounter.normalize_text(result)
         return re.sub(r"(\d{1,2})60$", r"\1/60", result)
 
 

@@ -55,7 +55,7 @@ class _OcrInferenceBatch:
 type DigitCounterValue = tuple[int, int, int]
 type OcrArea = tuple[Scalar, Scalar, Scalar, Scalar] | NumericArray
 type OcrRegion = Button | OcrArea
-type OcrRegions = OcrRegion | list[OcrRegion]
+type OcrRegions = OcrRegion | Sequence[OcrRegion]
 type OcrInput = ImageArray | Sequence[ImageArray]
 
 
@@ -110,6 +110,18 @@ class Ocr[OcrValueT = str]:
     SHOW_LOG = True
     SHOW_REVISE_WARNING = False
 
+    @staticmethod
+    def _normalize_regions(buttons: OcrRegions) -> list[OcrRegion]:
+        if isinstance(buttons, Button):
+            return [buttons]
+        if isinstance(buttons, np.ndarray):
+            return [cast("OcrArea", buttons)]
+        if isinstance(buttons, tuple) and len(buttons) == 4 and all(
+            isinstance(value, (int, float, np.integer, np.floating)) for value in buttons
+        ):
+            return [cast("OcrArea", buttons)]
+        return list(cast("Sequence[OcrRegion]", buttons))
+
     def __init__(
         self,
         buttons: OcrRegions,
@@ -120,7 +132,7 @@ class Ocr[OcrValueT = str]:
         options = ocr_options(options, settings)
         self.name = str(buttons) if isinstance(buttons, Button) else options.name
         self._profile = options.name or type(self).__name__
-        self._buttons = buttons
+        self._buttons = self._normalize_regions(buttons)
         self.letter = options.letter
         self.threshold = options.threshold
         self.alphabet = options.alphabet
@@ -132,15 +144,11 @@ class Ocr[OcrValueT = str]:
 
     @property
     def buttons(self) -> list[Area]:
-        if isinstance(self._buttons, list):
-            regions = cast("list[OcrRegion]", self._buttons)
-        else:
-            regions = [cast("OcrRegion", self._buttons)]
-        return [region.area if isinstance(region, Button) else region for region in regions]
+        return [region.area if isinstance(region, Button) else region for region in self._buttons]
 
     @buttons.setter
     def buttons(self, value: OcrRegions) -> None:
-        self._buttons = value
+        self._buttons = self._normalize_regions(value)
 
     def pre_process(self, image: ImageArray) -> ImageArray:
         """按目标 RGB 与阈值把 (height, width, 3) 图像映射为二维 uint8。"""

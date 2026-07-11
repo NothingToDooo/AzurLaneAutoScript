@@ -16,8 +16,10 @@ from module.ui.page import page_rpg_stage
 
 
 class RaidCounterPostMixin(DigitCounter):
-    def after_process(self, result):
+    @staticmethod
+    def normalize_text(result: str) -> str:
         # 修正 915/、1515 等缺少分隔符的结果。
+        result = DigitCounter.normalize_text(result)
         result = result.strip("/")
         if result.isdigit() and len(result) > 2 and result.endswith("15"):
             result = f"{result[:-2]}/15"
@@ -34,7 +36,7 @@ class HuanChangCounter(Digit):
     """春节共斗次数纵向排列；返回 (上半部分识别值, 0, 15)。"""
 
     def ocr(self, image, direct_ocr=False):
-        result = super().ocr(image, direct_ocr)
+        result = super().ocr(image, direct_ocr=direct_ocr)
         return (result, 0, 15)
 
 

@@ -36,8 +36,9 @@ class OcrDormFood(DigitCounter):
         image = cv2.subtract(_cv_scalar((255, 255, 255, 255)), cv2.max(orange, gray))
         return cv2.multiply(image, _cv_scalar((2, 2, 2, 2)))
 
-    def after_process(self, result):
-        result = super().after_process(result)
+    @staticmethod
+    def normalize_text(result: str) -> str:
+        result = DigitCounter.normalize_text(result)
 
         if "/" not in result:
             for exp in range(40000, 90001, 1000):
