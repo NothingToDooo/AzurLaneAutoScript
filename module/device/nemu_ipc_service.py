@@ -31,18 +31,9 @@ NEMU_IPC_SCREENSHOT_FAILED_MESSAGE = "nemu_capture_display failed during screens
 
 
 class CaptureStd:
-    """
-    Capture stdout and stderr from both python and C library
-    https://stackoverflow.com/questions/5081657/how-do-i-prevent-a-c-shared-library-to-print-on-stdout-in-python/17954769
+    """同时捕获 Python 与 C 库写入的 stdout/stderr。
 
-    ```
-    with CaptureStd() as capture:
-        # String wasn't printed
-        print('whatever')
-    # But captured in ``capture.stdout``
-    print(f'Got stdout: "{capture.stdout}"')
-    print(f'Got stderr: "{capture.stderr}"')
-    ```
+    见 https://stackoverflow.com/a/17954769。
     """
 
     def __init__(self):
@@ -100,10 +91,7 @@ class CaptureNemuIpc(CaptureStd):
     instance = None
 
     def is_capturing(self):
-        """
-        Only capture at the topmost wrapper to avoid nested capturing
-        If a capture is ongoing, this instance does nothing
-        """
+        """只让最外层包装器重定向，嵌套实例不做任何操作。"""
         cls = self.__class__
         return isinstance(cls.instance, cls) and cls.instance != self
 
@@ -177,10 +165,6 @@ def _nemu_ipc_error_recovery(self, error, func_name, trial):
 def retry(func):
     @wraps(func)
     def retry_wrapper(self, *args, **kwargs):
-        """
-        Args:
-            self (NemuIpcImpl):
-        """
         recovery = None
         func_name = func.__name__
         for trial in range(RETRY_TRIES):
@@ -190,7 +174,6 @@ def retry(func):
                     time.sleep(retry_sleep(trial))
                     recovery()
                 return func(self, *args, **kwargs)
-            # 无法自动处理。
             except RequestHumanTakeover:
                 break
             except (NemuIpcIncompatible, JobTimeout, NemuIpcError, OSError, ValueError, ctypes.ArgumentError) as e:
@@ -206,17 +189,14 @@ def retry(func):
 
 class NemuIpcImpl:
     def __init__(self, nemu_folder: str, instance_id: int, display_id: int = 0):
-        """
-        Args:
-            nemu_folder: Installation path of MuMu12, e.g. E:/ProgramFiles/MuMuPlayer-12.0
-            instance_id: Emulator instance ID, starting from 0
-            display_id: Always 0 if keep app alive was disabled
+        """nemu_folder 是 MuMu12 安装目录，instance_id 从 0 开始。
+
+        关闭后台保活时 display_id 始终为 0。
         """
         self.nemu_folder: str = nemu_folder
         self.instance_id: int = instance_id
         self.display_id: int = display_id
 
-        # try to load dll from various path
         nemu_path = Path(nemu_folder)
         list_dll = [
             # MuMuPlayer12
@@ -238,11 +218,9 @@ class NemuIpcImpl:
                 logger.error(f"ipc_dll={ipc_dll} exists, but cannot be loaded")
                 continue
         if lib is None:
-            # not found
             message = f"{NEMU_IPC_MIN_VERSION_MESSAGE}. None of the following path exists: {list_dll}"
             raise NemuIpcIncompatible(message)
         self.lib = lib
-        # success
         logger.info(
             f"NemuIpcImpl init, "
             f"nemu_folder={nemu_folder}, "
@@ -292,20 +270,12 @@ class NemuIpcImpl:
 
     @staticmethod
     def run_func(func, *args, on_thread=True, timeout=0.5):
-        """
-        Args:
-            func: Sync function to call
-            *args:
-            on_thread: True to run func on a separated thread
-            timeout:
+        """on_thread=True 时在工作线程运行同步函数，timeout 秒后抛出 JobTimeout。
 
-        Raises:
-            JobTimeout: If function call timeout
-            NemuIpcIncompatible:
-            NemuIpcError
+        底层调用还可抛出 NemuIpcIncompatible 或 NemuIpcError。
         """
         if on_thread:
-            # nemu_ipc may timeout sometimes, so we run it on a separated thread
+            # nemu_ipc 偶尔会阻塞，工作线程允许超时终止。
             job = WORKER_POOL.start_thread_soon(func, *args)
             result = job.get_or_kill(timeout)
         else:
@@ -319,7 +289,7 @@ class NemuIpcImpl:
                 err = True
         elif result > 0:
             err = True
-        # Get to actual error message printed in std
+        # 再调用一次以捕获 C 库写到 stdout/stderr 的真实错误。
         if err:
             logger.warning(f"Failed to call {func.__name__}, result={result}")
             with CaptureNemuIpc():
@@ -328,9 +298,7 @@ class NemuIpcImpl:
         return result
 
     def get_resolution(self, on_thread=True):
-        """
-        Get emulator resolution, `self.width` and `self.height` will be set
-        """
+        """结果写入 self.width 和 self.height，不直接返回。"""
         if self.connect_id == 0:
             self.connect()
 
@@ -374,19 +342,14 @@ class NemuIpcImpl:
         if ret > 0:
             raise NemuIpcError(NEMU_IPC_SCREENSHOT_FAILED_MESSAGE)
 
-        # Return pixels_pointer instead of image to avoid passing image through jobs
+        # 返回像素指针，避免在线程 Job 间传递整张图像。
         return pixels_pointer
 
     @retry
     def screenshot(self, timeout=0.5):
-        """
-        Args:
-            timeout: Timout in seconds to call nemu_ipc
-                Will be dynamically extended by `@retry`
+        """timeout 单位为秒，重试时动态延长。
 
-        Returns:
-            np.ndarray: Image array in RGBA color space
-                Note that image is upside down
+        返回上下颠倒的 RGBA 数组，形状为 (height, width, 4)。
         """
         if self.connect_id == 0:
             self.connect()
@@ -404,12 +367,7 @@ class NemuIpcCapture:
 
     @cached_property
     def nemu_ipc(self) -> NemuIpcImpl:
-        """
-        Initialize a nemu ipc implementation
-        """
-        # Search emulator instance
-        # with E:\ProgramFiles\MuMuPlayer-12.0\shell\MuMuPlayer.exe
-        # installation path is E:\ProgramFiles\MuMuPlayer-12.0
+        # 可执行文件位于 <安装目录>/shell 时，nemu_folder 取其上级安装目录。
         instance = self.mumu_runtime.emulator_instance
         if instance is None:
             logger.error("Unable to use NemuIpc because emulator instance not found")

@@ -37,15 +37,6 @@ class cached_property[T]:
 
 
 def iter_folder(folder, is_dir=False, ext=None):
-    """
-    Args:
-        folder (str):
-        is_dir (bool): True to iter directories only
-        ext (str): File extension, such as `.yaml`
-
-    Yields:
-        str: Absolute path of files
-    """
     try:
         files = list(Path(folder).iterdir())
     except FileNotFoundError:

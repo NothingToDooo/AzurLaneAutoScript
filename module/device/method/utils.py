@@ -12,14 +12,12 @@ RETRY_DELAY = 3
 
 
 def is_port_using(port_num):
-    """if port is using by others, return True. else return False"""
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(2)
 
     try:
         s.bind(("127.0.0.1", port_num))
     except OSError:
-        # Address already bind
         return True
     else:
         return False
@@ -28,7 +26,6 @@ def is_port_using(port_num):
 
 
 def random_port(port_range):
-    """get a random port from port set"""
     new_port = random.choice(list(range(*port_range)))
     if is_port_using(new_port):
         return random_port(port_range)
@@ -36,18 +33,7 @@ def random_port(port_range):
 
 
 def recv_all(stream, chunk_size=4096, recv_interval=0.000) -> bytes:
-    """
-    Args:
-        stream:
-        chunk_size:
-        recv_interval (float): Default to 0.000, use 0.001 if receiving as server
-
-    Returns:
-        bytes:
-
-    Raises:
-        AdbTimeout
-    """
+    """recv_interval 单位为秒；服务端接收建议用 0.001，10 秒无数据抛出 AdbTimeout。"""
     if isinstance(stream, AdbConnection):
         stream = stream.conn
         stream.settimeout(10)
@@ -71,12 +57,6 @@ def recv_all(stream, chunk_size=4096, recv_interval=0.000) -> bytes:
 
 
 def possible_reasons(*args):
-    """
-    Show possible reasons
-
-        Possible reason #1: <reason_1>
-        Possible reason #2: <reason_2>
-    """
     for index, reason in enumerate(args):
         reason_number = index + 1
         logger.critical(f"Possible reason #{reason_number}: {reason}")
@@ -94,10 +74,8 @@ def retry_sleep(trial):
     # 前两次尝试不等待。
     if trial in {0, 1}:
         return 0
-    # Failed twice
     if trial == 2:
         return 1
-    # Failed more
     return RETRY_DELAY
 
 
@@ -116,13 +94,6 @@ def is_retryable_adb_error(text: str) -> bool:
 
 
 def handle_adb_error(e):
-    """
-    Args:
-        e (Exception):
-
-    Returns:
-        bool: If should retry
-    """
     text = str(e)
     if is_retryable_adb_error(text):
         logger.error(e)
@@ -136,13 +107,6 @@ def handle_adb_error(e):
 
 
 def handle_unknown_host_service(e):
-    """
-    Args:
-        e (Exception):
-
-    Returns:
-        bool: If should retry
-    """
     text = str(e)
     if "unknown host service" in text:
         # AdbError(unknown host service)

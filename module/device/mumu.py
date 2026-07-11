@@ -75,17 +75,11 @@ def revise_mumu12_serial(serial: str) -> str:
 
 
 def mumu12_serial_to_id(serial: str) -> int | None:
-    """
-    从 MuMu12 TCP serial 推算实例 ID。
-    """
     parsed = MuMuSerial.parse(serial)
     return None if parsed is None else parsed.instance_id
 
 
 def is_mumu12_serial(serial: str) -> bool:
-    """
-    判断 serial 是否属于当前个人版支持的 MuMu12 TCP 端口族。
-    """
     return mumu12_serial_to_id(serial) is not None
 
 
