@@ -10,19 +10,19 @@ from tqdm import tqdm
 from module.base.decorator import cached_property
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Iterator
 
 REGEX_SETTING = re.compile(r"PlayerPrefs.Get(\w{1,10})\((.*)\)")
 REGEX_SETTING_KEY = re.compile(r'"(.*?)"')
 
 
-def _comment_lines(text):
+def _comment_lines(text: str) -> list[str]:
     return [
         f"# 来源：{line}" for line in textwrap.wrap(text, width=108, break_long_words=False, break_on_hyphens=False)
     ]
 
 
-def _strip_code(string):
+def _strip_code(string: str) -> Iterator[str]:
     nested = 0
     for word in string:
         if word == "(":
@@ -35,13 +35,13 @@ def _strip_code(string):
         yield word
 
 
-def strip_code(string):
+def strip_code(string: str) -> str:
     return "".join(list(_strip_code(string)))
 
 
 @dataclass
 class Field:
-    formatter: Callable[..., object]
+    formatter: type[int | float | str]
     default: int | float | str | None
     regex: str
 
@@ -67,7 +67,7 @@ def _parse_lua_float_default(value: str) -> float:
         return 0.0
 
 
-def _parse_lua_default(typ: str, value: str):
+def _parse_lua_default(typ: str, value: str) -> int | float | str | None:
     if typ == "Int":
         return _parse_lua_int_default(value)
     if typ == "String":
@@ -87,11 +87,11 @@ class LuaSetting:
     duplicate: bool = False
 
     @cached_property
-    def setting_code(self):
+    def setting_code(self) -> str:
         return self.code.rsplit(",", 1)[0].strip(" ") if "," in self.code else self.code.strip(" ")
 
     @cached_property
-    def default(self):
+    def default(self) -> int | float | str | None:
         if "," not in self.code:
             return _LUA_TYPE_DEFAULTS.get(self.typ)
 
@@ -99,7 +99,7 @@ class LuaSetting:
         return _parse_lua_default(self.typ, default.strip(' ",'))
 
     @cached_property
-    def key(self):
+    def key(self) -> str:
         # 形如 `"autoBotIsAcitve" .. AutoBotCommand.GetAutoBotMark(slot0)` 或 `"world_help_progress"`。
         res = REGEX_SETTING_KEY.search(self.setting_code)
         if res:
@@ -107,7 +107,7 @@ class LuaSetting:
         return ""
 
     @cached_property
-    def formatter(self):
+    def formatter(self) -> str:
         if self.typ == "Int":
             return "int"
         if self.typ == "String":
@@ -117,10 +117,10 @@ class LuaSetting:
         return "str"
 
     @cached_property
-    def regex(self):
+    def regex(self) -> str:
         pieces = self.setting_code.split("..")
 
-        def iter_piece():
+        def iter_piece() -> Iterator[str]:
             for piece in pieces:
                 res = REGEX_SETTING_KEY.search(piece)
                 if res:
@@ -131,7 +131,7 @@ class LuaSetting:
         return repr("".join(list(iter_piece())))
 
     @cached_property
-    def generated(self):
+    def generated(self) -> list[str]:
         if self.key == "":
             return [*_comment_lines(self.raw), "# 未识别"]
         if self.duplicate:
@@ -145,7 +145,7 @@ class LuaSetting:
 
 class SettingExtractor:
     @staticmethod
-    def iter_setting_from_file(file):
+    def iter_setting_from_file(file: str | Path) -> Iterator[LuaSetting]:
         with Path(file).open(encoding="utf8") as f:
             data = list(f.readlines())
 
@@ -159,13 +159,13 @@ class SettingExtractor:
                     yield LuaSetting(raw=row, typ=res.group(1), code=res.group(2))
 
     @staticmethod
-    def iter_file_from_folder(folder):
+    def iter_file_from_folder(folder: str) -> Iterator[str]:
         for path, _folders, files in os.walk(folder):
             for filename in files:
                 yield f"{path}/{filename}"
 
-    def iter_generated_lines(self, folder):
-        dic_settings = set()
+    def iter_generated_lines(self, folder: str) -> Iterator[str]:
+        dic_settings: set[str] = set()
         yield "from module.game_setting.setting_extractor import Field"
         yield ""
         yield "# 本文件由 module/game_setting/setting_extractor.py 自动生成。"
@@ -188,7 +188,7 @@ class SettingExtractor:
                 for line in setting.generated:
                     yield f"    {line}"
 
-    def generate(self, folder, output="./module/game_setting/setting_generated.py"):
+    def generate(self, folder: str, output: str | Path = "./module/game_setting/setting_generated.py") -> None:
         lines = [line + "\n" for line in self.iter_generated_lines(folder)]
         with Path(output).open(mode="w", encoding="utf8") as f:
             f.writelines(lines)
