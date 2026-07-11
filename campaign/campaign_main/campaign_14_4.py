@@ -197,7 +197,11 @@ class Campaign(CampaignBase):
         if not self.map_is_clear_mode:
             for override_grid in OVERRIDE:
                 # Set may_enemy, but keep may_ambush
-                self.map[override_grid.location].may_enemy = override_grid.may_enemy
+                location = override_grid.location
+                if location is None:
+                    message = "14-4 override grid is missing its map location"
+                    raise RuntimeError(message)
+                self.map[location].may_enemy = override_grid.may_enemy
 
     def battle_0(self) -> bool:
         self.pick_up_light_house(A9)

@@ -1,5 +1,6 @@
 import collections
 import time
+from typing import TYPE_CHECKING, cast
 
 import cv2
 import numpy as np
@@ -13,43 +14,64 @@ from module.map_detection.grid import Grid
 from module.map_detection.utils import corner2area
 from module.map_detection.utils_assets import ASSETS
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from module.base.type_alias import ImageArray, NumericArray, Point
+    from module.config.config import AzurLaneConfig
+    from module.map.type_alias import GridLocation, ViewMode
+
 NO_MAP_GRIDS_MESSAGE = "No map grids found"
 CAMERA_OUTSIDE_MAP_MESSAGE = "Camera outside map"
 
 
 class View(MapDetector):
-    grids: dict
-    shape: np.ndarray
-    center_loca: tuple
-    center_offset: np.ndarray
-    swipe_base: np.ndarray
+    grids: dict[GridLocation, Grid]
+    shape: NumericArray
+    center_loca: GridLocation
+    center_offset: NumericArray
+    swipe_base: NumericArray
 
-    def __init__(self, config, mode="main", grid_class=Grid):
+    def __init__(self, config: AzurLaneConfig, mode: ViewMode = "main", grid_class: type[Grid] = Grid) -> None:
         """mode 为 main 时识别普通地图，为 os 时识别大型作战地图。"""
         super().__init__(config)
         self.mode = mode
         self.grid_class = grid_class
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Grid]:
         return iter(self.grids.values())
 
-    def __getitem__(self, item):
-        return self.grids[tuple(item)]
+    def __getitem__(self, item: Point) -> Grid:
+        values = tuple(item)
+        if len(values) != 2:
+            raise KeyError(item)
+        location = (int(values[0]), int(values[1]))
+        return self.grids[location]
 
-    def __contains__(self, item):
-        return tuple(item) in self.grids
+    def __contains__(self, item: object) -> bool:
+        if isinstance(item, np.ndarray):
+            if item.shape != (2,):
+                return False
+            values = cast("list[int]", np.asarray(item, dtype=int).tolist())
+            return (values[0], values[1]) in self.grids
+        if not isinstance(item, (tuple, list)) or len(item) != 2:
+            return False
+        x, y = item
+        if not isinstance(x, (int, np.integer)) or not isinstance(y, (int, np.integer)):
+            return False
+        return (int(x), int(y)) in self.grids
 
-    def show(self):
+    def show(self) -> None:
         for y in range(self.shape[1] + 1):
             text = " ".join([self[(x, y)].str if (x, y) in self else ".." for x in range(self.shape[0] + 1)])
             logger.info(text)
 
-    def _image_clear_ui(self, image):
+    def _image_clear_ui(self, image: ImageArray) -> ImageArray:
         if self.mode == "os":
-            return cv2.copyTo(image, ASSETS.ui_mask_os_in_map)
-        return cv2.copyTo(image, ASSETS.ui_mask_in_map)
+            return cast("ImageArray", cv2.copyTo(image, ASSETS.ui_mask_os_in_map))
+        return cast("ImageArray", cv2.copyTo(image, ASSETS.ui_mask_in_map))
 
-    def load(self, image):
+    def load(self, image: ImageArray) -> None:
         image = self._image_clear_ui(np.array(image))
         self.image = image
         super().load(image)
@@ -91,13 +113,13 @@ class View(MapDetector):
                 raise MapDetectionError(message)
             break
 
-    def predict(self):
+    def predict(self) -> None:
         start_time = time.time()
         for grid in self:
             grid.predict()
         logger.attr_align("predict", len(self.grids.keys()), front=float2str(time.time() - start_time) + "s")
 
-    def update(self, image):
+    def update(self, image: ImageArray) -> None:
         """相机位置不变时只更新所有格子的截图，并重置识别状态。"""
         image = self._image_clear_ui(image)
         self.image = image
@@ -105,7 +127,7 @@ class View(MapDetector):
             grid.reset()
             grid.image = image
 
-    def select(self, **kwargs):
+    def select(self, **kwargs: object) -> SelectedGrids[Grid]:
         result = []
         for grid in self:
             flag = True
@@ -117,7 +139,16 @@ class View(MapDetector):
 
         return SelectedGrids(result)
 
-    def predict_swipe(self, prev, with_current_fleet=True, with_sea_grids=True):
+    @staticmethod
+    def _require_location(grid: Grid) -> GridLocation:
+        if grid.location is None:
+            msg = "检测视图中的格子缺少位置"
+            raise RuntimeError(msg)
+        return grid.location
+
+    def predict_swipe(
+        self, prev: View, *, with_current_fleet: bool = True, with_sea_grids: bool = True
+    ) -> GridLocation | None:
         """用当前舰队箭头或海面格匹配预测滑动偏移，返回 (x, y) 或 None。
         海面格匹配存在误判风险，可用 with_sea_grids=False 禁用。
         """
@@ -135,7 +166,9 @@ class View(MapDetector):
             current_fleet = self.select(is_fleet=True, is_current_fleet=True)
             previous_fleet = prev.select(is_fleet=True, is_current_fleet=True)
             if len(current_fleet) == 1 and len(previous_fleet) == 1:
-                diff = np.subtract(current_fleet[0].location, previous_fleet[0].location) - offset
+                current_location = self._require_location(current_fleet[0])
+                previous_location = self._require_location(previous_fleet[0])
+                diff = np.asarray(current_location) - np.asarray(previous_location) - offset
                 diff = tuple(diff.tolist())
                 logger.info(
                     f"Map swipe predict: {diff} ({float2str(time.time() - start_time) + 's'}, current fleet match)"

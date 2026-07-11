@@ -25,7 +25,15 @@ from module.os_shop.assets import PORT_SUPPLY_CHECK
 from module.ui.assets import BACK_ARROW
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
+    from module.base.button import Button, MatchOffset
+    from module.base.type_alias import Area, NumericArray, Point
     from module.map.map_grids import SelectedGrids
+    from module.map.type_alias import GridLocation, GridMode
+    from module.map_detection.grid_info import GridInfo
+
+type RecoveryOverlay = tuple[Button, MatchOffset, Button, str]
 
 _EARLY_CLICK_RECOVERY_OVERLAYS = (
     (GET_ITEMS_1, 5, GET_ITEMS_1, "Perspective error caused by get_items"),
@@ -45,24 +53,24 @@ IMAGE_IN_AUTO_SEARCH_MENU_MESSAGE = "Image is in auto search menu"
 
 @dataclass(slots=True)
 class FullScanOptions:
-    queue: SelectedGrids | None = None
-    must_scan: SelectedGrids | None = None
+    queue: SelectedGrids[GridInfo] | None = None
+    must_scan: SelectedGrids[GridInfo] | None = None
     battle_count: int = 0
     mystery_count: int = 0
     siren_count: int = 0
     carrier_count: int = 0
-    mode: str = "normal"
+    mode: GridMode = "normal"
 
 
 class Camera(MapOperation):
     view: View
     map: CampaignMap
-    camera = (0, 0)
+    camera: GridLocation = (0, 0)
     grid_class = Grid
     _prev_view: View | None = None
-    _prev_swipe = None
+    _prev_swipe: Point | None = None
 
-    def _map_swipe(self, vector, box=(123, 159, 1175, 628)):
+    def _map_swipe(self, vector: Point, box: Area = (123, 159, 1175, 628)) -> bool:
         """按浮点格子向量在 box 坐标区域内滑动，返回相机是否移动。"""
         vector = np.array(vector)
         name = "MAP_SWIPE_" + "_".join([str(round(x)) for x in vector])
@@ -85,7 +93,7 @@ class Camera(MapOperation):
             return True
         return False
 
-    def map_swipe(self, vector):
+    def map_swipe(self, vector: Point) -> bool:
         """按整数相对格子向量滑动；调用前必须已更新视图。"""
         logger.info(f"Map swipe: {vector}")
         self._prev_view = copy.copy(self.view)
@@ -94,7 +102,7 @@ class Camera(MapOperation):
         vector = np.array([0.5, 0.5]) - self.view.center_offset + vector
         return self._map_swipe(vector)
 
-    def focus_to_grid_center(self, tolerance=None):
+    def focus_to_grid_center(self, tolerance: float | None = None) -> bool:
         """把镜头重置到格子中心；容差为 0～0.5，None 时使用配置值。"""
         if not tolerance:
             tolerance = self.config.MAP_GRID_CENTER_TOLERANCE
@@ -104,7 +112,7 @@ class Camera(MapOperation):
 
         return False
 
-    def _view_init(self):
+    def _view_init(self) -> None:
         if not hasattr(self, "view"):
             self.view = View(self.config, grid_class=self.grid_class)
 
@@ -118,7 +126,7 @@ class Camera(MapOperation):
             logger.warning(IMAGE_NOT_IN_MAP_MESSAGE)
             raise MapDetectionError(IMAGE_NOT_IN_MAP_MESSAGE)
 
-    def _update_view(self):
+    def _update_view(self) -> bool:
         self._view_init()
         try:
             self._ensure_image_detectable()
@@ -128,7 +136,7 @@ class Camera(MapOperation):
 
         return True
 
-    def _handle_update_view_error(self, error):
+    def _handle_update_view_error(self, error: MapDetectionError) -> bool:
         if self._recover_perspective_error(error):
             return False
         if self._recover_camera_outside_map(error):
@@ -140,7 +148,7 @@ class Camera(MapOperation):
             raise GameNotRunningError from error
         raise error
 
-    def _recover_perspective_error(self, error):
+    def _recover_perspective_error(self, error: MapDetectionError) -> bool:
         for handler in (
             self._recover_info_bar,
             self._recover_early_click_overlays,
@@ -164,7 +172,7 @@ class Camera(MapOperation):
                 return True
         return False
 
-    def _recover_info_bar(self):
+    def _recover_info_bar(self) -> bool:
         if not self.info_bar_count():
             return False
 
@@ -172,13 +180,13 @@ class Camera(MapOperation):
         self.handle_info_bar()
         return True
 
-    def _recover_early_click_overlays(self):
+    def _recover_early_click_overlays(self) -> bool:
         return self._recover_click_overlays(_EARLY_CLICK_RECOVERY_OVERLAYS)
 
-    def _recover_late_click_overlays(self):
+    def _recover_late_click_overlays(self) -> bool:
         return self._recover_click_overlays(_LATE_CLICK_RECOVERY_OVERLAYS)
 
-    def _recover_click_overlays(self, overlays):
+    def _recover_click_overlays(self, overlays: Sequence[RecoveryOverlay]) -> bool:
         for button, offset, click_button, message in overlays:
             if self.appear(button, offset=offset):
                 logger.warning(message)
@@ -186,7 +194,7 @@ class Camera(MapOperation):
                 return True
         return False
 
-    def _recover_story(self):
+    def _recover_story(self) -> bool:
         if not self.handle_story_skip():
             return False
 
@@ -194,14 +202,14 @@ class Camera(MapOperation):
         self.ensure_no_story(skip_first_screenshot=False)
         return True
 
-    def _end_if_in_stage(self, error):
+    def _end_if_in_stage(self, error: MapDetectionError) -> bool:
         if not self.is_in_stage():
             return False
 
         logger.warning(IMAGE_IN_STAGE_MESSAGE)
         raise CampaignEnd(IMAGE_IN_STAGE_MESSAGE) from error
 
-    def _end_if_map_preparation(self, error):
+    def _end_if_map_preparation(self, error: MapDetectionError) -> bool:
         if not self.appear(MAP_PREPARATION, offset=(20, 20)):
             return False
 
@@ -209,7 +217,7 @@ class Camera(MapOperation):
         self.enter_map_cancel()
         raise CampaignEnd(IMAGE_IN_MAP_PREPARATION_MESSAGE) from error
 
-    def _end_if_auto_search_menu(self, error):
+    def _end_if_auto_search_menu(self, error: MapDetectionError) -> bool:
         if not self.appear(AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset):
             return False
 
@@ -217,7 +225,7 @@ class Camera(MapOperation):
         self.ensure_auto_search_exit()
         raise CampaignEnd(IMAGE_IN_AUTO_SEARCH_MENU_MESSAGE) from error
 
-    def _recover_globe_map(self):
+    def _recover_globe_map(self) -> bool:
         if not self.appear(GLOBE_GOTO_MAP, offset=(20, 20)):
             return False
 
@@ -231,7 +239,7 @@ class Camera(MapOperation):
         )
         return True
 
-    def _recover_auto_search_reward(self):
+    def _recover_auto_search_reward(self) -> bool:
         if not self.appear(AUTO_SEARCH_REWARD, offset=(50, 50)):
             return False
 
@@ -251,7 +259,7 @@ class Camera(MapOperation):
         )
         return True
 
-    def _recover_opsi_mission_check(self):
+    def _recover_opsi_mission_check(self) -> bool:
         if not self.appear(OPSI_MISSION_CHECK, offset=(20, 20)):
             return False
 
@@ -265,7 +273,7 @@ class Camera(MapOperation):
         self.ui_click(OPSI_MISSION_CHECK, check_button=self.is_in_map, offset=(200, 5), skip_first_screenshot=True)
         return True
 
-    def _recover_opsi_popup(self):
+    def _recover_opsi_popup(self) -> bool:
         if "opsi" not in self.config.task.command.lower() or not self.handle_popup_confirm("OPSI"):
             return False
 
@@ -273,7 +281,7 @@ class Camera(MapOperation):
         logger.warning("Perspective error caused by popups")
         return True
 
-    def _recover_camera_outside_map(self, error):
+    def _recover_camera_outside_map(self, error: MapDetectionError) -> bool:
         message = str(error)
         if CAMERA_OUTSIDE_MAP_MESSAGE not in message:
             return False
@@ -283,7 +291,7 @@ class Camera(MapOperation):
         self._map_swipe((-int(x.strip()), -int(y.strip())))
         return True
 
-    def _get_previous_center_offset(self, wait_swipe):
+    def _get_previous_center_offset(self, *, wait_swipe: bool) -> NumericArray | None:
         if not wait_swipe:
             return None
 
@@ -296,23 +304,29 @@ class Camera(MapOperation):
         logger.attr("prev.center_offset", prev_center_offset)
         return prev_center_offset
 
-    def _capture_update_screenshot(self, swipe_wait_timeout) -> None:
+    def _capture_update_screenshot(self, swipe_wait_timeout: Timer) -> None:
         # Camera.update() 没有 skip_first_screenshot。
         # 等待 swipe_wait_timeout 时不要额外限制截图间隔。
         if not swipe_wait_timeout.reached():
             self.device.screenshot_interval_clear()
         self.device.screenshot()
 
-    def _is_grid_center(self):
+    def _is_grid_center(self) -> bool:
         return not np.any(np.abs(self.view.center_offset - 0.5) > self.config.MAP_GRID_CENTER_TOLERANCE)
 
     @staticmethod
-    def _is_still_prev_view(center_offset, prev_center_offset):
+    def _is_still_prev_view(center_offset: NumericArray, prev_center_offset: NumericArray | None) -> bool:
         if prev_center_offset is None:
             return False
         return np.linalg.norm(center_offset - prev_center_offset) < 0.001
 
-    def _handle_wait_swipe_view(self, prev_center_offset, swiped, error_confirm):
+    def _handle_wait_swipe_view(
+        self,
+        prev_center_offset: NumericArray | None,
+        *,
+        swiped: bool,
+        error_confirm: Timer,
+    ) -> tuple[bool, bool]:
         if self._is_still_prev_view(self.view.center_offset, prev_center_offset):
             swiped = False
         if self._is_grid_center():
@@ -325,8 +339,8 @@ class Camera(MapOperation):
         error_confirm.reset()
         return False, swiped
 
-    def _update_view_data(self):
-        prev_swipe = np.asarray(self._prev_swipe)
+    def _update_view_data(self) -> bool:
+        prev_swipe = np.asarray(self._prev_swipe if self._prev_swipe is not None else (0, 0))
         if self._prev_view is not None and np.linalg.norm(prev_swipe) > 0:
             if self.config.MAP_SWIPE_PREDICT:
                 swipe = self._prev_view.predict_swipe(
@@ -363,7 +377,7 @@ class Camera(MapOperation):
         self.predict()
         return True
 
-    def update(self, camera=True, wait_swipe=False, allow_error=False):
+    def update(self, *, camera: bool = True, wait_swipe: bool = False, allow_error: bool = False) -> bool:
         """更新地图截图和相机视图。
 
         camera 控制是否更新相机与透视数据；wait_swipe 等待镜头回到格子中心；
@@ -372,7 +386,7 @@ class Camera(MapOperation):
         error_confirm = Timer(5, count=10).start()
         swipe_wait_timeout = Timer(0.35, count=1).start()
         swiped = True
-        prev_center_offset = self._get_previous_center_offset(wait_swipe)
+        prev_center_offset = self._get_previous_center_offset(wait_swipe=wait_swipe)
 
         while 1:
             self._capture_update_screenshot(swipe_wait_timeout)
@@ -395,7 +409,9 @@ class Camera(MapOperation):
 
             logger.attr("view.center_offset", self.view.center_offset)
             if wait_swipe and not swipe_wait_timeout.reached():
-                should_stop, swiped = self._handle_wait_swipe_view(prev_center_offset, swiped, error_confirm)
+                should_stop, swiped = self._handle_wait_swipe_view(
+                    prev_center_offset, swiped=swiped, error_confirm=error_confirm
+                )
                 if should_stop:
                     break
                 continue
@@ -404,14 +420,21 @@ class Camera(MapOperation):
         self._update_view_data()
         return True
 
-    def predict(self):
+    def predict(self) -> None:
         self.view.predict()
         self.view.show()
 
-    def show_camera(self):
+    def show_camera(self) -> None:
         logger.attr_align("Camera", location2node(self.camera))
 
-    def ensure_edge_insight(self, reverse=False, preset=None, swipe_limit=(3, 2), skip_first_update=True):
+    def ensure_edge_insight(
+        self,
+        *,
+        reverse: bool = False,
+        preset: GridLocation | None = None,
+        swipe_limit: GridLocation = (3, 2),
+        skip_first_update: bool = True,
+    ) -> list[GridLocation]:
         """滑到两个边缘以定位相机；swipe_limit 限制各轴幅度，并返回滑动向量记录。"""
         logger.info("Ensure edge in sight.")
         record = []
@@ -446,7 +469,7 @@ class Camera(MapOperation):
 
         return record
 
-    def focus_to(self, location, swipe_limit=(4, 3)):
+    def focus_to(self, location: GridInfo | str | Point, swipe_limit: GridLocation = (4, 3)) -> None:
         """聚焦到指定格子；swipe_limit 限制单次各轴滑动幅度。"""
         location = location_ensure(location)
         logger.info(f"Focus to: {location2node(location)}")
@@ -459,7 +482,7 @@ class Camera(MapOperation):
             if not has_swiped:
                 break
 
-    def full_scan(self, options=None):
+    def full_scan(self, options: FullScanOptions | None = None) -> None:
         """按扫描队列、必扫格子、计数快照和模式扫描整张地图。"""
         if options is None:
             options = FullScanOptions()
@@ -503,7 +526,7 @@ class Camera(MapOperation):
         )
         self.map.show()
 
-    def in_sight(self, location, sight=None):
+    def in_sight(self, location: GridInfo | str | Point, sight: tuple[int, int, int, int] | None = None) -> None:
         """确保格子位于相机视野矩形内；sight 形如 (-3, -1, 3, 2)。"""
         location = location_ensure(location)
         logger.info(f"In sight: {location2node(location)}")
@@ -525,7 +548,7 @@ class Camera(MapOperation):
             x = 0
         self.focus_to((self.camera[0] + x, self.camera[1] + y))
 
-    def convert_global_to_local(self, location):
+    def convert_global_to_local(self, location: GridInfo | str | Point) -> Grid:
         """把全局地图格转为当前视图格；越界时先聚焦再重算。"""
         location = location_ensure(location)
 
@@ -541,7 +564,7 @@ class Camera(MapOperation):
         local = np.array(location) - self.camera + self.view.center_loca
         return self.view[local]
 
-    def convert_local_to_global(self, location):
+    def convert_local_to_global(self, location: GridInfo | str | Point) -> GridInfo:
         """把当前视图格转为全局地图格；越界时校正相机再重算。"""
         location = location_ensure(location)
 
@@ -558,7 +581,7 @@ class Camera(MapOperation):
         global_ = np.array(location) + self.camera - self.view.center_loca
         return self.map[global_]
 
-    def full_scan_find_boss(self):
+    def full_scan_find_boss(self) -> bool:
         logger.info("Full scan find boss.")
         self.map.reset_fleet()
 
@@ -579,11 +602,11 @@ class Camera(MapOperation):
         logger.warning("No boss found.")
         return False
 
-    def get_swipe_area_opt(self, map_vector):
+    def get_swipe_area_opt(self, map_vector: Point) -> tuple[list[Area], list[Area]]:
         """返回滑动终点随机化使用的白名单、黑名单区域列表。"""
         map_vector = np.array(map_vector)
 
-        def local_to_area(local_grid, pad=0):
+        def local_to_area(local_grid: Iterable[Grid], pad: int = 0) -> list[Area]:
             result = []
             for local in local_grid:
                 # 预测滑动后的格子位置，让手势在那里结束以免被识别为点击。
@@ -593,7 +616,7 @@ class Camera(MapOperation):
                 result.append(area)
             return result
 
-        def globe_to_local(globe_grids):
+        def globe_to_local(globe_grids: SelectedGrids[GridInfo]) -> list[Grid]:
             result = []
             for globe in globe_grids:
                 location = tuple(np.array(globe.location) - self.camera + self.view.center_loca)

@@ -1,23 +1,44 @@
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
 import numpy as np
 
 from module.base.runtime_random import runtime_random
 from module.base.utils import node2location
 from module.map_detection.grid_info import GridInfo
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator, Mapping, Sequence
 
-def location_ensure(location):
+    from module.base.type_alias import NumericArray, Point
+    from module.map.type_alias import GridLocation
+
+
+@runtime_checkable
+class HasLocation(Protocol):
+    @property
+    def location(self) -> GridLocation | None: ...
+
+
+def location_ensure(location: HasLocation | str | Point) -> GridLocation:
     """格子对象取 location，格子名转坐标，其他输入原样返回。"""
-    if hasattr(location, "location"):
+    if isinstance(location, HasLocation):
+        if location.location is None:
+            msg = "格子缺少位置"
+            raise ValueError(msg)
         return location.location
     if isinstance(location, str):
         return node2location(location)
-    return location
+    values = tuple(location)
+    if len(values) != 2:
+        msg = f"无效格子坐标: {location}"
+        raise ValueError(msg)
+    return int(values[0]), int(values[1])
 
 
-def camera_1d(shape, sight):
+def camera_1d(shape: int, sight: tuple[int, int]) -> list[int]:
     start, step = abs(sight[0]), sight[1] - sight[0] + 1
     if shape <= start:
-        out = shape // 2
+        out = [shape // 2]
     else:
         out = list(range(start, 26, step))
         out.append(shape - sight[1])
@@ -25,18 +46,18 @@ def camera_1d(shape, sight):
     return out
 
 
-def camera_2d(area, sight):
+def camera_2d(area: tuple[int, int, int, int], sight: tuple[int, int, int, int]) -> list[GridLocation]:
     """按 (左上 x, 左上 y, 右下 x, 右下 y) 活动区和视野生成相机位置列表。"""
-    x = camera_1d(shape=area[2] - area[0], sight=[sight[0], sight[2]])
-    y = camera_1d(shape=area[3] - area[1], sight=[sight[1], sight[3]])
+    x = camera_1d(shape=area[2] - area[0], sight=(sight[0], sight[2]))
+    y = camera_1d(shape=area[3] - area[1], sight=(sight[1], sight[3]))
     out = np.array(np.meshgrid(x, y)).T.reshape(-1, 2) + area[:2]
-    return [tuple(c) for c in out]
+    return [(int(coordinate[0]), int(coordinate[1])) for coordinate in out]
 
 
-def get_map_active_area(grids):
+def get_map_active_area(grids: Mapping[GridLocation, GridInfo | str]) -> NumericArray:
     """返回地图活动区边界 (左上 x, 左上 y, 右下 x, 右下 y)。"""
 
-    def is_active(g):
+    def is_active(g: GridInfo | str) -> bool:
         g = g.str if isinstance(g, GridInfo) else str(g)
         return g not in {"--", "++"}
 
@@ -46,18 +67,19 @@ def get_map_active_area(grids):
     return np.append(upper_left, bottom_right)
 
 
-def camera_spawn_point(camera_list, sp_list):
+def camera_spawn_point(camera_list: Sequence[GridLocation], sp_list: Sequence[GridLocation]) -> list[GridLocation]:
     """从相机位置和出生点坐标生成 camera_data_spawn_point。"""
     camera_sp = []
-    camera_list = np.array(camera_list)
+    camera_array = np.asarray(camera_list)
     for sp in sp_list:
-        diff = np.sum(np.abs(camera_list - sp), axis=1)
-        camera_sp.append(tuple(camera_list[np.argmin(diff)].tolist()))
+        diff = np.sum(np.abs(camera_array - sp), axis=1)
+        nearest = camera_array[int(np.argmin(diff))]
+        camera_sp.append((int(nearest[0]), int(nearest[1])))
 
     return list(set(camera_sp))
 
 
-def random_direction(direction):
+def random_direction(direction: str) -> GridLocation:
     """把 upper-left 等方向转为 (x, y)；缺失轴随机，空字符串表示两轴随机。"""
     direction = direction.lower()
     x = 1 if runtime_random.chance() else -1
@@ -73,17 +95,23 @@ def random_direction(direction):
     return (x, y)
 
 
-def combine(before, after, limit):
-    after += [limit]
+def combine(before: Sequence[Sequence[int]], after: Sequence[int], limit: int) -> Iterator[list[int]]:
+    candidates = [*after, limit]
     for b in before:
-        for a in after:
+        for a in candidates:
             index = [*b, a]
             match = [m for m in index if m < limit]
             if len(set(match)) == len(match):
                 yield index
 
 
-def match_movable(before, spawn, after, fleets, fleet_step=2):
+def match_movable(
+    before: Sequence[GridLocation],
+    spawn: Sequence[GridLocation],
+    after: Sequence[GridLocation],
+    fleets: Sequence[GridLocation],
+    fleet_step: int = 2,
+) -> tuple[list[GridLocation], list[GridLocation]]:
     """优先按 before 顺序匹配移动前后坐标，返回 (匹配前坐标列表, 匹配后坐标列表)。"""
     base_weight = -10000
     encourage_weight = -100

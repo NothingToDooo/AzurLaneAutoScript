@@ -1,26 +1,33 @@
+from typing import TYPE_CHECKING
+
 from module.base.decorator import cached_property
 from module.map_detection.grid_info import GridInfo
 from module.map_detection.grid_predictor import GridPredictor
 from module.map_detection.utils import trapezoid2area
 
+if TYPE_CHECKING:
+    from module.base.type_alias import Area, ImageArray, NumericArray
+    from module.config.config import AzurLaneConfig
+    from module.map.type_alias import GridLocation
+
 
 class Grid(GridInfo, GridPredictor):
-    def __init__(self, location, image, corner, config):
+    def __init__(self, location: GridLocation, image: ImageArray, corner: NumericArray, config: AzurLaneConfig) -> None:
         """corner 顺序为左上、右上、左下、右下。"""
         self.location = location
         super().__init__(location, image, corner, config)
 
     @cached_property
-    def inner(self):
+    def inner(self) -> Area:
         """返回梯形最大内接矩形 (x1, y1, x2, y2)。"""
         return trapezoid2area(self.corner, pad=5)
 
     @cached_property
-    def outer(self):
+    def outer(self) -> Area:
         """返回梯形最小外接矩形 (x1, y1, x2, y2)。"""
         return trapezoid2area(self.corner, pad=-5)
 
     @cached_property
-    def button(self):
+    def button(self) -> Area:
         """暴露可点击的 button 区域。"""
         return self.inner

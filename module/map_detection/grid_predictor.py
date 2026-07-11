@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import cv2
 import numpy as np
@@ -12,7 +12,12 @@ from module.map_detection.utils_assets import ASSETS, DETECTING_AREA, UI_MASK, U
 from module.template import assets as template_assets
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from module.base.template import Template
+    from module.base.type_alias import Area, Color, ImageArray, NumericArray, Point, Size
+    from module.config.config import AzurLaneConfig
+    from module.map.type_alias import GridLocation
 
 MISSING_ENEMY_TEMPLATE_DETAIL = (
     "Enemy detection template asset is missing. Update checked-in assets/<server>/template before running this map."
@@ -20,7 +25,7 @@ MISSING_ENEMY_TEMPLATE_DETAIL = (
 
 
 class GridPredictor:
-    def __init__(self, location, image, corner, config):
+    def __init__(self, location: GridLocation, image: ImageArray, corner: NumericArray, config: AzurLaneConfig) -> None:
         """image 形状为 (720, 1280, 3)，corner 形状为 (4, 2)。
         corner 顺序为左上、右上、左下、右下。
         """
@@ -45,32 +50,37 @@ class GridPredictor:
                 self.template_enemy_genre[f"Siren_{name}"] = getattr(template_assets, f"TEMPLATE_SIREN_{name}", None)
 
         self.area = corner2area(self.corner)
-        self.homo_data = cv2.getPerspectiveTransform(
-            src=self.corner.astype(np.float32), dst=area2corner((0, 0, *self.config.HOMO_TILE)).astype(np.float32)
+        self.homo_data = cast(
+            "NumericArray",
+            cv2.getPerspectiveTransform(
+                src=self.corner.astype(np.float32),
+                dst=area2corner((0, 0, *self.config.HOMO_TILE)).astype(np.float32),
+            ),
         )
-        self.homo_invt = cv2.invert(self.homo_data)[1]
+        self.homo_invt = cast("NumericArray", cv2.invert(self.homo_data)[1])
 
-    def screen2grid(self, points):
+    def screen2grid(self, points: Sequence[Point] | NumericArray) -> NumericArray:
         """把 (n, 2) 屏幕坐标转换为以格子左上角为原点的网格坐标。"""
         return perspective_transform(points, self.homo_data) / self.config.HOMO_TILE
 
-    def grid2screen(self, points):
+    def grid2screen(self, points: Sequence[Point] | NumericArray) -> NumericArray:
         """把 (n, 2) 网格坐标转换回屏幕坐标。"""
-        return perspective_transform(np.multiply(points, self.config.HOMO_TILE), self.homo_invt)
+        scaled = np.asarray(points, dtype=float) * np.asarray(self.config.HOMO_TILE, dtype=float)
+        return perspective_transform(scaled, self.homo_invt)
 
     @cached_property
-    def image_trans(self):
-        return cv2.warpPerspective(self.image, self.homo_data, self.config.HOMO_TILE)
+    def image_trans(self) -> ImageArray:
+        return cast("ImageArray", cv2.warpPerspective(self.image, self.homo_data, self.config.HOMO_TILE))
 
     @cached_property
-    def image_homo(self):
+    def image_homo(self) -> ImageArray:
         image_edge = rgb2gray(self.image_trans)
         image_edge = cv2.Canny(image_edge, 100, 150)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         cv2.morphologyEx(image_edge, cv2.MORPH_CLOSE, kernel, dst=image_edge)
-        return image_edge
+        return cast("ImageArray", image_edge)
 
-    def predict(self):
+    def predict(self) -> None:
         self.enemy_scale = self.predict_enemy_scale()
         self.enemy_genre = self.predict_enemy_genre()
         self.is_boss = self.predict_boss()
@@ -95,7 +105,7 @@ class GridPredictor:
             self.is_siren = True
             self.enemy_scale = 0
 
-    def relative_crop(self, area, shape=None):
+    def relative_crop(self, area: Area, shape: Size | None = None) -> ImageArray:
         """按相对区域 (x1, y1, x2, y2) 裁剪，并消除透视缩放影响。
         shape 按 (width, height) 传入，输出形状为 (height, width, channel)。
         """
@@ -103,16 +113,23 @@ class GridPredictor:
         image = crop(self.image, area=np.rint(area).astype(int), copy=False)
         if shape is not None:
             # 与 Pillow 默认重采样一致，使用双三次插值。
-            image = cv2.resize(image, shape, interpolation=cv2.INTER_CUBIC)
-        return image
+            image = cv2.resize(image, tuple(int(value) for value in shape), interpolation=cv2.INTER_CUBIC)
+        return cast("ImageArray", image)
 
-    def relative_rgb_count(self, area, color, shape=(50, 50), threshold=221):
+    def relative_rgb_count(self, area: Area, color: Color, shape: Size = (50, 50), threshold: int = 221) -> int:
         """统计相对区域内匹配目标 RGB 的像素数；threshold 范围为 0～255。"""
         mask = color_similarity_2d(self.relative_crop(area, shape=shape), color=color)
         cv2.inRange(mask, threshold, 255, dst=mask)
         return cv2.countNonZero(mask)
 
-    def relative_hsv_count(self, area, h=(0, 360), s=(0, 100), v=(0, 100), shape=(50, 50)):
+    def relative_hsv_count(
+        self,
+        area: Area,
+        h: tuple[float, float] = (0, 360),
+        s: tuple[float, float] = (0, 100),
+        v: tuple[float, float] = (0, 100),
+        shape: Size = (50, 50),
+    ) -> int:
         """统计 HSV 范围内像素数；H 为 0～360，S、V 为 0～100。"""
         image = self.relative_crop(area, shape=shape)
         cv2.cvtColor(image, cv2.COLOR_RGB2HSV, dst=image)
@@ -122,7 +139,7 @@ class GridPredictor:
         image = cv2.inRange(image, lower, upper)
         return cv2.countNonZero(image)
 
-    def predict_enemy_scale(self):
+    def predict_enemy_scale(self) -> int:
         """返回敌舰规模：1 小型，2 中型，3 大型，0 未知。"""
         image = self.relative_crop((-0.415 - 0.7, -0.62 - 0.7, -0.415, -0.62), shape=(50, 50))
         red = color_similarity_2d(image, (255, 130, 132))
@@ -139,7 +156,7 @@ class GridPredictor:
 
         return scale
 
-    def _predict_siren_with_boss_icon(self):
+    def _predict_siren_with_boss_icon(self) -> bool:
         if not self.config.MAP_SIREN_HAS_BOSS_ICON:
             return False
         if self.enemy_scale:
@@ -148,7 +165,7 @@ class GridPredictor:
         image = color_similarity_2d(image, color=(255, 150, 24))
         return image[image > 221].shape[0] > 200 and template_assets.TEMPLATE_ENEMY_BOSS.match(image, similarity=0.6)
 
-    def _predict_siren_with_small_boss_icon(self):
+    def _predict_siren_with_small_boss_icon(self) -> bool:
         if not self.config.MAP_SIREN_HAS_BOSS_ICON_SMALL:
             return False
         if self.relative_hsv_count(area=(0.03, -0.15, 0.63, 0.15), h=(32 - 3, 32 + 3), shape=(50, 20)) <= 100:
@@ -157,7 +174,8 @@ class GridPredictor:
         image = color_similarity_2d(image, color=(255, 150, 33))
         return template_assets.TEMPLATE_ENEMY_BOSS.match(image, similarity=0.7)
 
-    def _ensure_enemy_genre_template(self, name, template) -> Template:
+    @staticmethod
+    def _ensure_enemy_genre_template(name: str, template: Template | None) -> Template:
         if template is not None:
             return template
         message = f"Enemy detection template not found: {name}"
@@ -165,18 +183,19 @@ class GridPredictor:
         logger.warning(MISSING_ENEMY_TEMPLATE_DETAIL)
         raise ScriptError(message)
 
-    def _enemy_genre_scaling(self, name):
+    def _enemy_genre_scaling(self, name: str) -> tuple[float, ...]:
         short_name = name.removeprefix("Siren_")
         scaling = self.config.MAP_ENEMY_GENRE_DETECTION_SCALING.get(short_name, 1)
-        return scaling if isinstance(scaling, tuple) else (scaling,)
+        values = scaling if isinstance(scaling, tuple) else (scaling,)
+        return tuple(float(value) for value in values)
 
-    def _enemy_genre_image(self, image_dic, scale):
+    def _enemy_genre_image(self, image_dic: dict[float, ImageArray], scale: float) -> ImageArray:
         if scale not in image_dic:
             shape = tuple(np.round(np.array((60, 60)) * scale).astype(int))
             image_dic[scale] = rgb2gray(self.relative_crop((-0.5, -1, 0.5, 0), shape=shape))
         return image_dic[scale]
 
-    def predict_enemy_genre(self):
+    def predict_enemy_genre(self) -> str | None:
         if self._predict_siren_with_boss_icon() or self._predict_siren_with_small_boss_icon():
             return "Siren_Siren"
 
@@ -191,7 +210,7 @@ class GridPredictor:
 
         return None
 
-    def predict_boss(self):
+    def predict_boss(self) -> bool:
         if self.enemy_genre == "Siren_Siren":
             return False
 
@@ -208,27 +227,27 @@ class GridPredictor:
 
         return False
 
-    def predict_missile_attack(self):
+    def predict_missile_attack(self) -> bool:
         return self.relative_rgb_count(area=(-0.5, -1, 0.5, 0), color=(255, 255, 60), shape=(50, 50)) > 35
 
-    def predict_fleet(self):
+    def predict_fleet(self) -> bool:
         image = self.relative_crop((-1, -2, -0.5, -1.5), shape=(50, 50))
         image = color_similarity_2d(image, color=(255, 255, 255))
         return template_assets.TEMPLATE_FLEET_AMMO.match(image)
 
-    def predict_submarine(self):
+    def predict_submarine(self) -> bool:
         image = self.relative_crop((-0.86, 0.08, -0.36, 0.58), shape=(50, 50))
         image = color_similarity_2d(image, color=(255, 243, 156))
         return template_assets.TEMPLATE_SUBMARINE.match(image)
 
-    def predict_caught_by_siren(self):
+    def predict_caught_by_siren(self) -> bool:
         image = self.relative_crop((-1, -1.5, 1, 0.5), shape=(120, 120))
         return template_assets.TEMPLATE_CAUGHT_BY_SIREN.match(image, similarity=0.6)
 
-    def predict_mystery(self):
+    def predict_mystery(self) -> bool:
         return self.relative_rgb_count(area=(-0.3, -2, 0.3, -0.6), color=(148, 255, 247), shape=(20, 50)) > 50
 
-    def predict_current_fleet(self):
+    def predict_current_fleet(self) -> bool:
         count = self.relative_hsv_count(area=(-0.5, -3.5, 0.5, -2.5), h=(141 - 3, 141 + 10), shape=(50, 50))
         if count < 600:
             return False
@@ -237,7 +256,7 @@ class GridPredictor:
         image = color_similarity_2d(image, color=(24, 255, 107))
         return template_assets.TEMPLATE_FLEET_CURRENT.match(image)
 
-    def predict_sea(self):
+    def predict_sea(self) -> bool:
         area = area_pad((48, 48, 48 + 46, 48 + 46), pad=5)
         res = cv2.matchTemplate(
             ASSETS.tile_center_image, crop(self.image_homo, area=area, copy=False), cv2.TM_CCOEFF_NORMED
@@ -262,38 +281,38 @@ class GridPredictor:
 
         return False
 
-    def predict_submarine_move(self):
+    def predict_submarine_move(self) -> bool:
         # 潜艇移动模式用橙色箭头标识。
         return self.relative_rgb_count((-0.5, -1, 0.5, 0), color=(231, 138, 49), shape=(60, 60)) > 200
 
-    def predict_mob_move_icon(self):
+    def predict_mob_move_icon(self) -> bool:
         image = rgb2gray(self.relative_crop(area=(-0.5, -0.5, 0.5, 0.5), shape=(60, 60)))
         return template_assets.TEMPLATE_MOB_MOVE_ICON.match(image)
 
-    def predict_air_strike_icon(self):
+    def predict_air_strike_icon(self) -> bool:
         image = color_similarity_2d(self.image_trans, color=(255, 255, 160))
         cv2.threshold(image, 175, 255, cv2.THRESH_BINARY, dst=image)
         return template_assets.TEMPLATE_AIR_STRIKE_ICON.match(image, similarity=0.7)
 
     @cached_property
-    def _image_similar_piece(self):
+    def _image_similar_piece(self) -> ImageArray:
         return rgb2gray(self.relative_crop(area=(-0.5, -0.5, 0.5, 0.5), shape=(60, 60)))
 
     @cached_property
-    def _image_similar_full(self):
+    def _image_similar_full(self) -> ImageArray:
         return rgb2gray(self.relative_crop(area=(-0.6, -0.6, 0.6, 0.6), shape=(72, 72)))
 
-    is_os: int
+    is_os: bool
 
     @cached_property
-    def is_in_detecting_area(self, area=(-0.5, -0.5, 0.5, 0.5)):
-        area = self._image_center + np.array(area) * self._image_a
-        area = area_offset(area, offset=DETECTING_AREA[:2])
+    def is_in_detecting_area(self, area: Area = (-0.5, -0.5, 0.5, 0.5)) -> bool:
+        detecting_area = self._image_center + np.asarray(area, dtype=float) * self._image_a
+        detecting_area = cast("NumericArray", area_offset(detecting_area, offset=DETECTING_AREA[:2]))
         mask = UI_MASK_OS if self.is_os else UI_MASK
-        color = cv2.mean(crop(mask.image, area=np.rint(area).astype(int), copy=False))
+        color = cv2.mean(crop(mask.image, area=np.rint(detecting_area).astype(int), copy=False))
         return color[0] > 235
 
-    def is_similar_to(self, grid, similarity=0.9):
+    def is_similar_to(self, grid: GridPredictor, similarity: float = 0.9) -> bool:
         """比较两个格子的截图，相似度阈值范围为 0～1。"""
         if not self.is_in_detecting_area or not grid.is_in_detecting_area:
             return False
@@ -304,5 +323,5 @@ class GridPredictor:
         return sim > similarity
 
     @property
-    def image_similar_full(self):
+    def image_similar_full(self) -> ImageArray:
         return self._image_similar_full

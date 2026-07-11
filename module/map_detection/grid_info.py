@@ -3,7 +3,11 @@ from typing import TYPE_CHECKING
 from module.base.utils import location2node
 
 if TYPE_CHECKING:
+    import builtins
+    from collections.abc import Mapping
+
     from module.map.map_grids import SelectedGrids
+    from module.map.type_alias import GridLocation, GridMode
 
 _PRIMARY_GRID_CODES = {
     "++": "is_land",
@@ -49,13 +53,13 @@ class GridInfo:
     is_submarine = False  # ss
     is_siren = False  # SI
     is_portal = False
-    portal_link = ()
+    portal_link: GridLocation | None = None
     is_maze = False
-    maze_round = (0, 1, 2)
-    maze_nearby = None  # 类型为 SelectedGrids。
+    maze_round: tuple[int, ...] = (0, 1, 2)
+    maze_nearby: SelectedGrids[GridInfo] | None = None
 
     enemy_scale = 0
-    enemy_genre = None  # Light、Main、Carrier、Treasure 或 Enemy（未知类型）。
+    enemy_genre: builtins.str | None = None  # Light、Main、Carrier、Treasure 或 Enemy（未知类型）。
 
     is_cleared = False
     is_caught_by_siren = False
@@ -63,8 +67,8 @@ class GridInfo:
     is_movable = False
     is_mechanism_trigger = False
     is_mechanism_block = False
-    mechanism_trigger: SelectedGrids | None = None
-    mechanism_block: SelectedGrids | None = None
+    mechanism_trigger: SelectedGrids[GridInfo] | None = None
+    mechanism_block: SelectedGrids[GridInfo] | None = None
     mechanism_wait = 2  # 等待机关解锁动画的秒数。
     is_fortress = False
     is_flare = False
@@ -73,12 +77,12 @@ class GridInfo:
     cost = 9999
     cost_1 = 9999
     cost_2 = 9999
-    connection = None
-    weight = 1
+    connection: GridLocation | None = None
+    weight: float = 1
 
-    location = None
+    location: GridLocation | None = None
 
-    def decode(self, text):
+    def decode(self, text: builtins.str) -> None:
         text = text.upper()
         dic = {
             "++": "is_land",
@@ -96,13 +100,13 @@ class GridInfo:
 
         self.may_ambush = not (self.may_enemy or self.may_boss or self.may_mystery or self.may_mystery)
 
-    def _encode_flag(self, flags):
+    def _encode_flag(self, flags: Mapping[builtins.str, builtins.str]) -> builtins.str:
         for key, value in flags.items():
             if getattr(self, value):
                 return key
         return ""
 
-    def _encode_siren(self):
+    def _encode_siren(self) -> builtins.str:
         if not self.enemy_genre:
             return "SU"
         # enemy_genre 形如 "Siren_xxx"。
@@ -116,12 +120,12 @@ class GridInfo:
             return f"{name} "
         return "SU"
 
-    def _encode_enemy(self):
+    def _encode_enemy(self) -> builtins.str:
         scale = self.enemy_scale or 0
         genre = self.enemy_genre[0].upper() if self.enemy_genre else "E"
         return f"{scale}{genre}"
 
-    def encode(self):
+    def encode(self) -> builtins.str:
         primary = self._encode_flag(_PRIMARY_GRID_CODES)
         if primary:
             return primary
@@ -133,46 +137,51 @@ class GridInfo:
         secondary = self._encode_flag(_SECONDARY_GRID_CODES)
         return secondary or "--"
 
-    def __str__(self):
+    def __str__(self) -> builtins.str:
+        if self.location is None:
+            msg = "Grid location is required to render its node"
+            raise ValueError(msg)
         return location2node(self.location)
 
     __repr__ = __str__
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.location)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, GridInfo):
+            return NotImplemented
         return self.location == other.location
 
     @property
-    def str(self):
+    def str(self) -> builtins.str:
         return self.encode()
 
     @property
-    def is_sea(self):
+    def is_sea(self) -> bool:
         return not (self.is_land or self.is_enemy or self.is_siren or self.is_fortress or self.is_boss)
 
     @property
-    def may_carrier(self):
+    def may_carrier(self) -> bool:
         return self.is_sea and not self.may_enemy
 
     @property
-    def is_accessible(self):
+    def is_accessible(self) -> bool:
         return self.cost < 9999
 
     @property
-    def is_accessible_1(self):
+    def is_accessible_1(self) -> bool:
         return self.cost_1 < 9999
 
     @property
-    def is_accessible_2(self):
+    def is_accessible_2(self) -> bool:
         return self.cost_2 < 9999
 
     @property
-    def is_nearby(self):
+    def is_nearby(self) -> bool:
         return self.cost < 20
 
-    def merge(self, info, mode="normal"):
+    def merge(self, info: GridInfo, mode: GridMode = "normal") -> bool:
         """按 init、normal、carrier 或 movable 模式合并识别结果。"""
         self._merge_submarine(info)
 
@@ -194,11 +203,11 @@ class GridInfo:
 
         return True if result is None else result
 
-    def _merge_submarine(self, info):
+    def _merge_submarine(self, info: GridInfo) -> None:
         if info.is_submarine and self.is_submarine_spawn_point:
             self.is_submarine = True
 
-    def _merge_caught_by_siren(self, info):
+    def _merge_caught_by_siren(self, info: GridInfo) -> bool | None:
         if not info.is_caught_by_siren:
             return None
         if not self.is_sea:
@@ -208,7 +217,7 @@ class GridInfo:
         self.is_caught_by_siren = True
         return None
 
-    def _merge_fleet(self, info, mode):
+    def _merge_fleet(self, info: GridInfo, mode: GridMode) -> bool | None:
         if not info.is_fleet:
             return None
         if not self.is_sea:
@@ -222,7 +231,7 @@ class GridInfo:
             return None
         return True
 
-    def _merge_boss(self, info):
+    def _merge_boss(self, info: GridInfo) -> bool | None:
         if not info.is_boss:
             return None
         if not self.is_land and self.may_boss:
@@ -230,7 +239,7 @@ class GridInfo:
             return True
         return False
 
-    def _merge_siren(self, info, mode):
+    def _merge_siren(self, info: GridInfo, mode: GridMode) -> bool | None:
         if not info.is_siren:
             return None
         if not self._can_merge_siren(mode):
@@ -241,10 +250,10 @@ class GridInfo:
         self.enemy_genre = info.enemy_genre
         return True
 
-    def _can_merge_siren(self, mode):
+    def _can_merge_siren(self, mode: GridMode) -> bool:
         return not self.is_land and (self.may_siren or mode == "movable" or self.is_movable)
 
-    def _merge_enemy(self, info, mode):
+    def _merge_enemy(self, info: GridInfo, mode: GridMode) -> bool | None:
         if not info.is_enemy:
             return None
         if self.is_fortress:
@@ -265,16 +274,16 @@ class GridInfo:
             return True
         return False
 
-    def _can_merge_known_enemy(self, mode):
+    def _can_merge_known_enemy(self, mode: GridMode) -> bool:
         return not self.is_land and (self.may_enemy or self.is_carrier or mode == "decoy")
 
-    def _can_merge_carrier_enemy(self, mode):
+    def _can_merge_carrier_enemy(self, mode: GridMode) -> bool:
         return mode == "carrier" and not self.is_land and self.may_carrier
 
-    def _can_merge_movable_enemy(self, mode):
+    def _can_merge_movable_enemy(self, mode: GridMode) -> bool:
         return not self.is_land and (mode == "movable" or self.is_movable)
 
-    def _update_enemy_spawn_info(self, info):
+    def _update_enemy_spawn_info(self, info: GridInfo) -> None:
         if info.enemy_scale and not self.enemy_scale:
             self.enemy_scale = info.enemy_scale
         if info.enemy_scale == 3 and self.enemy_scale == 2:
@@ -282,16 +291,16 @@ class GridInfo:
             self.enemy_scale = info.enemy_scale
         self._update_enemy_genre(info)
 
-    def _replace_enemy_info(self, info):
+    def _replace_enemy_info(self, info: GridInfo) -> None:
         if info.enemy_scale:
             self.enemy_scale = info.enemy_scale
         self._update_enemy_genre(info)
 
-    def _update_enemy_genre(self, info):
+    def _update_enemy_genre(self, info: GridInfo) -> None:
         if info.enemy_genre and not (info.enemy_genre == "Enemy" and self.enemy_genre):
             self.enemy_genre = info.enemy_genre
 
-    def _merge_mystery(self, info):
+    def _merge_mystery(self, info: GridInfo) -> bool | None:
         if not info.is_mystery:
             return None
         if self.may_mystery:
@@ -299,7 +308,7 @@ class GridInfo:
             return True
         return False
 
-    def _merge_ammo(self, info):
+    def _merge_ammo(self, info: GridInfo) -> bool | None:
         if not info.is_ammo:
             return None
         if self.may_ammo:
@@ -307,7 +316,7 @@ class GridInfo:
             return True
         return False
 
-    def _merge_missile_attack(self, info):
+    def _merge_missile_attack(self, info: GridInfo) -> bool | None:
         if not info.is_missile_attack:
             return None
         if self.may_siren:
@@ -320,7 +329,7 @@ class GridInfo:
         # 允许误判，不返回失败。
         return True
 
-    def wipe_out(self):
+    def wipe_out(self) -> None:
         """舰队踏入格子后清除该格的动态目标状态。"""
         self.is_enemy = False
         self.enemy_scale = 0
@@ -342,7 +351,7 @@ class GridInfo:
             mechanism_trigger.set(is_mechanism_trigger=False)
             mechanism_block.set(is_mechanism_block=False)
 
-    def reset(self):
+    def reset(self) -> None:
         """进入地图后重置该格的临时状态。"""
         self.wipe_out()
         self.is_fleet = False
@@ -355,7 +364,7 @@ class GridInfo:
         self.mechanism_block = None
         self.may_bouncing_enemy = False
 
-    def covered_grid(self):
+    def covered_grid(self) -> list[GridLocation]:
         """返回被大型对象覆盖格子的相对坐标列表。"""
         if self.is_current_fleet:
             return [(0, -1), (0, -2)]
@@ -364,7 +373,7 @@ class GridInfo:
 
         return []
 
-    def distance_to(self, other):
+    def distance_to(self, other: GridInfo) -> int:
         """返回与另一格的曼哈顿距离。"""
         l1 = self.location
         l2 = other.location
