@@ -11,8 +11,8 @@
 
 下一阶段采用**纵向切片式演进**，并暂时固定现有 CnOCR 模型：先完成两条最小切片——一条从识别结果到失败样本和业务判断，另一条从真实页面判断到设备动作和回放；各自验证价值后再扩大覆盖。当前最制约项目演进的问题是：
 
-1. CnOCR 已返回文字和置信度，但当前只保留文字；解析失败又容易退化为静默的 `0`、零时长或空字符串。
-2. 无效 OCR 没有保存裁剪图与失败上下文，既难诊断，也无法积累未来换模型需要的真实语料。
+1. 结构化入口已经保留 CnOCR 的文字和置信度，但大多数生产调用仍使用旧 `.ocr()`；这些调用中的解析失败仍容易退化为静默的 `0`、零时长或空字符串。
+2. 失败样本存储已经落地，但当前只由已迁移的纵向切片显式接入，真实语料的业务覆盖仍然不足。
 3. `ReplayDevice` 已存在，但尚未进入真实业务回归链，UI 更新和 OCR 错误仍主要依赖人工复现。
 4. WebUI 通过解析最后一条日志文字判断进程结果，异常、手动停止和正常完成没有独立数据契约。
 5. 大量命令式循环同时承担截图、识别、计时、动作和恢复，难以单独验证。
@@ -61,7 +61,7 @@
 
 ## 3. 当前架构基线
 
-旧的[可扩展架构实施计划](superpowers/plans/2026-07-10-alas-extensible-architecture.md)已经基本落地，不能再把其中的基础组件写成未来设想。
+此前的可扩展架构实施计划已经基本落地，不能再把其中的基础组件写成未来设想。
 
 ### 3.1 内容层
 
@@ -99,11 +99,11 @@
 
 当前 OCR 的事实是：
 
-- [`OcrModel`](../module/ocr/models.py#L11)中的两个逻辑模型名实际加载同一个 CnOCR 模型。
-- [`AlOcr`](../module/ocr/al_ocr.py#L15)固定使用 `densenet_lite_136-gru`，并通过 `det_model_name=""` 关闭文本检测。
-- [`_extract_text()`](../module/ocr/al_ocr.py#L36)立即丢弃置信度和其他识别元数据。
-- [`Ocr`](../module/ocr/ocr.py#L38)负责固定 ROI 裁剪、颜色或 YUV 预处理、调用模型和领域后处理。
-- [`Digit`、`DigitCounter` 和 `Duration`](../module/ocr/ocr.py#L114)分别约束字符表并解析业务值。
+- [`OcrModel`](../module/ocr/models.py#L11)中的两个逻辑模型名分别创建同一个 CnOCR 模型的独立 `AlOcr` 实例。
+- [`AlOcr`](../module/ocr/al_ocr.py#L18)固定使用 `densenet_lite_136-gru`，并通过 `det_model_name=""` 关闭文本检测。
+- [`_extract_raw_result()`](../module/ocr/al_ocr.py#L44)在第三方边界校验并保留文字与置信度，旧字符串接口只在项目边界投影文字。
+- [`Ocr`](../module/ocr/ocr.py#L76)负责固定 ROI 裁剪、颜色或 YUV 预处理、调用模型和领域后处理，并为数字类型提供结构化推理入口。
+- [`Digit`、`DigitCounter` 和 `Duration`](../module/ocr/ocr.py#L227)分别约束字符表并解析业务值；未迁移调用方仍使用旧 `.ocr()` 返回类型。
 
 AST 静态构造点统计如下：
 
@@ -303,7 +303,7 @@ Replay 读取固定帧并记录语义动作，不启动 ADB、模拟器、WebUI 
 - [`Digit` 与 `DigitCounter`](../module/ocr/ocr.py#L227) 已提供严格结构化解析，能够区分合法 `0` 与失败，并拒绝 Counter 部分匹配、`current > total` 和不符合调用点约束的 total。[`Duration`](../module/ocr/ocr.py#L451) 结构化接口已具备，生产调用点待按触碰迁移；旧 `.ocr()` 语义仍保留给未迁移调用方。
 - [`OcrFailureStore`](../module/ocr/failure_store.py#L112) 已按稳定摘要保存 `raw.png`、`processed.png` 与 `metadata.json`，并实施去重、容量限制、原子发布和失败熔断；root 是调用方信任的本地目录并允许 junction 重定向，reparse 检查只用于避免失败清理沿子级临时路径误删，另有同进程限额串行化与异常日志脱敏。只有结构化数字调用显式传入 recorder 时才会记录失败，一般文本 OCR 不自动采集。
 - [`meow_get_buy_count()`](../module/meowfficer/buy.py#L19) 已完成首条纵向切片：Counter 无效时跳过金币 OCR，Counter 或金币失败都按下一帧重试，合法零值不被真假判断误伤；有限帧回归见 [`test_meowfficer_buy.py`](../tests/test_meowfficer_buy.py#L140)。
-- P0 严格审查与 PR 机器人反馈已处理；收缩无效兼容和过度路径防御后，全量门禁为 `1546 passed, 1 skipped`，[fork PR #3](https://github.com/NothingToDooo/AzurLaneAutoScript/pull/3) 已创建。P1～P5 尚未进入实施。
+- P0 严格审查与 PR 机器人反馈已处理；收缩无效兼容和过度路径防御后，[fork PR #3](https://github.com/NothingToDooo/AzurLaneAutoScript/pull/3) 已合并。P1 已开始首个宿舍切片，P2～P5 尚未进入实施。
 
 **退出条件：** 失败与合法零值完全可区分；失败样本带有足够上下文，可离线复现相同解析结果；旧调用点行为未被批量改变。
 
@@ -316,6 +316,13 @@ Replay 读取固定帧并记录语义动作，不启动 ADB、模拟器、WebUI 
 - `azur_lane` 与 `cnocr` 共享同一模型会话；候选字符集设置与推理由同一串行边界保护。
 - 记录每个 profile 的调用次数、耗时和多 ROI 宽度分布，作为以后讨论缓存或批处理的依据。
 - 若首次 OCR 会侵占业务 timeout，在业务计时器启动前同步预热；不做后台线程预热。
+
+**实施状态（2026-07-12）：**
+
+- [`dorm_food_get()`](../module/dorm/dorm.py#L206) 已只裁剪并识别颜色前置判断确认存在的食物槽；合法 `0` 保持有效，任一食物数量失败时跳过本帧填充量 OCR，并由现有外层循环进入下一帧。
+- 食物数量与填充量均使用结构化结果，并按 `Error_SaveError` 接入现有失败样本存储；空槽不提交空批次，槽位与固定食物表使用严格长度契约。
+- [`test_dorm_food.py`](../tests/test_dorm_food.py) 覆盖混合空槽、合法零、空批次、食物数量失败、填充量失败和下一帧恢复。当前全量门禁为 `1552 passed, 1 skipped`。
+- 模型会话共享、串行字符集边界、profile 统计和同步预热尚未实施，P1 退出条件尚未满足。
 
 **退出条件：** 每项优化都有调用次数或内存数据证明收益；结果逐项一致；没有全局缓存、全局批处理或并发字符集切换。
 
@@ -406,7 +413,7 @@ Replay 读取固定帧并记录语义动作，不启动 ADB、模拟器、WebUI 
 
 ```powershell
 uv sync --check
-uv run ruff check . --no-cache
+uv run ruff check .
 uv run ruff format --check .
 uv run ty check
 uv run pytest
@@ -451,12 +458,12 @@ git diff --check
 
 ### 本项目
 
-- [ALAS 可扩展架构实施计划](superpowers/plans/2026-07-10-alas-extensible-architecture.md)
 - [OCR 调用门面](../module/ocr/ocr.py)
 - [当前 CnOCR 封装](../module/ocr/al_ocr.py)
 - [OCR 模型别名与会话](../module/ocr/models.py)
 - [喵箱购买计数](../module/meowfficer/buy.py)
 - [后宅食物槽识别](../module/dorm/dorm.py)
+- [后宅食物结构化识别回归](../tests/test_dorm_food.py)
 - [内容目录](../module/content/catalog.py)
 - [任务目录](../module/task_registry.py)
 - [配置快照](../module/config/resolved.py)

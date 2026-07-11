@@ -13,6 +13,7 @@ from module.dorm import assets as dorm_assets
 from module.dorm.buy_furniture import BuyFurniture
 from module.handler.assets import POPUP_CONFIRM
 from module.logger import logger
+from module.ocr.failure_store import OCR_FAILURE_STORE
 from module.ocr.ocr import Digit, DigitCounter
 from module.template.assets import TEMPLATE_DORM_COIN, TEMPLATE_DORM_LOVE
 from module.ui.assets import DORM_CHECK
@@ -204,13 +205,37 @@ class RewardDorm(UI):
 
     def dorm_food_get(self):
         """在喂食页返回食物列表和待补充量；OCR 无总量时待补充量为 -1。"""
+        failure_store = OCR_FAILURE_STORE if self.config.Error_SaveError else None
         has_food = [self._dorm_has_food(button) for button in self._dorm_food.buttons]
-        amount = self._dorm_food_ocr.ocr(self.device.image)
-        amount = [a if hf else 0 for a, hf in zip(amount, has_food, strict=False)]
-        food = [Food(feed=f, amount=a) for f, a in zip(FOOD_FEED_AMOUNT, amount, strict=False)]
-        _, fill, total = OCR_FILL.ocr(self.device.image)
-        if total == 0:
-            fill = -1
+        occupied_slots = [
+            (index, area)
+            for index, (area, is_present) in enumerate(zip(self._dorm_food_ocr.buttons, has_food, strict=True))
+            if is_present
+        ]
+        amounts = [0] * len(has_food)
+        amounts_valid = True
+        if occupied_slots:
+            images = [self.image_crop(area, copy=False) for _, area in occupied_slots]
+            results = self._dorm_food_ocr.recognize(
+                images,
+                direct_ocr=True,
+                failure_store=failure_store,
+            )
+            results = results if isinstance(results, list) else [results]
+            for (index, _), result in zip(occupied_slots, results, strict=True):
+                if result.valid and result.value is not None:
+                    amounts[index] = result.value
+                else:
+                    amounts_valid = False
+
+        food = [Food(feed=feed, amount=amount) for feed, amount in zip(FOOD_FEED_AMOUNT, amounts, strict=True)]
+        fill = -1
+        if amounts_valid:
+            fill_result = OCR_FILL.recognize(self.device.image, failure_store=failure_store)
+            if fill_result.valid and fill_result.value is not None:
+                _, fill, total = fill_result.value
+                if total == 0:
+                    fill = -1
         logger.info(f"Dorm food: {[f.amount for f in food]}, to fill: {fill}")
         return food, fill
 
