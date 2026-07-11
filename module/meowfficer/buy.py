@@ -1,7 +1,9 @@
 from module.combat.assets import GET_ITEMS_1
+from module.exception import ScriptError
 from module.logger import logger
 from module.meowfficer import assets as meow_assets
 from module.meowfficer.base import MeowfficerBase
+from module.ocr.failure_store import OCR_FAILURE_STORE
 from module.ocr.ocr import Digit, DigitCounter
 from module.ui.assets import MEOWFFICER_GOTO_DORMMENU
 from module.ui.ui import UiIndexControls
@@ -16,23 +18,31 @@ MEOWFFICER_COINS = Digit(meow_assets.OCR_MEOWFFICER_COINS, letter=(99, 69, 41), 
 class MeowfficerBuy(MeowfficerBase):
     def meow_get_buy_count(self, buy_amount, overflow_th):
         """在指挥喵主页 OCR 剩余次数和金币，返回本次购买的 0～15 箱。"""
+        failure_store = OCR_FAILURE_STORE if self.config.Error_SaveError else None
         for _ in self.loop(timeout=2):
-            remain, bought, total = MEOWFFICER.ocr(self.device.image)
-            coins = MEOWFFICER_COINS.ocr(self.device.image)
-            if total > 0:
-                break
-            # 总次数 OCR 为 0 时重试。
+            counter_result = MEOWFFICER.recognize(
+                self.device.image,
+                expected_total=BUY_MAX,
+                failure_store=failure_store,
+            )
+            if not counter_result.valid or counter_result.value is None:
+                continue
+            remain, bought, total = counter_result.value
+
+            coins_result = MEOWFFICER_COINS.recognize(self.device.image, failure_store=failure_store)
+            if isinstance(coins_result, list):
+                message = "MEOWFFICER_COINS 必须使用单个 OCR 区域"
+                raise ScriptError(message)
+            if not coins_result.valid or coins_result.value is None:
+                continue
+            coins = coins_result.value
+            break
         else:
             logger.warning("Failed to get meowfficer buy status")
             return 0
 
         logger.attr("Meowfficer_remain", remain)
         logger.attr("Meowfficer_coins", coins)
-
-        if total != BUY_MAX:
-            logger.warning(f"Invalid meowfficer buy limit: {total}, revise to {BUY_MAX}")
-            total = BUY_MAX
-            bought = total - remain
 
         return self._meow_get_buy_count(bought, total, coins, buy_amount, overflow_th)
 
