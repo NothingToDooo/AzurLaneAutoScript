@@ -10,6 +10,8 @@ from module.ui.ui import UI
 from module.ui_white import assets as ui_white_assets
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from module.base.button import Button
 
 
@@ -31,8 +33,8 @@ class _FakeDevice:
 
 @dataclass(frozen=True, slots=True)
 class _FakeUIOptions:
-    appear_buttons: tuple[Button, ...] = ()
-    appear_then_click_buttons: tuple[Button, ...] = ()
+    appear_buttons: Sequence[Button] = ()
+    appear_then_click_buttons: Sequence[Button] = ()
     os_popups: bool = False
     popup_confirm: bool = False
     urgent_commission: bool = False
@@ -42,8 +44,8 @@ class _FakeUIOptions:
 
 
 class _FakeUISettings(TypedDict, total=False):
-    appear_buttons: tuple[Button, ...]
-    appear_then_click_buttons: tuple[Button, ...]
+    appear_buttons: Sequence[Button]
+    appear_then_click_buttons: Sequence[Button]
     os_popups: bool
     popup_confirm: bool
     urgent_commission: bool
@@ -114,8 +116,16 @@ class _FakeUI(UI):
     def appear_then_click(self, button: Button, *_args: object, **_kwargs: object) -> bool:
         return self._has_button(self.appear_then_click_buttons, button)
 
-    def interval_reset(self, button: Button, *_args: object, **_kwargs: object) -> None:
-        self.reset_buttons.append(button)
+    def interval_reset(
+        self,
+        button: Button | list[Button] | tuple[Button, ...] | None,
+        interval: float = 3,
+    ) -> None:
+        del interval
+        if isinstance(button, (list, tuple)):
+            self.reset_buttons.extend(button)
+        elif button is not None:
+            self.reset_buttons.append(button)
 
 
 def test_ui_additional_keeps_os_popups_before_confirm_popups() -> None:
