@@ -1,5 +1,6 @@
 import re
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -21,7 +22,10 @@ from module.guild.assets import (
 from module.guild.base import GuildBase
 from module.logger import logger
 from module.ocr.ocr import Digit
-from module.statistics.item import ItemGrid
+from module.statistics.item import Item, ItemGrid
+
+if TYPE_CHECKING:
+    from module.base.type_alias import ImageArray
 
 EXCHANGE_GRIDS = ButtonGrid(
     origin=(470, 470), delta=(198.5, 0), button_shape=(83, 83), grid_shape=(3, 1), name="EXCHANGE_GRIDS"
@@ -29,17 +33,29 @@ EXCHANGE_GRIDS = ButtonGrid(
 EXCHANGE_BUTTONS = ButtonGrid(
     origin=(440, 609), delta=(198.5, 0), button_shape=(144, 31), grid_shape=(3, 1), name="EXCHANGE_BUTTONS"
 )
-EXCHANGE_FILTER = Filter(regex=re.compile(r"^(.*?)$"), attr=("name",))
 GUILD_LOGISTICS_REFRESH_BUG_MESSAGE = "Triggered guild logistics refresh bug"
 
 
 class ExchangeLimitOcr(Digit):
-    def pre_process(self, image):
+    MAX_MULTIPLY = 2.5
+
+    def pre_process(self, image: ImageArray) -> ImageArray:
         """把 (高, 宽, 通道) 图像转为同宽高的二维反色灰度图。"""
-        return 255 - color_mapping(rgb2gray(image), max_multiply=2.5)
+        return 255 - color_mapping(rgb2gray(image), max_multiply=self.MAX_MULTIPLY)
 
 
 GUILD_EXCHANGE_LIMIT = ExchangeLimitOcr(OCR_GUILD_EXCHANGE_LIMIT, threshold=64)
+
+
+class GuildExchangeItem(Item):
+    enough: bool = False
+
+
+class GuildExchangeItemGrid(ItemGrid[GuildExchangeItem]):
+    item_class = GuildExchangeItem
+
+
+EXCHANGE_FILTER: Filter[GuildExchangeItem] = Filter(regex=re.compile(r"^(.*?)$"), attr=("name",))
 
 
 @dataclass(slots=True)
@@ -52,27 +68,33 @@ class _GuildLogisticsCollectState:
     exchange_checked: bool = False
     exchange_count: int = 0
 
-    def all_checked(self):
-        return all([self.supply_checked, self.mission_checked, self.exchange_checked])
+    def all_checked(self) -> bool:
+        return self.supply_checked and self.mission_checked and self.exchange_checked
 
 
 class GuildLogistics(GuildBase):
     _guild_logistics_mission_finished = False
 
     @cached_property
-    def exchange_items(self):
-        item_grid = ItemGrid(EXCHANGE_GRIDS, {}, template_area=(40, 21, 89, 70), amount_area=(60, 71, 91, 92))
+    def exchange_items(self) -> GuildExchangeItemGrid:
+        return self._build_exchange_items()
+
+    @staticmethod
+    def _build_exchange_items() -> GuildExchangeItemGrid:
+        item_grid = GuildExchangeItemGrid(
+            EXCHANGE_GRIDS, {}, template_area=(40, 21, 89, 70), amount_area=(60, 71, 91, 92)
+        )
         item_grid.load_template_folder("./assets/stats_basic")
         return item_grid
 
-    def _is_in_guild_logistics(self):
+    def _is_in_guild_logistics(self) -> bool:
         """通过赤色或蓝色阵营背景采样判断是否在公会后勤页。"""
         # 赤色阵营 (181, 97, 99)，蓝色阵营 (148, 178, 255)。
         return self.image_color_count(
             GUILD_LOGISTICS_ENSURE_CHECK, color=(181, 97, 99), threshold=221, count=400
         ) or self.image_color_count(GUILD_LOGISTICS_ENSURE_CHECK, color=(148, 178, 255), threshold=221, count=400)
 
-    def _guild_logistics_ensure(self, skip_first_screenshot=True):
+    def _guild_logistics_ensure(self, *, skip_first_screenshot: bool = True) -> None:
         """等待后勤页完成背景、角色立绘和操作区的分阶段加载。"""
         while 1:
             if skip_first_screenshot:
@@ -83,7 +105,7 @@ class GuildLogistics(GuildBase):
             if self._is_in_guild_logistics():
                 break
 
-    def _guild_logistics_mission_available(self):
+    def _guild_logistics_mission_available(self) -> bool:
         """在后勤页按颜色区分任务完成、可点击、缺失和不可点击状态。"""
         r, g, b = get_color(self.device.image, GUILD_MISSION.area)
         if g > max(r, b) - 10:
@@ -102,7 +124,7 @@ class GuildLogistics(GuildBase):
         logger.info("Guild mission button inactive")
         return False
 
-    def _guild_logistics_supply_available(self):
+    def _guild_logistics_supply_available(self) -> bool:
         """在后勤页通过白字与灰字判断补给按钮是否可点击。"""
         color = get_color(self.device.image, GUILD_SUPPLY.area)
         # 可点击按钮是白字，不可点击按钮是灰字。
@@ -113,7 +135,7 @@ class GuildLogistics(GuildBase):
         logger.info("Guild supply button inactive")
         return False
 
-    def _handle_guild_fleet_mission_start(self):
+    def _handle_guild_fleet_mission_start(self) -> bool:
         """会长或军官按配置固定选择“塞壬歼灭 III／击败 300 个敌人”周任务。"""
         if not self.config.GuildLogistics_SelectNewMission:
             return False
@@ -122,7 +144,7 @@ class GuildLogistics(GuildBase):
             return True
         return self.appear_then_click(GUILD_MISSION_SELECT, offset=(20, 20), interval=2)
 
-    def _guild_logistics_collect(self, skip_first_screenshot=True):
+    def _guild_logistics_collect(self, *, skip_first_screenshot: bool = True) -> bool:
         """在后勤页处理补给、任务和兑换，返回三个区块是否都已检查。"""
         logger.hr("Guild logistics")
         logger.attr("Guild master/official", self.config.GuildLogistics_SelectNewMission)
@@ -150,7 +172,7 @@ class GuildLogistics(GuildBase):
         # 游戏现在会发放新的公会任务，不再把任务完成状态作为已检查条件。
         return state.all_checked()
 
-    def _handle_guild_logistics_popups(self, state):
+    def _handle_guild_logistics_popups(self, state: _GuildLogisticsCollectState) -> bool:
         if self.handle_popup_confirm("GUILD_LOGISTICS"):
             state.confirm_timer.reset()
             state.exchange_interval.reset()
@@ -164,7 +186,7 @@ class GuildLogistics(GuildBase):
             return True
         return False
 
-    def _guild_logistics_collect_step(self, state):
+    def _guild_logistics_collect_step(self, state: _GuildLogisticsCollectState) -> bool:
         if not self._is_in_guild_logistics():
             state.confirm_timer.reset()
             return True
@@ -180,7 +202,7 @@ class GuildLogistics(GuildBase):
         self._raise_if_guild_exchange_bugged(state)
         return True
 
-    def _handle_guild_supply(self, state):
+    def _handle_guild_supply(self, state: _GuildLogisticsCollectState) -> bool:
         if state.supply_checked:
             return False
         if self._guild_logistics_supply_available():
@@ -192,7 +214,7 @@ class GuildLogistics(GuildBase):
         state.supply_checked = True
         return False
 
-    def _handle_guild_mission(self, state):
+    def _handle_guild_mission(self, state: _GuildLogisticsCollectState) -> bool:
         if state.mission_checked:
             return False
         if self._guild_logistics_mission_available():
@@ -204,7 +226,7 @@ class GuildLogistics(GuildBase):
         state.mission_checked = True
         return False
 
-    def _handle_guild_exchange(self, state):
+    def _handle_guild_exchange(self, state: _GuildLogisticsCollectState) -> bool:
         if state.exchange_checked or not state.exchange_interval.reached():
             return False
         if self._guild_exchange():
@@ -215,7 +237,8 @@ class GuildLogistics(GuildBase):
         state.exchange_checked = True
         return False
 
-    def _raise_if_guild_exchange_bugged(self, state) -> None:
+    @staticmethod
+    def _raise_if_guild_exchange_bugged(state: _GuildLogisticsCollectState) -> None:
         if state.exchange_count < 5:
             return
 
@@ -224,7 +247,7 @@ class GuildLogistics(GuildBase):
         logger.warning("Unable to do guild exchange, probably because the timer in game was bugged")
         raise GameBugError(GUILD_LOGISTICS_REFRESH_BUG_MESSAGE)
 
-    def _guild_exchange_scan(self):
+    def _guild_exchange_scan(self) -> list[GuildExchangeItem]:
         """扫描后勤页兑换物品，并以 enough 标记库存是否充足。"""
         items = self.exchange_items.predict(self.device.image, name=True, amount=False)
 
@@ -240,17 +263,23 @@ class GuildLogistics(GuildBase):
         logger.info(f"Exchange items: {', '.join(text)}")
         return items
 
-    def _guild_exchange(self):
+    def _guild_exchange(self) -> bool:
         """按剩余次数和筛选器点击首个库存充足的兑换项。"""
-        if not GUILD_EXCHANGE_LIMIT.ocr(self.device.image) > 0:
+        if GUILD_EXCHANGE_LIMIT.ocr_single(self.device.image) <= 0:
             return False
 
         items = self._guild_exchange_scan()
         EXCHANGE_FILTER.load(self.config.GuildLogistics_ExchangeFilter)
-        selected = EXCHANGE_FILTER.apply(items, func=lambda item: item.enough)
+        filtered = EXCHANGE_FILTER.apply(items, func=lambda item: item.enough)
+        selected: list[GuildExchangeItem] = []
+        for item in filtered:
+            if isinstance(item, str):
+                message = "guild exchange filter does not support preset entries"
+                raise TypeError(message)
+            selected.append(item)
         logger.attr("Exchange_sort", " > ".join([str(item.name) for item in selected]))
 
-        if len(selected):
+        if selected:
             button = EXCHANGE_BUTTONS.buttons[items.index(selected[0])]
             # 点击后交给 self._guild_logistics_collect 重试确认。
             self.device.click(button)
@@ -258,7 +287,7 @@ class GuildLogistics(GuildBase):
         logger.warning("No guild exchange items satisfy current filter, or not having enough resources")
         return False
 
-    def guild_logistics(self):
+    def guild_logistics(self) -> bool:
         """从公会页进入后勤，返回今日三个区块是否都已检查。"""
         logger.hr("Guild logistics", level=1)
         self.guild_side_navbar_ensure(bottom=3)

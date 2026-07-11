@@ -1,6 +1,7 @@
 from dataclasses import dataclass
+from typing import Literal
 
-from module.base.button import ButtonGrid
+from module.base.button import Button, ButtonGrid
 from module.base.timer import Timer
 from module.base.utils import area_limit, area_pad, point_in_area, random_rectangle_vector
 from module.config.utils import get_server_monthday
@@ -16,12 +17,13 @@ GUILD_OPERATIONS_PROGRESS = DigitCounter(
     guild_assets.OCR_GUILD_OPERATIONS_PROGRESS, letter=(255, 247, 247), threshold=64
 )
 GUILD_OPERATION_JOIN_STUCK_MESSAGE = "Unable to start/join guild operation"
+type GuildOperationMode = Literal[0, 1, 2]
 
 
 @dataclass(slots=True)
 class _GuildDispatchEntrances:
-    expand: list
-    enter: list
+    expand: list[Button]
+    enter: list[Button]
 
 
 @dataclass(slots=True)
@@ -31,7 +33,7 @@ class _GuildOperationsEnsureState:
 
 
 class GuildOperations(GuildBase):
-    def _guild_operations_ensure(self, skip_first_screenshot=True):
+    def _guild_operations_ensure(self, *, skip_first_screenshot: bool = True) -> bool:
         """等待作战背景和派遣/Boss 区加载；进入成功返回 True，资金不足返回 False。"""
         logger.attr("Guild master/official", self.config.GuildOperation_SelectNewOperation)
         state = _GuildOperationsEnsureState(confirm_timer=Timer(1.5, count=3).start())
@@ -55,7 +57,8 @@ class GuildOperations(GuildBase):
                 return True
         return False
 
-    def _raise_if_guild_operations_join_stuck(self, state):
+    @staticmethod
+    def _raise_if_guild_operations_join_stuck(state: _GuildOperationsEnsureState) -> None:
         if state.join_confirm_count <= 5:
             return
 
@@ -67,7 +70,7 @@ class GuildOperations(GuildBase):
         )
         raise GameBugError(GUILD_OPERATION_JOIN_STUCK_MESSAGE)
 
-    def _handle_guild_operations_join(self, state):
+    def _handle_guild_operations_join(self, state: _GuildOperationsEnsureState) -> bool:
         if not self.appear(guild_assets.GUILD_OPERATIONS_JOIN, interval=3):
             return False
 
@@ -79,7 +82,7 @@ class GuildOperations(GuildBase):
         state.confirm_timer.reset()
         return True
 
-    def _guild_operations_monthly_attempts_depleted(self):
+    def _guild_operations_monthly_attempts_depleted(self) -> bool:
         return self.image_color_count(
             guild_assets.GUILD_OPERATIONS_MONTHLY_COUNT,
             color=(255, 93, 90),
@@ -87,8 +90,8 @@ class GuildOperations(GuildBase):
             count=20,
         )
 
-    def _guild_operations_click_join_by_progress(self):
-        current, _remain, total = GUILD_OPERATIONS_PROGRESS.ocr(self.device.image)
+    def _guild_operations_click_join_by_progress(self) -> None:
+        current, _remain, total = GUILD_OPERATIONS_PROGRESS.ocr_single(self.device.image)
         threshold = total * self.config.GuildOperation_JoinThreshold
         if current <= threshold:
             logger.info(f"Joining Operation, current progress less than threshold ({threshold:.2f})")
@@ -98,7 +101,7 @@ class GuildOperations(GuildBase):
         logger.info(f"Refrain from joining operation, current progress exceeds threshold ({threshold:.2f})")
         self.device.click(guild_assets.GUILD_OPERATIONS_CLICK_SAFE_AREA)
 
-    def _handle_guild_operations_join_popups(self, state):
+    def _handle_guild_operations_join_popups(self, state: _GuildOperationsEnsureState) -> bool:
         if self.handle_popup_confirm("JOIN_OPERATION"):
             state.join_confirm_count += 1
             state.confirm_timer.reset()
@@ -114,7 +117,7 @@ class GuildOperations(GuildBase):
         state.confirm_timer.reset()
         return True
 
-    def _guild_operations_loaded(self, state):
+    def _guild_operations_loaded(self, state: _GuildOperationsEnsureState) -> bool:
         if not (
             self.appear(guild_assets.GUILD_BOSS_ENTER)
             or self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK, offset=(20, 20))
@@ -124,7 +127,7 @@ class GuildOperations(GuildBase):
             return False
         return state.confirm_timer.reached()
 
-    def _handle_guild_operations_start(self):
+    def _handle_guild_operations_start(self) -> bool:
         """会长或军官开启所罗门海空战。
 
         普通成员每月只能参加两次，第三次通常无法派遣，会降低派遣评价和奖励。
@@ -143,7 +146,7 @@ class GuildOperations(GuildBase):
         # 新作战会依次经过资金确认、加入和地图加载，由外层循环统一处理。
         return self.appear_then_click(guild_assets.GUILD_OPERATIONS_NEW, offset=(20, 20), interval=3)
 
-    def _guild_operation_fund_insufficient(self):
+    def _guild_operation_fund_insufficient(self) -> bool:
         """仅在新作战页检测资金；不足返回 True，页面不匹配或资金充足返回 False。"""
         if not self.appear(guild_assets.GUILD_OPERATIONS_NEW, offset=(20, 20)):
             return False
@@ -154,7 +157,7 @@ class GuildOperations(GuildBase):
             return True
         return False
 
-    def _guild_operations_get_mode(self):
+    def _guild_operations_get_mode(self) -> GuildOperationMode | None:
         """返回作战页状态：0 无作战、1 节点图、2 Raid Boss、None 无法确认。"""
         if self.appear(guild_assets.GUILD_OPERATIONS_INACTIVE_CHECK) and self.appear(
             guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK
@@ -176,7 +179,7 @@ class GuildOperations(GuildBase):
         logger.warning("Operations interface is unrecognized")
         return None
 
-    def _guild_operations_get_entrance(self):
+    def _guild_operations_get_entrance(self) -> tuple[list[Button], list[Button]]:
         """实时返回展开和进入按钮列表；展开任务链后两类按钮会动态换位。"""
         # 整条作战任务链所在区域。
         detection_area = (152, 135, 1280, 630)
@@ -199,7 +202,7 @@ class GuildOperations(GuildBase):
 
         return list_expand, list_enter
 
-    def _guild_operations_dispatch_swipe(self, forward=True, skip_first_screenshot=True):
+    def _guild_operations_dispatch_swipe(self, *, forward: bool = True, skip_first_screenshot: bool = True) -> bool:
         """沿指定方向最多滑动五次，查找游戏自动聚焦遗漏的后续派遣任务。"""
         # 整条作战任务链所在区域。
         detection_area = (152, 135, 1280, 630)
@@ -223,7 +226,7 @@ class GuildOperations(GuildBase):
         logger.warning("Failed to find active operation dispatch")
         return False
 
-    def _guild_operations_dispatch_enter(self, skip_first_screenshot=True):
+    def _guild_operations_dispatch_enter(self, *, skip_first_screenshot: bool = True) -> bool:
         """从节点图实时展开并进入派遣准备页；当前节点无入口时返回 False。"""
         timer_1 = Timer(2, count=5)
         timer_2 = Timer(2, count=5)
@@ -249,7 +252,7 @@ class GuildOperations(GuildBase):
 
         return True
 
-    def _guild_operations_active_dispatch_entrances(self):
+    def _guild_operations_active_dispatch_entrances(self) -> tuple[bool, _GuildDispatchEntrances | None]:
         """返回 (是否在节点图, 动态派遣入口)；无入口时第二项为 None。"""
         if not self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK, offset=(20, 20)):
             return False, None
@@ -259,7 +262,7 @@ class GuildOperations(GuildBase):
             return True, None
         return True, _GuildDispatchEntrances(expand=entrance_1, enter=entrance_2)
 
-    def _guild_operations_click_dispatch_expand(self, entrances, timer):
+    def _guild_operations_click_dispatch_expand(self, entrances: _GuildDispatchEntrances, timer: Timer) -> bool:
         if not timer.reached():
             return False
 
@@ -267,7 +270,12 @@ class GuildOperations(GuildBase):
         timer.reset()
         return True
 
-    def _guild_operations_click_dispatch_enter(self, entrances, expand_timer, enter_timer):
+    def _guild_operations_click_dispatch_enter(
+        self,
+        entrances: _GuildDispatchEntrances,
+        expand_timer: Timer,
+        enter_timer: Timer,
+    ) -> bool:
         if not enter_timer.reached():
             return False
 
@@ -281,7 +289,7 @@ class GuildOperations(GuildBase):
                 return True
         return False
 
-    def _guild_operations_handle_dispatch_quick(self, expand_timer, enter_timer):
+    def _guild_operations_handle_dispatch_quick(self, expand_timer: Timer, enter_timer: Timer) -> bool:
         if not self.appear_then_click(guild_assets.GUILD_DISPATCH_QUICK, offset=(20, 20), interval=2):
             return False
 
@@ -289,7 +297,7 @@ class GuildOperations(GuildBase):
         enter_timer.reset()
         return True
 
-    def _guild_operations_get_dispatch(self):
+    def _guild_operations_get_dispatch(self) -> Button | None:
         """直接检测动态舰队切换点；返回切往最右侧的按钮，已在最右侧时返回 None。"""
         # 红点偶尔不显示，因此不能用它判断可用派遣。
         # 舰队切换点，最多有 4 种布局。
@@ -325,7 +333,7 @@ class GuildOperations(GuildBase):
             return None
         return button
 
-    def _guild_operations_dispatch_switch_fleet(self, skip_first_screenshot=True):
+    def _guild_operations_dispatch_switch_fleet(self, *, skip_first_screenshot: bool = True) -> None:
         """在派遣准备页切到最右侧可用舰队。"""
         while 1:
             if skip_first_screenshot:
@@ -344,7 +352,7 @@ class GuildOperations(GuildBase):
                 self.device.sleep((0.5, 0.6))
                 continue
 
-    def _guild_operations_dispatch_execute(self, skip_first_screenshot=True):
+    def _guild_operations_dispatch_execute(self, *, skip_first_screenshot: bool = True) -> None:
         """在派遣准备页补全推荐舰队并执行派遣。"""
         dispatched = False
         while 1:
@@ -393,7 +401,7 @@ class GuildOperations(GuildBase):
                 logger.info("Fleet dispatched")
                 break
 
-    def _guild_operations_dispatch_exit(self, skip_first_screenshot=True):
+    def _guild_operations_dispatch_exit(self, *, skip_first_screenshot: bool = True) -> None:
         """从派遣准备页退出到作战节点图。"""
         while 1:
             if skip_first_screenshot:
@@ -415,15 +423,15 @@ class GuildOperations(GuildBase):
             if self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK):
                 break
 
-    def _guild_operations_dispatch(self):
+    def _guild_operations_dispatch(self) -> bool:
         """在作战节点图完成全部可用派遣；未找到或重试耗尽返回 False。"""
         logger.hr("Guild dispatch")
         success = False
-        for _ in reversed(range(2)):
-            if self._guild_operations_dispatch_swipe(forward=_):
+        for forward in (True, False):
+            if self._guild_operations_dispatch_swipe(forward=forward):
                 success = True
                 break
-            if _:
+            if forward:
                 self.guild_side_navbar_ensure(bottom=2)
                 self.guild_side_navbar_ensure(bottom=1)
                 self._guild_operations_ensure()
@@ -441,7 +449,7 @@ class GuildOperations(GuildBase):
         logger.warning("Too many trials on guild operation dispatch")
         return False
 
-    def _guild_operations_boss_preparation(self, az, skip_first_screenshot=True):
+    def _guild_operations_boss_preparation(self, az: GuildCombat, *, skip_first_screenshot: bool = True) -> bool:
         """从 Boss 页进入战斗；独立 GuildCombat 实例用于隔离继承方法冲突。"""
         is_loading = False
         dispatch_count = 0
@@ -489,7 +497,7 @@ class GuildOperations(GuildBase):
                 return True
         return False
 
-    def _guild_operations_boss_combat(self):
+    def _guild_operations_boss_combat(self) -> bool:
         """从 Boss 页执行战斗并返回；准备失败时返回 False。"""
         az = GuildCombat(self.config, device=self.device)
 
@@ -500,7 +508,7 @@ class GuildOperations(GuildBase):
         logger.info("Guild Raid Boss has been repelled")
         return True
 
-    def _guild_operations_boss_available(self):
+    def _guild_operations_boss_available(self) -> bool:
         appear = self.image_color_count(
             guild_assets.GUILD_BOSS_AVAILABLE, color=(140, 243, 99), threshold=221, count=10
         )
@@ -510,7 +518,7 @@ class GuildOperations(GuildBase):
             logger.info("Guild boss not available")
         return appear
 
-    def guild_operations(self):
+    def guild_operations(self) -> bool:
         logger.hr("Guild operations", level=1)
         self.guild_side_navbar_ensure(bottom=1)
         entered = self._guild_operations_ensure()

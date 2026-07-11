@@ -2,6 +2,7 @@ from typing import ClassVar, TypeVar
 
 import pytest
 
+from module.base.button import Button
 from module.combat.assets import GET_ITEMS_1
 from module.guild import lobby as lobby_module
 from module.guild.assets import GUILD_REPORT_CLAIM, GUILD_REPORT_CLAIMED, GUILD_REPORT_CLOSE
@@ -57,12 +58,13 @@ class _GuildLobby(GuildLobby):
         self.calls: list[tuple[object, ...]] = []
         self.appear_results: dict[str, list[bool]] = {}
         self.appear_then_click_results: dict[str, list[bool]] = {}
-        self.report_results: list[object | None] = []
+        self.report_results: list[Button | None] = []
 
     def collect(self) -> None:
         self._guild_lobby_collect()
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
@@ -77,7 +79,7 @@ class _GuildLobby(GuildLobby):
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)
 
-    def guild_lobby_get_report(self) -> object | None:
+    def guild_lobby_get_report(self) -> Button | None:
         self.calls.append(("guild_lobby_get_report",))
         return self._next_result(self.report_results, default=None)
 
@@ -92,7 +94,8 @@ def _patch_timer(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_guild_lobby_collect_opens_available_report() -> None:
     guild = _GuildLobby()
-    report_button = object()
+    area = (0, 0, 10, 10)
+    report_button = Button(area=area, color=(255, 255, 255), button=area, name="report")
     _Timer.reached_results = {1: [True]}
     guild.report_results = [report_button]
     guild.appear_results[button_key(GUILD_CHECK)] = [True, True]
