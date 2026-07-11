@@ -3,7 +3,7 @@ from module.ui.page import page_event
 
 
 class CampaignBase(CampaignBase_):
-    def handle_exp_info(self):
+    def handle_exp_info(self) -> bool:
         # Random background hits EXP_INFO_B
         if self.ui_page_appear(page_event):
             return False

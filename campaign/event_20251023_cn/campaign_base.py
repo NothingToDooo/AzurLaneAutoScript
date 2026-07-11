@@ -3,7 +3,7 @@ from module.logger import logger
 
 
 class CampaignBase(CampaignBase_):
-    def campaign_set_chapter_20241219(self, chapter, stage, mode="combat"):
+    def campaign_set_chapter_20241219(self, chapter: str, stage: str, mode: str = "combat") -> bool:
         if self.config.MAP_CHAPTER_SWITCH_20241219:
             if chapter == "t":
                 self.ui_goto_sp()

@@ -155,7 +155,7 @@ class Campaign(CampaignBase):
     MAP = MAP
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
-    def battle_function(self):
+    def battle_function(self) -> bool:
         # 三路敌人太多。
         if self.config.MAP_CLEAR_ALL_THIS_TIME:
             remain = self.map.select(is_enemy=True)

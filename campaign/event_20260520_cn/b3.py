@@ -1,9 +1,15 @@
+from typing import TYPE_CHECKING
+
 from module.base.utils import location2node
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap, location_ensure
 
 from .b1 import Config as ConfigBase
 from .d3 import GridCurrentFleet
+
+if TYPE_CHECKING:
+    from module.base.type_alias import Point
+    from module.map_detection.grid_info import GridInfo
 
 MAP = CampaignMap("B3")
 MAP.shape = "I9"
@@ -149,7 +155,11 @@ class Campaign(CampaignBase):
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
     grid_class = GridCurrentFleet
 
-    def in_sight(self, location, sight=None):
+    def in_sight(
+        self,
+        location: GridInfo | str | Point,
+        sight: tuple[int, int, int, int] | None = None,
+    ) -> None:
         # Focus E3 when insight E3, to avoid ammo icon covered by pillar
         location = location_ensure(location)
         node = location2node(location)

@@ -14,6 +14,7 @@ from module.map.map_grids import SelectedGrids
 from module.map.utils import location_ensure, match_movable
 
 if TYPE_CHECKING:
+    from module.combat.combat import CombatEnd
     from module.config.config import AzurLaneConfig
     from module.device.device import Device
     from module.map.map_base import CampaignMap
@@ -1036,7 +1037,7 @@ class Fleet(Camera, AmbushHandler):
 
         return True
 
-    def _expected_end(self, expected: str) -> Literal["in_stage", "with_searching", "no_searching"] | None:
+    def _expected_end(self, expected: str) -> CombatEnd | None:
         for data in self.map.spawn_data:
             if data.get("battle") == self.battle_count and "boss" in expected:
                 return "in_stage"

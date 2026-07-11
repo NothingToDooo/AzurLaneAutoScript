@@ -1,8 +1,11 @@
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from module.map.map_base import CampaignMap
 
 from .campaign_base import CampaignBase
+
+if TYPE_CHECKING:
+    from module.combat.combat import CombatEnd
 
 MAP = CampaignMap("VSP")
 MAP.shape = "I9"
@@ -180,7 +183,7 @@ class Campaign(CampaignBase):
     def battle_7(self) -> bool:
         return self.fleet_boss.clear_boss()
 
-    def _expected_end(self, expected):
+    def _expected_end(self, expected: str) -> CombatEnd | None:
         # after 4th battle, no enemy search but has event animation
         # we wait until event animation appears, otherwise next map walk will click on animation popup
         if self.battle_count == 3:
