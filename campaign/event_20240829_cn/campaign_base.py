@@ -1,8 +1,13 @@
+from typing import TYPE_CHECKING
+
 from module.campaign.campaign_base import CampaignBase as CampaignBase_
+
+if TYPE_CHECKING:
+    from module.base.button import Button
 
 
 class CampaignBase(CampaignBase_):
-    def campaign_ensure_mode(self, mode="normal"):
+    def campaign_ensure_mode(self, mode: str = "normal") -> None:
         if mode == "hard":
             self.config.override(Campaign_Mode="hard")
 
@@ -15,7 +20,7 @@ class CampaignBase(CampaignBase_):
             return "ex_sp", "1"
         return CampaignBase_.campaign_separate_name(name)
 
-    def campaign_get_entrance(self, name):
+    def campaign_get_entrance(self, name: str) -> Button:
         if name == "sp":
             name = "tp"
         return super().campaign_get_entrance(name)

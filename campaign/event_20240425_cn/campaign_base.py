@@ -12,13 +12,13 @@ class CampaignBase(CampaignBase_):
         """,
     )
 
-    def campaign_set_chapter_event(self, chapter, mode="normal"):
+    def campaign_set_chapter_event(self, chapter: str, mode: str = "normal") -> bool:
         del mode
         self.ui_goto_event()
         self.campaign_ensure_chapter(chapter)
         return True
 
-    def campaign_get_chapter_index(self, name):
+    def campaign_get_chapter_index(self, name: str | int) -> int:
         """将整数或章节名转换为章节序号。"""
         if name == "sp":
             return 1
@@ -32,13 +32,13 @@ class CampaignBase(CampaignBase_):
         return super(CampaignBase, CampaignBase).campaign_get_chapter_index(name)
 
     @staticmethod
-    def campaign_ocr_result_process(result):
+    def campaign_ocr_result_process(result: str) -> str:
         result = CampaignBase_.campaign_ocr_result_process(result)
         if result in ["usp", "iisp", "ijsp", "jjsp"]:
             result = "sp"
         return result
 
-    def is_event_animation(self):
+    def is_event_animation(self) -> bool:
         # Blue banner
         if self.image_color_count((1180, 285, 1280, 335), color=(140, 215, 255), count=1000):
             logger.info("Live start!")

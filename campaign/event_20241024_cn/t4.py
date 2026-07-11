@@ -154,7 +154,7 @@ class Config(ConfigBase):
 
 
 class EventGrid(Grid):
-    def predict_enemy_genre(self):
+    def predict_enemy_genre(self) -> str | None:
         if self.enemy_scale:
             return ""
 

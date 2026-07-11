@@ -9,13 +9,13 @@ class CampaignBase(CampaignBase_):
     )
 
     @staticmethod
-    def campaign_get_chapter_index(name):
+    def campaign_get_chapter_index(name: str | int) -> int:
         """将整数或章节名转换为章节序号。"""
         if name == "ttl":
             return 1
         return CampaignBase_.campaign_get_chapter_index(name)
 
-    def campaign_set_chapter_20241219(self, chapter, stage, mode="combat"):
+    def campaign_set_chapter_20241219(self, chapter: str, stage: str, mode: str = "combat") -> bool:
         if chapter == "t":
             self.ui_goto_event()
             MODE_SWITCH_20241219.set("combat", main=self)

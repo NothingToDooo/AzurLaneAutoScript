@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from module.base.timer import Timer
 from module.base.utils import area_in_area, area_pad
 from module.campaign.campaign_base import CampaignBase as CampaignBase_
@@ -6,11 +8,14 @@ from module.exception import CampaignNameError
 from module.logger import logger
 from module.ui.page import page_event
 
+if TYPE_CHECKING:
+    from module.base.button import Button
+
 
 class CampaignBase(CampaignBase_):
     entrance_timer = Timer(2)
 
-    def get_story_entrance(self):
+    def get_story_entrance(self) -> Button | None:
         """返回剧情入口按钮；未匹配或落入黑名单区域时返回 None。"""
         # A2 后会依次出现 5 个剧情入口，未点击前无法继续。
         button = self.image_color_button(
@@ -22,7 +27,7 @@ class CampaignBase(CampaignBase_):
             return None
         return button
 
-    def handle_story_entrance(self):
+    def handle_story_entrance(self) -> bool:
         if not self.entrance_timer.reached():
             return False
 
@@ -34,7 +39,7 @@ class CampaignBase(CampaignBase_):
         self.entrance_timer.reset()
         return True
 
-    def ensure_no_stage_entrance(self, *, skip_first_screenshot=True):
+    def ensure_no_stage_entrance(self, *, skip_first_screenshot: bool = True) -> bool:
         logger.info("ensure_no_stage_entrance")
         while 1:
             if skip_first_screenshot:
@@ -60,23 +65,23 @@ class CampaignBase(CampaignBase_):
                 continue
         return False
 
-    def handle_in_stage(self):
+    def handle_in_stage(self) -> bool:
         if self.is_in_stage_page() and self.handle_story_entrance():
             return False
         return super().handle_in_stage()
 
-    def handle_get_chapter_additional(self):
+    def handle_get_chapter_additional(self) -> bool:
         if self.get_story_entrance():
             raise CampaignNameError
         return super().handle_get_chapter_additional()
 
-    def handle_campaign_ui_additional(self):
+    def handle_campaign_ui_additional(self) -> bool:
         if self.get_story_entrance():
             self.ensure_no_stage_entrance()
             return True
         return super().handle_campaign_ui_additional()
 
-    def handle_exp_info(self):
+    def handle_exp_info(self) -> bool:
         # Random background hits EXP_INFO_B
         if self.ui_page_appear(page_event):
             return False

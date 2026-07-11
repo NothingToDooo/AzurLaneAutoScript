@@ -7,7 +7,7 @@ from module.template.assets import TEMPLATE_ENEMY_BOSS
 
 
 class EventGrid(Grid):
-    def predict_enemy_genre(self):
+    def predict_enemy_genre(self) -> str | None:
         if self.enemy_scale:
             return ""
 
@@ -18,7 +18,7 @@ class EventGrid(Grid):
 
         return super().predict_enemy_genre()
 
-    def predict_boss(self):
+    def predict_boss(self) -> bool:
         if self.enemy_genre == "Siren_Siren":
             return False
         return super().predict_boss()
@@ -31,7 +31,7 @@ class CampaignBase(CampaignBase_):
         """,
     )
 
-    def campaign_set_chapter_20241219(self, chapter, stage, mode="combat"):
+    def campaign_set_chapter_20241219(self, chapter: str, stage: str, mode: str = "combat") -> bool:
         if chapter == "t":
             self.ui_goto_event()
             MODE_SWITCH_20241219.set("combat", main=self)
