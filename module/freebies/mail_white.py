@@ -52,14 +52,7 @@ class MailWhite(UI):
         return setting
 
     def _mail_enter(self, skip_first_screenshot=True):
-        """
-        Returns:
-            int: If having mails
-
-        Page:
-            in: page_main_white or MAIL_MANAGE
-            out: MAIL_BATCH_CLAIM
-        """
+        """从白色主页或邮件管理进入批量领取页；无邮件返回 False。"""
         logger.info("Mail enter")
         self.interval_clear([freebies_assets.MAIL_MANAGE])
         timeout = Timer(0.6, count=1)
@@ -70,7 +63,6 @@ class MailWhite(UI):
             else:
                 self.device.screenshot()
 
-            # 结束。
             if self.appear(freebies_assets.MAIL_BATCH_CLAIM, offset=(20, 20)):
                 logger.info("Mail entered")
                 return True
@@ -83,7 +75,6 @@ class MailWhite(UI):
                     logger.info("Mail empty, wait GOTO_MAIN_WHITE timeout")
                     return False
 
-            # 点击进入。
             if self.appear_then_click(freebies_assets.MAIL_MANAGE, offset=(30, 30), interval=3):
                 has_mail = True
                 continue
@@ -94,11 +85,7 @@ class MailWhite(UI):
         return False
 
     def _mail_quit(self, skip_first_screenshot=True):
-        """
-        Page:
-            in: Any page in page_mail
-            out: page_main_white
-        """
+        """从邮件内任意页面退出到白色主页。"""
         logger.info("Mail quit")
         self.interval_clear(
             [
@@ -115,12 +102,10 @@ class MailWhite(UI):
             else:
                 self.device.screenshot()
 
-            # 结束。
             if self.ui_page_appear(page_main):
                 logger.info("Mail quit to page_main")
                 break
 
-            # 点击退出。
             if self.handle_popup_confirm("MAIL_QUIT"):
                 continue
             if self.appear(freebies_assets.MAIL_BATCH_CLAIM, offset=(30, 30), interval=3):
@@ -144,14 +129,7 @@ class MailWhite(UI):
         return False
 
     def _mail_claim_execute(self, skip_first_screenshot=True):
-        """
-        Page:
-            in: MAIL_BATCH_CLAIM
-            out: page_main_white, may have info_bar
-
-        Returns:
-            int: If success to claim
-        """
+        """在批量领取页领取邮件，以信息条是否出现作为成功结果。"""
         self.handle_info_bar()
         self.interval_clear(
             [
@@ -169,10 +147,8 @@ class MailWhite(UI):
             else:
                 self.device.screenshot()
 
-            # 结束。
             if claimed and self.appear(freebies_assets.MAIL_BATCH_CLAIM, offset=(30, 30)):
                 break
-            # 点击领取。
             if not claimed and self.appear_then_click(freebies_assets.MAIL_BATCH_CLAIM, offset=(30, 30), interval=3):
                 continue
             if self.handle_popup_confirm("MAIL_CLAIM"):
@@ -187,11 +163,7 @@ class MailWhite(UI):
         return success
 
     def _mail_delete(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: MAIL_BATCH_DELETE
-            out: MAIL_BATCH_DELETE
-        """
+        """在批量删除页完成删除，结束后仍停留在该页。"""
         self.handle_info_bar()
         self.interval_clear([freebies_assets.MAIL_BATCH_DELETE])
         self.popup_interval_clear()
@@ -203,10 +175,8 @@ class MailWhite(UI):
             else:
                 self.device.screenshot()
 
-            # 结束。
             if deleted and self.appear(freebies_assets.MAIL_BATCH_DELETE, offset=(30, 30)):
                 break
-            # 点击删除。
             if not deleted and self.appear_then_click(freebies_assets.MAIL_BATCH_DELETE, offset=(30, 30), interval=3):
                 continue
             if self.handle_popup_confirm("MAIL_CLAIM"):
@@ -225,11 +195,7 @@ class MailWhite(UI):
         trade_license=False,
         delete=True,
     ):
-        """
-        Pages:
-            in: page_main_white or MAIL_MANAGE
-            out: MAIL_BATCH_CLAIM
-        """
+        """从白色主页或邮件管理页按开关领取邮件，并可选删除；完成后返回白色主页。"""
         if not self._mail_enter():
             return
 
@@ -281,7 +247,6 @@ class MailWhite(UI):
             logger.warning("Unknown page_main, cannot enter mail page")
             return False
 
-        # 领取邮件。
         self.mail_claim(
             merit=merit,
             maintenance=maintenance,

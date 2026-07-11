@@ -26,15 +26,7 @@ class CampaignSos(CampaignRun, CampaignBase):
         return Digit([], letter=[132, 230, 115], threshold=136, name="OCR_SOS_CHAPTER")
 
     def _find_target_chapter(self, chapter):
-        """
-        find the target chapter search button or goto button.
-
-        Args:
-            chapter (int): SOS target chapter
-
-        Returns:
-            Button: signal search button or goto button of the target chapter
-        """
+        """返回目标章节的搜索、前往或确认按钮；未找到时返回 None。"""
         signal_search_buttons = sos_assets.TEMPLATE_SIGNAL_SEARCH.match_multi(self.device.image)
         sos_goto_buttons = sos_assets.TEMPLATE_SIGNAL_GOTO.match_multi(self.device.image)
         sos_confirm_buttons = sos_assets.TEMPLATE_SIGNAL_CONFIRM.match_multi(self.device.image)
@@ -55,19 +47,7 @@ class CampaignSos(CampaignRun, CampaignBase):
         return None
 
     def _sos_signal_select(self, chapter):
-        """
-        select a SOS signal
-
-        Args:
-            chapter (int): 3 to 10.
-
-        Pages:
-            in: page_campaign
-            out: page_campaign, in target chapter
-
-        Returns:
-            bool: whether select successful
-        """
+        """在战役页选择 3～10 章 SOS 信号，成功进入目标章节返回 True。"""
         logger.hr(f"Select chapter {chapter} signal ")
         self.ui_click(
             sos_assets.SIGNAL_SEARCH_ENTER,
@@ -97,17 +77,7 @@ class CampaignSos(CampaignRun, CampaignBase):
         return False
 
     def _sos_signal_confirm(self, entrance, skip_first_screenshot=True):
-        """
-        Search a SOS signal, goto target chapter.
-
-        Args:
-            entrance (Button): Entrance button.
-            skip_first_screenshot (bool):
-
-        Pages:
-            in: SIGNAL_SEARCH
-            out: page_campaign
-        """
+        """从 SIGNAL_SEARCH 搜索或确认信号并返回战役页。"""
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -123,22 +93,11 @@ class CampaignSos(CampaignRun, CampaignBase):
                 if sos_assets.TEMPLATE_SIGNAL_CONFIRM.match(image):
                     self.device.click(entrance)
 
-            # 结束。
             if self.appear(CAMPAIGN_CHECK, offset=(20, 20)):
                 break
 
     def run(self, name=None, folder="campaign_sos", mode="normal", total=1):
-        """
-        Args:
-            name (str): Default to None, because stages in SOS are dynamic.
-            folder (str): Default to 'campaign_sos'.
-            mode (str): Must be `normal` in SOS
-            total (int): Default to 1, because SOS stages can only run once.
-
-        Pages:
-            in: Any page
-            out: page_campaign
-        """
+        """游戏已移除 SOS 地图；禁用并停止该任务。"""
         logger.warning("AL no longer has SOS maps, disable task")
         self.config.Scheduler_Enable = False
         self.config.task_stop()
@@ -147,14 +106,12 @@ class CampaignSos(CampaignRun, CampaignBase):
         self.ui_ensure(page_campaign)
 
         while 1:
-            # 结束。
             remain = OCR_SOS_SIGNAL.ocr(self.device.image)
             logger.attr("SOS signal", remain)
             if remain <= 0:
                 logger.info("All SOS signals cleared")
                 break
 
-            # 执行。
             if self._sos_signal_select(self.config.Sos_Chapter):
                 name = f"campaign_{self.config.Sos_Chapter}_5"
                 self.config.override(Campaign_Name=name)
@@ -172,5 +129,4 @@ class CampaignSos(CampaignRun, CampaignBase):
                 logger.warning(f"Failed to clear SOS signals, cannot locate chapter {self.config.Sos_Chapter}")
                 break
 
-        # 调度器。
         self.config.task_delay(server_update=True)

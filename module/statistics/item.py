@@ -12,13 +12,7 @@ from module.statistics.utils import load_folder
 
 class AmountOcr(Digit):
     def pre_process(self, image):
-        """
-        Args:
-            image (np.ndarray): Shape (height, width, channel)
-
-        Returns:
-            np.ndarray: Shape (width, height)
-        """
+        """把 (高, 宽, 通道) 图像转为同宽高的二维 uint8 白字图。"""
         image = extract_white_letters(image, threshold=self.threshold)
         return image.astype(np.uint8)
 
@@ -31,11 +25,6 @@ class Item:
     IMAGE_SHAPE = (96, 96)
 
     def __init__(self, image, button):
-        """
-        Args:
-            image:
-            button:
-        """
         self.image_raw = image
         self._button = button
         image = crop(image, button.area)
@@ -59,11 +48,7 @@ class Item:
 
     @name.setter
     def name(self, value):
-        """
-        Args:
-            value (str): Item name, such as 'PlateGeneralT3'. Suffix in name will be ignore.
-                For example, 'Javelin' and 'Javelin_2' are different templates, but have same output name 'Javelin'.
-        """
+        """移除模板名末尾的数字变体后缀，例如 Javelin_2 归一化为 Javelin。"""
         if "_" in value:
             pre, suffix = value.rsplit("_", 1)
             if suffix.isdigit():
@@ -113,11 +98,11 @@ class Item:
         return crop(self.image_raw, area_offset(area, offset=self._button.area[:2]))
 
     def __eq__(self, other):
-        # For de-redundancy in Filter.apply()
+        # Filter.apply() 按完整展示值去重。
         return str(self) == str(other)
 
     def __hash__(self):
-        # For de-redundancy in merging two get items images
+        # 合并多张掉落截图时按物品名去重。
         return hash(self.name)
 
 
@@ -160,13 +145,7 @@ class ItemGrid:
     cost_similarity = 0.75
 
     def __init__(self, grids, templates, areas=None, **area_settings):
-        """
-        Args:
-            grids (ButtonGrid): 商品网格。
-            templates (dict): Key 为商品名，value 为模板图片。
-            areas (ItemGridAreas): 商品识别裁剪区域。
-            **area_settings: 覆盖 `ItemGridAreas` 中的字段。
-        """
+        """初始化商品网格和名称模板；area_settings 覆盖 ItemGridAreas。"""
         areas = item_grid_areas(areas, area_settings)
         self.amount_ocr = AMOUNT_OCR
         self.price_ocr = PRICE_OCR
@@ -194,10 +173,6 @@ class ItemGrid:
         self.items = []
 
     def _load_image(self, image):
-        """
-        Args:
-            image (np.ndarray):
-        """
         self.items = []
         for button in self.grids.buttons:
             item = self.item_class(image, button)
@@ -205,10 +180,6 @@ class ItemGrid:
                 self.items.append(item)
 
     def load_template_folder(self, folder):
-        """
-        Args:
-            folder (str): Template folder.
-        """
         logger.info(f"Loading template folder: {folder}")
         max_digit = 0
         data = load_folder(folder)
@@ -227,10 +198,6 @@ class ItemGrid:
         logger.attr("next_template_index", self.next_template_index)
 
     def load_cost_template_folder(self, folder):
-        """
-        Args:
-            folder (str): Template folder.
-        """
         max_digit = 0
         data = load_folder(folder)
         for name, image_path in data.items():
@@ -245,22 +212,11 @@ class ItemGrid:
         self.next_cost_template_index = max(self.next_cost_template_index, max_digit + 1)
 
     def match_template(self, image, similarity=None):
-        """
-        Match templates, try most frequent hit templates first.
-
-        Args:
-            image (np.ndarray):
-            similarity (float):
-
-        Returns:
-            str: Template name.
-        """
+        """优先匹配高命中和已知模板；未命中时登记新数字模板并返回编号。"""
         if similarity is None:
             similarity = self.similarity
         color = cv2.mean(crop(image, self.template_area))[:3]
-        # Match frequently hit templates first
         names = np.array(list(self.templates.keys()))[np.argsort(list(self.templates_hit.values()))][::-1]
-        # Match known templates first
         names = [name for name in names if not name.isdigit()] + [name for name in names if name.isdigit()]
         for name in names:
             if color_similar(color1=color, color2=self.colors[name], threshold=30):
@@ -280,14 +236,7 @@ class ItemGrid:
         return name
 
     def extract_template(self, image, folder=None):
-        """
-        Args:
-            image (np.ndarray):
-            folder (str): Save templates if `folder` is provided
-
-        Returns:
-            dict: Newly found templates. Key: str, template name. Value: np.ndarray
-        """
+        """返回本次新增的模板图映射；提供 folder 时同时保存为 PNG。"""
         self._load_image(image)
         prev = set(self.templates.keys())
         new = {}
@@ -303,15 +252,7 @@ class ItemGrid:
         return new
 
     def match_cost_template(self, item):
-        """
-        Match templates, try most frequent hit templates first.
-
-        Args:
-            item (Item):
-
-        Returns:
-            str: Template name.
-        """
+        """按命中频次匹配成本模板；未匹配时返回 None 且不创建模板。"""
         image = item.crop(self.cost_area)
         names = np.array(list(self.cost_templates.keys()))[np.argsort(list(self.cost_templates_hit.values()))][::-1]
         for name in names:
@@ -321,29 +262,18 @@ class ItemGrid:
                 self.cost_templates_hit[name] += 1
                 return name
 
-        # 不生成新的成本模板；未匹配时把该商品视为空位。
         return None
 
     @staticmethod
     def predict_tag(image):
-        """
-        Args:
-            image (np.ndarray): The tag_area of the item.
-            Replace this method to predict tags.
-
-        Returns:
-            str: Tags are like `catchup`, `bonus`. Default to None
-        """
+        """按标签区域颜色返回 catchup、bonus、event；未匹配时返回 None。"""
         threshold = 50
         color = cv2.mean(np.array(image))[:3]
         if color_similar(color1=color, color2=(49, 125, 222), threshold=threshold):
-            # 蓝色。
             return "catchup"
         if color_similar(color1=color, color2=(33, 199, 239), threshold=threshold):
-            # 青色。
             return "bonus"
         if color_similar(color1=color, color2=(255, 85, 41), threshold=threshold):
-            # 红色。
             return "event"
         return None
 
@@ -386,15 +316,7 @@ class ItemGrid:
             self.items = items
 
     def predict(self, image, options=None, **settings):
-        """
-        Args:
-            image (np.ndarray): 待识别截图。
-            options (ItemPredictOptions): 本次需要识别的商品字段。
-            **settings: 覆盖 `ItemPredictOptions` 中的字段。
-
-        Returns:
-            list[Item]:
-        """
+        """按选项识别截图中的有效商品并返回列表；settings 覆盖 ItemPredictOptions。"""
         options = item_predict_options(options, settings)
         self._load_image(image)
         if options.amount:

@@ -78,11 +78,7 @@ class NewYearChallenge(MinigameRun):
         return self.use_coin_new_year_challenge(count=5)
 
     def play_game(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: page_game_room new_year_challenge_prepare
-            out: page_game_room new_year_challenge_end/new_year_challenge_prepare
-        """
+        """从新年挑战准备页游玩，分数超过 1000 时主动结束。"""
         score_ocr_interval = Timer(0.6, count=5).start()
         started = False
         while 1:
@@ -92,27 +88,22 @@ class NewYearChallenge(MinigameRun):
                 self.device.screenshot()
             if self.deal_popup():
                 continue
-            # 一轮选择。
             if self.appear(minigame_assets.NEW_YEAR_CHALLENGE_CHOOSING, offset=(5, 5), interval=3):
                 # 点时钟会被误判为两个按钮之间点击过多，所以这里只执行颜色选择。
                 self.new_year_challenge_turn(skip_first_screenshot=False)
                 self.device.click_record_clear()
                 continue
-            # 等待选择。
             if score_ocr_interval.reached() and self.appear(
                 minigame_assets.NEW_YEAR_CHALLENGE_STOP_PLAY, offset=(5, 5)
             ):
-                # 分数足够时停止游玩。
                 score = OCR_NEW_YEAR_BATTLE_SCORE.ocr(self.device.image)
                 score_ocr_interval.reset()
                 if score > 1000 and self.appear_then_click(
                     minigame_assets.NEW_YEAR_CHALLENGE_STOP_PLAY, offset=(5, 5), interval=3
                 ):
                     continue
-            # 游戏结束。
             if self.appear(minigame_assets.NEW_YEAR_CHALLENGE_END, offset=(5, 5), interval=3):
                 break
-            # 游戏规则介绍。
             if self.appear(minigame_assets.NEW_YEAR_CHALLENGE_START, offset=(5, 5), interval=3):
                 if started:
                     self.interval_clear(minigame_assets.NEW_YEAR_CHALLENGE_START)
@@ -140,6 +131,7 @@ class NewYearChallenge(MinigameRun):
                 continue
 
     def use_coin_new_year_challenge(self, skip_first_screenshot=True, count=1):
+        """设置本次代币数；测试用 count<1 不消耗代币，无法添加时返回 False。"""
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -148,7 +140,6 @@ class NewYearChallenge(MinigameRun):
             if self.deal_popup():
                 continue
             if self.appear(minigame_assets.NEW_YEAR_CHALLENGE_ADD_COIN, offset=(5, 5)):
-                # 添加代币。
                 if count > 1:
                     for _i in range(count - 1):
                         self.device.click(minigame_assets.NEW_YEAR_CHALLENGE_ADD_COIN)
@@ -164,10 +155,10 @@ class NewYearChallenge(MinigameRun):
         return False
 
     def new_year_challenge_turn(self, skip_first_screenshot=True):
+        """把五个目标位的颜色映射为按钮，并以 0.2 秒间隔按顺序点击。"""
         if not skip_first_screenshot:
             self.device.screenshot()
         to_clicks = []
-        # 判断需要点击的颜色按钮。
         for to_judge in self.NEW_YEAR_BATTLE_TMP_BUTTON:
             for color, button in self.NEW_YEAR_BATTLE_COLOR_BUTTON_DICT.items():
                 if self.image_color_count(to_judge, color, threshold=221, count=10):
@@ -175,7 +166,6 @@ class NewYearChallenge(MinigameRun):
                     break
         logger.info(f"to clicks: {to_clicks}")
         to_clicks.reverse()
-        # 按顺序点击。
         click_interval = Timer(0.2, count=5).start()
         while 1:
             if to_clicks and click_interval.reached():

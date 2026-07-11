@@ -35,7 +35,6 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
                 self.device.click(BATTLE_PREPARATION)
                 continue
 
-            # End
             pause = self.is_combat_executing()
             if pause:
                 logger.attr("BattleUI", pause)
@@ -127,24 +126,20 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
         return reward_end
 
     def _combat_execute(self):
-        """
-        Returns:
-            bool: True if wins. False if quit.
-        """
+        """正常结算时返回 True；低血量主动退出时返回 False。"""
         logger.info("Combat execute")
         self.device.stuck_record_clear()
         self.device.click_record_clear()
         self.low_hp_confirm_timer = Timer(1.5, count=2).start()
         show_hp_timer = Timer(5)
         pause_interval = Timer(0.5, count=1)
-        # Pause button to identify battle UI theme
+        # 暂停按钮皮肤决定血条布局。
         pause = None
         success = True
         end = False
-        battle_status_detected = False  # Track if in post battle screen
+        battle_status_detected = False
         while 1:
             self.device.screenshot()
-            # End
             if self._exercise_combat_ended(end):
                 break
             p, pause, end = self._update_exercise_combat_pause(pause, end)
@@ -154,14 +149,13 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
                 battle_status_detected = True
                 continue
 
-            # Only handle GET_ITEMS_1 after battle status
+            # 仅在识别到战斗结算后处理 GET_ITEMS_1，避免误判。
             reward_end = self._handle_exercise_reward_result(battle_status_detected)
             if reward_end is not None:
                 if reward_end:
                     success = True
                     end = True
                 continue
-            # Quit
             quit_success, handled = self._handle_exercise_quit(pause_interval)
             if handled:
                 if quit_success is not None:
@@ -170,16 +164,12 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
                 continue
             if not end and self._handle_exercise_low_hp(p, pause, pause_interval, show_hp_timer):
                 continue
-            # bunch of popup handlers
             if self._handle_exercise_combat_popups():
                 continue
         return success
 
     def _choose_opponent(self, index, skip_first_screenshot=True):
-        """
-        Args:
-            index (int): From left to right. 0 to 3.
-        """
+        """按从左到右的 0～3 索引进入对手准备页。"""
         logger.hr(f"Opponent: {index}")
         opponent_timer = Timer(5)
         preparation_timer = Timer(5)
@@ -199,7 +189,6 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
                 opponent_timer.reset()
                 continue
 
-            # End
             if self.appear(BATTLE_PREPARATION, offset=(20, 20)):
                 break
 
@@ -208,13 +197,7 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
         self.ui_back(check_button=self._in_exercise, appear_button=BATTLE_PREPARATION, skip_first_screenshot=True)
 
     def _combat(self, opponent):
-        """
-        Args:
-            opponent(int): From left to right. 0 to 3.
-
-        Returns:
-            bool: True if wins. False if challenge times exhausted.
-        """
+        """挑战索引 0～3 的对手；低血量退出重试耗尽后返回 False。"""
         self._choose_opponent(opponent)
 
         trial = self.config.Exercise_OpponentTrial

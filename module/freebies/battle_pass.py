@@ -17,13 +17,7 @@ from module.ui_white.assets import POPUP_CONFIRM_WHITE_BATTLEPASS
 
 class BattlePass(Combat, UI):
     def battle_pass_red_dot_appear(self):
-        """
-        Returns:
-            bool: 红点是否出现。
-
-        Page:
-            in: page_reward
-        """
+        """在 page_reward 判断战令入口红点是否出现。"""
         if self.appear(REWARD_GOTO_BATTLE_PASS, offset=(50, 150)):
             # 从 REWARD_GOTO_BATTLE_PASS 读取偏移，因为入口可能不在最上方。
             BATTLE_PASS_RED_DOT.load_offset(REWARD_GOTO_BATTLE_PASS)
@@ -41,11 +35,7 @@ class BattlePass(Combat, UI):
         return self.appear_then_click(PURCHASE_POPUP, offset=(20, 20), interval=2)
 
     def battle_pass_enter(self):
-        """
-        Page:
-            in: page_reward
-            out: page_battle_pass
-        """
+        """从 page_reward 进入战令页。"""
 
         def appear_button():
             return self.appear(REWARD_GOTO_BATTLE_PASS, offset=(50, 150))
@@ -101,14 +91,7 @@ class BattlePass(Combat, UI):
         return False
 
     def battle_pass_receive(self, skip_first_screenshot=True):
-        """
-        Returns:
-            bool: If received.
-
-        Pages:
-            in: page_battle_pass
-            out: page_battle_pass
-        """
+        """在战令页领取全部可领奖励，返回是否实际领取。"""
         logger.hr("Battle pass receive", level=1)
         self.battle_status_click_interval = 2
         confirm_timer = Timer(1, count=3).start()

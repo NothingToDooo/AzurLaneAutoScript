@@ -43,14 +43,7 @@ class SupplyPack(CampaignStatus):
         return False
 
     def supply_pack_buy(self, supply_pack, skip_first_screenshot=True):
-        """
-        Args:
-            supply_pack (Button): Button of supply pack, click to buy.
-            skip_first_screenshot (bool):
-
-        Returns:
-            bool: If bought.
-        """
+        """购买指定补给包；确认成功返回 True，连续点击三次仍未完成则放弃。"""
         logger.hr("Supply pack buy")
         self._clear_supply_pack_intervals(supply_pack)
 
@@ -89,19 +82,11 @@ class SupplyPack(CampaignStatus):
         return executed
 
     def goto_supply_pack(self):
-        """
-        页面：
-            进入：page_shop
-            退出：page_supply_pack，补给包页签。
-        """
+        """从商店进入补给包页签。"""
         self.ui_goto(page_supply_pack)
 
     def run(self):
-        """
-        Pages:
-            in: Any page
-            out: page_supply_pack, supply pack tab
-        """
+        """从任意页面进入补给包页签，按油量和星期配置领取周礼包。"""
         self.ui_ensure(page_shop)
         self.goto_supply_pack()
         if self.get_oil() < 21000:
@@ -118,10 +103,7 @@ class SupplyPack(CampaignStatus):
 
 class SupplyPack_250814(SupplyPack):
     def get_oil(self, skip_first_screenshot=True):
-        """
-        Returns:
-            int: Oil amount
-        """
+        """返回商店页油量；超时或识别失败时为 0。"""
         amount = 0
         timeout = Timer(1, count=2).start()
         while 1:
@@ -145,11 +127,7 @@ class SupplyPack_250814(SupplyPack):
         return amount
 
     def goto_supply_pack(self):
-        """
-        页面：
-            进入：page_shop
-            退出：page_supply_pack，补给包页签。
-        """
+        """从商店通过动态页签按钮进入补给包页。"""
         logger.info("Goto supply pack")
         for _ in self.loop():
             if self.match_template_color(page_supply_pack.check_button, offset=(20, 20)):

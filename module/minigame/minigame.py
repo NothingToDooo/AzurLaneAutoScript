@@ -22,16 +22,9 @@ class _MinigameRunState:
 
 class MinigameRun(UI):
     def minigame_run(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: page_game_room main_page
-            out: page_game_room main_page
-        Return:
-            False if unable or unnecessary to play
-        """
+        """从游戏室主页游玩一次并返回；无法或无需投币时返回 False。"""
         logger.hr("Minigame run", level=1)
 
-        # page_game_room main_page -> MINIGAME_SCROLL
         logger.info("Enter minigame")
         while 1:
             if skip_first_screenshot:
@@ -54,7 +47,6 @@ class MinigameRun(UI):
 
         logger.info("Choose minigame")
         self.choose_game()
-        # try to add coins, if failed, skip play
         add_coin_result = self.use_coin()
         if add_coin_result:
             logger.hr("Play minigame", level=2)
@@ -64,11 +56,7 @@ class MinigameRun(UI):
         return add_coin_result
 
     def deal_popup(self):
-        """
-        处理可能出现的弹窗。
-
-        返回 True 时需要重新截图。
-        """
+        """处理通用及小游戏弹窗；返回 True 时调用方需重新截图。"""
         # 具体小游戏自己的弹窗。
         if self.deal_specific_popup():
             return True
@@ -82,49 +70,34 @@ class MinigameRun(UI):
         return bool(self.appear_then_click(GET_ITEMS_1, offset=(5, 5), interval=3))
 
     def deal_specific_popup(self):
+        """供具体小游戏覆盖的弹窗钩子；默认不处理。"""
         return False
 
     def choose_game(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: page_game_room choosing_game
-            out: page_game_room game_entrance
-        """
+        """供子类实现从游戏列表进入具体小游戏。"""
 
     def use_coin(self):
+        """供子类实现投币；默认返回 False。"""
         return False
 
     def play_game(self, skip_first_screenshot=True):
+        # 供子类实现具体游玩流程。
         pass
 
     def exit_game(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: page_game_room new_year_challenge_end
-            out: page_game_room choose_game
-        """
+        """供子类实现从小游戏退出到游戏列表。"""
 
 
 class Minigame(UI):
     def get_coin_amount(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: page_game_room main_page
-            out: page_game_room main_page
-        Returns:
-            int: Coin amount
-        """
+        """在游戏室主页识别代币数，并把结果限制在 0～40。"""
         if not skip_first_screenshot:
             self.device.screenshot()
         amount = OCR_COIN.ocr(self.device.image)
         return min(40, amount)
 
     def go_to_main_page(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: page_game_room main_page/choose_game_page
-            out: page_game_room main_page
-        """
+        """从游戏室主页或列表页回到游戏室主页。"""
         logger.info("minigame go_to_main_page")
         while 1:
             if skip_first_screenshot:
@@ -144,11 +117,7 @@ class Minigame(UI):
                 break
 
     def collect_coin(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: page_game_room main_page/choose_game_page
-            out: page_game_room main_page
-        """
+        """回到游戏室主页收取代币，返回是否发生领取。"""
         coin_collected = False
         while 1:
             if skip_first_screenshot:
@@ -175,11 +144,7 @@ class Minigame(UI):
         return coin_collected
 
     def run(self):
-        """
-        Pages:
-            in: Any page
-            out: page_game_room
-        """
+        """从任意页面进入游戏室并消耗可用代币。"""
         self._minigame_enter_game_room()
         self.go_to_main_page()
 
@@ -197,8 +162,7 @@ class Minigame(UI):
             if self.ui_page_appear(page_academy, interval=5):
                 self.device.click(ACADEMY_GOTO_GAME_ROOM)
                 continue
-            # You've reached your monthly limit of Game Tickets, and will not be able to earn any more.
-            # Continue playing the minigame?
+            # 达到每月游戏券上限时，确认仍继续游玩。
             if self.handle_popup_confirm("MINIGAME_ENTER"):
                 continue
 
@@ -211,7 +175,6 @@ class Minigame(UI):
     def _spend_minigame_coins(self, minigame_instance, specific_game_name):
         state = _MinigameRunState()
         while state.play_count < 10:
-            # OCR 获取代币数量。
             coin_count = self.get_coin_amount()
             logger.info(f"coin count : {coin_count}")
 

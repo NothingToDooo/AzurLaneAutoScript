@@ -32,14 +32,7 @@ class _GuildOperationsEnsureState:
 
 class GuildOperations(GuildBase):
     def _guild_operations_ensure(self, skip_first_screenshot=True):
-        """
-        Ensure guild operation is loaded
-        After entering guild operation, background loaded first, then dispatch/boss
-
-        Returns:
-            bool: True if success to enter operation
-                False if fund insufficient
-        """
+        """等待作战背景和派遣/Boss 区加载；进入成功返回 True，资金不足返回 False。"""
         logger.attr("Guild master/official", self.config.GuildOperation_SelectNewOperation)
         state = _GuildOperationsEnsureState(confirm_timer=Timer(1.5, count=3).start())
         while 1:
@@ -132,14 +125,9 @@ class GuildOperations(GuildBase):
         return state.confirm_timer.reached()
 
     def _handle_guild_operations_start(self):
-        """
-        开启新的公会作战。
+        """会长或军官开启所罗门海空战。
 
-        当前账号必须是公会会长或军官。每月第三次公会作战不建议开启，普通成员每月只能参加两次，
-        第三次通常无法参与派遣，最终会降低派遣评价和奖励。
-
-        Returns:
-            bool: 是否发生点击。
+        普通成员每月只能参加两次，第三次通常无法派遣，会降低派遣评价和奖励。
         """
         if not self.config.GuildOperation_SelectNewOperation:
             return False
@@ -150,26 +138,13 @@ class GuildOperations(GuildBase):
             logger.info(f"No new guild operations because, today's date {today} >= limit {limit}")
             return False
 
-        # 固定选择收益最高的所罗门海空战。
         if self.appear_then_click(guild_assets.GUILD_OPERATIONS_SOLOMON, offset=(20, 20), interval=3):
             return True
-        # 进入刚开启的新作战。
-        # 页面切换示例：
-        # - GUILD_OPERATIONS_SOLOMON
-        # - GUILD_OPERATIONS_NEW
-        # - handle_popup_confirm()，确认消耗公会资金。
-        # - GUILD_OPERATIONS_JOIN
-        # - GUILD_OPERATIONS_ACTIVE_CHECK
+        # 新作战会依次经过资金确认、加入和地图加载，由外层循环统一处理。
         return self.appear_then_click(guild_assets.GUILD_OPERATIONS_NEW, offset=(20, 20), interval=3)
 
     def _guild_operation_fund_insufficient(self):
-        """
-        Returns:
-            bool: True if insufficient
-
-        Pages:
-            in: GUILD_OPERATIONS_NEW
-        """
+        """仅在新作战页检测资金；不足返回 True，页面不匹配或资金充足返回 False。"""
         if not self.appear(guild_assets.GUILD_OPERATIONS_NEW, offset=(20, 20)):
             return False
         if self.image_color_count(
@@ -180,18 +155,7 @@ class GuildOperations(GuildBase):
         return False
 
     def _guild_operations_get_mode(self):
-        """
-        Returns:
-            int: 当前公会作战菜单状态。
-                0 - 没有进行中的作战，需要精英、军官或会长先选择一个。
-                1 - 作战进行中，显示作战节点图。
-                2 - 公会 Raid Boss 已开启。
-                无法确认状态时返回 None。
-
-        Pages:
-            in: GUILD_OPERATIONS
-            out: GUILD_OPERATIONS
-        """
+        """返回作战页状态：0 无作战、1 节点图、2 Raid Boss、None 无法确认。"""
         if self.appear(guild_assets.GUILD_OPERATIONS_INACTIVE_CHECK) and self.appear(
             guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK
         ):
@@ -213,17 +177,7 @@ class GuildOperations(GuildBase):
         return None
 
     def _guild_operations_get_entrance(self):
-        """
-        Get 2 entrance button of guild dispatch
-        If operation is on the top, after clicking expand button, operation chain moves downward, and enter button
-        appears on the top. So we need to detect two buttons in real time.
-
-        Returns:
-            list[Button], list[Button]: Expand button, enter button
-
-        Pages:
-            in: page_guild, guild operation, operation map (GUILD_OPERATIONS_ACTIVE_CHECK)
-        """
+        """实时返回展开和进入按钮列表；展开任务链后两类按钮会动态换位。"""
         # 整条作战任务链所在区域。
         detection_area = (152, 135, 1280, 630)
         # 向内收一点，避免点到边缘。
@@ -246,18 +200,7 @@ class GuildOperations(GuildBase):
         return list_expand, list_enter
 
     def _guild_operations_dispatch_swipe(self, forward=True, skip_first_screenshot=True):
-        """
-        碧蓝航线会自动聚焦到可执行任务，但无法覆盖后面的作战任务。
-
-        这里主动向后滑动，再查找可执行任务。
-
-        Args:
-            forward: 横向滑动方向。
-            skip_first_screenshot (bool):
-
-        Returns:
-            bool: 是否找到可执行任务。
-        """
+        """沿指定方向最多滑动五次，查找游戏自动聚焦遗漏的后续派遣任务。"""
         # 整条作战任务链所在区域。
         detection_area = (152, 135, 1280, 630)
         direction_vector = (-600, 0) if forward else (600, 0)
@@ -281,16 +224,7 @@ class GuildOperations(GuildBase):
         return False
 
     def _guild_operations_dispatch_enter(self, skip_first_screenshot=True):
-        """
-        Returns:
-            bool: If entered
-
-        Pages:
-            in: page_guild, guild operation, operation map (GUILD_OPERATIONS_ACTIVE_CHECK)
-                After entering guild operation, game will auto located to active operation.
-                It is the main operation on chain that will be located to, side operations will be ignored.
-            out: page_guild, guild operation, operation dispatch preparation (GUILD_DISPATCH_RECOMMEND)
-        """
+        """从节点图实时展开并进入派遣准备页；当前节点无入口时返回 False。"""
         timer_1 = Timer(2, count=5)
         timer_2 = Timer(2, count=5)
         while 1:
@@ -310,13 +244,13 @@ class GuildOperations(GuildBase):
             if self._guild_operations_handle_dispatch_quick(timer_1, timer_2):
                 continue
 
-            # 结束。
             if self.appear(guild_assets.GUILD_DISPATCH_RECOMMEND, offset=(20, 20)):
                 break
 
         return True
 
     def _guild_operations_active_dispatch_entrances(self):
+        """返回 (是否在节点图, 动态派遣入口)；无入口时第二项为 None。"""
         if not self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK, offset=(20, 20)):
             return False, None
 
@@ -356,17 +290,8 @@ class GuildOperations(GuildBase):
         return True
 
     def _guild_operations_get_dispatch(self):
-        """
-        获取用于切换到可用派遣舰队的按钮。
-
-        旧版本会检测切换点上的红点；红点偶尔会原因不明地不显示，所以这里直接检测切换点本身。
-
-        Returns:
-            Button: 切换到可用派遣的按钮；已经在最右侧舰队时返回 None。
-
-        Pages:
-            in: page_guild, guild operation, operation dispatch preparation (GUILD_DISPATCH_RECOMMEND)
-        """
+        """直接检测动态舰队切换点；返回切往最右侧的按钮，已在最右侧时返回 None。"""
+        # 红点偶尔不显示，因此不能用它判断可用派遣。
         # 舰队切换点，最多有 4 种布局。
         #          | 1 |
         #       | 1 | | 2 |
@@ -401,13 +326,7 @@ class GuildOperations(GuildBase):
         return button
 
     def _guild_operations_dispatch_switch_fleet(self, skip_first_screenshot=True):
-        """
-        Switch to the fleet on most right
-
-        Pages:
-            in: page_guild, guild operation, operation dispatch preparation (GUILD_DISPATCH_RECOMMEND)
-            out: page_guild, guild operation, operation dispatch preparation (GUILD_DISPATCH_RECOMMEND)
-        """
+        """在派遣准备页切到最右侧可用舰队。"""
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -426,13 +345,7 @@ class GuildOperations(GuildBase):
                 continue
 
     def _guild_operations_dispatch_execute(self, skip_first_screenshot=True):
-        """
-        Executes the dispatch sequence
-
-        Pages:
-            in: page_guild, guild operation, operation dispatch preparation (GUILD_DISPATCH_RECOMMEND)
-            out: page_guild, guild operation, operation dispatch preparation (GUILD_DISPATCH_RECOMMEND)
-        """
+        """在派遣准备页补全推荐舰队并执行派遣。"""
         dispatched = False
         while 1:
             if skip_first_screenshot:
@@ -462,7 +375,6 @@ class GuildOperations(GuildBase):
                 dispatched = True
                 continue
 
-            # 结束。
             if self.appear(guild_assets.GUILD_DISPATCH_IN_PROGRESS):
                 # 首次派遣会显示派遣中按钮。
                 logger.info("Fleet dispatched, dispatch in progress")
@@ -482,13 +394,7 @@ class GuildOperations(GuildBase):
                 break
 
     def _guild_operations_dispatch_exit(self, skip_first_screenshot=True):
-        """
-        Exit to operation map
-
-        Pages:
-            in: page_guild, guild operation, operation dispatch preparation (GUILD_DISPATCH_RECOMMEND)
-            out: page_guild, guild operation, operation map (GUILD_OPERATIONS_ACTIVE_CHECK)
-        """
+        """从派遣准备页退出到作战节点图。"""
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -506,18 +412,11 @@ class GuildOperations(GuildBase):
                 self.device.click(guild_assets.GUILD_DISPATCH_CLOSE)
                 continue
 
-            # 结束。
             if self.appear(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK):
                 break
 
     def _guild_operations_dispatch(self):
-        """
-        Run guild dispatch
-
-        Pages:
-            in: page_guild, guild operation, operation map (GUILD_OPERATIONS_ACTIVE_CHECK)
-            out: page_guild, guild operation, operation map (GUILD_OPERATIONS_ACTIVE_CHECK)
-        """
+        """在作战节点图完成全部可用派遣；未找到或重试耗尽返回 False。"""
         logger.hr("Guild dispatch")
         success = False
         for _ in reversed(range(2)):
@@ -543,17 +442,7 @@ class GuildOperations(GuildBase):
         return False
 
     def _guild_operations_boss_preparation(self, az, skip_first_screenshot=True):
-        """
-        Execute preparation sequence for guild raid boss
-
-        az is a GuildCombat instance to handle combat various
-        interfaces. Independently created to avoid conflicts
-        or override methods of parent/child objects
-
-        Pages:
-            in: GUILD_OPERATIONS_BOSS
-            out: IN_BATTLE
-        """
+        """从 Boss 页进入战斗；独立 GuildCombat 实例用于隔离继承方法冲突。"""
         is_loading = False
         dispatch_count = 0
         while 1:
@@ -594,7 +483,6 @@ class GuildOperations(GuildBase):
             if az.handle_combat_automation_confirm():
                 continue
 
-            # End
             pause = az.is_combat_executing()
             if pause:
                 logger.attr("BattleUI", pause)
@@ -602,14 +490,7 @@ class GuildOperations(GuildBase):
         return False
 
     def _guild_operations_boss_combat(self):
-        """
-        Execute combat sequence
-        If battle could not be prepared, exit
-
-        Pages:
-            in: GUILD_OPERATIONS_BOSS
-            out: GUILD_OPERATIONS_BOSS
-        """
+        """从 Boss 页执行战斗并返回；准备失败时返回 False。"""
         az = GuildCombat(self.config, device=self.device)
 
         if not self._guild_operations_boss_preparation(az):
@@ -620,10 +501,6 @@ class GuildOperations(GuildBase):
         return True
 
     def _guild_operations_boss_available(self):
-        """
-        Returns:
-            bool:
-        """
         appear = self.image_color_count(
             guild_assets.GUILD_BOSS_AVAILABLE, color=(140, 243, 99), threshold=221, count=10
         )
@@ -640,12 +517,11 @@ class GuildOperations(GuildBase):
         if not entered:
             logger.info(f"Guild operation run success: {entered}")
             return False
-        # 判断作战模式，目前有 3 种。
         operations_mode = self._guild_operations_get_mode()
 
-        # 按检测到的模式执行动作。
         result = True
         if operations_mode == 0:
+            # 没有进行中的作战时有意不执行后续动作。
             pass
         elif operations_mode == 1:
             self._guild_operations_dispatch()

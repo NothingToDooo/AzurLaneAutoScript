@@ -39,16 +39,7 @@ class HpDaemon(ModuleBase):
 
     @staticmethod
     def _calculate_hp(image, area, options=None, prev_color=(239, 32, 33)):
-        """
-        Args:
-            image:
-            area:
-            options:
-            prev_color:
-
-        Returns:
-            float: HP. 0 to 1.
-        """
+        """返回指定血条区域的剩余比例，范围为 0～1。"""
         if options is None:
             options = ColorBarOptions(starter=2)
         return color_bar_percentage(image, area, prev_color=prev_color, options=options)
@@ -58,12 +49,6 @@ class HpDaemon(ModuleBase):
         return ColorBarOptions(reverse=reverse, starter=2)
 
     def _show_hp(self, low_hp_time=0.0):
-        """
-        Examples:
-            [ 80% - 70%]
-            [ 80% - 70%]
-            [ 80% - 70%] - Low HP: 3.154s
-        """
         attacker_hp = str(int(self.attacker_hp * 100)).rjust(2, "0") + "%"
         defender_hp = str(int(self.defender_hp * 100)).rjust(2, "0") + "%"
         text = f"[{attacker_hp} - {defender_hp}]"
