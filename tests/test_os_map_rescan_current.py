@@ -1,7 +1,14 @@
 from contextlib import AbstractContextManager
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar, override
 
+from module.map_detection.os_grid import OSGrid, OSGridInfo
 from module.os.map import OSMap
+
+if TYPE_CHECKING:
+    from module.base.type_alias import Area, Point
+    from module.device.control import ButtonTarget
+    from module.map.utils import HasLocation
+    from module.map_detection.grid_info import GridInfo
 
 _T = TypeVar("_T")
 
@@ -34,9 +41,10 @@ class _Config:
         return _TemporaryConfig(self, kwargs)
 
 
-class _Grid:
+class _Grid(OSGridInfo):
     def __init__(self, event: str) -> None:
         self.event = event
+        self.location = (0, 0)
         for flag in _EVENT_FLAGS:
             setattr(self, flag, False)
         setattr(self, event, True)
@@ -44,12 +52,19 @@ class _Grid:
     def __repr__(self) -> str:
         return f"_Grid({self.event})"
 
+    @property
+    def button(self) -> Area:
+        return (0, 0, 1, 1)
 
-class _FleetLocation:
+
+class _FleetLocation(OSGrid):
     def __init__(self, distance: int) -> None:
         self.distance = distance
+        self.location = (0, 0)
 
-    def distance_to(self, _grid: _Grid) -> int:
+    @override
+    def distance_to(self, other: GridInfo) -> int:
+        del other
         return self.distance
 
     def __repr__(self) -> str:
@@ -58,9 +73,9 @@ class _FleetLocation:
 
 class _Device:
     def __init__(self) -> None:
-        self.clicks: list[object] = []
+        self.clicks: list[ButtonTarget] = []
 
-    def click(self, target: object) -> None:
+    def click(self, target: ButtonTarget) -> None:
         self.clicks.append(target)
 
 
@@ -123,11 +138,15 @@ class _MapRescan(OSMap):
         self.calls.append(("wait_until_walk_stable", kwargs))
         return self._next_result(self.wait_results, default="")
 
-    def convert_radar_to_local(self, location: tuple[int, int]) -> _FleetLocation:
+    @override
+    def convert_radar_to_local(self, location: HasLocation | str | Point) -> _FleetLocation:
+        assert isinstance(location, tuple)
         self.calls.append(("convert_radar_to_local", location))
         return _FleetLocation(self.fleet_distance)
 
-    def handle_akashi_supply_buy(self, grid: _Grid) -> None:
+    @override
+    def handle_akashi_supply_buy(self, grid: ButtonTarget) -> None:
+        assert isinstance(grid, _Grid)
         self.calls.append(("handle_akashi_supply_buy", grid))
 
     def os_auto_search_run(self, *_args: object, **_kwargs: object) -> int:

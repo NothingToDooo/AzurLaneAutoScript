@@ -1,12 +1,32 @@
-from typing import ClassVar, TypeVar
+from typing import TYPE_CHECKING, ClassVar, TypeVar, override
 
+import numpy as np
 import pytest
 
 from module.exception import GameStuckError
 from module.os import globe_camera as globe_camera_module
 from module.os.globe_camera import GlobeCamera
+from module.os.globe_zone import Zone
 
 _T = TypeVar("_T")
+
+if TYPE_CHECKING:
+    from module.base.button import Button
+    from module.base.type_alias import ImageArray, Point
+
+
+def _zone() -> Zone:
+    return Zone(
+        42,
+        {
+            "shape": "A1",
+            "hazard_level": 1,
+            "cn": "zone-42",
+            "area_pos": (0, 0),
+            "offset_pos": (0, 0),
+            "region": 1,
+        },
+    )
 
 
 def button_key(button: object) -> str:
@@ -38,28 +58,24 @@ class _Timer:
 
 class _Device:
     def __init__(self) -> None:
-        self.image = object()
+        self.image = np.zeros((2, 2, 3), dtype=np.uint8)
         self.screenshot_count = 0
-        self.clicks: list[object] = []
+        self.clicks: list[Button] = []
 
     def screenshot(self) -> None:
         self.screenshot_count += 1
 
-    def click(self, button: object) -> None:
+    def click(self, button: Button) -> None:
         self.clicks.append(button)
-
-
-class _Zone:
-    zone_id = 42
 
 
 class _Globe:
     center_loca = (12, 34)
 
     def __init__(self) -> None:
-        self.loaded_images: list[object] = []
+        self.loaded_images: list[ImageArray] = []
 
-    def load(self, image: object) -> None:
+    def load(self, image: ImageArray) -> None:
         self.loaded_images.append(image)
 
 
@@ -73,7 +89,7 @@ class _GlobeCamera(GlobeCamera):
         self.in_globe_results: list[bool] = []
         self.appear_then_click_results: dict[str, list[bool]] = {}
         self.appear_results: dict[str, list[bool]] = {}
-        self.map_event_results: list[bool] = []
+        self.map_event_results: list[str] = []
         self.popup_results: list[bool] = []
 
     def update_globe(self) -> None:
@@ -107,20 +123,22 @@ class _GlobeCamera(GlobeCamera):
     def interval_reset(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_reset", button_key(button)))
 
-    def handle_map_event(self) -> bool:
+    @override
+    def handle_map_event(self) -> str:
         self.calls.append(("handle_map_event",))
-        return self._next_result(self.map_event_results, default=False)
+        return self._next_result(self.map_event_results, default="")
 
     def handle_popup_confirm(self, name: str = "", *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 
-    def camera_to_zone(self, camera: object, region: int | None = None) -> _Zone:
+    @override
+    def camera_to_zone(self, camera: Point, region: int | None = None) -> Zone:
         if region is None:
             self.calls.append(("camera_to_zone", camera))
         else:
             self.calls.append(("camera_to_zone", camera, region))
-        return _Zone()
+        return _zone()
 
 
 @pytest.fixture(autouse=True)

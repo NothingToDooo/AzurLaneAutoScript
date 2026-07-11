@@ -1,12 +1,18 @@
 from typing import TYPE_CHECKING, ClassVar, override
 
+import numpy as np
+
+from module.base.timer import Timer
 from module.os import fleet as fleet_module
 from module.os.fleet import OSFleet
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     import pytest
 
     from module.base.button import Button, MatchOffset
+    from module.base.type_alias import ImageArray
 
 UNEXPECTED_GLOBE_RECOVERY_MESSAGE = "unexpected globe recovery"
 UNEXPECTED_STORAGE_RECOVERY_MESSAGE = "unexpected storage recovery"
@@ -14,17 +20,17 @@ UNEXPECTED_MISSION_RECOVERY_MESSAGE = "unexpected mission recovery"
 UNEXPECTED_ORDER_RECOVERY_MESSAGE = "unexpected order recovery"
 
 
-class _Timer:
+class _Timer(Timer):
     created: ClassVar[list[_Timer]] = []
 
     def __init__(self, *_args: object, reached_results: list[bool] | None = None, **_kwargs: object) -> None:
         self.reached_results = list(reached_results or [])
         self.reset_count = 0
-        self.started = False
+        self.has_started = False
         _Timer.created.append(self)
 
     def start(self) -> _Timer:
-        self.started = True
+        self.has_started = True
         return self
 
     def reset(self) -> _Timer:
@@ -39,6 +45,7 @@ class _Timer:
 
 class _Device:
     def __init__(self) -> None:
+        self.image = np.zeros((2, 2, 3), dtype=np.uint8)
         self.interval_values: list[float | None] = []
         self.sleep_values: list[float] = []
         self.click_record_clear_count = 0
@@ -95,10 +102,16 @@ class _WalkStableFleet(OSFleet):
             return results.pop(0)
         return default
 
-    def loop(self, *, skip_first: bool = True, timeout: float | _Timer | None = None, **_kwargs: object) -> range:
+    @override
+    def loop(
+        self,
+        *,
+        skip_first: bool = True,
+        timeout: float | Timer | None = None,
+    ) -> Iterator[ImageArray]:
         del timeout
         self.loop_skip_first_values.append(skip_first)
-        return range(self.loop_count)
+        return iter([self.device.image] * self.loop_count)
 
     def handle_map_event(self) -> str:
         return self._next_result(self.map_event_results, "")

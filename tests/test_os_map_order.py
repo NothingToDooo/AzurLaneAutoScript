@@ -1,19 +1,39 @@
-from typing import ClassVar, TypeVar
+from typing import TYPE_CHECKING, ClassVar, TypeVar, override
 
+import numpy as np
 import pytest
 
+from module.base.button import Button
+from module.os.globe_zone import Zone
 from module.os_handler import map_order as map_order_module
 from module.os_handler.map_order import MapOrderHandler
 
 _T = TypeVar("_T")
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
-class _Button:
-    name = "ORDER_TEST"
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
+    from module.os.globe_zone import ZoneName
 
 
-class _Zone:
-    pass
+_ORDER_BUTTON = Button(area=(), color=(), button=(), name="ORDER_TEST")
+_LOOP_IMAGE = np.zeros((2, 2, 3), dtype=np.uint8)
+
+
+def _zone(zone_id: int) -> Zone:
+    return Zone(
+        zone_id,
+        {
+            "shape": "A1",
+            "hazard_level": 1,
+            "cn": f"zone-{zone_id}",
+            "area_pos": (0, 0),
+            "offset_pos": (0, 0),
+            "region": 1,
+        },
+    )
 
 
 class _Timer:
@@ -47,14 +67,14 @@ class _MapOrder(MapOrderHandler):
         self.appear_results: list[bool] = []
         self.click_results: list[bool] = []
         self.popup_results: list[bool] = []
-        self.map_event_results: list[bool] = []
+        self.map_event_results: list[str] = []
         self.cat_attack_results: list[bool] = []
         self.action_point_results: list[bool] = []
         self.loop_count = 5
         self.enter_count = 0
         self.quit_count = 0
 
-    def execute(self, button: _Button) -> bool:
+    def execute(self, button: Button) -> bool:
         return self.order_execute(button)
 
     @staticmethod
@@ -63,8 +83,15 @@ class _MapOrder(MapOrderHandler):
             return results.pop(0)
         return default
 
-    def loop(self, *_args: object, **_kwargs: object) -> range:
-        return range(self.loop_count)
+    @override
+    def loop(
+        self,
+        *,
+        skip_first: bool = True,
+        timeout: float | Timer | None = None,
+    ) -> Iterator[ImageArray]:
+        del skip_first, timeout
+        return iter([_LOOP_IMAGE] * self.loop_count)
 
     def order_enter(self) -> None:
         self.calls.append(("order_enter",))
@@ -74,9 +101,11 @@ class _MapOrder(MapOrderHandler):
         self.calls.append(("order_quit",))
         self.quit_count += 1
 
-    def name_to_zone(self, name: int, *_args: object, **_kwargs: object) -> _Zone:
+    @override
+    def name_to_zone(self, name: ZoneName) -> Zone:
+        assert isinstance(name, int)
         self.calls.append(("name_to_zone", name))
-        return _Zone()
+        return _zone(name)
 
     def is_in_map(self) -> bool:
         self.calls.append(("is_in_map",))
@@ -98,9 +127,10 @@ class _MapOrder(MapOrderHandler):
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 
-    def handle_map_event(self) -> bool:
+    @override
+    def handle_map_event(self) -> str:
         self.calls.append(("handle_map_event",))
-        return self._next_result(self.map_event_results, default=False)
+        return self._next_result(self.map_event_results, default="")
 
     def handle_map_cat_attack(self) -> bool:
         self.calls.append(("handle_map_cat_attack",))
@@ -124,7 +154,7 @@ def test_order_execute_returns_true_after_map_is_stable() -> None:
     _Timer.reached_results = {1: [True]}
     order.in_map_results = [True]
 
-    result = order.execute(_Button())
+    result = order.execute(_ORDER_BUTTON)
 
     assert result is True
     assert order.enter_count == 1
@@ -137,7 +167,7 @@ def test_order_execute_quits_when_order_button_is_missing() -> None:
     order.in_order_results = [True]
     order.appear_results = [False]
 
-    result = order.execute(_Button())
+    result = order.execute(_ORDER_BUTTON)
 
     assert result is False
     assert order.quit_count == 1
@@ -150,7 +180,7 @@ def test_order_execute_reenters_after_action_point_handler() -> None:
     order.in_order_results = [False]
     order.action_point_results = [True]
 
-    result = order.execute(_Button())
+    result = order.execute(_ORDER_BUTTON)
 
     assert result is True
     assert order.enter_count == 2

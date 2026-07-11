@@ -1,13 +1,23 @@
-from typing import ClassVar, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Literal, TypeVar, override
 
+import numpy as np
 import pytest
 
+from module.base.button import Button
+from module.map.map_grids import SelectedGrids
 from module.os import fleet as fleet_module
 from module.os.fleet import BossFleet, OSFleet
+from module.os.radar import Radar, RadarGrid
 from module.os_combat import assets as os_combat_assets
 from module.ui.assets import BACK_ARROW
 
 _T = TypeVar("_T")
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
 
 
 def button_key(button: object) -> str:
@@ -34,23 +44,26 @@ class _Timer:
         return self
 
 
-class _Button:
-    name = "BOSS_LEAVE_TEST"
-
-
 class _Device:
     def __init__(self) -> None:
-        self.clicks: list[object] = []
+        self.image = np.zeros((2, 2, 3), dtype=np.uint8)
+        self.clicks: list[Button] = []
 
-    def click(self, button: object) -> None:
+    def click(self, button: Button) -> None:
         self.clicks.append(button)
 
 
-class _Radar:
+class _RadarGrid(RadarGrid):
+    def __init__(self) -> None:
+        pass
+
+
+class _Radar(Radar):
     def __init__(self, owner: _Fleet) -> None:
         self.owner = owner
 
-    def select(self, **kwargs: object) -> list[object]:
+    @override
+    def select(self, **kwargs: object) -> SelectedGrids[RadarGrid]:
         self.owner.calls.append(("radar_select", kwargs))
         if kwargs.get("is_enemy"):
             matched = self.owner.radar_enemy_results.pop(0) if self.owner.radar_enemy_results else False
@@ -58,7 +71,7 @@ class _Radar:
             matched = self.owner.radar_question_results.pop(0) if self.owner.radar_question_results else False
         else:
             matched = False
-        return [object()] if matched else []
+        return SelectedGrids([_RadarGrid()] if matched else [])
 
 
 class _Fleet(OSFleet):
@@ -66,19 +79,19 @@ class _Fleet(OSFleet):
 
     def __init__(self) -> None:
         self.device = _Device()
-        self.radar = _Radar(self)
+        self._radar = _Radar(self)
         self.calls: list[tuple[object, ...]] = []
         self.loop_count = 5
         self.in_map_results: list[bool] = []
         self.radar_enemy_results: list[bool] = []
         self.radar_question_results: list[bool] = []
         self.appear_results: dict[str, list[bool]] = {}
-        self.combat_executing_results: list[object | None] = []
+        self.combat_executing_results: list[Button | Literal[False]] = []
         self.combat_quit_results: list[bool] = []
         self.combat_quit_reconfirm_results: list[bool] = []
-        self.leave_button_results: list[object | None] = []
+        self.leave_button_results: list[Button | None] = []
         self.interval_resets: list[object] = []
-        self.fleet_filter_results: list[object] = []
+        self.fleet_filter_results: list[BossFleet | str] = []
         self.fleet_set_results: list[bool] = []
         self.low_resolve_results: list[bool] = []
         self.boss_goto_calls: list[dict[str, object]] = []
@@ -91,14 +104,26 @@ class _Fleet(OSFleet):
     def clear_boss(self, *, has_fleet_step: bool = True, is_month: bool = False) -> bool:
         return self.boss_clear(has_fleet_step=has_fleet_step, is_month=is_month)
 
+    @property
+    @override
+    def radar(self) -> _Radar:
+        return self._radar
+
     @staticmethod
     def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
-    def loop(self, *_args: object, **_kwargs: object) -> range:
-        return range(self.loop_count)
+    @override
+    def loop(
+        self,
+        *,
+        skip_first: bool = True,
+        timeout: float | Timer | None = None,
+    ) -> Iterator[ImageArray]:
+        del skip_first, timeout
+        return iter([self.device.image] * self.loop_count)
 
     def update_os(self) -> None:
         self.calls.append(("update_os",))
@@ -118,9 +143,10 @@ class _Fleet(OSFleet):
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def is_combat_executing(self) -> object | None:
+    @override
+    def is_combat_executing(self) -> Button | Literal[False]:
         self.calls.append(("is_combat_executing",))
-        return self._next_result(self.combat_executing_results, default=None)
+        return self._next_result(self.combat_executing_results, default=False)
 
     def interval_reset(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_reset", button))
@@ -134,23 +160,29 @@ class _Fleet(OSFleet):
         self.calls.append(("handle_combat_quit_reconfirm",))
         return self._next_result(self.combat_quit_reconfirm_results, default=False)
 
-    def get_boss_leave_button(self) -> object | None:
+    @override
+    def get_boss_leave_button(self) -> Button | None:
         self.calls.append(("get_boss_leave_button",))
         return self._next_result(self.leave_button_results, default=None)
 
-    def parse_fleet_filter(self) -> list[object]:
+    @override
+    def parse_fleet_filter(self) -> list[BossFleet | str]:
         self.calls.append(("parse_fleet_filter",))
         return self.fleet_filter_results
 
     def os_order_execute(self, *_args: object, **kwargs: object) -> None:
         self.calls.append(("os_order_execute", kwargs))
 
-    def fleet_set(self, index: int = 1, *_args: object, **_kwargs: object) -> bool:
+    @override
+    def fleet_set(self, index: int | None = None, *, skip_first_screenshot: bool = True) -> bool:
+        del skip_first_screenshot
         self.calls.append(("fleet_set", index))
         return self._next_result(self.fleet_set_results, default=True)
 
-    def handle_os_map_fleet_lock(self, *_args: object, **kwargs: object) -> None:
-        self.calls.append(("handle_os_map_fleet_lock", kwargs))
+    @override
+    def handle_os_map_fleet_lock(self, *, enable: bool | None = None) -> bool:
+        self.calls.append(("handle_os_map_fleet_lock", {"enable": enable}))
+        return False
 
     def fleet_low_resolve_appear(self) -> bool:
         self.calls.append(("fleet_low_resolve_appear",))
@@ -208,7 +240,7 @@ def test_boss_leave_backs_out_from_battle_preparation() -> None:
 
 def test_boss_leave_clicks_leave_button_until_boss_returns() -> None:
     fleet = _Fleet()
-    leave_button = _Button()
+    leave_button = Button(area=(), color=(), button=(), name="BOSS_LEAVE_TEST")
     fleet.in_map_results = [True, True, True]
     fleet.radar_enemy_results = [False, True]
     fleet.leave_button_results = [leave_button]

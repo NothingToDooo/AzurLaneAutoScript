@@ -2,8 +2,11 @@ from typing import TypedDict, Unpack
 
 import pytest
 
+from module.config.config import AzurLaneConfig
 from module.map_detection.os_grid import OSGridInfo
 from module.os.radar import RadarGrid
+
+_CONFIG = object.__new__(AzurLaneConfig)
 
 
 class _GridOverrides(TypedDict, total=False):
@@ -36,7 +39,7 @@ def _grid(**kwargs: Unpack[_GridOverrides]) -> OSGridInfo:
 
 
 def _radar_grid(**kwargs: Unpack[_RadarGridOverrides]) -> RadarGrid:
-    grid = RadarGrid(location=(1, 0), image=None, center=(0, 0), config=object())
+    grid = RadarGrid(location=(1, 0), image=None, center=(0, 0), config=_CONFIG)
     for key, value in kwargs.items():
         setattr(grid, key, value)
     return grid
@@ -64,7 +67,9 @@ def test_os_grid_info_merge_requires_normal_mode() -> None:
 )
 def test_os_grid_info_merge_sets_first_matching_marker(flag: str) -> None:
     grid = _grid()
-    assert grid.merge(_grid(**{flag: True})) is True
+    source = _grid()
+    setattr(source, flag, True)
+    assert grid.merge(source) is True
     assert getattr(grid, flag) is True
 
 
