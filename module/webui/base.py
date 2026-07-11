@@ -7,11 +7,8 @@ from module.webui.utils import Icon, WebIOTaskHandler, set_localstorage
 class Base:
     def __init__(self) -> None:
         self.alive = True
-        # Whether window is visible
         self.visible = True
-        # Device type
         self.is_mobile = info.user_agent.is_mobile
-        # Task handler
         self.task_handler = WebIOTaskHandler()
         defer_call(self.stop)
 
@@ -26,12 +23,7 @@ class Frame(Base):
         self.page = "Home"
 
     def init_aside(self, *, expand_menu: bool = True, name: str | None = None) -> None:
-        """
-        在侧边栏按钮回调中调用。
-        参数：
-            expand_menu：是否展开菜单。
-            name：需要高亮的按钮名称（标签）。
-        """
+        """切换侧边栏前清理菜单和待移除任务，并恢复展开与高亮状态。"""
         self.visible = True
         self.task_handler.remove_pending_task()
         clear("menu")
@@ -42,12 +34,7 @@ class Frame(Base):
             set_localstorage("aside", name)
 
     def init_menu(self, *, collapse_menu: bool = True, name: str | None = None) -> None:
-        """
-        在菜单按钮回调中调用。
-        参数：
-            collapse_menu：是否收起菜单。
-            name：需要高亮的按钮名称（标签）。
-        """
+        """切换菜单前清理内容和待移除任务，并更新页面与高亮状态。"""
         self.visible = True
         self.page = name
         self.task_handler.remove_pending_task()

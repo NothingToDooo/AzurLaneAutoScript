@@ -102,13 +102,10 @@ class AlasGUI(Frame):
 
     def __init__(self) -> None:
         super().__init__()
-        # 已修改的键，值来自 pin_wait_change()。
         self.modified_config_queue = queue.Queue()
-        # Alas 配置名。
         self.alas_name = ""
         self.alas_config = AzurLaneConfig("template")
         self.initial()
-        # 渲染状态缓存。
         self.rendered_cache = []
         self.inst_cache = []
         self.load_home = False
@@ -163,7 +160,6 @@ class AlasGUI(Frame):
             self.inst_cache = alas_instance()
         if flag:
             for index, inst in enumerate(self.inst_cache):
-                # 检查状态变化。
                 state = ProcessManager.get_manager(inst).state
                 if state != self.rendered_cache[index]:
                     self.rendered_cache[index] = update(inst, index)
@@ -181,15 +177,7 @@ class AlasGUI(Frame):
 
     @use_scope("header_status")
     def set_status(self, state: int) -> None:
-        """
-        Args:
-            state (int):
-                1：运行中。
-                2：未运行。
-                3：警告，异常停止。
-                0：隐藏。
-                -1：状态未变化。
-        """
+        """状态值：1 运行，2 未运行，3 异常停止，0 隐藏，-1 不更新。"""
         if state == -1:
             return
         clear()
@@ -209,9 +197,6 @@ class AlasGUI(Frame):
 
     @use_scope("menu", clear=True)
     def alas_set_menu(self) -> None:
-        """
-        设置菜单。
-        """
         put_buttons(
             [
                 {
@@ -266,9 +251,6 @@ class AlasGUI(Frame):
 
     @use_scope("content", clear=True)
     def alas_set_group(self, task: str) -> None:
-        """
-        根据字典设置参数组。
-        """
         self.init_menu(name=task)
         self.set_title(t(f"Task.{task}.name"))
 
@@ -785,7 +767,6 @@ class AlasGUI(Frame):
             ).style("text-align: center")
 
     def run(self) -> None:
-        # 设置 GUI。
         set_env(title="Alas", output_animation=False)
         add_css(filepath_css("alas"))
         if self.is_mobile:
@@ -820,10 +801,8 @@ class AlasGUI(Frame):
         aside = get_localstorage("aside")
         self.show()
 
-        # 初始化配置监听器。
         self._init_alas_config_watcher()
 
-        # 保存配置。
         save_config_thread = threading.Thread(target=self._alas_thread_update_config)
         register_thread(save_config_thread)
         save_config_thread.start()
@@ -855,7 +834,6 @@ class AlasGUI(Frame):
         self.task_handler.add(visibility_state_switch.g(), 15)
         self.task_handler.start()
 
-        # 返回上一次打开的页面。
         if aside not in ["Home", None]:
             self.ui_alas(aside)
 
@@ -991,9 +969,7 @@ def startup():
 
 
 def clearup():
-    """
-    注意：必须在 uvicorn 重新加载 app 前执行。
-    """
+    """必须在 uvicorn 重新加载 app 前执行。"""
     logger.info("Start clearup")
     ProcessManager.stop_all()
     State.clearup()
@@ -1012,7 +988,6 @@ def app():
     )
     args, _ = parser.parse_known_args()
 
-    # 应用启动参数。
     AlasGUI.set_theme()
     key = args.key
     instances = args.run or []

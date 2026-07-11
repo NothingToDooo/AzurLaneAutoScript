@@ -89,15 +89,7 @@ class OSGridInfo(GridInfo):
         return "--"
 
     def merge(self, info, mode="normal"):
-        """把大型作战地图或雷达识别结果合并到当前格子。
-
-        Args:
-            info (OSGridInfo, RadarGrid):
-            mode (str): 大型作战只支持 'normal'。
-
-        Returns:
-            bool: 是否合并成功。
-        """
+        """合并大型作战地图或雷达结果；仅支持 normal 模式。"""
         if mode != "normal":
             message = f"{NORMAL_SCAN_MODE_ONLY_MESSAGE}: {mode}"
             raise ValueError(message)
@@ -136,9 +128,7 @@ class OSGridInfo(GridInfo):
         return True
 
     def wipe_out(self):
-        """
-        Call this method when a fleet step on grid.
-        """
+        """舰队踏入格子后清除大型作战动态目标状态。"""
         super().wipe_out()
 
         self.is_enemy = False
@@ -152,9 +142,7 @@ class OSGridInfo(GridInfo):
         self.is_fleet_mechanism = False
 
     def reset(self):
-        """
-        Call this method after entering a map.
-        """
+        """进入地图后重置雷达与友军临时状态。"""
         super().reset()
 
         self.is_radar_scanned = False
@@ -225,12 +213,7 @@ class OSGridPredictor(GridPredictor):
         return None
 
     def predict_enemy_scale(self):
-        """
-        Detect the icon on the upper-left which shows enemy scale: Large, Middle, Small.
-
-        Returns:
-            int: 1: Small, 2: Middle, 3: Large, 0: Unknown.
-        """
+        """返回敌舰规模：2 中型，3 大型，0 未知；1 已禁用。"""
         point = (-0.385, 0.815)
         size = (0.53, 0.53)
         image = self.relative_crop((point[0] - size[0], point[1] - size[1], point[0], point[1]), shape=(50, 50))
@@ -272,7 +255,6 @@ class OSGridPredictor(GridPredictor):
         )
 
     def predict_fleet_mechanism(self):
-        # 取得上边框。
         area = self.grid2screen(np.array([(0, 0), (1, 0.2)]))
         area = np.rint(area.flatten()).astype(int).tolist()
         # 颜色应该是青色。
@@ -283,7 +265,6 @@ class OSGridPredictor(GridPredictor):
         lower = (h[0] / 2, s[0] * 2.55, v[0] * 2.55)
         upper = (h[1] / 2 + 1, s[1] * 2.55 + 1, v[1] * 2.55 + 1)
         image = cv2.inRange(image, lower, upper)
-        # 压平成水平线。
         line = np.max(image, axis=0)
         # 线条应该连续；如果不连续，可能有舰队站在上面。
         if np.mean(line) < 180:

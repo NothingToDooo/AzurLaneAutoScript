@@ -15,10 +15,6 @@ type DetectionBackend = Homography | Perspective
 
 
 class MapDetector:
-    """
-    Map detector wrapper
-    """
-
     image: np.ndarray
     config: AzurLaneConfig
 
@@ -31,18 +27,11 @@ class MapDetector:
     generate: Callable[..., Iterable[tuple[tuple[int, int], Any]]]
 
     def __init__(self, config):
-        """
-        Args:
-            config (AzurLaneConfig):
-        """
         self.config = config
         self.detector_set_backend()
 
     def detector_set_backend(self, name=""):
-        """
-        Args:
-            name (str): 'homography' or 'perspective'
-        """
+        """name 应为 `homography` 或 `perspective`；空值读取配置。"""
         if not name:
             name = self.config.DETECTION_BACKEND
 
@@ -52,10 +41,7 @@ class MapDetector:
             self.backend = Perspective(config=self.config)
 
     def load(self, image):
-        """
-        Args:
-            image: Shape (720, 1280, 3)
-        """
+        """加载 (720, 1280, 3) 截图。"""
         self.backend.load(image)
 
         self.left_edge = bool(self.backend.left_edge)

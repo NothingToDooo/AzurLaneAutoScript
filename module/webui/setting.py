@@ -10,19 +10,8 @@ if TYPE_CHECKING:
 
 
 class cached_class_property[T]:
-    """
-    Code from https://github.com/dssg/dickens
-    Add typing support
-
-    Descriptor decorator implementing a class-level, read-only
-    property, which caches its results on the class(es) on which it
-    operates.
-    Inheritance is supported, insofar as the descriptor is never hidden
-    by its cache; rather, it stores values under its access name with
-    added underscores. For example, when wrapping getters named
-    "choices", "choices_" or "_choices", each class's result is stored
-    on the class at "_choices_"; decoration of a getter named
-    "_choices_" would raise an exception.
+    """类级只读缓存属性，缓存写入实际访问类并支持继承。
+    改写自 https://github.com/dssg/dickens，并补充类型标注。
     """
 
     class AliasConflict(ValueError):
@@ -48,10 +37,6 @@ class cached_class_property[T]:
 
 
 class State:
-    """
-    Shared settings
-    """
-
     _init = False
     _clearup = False
 
@@ -70,16 +55,8 @@ class State:
 
     @cached_class_property
     def webui_config(cls) -> WebUIConfig:
-        """
-        Returns:
-            WebUIConfig：
-        """
         return WebUIConfig()
 
     @cached_class_property
     def config_updater(cls) -> ConfigUpdater:
-        """
-        Returns:
-            ConfigUpdater：
-        """
         return ConfigUpdater()

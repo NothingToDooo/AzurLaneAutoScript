@@ -50,15 +50,6 @@ class Benchmark(DaemonBase, CampaignUI):
     TEST_BEST = int(TEST_TOTAL * 0.8)
 
     def benchmark_test(self, func, *args, **kwargs):
-        """
-        Args:
-            func: Function to test.
-            *args: Passes to func.
-            **kwargs: Passes to func.
-
-        Returns:
-            float: Time cost on average.
-        """
         logger.hr("Benchmark test", level=2)
         logger.info(f"Testing function: {func.__name__}")
         record = []
@@ -92,13 +83,6 @@ class Benchmark(DaemonBase, CampaignUI):
 
     @staticmethod
     def show(test, data, evaluate_func):
-        """
-        +--------------+--------+--------+
-        |  Screenshot  |  time  | Speed  |
-        +--------------+--------+--------+
-        |   nemu_ipc   | 0.019s |  Fast  |
-        +--------------+--------+--------+
-        """
         table = Table(show_lines=True)
         table.add_column(test, header_style="bright_cyan", style="cyan", no_wrap=True)
         table.add_column("Time", style="magenta")
@@ -128,7 +112,7 @@ class Benchmark(DaemonBase, CampaignUI):
             result = self.benchmark_test(screenshot_methods[method])
             screenshot_result.append([method, result])
 
-        area = (124, 4, 649, 106)  # Somewhere safe to click.
+        area = (124, 4, 649, 106)  # 避开危险操作的点击区域。
         click_result = []
         for method in click:
             x, y = random_rectangle_point(area)

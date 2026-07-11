@@ -7,17 +7,10 @@ dic_lang: dict[str, str] = {}
 
 
 def t(s, *args, **kwargs):
-    """
-    Get translation.
-    other args, kwargs pass to .format()
-    """
     return _t(s).format(*args, **kwargs)
 
 
 def _t(s):
-    """
-    Get translation.
-    """
     try:
         return dic_lang[s]
     except KeyError:

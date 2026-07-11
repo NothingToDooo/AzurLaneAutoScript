@@ -215,69 +215,30 @@ class Lines:
 
 
 def area2corner(area):
-    """
-    Args:
-        area: (x1, y1, x2, y2)
-
-    Returns:
-        np.ndarray: [upper-left, upper-right, bottom-left, bottom-right]
-    """
+    """把 (x1, y1, x2, y2) 转为 [左上, 右上, 左下, 右下]。"""
     return np.array([[area[0], area[1]], [area[2], area[1]], [area[0], area[3]], [area[2], area[3]]])
 
 
 def corner2area(corner):
-    """
-    Args:
-        corner: [upper-left, upper-right, bottom-left, bottom-right]
-
-    Returns:
-        np.ndarray: (x1, y1, x2, y2)
-    """
+    """把四角坐标转为外接区域 (x1, y1, x2, y2)。"""
     x, y = np.array(corner).T
     return np.rint([np.min(x), np.min(y), np.max(x), np.max(y)]).astype(int)
 
 
 def corner2inner(corner):
-    """
-    The largest rectangle inscribed in trapezoid.
-
-    Args:
-        corner: ((x0, y0), (x1, y1), (x2, y2), (x3, y3))
-
-    Returns:
-        tuple[int]: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-    """
+    """返回四角梯形的最大内接矩形 (x1, y1, x2, y2)。"""
     x0, y0, x1, y1, x2, y2, x3, y3 = np.array(corner).flatten()
     return tuple(np.rint((max(x0, x2), max(y0, y1), min(x1, x3), min(y2, y3))).astype(int))
 
 
 def corner2outer(corner):
-    """
-    The smallest rectangle circumscribed by the trapezoid.
-
-    Args:
-        corner: ((x0, y0), (x1, y1), (x2, y2), (x3, y3))
-
-    Returns:
-        tuple[int]: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-    """
+    """返回四角梯形的最小外接矩形 (x1, y1, x2, y2)。"""
     x0, y0, x1, y1, x2, y2, x3, y3 = np.array(corner).flatten()
     return tuple(np.rint((min(x0, x2), min(y0, y1), max(x1, x3), max(y2, y3))).astype(int))
 
 
 def trapezoid2area(corner, pad=0):
-    """
-    Convert corners of a trapezoid to area.
-
-    Args:
-        corner: ((x0, y0), (x1, y1), (x2, y2), (x3, y3))
-        pad (int):
-            Positive value for inscribed area.
-            Negative value and 0 for circumscribed area.
-
-    Returns:
-        tuple[int]: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-    """
+    """把四角梯形转为矩形区域；pad>0 取内接，pad<0 取外接。"""
     if pad > 0:
         return area_pad(corner2inner(corner), pad=pad)
     if pad < 0:
@@ -286,14 +247,7 @@ def trapezoid2area(corner, pad=0):
 
 
 def points_to_area_generator(points, shape):
-    """
-    Args:
-        points (np.ndarray): N x 2 array.
-        shape (tuple): (x, y).
-
-    Yields:
-        tuple, np.ndarray: (x, y), [upper-left, upper-right, bottom-left, bottom-right]
-    """
+    """从 shape=(x, y) 的点阵逐格产出 ((x, y), [左上, 右上, 左下, 右下])。"""
     points = points.reshape(*shape[::-1], 2)
     for y in range(shape[1] - 1):
         for x in range(shape[0] - 1):
@@ -302,13 +256,7 @@ def points_to_area_generator(points, shape):
 
 
 def get_map_inner(points):
-    """
-    Args:
-        points (np.ndarray): N x 2 array.
-
-    Yields:
-        np.ndarray: (x, y).
-    """
+    """返回 (n, 2) 点集的平均坐标。"""
     points = np.array(points)
     if len(points.shape) == 1:
         points = np.array([points])
@@ -317,14 +265,7 @@ def get_map_inner(points):
 
 
 def separate_edges(edges, inner):
-    """
-    Args:
-        edges: A iterate object which contains float ot integer.
-        inner (float, int): A inner point to separate edges.
-
-    Returns:
-        float, float: Lower edge and upper edge. if not found, return None
-    """
+    """以 inner 拆分边缘，返回 (下界, 上界)，缺失一侧时为 None。"""
     if len(edges) == 0:
         return None, None
     if len(edges) == 1:
@@ -338,14 +279,8 @@ def separate_edges(edges, inner):
 
 
 def perspective_transform(points, data):
-    """
-    Args:
-        points: A 2D array with shape (n, 2)
-        data: Perspective data, a 2D array with shape (3, 3),
-            see https://web.archive.org/web/20150222120106/xenia.media.mit.edu/~cwren/interpolator/
-
-    Returns:
-        np.ndarray: 2D array with shape (n, 2)
+    """用 (3, 3) 透视矩阵变换 (n, 2) 点集，并返回 (n, 2)。
+    公式参考 https://web.archive.org/web/20150222120106/xenia.media.mit.edu/~cwren/interpolator/。
     """
     points = np.pad(np.array(points), ((0, 0), (0, 1)), mode="constant", constant_values=1)
     matrix = data.dot(points.T)
@@ -354,18 +289,8 @@ def perspective_transform(points, data):
 
 
 def fit_points(points, mod, encourage=1):
-    """
-    Get a closet point in a group of points with common difference.
-    Will ignore points in the distance.
-
-    Args:
-        points: Points on image, a 2D array with shape (n, 2)
-        mod: Common difference of points, (x, y).
-        encourage (int, float): Describe how close to fit a group of points, in pixel.
-            Smaller means closer to local minimum, larger means closer to global minimum.
-
-    Returns:
-        np.ndarray: (x, y)
+    """在 (n, 2) 点集中拟合间距为 mod 的格点原点，并忽略远点。
+    encourage 单位为像素；越小越偏向局部最小值，越大越偏向全局最小值。
     """
     encourage = np.square(encourage)
     mod = np.array(mod)

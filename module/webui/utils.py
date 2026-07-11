@@ -121,23 +121,14 @@ class Task:
 
 class TaskHandler:
     def __init__(self) -> None:
-        # List of background running task
         self.tasks: list[Task] = []
-        # List of task name to be removed
         self.pending_remove_tasks: list[Task] = []
-        # Running task
         self._task = None
-        # Task running thread
         self._thread: threading.Thread | None = None
         self._alive = False
         self._lock = threading.Lock()
 
     def add(self, func, delay: float, *, pending_delete: bool = False) -> None:
-        """
-        Add a task running background.
-        Another way of `self.add_task()`.
-        func: Callable or Generator
-        """
         if isinstance(func, Callable):
             g = get_generator(func)
         elif isinstance(func, Generator):
@@ -145,9 +136,6 @@ class TaskHandler:
         self.add_task(Task(g, delay), pending_delete=pending_delete)
 
     def add_task(self, task: Task, *, pending_delete: bool = False) -> None:
-        """
-        Add a task running background.
-        """
         if task in self.tasks:
             logger.warning(f"Task {task} already in tasks list.")
             return
@@ -165,14 +153,7 @@ class TaskHandler:
             logger.warning(f"Failed to remove task {task}. Current tasks list: {self.tasks}")
 
     def remove_task(self, task: Task, *, nowait: bool = False) -> None:
-        """
-        Remove a task in `self.tasks`.
-
-        Args:
-            task:
-            nowait: if True, remove it right now,
-                    otherwise remove when call `self.remove_pending_task`
-        """
+        """默认延迟删除；nowait=True 时立即从任务列表移除。"""
         if nowait:
             with self._lock:
                 self._remove_task(task)
@@ -180,9 +161,6 @@ class TaskHandler:
             self.pending_remove_tasks.append(task)
 
     def remove_pending_task(self) -> None:
-        """
-        Remove all pending remove tasks.
-        """
         with self._lock:
             for task in self.pending_remove_tasks:
                 self._remove_task(task)
@@ -204,11 +182,7 @@ class TaskHandler:
             return None
 
     def loop(self) -> None:
-        """
-        启动后台任务循环。
-
-        这个方法应该在独立线程里运行。
-        """
+        """在独立线程中运行后台任务调度循环。"""
         self._alive = True
         while self._alive:
             if self.tasks:
@@ -243,9 +217,6 @@ class TaskHandler:
         return threading.Thread(target=self.loop, daemon=True)
 
     def start(self) -> None:
-        """
-        Start task handler.
-        """
         logger.info("Start task handler")
         if self._thread is not None and self._thread.is_alive():
             logger.warning("Task handler already running!")
@@ -275,36 +246,8 @@ class WebIOTaskHandler(TaskHandler):
 
 class Switch:
     def __init__(self, status, get_state, name=None):
-        """
-        Args:
-            status
-                (dict):A dict describes each state.
-                    {
-                        0: {
-                            'func': (Callable)
-                        },
-                        1: {
-                            'func'
-                            'args': (Optional, tuple)
-                            'kwargs': (Optional, dict)
-                        },
-                        2: [
-                            func1,
-                            {
-                                'func': func2
-                                'args': args2
-                            }
-                        ]
-                        -1: []
-                    }
-                (Callable):current state will pass into this function
-                    lambda state: do_update(state=state)
-            get_state:
-                (Callable):
-                    return current state
-                (Generator):
-                    yield current state, do nothing when state not in status
-            name:
+        """status 可为状态回调，或状态到回调／任务字典列表的映射。
+        get_state 可为返回当前状态的回调或逐次产出状态的生成器。
         """
         self._lock = threading.Lock()
         self.name = name
@@ -320,10 +263,7 @@ class Switch:
         pass
 
     def _get_state(self):
-        """
-        Predefined generator when `get_state` is an callable
-        Customize it if you have multiple criteria on state
-        """
+        """仅在回调结果变化时产出新状态，否则产出 -1。"""
         previous_status = self.get_state()
         yield previous_status
         while True:
@@ -386,10 +326,6 @@ def _read(path):
 
 
 class Icon:
-    """
-    Storage html of icon.
-    """
-
     ALAS = _read(filepath_icon("alas"))
     SETTING = _read(filepath_icon("setting"))
     RUN = _read(filepath_icon("run"))
@@ -428,9 +364,7 @@ def parse_pin_value(val, valuetype: str | None = None):
 
 
 def to_pin_value(val):
-    """
-    Convert bool to checkbox
-    """
+    """把 bool 转为 PyWebIO checkbox 使用的列表值。"""
     if val is True:
         return [True]
     if val is False:
@@ -471,7 +405,6 @@ def re_fullmatch(pattern, string):
             return False
         else:
             return True
-    # elif:
     return re.fullmatch(pattern=pattern, string=string)
 
 
@@ -507,7 +440,7 @@ def on_task_exception(self):
         )
 
 
-# 猴子补丁。
+# 将 WebUI 异常统一交给富文本弹窗处理。
 pywebio.session.base.Session.on_task_exception = on_task_exception
 
 

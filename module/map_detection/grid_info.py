@@ -24,26 +24,7 @@ _SECONDARY_GRID_CODES = {
 
 
 class GridInfo:
-    """
-    Class that gather basic information of a grid in map_v1.
-
-    Visit 碧蓝航线WIKI(Chinese Simplified) http://wiki.biligame.com/blhx, to get basic info of a map_v1.
-    For example, visit http://wiki.biligame.com/blhx/7-2, to know more about campaign 7-2,
-    which includes boss point, enemy spawn point.
-
-    A grid contains these unchangeable properties which can known from WIKI.
-    | print_name | property_name            | description             |
-    |------------|--------------------------|-------------------------|
-    | ++         | is_land                  | fleet can't go to land  |
-    | --         | is_sea                   | sea                     |
-    | __         | is_submarine_spawn_point | submarine spawn point   |
-    | SP         | is_spawn_point           | fleet may spawns here   |
-    | ME         | may_enemy                | enemy may spawns here   |
-    | MB         | may_boss                 | boss may spawns here    |
-    | MM         | may_mystery              | mystery may spawns here |
-    | MA         | may_ammo                 | fleet can get ammo here |
-    | MS         | may_siren                | Siren/Elite enemy spawn |
-    """
+    """汇总普通地图单格的静态地图属性与动态识别状态。"""
 
     is_os = False
 
@@ -192,15 +173,7 @@ class GridInfo:
         return self.cost < 20
 
     def merge(self, info, mode="normal"):
-        """把一次识别结果合并到当前网格状态。
-
-        Args:
-            info (GridInfo):
-            mode (str): 扫描模式，如 'init'、'normal'、'carrier'、'movable'。
-
-        Returns:
-            bool: 是否合并成功。
-        """
+        """按 init、normal、carrier 或 movable 模式合并识别结果。"""
         self._merge_submarine(info)
 
         result = self._merge_caught_by_siren(info)
@@ -348,9 +321,7 @@ class GridInfo:
         return True
 
     def wipe_out(self):
-        """
-        Call this method when a fleet step on grid.
-        """
+        """舰队踏入格子后清除该格的动态目标状态。"""
         self.is_enemy = False
         self.enemy_scale = 0
         self.enemy_genre = None
@@ -372,9 +343,7 @@ class GridInfo:
             mechanism_block.set(is_mechanism_block=False)
 
     def reset(self):
-        """
-        Call this method after entering a map.
-        """
+        """进入地图后重置该格的临时状态。"""
         self.wipe_out()
         self.is_fleet = False
         self.is_current_fleet = False
@@ -387,11 +356,7 @@ class GridInfo:
         self.may_bouncing_enemy = False
 
     def covered_grid(self):
-        """Relative coordinate of the covered grid.
-
-        Returns:
-            list[tuple]:
-        """
+        """返回被大型对象覆盖格子的相对坐标列表。"""
         if self.is_current_fleet:
             return [(0, -1), (0, -2)]
         if self.is_fleet or self.is_siren or self.is_mystery:
@@ -400,13 +365,7 @@ class GridInfo:
         return []
 
     def distance_to(self, other):
-        """
-        Args:
-            other (GridInfo):
-
-        Returns:
-            int: Manhattan distance
-        """
+        """返回与另一格的曼哈顿距离。"""
         l1 = self.location
         l2 = other.location
         if l1 is None or l2 is None:

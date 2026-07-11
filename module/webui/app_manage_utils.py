@@ -2,9 +2,6 @@ from pathlib import Path
 
 
 def parse_import_config_name(file_name: str) -> str:
-    """
-    从导入文件名解析配置名。
-    """
     return Path(file_name).stem
 
 

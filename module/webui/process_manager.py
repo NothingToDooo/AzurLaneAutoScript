@@ -119,16 +119,12 @@ class ProcessManager:
 
     @classmethod
     def get_manager(cls, config_name: str) -> ProcessManager:
-        """
-        Create a new alas if not exists.
-        """
         if config_name not in cls._processes:
             cls._processes[config_name] = ProcessManager(config_name)
         return cls._processes[config_name]
 
     @staticmethod
     def run_process(config_name, func: str, q: queue.Queue, stop_event: StopEvent | None = None) -> None:
-        # 初始化子进程 logger。
         set_file_logger(name=config_name)
         set_func_logger(func=q.put)
 
@@ -137,7 +133,6 @@ class ProcessManager:
 
         AzurLaneConfig.stop_event = stop_event
         try:
-            # 运行指定入口。
             if func == "alas":
                 if stop_event is not None:
                     AzurLaneAutoScript.stop_event = stop_event
@@ -167,9 +162,6 @@ class ProcessManager:
         instances: Sequence[ProcessManager | str] | None = None,
         ev: StopEvent | None = None,
     ) -> None:
-        """
-        Start configured alas instances when the web service starts.
-        """
         logger.hr("Restart alas")
 
         if instances is None:
