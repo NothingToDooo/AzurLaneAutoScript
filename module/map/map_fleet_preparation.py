@@ -43,7 +43,7 @@ class FleetOperator:
 
     OFFSET = (-20, -80, 20, 5)
 
-    def __init__(self, assets: FleetOperatorAssets, main: FleetPreparation) -> None:
+    def __init__(self, assets: FleetOperatorAssets, main: InfoHandler) -> None:
         self._choose = assets.choose
         self._advice = assets.advice
         self._bar = assets.bar

@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from module.base.timer import Timer
 from module.base.utils import random_rectangle_vector
 from module.config.config import TaskEnd
@@ -9,9 +11,12 @@ from module.logger import logger
 from module.ui.page import page_campaign_menu, page_hospital
 from module.ui.switch import Switch
 
+if TYPE_CHECKING:
+    from module.base.base import ModuleBase
+
 
 class HospitalSwitch(Switch):
-    def get(self, main):
+    def get(self, main: ModuleBase) -> str:
         """返回当前页签状态；无法识别时返回 unknown。"""
         for data in self.state_list:
             if main.image_color_count(data["check_button"], color=(33, 77, 189), threshold=221, count=100):
@@ -26,18 +31,18 @@ HOSPITAL_TAB.add_state("CHARACTER", check_button=hospital_assets.TAB_CHARACTER)
 
 
 class Hospital(HospitalClue, HospitalCombat):
-    def daily_red_dot_appear(self):
+    def daily_red_dot_appear(self) -> bool:
         return self.image_color_count(hospital_assets.DAILY_RED_DOT, color=(189, 69, 66), threshold=221, count=35)
 
-    def daily_reward_receive_appear(self):
+    def daily_reward_receive_appear(self) -> bool:
         return self.image_color_count(
             hospital_assets.DAILY_REWARD_RECEIVE, color=(41, 73, 198), threshold=221, count=200
         )
 
-    def is_in_daily_reward(self, interval=0):
+    def is_in_daily_reward(self, interval: float = 0) -> bool:
         return self.match_template_color(hospital_assets.HOSIPITAL_CLUE_CHECK, offset=(30, 30), interval=interval)
 
-    def daily_reward_receive(self):
+    def daily_reward_receive(self) -> bool:
         """在医院主页领取每日奖励并返回是否成功，结束后仍在医院主页。"""
         if not self._daily_reward_available():
             return False
@@ -48,7 +53,7 @@ class Hospital(HospitalClue, HospitalCombat):
         self._exit_daily_reward()
         return True
 
-    def _daily_reward_available(self):
+    def _daily_reward_available(self) -> bool:
         if self.daily_red_dot_appear():
             logger.info("Daily red dot appear")
             return True
@@ -113,7 +118,7 @@ class Hospital(HospitalClue, HospitalCombat):
                 logger.info(f"is_in_daily_reward -> {hospital_assets.HOSIPITAL_CLUE_CHECK}")
                 continue
 
-    def loop_invest(self):
+    def loop_invest(self) -> None:
         """强制舰队 1 出战并完成当前调查后领取奖励。
 
         情绪检查可能抛出 ScriptEnd；任务切换会触发 TaskEnd。战斗后侧栏重置，因此单轮退出。
@@ -141,7 +146,7 @@ class Hospital(HospitalClue, HospitalCombat):
             hospital_assets.INVEST_REWARD_RECEIVE, color=(33, 77, 189), threshold=221, count=100
         )
 
-    def claim_invest_reward(self):
+    def claim_invest_reward(self) -> bool:
         """在线索页领取调查奖励，并返回是否成功。"""
         if self.invest_reward_appear():
             logger.info("Invest reward appear")
@@ -167,7 +172,7 @@ class Hospital(HospitalClue, HospitalCombat):
                 continue
         return False
 
-    def loop_aside(self):
+    def loop_aside(self) -> None:
         """依次清理地点、角色首屏和角色后续页。"""
         while 1:
             logger.hr("Loop hospital aside", level=1)
@@ -196,7 +201,7 @@ class Hospital(HospitalClue, HospitalCombat):
 
         logger.info("Loop hospital aside end")
 
-    def aside_swipe_down(self, skip_first_screenshot=True):
+    def aside_swipe_down(self, *, skip_first_screenshot: bool = True) -> None:
         logger.info("Aside swipe down")
         swiped = False
         interval = Timer(2, count=6)
@@ -220,7 +225,7 @@ class Hospital(HospitalClue, HospitalCombat):
                 swiped = True
                 continue
 
-    def run(self):
+    def run(self) -> None:
         """从任意页面执行医院活动；OilExhausted 延迟重试，ScriptEnd 正常结束，TaskEnd 重新抛出。"""
         if self.event_time_limit_triggered():
             self.config.task_stop()

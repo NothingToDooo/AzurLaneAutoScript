@@ -1,3 +1,6 @@
+from collections.abc import Callable
+from typing import Literal
+
 import numpy as np
 
 from module.base.button import Button
@@ -15,6 +18,8 @@ from module.map.assets import MAP_OFFENSIVE
 from module.retire.retirement import Retirement
 from module.template.assets import TEMPLATE_COMBAT_LOADING
 from module.ui.assets import BACK_ARROW, EXERCISE_CHECK, MUNITIONS_CHECK
+
+type CombatEnd = Literal["in_stage", "with_searching", "no_searching", "in_ui"] | Callable[[], bool]
 
 # 自动战斗暂停按钮皮肤很多，顺序很重要：相似皮肤先用颜色匹配，PAUSE_Star 必须早于 PAUSE_Nurse。
 _COMBAT_EXECUTING_BUTTONS = (
@@ -178,7 +183,14 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             or self.handle_story_skip()
         )
 
-    def combat_preparation(self, balance_hp=False, emotion_reduce=False, auto="combat_auto", fleet_index=1):
+    def combat_preparation(
+        self,
+        *,
+        balance_hp: bool = False,
+        emotion_reduce: bool = False,
+        auto: str = "combat_auto",
+        fleet_index: int = 1,
+    ) -> None:
         logger.info("Combat preparation.")
         self.device.stuck_record_clear()
         self.device.click_record_clear()
@@ -467,12 +479,13 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
     def combat(
         self,
-        balance_hp=None,
-        emotion_reduce=None,
-        submarine_mode=None,
-        expected_end=None,
-        fleet_index=1,
-    ):
+        *,
+        balance_hp: bool | None = None,
+        emotion_reduce: bool | None = None,
+        submarine_mode: str | None = None,
+        expected_end: CombatEnd | None = None,
+        fleet_index: int = 1,
+    ) -> None:
         """执行战斗；None 参数回退用户配置，fleet_index 为 1 或 2。
 
         submarine_mode 接受 do_not_use、hunt_only、every_combat；expected_end 的值域同 combat_status。

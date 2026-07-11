@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from module.base.decorator import run_once
 from module.base.timer import Timer
 from module.campaign.campaign_event import CampaignEvent
@@ -18,9 +20,12 @@ from module.map.assets import (
 from module.map.map_fleet_preparation import FleetOperator, FleetOperatorAssets
 from module.raid.assets import RAID_FLEET_PREPARATION
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 
 class HospitalCombat(Combat, HospitalUI, CampaignEvent):
-    def handle_fleet_recommend(self, recommend=True):
+    def handle_fleet_recommend(self, *, recommend: bool = True) -> bool:
         fleet_1 = FleetOperator(
             assets=FleetOperatorAssets(
                 choose=FLEET_1_CHOOSE,
@@ -44,7 +49,13 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
         )
         raise RequestHumanTakeover
 
-    def _handle_hospital_preparation_page(self, *, auto, check_oil, check_coin):
+    def _handle_hospital_preparation_page(
+        self,
+        *,
+        auto: str,
+        check_oil: Callable[[], object],
+        check_coin: Callable[[], object],
+    ) -> bool:
         if not self.appear(BATTLE_PREPARATION, offset=(30, 20)):
             return False
         if self.handle_combat_automation_set(auto=auto == "combat_auto"):
@@ -53,7 +64,7 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
         check_coin()
         return False
 
-    def _handle_hospital_preparation_actions(self):
+    def _handle_hospital_preparation_actions(self) -> bool:
         return (
             self.handle_retirement()
             or self.handle_combat_low_emotion()
@@ -62,7 +73,7 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
             or self.handle_story_skip()
         )
 
-    def _handle_hospital_fleet_preparation(self):
+    def _handle_hospital_fleet_preparation(self) -> bool:
         if self.appear(RAID_FLEET_PREPARATION, offset=(30, 30), interval=2):
             if self.handle_fleet_recommend(recommend=self.config.Hospital_UseRecommendFleet):
                 self.interval_clear(RAID_FLEET_PREPARATION)
@@ -71,7 +82,12 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
             return True
         return self.appear_then_click(HOSPITAL_BATTLE_PREPARE, offset=(20, 20), interval=2)
 
-    def _finish_hospital_preparation_if_combat_started(self, *, emotion_reduce, fleet_index):
+    def _finish_hospital_preparation_if_combat_started(
+        self,
+        *,
+        emotion_reduce: bool,
+        fleet_index: int,
+    ) -> bool:
         pause = self.is_combat_executing()
         if not pause:
             return False
@@ -80,20 +96,27 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
             self.emotion.reduce(fleet_index)
         return True
 
-    def combat_preparation(self, balance_hp=False, emotion_reduce=False, auto="combat_auto", fleet_index=1):
+    def combat_preparation(
+        self,
+        *,
+        balance_hp: bool = False,
+        emotion_reduce: bool = False,
+        auto: str = "combat_auto",
+        fleet_index: int = 1,
+    ) -> None:
         logger.info("Combat preparation.")
         # 医院战斗复用普通战斗入口，但不执行普通战斗的血量平衡。
         del balance_hp
         # 不需要等待，raid_execute_once() 已经处理过。
 
         @run_once
-        def check_oil():
+        def check_oil() -> None:
             if self.get_oil() < max(500, self.config.StopCondition_OilLimit):
                 logger.hr("Triggered oil limit")
                 raise OilExhausted
 
         @run_once
-        def check_coin():
+        def check_coin() -> bool:
             if self.config.TaskBalancer_Enable and self.triggered_task_balancer():
                 logger.hr("Triggered stop condition: Coin limit")
                 self.handle_task_balancer()
@@ -115,7 +138,7 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
 
     in_clue_confirm = Timer(0.5, count=2)
 
-    def hospital_expected_end(self):
+    def hospital_expected_end(self) -> bool:
         """战斗结束回调：先处理线索退出，连续确认在线索页后才返回 True。"""
         if self.handle_clue_exit():
             return False
@@ -127,6 +150,6 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
             self.in_clue_confirm.reset()
         return False
 
-    def hospital_combat(self):
+    def hospital_combat(self) -> None:
         """页面状态：FLEET_PREPARATION → is_in_clue。"""
         self.combat(balance_hp=False, expected_end=self.hospital_expected_end)
