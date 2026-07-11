@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from module.base.timer import Timer
 from module.base.utils import random_rectangle_vector
@@ -8,10 +8,13 @@ from module.private_quarters import assets as pq_assets
 from module.ui.page import page_private_quarters
 from module.ui.ui import UI
 
+if TYPE_CHECKING:
+    from module.base.button import Button
+
 
 class PQInteract(UI):
-    # 目标舰船映射到 (房间入口, 所在页面)；后续元素可保存特定气泡位置。
-    available_targets: ClassVar[dict[str, tuple[object, ...]]] = {
+    # 目标舰船映射到 (房间入口, 所在页面)。
+    available_targets: ClassVar[dict[str, tuple[Button, Button]]] = {
         "anchorage": (pq_assets.PRIVATE_QUARTERS_SHIP_ANCHORAGE, pq_assets.PRIVATE_QUARTERS_PAGE_LOCALE_BEACH),
         "noshiro": (pq_assets.PRIVATE_QUARTERS_SHIP_NOSHIRO, pq_assets.PRIVATE_QUARTERS_PAGE_LOCALE_BEACH),
         "sirius": (pq_assets.PRIVATE_QUARTERS_SHIP_SIRIUS, pq_assets.PRIVATE_QUARTERS_PAGE_LOCALE_BEACH),
@@ -21,14 +24,14 @@ class PQInteract(UI):
         "nakhimov": (pq_assets.PRIVATE_QUARTERS_SHIP_NAKHIMOV, pq_assets.PRIVATE_QUARTERS_PAGE_LOCALE_VILLA),
     }
 
-    def _pq_handle_dialogue(self):
+    def _pq_handle_dialogue(self) -> None:
         """推进对话；加入大凤后偶尔会卡顿，因此多个房间状态都会调用。"""
 
         # 加载态消失前避免连续点击。
-        def after_loading_state():
+        def after_loading_state() -> bool:
             return not self.appear(pq_assets.PRIVATE_QUARTERS_LOADING_CHECK, offset=(20, 20))
 
-        def additional():
+        def additional() -> bool:
             return True
 
         self.ui_click(
@@ -41,7 +44,7 @@ class PQInteract(UI):
             retry_wait=1.5,
         )
 
-    def _pq_target_appear(self):
+    def _pq_target_appear(self) -> bool:
         """以 100px 偏移检查目标气泡；新舰船可在 available_targets 追加特定气泡位置。"""
         settle_timer = Timer(1.5, count=3).start()
         skip_first_screenshot = True
@@ -77,16 +80,12 @@ class PQInteract(UI):
                 settle_timer.reset()
         return False
 
-    def _pq_goto_room_seek(self, target_ship):
+    def _pq_goto_room_seek(self, target_ship: str) -> bool:
         """从当前位置向两侧查找目标舰船所在页面。"""
         target_title = target_ship.title().replace("_", " ")
         if target_ship not in self.available_targets:
             logger.error(f"Unsupported target ship: {target_title}, cannot continue subtask")
             return False
-        if len(self.available_targets[target_ship]) < 2:
-            logger.error(f"Missing tuple info page locale for target ship: {target_title}, cannot continue subtask")
-            return False
-
         page_btn = self.available_targets[target_ship][1]
         logger.hr(f"Seek {target_title}'s Page", level=2)
 
@@ -121,21 +120,17 @@ class PQInteract(UI):
         logger.warning(f"{target_title}'s page cannot be found")
         return False
 
-    def _pq_goto_room_check(self):
+    def _pq_goto_room_check(self) -> bool:
         if self.appear(pq_assets.PRIVATE_QUARTERS_LOADING_CHECK, offset=(20, 20)):
             return True
-        return bool(self.appear(POPUP_CANCEL, offset=(20, 20)))
+        return self.appear(POPUP_CANCEL, offset=(20, 20))
 
-    def _pq_goto_room_enter(self, target_ship):
+    def _pq_goto_room_enter(self, target_ship: str) -> bool:
         """进入目标房间；资源未下载或亲密度已满时返回 False。"""
         target_title = target_ship.title().replace("_", " ")
         if target_ship not in self.available_targets:
             logger.error(f"Unsupported target ship: {target_title}, cannot continue subtask")
             return False
-        if len(self.available_targets[target_ship]) < 1:
-            logger.error(f"Missing tuple info room entrance for target ship: {target_title}, cannot continue subtask")
-            return False
-
         target_btn = self.available_targets[target_ship][0]
         self.ui_click(
             click_button=target_btn,
@@ -159,7 +154,7 @@ class PQInteract(UI):
 
         return True
 
-    def _pq_goto_room_exit(self):
+    def _pq_goto_room_exit(self) -> None:
         """退出房间；少数情况下仍在对话，需先推进完毕。"""
         if not self.appear(pq_assets.PRIVATE_QUARTERS_ROOM_CHECK, offset=(20, 20)) and not self.appear(
             pq_assets.PRIVATE_QUARTERS_INTERACT, offset=(0, 60)
@@ -176,7 +171,7 @@ class PQInteract(UI):
         )
         self.handle_info_bar()
 
-    def pq_interact(self):
+    def pq_interact(self) -> None:
         """执行三轮互动；检查按钮时用 60px 纵向偏移兼容不同亲密度布局。"""
         logger.hr("Interact Start", level=2)
         self._pq_wait_interact_button()
@@ -188,7 +183,7 @@ class PQInteract(UI):
         logger.hr("Interact End", level=2)
         self._pq_goto_room_exit()
 
-    def _pq_wait_interact_button(self):
+    def _pq_wait_interact_button(self) -> None:
         click_timer = Timer(1.5, count=3).start()
         skip_first_screenshot = True
         while 1:
@@ -204,12 +199,12 @@ class PQInteract(UI):
                 self.device.click(pq_assets.PRIVATE_QUARTERS_ROOM_TARGET_CLICK_AREA)
                 click_timer.reset()
 
-    def _pq_interact_once(self):
+    def _pq_interact_once(self) -> None:
         self.interval_clear([pq_assets.PRIVATE_QUARTERS_INTERACT_CHECK, pq_assets.PRIVATE_QUARTERS_INTERACT])
         self._pq_enter_interact_confirm()
         self._pq_leave_interact_confirm()
 
-    def _pq_enter_interact_confirm(self):
+    def _pq_enter_interact_confirm(self) -> None:
         skip_first_screenshot = True
         while 1:
             if skip_first_screenshot:
@@ -223,7 +218,7 @@ class PQInteract(UI):
             if self.appear_then_click(pq_assets.PRIVATE_QUARTERS_INTERACT, offset=(0, 60), interval=1):
                 continue
 
-    def _pq_leave_interact_confirm(self):
+    def _pq_leave_interact_confirm(self) -> None:
         skip_first_screenshot = True
         while 1:
             if skip_first_screenshot:
@@ -238,7 +233,7 @@ class PQInteract(UI):
                 self.device.click(pq_assets.PRIVATE_QUARTERS_ROOM_BACK)
                 continue
 
-    def pq_goto_room(self, target_ship, retry=3):
+    def pq_goto_room(self, target_ship: str, retry: int = 3) -> bool:
         """进入目标房间并返回是否成功；初始加载后目标不存在时最多重试 retry 次。"""
         success = False
         target_title = target_ship.title().replace("_", " ")

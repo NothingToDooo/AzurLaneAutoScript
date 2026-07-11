@@ -58,7 +58,7 @@ class _Shop(PQShopClerk):
         return range(self.loop_count)
 
     def enter_purchase_confirm(self, item: _Item) -> None:
-        self._pq_shop_enter_purchase_confirm(item)
+        self._pq_shop_enter_purchase_confirm(item, skip_first_screenshot=True)
 
     def finish_purchase_confirm(self) -> None:
         self._pq_shop_finish_purchase_confirm()
@@ -92,7 +92,8 @@ class _TrackingShop(PQShopClerk):
     def _pq_shop_prepare_buy(self) -> None:
         self.calls.append(("_pq_shop_prepare_buy",))
 
-    def _pq_shop_enter_purchase_confirm(self, item: _Item) -> None:
+    def _pq_shop_enter_purchase_confirm(self, item: _Item, *, skip_first_screenshot: bool) -> None:
+        assert skip_first_screenshot is True
         self.calls.append(("_pq_shop_enter_purchase_confirm", item))
 
     def _pq_shop_finish_purchase_confirm(self) -> None:
