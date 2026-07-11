@@ -22,12 +22,8 @@ class MissionHandler(GlobeOperation, ZoneManager):
     _os_mission_submitted = False
 
     def get_mission_zone(self):
-        """
-        Returns:
-            Zone:
-        """
         area = (341, 72, 1217, 648)
-        # Points of the yellow `!`
+        # 黄色感叹号的像素点。
         image = color_similarity_2d(self.image_crop(area, copy=False), color=(255, 207, 66))
         points = np.array(np.where(image > 235)).T[:, ::-1]
         if not len(points):
@@ -44,13 +40,7 @@ class MissionHandler(GlobeOperation, ZoneManager):
         return self.appear(os_assets.MISSION_CHECK, offset=(20, 20))
 
     def os_mission_enter(self):
-        """
-        Enter mission list and claim mission reward.
-
-        Pages:
-            in: MISSION_ENTER
-            out: MISSION_CHECK
-        """
+        """从 MISSION_ENTER 进入任务列表并领取奖励，结束于 MISSION_CHECK。"""
         logger.info("OS mission enter")
         confirm_timer = Timer(2, count=6).start()
         for _ in self.loop():
@@ -107,36 +97,28 @@ class MissionHandler(GlobeOperation, ZoneManager):
     def os_mission_quit(self):
         logger.info("OS mission quit")
         for _ in self.loop():
-            # 结束。
             # 部分任务弹窗没有黑色模糊背景，此时 MISSION_QUIT 和地图会同时出现。
             if not self.appear(os_assets.MISSION_QUIT, offset=(20, 20)) and self.is_in_map():
                 break
-            # 点击。
             if self.appear_then_click(os_assets.MISSION_QUIT, offset=(20, 20), interval=3):
                 continue
 
     def os_get_next_mission(self):
-        """
-        Another method to get os mission. The old one is outdated.
-        After clicking MISSION_CHECKOUT, AL switch to target zone directly instead of showing a meaningless map.
-        If already at target zone, show info bar and close mission list.
+        """领取后游戏会直接切换至目标海域，已在目标海域时只显示信息栏。
 
-        Returns:
-            str: pinned_at_mission_zone, already_at_mission_zone, pinned_at_archive_zone,
-                or False if no more mission.
+        返回 pinned_at_mission_zone、already_at_mission_zone 或 pinned_at_archive_zone；
+        没有任务时返回 False。
         """
         self.os_mission_enter()
 
         checkout_offset = (20, 20)
         if self.appear(os_assets.MISSION_MONTHLY_BOSS, offset=(20, 20)):
-            # If monthly BOSS hasn't been killed, there is always a task.
+            # 月度 BOSS 未击败时任务会一直存在，需检查其下方任务。
             logger.info("Monthly BOSS mission found, checking missions bellow it")
             checkout_offset = (-20, 100, 20, 150)
 
         if not self.match_template_color(os_assets.MISSION_CHECKOUT, offset=checkout_offset):
-            # If not having enough items to claim a mission,
-            # there will still be MISSION_CHECKOUT, but button is transparent.
-            # So here needs to use both template matching and color detection.
+            # 材料不足时仍有透明的 MISSION_CHECKOUT，必须同时检查模板与颜色。
             logger.info("No more OS missions")
             self.os_mission_quit()
             return False
@@ -148,7 +130,6 @@ class MissionHandler(GlobeOperation, ZoneManager):
 
         logger.info("Checkout os mission")
         for _ in self.loop():
-            # End
             if self.is_zone_pinned():
                 if self.get_zone_pinned_name() == "ARCHIVE":
                     logger.info("Pinned at archive zone")
@@ -164,26 +145,14 @@ class MissionHandler(GlobeOperation, ZoneManager):
             if self.appear_then_click(os_assets.MISSION_CHECKOUT, offset=checkout_offset, interval=2):
                 continue
             if self.handle_popup_confirm("OS_MISSION_CHECKOUT"):
-                # Popup: Submarine will retreat after exiting current zone.
+                # 离开当前区域会触发潜艇撤退确认。
                 continue
         return False
 
     def os_mission_overview_accept(self):
-        """
-        Accept all missions in mission overview.
-
-        Returns:
-            bool: True if all missions accepted or no mission found.
-                  False if unable to accept more missions.
-
-        Pages:
-            in: is_in_map
-            out: is_in_map
-        """
+        """在区域地图领取任务总览中的全部任务；达到任务上限时返回 False。"""
         logger.hr("OS mission overview accept", level=1)
-        # is_in_map
         self.os_map_goto_globe(unpin=False)
-        # is_in_globe
         self.ui_click(
             os_assets.MISSION_OVERVIEW_ENTER,
             check_button=os_assets.MISSION_OVERVIEW_CHECK,
@@ -197,10 +166,8 @@ class MissionHandler(GlobeOperation, ZoneManager):
         accept_button_timer = Timer(timeout)
         self.interval_timer[os_assets.MISSION_OVERVIEW_ACCEPT_SINGLE.name] = accept_button_timer
         self.interval_timer[os_assets.MISSION_OVERVIEW_ACCEPT.name] = accept_button_timer
-        # MISSION_OVERVIEW_CHECK
         success = True
         for _ in self.loop():
-            # End
             if self.appear(os_assets.MISSION_OVERVIEW_EMPTY, offset=(20, 20)):
                 success = True
                 break
@@ -211,32 +178,24 @@ class MissionHandler(GlobeOperation, ZoneManager):
 
             if self.handle_manjuu():
                 continue
-            # Click
             if self.appear_then_click(os_assets.MISSION_OVERVIEW_ACCEPT, offset=(20, 20), interval=timeout):
                 continue
             if self.appear_then_click(os_assets.MISSION_OVERVIEW_ACCEPT_SINGLE, offset=(20, 20), interval=timeout):
                 continue
 
-        # is_in_globe
         self.ui_back(
             appear_button=os_assets.MISSION_OVERVIEW_CHECK, check_button=self.is_in_globe, skip_first_screenshot=True
         )
-        # is_in_map
         self.os_globe_goto_map()
         return success
 
     def is_in_opsi_explore(self):
-        """
-        Returns:
-            bool: If task OpsiExplore is under scheduling.
-        """
         enable = self.config.is_task_enabled("OpsiExplore")
         next_run = self.config.cross_get(keys="OpsiExplore.Scheduler.NextRun", default=DEFAULT_TIME)
         next_reset = get_os_next_reset()
         logger.attr("OpsiNextReset", next_reset)
         logger.attr("OpsiExplore", (enable, next_run))
-        # -12 hours to handle DST
-        # `next_run` might be calculated before DST but it's DST now
+        # 向前偏移 12 小时兼容跨夏令时计算的 next_run。
         # 2023-03-14 11:15:28.423 | INFO | [OpsiNextReset] 2023-04-01 03:00:00
         # 2023-03-14 11:15:28.425 | INFO | [OpsiExplore] (True, datetime.datetime(2023, 4, 1, 2, 0))
         # 2023-03-14 11:15:28.426 | INFO | OpsiExplore is still running, accept missions only...

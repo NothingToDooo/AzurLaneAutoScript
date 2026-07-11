@@ -18,20 +18,15 @@ class StorageHandler(GlobeOperation, ZoneManager):
         return self.appear(os_assets.STORAGE_CHECK, offset=(20, 20))
 
     def storage_enter(self):
-        """
-        Pages:
-            in: is_in_map, STORAGE_ENTER
-            out: STORAGE_CHECK
-        """
+        """从区域地图进入仓库。"""
         logger.info("Storage enter")
         for _ in self.loop():
-            # End
             if self.is_in_storage():
                 break
 
             if self.appear_then_click(os_assets.STORAGE_ENTER, offset=(200, 5), interval=3):
                 continue
-            # A game bug that AUTO_SEARCH_REWARD from the last cleared zone popups
+            # 游戏可能延迟弹出上一个已清理海域的自动搜索奖励。
             if self.appear_then_click(os_assets.AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
                 continue
             if self.handle_map_event():
@@ -40,23 +35,12 @@ class StorageHandler(GlobeOperation, ZoneManager):
         self.handle_info_bar()
 
     def storage_quit(self):
-        """
-        Pages:
-            in: STORAGE_CHECK
-            out: is_in_map
-        """
+        """从仓库返回区域地图。"""
         logger.info("Storage quit")
         self.ui_back(os_assets.STORAGE_ENTER, offset=(200, 5), skip_first_screenshot=True)
 
     def _storage_item_use(self, button):
-        """
-        Args:
-            button (Button): Item
-
-        Pages:
-            in: STORAGE_CHECK
-            out: STORAGE_CHECK
-        """
+        """在仓库使用物品，处理奖励后仍停留在仓库。"""
         success = False
         get_mission_counter = 0
         self.interval_clear(os_assets.STORAGE_CHECK)
@@ -67,7 +51,7 @@ class StorageHandler(GlobeOperation, ZoneManager):
         self.interval_clear(GET_MISSION)
 
         for _ in self.loop():
-            # Accidentally clicked on an item, having popups for its info
+            # 误点物品时会弹出详情页。
             if self.appear(GET_MISSION, offset=True, interval=2):
                 logger.info(f"_storage_item_use item info -> {GET_MISSION}")
                 self.device.click(GET_MISSION)
@@ -77,7 +61,6 @@ class StorageHandler(GlobeOperation, ZoneManager):
                     logger.warning("Possibly stuck on energy storage device, redetecting logger items.")
                     break
                 continue
-            # Item rewards
             if self.appear_then_click(os_assets.STORAGE_USE, offset=(180, 30), interval=5):
                 self.interval_reset(os_assets.STORAGE_CHECK)
                 continue
@@ -93,21 +76,15 @@ class StorageHandler(GlobeOperation, ZoneManager):
                 self.device.click(os_assets.CLICK_SAFE_AREA)
                 success = True
                 continue
-            # Use item
             if self.appear(os_assets.STORAGE_CHECK, offset=(20, 20), interval=5):
                 self.device.click(button)
                 continue
 
-            # End
             if success and self.appear(os_assets.STORAGE_CHECK, offset=(20, 20)):
                 break
 
     def storage_logger_use_all(self):
-        """
-        Pages:
-            in: STORAGE_CHECK
-            out: STORAGE_CHECK, scroll to bottom
-        """
+        """使用全部记录仪，结束时仓库滚动到底部。"""
         logger.hr("Storage logger use all")
         for _ in self.loop():
             if SCROLL_STORAGE.appear(main=self):
@@ -124,11 +101,7 @@ class StorageHandler(GlobeOperation, ZoneManager):
             break
 
     def storage_sample_use_all(self):
-        """
-        Pages:
-            in: STORAGE_CHECK
-            out: STORAGE_CHECK, scroll to bottom
-        """
+        """使用全部适应性样本，页面保持在仓库。"""
         sample_types = [
             os_assets.TEMPLATE_STORAGE_OFFENSE,
             os_assets.TEMPLATE_STORAGE_SURVIVAL,
@@ -156,15 +129,7 @@ class StorageHandler(GlobeOperation, ZoneManager):
         self.storage_quit()
 
     def _storage_coordinate_checkout(self, button, types=("OBSCURE",)):
-        """
-        Args:
-            button (Button): Item
-            types (tuple[str]):
-
-        Pages:
-            in: STORAGE_CHECK
-            out: is_in_map, in an obscure zone.
-        """
+        """从仓库结算坐标并进入指定类型的特殊海域。"""
         self.interval_clear([os_assets.STORAGE_CHECK, os_assets.STORAGE_COORDINATE_CHECKOUT])
         self.popup_interval_clear()
         for _ in self.loop():
@@ -175,10 +140,9 @@ class StorageHandler(GlobeOperation, ZoneManager):
                 self.interval_reset(os_assets.STORAGE_CHECK)
                 continue
             if self.handle_popup_confirm("STORAGE_CHECKOUT"):
-                # Submarine popup
+                # 离开当前区域会触发潜艇撤退确认。
                 continue
 
-            # End
             if self.is_zone_pinned():
                 break
 
@@ -187,13 +151,7 @@ class StorageHandler(GlobeOperation, ZoneManager):
 
     @staticmethod
     def _storage_item_to_template(item):
-        """
-        Args:
-            item (str): 'OBSCURE' or 'ABYSSAL'.
-
-        Returns:
-            Template:
-        """
+        """item 仅接受 OBSCURE 或 ABYSSAL。"""
         if item == "OBSCURE":
             return os_assets.TEMPLATE_STORAGE_OBSCURE
         if item == "ABYSSAL":
@@ -202,17 +160,9 @@ class StorageHandler(GlobeOperation, ZoneManager):
         raise ScriptError(message)
 
     def storage_checkout_item(self, item):
-        """
-        Args:
-            item (str): 'OBSCURE' or 'ABYSSAL'.
+        """从仓库结算 OBSCURE 或 ABYSSAL 坐标。
 
-        Returns:
-            bool: If checkout
-
-        Pages:
-            in: STORAGE_CHECK
-            out: is_in_map, in an obscure/abyssal zone if checkout.
-                 is_in_map, in previous zone if no more obscure/abyssal coordinates.
+        成功时进入对应特殊海域；没有坐标时返回原区域地图并返回 False。
         """
         logger.hr(f"Storage checkout item {item}")
         if SCROLL_STORAGE.appear(main=self):
@@ -234,19 +184,7 @@ class StorageHandler(GlobeOperation, ZoneManager):
         return False
 
     def storage_get_next_item(self, item, use_logger=True):
-        """
-        Args:
-            item (str): 'OBSCURE' or 'ABYSSAL'.
-            use_logger: If use all loggers.
-
-        Returns:
-            bool: If checkout
-
-        Pages:
-            in: in_map
-            out: is_in_map, in an obscure/abyssal zone if checkout.
-                 is_in_map, in previous zone if no more obscure/abyssal coordinates.
-        """
+        """从区域地图进入仓库，可先用完记录仪，再结算下一个特殊海域坐标。"""
         logger.hr("OS get next obscure")
         self.storage_enter()
         if use_logger:

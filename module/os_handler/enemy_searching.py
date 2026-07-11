@@ -11,14 +11,11 @@ class EnemySearchingHandler(EnemySearchingHandler_):
         return self.match_template_color(MAP_GOTO_GLOBE_FOG, offset=(5, 5))
 
     def wait_os_map_buttons(self):
-        """
-        When entering a os map, radar and buttons slide out from the right.
-        Wait until they slide to the final position.
-        """
+        """进入区域地图时，等待雷达和右侧按钮滑动到最终位置。"""
         for _ in self.loop(timeout=1):
             if self.appear(ORDER_ENTER, offset=(20, 20)):
                 break
-            # A game bug that AUTO_SEARCH_REWARD from the last cleared zone popups
+            # 游戏可能延迟弹出上一个已清理海域的自动搜索奖励。
             if self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
                 continue
         else:

@@ -42,14 +42,7 @@ class _OSShopBuyState:
 
 class OSShop(PortShop, AkashiShop):
     def os_shop_buy_execute(self, button: OSShopBuyItem, skip_first_screenshot=True) -> bool:
-        """
-        Args:
-            button: Item to buy
-            skip_first_screenshot:
-
-        Pages:
-            in: PORT_SUPPLY_CHECK
-        """
+        """在 PORT_SUPPLY_CHECK 购买商品并返回是否成功。"""
         state = _OSShopBuyState(button=button)
         self.interval_clear(
             [
@@ -145,13 +138,7 @@ class OSShop(PortShop, AkashiShop):
         return state.success and self.appear(PORT_SUPPLY_CHECK, offset=(20, 20))
 
     def os_shop_buy(self, select_func: Callable[[], OSShopBuyItem | None]) -> int:
-        """
-        Args:
-            select_func:
-                Function to select items to buy.
-
-            in: PORT_SUPPLY_CHECK
-        """
+        """在 PORT_SUPPLY_CHECK 反复调用 select_func，并返回尝试购买的商品数。"""
         count = 0
         for _ in range(12):
             button = select_func()
@@ -166,15 +153,7 @@ class OSShop(PortShop, AkashiShop):
         return count
 
     def close_shop_buy_confirm_amount(self, skip_first_screenshot=True):
-        """
-        Close shop buy confirm amount.
-
-        Args:
-            skip_first_screenshot:
-
-        Pages:
-            in: SHOP_BUY_CONFIRM_AMOUNT
-        """
+        """关闭 SHOP_BUY_CONFIRM_AMOUNT 并返回港口补给页。"""
         self.interval_clear([PORT_SUPPLY_CHECK, SHOP_BUY_CONFIRM_AMOUNT])
         while True:
             if skip_first_screenshot:
@@ -198,14 +177,7 @@ class OSShop(PortShop, AkashiShop):
         return cast("OSShopAmountItem", item)
 
     def shop_buy_amount_handler(self, item: OSShopBuyItem, skip_first_screenshot=True):
-        """处理商店购买数量。
-
-        Args:
-            item
-
-        Raises:
-            ScriptError: OCR_SHOP_AMOUNT
-        """
+        """按库存和可用货币设置购买数量；数量 OCR 失败时抛出 ScriptError。"""
         amount_item = self._require_amount_item(item)
         limit = self._shop_buy_amount_read_limit(skip_first_screenshot=skip_first_screenshot)
         if limit == 0:
@@ -262,7 +234,7 @@ class OSShop(PortShop, AkashiShop):
     @staticmethod
     def _shop_buy_amount_target(*, count: int, total_count: int) -> tuple[int, bool]:
         set_to_max = False
-        # Avg count of all items(no PurpleCoins) is 8.9, so use 10.
+        # 除 PurpleCoins 外商品平均数量为 8.9，因此以 10 为分段阈值。
         if count <= 10:
             if count - 1 > total_count - count:
                 set_to_max = True
@@ -292,14 +264,7 @@ class OSShop(PortShop, AkashiShop):
                 break
 
     def handle_port_supply_buy(self) -> bool:
-        """
-        Returns:
-            bool: True if success to buy any or no items found.
-                False if not enough coins to buy any.
-
-        Pages:
-            in: PORT_SUPPLY_CHECK
-        """
+        """在港口补给页扫描并购买商品；扫描为空或筛选无结果时返回 False。"""
         items = self.scan_all()
         if not len(items):
             logger.warning("Empty OS shop.")
@@ -346,14 +311,7 @@ class OSShop(PortShop, AkashiShop):
         return True
 
     def handle_akashi_supply_buy(self, grid):
-        """
-        Args:
-            grid: Grid where akashi stands.
-
-        Pages:
-            in: is_in_map
-            out: is_in_map
-        """
+        """从区域地图进入明石商店购买，结束后返回区域地图。"""
         self.ui_click(
             grid,
             appear_button=self.is_in_map,

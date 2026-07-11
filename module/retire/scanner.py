@@ -52,17 +52,15 @@ class Ship:
         for key in self.__dict__:
             value = limitaion.get(key)
             if self.__dict__[key] is not None and value is not None:
-                # str and int should be exactly equal to
+                # 标量精确匹配，元组按闭区间匹配，列表按成员匹配。
                 if isinstance(value, (str, int)):
                     if value == "any":
                         continue
                     if self.__dict__[key] != value:
                         return False
-                # tuple means should be in range
                 elif isinstance(value, tuple):
                     if not (value[0] <= self.__dict__[key] <= value[1]):
                         return False
-                # list means should be in the list
                 elif isinstance(value, list):
                     if self.__dict__[key] not in value:
                         return False
@@ -91,19 +89,10 @@ class Scanner(metaclass=ABCMeta):
         pass
 
     def clear(self) -> None:
-        """
-        Clear all cached results.
-        """
         self.results.clear()
 
     def scan(self, image, cached=False, output=False) -> list | None:
-        """
-        If scanner is enabled, return the real results.
-        Otherwise, return a series of None.
-
-        For multi-scan, caching the results is recommended.
-        If cached is set, results will be cached.
-        """
+        """禁用时产生 14 个 None；cached=True 时追加到缓存并返回 None。"""
         results: list = self._scan(image) if self._enabled else self._disabled_value
 
         if output:
@@ -117,9 +106,6 @@ class Scanner(metaclass=ABCMeta):
         return None
 
     def move(self, vector) -> None:
-        """
-        Call ButtonGrid.move for property grids.
-        """
         grids = self.grids
         if grids is None:
             raise RuntimeError
@@ -168,17 +154,9 @@ class RarityScanner(Scanner):
         self.value_list: list[str] = ["common", "rare", "elite", "super_rare"]
 
     def color_to_rarity(self, color: tuple[int, int, int]) -> str:
-        """
-        Convert color to a ship rarity.
-        Rarity can be ['common', 'rare', 'elite', 'super_rare', 'unknown']
-        For 'ultra', color difference is too great,
-        thus it's marked as 'unknown'
+        """返回 common、rare、elite、super_rare 或 unknown。
 
-        Args:
-            color (tuple): (r, g, b)
-
-        Returns:
-            str: Rarity
+        海上传奇颜色差异过大，统一标记为 unknown。
         """
         if color_similar(color, (171, 174, 186)):
             return "common"
@@ -215,23 +193,13 @@ class FleetScanner(Scanner):
         }
 
     def pre_process(self, image):
-        """
-        Practice shows that, the following steps will lead to a better performance.
-        It can distinguish the number from the background very well.
-        If anyone needs to update TEMPLATE_FLEET assets, do remember to preprocess
-        the image first.
-        """
+        """绿色通道二值化可稳定分离舰队编号；更新 TEMPLATE_FLEET 时也必须先做此预处理。"""
         _, g, _ = cv2.split(image)
         _, image = cv2.threshold(g, 205, 255, cv2.THRESH_BINARY)
         return cv2.merge([image, image, image])
 
     def _match(self, image) -> int:
-        """
-        Using a template matching method to identify fleet.
-        Performance on ultra rarity is not very good, because the flash
-        will interfere with identification.
-        Assuming it is not in any fleet if none matched.
-        """
+        """海上传奇闪光会干扰模板匹配；未命中时按不在舰队中处理。"""
         for template, fleet in self.templates.items():
             if template.match(image):
                 return fleet
@@ -287,23 +255,10 @@ class StatusScanner(Scanner):
 
 
 class ShipScanner(Scanner):
-    """
-    Ship Scanner is designed to use with an "Initial" page_dock, which means there cannot be
-    any move once a dock filter was set. Otherwise, it may return untrustable results.
+    """仅用于筛选后未滚动的船坞首屏；多页扫描应使用 DockScanner。
 
-    If you need to scan rather more than the initial page, Please use DockScanner.
-
-    By default, all properties of the ship are scanned.
-    You can set the required properties by calling enable() or disable().
-    disable() will simply skip scanning and set those properties to None.
-    To keep them and ignore limitations, use set_limitation(property=None)
-
-    Args:
-        rarity (str, list): 稀有度，支持 ['any', 'common', 'rare', 'elite', 'super_rare']。
-        level (tuple): 等级范围，会限制在 [1, 125]。
-        emotion (tuple): 心情范围，会限制在 [0, 150]。
-        fleet (int, list): 舰队编号，0 表示不在舰队中，会限制在 [0, 6]。
-        status (str, list): 状态，支持 ['any', 'commission', 'battle']。
+    等级、心情、舰队范围分别为 1 至 125、0 至 150、0 至 6；禁用字段返回 None。
+    rarity 支持 any、common、rare、elite、super_rare，status 支持 any、free、commission、battle；any 表示不限制。
     """
 
     def __init__(
@@ -325,7 +280,6 @@ class ShipScanner(Scanner):
             "status": "any",
         }
 
-        # Each property of a ship must be binded to a Scanner.
         self.sub_scanners: dict[str, Scanner] = {
             "level": LevelScanner(),
             "emotion": EmotionScanner(),
@@ -368,9 +322,6 @@ class ShipScanner(Scanner):
         return None
 
     def move(self, vector) -> None:
-        """
-        Apply moving to both sub-scanners and self.
-        """
         for scanner in self.sub_scanners.values():
             scanner.move(vector)
 
@@ -393,36 +344,16 @@ class ShipScanner(Scanner):
             self.limitaion[key] = self.sub_scanners[key].limit_value(value)
 
     def enable(self, *args) -> None:
-        """
-        Enable property sub-scanners.
-
-        Supported properties includes:
-            ['level', 'emotion', 'rarity', 'fleet', 'status']
-        """
         for name, scanner in self.sub_scanners.items():
             if name in args:
                 scanner.enable()
 
     def disable(self, *args) -> None:
-        """
-        Disable property sub-scanners.
-
-        Supported properties includes:
-            ['level', 'emotion', 'rarity', 'fleet', 'status']
-        """
         for name, scanner in self.sub_scanners.items():
             if name in args:
                 scanner.disable()
 
     def set_limitation(self, **kwargs):
-        """
-        Args:
-            rarity (str, list): ['any', 'common', 'rare', 'elite', 'super_rare'].
-            level (tuple): (lower, upper). Will be limited in range [1, 125]
-            emotion (tuple): (lower, upper). Will be limited in range [0, 150]
-            fleet (int): 0 means not in any fleet. Will be limited in range [0, 6]
-            status (str, list): ['any', 'commission', 'battle']
-        """
         for attr in self.limitaion:
             value = kwargs.get(attr, self.limitaion[attr])
             self._set_limitation_value(key=attr, value=value)
@@ -432,13 +363,6 @@ class ShipScanner(Scanner):
 
 class DockScanner(ShipScanner):
     scan_grids: ButtonGrid
-
-    """
-    Dock Scanner support multi-page scan.
-
-    Same as ShipScanner, DockScanner must start at the initial page_dock.
-    The scanning process can swipe the dock automatically and stop when finished.
-    """
 
     def __init__(
         self,
@@ -454,21 +378,7 @@ class DockScanner(ShipScanner):
         self.card_bottom = []
 
     def multi_scan(self, image):
-        """
-        Here is a simple example,
-            □ | □ | □                          --------- (*)
-            ---------                          ■ | □ | □
-            □ | □ | □       --- Moving --->    ---------
-            --------- (*)                      □ | □ | □
-            ■ | □ | □                          ---------
-        □ and ■ is a ship, | and - is the blank between ships.
-        To detect the moving above, we need to know the distance
-        that (*) moves.
-
-        There is little color change in the blanks between ships.
-        Therefore, graying the image and filter by np.std can get
-        the position of those blanks.
-        """
+        """用舰船卡片间低方差空隙的位移估算滚动偏移，再同步移动扫描网格。"""
         # Roughly Adjust
         # After graying the image, calculate the standard deviation and take the part below the threshold
         # Those parts should present multiple discontinuous subsequences, which here called gap_seq
@@ -507,10 +417,6 @@ class DockScanner(ShipScanner):
         self.move(offset)
 
     def scan_one_fleet(self, fleet: int | None = None) -> list[Ship]:
-        """
-        扫描指定舰队中的所有舰船。
-        如果未指定舰队，则使用 self.fleet。
-        """
         raise NotImplementedError
 
     def scan_whole_dock(self) -> list[Ship]:

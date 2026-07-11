@@ -24,12 +24,7 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
         return templates
 
     def _get_os_shop_cost(self) -> list:
-        """
-        Returns the coordinates of the upper left corner of each coin icon.
-
-        Returns:
-            list:
-        """
+        """返回各货币图标左上角坐标。"""
         image = self.image_crop((360, 320, 410, 700))
         result = list(chain.from_iterable(template.match_multi(image) for template in self.TEMPLATES))
         logger.attr("Costs", f"{result}")
@@ -49,12 +44,6 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
         return os_shop_items
 
     def _get_os_shop_grid(self) -> ButtonGrid:
-        """
-        Returns shop grid.
-
-        Returns:
-            ButtonGris:
-        """
         costs = self._get_os_shop_cost()
         row = len(costs)
         y = 0
@@ -71,14 +60,6 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
         )
 
     def os_shop_get_items(self, shop_index=False, scroll_pos=False) -> list[Item]:
-        """
-        Args:
-            shop_index (Integer): Additional shop index.
-            scroll_pos (Float): Additional scroll position.
-
-        Returns:
-            list[Item]:
-        """
         self.os_shop_items.grids = self._get_os_shop_grid()
         if self.config.SHOP_EXTRACT_TEMPLATE:
             self.os_shop_items.extract_template(self.device.image, "./assets/shop/os")
@@ -97,14 +78,6 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
         return []
 
     def os_shop_get_items_to_buy(self, name, price) -> Item | None:
-        """
-        Args:
-            name (str): Item name.
-            price (int): Item price.
-
-        Returns:
-            Item:
-        """
         items = self.os_shop_get_items()
         for _ in range(2):
             if not len(items) or any(not item.is_known_item() for item in items):
@@ -120,10 +93,6 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
         return None
 
     def scan_all(self) -> list[Item]:
-        """
-        Returns:
-            list[Item]:
-        """
         items = []
         self.device.click_record.clear()
 
@@ -145,8 +114,7 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
                         continue
                     logger.info(f"Found {len(page_items)} items in shop {i + 1} at pos {cur_pos:.2f}")
                     break
-                # always add items, even if last item list contains unknown items
-                # so any known items can be scanned
+                # 即使最后一轮含未知商品，也保留其中已识别的商品。
                 items += page_items
 
                 if OS_SHOP_SCROLL.at_bottom(main=self):

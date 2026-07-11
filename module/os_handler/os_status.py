@@ -35,10 +35,7 @@ class OSStatus(UI):
 
     @property
     def nearest_task_cooling_down(self) -> Function | None:
-        """
-        If having any tasks cooling down,
-        such as recon scan cooldown and submarine call cooldown.
-        """
+        """返回一小时内即将结束冷却的最近大世界任务。"""
         now = datetime.now()
         update = get_server_next_update("00:00")
         cd_tasks = [
@@ -63,14 +60,13 @@ class OSStatus(UI):
         yellow_coins = 0
         timeout = Timer(2, count=3).start()
         for _ in self.loop():
-            # End
             yellow_coins = OCR_SHOP_YELLOW_COINS.ocr(self.device.image)
             if timeout.reached():
                 logger.warning("Get yellow coins timeout")
                 break
 
             if yellow_coins < 100:
-                # OCR may get 0 or 1 when amount is not immediately loaded
+                # 金币尚未加载时 OCR 可能误读为 0 或 1。
                 logger.info("Yellow coins less than 100, assuming it is an ocr error")
                 continue
             break

@@ -12,19 +12,10 @@ class GeneralShop_250814(ShopClerk, ShopUI, ShopStatus):
 
     @cached_property
     def shop_filter(self):
-        """
-        Returns:
-            str:
-        """
         return self.config.GeneralShop_Filter.strip()
 
-    # New UI in 2025-08-14
     @cached_property
     def shop_general_items(self):
-        """
-        Returns:
-            ShopItemGrid:
-        """
         shop_grid = self.shop_grid
 
         shop_general_items = ShopItemGrid_250814(
@@ -40,20 +31,11 @@ class GeneralShop_250814(ShopClerk, ShopUI, ShopStatus):
         return shop_general_items
 
     def shop_items(self):
-        """覆盖统一接口，返回当前商店专用的商品识别网格。"""
         return self.shop_general_items
 
     currency_rechecked = 0
 
     def shop_currency(self):
-        """
-        Ocr shop guild currency if needed
-        (gold coins and gems)
-        Then return gold coin count
-
-        Returns:
-            int: gold coin amount
-        """
         while 1:
             self._currency = self.status_get_gold_coins()
             self.gems = self.status_get_gems()
@@ -68,7 +50,6 @@ class GeneralShop_250814(ShopClerk, ShopUI, ShopStatus):
         return self._currency
 
     def shop_check_item(self, item):
-        """返回当前货币是否足够购买物品。"""
         if item.cost == "Coins":
             return item.price <= self._currency
 
@@ -78,15 +59,6 @@ class GeneralShop_250814(ShopClerk, ShopUI, ShopStatus):
         return False
 
     def shop_check_custom_item(self, _item):
-        """
-        判断物品是否符合需要强制购买的自定义规则。
-
-        Args:
-            item: 待检查物品。
-
-        Returns:
-            bool: 是否命中自定义购买规则。
-        """
         if self.config.GeneralShop_ConsumeCoins and self._currency >= 550000 and _item.cost == "Coins":
             return True
 
@@ -100,19 +72,11 @@ class GeneralShop_250814(ShopClerk, ShopUI, ShopStatus):
         return self._currency >= _item.price
 
     def run(self):
-        """
-        Run General Shop
-        """
-        # Base case; exit run if filter empty
         if not self.shop_filter:
             return
 
-        # When called, expected to be in
-        # corrected General Shop interface
         logger.hr("General Shop", level=1)
 
-        # Execute buy operations
-        # Refresh if enabled and available
         refresh = self.config.GeneralShop_Refresh
         for _ in range(2):
             success = self.shop_buy()

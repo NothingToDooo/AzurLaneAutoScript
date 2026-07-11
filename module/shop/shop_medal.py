@@ -43,14 +43,14 @@ MEDAL_SHOP_SCROLL_250814 = ShopAdaptiveScroll(
     MEDAL_SHOP_SCROLL_AREA_250814.button, background=1, name="MEDAL_SHOP_SCROLL_250814"
 )
 MEDAL_SHOP_SCROLL_250814.drag_threshold = 0.1
-# A little bit larger than 0.1 to handle bottom
+# 略高于 0.1，确保能识别滚动到底部。
 MEDAL_SHOP_SCROLL_250814.edge_threshold = 0.12
 
 
 class ShopPriceOcr(DigitYuv):
     def after_process(self, result):
         result = Ocr.after_process(self, result)
-        # '100' detected as '00' on retrofit blueprint
+        # 改造图纸价格 100 会被误识别为 00。
         if result == "00":
             result = "100"
         return Digit.after_process(self, result)
@@ -66,20 +66,11 @@ TEMPLATE_MEDAL_ICON_3 = Template("./assets/shop/cost/Medal_3.png")
 class MedalShop2_250814(ShopClerk, ShopStatus):
     @cached_property
     def shop_filter(self):
-        """
-        Returns:
-            str:
-        """
         return self.config.MedalShop2_Filter.strip()
 
-    # New UI in 2025-08-14
     def _get_medals(self):
-        """
-        Returns:
-            np.array: [[x1, y1], [x2, y2]], location of the medal icon upper-left corner.
-        """
+        """返回各勋章图标左上角坐标组成的二维数组。"""
         area = (265, 317, 999, 635)
-        # copy image because we gonna paint it
         image = self.image_crop(area, copy=True)
         medals = TEMPLATE_MEDAL_ICON_3.match_multi(image, similarity=0.5, threshold=5)
         medals = Points([(0.0, m.area[1]) for m in medals]).group(threshold=5)
@@ -87,11 +78,7 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
         return medals
 
     def wait_until_medal_appear(self, skip_first_screenshot=True):
-        """
-        After entering medal shop page,
-        items are not loaded that fast,
-        wait until any medal icon appears
-        """
+        """进入勋章商店后等待任一勋章图标加载。"""
         timeout = Timer(1, count=3).start()
         while 1:
             if skip_first_screenshot:
@@ -111,10 +98,6 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
         return self.shop_medal_grid()
 
     def shop_medal_grid(self):
-        """
-        Returns:
-            ButtonGrid:
-        """
         medals = self._get_medals()
         count = len(medals)
         if count == 0:
@@ -124,8 +107,7 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
             row = 2
         elif count == 1:
             y_list = medals[:, 1]
-            # +256, top of the crop area in _get_medals()
-            # -125, from the top of medal icon to the top of shop item
+            # 加裁剪区顶部 317，再减图标到商品顶部的 126 像素。
             origin_y = y_list[0] + 317 - 126
             delta_y = 223
             row = 1
@@ -141,7 +123,6 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
             delta_y = 223
             row = 2
 
-        # 按新版 UI 补出商品网格。
         return ButtonGrid(
             origin=(265, origin_y), delta=(169, delta_y), button_shape=(64, 64), grid_shape=(5, row), name="SHOP_GRID"
         )
@@ -150,10 +131,6 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
 
     @cached_property
     def shop_medal_items(self):
-        """
-        Returns:
-            ShopItemGrid_250814:
-        """
         shop_grid = self.shop_grid
         shop_medal_items = ShopItemGrid_250814(
             shop_grid,
@@ -164,57 +141,30 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
         )
         shop_medal_items.load_template_folder(self.shop_template_folder)
         shop_medal_items.load_cost_template_folder("./assets/shop/cost")
-        shop_medal_items.similarity = 0.85  # Lower the threshold for consistent matches of PR/DRBP
+        shop_medal_items.similarity = 0.85  # 降低阈值以稳定匹配 PR/DR 图纸。
         shop_medal_items.cost_similarity = 0.5
         shop_medal_items.price_ocr = PRICE_OCR_250814
         return shop_medal_items
 
     def shop_items(self) -> ShopItemGrid_250814:
-        """覆盖统一接口，返回当前商店专用的商品识别网格。"""
         return self.shop_medal_items
 
     def shop_currency(self):
-        """
-        Ocr shop medal currency
-        Then return medal count
-
-        Returns:
-            int: medal amount
-        """
         self._currency = self.status_get_medal()
         logger.info(f"Medal: {self._currency}")
         return self._currency
 
     def shop_has_loaded(self, _items):
-        """
-        If any item parsed with a default
-        price of 5000; then shop cannot
-        be safely bought from yet
-
-        Returns:
-            bool
-        """
+        """价格仍为默认值 5000 时，真实商品尚未加载，不能购买。"""
         return all(int(item.price) != 5000 for item in _items)
 
     def shop_interval_clear(self):
-        """
-        Clear interval on select assets for
-        shop_buy_handle
-        """
         super().shop_interval_clear()
         self.interval_clear(SHOP_BUY_CONFIRM_SELECT)
         self.interval_clear(SHOP_BUY_CONFIRM_AMOUNT)
 
     def shop_buy_handle(self, _item):
-        """
-        Handle shop_medal buy interface if detected
-
-        Args:
-            item: Item to handle
-
-        Returns:
-            bool: whether interface was detected and handled
-        """
+        """处理勋章商店的商品选择或数量确认弹窗。"""
         if self.appear(SHOP_BUY_CONFIRM_SELECT, offset=(20, 20), interval=3):
             self.shop_buy_select_execute(_item)
             self.interval_reset(SHOP_BUY_CONFIRM_SELECT)
@@ -227,22 +177,14 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
         return False
 
     def run(self):
-        """
-        Run Medal Shop
-        """
-        # Base case; exit run if filter empty
         if not self.shop_filter:
             return
 
-        # When called, expected to be in
-        # correct Medal Shop interface
         logger.hr("Medal Shop", level=1)
-        # Execute buy operations
         MEDAL_SHOP_SCROLL_250814.set_top(main=self)
         time.sleep(0.5)
         while 1:
-            # sold items are auto sorted behind
-            # if we find any soldout items, no need to check behind
+            # 已售商品会自动排到后面，发现后无需继续扫描。
             if self.shop_items().get_soldout_count(self.device.image):
                 logger.info("Medal shop early stop")
                 break

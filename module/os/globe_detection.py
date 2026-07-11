@@ -15,36 +15,18 @@ GLOBE_MAP_SHAPE = (2570, 1696)
 
 
 class GlobeDetection:
-    """
-    Detect globe map in Operation Siren.
-
-    Examples:
-        globe = GlobeDetection(AzurLaneConfig('template'))
-        globe.load(image)
-
-    Logs:
-                  globe_center: (1305, 325)
-        0.062s      similarity: 0.354
-    """
-
     globe = None
     homo_center: tuple
     center_loca: tuple
 
     def __init__(self, config):
-        """
-        Args:
-            config (AzurLaneConfig):
-        """
         self.config = config
         self.perspective = Perspective(config)
         self.homography = Homography(config)
         self._globe_map_loaded = False
 
     def load_globe_map(self):
-        """
-        Call this method before doing anything.
-        """
+        """使用检测器前必须先载入全局地图模板。"""
         if self._globe_map_loaded:
             return False
 
@@ -77,14 +59,7 @@ class GlobeDetection:
         return perspective_transform(points, data=self.homography.homo_invt)
 
     def find_peaks(self, image, para):
-        """
-        Args:
-            image (np.ndarray): Screenshot.
-            para (dict): Parameters use in scipy.signal.find_peaks.
-
-        Returns:
-            np.ndarray: Image in monochrome, map borders in white, others in black.
-        """
+        """返回地图边界为白色、其余为黑色的单色图。"""
         r, g, b = cv2.split(image)
         cv2.convertScaleAbs(g, alpha=0.6, dst=g)
         cv2.convertScaleAbs(b, alpha=0.4, dst=b)
@@ -102,20 +77,10 @@ class GlobeDetection:
         return image
 
     def perspective_transform(self, image):
-        """
-        Args:
-            image (np.ndarray): Screenshot with perspective.
-
-        Returns:
-            np.ndarray: Image without perspective, like normal 2D maps.
-        """
+        """把带透视的截图转换为无透视二维地图图像。"""
         return cv2.warpPerspective(image, self.homography.homo_data, self.homography.homo_size)
 
     def load(self, image):
-        """
-        Args:
-            image (np.ndarray):
-        """
         self.load_globe_map()
         start_time = time.time()
 

@@ -25,11 +25,7 @@ class QuickRetireSetting(Setting):
 
 class QuickRetireSettingHandler(UI):
     def _retire_setting_enter(self):
-        """
-        Pages:
-            in: IN_RETIREMENT_CHECK, RETIRE_SETTING_ENTER
-            out: RETIRE_SETTING_QUIT
-        """
+        """从退役页进入快速退役设置。"""
         self.ui_click(
             RETIRE_SETTING_ENTER,
             check_button=RETIRE_SETTING_QUIT,
@@ -39,11 +35,7 @@ class QuickRetireSettingHandler(UI):
         )
 
     def _retire_setting_quit(self):
-        """
-        Pages:
-            in: RETIRE_SETTING_QUIT
-            out: IN_RETIREMENT_CHECK, RETIRE_SETTING_ENTER
-        """
+        """从快速退役设置返回退役页。"""
         self.ui_click(
             RETIRE_SETTING_QUIT,
             check_button=RETIRE_SETTING_ENTER,
@@ -77,34 +69,13 @@ class QuickRetireSettingHandler(UI):
         return setting
 
     def quick_retire_setting_set(self, filter_5="all"):
-        """
-        Set options of quick retire options.
-        The first 4 options are forced to set to:
-        - Prioritize Rarity 1: R (Rare)
-        - Prioritize Rarity 1: E (Elite)
-        - Prioritize Rarity 1: N (Normal)
-        - If you own a ship that has been fully Limit Broken, this option
-          determines what you want to do with the corresponding duplicate ships.
-              Don't Keep
+        """前三项固定优先 R、E、N，满破同名舰固定不保留。
 
-        Args:
-            filter_5 (str, None): The fifth option in quick retire options.
-                "If you own multiple copies of a ship that has not been fully Limit
-                Broken, this option determines what you want to do with those copies."
-                'keep_limit_break' for "Keep Enough to Max LB",
-                'all' for "Don't Keep"
-                None for don't change
-
-        Pages:
-            in: IN_RETIREMENT_CHECK, RETIRE_SETTING_ENTER
-            out: IN_RETIREMENT_CHECK, RETIRE_SETTING_ENTER
+        第五项接受 keep_limit_break、all 或 None，结束后返回退役页。
         """
         self._retire_setting_enter()
         self.retire_setting.set(filter_5=filter_5)
         self._retire_setting_quit()
 
     def server_support_quick_retire_setting_fallback(self):
-        """
-        Fallback to the correct quick retire settings if user has wrong set.
-        """
         return True

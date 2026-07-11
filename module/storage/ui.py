@@ -43,22 +43,10 @@ class StorageUI(UI):
         self.handle_info_bar()
 
     def _storage_in_material(self, interval=0):
-        """
-        Args:
-            interval (int): for appear func, varies
-                            by needs/location
-
-        Returns:
-            bool, if in MATERIAL_CHECK, appear and match_appear_on
-        """
         return self.match_template_color(MATERIAL_CHECK, offset=(20, 20), interval=interval)
 
     def _storage_enter_material(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: page_storage, any
-            out: page_storage, material, MATERIAL_CHECK
-        """
+        """从仓库任一分页进入材料页。"""
         logger.info("storage enter material")
         while 1:
             if skip_first_screenshot:
@@ -69,17 +57,14 @@ class StorageUI(UI):
             if self._storage_in_material():
                 break
 
-            # disassemble -> equipment
             if self.appear_then_click(DISASSEMBLE_CANCEL, offset=(20, 20), interval=3):
                 self.interval_reset(STORAGE_CHECK)
                 continue
-            # equipment -> material
             if self.appear(DISASSEMBLE, offset=(20, 20), interval=3):
                 logger.info("DISASSEMBLE -> MATERIAL_ENTER")
                 self.device.click(MATERIAL_ENTER)
                 self.interval_reset(STORAGE_CHECK)
                 continue
-            # design -> material
             if self.appear(STORAGE_CHECK, offset=(20, 20), interval=3):
                 logger.info("DISASSEMBLE -> MATERIAL_ENTER")
                 self.device.click(MATERIAL_ENTER)
@@ -88,11 +73,7 @@ class StorageUI(UI):
         self.interval_clear(STORAGE_CHECK)
 
     def _storage_enter_equipment(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: page_storage, any
-            out: page_storage, equipment, DISASSEMBLE
-        """
+        """从仓库任一分页进入装备页。"""
         logger.info("storage enter equipment")
         while 1:
             if skip_first_screenshot:
@@ -103,17 +84,14 @@ class StorageUI(UI):
             if self.appear(DISASSEMBLE, offset=(20, 20)):
                 break
 
-            # disassemble -> equipment
             if self.appear_then_click(DISASSEMBLE_CANCEL, offset=(20, 20), interval=3):
                 self.interval_reset(STORAGE_CHECK)
                 continue
-            # material -> equipment
             if self._storage_in_material(interval=3):
                 logger.info("_storage_in_material -> EQUIPMENT_ENTER")
                 self.device.click(EQUIPMENT_ENTER)
                 self.interval_reset(STORAGE_CHECK)
                 continue
-            # design -> equipment
             if self.appear(STORAGE_CHECK, offset=(20, 20), interval=3):
                 logger.info("STORAGE_CHECK -> EQUIPMENT_ENTER")
                 self.device.click(EQUIPMENT_ENTER)
@@ -122,11 +100,7 @@ class StorageUI(UI):
         self.interval_clear(STORAGE_CHECK)
 
     def _storage_enter_disassemble(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: page_storage, any
-            out: page_storage, disassemble, DISASSEMBLE_CANCEL
-        """
+        """从仓库任一分页进入拆解页。"""
         logger.info("storage enter disassemble")
         self.appear(STORAGE_CHECK, interval=3)
         while 1:
@@ -138,18 +112,15 @@ class StorageUI(UI):
             if self.appear(DISASSEMBLE_CANCEL, offset=(20, 20)):
                 break
 
-            # equipment -> disassemble
             if self.appear_then_click(DISASSEMBLE, offset=(20, 20), interval=3):
                 self.interval_reset(STORAGE_CHECK)
                 self.interval_reset(MATERIAL_CHECK)
                 continue
-            # material -> equipment
             if self._storage_in_material(interval=3):
                 logger.info("_storage_in_material -> EQUIPMENT_ENTER")
                 self.device.click(EQUIPMENT_ENTER)
                 self.interval_reset(STORAGE_CHECK)
                 continue
-            # design -> equipment
             if self.appear(STORAGE_CHECK, offset=(20, 20), interval=3):
                 logger.info("STORAGE_CHECK -> EQUIPMENT_ENTER")
                 self.device.click(EQUIPMENT_ENTER)
@@ -182,16 +153,7 @@ class StorageUI(UI):
         self._wait_until_storage_stable()
 
     def equipment_filter_set(self, rarity="all"):
-        """
-        A faster filter set function.
-
-        Args:
-            rarity (str, int): ['all', 'common', 'rare', 'elite', 'super_rare', 'ultra_rare']
-                Also allow: 1 for common, 2 for rare, 3 for elite, 4 for super_rare, 5 for ultra_rare
-
-        Pages:
-            in: DISASSEMBLE
-        """
+        """在拆解页设置稀有度；接受 all 或五档名称，也接受数字 1 至 5。"""
         rarity_convert = {
             "1": "common",
             "2": "rare",

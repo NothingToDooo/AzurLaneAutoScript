@@ -14,29 +14,22 @@ OCR_SHOP_VOUCHER = Digit(SHOP_VOUCHER, letter=(255, 255, 255), name="OCR_SHOP_VO
 
 class ShopStatus(UI):
     def status_get_gold_coins(self):
-        """读取金币数量。"""
         return OCR_SHOP_GOLD_COINS.ocr(self.device.image)
 
     def status_get_gems(self):
-        """读取钻石数量。"""
         return OCR_SHOP_GEMS.ocr(self.device.image)
 
     def status_get_medal(self):
-        """读取勋章数量。"""
         return OCR_SHOP_MEDAL.ocr(self.device.image)
 
     def status_get_merit(self):
-        """读取功勋数量。"""
         return OCR_SHOP_MERIT.ocr(self.device.image)
 
     def status_get_guild_coins(self):
-        """读取舰队币数量。"""
         return OCR_SHOP_GUILD_COINS.ocr(self.device.image)
 
     def status_get_core(self):
-        """读取核心数据数量。"""
         return OCR_SHOP_CORE.ocr(self.device.image)
 
     def status_get_voucher(self):
-        """读取兑换券数量。"""
         return OCR_SHOP_VOUCHER.ocr(self.device.image)

@@ -26,16 +26,7 @@ class CounterOcr(Ocr):
         return result.replace("B", "8")
 
     def ocr(self, image, direct_ocr=False):
-        """
-        Do OCR on a counter, such as `14/15`, and returns 14, 15
-
-        Args:
-            image:
-            direct_ocr:
-
-        Returns:
-            list[list[int]: [[current, total]].
-        """
+        """把 `14/15` 计数器识别为 `[当前数量, 总数量]`；多区域返回二维列表。"""
         result_list = super().ocr(image, direct_ocr=direct_ocr)
         if isinstance(result_list, list):
             parsed = []
@@ -127,15 +118,7 @@ class OSShopItemGrid(ItemGrid):
         self.counter_area = counter_area
 
     def predict(self, image, options=None, **settings) -> list[OSShopItem]:
-        """
-        Args:
-            image (np.ndarray):
-            options: 本次需要识别的商品字段。
-            **settings: 额外识别选项，支持 counter、shop_index 和 scroll_pos。
-
-        Returns:
-            list[Item]:
-        """
+        """settings 额外支持 counter、shop_index 和 scroll_pos 识别元数据。"""
         counter = settings.pop("counter", False)
         shop_index = settings.pop("shop_index", None)
         scroll_pos = settings.pop("scroll_pos", None)

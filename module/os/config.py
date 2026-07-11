@@ -2,10 +2,6 @@ from typing import ClassVar
 
 
 class OSConfig:
-    """
-    Configs for Operation Siren
-    """
-
     STORY_OPTION = -2
 
     MAP_FOCUS_ENEMY_AFTER_BATTLE = True

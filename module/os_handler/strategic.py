@@ -14,7 +14,6 @@ class StrategicSearchHandler(MapEventHandler):
         logger.info("Strategic search enter")
         self.interval_clear(os_assets.STRATEGIC_SEARCH_MAP_OPTION_OFF)
         for _ in self.loop():
-            # End
             if self.appear(os_assets.STRATEGIC_SEARCH_POPUP_CHECK, offset=(20, 20)):
                 return True
 
@@ -38,10 +37,6 @@ class StrategicSearchHandler(MapEventHandler):
                 break
 
     def _strategy_search_scroll_appear(self):
-        """
-        Returns:
-            bool: If it still exists
-        """
         for _ in self.loop(timeout=2):
             if STRATEGIC_SEARCH_SCROLL.appear(main=self):
                 return True
@@ -50,16 +45,10 @@ class StrategicSearchHandler(MapEventHandler):
         return False
 
     def _strategy_option_selected(self, button):
-        """
-        检查按钮是否已选中。
-        """
         return self.image_color_count(button.button, color=(156, 255, 82), count=30)
 
     def strategic_search_set_option(self):
-        """
-        Returns:
-            If success. False if strategic settings closed for unknown reason.
-        """
+        """设置页异常关闭时返回 False。"""
         logger.info("Strategic search set option")
         self._strategic_search_set_zone_and_merchant()
         if not self._strategic_search_scroll_to_device():
@@ -147,14 +136,7 @@ class StrategicSearchHandler(MapEventHandler):
         return False
 
     def strategic_search_start(self):
-        """
-        Returns:
-            If success.
-
-        Pages:
-            in: IN_MAP
-            out: IN_MAP, with strategic search running
-        """
+        """在区域地图启动战略搜索，三次失败后返回 False。"""
         logger.hr("Strategic search start")
         for _ in range(3):
             self.strategy_search_enter()
