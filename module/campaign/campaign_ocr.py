@@ -1,6 +1,7 @@
 import collections
 import re
 from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, TypedDict, Unpack
 
 import numpy as np
 
@@ -14,6 +15,13 @@ from module.map.assets import WITHDRAW
 from module.ocr.ocr import Ocr
 from module.template import assets as template_assets
 
+if TYPE_CHECKING:
+    from module.base.button import Button
+    from module.base.template import Template
+    from module.base.type_alias import ImageArray
+    from module.config.config import AzurLaneConfig
+    from module.device.device import Device
+
 
 @dataclass(frozen=True, slots=True)
 class StageMatchOptions:
@@ -24,7 +32,18 @@ class StageMatchOptions:
     similarity: float = 0.85
 
 
-def stage_match_options(options=None, settings=None) -> StageMatchOptions:
+class StageMatchSettings(TypedDict, total=False):
+    name_offset: tuple[int, int]
+    name_size: tuple[int, int]
+    name_letter: tuple[int, int, int]
+    name_thresh: int
+    similarity: float
+
+
+def stage_match_options(
+    options: StageMatchOptions | None = None,
+    settings: StageMatchSettings | None = None,
+) -> StageMatchOptions:
     options = StageMatchOptions() if options is None else options
     if settings:
         options = replace(options, **settings)
@@ -33,15 +52,21 @@ def stage_match_options(options=None, settings=None) -> StageMatchOptions:
 
 class CampaignOcr(ModuleBase):
     campaign_chapter: str = "0"
+    stage_entrance: dict[str, Button]
     # 大致关卡名区域，用来缩小模板匹配范围。
-    _stage_detect_area = (87, 117, 1151, 636)
+    _stage_detect_area: tuple[int, int, int, int] = (87, 117, 1151, 636)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        config: AzurLaneConfig | str,
+        device: Device | str | None = None,
+        task: str | None = None,
+    ) -> None:
         self.stage_entrance = {}
-        super().__init__(*args, **kwargs)
+        super().__init__(config=config, device=device, task=task)
 
     @staticmethod
-    def campaign_get_chapter_index(name):
+    def campaign_get_chapter_index(name: str | int) -> int:
         if isinstance(name, int):
             return name
         if name.isdigit():
@@ -53,12 +78,12 @@ class CampaignOcr(ModuleBase):
         raise CampaignNameError
 
     @staticmethod
-    def campaign_ocr_result_process(result):
+    def campaign_ocr_result_process(result: str) -> str:
         # 游戏内短横线不是普通 '-'，OCR 结果可能变成 '7--2'。
         result = result.replace("--", "-").replace("--", "-").lstrip("-")
 
         # 修正 'I1-1'、'1I-1' 这类数字段误识别，同时保留 'isp-2'、'sp1'。
-        def replace_func(match):
+        def replace_func(match: re.Match[str]) -> str:
             segment = match.group(0)
             return segment.replace("I", "1")
 
@@ -98,15 +123,15 @@ class CampaignOcr(ModuleBase):
 
     def campaign_match_multi(
         self,
-        template,
-        image,
-        stage_image=None,
-        options=None,
-        **settings,
-    ):
+        template: Template,
+        image: ImageArray,
+        stage_image: ImageArray | None = None,
+        options: StageMatchOptions | None = None,
+        **settings: Unpack[StageMatchSettings],
+    ) -> list[Button]:
         """从 stage_image 匹配入口并返回按钮列表；settings 覆盖 StageMatchOptions。"""
         options = stage_match_options(options, settings)
-        digits = []
+        digits: list[Button] = []
         stage_image = image if stage_image is None else stage_image
         result = template.match_multi(stage_image, similarity=options.similarity, name="STAGE")
         name_area = (
@@ -118,7 +143,8 @@ class CampaignOcr(ModuleBase):
         for matched_button in result:
             button = matched_button.move(self._stage_detect_area[:2])
             button_name = button.crop(area=name_area, image=image)
-            name = extract_letters(button_name.image, letter=options.name_letter, threshold=options.name_thresh)
+            name_image = crop(image, button_name.area, copy=False)
+            name = extract_letters(name_image, letter=options.name_letter, threshold=options.name_thresh)
             button_name = button_name.crop(area=self._extract_stage_name(name))
             # 每个按钮的 area 临时替换成关卡名区域，供 OCR 使用；button 保留关卡图标区域。
             button.load_color(image)
@@ -128,16 +154,16 @@ class CampaignOcr(ModuleBase):
         return digits
 
     @cached_property
-    def _stage_image(self):
+    def _stage_image(self) -> ImageArray:
         return crop(self.device.image, self._stage_detect_area, copy=False)
 
     @cached_property
-    def _stage_image_gray(self):
+    def _stage_image_gray(self) -> ImageArray:
         return rgb2gray(self._stage_image)
 
-    def campaign_extract_name_image(self, image):
+    def campaign_extract_name_image(self, image: ImageArray) -> list[Button]:
         """按 ManualConfig.STAGE_ENTRANCE 处理活动差异并返回全部关卡入口按钮。"""
-        digits = []
+        digits: list[Button] = []
 
         if "normal" in self.config.STAGE_ENTRANCE:
             digits += self.campaign_match_multi(
@@ -205,20 +231,25 @@ class CampaignOcr(ModuleBase):
         return digits
 
     @staticmethod
-    def _extract_stage_name(image):
+    def _extract_stage_name(image: ImageArray) -> tuple[int, int, int, int]:
         """从完整关卡名裁图中返回关卡编号区域坐标，例如 Counterattack! 前的 3-4。"""
         x_skip = 10
         interval = 5
         x_color = np.convolve(np.mean(image, axis=0), np.ones(interval), "valid") / interval
         x_list = np.where(x_color[x_skip:] > 245)[0]
-        if x_list is None or len(x_list) == 0:
+        if len(x_list) == 0:
             logger.warning("No interval between digit and text.")
             area = (0, 0, image.shape[1], image.shape[0])
         else:
             area = (0, 0, x_list[0] + 1 + x_skip, image.shape[0])
-        return np.add(area, (-3, -7, 3, 7))
+        return (
+            int(area[0] - 3),
+            int(area[1] - 7),
+            int(area[2] + 3),
+            int(area[3] + 7),
+        )
 
-    def _get_stage_name(self, image):
+    def _get_stage_name(self, image: ImageArray) -> None:
         """解析关卡名，并写入 campaign_chapter 和关卡名到入口按钮的 stage_entrance 映射。"""
         self.stage_entrance = {}
         del_cached_property(self, "_stage_image")
@@ -230,27 +261,25 @@ class CampaignOcr(ModuleBase):
             logger.info("No stage found.")
             raise CampaignNameError
 
-        ocr = Ocr(
+        ocr = Ocr[str](
             buttons,
             name="campaign",
             letter=(255, 255, 255),
             threshold=128,
             alphabet="0123456789ABCDEFGHIJKLMNPQRSTUVWXYZ-",
         )
-        result = ocr.ocr(image)
-        if not isinstance(result, list):
-            result = [result]
+        result = ocr.ocr_regions(image)
         result = [self.campaign_ocr_result_process(res) for res in result]
 
-        chapter = [self.campaign_separate_name(res)[0] for res in result if res]
-        chapter = list(filter(("").__ne__, chapter))
-        if not chapter:
+        chapters = [self.campaign_separate_name(res)[0] for res in result if res]
+        chapters = [chapter for chapter in chapters if chapter]
+        if not chapters:
             raise CampaignNameError
 
-        counter = collections.Counter(chapter)
+        counter = collections.Counter(chapters)
         self.campaign_chapter = counter.most_common()[0][0]
 
-        if self.campaign_chapter in {0, "0"}:
+        if self.campaign_chapter == "0":
             # OCR 误识别示例：'0F'、'F-IB'、'IGI'。
             raise CampaignNameError
 
@@ -260,7 +289,7 @@ class CampaignOcr(ModuleBase):
         # button.color：关卡图标颜色。
         # button.button：关卡图标区域。
         # button.name：OCR 识别出的关卡名。
-        for name, button in zip(result, buttons, strict=False):
+        for name, button in zip(result, buttons, strict=True):
             button.area = button.button
             button.name = name
             self.stage_entrance[name] = button
@@ -268,12 +297,13 @@ class CampaignOcr(ModuleBase):
         logger.attr("Chapter", self.campaign_chapter)
         logger.attr("Stage", ", ".join(self.stage_entrance.keys()))
 
-    def handle_get_chapter_additional(self):
+    def handle_get_chapter_additional(self) -> bool:
         if self.appear(WITHDRAW, offset=(30, 30)):
             logger.warning("get_chapter_index: WITHDRAW appears")
             raise CampaignNameError
+        return False
 
-    def get_chapter_index(self, skip_first_screenshot=True):
+    def get_chapter_index(self, *, skip_first_screenshot: bool = True) -> int:
         timeout = Timer(2, count=4).start()
         while 1:
             if skip_first_screenshot:

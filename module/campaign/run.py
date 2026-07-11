@@ -4,7 +4,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 from module.campaign.campaign_base import CampaignBase
 from module.campaign.campaign_event import CampaignEvent
@@ -30,6 +30,8 @@ from module.ui.page import page_campaign
 
 if TYPE_CHECKING:
     from module.config.config import AzurLaneConfig
+
+type CampaignMode = Literal["normal", "hard"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,7 +135,8 @@ class CampaignRun(CampaignEvent):
             and (self.loaded_stage is not None) == is_stage
         )
 
-    def _stage_for_reference(self, name: str, folder: str) -> str:
+    @staticmethod
+    def _stage_for_reference(name: str, folder: str) -> str:
         if folder.startswith("campaign_"):
             return "-".join(name.split("_")[1:3])
         if folder.startswith(("event", "war_archives")):
@@ -302,21 +305,26 @@ class CampaignRun(CampaignEvent):
             or self._triggered_task_balancer_limit(oil_check=oil_check)
         )
 
-    def _triggered_app_restart(self):
+    def _triggered_app_restart(self) -> bool:
         if not self.campaign.emotion.is_ignore and self.campaign.emotion.triggered_bug():
             logger.info("Triggered restart avoid emotion bug")
             return True
 
         return False
 
-    def handle_app_restart(self):
+    def handle_app_restart(self) -> bool:
         if self._triggered_app_restart():
             self.config.task_call("Restart")
             return True
 
         return False
 
-    def handle_stage_name(self, name, folder, mode="normal"):
+    def handle_stage_name(
+        self,
+        name: str,
+        folder: str,
+        mode: CampaignMode = "normal",
+    ) -> tuple[str, str]:
         """归一化活动别名并返回 (关卡名, 活动目录)；vsp、muse sp 等特殊 SP 统一映射到 sp.py。"""
         name = to_map_file_name(name)
         # 宝石委托按关卡名自动选择活动或主线目录。
@@ -349,21 +357,21 @@ class CampaignRun(CampaignEvent):
         _apply_campaign_folder_policies(folder, policy_config, catalog)
         return name, folder
 
-    def can_use_auto_search_continue(self):
+    def can_use_auto_search_continue(self) -> bool:
         # 自律寻敌菜单内无法更新地图信息；设置地图成就条件时必须关闭。
         if self.config.StopCondition_MapAchievement != "non_stop":
             return False
 
         return self.run_count > 0 and self.campaign.map_is_auto_search
 
-    def handle_commission_notice(self):
+    def handle_commission_notice(self) -> None:
         """在 page_campaign 检查委托通知；命中时切换委托任务并抛出 TaskEnd。"""
         if self.campaign.commission_notice_show_at_campaign():
             logger.info("Commission notice found")
             self.config.task_call("Commission", force_call=True)
             self.config.task_stop("Commission notice found")
 
-    def _ensure_campaign_run_ui(self, mode) -> None:
+    def _ensure_campaign_run_ui(self, mode: CampaignMode) -> None:
         self.device.stuck_record_clear()
         self.device.click_record_clear()
         if not self.device.has_cached_image:
@@ -405,7 +413,13 @@ class CampaignRun(CampaignEvent):
 
         return False
 
-    def run(self, name, folder="campaign_main", mode="normal", total=0):
+    def run(
+        self,
+        name: str,
+        folder: str = "campaign_main",
+        mode: CampaignMode = "normal",
+        total: int = 0,
+    ) -> None:
         """运行指定地图文件；mode 接受 normal 或 hard。"""
         name, folder = self.handle_stage_name(name, folder, mode=mode)
         self.config.override(Campaign_Name=name, Campaign_Event=folder)

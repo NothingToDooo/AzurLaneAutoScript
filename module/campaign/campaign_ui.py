@@ -1,4 +1,5 @@
 from contextlib import suppress
+from typing import TYPE_CHECKING, override
 
 from module.base.button import Button
 from module.base.timer import Timer
@@ -13,14 +14,21 @@ from module.map.map_operation import MapOperation
 from module.ui.assets import CAMPAIGN_CHECK
 from module.ui.switch import Switch
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from module.base.base import ModuleBase
+
 CAMPAIGN_NAME_ERROR_MESSAGE = "Campaign name error"
 
 
 class ModeSwitch(Switch):
-    def handle_additional(self, _main):
+    @override
+    def handle_additional(self, _main: ModuleBase) -> bool:
         if _main.appear(WITHDRAW, offset=(30, 30)):
             logger.warning("ModeSwitch: WITHDRAW appears")
             raise CampaignNameError
+        return False
 
 
 MODE_SWITCH_1 = ModeSwitch("Mode_switch_1", offset=(30, 10))
@@ -66,7 +74,7 @@ _CHAPTER_SWITCH_20241219_SPEX_ASIDE = {
 }
 
 
-def is_digit_chapter(chapter):
+def is_digit_chapter(chapter: str | int) -> bool:
     if isinstance(chapter, int):
         return True
     try:
@@ -77,8 +85,9 @@ def is_digit_chapter(chapter):
 
 class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
     ENTRANCE = Button(area=(), color=(), button=(), name="default_button")
+    stage_entrance: dict[str, Button]
 
-    def campaign_ensure_chapter(self, chapter, skip_first_screenshot=True):
+    def campaign_ensure_chapter(self, chapter: str | int, *, skip_first_screenshot: bool = True) -> None:
         """chapter 接受数字章节或 d、sp 等活动章节名。"""
         index = self.campaign_get_chapter_index(chapter)
         isdigit = is_digit_chapter(chapter)
@@ -122,11 +131,12 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
                 self.device.multi_click(button, n=abs(diff), interval=(0.2, 0.3))
                 retry.reset()
 
-    def handle_chapter_additional(self):
+    @staticmethod
+    def handle_chapter_additional() -> bool:
         """子类扩展钩子；处理后返回 True，默认不处理。"""
         return False
 
-    def campaign_ensure_mode(self, mode="normal"):
+    def campaign_ensure_mode(self, mode: str = "normal") -> None:
         """mode 接受 normal、hard 或 ex。"""
         if mode == "hard":
             self.config.override(Campaign_Mode="hard")
@@ -153,7 +163,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         else:
             logger.warning(f"Unknown campaign mode: {mode}")
 
-    def campaign_ensure_mode_20241219(self, mode="combat"):
+    def campaign_ensure_mode_20241219(self, mode: str = "combat") -> None:
         """mode 接受 combat 或 story。"""
         if mode in ["normal", "hard", "ex", "combat"]:
             MODE_SWITCH_20241219.set("combat", main=self)
@@ -162,7 +172,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         else:
             logger.warning(f"Unknown campaign mode: {mode}")
 
-    def campaign_ensure_aside_20241219(self, chapter):
+    def campaign_ensure_aside_20241219(self, chapter: str) -> None:
         """chapter 接受 part1、part2、sp 或 ex。"""
         if chapter in ["part1", "a", "c", "t"]:
             ASIDE_SWITCH_20241219.set("part1", main=self)
@@ -175,7 +185,8 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         else:
             logger.warning(f"Unknown campaign aside: {chapter}")
 
-    def campaign_get_mode_names(self, name):
+    @staticmethod
+    def campaign_get_mode_names(name: str) -> list[str]:
         """返回普通/困难关卡名对，例如 t1 → [t1, ht1]、a1 → [a1, c1]。"""
         if name.startswith("t"):
             return [f"t{name[1:]}", f"ht{name[1:]}"]
@@ -187,17 +198,14 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
             return [f"b{name[1:]}", f"d{name[1:]}"]
         return [name]
 
-    def _campaign_name_is_hard(self, name):
+    def _campaign_name_is_hard(self, name: str) -> bool:
         mode_names = self.campaign_get_mode_names(name)
         return len(mode_names) == 2 and mode_names[1] == name
 
-    def campaign_get_entrance(self, name):
+    def campaign_get_entrance(self, name: str) -> Button:
         """name 接受 7-2、d3 或 sp3 等关卡名。"""
         entrance_name = name
         stage_entrance = self.stage_entrance
-        if not isinstance(stage_entrance, dict):
-            logger.warning("Stage entrance not initialized")
-            raise CampaignNameError
         if self.config.MAP_HAS_MODE_SWITCH:
             for mode_name in self.campaign_get_mode_names(name):
                 if mode_name in stage_entrance:
@@ -211,7 +219,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         entrance.name = entrance_name
         return entrance
 
-    def campaign_set_chapter_main(self, chapter, mode="normal"):
+    def campaign_set_chapter_main(self, chapter: str, mode: str = "normal") -> bool:
         if chapter.isdigit():
             self.ui_goto_campaign()
             self.campaign_ensure_mode("normal")
@@ -225,7 +233,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
             return True
         return False
 
-    def campaign_set_chapter_event(self, chapter, mode="normal"):
+    def campaign_set_chapter_event(self, chapter: str, mode: str = "normal") -> bool:
         del mode
         if chapter in ["a", "b", "c", "d", "ex_sp", "as", "bs", "cs", "ds", "t", "ts", "tss", "ht", "hts"]:
             self.ui_goto_event()
@@ -239,7 +247,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
             return True
         return False
 
-    def campaign_set_chapter_sp(self, chapter, mode="normal"):
+    def campaign_set_chapter_sp(self, chapter: str, mode: str = "normal") -> bool:
         del mode
         if chapter == "sp":
             self.ui_goto_sp()
@@ -247,11 +255,15 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
             return True
         return False
 
-    def _set_20241219_hard_mode(self, chapter, stage) -> None:
+    def _set_20241219_hard_mode(self, chapter: str, stage: str) -> None:
         if self._campaign_name_is_hard(f"{chapter}{stage}"):
             self.config.override(Campaign_Mode="hard")
 
-    def _campaign_set_chapter_20241219_aside(self, chapter, aside_by_chapter):
+    def _campaign_set_chapter_20241219_aside(
+        self,
+        chapter: str,
+        aside_by_chapter: Mapping[str, str],
+    ) -> bool:
         aside = aside_by_chapter.get(chapter)
         if aside is None:
             return False
@@ -262,7 +274,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         self.campaign_ensure_chapter(chapter)
         return True
 
-    def campaign_set_chapter_20241219(self, chapter, stage, mode="combat"):
+    def campaign_set_chapter_20241219(self, chapter: str, stage: str, mode: str = "combat") -> bool:
         if self.config.MAP_CHAPTER_SWITCH_20241219:
             self._set_20241219_hard_mode(chapter, stage)
             if mode == "story":
@@ -284,7 +296,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
                 ASIDE_SWITCH_20241219.offset = (20, 20)
         return False
 
-    def campaign_set_chapter(self, name, mode="normal"):
+    def campaign_set_chapter(self, name: str, mode: str = "normal") -> None:
         """设置 7-2、d3 或 sp3 等关卡；mode 接受 normal 或 hard。"""
         chapter, stage = self.campaign_separate_name(name)
 
@@ -298,7 +310,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         else:
             logger.warning(f"Unknown campaign chapter: {name}")
 
-    def handle_campaign_ui_additional(self):
+    def handle_campaign_ui_additional(self) -> bool:
         if self.appear(WITHDRAW, offset=(30, 30)):
             self.ensure_no_info_bar(timeout=2)
             with suppress(CampaignEnd):
@@ -306,7 +318,13 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
             return True
         return False
 
-    def ensure_campaign_ui(self, name, mode="normal", skip_first_screenshot=True):
+    def ensure_campaign_ui(
+        self,
+        name: str,
+        mode: str = "normal",
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> bool:
         """切换到指定关卡和 normal/hard 模式；重试后仍失败则抛出 ScriptEnd。"""
         timeout = Timer(5, count=20).start()
         while 1:
@@ -331,7 +349,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
         logger.warning(CAMPAIGN_NAME_ERROR_MESSAGE)
         raise ScriptEnd(CAMPAIGN_NAME_ERROR_MESSAGE)
 
-    def commission_notice_show_at_campaign(self):
+    def commission_notice_show_at_campaign(self) -> bool:
         return self.appear(CAMPAIGN_CHECK, offset=(20, 20)) and self.appear(
             campaign_assets.COMMISSION_NOTICE_AT_CAMPAIGN
         )
