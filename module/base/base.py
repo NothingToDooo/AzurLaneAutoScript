@@ -26,17 +26,9 @@ class ModuleBase:
     EARLY_OCR_IMPORT = False
 
     def __init__(self, config, device=None, task=None):
-        """
-        Args:
-            config (AzurLaneConfig, str):
-                Name of the user config under ./config
-            device (Device, str):
-                To reuse a device.
-                If None, create a new Device object.
-                If str, create a new Device object and use the given device as serial.
-            task (str):
-                Bind a task only for dev purpose. Usually to be None for auto task scheduling.
-                If None, use default configs.
+        """config 可传配置对象或配置名；device 可复用对象、按序列号新建，或省略后新建。
+
+        task 仅供开发时绑定；未指定时使用默认配置。
         """
         if isinstance(config, AzurLaneConfig):
             self.config = config
@@ -67,11 +59,7 @@ class ModuleBase:
         return Emotion(config=self.config)
 
     def early_ocr_import(self):
-        """
-        在开始截图时提前导入 OCR 依赖。
-
-        截图是 I/O 密集，OCR 导入是 CPU 密集，放到后台线程可以缩短启动等待。
-        """
+        """截图是 I/O 密集，OCR 导入是 CPU 密集；后台导入可缩短启动等待。"""
         if ModuleBase.EARLY_OCR_IMPORT:
             return
         if not self.config.is_actual_task:
@@ -82,7 +70,6 @@ class ModuleBase:
             return
 
         def do_ocr_import():
-            # 等第一张截图缓存完成。
             while 1:
                 if self.device.has_cached_image:
                     break
@@ -100,50 +87,12 @@ class ModuleBase:
 
     @cached_class_property
     def worker(cls):
-        """
-        后台线程池，用于执行不阻塞主流程的工作。
-
-        示例：
-        ```
-        def func(image):
-            logger.info('Update thread start')
-            with self.config.multi_set():
-                self.dungeon_get_simuni_point(image)
-                self.dungeon_update_stamina(image)
-        ModuleBase.worker.submit(func, self.device.image)
-        ```
-        """
+        """共享单线程后台池，提交的任务不得阻塞主流程。"""
         logger.hr("Creating worker")
         return ThreadPoolExecutor(1)
 
     def loop(self, skip_first=True, timeout=None):
-        """
-        A syntactic sugar to start a state loop
-
-        Args:
-            skip_first (bool): Usually to be True to reuse the previous screenshot
-            timeout (int | float | Timer): Seconds of timeout or a Timer object
-
-        Yields:
-            np.ndarray: screenshot
-
-        Examples:
-            # state machine that handle clicking until destination
-            for _ in self.loop():
-                if self.appear(...):
-                    break
-                if self.appear_then_click(...):
-                    continue
-
-        Examples:
-            # state machine with timeout
-            for _ in self.loop(timeout=2):
-                if self.appear(...):
-                    logger.info('Wait success')
-                    break
-            else:
-                logger.warning('Wait timeout')
-        """
+        """循环产出最新截图；skip_first 可复用已有截图，timeout 可传秒数或 Timer。"""
         if timeout is not None:
             if isinstance(timeout, Timer):
                 timeout.reset()
@@ -166,24 +115,9 @@ class ModuleBase:
                 yield self.device.image
 
     def appear(self, button, offset=0, interval=0, similarity=0.85, threshold=10):
-        """
-        Args:
-            button (Button, Template):
-            offset (bool, int):
-            interval (int, float): interval between two active events.
-            similarity (int, float): 0 to 1.
-            threshold (int, float): 0 to 255 if not use offset, smaller means more similar
+        """offset 启用模板匹配，否则按区域颜色判断；interval 限制连续触发频率。
 
-        Returns:
-            bool:
-
-        Examples:
-            Image detection:
-            ```
-            self.device.screenshot()
-            self.appear(Button(area=(...), color=(...), button=(...))
-            self.appear(Template(file='...')
-            ```
+        similarity 范围为 0～1；threshold 范围为 0～255，且越小越相似。
         """
         self.device.stuck_record_add(button)
 
@@ -209,17 +143,7 @@ class ModuleBase:
         return appear
 
     def match_template_color(self, button, offset=(20, 20), interval=0, similarity=0.85, threshold=30):
-        """
-        Args:
-            button (Button):
-            offset (bool, int):
-            interval (int, float): interval between two active events.
-            similarity (int, float): 0 to 1.
-            threshold (int, float): 0 to 255 if not use offset, smaller means more similar
-
-        Returns:
-            bool:
-        """
+        """先匹配模板再校验颜色；interval 限制连续触发频率。"""
         self.device.stuck_record_add(button)
 
         if interval:
@@ -294,27 +218,12 @@ class ModuleBase:
                 break
 
     def image_crop(self, button, copy=True):
-        """Extract the area from image.
-
-        Args:
-            button(Button, tuple): Button instance or area tuple.
-            copy:
-        """
         if isinstance(button, Button) or hasattr(button, "area"):
             return crop(self.device.image, button.area, copy=copy)
         return crop(self.device.image, button, copy=copy)
 
     def image_color_count(self, button, color, threshold=221, count=50):
-        """
-        Args:
-            button (Button, tuple): Button instance or area.
-            color (tuple): RGB.
-            threshold: 255 means colors are the same, the lower the worse.
-            count (int): Pixels count.
-
-        Returns:
-            bool:
-        """
+        """判断区域内是否有超过 count 个像素达到颜色阈值；255 表示完全相同。"""
         image = button if isinstance(button, np.ndarray) else self.image_crop(button, copy=False)
         mask = color_similarity_2d(image, color=color)
         cv2.inRange(mask, threshold, 255, dst=mask)
@@ -322,23 +231,13 @@ class ModuleBase:
         return sum_ > count
 
     def image_color_button(self, area, color, color_threshold=250, encourage=5, name="COLOR_BUTTON"):
-        """
-        Find an area with pure color on image, convert into a Button.
+        """在区域内查找纯色块并生成按钮；color_threshold 为 0～255，encourage 为半径。
 
-        Args:
-            area (tuple[int]): Area to search from
-            color (tuple[int]): Target color
-            color_threshold (int): 0-255, 255 means exact match
-            encourage (int): Radius of button
-            name (str): Name of the button
-
-        Returns:
-            Button: Or None if nothing matched.
+        没有足够匹配像素时返回 None。
         """
         image = color_similarity_2d(self.image_crop(area, copy=False), color=color)
         points = np.array(np.where(image > color_threshold)).T[:, ::-1]
         if points.shape[0] < encourage**2:
-            # Not having enough pixels to match
             return None
 
         point = fit_points(points, mod=image_size(image), encourage=encourage)
@@ -399,11 +298,7 @@ class ModuleBase:
 
     @image_file.setter
     def image_file(self, value):
-        """
-        For development.
-        Load image from local file system and set it to self.device.image
-        Test an image without taking a screenshot from emulator.
-        """
+        """开发调试入口：用本地文件或 PIL 图像替换设备截图。"""
         if isinstance(value, Image.Image):
             value = np.array(value)
         elif isinstance(value, str):

@@ -4,10 +4,6 @@ from pathlib import Path
 
 class TabWrapper:
     def __init__(self, generator, prefix="", suffix="", newline=True):
-        """
-        Args:
-            generator (CodeGenerator):
-        """
         self.generator = generator
         self.prefix = prefix
         self.suffix = suffix

@@ -125,15 +125,9 @@ def _generated_value(name: str, value) -> list[str]:
 class ConfigGenerator:
     @cached_property
     def argument(self):
-        """
-        Load argument.yaml, and standardise its structure.
+        """读取 argument.yaml 并标准化为 `<group>.<argument>` 路径。
 
-        <group>:
-            <argument>:
-                type: checkbox|select|textarea|input
-                value:
-                option (Optional): Options, if argument has any options.
-                validate (Optional): datetime
+        每项包含 type 和 value；可选 option，datetime 项还包含 validate。
         """
         data = {}
         raw = read_file(filepath_argument("argument"))
@@ -141,7 +135,6 @@ class ConfigGenerator:
             arg = {
                 "type": "input",
                 "value": "",
-                # 可选项
             }
             value = raw_value if isinstance(raw_value, dict) else {"value": raw_value}
             arg["type"] = data_to_type(value, arg=path[1])
@@ -152,7 +145,6 @@ class ConfigGenerator:
             arg.update(value)
             deep_set(data, keys=path, value=arg)
 
-        # 定义存储组。
         arg = {
             "type": "storage",
             "value": {},
@@ -164,38 +156,22 @@ class ConfigGenerator:
 
     @cached_property
     def task(self):
-        """
-        <task_group>:
-            <task>:
-                command: <catalog command>
-                groups: <argument groups>
-        """
+        """读取 task.yaml 的 `<task_group>.<task>.{command, groups}` 结构。"""
         return read_file(filepath_argument("task"))
 
     @cached_property
     def default(self):
-        """
-        <task>:
-            <group>:
-                <argument>: value
-        """
+        """读取 default.yaml 的 `<task>.<group>.<argument>` 默认值。"""
         return read_file(filepath_argument("default"))
 
     @cached_property
     def override(self):
-        """
-        <task>:
-            <group>:
-                <argument>: value
-        """
+        """读取 override.yaml 的 `<task>.<group>.<argument>` 覆盖值。"""
         return read_file(filepath_argument("override"))
 
     @cached_property
     def gui(self):
-        """
-        <i18n_group>:
-            <i18n_key>: value, value is None
-        """
+        """读取 gui.yaml 的 `<i18n_group>.<i18n_key>` 结构。"""
         return read_file(filepath_argument("gui"))
 
     def _parse_task_groups(self, task: str, groups: object) -> tuple[str, ...]:
@@ -388,15 +364,7 @@ class ConfigGenerator:
     @cached_property
     @timer
     def args(self):
-        """
-        合并定义并生成标准化 json。
-
-            task.yaml ---+
-        argument.yaml ---+-----> args.json
-        override.yaml ---+
-         default.yaml ---+
-
-        """
+        """合并 task、argument、override 和 default 定义，生成标准化 args 数据。"""
         data = self._build_task_args()
         self._apply_default_values(data)
         self._apply_override_values(data)
@@ -405,12 +373,7 @@ class ConfigGenerator:
 
     @timer
     def generate_code(self):
-        """
-        生成 Python 配置代码。
-
-        args.json ---> config_generated.py
-
-        """
+        """根据标准化参数生成 config_generated.py。"""
         visited_group = set()
         visited_path = set()
         lines: list[str] = list(CONFIG_IMPORT)
@@ -441,7 +404,6 @@ class ConfigGenerator:
             deep_set(new, keys=key, value=value)
 
     def _generate_task_i18n(self, new, old) -> None:
-        # 菜单。
         for task_group, task, _command, _groups in self._iter_task_nodes():
             self._load_i18n_words(new, old, ["Menu", task_group])
             self._load_i18n_words(new, old, ["Task", task])
@@ -492,24 +454,13 @@ class ConfigGenerator:
 
     @timer
     def generate_i18n(self, lang):
-        """
-        读取旧翻译并生成新的翻译文件。
-
-                     args.json ---+-----> i18n/<lang>.json
-        (old) i18n/<lang>.json ---+
-
-        """
+        """用标准化参数补全旧翻译，并写回 `i18n/<lang>.json`。"""
         old = read_file(filepath_i18n(lang))
         write_file(filepath_i18n(lang), self.generate_i18n_data(old))
 
     @cached_property
     def menu(self):
-        """
-        生成菜单定义。
-
-        task.yaml --> menu.json
-
-        """
+        """根据 task.yaml 生成菜单数据。"""
         data = {}
         task_nodes = tuple(self._iter_task_nodes())
         for task_group in self.task:
@@ -529,7 +480,6 @@ class ConfigGenerator:
     @cached_property
     @timer
     def event_packs(self) -> tuple[EventPack, ...]:
-        """返回按 manifest 文件名确定性加载的活动包。"""
         return load_default_event_manifests()
 
     @staticmethod
@@ -576,9 +526,6 @@ class ConfigGenerator:
                 deep_set(self.args, keys=f"{task}.Campaign.Event.option_bold", value=options.copy())
 
     def insert_event(self):
-        """
-        将 manifest 中的活动信息写入 `self.args`。
-        """
         packs = tuple(self.event_packs)
         self._set_event_options(EVENTS + GEMS_FARMINGS, self._latest_named_options(packs, "event"), bold=True)
         self._set_event_options(RAIDS, self._latest_named_options(packs, "raid"), bold=True)
@@ -654,14 +601,6 @@ class ConfigUpdater:
                 deep_set(new, keys=f"{task}.Campaign.Name", value=stage)
 
     def config_update(self, old, is_template=False):
-        """
-        Args:
-            old (dict):
-            is_template (bool):
-
-        Returns:
-            dict:
-        """
         new = self._rebuild_config_from_args(old, is_template=is_template)
         self._migrate_opsi_hazard_leveling_enable(new)
 
@@ -681,76 +620,29 @@ class ConfigUpdater:
         return data
 
     def save_callback(self, key: str, _value: object) -> Iterable[tuple[str, object]]:
-        """
-        Args:
-            key：配置 json 中的键路径，例如 "Main.Emotion.Fleet1Value"。
-            _value：用户设置的值，例如 "98"。
-
-        Yields:
-            str：需要写入配置 json 的键路径，例如 "Main.Emotion.Fleet1Record"。
-            any：需要写入的值，例如 "2020-01-01 00:00:00"。
-        """
+        """配置值保存回调；Emotion 的 `*Value` 变化时产出对应 `*Record` 路径和当前时间。"""
         if "Emotion" in key and "Value" in key:
             keys = key.split(".")
             keys[-1] = keys[-1].replace("Value", "Record")
             yield ".".join(keys), datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def read_file(self, config_name, is_template=False):
-        """
-        读取并更新配置文件。
-
-        Args:
-            config_name (str): ./config/{file}.json
-            is_template (bool):
-
-        Returns:
-            dict:
-        """
+        """读取并迁移 `./config/{config_name}.json`，只返回结果而不立即写回。"""
         old = read_file(filepath_config(config_name))
-        # 更新后的配置不会立刻写回文件；这里为了性能保留只读行为。
         return self.config_update(old, is_template=is_template)
 
     @staticmethod
     def write_file(config_name, data):
-        """
-        写入配置文件。
-
-        Args:
-            config_name (str): ./config/{file}.json
-            data (dict):
-        """
         write_file(filepath_config(config_name), data)
 
     @timer
     def update_file(self, config_name, is_template=False):
-        """
-        读取、更新并写入配置文件。
-
-        Args:
-            config_name (str): ./config/{file}.json
-            is_template (bool):
-
-        Returns:
-            dict:
-        """
         data = self.read_file(config_name, is_template=is_template)
         self.write_file(config_name, data)
         return data
 
 
 if __name__ == "__main__":
-    r"""
-    Process the whole config generation.
-
-                 task.yaml -+----------------> menu.json
-             argument.yaml -+-> args.json ---> config_generated.py
-             override.yaml -+       |
-                  gui.yaml --------\|
-                                   ||
-    (old) i18n/<lang>.json --------\\========> i18n/<lang>.json
-    (old)    template.json ---------\========> template.json
-    """
-    # 确保在 Alas 根目录运行。
     import os
 
     os.chdir(REPO_ROOT)

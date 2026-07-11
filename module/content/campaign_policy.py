@@ -118,7 +118,6 @@ def apply_stage_policy(
     policy: CampaignPolicy,
     config: StagePolicyConfig,
 ) -> None:
-    """应用只依赖精确关卡名的有限配置覆盖。"""
     if stage in policy.force_threat_safe_stages and config.StopCondition_MapAchievement != "non_stop":
         logger.info(f"In {pack_id}/{stage}, MapAchievement is forced to threat_safe")
         config.override(StopCondition_MapAchievement="threat_safe")
@@ -140,7 +139,6 @@ def apply_pack_policy(
     policy: CampaignPolicy,
     config: StagePolicyConfig,
 ) -> None:
-    """应用只依赖活动包的有限配置值回退。"""
     fallback = dict(policy.map_achievement_fallbacks).get(config.StopCondition_MapAchievement)
     if fallback is None:
         return

@@ -25,13 +25,7 @@ class Mask(Template):
         self._image = value
 
     def set_channel(self, channel):
-        """
-        Args:
-            channel (int): 0 for monochrome, 3 for RGB.
-
-        Returns:
-            bool: If changed.
-        """
+        """把掩码切换为单通道 0 或 RGB 三通道 3；实际发生转换时返回 True。"""
         mask_channel = image_channel(self.image)
         if channel == 0:
             if mask_channel == 0:
@@ -44,14 +38,5 @@ class Mask(Template):
         return False
 
     def apply(self, image):
-        """
-        Apply mask on image.
-
-        Args:
-            image:
-
-        Returns:
-            np.ndarray:
-        """
         self.set_channel(image_channel(image))
         return cv2.bitwise_and(image, self.image)

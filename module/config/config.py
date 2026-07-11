@@ -80,13 +80,6 @@ def _schedule_priority() -> dict[str, int]:
 
 
 def name_to_function(name):
-    """
-    Args:
-        name (str):
-
-    Returns:
-        Function:
-    """
     function = Function({})
     function.command = name
     function.enable = True
@@ -96,7 +89,6 @@ def name_to_function(name):
 class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher):
     stop_event: StopEvent | None = None
 
-    # 类级开关。
     is_hoarding_task = True
 
     # 旧装备切换任务在运行期注入的舰队和装备记录。
@@ -118,38 +110,30 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
 
     def __init__(self, config_name, task=None):
         logger.attr("Server", self.SERVER)
-        # This will read ./config/<config_name>.json
         self.config_name = config_name
-        # Raw json data in yaml file.
+        # 原始配置树。
         self.data = {}
-        # Modified arguments. Key: Argument path in yaml file. Value: Modified value.
-        # All variable modifications will be record here and saved in method `save()`.
+        # 待持久化修改，键为配置路径，值为新值；save() 必须原地清空此对象。
         self.modified = {}
-        # Key: Argument name in GeneratedConfig. Value: Path in `data`.
+        # GeneratedConfig 属性名到原始配置路径的绑定。
         self.bound = {}
         # 关卡和大世界等仅在当前运行会话生效的配置覆盖。
         self._runtime_overlay: dict[str, object] = {}
         self._published_config_fields: set[str] = set()
-        # If write after every variable modification.
+        # 属性修改后是否立即更新并写回。
         self.auto_update = True
-        # Force override variables
-        # Key: Argument name in GeneratedConfig. Value: Modified value.
+        # 跨配置重载持续生效的强制覆盖。
         self.overridden = {}
-        # Scheduler queue, will be updated in `get_next_task()`, list of Function objects
-        # pending_task: Run time has been reached, but haven't been run due to task scheduling.
-        # waiting_task: Run time haven't been reached, wait needed.
+        # pending_task 已到运行时间；waiting_task 尚未到运行时间。
         self.pending_task = []
         self.waiting_task = []
         # 兼容保留类属性默认值，实际调度状态始终由当前配置实例持有。
         self.is_hoarding_task = type(self).is_hoarding_task
-        # Task to run and bind.
-        # Task means the name of the function to run in AzurLaneAutoScript class.
+        # 当前任务名对应 AzurLaneAutoScript 的入口方法。
         self.task: Function
-        # Template config is used for dev tools
         self.is_template_config = config_name.startswith("template")
 
         if self.is_template_config:
-            # For dev tools
             logger.info("Using template config, which is read only")
             self.auto_update = False
             self.task = name_to_function("template")
@@ -228,12 +212,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         instance_state["_published_config_fields"] = set(published)
 
     def bind(self, func, func_list=None):
-        """
-        Args:
-            func：将要运行的任务。
-            func_list：调用方追加的配置作用域。
-        """
-        # 绑定顺序：General、Alas、任务通用配置、当前任务、额外任务。
+        """按 General、Alas、任务通用作用域、当前任务、func_list 额外作用域依次绑定。"""
         task_name = self._task_name(func)
         bind_chain = self.task_bind_chain(func, func_list=func_list)
         logger.info(f"Bind task {bind_chain}")
@@ -316,7 +295,6 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         return _function_from_entry(decision.entry, next_run=next_run)
 
     def get_next(self):
-        """返回兼容旧调用方的下一个 Function。"""
         return self.function_from_decision(self.get_next_decision())
 
     def save(self):
@@ -371,11 +349,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         limit_next_run(["OpsiArchive"], limit=now + timedelta(days=7, seconds=-1))
         limit_next_run(self.args.keys(), limit=now + timedelta(hours=24, seconds=-1))
 
-        """
-        Override anything you want.
-        Variables stall remain overridden even config is reloaded from yaml file.
-        Note that this method is irreversible.
-        """
+        # 强制覆盖在配置重载后仍然生效，且没有自动恢复入口。
         for arg, value in kwargs.items():
             self.overridden[arg] = value
             super().__setattr__(arg, value)
@@ -392,11 +366,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
     config_override = override
 
     def set_record(self, **kwargs):
-        """
-        Args:
-            **kwargs: For example, `Emotion1_Value=150`
-                will set `Emotion1_Value=150` and `Emotion1_Record=now()`
-        """
+        """设置 `*_Value` 时同步把对应 `*_Record` 更新为当前时间。"""
         with self.multi_set():
             for arg, value in kwargs.items():
                 record = arg.replace("Value", "Record")
@@ -404,63 +374,24 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
                 self.__setattr__(record, datetime.now().replace(microsecond=0))
 
     def multi_set(self):
-        """
-        Set multiple arguments but save once.
-
-        Examples:
-            with self.config.multi_set():
-                self.config.foo1 = 1
-                self.config.foo2 = 2
-        """
+        """返回批量设置上下文，退出时只更新并保存一次。"""
         return MultiSetWrapper(main=self)
 
     def cross_get(self, keys, default=None):
-        """
-        Get configs from other tasks.
-
-        Args:
-            keys (str, list[str]): Such as `{task}.Scheduler.Enable`
-            default:
-
-        Returns:
-            Any:
-        """
+        """按点分隔字符串或键序列指定的深层路径读取其他任务配置。"""
         return deep_get(self.data, keys=keys, default=default)
 
     def cross_set(self, keys, value):
-        """
-        Set configs to other tasks.
-
-        Args:
-            keys (str, list[str]): Such as `{task}.Scheduler.Enable`
-            value (Any):
-
-        Returns:
-            Any:
-        """
+        """按点分隔字符串或键序列指定的深层路径修改其他任务配置，并按 auto_update 决定是否立即写回。"""
         self.modified[keys] = value
         if self.auto_update:
             self.update()
 
     def task_delay(self, success=None, server_update=None, target=None, minute=None, task=None):
-        """
-        Set Scheduler.NextRun
-        Should set at least one arguments.
-        If multiple arguments are set, use the nearest.
+        """设置当前或指定任务的 Scheduler.NextRun；多个候选取最近时间。
 
-        Args:
-            success (bool):
-                If True, delay Scheduler.SuccessInterval
-                If False, delay Scheduler.FailureInterval
-            server_update (bool, list, str):
-                If True, delay to nearest Scheduler.ServerUpdate
-                If type is list or str, delay to such server update
-            target (datetime.datetime, str, list):
-                Delay to such time.
-            minute (int, float, tuple):
-                Delay several minutes.
-            task (str):
-                Set across task. None for current task.
+        success 选择成功或失败间隔；server_update=True 使用配置触发点，也可直接传触发点；
+        target 接受时间或列表，minute 接受分钟数或范围。至少应提供一个候选。
         """
 
         def ensure_delta(delay):
@@ -572,14 +503,9 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         )
 
     def opsi_task_delay(self, recon_scan=False, submarine_call=False, ap_limit=False, cl1_preserve=False):
-        """
-        Delay the NextRun of all OpSi tasks.
+        """批量延迟大世界任务：侦察 27 分钟、潜艇 60 分钟、行动力或 CL1 保留 360 分钟。
 
-        Args:
-            recon_scan (bool): True to delay all tasks requiring recon scan 27 min.
-            submarine_call (bool): True to delay all tasks requiring submarine call 60 min.
-            ap_limit (bool): True to delay all tasks requiring action points 360 min.
-            cl1_preserve (bool): True to delay tasks requiring massive action points 360 min.
+        距离月重置不足一天时，行动力限制改为 150 分钟。
         """
         if not recon_scan and not submarine_call and not ap_limit and not cl1_preserve:
             return
@@ -608,20 +534,9 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         self.update()
 
     def task_call(self, task, force_call=True):
-        """
-        Call another task to run.
+        """把目标任务设为立即到期；force_call=False 时尊重用户的禁用状态。
 
-        That task will run when current task finished.
-        But it might not be run because:
-        - Other tasks should run first according to SCHEDULER_PRIORITY
-        - Task is disabled by user
-
-        Args:
-            task (str): Task name to call, such as `Restart`
-            force_call (bool):
-
-        Returns:
-            bool: If called.
+        返回是否成功入队；实际执行仍可能被调度优先级推迟。
         """
         if deep_get(self.data, keys=f"{task}.Scheduler.NextRun", default=None) is None:
             message = TASK_CALL_MISSING_TEMPLATE.format(task=task)
@@ -639,24 +554,13 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
 
     @staticmethod
     def task_stop(message=""):
-        """
-        Stop current task.
-
-        Raises:
-            TaskEnd:
-        """
+        """抛出 TaskEnd 终止当前任务。"""
         if message:
             raise TaskEnd(message)
         raise TaskEnd
 
     def task_switched(self):
-        """
-        Check if needs to switch task.
-
-        Raises:
-            bool: If task switched
-        """
-        # 更新停止事件。
+        """停止信号已设置或重载配置后下一任务变化时返回 True。"""
         if self.stop_event is not None and self.stop_event.is_set():
             return True
         prev = self.task
@@ -669,12 +573,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         return True
 
     def check_task_switch(self, message=""):
-        """
-        Stop current task when task switched.
-
-        Raises:
-            TaskEnd:
-        """
+        """任务已切换时抛出 TaskEnd。"""
         if self.task_switched():
             self.task_stop(message=message)
 
@@ -683,9 +582,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
 
     @property
     def campaign_name(self):
-        """
-        Sub-directory name when saving drop record.
-        """
+        """返回掉落记录子目录名；数字开头时加 `campaign_`，困难模式再加 `_hard`。"""
         name = self.Campaign_Name.lower().replace("-", "_")
         if name[0].isdigit():
             name = "campaign_" + str(name)
@@ -693,19 +590,11 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             name += "_hard"
         return name
 
-    """
-    The following configs and methods are used to be compatible with the old.
-    """
-
     def merge(self, other):
-        """
-        Args:
-            other：关卡或任务在运行期提供的配置覆盖。
+        """合并关卡或任务提供的运行期覆盖，并返回当前配置门面。
 
-        Returns:
-            当前配置门面。
+        覆盖不属于持久解析结果，不能触发配置写回。
         """
-        # 运行期覆盖不属于持久解析结果，也不能触发配置写回。
         config = self
         runtime_overlay = config._runtime_overlay_values()
 
@@ -766,20 +655,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         self._fleet_boss = value
 
     def temporary(self, **kwargs):
-        """
-        Cover some settings, and recover later.
-
-        Usage:
-        backup = self.config.cover(ENABLE_DAILY_REWARD=False)
-        # do_something()
-        backup.recover()
-
-        Args:
-            **kwargs:
-
-        Returns:
-            ConfigBackup:
-        """
+        """临时覆盖属性并返回可手动 recover 或作为上下文使用的 ConfigBackup。"""
         backup = ConfigBackup(config=self)
         backup.cover(**kwargs)
         return backup
@@ -791,10 +667,6 @@ vars(pywebio.pin)["Output"] = OutputConfig
 
 class ConfigBackup:
     def __init__(self, config):
-        """
-        Args:
-            config (AzurLaneConfig):
-        """
         self.config = config
         self.backup = {}
         self.kwargs = {}
@@ -818,10 +690,6 @@ class ConfigBackup:
 
 class MultiSetWrapper:
     def __init__(self, main):
-        """
-        Args:
-            main (AzurLaneConfig):
-        """
         self.main = main
         self.in_wrapper = False
 

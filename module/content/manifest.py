@@ -409,7 +409,6 @@ def load_event_manifests(path: Path) -> tuple[EventPack, ...]:
 
 @lru_cache(maxsize=1)
 def load_default_event_manifests() -> tuple[EventPack, ...]:
-    """加载仓库内的国区活动机器清单。"""
     return load_event_manifests(DEFAULT_EVENT_MANIFEST_PATH)
 
 

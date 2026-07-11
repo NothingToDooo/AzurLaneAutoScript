@@ -30,18 +30,7 @@ def _cv_scalar(value) -> np.ndarray:
 
 
 def random_normal_distribution_int(a, b, n=3):
-    """
-    Generate a normal distribution int within the interval.
-    Use the average value of several random numbers to simulate normal distribution.
-
-    Args:
-        a (int): The minimum of the interval.
-        b (int): The maximum of the interval.
-        n (int): The amount of numbers in simulation. Default to 3.
-
-    Returns:
-        int
-    """
+    """取 n 个闭区间 [a, b] 内均匀随机整数的均值，得到近似正态分布的整数。"""
     a = round(a)
     b = round(b)
     if a < b:
@@ -53,31 +42,16 @@ def random_normal_distribution_int(a, b, n=3):
 
 
 def random_rectangle_point(area, n=3):
-    """Choose a random point in an area.
-
-    Args:
-        area: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-        n (int): The amount of numbers in simulation. Default to 3.
-
-    Returns:
-        tuple(int): (x, y)
-    """
+    """在左上、右下坐标定义的区域内返回近似正态分布的 (x, y)。"""
     x = random_normal_distribution_int(area[0], area[2], n=n)
     y = random_normal_distribution_int(area[1], area[3], n=n)
     return x, y
 
 
 def random_rectangle_vector(vector, box, random_range=(0, 0, 0, 0), padding=15):
-    """Place a vector in a box randomly.
+    """在 box 内随机放置带扰动的 vector，返回起点和终点。
 
-    Args:
-        vector: (x, y)
-        box: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-        random_range (tuple): Add a random_range to vector. (x_min, y_min, x_max, y_max).
-        padding (int):
-
-    Returns:
-        tuple(int), tuple(int): start_point, end_point.
+    box 与 random_range 均为左上、右下坐标，padding 保证两端远离边界。
     """
     vector = np.array(vector) + random_rectangle_point(random_range)
     vector = np.round(vector).astype(int)
@@ -127,18 +101,9 @@ def _random_end_point_outside_blacklist(box_pad, vector, blacklist_area, segment
 
 
 def random_rectangle_vector_opted(vector, options):
-    """
-    在指定区域里随机放置滑动向量。
+    """在指定区域内随机放置滑动向量，返回起点和终点。
 
-    模拟器或游戏卡顿时，滑动可能会被当成点击，并点击在滑动终点。
-    为避免误触，随机结果需要按白名单和黑名单过滤。
-
-    Args:
-        vector: (x, y)
-        options: 滑动区域、随机范围和安全区域。
-
-    Returns:
-        tuple(int), tuple(int): start_point, end_point.
+    卡顿时滑动可能退化成终点点击，因此终点和路径会按白名单、黑名单过滤。
     """
     vector = np.array(vector) + random_rectangle_point(options.random_range)
     vector = np.round(vector).astype(int)
@@ -161,17 +126,7 @@ def random_rectangle_vector_opted(vector, options):
 
 
 def random_line_segments(p1, p2, n, random_range=(0, 0, 0, 0)):
-    """Cut a line into multiple segments.
-
-    Args:
-        p1: (x, y).
-        p2: (x, y).
-        n: Number of slice.
-        random_range: Add a random_range to points.
-
-    Returns:
-        list[tuple]: [(x0, y0), (x1, y1), (x2, y2)]
-    """
+    """把 p1 到 p2 均分为 n 段，并为每个点叠加 random_range 内的随机偏移。"""
     return [
         tuple((((n - index) * p1 + index * p2) / n).astype(int) + random_rectangle_point(random_range))
         for index in range(n + 1)
@@ -179,16 +134,7 @@ def random_line_segments(p1, p2, n, random_range=(0, 0, 0, 0)):
 
 
 def ensure_time(second, n=3, precision=3):
-    """Ensure to be time.
-
-    Args:
-        second (int, float, tuple): time, such as 10, (10, 30), '10, 30'
-        n (int): The amount of numbers in simulation. Default to 5.
-        precision (int): Decimals.
-
-    Returns:
-        float:
-    """
+    """把秒数或 `10,30`、`10-30`、(10, 30) 归一化为秒；区间按近似正态分布取值。"""
     if isinstance(second, tuple):
         multiply = 10**precision
         result = random_normal_distribution_int(second[0] * multiply, second[1] * multiply, n) / multiply
@@ -207,16 +153,7 @@ def ensure_time(second, n=3, precision=3):
 
 
 def ensure_int(*args):
-    """
-    Convert all elements to int.
-    Return the same structure as nested objects.
-
-    Args:
-        *args:
-
-    Returns:
-        list:
-    """
+    """递归转换为整数，并保留嵌套结构；单元素层会被折叠。"""
 
     def to_int(item):
         try:
@@ -231,62 +168,24 @@ def ensure_int(*args):
 
 
 def area_offset(area, offset):
-    """
-    Move an area.
-
-    Args:
-        area: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-        offset: (x, y).
-
-    Returns:
-        tuple: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-    """
+    """把 (x1, y1, x2, y2) 区域平移 (x, y)。"""
     upper_left_x, upper_left_y, bottom_right_x, bottom_right_y = area
     x, y = offset
     return upper_left_x + x, upper_left_y + y, bottom_right_x + x, bottom_right_y + y
 
 
 def area_pad(area, pad=10):
-    """
-    Inner offset an area.
-
-    Args:
-        area: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-        pad (int):
-
-    Returns:
-        tuple: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-    """
+    """把 (x1, y1, x2, y2) 区域四边向内收缩 pad。"""
     upper_left_x, upper_left_y, bottom_right_x, bottom_right_y = area
     return upper_left_x + pad, upper_left_y + pad, bottom_right_x - pad, bottom_right_y - pad
 
 
 def limit_in(x, lower, upper):
-    """
-    Limit x within range (lower, upper)
-
-    Args:
-        x:
-        lower:
-        upper:
-
-    Returns:
-        int, float:
-    """
     return max(min(x, upper), lower)
 
 
 def area_limit(area1, area2):
-    """
-    Limit an area in another area.
-
-    Args:
-        area1: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-        area2: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-
-    Returns:
-        tuple: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-    """
+    """逐坐标把 area1 限制在 area2 的 (x1, y1, x2, y2) 范围内。"""
     x_lower, y_lower, x_upper, y_upper = area2
     return (
         limit_in(area1[0], x_lower, x_upper),
@@ -297,57 +196,22 @@ def area_limit(area1, area2):
 
 
 def area_size(area):
-    """
-    Area size or shape.
-
-    Args:
-        area: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-
-    Returns:
-        tuple: (x, y).
-    """
+    """返回 (width, height)，反向或空区域的对应维度为 0。"""
     return (max(area[2] - area[0], 0), max(area[3] - area[1], 0))
 
 
 def point_limit(point, area):
-    """
-    Limit point in an area.
-
-    Args:
-        point: (x, y).
-        area: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-
-    Returns:
-        tuple: (x, y).
-    """
+    """把 (x, y) 逐坐标限制在 (x1, y1, x2, y2) 区域内。"""
     return (limit_in(point[0], area[0], area[2]), limit_in(point[1], area[1], area[3]))
 
 
 def point_in_area(point, area, threshold=5):
-    """
-
-    Args:
-        point: (x, y).
-        area: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-        threshold: int
-
-    Returns:
-        bool:
-    """
+    """判断点是否落入区域；threshold 会向四边扩张区域。"""
     return area[0] - threshold < point[0] < area[2] + threshold and area[1] - threshold < point[1] < area[3] + threshold
 
 
 def area_in_area(area1, area2, threshold=5):
-    """
-
-    Args:
-        area1: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-        area2: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-        threshold: int
-
-    Returns:
-        bool:
-    """
+    """判断 area1 是否包含在 area2 内；threshold 会向四边扩张 area2。"""
     return (
         area2[0] - threshold <= area1[0]
         and area2[1] - threshold <= area1[1]
@@ -357,17 +221,7 @@ def area_in_area(area1, area2, threshold=5):
 
 
 def area_cross_area(area1, area2, threshold=5):
-    """
-
-    Args:
-        area1: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-        area2: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-        threshold: int
-
-    Returns:
-        bool:
-    """
-    # https://www.yiiven.cn/rect-is-intersection.html
+    """判断两个区域是否相交；threshold 会扩张允许的相交距离。"""
     xa1, ya1, xa2, ya2 = area1
     xb1, yb1, xb2, yb2 = area2
     return (
@@ -377,61 +231,30 @@ def area_cross_area(area1, area2, threshold=5):
 
 
 def float2str(n, decimal=3):
-    """
-    Args:
-        n (float):
-        decimal (int):
-
-    Returns:
-        str:
-    """
     return str(round(n, decimal)).ljust(decimal + 2, "0")
 
 
 def point2str(x, y, length=4):
-    """
-    Args:
-        x (int, float):
-        y (int, float):
-        length (int): Align length.
-
-    Returns:
-        str: String with numbers right aligned, such as '( 100,  80)'.
-    """
+    """把坐标右对齐为 `( 100,   80)` 形式，每个数字宽度为 length。"""
     return f"({str(int(x)).rjust(length)}, {str(int(y)).rjust(length)})"
 
 
 def col2name(col):
-    """
-    Convert a zero indexed column cell reference to a string.
-
-    Args:
-       col: The cell column. Int.
-
-    Returns:
-        Column style string.
-
-    Examples:
-        0 -> A, 3 -> D, 35 -> AJ, -1 -> -A
-    """
+    """把从零开始的列索引转为 A1 列名；例如 0→A、35→AJ、-1→-A。"""
     col_neg = col < 0
     col_num = -col if col_neg else col + 1
     col_str = ""
 
     while col_num:
-        # Set remainder from 1 .. 26
         remainder = col_num % 26
 
         if remainder == 0:
             remainder = 26
 
-        # Convert the remainder to a character.
         col_letter = chr(remainder + 64)
 
-        # Accumulate the column letters, right to left.
         col_str = col_letter + col_str
 
-        # Get the next order of magnitude.
         col_num = int((col_num - 1) / 26)
 
     if col_neg:
@@ -440,16 +263,7 @@ def col2name(col):
 
 
 def name2col(col_str):
-    """
-    将 A1 表示法中的列名转换为从零开始的列索引。
-
-    Args:
-        col_str: A1 风格列名。
-
-    Returns:
-        int: 从零开始的列索引。
-    """
-    # 将 base26 列名转换成数字。
+    """把 A1 列名转为从零开始的列索引，并支持负列名。"""
     col = 0
     col_neg = col_str.startswith("-")
     col_str = col_str.strip("-").upper()
@@ -459,19 +273,11 @@ def name2col(col_str):
 
     if col_neg:
         return -col
-    return col - 1  # Convert 1-index to zero-index
+    return col - 1
 
 
 def node2location(node):
-    """
-    See location2node()
-
-    Args:
-        node (str): Example: 'E3'
-
-    Returns:
-        tuple[int]: Example: (4, 2)
-    """
+    """把 A1 风格节点转为从零开始的 (x, y)，例如 E3→(4, 2)。"""
     res = REGEX_NODE.search(node)
     if res:
         x, y = res.group(1), res.group(2)
@@ -479,45 +285,11 @@ def node2location(node):
         if y > 0:
             y -= 1
         return name2col(x), y
-    # Whatever
     return ord(node[0]) % 32 - 1, int(node[1:]) - 1
 
 
 def location2node(location):
-    """
-    Convert location tuple to an Excel-like cell.
-    Accept negative values also.
-
-         -2   -1    0    1    2    3
-    -2 -B-2 -A-2  A-2  B-2  C-2  D-2
-    -1 -B-1 -A-1  A-1  B-1  C-1  D-1
-     0  -B1  -A1   A1   B1   C1   D1
-     1  -B2  -A2   A2   B2   C2   D2
-     2  -B3  -A3   A3   B3   C3   D3
-     3  -B4  -A4   A4   B4   C4   D4
-
-    # To generate the table above
-    index = range(-2, 4)
-    row = '   ' + ' '.join([str(i).rjust(4) for i in index])
-    print(row)
-    for y in index:
-        row = str(y).rjust(2) + ' ' + ' '.join([location2node((x, y)).rjust(4) for x in index])
-        print(row)
-
-    def check(node):
-        return point2str(*node2location(location2node(node)), length=2)
-    row = '   ' + ' '.join([str(i).rjust(8) for i in index])
-    print(row)
-    for y in index:
-        row = str(y).rjust(2) + ' ' + ' '.join([check((x, y)).rjust(4) for x in index])
-        print(row)
-
-    Args:
-        location (tuple[int]):
-
-    Returns:
-        str:
-    """
+    """把从零开始的 (x, y) 转为 A1 风格节点，并支持负坐标。"""
     x, y = location
     if y >= 0:
         y += 1
@@ -525,33 +297,17 @@ def location2node(location):
 
 
 def xywh2xyxy(area):
-    """
-    Convert (x, y, width, height) to (x1, y1, x2, y2)
-    """
     x, y, w, h = area
     return x, y, x + w, y + h
 
 
 def xyxy2xywh(area):
-    """
-    Convert (x1, y1, x2, y2) to (x, y, width, height)
-    """
     x1, y1, x2, y2 = area
     return min(x1, x2), min(y1, y2), abs(x2 - x1), abs(y2 - y1)
 
 
 def load_image(file, area=None):
-    """
-    Load an image like pillow and drop alpha channel.
-
-    Args:
-        file (str):
-        area (tuple):
-
-    Returns:
-        np.ndarray:
-    """
-    # always remember to close Image object
+    """按 Pillow 语义读取并可选裁剪图片，RGBA 输入会丢弃 Alpha 通道。"""
     with Image.open(file) as image_file:
         image = np.array(image_file.crop(area)) if area is not None else np.array(image_file)
 
@@ -563,24 +319,10 @@ def load_image(file, area=None):
 
 
 def save_image(image, file):
-    """
-    Save an image like pillow.
-
-    Args:
-        image (np.ndarray):
-        file (str):
-    """
     Image.fromarray(image).save(file)
 
 
 def copy_image(src):
-    """
-    Equivalent to image.copy() but a little bit faster
-
-    Time cost to copy a 1280*720*3 image:
-        image.copy()      0.743ms
-        copy_image(image) 0.639ms
-    """
     dst = np.empty_like(src)
     np.copyto(dst, src)
     return dst
@@ -614,19 +356,7 @@ def _crop_border_value(image_shape):
 
 
 def crop(image, area, copy=True):
-    """
-    使用 opencv / numpy 按 Pillow 语义裁剪图片。
-
-    裁剪范围超出图片时，用黑色背景补齐。
-
-    Args:
-        image (np.ndarray):
-        area:
-        copy (bool):
-
-    Returns:
-        np.ndarray:
-    """
+    """按 Pillow 语义裁剪图片；超出边界时用黑色补齐，完全越界时返回全黑图。"""
     area = _round_area(area)
     shape = image.shape
     padding, overflow = _crop_padding_and_overflow(shape, area)
@@ -647,74 +377,35 @@ def crop(image, area, copy=True):
 
 
 def resize(image, size):
-    """
-    Resize image like pillow image.resize(), but implement in opencv.
-    Pillow uses PIL.Image.NEAREST by default.
-
-    Args:
-        image (np.ndarray):
-        size: (x, y)
-
-    Returns:
-        np.ndarray:
-    """
+    """按 Pillow 默认的最近邻语义缩放，size 为 (width, height)。"""
     return cv2.resize(image, size, interpolation=cv2.INTER_NEAREST)
 
 
 def image_channel(image):
-    """
-    Args:
-        image (np.ndarray):
-
-    Returns:
-        int: 0 for grayscale, 3 for RGB.
-    """
+    """二维灰度图返回 0，三维图返回 shape[2] 的通道数。"""
     return image.shape[2] if len(image.shape) == 3 else 0
 
 
 def image_size(image):
-    """
-    Args:
-        image (np.ndarray):
-
-    Returns:
-        int, int: width, height
-    """
+    """按 (width, height) 顺序返回图像尺寸。"""
     shape = image.shape
     return shape[1], shape[0]
 
 
 def image_paste(image, background, origin):
-    """
-    Paste an image on background.
-    This method does not return a value, but instead updates the array "background".
-
-    Args:
-        image:
-        background:
-        origin: Upper-left corner, (x, y)
-    """
+    """以 origin 为左上角原地修改 background，不返回新图像。"""
     x, y = origin
     w, h = image_size(image)
     background[y : y + h, x : x + w] = image
 
 
 def rgb2gray(image):
-    """
-    gray = ( MAX(r, g, b) + MIN(r, g, b)) / 2
-
-    Args:
-        image (np.ndarray): Shape (height, width, channel)
-
-    Returns:
-        np.ndarray: Shape (height, width)
-    """
+    """按 `(max(R,G,B) + min(R,G,B)) / 2` 转为 (height, width) 灰度图。"""
     r, g, b = cv2.split(image)
     maximum = cv2.max(r, g)
     cv2.min(r, g, dst=r)
     cv2.max(maximum, b, dst=maximum)
     cv2.min(r, b, dst=r)
-    # 此时 r 保存最小通道值。
     cv2.convertScaleAbs(maximum, alpha=0.5, dst=maximum)
     cv2.convertScaleAbs(r, alpha=0.5, dst=r)
     cv2.add(maximum, r, dst=maximum)
@@ -722,117 +413,63 @@ def rgb2gray(image):
 
 
 def rgb2hsv(image):
-    """
-    Convert RGB color space to HSV color space.
-    HSV is Hue Saturation Value.
-
-    Args:
-        image (np.ndarray): Shape (height, width, channel)
-
-    Returns:
-        np.ndarray: Hue (0~360), Saturation (0~100), Value (0~100).
-    """
+    """把 RGB 转为 HSV 浮点数组；H 为 0～360，S、V 为 0～100。"""
     image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV).astype(float)
     cv2.multiply(image, _cv_scalar((360 / 180, 100 / 255, 100 / 255, 0)), dst=image)
     return image
 
 
 def rgb2yuv(image):
-    """
-    Convert RGB to YUV color space.
-
-    Args:
-        image (np.ndarray): Shape (height, width, channel)
-
-    Returns:
-        np.ndarray: Shape (height, width)
-    """
+    """把 RGB 图像转为 YUV，保持 (height, width, 3) 形状。"""
     return cv2.cvtColor(image, cv2.COLOR_RGB2YUV)
 
 
 def rgb2luma(image):
-    """
-    Convert RGB to the Y channel (Luminance) in YUV color space.
-
-    Args:
-        image (np.ndarray): Shape (height, width, channel)
-
-    Returns:
-        np.ndarray: Shape (height, width)
-    """
+    """提取 RGB 图像的 YUV 亮度通道，返回 (height, width) 数组。"""
     image = cv2.cvtColor(image, cv2.COLOR_RGB2YUV)
     luma, _, _ = cv2.split(image)
     return luma
 
 
 def get_color(image, area):
-    """Calculate the average color of a particular area of the image.
-
-    Args:
-        image (np.ndarray): Screenshot.
-        area (tuple): (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y)
-
-    Returns:
-        tuple: (r, g, b)
-    """
+    """返回 (x1, y1, x2, y2) 区域的平均 RGB。"""
     temp = crop(image, area, copy=False)
     color = cv2.mean(temp)
     return color[:3]
 
 
 class ImageNotSupported(Exception):
-    """
-    Raised if we can't perform image calculation on this image
-    """
+    """图像形状或内容不支持当前计算。"""
 
 
 PURE_BLACK_BBOX_MESSAGE = "Cannot get bbox from a pure black image"
 
 
 def get_bbox(image, threshold=0):
-    """
-    Get outbound box of the content in image
-    A opencv implementation of the getbbox() in pillow
+    """返回所有亮度大于 threshold 内容的外接 (x1, y1, x2, y2)。
 
-    Args:
-        image (np.ndarray):
-        threshold (int):
-            color > threshold will be considered as content
-            color <= threshold will be considered background
-
-    Returns:
-        tuple[int, int, int, int]: area
-
-    Raises:
-        ImageNotSupported: if failed to get bbox
+    不支持的通道数、纯黑图或空外接框会抛出 ImageNotSupported。
     """
     channel = image_channel(image)
-    # convert to grayscale
     if channel == 3:
-        # RGB
         mask = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         cv2.threshold(mask, threshold, 255, cv2.THRESH_BINARY, dst=mask)
     elif channel == 0:
-        # grayscale
         _, mask = cv2.threshold(image, threshold, 255, cv2.THRESH_BINARY)
     elif channel == 4:
-        # RGBA
         mask = cv2.cvtColor(image, cv2.COLOR_RGBA2GRAY)
         cv2.threshold(mask, threshold, 255, cv2.THRESH_BINARY, dst=mask)
     else:
         message = f"shape={image.shape}"
         raise ImageNotSupported(message)
 
-    # find bbox
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     min_y, min_x = mask.shape
     max_x = 0
     max_y = 0
-    # all black
     if not contours:
         raise ImageNotSupported(PURE_BLACK_BBOX_MESSAGE)
     for contour in contours:
-        # x, y, w, h
         x1, y1, x2, y2 = cv2.boundingRect(contour)
         x2 += x1
         y2 += y1
@@ -842,56 +479,36 @@ def get_bbox(image, threshold=0):
         max_y = max(max_y, y2)
     if min_x < max_x and min_y < max_y:
         return min_x, min_y, max_x, max_y
-    # This shouldn't happen
     bbox = (min_x, min_y, max_x, max_y)
     message = f"Empty bbox {bbox}"
     raise ImageNotSupported(message)
 
 
 def get_bbox_reversed(image, threshold=255):
-    """
-    Get outbound box of the content in image
-    A opencv implementation of the getbbox() in pillow
+    """返回所有亮度小于 threshold 内容的外接 (x1, y1, x2, y2)。
 
-    Args:
-        image (np.ndarray):
-        threshold (int):
-            color < threshold will be considered as content
-            color >= threshold will be considered background
-
-    Returns:
-        tuple[int, int, int, int]: area
-
-    Raises:
-        ImageNotSupported: if failed to get bbox
+    不支持的通道数、纯黑图或空外接框会抛出 ImageNotSupported。
     """
     channel = image_channel(image)
-    # convert to grayscale
     if channel == 3:
-        # RGB
         mask = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         cv2.threshold(mask, 0, threshold, cv2.THRESH_BINARY, dst=mask)
     elif channel == 0:
-        # grayscale
         mask = cv2.threshold(image, 0, threshold, cv2.THRESH_BINARY)
     elif channel == 4:
-        # RGBA
         mask = cv2.cvtColor(image, cv2.COLOR_RGBA2GRAY)
         cv2.threshold(mask, 0, threshold, cv2.THRESH_BINARY, dst=mask)
     else:
         message = f"shape={image.shape}"
         raise ImageNotSupported(message)
 
-    # find bbox
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     min_y, min_x = mask.shape
     max_x = 0
     max_y = 0
-    # all black
     if not contours:
         raise ImageNotSupported(PURE_BLACK_BBOX_MESSAGE)
     for contour in contours:
-        # x, y, w, h
         x1, y1, x2, y2 = cv2.boundingRect(contour)
         x2 += x1
         y2 += y1
@@ -901,21 +518,13 @@ def get_bbox_reversed(image, threshold=255):
         max_y = max(max_y, y2)
     if min_x < max_x and min_y < max_y:
         return min_x, min_y, max_x, max_y
-    # This shouldn't happen
     bbox = (min_x, min_y, max_x, max_y)
     message = f"Empty bbox {bbox}"
     raise ImageNotSupported(message)
 
 
 def color_similarity(color1, color2):
-    """
-    Args:
-        color1 (tuple): (r, g, b)
-        color2 (tuple): (r, g, b)
-
-    Returns:
-        int:
-    """
+    """按 `max(正 RGB 差) + max(负 RGB 差的绝对值)` 返回 Photoshop 式色差。"""
     diff_r = color1[0] - color2[0]
     diff_g = color1[1] - color2[1]
     diff_b = color1[2] - color2[2]
@@ -939,19 +548,6 @@ def color_similarity(color1, color2):
 
 
 def color_similar(color1, color2, threshold=10):
-    """
-    Consider two colors are similar, if tolerance lesser or equal threshold.
-    Tolerance = Max(Positive(difference_rgb)) + Max(- Negative(difference_rgb))
-    The same as the tolerance in Photoshop.
-
-    Args:
-        color1 (tuple): (r, g, b)
-        color2 (tuple): (r, g, b)
-        threshold (int): Default to 10.
-
-    Returns:
-        bool: True if two colors are similar.
-    """
     diff_r = color1[0] - color2[0]
     diff_g = color1[1] - color2[1]
     diff_b = color1[2] - color2[2]
@@ -976,29 +572,14 @@ def color_similar(color1, color2, threshold=10):
 
 
 def color_similar_1d(image, color, threshold=10):
-    """
-    Args:
-        image (np.ndarray): 1D array.
-        color: (r, g, b)
-        threshold(int): Default to 10.
-
-    Returns:
-        np.ndarray: bool
-    """
+    """逐行比较 (n, 3) RGB 数组，返回形状为 (n,) 的布尔掩码。"""
     diff = image.astype(int) - color
     diff = np.max(np.maximum(diff, 0), axis=1) - np.min(np.minimum(diff, 0), axis=1)
     return diff <= threshold
 
 
 def color_similarity_2d(image, color):
-    """
-    Args:
-        image: 2D array.
-        color: (r, g, b)
-
-    Returns:
-        np.ndarray: uint8
-    """
+    """逐像素返回与目标 RGB 的反向色差，结果是二维 uint8，255 表示完全相同。"""
     diff = cv2.subtract(image, _cv_scalar((*color, 0)))
     r, g, b = cv2.split(diff)
     cv2.max(r, g, dst=r)
@@ -1015,16 +596,7 @@ def color_similarity_2d(image, color):
 
 
 def extract_letters(image, letter=(255, 255, 255), threshold=128):
-    """Set letter color to black, set background color to white.
-
-    Args:
-        image: Shape (height, width, channel)
-        letter (tuple): Letter RGB.
-        threshold (int):
-
-    Returns:
-        np.ndarray: Shape (height, width)
-    """
+    """把 (height, width, channel) 图像中的目标 RGB 字符映射为黑色，背景映射为白色。"""
     diff = cv2.subtract(image, _cv_scalar((*letter, 0)))
     r, g, b = cv2.split(diff)
     cv2.max(r, g, dst=r)
@@ -1042,23 +614,12 @@ def extract_letters(image, letter=(255, 255, 255), threshold=128):
 
 
 def extract_white_letters(image, threshold=128):
-    """Set letter color to black, set background color to white.
-    This function will discourage color pixels (Non-gray pixels)
-
-    Args:
-        image: Shape (height, width, channel)
-        threshold (int):
-
-    Returns:
-        np.ndarray: Shape (height, width)
-    """
+    """把白色字符映射为黑色、背景映射为白色，并额外抑制非灰度彩色像素。"""
     r, g, b = cv2.split(cv2.subtract(_cv_scalar((255, 255, 255, 0)), image))
     maximum = cv2.max(r, g)
     cv2.min(r, g, dst=r)
     cv2.max(maximum, b, dst=maximum)
     cv2.min(r, b, dst=r)
-    # 此时 r 保存最小通道值。
-
     cv2.convertScaleAbs(maximum, alpha=0.5, dst=maximum)
     cv2.convertScaleAbs(r, alpha=0.5, dst=r)
     cv2.subtract(maximum, r, dst=r)
@@ -1069,17 +630,7 @@ def extract_white_letters(image, threshold=128):
 
 
 def color_mapping(image, max_multiply=2):
-    """
-    Mapping color to 0-255.
-    Minimum color to 0, maximum color to 255, multiply colors by 2 at max.
-
-    Args:
-        image (np.ndarray):
-        max_multiply (int, float):
-
-    Returns:
-        np.ndarray:
-    """
+    """把颜色动态映射到 0～255，并把最大增益限制为 max_multiply。"""
     image = image.astype(float)
     low, high = np.min(image), np.max(image)
     multiply = min(255 / (high - low), max_multiply)
@@ -1092,20 +643,9 @@ def color_mapping(image, max_multiply=2):
 
 
 def image_left_strip(image, threshold, length):
-    """
-    In `DAILY:200/200` strip `DAILY:` and leave `200/200`
+    """从二维图首个平均亮度低于 threshold 的列起裁掉 length 像素。
 
-    Args:
-        image (np.ndarray): (height, width)
-        threshold (int):
-            0-255
-            The first column with brightness lower than this
-            will be considered as left edge.
-        length (int):
-            Strip this length of image after the left edge
-
-    Returns:
-        np.ndarray:
+    threshold 范围为 0～255；例如可从 `DAILY:200/200` 图像中裁掉 `DAILY:`，保留 `200/200`。
     """
     brightness = np.mean(image, axis=0)
     match = np.where(brightness < threshold)[0]
@@ -1119,30 +659,12 @@ def image_left_strip(image, threshold, length):
 
 
 def red_overlay_transparency(color1, color2, red=247):
-    """Calculate the transparency of red overlay.
-
-    Args:
-        color1: origin color.
-        color2: changed color.
-        red(int): red color 0-255. Default to 247.
-
-    Returns:
-        float: 0-1
-    """
+    """根据叠加前后颜色估算 0～1 的红色遮罩透明度；red 范围为 0～255。"""
     return (color2[0] - color1[0]) / (red - color1[0])
 
 
 def color_bar_percentage(image, area, prev_color, options=None):
-    """
-    Args:
-        image:
-        area:
-        prev_color:
-        options: 扫描方向、起点和颜色阈值。
-
-    Returns:
-        float: 0 to 1.
-    """
+    """按扫描方向、起点和颜色阈值估算色条比例，返回 0～1。"""
     if options is None:
         options = ColorBarOptions()
     image = crop(image, area, copy=False)
@@ -1163,7 +685,7 @@ def color_bar_percentage(image, area, prev_color, options=None):
         prev_row = bar[:, prev_index] > 255 - options.threshold
         if not prev_row.size:
             return prev_index / length
-        # Look back 5px to get average color
+        # 回看 5 像素更新平均颜色，以跟随渐变色条。
         left = max(prev_index - 5, 0)
         mask = np.where(bar[:, left : prev_index + 1] > 255 - options.threshold)
         prev_color = np.mean(image[:, left : prev_index + 1][mask], axis=0)

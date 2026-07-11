@@ -138,7 +138,6 @@ FunctionTaskSpec = FunctionTaskExecutor
 
 
 def command_to_config_name(command: str) -> str:
-    """把 catalog 命令转换成配置节点名。"""
     if not isinstance(command, str):
         message = f"task command must be a string: {command!r}"
         raise TypeError(message)
@@ -149,7 +148,6 @@ def command_to_config_name(command: str) -> str:
 
 
 def config_name_to_command(config_name: str) -> str:
-    """把配置节点名转换成 catalog 命令。"""
     return camel_to_snake(config_name)
 
 
@@ -234,7 +232,6 @@ OPSI_SCOPES = ("OpsiGeneral",)
 
 TASK_CATALOG: Mapping[str, TaskDefinition] = _build_catalog(
     _task("restart", RunnerMethodExecutor(method_name="restart"), priority=0),
-    # 普通任务：构造任务类后直接调用指定方法。
     _task("research", _class_executor("module.research.research", "RewardResearch"), priority=4),
     _task("commission", _class_executor("module.commission.commission", "RewardCommission"), priority=2),
     _task("tactical", _class_executor("module.tactical.tactical_class", "RewardTacticalClass"), priority=3),
@@ -287,14 +284,12 @@ TASK_CATALOG: Mapping[str, TaskDefinition] = _build_catalog(
         priority=38,
         config_scopes=EVENT_SCOPES,
     ),
-    # 商店任务共用 RewardShop，只切换执行方法。
     _task(
         "shop_frequent",
         _class_executor("module.shop.shop_reward", "RewardShop", method_name="run_frequent"),
         priority=11,
     ),
     _task("shop_once", _class_executor("module.shop.shop_reward", "RewardShop", method_name="run_once"), priority=12),
-    # 活动 ABCD 入口共用一个任务类，具体章节由配置决定。
     _task(
         "event_a",
         _class_executor("module.event.campaign_abcd", "CampaignABCD"),
@@ -319,7 +314,6 @@ TASK_CATALOG: Mapping[str, TaskDefinition] = _build_catalog(
         priority=36,
         config_scopes=EVENT_SCOPES,
     ),
-    # 大世界任务集中在 OSCampaignRun，这里只声明调用的方法。
     _task(
         "opsi_explore",
         _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_explore"),
@@ -392,7 +386,6 @@ TASK_CATALOG: Mapping[str, TaskDefinition] = _build_catalog(
         priority=1,
         config_scopes=OPSI_SCOPES,
     ),
-    # 这些入口都是 CampaignRun，只在执行时读取当前战役配置。
     _task("main", _campaign_executor("module.campaign.run", "CampaignRun"), priority=46),
     _task("main2", _campaign_executor("module.campaign.run", "CampaignRun"), priority=47),
     _task("main3", _campaign_executor("module.campaign.run", "CampaignRun"), priority=48),
@@ -408,7 +401,6 @@ TASK_CATALOG: Mapping[str, TaskDefinition] = _build_catalog(
         priority=50,
         config_scopes=EVENT_SCOPES,
     ),
-    # WebUI 工具保留原任务名绑定，但只允许直接启动。
     _task(
         "daemon",
         _class_executor("module.daemon.daemon", "AzurLaneDaemon", task_name="Daemon"),
