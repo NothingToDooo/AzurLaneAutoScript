@@ -28,7 +28,7 @@ class GridInfo:
 
     is_os = False
 
-    # is_sea --
+    # -- 表示海面。
     is_land = False  # ++
     is_spawn_point = False  # SP
     is_submarine_spawn_point = False  # __
@@ -40,7 +40,7 @@ class GridInfo:
     may_siren = False  # MS
     may_ambush = False
 
-    is_enemy = False  # example: 0L 1M 2C 3T 3E
+    is_enemy = False  # 例如：0L、1M、2C、3T、3E。
     is_boss = False  # BO
     is_mystery = False  # MY
     is_ammo = False  # AM
@@ -52,21 +52,21 @@ class GridInfo:
     portal_link = ()
     is_maze = False
     maze_round = (0, 1, 2)
-    maze_nearby = None  # SelectedGrids
+    maze_nearby = None  # 类型为 SelectedGrids。
 
     enemy_scale = 0
-    enemy_genre = None  # Light, Main, Carrier, Treasure, Enemy(unknown)
+    enemy_genre = None  # Light、Main、Carrier、Treasure 或 Enemy（未知类型）。
 
     is_cleared = False
     is_caught_by_siren = False
-    is_carrier = False  # Is carrier spawn in mystery
-    is_movable = False  # Is movable enemy
-    is_mechanism_trigger = False  # Mechanism has triggered
-    is_mechanism_block = False  # Blocked by mechanism
+    is_carrier = False  # 神秘点刷出的航母。
+    is_movable = False
+    is_mechanism_trigger = False
+    is_mechanism_block = False
     mechanism_trigger: SelectedGrids | None = None
     mechanism_block: SelectedGrids | None = None
-    mechanism_wait = 2  # Seconds to wait the mechanism unlock animation
-    is_fortress = False  # Machine fortress
+    mechanism_wait = 2  # 等待机关解锁动画的秒数。
+    is_fortress = False
     is_flare = False
     is_missile_attack = False
     may_bouncing_enemy = False

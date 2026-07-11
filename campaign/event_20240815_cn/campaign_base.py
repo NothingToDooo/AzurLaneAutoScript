@@ -12,14 +12,12 @@ class CampaignBase(CampaignBase_):
 
     def get_story_entrance(self):
         """返回剧情入口按钮；未匹配或落入黑名单区域时返回 None。"""
-        # 5 story stage after clearing A2
-        # You can't go anywhere unless you clicked it
+        # A2 后会依次出现 5 个剧情入口，未点击前无法继续。
         button = self.image_color_button(
             area=(66, 200, 1200, 690), color=(0, 0, 0), color_threshold=240, encourage=10, name="STORY_ENTRANCE"
         )
         if button is None:
             return None
-        # Blacklisted area
         if area_in_area(button.button, area_pad((424, 522, 444, 542), pad=-20)):
             return None
         return button

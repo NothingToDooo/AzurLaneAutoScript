@@ -4,13 +4,7 @@ from module.logger import logger
 
 
 class CampaignBase(CampaignBase_):
-    """
-    In event Universe in Unison (event_20201029_cn), maps are:
-    Chapter 1: SP1, SP2, SP3, SP4, SP5.
-    Chapter 2: uSP.
-    Chapter 3: EX.
-    Mode switch is meaningless.
-    """
+    """该联动活动分章：第 1 章 SP1～SP5，第 2 章 uSP，第 3 章 EX；模式切换无意义。"""
 
     @staticmethod
     def campaign_get_chapter_index(name):

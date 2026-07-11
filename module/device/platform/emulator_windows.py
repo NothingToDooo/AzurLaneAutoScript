@@ -135,7 +135,6 @@ class EmulatorManager(EmulatorManagerBase):
                 exe = proc.cmdline()
                 exe = exe[0].replace(r"\\", "/").replace("\\", "/")
             except psutil.AccessDenied, psutil.NoSuchProcess, IndexError, OSError:
-                # psutil.AccessDenied
                 # NoSuchProcess: process no longer exists (pid=xxx)
                 # OSError: [WinError 87] 参数错误。: '(originated from ReadProcessMemory)'
                 continue

@@ -31,7 +31,7 @@ class InfoHandler(ModuleBase):
         parameters = {
             "height": 235,
             "prominence": 50,
-            # Blue lines are in a interval of 56
+            # 蓝线间距为 56 像素。
             "distance": 50,
         }
         peaks, _ = signal.find_peaks(line, **parameters)
@@ -136,8 +136,7 @@ class InfoHandler(ModuleBase):
             self.device.click(handler_assets.GET_MISSION)
             self._hot_fix_check_wait.reset()
 
-        # Check game client existence after 3s to 6s
-        # Hot fixes will kill AL if you clicked the confirm button
+        # 点击确认后热修复会关闭客户端，因此在 3～6 秒窗口检查进程。
         if self._hot_fix_check_wait.reached():
             self._hot_fix_check_wait.clear()
         if self._hot_fix_check_wait.started() and 3 <= self._hot_fix_check_wait.current_time() <= 6:
@@ -149,7 +148,7 @@ class InfoHandler(ModuleBase):
                 logger.error(
                     "Account logged out, probably because account kicked by server maintenance or another log in"
                 )
-                # Kill game, because game patches after maintenance can only be downloaded at game startup
+                # 维护补丁仅在客户端启动时下载；检测到维护登出后结束进程，后续必须重启。
                 self.device.app_stop()
                 raise GameNotRunningError
             self._hot_fix_check_wait.clear()
@@ -187,7 +186,8 @@ class InfoHandler(ModuleBase):
                     self.device.click(handler_assets.USE_DATA_KEY_NOTIFIED)
                     continue
 
-            self.config.USE_DATA_KEY = False  # Reset on success as task can be stopped before can be recovered
+            # 成功后立即关闭开关，避免任务在恢复前停止而重复消耗数据钥匙。
+            self.config.USE_DATA_KEY = False
 
             # 点击确认。
             # 数据钥匙页面的 POPUP_CONFIRM 和标准按钮略有不同，因此这里直接绑定点击。
@@ -265,9 +265,9 @@ class InfoHandler(ModuleBase):
 
     def _story_option_buttons(self):
         """返回从上到下的剧情选项按钮；未识别时返回空列表。"""
-        # Area to detect the options, should include at least 3 options.
+        # 检测区域至少覆盖 3 个选项。
         story_option_area = (730, 188, 1140, 480)
-        # Background color of the left part of the option.
+        # 选项左侧的背景色。
         story_option_color = (99, 121, 156)
         image = color_similarity_2d(self.image_crop(story_option_area, copy=False), color=story_option_color) > 225
         x_count = np.where(np.sum(image, axis=0) > 40)[0]
@@ -276,14 +276,11 @@ class InfoHandler(ModuleBase):
         x_min, x_max = np.min(x_count), np.max(x_count)
 
         parameters = {
-            # Option is 300`320px x 50~52px.
+            # 单个选项约 300～320 × 50～52 像素。
             "height": 280,
             "width": 45,
             "distance": 50,
-            # Chooses the relative height at which the peak width is measured as a percentage of its prominence.
-            # 1.0 calculates the width of the peak at its lowest contour line,
-            # while 0.5 evaluates at half the prominence height.
-            # Must be at least 0.
+            # scipy 的 rel_height 按 prominence 比例测宽：1.0 对应最低等高线，0.5 对应半突出度，且不得小于 0。
             "rel_height": 5,
         }
         y_count = np.sum(image, axis=1)
@@ -303,7 +300,7 @@ class InfoHandler(ModuleBase):
 
     def _story_option_buttons_2(self):
         """返回从上到下的新版剧情选项按钮；未识别时返回空列表。"""
-        # Area to detect the options, should include at least 3 options.
+        # 检测区域至少覆盖 3 个选项。
         story_option_area = (330, 135, 980, 555)
         story_detect_area = (330, 135, 355, 555)
         story_option_color = (247, 247, 247)
@@ -315,15 +312,11 @@ class InfoHandler(ModuleBase):
         line[line >= 200] = 255
 
         parameters = {
-            # Option is 300`320px x 50~52px.
+            # 单个选项约 300～320 × 50～52 像素。
             "height": 200,
             "width": 40,
             "distance": 40,
-            # Chooses the relative height at which the peak width is measured as a percentage of its prominence.
-            # 1.0 calculates the width of the peak at its lowest contour line,
-            # while 0.5 evaluates at half the prominence height.
-            # Must be at least 0.
-            # rel_height is about 240 / 48
+            # scipy 的 rel_height 按 prominence 比例测宽：1.0 对应最低等高线，0.5 对应半突出度，且不得小于 0。
             "rel_height": 4,
         }
         peaks, properties = signal.find_peaks(line, **parameters)

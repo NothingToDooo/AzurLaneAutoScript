@@ -22,7 +22,6 @@ WAR_ARCHIVES_SCROLL = Scroll(WAR_ARCHIVES_SCROLL_AREA, color=(247, 211, 66), nam
 
 
 class CampaignBase(CampaignBase_):
-    # Helper variable to keep track of whether is the first runthrough
     first_run = True
     ENEMY_FILTER = "1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M"
 
@@ -80,20 +79,17 @@ class CampaignBase(CampaignBase_):
 
             self._discard_archives_scroll_record()
 
-            # Drag may result in accidental exit, recover
-            # before starting next search attempt
+            # 拖动可能意外退出；每轮搜索前先恢复档案列表页。
             if self._ensure_archives_search_page():
                 loading_checked = False
 
-            # check entrance first, because game can remember last scrolling position
-            # if you stays at page_campaign_menu
-            # and bypass _archives_loading_complete if reached entrance
+            # 游戏会保留上次滚动位置；先匹配入口，命中时可跳过较慢的加载检查。
             entrance = self._get_archives_entrance(name)
             if entrance is not None:
                 return entrance
 
             if not loading_checked:
-                # _archives_loading_complete might take 1~2s if archive list is not at top
+                # 档案列表不在顶部时，加载检查可能耗时 1～2 秒。
                 self._wait_archives_loaded()
                 loading_checked = True
 
@@ -110,10 +106,7 @@ class CampaignBase(CampaignBase_):
 
     def ui_goto_archives_campaign(self, mode="ex"):
         """切换档案模式并进入目标活动地图。"""
-        # On first run regardless of current location
-        # even in target stage map, start from page_archives
-        # For subsequent runs when neither reward or
-        # stop_triggers occur, no need perform operations
+        # 首次运行无论当前位置都从档案页重新进入；后续若仍在目标地图且未触发奖励或停止条件则直接复用。
         result = True
         if self.first_run or not self.appear(WAR_ARCHIVES_CAMPAIGN_CHECK, offset=(20, 20)):
             result = self.ui_ensure(destination=page_archives)
@@ -135,7 +128,6 @@ class CampaignBase(CampaignBase_):
                 )
                 raise RequestHumanTakeover
 
-        # Subsequent runs all set False
         if self.first_run:
             self.first_run = False
 
