@@ -95,10 +95,7 @@ class CampaignBase(CampaignBase_):
         self.campaign_ensure_mode("hard")
 
     def _campaign_ball_get(self):
-        """
-        Returns:
-            str: 'blue' or 'red'.
-        """
+        """返回球色 blue、red；无法识别时返回 unknown。"""
         color = get_color(self.device.image, BALL.area)
         # Blue: (93, 127, 182), Red: (186, 116, 124)
         index = np.argmax(color)
@@ -110,10 +107,7 @@ class CampaignBase(CampaignBase_):
         return "unknown"
 
     def _campaign_ball_set(self, status):
-        """
-        Args:
-            status (str): 'blue' or 'red'.
-        """
+        """把球色切换为 blue 或 red。"""
         skip_first_screenshot = True
         while 1:
             if skip_first_screenshot:

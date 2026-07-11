@@ -10,13 +10,7 @@ class CampaignBase(CampaignBase_):
 
     @staticmethod
     def campaign_separate_name(name):
-        """
-        Args:
-            name (str): Stage name in lowercase, such as 7-2, d3, sp3.
-
-        Returns:
-            tuple[str]: Campaign_name and stage index in lowercase, Such as ['7', '2'], ['d', '3'], ['sp', '3'].
-        """
+        """将 tp 特殊映射为 (ex_sp, 1)，其余按通用规则分解。"""
         if name == "tp":
             return "ex_sp", "1"
         return CampaignBase_.campaign_separate_name(name)

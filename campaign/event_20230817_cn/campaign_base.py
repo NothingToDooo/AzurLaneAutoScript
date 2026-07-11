@@ -12,10 +12,7 @@ from module.ui.page import page_event
 
 class CampaignBase(CampaignBase_):
     def handle_chapter_additional(self):
-        """
-        event_20230817_cn has stories act as stage entrance,
-        stories must be cleared to unlock stages.
-        """
+        """该活动以剧情作为关卡入口，需先清完剧情才能解锁关卡。"""
         if self.get_story_button():
             self.event_20230817_story()
             return True
@@ -23,12 +20,7 @@ class CampaignBase(CampaignBase_):
         return False
 
     def get_story_button(self):
-        """
-        获取活动剧情按钮，识别耗时约 26ms。
-
-        Returns:
-            Button | None：检测到的剧情按钮。
-        """
+        """识别活动剧情按钮（约 26ms），未检测到时返回 None。"""
         # Story before A1, E0-1 ~ E0-3
         if self.appear(EVENT_20230817_STORY, offset=(20, 100)):
             return EVENT_20230817_STORY

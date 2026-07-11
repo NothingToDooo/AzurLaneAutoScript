@@ -27,13 +27,7 @@ class CampaignBase(CampaignBase_):
     ENEMY_FILTER = "1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M"
 
     def _get_archives_entrance(self, name):
-        """
-        Create entrance button to target archive campaign
-        using a template acquired by event folder name
-
-        Args:
-            name(str): event folder name
-        """
+        """按活动目录名取得模板并识别对应档案入口。"""
         template = dic_archives_template[name]
 
         sim, button = template.match_result(self.device.image)
@@ -76,12 +70,7 @@ class CampaignBase(CampaignBase_):
         return True
 
     def _search_archives_entrance(self, name, skip_first_screenshot=True):
-        """
-        Search for entrance using mini-touch scroll down
-        at center
-        Fixed number of scrolls until give up, may need to
-        increase as more war archives campaigns are added
-        """
+        """滚动搜索档案入口，最多尝试 20 次后放弃。"""
         loading_checked = False
         for _ in range(20):
             if skip_first_screenshot:
@@ -120,10 +109,7 @@ class CampaignBase(CampaignBase_):
         return None
 
     def ui_goto_archives_campaign(self, mode="ex"):
-        """
-        Performs the operations needed to transition
-        to target archive's campaign stage map
-        """
+        """切换档案模式并进入目标活动地图。"""
         # On first run regardless of current location
         # even in target stage map, start from page_archives
         # For subsequent runs when neither reward or

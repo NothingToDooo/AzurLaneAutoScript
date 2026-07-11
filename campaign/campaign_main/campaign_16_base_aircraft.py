@@ -69,16 +69,9 @@ class CampaignBase(CampaignBase_):
                 continue
 
     def air_strike(self, location):
-        """
-        Open strategy, air strike on location, close strategy.
+        """从地图打开策略页，对 X=(x, y) 空袭后返回地图。
 
-        Air strike at location X = (x, y) will hit range [x-2, y-1, x+2, y] as follows:
-
-            OOOOO
-            OOXOO
-
-        Args:
-            location (typle, str, GridInfo): Location of air strike
+        覆盖 [x-2, y-1, x+2, y]：上排 OOOOO，下排 OOXOO。
         """
         location = location_ensure(location)
         if self.map[location].is_land:

@@ -44,12 +44,7 @@ class CampaignBase(CampaignBase_):
         return result
 
     def is_event_animation(self):
-        """
-        Animation in events after cleared an enemy.
-
-        Returns:
-            bool: If animation appearing.
-        """
+        """返回活动战斗后动画是否出现。"""
         appear = self.appear(EVENT_ANIMATION)
         if appear:
             logger.info("DOA animation, waiting")

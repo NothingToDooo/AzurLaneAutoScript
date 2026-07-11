@@ -11,10 +11,7 @@ class CampaignBase(CampaignBase_):
     entrance_timer = Timer(2)
 
     def get_story_entrance(self):
-        """
-        Returns:
-            Button: Or None if nothing matched.
-        """
+        """返回剧情入口按钮；未匹配或落入黑名单区域时返回 None。"""
         # 5 story stage after clearing A2
         # You can't go anywhere unless you clicked it
         button = self.image_color_button(
