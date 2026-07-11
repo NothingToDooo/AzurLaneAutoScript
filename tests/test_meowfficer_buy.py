@@ -23,12 +23,11 @@ class SequenceOcr:
     def recognize(
         self,
         image: np.ndarray,
-        direct_ocr: bool = False,  # noqa: FBT001
         *,
         expected_total: int | None = None,
         failure_store: object | None = None,
     ) -> RecognitionResult[object]:
-        del image, direct_ocr
+        del image
         self.calls.append({"expected_total": expected_total, "failure_store": failure_store})
         return next(self._results)
 
@@ -41,19 +40,16 @@ class ListOcr:
     def recognize(
         self,
         image: np.ndarray,
-        direct_ocr: bool = False,  # noqa: FBT001
         *,
         expected_total: int | None = None,
         failure_store: object | None = None,
     ) -> list[RecognitionResult[object]]:
-        del image, direct_ocr
+        del image
         self.calls.append({"expected_total": expected_total, "failure_store": failure_store})
         return [self._result]
 
 
 class _TestBuyer:
-    _meow_get_buy_count = staticmethod(MeowfficerBuy._meow_get_buy_count)  # noqa: SLF001
-
     def __init__(self, frames: list[np.ndarray], *, save_error: bool) -> None:
         self._frames = frames
         self.device = SimpleNamespace(image=frames[0])

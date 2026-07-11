@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from module.device import runtime as runtime_module
-from module.device.platform.platform_windows import PlatformWindows
+from module.device.runtime import MumuRuntime
 from module.map.map_grids import SelectedGrids
 
 
@@ -50,7 +50,7 @@ def _device(serial: str, status: str):
     return SimpleNamespace(serial=serial, status=status)
 
 
-def _make_platform(
+def _make_runtime(
     *,
     serial: str = "127.0.0.1:16384",
     device_batches: list[list[object]],
@@ -59,8 +59,8 @@ def _make_platform(
     connect_messages: list[str] | None = None,
 ):
     session = SimpleNamespace(serial=serial, adb_client=_AdbClient(connect_messages))
-    platform = PlatformWindows(session)
-    platform.__dict__["emulator_instance"] = SimpleNamespace(serial=serial)
+    runtime = MumuRuntime(session)
+    runtime.__dict__["emulator_instance"] = SimpleNamespace(serial=serial)
     session.device_batches = list(device_batches)
     session.last_devices = []
     session.shell_results = shell_results or ["pong"]
@@ -88,7 +88,7 @@ def _make_platform(
     session.list_device = list_device
     session.adb_shell = adb_shell
     session.list_known_packages = list_known_packages
-    return platform
+    return runtime
 
 
 @pytest.fixture(autouse=True)
@@ -102,41 +102,41 @@ def _patch_windows_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_emulator_start_watch_succeeds_when_device_shell_and_package_are_ready() -> None:
-    platform = _make_platform(device_batches=[[_device("127.0.0.1:16384", "device")]])
+    runtime = _make_runtime(device_batches=[[_device("127.0.0.1:16384", "device")]])
 
-    assert platform.emulator_start_watch()
-    assert platform.session.adb_client.connect_calls == []
-    assert platform.session.shell_calls == 1
-    assert platform.session.package_calls == 1
+    assert runtime.emulator_start_watch()
+    assert runtime.session.adb_client.connect_calls == []
+    assert runtime.session.shell_calls == 1
+    assert runtime.session.package_calls == 1
 
 
 def test_emulator_start_watch_disconnects_offline_device_before_retrying() -> None:
-    platform = _make_platform(
+    runtime = _make_runtime(
         device_batches=[
             [_device("127.0.0.1:16384", "offline")],
             [_device("127.0.0.1:16384", "device")],
         ]
     )
 
-    assert platform.emulator_start_watch()
-    assert platform.session.adb_client.disconnect_calls == ["127.0.0.1:16384"]
-    assert platform.session.adb_client.connect_calls == ["127.0.0.1:16384"]
+    assert runtime.emulator_start_watch()
+    assert runtime.session.adb_client.disconnect_calls == ["127.0.0.1:16384"]
+    assert runtime.session.adb_client.connect_calls == ["127.0.0.1:16384"]
 
 
 def test_emulator_start_watch_connects_when_device_is_missing() -> None:
-    platform = _make_platform(
+    runtime = _make_runtime(
         device_batches=[
             [],
             [_device("127.0.0.1:16384", "device")],
         ]
     )
 
-    assert platform.emulator_start_watch()
-    assert platform.session.adb_client.connect_calls == ["127.0.0.1:16384"]
+    assert runtime.emulator_start_watch()
+    assert runtime.session.adb_client.connect_calls == ["127.0.0.1:16384"]
 
 
 def test_emulator_start_watch_waits_until_shell_command_is_ready() -> None:
-    platform = _make_platform(
+    runtime = _make_runtime(
         device_batches=[
             [_device("127.0.0.1:16384", "device")],
             [_device("127.0.0.1:16384", "device")],
@@ -144,13 +144,13 @@ def test_emulator_start_watch_waits_until_shell_command_is_ready() -> None:
         shell_results=[OSError("not ready"), "pong"],
     )
 
-    assert platform.emulator_start_watch()
-    assert platform.session.shell_calls == 2
-    assert platform.session.package_calls == 1
+    assert runtime.emulator_start_watch()
+    assert runtime.session.shell_calls == 2
+    assert runtime.session.package_calls == 1
 
 
 def test_emulator_start_watch_waits_until_package_is_ready() -> None:
-    platform = _make_platform(
+    runtime = _make_runtime(
         device_batches=[
             [_device("127.0.0.1:16384", "device")],
             [_device("127.0.0.1:16384", "device")],
@@ -158,12 +158,12 @@ def test_emulator_start_watch_waits_until_package_is_ready() -> None:
         package_results=[[], ["com.bilibili.azurlane"]],
     )
 
-    assert platform.emulator_start_watch()
-    assert platform.session.package_calls == 2
+    assert runtime.emulator_start_watch()
+    assert runtime.session.package_calls == 2
 
 
 def test_emulator_start_watch_returns_false_on_timeout() -> None:
     _Timer.timeout_after = 0
-    platform = _make_platform(device_batches=[[_device("127.0.0.1:16384", "device")]])
+    runtime = _make_runtime(device_batches=[[_device("127.0.0.1:16384", "device")]])
 
-    assert not platform.emulator_start_watch()
+    assert not runtime.emulator_start_watch()

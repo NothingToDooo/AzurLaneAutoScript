@@ -1,7 +1,4 @@
-# ruff: noqa: SLF001
-
 import inspect
-from dataclasses import dataclass
 from datetime import timedelta
 from typing import TypedDict
 
@@ -12,7 +9,11 @@ from cnocr import CnOcr
 
 import module.ocr.ocr as ocr_module
 from module.ocr.al_ocr import AlOcr
-from module.ocr.failure_store import OcrFailureRecordResult, OcrFailureRecordStatus
+from module.ocr.failure_store import (
+    OcrFailureRecordResult,
+    OcrFailureRecordStatus,
+    OcrFailureSample,
+)
 from module.ocr.ocr import Digit, DigitCounter, Duration, Ocr
 from module.ocr.result import RawOcrResult, RecognitionFailureReason, RecognitionResult
 
@@ -72,46 +73,12 @@ class _SequenceEngine(_FakeEngine):
         return self.results
 
 
-@dataclass(frozen=True, slots=True)
-class _RecordedFailure:
-    result: object
-    raw_image: np.ndarray
-    processed_image: np.ndarray
-    area: tuple[int, int, int, int] | None
-    alphabet: str | None
-    letter: tuple[int, int, int]
-    threshold: int
-    expected_total: int | None
-
-
-class _RecordingFailureRecorder:
+class _RecordingFailureRecorder[T]:
     def __init__(self) -> None:
-        self.calls: list[_RecordedFailure] = []
+        self.calls: list[OcrFailureSample[T]] = []
 
-    def record[T](  # noqa: PLR0913
-        self,
-        result: RecognitionResult[T],
-        *,
-        raw_image: np.ndarray,
-        processed_image: np.ndarray,
-        area: tuple[int, int, int, int] | None,
-        alphabet: str | None,
-        letter: tuple[int, int, int],
-        threshold: int,
-        expected_total: int | None = None,
-    ) -> OcrFailureRecordResult:
-        self.calls.append(
-            _RecordedFailure(
-                result=result,
-                raw_image=raw_image,
-                processed_image=processed_image,
-                area=area,
-                alphabet=alphabet,
-                letter=letter,
-                threshold=threshold,
-                expected_total=expected_total,
-            )
-        )
+    def record(self, sample: OcrFailureSample[T]) -> OcrFailureRecordResult:
+        self.calls.append(sample)
         return OcrFailureRecordResult(OcrFailureRecordStatus.SAVED, "test-digest", None)
 
 
@@ -530,9 +497,11 @@ def test_structured_recognition_logs_success_and_failure_attributes(monkeypatch:
 
 
 def _loaded_ocr() -> AlOcr:
-    ocr = AlOcr()
-    ocr._model_loaded = True
-    return ocr
+    class _LoadedAlOcr(AlOcr):
+        def ensure_loaded(self) -> None:
+            pass
+
+    return _LoadedAlOcr()
 
 
 def _patch_cnocr_batch(
@@ -549,14 +518,19 @@ def _patch_cnocr_batch(
     return calls
 
 
-def test_extract_raw_result_preserves_text_and_score() -> None:
-    result = AlOcr._extract_raw_result({"text": "14/15", "score": 0.875})
+def extract_raw_result(monkeypatch: pytest.MonkeyPatch, payload: object) -> RawOcrResult:
+    _patch_cnocr_batch(monkeypatch, [payload])
+    return _loaded_ocr().ocr_for_single_lines_raw([object()])[0]
+
+
+def test_extract_raw_result_preserves_text_and_score(monkeypatch: pytest.MonkeyPatch) -> None:
+    result = extract_raw_result(monkeypatch, {"text": "14/15", "score": 0.875})
 
     assert result == RawOcrResult(text="14/15", score=0.875)
 
 
-def test_extract_raw_result_accepts_numpy_real_score() -> None:
-    result = AlOcr._extract_raw_result({"text": "14/15", "score": np.float32(0.875)})
+def test_extract_raw_result_accepts_numpy_real_score(monkeypatch: pytest.MonkeyPatch) -> None:
+    result = extract_raw_result(monkeypatch, {"text": "14/15", "score": np.float32(0.875)})
 
     assert result == RawOcrResult(text="14/15", score=0.875)
     assert type(result.score) is float
@@ -566,27 +540,33 @@ def test_extract_raw_result_accepts_numpy_real_score() -> None:
     "payload",
     [None, "14/15", {}, {"text": 14, "score": 0.9}, {"text": "14/15", "score": float("nan")}],
 )
-def test_extract_raw_result_rejects_malformed_payload(payload: object) -> None:
+def test_extract_raw_result_rejects_malformed_payload(monkeypatch: pytest.MonkeyPatch, payload: object) -> None:
     with pytest.raises((TypeError, ValueError)):
-        AlOcr._extract_raw_result(payload)
+        extract_raw_result(monkeypatch, payload)
 
 
 @pytest.mark.parametrize("payload", [{"text": "14/15"}, {"score": 0.9}])
-def test_extract_raw_result_translates_missing_fields_to_type_error(payload: object) -> None:
+def test_extract_raw_result_translates_missing_fields_to_type_error(
+    monkeypatch: pytest.MonkeyPatch,
+    payload: object,
+) -> None:
     with pytest.raises(TypeError):
-        AlOcr._extract_raw_result(payload)
+        extract_raw_result(monkeypatch, payload)
 
 
 @pytest.mark.parametrize("score", [True, False, "0.9", None])
-def test_extract_raw_result_rejects_non_real_score(score: object) -> None:
+def test_extract_raw_result_rejects_non_real_score(monkeypatch: pytest.MonkeyPatch, score: object) -> None:
     with pytest.raises(TypeError):
-        AlOcr._extract_raw_result({"text": "14/15", "score": score})
+        extract_raw_result(monkeypatch, {"text": "14/15", "score": score})
 
 
 @pytest.mark.parametrize("score", [float("-inf"), -0.001, 1.001, float("inf")])
-def test_extract_raw_result_rejects_non_finite_or_out_of_range_score(score: float) -> None:
+def test_extract_raw_result_rejects_non_finite_or_out_of_range_score(
+    monkeypatch: pytest.MonkeyPatch,
+    score: float,
+) -> None:
     with pytest.raises(ValueError, match="finite and between"):
-        AlOcr._extract_raw_result({"text": "14/15", "score": score})
+        extract_raw_result(monkeypatch, {"text": "14/15", "score": score})
 
 
 def test_recognition_result_accepts_consistent_success_and_failure() -> None:
@@ -703,8 +683,6 @@ def test_model_name_is_normalized_without_loading(monkeypatch: pytest.MonkeyPatc
 
     ocr = AlOcr(model_name="densenet-lite-gru")
 
-    assert ocr._model_loaded is False
-    assert ocr._model_name == "densenet_lite_136-gru"
     assert ocr.model_name == "densenet_lite_136-gru"
 
 

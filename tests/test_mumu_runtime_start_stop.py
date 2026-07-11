@@ -1,10 +1,10 @@
 import pytest
 
 from module.device.platform.emulator_windows import EmulatorInstance
-from module.device.platform.platform_windows import EmulatorUnknown, PlatformWindows
+from module.device.runtime import EmulatorUnknown, MumuRuntime
 
 
-class _Platform(PlatformWindows):
+class _Runtime(MumuRuntime):
     def start_instance(self, instance: EmulatorInstance) -> None:
         self._emulator_start(instance)
 
@@ -36,10 +36,10 @@ def _legacy_instance(tmp_path):
 
 def test_emulator_start_uses_mumu12_manager_api(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     commands: list[list[str]] = []
-    monkeypatch.setattr(PlatformWindows, "execute", classmethod(lambda _cls, command: commands.append(command)))
-    platform = object.__new__(_Platform)
+    monkeypatch.setattr(MumuRuntime, "execute", classmethod(lambda _cls, command: commands.append(command)))
+    runtime = object.__new__(_Runtime)
 
-    platform.start_instance(_mumu12_instance(tmp_path))
+    runtime.start_instance(_mumu12_instance(tmp_path))
 
     assert commands == [
         [
@@ -54,10 +54,10 @@ def test_emulator_start_uses_mumu12_manager_api(monkeypatch: pytest.MonkeyPatch,
 
 def test_emulator_stop_uses_mumu12_manager_api(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     commands: list[list[str]] = []
-    monkeypatch.setattr(PlatformWindows, "execute", classmethod(lambda _cls, command: commands.append(command)))
-    platform = object.__new__(_Platform)
+    monkeypatch.setattr(MumuRuntime, "execute", classmethod(lambda _cls, command: commands.append(command)))
+    runtime = object.__new__(_Runtime)
 
-    platform.stop_instance(_mumu12_instance(tmp_path))
+    runtime.stop_instance(_mumu12_instance(tmp_path))
 
     assert commands == [
         [
@@ -71,10 +71,10 @@ def test_emulator_stop_uses_mumu12_manager_api(monkeypatch: pytest.MonkeyPatch, 
 
 
 def test_legacy_emulator_instance_cannot_start_or_stop(tmp_path) -> None:
-    platform = object.__new__(_Platform)
+    runtime = object.__new__(_Runtime)
     instance = _legacy_instance(tmp_path)
 
     with pytest.raises(EmulatorUnknown):
-        platform.start_instance(instance)
+        runtime.start_instance(instance)
     with pytest.raises(EmulatorUnknown):
-        platform.stop_instance(instance)
+        runtime.stop_instance(instance)

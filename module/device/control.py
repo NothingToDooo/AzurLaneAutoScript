@@ -47,7 +47,7 @@ class Control:
     def drag_minitouch(self, p1, p2, point_random=(-10, -10, 10, 10)):
         return self.controller.drag(p1, p2, point_random=point_random)
 
-    def click(self, button, control_check=True):
+    def click(self, button, *, control_check=True):
         if control_check:
             self.handle_control_check(button)
         x, y = random_rectangle_point(button.button)
@@ -74,7 +74,7 @@ class Control:
         logger.info(f"Click {point2str(x, y)} @ {button}, {duration}")
         self.long_click_minitouch(x, y, duration)
 
-    def swipe(self, p1, p2, duration=(0.1, 0.2), name="SWIPE", distance_check=True):
+    def swipe(self, p1, p2, duration=(0.1, 0.2), name="SWIPE", *, distance_check=True):
         self.handle_control_check(name)
         p1, p2 = ensure_int(p1, p2)
         duration = ensure_time(duration)

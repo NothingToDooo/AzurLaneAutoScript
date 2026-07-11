@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Callable
 
-from rich.console import Console, ConsoleRenderable
+from rich.console import Console, ConsoleRenderable, RenderableType
 from rich.highlighter import RegexHighlighter
 from rich.logging import RichHandler
 from rich.theme import Theme
@@ -58,6 +58,10 @@ def render_options(
     options: RenderOptions | None = ...,
     settings: dict[str, object] | None = ...,
 ) -> RenderOptions: ...
+def emit_renderables(
+    *objects: RenderableType,
+    **kwargs,
+) -> None: ...
 
 class __logger(logging.Logger):
     log_file: str
@@ -95,11 +99,6 @@ class __logger(logging.Logger):
     def set_func_logger(
         self,
         func: Callable[[ConsoleRenderable], None],
-    ) -> None: ...
-    def print(
-        self,
-        *objects: ConsoleRenderable,
-        **kwargs,
     ) -> None: ...
 
 logger: __logger

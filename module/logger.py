@@ -32,8 +32,6 @@ if TYPE_CHECKING:
 
         def rule(self, title="", *, characters="─", style="rule.line", end="\n", align="center") -> None: ...
 
-        def print(self, *objects: RenderableType, **kwargs) -> None: ...
-
 
 def empty_function(*args, **kwargs):
     pass
@@ -285,7 +283,7 @@ def _get_renderables(
     return renderables
 
 
-def print(*objects: RenderableType, **kwargs):  # noqa: A001 - 作为 logger.print 兼容 API 暴露。
+def emit_renderables(*objects: RenderableType, **kwargs) -> None:
     for hdlr in logger.handlers:
         if isinstance(hdlr, RichRenderableHandler):
             for renderable in _get_renderables(hdlr.console, *objects, **kwargs):
@@ -296,7 +294,7 @@ def print(*objects: RenderableType, **kwargs):  # noqa: A001 - 作为 logger.pri
 
 def rule(title="", *, characters="─", style="rule.line", end="\n", align="center"):
     rule = Rule(title=title, characters=characters, style=style, end=end, align=align)
-    print(rule)
+    emit_renderables(rule)
 
 
 def hr(title, level=3):
@@ -365,7 +363,6 @@ vars(logger)["attr_align"] = attr_align
 vars(logger)["set_file_logger"] = set_file_logger
 vars(logger)["set_func_logger"] = set_func_logger
 vars(logger)["rule"] = rule
-vars(logger)["print"] = print
 
 logger.set_file_logger()
 logger.hr("Start", level=0)

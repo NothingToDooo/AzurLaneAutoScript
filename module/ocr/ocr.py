@@ -7,13 +7,11 @@ from typing import Protocol
 import cv2
 import numpy as np
 
+import module.ocr.failure_store as failure_store_module
 from module.base.button import Button
 from module.base.decorator import cached_property
 from module.base.utils import _cv_scalar, crop, extract_letters, float2str, rgb2luma
 from module.logger import logger
-
-# Python 3.14 的公开签名检查会求值延迟注解，Protocol 必须在运行时可见。
-from module.ocr.failure_store import OcrFailureRecorder  # noqa: TC001
 from module.ocr.models import OCR_MODEL
 from module.ocr.result import RawOcrResult, RecognitionFailureReason, RecognitionResult
 
@@ -161,7 +159,7 @@ class Ocr:
         self,
         result: RecognitionResult[T],
         inference: _OcrInference,
-        failure_store: OcrFailureRecorder | None,
+        failure_store: failure_store_module.OcrFailureRecorder | None,
         *,
         expected_total: int | None = None,
     ) -> None:
@@ -171,17 +169,18 @@ class Ocr:
         if len(letter) != 3:
             message = "letter must contain exactly three channels"
             raise ValueError(message)
+        sample = failure_store_module.OcrFailureSample(
+            result=result,
+            raw_image=inference.raw_image,
+            processed_image=inference.processed_image,
+            area=inference.area,
+            alphabet=self.alphabet,
+            letter=letter,
+            threshold=self.threshold,
+            expected_total=expected_total,
+        )
         try:
-            failure_store.record(
-                result,
-                raw_image=inference.raw_image,
-                processed_image=inference.processed_image,
-                area=inference.area,
-                alphabet=self.alphabet,
-                letter=letter,
-                threshold=self.threshold,
-                expected_total=expected_total,
-            )
+            failure_store.record(sample)
         except OSError as error:
             logger.warning("OCR failure recorder raised %s; recognition result is unchanged", type(error).__name__)
 
@@ -305,7 +304,7 @@ class Digit(Ocr):
         image,
         direct_ocr=False,
         *,
-        failure_store: OcrFailureRecorder | None = None,
+        failure_store: failure_store_module.OcrFailureRecorder | None = None,
     ) -> RecognitionResult[int] | list[RecognitionResult[int]]:
         batch = self._infer_raw(image, direct_ocr=direct_ocr)
         results = [
@@ -412,7 +411,7 @@ class DigitCounter(Ocr):
         direct_ocr=False,
         *,
         expected_total: int | None = None,
-        failure_store: OcrFailureRecorder | None = None,
+        failure_store: failure_store_module.OcrFailureRecorder | None = None,
     ) -> RecognitionResult[DigitCounterValue]:
         roi_count = len(image) if direct_ocr else len(self.buttons)
         if roi_count != 1:
@@ -524,7 +523,7 @@ class Duration(Ocr):
         image,
         direct_ocr=False,
         *,
-        failure_store: OcrFailureRecorder | None = None,
+        failure_store: failure_store_module.OcrFailureRecorder | None = None,
     ) -> RecognitionResult[timedelta] | list[RecognitionResult[timedelta]]:
         batch = self._infer_raw(image, direct_ocr=direct_ocr)
         results = [

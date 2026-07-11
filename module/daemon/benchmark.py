@@ -9,7 +9,7 @@ from module.base.utils import random_rectangle_point
 from module.campaign.campaign_ui import CampaignUI
 from module.daemon.daemon_base import DaemonBase
 from module.exception import RequestHumanTakeover
-from module.logger import logger
+from module.logger import emit_renderables, logger
 
 
 def float2str(n, decimal=3):
@@ -93,7 +93,7 @@ class Benchmark(DaemonBase, CampaignUI):
                 float2str(row[1]),
                 evaluate_func(row[1]),
             )
-        logger.print(table, justify="center")
+        emit_renderables(table, justify="center")
 
     def benchmark(self, screenshot: tuple[str, ...] = (), click: tuple[str, ...] = ()):
         logger.hr("Benchmark", level=1)

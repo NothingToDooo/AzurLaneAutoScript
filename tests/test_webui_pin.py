@@ -18,11 +18,18 @@ def test_put_input_pins_output_and_forwards_attrs(monkeypatch) -> None:
     monkeypatch.setattr(pin_module, "pywebio_input", fake_input)
     monkeypatch.setattr(pin_module, "_pin_output", fake_pin_output)
 
-    result = pin_module.put_input("demo", value="v", scope="scope-a", position="after", data_test="ok")
+    result = pin_module.put_input(
+        "demo",
+        input_type="password",
+        value="v",
+        scope="scope-a",
+        position="after",
+        data_test="ok",
+    )
 
     assert result == "pinned"
     assert calls["check"] == ("demo", "pin `name`")
-    assert calls["input"] == {"name": "demo", "type": "text", "value": "v", "data_test": "ok", "label": ""}
+    assert calls["input"] == {"name": "demo", "type": "password", "value": "v", "data_test": "ok", "label": ""}
     assert calls["pin"] == ("input-output", "scope-a", "after")
 
 

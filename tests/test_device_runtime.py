@@ -13,9 +13,8 @@ from module.device.device import Device
 from module.device.method.minitouch import Minitouch
 from module.device.method.nemu_ipc import NemuIpc
 from module.device.minitouch_service import MinitouchController
-from module.device.platform.platform_base import PlatformBase
-from module.device.platform.platform_windows import PlatformWindows
-from module.device.runtime import DeviceRuntime
+from module.device.mumu_runtime_base import MumuRuntimeBase
+from module.device.runtime import DeviceRuntime, MumuRuntime
 from module.device.screenshot import Screenshot
 from module.exception import EmulatorNotRunningError
 
@@ -43,8 +42,8 @@ def test_device_mro_keeps_one_connection_spine() -> None:
 
     assert mro[:4] == (Device, Screenshot, Control, Connection)
     assert mro.count(Connection) == 1
-    for legacy_base in (AppControl, Minitouch, NemuIpc, PlatformBase, PlatformWindows):
-        assert legacy_base not in mro
+    for owned_service in (AppControl, Minitouch, NemuIpc, MumuRuntimeBase, MumuRuntime):
+        assert owned_service not in mro
 
 
 def test_device_builds_runtime_before_first_connection_and_reuses_it_for_recovery(monkeypatch) -> None:

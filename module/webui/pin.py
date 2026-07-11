@@ -17,13 +17,13 @@ def _pop_pin_options(kwargs):
     return kwargs.pop("scope", None), kwargs.pop("position", OutputPosition.BOTTOM)
 
 
-def put_input(name, type="text", **kwargs) -> Output:  # noqa: A002 - 保持 pywebio.input.input() 兼容参数名。
+def put_input(name, input_type="text", **kwargs) -> Output:
     check_dom_name_value(name, "pin `name`")
     scope, position = _pop_pin_options(kwargs)
     kwargs.setdefault("label", "")
     single_input_return = pywebio_input(
         name=name,
-        type=type,
+        type=input_type,
         **kwargs,
     )
     return _pin_output(single_input_return, scope, position)

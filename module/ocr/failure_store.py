@@ -88,6 +88,18 @@ class OcrFailureRecordStatus(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class OcrFailureSample[T]:
+    result: _RecognitionResult[T]
+    raw_image: np.ndarray
+    processed_image: np.ndarray
+    area: tuple[int, int, int, int] | None
+    alphabet: str | None
+    letter: tuple[int, int, int]
+    threshold: int
+    expected_total: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class OcrFailureRecordResult:
     status: OcrFailureRecordStatus
     digest: str
@@ -95,18 +107,7 @@ class OcrFailureRecordResult:
 
 
 class OcrFailureRecorder(Protocol):
-    def record[T](  # noqa: PLR0913
-        self,
-        result: _RecognitionResult[T],
-        *,
-        raw_image: np.ndarray,
-        processed_image: np.ndarray,
-        area: tuple[int, int, int, int] | None,
-        alphabet: str | None,
-        letter: tuple[int, int, int],
-        threshold: int,
-        expected_total: int | None = None,
-    ) -> OcrFailureRecordResult: ...
+    def record[T](self, sample: OcrFailureSample[T]) -> OcrFailureRecordResult: ...
 
 
 class OcrFailureStore:
@@ -128,59 +129,20 @@ class OcrFailureStore:
         self._max_new_samples_per_process = max_new_samples_per_process
         self._disabled = False
 
-    def record[T](  # noqa: PLR0913
-        self,
-        result: _RecognitionResult[T],
-        *,
-        raw_image: np.ndarray,
-        processed_image: np.ndarray,
-        area: tuple[int, int, int, int] | None,
-        alphabet: str | None,
-        letter: tuple[int, int, int],
-        threshold: int,
-        expected_total: int | None = None,
-    ) -> OcrFailureRecordResult:
+    def record[T](self, sample: OcrFailureSample[T]) -> OcrFailureRecordResult:
         if self._disabled:
             return OcrFailureRecordResult(OcrFailureRecordStatus.DISABLED, "", None)
         try:
-            return self._record(
-                result,
-                raw_image=raw_image,
-                processed_image=processed_image,
-                area=area,
-                alphabet=alphabet,
-                letter=letter,
-                threshold=threshold,
-                expected_total=expected_total,
-            )
+            return self._record(sample)
         except OSError:
             self._disabled = True
             raise
 
-    def _record[T](  # noqa: PLR0913
-        self,
-        result: _RecognitionResult[T],
-        *,
-        raw_image: np.ndarray,
-        processed_image: np.ndarray,
-        area: tuple[int, int, int, int] | None,
-        alphabet: str | None,
-        letter: tuple[int, int, int],
-        threshold: int,
-        expected_total: int | None = None,
-    ) -> OcrFailureRecordResult:
-        self._validate_result(result)
-        self._validate_images(raw_image, processed_image)
-        digest = self._digest(
-            result,
-            processed_image=processed_image,
-            area=area,
-            alphabet=alphabet,
-            letter=letter,
-            threshold=threshold,
-            expected_total=expected_total,
-        )
-        final_directory = self._root / result.profile / digest
+    def _record[T](self, sample: OcrFailureSample[T]) -> OcrFailureRecordResult:
+        self._validate_result(sample.result)
+        self._validate_images(sample.raw_image, sample.processed_image)
+        digest = self._digest(sample)
+        final_directory = self._root / sample.result.profile / digest
         with _STORE_LOCK:
             if self._disabled:
                 return OcrFailureRecordResult(OcrFailureRecordStatus.DISABLED, "", None)
@@ -192,17 +154,7 @@ class OcrFailureStore:
         if record_result is not None:
             return record_result
 
-        bundle = self._encode_bundle(
-            result,
-            digest=digest,
-            raw_image=raw_image,
-            processed_image=processed_image,
-            area=area,
-            alphabet=alphabet,
-            letter=letter,
-            threshold=threshold,
-            expected_total=expected_total,
-        )
+        bundle = self._encode_bundle(sample, digest=digest)
         bundle_size = sum(len(content) for content in bundle)
         if bundle_size > self._max_total_bytes:
             return OcrFailureRecordResult(OcrFailureRecordStatus.TOO_LARGE, digest, None)
@@ -258,18 +210,8 @@ class OcrFailureStore:
             raise ValueError(message)
 
     @staticmethod
-    def _encode_bundle[T](  # noqa: PLR0913
-        result: _RecognitionResult[T],
-        *,
-        digest: str,
-        raw_image: np.ndarray,
-        processed_image: np.ndarray,
-        area: tuple[int, int, int, int] | None,
-        alphabet: str | None,
-        letter: tuple[int, int, int],
-        threshold: int,
-        expected_total: int | None,
-    ) -> _EncodedBundle:
+    def _encode_bundle[T](sample: OcrFailureSample[T], *, digest: str) -> _EncodedBundle:
+        result = sample.result
         metadata = {
             "schema_version": 1,
             "captured_at": datetime.now().astimezone().isoformat(),
@@ -283,18 +225,18 @@ class OcrFailureStore:
             "latency_seconds": result.latency_seconds,
             "profile": result.profile,
             "model": result.model,
-            "area": list(area) if area is not None else None,
-            "alphabet": alphabet,
-            "letter": list(letter),
-            "threshold": threshold,
-            "expected_total": expected_total,
-            "raw_shape": list(raw_image.shape),
-            "raw_dtype": str(raw_image.dtype),
-            "processed_shape": list(processed_image.shape),
-            "processed_dtype": str(processed_image.dtype),
+            "area": list(sample.area) if sample.area is not None else None,
+            "alphabet": sample.alphabet,
+            "letter": list(sample.letter),
+            "threshold": sample.threshold,
+            "expected_total": sample.expected_total,
+            "raw_shape": list(sample.raw_image.shape),
+            "raw_dtype": str(sample.raw_image.dtype),
+            "processed_shape": list(sample.processed_image.shape),
+            "processed_dtype": str(sample.processed_image.dtype),
         }
-        raw_png = OcrFailureStore._png_bytes(raw_image)
-        processed_png = OcrFailureStore._png_bytes(processed_image)
+        raw_png = OcrFailureStore._png_bytes(sample.raw_image)
+        processed_png = OcrFailureStore._png_bytes(sample.processed_image)
         metadata_json = (json.dumps(metadata, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")
         return raw_png, processed_png, metadata_json
 
@@ -382,16 +324,8 @@ class OcrFailureStore:
             raise ValueError(message)
 
     @staticmethod
-    def _digest[T](  # noqa: PLR0913
-        result: _RecognitionResult[T],
-        *,
-        processed_image: np.ndarray,
-        area: tuple[int, int, int, int] | None,
-        alphabet: str | None,
-        letter: tuple[int, int, int],
-        threshold: int,
-        expected_total: int | None,
-    ) -> str:
+    def _digest[T](sample: OcrFailureSample[T]) -> str:
+        result = sample.result
         context = {
             "schema_version": 1,
             "profile": result.profile,
@@ -399,13 +333,13 @@ class OcrFailureStore:
             "reason": result.reason.value if result.reason is not None else None,
             "raw_text": result.raw_text,
             "normalized_text": result.normalized_text,
-            "area": area,
-            "alphabet": alphabet,
-            "letter": letter,
-            "threshold": threshold,
-            "expected_total": expected_total,
-            "processed_dtype": str(processed_image.dtype),
-            "processed_shape": processed_image.shape,
+            "area": sample.area,
+            "alphabet": sample.alphabet,
+            "letter": sample.letter,
+            "threshold": sample.threshold,
+            "expected_total": sample.expected_total,
+            "processed_dtype": str(sample.processed_image.dtype),
+            "processed_shape": sample.processed_image.shape,
         }
         canonical_context = json.dumps(
             context,
@@ -414,7 +348,7 @@ class OcrFailureStore:
             separators=(",", ":"),
         ).encode("utf-8")
         hasher = hashlib.sha256(canonical_context)
-        hasher.update(np.ascontiguousarray(processed_image).tobytes())
+        hasher.update(np.ascontiguousarray(sample.processed_image).tobytes())
         return hasher.hexdigest()
 
     @staticmethod
