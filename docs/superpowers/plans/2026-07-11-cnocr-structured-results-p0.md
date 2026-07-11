@@ -74,7 +74,7 @@ def ocr_for_single_lines_raw(self, img_list, batch_size=1) -> list[RawOcrResult]
 def atomic_ocr_for_single_lines_raw(self, img_list, cand_alphabet=None) -> list[RawOcrResult]: ...
 ```
 
-第三方字典必须有 `text: str` 和有限、位于 `[0, 1]` 的实数 `score`；缺字段统一抛 `TypeError`，错误类型或范围抛 `TypeError`/`ValueError`，不再静默变成空字符串，也不泄漏 `KeyError`。现有 `ocr_for_single_line(s)` 和 `atomic_ocr_for_single_line(s)` 继续返回字符串，只从 raw 结果投影 `.text`。当前 `AlOcr.ocr()` 也已经投影为 `list[str]`；P0 保持这一现状，不借机恢复 CnOCR 检测结果中的 position/cropped image，也不把单行 DTO 错当成完整检测结果。
+第三方字典必须有 `text: str` 和有限、位于 `[0, 1]` 的实数 `score`；缺字段统一抛 `TypeError`，错误类型或范围抛 `TypeError`/`ValueError`，不再静默变成空字符串，也不泄漏 `KeyError`。复审后，CnOCR 的 `ocr_for_single_lines()` 扩展点保持原生字典契约，`AlOcr.ocr()` 与项目实际使用的 `atomic_ocr_for_single_lines()` 在各自外层边界投影为字符串；仓库内无调用方的单行兼容包装不再保留。P0 不恢复 CnOCR 检测结果中的 position/cropped image，也不把单行 DTO 错当成完整检测结果。
 
 `AlOcr.__init__()` 在不加载模型的情况下保存规范化后的 `self._model_name = self._normalize_model_name(model_name)`；`model_name` 属性必须返回实际模型名 `densenet_lite_136-gru`，不能返回构造别名 `densenet-lite-gru`，也不能触发 `ensure_loaded()`。
 
@@ -104,9 +104,9 @@ Run: `uv run pytest tests/test_ocr_result.py -q`
 
 `module/ocr/result.py` 不得导入 `cnocr`、OpenCV 或 Pillow，确保 `module/ocr/ocr.py` 运行时引用结果类型不会破坏现有重依赖延迟加载。`_extract_raw_result()` 使用 `numbers.Real` 接受 NumPy 实数，但显式拒绝 `bool`，并统一转成 Python `float`。
 
-- [x] **Step 4: 写 raw 批量/空列表及旧单张、批量字符串投影测试**
+- [x] **Step 4: 写 raw 批量、空列表、批量字符串投影与真实动态分派测试**
 
-测试通过 monkeypatch `CnOcr.ocr_for_single_lines`、`AlOcr.set_cand_alphabet` 并把 `AlOcr._model_loaded` 置为 `True` 隔离真实模型会话；导入 `al_ocr.py` 本身仍会导入 CnOCR，不能把它误写成轻量测试。现有 `ocr_for_single_line()` 自己从 raw batch 的第一项投影 `.text`，不能调用会动态分派回字符串方法的 `super().ocr_for_single_line()`。P0 只新增生产调用需要的两个 batch raw 入口，不预建无消费者的 raw 单张包装。
+测试通过 monkeypatch `CnOcr.ocr_for_single_lines`、`AlOcr.set_cand_alphabet` 并把 `AlOcr._model_loaded` 置为 `True` 隔离真实模型会话；导入 `al_ocr.py` 本身仍会导入 CnOCR，不能把它误写成轻量测试。检测入口必须运行真实 `CnOcr.ocr()` 调用链，证明动态分派取得字典后才在 `AlOcr.ocr()` 外层投影；不能再把整个 `CnOcr.ocr()` 替换成假返回值。P0 只保留生产调用需要的 batch 接口，不为仓库内无消费者的单行兼容包装增加长期维护面。
 
 - [x] **Step 5: 运行定向测试、Ruff、ty 和差异检查**
 
@@ -772,7 +772,7 @@ Run: `git push origin docs/next-generation-ocr-roadmap`
 - [x] CnOCR 原始 text 与 score 在第三方边界被严格保留。
 - [x] 新 Digit/Counter/Duration 结构化结果能区分合法 0 与失败。
 - [x] 新 Counter 拒绝部分匹配和 `99/15`，新 Duration 拒绝非法分钟/秒。
-- [x] 旧 `.ocr()` 返回与未迁移调用点保持兼容。
+- [x] `module/ocr/ocr.py` 中未迁移调用方使用的旧 `.ocr()` 返回与宽松语义保持兼容；无消费者的 `AlOcr` 单行包装不属于该兼容边界。
 - [x] 失败 bundle 含 raw、processed、metadata，按稳定摘要去重并受容量限制。
 - [x] 只有显式 store + `Error_SaveError` 才落盘，一般文本 OCR 不自动采集。
 - [x] 指挥喵 Counter 失败时不再执行金币 OCR，下一帧恢复和金币失败均可重试。
