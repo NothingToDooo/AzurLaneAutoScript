@@ -43,7 +43,7 @@ class AzurLaneDaemon(DaemonBase, CampaignBase):
             return True
         return bool(self.story_skip())
 
-    def run(self) -> bool:
+    def run(self) -> None:
         while 1:
             self.device.screenshot()
 
@@ -57,10 +57,8 @@ class AzurLaneDaemon(DaemonBase, CampaignBase):
                 continue
 
             if self.handle_guild_popup_cancel():
-                return True
+                return
             # 没有自动结束条件，需要手动停止。
-
-        return True
 
 
 if __name__ == "__main__":

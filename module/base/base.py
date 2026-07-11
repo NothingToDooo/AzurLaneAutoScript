@@ -305,8 +305,7 @@ class ModuleBase:
             return None
 
         point = fit_points(points, mod=image_size(image), encourage=encourage)
-        point_array = point + area[:2]
-        point = (int(point_array[0]), int(point_array[1]))
+        point = (int(point[0] + area[0]), int(point[1] + area[1]))
         button_area = area_offset((-encourage, -encourage, encourage, encourage), offset=point)
         color = get_color(self.device.image, button_area)
         return Button(area=button_area, color=color, button=button_area, name=name)

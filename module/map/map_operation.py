@@ -21,7 +21,7 @@ MAP_WITHDRAW_MESSAGE = "Withdraw"
 
 class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHandler):
     map_cat_attack_timer = Timer(2)
-    map_clear_percentage_prev = -1
+    map_clear_percentage_prev: float = -1.0
     map_clear_percentage_timer = Timer(0.3, count=1)
 
     # 屏幕上显示的舰队。
@@ -191,7 +191,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         campaign_click = 0
         fleet_click = 0
         checked_in_map = False
-        self.map_clear_percentage_prev = -1
+        self.map_clear_percentage_prev = -1.0
         self.map_clear_percentage_timer.reset()
 
         while 1:
@@ -330,7 +330,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         if self.appear(map_assets.MAP_PREPARATION, offset=(20, 20)):
             return True
 
-        self.map_clear_percentage_prev = -1
+        self.map_clear_percentage_prev = -1.0
         self.map_clear_percentage_timer.reset()
         return False
 

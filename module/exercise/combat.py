@@ -125,7 +125,7 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
         pause: Button | None,
         end: bool,
     ) -> tuple[Button | None, Button | None, bool]:
-        p = self.is_combat_executing()
+        p = self.is_combat_executing() or None
         if p:
             if end:
                 end = False
