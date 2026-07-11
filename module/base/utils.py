@@ -377,7 +377,7 @@ def crop(image, area, copy=True):
 
 
 def resize(image, size):
-    """按 Pillow 默认的最近邻语义缩放，size 为 (width, height)。"""
+    """按最近邻插值缩放，size 为 (width, height)。"""
     return cv2.resize(image, size, interpolation=cv2.INTER_NEAREST)
 
 
