@@ -1,23 +1,48 @@
+from __future__ import annotations
+
 from copy import deepcopy
+from typing import TYPE_CHECKING
 
 from module.config.config_updater import ConfigGenerator
-from module.config.deep import deep_get
+from module.config.deep import DeepValue, deep_get
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
-def _arg(value, typ: str = "input", **kwargs):
-    return {"value": value, "type": typ, **kwargs}
+def _arg(
+    value: DeepValue,
+    typ: str = "input",
+    *,
+    option: list[str] | None = None,
+    valuetype: str | None = None,
+    display: str | None = None,
+) -> dict[str, DeepValue]:
+    argument: dict[str, DeepValue] = {"value": value, "type": typ}
+    if option is not None:
+        argument["option"] = option
+    if valuetype is not None:
+        argument["valuetype"] = valuetype
+    if display is not None:
+        argument["display"] = display
+    return argument
 
 
-def _storage_group():
+def _storage_group() -> dict[str, DeepValue]:
     return {"Storage": _arg({}, typ="storage", valuetype="ignore", display="disabled")}
 
 
-def _generator(task: dict, argument: dict, default: dict | None = None, override: dict | None = None):
+def _generator(
+    task: Mapping[str, DeepValue],
+    argument: Mapping[str, DeepValue],
+    default: Mapping[str, DeepValue] | None = None,
+    override: Mapping[str, DeepValue] | None = None,
+) -> ConfigGenerator:
     generator = object.__new__(ConfigGenerator)
-    generator.task = task
-    generator.argument = argument
-    generator.default = default or {}
-    generator.override = override or {}
+    vars(generator)["task"] = task
+    vars(generator)["argument"] = argument
+    vars(generator)["default"] = default or {}
+    vars(generator)["override"] = override or {}
     return generator
 
 
@@ -38,7 +63,7 @@ def test_args_adds_storage_without_mutating_task_groups() -> None:
     args = generator.args
 
     assert task == original_task
-    assert "Storage" in args["Main"]
+    assert deep_get(args, keys="Main.Storage") is not None
     assert deep_get(args, keys="Main.Scheduler.Command.value") == "Main"
     assert deep_get(args, keys="Main.Scheduler.Command.display") == "hide"
 

@@ -1,9 +1,14 @@
-from typing import ClassVar
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, ClassVar
 
 import pytest
 
 from module.awaken import awaken as awaken_module
-from module.awaken.awaken import Awaken
+from module.awaken.awaken import Awaken, AwakenCostState
+
+if TYPE_CHECKING:
+    from module.base.button import Button
 
 
 class _Asset:
@@ -63,31 +68,32 @@ class _Awaken(Awaken):
         self.calls: list[tuple[object, ...]] = []
         self.appear_results: dict[str, list[bool]] = {}
         self.appear_then_click_results: dict[str, list[bool]] = {}
-        self.cost_results: list[object] = []
+        self.cost_results: list[AwakenCostState] = []
         self.popup_results: list[bool] = []
         self.finish_results: list[bool] = []
         self.in_awaken_results: list[bool] = []
 
-    def _next_result[T](self, results: list[T], *, default: T) -> T:
+    @staticmethod
+    def _next_result[T](results: list[T], *, default: T) -> T:
         if results:
             return results.pop(0)
         return default
 
-    def appear(self, button: _Asset, *args: object, **kwargs: object) -> bool:
+    def appear(self, button: Button | _Asset, *args: object, **kwargs: object) -> bool:
         _ = args
         self.calls.append(("appear", button.name, kwargs))
         return self._next_result(self.appear_results.get(button.name, []), default=False)
 
-    def appear_then_click(self, button: _Asset, *args: object, **kwargs: object) -> bool:
+    def appear_then_click(self, button: Button | _Asset, *args: object, **kwargs: object) -> bool:
         _ = args
         self.calls.append(("appear_then_click", button.name, kwargs))
         return self._next_result(self.appear_then_click_results.get(button.name, []), default=False)
 
-    def _get_awaken_cost(self, use_array=False):
+    def _get_awaken_cost(self, *, use_array: bool = False) -> AwakenCostState:
         self.calls.append(("_get_awaken_cost", use_array))
         return self.cost_results.pop(0)
 
-    def awaken_popup_close(self, skip_first_screenshot=True):
+    def awaken_popup_close(self, *, skip_first_screenshot: bool = True) -> None:
         self.calls.append(("awaken_popup_close", skip_first_screenshot))
 
     def interval_clear(self, button: object, *args: object, **kwargs: object) -> None:

@@ -360,7 +360,7 @@ def test_campaign_folder_policies_fallback_threat_safe_without_3_stars() -> None
         ("unknown", ("", "")),
     ],
 )
-def test_campaign_separate_name(name, expected) -> None:
+def test_campaign_separate_name(name: str, expected: tuple[str, str]) -> None:
     assert CampaignOcr.campaign_separate_name(name) == expected
 
 

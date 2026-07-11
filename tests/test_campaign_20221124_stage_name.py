@@ -14,7 +14,7 @@ from campaign.event_20221124_cn.campaign_base import CampaignBase
         ("t4", ("t1", "4")),
     ],
 )
-def test_ryza_campaign_separate_name_aliases(name, expected) -> None:
+def test_ryza_campaign_separate_name_aliases(name: str, expected: tuple[str, str]) -> None:
     assert CampaignBase.campaign_separate_name(name) == expected
 
 

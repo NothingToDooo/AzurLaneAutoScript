@@ -1,20 +1,28 @@
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from module.combat import combat, combat_auto, submarine
 
+if TYPE_CHECKING:
+    import pytest
+
+    from module.base.button import Button
+
+
+type _TestButton = _FakeButton | Button
+
 
 class _FakeButton:
-    def __init__(self, name, *, luma=False, color=False):
+    def __init__(self, name: str, *, luma: bool = False, color: bool = False) -> None:
         self.name = name
         self.luma = luma
         self.color = color
-        self.calls = []
+        self.calls: list[tuple[str, str, tuple[int, int]]] = []
 
-    def match_luma(self, image, *, offset):
+    def match_luma(self, image: str, *, offset: tuple[int, int]) -> bool:
         self.calls.append(("match_luma", image, offset))
         return self.luma
 
-    def match_template_color(self, image, *, offset):
+    def match_template_color(self, image: str, *, offset: tuple[int, int]) -> bool:
         self.calls.append(("match_template_color", image, offset))
         return self.color
 
@@ -26,26 +34,26 @@ class _FakeDevice:
     image = "image"
 
     def __init__(self) -> None:
-        self.clicks = []
-        self.sleeps = []
-        self.stuck_records = []
+        self.clicks: list[_TestButton] = []
+        self.sleeps: list[tuple[float, float]] = []
+        self.stuck_records: list[_TestButton] = []
 
-    def click(self, button) -> None:
+    def click(self, button: _TestButton) -> None:
         self.clicks.append(button)
 
-    def sleep(self, duration) -> None:
+    def sleep(self, duration: tuple[float, float]) -> None:
         self.sleeps.append(duration)
 
-    def stuck_record_add(self, button) -> None:
+    def stuck_record_add(self, button: _TestButton) -> None:
         self.stuck_records.append(button)
 
 
 class _FakeTimer:
-    def __init__(self, reached):
+    def __init__(self, *, reached: bool) -> None:
         self._reached = reached
         self.reset_count = 0
 
-    def reached(self):
+    def reached(self) -> bool:
         return self._reached
 
     def reset(self) -> None:
@@ -55,26 +63,27 @@ class _FakeTimer:
 class _FakeCombatContext:
     battle_status_click_interval = 3
 
-    def __init__(self, *, timer_reached=True, appearing=()):
+    def __init__(self, *, timer_reached: bool = True, appearing: tuple[_TestButton, ...] = ()) -> None:
         self.device = _FakeDevice()
-        self.timer = _FakeTimer(timer_reached)
+        self.timer = _FakeTimer(reached=timer_reached)
         self.appearing = set(appearing)
-        self.appear_calls = []
-        self.interval_resets = []
-        self.timer_args = None
+        self.appear_calls: list[tuple[_TestButton, dict[str, float]]] = []
+        self.interval_resets: list[_TestButton] = []
+        self.timer_args: tuple[_TestButton, float] | None = None
 
-    def get_interval_timer(self, button, *, interval):
+    def get_interval_timer(self, button: _TestButton, *, interval: float) -> _FakeTimer:
         self.timer_args = (button, interval)
         return self.timer
 
-    def is_combat_executing(self):
+    @staticmethod
+    def is_combat_executing() -> bool:
         return False
 
-    def appear(self, button, **kwargs):
+    def appear(self, button: _TestButton, **kwargs: float) -> bool:
         self.appear_calls.append((button, kwargs))
         return button in self.appearing
 
-    def interval_reset(self, button) -> None:
+    def interval_reset(self, button: _TestButton) -> None:
         self.interval_resets.append(button)
 
 
@@ -82,7 +91,7 @@ def _as_combat(context: _FakeCombatContext) -> combat.Combat:
     return cast("combat.Combat", context)
 
 
-def test_is_combat_executing_uses_ordered_button_table(monkeypatch) -> None:
+def test_is_combat_executing_uses_ordered_button_table(monkeypatch: pytest.MonkeyPatch) -> None:
     miss = _FakeButton("miss")
     hit = _FakeButton("hit", color=True)
     context = _FakeCombatContext()
@@ -94,7 +103,7 @@ def test_is_combat_executing_uses_ordered_button_table(monkeypatch) -> None:
     assert hit.calls == [("match_template_color", "image", (10, 10))]
 
 
-def test_handle_combat_quit_clicks_first_matching_quit_button(monkeypatch) -> None:
+def test_handle_combat_quit_clicks_first_matching_quit_button(monkeypatch: pytest.MonkeyPatch) -> None:
     miss = _FakeButton("miss")
     hit = _FakeButton("hit", luma=True)
     context = _FakeCombatContext()
@@ -106,7 +115,7 @@ def test_handle_combat_quit_clicks_first_matching_quit_button(monkeypatch) -> No
     assert context.timer.reset_count == 1
 
 
-def test_handle_battle_status_clicks_first_visible_status(monkeypatch) -> None:
+def test_handle_battle_status_clicks_first_visible_status(monkeypatch: pytest.MonkeyPatch) -> None:
     miss = _FakeButton("miss")
     hit = _FakeButton("hit")
     context = _FakeCombatContext(appearing=(hit,))
@@ -121,7 +130,7 @@ def test_handle_battle_status_clicks_first_visible_status(monkeypatch) -> None:
     ]
 
 
-def test_handle_get_items_resets_battle_status_intervals(monkeypatch) -> None:
+def test_handle_get_items_resets_battle_status_intervals(monkeypatch: pytest.MonkeyPatch) -> None:
     miss = _FakeButton("miss")
     hit = _FakeButton("hit")
     context = _FakeCombatContext(appearing=(hit,))
@@ -136,11 +145,20 @@ def test_handle_get_items_resets_battle_status_intervals(monkeypatch) -> None:
     ]
 
 
-def _new_combat_auto(*, auto_timer=False, skip_timer=True, click_timer=True, joystick=True):
-    handler = combat_auto.CombatAuto.__new__(combat_auto.CombatAuto)
-    handler.auto_mode_click_timer = _FakeTimer(auto_timer)
-    handler.auto_skip_timer = _FakeTimer(skip_timer)
-    handler.auto_click_interval_timer = _FakeTimer(click_timer)
+class _CombatAutoProbe(combat_auto.CombatAuto):
+    device: _FakeDevice
+    auto_mode_click_timer: _FakeTimer
+    auto_skip_timer: _FakeTimer
+    auto_click_interval_timer: _FakeTimer
+
+
+def _new_combat_auto(
+    *, auto_timer: bool = False, skip_timer: bool = True, click_timer: bool = True, joystick: bool = True
+) -> _CombatAutoProbe:
+    handler = object.__new__(_CombatAutoProbe)
+    handler.auto_mode_click_timer = _FakeTimer(reached=auto_timer)
+    handler.auto_skip_timer = _FakeTimer(reached=skip_timer)
+    handler.auto_click_interval_timer = _FakeTimer(reached=click_timer)
     handler.auto_mode_checked = False
     handler.auto_mode_switched = False
     handler.device = _FakeDevice()
@@ -165,22 +183,35 @@ def test_handle_combat_auto_clicks_when_visible_state_matches_target() -> None:
     assert handler.auto_mode_switched is True
 
 
-def _new_submarine_call(*, timer=False, click_timer=True, appearing=(), ready_click=True):
-    handler = submarine.SubmarineCall.__new__(submarine.SubmarineCall)
+class _SubmarineCallProbe(submarine.SubmarineCall):
+    device: _FakeDevice
+    submarine_call_timer: _FakeTimer
+    submarine_call_click_timer: _FakeTimer
+    appear_then_click_calls: list[Button]
+
+
+def _new_submarine_call(
+    *,
+    timer: bool = False,
+    click_timer: bool = True,
+    appearing: tuple[Button, ...] = (),
+    ready_click: bool = True,
+) -> _SubmarineCallProbe:
+    handler = object.__new__(_SubmarineCallProbe)
     handler.submarine_call_flag = False
-    handler.submarine_call_timer = _FakeTimer(timer)
-    handler.submarine_call_click_timer = _FakeTimer(click_timer)
+    handler.submarine_call_timer = _FakeTimer(reached=timer)
+    handler.submarine_call_click_timer = _FakeTimer(reached=click_timer)
     handler.device = _FakeDevice()
     handler.appearing = set(appearing)
     handler.ready_click = ready_click
     handler.appear_calls = []
     handler.appear_then_click_calls = []
 
-    def appear(button):
+    def appear(button: Button) -> bool:
         handler.appear_calls.append(button)
         return button in handler.appearing
 
-    def appear_then_click(button):
+    def appear_then_click(button: Button) -> bool:
         handler.appear_then_click_calls.append(button)
         return handler.ready_click
 

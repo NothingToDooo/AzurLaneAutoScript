@@ -1,25 +1,50 @@
+from __future__ import annotations
+
 import copy
 from types import SimpleNamespace
-from typing import cast
+from typing import TYPE_CHECKING
 
 import pytest
 
 from module.config.config import AzurLaneConfig, name_to_function
 from module.os.config import OSConfig
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
-def _config(data: dict, overridden: dict | None = None):
-    config = object.__new__(AzurLaneConfig)
-    config.data = data
+    from module.config.config_generated import ConfigValue
+    from module.config.deep import DeepValue
+    from module.config.resolved import ResolvedTaskConfig
+
+
+class _TestConfig(AzurLaneConfig):
+    resolved: ResolvedTaskConfig
+    Shared_Value: str
+    Balancer_Enable: bool
+    EventOnly_Value: str
+    TaskBOnly_Value: str
+    Runtime_First: str
+    Runtime_Second: str
+
+    def runtime_overlay(self) -> dict[str, ConfigValue]:
+        return self._runtime_overlay_values()
+
+
+def _config(
+    data: Mapping[str, DeepValue],
+    overridden: Mapping[str, str] | None = None,
+) -> _TestConfig:
+    config = object.__new__(_TestConfig)
+    vars(config)["data"] = data
     config.bound = {}
-    config.overridden = overridden or {}
+    vars(config)["overridden"] = dict(overridden or {})
     config.modified = {}
     config.auto_update = False
     return config
 
 
-def _runtime_overlay(config: AzurLaneConfig) -> dict[str, object]:
-    return cast("dict[str, object]", config.__dict__["_runtime_overlay"])
+def _runtime_overlay(config: _TestConfig) -> dict[str, ConfigValue]:
+    return config.runtime_overlay()
 
 
 def test_task_bind_chain_adds_event_defaults_in_existing_order() -> None:
@@ -84,7 +109,7 @@ def test_bind_applies_overridden_arguments_after_binding() -> None:
 
     assert config.Shared_Value == "override"
     assert config.bound["Shared_Value"] == "General.Shared.Value"
-    assert config.resolved.Shared_Value == "override"
+    assert config.resolved.fields["Shared_Value"].value == "override"
 
 
 def test_rebind_removes_previous_task_values_and_reveals_class_default() -> None:
@@ -127,7 +152,7 @@ def test_bound_assignment_records_source_path_and_updates_once() -> None:
     config.bind("TaskA")
     calls: list[str] = []
     config.auto_update = True
-    config.update = lambda: calls.append("update")
+    vars(config)["update"] = lambda: calls.append("update")
 
     config.Campaign_Name = "SP"
 
@@ -138,13 +163,13 @@ def test_bound_assignment_records_source_path_and_updates_once() -> None:
 def test_override_keeps_resolved_snapshot_in_sync() -> None:
     config = _config({"General": {"Shared": {"Value": "stored"}}})
     config.bind("Alas")
-    config.is_task_enabled = lambda _task: True
+    vars(config)["is_task_enabled"] = lambda _task: True
     config.args = {}
 
     config.override(Shared_Value="runtime")
 
     assert config.Shared_Value == "runtime"
-    assert config.resolved.Shared_Value == "runtime"
+    assert config.resolved.fields["Shared_Value"].value == "runtime"
     assert config.resolved.fields["Shared_Value"].is_override is True
 
 
@@ -153,12 +178,12 @@ def test_deepcopy_merge_is_runtime_overlay_not_persistent_resolution() -> None:
     config.bind("TaskA")
     update_calls: list[str] = []
     config.auto_update = True
-    config.update = lambda: update_calls.append("update")
+    vars(config)["update"] = lambda: update_calls.append("update")
 
     merged = copy.deepcopy(config).merge(SimpleNamespace(Campaign_Name="SP"))
 
     assert merged.Campaign_Name == "SP"
-    assert merged.resolved.Campaign_Name == "D3"
+    assert merged.resolved.fields["Campaign_Name"].value == "D3"
     assert merged.modified == {}
     assert config.Campaign_Name == "D3"
     assert update_calls == []
@@ -168,14 +193,14 @@ def test_runtime_overlay_survives_multiple_force_overrides() -> None:
     config = _config({"TaskA": {"Campaign": {"Name": "D3"}}})
     config.bind("TaskA")
     merged = copy.deepcopy(config).merge(SimpleNamespace(Campaign_Name="SP"))
-    merged.is_task_enabled = lambda _task: True
+    vars(merged)["is_task_enabled"] = lambda _task: True
     merged.args = {}
 
     merged.override(Runtime_First="first")
     merged.override(Runtime_Second="second")
 
     assert merged.Campaign_Name == "SP"
-    assert merged.resolved.Campaign_Name == "D3"
+    assert merged.resolved.fields["Campaign_Name"].value == "D3"
     assert merged.Runtime_First == "first"
     assert merged.Runtime_Second == "second"
     assert _runtime_overlay(merged)["Campaign_Name"] == "SP"
@@ -189,15 +214,15 @@ def test_runtime_overlay_survives_update_and_rebind_without_writing() -> None:
     config.merge(SimpleNamespace(Campaign_Name="SP"))
     config.config_name = "alas"
     config.task = name_to_function("TaskA")
-    config.read_file = lambda _name: copy.deepcopy(stored)
-    config.config_override = lambda: None
-    config.write_file = lambda *_args, **_kwargs: pytest.fail("runtime overlay must not write config")
+    vars(config)["read_file"] = lambda _name: copy.deepcopy(stored)
+    vars(config)["config_override"] = lambda: None
+    vars(config)["write_file"] = lambda *_args, **_kwargs: pytest.fail("runtime overlay must not write config")
 
     config.update()
     config.bind("TaskA")
 
     assert config.Campaign_Name == "SP"
-    assert config.resolved.Campaign_Name == "D3"
+    assert config.resolved.fields["Campaign_Name"].value == "D3"
     assert config.modified == {}
 
 
@@ -205,14 +230,14 @@ def test_force_override_has_priority_over_same_runtime_overlay_field() -> None:
     config = _config({"TaskA": {"Campaign": {"Name": "D3"}}})
     config.bind("TaskA")
     config.merge(SimpleNamespace(Campaign_Name="SP"))
-    config.is_task_enabled = lambda _task: True
+    vars(config)["is_task_enabled"] = lambda _task: True
     config.args = {}
 
     config.override(Campaign_Name="FORCED")
     config.merge(SimpleNamespace(Campaign_Name="HT"))
 
     assert config.Campaign_Name == "FORCED"
-    assert config.resolved.Campaign_Name == "FORCED"
+    assert config.resolved.fields["Campaign_Name"].value == "FORCED"
     assert _runtime_overlay(config)["Campaign_Name"] == "HT"
     assert config.modified == {}
 
@@ -225,7 +250,9 @@ def test_runtime_overlay_is_deepcopy_isolated() -> None:
     cloned = copy.deepcopy(merged)
     merged_overlay = _runtime_overlay(merged)
     cloned_overlay = _runtime_overlay(cloned)
-    cast("list[str]", cloned_overlay["Campaign_Name"]).append("clone")
+    cloned_campaign_name = cloned_overlay["Campaign_Name"]
+    assert isinstance(cloned_campaign_name, list)
+    cloned_campaign_name.append("clone")
 
     assert merged.Campaign_Name == ["SP"]
     assert merged_overlay == {"Campaign_Name": ["SP"]}
@@ -250,10 +277,10 @@ def test_update_applies_config_override_only_once() -> None:
     config.config_name = "alas"
     config.task = name_to_function("Alas")
     calls: list[str] = []
-    config.read_file = lambda _name: {}
-    config.config_override = lambda: calls.append("override")
-    config.bind = lambda _task: calls.append("bind")
-    config.save = lambda: calls.append("save")
+    vars(config)["read_file"] = lambda _name: {}
+    vars(config)["config_override"] = lambda: calls.append("override")
+    vars(config)["bind"] = lambda _task: calls.append("bind")
+    vars(config)["save"] = lambda: calls.append("save")
 
     config.update()
 

@@ -67,7 +67,8 @@ class _CommissionUI(RewardCommission):
     def receive(self) -> bool:
         return self._commission_receive()
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default

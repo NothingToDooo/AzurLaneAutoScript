@@ -12,6 +12,7 @@ from module.exception import GameStuckError
 from module.map.map_grids import SelectedGrids
 
 if TYPE_CHECKING:
+    from module.base.button import MatchOffset
     from module.base.type_alias import Area
 
 _T = TypeVar("_T")
@@ -88,7 +89,8 @@ class _CommissionUI(RewardCommission):
     def start_click(self, comm: Commission, *, is_urgent: bool = False) -> bool:
         return self._commission_start_click(comm, is_urgent=is_urgent)
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
@@ -108,7 +110,12 @@ class _CommissionUI(RewardCommission):
         self.calls.append(("match_template_color", key, kwargs))
         return self._next_result(self.match_results.get(key, []), default=False)
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+    def handle_popup_confirm(
+        self,
+        name: str = "",
+        offset: MatchOffset | None = None,
+        interval: float = 2,
+    ) -> bool:
         _ = (name, offset, interval)
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)

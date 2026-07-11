@@ -1,10 +1,24 @@
+from collections.abc import Mapping
 from datetime import date
 
 from module.config.config_updater import ConfigGenerator
-from module.config.deep import deep_get
+from module.config.deep import DeepValue, MutableDeepData, deep_get
 from module.config.utils import filepath_i18n, read_file
 from module.content.manifest import load_default_event_manifests
 from module.content.models import ContentId, EventPack, EventRelease
+
+
+def _string_mapping(value: DeepValue | None) -> dict[str, str]:
+    if not isinstance(value, Mapping):
+        message = "expected string mapping"
+        raise TypeError(message)
+    result: dict[str, str] = {}
+    for key, item in value.items():
+        if not isinstance(key, str) or not isinstance(item, str):
+            message = "expected string mapping"
+            raise TypeError(message)
+        result[key] = item
+    return result
 
 
 def _pack(pack_id: str, kind: str, *releases: tuple[str, str | None, int]) -> EventPack:
@@ -15,7 +29,12 @@ def _pack(pack_id: str, kind: str, *releases: tuple[str, str | None, int]) -> Ev
     )
 
 
-def _generator(task: dict, argument: dict, gui: dict | None = None, packs: list[EventPack] | None = None):
+def _generator(
+    task: MutableDeepData,
+    argument: MutableDeepData,
+    gui: MutableDeepData | None = None,
+    packs: list[EventPack] | None = None,
+) -> ConfigGenerator:
     generator = object.__new__(ConfigGenerator)
     generator.task = task
     generator.argument = argument
@@ -83,8 +102,8 @@ def test_generate_i18n_data_uses_cn_event_name_and_directory_fallback() -> None:
 def test_real_manifest_i18n_matches_checked_in_chinese_names() -> None:
     generator = _generator(task={}, argument={}, packs=list(load_default_event_manifests()))
 
-    generated = deep_get(generator.generate_i18n_data({}), keys="Campaign.Event")
-    checked_in = deep_get(read_file(filepath_i18n("zh-CN")), keys="Campaign.Event")
+    generated = _string_mapping(deep_get(generator.generate_i18n_data({}), keys="Campaign.Event"))
+    checked_in = _string_mapping(deep_get(read_file(filepath_i18n("zh-CN")), keys="Campaign.Event"))
     checked_in_packs = {pack_id: checked_in[pack_id] for pack_id in generated}
 
     assert generated == checked_in_packs

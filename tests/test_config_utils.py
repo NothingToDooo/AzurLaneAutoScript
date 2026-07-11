@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta, tzinfo
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -10,6 +13,9 @@ from module.config.utils import (
     parse_value,
     server_time_offset,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class _FixedDatetime(datetime):
@@ -54,7 +60,7 @@ def test_parse_value_converts_config_strings() -> None:
         assert parse_value(raw, {}) == expected
 
 
-def test_server_update_selects_nearest_nonempty_trigger(monkeypatch) -> None:
+def test_server_update_selects_nearest_nonempty_trigger(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(config_utils, "datetime", _FixedDatetime)
 
     assert get_server_next_update(["10:00", "12:00"]) == datetime(2026, 7, 10, 12)
@@ -62,6 +68,6 @@ def test_server_update_selects_nearest_nonempty_trigger(monkeypatch) -> None:
 
 
 @pytest.mark.parametrize("get_update", [get_server_next_update, get_server_last_update])
-def test_server_update_rejects_empty_trigger(get_update) -> None:
+def test_server_update_rejects_empty_trigger(get_update: Callable[[list[str]], datetime]) -> None:
     with pytest.raises(ValueError, match="daily_trigger"):
         get_update([])

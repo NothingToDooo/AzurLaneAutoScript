@@ -1,34 +1,44 @@
+from typing import TYPE_CHECKING, override
+
 import pytest
 
 from module.coalition.coalition import Coalition
 from module.exception import CampaignNameError, ScriptEnd, ScriptError
 
+if TYPE_CHECKING:
+    from module.base.button import MatchOffset
+    from module.coalition.contracts import CoalitionEvent, CoalitionFleetMode, CoalitionPageMode, CoalitionStage
+    from module.ui.page import Page
+
+
+type _Call = tuple[str] | tuple[str, str] | tuple[str, str, str] | tuple[str, str, str, str] | tuple[str, bool, bool]
+
 
 class _Config:
-    def __init__(self):
+    def __init__(self) -> None:
         self.Campaign_Event = "coalition_20230323"
         self.Coalition_Mode = "tc1"
         self.Coalition_Fleet = "multi"
         self.StopCondition_RunCount = 2
         self.switched = False
-        self.calls = []
+        self.calls: list[tuple[str]] = []
 
-    def task_stop(self):
+    def task_stop(self) -> None:
         self.calls.append(("task_stop",))
 
-    def task_switched(self):
+    def task_switched(self) -> bool:
         self.calls.append(("task_switched",))
         return self.switched
 
 
 class _Device:
-    def __init__(self, calls):
+    def __init__(self, calls: list[_Call]) -> None:
         self.calls = calls
 
-    def stuck_record_clear(self):
+    def stuck_record_clear(self) -> None:
         self.calls.append(("stuck_record_clear",))
 
-    def click_record_clear(self):
+    def click_record_clear(self) -> None:
         self.calls.append(("click_record_clear",))
 
 
@@ -36,8 +46,8 @@ class _Coalition(Coalition):
     config: _Config
     device: _Device
 
-    def __init__(self):
-        self.calls = []
+    def __init__(self) -> None:
+        self.calls: list[_Call] = []
         self.config = _Config()
         self.device = _Device(self.calls)
         self.stop_on_oil = False
@@ -45,28 +55,49 @@ class _Coalition(Coalition):
         self.event_time_limited = False
         self.execute_raises = False
 
-    def event_time_limit_triggered(self):
+    def event_time_limit_triggered(self) -> bool:
         self.calls.append(("event_time_limit_triggered",))
         return self.event_time_limited
 
-    def triggered_stop_condition(self, *, oil_check=False, pt_check=False):
+    @override
+    def triggered_stop_condition(self, *, oil_check: bool = False, pt_check: bool = False) -> bool:
         self.calls.append(("triggered_stop_condition", oil_check, pt_check))
         return (oil_check and self.stop_on_oil) or (pt_check and self.stop_on_pt)
 
-    def ui_goto(self, destination, get_ship=True, offset=(30, 30), skip_first_screenshot=True):
-        _ = (get_ship, offset, skip_first_screenshot)
+    @override
+    def ui_goto(
+        self,
+        destination: Page,
+        *,
+        get_ship: bool = True,
+        offset: MatchOffset | None = (30, 30),
+        skip_first_screenshot: bool = True,
+    ) -> None:
+        del get_ship, offset, skip_first_screenshot
         self.calls.append(("ui_goto", destination.name))
 
-    def ui_goto_coalition(self):
+    @override
+    def ui_goto_coalition(self) -> bool:
         self.calls.append(("ui_goto_coalition",))
+        return True
 
-    def disable_event_on_raid(self):
+    @override
+    def disable_event_on_raid(self) -> bool:
         self.calls.append(("disable_event_on_raid",))
+        return True
 
-    def coalition_ensure_mode(self, event, mode):
+    @override
+    def coalition_ensure_mode(self, event: CoalitionEvent, mode: CoalitionPageMode) -> None:
         self.calls.append(("coalition_ensure_mode", event, mode))
 
-    def coalition_execute_once(self, *, event, stage, fleet):
+    @override
+    def coalition_execute_once(
+        self,
+        *,
+        event: CoalitionEvent,
+        stage: CoalitionStage,
+        fleet: CoalitionFleetMode,
+    ) -> None:
         self.calls.append(("coalition_execute_once", event, stage, fleet))
         if self.execute_raises:
             message = "stop"

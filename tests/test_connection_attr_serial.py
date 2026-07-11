@@ -1,4 +1,8 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -8,9 +12,12 @@ from module.device.device import Device
 from module.device.runtime import DeviceRuntime
 from module.exception import RequestHumanTakeover
 
+if TYPE_CHECKING:
+    from module.device.contracts import ControllerService
+
 
 class _Closeable:
-    def __init__(self, connection: Device):
+    def __init__(self, connection: Device) -> None:
         self.connection = connection
         self.closed_at: list[str] = []
 
@@ -19,7 +26,7 @@ class _Closeable:
 
 
 class _NemuIpc:
-    def __init__(self, connection: Device):
+    def __init__(self, connection: Device) -> None:
         self.connection = connection
         self.disconnected_at: list[str] = []
 
@@ -28,7 +35,7 @@ class _NemuIpc:
 
 
 class _MinitouchInitThread:
-    def __init__(self, connection: Device, controller, builder: object):
+    def __init__(self, connection: Device, controller: ControllerService, builder: object) -> None:
         self.connection = connection
         self.controller = controller
         self.builder = builder
@@ -39,7 +46,7 @@ class _MinitouchInitThread:
         self.controller.__dict__["_minitouch_builder"] = self.builder
 
 
-def _make_attr(serial: str):
+def _make_attr(serial: str) -> ConnectionAttr:
     attr = object.__new__(ConnectionAttr)
     attr.config = SimpleNamespace(Emulator_Serial=serial)
     attr.serial = serial
@@ -54,7 +61,15 @@ def _make_connection(serial: str) -> Device:
     return connection
 
 
-def _prime_serial_bound_state(connection: Device):
+@dataclass(frozen=True)
+class _SerialBoundState:
+    client: _Closeable
+    stream: _Closeable
+    nemu_ipc: _NemuIpc
+    forward_removals: list[tuple[str, str]]
+
+
+def _prime_serial_bound_state(connection: Device) -> _SerialBoundState:
     client = _Closeable(connection)
     stream = _Closeable(connection)
     nemu_ipc = _NemuIpc(connection)
@@ -70,15 +85,15 @@ def _prime_serial_bound_state(connection: Device):
     )
     connection.capture.__dict__["nemu_ipc"] = nemu_ipc
     connection.__dict__["adb_forward_remove"] = lambda local: forward_removals.append((local, connection.serial))
-    return SimpleNamespace(
-        client=client,
-        stream=stream,
-        nemu_ipc=nemu_ipc,
-        forward_removals=forward_removals,
-    )
+    return _SerialBoundState(client, stream, nemu_ipc, forward_removals)
 
 
-def _assert_serial_bound_state_released(connection: Device, state, *, old_serial: str) -> None:
+def _assert_serial_bound_state_released(
+    connection: Device,
+    state: _SerialBoundState,
+    *,
+    old_serial: str,
+) -> None:
     controller = connection.controller
     assert vars(controller)["_minitouch_port"] == 0
     assert vars(controller)["_minitouch_client"] is None
@@ -131,7 +146,7 @@ def test_bind_serial_persists_explicit_change() -> None:
     assert connection.config.Emulator_Serial == "127.0.0.1:16385"
 
 
-def test_bind_serial_recomputes_each_layer_from_new_serial(monkeypatch) -> None:
+def test_bind_serial_recomputes_each_layer_from_new_serial(monkeypatch: pytest.MonkeyPatch) -> None:
     old_serial = "127.0.0.1:16384"
     new_serial = "127.0.0.1:16385"
     connection = _make_connection(old_serial)

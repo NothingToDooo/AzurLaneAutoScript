@@ -55,7 +55,7 @@ class _CommissionUI(RewardCommission):
     def __init__(self) -> None:
         self.config = _Config()
 
-    def choose(self, daily: SelectedGrids, urgent: SelectedGrids):
+    def choose(self, daily: SelectedGrids, urgent: SelectedGrids) -> tuple[SelectedGrids, SelectedGrids]:
         return self._commission_choose(daily, urgent)
 
 

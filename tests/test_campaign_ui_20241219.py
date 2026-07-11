@@ -1,7 +1,12 @@
+from typing import TYPE_CHECKING, override
+
 import pytest
 
 import module.campaign.campaign_ui as campaign_ui_module
 from module.campaign.campaign_ui import CampaignUI
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 class _Config:
@@ -15,9 +20,9 @@ class _Config:
         self.MAP_CHAPTER_SWITCH_20241219 = chapter_switch
         self.MAP_CHAPTER_SWITCH_20241219_SP = chapter_switch_sp
         self.MAP_CHAPTER_SWITCH_20241219_SPEX = chapter_switch_spex
-        self.overrides = []
+        self.overrides: list[dict[str, str]] = []
 
-    def override(self, **kwargs) -> None:
+    def override(self, **kwargs: str) -> None:
         self.overrides.append(kwargs)
 
 
@@ -30,7 +35,7 @@ class _CampaignUI(CampaignUI):
         chapter_switch: bool = False,
         chapter_switch_sp: bool = False,
         chapter_switch_spex: bool = False,
-        hard_names=(),
+        hard_names: Iterable[str] = (),
     ) -> None:
         self.config = _Config(
             chapter_switch=chapter_switch,
@@ -40,20 +45,29 @@ class _CampaignUI(CampaignUI):
         self.hard_names = set(hard_names)
         self.calls = []
 
-    def _campaign_name_is_hard(self, name):
+    def _campaign_name_is_hard(self, name: str) -> bool:
         self.calls.append(("is_hard", name))
         return name in self.hard_names
 
-    def ui_goto_event(self) -> None:
+    @override
+    def ui_goto_event(self) -> bool:
         self.calls.append(("ui_goto_event",))
+        return True
 
-    def campaign_ensure_mode_20241219(self, mode="combat") -> None:
+    def campaign_ensure_mode_20241219(self, mode: str = "combat") -> None:
         self.calls.append(("mode", mode))
 
-    def campaign_ensure_aside_20241219(self, chapter) -> None:
+    @override
+    def campaign_ensure_aside_20241219(self, chapter: str) -> None:
         self.calls.append(("aside", chapter))
 
-    def campaign_ensure_chapter(self, chapter, skip_first_screenshot=True) -> None:
+    @override
+    def campaign_ensure_chapter(
+        self,
+        chapter: str | int,
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> None:
         del skip_first_screenshot
         self.calls.append(("chapter", chapter))
 
@@ -80,7 +94,7 @@ def test_campaign_set_chapter_20241219_story_mode_uses_story_switch() -> None:
         ("ex_ex", "ex"),
     ],
 )
-def test_campaign_set_chapter_20241219_full_switch_routes_chapter(chapter, aside) -> None:
+def test_campaign_set_chapter_20241219_full_switch_routes_chapter(chapter: str, aside: str) -> None:
     ui = _CampaignUI(chapter_switch=True)
 
     assert ui.campaign_set_chapter_20241219(chapter, "1") is True
@@ -103,7 +117,7 @@ def test_campaign_set_chapter_20241219_full_switch_routes_chapter(chapter, aside
         ("ex_sp", "sp"),
     ],
 )
-def test_campaign_set_chapter_20241219_sp_switch_routes_limited_chapter(chapter, aside) -> None:
+def test_campaign_set_chapter_20241219_sp_switch_routes_limited_chapter(chapter: str, aside: str) -> None:
     ui = _CampaignUI(chapter_switch_sp=True)
 
     assert ui.campaign_set_chapter_20241219(chapter, "1") is True
@@ -127,7 +141,7 @@ def test_campaign_set_chapter_20241219_sp_switch_routes_limited_chapter(chapter,
         ("ex_ex", "ex"),
     ],
 )
-def test_campaign_set_chapter_20241219_spex_switch_routes_and_restores_offset(chapter, aside) -> None:
+def test_campaign_set_chapter_20241219_spex_switch_routes_and_restores_offset(chapter: str, aside: str) -> None:
     ui = _CampaignUI(chapter_switch_spex=True)
 
     assert ui.campaign_set_chapter_20241219(chapter, "1") is True
