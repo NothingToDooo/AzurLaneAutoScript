@@ -266,8 +266,36 @@ def test_digit_recognize_returns_list_for_multiple_rois() -> None:
     assert [result.value for result in results] == [7, 7]
 
 
+def test_digit_recognize_direct_single_roi_returns_scalar() -> None:
+    result = make_digit("7", buttons=[TEST_AREA, TEST_AREA]).recognize([TEST_IMAGE], direct_ocr=True)
+
+    assert not isinstance(result, list)
+    assert result.value == 7
+
+
+def test_digit_recognize_direct_multiple_rois_returns_list() -> None:
+    results = make_digit("7").recognize([TEST_IMAGE, TEST_IMAGE], direct_ocr=True)
+
+    assert isinstance(results, list)
+    assert [result.value for result in results] == [7, 7]
+
+
 def test_duration_recognize_returns_list_for_multiple_rois() -> None:
     results = make_duration("01:30:00", buttons=[TEST_AREA, TEST_AREA]).recognize(TEST_IMAGE)
+
+    assert isinstance(results, list)
+    assert [result.value for result in results] == [timedelta(hours=1, minutes=30)] * 2
+
+
+def test_duration_recognize_direct_single_roi_returns_scalar() -> None:
+    result = make_duration("01:30:00", buttons=[TEST_AREA, TEST_AREA]).recognize([TEST_IMAGE], direct_ocr=True)
+
+    assert not isinstance(result, list)
+    assert result.value == timedelta(hours=1, minutes=30)
+
+
+def test_duration_recognize_direct_multiple_rois_returns_list() -> None:
+    results = make_duration("01:30:00").recognize([TEST_IMAGE, TEST_IMAGE], direct_ocr=True)
 
     assert isinstance(results, list)
     assert [result.value for result in results] == [timedelta(hours=1, minutes=30)] * 2

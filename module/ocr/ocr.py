@@ -277,7 +277,7 @@ class Digit(Ocr):
         ]
         for result in results:
             self._log_recognition(result)
-        if len(self.buttons) == 1:
+        if len(batch.items) == 1:
             return results[0]
         return results
 
@@ -487,7 +487,7 @@ class Duration(Ocr):
         ]
         for result in results:
             self._log_recognition(result)
-        if len(self.buttons) == 1:
+        if len(batch.items) == 1:
             return results[0]
         return results
 
