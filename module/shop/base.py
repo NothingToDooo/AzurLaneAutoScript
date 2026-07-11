@@ -43,7 +43,7 @@ FILTER_ATTR = ("group", "sub_genre", "tier")
 FILTER = Filter(FILTER_REGEX, FILTER_ATTR)
 
 
-class ShopItem_250814(Item):
+class ShopItem250814(Item):
     """未售商品计算值为 0.36，已售低于 0.2，因此有效阈值取 0.3。"""
 
     def predict_valid(self):
@@ -80,8 +80,8 @@ class ShopItemGrid(ItemGrid):
         return self.items
 
 
-class ShopItemGrid_250814(ShopItemGrid):
-    item_class = ShopItem_250814
+class ShopItemGrid250814(ShopItemGrid):
+    item_class = ShopItem250814
 
     def get_soldout_count(self, image):
         count = 0

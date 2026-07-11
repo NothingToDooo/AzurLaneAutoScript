@@ -644,36 +644,43 @@ class MapData:
             "    # ===== Start of generated config =====",
         ]
         if self.MAP_SIREN_TEMPLATE:
-            lines.append(f"    MAP_SIREN_TEMPLATE = {self.MAP_SIREN_TEMPLATE}")
-            lines.append(f"    MOVABLE_ENEMY_TURN = {tuple(self.MOVABLE_ENEMY_TURN)}")
-            lines.append("    MAP_HAS_SIREN = True")
-            lines.append(f"    MAP_HAS_MOVABLE_ENEMY = {self.MAP_HAS_MOVABLE_ENEMY}")
-        lines.append(f"    MAP_HAS_MAP_STORY = {self.MAP_HAS_MAP_STORY}")
-        lines.append(f"    MAP_HAS_FLEET_STEP = {self.MAP_HAS_FLEET_STEP}")
-        lines.append(f"    MAP_HAS_AMBUSH = {self.MAP_HAS_AMBUSH}")
-        lines.append(f"    MAP_HAS_MYSTERY = {self.MAP_HAS_MYSTERY}")
+            lines.extend(
+                (
+                    f"    MAP_SIREN_TEMPLATE = {self.MAP_SIREN_TEMPLATE}",
+                    f"    MOVABLE_ENEMY_TURN = {tuple(self.MOVABLE_ENEMY_TURN)}",
+                    "    MAP_HAS_SIREN = True",
+                    f"    MAP_HAS_MOVABLE_ENEMY = {self.MAP_HAS_MOVABLE_ENEMY}",
+                )
+            )
+        lines.extend(
+            (
+                f"    MAP_HAS_MAP_STORY = {self.MAP_HAS_MAP_STORY}",
+                f"    MAP_HAS_FLEET_STEP = {self.MAP_HAS_FLEET_STEP}",
+                f"    MAP_HAS_AMBUSH = {self.MAP_HAS_AMBUSH}",
+                f"    MAP_HAS_MYSTERY = {self.MAP_HAS_MYSTERY}",
+            )
+        )
         if self.MAP_HAS_PORTAL:
             lines.append(f"    MAP_HAS_PORTAL = {self.MAP_HAS_PORTAL}")
         if self.MAP_HAS_LAND_BASED:
             lines.append(f"    MAP_HAS_LAND_BASED = {self.MAP_HAS_LAND_BASED}")
-        lines.extend(
-            f"    STAR_REQUIRE_{n} = 0" for n in range(1, 4) if self.__getattribute__(f"STAR_REQUIRE_{n}") != n
-        )
-        lines.append("    # ===== End of generated config =====")
-        lines.append("")
-        lines.append("")
+        lines.extend(f"    STAR_REQUIRE_{n} = 0" for n in range(1, 4) if getattr(self, f"STAR_REQUIRE_{n}") != n)
+        lines.extend(("    # ===== End of generated config =====", "", ""))
         return lines
 
     def _get_clear_enemy_battle_lines(self, battle_name, preserve):
         lines = [f"    def {battle_name}(self):"]
         if self.MAP_SIREN_TEMPLATE:
-            lines.append("        if self.clear_siren():")
-            lines.append("            return True")
-        lines.append(f"        if self.clear_filter_enemy(self.ENEMY_FILTER, preserve={preserve}):")
-        lines.append("            return True")
-        lines.append("")
-        lines.append("        return self.battle_default()")
-        lines.append("")
+            lines.extend(("        if self.clear_siren():", "            return True"))
+        lines.extend(
+            (
+                f"        if self.clear_filter_enemy(self.ENEMY_FILTER, preserve={preserve}):",
+                "            return True",
+                "",
+                "        return self.battle_default()",
+                "",
+            )
+        )
         return lines
 
     def _get_campaign_lines(self):

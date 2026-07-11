@@ -1,9 +1,9 @@
 from module.shop.assets import NAV_GENERAL, NAV_MONTHLY, TAB_CORE_MONTHLY, TAB_GENERAL, TAB_GUILD, TAB_MEDAL, TAB_MERIT
-from module.shop.shop_core import CoreShop_250814
-from module.shop.shop_general import GeneralShop_250814
-from module.shop.shop_guild import GuildShop_250814
-from module.shop.shop_medal import MedalShop2_250814
-from module.shop.shop_merit import MeritShop_250814
+from module.shop.shop_core import CoreShop250814
+from module.shop.shop_general import GeneralShop250814
+from module.shop.shop_guild import GuildShop250814
+from module.shop.shop_medal import MedalShop2V250814
+from module.shop.shop_merit import MeritShop250814
 from module.shop.ui import ShopUI
 
 
@@ -13,7 +13,7 @@ class RewardShop(ShopUI):
         self.device.click_record_clear()
         self.shop_nav_250814.set(NAV_GENERAL, main=self)
         self.shop_tab_250814.set(TAB_GENERAL, main=self)
-        GeneralShop_250814(self.config, self.device).run()
+        GeneralShop250814(self.config, self.device).run()
 
         self.config.task_delay(server_update=True)
 
@@ -22,22 +22,22 @@ class RewardShop(ShopUI):
         self.device.click_record_clear()
         self.shop_nav_250814.set(NAV_GENERAL, main=self)
         self.shop_tab_250814.set(TAB_MERIT, main=self)
-        MeritShop_250814(self.config, self.device).run()
+        MeritShop250814(self.config, self.device).run()
 
         self.device.click_record_clear()
         self.shop_nav_250814.set(NAV_GENERAL, main=self)
         self.shop_tab_250814.set(TAB_GUILD, main=self)
-        GuildShop_250814(self.config, self.device).run()
+        GuildShop250814(self.config, self.device).run()
 
         self.device.click_record_clear()
         self.shop_nav_250814.set(NAV_MONTHLY, main=self)
         self.shop_tab_250814.set(TAB_CORE_MONTHLY, main=self)
-        CoreShop_250814(self.config, self.device).run()
+        CoreShop250814(self.config, self.device).run()
 
         self.device.click_record_clear()
         self.shop_nav_250814.set(NAV_MONTHLY, main=self)
         self.shop_tab_250814.set(TAB_MEDAL, main=self)
-        MedalShop2_250814(self.config, self.device).run()
+        MedalShop2V250814(self.config, self.device).run()
 
         self.config.task_delay(server_update=True)
 

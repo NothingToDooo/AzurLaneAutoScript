@@ -67,7 +67,7 @@ class AzurLaneAutoScript:
         if task_spec is not None:
             task_spec.execute(self)
         else:
-            self.__getattribute__(command)()
+            getattr(self, command)()
 
     def _handle_recoverable_run_error(
         self,

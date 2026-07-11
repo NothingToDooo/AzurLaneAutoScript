@@ -55,7 +55,7 @@ class EmulatorInstanceBase:
         return True
 
     @cached_property
-    def MuMuPlayer12_id(self):
+    def mumu_player_12_id(self):
         """支持 MuMuPlayer-12.0-* 、MuMuPlayer-15.0-* 和 YXArkNights-12.0-* ；其他名称返回 None。"""
         res = re.search(r"MuMuPlayer-12.0-(\d+)", self.name)
         if res:

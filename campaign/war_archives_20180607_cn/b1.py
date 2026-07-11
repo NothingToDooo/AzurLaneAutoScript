@@ -113,7 +113,7 @@ road_main = RoadGrids([H5, G4, F3, E2, D4])
 
 
 class Config:
-    SUBMARINE = 0
+    submarine = 0
 
     POOR_MAP_DATA = True
     MAP_HAS_AMBUSH = False

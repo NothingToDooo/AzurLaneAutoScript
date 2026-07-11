@@ -80,12 +80,12 @@ class StrategyHandler(InfoHandler):
                 logger.warning("Setting up submarine_hunt but no icon appears")
 
     def handle_strategy(self, index):
-        if self.__getattribute__(f"fleet_{index}_formation_fixed"):
+        if getattr(self, f"fleet_{index}_formation_fixed"):
             return False
-        expected_formation = self.config.__getattribute__(f"Fleet_Fleet{index}Formation")
+        expected_formation = getattr(self.config, f"Fleet_Fleet{index}Formation")
         if self._strategy_get_from_map_buff() == expected_formation and not self.config.Submarine_Fleet:
             logger.info("Skip strategy bar check.")
-            self.__setattr__(f"fleet_{index}_formation_fixed", True)
+            setattr(self, f"fleet_{index}_formation_fixed", True)
             return False
 
         self.strategy_open()
@@ -95,7 +95,7 @@ class StrategyHandler(InfoHandler):
             sub_hunt=bool(self.config.Submarine_Fleet) and self.config.Submarine_Mode in ["hunt_only", "hunt_and_boss"],
         )
         self.strategy_close()
-        self.__setattr__(f"fleet_{index}_formation_fixed", True)
+        setattr(self, f"fleet_{index}_formation_fixed", True)
         return True
 
     def _strategy_get_from_map_buff(self):

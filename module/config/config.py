@@ -370,8 +370,8 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         with self.multi_set():
             for arg, value in kwargs.items():
                 record = arg.replace("Value", "Record")
-                self.__setattr__(arg, value)
-                self.__setattr__(record, datetime.now().replace(microsecond=0))
+                setattr(self, arg, value)
+                setattr(self, record, datetime.now().replace(microsecond=0))
 
     def multi_set(self):
         """返回批量设置上下文，退出时只更新并保存一次。"""
@@ -602,7 +602,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             if attr.endswith("__") or attr in RUNTIME_OVERLAY_INTERNALS:
                 continue
             if hasattr(other, attr):
-                value = other.__getattribute__(attr)
+                value = getattr(other, attr)
                 if value is not None:
                     runtime_overlay[attr] = copy.deepcopy(value)
 
@@ -618,29 +618,29 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         return config
 
     @property
-    def FLEET_1(self):
+    def fleet_1(self):
         return self.Fleet_Fleet1
 
     @property
-    def FLEET_2(self):
+    def fleet_2(self):
         return self.Fleet_Fleet2
 
-    @FLEET_2.setter
-    def FLEET_2(self, value):
+    @fleet_2.setter
+    def fleet_2(self, value):
         self.override(Fleet_Fleet2=value)
 
     @property
-    def SUBMARINE(self):
+    def submarine(self):
         return self.Submarine_Fleet
 
-    @SUBMARINE.setter
-    def SUBMARINE(self, value):
+    @submarine.setter
+    def submarine(self, value):
         self.override(Submarine_Fleet=value)
 
     _fleet_boss = 0
 
     @property
-    def FLEET_BOSS(self):
+    def fleet_boss(self):
         if self._fleet_boss:
             return self._fleet_boss
         if self.Fleet_Fleet2 and self.Fleet_FleetOrder in [
@@ -650,8 +650,8 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             return 2
         return 1
 
-    @FLEET_BOSS.setter
-    def FLEET_BOSS(self, value):
+    @fleet_boss.setter
+    def fleet_boss(self, value):
         self._fleet_boss = value
 
     def temporary(self, **kwargs):
@@ -674,12 +674,12 @@ class ConfigBackup:
     def cover(self, **kwargs):
         self.kwargs = kwargs
         for key, value in kwargs.items():
-            self.backup[key] = self.config.__getattribute__(key)
-            self.config.__setattr__(key, value)
+            self.backup[key] = getattr(self.config, key)
+            setattr(self.config, key, value)
 
     def recover(self):
         for key, value in self.backup.items():
-            self.config.__setattr__(key, value)
+            setattr(self.config, key, value)
 
     def __enter__(self):
         return self

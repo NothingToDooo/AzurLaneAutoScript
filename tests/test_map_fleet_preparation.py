@@ -69,7 +69,7 @@ class _FleetPreparation(FleetPreparation):
             Fleet_Fleet1=fleet1,
             Fleet_Fleet2=fleet2,
             Submarine_Fleet=submarine,
-            SUBMARINE=submarine_enabled,
+            submarine=submarine_enabled,
         )
         self.device = _Device()
         self.map_fleet_checked = False
@@ -107,7 +107,7 @@ def test_fleet_preparation_sets_two_fleets_in_config_order(monkeypatch) -> None:
         ("fleet1", "ensure_to_be", 1),
         ("fleet2", "ensure_to_be", 2),
     ]
-    assert preparation.config.SUBMARINE == 0
+    assert preparation.config.submarine == 0
 
 
 def test_fleet_preparation_fast_clears_submarine_when_not_configured(monkeypatch) -> None:

@@ -378,7 +378,7 @@ class NemuIpcCapture:
         try:
             impl = NemuIpcImpl(
                 nemu_folder=instance.emulator.abspath("../"),
-                instance_id=instance.MuMuPlayer12_id,
+                instance_id=instance.mumu_player_12_id,
                 display_id=0,
             )
             impl.connect_with_retry()

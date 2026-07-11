@@ -441,51 +441,59 @@ class AlasGUI(Frame):
         config_updater: ConfigUpdater = State.config_updater,
     ) -> None:
         try:
-            valid = []
-            invalid = []
-            config = config_updater.read_file(config_name)
-            n = datetime.now()
-            for p, v in deep_iter(config, depth=3):
-                if p[-1].endswith("un") and not isinstance(v, bool) and (v - n).days >= 31:
-                    deep_set(config, p, "")
-            for k, raw_value in modified.copy().items():
-                valuetype = deep_get(self.ALAS_ARGS, k + ".valuetype")
-                v = parse_pin_value(raw_value, valuetype)
-                validate = deep_get(self.ALAS_ARGS, k + ".validate")
-                if not str(v):
-                    default = deep_get(self.ALAS_ARGS, k + ".value")
-                    modified[k] = default
-                    deep_set(config, k, default)
-                    valid.append(k)
-                    pin["_".join(k.split("."))] = default
-
-                elif not validate or re_fullmatch(validate, v):
-                    deep_set(config, k, v)
-                    modified[k] = v
-                    valid.append(k)
-                    for set_key, set_value in config_updater.save_callback(k, v):
-                        modified[set_key] = set_value
-                        deep_set(config, set_key, set_value)
-                        valid.append(set_key)
-                        pin["_".join(set_key.split("."))] = to_pin_value(set_value)
-                else:
-                    modified.pop(k)
-                    invalid.append(k)
-                    logger.warning(f"Invalid value {v} for key {k}, skip saving.")
-            self.pin_remove_invalid_mark(valid)
-            self.pin_set_invalid_mark(invalid)
-            if modified:
-                logger.info(f"Save config {filepath_config(config_name)}, {dict_to_kv(modified)}")
-                config_updater.write_file(config_name, config)
-                toast(
-                    t("Gui.Toast.ConfigSaved"),
-                    duration=1,
-                    position="right",
-                    color="success",
-                )
+            self._save_config_unchecked(modified, config_name, config_updater)
         except (KeyError, OSError, TypeError, ValueError) as e:
             logger.exception(e)
             toast("设置保存失败", duration=3, position="right", color="error")
+
+    def _save_config_unchecked(
+        self,
+        modified: dict[str, object],
+        config_name: str,
+        config_updater: ConfigUpdater,
+    ) -> None:
+        valid = []
+        invalid = []
+        config = config_updater.read_file(config_name)
+        n = datetime.now()
+        for p, v in deep_iter(config, depth=3):
+            if p[-1].endswith("un") and not isinstance(v, bool) and (v - n).days >= 31:
+                deep_set(config, p, "")
+        for k, raw_value in modified.copy().items():
+            valuetype = deep_get(self.ALAS_ARGS, k + ".valuetype")
+            v = parse_pin_value(raw_value, valuetype)
+            validate = deep_get(self.ALAS_ARGS, k + ".validate")
+            if not str(v):
+                default = deep_get(self.ALAS_ARGS, k + ".value")
+                modified[k] = default
+                deep_set(config, k, default)
+                valid.append(k)
+                pin["_".join(k.split("."))] = default
+
+            elif not validate or re_fullmatch(validate, v):
+                deep_set(config, k, v)
+                modified[k] = v
+                valid.append(k)
+                for set_key, set_value in config_updater.save_callback(k, v):
+                    modified[set_key] = set_value
+                    deep_set(config, set_key, set_value)
+                    valid.append(set_key)
+                    pin["_".join(set_key.split("."))] = to_pin_value(set_value)
+            else:
+                modified.pop(k)
+                invalid.append(k)
+                logger.warning(f"Invalid value {v} for key {k}, skip saving.")
+        self.pin_remove_invalid_mark(valid)
+        self.pin_set_invalid_mark(invalid)
+        if modified:
+            logger.info(f"Save config {filepath_config(config_name)}, {dict_to_kv(modified)}")
+            config_updater.write_file(config_name, config)
+            toast(
+                t("Gui.Toast.ConfigSaved"),
+                duration=1,
+                position="right",
+                color="success",
+            )
 
     def put_overview_task(self, func: Function) -> None:
         with use_scope(f"overview-task_{func.command}"):
@@ -810,12 +818,12 @@ class AlasGUI(Frame):
         visibility_state_switch = Switch(
             status={
                 True: [
-                    lambda: self.__setattr__("visible", True),
+                    lambda: setattr(self, "visible", True),
                     lambda: self.alas_update_overview_task() if self.page == "Overview" else 0,
                     lambda: self.task_handler.set_current_task_delay(15),
                 ],
                 False: [
-                    lambda: self.__setattr__("visible", False),
+                    lambda: setattr(self, "visible", False),
                     lambda: self.task_handler.set_current_task_delay(1),
                 ],
             },

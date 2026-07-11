@@ -39,6 +39,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 120
+namespace-packages = ["module"]
 target-version = "py314"
 
 [tool.ruff.lint]
@@ -54,7 +55,6 @@ ignore = [
     "ANN202",
     "ANN204",
     "ANN205",
-    "B903",
     "COM812",
     "CPY",
     "D",
@@ -62,31 +62,15 @@ ignore = [
     "DTZ001",
     "DTZ005",
     "FBT002",
-    "FURB113",
-    "FURB118",
     "FURB140",
-    "FURB142",
-    "FURB156",
-    "FURB180",
     "FURB189",
     "INP",
-    "N801",
-    "N802",
-    "N815",
-    "N816",
     "N818",
     "PLC1901",
-    "PLC2701",
-    "PLC2801",
     "PLR0904",
-    "PLR0914",
-    "PLR0916",
-    "PLR1702",
     "PLR2004",
-    "PLR6104",
     "PLR6201",
     "PLR6301",
-    "PLW0717",
     "RUF001",
     "RUF002",
     "RUF003",
@@ -94,14 +78,25 @@ ignore = [
     "RUF069",
     "S311",
     "S404",
-    "TID",
 ]
 [tool.ruff.lint.per-file-ignores]
+"campaign/war_archives_*/*.py" = ["TID252"]
 "dev_tools/**/*.py" = ["T201"]
+"module/device/platform/utils.py" = ["N801"]
+"module/game_setting/setting_generated.py" = ["N815"]
+"module/webui/setting.py" = ["N801"]
+"tests/test_campaign_stage_name.py" = ["PLC2701"]
+"tests/test_webui_utils.py" = ["PLC2701"]
 "tests/**/*.py" = ["S101"]
 
 [tool.ruff.lint.pep8-naming]
 classmethod-decorators = ["cached_class_property"]
+
+[tool.ruff.lint.pylint]
+max-bool-expr = 6
+max-locals = 20
+max-nested-blocks = 6
+max-statements-in-try = 20
 
 [tool.ty.environment]
 python-version = "3.14"

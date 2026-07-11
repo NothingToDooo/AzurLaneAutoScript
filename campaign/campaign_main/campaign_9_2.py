@@ -82,7 +82,7 @@ road_main = RoadGrids([C3, C2, [C1, D2], F1, H1, H2, H3, H4])
 
 
 class Config:
-    SUBMARINE = 0
+    submarine = 0
     MAP_HAS_MYSTERY = True
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 40
     EDGE_LINES_HOUGHLINES_THRESHOLD = 40

@@ -158,30 +158,30 @@ class Campaign(CampaignBase):
     MAP = MAP
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
     grid_class = CurrentFleetGrid
-    bored_visited_G3 = False
-    bored_visited_H2 = False
+    bored_visited_g3 = False
+    bored_visited_h2 = False
 
     def find_current_fleet(self):
         logger.hr("Find current fleet")
         logger.info("No fleet scan, assume fleet_1 at D5")
         self.fleet_1 = D5.location
-        if self.config.FLEET_2:
+        if self.config.fleet_2:
             logger.info("No fleet scan, assume fleet_2 at F5")
             self.fleet_2 = F5.location
 
     def map_init(self, map_):
         super().map_init(map_)
-        self.bored_visited_G3 = False
-        self.bored_visited_H2 = False
-        self.config.FLEET_BOSS = 1
+        self.bored_visited_g3 = False
+        self.bored_visited_h2 = False
+        self.config.fleet_boss = 1
 
     def bored_visit(self):
-        if not self.bored_visited_G3:
-            self.bored_visited_G3 = True
+        if not self.bored_visited_g3:
+            self.bored_visited_g3 = True
             if self.clear_chosen_enemy(G3):
                 return True
-        if not self.bored_visited_H2:
-            self.bored_visited_H2 = True
+        if not self.bored_visited_h2:
+            self.bored_visited_h2 = True
             if self.clear_chosen_enemy(H2):
                 return True
         return False
@@ -199,7 +199,7 @@ class Campaign(CampaignBase):
                 .delete(self.map.select(is_boss=True))
             )
             logger.info(f"Enemy remain: {remain}")
-            logger.info(f"bored_visited_G3: {self.bored_visited_G3}, bored_visited_H2: {self.bored_visited_H2}")
+            logger.info(f"bored_visited_g3: {self.bored_visited_g3}, bored_visited_h2: {self.bored_visited_h2}")
             if remain.count > 0:
                 if self.clear_siren():
                     return True

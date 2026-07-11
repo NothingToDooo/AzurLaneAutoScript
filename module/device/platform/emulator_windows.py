@@ -93,14 +93,14 @@ class Emulator(EmulatorBase):
             if is_mumu12_serial(serial):
                 yield instance
                 continue
-            if instance.MuMuPlayer12_id is not None:
+            if instance.mumu_player_12_id is not None:
                 instance.serial = self._mumu12_default_serial(instance)
                 yield instance
 
     @staticmethod
     def _mumu12_default_serial(instance):
         # MuMu12 v4.0.4 默认实例的 vbox 配置可能没有转发记录。
-        return f"127.0.0.1:{16384 + 32 * instance.MuMuPlayer12_id}"
+        return f"127.0.0.1:{16384 + 32 * instance.mumu_player_12_id}"
 
     def iter_adb_binaries(self) -> t.Iterable[str]:
         if self != Emulator.MuMuPlayer12:
@@ -144,10 +144,7 @@ class EmulatorManager(EmulatorManagerBase):
 
     @cached_property
     def all_emulators(self) -> list[Emulator]:
-        exe = set()
-
-        for file in self.iter_configured_emulator():
-            exe.add(file)
+        exe = set(self.iter_configured_emulator())
         for file in self.iter_running_emulator() or ():
             if Path(file).exists():
                 exe.add(file)

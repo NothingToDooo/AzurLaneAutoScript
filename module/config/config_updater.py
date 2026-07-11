@@ -375,8 +375,7 @@ class ConfigGenerator:
         for path, data in deep_iter(self.argument, depth=2):
             group = path[0]
             if group not in visited_group:
-                lines.append("")
-                lines.append(f"    # 配置组 `{group}`")
+                lines.extend(("", f"    # 配置组 `{group}`"))
                 visited_group.add(group)
 
             option = []

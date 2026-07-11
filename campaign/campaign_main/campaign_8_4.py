@@ -92,8 +92,8 @@ MAP.spawn_data = [
     H7,
 ) = MAP.flatten()
 
-road_D7 = RoadGrids([G7, E7]).combine(RoadGrids([G5, E5, [C5, D6], [D6, C7]]))
-road_F3 = RoadGrids([G5, [F4, G4], [F4, G3]])
+ROAD_D7 = RoadGrids([G7, E7]).combine(RoadGrids([G5, E5, [C5, D6], [D6, C7]]))
+ROAD_F3 = RoadGrids([G5, [F4, G4], [F4, G3]])
 road_main = RoadGrids([[G7, H6]])
 
 
@@ -112,11 +112,11 @@ class Campaign(CampaignBase):
 
         self.clear_all_mystery()
 
-        if self.clear_roadblocks([road_D7, road_F3, road_main]):
+        if self.clear_roadblocks([ROAD_D7, ROAD_F3, road_main]):
             return True
-        if self.clear_potential_roadblocks([road_D7, road_F3, road_main]):
+        if self.clear_potential_roadblocks([ROAD_D7, ROAD_F3, road_main]):
             return True
-        if self.clear_first_roadblocks([road_D7, road_F3, road_main]):
+        if self.clear_first_roadblocks([ROAD_D7, ROAD_F3, road_main]):
             return True
 
         return self.battle_default()

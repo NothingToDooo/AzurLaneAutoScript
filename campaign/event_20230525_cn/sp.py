@@ -173,7 +173,7 @@ def parse_move(movement: str, step: int):
     if step % len(movement) != 0:
         raise ScriptError(INVALID_SP_MOVEMENT_MESSAGE)
 
-    movement = movement * int(step / len(movement))
+    movement *= int(step / len(movement))
     dx, dy = 0, 0
     for direction in movement:
         dx += 1 if direction == "R" else 0
@@ -196,8 +196,8 @@ class Campaign(CampaignBase):
     def execute_actions(self, step):
         for action in self.action[step]:
             fleet_index, movement, step, battle = action.split("_")
-            src = self.__getattribute__(f"fleet_{fleet_index}_location")
-            fleet = self.__getattribute__(f"fleet_{fleet_index}")
+            src = getattr(self, f"fleet_{fleet_index}_location")
+            fleet = getattr(self, f"fleet_{fleet_index}")
             step = int(step)
             dx, dy = parse_move(movement, step)
             dst = (src[0] + dx, src[1] + dy)
@@ -210,7 +210,7 @@ class Campaign(CampaignBase):
                 else:
                     fleet.goto(location2node(dst))
 
-                fleet_location = self.__getattribute__(f"fleet_{fleet_index}_location")
+                fleet_location = getattr(self, f"fleet_{fleet_index}_location")
                 if fleet_location not in [src, dst]:
                     message = FLEET_MOVE_MISMATCH_TEMPLATE.format(
                         fleet_index=fleet_index,

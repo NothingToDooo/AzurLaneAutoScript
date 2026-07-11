@@ -173,8 +173,8 @@ OVERRIDE.map_data = """
     -- ME -- -- ME -- ME ME ME -- --
     -- -- -- -- -- -- -- -- -- ME --
 """
-road_A8 = RoadGrids([B8])
-road_H9 = RoadGrids(
+ROAD_A8 = RoadGrids([B8])
+ROAD_H9 = RoadGrids(
     [
         [H8, I8, J9],
     ]
@@ -202,7 +202,7 @@ class Campaign(CampaignBase):
     def battle_0(self):
         self.pick_up_light_house(A9)
 
-        if self.clear_roadblocks([road_A8, road_H9], weakest=False):
+        if self.clear_roadblocks([ROAD_A8, ROAD_H9], weakest=False):
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=1):
             return True
@@ -214,7 +214,7 @@ class Campaign(CampaignBase):
         self.pick_up_ammo()
         self.pick_up_flare(H9)
 
-        if self.clear_roadblocks([road_A8, road_H9], weakest=False):
+        if self.clear_roadblocks([ROAD_A8, ROAD_H9], weakest=False):
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=1):
             return True
@@ -226,7 +226,7 @@ class Campaign(CampaignBase):
         self.pick_up_ammo()
         self.pick_up_flare(H9)
 
-        if self.clear_roadblocks([road_A8, road_H9], weakest=False):
+        if self.clear_roadblocks([ROAD_A8, ROAD_H9], weakest=False):
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
             return True

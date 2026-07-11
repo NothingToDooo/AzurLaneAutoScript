@@ -26,8 +26,8 @@ MAP.spawn_data = [
 
 
 class Config:
-    FLEET_2 = 0
-    SUBMARINE = 0
+    fleet_2 = 0
+    submarine = 0
     INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (120, 255 - 49),
         "width": (1.5, 10),

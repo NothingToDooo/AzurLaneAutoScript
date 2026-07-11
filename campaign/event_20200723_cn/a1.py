@@ -97,7 +97,7 @@ MAP.spawn_data = [
 
 
 class Config:
-    SUBMARINE = 0
+    submarine = 0
 
     MAP_HAS_AMBUSH = False
     MAP_HAS_FLEET_STEP = True

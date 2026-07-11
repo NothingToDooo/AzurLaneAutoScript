@@ -1,12 +1,12 @@
 from module.base.decorator import cached_property
 from module.logger import logger
-from module.shop.base import ShopItemGrid_250814
+from module.shop.base import ShopItemGrid250814
 from module.shop.clerk import ShopClerk
 from module.shop.shop_status import ShopStatus
 from module.shop.ui import ShopUI
 
 
-class MeritShop_250814(ShopClerk, ShopUI, ShopStatus):
+class MeritShop250814(ShopClerk, ShopUI, ShopStatus):
     shop_template_folder = "./assets/shop/merit"
 
     @cached_property
@@ -16,7 +16,7 @@ class MeritShop_250814(ShopClerk, ShopUI, ShopStatus):
     @cached_property
     def shop_merit_items(self):
         shop_grid = self.shop_grid
-        shop_merit_items = ShopItemGrid_250814(
+        shop_merit_items = ShopItemGrid250814(
             shop_grid,
             templates={},
             template_area=(25, 20, 82, 72),

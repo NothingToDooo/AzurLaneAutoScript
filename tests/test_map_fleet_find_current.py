@@ -6,7 +6,7 @@ _MaybeLocation = _Location | tuple[()]
 
 class _Config:
     POOR_MAP_DATA = False
-    FLEET_2 = False
+    fleet_2 = False
 
 
 class _Grid:
@@ -107,7 +107,7 @@ def test_find_current_fleet_uses_single_detected_fleet_without_second_fleet() ->
 
 def test_find_current_fleet_predicts_missing_second_fleet_from_spawn_points() -> None:
     fleet = _Fleet()
-    fleet.config.FLEET_2 = True
+    fleet.config.fleet_2 = True
     detected = _Grid((1, 1), is_current_fleet=False)
     another = _Grid((2, 2))
     fleet.map.set_select({"is_fleet": True, "is_spawn_point": True}, _Selected([detected]))

@@ -67,36 +67,36 @@ class CodeGenerator:
     def tab(self):
         return TabWrapper(self)
 
-    def Empty(self):
+    def empty(self):
         self.add("")
 
-    def Import(self, text, empty=2):
+    def import_(self, text, empty=2):
         for raw_line in text.strip().split("\n"):
             line = raw_line.strip()
             self.add(line)
         for _ in range(empty):
-            self.Empty()
+            self.empty()
 
-    def Value(self, key=None, value=None, type_=None, **kwargs):
+    def value(self, key=None, value=None, type_=None, **kwargs):
         if key is not None:
             if type_ is not None:
                 self.add(f"{key}: {type_} = {self._repr(value)}")
             else:
                 self.add(f"{key} = {self._repr(value)}")
         for kw_key, kw_value in kwargs.items():
-            self.Value(kw_key, kw_value)
+            self.value(kw_key, kw_value)
 
-    def Comment(self, text):
+    def comment(self, text):
         for raw_line in text.strip().split("\n"):
             line = raw_line.strip()
             self.add(line, comment=True)
 
-    def List(self, key=None):
+    def list_(self, key=None):
         if key is not None:
             return TabWrapper(self, prefix=str(key) + " = [", suffix="]")
         return TabWrapper(self, prefix="[", suffix="]", newline=False)
 
-    def ListItem(self, value):
+    def list_item(self, value):
         if isinstance(value, TabWrapper):
             value.set_nested(suffix=",")
             self.add(f"{self._repr(value)}")
@@ -104,12 +104,12 @@ class CodeGenerator:
         self.add(f"{self._repr(value)},")
         return None
 
-    def Dict(self, key=None):
+    def dict_(self, key=None):
         if key is not None:
             return TabWrapper(self, prefix=str(key) + " = {", suffix="}")
         return TabWrapper(self, prefix="{", suffix="}", newline=False)
 
-    def DictItem(self, key=None, value=None):
+    def dict_item(self, key=None, value=None):
         if isinstance(value, TabWrapper):
             value.set_nested(suffix=",")
             if key is not None:
@@ -119,12 +119,12 @@ class CodeGenerator:
             self.add(f"{self._repr(key)}: {self._repr(value)},")
         return None
 
-    def Object(self, object_class, key=None):
+    def object_(self, object_class, key=None):
         if key is not None:
             return TabWrapper(self, prefix=f"{key} = {object_class}(", suffix=")")
         return TabWrapper(self, prefix=f"{object_class}(", suffix=")", newline=False)
 
-    def ObjectAttr(self, key=None, value=None):
+    def object_attr(self, key=None, value=None):
         if isinstance(value, TabWrapper):
             value.set_nested(suffix=",")
             if key is None:
@@ -138,18 +138,18 @@ class CodeGenerator:
             self.add(f"{key}={self._repr(value)},")
         return None
 
-    def Class(self, name, inherit=None):
+    def class_(self, name, inherit=None):
         if inherit is not None:
             return TabWrapper(self, prefix=f"class {name}({inherit}):")
         return TabWrapper(self, prefix=f"class {name}:")
 
-    def Def(self, name, args=""):
+    def def_(self, name, args=""):
         return TabWrapper(self, prefix=f"def {name}({args}):")
 
 
 generator = CodeGenerator()
-Import = generator.Import
-Value = generator.Value
-Comment = generator.Comment
-Dict = generator.Dict
-DictItem = generator.DictItem
+import_ = generator.import_
+value = generator.value
+comment = generator.comment
+dict_ = generator.dict_
+dict_item = generator.dict_item

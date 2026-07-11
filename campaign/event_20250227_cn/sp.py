@@ -158,13 +158,13 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
-    _is_D9 = False
+    _is_d9 = False
 
     def battle_0(self):
         if self.fleet_at(D9):
-            self._is_D9 = True
+            self._is_d9 = True
 
-        if self._is_D9:
+        if self._is_d9:
             self.clear_chosen_enemy(D7)
         else:
             self.clear_chosen_enemy(F7)
@@ -172,7 +172,7 @@ class Campaign(CampaignBase):
         return True
 
     def battle_1(self):
-        if self._is_D9:
+        if self._is_d9:
             self.clear_chosen_enemy(F7)
         else:
             self.clear_chosen_enemy(D7)
@@ -180,7 +180,7 @@ class Campaign(CampaignBase):
         return True
 
     def battle_2(self):
-        if self._is_D9:
+        if self._is_d9:
             self.clear_chosen_enemy(D7)
         else:
             self.clear_chosen_enemy(F7)
@@ -188,7 +188,7 @@ class Campaign(CampaignBase):
         return True
 
     def battle_3(self):
-        if self._is_D9:
+        if self._is_d9:
             self.clear_chosen_enemy(F7)
         else:
             self.clear_chosen_enemy(D7)

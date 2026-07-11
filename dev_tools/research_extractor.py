@@ -246,11 +246,12 @@ class TechnologyTemplate:
         return projects
 
     def encode(self):
-        lines = []
-        lines.append("# 此文件由 dev_tools/research_extractor.py 自动生成。")
-        lines.append("# 不要手动修改。")
-        lines.append("")
-        lines.append("LIST_RESEARCH_PROJECT = [")
+        lines = [
+            "# 此文件由 dev_tools/research_extractor.py 自动生成。",
+            "# 不要手动修改。",
+            "",
+            "LIST_RESEARCH_PROJECT = [",
+        ]
         for project in self.projects.values():
             lines.extend(encode_project(project.encode()))
         lines.append("]")

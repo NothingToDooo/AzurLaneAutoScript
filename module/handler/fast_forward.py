@@ -129,7 +129,7 @@ class FastForwardHandler(AutoSearchHandler):
             self.config.MAP_HAS_MAP_STORY = False
         self.config.MAP_CLEAR_ALL_THIS_TIME = bool(
             self.config.STAR_REQUIRE_3
-            and not self.__getattribute__(f"map_achieved_star_{self.config.STAR_REQUIRE_3}")
+            and not getattr(self, f"map_achieved_star_{self.config.STAR_REQUIRE_3}")
             and (self.config.StopCondition_MapAchievement in ["map_3_stars", "threat_safe"])
         )
 
@@ -149,7 +149,7 @@ class FastForwardHandler(AutoSearchHandler):
         strip = ["map", "achieved", "is", "has"]
         log_names = ["_".join([x for x in name.split("_") if x not in strip]) for name in names]
         enabled_log_names = [
-            log_name for log_name, attr_name in zip(log_names, names, strict=True) if self.__getattribute__(attr_name)
+            log_name for log_name, attr_name in zip(log_names, names, strict=True) if getattr(self, attr_name)
         ]
         text = ", ".join(enabled_log_names)
         text = f"{int(self.map_clear_percentage * 100)}%, " + text
@@ -241,13 +241,13 @@ class FastForwardHandler(AutoSearchHandler):
         logger.info("Auto search setting")
         self.fleet_preparation_sidebar_ensure(3)
         self.auto_search_setting_ensure(self.config.Fleet_FleetOrder)
-        if self.config.SUBMARINE:
+        if self.config.submarine:
             self.auto_search_setting_ensure(self.config.Submarine_AutoSearchMode)
         return True
 
     @property
     def is_call_submarine_at_boss(self):
-        return self.config.SUBMARINE and self.config.Submarine_Mode in ["boss_only", "hunt_and_boss"]
+        return self.config.submarine and self.config.Submarine_Mode in ["boss_only", "hunt_and_boss"]
 
     def handle_auto_submarine_call_disable(self):
         """页面进入：FLEET_PREPARATION。"""

@@ -111,7 +111,7 @@ class Campaign(CampaignBase):
         if self.config.MAP_CLEAR_ALL_THIS_TIME and self.battle_count == 0 and not self.map_is_clear_mode:
             func = self.FUNCTION_NAME_BASE + str(self.battle_count)
             logger.info(f"Using function: {func}")
-            func = self.__getattribute__(func)
+            func = getattr(self, func)
             return func()
 
         return super().battle_function()

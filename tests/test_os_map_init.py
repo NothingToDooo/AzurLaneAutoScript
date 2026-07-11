@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from module.os.map import OSMap
 from module.ui.page import page_os
 
@@ -18,9 +20,9 @@ class _Config:
         self.override_calls.append(kwargs)
 
 
+@dataclass
 class _Zone:
-    def __init__(self, zone_id: int) -> None:
-        self.zone_id = zone_id
+    zone_id: int
 
 
 class _Map(OSMap):

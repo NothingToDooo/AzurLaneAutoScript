@@ -62,7 +62,7 @@ class OSGridInfo(GridInfo):
             "FM": "is_fleet_mechanism",
         }
         for key, value in dic.items():
-            if self.__getattribute__(value):
+            if getattr(self, value):
                 return key
 
         if self.is_siren:
@@ -83,7 +83,7 @@ class OSGridInfo(GridInfo):
             "==": "is_radar_scanned",
         }
         for key, value in dic.items():
-            if self.__getattribute__(value):
+            if getattr(self, value):
                 return key
 
         return "--"

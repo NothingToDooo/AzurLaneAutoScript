@@ -180,7 +180,7 @@ class MumuRuntimeBase:
         if instance_id is None:
             return None
 
-        select = instances.select(MuMuPlayer12_id=instance_id)
+        select = instances.select(mumu_player_12_id=instance_id)
         # 这里只是试探，因此 select.count == 1 时不单独记录日志。
         if select.count == 1:
             return self._log_found_emulator_instance(select[0])

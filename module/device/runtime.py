@@ -66,18 +66,18 @@ class MumuRuntime(MumuRuntimeBase):
             message = f"Cannot start an unknown emulator instance: {instance}"
             raise EmulatorUnknown(message)
         # 通过 MuMuManager 启动，避免多个 MuMuNxMain.exe 同时启动时请求被吞掉。
-        if instance.MuMuPlayer12_id is None:
+        if instance.mumu_player_12_id is None:
             logger.warning(f"Cannot get MuMu instance index from name {instance.name}")
-        self.execute([Emulator.single_to_console(exe), "api", "-v", str(instance.MuMuPlayer12_id), "launch_player"])
+        self.execute([Emulator.single_to_console(exe), "api", "-v", str(instance.mumu_player_12_id), "launch_player"])
 
     def _emulator_stop(self, instance: EmulatorInstance):
         exe: str = instance.emulator.path
         if instance != Emulator.MuMuPlayer12:
             message = f"Cannot stop an unknown emulator instance: {instance}"
             raise EmulatorUnknown(message)
-        if instance.MuMuPlayer12_id is None:
+        if instance.mumu_player_12_id is None:
             logger.warning(f"Cannot get MuMu instance index from name {instance.name}")
-        self.execute([Emulator.single_to_console(exe), "api", "-v", str(instance.MuMuPlayer12_id), "shutdown_player"])
+        self.execute([Emulator.single_to_console(exe), "api", "-v", str(instance.mumu_player_12_id), "shutdown_player"])
 
     def _emulator_function_wrapper(self, func: Callable[[EmulatorInstance], None]):
         instance = self.emulator_instance

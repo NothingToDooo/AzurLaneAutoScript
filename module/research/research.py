@@ -437,5 +437,5 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             self.queue_quit()
         if slot == 4:
             # 资源不足时提前十分钟重试，避免科研队列空转。
-            self.end_time = self.end_time + timedelta(minutes=-10)
+            self.end_time += timedelta(minutes=-10)
         self.config.task_delay(target=self.end_time)

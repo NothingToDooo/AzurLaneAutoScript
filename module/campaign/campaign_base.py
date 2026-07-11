@@ -100,7 +100,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
                 break
 
         logger.info(f"Using function: {func_name}")
-        return self.__getattribute__(func_name)()
+        return getattr(self, func_name)()
 
     def execute_a_battle(self):
         logger.hr(f"{self.FUNCTION_NAME_BASE}{self.battle_count}", level=2)

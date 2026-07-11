@@ -16,7 +16,7 @@ from module.statistics.utils import load_folder
 
 class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
     @cached_property
-    def TEMPLATES(self) -> list[Template]:
+    def templates(self) -> list[Template]:
         coins = load_folder("./assets/shop/os_cost")
         coins_sold_out = load_folder("./assets/shop/os_cost_sold_out")
         templates = [Template(c) for c in coins.values()]
@@ -26,7 +26,7 @@ class PortShop(OSStatus, OSShopUI, Selector, MapEventHandler):
     def _get_os_shop_cost(self) -> list:
         """返回各货币图标左上角坐标。"""
         image = self.image_crop((360, 320, 410, 700))
-        result = list(chain.from_iterable(template.match_multi(image) for template in self.TEMPLATES))
+        result = list(chain.from_iterable(template.match_multi(image) for template in self.templates))
         logger.attr("Costs", f"{result}")
         return Points([(0.0, m.area[1]) for m in result]).group(threshold=5)
 

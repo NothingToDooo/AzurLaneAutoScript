@@ -48,7 +48,7 @@ class SelectedGrids:
         def matched(obj):
             flag = True
             for k, v in kwargs.items():
-                obj_v = obj.__getattribute__(k)
+                obj_v = getattr(obj, k)
                 if type(obj_v) is not type(v) or obj_v != v:
                     flag = False
             return flag
@@ -58,7 +58,7 @@ class SelectedGrids:
     def create_index(self, *attrs):
         indexes = {}
         for grid in self.grids:
-            k = tuple(grid.__getattribute__(attr) for attr in attrs)
+            k = tuple(getattr(grid, attr) for attr in attrs)
             try:
                 indexes[k].append(grid)
             except KeyError:
@@ -74,14 +74,14 @@ class SelectedGrids:
     def left_join(self, right, on_attr, set_attr, default=None):
         right.create_index(*on_attr)
         for grid in self:
-            attr_value = tuple([grid.__getattribute__(attr) for attr in on_attr])
+            attr_value = tuple([getattr(grid, attr) for attr in on_attr])
             right_grid = right.indexed_select(*attr_value).first_or_none()
             if right_grid is not None:
                 for attr in set_attr:
-                    grid.__setattr__(attr, right_grid.__getattribute__(attr))
+                    setattr(grid, attr, getattr(right_grid, attr))
             else:
                 for attr in set_attr:
-                    grid.__setattr__(attr, default)
+                    setattr(grid, attr, default)
 
         return self
 
@@ -92,13 +92,13 @@ class SelectedGrids:
     def set(self, **kwargs):
         for grid in self:
             for key, value in kwargs.items():
-                grid.__setattr__(key, value)
+                setattr(grid, key, value)
 
     def get(self, attr):
-        return [grid.__getattribute__(attr) for grid in self.grids]
+        return [getattr(grid, attr) for grid in self.grids]
 
     def call(self, func, **kwargs):
-        return [grid.__getattribute__(func)(**kwargs) for grid in self]
+        return [getattr(grid, func)(**kwargs) for grid in self]
 
     def first_or_none(self):
         try:
@@ -152,7 +152,7 @@ class SelectedGrids:
         vector = np.subtract(self.location, center)
         theta = np.arctan2(vector[:, 1], vector[:, 0]) / np.pi * 180
         vector = np.subtract(start, center)
-        theta = theta - np.arctan2(vector[1], vector[0]) / np.pi * 180
+        theta -= np.arctan2(vector[1], vector[0]) / np.pi * 180
         if not clockwise:
             theta = -theta
         theta[theta < 0] += 360

@@ -26,8 +26,8 @@ MAP.spawn_data = [
 
 
 class Config:
-    SUBMARINE = 0
-    FLEET_BOSS = 2
+    submarine = 0
+    fleet_boss = 2
 
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 40
     EDGE_LINES_HOUGHLINES_THRESHOLD = 40

@@ -55,7 +55,7 @@ class Filter:
         for attr, value in zip(self.attr, filter_value, strict=True):
             if not value:
                 continue
-            if str(obj.__getattribute__(attr)).lower() != str(value):
+            if str(getattr(obj, attr)).lower() != str(value):
                 return False
 
         return True

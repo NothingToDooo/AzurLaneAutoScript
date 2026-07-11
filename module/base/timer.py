@@ -42,7 +42,7 @@ def future_time_range(string):
     """把 `23:30-06:30` 转为未来起止时间；跨午夜时起点落在前一天。"""
     start, end = [future_time(s) for s in string.split("-")]
     if start > end:
-        start = start - timedelta(days=1)
+        start -= timedelta(days=1)
     return start, end
 
 

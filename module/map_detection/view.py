@@ -110,7 +110,7 @@ class View(MapDetector):
         for grid in self:
             flag = True
             for k, v in kwargs.items():
-                if grid.__getattribute__(k) != v:
+                if getattr(grid, k) != v:
                     flag = False
             if flag:
                 result.append(grid)

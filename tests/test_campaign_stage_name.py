@@ -1,3 +1,4 @@
+from operator import itemgetter
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -145,7 +146,7 @@ def test_stage_loop_alias_preserves_reverse_modulo_boundary(run_count: int, expe
 
 def test_stage_loop_alias_uses_random_choice_for_zero_count(monkeypatch: pytest.MonkeyPatch) -> None:
     config = _LoopConfig(run_count=0)
-    monkeypatch.setattr("module.content.campaign_policy.random.choice", lambda stages: stages[2])
+    monkeypatch.setattr("module.content.campaign_policy.random.choice", itemgetter(2))
 
     name, is_stage_loop = _resolve_stage_loop_alias("th", "event_20221124_cn", config)
 

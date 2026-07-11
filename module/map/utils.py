@@ -89,8 +89,8 @@ def match_movable(before, spawn, after, fleets, fleet_step=2):
     encourage_weight = -100
     before_len = len(before)
     after_len = len(after)
-    before = before + spawn
-    after = after + fleets
+    before = [*before, *spawn]
+    after = [*after, *fleets]
     x = len(after)
     y = len(before)
     distance = np.ones((y, x), dtype=int) * base_weight

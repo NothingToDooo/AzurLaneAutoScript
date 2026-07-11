@@ -1,12 +1,12 @@
 from module.base.decorator import cached_property
 from module.logger import logger
-from module.shop.base import ShopItemGrid_250814
+from module.shop.base import ShopItemGrid250814
 from module.shop.clerk import ShopClerk
 from module.shop.shop_status import ShopStatus
 from module.shop.ui import ShopUI
 
 
-class GeneralShop_250814(ShopClerk, ShopUI, ShopStatus):
+class GeneralShop250814(ShopClerk, ShopUI, ShopStatus):
     gems = 0
     shop_template_folder = "./assets/shop/general"
 
@@ -18,7 +18,7 @@ class GeneralShop_250814(ShopClerk, ShopUI, ShopStatus):
     def shop_general_items(self):
         shop_grid = self.shop_grid
 
-        shop_general_items = ShopItemGrid_250814(
+        shop_general_items = ShopItemGrid250814(
             shop_grid,
             templates={},
             template_area=(25, 20, 82, 72),

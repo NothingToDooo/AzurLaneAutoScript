@@ -579,7 +579,8 @@ def test_failure_store_rejects_unsafe_profile_before_writing(
 ) -> None:
     root = tmp_path / "root"
     result = make_invalid_counter_result()
-    object.__setattr__(result, "profile", profile)
+    # 白盒测试需要构造冻结结果模型无法通过公开入口表达的非法 profile。
+    object.__setattr__(result, "profile", profile)  # noqa: PLC2801
 
     def fail_encoding(_image: np.ndarray) -> bytes:
         pytest.fail("profile validation reached PNG encoding")

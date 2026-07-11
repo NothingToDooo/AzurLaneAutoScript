@@ -154,7 +154,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
             area = (400, 200, GLOBE_MAP_SHAPE[0] - 400, GLOBE_MAP_SHAPE[1] - 250)
             loca = point_limit(zone.location, area=area)
             vector = np.array(loca) - self.globe_camera
-            vector = vector / self.config.OS_GLOBE_SWIPE_MULTIPLY
+            vector /= self.config.OS_GLOBE_SWIPE_MULTIPLY
             swipe = tuple(np.min([np.abs(vector), swipe_limit], axis=0) * np.sign(vector))
             self.globe_swipe(swipe)
 
@@ -265,7 +265,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
             region = zones[0].region
 
         index = order.index(region)
-        order = order * 2
+        order *= 2
         order = order[index : index + 4]
         for region in order:
             logger.hr(f"Find siren stronghold in region {region}", level=2)

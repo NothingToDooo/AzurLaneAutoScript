@@ -72,9 +72,9 @@ MAP.spawn_data = [
     H5,
 ) = MAP.flatten()
 
-road_A1 = RoadGrids([[A2, B1], [B1, B2, B3], [A2, B2, C2], [B3, C2], D3])
-road_H1 = RoadGrids([[F1, G2, H3], [F1, G2, G3], [F2, G2, H3], [F2, G3], E3])
-road_MY = RoadGrids([A4, [A2, B3]])
+ROAD_A1 = RoadGrids([[A2, B1], [B1, B2, B3], [A2, B2, C2], [B3, C2], D3])
+ROAD_H1 = RoadGrids([[F1, G2, H3], [F1, G2, G3], [F2, G2, H3], [F2, G3], E3])
+ROAD_MY = RoadGrids([A4, [A2, B3]])
 road_middle = RoadGrids([E5, [D5, E4], D3]).combine(RoadGrids([H4, H3, [F1, G2, G3], [F2, G3], E3]))
 step_on = SelectedGrids([D3, E3])
 
@@ -92,13 +92,13 @@ class Campaign(CampaignBase):
 
         self.clear_all_mystery()
 
-        if self.clear_roadblocks([road_A1, road_H1]):
+        if self.clear_roadblocks([ROAD_A1, ROAD_H1]):
             return True
-        if self.mystery_count < 1 and self.clear_roadblocks([road_MY]):
+        if self.mystery_count < 1 and self.clear_roadblocks([ROAD_MY]):
             return True
-        if self.clear_potential_roadblocks([road_A1, road_H1]):
+        if self.clear_potential_roadblocks([ROAD_A1, ROAD_H1]):
             return True
-        if self.clear_first_roadblocks([road_A1, road_H1]):
+        if self.clear_first_roadblocks([ROAD_A1, ROAD_H1]):
             return True
 
         return self.battle_default()

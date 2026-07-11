@@ -110,7 +110,7 @@ MAP.spawn_data = [
 
 
 class Config:
-    SUBMARINE = 0
+    submarine = 0
 
     POOR_MAP_DATA = True
     MAP_HAS_AMBUSH = False

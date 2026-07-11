@@ -313,7 +313,7 @@ class FleetPreparation(InfoHandler):
             if not self.config.Submarine_Fleet:
                 submarine.clear()
         else:
-            self.config.SUBMARINE = 0
+            self.config.submarine = 0
 
     def _prepare_submarine_fleet(self, fleet_2, submarine):
         # 缓存 submarine.allow()，避免设置 fleet_2 后结果不一致。
@@ -360,7 +360,7 @@ class FleetPreparation(InfoHandler):
             if not self.config.Submarine_Fleet:
                 submarine.clear()
         else:
-            self.config.SUBMARINE = 0
+            self.config.submarine = 0
 
     def fleet_preparation(self):
         logger.info(f"Using fleet: {[self.config.Fleet_Fleet1, self.config.Fleet_Fleet2, self.config.Submarine_Fleet]}")

@@ -64,7 +64,7 @@ class Config:
     # ===== End of generated config =====
 
     MAP_HAS_CLEAR_PERCENTAGE = False
-    FLEET_2 = 0
+    fleet_2 = 0
     MAP_IS_ONE_TIME_STAGE = True
 
 

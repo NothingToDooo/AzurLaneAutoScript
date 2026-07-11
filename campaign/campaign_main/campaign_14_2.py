@@ -111,8 +111,8 @@ MAP.spawn_data = [
     H8,
     I8,
 ) = MAP.flatten()
-road_H7 = RoadGrids([[G6, G7, H6], [G6, G7, H7]])
-road_A5 = RoadGrids([[A4, B5]])
+ROAD_H7 = RoadGrids([[G6, G7, H6], [G6, G7, H7]])
+ROAD_A5 = RoadGrids([[A4, B5]])
 
 
 class Config(ConfigBase):
@@ -133,7 +133,7 @@ class Campaign(CampaignBase):
             self.fleet_boss.goto(D6)
             self.fleet_1.switch_to()
 
-        if self.clear_roadblocks([road_A5, road_H7], weakest=True):
+        if self.clear_roadblocks([ROAD_A5, ROAD_H7], weakest=True):
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=1):
             return True

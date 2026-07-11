@@ -430,7 +430,7 @@ class CampaignMap:
 
     def ignore_prediction_match(self, globe, local):
         for wrong_globe, wrong_local in self._ignore_prediction:
-            if wrong_globe == globe and all(local.__getattribute__(k) == v for k, v in wrong_local.items()):
+            if wrong_globe == globe and all(getattr(local, k) == v for k, v in wrong_local.items()):
                 return True
 
         return False
@@ -518,7 +518,7 @@ class CampaignMap:
             self.find_path_initial(location, has_ambush=has_ambush)
             attr = f"cost_{fleet}"
             for grid in self:
-                grid.__setattr__(attr, grid.cost)
+                setattr(grid, attr, grid.cost)
 
     def _find_path(self, location):
         """从目标格沿 connection 回溯，返回起点到目标格的坐标路线。"""
@@ -704,19 +704,19 @@ class CampaignMap:
         # 推断。
         for upper in self.map_covered:
             for attr in ["enemy", "mystery", "siren", "boss"]:
-                if upper.__getattribute__("may_" + attr) and missing[attr] > 0 and missing[attr] == may[attr]:
+                if getattr(upper, "may_" + attr) and missing[attr] > 0 and missing[attr] == may[attr]:
                     logger.info(f"Predict {location2node(upper.location)} to be {attr}")
-                    upper.__setattr__("is_" + attr, True)
+                    setattr(upper, "is_" + attr, True)
             if carrier_count and upper.may_carrier and missing["carrier"] > 0 and missing["carrier"] == may["carrier"]:
                 logger.info(f"Predict {location2node(upper.location)} to be enemy")
-                upper.__setattr__("is_enemy", True)
+                upper.is_enemy = True
 
     def select(self, **kwargs):
         result = []
         for grid in self:
             flag = True
             for k, v in kwargs.items():
-                if grid.__getattribute__(k) != v:
+                if getattr(grid, k) != v:
                     flag = False
             if flag:
                 result.append(grid)

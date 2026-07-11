@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import ClassVar, TypeVar
 
 import pytest
@@ -51,9 +52,9 @@ class _Device:
         self.screenshot_count += 1
 
 
+@dataclass
 class _Item:
-    def __init__(self, amount: int) -> None:
-        self.amount = amount
+    amount: int
 
 
 class _EquipmentItems:

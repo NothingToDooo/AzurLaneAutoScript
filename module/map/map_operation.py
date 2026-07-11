@@ -396,7 +396,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
 
     @property
     def fleets_reversed(self):
-        if not self.config.FLEET_2:
+        if not self.config.fleet_2:
             return False
         return self.config.Fleet_FleetOrder in ["fleet1_boss_fleet2_mob", "fleet1_standby_fleet2_all"]
 

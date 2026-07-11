@@ -20,7 +20,7 @@ def _instance(
         name=name,
         path=path,
         type=emulator_type,
-        MuMuPlayer12_id=mumu_id,
+        mumu_player_12_id=mumu_id,
         mumu_vms_config=lambda _: "",
     )
 

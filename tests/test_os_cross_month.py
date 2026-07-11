@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import ClassVar, override
 
@@ -53,10 +54,10 @@ class _Config:
         return True
 
 
+@dataclass
 class _Zone:
-    def __init__(self, zone_id: int, location: tuple[int, int]) -> None:
-        self.zone_id = zone_id
-        self.location = location
+    zone_id: int
+    location: tuple[int, int]
 
 
 class _Zones:

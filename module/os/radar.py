@@ -51,7 +51,7 @@ class RadarGrid:
 
     def encode(self):
         for key, value in self.dic_encode.items():
-            if self.__getattribute__(value):
+            if getattr(self, value):
                 return key
 
         return "--"
@@ -185,7 +185,7 @@ class Radar:
         for grid in self:
             flag = True
             for k, v in kwargs.items():
-                if grid.__getattribute__(k) != v:
+                if getattr(grid, k) != v:
                     flag = False
             if flag:
                 result.append(grid)

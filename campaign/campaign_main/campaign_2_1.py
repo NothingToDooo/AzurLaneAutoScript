@@ -54,7 +54,7 @@ MAP.spawn_data = [
 
 
 class Config:
-    FLEET_BOSS = 1
+    fleet_boss = 1
 
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 40
     EDGE_LINES_HOUGHLINES_THRESHOLD = 40

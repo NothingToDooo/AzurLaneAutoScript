@@ -53,7 +53,7 @@ class Fleet(Camera, AmbushHandler):
 
     @property
     def fleet_2(self):
-        if self.config.FLEET_2 and self.fleet_current_index != 2:
+        if self.config.fleet_2 and self.fleet_current_index != 2:
             self.fleet_ensure(index=2)
         return self
 
@@ -84,13 +84,13 @@ class Fleet(Camera, AmbushHandler):
 
     @property
     def fleet_boss(self):
-        if self.config.FLEET_BOSS == 2 and self.config.FLEET_2:
+        if self.config.fleet_boss == 2 and self.config.fleet_2:
             return self.fleet_2
         return self.fleet_1
 
     @property
     def fleet_boss_index(self):
-        if self.config.FLEET_BOSS == 2 and self.config.FLEET_2:
+        if self.config.fleet_boss == 2 and self.config.fleet_2:
             return 2
         return 1
 
@@ -437,7 +437,7 @@ class Fleet(Camera, AmbushHandler):
         self.map[self.fleet_current].is_fleet = False
         self.map[state.location].wipe_out()
         self.map[state.location].is_fleet = True
-        self.__setattr__(f"fleet_{self.fleet_current_index}_location", state.location)
+        setattr(self, f"fleet_{self.fleet_current_index}_location", state.location)
         if state.result_mystery == "get_carrier":
             self.full_scan_carrier()
         if state.result == "combat":
@@ -560,7 +560,7 @@ class Fleet(Camera, AmbushHandler):
     def show_fleet(self):
         fleets = []
         for n in [1, 2]:
-            fleet = self.__getattribute__(f"fleet_{n}_location")
+            fleet = getattr(self, f"fleet_{n}_location")
             if len(fleet):
                 text = f"Fleet_{n}: {location2node(fleet)}"
                 if self.fleet_current_index == n:
@@ -586,7 +586,7 @@ class Fleet(Camera, AmbushHandler):
             options.mode = "decoy"
         super().full_scan(options)
 
-        if self.config.FLEET_2 and not self.fleet_2_location:
+        if self.config.fleet_2 and not self.fleet_2_location:
             fleets = self.map.select(is_fleet=True, is_current_fleet=False)
             if fleets.count:
                 logger.info(f"Predict fleet_2 to be {fleets[0]}")
@@ -772,7 +772,7 @@ class Fleet(Camera, AmbushHandler):
         return self.map.select(is_fleet=True)
 
     def _find_current_fleet_from_single(self, fleets):
-        if not self.config.FLEET_2:
+        if not self.config.fleet_2:
             self.fleet_1 = fleets[0].location
             return
 
@@ -853,7 +853,7 @@ class Fleet(Camera, AmbushHandler):
             queue = queue[1:]
 
     def find_submarine(self):
-        if not (self.config.SUBMARINE and self.map.select(is_submarine_spawn_point=True)):
+        if not (self.config.submarine and self.map.select(is_submarine_spawn_point=True)):
             return False
 
         fleets = self.map.select(is_submarine=True)

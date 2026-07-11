@@ -96,24 +96,24 @@ def convert_name(name, series):
 
 
 if __name__ == "__main__":
-    from module.config.code_generator import Comment, Dict, DictItem, Value, generator
+    from module.config.code_generator import comment, dict_, dict_item, generator, value
 
-    Value(FILTER_STRING_SHORTEST="0.5 > 1 > 1.5 > 2 > 2.5 > 3 > 4 > 5 > 6 > 8 > 10 > 12")
+    value(FILTER_STRING_SHORTEST="0.5 > 1 > 1.5 > 2 > 2.5 > 3 > 4 > 5 > 6 > 8 > 10 > 12")
     generator.add("FILTER_STRING_CHEAPEST = (")
     with generator.tab():
         generator.add('"Q1 > Q2 > T3 > T4 > Q4 > C6 > T6 > C8 > C12 > G1.5 > D2.5 > G2.5 > "')
         generator.add('"D5 > Q0.5 > G4 > D8 > H1 > H2 > H0.5 > D0.5 > H4"')
     generator.add(")")
-    with Dict("DICT_FILTER_PRESET"):
+    with dict_("DICT_FILTER_PRESET"):
         for series in [9, 8, 7, 6, 5, 4, 3, 2]:
 
             def new_filter(series=series, **kwargs):
                 for raw_key, raw_value in kwargs.items():
                     key = convert_name(raw_key, series)
                     value = translate(raw_value, target=key)
-                    DictItem(key, value)
+                    dict_item(key, value)
 
-            Comment("""
+            comment("""
                 Goal: DR_blurprint=0, PRY_blueprint=0, tanrai_blueprint=150
                 Average time cost: 153.41706666666678
                 Average rewards: [238.69016631 238.37881965 529.71190834 528.92520834 528.39586667 150.07973333]
@@ -127,7 +127,7 @@ if __name__ == "__main__":
                 > !4-C8 > !4-C12
             """
             )
-            Comment("""
+            comment("""
                 Goal: DR_blurprint=0, PRY_blueprint=0, tanrai_blueprint=150
                 Average time cost: 161.37177965277806
                 Average rewards: [241.92774575 241.13046242 421.82134358 421.04494941 420.46893024 150.07799978]
@@ -141,7 +141,7 @@ if __name__ == "__main__":
                 > !4-C8 > S4-C12 > !4-C12
             """
             )
-            Comment("""
+            comment("""
                 Goal: DR_blurprint=513, PRY_blueprint=343, tanrai_blueprint=100
                 Average time cost: 124.67622465277958
                 Average rewards: [531.93022864 529.81919864 510.27473326 510.18530159 510.11215826 100.8088164]
@@ -155,7 +155,7 @@ if __name__ == "__main__":
                 > !4-C8 > S4-C12 > !4-C12
             """
             )
-            Comment("""
+            comment("""
                 Goal: DR_blurprint=513, PRY_blueprint=343, tanrai_blueprint=100
                 Average time cost: 143.56399131945145
                 Average rewards: [520.06195858 519.19883191 392.86544828 392.64870495 392.49383995 102.2368499]
@@ -169,7 +169,7 @@ if __name__ == "__main__":
                 > S4-C12 > !4-C8 > !4-C12
             """
             )
-            Comment("""
+            comment("""
                 Goal: DR_blurprint=513, PRY_blueprint=343, tanrai_blueprint=0
                 Average time cost: 82.0121088194467
                 Average rewards: [519.0311752  514.64003687 653.77171198 653.72126532 653.66129615 26.97694791]
@@ -183,7 +183,7 @@ if __name__ == "__main__":
                 > S4-C12 > !4-C8 > !4-C12
             """
             )
-            Comment("""
+            comment("""
                 Goal: DR_blurprint=513, PRY_blueprint=343, tanrai_blueprint=0
                 Average time cost: 124.71616166666873
                 Average rewards: [514.96354877 514.70099977 355.58865468 354.96831385 354.66888635 56.48432238]
@@ -198,8 +198,8 @@ if __name__ == "__main__":
             """
             )
 
-        Comment("Old community filters")
-        DictItem(
+        comment("Old community filters")
+        dict_item(
             "series_2_than_3_457_234",
             beautify_filter("""
             S2-Q0.5 > S2-PRY0.5 > S2-DR0.5 > S2-Q4 > S2-Q1 > S2-Q2 > S2-H0.5 > 0.5

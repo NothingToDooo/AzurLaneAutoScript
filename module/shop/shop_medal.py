@@ -13,7 +13,7 @@ from module.logger import logger
 from module.map_detection.utils import Points
 from module.ocr.ocr import Digit, DigitYuv, Ocr
 from module.shop.assets import MEDAL_SHOP_SCROLL_AREA_250814, SHOP_BUY_CONFIRM_AMOUNT, SHOP_BUY_CONFIRM_SELECT
-from module.shop.base import ShopItemGrid_250814
+from module.shop.base import ShopItemGrid250814
 from module.shop.clerk import ShopClerk
 from module.shop.shop_status import ShopStatus
 from module.ui.scroll import AdaptiveScroll
@@ -63,7 +63,7 @@ TEMPLATE_MEDAL_ICON_2 = Template("./assets/shop/cost/Medal_2.png")
 TEMPLATE_MEDAL_ICON_3 = Template("./assets/shop/cost/Medal_3.png")
 
 
-class MedalShop2_250814(ShopClerk, ShopStatus):
+class MedalShop2V250814(ShopClerk, ShopStatus):
     @cached_property
     def shop_filter(self):
         return self.config.MedalShop2_Filter.strip()
@@ -132,7 +132,7 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
     @cached_property
     def shop_medal_items(self):
         shop_grid = self.shop_grid
-        shop_medal_items = ShopItemGrid_250814(
+        shop_medal_items = ShopItemGrid250814(
             shop_grid,
             templates={},
             amount_area=(60, 74, 96, 95),
@@ -146,7 +146,7 @@ class MedalShop2_250814(ShopClerk, ShopStatus):
         shop_medal_items.price_ocr = PRICE_OCR_250814
         return shop_medal_items
 
-    def shop_items(self) -> ShopItemGrid_250814:
+    def shop_items(self) -> ShopItemGrid250814:
         return self.shop_medal_items
 
     def shop_currency(self):

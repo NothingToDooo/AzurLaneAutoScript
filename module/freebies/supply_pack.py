@@ -101,7 +101,7 @@ class SupplyPack(CampaignStatus):
             logger.info("Oil > 21000, unable to buy free weekly supply pack")
 
 
-class SupplyPack_250814(SupplyPack):
+class SupplyPack250814(SupplyPack):
     def get_oil(self, skip_first_screenshot=True):
         """返回商店页油量；超时或识别失败时为 0。"""
         amount = 0

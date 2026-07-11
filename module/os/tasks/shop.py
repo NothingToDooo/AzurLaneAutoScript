@@ -44,7 +44,7 @@ class OpsiShop(OSMap):
             if remain == 0:
                 next_reset = get_server_next_update(self.config.Scheduler_ServerUpdate)
             elif remain < 7:
-                next_reset = next_reset - timedelta(days=1)
+                next_reset -= timedelta(days=1)
             else:
                 next_reset = get_server_next_update(self.config.Scheduler_ServerUpdate) + timedelta(days=6)
         return next_reset

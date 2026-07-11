@@ -1,4 +1,4 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -68,7 +68,7 @@ class Ship:
         return True
 
 
-class Scanner(metaclass=ABCMeta):
+class Scanner(ABC):
     _results: list | None = None
     _enabled: bool = True
     _disabled_value: list[None] = [None] * 14

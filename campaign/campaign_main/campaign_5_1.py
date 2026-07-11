@@ -83,7 +83,7 @@ MAP.spawn_data = [
 
 
 class Config:
-    FLEET_BOSS = 1
+    fleet_boss = 1
     MAP_MYSTERY_HAS_CARRIER = True
 
     INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {

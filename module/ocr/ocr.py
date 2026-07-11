@@ -88,7 +88,7 @@ class Ocr:
 
     @property
     def cnocr(self) -> _OcrEngine:
-        return OCR_MODEL.__getattribute__(self.lang)
+        return getattr(OCR_MODEL, self.lang)
 
     @property
     def buttons(self):

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime
 
 import pytest
@@ -49,15 +50,15 @@ class _Config:
         raise TaskEnd
 
 
+@dataclass
 class _Cooldown:
-    def __init__(self, next_run: datetime) -> None:
-        self.next_run = next_run
+    next_run: datetime
 
 
+@dataclass
 class _Zone:
-    def __init__(self, zone_id: int, location: tuple[int, int]) -> None:
-        self.zone_id = zone_id
-        self.location = location
+    zone_id: int
+    location: tuple[int, int]
 
 
 class _Zones:

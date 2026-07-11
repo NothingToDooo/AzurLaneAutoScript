@@ -386,7 +386,7 @@ class Map(Fleet):
         if not self.config.MAP_HAS_SIREN and not self.config.MAP_HAS_FORTRESS:
             return False
 
-        if self.config.FLEET_2:
+        if self.config.fleet_2:
             kwargs = {**kwargs, "sort": ("weight", "cost_2")}
         grids = self.map.select(is_siren=True)
         if self.config.MAP_HAS_FORTRESS:
@@ -429,7 +429,7 @@ class Map(Fleet):
 
     def fleet_2_step_on(self, grids, roadblocks):
         """让二队踏上指定格以降低另一队伏击率，并处理沿途阻挡；清敌后返回 True。"""
-        if not self.config.FLEET_2:
+        if not self.config.fleet_2:
             return False
         for grid in grids:
             if self.fleet_at(grid=grid, fleet=2):
@@ -519,7 +519,7 @@ class Map(Fleet):
 
     def fleet_2_protect(self):
         """让道中队环绕 Boss 队并清理接近的塞壬；清敌后返回 True。"""
-        if not self.config.FLEET_2 or not self.config.MAP_HAS_MOVABLE_ENEMY:
+        if not self.config.fleet_2 or not self.config.MAP_HAS_MOVABLE_ENEMY:
             return False
 
         # 使用两支舰队时。

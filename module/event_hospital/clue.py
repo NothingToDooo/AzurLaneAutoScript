@@ -1,4 +1,5 @@
 from functools import reduce
+from operator import itemgetter
 
 import cv2
 import numpy as np
@@ -23,7 +24,7 @@ def merge_two_rects(r1: tuple[int, int, int, int], r2: tuple[int, int, int, int]
 
 
 def merge_rows(list_word, merge):
-    list_word = sorted(list_word, key=lambda x: x[1])
+    list_word = sorted(list_word, key=itemgetter(1))
 
     list_row = []
     current_row = []

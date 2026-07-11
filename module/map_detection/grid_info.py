@@ -92,13 +92,13 @@ class GridInfo:
         }
         valid = text in dic
         for k, v in dic.items():
-            self.__setattr__(v, valid and bool(k == text))
+            setattr(self, v, valid and bool(k == text))
 
         self.may_ambush = not (self.may_enemy or self.may_boss or self.may_mystery or self.may_mystery)
 
     def _encode_flag(self, flags):
         for key, value in flags.items():
-            if self.__getattribute__(value):
+            if getattr(self, value):
                 return key
         return ""
 

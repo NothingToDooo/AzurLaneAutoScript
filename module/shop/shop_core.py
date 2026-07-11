@@ -1,12 +1,12 @@
 from module.base.decorator import cached_property
 from module.logger import logger
 from module.shop.assets import SHOP_BUY_CONFIRM_AMOUNT
-from module.shop.base import ShopItemGrid_250814
+from module.shop.base import ShopItemGrid250814
 from module.shop.clerk import ShopClerk
 from module.shop.shop_status import ShopStatus
 
 
-class CoreShop_250814(ShopClerk, ShopStatus):
+class CoreShop250814(ShopClerk, ShopStatus):
     shop_template_folder = "./assets/shop/core"
 
     @cached_property
@@ -16,7 +16,7 @@ class CoreShop_250814(ShopClerk, ShopStatus):
     @cached_property
     def shop_core_items(self):
         shop_grid = self.shop_grid
-        shop_core_items = ShopItemGrid_250814(
+        shop_core_items = ShopItemGrid250814(
             shop_grid,
             templates={},
             template_area=(25, 20, 82, 72),

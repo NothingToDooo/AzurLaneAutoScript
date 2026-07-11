@@ -63,7 +63,7 @@ def emit_renderables(
     **kwargs,
 ) -> None: ...
 
-class __logger(logging.Logger):
+class AlasLogger(logging.Logger):
     log_file: str
 
     def rule(
@@ -101,4 +101,4 @@ class __logger(logging.Logger):
         func: Callable[[ConsoleRenderable], None],
     ) -> None: ...
 
-logger: __logger
+logger: AlasLogger

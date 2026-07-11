@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 from pywebio.input import checkbox, select, textarea
 from pywebio.input import input as pywebio_input
 from pywebio.output import OutputPosition
-from pywebio.pin import _pin_output, check_dom_name_value
+from pywebio.pin import _pin_output, check_dom_name_value  # noqa: PLC2701
 
 if TYPE_CHECKING:
     from pywebio.io_ctrl import Output

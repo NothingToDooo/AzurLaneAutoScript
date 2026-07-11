@@ -76,7 +76,7 @@ road_mystery = RoadGrids([[C4, D5], D4, G2, [G1, H2]])
 
 
 class Config:
-    FLEET_BOSS = 1
+    fleet_boss = 1
     MAP_MYSTERY_HAS_CARRIER = True
 
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 40
