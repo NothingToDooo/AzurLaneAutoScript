@@ -346,6 +346,11 @@ def test_ocr_single_uses_direct_input_cardinality() -> None:
         ocr.ocr_single([TEST_IMAGE, TEST_IMAGE], direct_ocr=True)
 
 
+@pytest.mark.parametrize("images", [[], [TEST_IMAGE], [TEST_IMAGE, TEST_IMAGE]])
+def test_ocr_many_keeps_list_shape_for_every_cardinality(images: list[np.ndarray]) -> None:
+    assert _TestOcr(_FakeEngine("7", 0.9)).ocr_many(images) == ["7"] * len(images)
+
+
 def test_digit_recognize_returns_list_for_multiple_rois() -> None:
     results = make_digit("7", buttons=[TEST_AREA, TEST_AREA]).recognize(TEST_IMAGE)
 

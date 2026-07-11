@@ -6,8 +6,7 @@ class FakeOcr:
         self.values = values
         self.images = None
 
-    def ocr(self, images, direct_ocr=False):
-        assert direct_ocr is True
+    def ocr_many(self, images):
         self.images = images
         return self.values
 

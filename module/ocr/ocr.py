@@ -290,6 +290,13 @@ class Ocr[OcrValueT = str]:
             raise ValueError(message)
         return cast("OcrValueT", self.ocr(image, direct_ocr=direct_ocr))
 
+    def ocr_many(self, images: Sequence[ImageArray]) -> list[OcrValueT]:
+        """直接识别一组区域图像，并始终返回列表，包括零个或一个区域。"""
+        results = self.ocr(images, direct_ocr=True)
+        if len(images) == 1:
+            return [cast("OcrValueT", results)]
+        return cast("list[OcrValueT]", results)
+
 
 class OcrYuv[OcrValueT = str](Ocr[OcrValueT]):
     """在 RGB 图像的 YUV 亮度通道上识别。"""
