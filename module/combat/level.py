@@ -19,24 +19,14 @@ class Level(ModuleBase):
 
     @property
     def lv(self):
-        """
-        Returns:
-            list[int]:
-        """
         return self._lv
 
     @lv.setter
     def lv(self, value):
-        """
-        Args:
-            value (list[int]):
-        """
         self._lv = value
 
     def lv_reset(self):
-        """
-        Call this method after enter map.
-        """
+        """进入地图后清空战前、战后等级缓存。"""
         self._lv = [-1] * 6
         self._lv_before_battle = [-1] * 6
 
@@ -44,13 +34,6 @@ class Level(ModuleBase):
         return ButtonGrid(origin=(58, 128), delta=(0, 100), button_shape=(46, 19), grid_shape=(1, 6))
 
     def lv_get(self, after_battle=False):
-        """
-        Args:
-            after_battle (bool): True if called after battle else False.
-
-        Returns:
-            list[int]:
-        """
         if not self.config.StopCondition_ReachLevel and not self.config.STOP_IF_REACH_LV32:
             return [-1] * 6
 

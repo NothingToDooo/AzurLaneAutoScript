@@ -31,69 +31,41 @@ EMOTION_CONTROL_DELAY_MESSAGE = "Emotion control"
 
 class FleetEmotion:
     def __init__(self, config, fleet):
-        """
-        Args:
-            config (AzurLaneConfig):
-            fleet (int): Fleet index
-        """
         self.config = config
         self.fleet = fleet
         self.current = 0
 
     @property
     def value(self):
-        """
-        Returns:
-            int: 0 to 150
-        """
+        """返回 0～150 的当前心情值。"""
         return getattr(self.config, f"Emotion_Fleet{self.fleet}Value")
 
     @property
     def value_name(self):
-        """
-        Returns:
-            str:
-        """
         return f"Emotion_Fleet{self.fleet}Value"
 
     @property
     def record(self):
-        """
-        Returns:
-            datetime.datetime:
-        """
+        """返回上次记录心情值的时间。"""
         return getattr(self.config, f"Emotion_Fleet{self.fleet}Record")
 
     @property
     def recover(self):
-        """
-        Returns:
-            str: not_in_dormitory, dormitory_floor_1, dormitory_floor_2
-        """
+        """返回 not_in_dormitory、dormitory_floor_1 或 dormitory_floor_2。"""
         return getattr(self.config, f"Emotion_Fleet{self.fleet}Recover")
 
     @property
     def control(self):
-        """
-        Returns:
-            str: keep_exp_bonus, prevent_green_face, prevent_yellow_face, prevent_red_face
-        """
+        """返回 keep_exp_bonus、prevent_green_face、prevent_yellow_face 或 prevent_red_face。"""
         return getattr(self.config, f"Emotion_Fleet{self.fleet}Control")
 
     @property
     def oath(self):
-        """
-        Returns:
-            bool: If all ships oath.
-        """
         return getattr(self.config, f"Emotion_Fleet{self.fleet}Oath")
 
     @property
     def speed(self):
-        """
-        Returns:
-            int: Recover speed per 6 min.
-        """
+        """返回每 6 分钟恢复的心情点数。"""
         speed = DIC_RECOVER[self.recover]
         if self.oath:
             speed += OATH_RECOVER
@@ -101,18 +73,12 @@ class FleetEmotion:
 
     @property
     def limit(self):
-        """
-        Returns:
-            int: Minimum emotion value to control
-        """
+        """返回控制模式要求的最低心情点数。"""
         return DIC_LIMIT[self.control]
 
     @property
     def max(self):
-        """
-        Returns:
-            int: Maximum emotion value
-        """
+        """返回当前恢复位置允许的最高心情点数。"""
         return DIC_RECOVER_MAX[self.recover]
 
     def update(self):
@@ -121,14 +87,7 @@ class FleetEmotion:
         self.current = min(max(self.value, 0) + self.speed * recover_count, self.max)
 
     def get_recovered(self, expected_reduce=0):
-        """
-        Args:
-            expected_reduce (int):
-
-        Returns:
-            datetime.datetime: When will emotion >= control limit.
-                If already recovered, return time in the past.
-        """
+        """返回达到控制阈值的时间；已满足时可能返回过去时间。"""
         if self.control == "keep_exp_bonus" and self.recover == "not_in_dormitory":
             logger.critical(
                 f'Fleet {self.fleet} Emotion Control="Keep Happy Bonus" and '
@@ -136,8 +95,7 @@ class FleetEmotion:
                 "please check your emotion settings"
             )
             raise RequestHumanTakeover
-        # In 14-4 with 2X book, expected emotion reduce is 32, can't keep happy bonus (>120),
-        # otherwise will infinite task delay
+        # 14-4 使用双倍书时预计消耗 32 点，无法保持大于 120；这里限为 29，避免任务无限延迟。
         if self.control == "keep_exp_bonus" and expected_reduce >= 29:
             expected_reduce = 29
             logger.info(f'Fleet {self.fleet} expected_reduce is limited to 29 when Emotion Control="Keep Happy Bonus"')
@@ -152,10 +110,6 @@ class Emotion:
     map_is_2x_book = False
 
     def __init__(self, config):
-        """
-        Args:
-            config (AzurLaneConfig):
-        """
         self.config = config
         self.fleet_1 = FleetEmotion(self.config, fleet=1)
         self.fleet_2 = FleetEmotion(self.config, fleet=2)
@@ -170,16 +124,12 @@ class Emotion:
         return "ignore" in self.config.Emotion_Mode
 
     def update(self):
-        """
-        Update emotion value. This should be called before doing anything.
-        """
+        """按记录时间更新心情值；其他心情操作前必须先调用。"""
         for fleet in self.fleets:
             fleet.update()
 
     def record(self):
-        """
-        Save current emotion value to config.
-        """
+        """把当前心情值写回配置记录。"""
         value = {}
         for fleet in self.fleets:
             value[fleet.value_name] = fleet.current
@@ -203,15 +153,7 @@ class Emotion:
         return 2
 
     def check_reduce(self, battle):
-        """
-        Check emotion before entering a campaign.
-
-        Args:
-            battle (int): Battles in this campaign
-
-        Raise:
-            ScriptEnd: Delay current task to prevent emotion control in the future.
-        """
+        """进图前按预计战斗数检查心情；不足时延迟任务并抛出 ScriptEnd。"""
         if not self.is_calculate:
             return
 
@@ -242,13 +184,7 @@ class Emotion:
             raise ScriptEnd(EMOTION_CONTROL_DELAY_MESSAGE)
 
     def wait(self, fleet_index):
-        """
-        Wait emotion of specific fleet.
-        Should be called before entering any battles.
-
-        Args:
-            fleet_index (int): 1 or 2.
-        """
+        """进入战斗前等待 1 或 2 号舰队恢复到控制阈值。"""
         self.update()
         self.record()
         self.show()
@@ -266,14 +202,7 @@ class Emotion:
                 sleep(60)
 
     def reduce(self, fleet_index):
-        """
-        Reduce emotion of specific fleet.
-        Should be called after battle executing.
-        On server side, emotion is reduced once battle loading finished.
-
-        Args:
-            fleet_index (int): 1 or 2.
-        """
+        """战斗加载完成后扣减 1 或 2 号舰队心情，并写回配置。"""
         logger.hr("Emotion reduce")
         self.update()
 
@@ -285,21 +214,14 @@ class Emotion:
 
     @cached_property
     def bug_threshold(self):
-        """
-        Returns:
-            int:
-        """
         return random_normal_distribution_int(55, 105, n=2)
 
     def bug_threshold_reset(self):
-        """Call this method after emotion bug triggered."""
+        """触发客户端心情同步 bug 后重置随机阈值。"""
         del self.__dict__["bug_threshold"]
 
     def triggered_bug(self):
-        """
-        Azur Lane client does not calculate emotion correctly, which is a bug.
-        After a long run, we have to restart game client and let the client update it.
-        """
+        """长时间运行后客户端心情会不同步；达到阈值时要求重启以刷新。"""
         logger.attr("Emotion_bug", f"{self.total_reduced}/{self.bug_threshold}")
         if self.total_reduced >= self.bug_threshold:
             logger.info(

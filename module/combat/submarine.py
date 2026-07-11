@@ -17,9 +17,7 @@ class SubmarineCall(ModuleBase):
     submarine_call_click_timer = Timer(1)
 
     def submarine_call_reset(self):
-        """
-        Call this method after in battle_execute.
-        """
+        """进入战斗执行阶段后重置潜艇呼叫状态。"""
         self.submarine_call_timer.reset()
         self.submarine_call_flag = False
 
@@ -42,10 +40,6 @@ class SubmarineCall(ModuleBase):
         return False
 
     def handle_submarine_call(self, submarine="do_not_use"):
-        """
-        Returns:
-            bool: 是否执行了潜艇呼叫。
-        """
         if self._submarine_call_should_wait(submarine) or not self.submarine_call_click_timer.reached():
             return False
 

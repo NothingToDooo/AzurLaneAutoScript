@@ -364,14 +364,14 @@ class Fleet(Camera, AmbushHandler):
     def _goto_handle_cat_attack(self, state):
         if not self.handle_map_cat_attack():
             return False
-        # Already arrive, combat will appear later, but still need to wait siren moving
+        # 已到达目标格，但战斗稍后才出现，仍需等待塞壬移动。
         state.arrive_timer.reset()
         state.arrive_unexpected_timer.reset()
         state.walk_timeout.reset()
         return True
 
     def _goto_handle_guild_popup(self, state):
-        # Usually handled in combat_status, but sometimes delayed until after battle on slow PCs.
+        # 通常由 combat_status 处理，低性能设备上可能延迟到战斗结束后。
         if not self.handle_guild_popup_cancel():
             return False
         state.walk_timeout.reset()
@@ -504,7 +504,7 @@ class Fleet(Camera, AmbushHandler):
         if self.hp_retreat_triggered():
             self.withdraw()
         is_portal = self.map[location].is_portal
-        # The upper grid is submarine, may mess up predict_fleet()
+        # 上方格子可能是潜艇，会干扰 predict_fleet()。
         may_submarine_icon = self.map.grid_covered(self.map[location], location=[(0, -1)])
         may_submarine_icon = may_submarine_icon and self.fleet_submarine_location == may_submarine_icon[0].location
 
@@ -513,7 +513,7 @@ class Fleet(Camera, AmbushHandler):
             state = self._goto_state(location, expected, grid, is_portal, may_submarine_icon)
             self._goto_wait_arrival(state)
             if state.arrived:
-                # Ammo grid needs to click again, otherwise the next click doesn't work.
+                # 弹药格必须再点一次，否则下一次点击不会生效。
                 if self.map[state.location].may_ammo:
                     self.device.click(state.grid)
                 break
@@ -644,7 +644,7 @@ class Fleet(Camera, AmbushHandler):
             if len(loca) and loca in self.map:
                 grid = self.map[loca]
                 if grid.may_boss and grid.is_caught_by_siren:
-                    # Only boss appears on fleet's face
+                    # Boss 可能直接刷新在舰队所在格。
                     pass
                 else:
                     self.map[loca].wipe_out()
@@ -925,14 +925,12 @@ class Fleet(Camera, AmbushHandler):
             self.fleet_submarine = fleets[0].location
         elif count == 0:
             logger.info("No submarine found")
-            # Try spawn points
             spawn_point = self.map.select(is_submarine_spawn_point=True)
             if spawn_point.count == 1:
                 logger.info(f"Predict the only submarine spawn point {spawn_point[0]} as submarine")
                 self.fleet_submarine = spawn_point[0].location
             else:
                 logger.info(f"Having multiple submarine spawn points: {spawn_point}")
-                # Try covered grids
                 covered = SelectedGrids([])
                 for grid in spawn_point:
                     covered = covered.add(self.map.grid_covered(grid, location=[(0, 1)]))
@@ -943,7 +941,6 @@ class Fleet(Camera, AmbushHandler):
                     self.fleet_submarine = spawn_point[0].location
                 else:
                     logger.info("Found multiple submarine spawn points being covered")
-                    # Give up
                     self.find_all_submarines()
         else:
             logger.warning(f"Too many submarines: {fleets}.")
@@ -1017,7 +1014,7 @@ class Fleet(Camera, AmbushHandler):
         self.lv_reset()
         self.lv_get()
         self.ensure_edge_insight(preset=self.map.in_map_swipe_preset_data)
-        self.handle_info_bar()  # The info_bar which shows "Changed to fleet 2", will block the ammo icon
+        self.handle_info_bar()  # “Changed to fleet 2”信息条会遮住弹药图标。
         self.full_scan(must_scan=self.map.camera_data_spawn_point, mode="init")
         self.find_current_fleet()
         self.find_submarine()
@@ -1054,10 +1051,9 @@ class Fleet(Camera, AmbushHandler):
             if data.get("battle") == self.battle_count + 1:
                 matched = True
         if not len(self.map.spawn_data) or matched:
-            # No spawn_data
-            # spawn_data is not continuous, some battles are missing
+            # 没有刷新数据或数据不连续时，部分战斗可能无法推断。
             return None
-        # Out of the spawn_data, nothing will spawn
+        # 超出刷新数据范围后不会再生成单位。
         return "no_searching"
 
     def _submarine_mode(self, expected):
@@ -1178,7 +1174,7 @@ class Fleet(Camera, AmbushHandler):
                 self.update()
             except MapDetectionError:
                 logger.info(f"MapDetectionError occurs after boss appear, trying swipe preset {preset}")
-                # Swipe optimize here may not be accurate.
+                # 此处的滑动优化可能不准确。
                 self.map_swipe(preset)
             self.ensure_edge_insight()
         else:
@@ -1217,16 +1213,15 @@ class Fleet(Camera, AmbushHandler):
 
             self.device.click(grid)
             arrived = False
-            # Usually no need to wait
+            # 通常无需等待。
             arrive_timer = Timer(0.1, count=0)
-            # If nothing happens, click again.
+            # 没有响应时重试点击。
             walk_timeout = Timer(2, count=6).start()
 
             while 1:
                 self.device.screenshot()
                 self.view.update(image=self.device.image)
 
-                # Arrive
                 arrive_checker = grid.predict_submarine_move()
                 if grid.predict_submarine() or (walk_timeout.reached() and grid.predict_fleet()):
                     arrive_checker = True
@@ -1243,14 +1238,12 @@ class Fleet(Camera, AmbushHandler):
                     arrived = True
                     break
 
-                # End
                 if walk_timeout.reached():
                     logger.warning("Walk timeout. Retrying.")
                     self.predict()
                     self.ensure_edge_insight(skip_first_update=False)
                     break
 
-            # End
             if arrived:
                 break
 
@@ -1278,7 +1271,7 @@ class Fleet(Camera, AmbushHandler):
         else:
             self.strategy_submarine_move_cancel()
             result = False
-        # Hunt zone view re-enabled by game, after entering sub move mode
+        # 进入潜艇移动模式后，游戏会重新打开狩猎范围显示。
         self.strategy_set_execute(sub_view=False)
         self.strategy_close()
         return result

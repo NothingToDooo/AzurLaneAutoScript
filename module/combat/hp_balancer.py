@@ -6,7 +6,7 @@ from module.base.utils import color_bar_percentage
 from module.config.utils import to_list
 from module.logger import logger
 
-# Color that shows on HP bar.
+# 血条上的前景色。
 COLOR_HP_GREEN = (156, 235, 57)
 COLOR_HP_RED = (99, 44, 24)
 SCOUT_POSITION = [(403, 421), (625, 369), (821, 326)]
@@ -23,45 +23,23 @@ class HPBalancer(ModuleBase):
 
     @property
     def hp(self):
-        """
-        Returns:
-            list[float]:
-        """
+        """返回当前舰队六个位置的血量比例，范围为 0.0～1.0。"""
         return self._hp[self.fleet_current_index]
 
     @hp.setter
     def hp(self, value):
-        """
-        Args:
-            value (list[float]):
-        """
         self._hp[self.fleet_current_index] = value
 
     @property
     def hp_has_ship(self):
-        """
-        Returns:
-            list[bool]:
-        """
         return self._hp_has_ship[self.fleet_current_index]
 
     @hp_has_ship.setter
     def hp_has_ship(self, value):
-        """
-        Args:
-            value (list[float]):
-        """
         self._hp_has_ship[self.fleet_current_index] = value
 
     def _calculate_hp(self, area):
-        """Calculate hp according to color.
-
-        Args:
-            area (tuple):
-
-        Returns:
-            float: HP.
-        """
+        """按血条颜色计算 0.0～1.0 的血量比例。"""
         return max(
             color_bar_percentage(self.device.image, area=area, prev_color=COLOR_HP_RED),
             color_bar_percentage(self.device.image, area=area, prev_color=COLOR_HP_GREEN),
@@ -71,15 +49,7 @@ class HPBalancer(ModuleBase):
         return ButtonGrid(origin=(35, 206), delta=(0, 100), button_shape=(66, 4), grid_shape=(1, 6))
 
     def hp_get(self):
-        """Get current HP from screenshot.
-
-        Returns:
-            list: HP(float) of 6 ship.
-
-        Logs:
-            [HP]  98% ____ ____  98%  98%  98%
-        """
-        # Chinese comma
+        """识别六个位置的血量比例并缓存；前排返回值会应用平衡权重。"""
         weight = self.config.HpControl_HpBalanceWeight
         if "，" in self.config.HpControl_HpBalanceWeight:
             weight = self.config.HpControl_HpBalanceWeight.replace("，", ",")
@@ -109,20 +79,12 @@ class HPBalancer(ModuleBase):
         return self.hp
 
     def hp_reset(self):
-        """
-        Call this method after enter map.
-        """
+        """进入地图后清空血量和舰船位置缓存。"""
         self._hp = {}
         self._hp_has_ship = {}
 
     def _scout_position_change(self, p1, p2):
-        """Exchange KAN-SEN's position.
-        It need to move up and down a little, even though it moves to the right location.
-
-        Args:
-            p1 (int): Origin position [0, 2].
-            p2 (int): Target position [0, 2].
-        """
+        """交换前排 0～2 号位置；拖动手势需带少量纵向偏移。"""
         logger.info(f"scout_position_change ({p1}, {p2})")
         self.device.drag(p1=SCOUT_POSITION[p1], p2=SCOUT_POSITION[p2])
 

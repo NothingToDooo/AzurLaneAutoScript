@@ -14,13 +14,6 @@ from module.ui_white.assets import POPUP_CANCEL_WHITE, POPUP_CONFIRM_WHITE, POPU
 
 
 def info_letter_preprocess(image):
-    """
-    Args:
-        image (np.ndarray):
-
-    Returns:
-        np.ndarray
-    """
     image = image.astype(float)
     image = (image - 64) / 0.75
     image[image > 255] = 255
@@ -29,21 +22,8 @@ def info_letter_preprocess(image):
 
 
 class InfoHandler(ModuleBase):
-    """
-    Class to handle all kinds of message.
-    """
-
-    """
-    Info bar
-    """
-
     def info_bar_count(self):
-        """
-        Detect info bar by the blue lines on the top of it.
-
-        Returns:
-            int:
-        """
+        """按顶部蓝线识别信息条数量。"""
         image = self.image_crop(handler_assets.INFO_BAR_AREA, copy=False)
         line = cv2.reduce(image, 1, cv2.REDUCE_AVG)
         line = color_similarity_2d(line, color=(107, 158, 255))[:, 0]
@@ -81,15 +61,11 @@ class InfoHandler(ModuleBase):
             if self.handle_info_bar():
                 handled = True
 
-            # 结束。
             if timeout.reached():
                 break
 
         return handled
 
-    """
-    Popup info
-    """
     _popup_offset = (3, 30)
 
     def handle_popup_confirm(self, name="", offset=None, interval=2):
@@ -154,10 +130,6 @@ class InfoHandler(ModuleBase):
     _hot_fix_check_wait = Timer(6)
 
     def handle_urgent_commission(self):
-        """
-        Returns:
-            bool:
-        """
         appear = self.appear(handler_assets.GET_MISSION, offset=True, interval=2)
         if appear:
             logger.info("Get urgent commission")
@@ -232,38 +204,19 @@ class InfoHandler(ModuleBase):
         return False
 
     def handle_vote_popup(self):
-        """
-        Dismiss vote pop-ups.
-
-        Returns:
-            bool:
-        """
         # 投票弹窗已于 2023 年移除。
         return False
 
     def handle_get_skin(self):
-        """
-        Returns:
-            bool:
-        """
         return self.appear_then_click(handler_assets.GET_SKIN, offset=(20, 20), interval=2)
 
     def handle_get_items_ship(self):
-        """
-        2026.06.12 added different GET_ITEMS popup when getting ship
-
-        Returns:
-            bool:
-        """
+        """兼容 2026-06-12 起获得舰船时使用的独立 GET_ITEMS 弹窗。"""
         if self.appear(handler_assets.GET_ITEMS_SHIP_1, offset=5, interval=2):
             self.device.click(handler_assets.GET_ITEMS_SHIP_1)
             return True
 
         return False
-
-    """
-    Guild popup info
-    """
 
     def handle_guild_popup_confirm(self):
         if self.appear(handler_assets.GUILD_POPUP_CANCEL, offset=self._popup_offset) and self.appear(
@@ -283,10 +236,6 @@ class InfoHandler(ModuleBase):
 
         return False
 
-    """
-    Mission popup info
-    """
-
     def handle_mission_popup_go(self):
         if self.appear(handler_assets.MISSION_POPUP_ACK, offset=self._popup_offset) and self.appear(
             handler_assets.MISSION_POPUP_GO, offset=self._popup_offset, interval=2
@@ -305,9 +254,6 @@ class InfoHandler(ModuleBase):
 
         return False
 
-    """
-    Story
-    """
     story_popup_timeout = Timer(10, count=20)
     map_has_clear_mode = False  # 会在 fast_forward.py 中覆盖。
     map_is_threat_safe = False
@@ -318,10 +264,7 @@ class InfoHandler(ModuleBase):
     _story_option_confirm = Timer(0.3, count=0)
 
     def _story_option_buttons(self):
-        """
-        Returns:
-            list[Button]: List of story options, from upper to bottom. If no option found, return an empty list.
-        """
+        """返回从上到下的剧情选项按钮；未识别时返回空列表。"""
         # Area to detect the options, should include at least 3 options.
         story_option_area = (730, 188, 1140, 480)
         # Background color of the left part of the option.
@@ -359,10 +302,7 @@ class InfoHandler(ModuleBase):
         return buttons
 
     def _story_option_buttons_2(self):
-        """
-        Returns:
-            list[Button]: List of story options, from upper to bottom. If no option found, return an empty list.
-        """
+        """返回从上到下的新版剧情选项按钮；未识别时返回空列表。"""
         # Area to detect the options, should include at least 3 options.
         story_option_area = (330, 135, 980, 555)
         story_detect_area = (330, 135, 355, 555)
@@ -415,10 +355,7 @@ class InfoHandler(ModuleBase):
         return color_similar(color, (0, 0, 0), threshold=10)
 
     def story_skip(self):
-        """
-        2023.09.14 剧情选项改为屏幕中部的大块白色选项，
-        需要检查 STORY_SKIP_3，但实际点击旧的 STORY_SKIP。
-        """
+        """2023-09-14 起检查中部白色 STORY_SKIP_3，但仍点击旧 STORY_SKIP。"""
         if self._handle_story_popup_confirm():
             return True
         if self._handle_story_letters_only():
@@ -548,15 +485,7 @@ class InfoHandler(ModuleBase):
         self.ensure_no_story()
         return True
 
-    """
-    Game tips
-    """
-
     def handle_game_tips(self):
-        """
-        Returns:
-            bool: If handled
-        """
         if self.appear(handler_assets.GAME_TIPS, offset=(20, 20), interval=2) and self.image_color_count(
             handler_assets.GAME_TIPS.button, color=(40, 40, 40), threshold=240, count=50
         ):
@@ -575,16 +504,7 @@ class InfoHandler(ModuleBase):
 
         return False
 
-    """
-    Manjuu loading
-    """
-
     def manjuu_count(self):
-        """
-        detect manjuu count by template matching
-        Returns:
-            int: Number of manjuu
-        """
         image = self.image_crop(handler_assets.MANJUU_AREA, copy=False)
         # Manjuu 表情会拉伸和缩小，默认 0.85 无法稳定匹配。
         # 使用 0.8 匹配变形后的表情。
@@ -592,21 +512,12 @@ class InfoHandler(ModuleBase):
         return len(buttons)
 
     def wait_until_manjuu_disappear(self):
-        """
-        Wait until manjuu loading disappear.
-        """
         while 1:
             self.device.screenshot()
             if not self.manjuu_count():
                 break
 
     def handle_manjuu(self):
-        """
-        Handle manjuu loading.
-
-        Returns:
-            bool: If handled
-        """
         count = self.manjuu_count()
         if count > 2:
             logger.info(f"Manjuu count: {count}, waiting for manjuu to disappear")

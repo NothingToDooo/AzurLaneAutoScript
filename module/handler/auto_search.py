@@ -38,13 +38,7 @@ class AutoSearchHandler(EnemySearchingHandler):
         )
 
     def _fleet_preparation_get(self):
-        """
-        Returns:
-            int:
-                1 for formation
-                2 for meowfficers
-                3 for auto search setting
-        """
+        """返回侧栏索引：1 为编队，2 为指挥喵，3 为自律寻敌设置。"""
         current = 0
         total = 0
         sidebar = self._fleet_sidebar()
@@ -65,18 +59,7 @@ class AutoSearchHandler(EnemySearchingHandler):
         return current
 
     def fleet_preparation_sidebar_ensure(self, index):
-        """
-        Args:
-            index (int):
-                1 for formation
-                2 for meowfficers
-                3 for auto search setting
-
-        Returns:
-            bool: whether sidebar could be ensured
-                  at most 3 attempts are made before
-                  return False otherwise True
-        """
+        """确保切到 1～5 号侧栏；3 秒内未成功则返回 False。"""
         if index <= 0 or index > 5:
             logger.warning(f"Sidebar index cannot be ensured, {index}, limit 1 through 5 only")
             return False
@@ -95,13 +78,6 @@ class AutoSearchHandler(EnemySearchingHandler):
         return False
 
     def _auto_search_set_click(self, setting):
-        """
-        Args:
-            setting (str):
-
-        Returns:
-            bool: If selected to the correct option.
-        """
         active = []
 
         for index, button in enumerate(AUTO_SEARCH_SETTINGS):
@@ -125,18 +101,8 @@ class AutoSearchHandler(EnemySearchingHandler):
         return False
 
     def auto_search_setting_ensure(self, setting, skip_first_screenshot=True):
-        """
-        Args:
-            setting (str):
-                fleet1_mob_fleet2_boss, fleet1_boss_fleet2_mob,
-                fleet1_all_fleet2_standby, fleet1_standby_fleet2_all,
-                sub_auto_call, sub_standby
-            skip_first_screenshot (bool):
-
-        Returns:
-                bool: whether sidebar could be ensured
-                      at most 3 attempts are made before
-                      return False otherwise True
+        """setting 接受 fleet1_mob_fleet2_boss、fleet1_boss_fleet2_mob、
+        fleet1_all_fleet2_standby、fleet1_standby_fleet2_all、sub_auto_call、sub_standby。
         """
         counter = 0
         while 1:
@@ -159,30 +125,16 @@ class AutoSearchHandler(EnemySearchingHandler):
     _auto_search_menu_offset = (250, 30)
 
     def is_auto_search_running(self):
-        """
-        Returns:
-            bool:
-        """
         return self.appear(handler_assets.AUTO_SEARCH_MAP_OPTION_ON, offset=self._auto_search_offset) and self.appear(
             handler_assets.AUTO_SEARCH_MAP_OPTION_ON
         )
 
     def handle_auto_search_map_option(self):
-        """
-        Ensure auto search option in map is ON
-
-        Returns:
-            bool: If clicked
-        """
         return self.appear(
             handler_assets.AUTO_SEARCH_MAP_OPTION_OFF, offset=self._auto_search_offset
         ) and self.appear_then_click(handler_assets.AUTO_SEARCH_MAP_OPTION_OFF, interval=2)
 
     def is_in_auto_search_menu(self):
-        """
-        Returns:
-            bool:
-        """
         return handler_assets.AUTO_SEARCH_MENU_CONTINUE.match_luma(
             self.device.image, offset=self._auto_search_menu_offset
         )
@@ -193,10 +145,6 @@ class AutoSearchHandler(EnemySearchingHandler):
         )
 
     def handle_auto_search_exit(self):
-        """
-        Returns:
-            bool
-        """
         if self.appear(handler_assets.AUTO_SEARCH_MENU_EXIT, offset=self._auto_search_menu_offset, interval=2):
             # 这里仍是较粗糙的处理，先保留原行为。
             self.device.click(handler_assets.AUTO_SEARCH_MENU_EXIT)
@@ -205,11 +153,7 @@ class AutoSearchHandler(EnemySearchingHandler):
         return False
 
     def ensure_auto_search_exit(self, skip_first_screenshot=True):
-        """
-        Page:
-            in: is_in_auto_search_menu
-            out: page_campaign or page_event or page_sp
-        """
+        """页面状态：自律寻敌菜单 → 战役、活动或 SP 页面。"""
         if not self.is_in_auto_search_menu():
             return False
 
@@ -222,7 +166,6 @@ class AutoSearchHandler(EnemySearchingHandler):
             if self.handle_auto_search_exit():
                 continue
 
-            # 结束。
             if self.is_in_stage():
                 break
 

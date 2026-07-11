@@ -36,14 +36,6 @@ class GridSelection:
 
 class Map(Fleet):
     def clear_chosen_enemy(self, grid, expected=""):
-        """
-        Args:
-            grid (GridInfo):
-            expected (str):
-
-        Returns:
-            int: If cleared an enemy.
-        """
         logger.info(f"targetEnemyScale:{self.config.EnemyPriority_EnemyScaleBalanceWeight}")
         logger.info(f"Clear enemy: {grid}")
         expected = f"combat_{expected}" if expected else "combat"
@@ -59,20 +51,12 @@ class Map(Fleet):
         return self.battle_count >= battle_count
 
     def clear_chosen_mystery(self, grid):
-        """
-        Args:
-            grid (GridInfo):
-        """
         logger.info(f"Clear mystery: {grid}")
         self.show_fleet()
         self.goto(grid, expected="mystery")
         self.map.show_cost()
 
     def pick_up_ammo(self, grid=None):
-        """
-        Args:
-            grid (GridInfo):
-        """
         if grid is None:
             grid = self.map.select(may_ammo=True)
             if not grid:
@@ -160,14 +144,6 @@ class Map(Fleet):
         grids,
         selection=None,
     ):
-        """
-        Args:
-            grids (SelectedGrids):
-            selection (GridSelection):
-
-        Returns:
-            SelectedGrids:
-        """
         if selection is None:
             selection = GridSelection()
 
@@ -466,10 +442,6 @@ class Map(Fleet):
         return False
 
     def clear_siren(self, **kwargs):
-        """
-        Returns:
-            bool: True if clear an enemy.
-        """
         if not self.config.MAP_HAS_SIREN and not self.config.MAP_HAS_FORTRESS:
             return False
 
@@ -490,10 +462,6 @@ class Map(Fleet):
         return False
 
     def clear_any_enemy(self, **kwargs):
-        """
-        Returns:
-            bool: True if clear an enemy.
-        """
         grids = self.map.select(is_enemy=True, is_boss=False)
 
         if self.config.MAP_HAS_SIREN:
@@ -645,7 +613,7 @@ class Map(Fleet):
         if not self.config.FLEET_2 or not self.config.MAP_HAS_MOVABLE_ENEMY:
             return False
 
-        # When having 2 fleet
+        # 使用两支舰队时。
         for _n in range(20):
             if not self.map.select(is_siren=True):
                 return False

@@ -11,17 +11,9 @@ class CombatManual(ModuleBase):
         self.manual_executed = False
 
     def handle_combat_stand_still_in_the_middle(self, auto):
-        """
-        Args:
-            auto (str): Combat auto mode.
-
-        Returns:
-            bool: If executed
-        """
         if auto != "stand_still_in_the_middle":
             return False
-        # When switching from auto to manual, fleets are usually in the middle, no need to move down
-        # Otherwise fleet will be moved to the bottom
+        # 从自动切到手动时舰队通常已在中间；继续下移反而会移到最底部。
         if self.auto_mode_switched:
             return False
 
@@ -29,13 +21,6 @@ class CombatManual(ModuleBase):
         return True
 
     def handle_combat_stand_still_bottom_left(self, auto):
-        """
-        Args:
-            auto (str): Combat auto mode.
-
-        Returns:
-            bool: If executed
-        """
         if auto != "hide_in_bottom_left":
             return False
 
@@ -43,13 +28,6 @@ class CombatManual(ModuleBase):
         return True
 
     def handle_combat_stand_still_upper_left(self, auto):
-        """
-        Args:
-            auto (str): Combat auto mode.
-
-        Returns:
-            bool: If executed
-        """
         if auto != "hide_in_upper_left":
             return False
 
@@ -62,13 +40,6 @@ class CombatManual(ModuleBase):
         return self.appear_then_click(READY_TORPEDO, interval=10)
 
     def handle_combat_manual(self, auto):
-        """
-        Args:
-            auto (str): Combat auto mode.
-
-        Returns:
-            bool: If executed
-        """
         if self.manual_executed or not self.auto_mode_checked:
             return False
 

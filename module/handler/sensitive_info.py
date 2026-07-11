@@ -10,13 +10,6 @@ MASK_PLAYER = Mask("./assets/mask/MASK_PLAYER.png")
 
 
 def handle_sensitive_image(image):
-    """
-    Args:
-        image:
-
-    Returns:
-        np.ndarray:
-    """
     if PLAYER_CHECK.match(image, offset=(30, 30)):
         image = MASK_PLAYER.apply(image)
     if MAIN_GOTO_FLEET.match(image, offset=(30, 30)):
@@ -28,13 +21,6 @@ def handle_sensitive_image(image):
 
 
 def handle_sensitive_text(text):
-    """
-    Args:
-        text (str):
-
-    Returns:
-        str:
-    """
     text = re.sub(r'File "(.*?)AzurLaneAutoScript', 'File "C:\\\\fakepath\\\\AzurLaneAutoScript', text)
     return re.sub(r"\[Adb_binary\] (.*?)AzurLaneAutoScript", "[Adb_binary] C:\\\\fakepath\\\\AzurLaneAutoScript", text)
 

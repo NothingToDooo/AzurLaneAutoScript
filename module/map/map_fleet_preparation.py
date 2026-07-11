@@ -40,11 +40,6 @@ class FleetOperator:
     OFFSET = (-20, -80, 20, 5)
 
     def __init__(self, assets, main):
-        """
-        Args:
-            assets (FleetOperatorAssets): 舰队下拉控件的按钮资产。
-            main (InfoHandler): Alas module.
-        """
         self._choose = assets.choose
         self._advice = assets.advice
         self._bar = assets.bar
@@ -67,13 +62,7 @@ class FleetOperator:
         return str(self._choose)[:-7]
 
     def parse_fleet_bar(self, image):
-        """
-        Args:
-            image (np.ndarray): Image of dropdown menu.
-
-        Returns:
-            list: List of int. Currently selected fleet ranges from 1 to 6.
-        """
+        """返回下拉菜单中已选的舰队编号列表，编号范围为 1～6。"""
         width, height = image_size(image)
         result = []
         for index, y in enumerate(range(0, height, self.FLEET_BAR_SHAPE_Y + self.FLEET_BAR_MARGIN_Y)):
@@ -85,15 +74,7 @@ class FleetOperator:
         return result
 
     def get_button(self, index):
-        """
-        Convert fleet index to the Button object on dropdown menu.
-
-        Args:
-            index (int): Fleet index, 1-6.
-
-        Returns:
-            Button: Button instance.
-        """
+        """把 1～6 的舰队编号映射为下拉菜单按钮。"""
         bar = self._bar.button
         area = area_offset(
             area=(
@@ -107,29 +88,13 @@ class FleetOperator:
         return Button(area=(), color=(), button=area, name=f"{self._bar}_INDEX_{index}")
 
     def allow(self):
-        """
-        Returns:
-            bool: If current fleet is allow to be chosen.
-        """
         return self.main.appear(self._clear, offset=FleetOperator.OFFSET)
 
     def is_hard(self):
-        """
-        Returns:
-            bool: Whether to have a recommend. If so, this stage is a hard campaign.
-        """
         return self.main.appear(self._advice, offset=FleetOperator.OFFSET)
 
     def is_hard_satisfied(self):
-        """
-        Detect how many light orange lines are there.
-        Having lines means current map has stat limits and user has satisfied at least one of them,
-        so this is a hard map.
-
-        Returns:
-            bool: If current fleet satisfies hard restrictions.
-                Or None if this is not a hard mode
-        """
+        """以浅橙色限制线判断困难图是否达标；非困难模式返回 None。"""
         if not self.is_hard():
             return None
 
@@ -150,9 +115,6 @@ class FleetOperator:
             raise RequestHumanTakeover
 
     def clear(self, skip_first_screenshot=True):
-        """
-        Clear chosen fleet.
-        """
         main = self.main
         click_timer = Timer(3, count=6)
         while 1:
@@ -167,19 +129,14 @@ class FleetOperator:
 
             # 检查 CLEAR 按钮，避免在弹窗显示动画期间提前停止。
             if self.allow():
-                # 结束。
                 if not self.in_use():
                     break
 
-                # 点击。
                 if click_timer.reached():
                     main.device.click(self._clear)
                     click_timer.reset()
 
     def recommend(self, skip_first_screenshot=True):
-        """
-        Recommend fleet
-        """
         main = self.main
         click_timer = Timer(3, count=6)
         while 1:
@@ -188,19 +145,14 @@ class FleetOperator:
             else:
                 main.device.screenshot()
 
-            # 结束。
             if self.in_use():
                 break
 
-            # 点击。
             if click_timer.reached():
                 main.device.click(self._choose)
                 click_timer.reset()
 
     def open(self, skip_first_screenshot=True):
-        """
-        Activate dropdown menu for fleet selection.
-        """
         main = self.main
         click_timer = Timer(3, count=6)
         while 1:
@@ -209,19 +161,14 @@ class FleetOperator:
             else:
                 main.device.screenshot()
 
-            # 结束。
             if self.bar_opened():
                 break
 
-            # 点击。
             if click_timer.reached():
                 main.device.click(self._choose)
                 click_timer.reset()
 
     def close(self, skip_first_screenshot=True):
-        """
-        Deactivate dropdown menu for fleet selection.
-        """
         main = self.main
         click_timer = Timer(3, count=6)
         while 1:
@@ -230,23 +177,15 @@ class FleetOperator:
             else:
                 main.device.screenshot()
 
-            # 结束。
             if not self.bar_opened():
                 break
 
-            # 点击。
             if click_timer.reached():
                 main.device.click(self._choose)
                 click_timer.reset()
 
     def click(self, index, skip_first_screenshot=True):
-        """
-        Choose a fleet on dropdown menu, and dropdown deactivated.
-
-        Args:
-            index (int): Fleet index, 1-6.
-            skip_first_screenshot (bool):
-        """
+        """选择 1～6 号舰队并关闭下拉菜单。"""
         main = self.main
         button = self.get_button(index)
         click_timer = Timer(3, count=6)
@@ -257,28 +196,19 @@ class FleetOperator:
                 main.device.screenshot()
 
             if not self.bar_opened():
-                # 结束。
                 if self.in_use():
                     break
                 self.open()
 
-            # 点击。
             if click_timer.reached():
                 main.device.click(button)
                 click_timer.reset()
 
     def selected(self):
-        """
-        返回：
-            list：当前选择的舰队编号，范围为 1 到 6。
-        """
+        """返回当前选择的舰队编号列表，编号范围为 1～6。"""
         return self.parse_fleet_bar(self.main.image_crop(self._bar.button, copy=False))
 
     def in_use(self):
-        """
-        Returns:
-            bool: If has selected to any fleet.
-        """
         # 裁剪 FLEET_*_IN_USE 以避开 info_bar，也能避免额外处理 info_bar。
         image = self.main.image_crop(self._in_use.button, copy=False)
 
@@ -293,22 +223,13 @@ class FleetOperator:
         return np.std(gray.flatten(), ddof=1) > self.FLEET_IN_USE_STD
 
     def bar_opened(self):
-        """
-        Returns:
-            bool: If dropdown menu appears.
-        """
         # 检查列表区域最右列的亮度。
         luma = rgb2gray(self.main.image_crop(self._bar.button, copy=False))[:, -1]
         # FLEET_PREPARATION is about 146~155
         return np.sum(luma > 168) / luma.size > 0.5
 
     def ensure_to_be(self, index):
-        """
-        Set to a specific fleet.
-
-        Args:
-            index (int): Fleet index, 1-6.
-        """
+        """确保选中 1～6 号中的指定舰队。"""
         self.open()
         if index in self.selected():
             self.close()
@@ -423,14 +344,12 @@ class FleetPreparation(InfoHandler):
 
     def _prepare_surface_fleets(self, fleet_1, fleet_2):
         if self.config.Fleet_Fleet2:
-            # 使用两支舰队。
             # 强制重新设置一次。
             # AL 不再把编号较小的舰队当作第一舰队，因此舰队可能被反转。
             fleet_2.clear()
             fleet_1.ensure_to_be(self.config.Fleet_Fleet1)
             fleet_2.ensure_to_be(self.config.Fleet_Fleet2)
             return
-        # 不使用 fleet 2。
         if fleet_2.allow():
             fleet_2.clear()
         fleet_1.ensure_to_be(self.config.Fleet_Fleet1)
@@ -444,11 +363,6 @@ class FleetPreparation(InfoHandler):
             self.config.SUBMARINE = 0
 
     def fleet_preparation(self):
-        """Change fleets.
-
-        Returns:
-            bool: True if changed.
-        """
         logger.info(f"Using fleet: {[self.config.Fleet_Fleet1, self.config.Fleet_Fleet2, self.config.Submarine_Fleet]}")
         if self.map_fleet_checked:
             return False
@@ -462,10 +376,7 @@ class FleetPreparation(InfoHandler):
             self._handle_hard_mode_fleet_preparation(submarine)
             return False
 
-        # 潜艇。
         map_allow_submarine = self._prepare_submarine_fleet(fleet_2, submarine)
-
-        # 不需要，这可能会误清 FLEET_2；在地图配置里清理 FLEET_2。
 
         self._prepare_surface_fleets(fleet_1, fleet_2)
         self._finalize_submarine_fleet(submarine, map_allow_submarine)
