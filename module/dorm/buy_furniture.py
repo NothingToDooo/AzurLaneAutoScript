@@ -33,7 +33,7 @@ FURNITURE_BUY_BUTTON = {"all": dorm_assets.DORM_FURNITURE_BUY_ALL, "set": dorm_a
 
 
 class BuyFurniture(UI):
-    def enter_first_furniture_details_page(self, skip_first_screenshot=False):
+    def enter_first_furniture_details_page(self, *, skip_first_screenshot: bool = False) -> None:
         """从宿舍或家具商店进入第一个家具详情页。"""
         self.interval_clear(
             (
@@ -73,7 +73,7 @@ class BuyFurniture(UI):
                 self.interval_clear(DORM_CHECK)
                 continue
 
-    def furniture_shop_quit(self, skip_first_screenshot=False):
+    def furniture_shop_quit(self, *, skip_first_screenshot: bool = False) -> None:
         """从家具商店返回宿舍页。"""
         self.interval_clear(dorm_assets.DORM_FURNITURE_DETAILS_ENTER)
         while 1:
@@ -89,7 +89,7 @@ class BuyFurniture(UI):
                 self.device.click(dorm_assets.DORM_FURNITURE_SHOP_QUIT)
                 continue
 
-    def furniture_details_page_quit(self, skip_first_screenshot=False):
+    def furniture_details_page_quit(self, *, skip_first_screenshot: bool = False) -> None:
         """从家具详情返回家具商店。"""
         self.interval_clear(dorm_assets.DORM_FURNITURE_DETAILS_QUIT)
         while 1:
@@ -105,7 +105,7 @@ class BuyFurniture(UI):
                 self.device.click(dorm_assets.DORM_FURNITURE_DETAILS_QUIT)
                 continue
 
-    def furniture_payment_enter(self, buy_button: Button, skip_first_screenshot=False):
+    def furniture_payment_enter(self, buy_button: Button, *, skip_first_screenshot: bool = False) -> None:
         """从家具详情进入整套或全部购买的付款页。"""
         self.interval_clear(dorm_assets.DORM_FURNITURE_DETAILS_QUIT)
         while 1:
@@ -120,7 +120,7 @@ class BuyFurniture(UI):
             if self.appear(dorm_assets.DORM_FURNITURE_DETAILS_QUIT, interval=3):
                 self.device.click(buy_button)
 
-    def buy_furniture_confirm(self, skip_first_screenshot=False):
+    def buy_furniture_confirm(self, *, skip_first_screenshot: bool = False) -> None:
         """从付款页确认购买并回到家具详情。"""
         self.interval_clear(dorm_assets.DORM_FURNITURE_BUY_CONFIRM)
         while 1:
@@ -135,13 +135,13 @@ class BuyFurniture(UI):
             if self.appear(dorm_assets.DORM_FURNITURE_BUY_CONFIRM, offset=(20, 20), interval=3):
                 self.device.click(dorm_assets.DORM_FURNITURE_BUY_CONFIRM)
 
-    def buy_furniture_once(self, buy_option: str):
+    def buy_furniture_once(self, buy_option: str) -> bool:
         """在家具详情按 all 或 set 购买，返回家具币是否足够。"""
         buy_button: Button = FURNITURE_BUY_BUTTON[buy_option]
-        coin = OCR_FURNITURE_COIN.ocr(self.device.image)
+        coin = OCR_FURNITURE_COIN.ocr_single(self.device.image)
 
         self.furniture_payment_enter(buy_button, skip_first_screenshot=True)
-        price = OCR_FURNITURE_PRICE.ocr(self.device.image)
+        price = OCR_FURNITURE_PRICE.ocr_single(self.device.image)
 
         # 购买成功或失败都会弹窗并回到详情页，通过家具币和价格比较判断结果。
         if coin >= price > 0:
@@ -154,7 +154,7 @@ class BuyFurniture(UI):
         self.furniture_details_page_quit(skip_first_screenshot=True)
         return buy_successful
 
-    def _buy_furniture_run(self):
+    def _buy_furniture_run(self) -> bool:
         """购买第一个带倒计时的限时家具，返回是否成功。"""
         self.enter_first_furniture_details_page()
         if self.match_template_color(dorm_assets.DORM_FURNITURE_COUNTDOWN, offset=(20, 20)):
@@ -167,7 +167,7 @@ class BuyFurniture(UI):
         logger.info("No time-limited furniture found")
         return False
 
-    def buy_furniture_run(self):
+    def buy_furniture_run(self) -> None:
         """从家具商店连续购买限时家具，最后返回宿舍页。"""
         logger.info("Buy furniture run")
         while 1:
@@ -179,7 +179,7 @@ class BuyFurniture(UI):
         self.furniture_shop_quit(skip_first_screenshot=True)
         self.config.BuyFurniture_LastRun = datetime.now().replace(microsecond=0)
 
-    def run(self):
+    def run(self) -> None:
         logger.attr("BuyFurniture_LastRun", self.config.BuyFurniture_LastRun)
         logger.attr("CHECK_INTERVAL", CHECK_INTERVAL)
 
