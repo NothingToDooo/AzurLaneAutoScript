@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal, TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 from module.base.timer import Timer
 from module.exception import ScriptError
@@ -94,12 +94,8 @@ class Switch:
         message = INVALID_SWITCH_STATE_TEMPLATE.format(name=self.name, state=state)
         raise ScriptError(message)
 
-    def handle_additional(self, _main: ModuleBase) -> bool:
+    def handle_additional(self, _main: ModuleBase) -> bool:  # noqa: PLR6301
         """额外弹窗处理钩子；默认表示未处理。"""
-        return self._default_handle_additional(_main)
-
-    @staticmethod
-    def _default_handle_additional(_main: ModuleBase) -> Literal[False]:
         return False
 
     def set(

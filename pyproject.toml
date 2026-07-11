@@ -48,20 +48,12 @@ preview = true
 explicit-preview-rules = false
 select = ["ALL"]
 ignore = [
-    "ANN001",
-    "ANN002",
-    "ANN003",
-    "ANN201",
-    "ANN202",
-    "ANN204",
-    "ANN205",
     "COM812",
     "CPY",
     "D",
     "DOC",
     "DTZ001",
     "DTZ005",
-    "FBT002",
     "FURB140",
     "FURB189",
     "INP",
@@ -70,7 +62,6 @@ ignore = [
     "PLR0904",
     "PLR2004",
     "PLR6201",
-    "PLR6301",
     "RUF001",
     "RUF002",
     "RUF003",
