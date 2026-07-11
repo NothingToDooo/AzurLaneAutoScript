@@ -67,8 +67,7 @@ class MapEventHandler(EnemySearchingHandler):
 
     def handle_ash_popup(self):
         name = "ASH"
-        # 2021.12.09
-        # Ash 弹窗不再显示红字，改用 `Ashes Coordinates` 文字识别。
+        # 2021-12-09 起 Ash 弹窗不再显示红字，改用 `Ashes Coordinates` 文字识别。
         if (
             self.appear(POPUP_CONFIRM, offset=self._popup_offset)
             and self.appear(POPUP_CANCEL, offset=self._popup_offset, interval=2)

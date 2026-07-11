@@ -5,7 +5,7 @@ from module.os.map import OSMap
 class OpsiHazard1Leveling(OSMap):
     def os_hazard1_leveling(self):
         logger.hr("OS hazard 1 leveling", level=1)
-        # Without these enabled, CL1 gains 0 profits
+        # 未启用这些配置时，CL1 没有收益。
         self.config.override(
             OpsiGeneral_DoRandomMapEvent=True,
             OpsiGeneral_AkashiShopFilter="ActionPoint",
@@ -13,7 +13,7 @@ class OpsiHazard1Leveling(OSMap):
         if not self.config.is_task_enabled("OpsiMeowfficerFarming"):
             self.config.cross_set(keys="OpsiMeowfficerFarming.Scheduler.Enable", value=True)
         while True:
-            # Limited action point preserve of hazard 1 to 200
+            # 侵蚀 1 刷图最多保留 200 行动力。
             self.config.OS_ACTION_POINT_PRESERVE = 200
             if (
                 self.config.is_task_enabled("OpsiAshBeacon")
@@ -34,8 +34,7 @@ class OpsiHazard1Leveling(OSMap):
 
             self.get_current_zone()
 
-            # Preset action point to 70
-            # When running CL1 oil is for running CL1, not meowfficer farming
+            # CL1 启动行动力固定为 70；此时石油用于 CL1，而非猫窝刷图。
             keep_current_ap = True
             if self.config.OpsiGeneral_BuyActionPointLimit > 0:
                 keep_current_ap = False

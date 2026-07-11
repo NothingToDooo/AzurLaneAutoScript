@@ -379,9 +379,6 @@ class DockScanner(ShipScanner):
 
     def multi_scan(self, image):
         """用舰船卡片间低方差空隙的位移估算滚动偏移，再同步移动扫描网格。"""
-        # Roughly Adjust
-        # After graying the image, calculate the standard deviation and take the part below the threshold
-        # Those parts should present multiple discontinuous subsequences, which here called gap_seq
         scan_image = crop(image, self.scan_zone, copy=False)
 
         def find_bound(image):
@@ -398,21 +395,10 @@ class DockScanner(ShipScanner):
 
         bounds = [find_bound(crop(scan_image, button.area, copy=False)) for button in self.scan_grids.buttons]
         card_bottom = (np.mean(bounds, axis=0) + 0.5).astype(np.uint8)
-        # Calculate the bound of gap_seq, usually we get 3 endpoints
-        # The offset is the difference between the two groups of endpoints
-        # Notice the example above, the first endpoint is the closest to the boundary, so we use its difference.
         offset_rough = card_bottom[0] - self.card_bottom[0]
         self.card_bottom.clear()
         self.card_bottom.extend(card_bottom)
 
-        # Preciously Adjust
-        # The adjustment here is based on CARD_RARITY_GRIDS, whose height is 5
-        # After binarization, the standard deviation of its surroundings is very small
-        # A correct offset will place CARD_RARITY_GRIDS on the first 5 lines
-        # Now do what similar to rough adjustment can get a precious offset
-        # !!!!
-        # Pratice shows that, the above method seems to have a poor effect
-        # Further work is needed.
         offset = offset_rough
         self.move(offset)
 

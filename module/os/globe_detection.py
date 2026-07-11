@@ -32,7 +32,6 @@ class GlobeDetection:
 
         logger.info("Loading OS globe map")
 
-        # Load GLOBE_MAP
         image = load_image(GLOBE_MAP)
         image = self.find_peaks(image, para=self.config.OS_GLOBE_FIND_PEAKS_PARAMETERS)
         pad = self.config.OS_GLOBE_IMAGE_PAD
@@ -41,7 +40,6 @@ class GlobeDetection:
         image = cv2.resize(image, None, fx=self.config.OS_GLOBE_IMAGE_RESIZE, fy=self.config.OS_GLOBE_IMAGE_RESIZE)
         self.globe = image
 
-        # Load homography
         backup = self.config.temporary(
             HOMO_STORAGE=self.config.OS_GLOBE_HOMO_STORAGE, DETECTING_AREA=self.config.OS_GLOBE_DETECTING_AREA
         )

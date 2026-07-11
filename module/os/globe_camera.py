@@ -118,7 +118,6 @@ class GlobeCamera(GlobeOperation, ZoneManager):
 
             self.globe_update()
 
-            # End
             if np.linalg.norm(np.subtract(self.globe_camera, prev)) < 10:
                 if confirm.reached():
                     logger.info("Globe map stabled")
@@ -195,21 +194,18 @@ class GlobeCamera(GlobeOperation, ZoneManager):
                 self.globe_update()
                 continue
 
-            # Insight
             self.globe_in_sight(zone)
-            # Click zone
             button = self.zone_to_button(zone)
             self.device.click(button)
-            # Wait until zone pinned
             if self.globe_wait_until_zone_pinned(zone):
                 break
 
     def _globe_predict_stronghold(self, zone):
         """调用前必须先用 globe_in_sight 把海域移入视野。"""
         zone = self.name_to_zone(zone)
-        # The center of red whirlpool, on 2D map.
+        # 二维地图上的红色漩涡中心。
         location = np.add(zone.location, (-9.5, -12.5))
-        # Area around the center, on 2D map.
+        # 二维地图上的中心邻域。
         location = [np.subtract(location, (4, 4)), np.add(location, (4, 4))]
         # 取屏幕上的中心邻域。
         screen = self.globe2screen(location).flatten().round()
@@ -260,7 +256,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
         region = self.camera_to_zone(self.globe_camera).region
         order = [1, 2, 4, 3]
         if region not in order:
-            # Camera may focus on region 5, select the nearest non-region-5 zone
+            # 镜头可能聚焦区域 5，此时选择最近的非区域 5 海域。
             zones = (
                 self.zones.delete(self.zones.select(region=5))
                 .delete(self.zones.select(is_port=True))

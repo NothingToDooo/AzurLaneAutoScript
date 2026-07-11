@@ -25,10 +25,6 @@ class AshBeaconFinished(Exception):
 
 class AshCombat(Combat):
     def handle_battle_status(self):
-        """
-        Returns:
-            bool:
-        """
         if self.is_combat_executing():
             return False
         if self.appear(ash_assets.BATTLE_STATUS, offset=(120, 20), interval=self.battle_status_click_interval):
@@ -41,10 +37,7 @@ class AshCombat(Combat):
         return bool(super().handle_battle_status())
 
     def handle_exp_info(self):
-        """
-        META combats don't drop EXP so no handle_exp_info
-        Random background of BATTLE_STATUS may trigger EXP_INFO_B
-        """
+        """META 战斗不掉落经验；随机结算背景可能误触发经验识别，因此不处理。"""
         return False
 
     def handle_battle_preparation(self):
@@ -76,10 +69,7 @@ class OSAsh(UI, MapEventHandler):
     _ash_fully_collected = False
 
     def ash_collect_status(self):
-        """
-        Returns:
-            int: 0 to 100.
-        """
+        """返回当前信标收集进度，范围为 0 至 100。"""
         if self._ash_fully_collected:
             return 0
         if self.image_color_count(ash_assets.ASH_COLLECT_STATUS, color=(235, 235, 235), threshold=221, count=20):
@@ -116,20 +106,12 @@ class OSAsh(UI, MapEventHandler):
         return max(status, 0)
 
     def _support_call_ash_beacon_task(self):
-        # AshBeacon 下次运行时间。
         next_run = self.config.cross_get(keys="OpsiAshBeacon.Scheduler.NextRun", default=DEFAULT_TIME)
         # 距离下次执行还有 30 分钟以上时，可以支援调用。
         return next_run - datetime.now() > timedelta(minutes=30)
 
     def handle_ash_beacon_attack(self):
-        """
-        Returns:
-            bool: If attacked.
-
-        Pages:
-            in: is_in_map
-            out: is_in_map
-        """
+        """在区域地图处理信标攻击；结束后仍在区域地图，返回是否发起攻击。"""
         if self.ash_collect_status() >= 100 and self._support_call_ash_beacon_task():
             self.config.task_call(task="OpsiAshBeacon")
             return True

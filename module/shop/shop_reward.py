@@ -18,7 +18,6 @@ class RewardShop(ShopUI):
         self.config.task_delay(server_update=True)
 
     def run_once(self):
-        # Munitions shops
         self.ui_goto_shop()
         self.device.click_record_clear()
         self.shop_nav_250814.set(NAV_GENERAL, main=self)
@@ -30,7 +29,6 @@ class RewardShop(ShopUI):
         self.shop_tab_250814.set(TAB_GUILD, main=self)
         GuildShop_250814(self.config, self.device).run()
 
-        # core limited, core monthly, medal, prototype
         self.device.click_record_clear()
         self.shop_nav_250814.set(NAV_MONTHLY, main=self)
         self.shop_tab_250814.set(TAB_CORE_MONTHLY, main=self)

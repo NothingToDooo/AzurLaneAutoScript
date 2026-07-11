@@ -23,7 +23,7 @@ CARD_RARITY_COLORS = {
     "R": (106, 195, 248),
     "SR": (151, 134, 254),
     "SSR": (248, 223, 107),
-    # Not support marriage cards.
+    # 不支持婚舰卡片。
 }
 
 RETIRE_CONFIRM_SCROLL = Scroll(
@@ -37,7 +37,6 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
     _unable_to_enhance = False
     _have_kept_cv = True
 
-    # From MapOperation
     map_cat_attack_timer = Timer(2)
 
     @property
@@ -45,14 +44,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         return self.config.is_task_enabled("GemsFarming")
 
     def _retirement_choose(self, amount=10, target_rarity=("N",)):
-        """
-        Args:
-            amount (int): Amount of cards retire. 0 to 10.
-            target_rarity (tuple(str)): Card rarity. N, R, SR, SSR.
-
-        Returns:
-            int: Amount of cards have retired.
-        """
+        """选择 0 至 10 张指定稀有度舰船，并返回实际选择数。"""
         cards = []
         rarity = []
         for x, y, button in CARD_RARITY_GRIDS.generate():
@@ -163,13 +155,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         return True
 
     def _retirement_confirm(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: IN_RETIREMENT_CHECK, and also
-                SHIP_CONFIRM_2 if using one_click_retire
-                SHIP_CONFIRM if using old_retire
-            out: IN_RETIREMENT_CHECK
-        """
+        """从一键或旧版退役确认弹窗完成退役，结束于退役检查页。"""
         logger.info("Retirement confirm")
         executed = False
         self._clear_retirement_confirm_intervals()
@@ -180,10 +166,8 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
             else:
                 self.device.screenshot()
 
-            # 等待退役确认流程完成。
             if self._retirement_confirm_finished(timeout, executed):
                 break
-            # 按显示层级处理确认按钮。
             if self._handle_retirement_sr_ssr_confirm():
                 continue
             if self._handle_ship_retirement_confirm():
@@ -223,13 +207,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         return rarity
 
     def _retire_wait_slow_retire(self, skip_first_screenshot=True):
-        """
-        SHIP_CONFIRM_2 may slow to appear on slow devices or large dock, wait it
-        If SHIP_CONFIRM_2 can't be waited within 60s, GameStuckError will be raised
-
-        Returns:
-            bool: If SHIP_CONFIRM_2 appears
-        """
+        """等待慢设备或大船坞延迟出现的确认弹窗；60 秒超时会抛出 GameStuckError。"""
         logger.info("Wait slow retire")
         self.device.click_record_clear()
         self.device.stuck_record_clear()
@@ -239,7 +217,6 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
             else:
                 self.device.screenshot()
 
-            # End
             if self.appear(retire_assets.SHIP_CONFIRM_2, offset=(30, 30)):
                 return True
         return False
@@ -251,7 +228,6 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
                 skip_first_screenshot = False
             else:
                 self.device.screenshot()
-            # 已进入确认弹窗。
             if self.appear(retire_assets.SHIP_CONFIRM_2, offset=(30, 30)):
                 return True, 0
             if self.info_bar_count():
@@ -274,7 +250,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
     def retire_ships_one_click(self):
         logger.hr("Retirement")
         logger.info("Using one click retirement.")
-        # No need to wait, one-click-retire doesn't need to check dock
+        # 一键退役无需等待船坞检查完成。
         self.dock_favourite_set(wait_loading=False)
         self.dock_sort_method_dsc_set(wait_loading=False)
         total = 0
@@ -293,14 +269,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         return total
 
     def retire_ships_old(self, amount=None, rarity=None):
-        """
-        Args:
-            amount (int): Amount of cards retire. 0 to 2000.
-            rarity (tuple(str)): Card rarity. N, R, SR, SSR.
-
-        Returns:
-            int: Total retired.
-        """
+        """按指定稀有度退役 amount 艘舰船并返回实际总数；amount=None 时使用配置值。"""
         if amount is None:
             amount = self._retire_amount
         if rarity is None:
@@ -308,7 +277,6 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         logger.hr("Retirement")
         logger.info(f"Amount={amount}. Rarity={rarity}")
 
-        # transfer N R SR SSR to filter name
         correspond_name = {"N": "common", "R": "rare", "SR": "elite", "SSR": "super_rare"}
         rarity_filters = [correspond_name[i] for i in rarity]
         self.dock_sort_method_dsc_set(enable=False, wait_loading=False)
@@ -345,11 +313,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         return total
 
     def retire_gems_farming_flagships(self, keep_one=True) -> int:
-        """
-        Retire abandoned flagships of GemsFarming.
-        Common CV whose level > 1, fleet is none and status is free
-        will be regarded as targets.
-        """
+        """退役 GemsFarming 遗留的普通航母：等级大于 1、未编队且空闲。"""
         logger.info("Retire abandoned flagships of GemsFarming")
 
         gems_farming_enable: bool = self.config.is_task_enabled("GemsFarming")
@@ -378,7 +342,6 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
             self.handle_info_bar()
             ships = scanner.scan(self.device.image)
             if not ships:
-                # exit if nothing can be retired
                 break
             if keep_one:
                 if len(ships) < 2:
@@ -394,12 +357,12 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
 
             self._retirement_confirm()
 
-            # Quick exit if there's only a few CV to retire
+            # 不足十艘说明本页已经扫完，可以直接退出。
             if len(ships) < 10:
                 break
 
         self._have_kept_cv = _
-        # No need to wait, retire finished, just about to exit
+        # 退役已完成且即将退出，无需等待筛选加载。
         self.dock_filter_set(wait_loading=False)
 
         return total
@@ -464,10 +427,6 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         return True
 
     def handle_retirement(self):
-        """
-        Returns:
-            bool: If retired.
-        """
         # 2025.05.29 进入船坞时会弹出换装提示。
         if self.handle_game_tips():
             return True
@@ -532,17 +491,7 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         return total
 
     def _retire_handler(self, mode=None):
-        """
-        Args:
-            mode (str): `one_click_retire` or `old_retire`
-
-        Returns:
-            int: Amount of retired ships
-
-        Pages:
-            in: IN_RETIREMENT_CHECK
-            out: the page before retirement popup
-        """
+        """以 one_click_retire 或 old_retire 模式退役，返回数量并恢复到弹窗前页面。"""
         if mode is None:
             mode = self.config.Retirement_RetireMode
 
@@ -560,11 +509,6 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         return total
 
     def _retire_select_one(self, button, skip_first_screenshot=True):
-        """
-        Args:
-            button (Button): Ship button to select
-            skip_first_screenshot:
-        """
         count = 0
         retire_assets.RETIRE_COIN.load_color(self.device.image)
         retire_assets.RETIRE_COIN.mark_match_initialized()
@@ -590,10 +534,6 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         return False
 
     def retirement_get_common_rarity_cv_in_page(self):
-        """
-        Returns:
-            Button:
-        """
         if self.config.GemsFarming_CommonCV == "any":
             for common_cv_name in ["BOGUE", "HERMES", "LANGLEY", "RANGER"]:
                 template = getattr(retire_assets, f"TEMPLATE_{common_cv_name}")
@@ -622,13 +562,6 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         return None
 
     def retirement_get_common_rarity_cv(self, skip_first_screenshot=False):
-        """
-        Args:
-            skip_first_screenshot:
-
-        Returns:
-            Button: Button to click to remove ship from retire list
-        """
         swipe_count = 0
         disappear_confirm = Timer(2, count=6)
         top_checked = False
@@ -638,12 +571,10 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
             else:
                 self.device.screenshot()
 
-            # Try to get CV
             button = self.retirement_get_common_rarity_cv_in_page()
             if button is not None:
                 return button
 
-            # Wait scroll bar
             if RETIRE_CONFIRM_SCROLL.appear(main=self):
                 disappear_confirm.clear()
             else:
@@ -661,7 +592,6 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
             if RETIRE_CONFIRM_SCROLL.at_top(main=self):
                 logger.info("Scroll bar reached top, stop")
                 break
-            # 滑动到上一页。
             if swipe_count >= 7:
                 logger.info("Reached maximum swipes to find common CV")
                 break
@@ -671,9 +601,6 @@ class Retirement(Enhancement, QuickRetireSettingHandler):
         return button
 
     def keep_one_common_cv(self):
-        """
-        保留一个普通航母用于任务需求。
-        """
         logger.info("Keep one common CV")
         button = self.retirement_get_common_rarity_cv()
         if button is not None:

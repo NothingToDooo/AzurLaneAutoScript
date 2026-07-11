@@ -6,10 +6,7 @@ from module.os.map import OSMap
 
 class OpsiAbyssal(OSMap):
     def delay_abyssal(self, result=True):
-        """
-        Args:
-            result(bool): If still have obscure coordinates.
-        """
+        """根据是否仍有深渊坐标安排下次运行。"""
         if get_os_reset_remain() == 0:
             logger.info("Just less than 1 day to OpSi reset, delay 2.5 hours")
             self.config.task_delay(minute=150, server_update=True)
@@ -19,15 +16,9 @@ class OpsiAbyssal(OSMap):
             self.config.task_stop()
 
     def clear_abyssal(self):
-        """
-        Get one abyssal logger in storage,
-        attack abyssal boss,
-        repair fleets in port.
+        """使用一个深渊坐标、击败首领并维修舰队。
 
-        Raises:
-            ActionPointLimit:
-            TaskEnd: If no more abyssal loggers.
-            RequestHumanTakeover: If unable to clear boss, fleets exhausted.
+        行动力不足时抛出 ActionPointLimit；坐标耗尽时抛出 TaskEnd；舰队耗尽仍未击败时抛出 RequestHumanTakeover。
         """
         logger.hr("OS clear abyssal", level=1)
         self.cl1_ap_preserve()
