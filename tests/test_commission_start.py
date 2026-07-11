@@ -1,4 +1,5 @@
-from typing import ClassVar, TypeVar
+from datetime import timedelta
+from typing import TYPE_CHECKING, ClassVar, TypeVar
 
 import numpy as np
 import pytest
@@ -6,7 +7,12 @@ import pytest
 from module.commission import assets as commission_assets
 from module.commission import commission as commission_module
 from module.commission.commission import RewardCommission
+from module.commission.project import Commission
 from module.exception import GameStuckError
+from module.map.map_grids import SelectedGrids
+
+if TYPE_CHECKING:
+    from module.base.type_alias import Area
 
 _T = TypeVar("_T")
 
@@ -50,32 +56,21 @@ class _Device:
         self.screenshot_count += 1
 
 
-class _Commission:
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.button = object()
-
-    def __eq__(self, other: object) -> bool:
-        return isinstance(other, _Commission) and self.name == other.name
-
-    def __hash__(self) -> int:
-        return hash(self.name)
-
-
-class _Selection:
-    def __init__(self, commissions: list[_Commission]) -> None:
-        self.commissions = commissions
-        self.calls: list[str] = []
-
-    @property
-    def count(self) -> int:
-        return len(self.commissions)
-
-    def __getitem__(self, index: int) -> _Commission:
-        return self.commissions[index]
-
-    def call(self, name: str) -> None:
-        self.calls.append(name)
+def _commission(name: str) -> Commission:
+    commission = Commission.__new__(Commission)
+    commission.name = name
+    commission.button = commission_assets.COMMISSION_ADVICE
+    commission.valid = True
+    commission.genre = f"daily_{name}"
+    commission.status = "pending"
+    commission.category_str = "daily"
+    commission.genre_str = name
+    commission.duration = timedelta(hours=1)
+    commission.expire = timedelta()
+    commission.repeat_count = 1
+    commission.suffix_image = None
+    commission.suffix_hash = ""
+    return commission
 
 
 class _CommissionUI(RewardCommission):
@@ -88,9 +83,9 @@ class _CommissionUI(RewardCommission):
         self.match_results: dict[str, list[bool]] = {}
         self.appear_results: dict[str, list[bool]] = {}
         self.popup_results: list[bool] = []
-        self.detect_results: list[_Selection] = []
+        self.detect_results: list[SelectedGrids[Commission]] = []
 
-    def start_click(self, comm: _Commission, *, is_urgent: bool = False) -> bool:
+    def start_click(self, comm: Commission, *, is_urgent: bool = False) -> bool:
         return self._commission_start_click(comm, is_urgent=is_urgent)
 
     def _next_result(self, results: list[_T], *, default: _T) -> _T:
@@ -123,8 +118,19 @@ class _CommissionUI(RewardCommission):
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def commission_detect(self, *_args: object, **kwargs: object) -> _Selection:
-        self.calls.append(("commission_detect", kwargs))
+    def commission_detect(
+        self,
+        trial: int = 1,
+        area: Area | None = None,
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> SelectedGrids[Commission]:
+        self.calls.append(
+            (
+                "commission_detect",
+                {"trial": trial, "area": area, "skip_first_screenshot": skip_first_screenshot},
+            )
+        )
         return self.detect_results.pop(0)
 
 
@@ -137,7 +143,7 @@ def _patch_timer(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_commission_start_click_uses_start_button() -> None:
     ui = _CommissionUI()
-    comm = _Commission("daily")
+    comm = _commission("daily")
     ui.info_bar_results = [False, True]
     ui.match_results[button_key(commission_assets.COMMISSION_START)] = [True]
 
@@ -150,9 +156,9 @@ def test_commission_start_click_uses_start_button() -> None:
 
 def test_commission_start_click_returns_false_for_wrong_advice() -> None:
     ui = _CommissionUI()
-    comm = _Commission("target")
+    comm = _commission("target")
     ui.appear_results[button_key(commission_assets.COMMISSION_ADVICE)] = [True]
-    ui.detect_results = [_Selection([_Commission("other")])]
+    ui.detect_results = [SelectedGrids([_commission("other")])]
 
     result = ui.start_click(comm)
 
@@ -162,7 +168,7 @@ def test_commission_start_click_returns_false_for_wrong_advice() -> None:
 
 def test_commission_start_click_enters_commission_when_timer_reaches() -> None:
     ui = _CommissionUI()
-    comm = _Commission("daily")
+    comm = _commission("daily")
     ui.info_bar_results = [False, True]
     _Timer.reached_results = {0: [True]}
 
@@ -175,9 +181,9 @@ def test_commission_start_click_enters_commission_when_timer_reaches() -> None:
 
 def test_commission_start_click_raises_on_flashing_advice() -> None:
     ui = _CommissionUI()
-    comm = _Commission("daily")
+    comm = _commission("daily")
     ui.appear_results[button_key(commission_assets.COMMISSION_ADVICE)] = [True, True, True]
-    ui.detect_results = [_Selection([]), _Selection([]), _Selection([])]
+    ui.detect_results = [SelectedGrids([]), SelectedGrids([]), SelectedGrids([])]
 
     with pytest.raises(GameStuckError):
         ui.start_click(comm)
