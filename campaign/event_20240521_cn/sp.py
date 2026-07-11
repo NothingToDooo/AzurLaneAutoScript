@@ -140,7 +140,7 @@ class Campaign(CampaignBase):
 
     is_left = False
 
-    def map_data_init(self, map_):
+    def map_data_init(self, map_: CampaignMap | None) -> None:
         super().map_data_init(map_)
         B7.is_siren = True
         C8.is_siren = True

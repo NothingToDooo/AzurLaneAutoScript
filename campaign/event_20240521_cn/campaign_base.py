@@ -4,7 +4,7 @@ from module.template.assets import TEMPLATE_ENEMY_BOSS
 
 
 class CurrentFleetGrid(Grid):
-    def predict_current_fleet(self):
+    def predict_current_fleet(self) -> bool:
         count = self.relative_hsv_count(area=(-0.5, -3.5, 0.5, -2.5), h=(141 - 3, 141 + 10), shape=(50, 50))
         # 该活动不做模板匹配，只用当前舰队颜色阈值判断。
         return count >= 600
@@ -12,7 +12,7 @@ class CurrentFleetGrid(Grid):
 
 class SirenIconGrid(Grid):
     # Event grids with sirens having small boss icons
-    def predict_enemy_genre(self):
+    def predict_enemy_genre(self) -> str | None:
         if self.enemy_scale:
             return ""
 
@@ -23,7 +23,7 @@ class SirenIconGrid(Grid):
 
         return super().predict_enemy_genre()
 
-    def predict_boss(self):
+    def predict_boss(self) -> bool:
         if self.enemy_genre == "Siren_Siren":
             return False
         return super().predict_boss()

@@ -1,9 +1,12 @@
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from campaign.event_20240521_cn.campaign_base import CurrentFleetGrid
 from module.campaign.campaign_base import CampaignBase
 from module.logger import logger
 from module.map.map_base import CampaignMap
+
+if TYPE_CHECKING:
+    from module.map.fleet import FleetLocation
 
 MAP = CampaignMap("C1")
 MAP.shape = "I9"
@@ -161,21 +164,22 @@ class Campaign(CampaignBase):
     bored_visited_g3 = False
     bored_visited_h2 = False
 
-    def find_current_fleet(self):
+    def find_current_fleet(self) -> FleetLocation:
         logger.hr("Find current fleet")
         logger.info("No fleet scan, assume fleet_1 at D5")
         self.fleet_1 = D5.location
         if self.config.fleet_2:
             logger.info("No fleet scan, assume fleet_2 at F5")
             self.fleet_2 = F5.location
+        return self.fleet_current
 
-    def map_init(self, map_):
+    def map_init(self, map_: CampaignMap | None) -> None:
         super().map_init(map_)
         self.bored_visited_g3 = False
         self.bored_visited_h2 = False
         self.config.fleet_boss = 1
 
-    def bored_visit(self):
+    def bored_visit(self) -> bool:
         if not self.bored_visited_g3:
             self.bored_visited_g3 = True
             if self.clear_chosen_enemy(G3):
@@ -186,7 +190,7 @@ class Campaign(CampaignBase):
                 return True
         return False
 
-    def battle_function(self):
+    def battle_function(self) -> bool:
         if self.battle_count == 0:
             return self.battle_0()
 
