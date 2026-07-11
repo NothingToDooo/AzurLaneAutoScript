@@ -64,14 +64,6 @@ class UI(InfoHandler):
     ui_current: Page
 
     def ui_page_appear(self, page, offset=(30, 30), interval=0):
-        """
-        判断指定页面是否出现在当前截图中。
-
-        Args:
-            page (Page):
-            offset:
-            interval:
-        """
         if page == page_main:
             return self.appear(page_main_white.check_button, offset=offset, interval=interval) or self.appear(
                 page_main.check_button, offset=(5, 5), interval=interval
@@ -82,15 +74,6 @@ class UI(InfoHandler):
         return self.ui_page_appear(page_main, offset=offset, interval=interval)
 
     def ui_main_appear_then_click(self, page, offset=(30, 30), interval=3):
-        """
-        Args:
-            page: Destination page
-            offset:
-            interval:
-
-        Returns:
-            bool: If clicked
-        """
         if self.appear(page_main.check_button, offset=offset, interval=interval):
             button = page_main.links[page]
             self.device.click(button)
@@ -113,13 +96,7 @@ class UI(InfoHandler):
         options=None,
         **settings,
     ):
-        """
-        Args:
-            click_button (Button):
-            check_button (Button, callable):
-            options (UiClickOptions):
-            **settings: 旧调用形状，进入函数后会转为 UiClickOptions。
-        """
+        """check_button 可为 Button 或回调；settings 是会转为 UiClickOptions 的旧调用形状。"""
         options = _ui_click_options(options, settings)
         logger.hr("UI click")
         appear_button = options.appear_button if options.appear_button is not None else click_button
@@ -151,16 +128,7 @@ class UI(InfoHandler):
                 continue
 
     def ui_process_check_button(self, check_button, offset=(30, 30)):
-        """
-        执行 UI 等待用的检查按钮判断。
-
-        Args:
-            check_button (Button, callable, list[Button], tuple[Button]):
-            offset:
-
-        Returns:
-            bool:
-        """
+        """check_button 可为 Button、回调或 Button 列表/元组。"""
         if isinstance(check_button, Button):
             return self.appear(check_button, offset=offset)
         if callable(check_button):
@@ -217,13 +185,6 @@ class UI(InfoHandler):
         raise GamePageUnknownError
 
     def ui_get_current_page(self, skip_first_screenshot=True):
-        """
-        Args:
-            skip_first_screenshot:
-
-        Returns:
-            Page:
-        """
         logger.info("UI get current page")
 
         app_check = self._create_current_page_app_check()
@@ -252,14 +213,6 @@ class UI(InfoHandler):
         return self._raise_unknown_current_page_error()
 
     def ui_goto(self, destination, get_ship=True, offset=(30, 30), skip_first_screenshot=True):
-        """
-        Args:
-            destination (Page):
-            get_ship:
-            offset:
-            skip_first_screenshot:
-        """
-        # Create connection
         Page.init_connection(destination)
         self.interval_clear(list(Page.iter_check_buttons()))
 
@@ -271,12 +224,10 @@ class UI(InfoHandler):
             else:
                 self.device.screenshot()
 
-            # Destination page
             if self.ui_page_appear(page=destination, offset=offset):
                 logger.info(f"Page arrive: {destination}")
                 break
 
-            # Other pages
             clicked = False
             for page in Page.iter_pages():
                 if page.parent is None or page.check_button is None:
@@ -291,24 +242,13 @@ class UI(InfoHandler):
             if clicked:
                 continue
 
-            # Additional
             if self.ui_additional(get_ship=get_ship):
                 continue
 
-        # Reset connection
         Page.clear_connection()
 
     def ui_ensure(self, destination, skip_first_screenshot=True):
-        """
-        确保 UI 已切换到目标页面。
-
-        Args:
-            destination (Page):
-            skip_first_screenshot:
-
-        Returns:
-            bool: 是否发生页面切换。
-        """
+        """返回是否实际发生了页面切换。"""
         logger.hr("UI ensure")
         self.ui_get_current_page(skip_first_screenshot=skip_first_screenshot)
         if self.ui_current == destination:
@@ -336,12 +276,6 @@ class UI(InfoHandler):
         controls,
         skip_first_screenshot=False,
     ):
-        """
-        Args:
-            index (int):
-            controls (UiIndexControls): OCR 和前后按钮。
-            skip_first_screenshot (bool):
-        """
         logger.hr("UI ensure index")
         retry = Timer(1, count=2)
         while 1:
@@ -435,10 +369,7 @@ class UI(InfoHandler):
         )
 
     def ui_page_main_popups(self, get_ship=True):
-        """
-        处理 page_main、page_reward 上出现的弹窗。
-        """
-        # 公会弹窗。
+        """处理主页和奖励页弹窗。"""
         if self.handle_guild_popup_cancel():
             return True
 
@@ -452,14 +383,8 @@ class UI(InfoHandler):
         )
 
     def ui_page_os_popups(self):
-        """
-        Handle popups appear at page_os
-        """
-        # Opsi reset
-        # - Opsi has reset, handle_story_skip() clicks confirm
-        # - RESET_TICKET_POPUP
-        # - Open exchange shop? handle_popup_confirm() click confirm
-        # - EXCHANGE_CHECK, click BACK_ARROW
+        """处理大世界入口页的重置弹窗。"""
+        # 大世界重置可能依次出现剧情确认、重置券、舰队准备和兑换商店。
         if self._opsi_reset_fleet_preparation_click >= 5:
             logger.critical("Failed to confirm OpSi fleets, too many click on RESET_FLEET_PREPARATION")
             logger.critical("Possible reason #1: You haven't set any fleets in operation siren")
@@ -544,14 +469,8 @@ class UI(InfoHandler):
     def _handle_withdraw_popup(self):
         if not self.appear(WITHDRAW, offset=(30, 30), interval=3):
             return False
-        # 这里故意等待，用来规避 2022-04-07 更新后的客户端卡死问题。
-        # 复现方式（基本稳定）：
-        # - 进入任意关卡，例如 12-4。
-        # - 停止并重启游戏。
-        # - 运行 Alas 的 `Main` 任务。
-        # - Alas 切换到 page_campaign，并从已进入的关卡撤退。
-        # - 客户端卡在 page_campaign W12，点击屏幕任意位置都没有响应。
-        # - 再次重启客户端即可恢复。
+        # 2022-04-07 后，从已进入关卡重启再运行 Main，立即撤退可能让客户端卡死。
+        # 点击前等待并刷新截图；按钮已消失时不再点击。
         logger.info("WITHDRAW button found, wait until map loaded to prevent bugs in game client")
         self.device.sleep(2)
         self.device.screenshot()
@@ -587,12 +506,7 @@ class UI(InfoHandler):
         return True
 
     def ui_additional(self, get_ship=True):
-        """
-        处理 UI 切换期间可能出现的干扰弹窗。
-
-        Args:
-            get_ship:
-        """
+        """处理 UI 切换期间的干扰弹窗；get_ship 控制是否处理获得舰船页面。"""
         return (
             self._handle_priority_additional_popups(get_ship=get_ship)
             or self._handle_game_tips_popup()
@@ -606,10 +520,6 @@ class UI(InfoHandler):
         )
 
     def handle_idle_page(self):
-        """
-        Returns:
-            bool: If handled
-        """
         timer = self.get_interval_timer(ui_assets.IDLE, interval=3)
         if not timer.reached():
             return False
@@ -654,12 +564,7 @@ class UI(InfoHandler):
             yield EXCHANGE_CHECK
 
     def ui_button_interval_reset(self, button):
-        """
-        重置部分按钮的点击间隔，避免误触。
-
-        Args:
-            button (Button):
-        """
+        """重置目标按钮及关联按钮的点击间隔。"""
         for reset_button in self._iter_button_interval_reset_targets(button):
             self.interval_reset(reset_button)
         if button in [raid_assets.RPG_GOTO_STAGE, raid_assets.RPG_GOTO_STORY, raid_assets.RPG_LEAVE_CITY]:

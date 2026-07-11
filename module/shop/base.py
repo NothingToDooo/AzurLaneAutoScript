@@ -44,10 +44,7 @@ FILTER = Filter(FILTER_REGEX, FILTER_ATTR)
 
 
 class ShopItem_250814(Item):
-    """
-    Calculation result of unsold ship_T2 is 0.36, so 0.3 is taken as threshold,
-    result of sold product is < 0.2
-    """
+    """未售商品计算值为 0.36，已售低于 0.2，因此有效阈值取 0.3。"""
 
     def predict_valid(self):
         mean = np.mean(np.max(self.image, axis=2) > 139)
@@ -56,16 +53,11 @@ class ShopItem_250814(Item):
 
 class ShopItemGrid(ItemGrid):
     def predict(self, image, options=None, **settings):
-        """
-        给商品补充过滤用属性。
-        """
         options = item_predict_options(options, settings)
         super().predict(image, options=options)
         for item in self.items:
-            # 设置默认过滤属性。
             item.group, item.sub_genre, item.tier = None, None, None
 
-            # 正则可以快速填充过滤字段。
             name = item.name
             result = re.search(FILTER_REGEX, name)
             if result:
@@ -73,14 +65,9 @@ class ShopItemGrid(ItemGrid):
                     group.lower() if group is not None else None for group in result.groups()
                 ]
             else:
-                # if not name.isnumeric():
-                #     logger.warning(f'Unable to parse shop item {name}; '
-                #                     'check template asset and filter regexp')
-                #     raise ScriptError
                 continue
 
-            # Sometimes book's color and/or tier will be misidentified
-            # Undergo a second template match using Book class
+            # 书本颜色和等级容易误识别，使用 Book 模板二次匹配。
             if item.group == "book":
                 book = Book(image, item.source_button)
                 if item.sub_genre is not None:
@@ -112,10 +99,6 @@ class ShopBase(UI):
 
     @cached_property
     def shop_filter(self):
-        """
-        Returns:
-            str:
-        """
         return ""
 
     @cached_property
@@ -126,39 +109,18 @@ class ShopBase(UI):
         )
 
     def shop_items(self):
-        """
-        Returns:
-            None, base default value
-            ShopItemGrid, variant value
-        """
+        """基类返回 None，商店变体返回各自的 ShopItemGrid。"""
         return
 
     def shop_currency(self):
-        """
-        Returns:
-            int:
-        """
         return self._currency
 
     def shop_has_loaded(self, _items):
-        """
-        变体商店的加载完成检查钩子。
-
-        例如勋章商店刚打开时会先显示默认物品和默认价格，
-        变体类可覆写该方法继续等待真实商品加载。
-
-        Args:
-            _items: 当前识别到的商品列表；默认实现不需要。
-
-        Returns:
-            bool: 是否已加载完成。
-        """
+        """变体加载检查钩子；用于等待默认商品和价格被真实数据替换。"""
         return True
 
     def shop_detect_items(self, image=None):
-        """
-        在指定截图上识别商店商品，主要用于测试。
-        """
+        """在指定截图上识别商品，供测试使用。"""
         if image is None:
             image = self.device.image
 
@@ -192,18 +154,10 @@ class ShopBase(UI):
         return []
 
     def shop_obstruct_handle(self):
-        """
-        Remove obstructions in shop view if any
-
-        Returns:
-            bool:
-        """
-        # Handle shop obstructions
         if self.appear(GET_SHIP, interval=1):
             logger.info(f"Shop obstruct: {GET_SHIP} -> {SHOP_CLICK_SAFE_AREA}")
             self.device.click(SHOP_CLICK_SAFE_AREA)
             return True
-        # To lock new ships
         if self.handle_popup_confirm("SHOP_OBSTRUCT"):
             return True
         if self.appear(GET_ITEMS_1, interval=1):
@@ -251,13 +205,6 @@ class ShopBase(UI):
                 break
 
     def shop_get_items(self, skip_first_screenshot=True):
-        """
-        Args:
-            skip_first_screenshot (bool):
-
-        Returns:
-            list[Item]:
-        """
         shop_items = self.shop_items()
         if shop_items is None:
             logger.warning("Expected type 'ShopItemGrid' but was None")
@@ -267,39 +214,17 @@ class ShopBase(UI):
         return self._log_shop_items(shop_items.items, shop_items.grids)
 
     def shop_check_item(self, item):
-        """返回当前货币是否足够购买物品。"""
         return item.price <= self._currency
 
     def shop_check_custom_item(self, _item):
-        """
-        自定义商品检查钩子。
-
-        变体类可覆写该方法处理不适合通过过滤字符串描述的商品。
-
-        Args:
-            _item (Item): 待检查商品；默认实现不需要。
-
-        Returns:
-            bool: 是否命中自定义购买条件。
-        """
+        """供变体处理无法用过滤字符串描述的商品。"""
         return False
 
     def shop_get_item_to_buy(self, items):
-        """
-        Args:
-            items list(Item): acquired from shop_get_items
-
-        Returns:
-            Item: Item to buy, or None.
-        """
-        # First, must scan for custom items
-        # as has no template or filter support
         for item in items:
             if self.shop_check_custom_item(item):
                 return item
 
-        # Second, load selection, apply filter,
-        # and return 1st item in result if any
         FILTER.load(self.shop_filter)
         filtered = FILTER.apply(items, self.shop_check_item)
 

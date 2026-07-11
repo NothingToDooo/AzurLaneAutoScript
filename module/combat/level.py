@@ -19,24 +19,14 @@ class Level(ModuleBase):
 
     @property
     def lv(self):
-        """
-        Returns:
-            list[int]:
-        """
         return self._lv
 
     @lv.setter
     def lv(self, value):
-        """
-        Args:
-            value (list[int]):
-        """
         self._lv = value
 
     def lv_reset(self):
-        """
-        Call this method after enter map.
-        """
+        """进入地图后清空战前、战后等级缓存。"""
         self._lv = [-1] * 6
         self._lv_before_battle = [-1] * 6
 
@@ -44,13 +34,6 @@ class Level(ModuleBase):
         return ButtonGrid(origin=(58, 128), delta=(0, 100), button_shape=(46, 19), grid_shape=(1, 6))
 
     def lv_get(self, after_battle=False):
-        """
-        Args:
-            after_battle (bool): True if called after battle else False.
-
-        Returns:
-            list[int]:
-        """
         if not self.config.StopCondition_ReachLevel and not self.config.STOP_IF_REACH_LV32:
             return [-1] * 6
 
@@ -100,21 +83,16 @@ class Level(ModuleBase):
 
 class LevelOcr(Digit):
     def pre_process(self, image):
-        # Check the max value of red channel to find out whether the image is masked.
-        # It would be no larger than COLOR_MASKED[0]=107 iff masked.
-        # Crop before checking to cut off the "need repair" icon while preserving upper part of char 'V'.
+        # 仅检查上方 8 行：避开“需要维修”图标并保留 V 的上部；红通道最大值不超过 107 即视为遮罩。
         max_red = image[:8, :, 0].max()
         if max_red <= COLOR_MASKED[0]:
-            # The mask on low hp ships turns COLOR_WHITE=(255, 255, 255) to COLOR_MASKED=(107, 105, 107),
-            # so multiply all channels by a scalar can turn them back.
+            # 低血量遮罩将白色 (255, 255, 255) 压成 (107, 105, 107)，按均值比例放大各通道以还原。
             scalar = np.mean(COLOR_WHITE) / np.mean(COLOR_MASKED)
             image = cv2.addWeighted(image, scalar, image, 0, 0)
 
-        # Deal with the blue background of chars before converting to greyscale.
-        # The background is semi-transparent. It turns (0, 0, 0) to (33, 65, 115), and (255, 255, 255)
-        # to (107, 138, 189). We use the middle point (70, 102, 152).
+        # 半透明蓝底将黑色变为 (33, 65, 115)、白色变为 (107, 138, 189)，取中点 (70, 102, 152) 消除背景。
         bg = (70, 102, 152)
-        # BT.601
+        # 按 BT.601 亮度系数转为灰度。
         luma_trans = (0.299, 0.587, 0.114)
         luma_bg = np.dot(bg, luma_trans)
         image = cv2.subtract(image, _cv_scalar((*bg, 0))).dot(luma_trans).round().astype(np.uint8)
@@ -122,12 +100,11 @@ class LevelOcr(Digit):
             _cv_scalar((255, 255, 255, 255)),
             cv2.multiply(image, _cv_scalar((255 / (255 - luma_bg),) * 4)),
         )
-        # Find 'L' to strip 'LV.'.
-        # Return an empty image if 'L' is not found.
+        # 定位 L 后裁掉 LV. 前缀；找不到 L 时返回空白图。
         letter_l = np.nonzero(image[9:15, :].max(axis=0) < 127)[0]
         if len(letter_l):
             first_digit = letter_l[0] + 17
-            if first_digit + 3 < 46:  # LV_GRID_MAIN.button_shape[0] = 46
+            if first_digit + 3 < 46:  # 等于等级按钮宽度。
                 return image[:, first_digit:]
         return np.array([[255]], dtype=np.uint8)
 

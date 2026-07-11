@@ -7,45 +7,26 @@ if TYPE_CHECKING:
 
 
 class DetectionBackendExample:
-    """
-    Example for map detection backend.
-    """
+    """地图检测后端实现模板。"""
 
     def __init__(self, config):
-        """
-        Args:
-            config (AzurLaneConfig):
-        """
         self.config = config
 
-    """
-    Input
-    """
-
     def load(self, image):
-        """
-        Args:
-            image (np.ndarray): Shape (720, 1280, 3)
-        """
+        """加载 (720, 1280, 3) 截图。"""
         self.image = image
         # 在这里执行地图检测。
 
-    """
-    Output
-    """
     image: np.ndarray
     config: AzurLaneConfig
-    # Four edges in bool, or has attribute __bool__
+    # 四条边可为 bool，或实现 __bool__。
     left_edge: bool
     right_edge: bool
     lower_edge: bool
     upper_edge: bool
 
-    # A method that yield grid location and corners.
     def generate(self):
-        """
-        Yields (tuple): ((x, y), [upper-left, upper-right, bottom-left, bottom-right])
-        """
+        """逐格产出 ((x, y), [左上, 右上, 左下, 右下])。"""
         for x in range(8):
             for y in range(5):
                 yield (x, y), [(0, 0), (100, 0), (0, 100), (100, 100)]

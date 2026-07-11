@@ -30,14 +30,7 @@ COMMISSION_FILTER = Filter(
 
 
 def crop_suffix_image(image, area):
-    """
-    Args:
-        image (np.ndarray):
-        area (tuple): Commission name area.
-
-    Returns:
-        np.ndarray | None: Cropped suffix image, black letters on white background.
-    """
+    """裁剪委托名的黑字白底后缀；无后缀时返回 None。"""
     name_image = crop(image, area)
     name_image = extract_letters(name_image, letter=(255, 255, 255), threshold=128).astype(np.uint8)
 
@@ -65,13 +58,6 @@ def crop_suffix_image(image, area):
 
 
 def image_hash(image):
-    """
-    Args:
-        image (np.ndarray):
-
-    Returns:
-        str:
-    """
     if image is None:
         return ""
 
@@ -79,31 +65,22 @@ def image_hash(image):
 
 
 class Commission:
-    # 进入委托开始页的按钮。
     button: Button
-    # OCR 结果。
     name: str
-    # 委托名是否解析成功。
     valid: bool
     # 裁剪后的后缀图，黑字白底；没有后缀时为 None。
     suffix_image: np.ndarray
-    # 后缀图 hash，仅用于日志；没有后缀时为空字符串。
     suffix_hash: str
-    # project_data.py 中的委托类型名，例如 major_comm、daily_resource。
     genre: str
-    # 委托状态：finished、running、pending。
+    # 状态值为 finished、running、pending。
     status: str
-    # 委托耗时。
     duration: timedelta
-    # 紧急委托的过期时间，其他委托为 None。
     expire: timedelta
-    # 过滤分类：major、daily、extra、urgent、night。
+    # 过滤分类为 major、daily、extra、urgent、night。
     category_str: str
-    # 过滤类型：resource、chip、event、drill、part、cube 等。
+    # 过滤类型为 resource、chip、event、drill、part、cube 等。
     genre_str: str
-    # 小时形式的耗时。
     duration_hour: str
-    # HH:MM 形式的耗时。
     duration_hm: str
 
     def __init__(self, image, y, config):
@@ -129,7 +106,6 @@ class Commission:
             self.duration_hm = str(self.duration).rsplit(":", 1)[0]
 
     def commission_parse(self):
-        # Name
         area = area_offset((176, 23, 420, 53), self.area[0:2])
         button = Button(area=area, color=(), button=area, name="COMMISSION")
         ocr = Ocr(button, lang="cnocr", threshold=256)
@@ -138,17 +114,14 @@ class Commission:
         self.name = result
         self.genre = self.commission_name_parse(self.name)
 
-        # Suffix
         self.suffix_image = crop_suffix_image(self.image, self.button.area)
         self.suffix_hash = image_hash(self.suffix_image)
 
-        # Duration time
         area = area_offset((290, 68, 390, 95), self.area[0:2])
         button = Button(area=area, color=(), button=area, name="DURATION")
         ocr = Duration(button)
         self.duration = ocr.ocr(self.image)
 
-        # Expire time
         area = area_offset((-49, 68, -45, 84), self.area[0:2])
         button = Button(area=area, color=(189, 65, 66), button=area, name="IS_URGENT")
         if button.appear_on(self.image, threshold=30):
@@ -159,7 +132,6 @@ class Commission:
         else:
             self.expire = timedelta(seconds=0)
 
-        # Status
         area = area_offset((179, 71, 187, 93), self.area[0:2])
         dic = {0: "finished", 1: "running", 2: "pending"}
         color = np.array(get_color(self.image, area))
@@ -201,13 +173,6 @@ class Commission:
         return True
 
     def __eq__(self, other):
-        """
-        Args:
-            other (Commission):
-
-        Returns:
-            bool:
-        """
         if not isinstance(other, Commission):
             return False
 
@@ -227,14 +192,6 @@ class Commission:
         return hash(f"{self.genre}_{self.name}")
 
     def suffix_match(self, other, similarity=0.75):
-        """
-        Args:
-            other (Commission):
-            similarity (float): 0-1. Similarity.
-
-        Returns:
-            bool:
-        """
         if self.suffix_image is None and other.suffix_image is None:
             return True
         if self.suffix_image is None or other.suffix_image is None:
@@ -253,14 +210,8 @@ class Commission:
         return sim >= similarity
 
     def parse_time(self, string):
-        """
-        Args:
-            string (str): Such as 01:00:00, 05:47:10, 17:50:51.
-
-        Returns:
-            timedelta: datetime.timedelta instance.
-        """
-        string = string.replace("D", "0")  # Poor OCR
+        """解析 HH:MM:SS；无效时标记委托无效并返回 None。"""
+        string = string.replace("D", "0")  # OCR 会把 0 识别为 D。
         result = re.search(r"(\d+):(\d+):(\d+)", string)
         if not result:
             logger.warning(f"Invalid time string: {string}")
@@ -270,13 +221,7 @@ class Commission:
         return timedelta(hours=result[0], minutes=result[1], seconds=result[2])
 
     def commission_name_parse(self, string):
-        """
-        Args:
-            string (str): Commission name, such as 'NYB要员护卫'.
-
-        Returns:
-            str: Commission genre, such as 'urgent_gem'.
-        """
+        """把委托名解析为 urgent_gem 等类型；未知名称会标记为无效。"""
         if self.is_event_commission():
             return "daily_event"
         for key, value in dictionary_cn.items():
@@ -289,10 +234,6 @@ class Commission:
         return ""
 
     def is_event_commission(self):
-        """
-        Returns:
-            bool:
-        """
         # 2023.04.27 Vacation Lane 复刻，粉黄渐变类似偶像大师活动。
         area = area_offset((5, 5, 30, 30), self.area[0:2])
         return color_similar(color1=get_color(self.image, area), color2=(235, 173, 161), threshold=30)

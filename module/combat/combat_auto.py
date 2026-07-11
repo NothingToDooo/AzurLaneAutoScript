@@ -12,7 +12,6 @@ class CombatAuto(ModuleBase):
     auto_mode_click_timer = Timer(5)
 
     def combat_joystick_appear(self) -> bool:
-        """返回是否出现战斗摇杆。"""
         if self.appear(COMBAT_AUTO, offset=(20, 20)):
             return True
         if self.appear(COMBAT_AUTO_133, offset=(20, 20)):
@@ -40,13 +39,6 @@ class CombatAuto(ModuleBase):
         self.auto_mode_switched = True
 
     def handle_combat_auto(self, auto):
-        """
-        Args:
-            auto (str): 战斗自动模式。
-
-        Returns:
-            bool: 是否执行了开关点击。
-        """
         if self._combat_auto_should_wait():
             return False
 

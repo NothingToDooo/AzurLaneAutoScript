@@ -14,10 +14,7 @@ from module.map_detection.utils import Points
 
 class Template(Resource):
     def __init__(self, file):
-        """
-        Args:
-            file (dict[str], str): Filepath of template file.
-        """
+        """file 可传模板路径或按服务器选择路径的映射。"""
         self.raw_file = file
         self._image = None
         self._image_binary = None
@@ -51,7 +48,7 @@ class Template(Resource):
                     if channel == 3:
                         image = frame[:, :, :3].copy()
                     elif len(frame.shape) == 3:
-                        # Follow the first frame
+                        # 所有帧都沿用首帧的通道数。
                         image = frame[:, :, 0].copy()
                     else:
                         image = frame
@@ -102,13 +99,7 @@ class Template(Resource):
         self._image_luma = None
 
     def pre_process(self, image):
-        """
-        Args:
-            image (np.ndarray):
-
-        Returns:
-            np.ndarray:
-        """
+        """供子类覆盖的模板预处理钩子。"""
         return image
 
     @cached_property
@@ -118,15 +109,7 @@ class Template(Resource):
         return self.image.shape[0:2][::-1]
 
     def match(self, image, scaling=1.0, similarity=0.85):
-        """
-        Args:
-            image:
-            scaling (int, float): Scale the template to match image
-            similarity (float): 0 to 1.
-
-        Returns:
-            bool: If matches.
-        """
+        """按 scaling 缩放待测图后匹配模板；similarity 范围为 0～1。"""
         scaling = 1 / scaling
         if scaling != 1.0:
             image = cv2.resize(image, None, fx=scaling, fy=scaling)
@@ -145,23 +128,11 @@ class Template(Resource):
         return sim > similarity
 
     def match_binary(self, image, similarity=0.85):
-        """
-        Use template match after binarization.
-
-        Args:
-            image:
-            similarity (float): 0 to 1.
-
-        Returns:
-            bool: If matches.
-        """
+        """在 Otsu 二值图上匹配模板。"""
         if self.is_gif:
-            # graying
             image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            # binarization
             _, image_binary = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
             for template in self.image_binary:
-                # template matching
                 res = cv2.matchTemplate(template, image_binary, cv2.TM_CCOEFF_NORMED)
                 _, sim, _, _ = cv2.minMaxLoc(res)
                 if sim > similarity:
@@ -169,11 +140,8 @@ class Template(Resource):
 
             return False
 
-        # graying
         image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        # binarization
         _, image_binary = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-        # template matching
         res = cv2.matchTemplate(self.image_binary, image_binary, cv2.TM_CCOEFF_NORMED)
         _, sim, _, _ = cv2.minMaxLoc(res)
         return sim > similarity
@@ -194,15 +162,6 @@ class Template(Resource):
         return sim > similarity
 
     def _point_to_button(self, point, image=None, name=None):
-        """
-        Args:
-            point:
-            image (np.ndarray): Screenshot. If provided, load color and image from it.
-            name (str):
-
-        Returns:
-            Button:
-        """
         if name is None:
             name = self.name
         area = area_offset(area=(0, 0, *self.size), offset=point)
@@ -212,15 +171,7 @@ class Template(Resource):
         return button
 
     def match_result(self, image, name=None):
-        """
-        Args:
-            image:
-            name (str):
-
-        Returns:
-            float: Similarity
-            Button:
-        """
+        """返回最佳匹配的相似度和对应 Button。"""
         res = cv2.matchTemplate(image, self.image, cv2.TM_CCOEFF_NORMED)
         _, sim, _, point = cv2.minMaxLoc(res)
 
@@ -236,17 +187,7 @@ class Template(Resource):
         return sim, button
 
     def match_multi(self, image, scaling=1.0, similarity=0.85, threshold=3, name=None):
-        """
-        Args:
-            image:
-            scaling (int, float): Scale the template to match image
-            similarity (float): 0 to 1.
-            threshold (int): Distance to delete nearby results.
-            name (str):
-
-        Returns:
-            list[Button]:
-        """
+        """返回全部匹配按钮；threshold 是合并相邻结果的像素距离。"""
         scaling = 1 / scaling
         if scaling != 1.0:
             image = cv2.resize(image, None, fx=scaling, fy=scaling)
@@ -263,7 +204,7 @@ class Template(Resource):
             result = cv2.matchTemplate(image, self.image, cv2.TM_CCOEFF_NORMED)
             result = np.array(np.where(result > similarity)).T[:, ::-1]
 
-        # result: np.array([[x0, y0], [x1, y1], ...)
+        # result 形状为 (n, 2)，每行是一个 (x, y) 坐标。
         if scaling != 1.0:
             result = np.round(result / scaling).astype(int)
         result = Points(result).group(threshold=threshold)

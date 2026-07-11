@@ -35,7 +35,6 @@ def minimize_window(hwnd):
 
 
 def get_window_title(hwnd):
-    """Returns the window title as a string."""
     text_len_in_characters = ctypes.windll.user32.GetWindowTextLengthW(hwnd)
     string_buffer = ctypes.create_unicode_buffer(
         text_len_in_characters + 1
@@ -57,21 +56,11 @@ class MumuRuntime(MumuRuntimeBase):
 
     @classmethod
     def execute(cls, command) -> psutil.Popen:
-        """
-        Args:
-            command (list[str]):
-
-        Returns:
-            psutil.Popen:
-        """
         logger.info(f"Execute: {command}")
         # 让模拟器进程脱离 ALAS，避免 ALAS 退出时连带结束模拟器。
         return psutil.Popen(command, close_fds=True, start_new_session=True)
 
     def _emulator_start(self, instance: EmulatorInstance):
-        """
-        Start a emulator without error handling
-        """
         exe: str = instance.emulator.path
         if instance != Emulator.MuMuPlayer12:
             message = f"Cannot start an unknown emulator instance: {instance}"
@@ -82,9 +71,6 @@ class MumuRuntime(MumuRuntimeBase):
         self.execute([Emulator.single_to_console(exe), "api", "-v", str(instance.MuMuPlayer12_id), "launch_player"])
 
     def _emulator_stop(self, instance: EmulatorInstance):
-        """
-        Stop a emulator without error handling
-        """
         exe: str = instance.emulator.path
         if instance != Emulator.MuMuPlayer12:
             message = f"Cannot stop an unknown emulator instance: {instance}"
@@ -94,13 +80,6 @@ class MumuRuntime(MumuRuntimeBase):
         self.execute([Emulator.single_to_console(exe), "api", "-v", str(instance.MuMuPlayer12_id), "shutdown_player"])
 
     def _emulator_function_wrapper(self, func: Callable[[EmulatorInstance], None]):
-        """
-        参数：
-            func：_emulator_start 或 _emulator_stop。
-
-        返回：
-            bool：是否成功。
-        """
         instance = self.emulator_instance
         if instance is None:
             logger.error("未找到可启动或停止的模拟器实例")
@@ -163,7 +142,6 @@ class MumuRuntime(MumuRuntimeBase):
     def _check_start_watch_device(self, serial: str):
         devices = self.session.list_device().select(serial=serial)
         if not devices:
-            # Try to connect
             self._adb_connect_for_start_watch()
             return None
 
@@ -200,11 +178,7 @@ class MumuRuntime(MumuRuntimeBase):
             flash_window(new_window, flash=True)
 
     def emulator_start_watch(self):
-        """
-        Returns:
-            bool: True if startup completed
-                False if timeout
-        """
+        """模拟器启动完成返回 True，180 秒超时返回 False。"""
         logger.hr("Emulator start", level=2)
         current_window = get_focused_window()
         instance = self.emulator_instance
@@ -228,28 +202,23 @@ class MumuRuntime(MumuRuntimeBase):
                 logger.warning("Emulator start timeout")
                 return False
 
-            # Check emulator window showing up
             new_window = self._focus_back_from_new_window(current_window, new_window)
 
-            # Check device connection
             device = self._check_start_watch_device(serial)
             if device is None:
                 continue
             show_online(device)
 
-            # Check command availability
             pong = self._check_start_watch_shell()
             if pong is None:
                 continue
             show_ping(pong)
 
-            # Check azuelane package
             packages = self._check_start_watch_package()
             if packages is None:
                 continue
             show_package(packages)
 
-            # All check passed
             break
 
         self._finish_start_watch_window_state(current_window, new_window)
@@ -259,17 +228,12 @@ class MumuRuntime(MumuRuntimeBase):
     def emulator_start(self):
         logger.hr("Emulator start", level=1)
         for _ in range(3):
-            # Stop
             if not self._emulator_function_wrapper(self._emulator_stop):
                 return False
-            # Start
             if self._emulator_function_wrapper(self._emulator_start):
                 if self.emulator_start_watch():
-                    # Success
                     return True
-                # Start command was sent but emulator didn't come online, stop and start again
                 continue
-            # Failed to start, stop and start again
             if self._emulator_function_wrapper(self._emulator_stop):
                 continue
             return False
@@ -280,11 +244,8 @@ class MumuRuntime(MumuRuntimeBase):
     def emulator_stop(self):
         logger.hr("Emulator stop", level=1)
         for _ in range(3):
-            # Stop
             if self._emulator_function_wrapper(self._emulator_stop):
-                # Success
                 return True
-            # Failed to stop, start and stop again
             if self._emulator_function_wrapper(self._emulator_start):
                 continue
             return False

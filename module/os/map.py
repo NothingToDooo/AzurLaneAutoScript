@@ -24,13 +24,7 @@ from module.ui.page import page_os
 
 class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
     def os_init(self):
-        """
-        调用大世界功能前先完成页面定位、区域状态刷新和当前区域清理。
-
-        Pages:
-            in: IN_MAP or IN_GLOBE or page_os or any page
-            out: IN_MAP
-        """
+        """调用大世界功能前完成页面定位、区域状态刷新和当前区域清理，结束于区域地图。"""
         logger.hr("OS init", level=1)
         self.config.override(Submarine_Fleet=1, Submarine_Mode="every_combat", STORY_ALLOW_SKIP=False)
         self._os_init_ensure_page()
@@ -66,9 +60,6 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             self.handle_after_auto_search()
 
     def get_current_zone_from_globe(self):
-        """
-        Get current zone from globe map. See OSMapOperation.get_current_zone()
-        """
         self.os_map_goto_globe(unpin=False)
         self.globe_update()
         self.zone = self.get_globe_pinned_zone()
@@ -78,25 +69,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         return self.zone
 
     def globe_goto(self, zone, types=("SAFE", "DANGEROUS"), refresh=False, stop_if_safe=False):
-        """
-        Goto another zone in OS.
+        """从区域地图或全球地图前往指定海域，结束于区域地图。
 
-        Args:
-            zone (str, int, Zone): Name in CN/EN/JP/TW, zone id, or Zone instance.
-            types (tuple[str], list[str], str): Zone types, or a list of them.
-                Available types: DANGEROUS, SAFE, OBSCURE, ABYSSAL, STRONGHOLD.
-                Try the the first selection in type list, if not available, try the next one.
-            refresh (bool): If already at target zone,
-                set false to skip zone switching,
-                set true to re-enter current zone to refresh.
-            stop_if_safe (bool): Return false if zone is SAFE.
-
-        Returns:
-            bool: If zone switched.
-
-        Pages:
-            in: IN_MAP or IN_GLOBE
-            out: IN_MAP
+        zone 接受多语言名称、编号或 Zone；types 按调用方顺序尝试 DANGEROUS、SAFE、OBSCURE、
+        ABYSSAL、STRONGHOLD。已在目标海域时，refresh 控制是否重新进入；stop_if_safe 会在安全海域返回 False。
+        返回是否发生海域切换。
         """
         zone = self.name_to_zone(zone)
         logger.hr(f"Globe goto: {zone}")
@@ -109,13 +86,10 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                     self.os_globe_goto_map()
                 logger.info("Already at target zone")
                 return False
-        # MAP_EXIT
         if self.is_in_special_zone():
             self.map_exit()
-        # 当前在地图内。
         if self.is_in_map():
             self.os_map_goto_globe()
-        # 当前在大世界总览。
         self.globe_update()
         self.globe_focus_to(zone)
         if stop_if_safe and self.zone_has_safe():
@@ -124,7 +98,6 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             return False
         self.zone_type_select(types=types)
         self.globe_enter(zone)
-        # 回到地图内。
         if hasattr(self, "zone"):
             del self.zone
         self.zone_init()
@@ -140,8 +113,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             try:
                 super().os_map_goto_globe(*args, **kwargs)
             except RewardUncollectedError:
-                # Disable after_auto_search since it will exit current zone.
-                # Or will cause RecursionError: maximum recursion depth exceeded
+                # 搜索后处理会退出当前海域，递归调用还会触发 RecursionError，因此必须禁用。
                 self.run_auto_search(rescan=True, after_auto_search=False)
                 continue
             else:
@@ -151,12 +123,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         raise GameTooManyClickError
 
     def port_goto(self, allow_port_arrive=True):
-        """
-        Wraps `port_goto()`, handle walk_out_of_step
-
-        Returns:
-            bool: If success
-        """
+        """前往港口并处理步数不同步，返回是否成功。"""
         for _ in range(3):
             try:
                 super().port_goto(allow_port_arrive=allow_port_arrive)
@@ -175,12 +142,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         return False
 
     def fleet_repair(self, revert=True):
-        """
-        Repair fleets in nearest port.
-
-        Args:
-            revert (bool): If go back to previous zone.
-        """
+        """在最近港口维修舰队；revert 控制是否返回原海域。"""
         logger.hr("OS fleet repair")
         prev = self.zone
         if self.zone.is_azur_port:
@@ -197,13 +159,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             self.globe_goto(prev)
 
     def handle_fleet_repair(self, revert=True):
-        """
-        Args:
-            revert (bool): If go back to previous zone.
-
-        Returns:
-            bool: If repaired.
-        """
+        """需要时维修舰队；revert 控制是否返回原海域，并返回是否执行维修。"""
         if self.config.OpsiGeneral_RepairThreshold < 0:
             return False
         if self.is_in_special_zone():
@@ -233,14 +189,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         return False
 
     def fleet_resolve(self, revert=True):
-        """
-        Cure fleet's low resolve by going
-        to an 'easy' zone and winning
-        battles
-
-        Args:
-            revert (bool): If go back to previous zone.
-        """
+        """前往低侵蚀海域战斗以解除低士气；revert 控制是否返回原海域。"""
         logger.hr("OS fleet cure low resolve debuff")
 
         prev = self.zone
@@ -252,17 +201,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             self.globe_goto(prev)
 
     def handle_fleet_resolve(self, revert=False):
-        """
-        Check each fleet if afflicted with the low
-        resolve debuff
-        If so, handle by completing an easy zone
-
-        Args:
-            revert (bool): If go back to previous zone.
-
-        Returns:
-            bool:
-        """
+        """检查并解除各舰队的低士气；revert 控制是否返回原海域。"""
         if self.is_in_special_zone():
             logger.info("OS is in a special zone type, skip fleet resolve")
             return False
@@ -280,16 +219,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         return False
 
     def handle_current_fleet_resolve(self, revert=False):
-        """
-        Similar to handle_fleet_resolve,
-        but check current fleet only for better performance at initialization
-
-        Args:
-            revert (bool): If go back to previous zone.
-
-        Returns:
-            bool:
-        """
+        """初始化时只检查当前舰队的低士气；revert 控制是否返回原海域。"""
         if self.fleet_low_resolve_appear():
             logger.info("Current fleet is afflicted with the low resolve debuff")
             self.fleet_resolve(revert)
@@ -299,13 +229,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         return False
 
     def handle_fleet_emp_debuff(self):
-        """
-        EMP debuff limits fleet step to 1 and messes auto search up.
-        It can be solved by moving fleets on map meaninglessly.
-
-        Returns:
-            bool: If solved
-        """
+        """通过移动舰队解除会限制步数并干扰自动搜索的 EMP，返回是否处理。"""
         if self.is_in_special_zone():
             logger.info("OS is in a special zone type, skip handle_fleet_emp_debuff")
             return False
@@ -339,16 +263,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         return True
 
     def handle_fog_block(self, repair=True):
-        """
-        AL game bug where fog remains in OpSi
-        even after jumping between zones or
-        other pages
-        Recover by restarting the game to
-        alleviate and resume OpSi task
-
-        Args:
-            repair (bool): call handle_fleet_repair after restart
-        """
+        """游戏 bug 可能使迷雾跨海域或页面残留；重启后恢复任务，repair 控制是否顺带维修。"""
         if not self.appear(MAP_GOTO_GLOBE_FOG):
             return False
 
@@ -356,9 +271,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             f"Triggered stuck fog status, restarting game to resolve and continue {self.config.task.command}"
         )
 
-        # Restart the game manually rather
-        # than through 'task_call'
-        # Ongoing task is uninterrupted
+        # 直接重启而不调用新任务，确保当前任务不中断。
         self.device.app_stop()
         self.device.app_start()
         LoginHandler(self.config, self.device).handle_app_login()
@@ -370,13 +283,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         return True
 
     def get_action_point_limit(self):
-        """
-        Override user config at the end of every month.
-        To consume all action points without manual configuration.
-
-        Returns:
-            int: ActionPointPreserve
-        """
+        """月末覆盖行动力保留配置，以便自动消耗全部行动力。"""
         remain = get_os_reset_remain()
         if remain <= 0:
             if self.config.is_task_enabled("OpsiCrossMonth"):
@@ -407,9 +314,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         return solved
 
     def cl1_ap_preserve(self):
-        """
-        Keeping enough startup AP to run CL1.
-        """
+        """保留足够启动 CL1 的行动力。"""
         if (
             self.is_cl1_enabled
             and get_os_reset_remain() > 2
@@ -437,21 +342,10 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             self._auto_search_round_timer = time.time()
 
     def os_auto_search_daemon(self, strategic=False):
-        """
-        Args:
-            strategic (bool): True if running in strategic search
+        """从关闭的自动搜索选项开始推进搜索，并返回完成战斗数。
 
-        Returns:
-            int: Number of finished battle
-
-        Raises:
-            CampaignEnd: If auto search ended
-            RequestHumanTakeover: If there's no auto search option.
-
-        Pages:
-            in: AUTO_SEARCH_OS_MAP_OPTION_OFF
-            out: AUTO_SEARCH_OS_MAP_OPTION_OFF and info_bar_count() >= 2, if no more objects to clear on this map.
-                 AUTO_SEARCH_REWARD if get auto search reward.
+        搜索结束抛出 CampaignEnd；没有自动搜索选项时抛出 RequestHumanTakeover。地图清空后仍在关闭选项页并等待信息栏，
+        获得奖励时结束于 AUTO_SEARCH_REWARD。
         """
         logger.hr("OS auto search", level=2)
         self.on_auto_search_battle_count_reset()
@@ -532,14 +426,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         return 0, False
 
     def interrupt_auto_search(self):
-        """
-        Raises:
-            TaskEnd: If auto search interrupted
-
-        Pages:
-            in: Any, usually to be is_combat_executing
-            out: page_main
-        """
+        """从任意页面中断自动搜索并返回主页；中断成功时抛出 TaskEnd。"""
         logger.info("Interrupting auto search")
         is_loading = False
         pause_interval = Timer(0.5, count=1)
@@ -617,13 +504,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         return False, self.handle_battle_status() or self.handle_exp_info()
 
     def os_auto_search_run(self, strategic=False):
-        """
-        Args:
-            strategic (bool): True to use strategic search
-
-        Returns:
-            int: Number of finished combat
-        """
+        """运行普通或战略自动搜索，并返回完成战斗数。"""
         finished_combat = 0
         for _ in range(5):
             backup = self.config.temporary(Campaign_UseAutoSearch=True)
@@ -638,8 +519,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             finally:
                 backup.recover()
 
-            # Continue if was Auto search interrupted by ash popup
-            # Break if zone cleared
+            # 信标弹窗中断搜索时继续；海域已清空时结束。
             if self.config.is_task_enabled("OpsiAshBeacon"):
                 if self.handle_ash_beacon_attack() or self.ash_popup_canceled:
                     strategic = False
@@ -654,13 +534,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         return finished_combat
 
     def clear_question(self):
-        """
-        Clear nearly (and 3 grids from above) question marks on radar.
-        Try 3 times at max to avoid loop tries on 2 adjacent fleet mechanism.
-
-        Returns:
-            bool: If cleared
-        """
+        """最多尝试三次清理雷达附近及上方三格内的问号，避免双舰队机关导致循环。"""
         logger.hr("Clear question", level=2)
         for _ in range(3):
             grid = self.radar.predict_question(self.device.image, in_port=self.zone.is_port)
@@ -696,25 +570,11 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         return False
 
     def run_auto_search(self, question=True, rescan=None, after_auto_search=True):
-        """
-        Clear current zone by running auto search.
-        OpSi story mode must be cleared to unlock auto search.
+        """用自动搜索清理当前海域，并返回完成战斗数；剧情模式需先通关才能解锁。
 
-        Args:
-            question (bool):
-                If clear nearing questions after auto search.
-            rescan (bool, str): Whether to rescan the whole map after running auto search.
-                This will clear siren scanning devices, siren logging tower,
-                visit akashi's shop that auto search missed, and unlock mechanism that requires 2 fleets.
-                Accept str also, `current` to scan current camera only,
-                `full` to scan current then rescan the whole map
-
-                This option should be disabled in special tasks like OpsiObscure, OpsiAbyssal, OpsiStronghold.
-            after_auto_search (bool):
-                Whether to call handle_after_auto_search() after auto search
-
-        Returns:
-            int: Number of finished combat
+        question 控制搜索后是否清理附近问号；rescan 接受 current 或 full，分别复扫当前视野或全图，
+        用于处理搜索遗漏的装置、明石商店和双舰队机关。特殊海域任务应禁用复扫。
+        after_auto_search 控制是否执行搜索后处理。
         """
         if rescan is None:
             rescan = self.config.OpsiGeneral_DoRandomMapEvent
@@ -737,7 +597,6 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                     continue
             break
 
-        # Rescan
         self._solved_map_event = set()
         self._solved_fleet_mechanism = False
         if question:
@@ -766,12 +625,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         self.map_rescan()
 
     def map_rescan_current(self):
-        """
-        检查当前视野内可处理的随机地图事件。
-
-        Returns:
-            bool: If solved a map random event
-        """
+        """检查当前视野内可处理的随机地图事件，并返回是否处理。"""
         handlers = (
             self._map_rescan_exploration_reward,
             self._map_rescan_akashi,
@@ -890,17 +744,9 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         return True
 
     def map_rescan_once(self, rescan_mode="full"):
-        """
-        Args:
-            rescan_mode (str): `current` to scan current camera only,
-                `full` to scan current then rescan the whole map
-
-        Returns:
-            bool: If solved a map random event
-        """
+        """按 current 或 full 复扫当前视野或全图，并返回是否处理随机事件。"""
         result = False
 
-        # Try current camera first
         logger.hr("Map rescan current", level=2)
         self.map_data_init(map_=None)
         self.handle_info_bar()

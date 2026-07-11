@@ -7,28 +7,12 @@ INVALID_SWITCH_STATE_TEMPLATE = "Switch {name} received an invalid state: {state
 
 
 class Switch:
-    """
-    A wrapper to handle switches in game, switch among states with retries.
+    """在多个已知状态间检测并重试切换。
 
-    Examples:
-        # Definitions
-        submarine_hunt = Switch('Submarine_hunt', offset=120)
-        submarine_hunt.add_state('on', check_button=SUBMARINE_HUNT_ON)
-        submarine_hunt.add_state('off', check_button=SUBMARINE_HUNT_OFF)
-
-        # Change state to ON
-        submarine_view.set('on', main=self)
+    is_selector=True 时点击目标项；否则点击当前开关位置。
     """
 
     def __init__(self, name="Switch", is_selector=False, offset=0):
-        """
-        Args:
-            name (str):
-            is_selector (bool): True if this is a multi choice, click to choose one of the switches.
-                For example: | [Daily] | Urgent | -> click -> | Daily | [Urgent] |
-                False if this is a switch, click the switch itself, and it changed in the same position.
-                For example: | [ON] | -> click -> | [OFF] |
-        """
         self.name = name
         self.is_selector = is_selector
         self._offset = offset
@@ -38,13 +22,7 @@ class Switch:
         self.wait_timeout = Timer(2, count=4)
 
     def add_state(self, state, check_button, click_button=None, offset=0):
-        """
-        Args:
-            state (str): State name but cannot use 'unknown' as state name
-            check_button (Button):
-            click_button (Button):
-            offset (bool, int, tuple):
-        """
+        """'unknown' 是检测保留值，不能注册为状态名。"""
         if state == "unknown":
             raise ScriptError(UNKNOWN_STATE_NAME_MESSAGE)
         self.state_list.append(
@@ -67,23 +45,10 @@ class Switch:
             data["offset"] = value
 
     def appear(self, main):
-        """
-        Args:
-            main (ModuleBase):
-
-        Returns:
-            bool:
-        """
         return self.get(main=main) != "unknown"
 
     def get(self, main):
-        """
-        Args:
-            main (ModuleBase):
-
-        Returns:
-            str: state name or 'unknown'.
-        """
+        """未匹配任何已知状态时返回 'unknown'。"""
         for data in self.state_list:
             if main.appear(data["check_button"], offset=data["offset"]):
                 return data["state"]
@@ -91,25 +56,11 @@ class Switch:
         return "unknown"
 
     def click(self, state, main):
-        """
-        Args:
-            state (str):
-            main (ModuleBase):
-        """
         button = self.get_data(state)["click_button"]
         main.device.click(button)
 
     def get_data(self, state):
-        """
-        Args:
-            state (str):
-
-        Returns:
-            dict: Dictionary in add_state
-
-        Raises:
-            ScriptError: If state invalid
-        """
+        """状态未注册时抛出 ScriptError。"""
         for row in self.state_list:
             if row["state"] == state:
                 return row
@@ -118,27 +69,10 @@ class Switch:
         raise ScriptError(message)
 
     def handle_additional(self, _main):
-        """
-        额外弹窗处理钩子。
-
-        Args:
-            _main (ModuleBase): 调用开关的模块；默认实现不需要。
-
-        Returns:
-            bool: 是否已处理。
-        """
+        """额外弹窗处理钩子；默认表示未处理。"""
         return False
 
     def set(self, state, main, skip_first_screenshot=True):
-        """
-        Args:
-            state:
-            main (ModuleBase):
-            skip_first_screenshot (bool):
-
-        Returns:
-            bool: If clicked
-        """
         logger.info(f"{self.name} set to {state}")
         self.get_data(state)
 
@@ -152,36 +86,27 @@ class Switch:
             else:
                 main.device.screenshot()
 
-            # Detect
             current = self.get(main=main)
             logger.attr(self.name, current)
 
-            # End
             if current == state:
                 return changed
 
-            # Handle additional popups
             if self.handle_additional(main):
                 continue
 
-            # Warning
             if current == "unknown":
                 if unknown_timer.reached():
                     logger.warning(f"Switch {self.name} has states evaluated to unknown, asset should be re-verified")
                     has_unknown = True
                     unknown_timer.reset()
-                # If unknown_timer never reached, don't click when having an unknown state,
-                # the unknown state is probably the switching animation.
-                # If unknown_timer reached once, click target state ignoring whether state is unknown or not,
-                # the unknown state is probably a new state not yet added.
-                # By ignoring new states, Switch.set() can still switch among known states.
+                # 短暂 unknown 通常是切换动画，不点击；持续超时则可能是未注册的新状态。
+                # 此时忽略新状态，仍允许在已知状态间切换。
                 if not has_unknown:
                     continue
             else:
-                # Known state, reset timer
                 unknown_timer.reset()
 
-            # Click
             if click_timer.reached():
                 # 选择器点击目标；普通开关点击当前状态，unknown 没有可点位置时退回目标状态。
                 click_state = state if self.is_selector or current == "unknown" else current
@@ -193,16 +118,6 @@ class Switch:
         return changed
 
     def wait(self, main, skip_first_screenshot=True):
-        """
-        Wait until any state activated
-
-        Args:
-            main (ModuleBase):
-            skip_first_screenshot:
-
-        Returns:
-            bool: If success
-        """
         timeout = self.wait_timeout.reset()
         while 1:
             if skip_first_screenshot:
@@ -210,18 +125,15 @@ class Switch:
             else:
                 main.device.screenshot()
 
-            # Detect
             current = self.get(main=main)
             logger.attr(self.name, current)
 
-            # End
             if current != "unknown":
                 return True
             if timeout.reached():
                 logger.warning(f"{self.name} wait activated timeout")
                 return False
 
-            # Handle additional popups
             if self.handle_additional(main):
                 continue
         return False

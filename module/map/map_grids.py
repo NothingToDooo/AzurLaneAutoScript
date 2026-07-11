@@ -30,45 +30,21 @@ class SelectedGrids:
 
     @property
     def location(self):
-        """
-        Returns:
-            list[tuple]:
-        """
         return [grid.location for grid in self.grids]
 
     @property
     def cost(self):
-        """
-        Returns:
-            list[int]:
-        """
         return [grid.cost for grid in self.grids]
 
     @property
     def weight(self):
-        """
-        Returns:
-            list[int]:
-        """
         return [grid.weight for grid in self.grids]
 
     @property
     def count(self):
-        """
-        Returns:
-            int:
-        """
         return len(self.grids)
 
     def select(self, **kwargs):
-        """
-        Args:
-            **kwargs: Attributes of Grid.
-
-        Returns:
-            SelectedGrids:
-        """
-
         def matched(obj):
             flag = True
             for k, v in kwargs.items():
@@ -96,16 +72,6 @@ class SelectedGrids:
         return self.indexes.get(values, SelectedGrids([]))
 
     def left_join(self, right, on_attr, set_attr, default=None):
-        """
-        Args:
-            right (SelectedGrids): Right table to join
-            on_attr:
-            set_attr:
-            default:
-
-        Returns:
-            SelectedGrids:
-        """
         right.create_index(*on_attr)
         for grid in self:
             attr_value = tuple([grid.__getattribute__(attr) for attr in on_attr])
@@ -120,82 +86,31 @@ class SelectedGrids:
         return self
 
     def filter(self, func):
-        """
-        Filter grids by a function.
-
-        Args:
-            func (callable): Function should receive an grid as argument, and return a bool.
-
-        Returns:
-            SelectedGrids:
-        """
+        """func 接收单个格子并返回是否保留。"""
         return SelectedGrids([grid for grid in self if func(grid)])
 
     def set(self, **kwargs):
-        """
-        Set attribute to each grid.
-
-        Args:
-            **kwargs:
-        """
         for grid in self:
             for key, value in kwargs.items():
                 grid.__setattr__(key, value)
 
     def get(self, attr):
-        """
-        Get an attribute from each grid.
-
-        Args:
-            attr: Attribute name.
-
-        Returns:
-            list:
-        """
         return [grid.__getattribute__(attr) for grid in self.grids]
 
     def call(self, func, **kwargs):
-        """
-        Call a function in reach grid, and get results.
-
-        Args:
-            func (str): Function name to call.
-            **kwargs:
-
-        Returns:
-            list:
-        """
         return [grid.__getattribute__(func)(**kwargs) for grid in self]
 
     def first_or_none(self):
-        """
-        返回第一个格子；没有格子时返回 None。
-        """
         try:
             return self.grids[0]
         except IndexError:
             return None
 
     def add(self, grids):
-        """
-        Args:
-            grids(SelectedGrids):
-
-        Returns:
-            SelectedGrids:
-        """
         return SelectedGrids(list(set(self.grids + grids.grids)))
 
     def add_by_eq(self, grids):
-        """
-        Another `add()` method, but de-duplicates with `__eq__` instead of `__hash__`.
-
-        Args:
-            grids(SelectedGrids):
-
-        Returns:
-            SelectedGrids:
-        """
+        """按 __eq__ 而非 __hash__ 去重后合并。"""
         new = []
         for grid in self.grids + grids.grids:
             if grid not in new:
@@ -204,46 +119,17 @@ class SelectedGrids:
         return SelectedGrids(new)
 
     def intersect(self, grids):
-        """
-        Args:
-            grids(SelectedGrids):
-
-        Returns:
-            SelectedGrids:
-        """
         return SelectedGrids(list(set(self.grids).intersection(set(grids.grids))))
 
     def intersect_by_eq(self, grids):
-        """
-        Another `intersect()` method, but de-duplicates with `__eq__` instead of `__hash__`.
-
-        Args:
-            grids(SelectedGrids):
-
-        Returns:
-            SelectedGrids:
-        """
+        """按 __eq__ 而非 __hash__ 求交集。"""
         return SelectedGrids([grid for grid in self.grids if grid in grids.grids])
 
     def delete(self, grids):
-        """
-        Args:
-            grids(SelectedGrids):
-
-        Returns:
-            SelectedGrids:
-        """
         g = [grid for grid in self.grids if grid not in grids]
         return SelectedGrids(g)
 
     def sort(self, *args):
-        """
-        Args:
-            args (str): Attribute name to sort.
-
-        Returns:
-            SelectedGrids:
-        """
         if not self:
             return self
         if args:
@@ -252,13 +138,6 @@ class SelectedGrids:
         return self
 
     def sort_by_camera_distance(self, camera):
-        """
-        Args:
-            camera (tuple):
-
-        Returns:
-            SelectedGrids:
-        """
         if not self:
             return self
         location = np.array(self.location)
@@ -267,15 +146,7 @@ class SelectedGrids:
         return SelectedGrids(grids)
 
     def sort_by_clock_degree(self, center=(0, 0), start=(0, 1), clockwise=True):
-        """
-        Args:
-            center (tuple): Origin point.
-            start (tuple): Start coordinate, this point will be considered as theta=0.
-            clockwise (bool): True for clockwise, false for counterclockwise.
-
-        Returns:
-            SelectedGrids:
-        """
+        """以 center 为原点、start 方向为 0°，按顺时针或逆时针排序。"""
         if not self:
             return self
         vector = np.subtract(self.location, center)
@@ -291,10 +162,6 @@ class SelectedGrids:
 
 class RoadGrids:
     def __init__(self, grids):
-        """
-        Args:
-            grids (list):
-        """
         self.grids = []
         for grid in grids:
             if isinstance(grid, list):
@@ -306,10 +173,6 @@ class RoadGrids:
         return str(" - ".join([str(grid) for grid in self.grids]))
 
     def roadblocks(self):
-        """
-        Returns:
-            SelectedGrids:
-        """
         grids = []
         for block in self.grids:
             if block.count == block.select(is_enemy=True).count:
@@ -317,10 +180,6 @@ class RoadGrids:
         return SelectedGrids(grids)
 
     def potential_roadblocks(self):
-        """
-        Returns:
-            SelectedGrids:
-        """
         grids = []
         for block in self.grids:
             if any(grid.is_fleet for grid in block):
@@ -332,10 +191,6 @@ class RoadGrids:
         return SelectedGrids(grids)
 
     def first_roadblocks(self):
-        """
-        Returns:
-            SelectedGrids:
-        """
         grids = []
         for block in self.grids:
             if any(grid.is_fleet for grid in block):
@@ -347,13 +202,6 @@ class RoadGrids:
         return SelectedGrids(grids)
 
     def combine(self, road):
-        """
-        Args:
-            road (RoadGrids):
-
-        Returns:
-            RoadGrids:
-        """
         out = RoadGrids([])
         for select_1 in self.grids:
             for select_2 in road.grids:

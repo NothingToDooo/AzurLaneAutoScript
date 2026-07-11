@@ -67,8 +67,7 @@ class MapEventHandler(EnemySearchingHandler):
 
     def handle_ash_popup(self):
         name = "ASH"
-        # 2021.12.09
-        # Ash 弹窗不再显示红字，改用 `Ashes Coordinates` 文字识别。
+        # 2021-12-09 起 Ash 弹窗不再显示红字，改用 `Ashes Coordinates` 文字识别。
         if (
             self.appear(POPUP_CONFIRM, offset=self._popup_offset)
             and self.appear(POPUP_CANCEL, offset=self._popup_offset, interval=2)
@@ -82,10 +81,7 @@ class MapEventHandler(EnemySearchingHandler):
         return False
 
     def handle_map_event(self):
-        """
-        Returns:
-            str: Event that handled
-        """
+        """返回已处理的事件名；没有事件时返回空字符串。"""
         for handler, event in _MAP_EVENT_HANDLERS:
             if getattr(self, handler)():
                 return event
@@ -107,15 +103,11 @@ class MapEventHandler(EnemySearchingHandler):
         for _ in self.loop():
             if self.handle_map_event():
                 continue
-            # End
             if self.handle_os_in_map():
                 break
 
     def os_auto_search_quit(self):
-        """
-        Returns:
-            bool: True if current map cleared
-        """
+        """退出自动搜索，并返回当前地图是否已清空。"""
         confirm_timer = Timer(1.2, count=3).start()
         cleared = False
         for _ in self.loop():
@@ -148,7 +140,6 @@ class MapEventHandler(EnemySearchingHandler):
                 confirm_timer.reset()
                 continue
 
-            # End
             if self.is_in_map():
                 if confirm_timer.reached():
                     break
@@ -158,13 +149,7 @@ class MapEventHandler(EnemySearchingHandler):
         return cleared
 
     def handle_os_auto_search_map_option(self, enable=True):
-        """
-        Args:
-            enable (bool): True/False, or None for doing nothing.
-
-        Returns:
-            bool: 是否点击。
-        """
+        """enable 为 None 时不切换；搜索结束时退出并抛出 CampaignEnd。"""
         if (
             self.match_template_color(os_assets.AUTO_SEARCH_OS_MAP_OPTION_OFF, offset=(5, 120))
             and self.info_bar_count() >= 2
@@ -206,13 +191,6 @@ class MapEventHandler(EnemySearchingHandler):
         return False
 
     def handle_os_map_fleet_lock(self, enable=None):
-        """
-        Args:
-            enable (bool): Default to None, use Campaign_UseFleetLock.
-
-        Returns:
-            bool: If switched.
-        """
         # 舰队锁定依赖按钮是否出现在地图上，而不是地图状态。
         # 已经在地图内时不会再显示地图状态。
         if not fleet_lock.appear(main=self):

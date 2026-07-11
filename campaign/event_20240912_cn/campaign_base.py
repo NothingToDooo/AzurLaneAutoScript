@@ -10,13 +10,6 @@ MODE_SWITCH_20240912.add_state("story", SWITCH_20241219_STORY, offset=(444, 4))
 
 class CampaignBase(CampaignBase_):
     def campaign_ensure_mode(self, mode="normal"):
-        """
-        Args:
-            mode (str): 'normal', 'hard', 'ex', 'story'
-
-        Returns:
-            bool: If mode changed.
-        """
         # event_20240912_cn has two mode switches at bottom
         # The classic one, MODE_SWITCH_* is at bottom-left,
         # and MODE_SWITCH_20240912 is at bottom-middle

@@ -15,17 +15,7 @@ class BeaconReward(Combat, UI):
         return self.appear(mr_assets.META_REWARD_NOTICE, threshold=30)
 
     def meta_reward_receive(self, skip_first_screenshot=True):
-        """
-        Args:
-            skip_first_screenshot:
-
-        Returns:
-            bool: If received.
-
-        Pages:
-            in: page_meta or REWARD_CHECK
-            out: REWARD_CHECK
-        """
+        """从 META 页或奖励页领取奖励，结束于 REWARD_CHECK 并返回是否实际领取。"""
         logger.hr("Meta reward receive", level=1)
         confirm_timer = Timer(1, count=3).start()
         received = False
@@ -70,18 +60,7 @@ class BeaconReward(Combat, UI):
         )
 
     def meta_sync_receive(self, skip_first_screenshot=True):
-        """
-        Args:
-            skip_first_screenshot:
-
-        Returns:
-            bool: If received.
-
-        Pages:
-            in: SYNC_ENTER
-            out: SYNC_ENTER if meta ship synced < 100%
-                REWARD_ENTER if meta ship synced >= 100%
-        """
+        """领取同步奖励并返回是否实际领取；未满 100% 停在 SYNC_ENTER，满 100% 停在 REWARD_ENTER。"""
         logger.hr("Meta sync receive", level=1)
         received = False
         while 1:
@@ -99,7 +78,6 @@ class BeaconReward(Combat, UI):
                 logger.info("meta_sync_receive ends at SYNC_ENTER")
                 break
 
-            # 点击领取。
             if self.handle_popup_confirm("META_REWARD"):
                 # 锁定新的 META 舰船。
                 continue
@@ -122,9 +100,7 @@ class BeaconReward(Combat, UI):
         return received
 
     def meta_wait_reward_page(self, skip_first_screenshot=True):
-        """
-        Wait the circle loading animation
-        """
+        """等待圆形加载动画结束，最多两秒。"""
         timeout = Timer(2, count=6).start()
         while 1:
             if skip_first_screenshot:
@@ -162,7 +138,6 @@ class BeaconReward(Combat, UI):
         else:
             logger.info("No meta sync red dot or sync tap")
 
-        # META 奖励。
         if self.meta_reward_notice_appear():
             logger.info("Found meta reward red dot")
             self.meta_reward_receive()
@@ -172,13 +147,7 @@ class BeaconReward(Combat, UI):
 
 class DossierReward(Combat, UI):
     def meta_reward_notice_appear(self):
-        """
-        Returns:
-            bool: If appear.
-
-        Page:
-            in: dossier meta page
-        """
+        """在档案 META 页判断奖励红点是否出现。"""
         self.device.screenshot()
         if self.appear(mr_assets.DOSSIER_REWARD_RECEIVE, offset=(-40, 10, -10, 40), similarity=0.7):
             logger.info("Found dossier reward red dot")
@@ -187,11 +156,7 @@ class DossierReward(Combat, UI):
         return False
 
     def meta_reward_enter(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: dossier meta page
-            out: DOSSIER_REWARD_CHECK
-        """
+        """从档案 META 页进入 DOSSIER_REWARD_CHECK。"""
         logger.info("Dossier reward enter")
         while 1:
             if skip_first_screenshot:
@@ -203,22 +168,11 @@ class DossierReward(Combat, UI):
                 self.device.click(mr_assets.DOSSIER_REWARD_ENTER)
                 continue
 
-            # 结束。
             if self.appear(mr_assets.DOSSIER_REWARD_CHECK, offset=(20, 20)):
                 break
 
     def meta_reward_receive(self, skip_first_screenshot=True):
-        """
-        Args:
-            skip_first_screenshot:
-
-        Returns:
-            bool: If received.
-
-        Pages:
-            in: DOSSIER_REWARD_CHECK
-            out: DOSSIER_REWARD_CHECK
-        """
+        """在档案奖励页领取全部奖励，返回是否实际领取。"""
         logger.hr("Dossier reward receive", level=1)
         confirm_timer = Timer(1, count=3).start()
         received = False
@@ -245,7 +199,6 @@ class DossierReward(Combat, UI):
                 confirm_timer.reset()
                 continue
 
-            # 结束。
             if not self.appear(mr_assets.DOSSIER_REWARD_RECEIVE, offset=(20, 20)):
                 if confirm_timer.reached():
                     break

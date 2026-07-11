@@ -7,9 +7,7 @@ from module.logger import logger
 
 
 def timer(function):
-    """
-    记录函数执行耗时，仅用于调试和生成流程。
-    """
+    """记录函数执行耗时，仅用于调试和生成流程。"""
 
     @wraps(function)
     def function_timer(*args, **kwargs):
@@ -23,7 +21,6 @@ def timer(function):
 
 
 def future_time(string):
-    """返回指定时分对应的未来时间。"""
     hour, minute = [int(x) for x in string.split(":")]
     now = datetime.now()
     future = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
@@ -33,7 +30,6 @@ def future_time(string):
 
 
 def past_time(string):
-    """返回指定时分对应的过去时间。"""
     hour, minute = [int(x) for x in string.split(":")]
     now = datetime.now()
     past = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
@@ -43,13 +39,7 @@ def past_time(string):
 
 
 def future_time_range(string):
-    """
-    Args:
-        string (str): Such as 23:30-06:30.
-
-    Returns:
-        tuple(datetime.datetime): (time start, time end).
-    """
+    """把 `23:30-06:30` 转为未来起止时间；跨午夜时起点落在前一天。"""
     start, end = [future_time(s) for s in string.split("-")]
     if start > end:
         start = start - timedelta(days=1)
@@ -57,26 +47,12 @@ def future_time_range(string):
 
 
 def time_range_active(time_range):
-    """
-    Args:
-        time_range(tuple(datetime.datetime)): (time start, time end).
-
-    Returns:
-        bool:
-    """
     return time_range[0] < datetime.now() < time_range[1]
 
 
 class Timer:
     def __init__(self, limit, count=0):
-        """
-        Dual timer for time count and access count.
-        Access count can provide robustness on slow devices where screen shot time cost > timer.limit
-
-        Args:
-            limit (int | float): Timer limit
-            count (int): Timer access count. Default to 0.
-        """
+        """同时按秒数 limit 和访问次数 count 判定，避免慢设备仅凭截图耗时提前触发。"""
         self.limit = limit
         self.count = count
         self._start = 0.0
@@ -84,27 +60,11 @@ class Timer:
 
     @classmethod
     def from_seconds(cls, limit, speed=0.5) -> Self:
-        """
-        Create timer from given seconds
-
-        Args:
-            limit (int | float):
-            speed (int | float): Approximate screen shot time cost
-                if time cost > 0.5s, device is considered slow
-        """
+        """按估计的单次截图耗时 speed 换算访问次数。"""
         count = int(limit / speed)
         return cls(limit, count=count)
 
     def start(self):
-        """
-        Start current timer.
-        If timer not started, reached() always return True. So we can have fast first try on:
-
-        interval = Timer(2)
-        while 1:
-            if interval.reached():
-                pass
-        """
         if self._start <= 0:
             self._start = time()
             self._access = 0
@@ -112,17 +72,9 @@ class Timer:
         return self
 
     def started(self):
-        """
-        Returns:
-            bool:
-        """
         return self._start > 0
 
     def current_time(self):
-        """
-        Returns:
-            float:
-        """
         if self._start > 0:
             diff = time() - self._start
             if diff < 0:
@@ -131,10 +83,6 @@ class Timer:
         return 0.0
 
     def current_count(self):
-        """
-        Returns:
-            int:
-        """
         return self._access
 
     def add_count(self):
@@ -142,47 +90,29 @@ class Timer:
         return self
 
     def reached(self):
-        """
-        Returns:
-            bool:
-        """
-        # each reached() call is consider as an access
+        """每次调用计一次访问；未启动时返回 True，以允许首次立即执行。"""
         self._access += 1
         if self._start > 0:
             return self._access > self.count and time() - self._start > self.limit
-        # not started, return True for fast first try
         return True
 
     def reset(self):
-        """
-        Reset the timer as if it just started
-        """
         self._start = time()
         self._access = 0
         return self
 
     def clear(self):
-        """
-        Reset the timer as if it never started
-        """
         self._start = 0.0
         self._access = self.count
         return self
 
     def reached_and_reset(self):
-        """
-        Returns:
-            bool:
-        """
         if self.reached():
             self.reset()
             return True
         return False
 
     def wait(self):
-        """
-        Wait until timer reached.
-        """
         diff = self._start + self.limit - time()
         if diff > 0:
             sleep(diff)
@@ -191,7 +121,6 @@ class Timer:
         logger.info(str(self))
 
     def __str__(self):
-        # 字符串会显示当前耗时、限制和计数。
         return f"Timer(limit={round(self.current_time(), 3)}/{self.limit}, count={self._access}/{self.count})"
 
     __repr__ = __str__

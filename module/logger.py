@@ -39,12 +39,10 @@ def empty_function(*args, **kwargs):
     pass
 
 
-# cnocr will set root logger in cnocr.utils
-# Delete logging.basicConfig to avoid logging the same message twice.
+# cnocr 会设置根日志器；禁用 basicConfig 可避免同一消息重复输出。
 vars(logging)["basicConfig"] = empty_function
-logging.raiseExceptions = True  # Set True if wanna see encode errors on console
+logging.raiseExceptions = True
 
-# Remove HTTP keywords (GET, POST etc.)
 RichHandler.KEYWORDS = []
 
 
@@ -59,10 +57,6 @@ class RichFileHandler(RichHandler):
 
 
 class RichRenderableHandler(RichHandler):
-    """
-    将 renderable 传入回调函数。
-    """
-
     def __init__(self, *args, func: Callable[[ConsoleRenderable], None] | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         self._func = func
@@ -100,7 +94,6 @@ class RichRenderableHandler(RichHandler):
         message_renderable = self.render_message(record, message)
         log_renderable = self.render(record=record, traceback=traceback, message_renderable=message_renderable)
 
-        # 直接把 renderable 交给回调函数。
         self.emit_renderable(log_renderable)
 
     def handle(self, record: logging.LogRecord) -> bool:
@@ -110,11 +103,6 @@ class RichRenderableHandler(RichHandler):
 
 
 class HTMLConsole(Console):
-    """
-    Force full feature console
-    but not working lol :(
-    """
-
     @property
     def options(self) -> ConsoleOptions:
         return ConsoleOptions(
@@ -156,7 +144,6 @@ WEB_THEME = Theme(
 )
 
 
-# 初始化日志。
 logger_debug = False
 logger = cast("AlasLogger", logging.getLogger("alas"))
 logger.setLevel(logging.DEBUG if logger_debug else logging.INFO)
@@ -167,7 +154,6 @@ file_formatter = logging.Formatter(
 console_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d │ %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 web_formatter = logging.Formatter(fmt="%(asctime)s.%(msecs)03d │ %(message)s", datefmt="%H:%M:%S")
 
-# 添加 rich 控制台日志。
 stdout_console = console = Console()
 console_hdlr = RichHandler(
     show_path=False,
@@ -179,10 +165,9 @@ console_hdlr = RichHandler(
 console_hdlr.setFormatter(console_formatter)
 logger.addHandler(console_hdlr)
 
-# Ensure running in Alas root folder
+# 后续相对路径均以仓库根目录为基准。
 os.chdir(Path(__file__).resolve().parents[1])
 
-# Add file logger
 pyw_name = Path(sys.argv[0]).stem
 
 
@@ -222,7 +207,6 @@ def set_file_logger(name=pyw_name):
 
 
 def get_log_file() -> str:
-    """返回当前文件日志路径。"""
     log_file = _logger_state["log_file"]
     if log_file is None:
         msg = "File logger is not initialized"
@@ -362,9 +346,7 @@ def show():
     logger.info(r"Brace { [ ( ) ] }")
     logger.info(r"True, False, None")
     logger.info(r"F:/alas/gui.py, F:/alas/alas.py, ./relative/path/log.txt")
-    # Line before exception
     raise LoggerDemoError(LOGGER_DEMO_ERROR_MESSAGE)
-    # Line below exception
 
 
 def error_convert(func):

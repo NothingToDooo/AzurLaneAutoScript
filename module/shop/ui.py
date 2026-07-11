@@ -32,16 +32,7 @@ class ShopUI(UI):
 
     @cached_property
     def _shop_bottom_navbar(self):
-        """
-        Below information relative to after
-        shop_swipe
-        shop_bottom_navbar 5 options
-            medal
-            guild.
-            prototype.
-            core.
-            merit.
-        """
+        """底部导航从左到右为勋章、舰队、原型、核心、功勋。"""
         shop_bottom_navbar = ButtonGrid(
             origin=(399, 619), delta=(182, 0), button_shape=(56, 42), grid_shape=(5, 1), name="SHOP_BOTTOM_NAVBAR"
         )
@@ -55,7 +46,6 @@ class ShopUI(UI):
         )
 
     def shop_bottom_navbar_ensure(self, left=None, right=None):
-        """确保商店底部导航栏已经切换到目标范围。"""
         return self._shop_bottom_navbar.set(self, NavbarTarget(left=left, right=right))
 
     @cached_property
@@ -134,10 +124,6 @@ class ShopUI(UI):
         return refreshed
 
     def shop_refresh(self):
-        """
-        Returns:
-            bool: If refreshed
-        """
         logger.info("Shop refresh")
         self._open_shop_refresh_confirm()
         refreshed = self._confirm_shop_refresh()
@@ -145,15 +131,7 @@ class ShopUI(UI):
         return refreshed
 
     def ui_goto_shop(self):
-        """
-        Goes to page_munitions
-        This route guarantees start
-        in general shop
-
-        Pages:
-            in: Any
-            out: page_munitions
-        """
+        """从任意页面进入军需商店，并保证落在普通商店。"""
         if self.ui_get_current_page() == page_munitions:
             logger.info(f"Already at {page_munitions}")
             return
@@ -170,6 +148,6 @@ class ShopUI(UI):
             if self.appear(page_munitions.check_button, offset=(20, 20)):
                 break
 
-            # Large offset cause it camera in academy can be move around
+            # 学院镜头可移动，因此使用较大匹配偏移。
             if self.appear_then_click(ACADEMY_GOTO_MUNITIONS, offset=(200, 200), interval=5):
                 continue

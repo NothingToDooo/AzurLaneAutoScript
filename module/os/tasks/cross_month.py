@@ -20,7 +20,6 @@ class OpsiCrossMonth(OSMap):
         self.config.task_stop()
 
     def os_cross_month(self):
-        """执行大世界跨月清理流程。"""
         next_reset = get_os_next_reset()
         self._validate_opsi_cross_month_start(next_reset)
         self._wait_until_opsi_reset(next_reset)

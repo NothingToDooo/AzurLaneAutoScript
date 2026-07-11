@@ -34,10 +34,6 @@ class Screenshot:
         super().__init__(*args, **kwargs)
 
     def screenshot(self):
-        """
-        Returns:
-            np.ndarray:
-        """
         self._screenshot_interval.wait()
         self._screenshot_interval.reset()
 
@@ -60,13 +56,6 @@ class Screenshot:
         return hasattr(self, "image") and self.image is not None
 
     def _handle_orientated_image(self, image):
-        """
-        Args:
-            image (np.ndarray):
-
-        Returns:
-            np.ndarray:
-        """
         width, height = image_size(self.image)
         if width == 1280 and height == 720:
             return image
@@ -101,12 +90,7 @@ class Screenshot:
         self._screenshot_interval.clear()
 
     def screenshot_interval_set(self, interval=None):
-        """
-        Args:
-            interval (int, float, str):
-                Minimum interval between 2 screenshots in seconds.
-                Or None for Optimization_ScreenshotInterval, 'combat' for Optimization_CombatScreenshotInterval
-        """
+        """interval 为截图间隔秒数；None 读取默认配置，'combat' 读取战斗配置。"""
         if interval is None:
             origin = self.config.Optimization_ScreenshotInterval
             interval = limit_in(origin, 0.1, 0.3)
@@ -122,7 +106,6 @@ class Screenshot:
                 logger.warning(f"Optimization.CombatScreenshotInterval {origin} is revised to {interval}")
                 self.config.Optimization_CombatScreenshotInterval = interval
         elif isinstance(interval, (int, float)):
-            # No limitation for manual set in code
             pass
         else:
             logger.warning(f"Unknown screenshot interval: {interval}")
@@ -143,16 +126,12 @@ class Screenshot:
         save_image(self.image, file)
 
     def check_screen_size(self):
-        """
-        Screen size must be 1280x720.
-        Take a screenshot before call.
-        """
+        """调用前必须已截图，期望方向校正后为 1280x720。"""
         if self._screen_size_checked:
             return True
 
         orientated = False
         for _ in range(2):
-            # Check screen size
             width, height = image_size(self.image)
             logger.attr("Screen_size", f"{width}x{height}")
             if width == 1280 and height == 720:

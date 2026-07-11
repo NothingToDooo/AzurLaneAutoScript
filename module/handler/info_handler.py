@@ -14,13 +14,6 @@ from module.ui_white.assets import POPUP_CANCEL_WHITE, POPUP_CONFIRM_WHITE, POPU
 
 
 def info_letter_preprocess(image):
-    """
-    Args:
-        image (np.ndarray):
-
-    Returns:
-        np.ndarray
-    """
     image = image.astype(float)
     image = (image - 64) / 0.75
     image[image > 255] = 255
@@ -29,21 +22,8 @@ def info_letter_preprocess(image):
 
 
 class InfoHandler(ModuleBase):
-    """
-    Class to handle all kinds of message.
-    """
-
-    """
-    Info bar
-    """
-
     def info_bar_count(self):
-        """
-        Detect info bar by the blue lines on the top of it.
-
-        Returns:
-            int:
-        """
+        """按顶部蓝线识别信息条数量。"""
         image = self.image_crop(handler_assets.INFO_BAR_AREA, copy=False)
         line = cv2.reduce(image, 1, cv2.REDUCE_AVG)
         line = color_similarity_2d(line, color=(107, 158, 255))[:, 0]
@@ -51,7 +31,7 @@ class InfoHandler(ModuleBase):
         parameters = {
             "height": 235,
             "prominence": 50,
-            # Blue lines are in a interval of 56
+            # 蓝线间距为 56 像素。
             "distance": 50,
         }
         peaks, _ = signal.find_peaks(line, **parameters)
@@ -81,15 +61,11 @@ class InfoHandler(ModuleBase):
             if self.handle_info_bar():
                 handled = True
 
-            # 结束。
             if timeout.reached():
                 break
 
         return handled
 
-    """
-    Popup info
-    """
     _popup_offset = (3, 30)
 
     def handle_popup_confirm(self, name="", offset=None, interval=2):
@@ -154,18 +130,13 @@ class InfoHandler(ModuleBase):
     _hot_fix_check_wait = Timer(6)
 
     def handle_urgent_commission(self):
-        """
-        Returns:
-            bool:
-        """
         appear = self.appear(handler_assets.GET_MISSION, offset=True, interval=2)
         if appear:
             logger.info("Get urgent commission")
             self.device.click(handler_assets.GET_MISSION)
             self._hot_fix_check_wait.reset()
 
-        # Check game client existence after 3s to 6s
-        # Hot fixes will kill AL if you clicked the confirm button
+        # 点击确认后热修复会关闭客户端，因此在 3～6 秒窗口检查进程。
         if self._hot_fix_check_wait.reached():
             self._hot_fix_check_wait.clear()
         if self._hot_fix_check_wait.started() and 3 <= self._hot_fix_check_wait.current_time() <= 6:
@@ -177,7 +148,7 @@ class InfoHandler(ModuleBase):
                 logger.error(
                     "Account logged out, probably because account kicked by server maintenance or another log in"
                 )
-                # Kill game, because game patches after maintenance can only be downloaded at game startup
+                # 维护补丁仅在客户端启动时下载；检测到维护登出后结束进程，后续必须重启。
                 self.device.app_stop()
                 raise GameNotRunningError
             self._hot_fix_check_wait.clear()
@@ -215,7 +186,8 @@ class InfoHandler(ModuleBase):
                     self.device.click(handler_assets.USE_DATA_KEY_NOTIFIED)
                     continue
 
-            self.config.USE_DATA_KEY = False  # Reset on success as task can be stopped before can be recovered
+            # 成功后立即关闭开关，避免任务在恢复前停止而重复消耗数据钥匙。
+            self.config.USE_DATA_KEY = False
 
             # 点击确认。
             # 数据钥匙页面的 POPUP_CONFIRM 和标准按钮略有不同，因此这里直接绑定点击。
@@ -232,38 +204,19 @@ class InfoHandler(ModuleBase):
         return False
 
     def handle_vote_popup(self):
-        """
-        Dismiss vote pop-ups.
-
-        Returns:
-            bool:
-        """
         # 投票弹窗已于 2023 年移除。
         return False
 
     def handle_get_skin(self):
-        """
-        Returns:
-            bool:
-        """
         return self.appear_then_click(handler_assets.GET_SKIN, offset=(20, 20), interval=2)
 
     def handle_get_items_ship(self):
-        """
-        2026.06.12 added different GET_ITEMS popup when getting ship
-
-        Returns:
-            bool:
-        """
+        """兼容 2026-06-12 起获得舰船时使用的独立 GET_ITEMS 弹窗。"""
         if self.appear(handler_assets.GET_ITEMS_SHIP_1, offset=5, interval=2):
             self.device.click(handler_assets.GET_ITEMS_SHIP_1)
             return True
 
         return False
-
-    """
-    Guild popup info
-    """
 
     def handle_guild_popup_confirm(self):
         if self.appear(handler_assets.GUILD_POPUP_CANCEL, offset=self._popup_offset) and self.appear(
@@ -283,10 +236,6 @@ class InfoHandler(ModuleBase):
 
         return False
 
-    """
-    Mission popup info
-    """
-
     def handle_mission_popup_go(self):
         if self.appear(handler_assets.MISSION_POPUP_ACK, offset=self._popup_offset) and self.appear(
             handler_assets.MISSION_POPUP_GO, offset=self._popup_offset, interval=2
@@ -305,9 +254,6 @@ class InfoHandler(ModuleBase):
 
         return False
 
-    """
-    Story
-    """
     story_popup_timeout = Timer(10, count=20)
     map_has_clear_mode = False  # 会在 fast_forward.py 中覆盖。
     map_is_threat_safe = False
@@ -318,13 +264,10 @@ class InfoHandler(ModuleBase):
     _story_option_confirm = Timer(0.3, count=0)
 
     def _story_option_buttons(self):
-        """
-        Returns:
-            list[Button]: List of story options, from upper to bottom. If no option found, return an empty list.
-        """
-        # Area to detect the options, should include at least 3 options.
+        """返回从上到下的剧情选项按钮；未识别时返回空列表。"""
+        # 检测区域至少覆盖 3 个选项。
         story_option_area = (730, 188, 1140, 480)
-        # Background color of the left part of the option.
+        # 选项左侧的背景色。
         story_option_color = (99, 121, 156)
         image = color_similarity_2d(self.image_crop(story_option_area, copy=False), color=story_option_color) > 225
         x_count = np.where(np.sum(image, axis=0) > 40)[0]
@@ -333,14 +276,11 @@ class InfoHandler(ModuleBase):
         x_min, x_max = np.min(x_count), np.max(x_count)
 
         parameters = {
-            # Option is 300`320px x 50~52px.
+            # 单个选项约 300～320 × 50～52 像素。
             "height": 280,
             "width": 45,
             "distance": 50,
-            # Chooses the relative height at which the peak width is measured as a percentage of its prominence.
-            # 1.0 calculates the width of the peak at its lowest contour line,
-            # while 0.5 evaluates at half the prominence height.
-            # Must be at least 0.
+            # scipy 的 rel_height 按 prominence 比例测宽：1.0 对应最低等高线，0.5 对应半突出度，且不得小于 0。
             "rel_height": 5,
         }
         y_count = np.sum(image, axis=1)
@@ -359,11 +299,8 @@ class InfoHandler(ModuleBase):
         return buttons
 
     def _story_option_buttons_2(self):
-        """
-        Returns:
-            list[Button]: List of story options, from upper to bottom. If no option found, return an empty list.
-        """
-        # Area to detect the options, should include at least 3 options.
+        """返回从上到下的新版剧情选项按钮；未识别时返回空列表。"""
+        # 检测区域至少覆盖 3 个选项。
         story_option_area = (330, 135, 980, 555)
         story_detect_area = (330, 135, 355, 555)
         story_option_color = (247, 247, 247)
@@ -375,15 +312,11 @@ class InfoHandler(ModuleBase):
         line[line >= 200] = 255
 
         parameters = {
-            # Option is 300`320px x 50~52px.
+            # 单个选项约 300～320 × 50～52 像素。
             "height": 200,
             "width": 40,
             "distance": 40,
-            # Chooses the relative height at which the peak width is measured as a percentage of its prominence.
-            # 1.0 calculates the width of the peak at its lowest contour line,
-            # while 0.5 evaluates at half the prominence height.
-            # Must be at least 0.
-            # rel_height is about 240 / 48
+            # scipy 的 rel_height 按 prominence 比例测宽：1.0 对应最低等高线，0.5 对应半突出度，且不得小于 0。
             "rel_height": 4,
         }
         peaks, properties = signal.find_peaks(line, **parameters)
@@ -415,10 +348,7 @@ class InfoHandler(ModuleBase):
         return color_similar(color, (0, 0, 0), threshold=10)
 
     def story_skip(self):
-        """
-        2023.09.14 剧情选项改为屏幕中部的大块白色选项，
-        需要检查 STORY_SKIP_3，但实际点击旧的 STORY_SKIP。
-        """
+        """2023-09-14 起检查中部白色 STORY_SKIP_3，但仍点击旧 STORY_SKIP。"""
         if self._handle_story_popup_confirm():
             return True
         if self._handle_story_letters_only():
@@ -548,15 +478,7 @@ class InfoHandler(ModuleBase):
         self.ensure_no_story()
         return True
 
-    """
-    Game tips
-    """
-
     def handle_game_tips(self):
-        """
-        Returns:
-            bool: If handled
-        """
         if self.appear(handler_assets.GAME_TIPS, offset=(20, 20), interval=2) and self.image_color_count(
             handler_assets.GAME_TIPS.button, color=(40, 40, 40), threshold=240, count=50
         ):
@@ -575,16 +497,7 @@ class InfoHandler(ModuleBase):
 
         return False
 
-    """
-    Manjuu loading
-    """
-
     def manjuu_count(self):
-        """
-        detect manjuu count by template matching
-        Returns:
-            int: Number of manjuu
-        """
         image = self.image_crop(handler_assets.MANJUU_AREA, copy=False)
         # Manjuu 表情会拉伸和缩小，默认 0.85 无法稳定匹配。
         # 使用 0.8 匹配变形后的表情。
@@ -592,21 +505,12 @@ class InfoHandler(ModuleBase):
         return len(buttons)
 
     def wait_until_manjuu_disappear(self):
-        """
-        Wait until manjuu loading disappear.
-        """
         while 1:
             self.device.screenshot()
             if not self.manjuu_count():
                 break
 
     def handle_manjuu(self):
-        """
-        Handle manjuu loading.
-
-        Returns:
-            bool: If handled
-        """
         count = self.manjuu_count()
         if count > 2:
             logger.info(f"Manjuu count: {count}, waiting for manjuu to disappear")

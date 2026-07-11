@@ -16,14 +16,9 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
         return self.appear(os_assets.ORDER_CHECK, offset=(20, 20))
 
     def order_enter(self):
-        """
-        Pages:
-            in: is_in_map
-            out: is_in_map_order
-        """
+        """从区域地图进入指令页。"""
         logger.info("Order enter")
         for _ in self.loop():
-            # 结束。
             if self.is_in_map_order():
                 break
 
@@ -37,11 +32,7 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
                 continue
 
     def order_quit(self):
-        """
-        Pages:
-            in: is_in_map_order
-            out: is_in_map
-        """
+        """从指令页返回区域地图。"""
         logger.info("Order quit")
         self.ui_click(
             os_assets.ORDER_CHECK,
@@ -51,17 +42,7 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
         )
 
     def order_execute(self, button):
-        """
-        Args:
-            button (Button): A button in navigational order page.
-
-        Returns:
-            bool: If success
-
-        Pages:
-            in: is_in_map
-            out: is_in_map
-        """
+        """在区域地图执行一项导航指令，结束后仍在区域地图。"""
         logger.hr(button)
         self.order_enter()
 
@@ -115,7 +96,6 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
 
     def wait_until_order_finished(self):
         for _ in self.loop():
-            # 结束。
             if self.is_in_map() and self.appear(os_assets.ORDER_ENTER, offset=(20, 20)):
                 break
 
@@ -125,22 +105,9 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
                 continue
 
     def os_order_execute(self, recon_scan=True, submarine_call=True):
-        """
-        Do navigational orders.
+        """在区域地图执行指令，侦察与潜艇冷却分别为 30、60 分钟。
 
-        Note that,
-        A recon_scan needs 30min to cool down, and a submarine_call needs 60min.
-        This method will force to use AP boxes.
-        If an order is still in CD, it will cost extra AP.
-        A recon_scan needs 10 AP at max, and a submarine_call needs 39 AP at max.
-
-        Args:
-            recon_scan (bool): If do recon scan
-            submarine_call (bool): If do submarine call
-
-        Pages:
-            in: is_in_map
-            out: is_in_map
+        冷却中会强制消耗行动力箱，最多分别消耗 10、39 行动力。
         """
         if recon_scan:
             recon_scan = self.order_execute(os_assets.ORDER_SCAN)
@@ -152,12 +119,7 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
         self.config.opsi_task_delay(recon_scan=recon_scan, submarine_call=submarine_call)
 
     def handle_map_cat_attack(self):
-        """
-        Click to skip the animation when cat attacks.
-
-        Overridden as button position matches with
-        MAP_EXIT for OpSi
-        """
+        """猫攻击按钮与大世界 MAP_EXIT 重叠，因此覆盖普通地图处理。"""
         if not self.map_cat_attack_timer.reached():
             return False
         if np.sum(color_similarity_2d(self.image_crop(MAP_CAT_ATTACK, copy=False), (255, 231, 123)) > 221) > 100:

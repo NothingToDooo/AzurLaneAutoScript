@@ -26,20 +26,12 @@ class AzurLaneUncensored(LoginHandler):
             f.write(localization_txt)
 
     def run(self):
-        """
-        执行本地反和谐流程：
-
-        1. 生成本地反和谐文件。
-        2. 推送文件到模拟器。
-        3. 重启游戏。
-        """
         folder = "./toolkit/AzurLaneUncensored"
 
         logger.hr("生成反和谐文件", level=1)
         Path(folder).mkdir(parents=True, exist_ok=True)
         prev = Path.cwd()
 
-        # 在 ./toolkit/AzurLaneUncensored 中生成推送目录。
         os.chdir(folder)
         self.create_level1_uncensored()
 
@@ -48,7 +40,6 @@ class AzurLaneUncensored(LoginHandler):
         self.device.adb_push("files", remote)
         logger.info("推送完成")
 
-        # 回到项目根目录。
         os.chdir(prev)
         logger.hr("重启碧蓝航线", level=1)
         self.config.override(Error_HandleError=True)

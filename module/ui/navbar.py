@@ -56,48 +56,20 @@ class NavbarTarget:
 
 class Navbar:
     def __init__(self, grids, *, visual=None, name=None):
-        """
-        Args:
-            grids (ButtonGrid):
-            visual (NavbarVisualRules):
-            name (str):
-        """
         self.grids = grids
         self.visual = visual if visual is not None else NavbarVisualRules()
         self.name = name if name is not None else grids.name
 
     def is_button_active(self, button, main):
-        """
-        Args:
-            button (Button):
-            main (ModuleBase):
-
-        Returns:
-            bool:
-        """
         active = self.visual.active
         return main.image_color_count(button, color=active.color, threshold=active.threshold, count=active.count)
 
     def is_button_inactive(self, button, main):
-        """
-        Args:
-            button (Button):
-            main (ModuleBase):
-
-        Returns:
-            bool:
-        """
         inactive = self.visual.inactive
         return main.image_color_count(button, color=inactive.color, threshold=inactive.threshold, count=inactive.count)
 
     def get_info(self, main):
-        """
-        Args:
-            main (ModuleBase):
-
-        Returns:
-            int, int, int: Index of the active nav item, leftmost nav item, and rightmost nav item.
-        """
+        """返回活动项、最左可见项和最右可见项的索引。"""
         total = []
         active = []
         for index, button in enumerate(self.grids.buttons):
@@ -125,45 +97,19 @@ class Navbar:
         return active, left, right
 
     def get_active(self, main):
-        """
-        Args:
-            main (ModuleBase):
-
-        Returns:
-            int: Index of the active nav item.
-        """
         return self.get_info(main=main)[0]
 
     def get_total(self, main):
-        """
-        Args:
-            main (ModuleBase):
-
-        Returns:
-            int: Numbers of nav items that appears
-        """
         _, left, right = self.get_info(main=main)
         if left is None or right is None:
             return 0
         return right - left + 1
 
     def _shop_obstruct_handle(self, main):
-        """
-        IFF in shop, then remove obstructions
-        in shop view if any
-
-        Args:
-            main (ModuleBase):
-
-        Returns:
-            bool:
-        """
-        # Check name, identifies if NavBar
-        # instance belongs to shop module
+        """仅商店导航栏需要先关闭遮挡项。"""
         if self.name not in ["SHOP_BOTTOM_NAVBAR", "GUILD_SIDE_NAVBAR"]:
             return False
 
-        # Handle shop obstructions
         if main.appear(GET_SHIP, interval=1):
             main.device.click(SHOP_CLICK_SAFE_AREA)
             return True
@@ -204,17 +150,7 @@ class Navbar:
         return index
 
     def set(self, main, target, skip_first_screenshot=True):
-        """
-        Set nav bar from 1 direction.
-
-        Args:
-            main (ModuleBase):
-            target (NavbarTarget): 从某一侧计数的目标导航项，从 1 开始。
-            skip_first_screenshot (bool):
-
-        Returns:
-            bool: If success
-        """
+        """target 从指定边缘开始按 1 计数，返回是否成功切换。"""
         resolved = self._resolve_set_target(target)
         if resolved is None:
             return False
@@ -245,7 +181,6 @@ class Navbar:
             if active is None or index is None:
                 continue
 
-            # 已到目标项。
             if active == index:
                 return True
 

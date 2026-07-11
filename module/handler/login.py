@@ -18,17 +18,7 @@ from module.ui.ui import UI
 
 class LoginHandler(UI):
     def _handle_app_login(self):
-        """处理从任意页面回到主界面的登录流程。
-
-        Pages:
-            in: Any page
-            out: page_main
-
-        Raises:
-            GameStuckError:
-            GameTooManyClickError:
-            GameNotRunningError:
-        """
+        """从任意页面回到 page_main；可能抛出 GameStuckError、GameTooManyClickError 或 GameNotRunningError。"""
         logger.hr("App login")
 
         confirm_timer = Timer(1.5, count=4).start()
@@ -38,7 +28,6 @@ class LoginHandler(UI):
         self.device.click_record_clear()
 
         while 1:
-            # 监控设备旋转。
             if not login_success and orientation_timer.reached():
                 # 启动应用后屏幕可能会旋转。
                 self.device.get_orientation()
@@ -46,11 +35,9 @@ class LoginHandler(UI):
 
             self.device.screenshot()
 
-            # 结束。
             if self._login_main_confirmed(confirm_timer):
                 break
 
-            # 登录。
             login_success = self._handle_login_button(login_success)
             action = self._handle_login_screen_actions(login_success)
             if action == "success":
@@ -99,7 +86,6 @@ class LoginHandler(UI):
         for handler in handlers:
             if handler():
                 return "continue"
-        # page_main 上出现的弹窗。
         if self.ui_page_main_popups(get_ship=login_success):
             return "success"
         # 始终回到 page_main。
@@ -115,7 +101,6 @@ class LoginHandler(UI):
         if self.appear(EVENT_LIST_CHECK, offset=(30, 30), interval=5):
             self.device.click(BACK_ARROW)
             return True
-        # 更新和维护公告。
         if self.appear_then_click(handler_assets.MAINTENANCE_ANNOUNCE, offset=(30, 30), interval=5):
             return True
         return bool(self.appear_then_click(handler_assets.LOGIN_GAME_UPDATE, offset=(30, 30), interval=5))
@@ -124,7 +109,6 @@ class LoginHandler(UI):
         return bool(not login_success and self.handle_cn_user_agreement())
 
     def _handle_return_player_popups(self):
-        # 回归玩家。
         return (
             self.appear_then_click(handler_assets.LOGIN_RETURN_SIGN, offset=(30, 30), interval=5)
             or self.appear_then_click(handler_assets.LOGIN_RETURN_INFO, offset=(30, 30), interval=5)
@@ -159,28 +143,18 @@ class LoginHandler(UI):
             area=(0, 360, 640, 720), color=(78, 189, 234), color_threshold=245, encourage=25, name="AGREEMENT_CONFIRM"
         )
         if left is None:
-            # 用户协议在中间区域。
             box = (350, 230, 920, 430)
             self.device.swipe_vector((0, -150), SwipeVectorOptions(box=box, name="AGREEMENT_SCROLL"))
             self.device.swipe_vector((0, -150), SwipeVectorOptions(box=box, name="AGREEMENT_SCROLL"))
             self.device.click(right)
             self._user_agreement_timer.reset()
             return True
-        # 用户登录。
         self.device.click(right)
         self._user_agreement_timer.reset()
         return True
 
     def handle_app_login(self):
-        """
-        Returns:
-            bool: If login success
-
-        Raises:
-            GameStuckError:
-            GameTooManyClickError:
-            GameNotRunningError:
-        """
+        """可能抛出 GameStuckError、GameTooManyClickError 或 GameNotRunningError。"""
         logger.info("handle_app_login")
         self.device.screenshot_interval_set(1.0)
         try:
@@ -205,13 +179,7 @@ class LoginHandler(UI):
         self.config.task_delay(server_update=True)
 
     def ensure_no_unfinished_campaign(self):
-        """
-        确保没有未完成的战役停留在地图中。
-
-        页面：
-            进入：page_main
-            退出：page_main
-        """
+        """退出未完成战役；页面进出均为 page_main。"""
 
         def ensure_campaign_retreat():
             if self.appear_then_click(WITHDRAW, offset=(30, 30), interval=5):
@@ -233,11 +201,9 @@ class LoginHandler(UI):
             else:
                 self.device.screenshot()
 
-            # 结束。
             if in_campaign():
                 break
 
-            # 点击。
             if self.ui_main_appear_then_click(page_campaign_menu, interval=3):
                 continue
             if ensure_campaign_retreat():

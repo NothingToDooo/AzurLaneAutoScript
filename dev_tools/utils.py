@@ -7,9 +7,7 @@ from dev_tools.slpp import slpp
 
 
 class LuaLoader:
-    """
-    读取解密后的国区 Lua 脚本。
-    """
+    """仅加载已解密的国区 Lua 脚本。"""
 
     server_alias = (("zh-CN", "zh-cn", "cn", "CN"),)
 
@@ -85,13 +83,6 @@ class LuaLoader:
         return result
 
     def _load_file(self, file, keyword=None):
-        """
-        Args:
-            file (str):
-
-        Returns:
-            dict:
-        """
         text = Path(self.filepath(file)).read_text(encoding="utf-8")
 
         if "pg.base." in text:
@@ -120,16 +111,7 @@ class LuaLoader:
         return result
 
     def load(self, path, keyword=None):
-        """
-        读取 Lua 文件并转换为 Python 字典。
-
-        Args:
-            path (str): Relative path from {folder}/{server}.
-                Can be a file or a directory.
-
-        Returns:
-            dict:
-        """
+        """读取相对 `{folder}/{server}` 的 Lua 文件或目录，并返回合并后的字典。"""
         print(f"Loading {path}")
         if Path(self.filepath(path)).is_dir():
             result = {}
@@ -143,6 +125,5 @@ class LuaLoader:
 
 
 if __name__ == "__main__":
-    # 使用示例。
     lua = LuaLoader(r"xxx/AzurLaneData", server="zh-CN")
     res = lua.load("./sharecfg/item_data_statistics.lua")

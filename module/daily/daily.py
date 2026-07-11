@@ -59,20 +59,9 @@ class Daily(Combat, DailyEquipment):
         return bool(self.handle_guild_popup_cancel())
 
     def get_daily_stage_and_fleet(self):
-        """
-        Returns:
-            int: Stage index, 0 to 3
-            int: Fleet index, 1 to 6
-        """
+        """返回 (关卡 0～3, 舰队 0～6)；0 表示跳过、手动处理或无配置。"""
         if self.emergency_module_development:
-            # daily_current 含义：
-            # 1 Emergency Module Development 限时兵装训练
-            # 2 Escort Mission 商船护送
-            # 3 Advance Mission 海域突进
-            # 4 Fierce Assault 斩首行动
-            # 5 Tactical Training 战术研修
-            # 6 Supply Line Disruption 破交作战
-            # 7 Module Development 兵装训练
+            # 索引依次为限时兵装、商船护送、海域突进、斩首、战术研修、破交、兵装训练。
             fleets = [
                 0,
                 self.config.Daily_EmergencyModuleDevelopmentFleet,
@@ -96,14 +85,7 @@ class Daily(Combat, DailyEquipment):
                 0,
             ]
         else:
-            # daily_current 含义：
-            # 1 Tactical Training 战术研修
-            # 2 Supply Line Disruption 破交作战
-            # 3 Module Development 兵装训练
-            # 4 未开放
-            # 5 Escort Mission 商船护送
-            # 6 Advance Mission 海域突进
-            # 7 Fierce Assault 斩首行动
+            # 索引依次为战术研修、破交、兵装训练、未开放、商船护送、海域突进、斩首。
             fleets = [
                 0,
                 self.config.Daily_TacticalTrainingFleet,
@@ -149,19 +131,7 @@ class Daily(Combat, DailyEquipment):
         return 4
 
     def daily_execute(self, remain=3, stage=1, fleet=1):
-        """
-        Args:
-            remain (int): Remain daily challenge count.
-            stage (int): Index of stage counted from top, 1 to 3.
-            fleet (int): Index of fleet to use.
-
-        Returns:
-            bool: True if success, False if daily locked.
-
-        Pages:
-            in: page_daily
-            out: page_daily
-        """
+        """在每日页执行剩余次数；stage 为 1～3、fleet 为 1～6，锁定时返回 False。"""
         logger.hr(f"Daily {self.daily_current}", level=2)
         logger.info(f"remain={remain}, stage={stage}, fleet={fleet}")
 
@@ -195,7 +165,6 @@ class Daily(Combat, DailyEquipment):
                 logger.info("Submarine daily skip not unlocked, skip")
                 self.ui_click(click_button=BACK_ARROW, check_button=daily_enter_check, skip_first_screenshot=True)
                 break
-            # 执行传统每日战斗。
             self.ui_ensure_index(
                 fleet,
                 UiIndexControls(
@@ -218,18 +187,7 @@ class Daily(Combat, DailyEquipment):
         return True
 
     def daily_enter(self, button, skip_first_screenshot=True):
-        """
-        Args:
-            button (Button): Daily entrance
-            skip_first_screenshot (bool):
-
-        Returns:
-            bool: True if combat appear. False if daily skip unlocked, skipped daily, received rewards.
-
-        Pages:
-            in: DAILY_ENTER_CHECK
-            out: DAILY_ENTER_CHECK or combat_appear
-        """
+        """从 DAILY_ENTER_CHECK 进入任务；出现战斗返回 True，跳过或领奖完成返回 False。"""
         reward_received = False
         while 1:
             if skip_first_screenshot:
@@ -357,11 +315,7 @@ class Daily(Combat, DailyEquipment):
                 break
 
     def run(self):
-        """
-        Pages:
-            in: Any page
-            out: page_daily
-        """
+        """从任意页面处理每日任务，结束于每日页或战役菜单。"""
         self.daily_run()
 
         # 不能停留在 page_daily，因为顺序已经乱掉。

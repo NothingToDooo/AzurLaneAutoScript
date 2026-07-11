@@ -37,15 +37,10 @@ class EquipmentChange(Equipment):
             self.wait_until_stable(equipment_assets.SWIPE_AREA)
 
     def ship_equipment_record_image(self, index_list=EQUIPMENT_INDEXES):
-        """
-        通过强化页面记录装备。
-
-        注意：强化页面装备图标和装备状态页图标尺寸一致。
-        """
+        """利用强化页与装备状态页尺寸一致的图标记录装备模板。"""
         logger.info("RECORD EQUIPMENT")
         self.ship_side_navbar_ensure(bottom=1)
 
-        # 确保 EQUIPMENT_GRID 位于正确位置。
         skip_first_screenshot = True
         while True:
             if skip_first_screenshot:
@@ -66,24 +61,20 @@ class EquipmentChange(Equipment):
             # +1 约为 40。
             # +10 约为 46。
             if edge_value > 10:
-                # 进入装备详情。
                 self.ui_click(
                     appear_button=equipment_assets.EQUIPMENT_OPEN,
                     click_button=EQUIP_INFO_BAR[(index, 0)],
                     check_button=equipment_assets.UPGRADE_ENTER,
                 )
-                # 进入强化信息。
                 self.ui_click(
                     click_button=equipment_assets.UPGRADE_ENTER,
                     check_button=equipment_assets.UPGRADE_ENTER_CHECK,
                     skip_first_screenshot=True,
                 )
-                # 保存装备模板。
                 if not info_bar_disappeared:
                     self.handle_info_bar()
                     info_bar_disappeared = True
                 self.equipment_list[index] = self.image_crop(equipment_assets.EQUIP_SAVE)
-                # 退出强化信息。
                 self.ui_click(
                     click_button=equipment_assets.UPGRADE_QUIT,
                     check_button=equipment_assets.EQUIPMENT_OPEN,
@@ -96,9 +87,6 @@ class EquipmentChange(Equipment):
         logger.info(f"Recorded equipment index list: {list(self.equipment_list.keys())}")
 
     def ship_equipment_take_on_image(self, index_list=EQUIPMENT_INDEXES, skip_first_screenshot=True):
-        """
-        穿上之前记录的装备。
-        """
         logger.info("Take on equipment")
         self.ship_side_navbar_ensure(bottom=2)
 
@@ -124,14 +112,7 @@ class EquipmentChange(Equipment):
         self.device.screenshot()
 
     def _equip_equipment(self, point, offset=(100, 100)):
-        """
-        穿上装备并回到舰船详情。
-
-        过程里会确认弹窗。
-        页面：
-            进入：装备状态。
-            退出：舰船侧栏装备页。
-        """
+        """从装备状态页穿上装备、确认弹窗并回到舰船侧栏装备页。"""
         logger.info("Equip equipment")
         button = Button(
             area=(), color=(), button=(point[0], point[1], point[0] + offset[0], point[1] + offset[1]), name="EQUIPMENT"
@@ -148,12 +129,7 @@ class EquipmentChange(Equipment):
         )
 
     def _find_equipment(self, index):
-        """
-        查找之前记录过的装备。
-
-        页面：
-            进入：装备状态。
-        """
+        """在装备状态页查找之前记录的模板。"""
         enter_button = getattr(equipment_assets, f"EQUIP_TAKE_ON_{index}")
 
         self.equipping_set(enable=False)

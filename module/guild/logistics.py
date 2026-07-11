@@ -35,13 +35,7 @@ GUILD_LOGISTICS_REFRESH_BUG_MESSAGE = "Triggered guild logistics refresh bug"
 
 class ExchangeLimitOcr(Digit):
     def pre_process(self, image):
-        """
-        Args:
-            image (np.ndarray): Shape (height, width, channel)
-
-        Returns:
-            np.ndarray: Shape (width, height)
-        """
+        """把 (高, 宽, 通道) 图像转为同宽高的二维反色灰度图。"""
         return 255 - color_mapping(rgb2gray(image), max_multiply=2.5)
 
 
@@ -72,26 +66,14 @@ class GuildLogistics(GuildBase):
         return item_grid
 
     def _is_in_guild_logistics(self):
-        """
-        通过 GUILD_LOGISTICS_ENSURE_CHECK 颜色采样判断当前是否在后勤页。
-
-        Pages:
-            in: GUILD_LOGISTICS
-            out: GUILD_LOGISTICS
-        """
+        """通过赤色或蓝色阵营背景采样判断是否在公会后勤页。"""
         # 赤色阵营 (181, 97, 99)，蓝色阵营 (148, 178, 255)。
         return self.image_color_count(
             GUILD_LOGISTICS_ENSURE_CHECK, color=(181, 97, 99), threshold=221, count=400
         ) or self.image_color_count(GUILD_LOGISTICS_ENSURE_CHECK, color=(148, 178, 255), threshold=221, count=400)
 
     def _guild_logistics_ensure(self, skip_first_screenshot=True):
-        """
-        Ensure guild logistics is loaded
-        After entering guild logistics, background loaded first, then St.Louis / Leipzig, then guild logistics
-
-        Args:
-            skip_first_screenshot (bool):
-        """
+        """等待后勤页完成背景、角色立绘和操作区的分阶段加载。"""
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -102,18 +84,7 @@ class GuildLogistics(GuildBase):
                 break
 
     def _guild_logistics_mission_available(self):
-        """
-        通过 GUILD_MISSION 区域颜色判断任务按钮状态。
-
-        领取和接受任务时都会调用。
-
-        Returns:
-            bool: 任务按钮是否可点击。
-
-        Pages:
-            in: GUILD_LOGISTICS
-            out: GUILD_LOGISTICS
-        """
+        """在后勤页按颜色区分任务完成、可点击、缺失和不可点击状态。"""
         r, g, b = get_color(self.device.image, GUILD_MISSION.area)
         if g > max(r, b) - 10:
             # 任务完成后右下角会出现绿色勾。
@@ -132,16 +103,7 @@ class GuildLogistics(GuildBase):
         return False
 
     def _guild_logistics_supply_available(self):
-        """
-        通过 GUILD_SUPPLY 区域颜色判断补给按钮是否可用。
-
-        Returns:
-            bool: 补给按钮是否可点击。
-
-        Pages:
-            in: GUILD_LOGISTICS
-            out: GUILD_LOGISTICS
-        """
+        """在后勤页通过白字与灰字判断补给按钮是否可点击。"""
         color = get_color(self.device.image, GUILD_SUPPLY.area)
         # 可点击按钮是白字，不可点击按钮是灰字。
         if np.max(color) > np.mean(color) + 25:
@@ -152,37 +114,16 @@ class GuildLogistics(GuildBase):
         return False
 
     def _handle_guild_fleet_mission_start(self):
-        """
-        选择新的每周舰队任务。
-
-        当前账号必须是公会会长或军官。
-
-        Returns:
-            bool: 是否发生点击。
-        """
+        """会长或军官按配置固定选择“塞壬歼灭 III／击败 300 个敌人”周任务。"""
         if not self.config.GuildLogistics_SelectNewMission:
             return False
 
         if self.appear_then_click(GUILD_MISSION_NEW, offset=(20, 20), interval=2):
             return True
-        # 公会会长选择公会任务。
-        # 固定选择“塞壬歼灭 III，击败 300 个敌人”。
-        # 这个任务补给最多，也最容易让成员完成。
         return self.appear_then_click(GUILD_MISSION_SELECT, offset=(20, 20), interval=2)
 
     def _guild_logistics_collect(self, skip_first_screenshot=True):
-        """执行公会后勤页的领取、接取和兑换流程。
-
-        Args:
-            skip_first_screenshot (bool):
-
-        Returns:
-            bool: 三个后勤区块是否都已经检查完成。
-
-        Pages:
-            in: GUILD_LOGISTICS
-            out: GUILD_LOGISTICS
-        """
+        """在后勤页处理补给、任务和兑换，返回三个区块是否都已检查。"""
         logger.hr("Guild logistics")
         logger.attr("Guild master/official", self.config.GuildLogistics_SelectNewMission)
         state = _GuildLogisticsCollectState(
@@ -284,22 +225,10 @@ class GuildLogistics(GuildBase):
         raise GameBugError(GUILD_LOGISTICS_REFRESH_BUG_MESSAGE)
 
     def _guild_exchange_scan(self):
-        """
-        Image scan of available options.
-        Not exchangeable items are tagged enough=False.
-
-        Returns:
-            list[Item]:
-
-        Pages:
-            in: GUILD_LOGISTICS
-            out: GUILD_LOGISTICS
-        """
-        # 扫描可选择的兑换物品。
+        """扫描后勤页兑换物品，并以 enough 标记库存是否充足。"""
         items = self.exchange_items.predict(self.device.image, name=True, amount=False)
 
-        # 遍历 EXCHANGE_GRIDS，检测右下角红色文本。
-        # 红色文本表示玩家缺少该物品库存。
+        # 右下角红字表示玩家缺少该物品库存。
         for item, button in zip(items, EXCHANGE_GRIDS.buttons, strict=False):
             area = area_offset((35, 64, 83, 83), button.area[0:2])
             if self.image_color_count(area, color=(255, 93, 90), threshold=221, count=20):
@@ -312,18 +241,7 @@ class GuildLogistics(GuildBase):
         return items
 
     def _guild_exchange(self):
-        """
-        根据筛选器执行可用的公会兑换。
-
-        兑换次数由剩余次数限制决定；完全无法兑换时外层流程会提前结束。
-
-        Returns:
-            bool: 是否发生点击。
-
-        Pages:
-            in: GUILD_LOGISTICS
-            out: GUILD_LOGISTICS
-        """
+        """按剩余次数和筛选器点击首个库存充足的兑换项。"""
         if not GUILD_EXCHANGE_LIMIT.ocr(self.device.image) > 0:
             return False
 
@@ -341,16 +259,7 @@ class GuildLogistics(GuildBase):
         return False
 
     def guild_logistics(self):
-        """
-        Execute all actions in logistics
-
-        Returns:
-            bool: If all guild logistics are check, no need to check them today.
-
-        Pages:
-            in: page_guild
-            out: page_guild, GUILD_LOGISTICS
-        """
+        """从公会页进入后勤，返回今日三个区块是否都已检查。"""
         logger.hr("Guild logistics", level=1)
         self.guild_side_navbar_ensure(bottom=3)
         self._guild_logistics_ensure()

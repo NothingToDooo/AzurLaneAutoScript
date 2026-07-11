@@ -39,28 +39,9 @@ OCR_RESEARCH = Ocr(OCR_RESEARCH, name="RESEARCH", threshold=64, alphabet="012345
 
 
 def get_research_series_old(image, series_button=RESEARCH_SERIES):
-    r"""
-    Get research series using a simple color detection.
-    Counting white lines to detect Roman numerals.
-
-    -------               --- --   --
-     | | |   --> 3 lines   |   \   /   --> 3 lines
-     | | |                 |   \   /
-     | | |   --> 3 lines   |    \ /    --> 2 lines
-    -------               ---    v
-
-    Args:
-        image (np.ndarray):
-        series_button:
-
-    Returns:
-        list[int]: Such as [1, 1, 1, 2, 3]
-    """
+    """按罗马数字的白色线条峰值识别各项目系列，返回五个系列编号。"""
     result = []
-    # Set 'prominence = 50' to ignore possible noise.
-    # 2021.07.18 Letter IV is now smaller than I, II, III, since the maintenance in 07.15.
-    #   The "/" of the "V" in IV become darker because of anti-aliasing.
-    #   So lower height to 160 to have a better detection.
+    # prominence=50 用于滤除噪声；2021-07-15 后 IV 更小且 V 的斜线因抗锯齿变暗，故高度降为 160。
     parameters = {"height": 160, "prominence": 50, "width": 1}
 
     for button in series_button:
@@ -68,7 +49,7 @@ def get_research_series_old(image, series_button=RESEARCH_SERIES):
         peaks = [len(signal.find_peaks(row, **parameters)[0]) for row in im[5:-5]]
         upper, lower = max(peaks), min(peaks)
 
-        # Remove noise like [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 2]
+        # 忽略仅一两行出现额外峰值的噪声。
         if upper == 3 and lower == 2 and peaks.count(3) <= 2:
             upper = 2
 
@@ -107,14 +88,7 @@ def _get_research_series(img):
 
 
 def get_research_series(image, series_button=RESEARCH_SERIES):
-    """
-    Args:
-        image (np.ndarray):
-        series_button:
-
-    Returns:
-        list[int]: Such as [1, 1, 1, 2, 3]
-    """
+    """返回五个科研项目的系列编号。"""
     result = []
     for button in series_button:
         img = crop(image, button.area, copy=False)
@@ -125,14 +99,7 @@ def get_research_series(image, series_button=RESEARCH_SERIES):
 
 
 def get_research_name(image, ocr=OCR_RESEARCH):
-    """
-    Args:
-        image (np.ndarray):
-        ocr (Ocr):
-
-    Returns:
-        list[str]: Such as ['D-057-UL', 'D-057-UL', 'D-057-UL', 'D-057-UL', 'D-057-UL']
-    """
+    """返回五个科研项目名称的字符串列表。"""
     names = ocr.ocr(image)
     if not isinstance(names, list):
         names = [names]
@@ -140,24 +107,19 @@ def get_research_name(image, ocr=OCR_RESEARCH):
 
 
 def get_research_finished(image):
-    """
-    Args:
-        image (np.ndarray):
-
-    Returns:
-        int: Index of the finished project, 0 to 4. Return None if no project finished.
-    """
+    """返回已完成项目的 0～4 索引；没有已完成项目时返回 None。"""
     for index in [2, 1, 3, 0, 4]:
         button = RESEARCH_STATUS[index]
         color = get_color(image, button.area)
         if max(color) - min(color) < 40:
             logger.warning(f"Unexpected color: {color}")
             continue
-        color_index = np.argmax(color)  # RGB 通道索引。
+        # get_color 返回 RGB；argmax 1 表示绿色已完成，2 表示蓝色未完成。
+        color_index = np.argmax(color)
         if color_index == 1:
-            return index  # 绿色。
+            return index
         if color_index == 2:
-            continue  # 蓝色。
+            continue
         logger.warning(f"Unexpected color: {color}")
         continue
 
@@ -165,13 +127,7 @@ def get_research_finished(image):
 
 
 def parse_time(string):
-    """
-    Args:
-        string (str): Such as 01:00:00, 05:47:10, 17:50:51.
-
-    Returns:
-        timedelta: datetime.timedelta instance.
-    """
+    """解析 HH:MM:SS；格式无效时返回 None。"""
     result = re.search(r"(\d+):(\d+):(\d+)", string)
     if not result:
         logger.warning(f"Invalid time string: {string}")
@@ -181,13 +137,7 @@ def parse_time(string):
 
 
 def research_detect(image):
-    """
-    Args:
-        image (np.ndarray): Screenshot
-
-    Return:
-        list[ResearchProject]:
-    """
+    """从截图返回五个 ResearchProject。"""
     projects = []
     for name, series in zip(get_research_name(image), get_research_series_3(image), strict=False):
         project = ResearchProject(name=name, series=series)
@@ -210,29 +160,16 @@ class ResearchProject:
     D_PROJECT_NUMBERS: ClassVar[frozenset[str]] = _research_project_numbers("D")
 
     def __init__(self, name, series):
-        """
-        Args:
-            name (str): Such as 'D-057-UL'
-            series (int): Such as 1, 2, 3
-        """
         self.valid = True
-        # '4'
         self.raw_series = series
-        # 'S4'
         self.series = f"S{series}"
-        # 'D-057-UL'
         self.name = self.check_name(name)
         if self.name != name:
             logger.info(f"Research name {name} is revised to {self.name}")
-        # 'D'
         self.genre = ""
-        # '057'
         self.number = ""
-        # '0.5'
         self.duration = "24"
-        # Ship face, like 'Azuma'
         self.ship = ""
-        # 'dr' or 'pry'
         self.ship_rarity = ""
         self.need_coin = False
         self.need_cube = False
@@ -270,22 +207,21 @@ class ResearchProject:
 
     def _normalize_project_number(self, prefix, number):
         number = number.replace("D", "0").replace("O", "0").replace("S", "5")
-        # E-316-MI -> E-315-MI
+        # 已知 OCR 误识别：E-316-MI 应为 E-315-MI。
         number = number.replace("316", "315")
-        # [TW] S5 D-349-MI -> S5 D-319-MI
+        # 台服 S5 会把 D-319-MI 识别为 D-349-MI。
         if prefix == "D" and number == "349" and self.raw_series == 5:
             return "319"
         return number
 
     @staticmethod
     def _normalize_project_suffix(suffix):
-        # S3 D-022-MI (S3-Drake-0.5) detected as 'D-022-ML', because of Drake's white cloth.
+        # Drake 的白衣会让 S3 D-022-MI 后缀误识别为 ML。
         suffix = suffix.replace("ML", "MI").replace("MIL", "MI").replace("M1", "MI")
-        # S4 D-063-UL (S4-hakuryu-0.5) detected as 'D-063-0C'
-        # D-057-DC -> D-057-UL
+        # 白龙卡面会把 UL 识别为 0C；其他卡面也可能识别为 DC 或 UC。
         suffix = suffix.replace("0C", "UL").replace("UC", "UL")
         suffix = suffix.replace("DC5", "UL").replace("DC3", "UL").replace("DC", "UL")
-        # D-075-UL1 -> D-075-UL
+        # 清理 UL 后的 OCR 尾字符。
         suffix = suffix.replace("UL1", "UL").replace("ULI", "UL").replace("UL5", "UL")
         if suffix == "U":
             return "UL"
@@ -296,19 +232,19 @@ class ResearchProject:
         if prefix in ["I1", "U"]:
             prefix = "D"
         prefix = prefix.strip("I1")
-        # LC-038-RF -> C-038-RF
+        # LC-038-RF 应为 C-038-RF。
         prefix = prefix.replace("LC", "C")
 
-        # TW ocr errors, convert B to D
+        # 台服 OCR 会把 D 识别为 B。
         if prefix == "B" and number in cls.D_PROJECT_NUMBERS:
-            # Keep B-397-RF, S7 D-397-MI and S* B-397-RF shares 397
+            # B-397-RF 与 S7 D-397-MI 共用编号，不能按编号改写。
             if number == "397" and suffix == "RF":
                 return prefix
             return "D"
-        # I-483-RF revised to -483-RF -> D-483-RF
+        # I-483-RF 清理前缀后为空，应恢复为 D-483-RF。
         if prefix == "" and number in cls.D_PROJECT_NUMBERS:
             return "D"
-        # L-153-MI -> C-153-MI
+        # L-153-MI 应为 C-153-MI。
         if prefix == "L" and number in cls.C_PROJECT_NUMBERS:
             return "C"
         return prefix
@@ -321,17 +257,10 @@ class ResearchProject:
         return f"{prefix}-{number}-{suffix}"
 
     def check_name(self, name):
-        """
-        Args:
-            name (str):
-
-        Returns:
-            str:
-        """
         name = name.strip("-")
-        # G-185-MI, D-T85-MI -> C-185-MI
+        # G-185-MI、D-T85-MI 均为 C-185-MI 的已知误识别。
         name = name.replace("G-185", "C-185").replace("D-T85", "C-185")
-        # E-316-MI -> E-315-MI
+        # 缺少前缀时仍修正 E-316-MI。
         if name == "316-MI":
             name = "E-315-MI"
 
@@ -355,7 +284,7 @@ class ResearchProject:
             for prefix in "QGE":
                 yield f"{prefix}-{self.name}"
         if name.startswith("D"):
-            # Letter 'C' may recognized as 'D', because project card is shining.
+            # 卡片高光会把 C 识别为 D。
             yield "C" + self.name[1:]
 
     @staticmethod
@@ -367,14 +296,7 @@ class ResearchProject:
                 yield data
 
     def get_data(self, name, series):
-        """
-        Args:
-            name (str): Such as 'D-057-UL'
-            series (int): Such as 1, 2, 3
-
-        Yields:
-            dict:
-        """
+        """依次生成精确匹配、近似名称和忽略后缀后的项目数据。"""
         yield from self._iter_research_data(name, series)
 
         for candidate in self._iter_similar_research_names(name):

@@ -1,10 +1,4 @@
 OS_SHOP = {
-    #   line(all):
-    #   1: Logger, ActionPoint, PurpleCoins
-    #   2: T0 and T1
-    #   3: ...
-    #   4: META
-    #   5: Rubbish
     "max_benefit": """
         LoggerAbyssalT6 > LoggerAbyssalT5 > LoggerObscure > LoggerAbyssalT4 > ActionPoint > PurpleCoins >
         GearDesignPlanT3 > PlateRandomT4 > DevelopmentMaterialT3 > GearDesignPlanT2 > GearPart >

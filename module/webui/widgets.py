@@ -93,7 +93,6 @@ class RichLog:
         )
 
     def set_scroll(self, *, keep_bottom: bool) -> None:
-        # 用于开关回调，回调入口通过 lambda 转成关键字参数。
         self.keep_bottom = keep_bottom
 
     def get_width(self):
@@ -150,25 +149,6 @@ class BinarySwitchOptions:
 
 class BinarySwitchButton(Switch):
     def __init__(self, options: BinarySwitchOptions):
-        """
-        Args:
-            options:
-                二元开关的标签、回调、颜色和 scope。
-            get_state:
-                (Callable):
-                    return True to represent state `ON`
-                    return False tp represent state `OFF`
-                (Generator):
-                    yield True to change btn state to `ON`
-                    yield False to change btn state to `OFF`
-            label_on: label to show when state is `ON`
-            label_off:
-            onclick_on: function to call when state is `ON`
-            onclick_off:
-            color_on: button color when state is `ON`
-            color_off:
-            scope: scope for button, just for button **only**
-        """
         self.scope = options.scope
         status = {
             0: {
@@ -193,9 +173,6 @@ class BinarySwitchButton(Switch):
     def update_button(self, label, onclick, color):
         clear(self.scope)
         put_button(label=label, onclick=onclick, color=color, scope=self.scope)
-
-
-# aside buttons
 
 
 def put_icon_buttons(
@@ -239,7 +216,6 @@ def get_title_help(kwargs: T_Output_Kwargs) -> Output:
     return res
 
 
-# args input widget
 def put_arg_input(kwargs: T_Output_Kwargs) -> Output:
     name: str = kwargs["name"]
     options = kwargs.get("options")
@@ -373,7 +349,7 @@ def put_arg_textarea(kwargs: T_Output_Kwargs) -> Output:
 
 
 def put_arg_checkbox(kwargs: T_Output_Kwargs) -> Output:
-    # Not real checkbox, use as a switch (on/off)
+    # 这里的 checkbox 用作二元开关，而非多选框。
     name: str = kwargs["name"]
     value: str = kwargs["value"]
     _: str = kwargs.pop("invalid_feedback", None)

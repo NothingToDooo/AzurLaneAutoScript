@@ -48,18 +48,7 @@ class StorageHandler(StorageUI):
         raise ScriptError(message)
 
     def _handle_use_box_amount(self, amount):
-        """设置单次开箱数量。
-
-        Args:
-            amount (int): Expected amount to set
-
-        Returns:
-            int: Actual amount set in the UI.
-                May be less than expected if not enough boxes available.
-
-        Pages:
-            in: SHOP_BUY_CONFIRM_AMOUNT
-        """
+        """在数量确认页设置单次开箱数；箱子不足时实际值可能小于请求值。"""
         logger.info("Set box amount")
 
         # 复用商店数量选择的识别逻辑。
@@ -118,21 +107,9 @@ class StorageHandler(StorageUI):
         return current
 
     def _storage_use_one_box(self, button, amount=1):
-        """使用一组装备箱。
+        """在材料页使用一组装备箱，返回可能不精确的实际数量。
 
-        Args:
-            button (Button): Box
-            amount (int):
-
-        Returns:
-            int: amount of box used, not accurate
-
-        Raises:
-            StorageFull:
-
-        Pages:
-            in: MATERIAL_CHECK
-            out: MATERIAL_CHECK
+        仓库已满时关闭弹窗并抛出 StorageFull；结束后仍在材料页。
         """
         logger.hr("Use one box")
         success = False
@@ -207,10 +184,9 @@ class StorageHandler(StorageUI):
             self.interval_reset(storage_assets.MATERIAL_CHECK)
             return False
         if self.appear_then_click(EQUIP_CONFIRM_2, offset=(20, 20), interval=5):
-            # GET_ITEMS_* 不会这么快出现。
             self.interval_reset(storage_assets.MATERIAL_CHECK)
             self.interval_clear([GET_ITEMS_1, GET_ITEMS_2])
-            # EQUIP_CONFIRM_2 -> GET_ITEMS -> _storage_in_material，把 EQUIP_CONFIRM_2 视作最后一步。
+            # GET_ITEMS_* 不会立即出现，因此把 EQUIP_CONFIRM_2 视作最后一步。
             return True
         return None
 
@@ -219,7 +195,6 @@ class StorageHandler(StorageUI):
             return
 
         logger.info("Storage full")
-        # 关闭弹窗。
         self.ui_click(
             storage_assets.MATERIAL_ENTER,
             check_button=self._storage_in_material,
@@ -230,19 +205,7 @@ class StorageHandler(StorageUI):
         raise StorageFull
 
     def _storage_use_box_in_page(self, rarity, amount, skip_first_screenshot=False):
-        """
-        Args:
-            rarity (int):
-            amount (int): Expected amount of boxes to use
-            skip_first_screenshot:
-
-        Returns:
-            int: Actual amount of box used, not accurate
-
-        Pages:
-            in: MATERIAL_CHECK
-            out: MATERIAL_CHECK
-        """
+        """在当前材料页最多使用 amount 个箱子，返回可能不精确的实际数量。"""
         used = 0
         timeout = Timer(1.5, count=3).start()
         while 1:
@@ -270,27 +233,16 @@ class StorageHandler(StorageUI):
         return used
 
     def _storage_use_box_execute(self, rarity=1, amount=10):
-        """
-        Args:
-            rarity (int): 1/2/3 for T1/T2/T3
-            amount (int): use how many boxes at most
+        """在材料页最多使用 amount 个 T1 至 T4 箱子，返回可能不精确的实际数量。
 
-        Returns:
-            int: amount of box used, not accurate
-
-        Raises:
-            StorageFull: If storage full
-
-        Pages:
-            in: page_storage, material, MATERIAL_CHECK
-            out: page_storage, material, MATERIAL_CHECK
+        仓库已满时抛出 StorageFull，页面保持在材料页。
         """
         logger.hr("Use Box", level=2)
         used = 0
 
         if MATERIAL_SCROLL.appear(main=self):
             if rarity == 1:
-                # T1 boxes are always at the bottom
+                # T1 箱始终位于底部。
                 MATERIAL_SCROLL.set_bottom(main=self)
             else:
                 MATERIAL_SCROLL.set_top(main=self)
@@ -311,15 +263,7 @@ class StorageHandler(StorageUI):
         return used
 
     def _storage_disassemble_equipment_execute_once(self, amount=40):
-        """执行一轮装备拆解。
-
-        Returns:
-            int: amount of equipments disassembled
-
-        Pages:
-            in: DISASSEMBLE_CANCEL
-            out: DISASSEMBLE_CANCEL
-        """
+        """在拆解页执行一轮，单轮最多拆解 40 件，并返回实际数量。"""
         amount = min(amount, 40)
         self.interval_clear(
             [
@@ -439,19 +383,7 @@ class StorageHandler(StorageUI):
         return disassembled
 
     def _storage_disassemble_equipment_execute(self, rarity=1, amount=40):
-        """
-        Args:
-            rarity (int): 1 for common, 2 for rare, 3 for elite, 4 for super_rare, 5 for ultra_rare
-            amount (int): Expected amount to disassemble.
-                Actual amount >= expected
-
-        Pages:
-            in: page_storage, equipment, DISASSEMBLE
-            out: page_storage, equipment, DISASSEMBLE
-
-        Returns:
-            int: Actual amount of equipments disassembled
-        """
+        """在拆解页按 1 至 5 的稀有度拆解；堆叠选择可能使实际数量超过目标。"""
         disassembled = 0
         self.equipment_filter_set(rarity=rarity)
         if MATERIAL_SCROLL.appear(main=self):
@@ -476,21 +408,9 @@ class StorageHandler(StorageUI):
         return disassembled
 
     def storage_disassemble_equipment(self, rarity=1, amount=15):
-        """
-        Disassemble target amount of equipment.
-        If not having enough equipment, use boxes then disassemble.
+        """从任意页面拆解目标数量的 1 至 4 稀有度装备；不足时先开箱。
 
-        Args:
-            rarity (int): 1 for common, 2 for rare, 3 for elite, 4 for super_rare
-            amount (int): Expected amount to disassemble.
-                Actual amount >= expected
-
-        Returns:
-            int: Actual amount of equipments disassembled
-
-        Pages:
-            in: Any
-            out: page_storage, equipment, DISASSEMBLE
+        堆叠选择可能超过目标，结束于仓库拆解页并返回实际数量。
         """
         logger.hr("Disassemble Equipment", level=2)
         self.ui_goto_storage()
@@ -512,11 +432,9 @@ class StorageHandler(StorageUI):
                     break
                 # 2025.05.20 起，箱子里的装备会自动拆解。
                 disassembled += boxes
-                # 开箱成功后重新检查总数。
                 continue
             except StorageFull:
                 pass
-            # 处理仓库已满。
             self._storage_enter_disassemble()
             equip = self._storage_disassemble_equipment_execute(rarity=rarity, amount=amount)
             disassembled += equip
@@ -533,21 +451,9 @@ class StorageHandler(StorageUI):
         return disassembled
 
     def storage_use_box(self, rarity=1, amount=40):
-        """
-        Disassemble target amount of equipment.
-        If not having enough equipment, use boxes then disassemble.
+        """从任意页面清理仓库后最多使用 amount 个 1 至 4 稀有度箱子。
 
-        Args:
-            rarity (int): 1 for common, 2 for rare, 3 for elite, 4 for super_rare
-            amount (int): Expected amount to disassemble.
-                Actual amount >= expected
-
-        Returns:
-            int: Actual amount of equipments disassembled
-
-        Pages:
-            in: Any
-            out: page_storage, material, MATERIAL_CHECK
+        结束于材料页并返回实际开箱数。
         """
         logger.hr("Use boxes", level=2)
         self.ui_goto_storage()
@@ -587,23 +493,10 @@ class StorageHandler(StorageUI):
         return used
 
     def handle_storage_full(self, rarity=1, amount=40):
-        """
-        Args:
-            rarity (int): 1 for common, 2 for rare, 3 for elite, 4 for super_rare
-            amount (int): Expected amount to disassemble.
-                Actual amount >= expected
-
-        Returns:
-            bool: If handled
-
-        Pages:
-            in: Any, if EQUIPMENT_FULL appears, handle it
-            out: the page before handling storage popup
-        """
+        """出现仓库已满弹窗时拆解 1 至 4 稀有度装备，并恢复到原页面。"""
         if not self.appear(storage_assets.EQUIPMENT_FULL, offset=(30, 30), interval=2):
             return False
 
-        # 装备仓库已满弹窗。
         logger.info("handle_storage_full")
         self.ui_click(
             storage_assets.EQUIPMENT_FULL,
@@ -615,7 +508,6 @@ class StorageHandler(StorageUI):
         if disassembled <= 0:
             logger.warning("Storage full but unable to disassemble any equipment")
 
-        # Quit
         skip_first_screenshot = True
         while 1:
             if skip_first_screenshot:
@@ -629,7 +521,6 @@ class StorageHandler(StorageUI):
                 self.device.click(BACK_ARROW)
                 continue
 
-            # End
             if not self.appear(STORAGE_CHECK, offset=(30, 30)):
                 break
 

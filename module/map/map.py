@@ -36,14 +36,6 @@ class GridSelection:
 
 class Map(Fleet):
     def clear_chosen_enemy(self, grid, expected=""):
-        """
-        Args:
-            grid (GridInfo):
-            expected (str):
-
-        Returns:
-            int: If cleared an enemy.
-        """
         logger.info(f"targetEnemyScale:{self.config.EnemyPriority_EnemyScaleBalanceWeight}")
         logger.info(f"Clear enemy: {grid}")
         expected = f"combat_{expected}" if expected else "combat"
@@ -59,20 +51,12 @@ class Map(Fleet):
         return self.battle_count >= battle_count
 
     def clear_chosen_mystery(self, grid):
-        """
-        Args:
-            grid (GridInfo):
-        """
         logger.info(f"Clear mystery: {grid}")
         self.show_fleet()
         self.goto(grid, expected="mystery")
         self.map.show_cost()
 
     def pick_up_ammo(self, grid=None):
-        """
-        Args:
-            grid (GridInfo):
-        """
         if grid is None:
             grid = self.map.select(may_ammo=True)
             if not grid:
@@ -95,13 +79,7 @@ class Map(Fleet):
         return False
 
     def clear_mechanism(self, grids=None):
-        """
-        Args:
-            grids (SelectedGrids): Grids that triggers mechanism. If None, select all mechanism triggers.
-
-        Returns:
-            bool: False, because didn't clear any enemy.
-        """
+        """触发指定机制格；grids 为 None 时选择全部触发格，且因未清敌固定返回 False。"""
         if not self.config.MAP_HAS_LAND_BASED:
             return False
 
@@ -160,14 +138,6 @@ class Map(Fleet):
         grids,
         selection=None,
     ):
-        """
-        Args:
-            grids (SelectedGrids):
-            selection (GridSelection):
-
-        Returns:
-            SelectedGrids:
-        """
         if selection is None:
             selection = GridSelection()
 
@@ -210,11 +180,7 @@ class Map(Fleet):
         logger.info(f"Grids: {grids}")
 
     def clear_all_mystery(self, **kwargs):
-        """Methods to pick up all mystery.
-
-        Returns:
-            bool: False, because didn't clear any enemy.
-        """
+        """拾取全部神秘事件；因未清敌固定返回 False。"""
         kwargs = {**kwargs, "sort": ("cost",)}
         while 1:
             grids = self.map.select(is_mystery=True)
@@ -230,11 +196,7 @@ class Map(Fleet):
         return False
 
     def clear_enemy(self, **kwargs):
-        """Methods to clear a enemy. May not do anything if no suitable enemy.
-
-        Returns:
-            bool: True if clear an enemy.
-        """
+        """清理符合条件的敌人；没有目标时不操作，清敌后返回 True。"""
         grids = self.map.select(is_enemy=True, is_boss=False)
 
         target = self.config.EnemyPriority_EnemyScaleBalanceWeight
@@ -250,14 +212,7 @@ class Map(Fleet):
         return False
 
     def clear_roadblocks(self, roads, **kwargs):
-        """Clear roadblocks.
-
-        Args:
-            roads(list[RoadGrids]):
-
-        Returns:
-            bool: True if clear an enemy.
-        """
+        """清理 RoadGrids 路线上的阻挡敌人，清敌后返回 True。"""
         grids = SelectedGrids([])
         for road in roads:
             grids = grids.add(road.roadblocks())
@@ -275,14 +230,7 @@ class Map(Fleet):
         return False
 
     def clear_potential_roadblocks(self, roads, **kwargs):
-        """Avoid roadblock that only has one grid empty.
-
-        Args:
-            roads(list[RoadGrids]):
-
-        Returns:
-            bool: True if clear an enemy.
-        """
+        """提前清理仅剩一个空格的潜在阻挡路线，清敌后返回 True。"""
         grids = SelectedGrids([])
         for road in roads:
             grids = grids.add(road.potential_roadblocks())
@@ -300,14 +248,7 @@ class Map(Fleet):
         return False
 
     def clear_first_roadblocks(self, roads, **kwargs):
-        """Ensure every roadblocks have one grid with is_cleared=True.
-
-        Args:
-            roads(list[RoadGrids]):
-
-        Returns:
-            bool: True if clear an enemy.
-        """
+        """确保每条阻挡路线至少有一个已清格，清敌后返回 True。"""
         grids = SelectedGrids([])
         for road in roads:
             grids = grids.add(road.first_roadblocks())
@@ -323,14 +264,7 @@ class Map(Fleet):
         return False
 
     def clear_grids_for_faster(self, grids, **kwargs):
-        """Clear some grids to walk a shorter distance.
-
-        Args:
-            grids(SelectedGrids):
-
-        Returns:
-            bool: True if clear an enemy.
-        """
+        """清理指定格以缩短路径，清敌后返回 True。"""
         grids = grids.select(is_enemy=True)
         grids = self.select_grids(grids, GridSelection.from_settings(kwargs))
 
@@ -343,12 +277,7 @@ class Map(Fleet):
         return False
 
     def clear_boss(self):
-        """
-        已弃用的简单地图 Boss 清理方法；复杂地图应使用 brute_clear_boss。
-
-        Returns:
-            bool：是否清理成功。
-        """
+        """已弃用的简单 Boss 清理方法；复杂地图应使用 brute_clear_boss。"""
         grids = self.map.select(is_boss=True, is_accessible=True)
         grids = grids.add(self.map.select(may_boss=True, is_caught_by_siren=True))
         logger.info(f"Is boss: {grids}")
@@ -369,12 +298,7 @@ class Map(Fleet):
         return self.clear_potential_boss()
 
     def capture_clear_boss(self):
-        """
-        已弃用的简单地图 Boss 清理方法，用于旧的大世界占领地图。
-
-        Returns:
-            bool：是否清理成功。
-        """
+        """已弃用的简单 Boss 清理方法，仅用于旧的大世界占领地图。"""
         grids = self.map.select(is_boss=True, is_accessible=True)
         grids = grids.add(self.map.select(may_boss=True, is_caught_by_siren=True))
         logger.info(f"Is boss: {grids}")
@@ -394,9 +318,7 @@ class Map(Fleet):
         self.withdraw()
 
     def clear_potential_boss(self):
-        """
-        Method to step on all boss spawn point when boss not detected.
-        """
+        """未检测到 Boss 时依次踏遍所有 Boss 刷新点。"""
         grids = self.map.select(may_boss=True, is_accessible=True).sort("weight", "cost")
         logger.info(f"May boss: {grids}")
         battle_count = self.battle_count
@@ -426,10 +348,7 @@ class Map(Fleet):
         return False
 
     def brute_clear_boss(self):
-        """
-        Method to clear boss, using brute-force to find roadblocks.
-        Note: This method will use 2 fleets.
-        """
+        """使用两支舰队暴力搜索并清理通往 Boss 的阻挡。"""
         boss = self.map.select(is_boss=True)
         if boss:
             logger.info("Brute clear BOSS")
@@ -451,9 +370,7 @@ class Map(Fleet):
         return self.clear_potential_boss()
 
     def brute_fleet_meet(self):
-        """
-        Method to clear roadblocks between fleets, using brute-force to find roadblocks.
-        """
+        """暴力搜索并清理两支舰队之间的阻挡。"""
         if self.fleet_boss_index != 2 or not self.fleet_2_location:
             return False
         grids = self.brute_find_roadblocks(self.map[self.fleet_2_location], fleet=1)
@@ -466,10 +383,6 @@ class Map(Fleet):
         return False
 
     def clear_siren(self, **kwargs):
-        """
-        Returns:
-            bool: True if clear an enemy.
-        """
         if not self.config.MAP_HAS_SIREN and not self.config.MAP_HAS_FORTRESS:
             return False
 
@@ -490,10 +403,6 @@ class Map(Fleet):
         return False
 
     def clear_any_enemy(self, **kwargs):
-        """
-        Returns:
-            bool: True if clear an enemy.
-        """
         grids = self.map.select(is_enemy=True, is_boss=False)
 
         if self.config.MAP_HAS_SIREN:
@@ -519,17 +428,7 @@ class Map(Fleet):
         return False
 
     def fleet_2_step_on(self, grids, roadblocks):
-        """Fleet step on a grid which can reduce the ambush frequency another fleet.
-        Of course, you can simply use 'self.fleet_2.goto(grid)' and do the same thing.
-        However, roads can be block by enemy and this method can handle that.
-
-        Args:
-            grids (SelectedGrids):
-            roadblocks (list[RoadGrids]):
-
-        Returns:
-            bool: if clear an enemy.
-        """
+        """让二队踏上指定格以降低另一队伏击率，并处理沿途阻挡；清敌后返回 True。"""
         if not self.config.FLEET_2:
             return False
         for grid in grids:
@@ -576,17 +475,7 @@ class Map(Fleet):
         return True
 
     def fleet_2_push_forward(self):
-        """Move fleet 2 to the grid with lower grid.weight
-        This will reduce the possibility of Boss fleet get stuck by enemies, especially for those one-way-road map
-        from chapter 7 to chapter 9.
-
-        Know more (in Chinese simplified):
-        9章道中战最小化路线规划 (Route Planning for battle minimization in chapter 9)
-        https://wiki.biligame.com/blhx/9%E7%AB%A0%E9%81%93%E4%B8%AD%E6%88%98%E6%9C%80%E5%B0%8F%E5%8C%96%E8%B7%AF%E7%BA%BF%E8%A7%84%E5%88%92
-
-        Returns:
-            bool: If pushed forward.
-        """
+        """把二队推向更低权重格，降低 7～9 章单行道中 Boss 队被敌人堵住的概率。"""
         if self.fleet_boss_index != 2:
             return False
 
@@ -613,14 +502,7 @@ class Map(Fleet):
         return True
 
     def fleet_2_rescue(self, grid):
-        """Use mob fleet to rescue boss fleet.
-
-        Args:
-            grid (GridInfo): Destination. Usually to be boss spawn grid.
-
-        Returns:
-            bool: If clear an enemy.
-        """
+        """让道中队前往通常为 Boss 刷新点的目标格救援 Boss 队；清敌后返回 True。"""
         if self.fleet_boss_index != 2:
             return False
 
@@ -636,16 +518,11 @@ class Map(Fleet):
         return True
 
     def fleet_2_protect(self):
-        """
-        Mob fleet moves around boss fleet, clear any approaching sirens.
-
-        Returns:
-            bool: If clear an enemy.
-        """
+        """让道中队环绕 Boss 队并清理接近的塞壬；清敌后返回 True。"""
         if not self.config.FLEET_2 or not self.config.MAP_HAS_MOVABLE_ENEMY:
             return False
 
-        # When having 2 fleet
+        # 使用两支舰队时。
         for _n in range(20):
             if not self.map.select(is_siren=True):
                 return False
@@ -669,18 +546,7 @@ class Map(Fleet):
         return False
 
     def clear_filter_enemy(self, string, preserve=0):
-        """
-        If EnemyPriority_EnemyScaleBalanceWeight != default_mode, enemy filter is ignored
-        If MAP_HAS_MOVABLE_NORMAL_ENEMY, enemy filter is ignored
-
-        Args:
-            string (str): Filter to select enemies, from easy to hard
-            preserve (int): Preserve several easiest enemies for battle without ammo.
-                When run out of ammo, use 0 to clear those preserved enemies.
-
-        Returns:
-            bool: If clear an enemy.
-        """
+        """按由易到难的过滤串清敌；非默认权重或有普通移动敌人时忽略过滤，preserve 保留最易敌人供无弹药战斗。"""
         if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
             return bool(self.clear_any_enemy(sort=("cost_2",)))
 
@@ -708,16 +574,7 @@ class Map(Fleet):
         return False
 
     def clear_bouncing_enemy(self):
-        """
-        Clear enemies which are bouncing in a fixed route.
-        This method will be disabled once it cleared an enemy, since there's only one bouncing enemy on the map.
-
-        Args:
-            route (tuple[GridInfo]):
-
-        Returns:
-            bool: If cleared an enemy.
-        """
+        """清理固定路线上的唯一弹跳敌人；成功后禁用该路线。"""
         if not self.config.MAP_HAS_BOUNCING_ENEMY:
             return False
 

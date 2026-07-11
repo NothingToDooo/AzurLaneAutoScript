@@ -110,7 +110,6 @@ class Equipment(StorageHandler):
             else:
                 self.device.screenshot()
 
-            # 已进入目标页面。
             if self.appear(check_button, offset=(5, 5)):
                 break
 
@@ -130,17 +129,10 @@ class Equipment(StorageHandler):
 
     @cached_property
     def _ship_side_navbar(self):
-        """
-        侧边栏可能有 3、4 或 5 个入口。
+        """侧栏按舰船状态分为三种布局。
 
-        pry_sidebar:
-            科研、装备、详情。
-
-        regular_sidebar:
-            强化、突破、装备、详情。
-
-        retrofit_sidebar:
-            改造、强化、突破、装备、详情。
+        科研布局：科研、装备、详情；常规布局：强化、突破、装备、详情；
+        改造布局：改造、强化、突破、装备、详情。
         """
         ship_side_navbar = ButtonGrid(
             origin=(21, 118), delta=(0, 94.5), button_shape=(60, 75), grid_shape=(1, 5), name="SHIP_SIDE_NAVBAR"
@@ -155,31 +147,12 @@ class Equipment(StorageHandler):
         )
 
     def ship_side_navbar_ensure(self, upper=None, bottom=None):
-        """
-        确保可以切换到目标页面。
+        """按顶部或底部索引切换侧栏；页面加载仍由调用方确认。
 
-        页面是否完全加载由调用方按需检查。
-
-        Args:
-            upper (int):
-                pry|regular|retrofit
-                1|N/A|N/A 科研。
-                N/A|N/A|1 改造。
-                N/A|1|2   强化。
-                N/A|2|3   突破。
-                2|3|4     装备。
-                3|4|5     详情。
-            bottom (int):
-                pry|regular|retrofit
-                3|N/A|N/A 科研。
-                N/A|N/A|5 改造。
-                N/A|4|4   强化。
-                N/A|3|3   突破。
-                2         装备。
-                1         详情。
-
-        Returns:
-            bool: 是否切换成功。
+        科研/常规/改造顶部索引：科研 1/无/无、改造 无/无/1、强化 无/1/2、
+        突破 无/2/3、装备 2/3/4、详情 3/4/5；底部索引：科研 3/无/无、
+        改造 无/无/5、强化 无/4/4、突破 无/3/3、装备 2/2/2、详情 1/1/1。
+        返回是否切换成功。
         """
         if self._ship_side_navbar.get_total(main=self) == 3 and (upper == 1 or bottom == 3):
             logger.warning('Transitions to "research" is not supported')
@@ -233,12 +206,6 @@ class Equipment(StorageHandler):
         logger.info("Equipment take off ended")
 
     def fleet_equipment_take_off(self, enter, long_click, out):
-        """
-        Args:
-            enter (Button): 进入装备编辑的按钮。
-            long_click (bool): 是否长按进入。
-            out (Button): 用于确认退出成功的按钮。
-        """
         logger.hr("Equipment take off")
         self.ship_info_enter(enter, long_click=long_click)
 
@@ -290,13 +257,7 @@ class Equipment(StorageHandler):
         logger.info("Equipment take on ended")
 
     def fleet_equipment_take_on_preset(self, preset_record, enter, long_click, out):
-        """
-        Args:
-            preset_record (list[int]): 装备记录，例如 [3, 1, 1, 1, 1, 1]。
-            enter (Button): 进入装备编辑的按钮。
-            long_click (bool): 是否长按进入。
-            out (Button): 用于确认退出成功的按钮。
-        """
+        """按每艘舰船的 1～3 号预设记录依次换装。"""
         logger.hr("Equipment take on")
         self.ship_info_enter(enter, long_click=long_click)
 

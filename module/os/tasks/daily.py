@@ -5,9 +5,7 @@ from module.os.map import OSMap
 
 class OpsiDaily(OSMap):
     def os_port_mission(self):
-        """
-        访问所有港口并完成港口日常任务。
-        """
+        """访问所有港口并完成港口日常任务。"""
         logger.hr("OS port mission", level=1)
         ports = [0, 7, 5, 2, 6, 1, 4, 3]
         if runtime_random.chance():
@@ -22,16 +20,9 @@ class OpsiDaily(OSMap):
             self.handle_after_auto_search()
 
     def os_finish_daily_mission(self, question=True, rescan=None):
-        """
-        Finish all daily mission in Operation Siren.
-        Suggest to run os_port_daily to accept missions first.
+        """完成全部大世界日常任务并返回数量；应先运行港口日常以领取任务。
 
-        Args:
-            question (bool): refer to run_auto_search
-            rescan (None, bool): refer to run_auto_search
-
-        Returns:
-            int: Number of missions finished
+        question 和 rescan 直接传给 run_auto_search。
         """
         logger.hr("OS finish daily mission", level=1)
         count = 0
@@ -41,8 +32,7 @@ class OpsiDaily(OSMap):
                 break
 
             if result != "pinned_at_archive_zone":
-                # The name of archive zone is "archive zone", which is not an existing zone.
-                # After archive zone, it go back to previous zone automatically.
+                # 档案海域名称不是可解析的普通海域；结算后会自动返回原海域。
                 self.zone_init()
             if result == "already_at_mission_zone":
                 self.globe_goto(self.zone, refresh=True)
@@ -65,12 +55,9 @@ class OpsiDaily(OSMap):
             self.tuning_sample_use()
 
         while True:
-            # If unable to receive more dailies, finish them and try again.
+            # 无法继续领取时先完成已有日常，再重新尝试。
             success = self.os_mission_overview_accept()
-            # Re-init zone name
-            # MISSION_ENTER appear from the right,
-            # need to confirm that the animation has ended,
-            # or it will click on MAP_GOTO_GLOBE
+            # MISSION_ENTER 从右侧滑入，必须等动画结束后再初始化海域名，避免误点 MAP_GOTO_GLOBE。
             self.zone_init()
             self.os_finish_daily_mission()
             if self.is_in_opsi_explore():

@@ -12,19 +12,10 @@ class GuildShop_250814(ShopClerk, ShopUI, ShopStatus):
 
     @cached_property
     def shop_filter(self):
-        """
-        Returns:
-            str:
-        """
         return self.config.GuildShop_Filter.strip()
 
-    # New UI in 2025-08-14
     @cached_property
     def shop_guild_items(self):
-        """
-        Returns:
-            ShopItemGrid:
-        """
         shop_grid = self.shop_grid
         shop_guild_items = ShopItemGrid_250814(
             shop_grid,
@@ -40,39 +31,19 @@ class GuildShop_250814(ShopClerk, ShopUI, ShopStatus):
         return shop_guild_items
 
     def shop_items(self):
-        """覆盖统一接口，返回当前商店专用的商品识别网格。"""
         return self.shop_guild_items
 
     def shop_currency(self):
-        """
-        Ocr shop guild currency
-        Then return guild coin count
-
-        Returns:
-            int: guild coin amount
-        """
         self._currency = self.status_get_guild_coins()
         logger.info(f"Guild coins: {self._currency}")
         return self._currency
 
     def shop_interval_clear(self):
-        """
-        Clear interval on select assets for
-        shop_buy_handle
-        """
         super().shop_interval_clear()
         self.interval_clear(SHOP_BUY_CONFIRM_SELECT)
 
     def shop_buy_handle(self, _item):
-        """
-        Handle shop_guild buy interface if detected
-
-        Args:
-            item: Item to handle
-
-        Returns:
-            bool: whether interface was detected and handled
-        """
+        """处理舰队商店的商品选择弹窗。"""
         if self.appear(SHOP_BUY_CONFIRM_SELECT, offset=(20, 20), interval=3):
             self.shop_buy_select_execute(_item)
             self.interval_reset(SHOP_BUY_CONFIRM_SELECT)
@@ -81,26 +52,18 @@ class GuildShop_250814(ShopClerk, ShopUI, ShopStatus):
         return False
 
     def run(self):
-        """
-        Run Guild Shop
-        """
-        # Base case; exit run if filter empty
         if not self.shop_filter:
             return
 
-        # When called, expected to be in
-        # correct Guild Shop interface
         logger.hr("Guild Shop", level=1)
 
-        # Execute buy operations
-        # Refresh if enabled and available
         refresh = self.config.GuildShop_Refresh
         for _ in range(2):
             success = self.shop_buy()
             if not success:
                 break
             if refresh:
-                # Refresh costs 50 and PlateT4 costs 60
+                # 刷新消耗 50，PlateT4 消耗 60，至少保留 110 舰队币。
                 if self._currency >= 110:
                     if self.shop_refresh():
                         continue

@@ -35,17 +35,7 @@ class Enhancement(Dock):
         return 3000
 
     def _enhance_enter(self, favourite=False, ship_type=None):
-        """
-        Pages:
-            in: page_dock
-            out: page_ship_enhance
-
-        Returns:
-            bool: False with filter applied resulting
-                  in empty dock.
-                  Otherwise true with at least 1 card
-                  available to be picked.
-        """
+        """从船坞进入强化页；筛选后无可用舰船时返回 False。"""
         if favourite:
             self.dock_favourite_set(enable=True, wait_loading=False)
 
@@ -61,21 +51,13 @@ class Enhancement(Dock):
         return self.dock_enter_first()
 
     def _enhance_quit(self):
-        """
-        Pages:
-            in: page_ship_enhance
-            out: page_dock
-        """
+        """从强化页返回船坞，并重置收藏与筛选状态。"""
         self.ui_back(retire_assets.DOCK_CHECK)
         self.dock_favourite_set(enable=False, wait_loading=False)
         self.dock_filter_set()
 
     def _enhance_confirm(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: EQUIP_CONFIRM
-            out: page_ship_enhance, without info_bar
-        """
+        """确认强化并等待信息栏消失，结束于强化页。"""
         confirm_timer = Timer(1.5, count=3).start()
         while 1:
             if skip_first_screenshot:
@@ -229,26 +211,7 @@ class Enhancement(Dock):
         return handler(context)
 
     def _enhance_choose(self, ship_count, skip_first_screenshot=True):
-        """
-        Refactor the implementation.
-        Divided the enhancement process into
-        several state functions. Use a DFA method
-        to call those functions according to
-        current state. Each state corresponds to
-        a function with the same name.
-
-        Pages:
-            in: page_ship_enhance
-            out: page_ship_enhance
-
-        Args:
-            ship_count (int): ship_count, must be
-            non-zero positive integer
-
-        Returns:
-            True if able to enhance otherwise False
-            Always paired with current ship_count
-        """
+        """在强化页按页面状态推进；ship_count 必须为正整数，返回状态和剩余数量。"""
         context = _EnhanceChooseContext(ship_count=ship_count)
         handlers = self._enhance_state_handlers()
         state = "state_enhance_check"
@@ -268,23 +231,7 @@ class Enhancement(Dock):
         return state, context.ship_count
 
     def enhance_ships(self, favourite=None):
-        """
-        Enhance target ships by specified order
-        of types listed in ENHANCE_ORDER_STRING
-
-        Invalid types are treated as requesting
-        from ALAS to choose a valid one at random
-
-        Pages:
-            in: page_dock
-            out: page_dock
-
-        Args:
-            favourite (bool):
-
-        Returns:
-            int: total enhanced
-        """
+        """按配置顺序强化并返回已消耗的素材舰船总数；无效舰种会随机选择，结束于船坞页。"""
         if favourite is None:
             favourite = self.config.Enhance_ShipToEnhance == "favourite"
 
@@ -355,18 +302,7 @@ class Enhancement(Dock):
         return enhanced
 
     def _enhance_handler(self):
-        """
-        Pages:
-            in: RETIRE_APPEAR
-            out:
-
-        Returns:
-            tuple(int, int): (enhance turn count, remaining dock amount)
-
-        Pages:
-            in: DOCK_CHECK
-            out: the page before retirement popup
-        """
+        """处理船坞已满时的强化，返回已消耗的强化素材舰船数和剩余船坞容量。"""
         total = self.enhance_ships()
         _, remain, _ = OCR_DOCK_AMOUNT.ocr(self.device.image)
 

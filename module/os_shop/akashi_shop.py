@@ -12,10 +12,6 @@ from module.os_shop.ui import OSShopUI
 class AkashiShop(OSStatus, OSShopUI, Selector, MapEventHandler):
     @cached_property
     def os_akashi_shop_items(self) -> ItemGrid:
-        """
-        Returns:
-            ItemGrid:
-        """
         shop_grid = ButtonGrid(
             origin=(233, 224), delta=(193.2, 228), button_shape=(98, 98), grid_shape=(4, 2), name="SHOP_GRID"
         )
@@ -31,13 +27,6 @@ class AkashiShop(OSStatus, OSShopUI, Selector, MapEventHandler):
         return shop_items
 
     def os_shop_get_items_in_akashi(self) -> list[Item]:
-        """
-        Args:
-            name (bool): If detect item name. True if detect akashi shop, false if detect port shop.
-
-        Returns:
-            list[Item]:
-        """
         if self.config.SHOP_EXTRACT_TEMPLATE:
             self.os_akashi_shop_items.extract_template(self.device.image, "./assets/shop/os")
         self.os_akashi_shop_items.predict(self.device.image)
@@ -54,13 +43,9 @@ class AkashiShop(OSStatus, OSShopUI, Selector, MapEventHandler):
         return []
 
     def os_shop_get_item_to_buy_in_akashi(self) -> Item | None:
-        """
-        Returns:
-            list[Item]:
-        """
         self.os_shop_get_coins()
         items = self.os_shop_get_items_in_akashi()
-        # Shop supplies do not appear immediately, need to confirm if shop is empty.
+        # 商品不会立即出现，判空前需要再次确认。
         for _ in range(2):
             if not len(items) or any(not item.is_known_item() for item in items):
                 logger.warning("Empty akashi shop or empty items, confirming")

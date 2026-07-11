@@ -131,7 +131,6 @@ class Config:
     MAP_CHAPTER_SWITCH_20241219 = True
     STAGE_ENTRANCE = ("half", "20240725")
 
-    # Additional settings for chapter TS
     STAGE_INCREASE_CUSTOM = ("TS1 > TS2 > TS3 > TS4 > TS5 > TS6",)
 
     INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {

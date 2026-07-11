@@ -146,9 +146,7 @@ class Config(ConfigBase):
     MAP_IS_ONE_TIME_STAGE = True
 
 
-# hard to find a dynamic solution
-# therefore overwrite all MAP girds with ME
-# and use a serial of static actions
+# 动态寻路不稳定，因此将全图按敌方节点处理并执行预设路线。
 actions = {
     4: [
         ["1_R_2_", "1_L_2_", "1_R_2_B"],

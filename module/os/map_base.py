@@ -25,20 +25,14 @@ class OSCampaignMap(CampaignMap):
                 grid.location = (x, y)
                 self.grids[(x, y)] = grid
 
-        # camera_data can be generate automatically, but it's better to set it manually.
+        # camera_data 虽可自动生成，但手动固定可避免扫描路径漂移。
         self.camera_data = [location2node(loca) for loca in camera_2d((0, 0, *self._shape), sight=self.camera_sight)]
         self.camera_data_spawn_point = []
-        # weight_data set to 10.
         for grid in self:
             grid.weight = 10.0
 
     def update(self, grids, camera, mode="normal"):
-        """
-        Args:
-            grids:
-            camera (tuple):
-            mode (str): Scan mode, such as 'normal', 'carrier', 'movable'
-        """
+        """按镜头坐标合并扫描格子；大世界仅支持 normal 模式。"""
         if mode != "normal":
             message = f"{OS_MAP_UPDATE_MODE_MESSAGE}: {mode}"
             raise ValueError(message)

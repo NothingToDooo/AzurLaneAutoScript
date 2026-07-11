@@ -15,18 +15,18 @@ MASK_RADAR = Mask("./assets/mask/MASK_OS_RADAR.png")
 
 
 class RadarGrid:
-    is_enemy = False  # Red gun
-    is_resource = False  # green box to get items
-    is_exclamation = False  # Yellow exclamation mark '!'
-    is_meowfficer = False  # Blue meowfficer
-    is_question = False  # White question mark '?'
-    is_ally = False  # Ally cargo ship in daily mission, yellow '!' on radar
-    is_akashi = False  # White question mark '?'
-    is_archive = False  # Purple archive
+    is_enemy = False  # 红色炮口。
+    is_resource = False  # 绿色物资箱。
+    is_exclamation = False  # 黄色感叹号。
+    is_meowfficer = False  # 蓝色猫指挥官。
+    is_question = False  # 白色问号。
+    is_ally = False  # 每日任务中的黄色感叹号友军运输船。
+    is_akashi = False  # 白色问号明石。
+    is_archive = False  # 紫色档案。
     is_port = False
 
     enemy_scale = 0
-    enemy_genre = None  # Light, Main, Carrier, Treasure, Enemy(unknown)
+    enemy_genre = None  # Light、Main、Carrier、Treasure 或 Enemy（未知）。
 
     is_fleet = False
 
@@ -42,13 +42,7 @@ class RadarGrid:
     }
 
     def __init__(self, location, image, center, config):
-        """
-        Args:
-            location (tuple): (x, y), Grid location relative to radar center, such as (3, 2)
-            image: Screenshot
-            center (tuple): (x, y), the center grid center in pixel, such as (1099, 238)
-            config (AzurLaneConfig):
-        """
+        """location 是相对雷达中心的格子坐标；center 是该格中心的截图像素坐标。"""
         self.location = location
         self.image: np.ndarray = image
         self.center = center
@@ -56,10 +50,6 @@ class RadarGrid:
         self.is_fleet = np.sum(np.abs(location)) == 0
 
     def encode(self):
-        """
-        Returns:
-            str:
-        """
         for key, value in self.dic_encode.items():
             if self.__getattribute__(value):
                 return key
@@ -107,16 +97,7 @@ class RadarGrid:
             self.enemy_scale = 0
 
     def image_color_count(self, area, color, threshold=221, count=50):
-        """
-        Args:
-            area (tuple): Area relative to center
-            color (tuple): RGB.
-            threshold: 255 means colors are the same, the lower the worse.
-            count (int): Pixels count.
-
-        Returns:
-            bool:
-        """
+        """统计中心相对区域内的近似 RGB 像素；threshold 越接近 255，颜色要求越严格。"""
         image = crop(self.image, area_offset(area, self.center), copy=False)
         mask = color_similarity_2d(image, color=color) > threshold
         return np.sum(mask) >= count
@@ -152,13 +133,6 @@ class Radar:
     port_loca = (0, 0)
 
     def __init__(self, config, center=(1140, 226), delta=(11.7, 11.7), radius=5.15):
-        """
-        Args:
-            config:
-            center:
-            delta:
-            radius:
-        """
         self.grids = {}
         self.config = config
         self.center = center
@@ -179,10 +153,6 @@ class Radar:
         return iter(self.grids.values())
 
     def __getitem__(self, item):
-        """
-        Returns:
-            RadarGrid:
-        """
         return self.grids[tuple(item)]
 
     def __contains__(self, item):
@@ -194,18 +164,13 @@ class Radar:
             logger.info(text)
 
     def predict(self, image):
-        """
-        根据雷达图像更新格子预测结果。
-
-        Args:
-            image：雷达图像。
-        """
+        """根据雷达截图更新格子预测结果。"""
         image = MASK_RADAR.apply(image)
         for grid in self:
             grid.image = image
             grid.reset()
             grid.predict()
-        # Fixup is_question near is_port
+        # 港口旁的白色像素可能被误识别为问号，需要纠正。
         for port in self.select(is_port=True):
             for grid in self.select(is_question=True):
                 if np.sum(np.abs(np.subtract(port.location, grid.location))) == 1:
@@ -216,13 +181,6 @@ class Radar:
                     grid.is_question = False
 
     def select(self, **kwargs):
-        """
-        Args:
-            **kwargs: Attributes of Grid.
-
-        Returns:
-            SelectedGrids:
-        """
         result = []
         for grid in self:
             flag = True
@@ -235,15 +193,7 @@ class Radar:
         return SelectedGrids(result)
 
     def predict_port_outside(self, image):
-        """
-        Args:
-            image: Screenshot.
-
-        Returns:
-            np.ndarray: Coordinate of the center of port icon, relative to radar center.
-                Such as [57.70732954 50.89636818].
-                Or None if port not found.
-        """
+        """返回港口图标中心相对雷达中心的像素坐标；未找到时返回 None。"""
         radius = (15, 82)
         image = crop(image, area_offset((-radius[1], -radius[1], radius[1], radius[1]), self.center), copy=False)
         points = np.where(color_similarity_2d(image, color=(255, 255, 255)) > 250)
@@ -258,17 +208,11 @@ class Radar:
         return None
 
     def predict_port_inside(self, image):
-        """
-        Args:
-            image: Screenshot.
-
-        Returns:
-            np.ndarray: Grid location of port on radar. Such as [3 -1].
-        """
+        """返回雷达内港口中心旁的可接近格子坐标；未找到时返回 None。"""
         self.predict(image)
         for grid in self:
             if grid.is_port:
-                # Goto the nearby grid of port
+                # 港口中心不可点击，改走相邻格。
                 location = np.array(grid.location) - np.sign(grid.location) * (1, 1)
                 self.port_loca = location
                 return location
@@ -277,15 +221,7 @@ class Radar:
 
     @staticmethod
     def port_outside_to_inside(point):
-        """
-        Convert `predict_port_outside` result to `predict_port_inside`
-
-        Args:
-            point (np.ndarray): Coordinate of the center of port icon, relative to radar center.
-
-        Returns:
-            np.ndarray: Grid location of port on radar.
-        """
+        """把雷达外港口的相对像素坐标投影为雷达边缘格子坐标。"""
         sight = (-4, -2, 3, 2)
         grids = [(x, y) for x in range(sight[0], sight[2] + 1) for y in [sight[1], sight[3]]] + [
             (x, y) for x in [sight[0], sight[2]] for y in range(sight[1] + 1, sight[3])
@@ -296,15 +232,7 @@ class Radar:
         return grids[np.argmax(degree)]
 
     def port_predict(self, image):
-        """
-        Args:
-            image: Screenshot.
-
-        Returns:
-            np.ndarray: Grid location of port on radar,
-                or a grid location that can approach port,
-                or None if port not found.
-        """
+        """返回港口格或可接近港口的格子坐标；未找到时返回 None。"""
         port = self.predict_port_inside(image)
         if port is not None:
             return port
@@ -316,13 +244,7 @@ class Radar:
         return None
 
     def predict_akashi(self, image):
-        """
-        Args:
-            image: Screenshot.
-
-        Returns:
-            tuple: Grid location of akashi on radar, or None if no akashi found.
-        """
+        """返回雷达上的明石格子坐标；未找到时返回 None。"""
         self.predict(image)
         for location in [(0, 1), (-1, 0), (1, 0), (0, -1)]:
             grid = self[location]
@@ -332,14 +254,7 @@ class Radar:
         return None
 
     def predict_question(self, image, in_port=True):
-        """
-        Args:
-            image: Screenshot.
-            in_port (bool): False to treat is_port as is_question
-
-        Returns:
-            tuple: Grid location of question mark on radar, or None if nothing found.
-        """
+        """返回问号格子坐标；未找到时返回 None，in_port=False 时把港口也视作问号。"""
         self.predict(image)
         self.show()
         for location in [(0, 1), (-1, 0), (1, 0), (0, -1), (0, -2), (0, -3)]:
@@ -353,13 +268,7 @@ class Radar:
         return None
 
     def nearest_object(self, camera_sight=(-4, -3, 3, 3)):
-        """
-        Args:
-            camera_sight:
-
-        Returns:
-            RadarGrid: Or None if no objects
-        """
+        """返回视野限制内最接近的可处理对象；没有对象时返回 None。"""
         objects = []
         for grid in self:
             if grid.is_port:

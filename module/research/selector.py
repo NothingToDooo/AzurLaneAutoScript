@@ -48,9 +48,7 @@ _RESEARCH_RESOURCE_RULES = (
 
 
 class ResearchSelector(ResearchUI):
-    # List of current research projects
     projects: list
-    # From StorageHandler
     storage_has_boxes = True
 
     def research_goto_detail(self, index, skip_first_screenshot=True):
@@ -62,13 +60,12 @@ class ResearchSelector(ResearchUI):
             else:
                 self.device.screenshot()
 
-            # DETAIL_NEXT appears even when the research detail page is not fully loaded.
+            # DETAIL_NEXT 会提前出现，还需等待费用区域确认详情页加载完成。
             if not self.appear(DETAIL_NEXT, offset=(20, 20)):
                 if click_timer.reached():
                     self.device.click(RESEARCH_ENTRANCE[index])
                     click_timer.reset()
             else:
-                # Check RESEARCH_COST_CHECKER to ensure that the research detail page is fully loaded.
                 self.wait_until_appear(RESEARCH_COST_CHECKER, offset=(20, 20), skip_first_screenshot=True)
                 break
 
@@ -82,10 +79,9 @@ class ResearchSelector(ResearchUI):
                 break
 
             if sum(p.valid for p in projects) < 5:
-                # Leftmost research series covered by battle pass info, see #1037
+                # 战令提示可能遮住最左侧科研系列，见 #1037；短暂等待后重试 OCR。
                 logger.info("Invalid project detected")
                 logger.info("Probably because of battle pass info or too fast screenshot")
-                # A rare case, poor sleep is acceptable
                 self.device.sleep(1)
                 self.device.screenshot()
                 continue
@@ -94,12 +90,7 @@ class ResearchSelector(ResearchUI):
         self.projects = projects
 
     def research_sort_filter(self, enforce=False):
-        """
-        Returns:
-            list: A list of ResearchProject objects and preset strings,
-                such as [object, object, object, 'reset']
-        """
-        # Load filter string
+        """按预设返回 ResearchProject 与 shortest、cheapest、reset 等指令的优先级列表。"""
         preset = self.config.Research_PresetFilter
         if preset == "custom":
             string = self.config.Research_CustomFilter
@@ -120,32 +111,19 @@ class ResearchSelector(ResearchUI):
         )
         logger.attr("Allow delay", self.config.Research_AllowDelay)
 
-        # Case insensitive
+        # 筛选器不区分大小写，并兼容历史别名。
         string = string.lower()
-        # Filter uses `hakuryu`, but allows both `hakuryu` and `hakuryuu`
         string = string.replace("hakuryuu", "hakuryu")
-        # Allow both `fastest` and `shortest`
         string = string.replace("fastest", "shortest")
-        # Allow both `PR` and `PRY`
         string = re.sub(r"pr([\d\- >])", r"pry\1", string)
 
         FILTER.load(string)
         priority = FILTER.apply(self.projects, func=partial(self._research_check, enforce=enforce))
 
-        # Log
         logger.attr("Filter_sort", " > ".join([str(project) for project in priority]))
         return priority
 
     def _research_check(self, project, enforce=False):
-        """检查科研项目是否符合当前筛选策略。
-
-        Args:
-            project (ResearchProject):
-            enforce (bool):
-
-        Returns:
-            bool:
-        """
         if not project.valid:
             return False
         if not self._research_resource_allowed(project, enforce):
@@ -179,11 +157,7 @@ class ResearchSelector(ResearchUI):
         return self.storage_has_boxes or genre != "E" or project.equipment_amount == 0
 
     def research_sort_shortest(self, enforce):
-        """
-        Returns:
-            list: A list of ResearchProject objects and preset strings,
-                such as [object, object, object, 'reset']
-        """
+        """返回按耗时排序的项目与预设指令列表。"""
         FILTER.load(FILTER_STRING_SHORTEST)
         priority = FILTER.apply(self.projects, func=partial(self._research_check, enforce=enforce))
 
@@ -191,11 +165,7 @@ class ResearchSelector(ResearchUI):
         return priority
 
     def research_sort_cheapest(self, enforce):
-        """
-        Returns:
-            list: A list of ResearchProject objects and preset strings,
-                such as [object, object, object, 'reset']
-        """
+        """返回按消耗排序的项目与预设指令列表。"""
         FILTER.load(FILTER_STRING_CHEAPEST)
         priority = FILTER.apply(self.projects, func=partial(self._research_check, enforce=enforce))
 

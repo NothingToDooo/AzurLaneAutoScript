@@ -48,12 +48,6 @@ class Control:
         return self.controller.drag(p1, p2, point_random=point_random)
 
     def click(self, button, control_check=True):
-        """Method to click a button.
-
-        Args:
-            button (button.Button): AzurLane Button instance.
-            control_check (bool):
-        """
         if control_check:
             self.handle_control_check(button)
         x, y = random_rectangle_point(button.button)
@@ -73,12 +67,6 @@ class Control:
             self.click(button, control_check=False)
 
     def long_click(self, button, duration=(1, 1.2)):
-        """Method to long click a button.
-
-        Args:
-            button (button.Button): AzurLane Button instance.
-            duration(int, float, tuple):
-        """
         self.handle_control_check(button)
         x, y = random_rectangle_point(button.button)
         x, y = ensure_int(x, y)
@@ -100,12 +88,7 @@ class Control:
         self.swipe_minitouch(p1, p2)
 
     def swipe_vector(self, vector, options=None):
-        """Method to swipe.
-
-        Args:
-            vector (tuple): (x, y).
-            options: 滑动路径和校验参数。
-        """
+        """vector 是 (x, y) 位移，options 控制路径、时长和距离校验。"""
         if options is None:
             options = SwipeVectorOptions()
         p1, p2 = random_rectangle_vector_opted(

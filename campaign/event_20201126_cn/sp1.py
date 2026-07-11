@@ -101,7 +101,7 @@ class Config:
     MAP_HAS_MYSTERY = False
     # ===== End of generated config =====
 
-    STAGE_ENTRANCE = ("normal", "half")  # normal, blue, half
+    STAGE_ENTRANCE = ("normal", "half")
     MAP_SWIPE_MULTIPLY = (1.221, 1.244)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.181, 1.203)
     INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {

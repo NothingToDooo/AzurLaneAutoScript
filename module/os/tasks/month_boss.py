@@ -12,16 +12,7 @@ class OpsiMonthBoss(OSMap):
         return OCR_OS_ADAPTABILITY.ocr(self.device.image)
 
     def clear_month_boss(self):
-        """
-        check adaptability
-        check current boss difficulty
-        clear boss
-        repair fleets in port
-
-        Raises:
-            ActionPointLimit
-            TaskEnd: if no more month boss
-        """
+        """检查适应性和难度后清理月度首领并维修；行动力不足时抛出 ActionPointLimit，首领耗尽时抛出 TaskEnd。"""
         if self.is_in_opsi_explore():
             logger.info("OpsiExplore is under scheduling, stop OpsiMonthBoss")
             self.config.task_delay(server_update=True)
@@ -59,13 +50,11 @@ class OpsiMonthBoss(OSMap):
                 self.config.task_stop()
             # 不需要退出地图，直接复用当前页面。
 
-        # 战斗。
         logger.hr("Month Boss goto", level=2)
         self.globe_goto(154)
         self.go_month_boss_room(is_normal=is_normal)
         result = self.boss_clear(has_fleet_step=True, is_month=True)
 
-        # end
         logger.hr("Month Boss repair", level=2)
         self.fleet_repair(revert=False)
         self.handle_fleet_resolve(revert=False)
@@ -73,11 +62,7 @@ class OpsiMonthBoss(OSMap):
         return result
 
     def month_boss_delay(self, is_normal=True, result=True):
-        """
-        Args:
-            is_normal: True for normal, False for hard
-            result: If success to clear boss
-        """
+        """按普通或困难模式及清理结果安排下次运行。"""
         if is_normal:
             if result:
                 if self.config.OpsiMonthBoss_Mode == "normal_hard":

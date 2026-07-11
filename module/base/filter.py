@@ -5,12 +5,6 @@ from module.logger import logger
 
 class Filter:
     def __init__(self, regex, attr, preset=()):
-        """
-        Args:
-            regex: Regular expression.
-            attr: Attribute name.
-            preset: Build-in string preset.
-        """
         if isinstance(regex, str):
             regex = re.compile(regex)
         self.regex = regex
@@ -20,18 +14,7 @@ class Filter:
         self.filter = []
 
     def load(self, string):
-        """
-        Load a filter string, filters are connected with ">"
-
-        There are also tons of unicode characters similar to ">"
-        > \u003e correct
-        ＞ \uff1e
-        ﹥ \ufe65
-        › \u203a
-        ˃ \u02c3
-        ᐳ \u1433
-        ❯ \u276f
-        """
+        """用 `>` 连接筛选项，同时接受 `＞﹥›˃ᐳ❯` 等近似字符。"""
         string = str(string)
         string = re.sub(r"[ \t\r\n]", "", string)
         string = re.sub(r"[＞﹥›˃ᐳ❯]", ">", string)
@@ -42,16 +25,7 @@ class Filter:
         return len(filter_value) and filter_value.lower() in self.preset
 
     def apply(self, objs, func=None):
-        """
-        Args:
-            objs (list): List of objects and strings
-            func (callable): A function that to filter object.
-                Function should receive an object as arguments, and return a bool.
-                True means add it to output.
-
-        Returns:
-            list: A list of objects and preset strings, such as [object, object, object, 'reset']
-        """
+        """按已加载条件筛选对象并保留预设字符串；func 返回真时保留对应对象。"""
         out = []
         for raw_filter, parsed_filter in zip(self.filter_raw, self.filter, strict=True):
             if self.is_preset(raw_filter):
@@ -69,33 +43,15 @@ class Filter:
                 if isinstance(obj, str) or func(obj):
                     out.append(obj)
                 else:
-                    # Drop this object
+                    # 回调拒绝的对象不进入结果。
                     pass
 
         return out
 
     def applys(self, objs, funcs):
-        """
-        Args:
-            objs (list): List of objects and strings
-            List[func(callable)] : A list of funciton that to filter object.
-                Function should receive an object as arguments, and return a bool.
-                True means add it to output.
-
-        Returns:
-            list: A list of objects and preset strings, such as [object, object, object, 'reset']
-        """
         return self.apply(objs, func=lambda x: all(func(x) for func in funcs))
 
     def apply_filter_to_obj(self, obj, filter_value):
-        """
-        Args:
-            obj (object):
-            filter_value (list[str]):
-
-        Returns:
-            bool: If an object satisfy a filter.
-        """
         for attr, value in zip(self.attr, filter_value, strict=True):
             if not value:
                 continue
@@ -105,13 +61,6 @@ class Filter:
         return True
 
     def parse_filter(self, string):
-        """
-        Args:
-            string (str):
-
-        Returns:
-            list[strNone]:
-        """
         string = string.replace(" ", "").lower()
         result = re.search(self.regex, string)
 
@@ -121,6 +70,5 @@ class Filter:
         if result and len(string) and result.span()[1]:
             return [result.group(index + 1) for index, attr in enumerate(self.attr)]
         logger.warning(f'Invalid filter: "{string}". This selector does not match the regex, nor a preset.')
-        # Invalid filter will be ignored.
-        # Return strange things and make it impossible to match
+        # 无效筛选器用不可能匹配的哨兵表示，避免意外选中对象。
         return ["1nVa1d"] + [None] * (len(self.attr) - 1)

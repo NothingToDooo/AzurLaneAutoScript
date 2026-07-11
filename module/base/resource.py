@@ -27,7 +27,7 @@ class PreservedAssets:
         assets |= get_assets_from_file(
             file="./module/handler/info_handler.py", regex=re.compile(r"\(([A-Z][A-Z0-9_]+),")
         )
-        # MAIN_CHECK 与 MAIN_GOTO_CAMPAIGN 共用资源，不需要额外保留。
+        # MAIN_CHECK 与 MAIN_GOTO_CAMPAIGN 共用资源，无需重复保留。
         return assets
 
 
@@ -35,9 +35,7 @@ _preserved_assets = PreservedAssets()
 
 
 class Resource:
-    # 记录所有按钮和模板实例。
     instances: ClassVar[dict[str, Resource]] = {}
-    # 子类声明需要释放的缓存属性。
     cached: ClassVar[tuple[str, ...]] = ()
 
     def resource_add(self, key):
@@ -63,29 +61,20 @@ class Resource:
 
     @staticmethod
     def parse_property(data):
-        """
-        返回按钮或模板的原始属性。
-        """
         return data
 
 
 def release_resources(next_task=""):
-    # 释放 OCR 模型。通常会加载 2 个模型，每个约 20MB。
+    # OCR 通常加载两个约 20MB 的模型；下一任务马上使用时保留对应缓存。
     if "Opsi" in next_task or "commission" in next_task:
-        # 马上会用到 OCR，不释放。
         models = []
     elif next_task:
-        # 保留常用的 azur_lane 模型。
         models = ["cnocr"]
     else:
         models = ["azur_lane", "cnocr"]
     for model in models:
         del_cached_property(OCR_MODEL, model)
 
-    # 释放已加载资源缓存。
-    # module.ui 约 80 个资源，占用约 3MB。
-    # Alas 约 800 个资源，但不会全部加载。
-    # Template 图片更大，每张约 6MB。
     for obj in Resource.instances.values():
         # 保留 UI 切换需要的资源。
         if next_task and str(obj) in _preserved_assets.ui:
@@ -107,5 +96,3 @@ def release_resources(next_task=""):
         ]
         for attr in attr_list:
             del_cached_property(utils_assets.ASSETS, attr)
-
-    # 多数情况下主动 GC 收益不大，暂时不调用。

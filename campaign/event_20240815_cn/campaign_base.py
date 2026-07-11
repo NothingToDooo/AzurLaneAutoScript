@@ -11,18 +11,13 @@ class CampaignBase(CampaignBase_):
     entrance_timer = Timer(2)
 
     def get_story_entrance(self):
-        """
-        Returns:
-            Button: Or None if nothing matched.
-        """
-        # 5 story stage after clearing A2
-        # You can't go anywhere unless you clicked it
+        """返回剧情入口按钮；未匹配或落入黑名单区域时返回 None。"""
+        # A2 后会依次出现 5 个剧情入口，未点击前无法继续。
         button = self.image_color_button(
             area=(66, 200, 1200, 690), color=(0, 0, 0), color_threshold=240, encourage=10, name="STORY_ENTRANCE"
         )
         if button is None:
             return None
-        # Blacklisted area
         if area_in_area(button.button, area_pad((424, 522, 444, 542), pad=-20)):
             return None
         return button
@@ -48,14 +43,12 @@ class CampaignBase(CampaignBase_):
                 self.device.screenshot()
 
             if self.is_in_stage_page():
-                # End
                 try:
                     self._get_stage_name(self.device.image)
                 except IndexError, CampaignNameError:
                     pass
                 else:
                     return True
-                # Click
                 if self.handle_story_entrance():
                     continue
             if self.handle_story_skip():
@@ -68,13 +61,11 @@ class CampaignBase(CampaignBase_):
         return False
 
     def handle_in_stage(self):
-        # 关卡结束后处理剧情入口。
         if self.is_in_stage_page() and self.handle_story_entrance():
             return False
         return super().handle_in_stage()
 
     def handle_get_chapter_additional(self):
-        # Exit when having story entrance
         if self.get_story_entrance():
             raise CampaignNameError
         return super().handle_get_chapter_additional()

@@ -28,10 +28,6 @@ class ContinuousCombat(Exception):
 
 class Combat(Combat_, MapEventHandler):
     def combat_appear(self):
-        """
-        Returns:
-            bool: If enter combat.
-        """
         if self.is_in_map():
             return False
 
@@ -45,13 +41,6 @@ class Combat(Combat_, MapEventHandler):
         return self.appear(combat_assets.BATTLE_PREPARATION_WITH_OVERLAY) and self.handle_combat_automation_confirm()
 
     def combat_preparation(self, balance_hp=False, emotion_reduce=False, auto="combat_auto", fleet_index=1):
-        """
-        Args:
-            balance_hp (bool):
-            emotion_reduce (bool):
-            auto (str):
-            fleet_index (int):
-        """
         logger.info("Combat preparation.")
         self.device.stuck_record_clear()
         self.device.click_record_clear()
@@ -77,7 +66,6 @@ class Combat(Combat_, MapEventHandler):
             if self.handle_story_skip():
                 continue
 
-            # 结束。
             pause = self.is_combat_executing()
             if pause:
                 logger.attr("BattleUI", pause)
@@ -94,12 +82,7 @@ class Combat(Combat_, MapEventHandler):
         return False
 
     def handle_get_items(self):
-        """
-        Click CLICK_SAFE_AREA instead of button itself.
-
-        Returns:
-            bool:
-        """
+        """识别掉落后点击安全区域，避免直接点击掉落按钮。"""
         if getattr(self, "_disable_handle_get_items", False):
             return False
         if self.appear(combat_assets.GET_ITEMS_1, offset=5, interval=self.battle_status_click_interval):
@@ -142,12 +125,7 @@ class Combat(Combat_, MapEventHandler):
             self._disable_handle_get_items = False
 
     def combat(self, *args, **kwargs):
-        """
-        处理大世界中的连续战斗。
-
-        塞壬扫描装置可能连续触发两场伏击，中间没有间隔。这里在继承普通 combat
-        流程的基础上额外识别第二场战斗，避免停在战斗确认阶段。
-        """
+        """塞壬扫描装置可能无间隔触发两场伏击，因此额外识别连续战斗。"""
         for count in range(3):
             if count >= 2:
                 logger.warning("Too many continuous combat")
@@ -184,7 +162,6 @@ class Combat(Combat_, MapEventHandler):
             if self.handle_combat_automation_confirm():
                 continue
 
-            # 结束。
             if self.handle_os_auto_search_map_option():
                 break
             pause = self.is_combat_executing()
@@ -206,7 +183,6 @@ class Combat(Combat_, MapEventHandler):
             if self.handle_os_auto_search_map_option(enable=enable):
                 continue
 
-            # 结束。
             if self.is_in_map():
                 self.device.screenshot_interval_set()
                 break
@@ -224,14 +200,7 @@ class Combat(Combat_, MapEventHandler):
         return success
 
     def auto_search_combat(self):
-        """
-        Returns:
-            bool: True if enemy cleared, False if fleet died.
-
-        Pages:
-            in: is_combat_loading()
-            out: combat status
-        """
+        """从战斗加载推进到结算；返回 True，无法确认结果时返回 None。"""
         logger.info("Auto search combat loading")
         self.device.stuck_record_clear()
         self.device.click_record_clear()

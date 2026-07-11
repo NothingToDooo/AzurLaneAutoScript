@@ -10,13 +10,7 @@ class CampaignBase(CampaignBase_):
 
     @staticmethod
     def campaign_get_chapter_index(name):
-        """
-        Args:
-            name (str, int):
-
-        Returns:
-            int
-        """
+        """将整数或章节名转换为章节序号。"""
         if name == "ttl":
             return 1
         return CampaignBase_.campaign_get_chapter_index(name)

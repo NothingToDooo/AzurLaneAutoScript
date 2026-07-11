@@ -28,9 +28,7 @@ class OperationSiren(
     OpsiExplore,
     OpsiCrossMonth,
 ):
-    """
-    Operation Siren main class that combines all task modules.
-    """
+    """聚合大世界各任务模块。"""
 
 
 if __name__ == "__main__":

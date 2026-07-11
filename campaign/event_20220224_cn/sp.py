@@ -195,7 +195,7 @@ class Config:
         "CV": 1.111,
     }
     MAP_HAS_FORTRESS = True
-    # Swipe multiply is the same as default
+    # 沿用默认滑动倍率。
 
 
 class Campaign(CampaignBase):

@@ -77,7 +77,6 @@ def _campaign_policy(folder: str, catalog: ContentCatalog | None = None) -> Camp
 
 
 def _normalize_stage_alias(name: str, folder: str, catalog: ContentCatalog | None = None) -> str:
-    """归一化地图文件名里的活动别名。"""
     if folder == "campaign_main":
         return MAIN_CAMPAIGN_STAGE_ALIASES.get(name, name)
     return _campaign_policy(folder, catalog).resolve_alias(name)
@@ -89,7 +88,6 @@ def _resolve_stage_loop_alias(
     config: StageLoopConfig,
     catalog: ContentCatalog | None = None,
 ) -> tuple[str, bool]:
-    """处理循环关卡别名，返回实际关卡名和是否命中循环。"""
     return resolve_stage_loop(name, folder, _campaign_policy(folder, catalog), config)
 
 
@@ -99,7 +97,6 @@ def _apply_stage_alias_policies(
     config: StagePolicyConfig,
     catalog: ContentCatalog | None = None,
 ) -> None:
-    """应用依赖归一化关卡名的运行策略。"""
     apply_stage_policy(name, folder, _campaign_policy(folder, catalog), config)
 
 
@@ -108,7 +105,6 @@ def _apply_campaign_folder_policies(
     config: StagePolicyConfig,
     catalog: ContentCatalog | None = None,
 ) -> None:
-    """应用只依赖活动目录的运行策略。"""
     apply_pack_policy(folder, _campaign_policy(folder, catalog), config)
 
 
@@ -295,10 +291,6 @@ class CampaignRun(CampaignEvent):
         return True
 
     def triggered_stop_condition(self, oil_check=True):
-        """
-        Returns:
-            bool: If triggered a stop condition.
-        """
         return (
             self._triggered_run_count_limit()
             or self._triggered_reach_level_limit()
@@ -311,10 +303,6 @@ class CampaignRun(CampaignEvent):
         )
 
     def _triggered_app_restart(self):
-        """
-        Returns:
-            bool: If triggered a restart condition.
-        """
         if not self.campaign.emotion.is_ignore and self.campaign.emotion.triggered_bug():
             logger.info("Triggered restart avoid emotion bug")
             return True
@@ -329,20 +317,9 @@ class CampaignRun(CampaignEvent):
         return False
 
     def handle_stage_name(self, name, folder, mode="normal"):
-        """
-        Handle wrong stage names.
-        In some events, the name of SP may be different, such as 'vsp', muse sp.
-        To call them easier, their map files should named 'sp.py'.
-
-        Args:
-            name (str): Name of .py file.
-            folder (str): Name of the file folder under campaign.
-
-        Returns:
-            str, str: name, folder
-        """
+        """归一化活动别名并返回 (关卡名, 活动目录)；vsp、muse sp 等特殊 SP 统一映射到 sp.py。"""
         name = to_map_file_name(name)
-        # For GemsFarming, auto choose events or main chapters
+        # 宝石委托按关卡名自动选择活动或主线目录。
         if self.config.task.command == "GemsFarming":
             if self.stage_is_main(name):
                 logger.info(f"Stage name {name} is from campaign_main")
@@ -365,31 +342,21 @@ class CampaignRun(CampaignEvent):
             catalog,
         )
         self.is_stage_loop = self.is_stage_loop or is_stage_loop
-        # Convert campaign_main to campaign hard if mode is hard and file exists
+        # 困难模式且对应文件存在时改用 campaign_hard。
         if mode == "hard" and folder == "campaign_main" and name in map_files("campaign_hard"):
             folder = "campaign_hard"
         _apply_campaign_folder_policies(folder, policy_config, catalog)
         return name, folder
 
     def can_use_auto_search_continue(self):
-        # Cannot update map info in auto search menu
-        # Close it if map achievement is set
+        # 自律寻敌菜单内无法更新地图信息；设置地图成就条件时必须关闭。
         if self.config.StopCondition_MapAchievement != "non_stop":
             return False
 
         return self.run_count > 0 and self.campaign.map_is_auto_search
 
     def handle_commission_notice(self):
-        """
-        Check commission notice.
-        If found, stop current task and call commission.
-
-        Raises:
-            TaskEnd: If found commission notice.
-
-        Pages:
-            in: page_campaign
-        """
+        """在 page_campaign 检查委托通知；命中时切换委托任务并抛出 TaskEnd。"""
         if self.campaign.commission_notice_show_at_campaign():
             logger.info("Commission notice found")
             self.config.task_call("Commission", force_call=True)
@@ -438,26 +405,18 @@ class CampaignRun(CampaignEvent):
         return False
 
     def run(self, name, folder="campaign_main", mode="normal", total=0):
-        """
-        Args:
-            name (str): Name of .py file.
-            folder (str): Name of the file folder under campaign.
-            mode (str): `normal` or `hard`
-            total (int):
-        """
+        """运行指定地图文件；mode 接受 normal 或 hard。"""
         name, folder = self.handle_stage_name(name, folder, mode=mode)
         self.config.override(Campaign_Name=name, Campaign_Event=folder)
         self.load_campaign(name, folder=folder)
         self.run_count = 0
         self.run_limit = self.config.StopCondition_RunCount
         while 1:
-            # End
             if total and self.run_count >= total:
                 break
             if self.campaign.event_time_limit_triggered():
                 self.config.task_stop()
 
-            # Log
             logger.hr(name, level=1)
             if self.config.StopCondition_RunCount > 0:
                 logger.info(f"Count remain: {self.config.StopCondition_RunCount}")
@@ -466,7 +425,7 @@ class CampaignRun(CampaignEvent):
 
             self._ensure_campaign_run_ui(mode)
 
-            # if in hard mode, check remain times
+            # 困难模式还需检查剩余次数。
             if self.ui_page_appear(page_campaign) and MODE_SWITCH_1.get(main=self) == "normal":
                 ocr_hard_remain = importlib.import_module("module.hard.hard").OCR_HARD_REMAIN
                 remain = ocr_hard_remain.ocr(self.device.image)
@@ -475,11 +434,9 @@ class CampaignRun(CampaignEvent):
                     self.config.task_delay(server_update=True)
                     break
 
-            # End
             if self.triggered_stop_condition(oil_check=not self.campaign.is_in_auto_search_menu()):
                 break
 
-            # Run
             self.device.stuck_record_clear()
             self.device.click_record_clear()
             try:

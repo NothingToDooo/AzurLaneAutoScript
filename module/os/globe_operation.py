@@ -42,10 +42,6 @@ class GlobeOperation(ActionPointHandler):
         return self.appear(os_assets.GLOBE_GOTO_MAP, offset=(20, 20))
 
     def get_zone_pinned(self):
-        """
-        Returns:
-            Button:
-        """
         for zone in ZONE_TYPES:
             if self.appear(zone, offset=(20, 20)):
                 for button in ASSETS_PINNED_ZONE:
@@ -56,40 +52,20 @@ class GlobeOperation(ActionPointHandler):
         return None
 
     def is_zone_pinned(self):
-        """
-        Returns:
-            bool:
-        """
         return self.get_zone_pinned() is not None
 
     @staticmethod
     def pinned_to_name(button):
-        """
-        Args:
-            button (Button):
-
-        Returns:
-            str: DANGEROUS, SAFE, OBSCURE, ABYSSAL, STRONGHOLD, ARCHIVE.
-        """
         return button.name.split("_")[1]
 
     def get_zone_pinned_name(self):
-        """
-        Returns:
-            str: DANGEROUS, SAFE, OBSCURE, ABYSSAL, STRONGHOLD, ARCHIVE, or ''.
-        """
+        """返回钉选海域类型；未钉选时返回空字符串。"""
         pinned = self.get_zone_pinned()
         if pinned is not None:
             return self.pinned_to_name(pinned)
         return ""
 
     def handle_zone_pinned(self):
-        """
-        CLose pinned zone info.
-
-        Returns:
-            bool: If handled.
-        """
         if not self._zone_unpin_interval.reached():
             return False
 
@@ -118,15 +94,9 @@ class GlobeOperation(ActionPointHandler):
                 break
 
     def zone_has_switch(self):
-        """
-        Switch is an icon of 4 block, one block in white. White block keeps rotating.
-        If detected one white block, consider this is a zone switch.
+        """海域切换图标会旋转，旧版白块检测不稳定。
 
-        2021.07.15 ZONE_SWITCH was downscaled and added text "Change Zone".
-            So ZONE_SWITCH changed to detect "Change Zone"
-
-        Returns:
-            bool: If current zone has switch.
+        2021-07-15 图标缩小并新增 Change Zone 文本后，改为检测文字。
         """
         return self.appear(os_assets.ZONE_SWITCH, offset=(5, 5))
 
@@ -134,10 +104,6 @@ class GlobeOperation(ActionPointHandler):
     _zone_select_similarity = 0.75
 
     def get_zone_select(self):
-        """
-        Returns:
-            list[Button]:
-        """
         # 降低阈值到 0.75。
         # 原因不明，但字体有时会不同。
         return [
@@ -147,17 +113,9 @@ class GlobeOperation(ActionPointHandler):
         ]
 
     def is_in_zone_select(self):
-        """
-        Returns:
-            bool:
-        """
         return len(self.get_zone_select()) > 0
 
     def ensure_zone_select_expanded(self):
-        """
-        Returns:
-            list[Button]:
-        """
         record = 0
         for _ in range(5):
             selection = self.get_zone_select()
@@ -171,11 +129,7 @@ class GlobeOperation(ActionPointHandler):
         return self.get_zone_select()
 
     def zone_select_enter(self):
-        """
-        Pages:
-            in: is_zone_pinned
-            out: is_in_zone_select
-        """
+        """从海域钉选信息进入海域类型选择页。"""
         self.ui_click(
             os_assets.ZONE_SWITCH,
             appear_button=self.is_zone_pinned,
@@ -184,14 +138,7 @@ class GlobeOperation(ActionPointHandler):
         )
 
     def zone_select_execute(self, button):
-        """
-        Args:
-            button (Button): Button to select, one of the SELECT_* buttons
-
-        Pages:
-            in: is_in_zone_select
-            out: is_zone_pinned
-        """
+        """在海域类型选择页选择 SELECT_*，完成后返回海域钉选信息。"""
         logger.info(f"Zone select: {button}")
         for _ in self.loop():
             # 结束。
@@ -203,19 +150,9 @@ class GlobeOperation(ActionPointHandler):
                 continue
 
     def zone_type_select(self, types=("SAFE", "DANGEROUS")):
-        """
-        Args:
-            types (tuple[str], list[str], str): Zone types, or a list of them.
-                Available types: DANGEROUS, SAFE, OBSCURE, ABYSSAL, STRONGHOLD, ARCHIVE.
-                Try the the first selection in type list, if not available, try the next one.
-                Do nothing if no selection satisfied input.
+        """按调用方 types 的顺序选择海域类型；允许 DANGEROUS、SAFE、OBSCURE、ABYSSAL、STRONGHOLD、ARCHIVE。
 
-        Returns:
-            bool: If success.
-
-        Pages:
-            in: is_zone_pinned
-            out: is_zone_pinned
+        无匹配时回退到 SAFE、DANGEROUS；页面保持在海域钉选信息。
         """
         if not self.zone_has_switch():
             logger.info("Zone has no type to select, skip")
@@ -265,17 +202,7 @@ class GlobeOperation(ActionPointHandler):
         return self.pinned_to_name(button) == self.get_zone_pinned_name(), types
 
     def zone_has_safe(self):
-        """
-        Checks and selects if zone has SAFE otherwise selects DANGEROUS
-        which is guaranteed to be present in every zone
-
-        Returns:
-            bool: If SAFE is present.
-
-        Pages:
-            in: is_zone_pinned
-            out: is_zone_pinned
-        """
+        """优先选择 SAFE，否则选择必定存在的 DANGEROUS；页面保持在钉选信息。"""
         if self.get_zone_pinned_name() == "SAFE":
             return True
         if self.zone_has_switch():
@@ -288,11 +215,7 @@ class GlobeOperation(ActionPointHandler):
         return False
 
     def os_globe_goto_map(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: is_in_globe
-            out: is_in_map
-        """
+        """从全局地图返回区域地图。"""
         return self.ui_click(
             os_assets.GLOBE_GOTO_MAP,
             check_button=self.is_in_map,
@@ -302,14 +225,7 @@ class GlobeOperation(ActionPointHandler):
         )
 
     def os_map_goto_globe(self, unpin=True):
-        """
-        Args:
-            unpin (bool):
-
-        Pages:
-            in: is_in_map
-            out: is_in_globe
-        """
+        """从区域地图进入全局地图；unpin 控制是否关闭已有钉选信息。"""
         click_count = 0
         for _ in self.loop():
             # 结束。
@@ -381,17 +297,7 @@ class GlobeOperation(ActionPointHandler):
                 break
 
     def globe_enter(self, zone):
-        """
-        Args:
-            zone (Zone): Zone to enter.
-
-        Raises:
-            OSExploreError: If zone locked.
-
-        Pages:
-            in: is_zone_pinned
-            out: is_in_map
-        """
+        """从钉选信息进入区域地图；海域未解锁时抛出 OSExploreError。"""
         click_timer = Timer(10)
         click_count = 0
         pinned = None

@@ -11,10 +11,7 @@ _ = module.logger
 
 class Item:
     def __init__(self, data):
-        """
-        Args:
-            data (dict): Such as {0: 2, 1: 20001, 2: 5}
-        """
+        """按 Lua 三元组的值顺序读取：类型标记、物品 ID、数量。"""
         self.name = ""
         _, self.id, self.amount = data.values()
         if self.id == 1:
@@ -194,10 +191,6 @@ def encode_project(data):
 
 class Project:
     def __init__(self, data):
-        """
-        Args:
-            data (dict):
-        """
         self.name = data["name"]
         self.series = int(data["blueprint_version"])
         self.time = int(data["time"])

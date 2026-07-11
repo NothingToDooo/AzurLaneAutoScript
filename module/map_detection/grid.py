@@ -6,42 +6,21 @@ from module.map_detection.utils import trapezoid2area
 
 class Grid(GridInfo, GridPredictor):
     def __init__(self, location, image, corner, config):
-        """
-
-        Args:
-            location(tuple):
-            image:
-            corner: (x0, y0)  +-------+  (x1, y1)
-                             /         \
-                            /           \
-                 (x2, y2)  +-------------+  (x3, y3)
-        """
+        """corner 顺序为左上、右上、左下、右下。"""
         self.location = location
         super().__init__(location, image, corner, config)
 
     @cached_property
     def inner(self):
-        """
-        The largest rectangle inscribed in trapezoid.
-
-        Returns:
-            tuple[int]: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-        """
+        """返回梯形最大内接矩形 (x1, y1, x2, y2)。"""
         return trapezoid2area(self.corner, pad=5)
 
     @cached_property
     def outer(self):
-        """
-        The smallest rectangle circumscribed by the trapezoid.
-
-        Returns:
-            tuple[int]: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-        """
+        """返回梯形最小外接矩形 (x1, y1, x2, y2)。"""
         return trapezoid2area(self.corner, pad=-5)
 
     @cached_property
     def button(self):
-        """
-        Expose `button` attribute, making Grid object clickable.
-        """
+        """暴露可点击的 button 区域。"""
         return self.inner

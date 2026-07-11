@@ -14,13 +14,6 @@ class Scroll:
     edge_add = (0.3, 0.5)
 
     def __init__(self, area, color, is_vertical=True, name="Scroll"):
-        """
-        Args:
-            area (Button, tuple): A button or area of the whole scroll.
-            color (tuple): RGB of the scroll
-            is_vertical (bool): True if vertical, false if horizontal.
-            name (str):
-        """
         if isinstance(area, Button):
             name = area.name
             area = area.area
@@ -33,19 +26,12 @@ class Scroll:
             self.total = self.area[3] - self.area[1]
         else:
             self.total = self.area[2] - self.area[0]
-        # Just default value, will change in match_color()
         self.length = self.total / 2
         self.drag_interval = Timer(1, count=2)
         self.drag_timeout = Timer(5, count=10)
 
     def match_color(self, main):
-        """
-        Args:
-            main (ModuleBase):
-
-        Returns:
-            np.ndarray: Shape (n,), dtype bool.
-        """
+        """返回形状为 (n,) 的布尔掩码。"""
         image = main.image_crop(self.area, copy=False)
         image = color_similarity_2d(image, color=self.color)
         mask = np.max(image, axis=1 if self.is_vertical else 0) > self.color_threshold
@@ -53,13 +39,7 @@ class Scroll:
         return mask
 
     def cal_position(self, main):
-        """
-        Args:
-            main (ModuleBase):
-
-        Returns:
-            float: 0 to 1.
-        """
+        """返回 0 到 1 之间的滚动位置。"""
         mask = self.match_color(main)
         middle = np.mean(np.where(mask)[0])
 
@@ -70,16 +50,9 @@ class Scroll:
         return position
 
     def position_to_screen(self, position, random_range=(-0.05, 0.05)):
-        """
-        Convert scroll position to screen coordinates.
-        Call cal_position() or match_color() to get length, before calling this.
+        """调用前先用 cal_position() 或 match_color() 更新长度。
 
-        Args:
-            position (int, float):
-            random_range (tuple):
-
-        Returns:
-            tuple[int]: (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y)
+        返回 (左上 x，左上 y，右下 x，右下 y) 屏幕区域。
         """
         position = np.add(position, random_range)
         middle = position * (self.total - self.length) + self.length / 2
@@ -101,13 +74,6 @@ class Scroll:
         return area
 
     def appear(self, main):
-        """
-        Args:
-            main (ModuleBase):
-
-        Returns:
-            bool
-        """
         return np.mean(self.match_color(main)) > 0.1
 
     def at_top(self, main):
@@ -117,18 +83,9 @@ class Scroll:
         return self.cal_position(main) > 1 - self.edge_threshold
 
     def set(self, position, main, random_range=(-0.05, 0.05), distance_check=True, skip_first_screenshot=True):
-        """
-        Set scroll to a specific position.
+        """position 取 0 到 1；distance_check=True 时丢弃过短滑动。
 
-        Args:
-            position (float, int): 0 to 1.
-            main (ModuleBase):
-            random_range (tuple(int, float)):
-            distance_check (bool): Whether to drop short swipes
-            skip_first_screenshot:
-
-        Returns:
-            bool: If dragged.
+        返回实际拖动次数。
         """
         logger.info(f"{self.name} set to {position}")
         self.drag_interval.clear()
@@ -172,15 +129,7 @@ class Scroll:
         return self.set(1.00, main=main, random_range=random_range, skip_first_screenshot=skip_first_screenshot)
 
     def drag_page(self, page, main, random_range=(-0.05, 0.05), skip_first_screenshot=True):
-        """
-        Drag scroll forward or backward.
-
-        Args:
-            page (int, float): Relative position to drag. 1.0 means next page, -1.0 means previous page.
-            main (ModuleBase):
-            random_range (tuple[float]):
-            skip_first_screenshot:
-        """
+        """page=1.0 向后一页，page=-1.0 向前一页。"""
         if not skip_first_screenshot:
             main.device.screenshot()
         current = self.cal_position(main)
@@ -199,14 +148,7 @@ class Scroll:
 
 class AdaptiveScroll(Scroll):
     def __init__(self, area, parameters: dict | None = None, background=5, is_vertical=True, name="Scroll"):
-        """
-        参数：
-            area (Button, tuple)：整个滚动条的按钮或区域。
-            parameters (dict)：传给 scipy.find_peaks 的参数。
-            background (int)：
-            is_vertical (bool)：True 表示纵向，False 表示横向。
-            name (str)：
-        """
+        """parameters 传给 scipy.find_peaks，background 是滚动条两侧的取样扩展像素数。"""
         if parameters is None:
             parameters = {}
         self.parameters = parameters

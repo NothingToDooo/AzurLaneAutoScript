@@ -155,7 +155,7 @@ class Campaign(CampaignBase):
         return self.fleet_boss.clear_boss()
 
     def before_boss(self):
-        # Handle giant boss at A8
+        # A8 大型首领需要先调整进场位置，再开始战斗。
         logger.info("B2 before boss")
         grid = SelectedGrids([B6, C7]).sort("weight", "cost")[0]
         self.fleet_boss.goto(grid)

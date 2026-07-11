@@ -17,17 +17,7 @@ UNEXPECTED_IMAGE_SIZE_TEMPLATE = "Unexpected image size: {size}"
 
 
 def load_folder(folder, ext=".png"):
-    """
-    Args:
-        folder (str): Template folder contains images.
-            Image shape: width=96, height=96, channel=3, format=png.
-            Image name: Camel-Case, such as 'PlateGeneralT3'. Suffix in name will be ignore.
-            For example, 'Javelin' and 'Javelin_2' are different templates, but have same output name 'Javelin'.
-        ext (str): File extension.
-
-    Returns:
-        dict: Key: str, image file base name. Value: full filepath.
-    """
+    """返回目录中指定扩展名的 {文件名: 路径} 映射；目录不存在时返回空字典。"""
     if not Path(folder).exists():
         return {}
 
@@ -40,28 +30,12 @@ def load_folder(folder, ext=".png"):
 
 
 def pack(img_list):
-    """
-    Stack images vertically.
-
-    Args:
-        img_list (list): List of image
-
-    Returns:
-        np.ndarray:
-    """
+    """纵向拼接图像列表。"""
     return cv2.vconcat(img_list)
 
 
 def unpack(image):
-    """
-    按 720 像素高度纵向拆分图片。
-
-    Args:
-        image:
-
-    Returns:
-        list: np.ndarray 列表。
-    """
+    """按 720 像素高度拆分 1280 宽图片；尺寸不符时抛出 ImageInvalidResolution。"""
     size = image_size(image)
     if size == (1280, 720):
         return [image]

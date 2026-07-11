@@ -30,24 +30,9 @@ def random_rho(dis):
 
 
 def insert_swipe(p0, p3, speed=15, min_distance=10):
-    """
-    在起点和终点之间插入路径点。
+    """在 p0 与 p3 间生成三阶贝塞尔路径点。
 
-    先生成一条三阶贝塞尔曲线。
-
-    Args:
-        p0：起点。
-        p3：终点。
-        speed：平均移动速度，单位为每 10ms 的像素数。
-        min_distance:
-
-    Returns:
-        list[list[int]]：路径点列表。
-
-    示例：
-        > insert_swipe((400, 400), (600, 600), speed=20)
-        [[400, 400], [406, 406], [416, 415], [429, 428], [444, 442], [462, 459], [481, 478], [504, 500], [527, 522],
-        [545, 540], [560, 557], [573, 570], [584, 582], [592, 590], [597, 596], [600, 600]]
+    speed 单位为像素/10ms，相邻输出点至少相距 min_distance 像素。
     """
     p0 = np.array(p0)
     p3 = np.array(p3)
@@ -66,7 +51,6 @@ def insert_swipe(p0, p3, speed=15, min_distance=10):
     ts = np.sign(ts) * abs(ts) ** 0.9
     ts = (ts - min(ts)) / (max(ts) - min(ts))
 
-    # 生成三阶贝塞尔曲线。
     points = []
     prev = (-100, -100)
     for t in ts:
@@ -78,7 +62,6 @@ def insert_swipe(p0, p3, speed=15, min_distance=10):
         points.append(point)
         prev = point
 
-    # 删除过近的路径点。
     if len(points[1:]):
         distance = np.linalg.norm(np.subtract(points[1:], points[0]), axis=1)
         mask = np.append(True, distance > min_distance)
@@ -120,23 +103,7 @@ class Command:
 
 
 class CommandBuilder:
-    """构建 minitouch 命令字符串。
-
-    可用它按需构造自定义动作：
-
-        with safe_connection(_DEVICE_ID) as connection:
-            builder = CommandBuilder()
-            builder.down(0, 400, 400, 50)
-            builder.commit()
-            builder.move(0, 500, 500, 50)
-            builder.commit()
-            builder.move(0, 800, 400, 50)
-            builder.commit()
-            builder.up(0)
-            builder.commit()
-            builder.publish(connection)
-
-    """
+    """按 minitouch socket 协议组合动作命令。"""
 
     DEFAULT_DELAY = 0.05
     max_x = 1280
@@ -148,10 +115,6 @@ class CommandBuilder:
         contact=0,
         handle_orientation=True,
     ):
-        """
-        Args:
-            controller：持有 minitouch 状态的控制服务。
-        """
         self.controller = controller
         self.commands = []
         self.delay = 0
@@ -221,7 +184,6 @@ class CommandBuilder:
         return self
 
     def clear(self):
-        """清空当前命令。"""
         self.commands = []
         self.delay = 0
         return self
@@ -235,12 +197,7 @@ class CommandBuilder:
         return self.controller.minitouch_send(builder=self)
 
     def _check_empty(self, text=None):
-        """
-        有效命令列表必须包含实际操作，不能只有 commit。
-
-        Returns:
-            bool：命令是否为空。
-        """
+        """只有 commit、wait 或 sync 的列表视为空命令。"""
         empty = True
         for command in self.commands:
             if command.operation not in ["c", "w", "s"]:
@@ -317,10 +274,6 @@ def _minitouch_error_recovery(self, error):
 def retry(func):
     @wraps(func)
     def retry_wrapper(self, *args, **kwargs):
-        """
-        Args:
-            self (Minitouch):
-        """
         recovery = None
         for _ in range(RETRY_TRIES):
             try:
@@ -328,7 +281,6 @@ def retry(func):
                     time.sleep(retry_sleep(_))
                     recovery()
                 return func(self, *args, **kwargs)
-            # 无法自动处理。
             except RequestHumanTakeover:
                 break
             except (AdbError, MinitouchNotInstalledError, MinitouchOccupiedError, OSError) as e:
@@ -465,7 +417,6 @@ class MinitouchController:
 
     @property
     def minitouch_builder(self):
-        # 等待初始化线程结束。
         if self._minitouch_init_thread is not None:
             if self._minitouch_init_thread is not threading.current_thread():
                 self._minitouch_init_thread.join()
@@ -474,11 +425,7 @@ class MinitouchController:
         return self._minitouch_builder
 
     def early_minitouch_init(self):
-        """
-        Alas 开始截图时提前开线程初始化 minitouch 连接。
-
-        这样可以让第一次点击快约 0.05 秒。
-        """
+        """截图阶段异步预热 minitouch，使首次点击快约 0.05 秒。"""
         if has_cached_property(self, "_minitouch_builder"):
             return
 
@@ -498,7 +445,6 @@ class MinitouchController:
         max_contacts = 2
         max_pressure = 50
 
-        # 尝试关闭已有连接。
         self._close_minitouch_client()
 
         self.session.get_orientation()
@@ -513,7 +459,6 @@ class MinitouchController:
             client.connect(("127.0.0.1", self._minitouch_port))
             self._minitouch_client = client
 
-            # 读取 minitouch server 信息。
             socket_out = client.makefile()
 
             # v <version>

@@ -11,7 +11,6 @@ from module.logger import logger
 class CampaignABCD(EventBase):
     def run(self, name="", folder="campaign_main", mode="normal", total=0):
         _ = (name, folder, mode, total)
-        # Filter map files
         stages = [EventStage(file.name) for file in Path(f"./campaign/{self.config.Campaign_Event}").iterdir()]
         stages = self.convert_stages(stages)
         logger.attr("Stage", [str(stage) for stage in stages])
@@ -26,7 +25,6 @@ class CampaignABCD(EventBase):
             self.config.Scheduler_Enable = False
             self.config.task_stop()
 
-        # Start from last stage
         logger.info(f"LastStage {self.config.EventDaily_LastStage}, recorded at {self.config.Scheduler_NextRun}")
         if get_server_last_update(self.config.Scheduler_ServerUpdate) >= self.config.Scheduler_NextRun:
             logger.info("LastStage outdated, reset")
@@ -40,16 +38,14 @@ class CampaignABCD(EventBase):
             else:
                 logger.info("Start from the beginning")
 
-        # Run
         for raw_stage in stages:
             stage = str(raw_stage)
             try:
                 super().run(name=stage, folder=self.config.Campaign_Event, total=1)
             except TaskEnd:
-                # Catch task switch
+                # 捕获任务切换，交由循环末尾统一收束。
                 pass
             except ScriptEnd as e:
-                # Raise from CampaignUI.ensure_campaign_ui()
                 if str(e) == CAMPAIGN_NAME_ERROR_MESSAGE:
                     task = self.config.task.command
                     logger.critical(
@@ -69,5 +65,4 @@ class CampaignABCD(EventBase):
             if self.config.task_switched():
                 self.config.task_stop()
 
-        # Scheduler
         self.config.task_delay(server_update=True)

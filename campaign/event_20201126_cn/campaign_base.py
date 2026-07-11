@@ -17,13 +17,7 @@ EVENT_ANIMATION = Button(
 
 
 class CampaignBase(CampaignBase_):
-    """
-    In event Vacation Lane (event_20201126_cn), DOA collaboration, maps are:
-    Chapter 1: SP1, SP2, SP3, SP4.
-    Chapter 2: VSP.
-    Chapter 3: EX.
-    Mode switch is meaningless.
-    """
+    """DOA 联动图分章：第 1 章 SP1～SP4，第 2 章 VSP，第 3 章 EX；模式切换无意义。"""
 
     def ui_goto_event(self):
         if self.appear(EVENT_20201126_PT_ICON, offset=(40, 20)) and self.ui_page_appear(page_event):
@@ -47,35 +41,23 @@ class CampaignBase(CampaignBase_):
 
     @staticmethod
     def campaign_separate_name(name):
-        """
-        Args:
-            name (str): Stage name in lowercase, such as 7-2, d3, sp3.
-
-        Returns:
-            tuple[str]: Campaign_name and stage index in lowercase, Such as ['7', '2'], ['d', '3'], ['sp', '3'].
-        """
-        if name in {"vsp", "sp"}:  # 活动差异。
+        """将 vsp、sp 特殊映射为 (ex_sp, 1)，其余按通用规则分解。"""
+        if name in {"vsp", "sp"}:
             return "ex_sp", "1"
         return CampaignBase_.campaign_separate_name(name)
 
     @staticmethod
     def campaign_get_chapter_index(name):
-        """
-        Args:
-            name (str, int):
-
-        Returns:
-            int
-        """
+        """将整数或章节名转换为章节序号。"""
         if isinstance(name, int):
             return name
         if name.isdigit():
             return int(name)
         if name in ["a", "c", "sp"]:
             return 1
-        if name in ["b", "d", "ex_sp"]:  # 活动差异。
+        if name in ["b", "d", "ex_sp"]:
             return 2
-        if name == "ex_ex":  # 活动差异。
+        if name == "ex_ex":
             return 3
         raise CampaignNameError
 
@@ -91,12 +73,7 @@ class CampaignBase(CampaignBase_):
         return super().campaign_get_entrance(name)
 
     def is_event_animation(self):
-        """
-        Animation in events after cleared an enemy.
-
-        Returns:
-            bool: If animation appearing.
-        """
+        """返回活动战斗后动画是否出现。"""
         appear = self.appear(EVENT_ANIMATION)
         if appear:
             logger.info("DOA animation, waiting")

@@ -13,17 +13,10 @@ class ConfigWatcher:
         self.start_mtime = self.get_mtime()
 
     def get_mtime(self) -> datetime:
-        """
-        Last modify time of the file
-        """
         timestamp = Path(filepath_config(self.config_name)).stat().st_mtime
         return datetime.fromtimestamp(timestamp, tz=UTC).astimezone().replace(tzinfo=None, microsecond=0)
 
     def should_reload(self) -> bool:
-        """
-        Returns:
-            bool: Whether the file has been modified and configs should reload
-        """
         mtime = self.get_mtime()
         if mtime > self.start_mtime:
             logger.info(f'Config "{self.config_name}" changed at {mtime}')

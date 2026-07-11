@@ -19,12 +19,10 @@ def _as_path(file: FilePath) -> Path:
 
 
 def random_id() -> str:
-    """生成用于临时文件名的短随机 ID。"""
     return "".join(random.sample(string.ascii_letters + string.digits, 6))
 
 
 def is_tmp_file(file: str) -> bool:
-    """判断文件名是否是本模块生成的临时文件。"""
     if not file.endswith(".tmp"):
         return False
     dot = file[-11:-10]
@@ -34,19 +32,16 @@ def is_tmp_file(file: str) -> bool:
 
 
 def to_tmp_file(file: FilePath) -> str:
-    """把目标路径转换成同目录临时路径。"""
     return f"{os.fspath(file)}.{random_id()}.tmp"
 
 
 def to_nontmp_file(file: str) -> str:
-    """把本模块生成的临时路径还原为目标路径。"""
     if is_tmp_file(file):
         return file[:-11]
     return file
 
 
 def windows_attempt_delay(attempt: int) -> float:
-    """返回 Windows 文件占用重试等待时间。"""
     return 2**attempt * WINDOWS_RETRY_DELAY
 
 
@@ -56,7 +51,6 @@ def _raise_after_retry(file: FilePath, action: str) -> NoReturn:
 
 
 def replace_tmp(tmp: FilePath, file: FilePath) -> None:
-    """把临时路径原子替换为目标路径。"""
     last_error = None
     for attempt in range(WINDOWS_MAX_ATTEMPT):
         try:
@@ -81,7 +75,6 @@ def replace_tmp(tmp: FilePath, file: FilePath) -> None:
 
 
 def atomic_replace(replace_from: FilePath, replace_to: FilePath) -> None:
-    """原子替换文件或目录。"""
     last_error = None
     for attempt in range(WINDOWS_MAX_ATTEMPT):
         try:
@@ -131,7 +124,6 @@ def _write_once(file: FilePath, data: object) -> None:
 
 
 def file_write(file: FilePath, data: object) -> None:
-    """写入文件，自动创建父目录。"""
     _write_once(file, data)
 
 
@@ -171,14 +163,12 @@ def file_write_stream(file: FilePath, data_generator: Iterable[str] | Iterable[b
 
 
 def atomic_write(file: FilePath, data: object) -> None:
-    """通过临时文件原子写入目标文件。"""
     temp = to_tmp_file(file)
     file_write(temp, data)
     replace_tmp(temp, file)
 
 
 def atomic_write_stream(file: FilePath, data_generator: Iterable[str] | Iterable[bytes]) -> None:
-    """通过临时文件流式原子写入目标文件。"""
     temp = to_tmp_file(file)
     if file_write_stream(temp, data_generator):
         replace_tmp(temp, file)
@@ -352,7 +342,6 @@ def atomic_rmtree(folder: FilePath) -> None:
 
 
 def atomic_failure_cleanup(folder: FilePath, *, recursive: bool = False) -> None:
-    """启动时清理残留临时文件。"""
     try:
         with os.scandir(folder) as entries:
             for entry in entries:

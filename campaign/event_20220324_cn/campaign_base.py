@@ -11,23 +11,10 @@ class CampaignBase(CampaignBase_):
         return False
 
     def campaign_ensure_mode(self, mode="normal"):
-        """
-        Args:
-            mode (str): 'normal', 'hard', 'ex'
-
-        Returns:
-            bool: If mode changed.
-        """
-        # No need to switch
+        """该活动不需要切换模式。"""
 
     def campaign_get_chapter_index(self, name):
-        """
-        Args:
-            name (str, int):
-
-        Returns:
-            int
-        """
+        """将整数或章节名转换为章节序号。"""
         if name == "t":
             return 1
         if name == "ex_sp":
@@ -39,13 +26,7 @@ class CampaignBase(CampaignBase_):
 
     @staticmethod
     def campaign_separate_name(name):
-        """
-        Args:
-            name (str): Stage name in lowercase, such as 7-2, d3, sp3.
-
-        Returns:
-            tuple[str]: Campaign_name and stage index in lowercase, Such as ['7', '2'], ['d', '3'], ['sp', '3'].
-        """
+        """名称含 esp 时映射为 (ex_sp, 1)，含 ex 时映射为 (ex_ex, 1)，其余按通用规则分解。"""
         if "esp" in name:
             return ["ex_sp", "1"]
         if "ex" in name:
@@ -54,13 +35,7 @@ class CampaignBase(CampaignBase_):
         return super(CampaignBase, CampaignBase).campaign_separate_name(name)
 
     def campaign_get_entrance(self, name):
-        """
-        Args:
-            name (str): Campaign name, such as '7-2', 'd3', 'sp3'.
-
-        Returns:
-            Button:
-        """
+        """返回指定关卡的入口按钮。"""
         if name == "sp":
             for stage_name in self.stage_entrance or {}:
                 if "esp" in stage_name.lower():

@@ -16,20 +16,14 @@ INVALID_DEFAULT_OPTION_TEMPLATE = 'Define option_default="{default}", but defaul
 class Setting:
     def __init__(self, name="Setting", main: ModuleBase | None = None):
         self.name = name
-        # ALAS 模块对象。
         self._main: ModuleBase | None = main
-        # 设置选项前是否先重置。
         self.reset_first = True
-        # 是否取消已启用但不需要的选项。
         self.need_deselect = False
-        # 记录每个设置项选项对应的按钮。
         self.settings: dict[tuple[str, str], Button] = {}
-        # 记录每个设置项的默认选项。
         self.settings_default: dict[str, str] = {}
 
     @property
     def main(self) -> ModuleBase:
-        """返回绑定的 ALAS 模块对象。"""
         if self._main is None:
             msg = f"{self.name} setting is not bound to a module"
             raise ScriptError(msg)
@@ -40,17 +34,7 @@ class Setting:
         self._main = value
 
     def add_setting(self, setting, option_buttons, option_names, option_default):
-        """
-        Args:
-            setting (str):
-                Name of the setting
-            option_buttons (list[Button], ButtonGrid):
-                List of buttons produced by ButtonGrid.buttons
-            option_names (list[str]):
-                Name of each options, `option_names` and `options` must has the same length.
-            option_default (str):
-                Name of the default option, must in `option_names`
-        """
+        """option_buttons 与 option_names 必须等长，option_default 必须在 option_names 中。"""
         if isinstance(option_buttons, ButtonGrid):
             option_buttons = option_buttons.buttons
         for option, option_name in zip(option_buttons, option_names, strict=True):
@@ -67,20 +51,13 @@ class Setting:
         ) or self.main.image_color_count(option, color=(74, 117, 189), threshold=235, count=250)
 
     def _product_setting_status(self, **kwargs) -> dict[Button, bool]:
-        """
-        Args:
-            **kwargs: Key: setting, value: required option or a list of them
-                `sort=['rarity', 'level'], ...` or `sort='rarity'`,
-                or `sort=None` means don't change this setting
+        """kwargs 的值可为单选项、选项列表或 None；None 表示不修改该项。
 
-        Returns:
-            dict: Key: option_button, value: whether should be active
+        返回 Button 到目标启用状态的映射，bool 表示该按钮是否应激活。
         """
-        # 添加默认选项。
         required_options = copy.deepcopy(self.settings_default)
         required_options.update(kwargs)
 
-        # 记录每个选项按钮是否应该启用。
         status: dict[Button, bool] = {}
         for key, option_button in self.settings.items():
             setting, option_name = key
@@ -92,10 +69,6 @@ class Setting:
         return status
 
     def show_active_buttons(self):
-        """
-        Logs:
-            [Setting] sort/rarity, sort/level
-        """
         active = []
         for key, option_button in self.settings.items():
             setting, option_name = key
@@ -105,13 +78,6 @@ class Setting:
         logger.attr(self.name, ", ".join(active))
 
     def get_buttons_to_click(self, status: dict[Button, bool]) -> list[Button]:
-        """
-        Args:
-            status: Key: option_button, value: whether should be active
-
-        Returns:
-            Buttons to click
-        """
         click = []
         for option_button, enable in status.items():
             active = self.is_option_active(option_button)
@@ -122,15 +88,6 @@ class Setting:
         return click
 
     def _set_execute(self, **kwargs):
-        """
-        Args:
-            **kwargs: Key: setting, value: required option or a list of them
-                `sort=['rarity', 'level'], ...` or `sort='rarity'`,
-                or `sort=None` means don't change this setting
-
-        Returns:
-            bool: If success the set
-        """
         status = self._product_setting_status(**kwargs)
 
         logger.info(f"Setting options {self.name}, {dict_to_kv(kwargs)}")
@@ -159,15 +116,7 @@ class Setting:
         return False
 
     def set(self, **kwargs):
-        """
-        Args:
-            **kwargs: Key: setting, value: required option or a list of them
-                `sort=['rarity', 'level'], ...` or `sort='rarity'`,
-                or `sort=None` means don't change this setting
-
-        Returns:
-            bool: If success the set
-        """
+        """kwargs 的值可为单选项、选项列表或 None；None 表示不修改该项。"""
         if self.reset_first:
-            self._set_execute()  # Reset options
+            self._set_execute()
         return self._set_execute(**kwargs)

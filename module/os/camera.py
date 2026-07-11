@@ -53,16 +53,9 @@ class OSCamera(OSMapOperation, Camera):
 
     @cached_property
     def radar(self):
-        """
-        Returns:
-            Radar:
-        """
         return Radar(self.config)
 
     def predict_radar(self):
-        """
-        Scan radar and merge it into map
-        """
         self.radar.predict(self.device.image)
         self.radar.show()
 
@@ -88,10 +81,6 @@ class OSCamera(OSMapOperation, Camera):
         return x == 0 and y == 0
 
     def _get_map_outside_button(self):
-        """
-        Returns:
-            Button: Click outside of map.
-        """
         for _ in range(2):
             backend = self.view.backend
             if self.view.left_edge:
@@ -115,9 +104,6 @@ class OSCamera(OSMapOperation, Camera):
         return None
 
     def update_os(self):
-        """
-        Similar to `Camera.update()`, but for OPSI.
-        """
         self._view_init()
 
         try:
@@ -141,20 +127,9 @@ class OSCamera(OSMapOperation, Camera):
             vars(backend)["load"] = backup
 
     def convert_radar_to_local(self, location):
-        """
-        Converts the coordinate on radar to the coordinate of local map view,
-        also handles a rare game bug.
+        """把雷达坐标转换为本地视野格子。
 
-        Usually, OPSI camera focus on current fleet, which is (5, 4) in local view.
-        The convert should be `local = view[np.add(radar, view.center_loca)]`
-        However, Azur Lane may bugged, not focusing current.
-        In this case, the convert should base on fleet position.
-
-        Args:
-            location: (x, y), Position on radar.
-
-        Returns:
-            OSGrid: Grid instance in self.view
+        游戏偶尔不会把镜头聚焦到当前舰队，此时必须改用实际舰队位置校正。
         """
         location = location_ensure(location)
 

@@ -20,9 +20,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
     globe_camera: tuple
 
     def _globe_init(self):
-        """
-        Call this method before doing anything.
-        """
+        """执行全局地图操作前必须先初始化检测器。"""
         if not hasattr(self, "globe"):
             self.globe = GlobeDetection(self.config)
             self.globe.load_globe_map()
@@ -95,14 +93,6 @@ class GlobeCamera(GlobeOperation, ZoneManager):
         logger.attr("Globe_center", center.zone_id)
 
     def globe_swipe(self, vector, box=(20, 220, 980, 620)):
-        """
-        Args:
-            vector (tuple, np.ndarray): float
-            box (tuple): Area that allows to swipe.
-
-        Returns:
-            bool: if camera moved.
-        """
         name = "GLOBE_SWIPE_" + "_".join([str(round(x)) for x in vector])
         if np.linalg.norm(vector) <= 25:
             logger.warning(f"Globe swipe to short: {vector}")
@@ -128,7 +118,6 @@ class GlobeCamera(GlobeOperation, ZoneManager):
 
             self.globe_update()
 
-            # End
             if np.linalg.norm(np.subtract(self.globe_camera, prev)) < 10:
                 if confirm.reached():
                     logger.info("Globe map stabled")
@@ -150,25 +139,12 @@ class GlobeCamera(GlobeOperation, ZoneManager):
         return points - self.globe.homo_center + self.globe_camera
 
     def zone_to_button(self, zone):
-        """
-        Args:
-            zone (Zone):
-
-        Returns:
-            Button:
-        """
         pinned = self.globe2screen([zone.location])[0]
         # pinned 是实际标记位置的左下角。
         area = area_offset((0, -10, 16, 0), offset=pinned)
         return Button(area=area, color=(), button=area, name=f"ZONE_{zone.zone_id}")
 
     def globe_in_sight(self, zone, swipe_limit=(620, 340), sight=(20, 220, 980, 620)):
-        """
-        Args:
-            zone (str, int, Zone): Name in CN/EN/JP/TW, zone id, or Zone instance.
-            swipe_limit (tuple):
-            sight (tuple):
-        """
         zone = self.name_to_zone(zone)
 
         while 1:
@@ -183,22 +159,11 @@ class GlobeCamera(GlobeOperation, ZoneManager):
             self.globe_swipe(swipe)
 
     def get_globe_pinned_zone(self):
-        """
-        Returns:
-            Zone:
-        """
         location = self.screen2globe([ZONE_PINNED.button[:2]])[0] + (0, 5)
         return self.camera_to_zone(location)
 
     def globe_wait_until_zone_pinned(self, zone, skip_first_screenshot=True):
-        """
-        Args:
-            zone (str, int, Zone): Name in CN/EN/JP/TW, zone id, or Zone instance.
-            skip_first_screenshot:
-
-        Returns:
-            bool: True if zone pinned, False if timeout
-        """
+        """等待指定海域被钉选；超时返回 False。"""
         zone = self.name_to_zone(zone)
         timeout = Timer(5, count=5).start()
         while 1:
@@ -217,16 +182,9 @@ class GlobeCamera(GlobeOperation, ZoneManager):
         return False
 
     def globe_focus_to(self, zone):
-        """
-        Focus to a zone in globe view
-        self.globe_update() needs to be called first
+        """先调用 globe_update，再把全局地图聚焦并钉选指定海域。
 
-        Args:
-            zone (str, int, Zone): Name in CN/EN/JP/TW, zone id, or Zone instance.
-
-        Pages:
-            in: IN_GLOBE
-            out: IN_GLOBE, zone selected, ZONE_ENTRANCE
+        页面保持在 IN_GLOBE，结束时显示 ZONE_ENTRANCE。
         """
         zone = self.name_to_zone(zone)
         logger.info(f"Globe focus_to: {zone.zone_id}")
@@ -236,30 +194,18 @@ class GlobeCamera(GlobeOperation, ZoneManager):
                 self.globe_update()
                 continue
 
-            # Insight
             self.globe_in_sight(zone)
-            # Click zone
             button = self.zone_to_button(zone)
             self.device.click(button)
-            # Wait until zone pinned
             if self.globe_wait_until_zone_pinned(zone):
                 break
 
     def _globe_predict_stronghold(self, zone):
-        """
-        Predict if this zone has siren stronghold.
-        `self.globe_in_sight(zone)` must be called before calling this method.
-
-        Args:
-            zone (str, int, Zone): Name in CN/EN/JP/TW, zone id, or Zone instance.
-
-        Returns:
-            bool:
-        """
+        """调用前必须先用 globe_in_sight 把海域移入视野。"""
         zone = self.name_to_zone(zone)
-        # The center of red whirlpool, on 2D map.
+        # 二维地图上的红色漩涡中心。
         location = np.add(zone.location, (-9.5, -12.5))
-        # Area around the center, on 2D map.
+        # 二维地图上的中心邻域。
         location = [np.subtract(location, (4, 4)), np.add(location, (4, 4))]
         # 取屏幕上的中心邻域。
         screen = self.globe2screen(location).flatten().round()
@@ -278,19 +224,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
         return bool(285 < h <= 360 and s > 45 and v > 45)
 
     def _find_siren_stronghold(self, zones):
-        """
-        self.globe_update() needs to be called first
-
-        Args:
-            zones (SelectGrids): A group of zones to search from.
-
-        Returns:
-            zone: Zone that has siren stronghold, or None if not found.
-
-        Pages:
-            in: in_globe
-            out: in_globe, is_zone_pinned() if found.
-        """
+        """调用前必须先执行 globe_update；找到后仍在全局地图并钉选目标。"""
         sight = (20, 220, 980, 620)
         while zones:
             prev = self.camera_to_zone(self.globe_camera)
@@ -317,19 +251,12 @@ class GlobeCamera(GlobeOperation, ZoneManager):
         return None
 
     def find_siren_stronghold(self):
-        """
-        Returns:
-            zone: Zone that has siren stronghold, or None if not found.
-
-        Pages:
-            in: in_globe
-            out: in_globe, is_zone_pinned() if found.
-        """
+        """在全局地图查找要塞；找到后钉选目标，找不到返回 None。"""
         logger.hr("Find siren stronghold", level=1)
         region = self.camera_to_zone(self.globe_camera).region
         order = [1, 2, 4, 3]
         if region not in order:
-            # Camera may focus on region 5, select the nearest non-region-5 zone
+            # 镜头可能聚焦区域 5，此时选择最近的非区域 5 海域。
             zones = (
                 self.zones.delete(self.zones.select(region=5))
                 .delete(self.zones.select(is_port=True))

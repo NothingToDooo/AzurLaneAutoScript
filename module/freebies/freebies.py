@@ -8,9 +8,6 @@ from module.logger import logger
 
 class Freebies(ModuleBase):
     def run(self):
-        """
-        Run all freebie related modules
-        """
         if self.config.BattlePass_Collect:
             logger.hr("Battle pass", level=1)
             BattlePass(self.config, self.device).run()

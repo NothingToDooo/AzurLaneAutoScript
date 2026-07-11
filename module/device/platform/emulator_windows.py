@@ -20,23 +20,12 @@ from module.device.platform.utils import cached_property, iter_folder
 class EmulatorInstance(EmulatorInstanceBase):
     @cached_property
     def emulator(self):
-        """
-        Returns:
-            Emulator:
-        """
         return Emulator(self.path)
 
 
 class Emulator(EmulatorBase):
     @classmethod
     def path_to_type(cls, path: str) -> str:
-        """
-        Args:
-            path: Path to .exe file, case insensitive
-
-        Returns:
-            str: Emulator type, such as Emulator.MuMuPlayer12
-        """
         emulator_path = Path(path)
         exe = emulator_path.name.lower()
         if exe in ["mumuplayer.exe", "mumunxmain.exe"]:
@@ -46,15 +35,7 @@ class Emulator(EmulatorBase):
 
     @staticmethod
     def multi_to_single(exe: str):
-        """
-        Convert a string that might be a multi-instance manager to its single instance executable.
-
-        Args:
-            exe (str): Path to emulator executable
-
-        Yields:
-            str: Path to emulator executable
-        """
+        """将多开管理器路径转为单实例可执行文件路径。"""
         if "MuMuMultiPlayer.exe" in exe:
             yield exe.replace("MuMuMultiPlayer.exe", "MuMuPlayer.exe")
         elif "MuMuManager.exe" in exe:
@@ -64,15 +45,6 @@ class Emulator(EmulatorBase):
 
     @staticmethod
     def single_to_console(exe: str):
-        """
-        Convert a string that might be a single instance executable to its console.
-
-        Args:
-            exe (str): Path to emulator executable
-
-        Returns:
-            str: Path to emulator console
-        """
         if "MuMuPlayer.exe" in exe:
             return exe.replace("MuMuPlayer.exe", "MuMuManager.exe")
         # MuMuPlayer12 5.0
@@ -82,13 +54,7 @@ class Emulator(EmulatorBase):
 
     @staticmethod
     def vbox_file_to_serial(file: str) -> str:
-        """
-        Args:
-            file: Path to vbox file
-
-        Returns:
-            str: serial，例如 `127.0.0.1:16384`
-        """
+        """返回 vbox 中转发的 `127.0.0.1:<port>`，文件不存在时返回空字符串。"""
         regex = re.compile(r'<*?hostport="(.*?)".*?guestport="5555"/>')
         serial = ""
         try:
@@ -105,10 +71,6 @@ class Emulator(EmulatorBase):
             return serial
 
     def iter_instances(self):
-        """
-        Yields:
-            EmulatorInstance: Emulator instances found in this emulator
-        """
         if self == Emulator.MuMuPlayer12:
             yield from self._iter_vbox_instances()
 
@@ -141,10 +103,6 @@ class Emulator(EmulatorBase):
         return f"127.0.0.1:{16384 + 32 * instance.MuMuPlayer12_id}"
 
     def iter_adb_binaries(self) -> t.Iterable[str]:
-        """
-        Yields:
-            str: Filepath to adb binaries found in this emulator
-        """
         if self != Emulator.MuMuPlayer12:
             return
 
@@ -160,10 +118,7 @@ class Emulator(EmulatorBase):
 
 class EmulatorManager(EmulatorManagerBase):
     def iter_configured_emulator(self):
-        """
-        Yields:
-            str: 调试或测试时显式注入的 MuMu 可执行文件路径。
-        """
+        """仅用于调试或测试时显式注入的 MuMu 路径。"""
         path = getattr(self, "configured_emulator_path", "")
         if not path:
             return
@@ -173,17 +128,13 @@ class EmulatorManager(EmulatorManagerBase):
 
     @staticmethod
     def iter_running_emulator():
-        """
-        Yields:
-            str: Path to emulator executables, may contains duplicate values
-        """
+        """产生正在运行的模拟器路径，可能重复。"""
         for pid in psutil.pids():
             proc = psutil.Process(pid)
             try:
                 exe = proc.cmdline()
                 exe = exe[0].replace(r"\\", "/").replace("\\", "/")
             except psutil.AccessDenied, psutil.NoSuchProcess, IndexError, OSError:
-                # psutil.AccessDenied
                 # NoSuchProcess: process no longer exists (pid=xxx)
                 # OSError: [WinError 87] 参数错误。: '(originated from ReadProcessMemory)'
                 continue
@@ -193,9 +144,6 @@ class EmulatorManager(EmulatorManagerBase):
 
     @cached_property
     def all_emulators(self) -> list[Emulator]:
-        """
-        获取当前个人版会使用的 MuMu。
-        """
         exe = set()
 
         for file in self.iter_configured_emulator():
@@ -204,15 +152,11 @@ class EmulatorManager(EmulatorManagerBase):
             if Path(file).exists():
                 exe.add(file)
 
-        # 去重。
         emulator_paths = [Emulator(path).path for path in exe if Emulator.is_emulator(path)]
         return [Emulator(path) for path in remove_duplicated_path(emulator_paths)]
 
     @cached_property
     def all_emulator_instances(self) -> list[EmulatorInstance]:
-        """
-        Get all emulator instances installed on current computer.
-        """
         instances = []
         for emulator in self.all_emulators:
             instances += list(emulator.iter_instances())

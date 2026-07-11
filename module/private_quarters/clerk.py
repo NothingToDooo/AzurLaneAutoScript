@@ -7,9 +7,6 @@ from module.shop.clerk import ShopClerk
 
 class PQShopClerk(ShopClerk, PQShopUI):
     def shop_interval_clear(self):
-        """
-        清理私人宿舍商店特有的按钮间隔。
-        """
         self.interval_clear(
             [
                 pq_assets.PRIVATE_QUARTERS_SHOP_CHECK,
@@ -19,13 +16,6 @@ class PQShopClerk(ShopClerk, PQShopUI):
         )
 
     def shop_buy_execute(self, item, skip_first_screenshot=True):
-        """
-        Args:
-            item: 要购买的商品。
-
-        Returns:
-            None: 正常退出即表示购买成功。
-        """
         _ = skip_first_screenshot
         self._pq_shop_prepare_buy()
         self._pq_shop_enter_purchase_confirm(item)
@@ -83,10 +73,7 @@ class PQShopClerk(ShopClerk, PQShopUI):
         return True
 
     def shop_buy(self):
-        """
-        Returns:
-            bool: If success, and able to continue.
-        """
+        """购买可选商品；资金不足返回 False，正常扫描完成返回 True。"""
         for _ in range(12):
             logger.hr("Shop buy", level=2)
             # 先读取商品，给货币 OCR 留出内部延迟。

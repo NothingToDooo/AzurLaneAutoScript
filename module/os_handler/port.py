@@ -12,11 +12,7 @@ PORT_CHECK = os_assets.PORT_GOTO_SUPPLY
 
 class PortHandler(OSShop):
     def port_enter(self):
-        """
-        Pages:
-            in: IN_MAP
-            out: PORT_CHECK
-        """
+        """从区域地图进入港口。"""
         logger.info("Port enter")
         for _ in self.loop():
             if self.appear(PORT_CHECK, offset=(20, 20)):
@@ -29,29 +25,16 @@ class PortHandler(OSShop):
         # ui_click 已经确保等待完成。
 
     def port_quit(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: PORT_CHECK
-            out: IN_MAP
-        """
+        """从港口返回区域地图，并等待底部按钮动画结束。"""
         logger.info("Port quit")
         self.ui_back(appear_button=PORT_CHECK, check_button=self.is_in_map, skip_first_screenshot=skip_first_screenshot)
         # 底部按钮有出现动画。
         self.wait_os_map_buttons()
 
     def port_mission_accept(self):
-        """
-        Accept all missions in port.
+        """在港口领取全部任务；2022-01-13 后任务已只显示在总览中。
 
-        Deprecated since 2022.01.13, missions are shown only in overview, no longer to be shown at ports.
-
-        Returns:
-            bool: True if all missions accepted or no mission found.
-                  False if unable to accept more missions.
-
-        Pages:
-            in: PORT_CHECK
-            out: PORT_CHECK
+        达到任务上限时返回 False，页面保持在港口。
         """
         if not self.appear(os_assets.PORT_MISSION_RED_DOT):
             logger.info("No available missions in this port")
@@ -70,7 +53,6 @@ class PortHandler(OSShop):
             if self.appear_then_click(os_assets.PORT_MISSION_ACCEPT, offset=(20, 20), interval=0.2):
                 confirm_timer.reset()
                 continue
-            # 结束。
             if confirm_timer.reached():
                 success = True
                 break
@@ -84,11 +66,7 @@ class PortHandler(OSShop):
         return success
 
     def port_shop_enter(self):
-        """
-        Pages:
-            in: PORT_CHECK
-            out: PORT_SUPPLY_CHECK
-        """
+        """从港口进入补给商店，并等待商品动画结束。"""
         self.ui_click(
             os_assets.PORT_GOTO_SUPPLY,
             appear_button=PORT_CHECK,
@@ -100,21 +78,11 @@ class PortHandler(OSShop):
         self.device.screenshot()
 
     def port_shop_quit(self):
-        """
-        Pages:
-            in: PORT_SUPPLY_CHECK
-            out: PORT_CHECK
-        """
+        """从补给商店返回港口。"""
         self.ui_back(appear_button=PORT_SUPPLY_CHECK, check_button=PORT_CHECK, skip_first_screenshot=True)
 
     def port_dock_repair(self):
-        """
-        Repair all ships.
-
-        Pages:
-            in: PORT_CHECK
-            out: PORT_CHECK
-        """
+        """在港口维修全部舰船，页面保持在港口。"""
         self.ui_click(
             os_assets.PORT_GOTO_DOCK,
             appear_button=PORT_CHECK,
@@ -124,7 +92,6 @@ class PortHandler(OSShop):
 
         repaired = False
         for _ in self.loop():
-            # 结束。
             if self.info_bar_count():
                 break
             if repaired and self.appear(os_assets.PORT_DOCK_CHECK, offset=(20, 20)):

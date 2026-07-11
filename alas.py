@@ -40,10 +40,7 @@ class AzurLaneAutoScript:
     def __init__(self, config_name: str = "alas") -> None:
         logger.hr("Start", level=0)
         self.config_name = config_name
-        # 跳过第一次重启。
         self.is_first_task = True
-        # 记录任务失败次数。
-        # key 为任务名，value 为失败次数。
         self.failure_record = {}
 
     @cached_property
@@ -123,7 +120,6 @@ class AzurLaneAutoScript:
             return self._handle_recoverable_run_error(e)
         except (GamePageUnknownError, ScriptError, RequestHumanTakeover) as e:
             self._exit_on_fatal_run_error(e)
-        # 任务崩溃边界：保存现场并退出，避免调度循环继续运行在未知状态。
         except Exception as e:  # noqa: BLE001
             self._exit_on_unexpected_run_error(e)
         else:
@@ -251,7 +247,6 @@ class AzurLaneAutoScript:
         return self._wait_in_place(wake_at)
 
     def get_next_task(self) -> str:
-        """返回下一个任务名称。"""
         while 1:
             decision = self.config.get_next_decision()
             task = self.config.function_from_decision(decision)
@@ -273,24 +268,20 @@ class AzurLaneAutoScript:
         logger.info(f"Start scheduler loop: {self.config_name}")
 
         while 1:
-            # 检查来自 WebUI 的更新事件。
             if self.stop_event is not None and self.stop_event.is_set():
                 logger.info("Update event detected")
                 logger.info(f"Alas [{self.config_name}] exited.")
                 break
-            # 获取任务。
             task = self.get_next_task()
-            # 初始化设备并切换服务器配置。
+            # 访问属性会触发设备懒初始化。
             _ = self.device
             self.device.config = self.config
-            # 跳过第一次重启。
             if self.is_first_task and task == "Restart":
                 logger.info("Skip task `Restart` at scheduler start")
                 self.config.task_delay(server_update=True)
                 del_cached_property(self, "config")
                 continue
 
-            # 运行任务。
             logger.info(f"Scheduler: Start task `{task}`")
             self.device.stuck_record_clear()
             self.device.click_record_clear()
@@ -299,7 +290,6 @@ class AzurLaneAutoScript:
             logger.info(f"Scheduler: End task `{task}`")
             self.is_first_task = False
 
-            # 检查失败次数。
             failed = deep_get(self.failure_record, keys=task, default=0)
             failed = 0 if success else failed + 1
             deep_set(self.failure_record, keys=task, value=failed)

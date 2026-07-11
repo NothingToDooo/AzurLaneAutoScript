@@ -14,9 +14,8 @@ LANGUAGES = ["zh-CN"]
 DEFAULT_TIME = datetime(2020, 1, 1, 0, 0)
 
 
-# https://stackoverflow.com/questions/8640959/how-can-i-control-what-scalar-form-pyyaml-uses-for-my-data/15423007
 def str_presenter(dumper, data):
-    if len(data.splitlines()) > 1:  # check for multiline string
+    if len(data.splitlines()) > 1:
         return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
     return dumper.represent_scalar("tag:yaml.org,2002:str", data)
 
@@ -46,16 +45,7 @@ def filepath_code():
 
 
 def read_file(file):
-    """
-    Read a file, support both .yaml and .json format.
-    Return empty dict if file not exists.
-
-    Args:
-        file (str):
-
-    Returns:
-        dict, list:
-    """
+    """读取 YAML 或 JSON；文件不存在、为空或扩展名不支持时返回空字典。"""
     logger.debug(f"read: {file}")
     if file.endswith(".json"):
         content = atomic_read_bytes(file)
@@ -75,13 +65,7 @@ def read_file(file):
 
 
 def write_file(file, data):
-    """
-    Write data into a file, supports both .yaml and .json format.
-
-    Args:
-        file (str):
-        data (dict, list):
-    """
+    """原子写入 YAML 或 JSON；不支持的扩展名只记录警告。"""
     logger.debug(f"write: {file}")
     if file.endswith(".json"):
         content = json.dumps(data, indent=2, ensure_ascii=False, sort_keys=False, default=str)
@@ -101,15 +85,7 @@ def write_file(file, data):
 
 
 def iter_folder(folder, is_dir=False, ext=None):
-    """
-    Args:
-        folder (str):
-        is_dir (bool): True to iter directories only
-        ext (str): File extension, such as `.yaml`
-
-    Yields:
-        str: Absolute path of files
-    """
+    """产出目录项路径；is_dir 仅取目录，ext 按 `.yaml` 形式筛选文件。"""
     for sub in Path(folder).iterdir():
         if is_dir:
             if sub.is_dir():
@@ -122,18 +98,11 @@ def iter_folder(folder, is_dir=False, ext=None):
 
 
 def alas_template():
-    """
-    Returns:
-        list[str]: Name of all Alas instances, except `template`.
-    """
     return ["template"] if Path("./config/template.json").exists() else []
 
 
 def alas_instance():
-    """
-    Returns:
-        list[str]: Name of all Alas instances, except `template`.
-    """
+    """列出 template 以外的顶层 JSON 实例；没有实例时回退为 `alas`。"""
     out = []
     for path in Path("./config").iterdir():
         name = path.stem
@@ -180,16 +149,7 @@ def _parse_string_value(value: str):
 
 
 def parse_value(value, data):
-    """
-    尽量把配置字符串转换成 bool、int、float 或 datetime。
-
-    Args:
-        value (str)：待解析的值。
-        data (dict)：配置项定义。
-
-    Returns:
-        object：解析后的配置值。
-    """
+    """把配置字符串转换成 bool、数字或 datetime；非法选项回退到定义的默认值。"""
     if "option" in data and value not in data["option"]:
         return data["value"]
     if not isinstance(value, str):
@@ -198,21 +158,7 @@ def parse_value(value, data):
 
 
 def data_to_type(data, **kwargs):
-    """
-    | Condition                            | Type     |
-    | ------------------------------------ | -------- |
-    | Value is bool                        | checkbox |
-    | Arg has options                      | select   |
-    | `Filter` is in name (in data['arg']) | textarea |
-    | Rest of the args                     | input    |
-
-    Args:
-        data (dict):
-        kwargs: Any additional properties
-
-    Returns:
-        str:
-    """
+    """按值类型映射 UI 控件：bool→checkbox、有选项→select、Filter→textarea，其余为 input。"""
     kwargs.update(data)
     if isinstance(kwargs["value"], bool):
         return "checkbox"
@@ -224,65 +170,26 @@ def data_to_type(data, **kwargs):
 
 
 def data_to_path(data):
-    """
-    Args:
-        data (dict):
-
-    Returns:
-        str: <func>.<group>.<arg>
-    """
+    """返回 `<func>.<group>.<arg>` 路径。"""
     return ".".join([data.get(attr, "") for attr in ["func", "group", "arg"]])
 
 
 def path_to_arg(path):
-    """
-    Convert dictionary keys in .yaml files to argument names in config.
-
-    Args:
-        path (str): Such as `Scheduler.ServerUpdate`
-
-    Returns:
-        str: Such as `Scheduler_ServerUpdate`
-    """
     return path.replace(".", "_")
 
 
 def dict_to_kv(dictionary, allow_none=True):
-    """
-    Args:
-        dictionary: Such as `{'path': 'Scheduler.ServerUpdate', 'value': True}`
-        allow_none (bool):
-
-    Returns:
-        str: Such as `path='Scheduler.ServerUpdate', value=True`
-    """
+    """把字典格式化为 `path='Scheduler.ServerUpdate', value=True` 形式。"""
     return ", ".join([f"{k}={v!r}" for k, v in dictionary.items() if allow_none or v is not None])
 
 
 def server_time_offset() -> timedelta:
-    """
-    个人国区分支默认本机时间就是服务器时间。
-    """
+    """个人国区分支默认本机时间就是服务器时间。"""
     return timedelta()
 
 
 def random_normal_distribution_int(a, b, n=3):
-    """
-    A non-numpy implementation of the `random_normal_distribution_int` in module.base.utils
-
-
-    Generate a normal distribution int within the interval.
-    Use the average value of several random numbers to
-    simulate normal distribution.
-
-    Args:
-        a (int): The minimum of the interval.
-        b (int): The maximum of the interval.
-        n (int): The amount of numbers in simulation. Default to 3.
-
-    Returns:
-        int
-    """
+    """不依赖 NumPy，取 n 个闭区间 [a, b] 内均匀随机整数的均值模拟正态分布。"""
     if a < b:
         output = sum(random.randint(a, b) for _ in range(n)) / n
         return round(output)
@@ -290,16 +197,7 @@ def random_normal_distribution_int(a, b, n=3):
 
 
 def ensure_time(second, n=3, precision=3):
-    """Ensure to be time.
-
-    Args:
-        second (int, float, tuple): time, such as 10, (10, 30), '10, 30'
-        n (int): The amount of numbers in simulation. Default to 5.
-        precision (int): Decimals.
-
-    Returns:
-        float:
-    """
+    """把秒数或 `10,30`、`10-30`、(10, 30) 归一化为秒；区间按近似正态分布取值。"""
     if isinstance(second, tuple):
         multiply = 10**precision
         return random_normal_distribution_int(second[0] * multiply, second[1] * multiply, n) / multiply
@@ -317,12 +215,6 @@ def ensure_time(second, n=3, precision=3):
 
 
 def get_os_next_reset():
-    """
-    Get the first day of next month.
-
-    Returns:
-        datetime.datetime
-    """
     diff = server_time_offset()
     server_now = datetime.now() - diff
     server_reset = (server_now.replace(day=1) + timedelta(days=32)).replace(
@@ -332,10 +224,6 @@ def get_os_next_reset():
 
 
 def get_os_reset_remain():
-    """
-    Returns:
-        int: number of days before next opsi reset
-    """
     next_reset = get_os_next_reset()
     now = datetime.now()
     logger.attr("OpsiNextReset", next_reset)
@@ -346,13 +234,7 @@ def get_os_reset_remain():
 
 
 def get_server_next_update(daily_trigger):
-    """
-    Args:
-        daily_trigger (list[str], str): [ "00:00", "12:00", "18:00",]
-
-    Returns:
-        datetime.datetime
-    """
+    """接受 `HH:MM` 列表或逗号分隔字符串，返回最近的下一次服务器触发时间。"""
     if isinstance(daily_trigger, str):
         daily_trigger = daily_trigger.replace(" ", "").split(",")
     if not daily_trigger:
@@ -372,13 +254,7 @@ def get_server_next_update(daily_trigger):
 
 
 def get_server_last_update(daily_trigger):
-    """
-    Args:
-        daily_trigger (list[str], str): [ "00:00", "12:00", "18:00",]
-
-    Returns:
-        datetime.datetime
-    """
+    """接受 `HH:MM` 列表或逗号分隔字符串，返回最近的上一次服务器触发时间。"""
     if isinstance(daily_trigger, str):
         daily_trigger = daily_trigger.replace(" ", "").split(",")
     if not daily_trigger:
@@ -398,17 +274,7 @@ def get_server_last_update(daily_trigger):
 
 
 def nearest_future(future, interval=120):
-    """
-    Get the neatest future time.
-    Return the last one if two things will finish within `interval`.
-
-    Args:
-        future (list[datetime.datetime]):
-        interval (int): Seconds
-
-    Returns:
-        datetime.datetime:
-    """
+    """返回最早未来时间；相邻时间差小于 interval 秒时合并到较晚者。"""
     future = [datetime.fromisoformat(f) if isinstance(f, str) else f for f in future]
     future = sorted(future)
     next_run = future[0]
@@ -420,23 +286,12 @@ def nearest_future(future, interval=120):
 
 
 def get_nearest_weekday_date(target):
-    """
-    Get nearest weekday date starting
-    from current date
-
-    Args:
-        target (int): target weekday to
-                      calculate
-
-    Returns:
-        datetime.datetime
-    """
+    """返回下一个 target 星期的零点；target 为 0～6，当天也顺延到下一周。"""
     diff = server_time_offset()
     server_now = datetime.now() - diff
 
     days_ahead = target - server_now.weekday()
     if days_ahead <= 0:
-        # Target day has already happened
         days_ahead += 7
     server_reset = (server_now + timedelta(days=days_ahead)).replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -444,62 +299,30 @@ def get_nearest_weekday_date(target):
 
 
 def get_server_weekday():
-    """
-    Returns:
-        int: The server's current day of the week
-    """
     diff = server_time_offset()
     server_now = datetime.now() - diff
     return server_now.weekday()
 
 
 def get_server_monthday():
-    """
-    Returns:
-        int: The server's current day of the month
-    """
     diff = server_time_offset()
     server_now = datetime.now() - diff
     return server_now.day
 
 
 def random_id(length=32):
-    """
-    Args:
-        length (int):
-
-    Returns:
-        str: Random azurstat id.
-    """
     return "".join(random.sample(string.ascii_lowercase + string.digits, length))
 
 
 def to_list(text, length=1):
-    """
-    Args:
-        text (str): Such as `1, 2, 3`
-        length (int): If there's only one digit, return a list expanded to given length,
-            i.e. text='3', length=5, returns `[3, 3, 3, 3, 3]`
-
-    Returns:
-        list[int]:
-    """
+    """把逗号分隔整数转为列表；单个整数会重复到 length，例如 `3`→`[3, 3]`。"""
     if text.isdigit():
         return [int(text)] * length
     return [int(letter.strip()) for letter in text.split(",")]
 
 
 def type_to_str(typ):
-    """
-    Convert any types or any objects to a string。
-    Remove <> to prevent them from being parsed as HTML tags.
-
-    Args:
-        typ:
-
-    Returns:
-        str: Such as `int`, 'datetime.datetime'.
-    """
+    """把类型或对象转为不含尖括号的类型名，避免被解析为 HTML 标签。"""
     if not isinstance(typ, type):
         typ = type(typ).__name__
     return str(typ)

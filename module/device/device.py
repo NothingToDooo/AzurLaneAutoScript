@@ -23,28 +23,11 @@ from module.logger import logger
 
 
 def show_function_call():
-    """
-    INFO     21:07:31.554 │ Function calls:
-                       <string>   L1 <module>
-                   spawn.py L116 spawn_main()
-                   spawn.py L129 _main()
-                 process.py L314 _bootstrap()
-                 process.py L108 run()
-         process_manager.py L149 run_process()
-                    alas.py L285 loop()
-                    alas.py  L69 run()
-                     src.py  L55 rogue()
-                   rogue.py  L36 run()
-                   rogue.py  L18 rogue_once()
-                   entry.py L335 rogue_world_enter()
-                    path.py L193 rogue_path_select()
-    """
     stack = traceback.extract_stack()
     func_list = []
     for row in stack:
         filename, line_number, function_name, _ = row
         filename = Path(filename).name
-        # /tasks/character/switch.py:64 character_update()
         func_list.append([filename, str(line_number), function_name])
     max_filename = max(len(row[0]) for row in func_list)
     max_linenum = max(len(row[1]) for row in func_list) + 1
@@ -79,7 +62,6 @@ class Device(Screenshot, Control, Connection):
                 if trial >= 3:
                     logger.critical("Failed to start emulator after 3 trial")
                     raise RequestHumanTakeover from e
-                # 尝试启动模拟器。
                 if self.emulator_instance is not None:
                     self.emulator_start()
                 else:
@@ -170,23 +152,13 @@ class Device(Screenshot, Control, Connection):
         return self.app_controller.stop()
 
     def method_check(self):
-        """
-        检查当前个人版保留的模拟器实例。
-        """
         instance = self.emulator_instance
         if instance is None or instance.type != EmulatorBase.MuMuPlayer12:
             logger.critical("当前个人版只保留 MuMu + nemu_ipc 截图 + minitouch 控制，当前需要 MuMu12 实例")
             raise RequestHumanTakeover
 
     def handle_night_commission(self, daily_trigger="21:00", threshold=30):
-        """
-        Args:
-            daily_trigger (int): Time for commission refresh.
-            threshold (int): Seconds around refresh time.
-
-        Returns:
-            bool: If handled.
-        """
+        """仅在 daily_trigger 前后 threshold 秒内处理夜间委托。"""
         update = get_server_next_update(daily_trigger=daily_trigger)
         now = datetime.now()
         diff = (update.timestamp() - now.timestamp()) % 86400
@@ -201,10 +173,6 @@ class Device(Screenshot, Control, Connection):
         return False
 
     def screenshot(self):
-        """
-        Returns:
-            np.ndarray:
-        """
         self.stuck_record_check()
 
         super().screenshot()
@@ -218,9 +186,7 @@ class Device(Screenshot, Control, Connection):
         self.capture.release()
 
     def get_orientation(self):
-        """
-        Callbacks when orientation changed.
-        """
+        """屏幕方向变化时触发底层回调。"""
         return super().get_orientation()
 
     def stuck_record_add(self, button):
@@ -232,10 +198,7 @@ class Device(Screenshot, Control, Connection):
         self.stuck_timer_long.reset()
 
     def stuck_record_check(self):
-        """
-        Raises:
-            GameStuckError:
-        """
+        """检测到长时间无进展时抛出 GameStuckError。"""
         if not self.stuck_detection_enabled:
             return False
 
@@ -272,15 +235,7 @@ class Device(Screenshot, Control, Connection):
         self.click_record.clear()
 
     def click_record_remove(self, button):
-        """
-        Remove a button from `click_record`
-
-        Args:
-            button (Button):
-
-        Returns:
-            int: Number of button removed
-        """
+        """移除所有匹配记录并返回移除数量。"""
         removed = 0
         maxlen = self.click_record.maxlen
         limit = maxlen if maxlen is not None else len(self.click_record)
@@ -289,16 +244,12 @@ class Device(Screenshot, Control, Connection):
                 self.click_record.remove(str(button))
                 removed += 1
             except ValueError:
-                # Value not in queue
                 break
 
         return removed
 
     def click_record_check(self):
-        """
-        Raises:
-            GameTooManyClickError:
-        """
+        """点击模式异常重复时抛出 GameTooManyClickError。"""
         if not self.stuck_detection_enabled:
             return False
 
@@ -322,9 +273,7 @@ class Device(Screenshot, Control, Connection):
         return False
 
     def disable_stuck_detection(self):
-        """
-        Disable stuck detection and its handler. Usually uses in semi auto and debugging.
-        """
+        """禁用卡死检测及其处理，用于半自动流程和调试。"""
         logger.info("Disable stuck detection")
         self.stuck_detection_enabled = False
 

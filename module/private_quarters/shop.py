@@ -15,17 +15,13 @@ FILTER = Filter(FILTER_REGEX, FILTER_ATTR)
 
 class PQShopItemGrid(ItemGrid):
     def predict(self, image, options=None, **settings):
-        """
-        给商品补充过滤用属性。
-        """
+        """识别商品并补充筛选属性。"""
         options = item_predict_options(options, settings)
         super().predict(image, options=options)
 
         for item in self.items:
-            # 设置默认过滤属性。
             item.group, item.sub_genre, item.tier = None, None, None
 
-            # 正则可以快速填充过滤字段。
             name = item.name
             result = re.search(FILTER_REGEX, name)
             if result:
@@ -33,10 +29,6 @@ class PQShopItemGrid(ItemGrid):
                     group.lower() if group is not None else None for group in result.groups()
                 ]
             else:
-                # if not name.isnumeric():
-                #     logger.warning(f'Unable to parse shop item {name}; '
-                #                     'check template asset and filter regexp')
-                #     raise ScriptError
                 continue
 
         return self.items
@@ -48,10 +40,6 @@ class PQShop(PQShopClerk, PQStatus):
 
     @cached_property
     def shop_filter(self):
-        """
-        Returns:
-            str:
-        """
         list_filter = []
         if self.config.PrivateQuarters_BuyRoses:
             list_filter.append("GiftRoses")
@@ -62,7 +50,6 @@ class PQShop(PQShopClerk, PQStatus):
 
     @cached_property
     def shop_grid(self):
-        """返回私人房间商店的商品网格。"""
         return ButtonGrid(
             origin=(290, 215),
             delta=(230, 0),
@@ -73,11 +60,6 @@ class PQShop(PQShopClerk, PQStatus):
 
     @cached_property
     def shop_private_quarters_items(self):
-        """
-        Returns:
-            PQShopItemGrid:
-            cost_area=(-52, 330, -26, 353)
-        """
         shop_grid = self.shop_grid
         shop_private_quarters_items = PQShopItemGrid(
             shop_grid, templates={}, cost_area=(-52, 330, -26, 353), price_area=(-26, 331, 36, 357)
@@ -88,30 +70,14 @@ class PQShop(PQShopClerk, PQStatus):
         return shop_private_quarters_items
 
     def shop_items(self):
-        """覆盖统一接口，返回当前商店专用的商品识别网格。"""
         return self.shop_private_quarters_items
 
     def shop_currency(self):
-        """
-        Ocr shop guild currency if needed
-        (gold coins and gems)
-        Then return gold coin count
-
-        Returns:
-            int: gold coin amount
-        """
         self._currency = self.status_get_gold_coins()
         self.gems = self.status_get_gems()
         logger.info(f"Gold coins: {self._currency}, Gems: {self.gems}")
 
     def shop_check_item(self, item):
-        """
-        Args:
-            item: 待检查物品。
-
-        Returns:
-            bool: 是否可以购买。
-        """
         if self.config.PrivateQuarters_BuyRoses and item.sub_genre == "roses":
             return self._currency >= 24000
 
@@ -121,15 +87,6 @@ class PQShop(PQShopClerk, PQStatus):
         return False
 
     def shop_get_item_to_buy(self, items):
-        """
-        Args:
-            items list(Item): acquired from shop_get_items
-
-        Returns:
-            Item: Item to buy, or None.
-        """
-        # Load selection, apply filter,
-        # and return 1st item in result if any
         FILTER.load(self.shop_filter)
         filtered = FILTER.apply(items, self.shop_check_item)
 

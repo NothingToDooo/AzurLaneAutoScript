@@ -5,15 +5,9 @@ from module.os.map import OSMap
 
 class OpsiStronghold(OSMap):
     def clear_stronghold(self):
-        """
-        Find a siren stronghold on globe map,
-        clear stronghold,
-        repair fleets in port.
+        """在全球地图查找并清理要塞，然后维修舰队。
 
-        Raises:
-            ActionPointLimit:
-            TaskEnd: If no more strongholds.
-            RequestHumanTakeover: If unable to clear boss, fleets exhausted.
+        行动力不足时抛出 ActionPointLimit；没有要塞时抛出 TaskEnd；舰队耗尽仍未清理时抛出 RequestHumanTakeover。
         """
         logger.hr("OS clear stronghold", level=1)
         self.cl1_ap_preserve()
@@ -22,7 +16,7 @@ class OpsiStronghold(OSMap):
         self.globe_update()
         zone = self.find_siren_stronghold()
         if zone is None:
-            # No siren stronghold, delay next run to tomorrow.
+            # 没有要塞时推迟到次日运行。
             self.config.task_delay(server_update=True)
             self.config.task_stop()
 
@@ -40,25 +34,15 @@ class OpsiStronghold(OSMap):
             self.config.check_task_switch()
 
     def run_stronghold_one_fleet(self, fleet):
-        """
-        使用指定舰队清理一次要塞。
-
-        Args:
-            fleet (BossFleet)：用于清理要塞的舰队。
-
-        Returns:
-            bool：是否全部清理完成。
-        """
+        """使用指定舰队清理一次要塞，并返回是否全部完成。"""
         self.config.override(OpsiGeneral_DoRandomMapEvent=False, HOMO_EDGE_DETECT=False, STORY_OPTION=0)
-        # Try 3 times, because fleet may stuck in fog.
+        # 舰队可能卡在迷雾中，最多尝试三次。
         for _ in range(3):
-            # Attack
             self.fleet_set(fleet.fleet_index)
             self.run_auto_search(question=False, rescan=False)
             self.hp_reset()
             self.hp_get()
 
-            # End
             if self.get_stronghold_percentage() == "0":
                 logger.info("BOSS clear")
                 return True
@@ -80,17 +64,7 @@ class OpsiStronghold(OSMap):
         return False
 
     def run_stronghold(self):
-        """
-        All fleets take turns in attacking siren stronghold.
-
-        Returns:
-            bool: If success to clear.
-
-        Pages:
-            in: Siren logger (abyssal), boss appeared.
-            out: If success, dangerous or safe zone.
-                If failed, still in abyssal.
-        """
+        """让各舰队轮流攻击要塞；成功后进入危险或安全海域，失败时仍在要塞。"""
         logger.hr("Stronghold clear", level=1)
         fleets = self.parse_fleet_filter()
         for fleet in fleets:

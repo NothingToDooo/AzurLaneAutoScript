@@ -3,20 +3,8 @@ from contextlib import suppress
 from numbers import Number
 from typing import Any, ClassVar
 
-"""
-SLPP is a simple lua-python data structures parser.
-
-This is my fork of SLPP, https://github.com/LmeSzinc/slpp
-Origin repository here, https://github.com/SirAnthony/slpp
-
-I found some error in it
-lua example: '{点={2={0={叫={醒={我={this=true}}}}}}}'
-wrong result: {'点': {2: [{'叫': {'醒': {'我': {'this': True}}}}]}}
-fixed result: {'点': {2: {0: {'叫': {'醒': {'我': {'this': True}}}}}}}
-
-They seems to treat this as a feature not a bug, https://github.com/SirAnthony/slpp/issues/21
-So I made my own fork for Alas.
-"""
+# 来源：https://github.com/LmeSzinc/slpp，原项目：https://github.com/SirAnthony/slpp。
+# 稀疏数字键表保持为字典，避免错误压缩为列表。
 
 
 ERRORS = {
@@ -52,11 +40,7 @@ class SLPP:
     def decode(self, text):
         if not text or not isinstance(text, str):
             return None
-        # 游戏脚本没有注释。
-        # 删除注释可能导致错误，例如下面这类内容会被误认为注释：
-        # `profiles = "现世与梦境夹缝中的蝴蝶，狂风与巨浪蹂躏中的小舟。`
-        # `跨越虚无，驱散黑暗，为重樱带来希望和未来吧---------- ",`
-        # 早期尝试用 "--.*$" 正则删注释，后来确认会误伤包含长破折号的文本。
+        # 不能用正则删除 Lua 注释，字符串中的连续短横线会被误伤。
         self.text = text
         self.at, self.ch, self.depth = 0, "", 0
         self.len = len(text)
@@ -221,7 +205,7 @@ class SLPP:
                 self.next_chr()
                 continue
             pending_key, index = self._read_object_item(data, index)
-        raise ParseError(ERRORS["unexp_end_table"])  # 表未正常结束。
+        raise ParseError(ERRORS["unexp_end_table"])
 
     words: ClassVar[dict[str, Any]] = {"true": True, "false": False, "nil": None}
 

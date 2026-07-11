@@ -34,15 +34,6 @@ class Selector:
         def is_cl1_enabled(self) -> bool: ...
 
     def pretreatment(self, items) -> list[Item]:
-        """
-        Pretreatment items.
-
-        Args:
-            items:
-
-        Returns:
-            list[Item]:
-        """
         matching_items = []
         for item in items:
             item.group, item.sub_genre, item.tier = None, None, None
@@ -56,46 +47,19 @@ class Selector:
         return matching_items
 
     def enough_coins_in_akashi(self, item) -> bool:
-        """返回明石商店货币是否足够购买物品。"""
         return (item.cost == "YellowCoins" and item.price <= self._shop_yellow_coins) or (
             item.cost == "PurpleCoins" and item.price <= self._shop_purple_coins
         )
 
     def check_cl1_purple_coins(self, item) -> bool:
-        """
-        Check if cl1 is enable and item name is PurpleCoins.
-
-        Args:
-            item:
-
-        Returns:
-            bool: False if cl1 is enable and item name is PurpleCoins.
-        """
+        """启用 CL1 刷图时保留 PurpleCoins，不在商店购买。"""
         return not (self.is_cl1_enabled and item.name == "PurpleCoins")
 
     def check_item_count(self, item) -> bool:
-        """
-        Check if the item has a valid count.
-
-        Args:
-            item: Irem.
-
-        Returns:
-            bool: True if the item has at least one count, the total count is at least one,
-                  and the current count does not exceed the total count. False otherwise.
-        """
+        """当前和总数量都至少为 1，且当前数量不得超过总数量。"""
         return item.count >= 1 and item.total_count >= 1 and item.count <= item.total_count
 
     def items_filter_in_akashi_shop(self, items) -> list[Item]:
-        """
-        Returns items that can be bought.
-
-        Args:
-            items: Irems to be filtered.
-
-        Returns:
-            list[Item]:
-        """
         items = self.pretreatment(items)
         parser = self.config.OpsiGeneral_AkashiShopFilter
         if not parser.strip():
@@ -104,15 +68,6 @@ class Selector:
         return FILTER.applys(items, funcs=[self.check_cl1_purple_coins, self.enough_coins_in_akashi])
 
     def items_filter_in_os_shop(self, items) -> list[Item]:
-        """
-        Returns items that can be bought.
-
-        Args:
-            items: Items to be filtered.
-
-        Returns:
-            list[Item]:
-        """
         items = self.pretreatment(items)
         preset = self.config.OpsiShop_PresetFilter
         parser = ""

@@ -34,28 +34,20 @@ class ConnectionAttr:
     )
 
     def __init__(self, config):
-        """
-        参数：
-            config (AzurLaneConfig, str)：./config 下的用户配置名。
-        """
         logger.hr("Device", level=1)
         if isinstance(config, str):
             self.config = AzurLaneConfig(config, task=None)
         else:
             self.config = config
 
-        # 初始化 ADB 客户端。
         logger.attr("AdbBinary", self.adb_binary)
 
-        # 让 adbutils 使用自定义 ADB。
         def adb_path() -> str:
             return self.adb_binary
 
         vars(adbutils)["adb_path"] = adb_path
-        # 预热 adb_client 缓存。
         _ = self.adb_client
 
-        # 解析自定义 serial。
         self.serial = str(self.config.Emulator_Serial)
         self.serial_check()
 
@@ -88,9 +80,6 @@ class ConnectionAttr:
         return True
 
     def serial_check(self):
-        """
-        检查并修正 serial。
-        """
         # 兼容常见手填错误。
         new = revise_mumu12_serial(self.serial)
         if new != self.serial:
@@ -121,23 +110,19 @@ class ConnectionAttr:
 
     @cached_property
     def adb_binary(self):
-        # 优先使用 WebUI 配置指定的 ADB。
         file = State.webui_config.AdbExecutable
         file = file.replace("\\", "/")
         if Path(file).exists():
             return str(Path(file).resolve())
 
-        # 再尝试项目内已有的 adb.exe。
         for file in self.adb_binary_list:
             if Path(file).exists():
                 return str(Path(file).resolve())
 
-        # 再尝试 Python 环境里的 ADB。
         file = (Path(sys.executable) / "../Lib/site-packages/adbutils/binaries/adb.exe").resolve().as_posix()
         if Path(file).exists():
             return file
 
-        # 最后使用系统 PATH 里的 ADB。
         return "adb"
 
     @cached_property
@@ -145,7 +130,6 @@ class ConnectionAttr:
         host = "127.0.0.1"
         port = 5037
 
-        # 允许通过环境变量覆盖 ADB server 端口。
         env = os.environ.get("ANDROID_ADB_SERVER_PORT", None)
         if env is not None:
             try:

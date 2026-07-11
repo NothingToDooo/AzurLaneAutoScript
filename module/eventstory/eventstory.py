@@ -10,22 +10,19 @@ from module.ui.page import page_event, page_sp
 
 class EventStory(CampaignUI, Combat, LoginHandler):
     def ui_goto_event_story(self):
-        """
-        Returns:
-            str: 'finish', 'story', 'unknown'
+        """进入活动剧情页并返回 finish、story、story_alchemist 或 unknown。
+
+        2025-10-23 国服活动使用 SP 页，其余使用活动页。
         """
         event = self.config.cross_get("Event.Campaign.Event", "")
         if event == "event_20251023_cn":
-            # SP 活动。
             self.ui_ensure(page_sp)
         else:
-            # 大多数活动位于 page_event。
             self.ui_ensure(page_event)
         self.campaign_ensure_mode_20241219("story")
 
         state = "unknown"
         for _ in range(3):
-            # 等待任意剧情状态。
             timeout = Timer(2, count=6).start()
             for _ in self.loop():
                 state = self.get_event_story_state()
@@ -45,32 +42,22 @@ class EventStory(CampaignUI, Combat, LoginHandler):
         return state
 
     def get_event_20250724_button(self):
-        """
-        Returns:
-            Button | None:
-        """
+        """以 0.85 相似度查找炼金联动入口，返回下移 44px 的按钮；未找到时返回 None。"""
         area = (0, 72, 1280, 560)
         image = self.image_crop(area, copy=False)
         image = rgb2gray(image)
         sim, button = eventstory_assets.TEMPLATE_ALCHEMIST_STORY.match_result(image)
         if sim >= 0.85:
             button = button.move(area[:2])
-            # 下移以点击文字。
             return button.move((0, 44))
         sim, button = eventstory_assets.TEMPLATE_ALCHEMIST_BATTLE.match_result(image)
         if sim >= 0.85:
             button = button.move(area[:2])
-            # 下移以点击文字。
             return button.move((0, 44))
         return None
 
     def handle_event_20250724(self, interval=2):
-        """
-        In Alchemist collab 2, story button just appear everywhere
-
-        Returns:
-            bool: If clicked
-        """
+        """处理第二次炼金联动中全页面可见的剧情按钮，并返回是否点击。"""
         interval = self.get_interval_timer(eventstory_assets.TEMPLATE_ALCHEMIST_STORY, interval=interval)
         if not interval.reached():
             return False
@@ -112,13 +99,7 @@ class EventStory(CampaignUI, Combat, LoginHandler):
         )
 
     def event_story(self, skip_first_screenshot=True):
-        """
-        Args:
-            skip_first_screenshot:
-
-        Returns:
-            str: 'battle' or 'finish'
-        """
+        """推进活动剧情；进入战斗返回 battle，剧情结束返回 finish。"""
         logger.hr("Event story", level=1)
         while 1:
             if skip_first_screenshot:
@@ -126,7 +107,6 @@ class EventStory(CampaignUI, Combat, LoginHandler):
             else:
                 self.device.screenshot()
 
-            # 结束。
             if self.is_combat_executing() or self.is_combat_loading():
                 logger.info("run_story end at battle")
                 return "battle"
@@ -137,14 +117,12 @@ class EventStory(CampaignUI, Combat, LoginHandler):
                 logger.info("run_story end at REWARD_GOT")
                 return "finish"
 
-            # 跳过剧情。
             if self.handle_story_skip():
                 self.interval_clear([eventstory_assets.STORY_MIDDLE, eventstory_assets.BATTLE_MIDDLE])
                 continue
             if self.handle_get_items():
                 continue
 
-            # 点击剧情入口。
             if self._handle_event_story_entry():
                 self._event_story_clear_intervals()
                 continue
@@ -154,10 +132,7 @@ class EventStory(CampaignUI, Combat, LoginHandler):
         return "finish"
 
     def run_event_story(self):
-        """
-        Loop until event story finished
-        Handle story battles
-        """
+        """循环处理剧情和战斗，直到活动剧情结束。"""
         while 1:
             state = self.ui_goto_event_story()
             if state == "finish":
@@ -177,10 +152,7 @@ class EventStory(CampaignUI, Combat, LoginHandler):
                 self.ui_goto_event_story()
 
     def get_event_story_state(self):
-        """
-        Returns:
-            str: 'finish', 'story', 'unknown'
-        """
+        """返回 finish、story、story_alchemist 或 unknown。"""
         if self._event_story_finished():
             return "finish"
 

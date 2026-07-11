@@ -22,18 +22,11 @@ WAR_ARCHIVES_SCROLL = Scroll(WAR_ARCHIVES_SCROLL_AREA, color=(247, 211, 66), nam
 
 
 class CampaignBase(CampaignBase_):
-    # Helper variable to keep track of whether is the first runthrough
     first_run = True
     ENEMY_FILTER = "1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M"
 
     def _get_archives_entrance(self, name):
-        """
-        Create entrance button to target archive campaign
-        using a template acquired by event folder name
-
-        Args:
-            name(str): event folder name
-        """
+        """按活动目录名取得模板并识别对应档案入口。"""
         template = dic_archives_template[name]
 
         sim, button = template.match_result(self.device.image)
@@ -43,9 +36,6 @@ class CampaignBase(CampaignBase_):
         return button.crop((-12, -12, 44, 32), image=self.device.image, name=name)
 
     def _archives_loading_complete(self):
-        """
-        Check if war archive has finished loading
-        """
         for war_archive_folder in dic_archives_template:
             template = dic_archives_template[war_archive_folder]
             loading_result = template.match(self.device.image)
@@ -79,12 +69,7 @@ class CampaignBase(CampaignBase_):
         return True
 
     def _search_archives_entrance(self, name, skip_first_screenshot=True):
-        """
-        Search for entrance using mini-touch scroll down
-        at center
-        Fixed number of scrolls until give up, may need to
-        increase as more war archives campaigns are added
-        """
+        """滚动搜索档案入口，最多尝试 20 次后放弃。"""
         loading_checked = False
         for _ in range(20):
             if skip_first_screenshot:
@@ -94,20 +79,17 @@ class CampaignBase(CampaignBase_):
 
             self._discard_archives_scroll_record()
 
-            # Drag may result in accidental exit, recover
-            # before starting next search attempt
+            # 拖动可能意外退出；每轮搜索前先恢复档案列表页。
             if self._ensure_archives_search_page():
                 loading_checked = False
 
-            # check entrance first, because game can remember last scrolling position
-            # if you stays at page_campaign_menu
-            # and bypass _archives_loading_complete if reached entrance
+            # 游戏会保留上次滚动位置；先匹配入口，命中时可跳过较慢的加载检查。
             entrance = self._get_archives_entrance(name)
             if entrance is not None:
                 return entrance
 
             if not loading_checked:
-                # _archives_loading_complete might take 1~2s if archive list is not at top
+                # 档案列表不在顶部时，加载检查可能耗时 1～2 秒。
                 self._wait_archives_loaded()
                 loading_checked = True
 
@@ -123,14 +105,8 @@ class CampaignBase(CampaignBase_):
         return None
 
     def ui_goto_archives_campaign(self, mode="ex"):
-        """
-        Performs the operations needed to transition
-        to target archive's campaign stage map
-        """
-        # On first run regardless of current location
-        # even in target stage map, start from page_archives
-        # For subsequent runs when neither reward or
-        # stop_triggers occur, no need perform operations
+        """切换档案模式并进入目标活动地图。"""
+        # 首次运行无论当前位置都从档案页重新进入；后续若仍在目标地图且未触发奖励或停止条件则直接复用。
         result = True
         if self.first_run or not self.appear(WAR_ARCHIVES_CAMPAIGN_CHECK, offset=(20, 20)):
             result = self.ui_ensure(destination=page_archives)
@@ -152,22 +128,13 @@ class CampaignBase(CampaignBase_):
                 )
                 raise RequestHumanTakeover
 
-        # Subsequent runs all set False
         if self.first_run:
             self.first_run = False
 
         return result
 
     def ui_goto_event(self):
-        """
-        Overridden to handle specifically transitions
-        to target ex event in page_archives
-        """
         return self.ui_goto_archives_campaign(mode="ex")
 
     def ui_goto_sp(self):
-        """
-        Overridden to handle specifically transitions
-        to target sp event in page_archives
-        """
         return self.ui_goto_archives_campaign(mode="sp")

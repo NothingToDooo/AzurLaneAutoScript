@@ -43,13 +43,6 @@ class CampaignMap:
         return iter(self.grids.values())
 
     def __getitem__(self, item):
-        """
-        Args:
-            item:
-
-        Returns:
-            GridInfo:
-        """
         return self.grids[tuple(item)]
 
     def __contains__(self, item):
@@ -76,10 +69,9 @@ class CampaignMap:
                 grid.location = (x, y)
                 self.grids[(x, y)] = grid
 
-        # camera_data can be generate automatically, but it's better to set it manually.
+        # camera_data 可自动生成，但手动设置通常更稳定。
         self.camera_data = [location2node(loca) for loca in camera_2d((0, 0, *self._shape), sight=self.camera_sight)]
         self.camera_data_spawn_point = []
-        # weight_data set to 10.
         for grid in self:
             grid.weight = 10.0
 
@@ -101,11 +93,7 @@ class CampaignMap:
         self._map_data_loop = text
 
     def load_map_data(self, use_loop=False):
-        """
-        Args:
-            use_loop (bool): If at clearing mode.
-                             clearing mode (Correct name) == fast forward (in old Alas) == loop (in lua files)
-        """
+        """use_loop 表示清理模式；旧 Alas 称 fast forward，Lua 文件称 loop。"""
         has_loop = bool(len(self.map_data_loop))
         logger.info(f"Load map_data, has_loop={has_loop}, use_loop={use_loop}")
         if has_loop and use_loop:
@@ -135,10 +123,7 @@ class CampaignMap:
 
     @portal_data.setter
     def portal_data(self, portal_list):
-        """
-        Args:
-            portal_list (list[tuple]): [(start, end),]
-        """
+        """portal_list 形如 [(起点, 终点), ...]。"""
         for nodes in portal_list:
             node1, node2 = location_ensure(nodes[0]), location_ensure(nodes[1])
             self._portal_data.append((node1, node2))
@@ -153,12 +138,7 @@ class CampaignMap:
         self._land_based_data = data
 
     def _load_land_base_data(self, data):
-        """
-        land_based_data need to be set after map_data.
-
-        Args:
-            data (list[list[str]]): Such as [['H7', 'up'], ['D5', 'left'], ['G3', 'down'], ['C2', 'right']]
-        """
+        """在 map_data 之后加载陆基单位；data 形如 [['H7', 'up'], ['D5', 'left']]。"""
         rotation_dict = {
             "up": [(0, -1), (0, -2), (0, -3)],
             "down": [(0, 1), (0, 2), (0, 3)],
@@ -183,10 +163,7 @@ class CampaignMap:
         self._maze_data = data
 
     def _load_maze_data(self, data):
-        """
-        Args:
-            data (list): Such as [('D5', 'I4', 'J6'), ('C4', 'E4', 'D8'), ('C2', 'G2', 'G6')]
-        """
+        """data 由迷宫格组构成，例如 [('D5', 'I4', 'J6'), ('C4', 'E4', 'D8')]。"""
         self._maze_data = data
         self.maze_round = len(data) * 3
         for index, raw_maze in enumerate(data):
@@ -210,11 +187,7 @@ class CampaignMap:
         self._fortress_data = [enemy, block]
 
     def _load_fortress_data(self, data):
-        """
-        Args:
-            data (list):  [fortress_enemy, fortress_block], they can should be str or a tuple/list of str.
-                Such as [('B5', 'E2', 'H5', 'E8'), 'G3'] or ['F5', 'G1']
-        """
+        """data 为 [要塞敌人, 阻挡格]，两项均可为格子名或格子名序列。"""
         self._fortress_data = data
         enemy, block = data
         enemy.set(is_fortress=True)
@@ -229,11 +202,7 @@ class CampaignMap:
         self._bouncing_enemy_data = [self.to_selected(route) for route in data]
 
     def _load_bouncing_enemy_data(self, data):
-        """
-        Args:
-            data (list[SelectedGrids]): Grids that enemy is bouncing in.
-                [enemy_route, enemy_route, ...], Such as [(C2, C3, C4), ]
-        """
+        """data 为弹跳敌人的路线列表，例如 [(C2, C3, C4)]。"""
         for route in data:
             route.set(may_bouncing_enemy=True)
 
@@ -297,14 +266,7 @@ class CampaignMap:
             self[start].portal_link = None
 
     def grid_connection_initial(self, wall=False, portal=False):
-        """
-        Args:
-            wall (bool): If use wall_data
-            portal (bool): If use portal_data
-
-        Returns:
-            bool: If used wall data.
-        """
+        """按开关应用墙和传送门连接。"""
         logger.info(f"grid_connection: wall={wall}, portal={portal}")
 
         self._init_grid_connection()
@@ -315,8 +277,7 @@ class CampaignMap:
         return True
 
     def fixup_submarine_fleet(self):
-        # fixup submarine spawn point
-        # If a grid is_submarine, the lower grid may detected as is_fleet, because they have the same ammo icon
+        # 潜艇和下方格共享弹药图标，下方格可能被误识别为舰队。
         for grid in self.select(is_fleet=True):
             if grid.is_spawn_point:
                 continue
@@ -326,8 +287,7 @@ class CampaignMap:
                     grid.is_fleet = False
                     grid.is_current_fleet = False
                     upper.is_submarine = True
-        # and we don't allow a grid to be both is_enemy and is_fleet at init
-        # which might be an submarine above
+        # 初始化时格子不能同时为敌人和舰队；这种冲突也可能来自上方潜艇。
         for grid in self.select(is_enemy=True, is_fleet=True):
             grid.is_fleet = False
             grid.is_current_fleet = False
@@ -343,12 +303,7 @@ class CampaignMap:
             logger.info(text)
 
     def update(self, grids, camera, mode="normal"):
-        """
-        Args:
-            grids:
-            camera (tuple):
-            mode (str): Scan mode, such as 'init', 'normal', 'carrier', 'movable'
-        """
+        """mode 接受 init、normal、carrier 或 movable。"""
         offset = np.array(camera) - np.array(grids.center_loca)
 
         failed_count = 0
@@ -384,43 +339,25 @@ class CampaignMap:
 
     @property
     def camera_data(self):
-        """
-        Returns:
-            SelectedGrids:
-        """
         return self._camera_data
 
     @camera_data.setter
     def camera_data(self, nodes):
-        """
-        Args:
-            nodes (list): Contains str.
-        """
         self._camera_data = SelectedGrids([self[node2location(node)] for node in nodes])
 
     @property
     def camera_data_spawn_point(self):
-        """Additional camera_data to detect fleets at spawn point.
-
-        Returns:
-            SelectedGrids:
-        """
+        """返回用于检测出生点舰队的额外相机位置。"""
         return self._camera_data_spawn_point
 
     @camera_data_spawn_point.setter
     def camera_data_spawn_point(self, nodes):
-        """
-        Args:
-            nodes (list): Contains str.
-        """
+        """nodes 为格子名列表。"""
         self._camera_data_spawn_point = SelectedGrids([self[node2location(node)] for node in nodes])
 
     @property
     def spawn_data(self):
-        """
-        Returns:
-            [list[dict]]:
-        """
+        """返回当前模式的刷新规则字典列表。"""
         if self._spawn_data_use_loop:
             return self._spawn_data_loop
         return self._spawn_data
@@ -473,10 +410,6 @@ class CampaignMap:
 
     @property
     def map_covered(self):
-        """
-        Returns:
-            SelectedGrids:
-        """
         covered = []
         for grid in self:
             covered += self.grid_covered(grid).grids
@@ -488,34 +421,14 @@ class CampaignMap:
 
     @map_covered.setter
     def map_covered(self, nodes):
-        """
-        Args:
-            nodes (list): Contains str.
-        """
         self._map_covered = SelectedGrids([self[node2location(node)] for node in nodes])
 
     def ignore_prediction(self, globe, **local):
-        """
-        Args:
-            globe (GridInfo, tuple, str): Grid in globe map.
-            **local: Any properties in local grid.
-
-        Examples:
-            MAP.ignore_prediction(D5, enemy_scale=1, enemy_genre='Enemy')
-            will ignore `1E` enemy on D5.
-        """
+        """忽略 globe 格上匹配 local 属性的预测；例如 D5 上的 1E 敌人。"""
         globe = location_ensure(globe)
         self._ignore_prediction.append((globe, local))
 
     def ignore_prediction_match(self, globe, local):
-        """
-        Args:
-            globe (tuple):
-            local (GridInfo):
-
-        Returns:
-            bool: 是否匹配到需要忽略的错误预测。
-        """
         for wrong_globe, wrong_local in self._ignore_prediction:
             if wrong_globe == globe and all(local.__getattribute__(k) == v for k, v in wrong_local.items()):
                 return True
@@ -580,12 +493,7 @@ class CampaignMap:
         return None
 
     def find_path_initial(self, location, has_ambush=True, has_enemy=True):
-        """
-        Args:
-            location (tuple(int)): Grid location
-            has_ambush (bool): MAP_HAS_AMBUSH
-            has_enemy (bool): False if only sea and land are considered
-        """
+        """从 location 计算路径代价；has_enemy=False 时只区分海面与陆地。"""
         location = location_ensure(location)
         ambush_cost = 10 if has_ambush else 1
         visited = self._reset_path_costs(location)
@@ -602,12 +510,7 @@ class CampaignMap:
             visited = new
 
     def find_path_initial_multi_fleet(self, location_dict, current, has_ambush):
-        """
-        Args:
-            location_dict (dict): Key: int, fleet index. Value: tuple(int), grid location.
-            current (tuple): Current location.
-            has_ambush (bool): MAP_HAS_AMBUSH
-        """
+        """按舰队位置写入 cost_<fleet>；当前舰队最后计算并保留在通用 cost 中。"""
         location_dict = sorted(location_dict.items(), key=lambda kv: (int(kv[1] == current),))
         for fleet, location in location_dict:
             if location == ():
@@ -618,17 +521,7 @@ class CampaignMap:
                 grid.__setattr__(attr, grid.cost)
 
     def _find_path(self, location):
-        """
-        Args:
-            location (tuple):
-
-        Returns:
-            list[tuple]: walking route.
-
-        Examples:
-            MAP_7_2._find_path(node2location('H2'))
-            [(2, 2), (3, 2), (4, 2), (5, 2), (6, 2), (6, 1), (7, 1)]  # ['C3', 'D3', 'E3', 'F3', 'G3', 'G2', 'H2']
-        """
+        """从目标格沿 connection 回溯，返回起点到目标格的坐标路线。"""
         if self[location].cost == 0:
             return [location]
         if self[location].connection is None:
@@ -699,19 +592,7 @@ class CampaignMap:
         return self._step_route_indexes(route, indexes, step)
 
     def _find_route_node(self, route, step=0, turning_optimize=False):
-        """
-        Args:
-            route (list[tuple]): list of grids.
-            step (int): Fleet step in event map. Default to 0.
-            turning_optimize: (bool): True to optimize route to reduce ambushes
-
-        Returns:
-            list[tuple]: list of walking node.
-
-        Examples:
-            MAP_7_2._find_route_node([(2, 2), (3, 2), (4, 2), (5, 2), (6, 2), (6, 1), (7, 1)])
-            [(6, 2), (7, 1)]
-        """
+        """从路线选取实际点击节点；step 限制步长，turning_optimize 减少转弯伏击。"""
         return [route[index] for index in self._route_node_indexes(route, step, turning_optimize)]
 
     def find_path(self, location, step=0, turning_optimize=False):
@@ -745,14 +626,7 @@ class CampaignMap:
         return portal_path
 
     def grid_covered(self, grid, location=None):
-        """
-        Args:
-            grid (GridInfo)
-            location (list[tuple[int]]): Relative coordinate of the covered grid.
-
-        Returns:
-            SelectedGrids:
-        """
+        """按相对坐标 location 返回 grid 覆盖的有效格子；默认使用其覆盖范围。"""
         if location is None:
             covered = [tuple(np.array(grid.location) + upper) for upper in grid.covered_grid()]
         else:
@@ -838,13 +712,6 @@ class CampaignMap:
                 upper.__setattr__("is_enemy", True)
 
     def select(self, **kwargs):
-        """
-        Args:
-            **kwargs: Attributes of Grid.
-
-        Returns:
-            SelectedGrids:
-        """
         result = []
         for grid in self:
             flag = True
@@ -857,18 +724,7 @@ class CampaignMap:
         return SelectedGrids(result)
 
     def to_selected(self, grids):
-        """
-        Args:
-            grids (list):
-
-        Returns:
-            SelectedGrids:
-        """
         return SelectedGrids([self[location_ensure(loca)] for loca in grids])
 
     def flatten(self):
-        """
-        Returns:
-            list[GridInfo]:
-        """
         return self.grids.values()

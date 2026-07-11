@@ -34,34 +34,16 @@ class LineDetectionOptions:
 
 
 class Perspective:
-    """
-    Perspective detection
+    """从地图截图检测透视消失点、远点与网格线。"""
 
-    Examples:
-        persp = Perspective(AzurLaneConfig('template'))
-        persp.load(image)
-
-    Logs:
-                  vanish_point: (  646, -1736)
-                 distant_point: (-2321, -1736)
-        0.155s  _   Horizontal: 5 (7 inner, 3 edge)
-        Edges: /_     Vertical: 9 (10 inner, 3 edge)
-    """
-
-    """
-    Output
-    """
     image: np.ndarray
     config: AzurLaneConfig
-    # Four edges in bool, or has attribute __bool__
+    # 四条边可为 bool，或实现 __bool__。
     left_edge: Lines
     right_edge: Lines
     lower_edge: Lines
     upper_edge: Lines
 
-    """
-    Private
-    """
     horizontal: Lines
     vertical: Lines
     crossings: Points
@@ -70,24 +52,15 @@ class Perspective:
     map_inner: np.ndarray
 
     def __init__(self, config):
-        """
-        Args:
-            config (AzurLaneConfig):
-        """
         self.config = config
 
     def load(self, image):
-        """
-        Args:
-            image (np.ndarray): Shape (720, 1280, 3)
-        """
+        """加载 (720, 1280, 3) 截图。"""
         start_time = time.time()
         self.image = image
 
-        # Image initialisation
         image = self.load_image(image)
 
-        # Lines detection
         inner_h = self.detect_lines(
             image,
             LineDetectionOptions(
@@ -127,13 +100,12 @@ class Perspective:
             ),
         ).move(*self.config.DETECTING_AREA[:2])
 
-        # Lines pre-cleansing
         horizontal = inner_h.add(edge_h).group()
         vertical = inner_v.add(edge_v).group()
         edge_h = edge_h.group()
         edge_v = edge_v.group()
         if not self.config.TRUST_EDGE_LINES:
-            # Experimental, reduce edge lines.
+            # 实验选项：用内部线排除不可信边缘线。
             edge_h = edge_h.delete(inner_h, threshold=self.config.TRUST_EDGE_LINES_THRESHOLD)
             edge_v = edge_v.delete(inner_v, threshold=self.config.TRUST_EDGE_LINES_THRESHOLD)
         self.horizontal = horizontal
@@ -143,7 +115,6 @@ class Perspective:
         if not self.vertical:
             raise MapDetectionError(NO_VERTICAL_LINE_MESSAGE)
 
-        # Calculate perspective
         self.crossings = self.horizontal.cross(self.vertical)
         self.vanish_point = optimize.brute(self._vanish_point_value, self.config.VANISH_POINT_RANGE)
         distance_point_x = optimize.brute(self._distant_point_value, self.config.DISTANCE_POINT_X_RANGE)[0]
@@ -153,7 +124,6 @@ class Perspective:
         if np.linalg.norm(np.subtract(self.vanish_point, self.distant_point)) < 10:
             raise MapDetectionError(VANISH_POINT_TOO_CLOSE_MESSAGE)
 
-        # Lines cleansing
         self.map_inner = get_map_inner(self.crossings.points)
         self.horizontal, self.lower_edge, self.upper_edge = self.line_cleanse(
             self.horizontal, inner=inner_h.group(), edge=edge_h
@@ -162,7 +132,6 @@ class Perspective:
             self.vertical, inner=inner_v.group(), edge=edge_v
         )
 
-        # Log
         time_cost = round(time.time() - start_time, 3)
         lower_edge = "_" if self.lower_edge else " "
         left_edge = "/" if self.left_edge else " "
@@ -178,14 +147,7 @@ class Perspective:
         )
 
     def load_image(self, image):
-        """Method that turns image to monochrome and hide UI.
-
-        Args:
-            image: Screenshot.
-
-        Returns:
-            np.ndarray
-        """
+        """裁剪检测区域并屏蔽 UI，返回反色单通道图。"""
         image = rgb2gray(crop(image, self.config.DETECTING_AREA, copy=False))
         cv2.bitwise_and(image, ASSETS.ui_mask, dst=image)
         cv2.bitwise_not(image, dst=image)
@@ -193,17 +155,7 @@ class Perspective:
 
     @staticmethod
     def find_peaks(image, is_horizontal, param, pad=0, mask=None):
-        """
-        Args:
-            image(np.ndarray): Processed screenshot.
-            is_horizontal(bool): True if detects horizontal lines.
-            param(dict): Parameters use in scipy.signal.find_peaks.
-            pad(int):
-            mask(np.ndarray, None):
-
-        Returns:
-            np.ndarray:
-        """
+        """沿指定轴提取峰值，应用可选填充与二维掩码后保持原图形状。"""
         if is_horizontal:
             image = image.T
         if pad:
@@ -222,17 +174,7 @@ class Perspective:
         return out
 
     def hough_lines(self, image, is_horizontal, threshold, theta):
-        """
-
-        Args:
-            image (np.ndarray): Peaks image.
-            is_horizontal (bool): True if detects horizontal lines.
-            threshold (int): Threshold use in cv2.HoughLines
-            theta:
-
-        Returns:
-            Lines:
-        """
+        """从峰值图提取水平或垂直 Lines；theta 的单位为度。"""
         lines = cv2.HoughLines(image, 1, np.pi / 180, threshold)
         if lines is None:
             return Lines(None, is_horizontal=is_horizontal)
@@ -245,7 +187,6 @@ class Perspective:
         return Lines(lines, is_horizontal=is_horizontal)
 
     def detect_lines(self, image, options):
-        """包装 find_peaks 和 hough_lines。"""
         peaks = self.find_peaks(
             image,
             is_horizontal=options.is_horizontal,
@@ -300,17 +241,7 @@ class Perspective:
         return np.sum(np.log10(np.diff(mid) + 0.001))
 
     def mid_cleanse(self, mids, is_horizontal, threshold=3):
-        """
-        Args:
-            mids(np.ndarray): Lines.mid
-            is_horizontal(bool): True if detects horizontal lines.
-            threshold(int):
-
-        Returns:
-            np.ndarray: All correct lines.mid in DETECTING_AREA. Such as:
-            [ 147.52489312  276.64750191  405.77011071  534.89271951  664.0153283
-            793.1379371   922.2605459  1051.38315469 1180.50576349 1309.62837229]
-        """
+        """拟合等距线中点，返回 DETECTING_AREA 内的有效 mids；threshold 单位为像素。"""
         right_distant_point = (self.vanish_point[0] * 2 - self.distant_point[0], self.distant_point[1])
         encourage = self.config.COINCIDENT_POINT_ENCOURAGE_DISTANCE**2
 
@@ -337,14 +268,12 @@ class Perspective:
         if is_horizontal:
             mids = convert_to_x(mids)
 
-        # Drawing lines
         lines = []
         for index, mid in enumerate(mids):
             for n in range(self.config.ERROR_LINES_TOLERANCE[0], self.config.ERROR_LINES_TOLERANCE[1] + 1):
                 theta = np.arctan(index + n)
                 rho = mid * np.cos(theta)
                 lines.append([rho, theta])
-        # Fitting mid
         coincident = Lines(np.vstack(lines), is_horizontal=False)
         mid_diff_range = self.config.MID_DIFF_RANGE_H if is_horizontal else self.config.MID_DIFF_RANGE_V
         coincident_point_range = ((-abs(self.config.ERROR_LINES_TOLERANCE[0]) * mid_diff_range[1], 200), mid_diff_range)
@@ -355,7 +284,6 @@ class Perspective:
             direction = "Horizontal" if is_horizontal else "Vertical"
             logger.info(f"{direction} coincident point unexpected: {coincident_point}")
 
-        # The limits of detecting area
         if is_horizontal:
             border = (
                 Points(
@@ -375,7 +303,6 @@ class Perspective:
             )
 
         left, right = border
-        # Filling mid
         mids = np.arange(-25, 25) * coincident_point[1] + coincident_point[0]
         mids = mids[(mids > left - threshold) & (mids < right + threshold)]
         if is_horizontal:
@@ -387,25 +314,20 @@ class Perspective:
         origin = lines.mid
         clean = self.mid_cleanse(origin, is_horizontal=lines.is_horizontal, threshold=threshold)
 
-        # 清理边缘线。
         edge = edge.mid
         inner = inner.mid
-        # 用正确的内部线删除错误边缘线。
         inner_clean = [inner_mid for inner_mid in inner if np.any(np.abs(inner_mid - clean) < 5)]
         if len(inner_clean) > 0:
             edge = edge[(edge > np.max(inner_clean) - threshold) | (edge < np.min(inner_clean) + threshold)]
         edge = [c for c in clean if np.any(np.abs(c - edge) < 5)]
 
-        # 拆分边缘线。
         lower, upper = separate_edges(edge, inner=self.map_inner[1] if lines.is_horizontal else self.map_inner[0])
 
-        # 裁剪中线。
         if lower:
             clean = clean[clean > lower - threshold]
         if upper:
             clean = clean[clean < upper + threshold]
 
-        # mid to lines
         if lines.is_horizontal:
             lines = Points([[self.config.SCREEN_CENTER[0], y] for y in clean]).link(None, is_horizontal=True)
             lower = (
@@ -434,8 +356,6 @@ class Perspective:
         return lines, lower, upper
 
     def generate(self):
-        """
-        Yields (tuple): ((x, y), [upper-left, upper-right, bottom-left, bottom-right])
-        """
+        """逐格产出 ((x, y), [左上, 右上, 左下, 右下])。"""
         points = self.horizontal.cross(self.vertical).points
         yield from points_to_area_generator(points, shape=(len(self.vertical), len(self.horizontal)))

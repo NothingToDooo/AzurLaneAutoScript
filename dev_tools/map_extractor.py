@@ -82,10 +82,6 @@ def _validate_output_strategy(path, strategy):
     _validate_strategy_reference(strategy, pack_id=output_root.parent.name)
 
 
-"""
-This an auto-tool to extract map files used in Alas.
-"""
-
 DIC_SIREN_NAME_CHI_TO_ENG = {
     # Siren Winter's Crown, Fallen Wings
     "sairenquzhu": "DD",
@@ -373,7 +369,7 @@ class MapData:
         1: "SP",
         2: "MM",
         3: "MA",
-        4: "Me",  # This grid 100% spawn enemy?
+        4: "Me",
         6: "ME",
         8: "MB",
         12: "MS",
@@ -700,14 +696,6 @@ class MapData:
         return lines
 
     def get_file_lines(self, has_modified_campaign_base):
-        """生成地图文件源码行。
-
-        Args:
-            has_modified_campaign_base (bool): 目标目录是否有自定义 campaign_base.py。
-
-        Returns:
-            list(str): 地图文件的 Python 源码行。
-        """
         return [
             *self._get_import_lines(has_modified_campaign_base),
             *self._get_map_lines(),
@@ -905,16 +893,11 @@ class ChapterTemplate:
         return self._find_maps_by_id(name)
 
     def get_chapter_by_name(self, name, select=False):
-        """按地图名关键词或地图 ID 查找地图。
+        """按字符串关键词或数字字符串查找地图。
 
-        地图 ID 形如 11004 表示第 10 章困难 4 图，1140017 表示活动图 D2。
-
-        Args:
-            name (str, int): 地图名称关键词，例如 '短兵相接'；也可以是地图 ID，例如 702、1140017。
-            select (bool): False 只抽取命中的第一张图，True 抽取同活动全部地图。
-
-        Returns:
-            list(MapData):
+        地图 ID 例如 11004（第 10 章困难 4 图）和 1140017（活动图 D2）。
+        `name` 会先调用 `strip()`，不能传入整数；数字字符串按地图 ID 解析。
+        `select=False` 仅取首个命中，`select=True` 选取同活动全部地图。
         """
         print("<<< SEARCH MAP >>>")
         name = name.strip()
@@ -930,11 +913,6 @@ class ChapterTemplate:
         return self._select_maps(maps, select)
 
     def extract(self, maps, folder, *, strategy=None):
-        """
-        Args:
-            maps (list[MapData]):
-            folder (str):
-        """
         _validate_output_strategy(folder, strategy)
         print("<<< CONFIRM >>>")
         print("Please confirm selected the correct maps before extracting.\nInput any key and press ENTER to continue")

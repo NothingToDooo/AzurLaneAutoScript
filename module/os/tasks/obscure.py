@@ -5,10 +5,7 @@ from module.os.map import OSMap
 
 class OpsiObscure(OSMap):
     def clear_obscure(self):
-        """
-        Raises:
-            ActionPointLimit:
-        """
+        """清理一个隐秘海域；行动力不足时抛出 ActionPointLimit。"""
         logger.hr("OS clear obscure", level=1)
         self.cl1_ap_preserve()
         if self.config.OpsiObscure_ForceRun:
@@ -16,7 +13,7 @@ class OpsiObscure(OSMap):
 
         result = self.storage_get_next_item("OBSCURE", use_logger=self.config.OpsiGeneral_UseLogger)
         if not result:
-            # No obscure coordinates, delay next run to tomorrow.
+            # 隐秘坐标耗尽时推迟到次日运行。
             if get_os_reset_remain() > 0:
                 self.config.task_delay(server_update=True)
             else:

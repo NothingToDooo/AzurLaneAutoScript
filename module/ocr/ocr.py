@@ -40,12 +40,7 @@ class Ocr:
     SHOW_REVISE_WARNING = False
 
     def __init__(self, buttons, options=None, **settings):
-        """
-        Args:
-            buttons (Button, tuple, list[Button], list[tuple]): OCR 区域。
-            options (OcrOptions): OCR 识别配置。
-            **settings: 覆盖 `OcrOptions` 中的字段。
-        """
+        """buttons 接受单个 Button／区域或列表；settings 覆盖 OcrOptions 字段。"""
         options = ocr_options(options, settings)
         self.name = str(buttons) if isinstance(buttons, Button) else options.name
         self._buttons = buttons
@@ -69,34 +64,17 @@ class Ocr:
         self._buttons = value
 
     def pre_process(self, image):
-        """
-        Args:
-            image (np.ndarray): Shape (height, width, channel)
-
-        Returns:
-            np.ndarray: Shape (width, height)
-        """
+        """按目标 RGB 与阈值把 (height, width, 3) 图像映射为二维 uint8。"""
         image = extract_letters(image, letter=self.letter, threshold=self.threshold)
 
         return image.astype(np.uint8)
 
     def after_process(self, result):
-        """
-        Args:
-            result (str): '第二行'
-
-        Returns:
-            str:
-        """
         return result
 
     def ocr(self, image, direct_ocr=False):
-        """
-        执行 OCR，单区域返回字符串，多区域返回字符串列表。
-
-        Args:
-            image (np.ndarray, list[np.ndarray])：待识别图像。
-            direct_ocr (bool)：是否跳过预处理。
+        """单区域返回字符串，多区域返回字符串列表。
+        direct_ocr=True 时 image 是区域图像列表，仅跳过按 buttons 裁剪。
         """
         start_time = time.time()
 
@@ -118,9 +96,7 @@ class Ocr:
 
 
 class OcrYuv(Ocr):
-    """
-    Do OCR in the Y channel of the YUV color space.
-    """
+    """在 RGB 图像的 YUV 亮度通道上识别。"""
 
     @cached_property
     def letter_y(self):
@@ -128,13 +104,7 @@ class OcrYuv(Ocr):
         return rgb2luma(arr)[0][0]
 
     def pre_process(self, image):
-        """
-        Args:
-            image (np.ndarray): Shape (height, width, channel)
-
-        Returns:
-            np.ndarray: Shape (width, height)
-        """
+        """输入 (height, width, 3) RGB，返回二维 uint8 亮度差图。"""
         y = rgb2luma(image)
         letter_y = (np.ones(y.shape) * self.letter_y).astype(np.uint8)
         diff = cv2.absdiff(y, letter_y)
@@ -142,10 +112,7 @@ class OcrYuv(Ocr):
 
 
 class Digit(Ocr):
-    """
-    Do OCR on a digit, such as `45`.
-    Method ocr() returns int, or a list of int.
-    """
+    """识别单个或多个数字区域，返回 int 或 int 列表。"""
 
     def __init__(self, buttons, options=None, **settings):
         super().__init__(buttons, options=ocr_options(options, settings, alphabet="0123456789IDSB"))
@@ -177,18 +144,7 @@ class DigitCounter(Ocr):
         return result.replace("B", "8")
 
     def ocr(self, image, direct_ocr=False):
-        """
-        DigitCounter 只支持单个按钮区域。
-
-        识别 `14/15` 这类计数器，并返回 14、1、15。
-
-        Args:
-            image:
-            direct_ocr:
-
-        Returns:
-            int, int, int: current, remain, total.
-        """
+        """仅支持单个区域；把 `14/15` 返回为 (current, remain, total)。"""
         result_list = super().ocr(image, direct_ocr=direct_ocr)
         result = result_list[0] if isinstance(result_list, list) else result_list
 
@@ -216,16 +172,7 @@ class Duration(Ocr):
         return result.replace("B", "8")
 
     def ocr(self, image, direct_ocr=False):
-        """
-        Do OCR on a duration, such as `01:30:00`.
-
-        Args:
-            image:
-            direct_ocr:
-
-        Returns:
-            list, datetime.timedelta: timedelta object, or a list of it.
-        """
+        """识别 `01:30:00` 形式的时长，单区域返回 timedelta，多区域返回列表。"""
         result_list = super().ocr(image, direct_ocr=direct_ocr)
         if not isinstance(result_list, list):
             result_list = [result_list]
@@ -236,15 +183,6 @@ class Duration(Ocr):
 
     @staticmethod
     def parse_time(string):
-        """
-        解析 `01:30:00` 这类时长文本。
-
-        Args:
-            string (str): `01:30:00`
-
-        Returns:
-            datetime.timedelta:
-        """
         result = re.search(r"(\d{1,2}):?(\d{2}):?(\d{2})", string)
         if result:
             result = [int(s) for s in result.groups()]

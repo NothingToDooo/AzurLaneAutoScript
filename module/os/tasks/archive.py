@@ -33,14 +33,7 @@ class OpsiArchive(OSMap):
         self.os_globe_goto_map()
 
     def os_archive(self):
-        """
-        Complete active archive zone in daily mission
-        Purchase next available logger archive then repeat
-        until exhausted
-
-        Run on weekly basis, AL devs seemingly add new logger
-        archives after random scheduled maintenances
-        """
+        """每周清理已有档案海域，并重复购买、清理新档案直至售罄。"""
         if self.is_in_opsi_explore():
             logger.info("OpsiExplore is under scheduling, stop OpsiArchive")
             self.config.task_delay(server_update=True)
@@ -48,8 +41,7 @@ class OpsiArchive(OSMap):
 
         shop = VoucherShop(self.config, self.device)
         while True:
-            # In case logger bought manually,
-            # finish pre-existing archive zone
+            # 先处理可能由手动购买留下的档案海域。
             self.os_finish_daily_mission(question=False, rescan=False)
 
             logger.hr("OS voucher", level=1)
@@ -59,7 +51,7 @@ class OpsiArchive(OSMap):
             if not bought:
                 break
 
-        # Reset to nearest 'Wednesday' date
+        # 周三再检查维护后可能新增的档案。
         next_reset = get_nearest_weekday_date(target=2)
         logger.info("All archive zones finished, delay to next reset")
         logger.attr("OpsiNextReset", next_reset)

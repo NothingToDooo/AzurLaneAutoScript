@@ -5,11 +5,7 @@ from module.logger import logger
 
 class CampaignBase(CampaignBase_):
     def campaign_set_chapter(self, name, mode="normal"):
-        """
-        Args:
-            name (str): Campaign name, such as '7-2', 'd3', 'sp3'.
-            mode (str): 'normal' or 'hard'.
-        """
+        """按关卡名和 normal/hard 模式切换章节。"""
         chapter, _ = self.campaign_separate_name(name)
 
         if chapter.isdigit():
@@ -39,13 +35,7 @@ class CampaignBase(CampaignBase_):
 
     @staticmethod
     def campaign_get_chapter_index(name):
-        """
-        Args:
-            name (str, int):
-
-        Returns:
-            int
-        """
+        """将整数或章节名转换为章节序号。"""
         if isinstance(name, int):
             return name
         if name.isdigit():

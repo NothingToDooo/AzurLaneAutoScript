@@ -97,12 +97,7 @@ class CampaignBase(CampaignBase_):
         return False
 
     def clear_map_items(self, grids):
-        """
-        按距离顺序清理指定地图道具格。
-
-        Args:
-            grids (GridInfo, list[GridInfo])：单个格子或格子列表。
-        """
+        """按距离顺序清理单个 GridInfo 或 GridInfo 列表中的地图道具格。"""
         if not isinstance(grids, list):
             grids = [grids]
         grids = SelectedGrids(grids).sort("cost")

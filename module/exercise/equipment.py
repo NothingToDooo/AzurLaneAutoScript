@@ -13,7 +13,6 @@ class ExerciseEquipment(EquipmentChange):
             if timer.reached() and self.appear_then_click(EQUIP_EDIT_INACTIVE):
                 timer.reset()
 
-            # End
             if self.appear(EQUIP_EDIT_ACTIVE):
                 self.device.sleep((0.2, 0.3))
                 break
@@ -26,7 +25,6 @@ class ExerciseEquipment(EquipmentChange):
             if timer.reached() and self.appear_then_click(EQUIP_EDIT_ACTIVE):
                 timer.reset()
 
-            # End
             if self.appear(EQUIP_EDIT_INACTIVE):
                 self.device.sleep((0.2, 0.3))
                 break

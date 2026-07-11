@@ -11,11 +11,7 @@ class CoalitionCombat(CoalitionUI, CampaignBase):
     battle_status_click_interval = 2
 
     def coalition_combat_re_enter(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: battle_status
-            out: is_combat_executing
-        """
+        """页面状态：battle_status → is_combat_executing。"""
         logger.info("Coalition combat re-enter")
         status_clicked = False
         click_timer = Timer(0.3)
@@ -26,7 +22,6 @@ class CoalitionCombat(CoalitionUI, CampaignBase):
             else:
                 self.device.screenshot()
 
-            # End
             if self.is_combat_loading() or self.is_combat_executing():
                 break
             if self.in_coalition():
@@ -46,7 +41,7 @@ class CoalitionCombat(CoalitionUI, CampaignBase):
                 status_clicked = True
                 click_last.reset()
                 continue
-            # Keep clicking BATTLE_STATUS to skip animations
+            # 持续点击 BATTLE_STATUS 跳过动画。
             if status_clicked and click_timer.reached() and not click_last.reached():
                 self.device.click(BATTLE_STATUS)
                 click_timer.reset()
@@ -55,11 +50,7 @@ class CoalitionCombat(CoalitionUI, CampaignBase):
         return self.appear(BATTLE_STATUS, offset=(80, 20))
 
     def coalition_combat(self):
-        """
-        Pages:
-            in: is_coalition
-            out: is_coalition
-        """
+        """页面进出均为 is_coalition。"""
         self.battle_count = 0
         self.combat_preparation(emotion_reduce=False)
 

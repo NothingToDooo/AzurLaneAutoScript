@@ -162,7 +162,7 @@ class Campaign(CampaignBase):
             return False
         if not self.map_is_clear_mode and destination.is_fortress:
             logger.info("Catch camera re-positioning after fortress cleared")
-            # Poor implementation to wait camera move
+            # 堡垒清除会强制移动镜头，等待后再读取画面。
             self.device.sleep(3)
             return True
         return False

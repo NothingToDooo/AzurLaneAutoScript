@@ -28,9 +28,7 @@ class EventBase(CampaignRun):
         self.campaign.config.temporary(MAP_IS_ONE_TIME_STAGE=False)
 
     def convert_stages(self, stages):
-        """
-        Convert whatever input to the correct stage name
-        """
+        """将字符串、列表或筛选器中的关卡名统一转换为当前活动的规范名称。"""
 
         def convert(n):
             return self.handle_stage_name(n, folder=self.config.Campaign_Event)[0]

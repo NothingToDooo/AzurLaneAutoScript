@@ -22,23 +22,9 @@ def _match_offset(offset):
 
 class Button(Resource):
     def __init__(self, area, color, button, file=None, name=None):
-        """Initialize a Button instance.
+        """area 和 button 均为左上、右下坐标，color 为 RGB；三者也可按服务器提供映射。
 
-        Args:
-            area (dict[tuple], tuple): Area that the button would appear on the image.
-                          (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y)
-            color (dict[tuple], tuple): Color we expect the area would be.
-                           (r, g, b)
-            button (dict[tuple], tuple): Area to be click if button appears on the image.
-                            (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y)
-                            If tuple is empty, this object can be use as a checker.
-
-        Examples:
-            BATTLE_PREPARATION = Button(
-                area=(1562, 908, 1864, 1003),
-                color=(231, 181, 90),
-                button=(1562, 908, 1864, 1003)
-            )
+        button 为空元组时实例仅用于检测，不用于点击。
         """
         self.raw_area = area
         self.raw_color = color
@@ -111,62 +97,34 @@ class Button(Resource):
 
     @property
     def base_button(self):
-        """返回未应用 offset 的原始点击区域。"""
         return self._button
 
     @property
     def is_match_initialized(self):
-        """返回模板匹配缓存是否已初始化。"""
         return self._match_init
 
     def mark_match_initialized(self):
-        """标记当前 image/color 已可直接用于 match。"""
         self._match_init = True
 
     def reset_match_state(self):
-        """重置模板匹配缓存状态。"""
         self._match_init = False
 
     def set_button_area(self, button):
-        """更新原始点击区域。"""
         self.raw_button = button
         self.__dict__["_button"] = self.parse_property(button)
         self._button_offset = None
 
     def appear_on(self, image, threshold=10):
-        """Check if the button appears on the image.
-
-        Args:
-            image (np.ndarray): Screenshot.
-            threshold (int): Default to 10.
-
-        Returns:
-            bool: True if button appears on screenshot.
-        """
         return color_similar(color1=get_color(image, self.area), color2=self.color, threshold=threshold)
 
     def load_color(self, image):
-        """Load color from the specific area of the given image.
-        This method is irreversible, this would be only use in some special occasion.
-
-        Args:
-            image: Another screenshot.
-
-        Returns:
-            tuple: Color (r, g, b).
-        """
+        """用截图区域永久替换预设颜色和模板，并返回 RGB。"""
         self.__dict__["color"] = get_color(image, self.area)
         self.image = crop(image, self.area)
         self.__dict__["is_gif"] = False
         return self.color
 
     def load_offset(self, button):
-        """
-        Load offset from another button.
-
-        Args:
-            button (Button):
-        """
         offset = np.subtract(button.button, button.base_button)[:2]
         self._button_offset = area_offset(self._button, offset=offset)
 
@@ -174,10 +132,7 @@ class Button(Resource):
         self._button_offset = None
 
     def ensure_template(self):
-        """
-        Load asset image.
-        If needs to call self.match, call this first.
-        """
+        """按需加载匹配模板；GIF 会保留全部帧。"""
         if not self._match_init:
             if self.is_gif:
                 self.image = []
@@ -190,10 +145,7 @@ class Button(Resource):
             self._match_init = True
 
     def ensure_binary_template(self):
-        """
-        Load asset image.
-        If needs to call self.match, call this first.
-        """
+        """按需生成 Otsu 二值化模板；调用前必须已加载原模板。"""
         if not self._match_binary_init:
             if self.is_gif:
                 self.image_binary = []
@@ -227,16 +179,7 @@ class Button(Resource):
         self._match_luma_init = False
 
     def match(self, image, offset=30, similarity=0.85):
-        """Detects button by template matching. To Some button, its location may not be static.
-
-        Args:
-            image: Screenshot.
-            offset (int, tuple): Detection area offset.
-            similarity (float): 0-1. Similarity.
-
-        Returns:
-            bool.
-        """
+        """在 offset 扩展区域内匹配模板，并把点击区域偏移到最佳位置；similarity 为 0～1。"""
         self.ensure_template()
 
         offset = _match_offset(offset)
@@ -256,17 +199,7 @@ class Button(Resource):
         return sim > similarity
 
     def match_binary(self, image, offset=30, similarity=0.85):
-        """Detects button by template matching. To Some button, its location may not be static.
-           This method will apply template matching under binarization.
-
-        Args:
-            image: Screenshot.
-            offset (int, tuple): Detection area offset.
-            similarity (float): 0-1. Similarity.
-
-        Returns:
-            bool.
-        """
+        """在 Otsu 二值图上匹配模板，并把点击区域偏移到最佳位置。"""
         self.ensure_template()
         self.ensure_binary_template()
 
@@ -275,39 +208,23 @@ class Button(Resource):
 
         if self.is_gif:
             for template in cast("list[np.ndarray]", self.image_binary):
-                # graying
                 image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                # binarization
                 _, image_binary = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-                # template matching
                 res = cv2.matchTemplate(template, image_binary, cv2.TM_CCOEFF_NORMED)
                 _, sim, _, point = cv2.minMaxLoc(res)
                 self._button_offset = area_offset(self._button, offset[:2] + np.array(point))
                 if sim > similarity:
                     return True
             return False
-        # graying
         image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        # binarization
         _, image_binary = cv2.threshold(image_gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-        # template matching
         res = cv2.matchTemplate(cast("np.ndarray", self.image_binary), image_binary, cv2.TM_CCOEFF_NORMED)
         _, sim, _, point = cv2.minMaxLoc(res)
         self._button_offset = area_offset(self._button, offset[:2] + np.array(point))
         return sim > similarity
 
     def match_luma(self, image, offset=30, similarity=0.85):
-        """
-        Detects button by template matching under Y channel (Luminance)
-
-        Args:
-            image: Screenshot.
-            offset (int, tuple): Detection area offset.
-            similarity (float): 0-1. Similarity.
-
-        Returns:
-            bool.
-        """
+        """在 YUV 的亮度通道上匹配模板，并把点击区域偏移到最佳位置。"""
         self.ensure_template()
         self.ensure_luma_template()
 
@@ -331,18 +248,7 @@ class Button(Resource):
         return sim > similarity
 
     def match_template_color(self, image, offset=(20, 20), similarity=0.85, threshold=30):
-        """
-        Template match first, color match then
-
-        Args:
-            image: Screenshot.
-            offset (int, tuple): Detection area offset.
-            similarity (float): 0-1.
-            threshold (int): Default to 30.
-
-        Returns:
-            bool.
-        """
+        """先匹配亮度模板，再校验偏移后区域的颜色。"""
         if self.match_luma(image, offset=offset, similarity=similarity):
             diff = np.subtract(self.button, self._button)[:2]
             area = area_offset(self.area, offset=diff)
@@ -351,17 +257,7 @@ class Button(Resource):
         return False
 
     def crop(self, area, image=None, name=None):
-        """
-        Get a new button by relative coordinates.
-
-        Args:
-            area (tuple):
-            image (np.ndarray): Screenshot. If provided, load color and image from it.
-            name (str):
-
-        Returns:
-            Button:
-        """
+        """按当前检测区和点击区的相对坐标生成按钮；传入 image 时同时重采样颜色。"""
         if name is None:
             name = self.name
         new_area = area_offset(area, offset=self.area[:2])
@@ -372,17 +268,7 @@ class Button(Resource):
         return button
 
     def move(self, vector, image=None, name=None):
-        """
-        Move button.
-
-        Args:
-            vector (tuple):
-            image (np.ndarray): Screenshot. If provided, load color and image from it.
-            name (str):
-
-        Returns:
-            Button:
-        """
+        """平移检测区和点击区；传入 image 时同时重采样颜色。"""
         if name is None:
             name = self.name
         new_area = area_offset(self.area, offset=vector)
@@ -424,14 +310,6 @@ class ButtonGrid:
         return [button for _, _, button in self.generate()]
 
     def crop(self, area, name=None):
-        """
-        Args:
-            area (tuple): Area related to self.origin
-            name (str): Name of the new ButtonGrid instance.
-
-        Returns:
-            ButtonGrid:
-        """
         if name is None:
             name = self._name
         origin = self.origin + area[:2]
@@ -441,14 +319,6 @@ class ButtonGrid:
         )
 
     def move(self, vector, name=None):
-        """
-        Args:
-            vector (tuple): Move vector.
-            name (str): Name of the new ButtonGrid instance.
-
-        Returns:
-            ButtonGrid:
-        """
         if name is None:
             name = self._name
         origin = self.origin + vector
@@ -457,12 +327,7 @@ class ButtonGrid:
         )
 
     def gen_mask(self):
-        """
-        Generate a mask image to display this ButtonGrid object for debugging.
-
-        Returns:
-            PIL.Image.Image: Area in white, background in black.
-        """
+        """生成 1280×720 的调试掩码：按钮区域为白色，背景为黑色。"""
         image = Image.new("RGB", (1280, 720), (0, 0, 0))
         draw = ImageDraw.Draw(image)
         for button in self.buttons:
@@ -473,7 +338,4 @@ class ButtonGrid:
         self.gen_mask().show()
 
     def save_mask(self):
-        """
-        Save mask to {name}.png
-        """
         self.gen_mask().save(f"{self._name}.png")

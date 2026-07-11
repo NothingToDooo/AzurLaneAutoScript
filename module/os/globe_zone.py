@@ -44,10 +44,6 @@ class Zone:
         return np.array((point[0], GLOBE_MAP_SHAPE[1] - point[1]))
 
     def __str__(self):
-        """
-        Returns:
-            str: Such as `[3|圣彼得伯格]`
-        """
         return f"[{self.zone_id}|{self.cn}]"
 
     __repr__ = __str__
@@ -63,21 +59,10 @@ class ZoneManager:
 
     @cached_property
     def zones(self):
-        """
-        Returns:
-            SelectedGrids:
-        """
         return SelectedGrids([Zone(zone_id, info) for zone_id, info in DIC_OS_MAP.items()])
 
     def camera_to_zone(self, camera, region=None):
-        """
-        Args:
-            camera (tuple): Point in os_globe_map.png
-            region (int): Limit zone in specific region.
-
-        Returns:
-            Zone:
-        """
+        """返回 os_globe_map.png 坐标最近的海域，可限制在指定区域。"""
         zones = self.zones if region is None else self.zones.select(region=region)
         zones = zones.sort_by_camera_distance(camera=camera)
         return zones[0]
@@ -102,18 +87,7 @@ class ZoneManager:
             raise ScriptError(message) from e
 
     def name_to_zone(self, name):
-        """
-        Convert a zone id or CN name to zone instance.
-
-        Args:
-            name (str, int, Zone): CN name, zone id, or Zone instance.
-
-        Returns:
-            Zone:
-
-        Raises:
-            ScriptError: If Unable to find such zone.
-        """
+        """把海域编号或国区名称转为海域；找不到时抛出 ScriptError。"""
         if isinstance(name, Zone):
             return name
 
@@ -133,33 +107,16 @@ class ZoneManager:
         raise ScriptError(message)
 
     def zone_nearest_azur_port(self, zone):
-        """
-        Args:
-            zone (str, int, Zone): CN name, zone id, or Zone instance.
-
-        Returns:
-            Zone:
-        """
         zone = self.name_to_zone(zone)
         ports = self.zones.select(is_azur_port=True).delete(SelectedGrids([self.zone]))
-        # In same region
         for port in ports:
             if zone.region == port.region:
                 return port
-        # In different region
         ports = ports.sort_by_camera_distance(camera=tuple(zone.location))
         return ports[0]
 
     def zone_select(self, hazard_level):
-        """
-        Similar to `self.zone.select(**kwargs)`, but delete zones in region 5.
-
-        Args:
-            hazard_level: 1-6, or 10 for center zones.
-
-        Returns:
-            SelectedGrids: SelectedGrids containing zone objects.
-        """
+        """侵蚀等级 1 至 6 排除区域 5；等级 10 专指区域 5。"""
         if 1 <= hazard_level <= 6:
             return self.zones.select(hazard_level=hazard_level).delete(self.zones.select(region=5))
         if hazard_level == 10:

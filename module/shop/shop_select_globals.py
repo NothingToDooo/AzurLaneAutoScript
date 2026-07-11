@@ -8,7 +8,6 @@ class SelectItemInfo(TypedDict):
     choices: dict[str, int]
 
 
-# Known Secondary Grid Sizes
 SELECT_GRID_3X1 = ButtonGrid(
     origin=(185, 266), delta=(158, 0), button_shape=(119, 19), grid_shape=(3, 1), name="SHOP_SELECT_GRID_3X1"
 )
@@ -25,9 +24,6 @@ SELECT_GRID_6X1 = ButtonGrid(
     origin=(185, 266), delta=(158, 0), button_shape=(119, 19), grid_shape=(6, 1), name="SHOP_SELECT_GRID_6X1"
 )
 
-# Consolidated Select Item Information Map
-# Applicable shops (Guild and Medal)
-# Placeholder entry 'DR'; not valid atm
 SELECT_ITEM_INFO_MAP: dict[str, SelectItemInfo] = {
     "book": {
         "grid": SELECT_GRID_3X1,

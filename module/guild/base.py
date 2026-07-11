@@ -8,22 +8,7 @@ from module.ui.ui import UI
 class GuildBase(UI):
     @cached_property
     def _guild_side_navbar(self):
-        """
-        leader_sidebar 6 options
-            lobby.
-            members.
-            apply.
-            logistics.
-            tech.
-            operations.
-
-        member_sidebar 5 options
-            lobby.
-            members.
-            logistics.
-            tech.
-            operations.
-        """
+        """会长侧栏依次为大厅、成员、申请、后勤、科技、作战；成员侧栏没有申请。"""
         guild_side_navbar = ButtonGrid(
             origin=(21, 118), delta=(0, 94.5), button_shape=(60, 75), grid_shape=(1, 6), name="GUILD_SIDE_NAVBAR"
         )
@@ -34,31 +19,10 @@ class GuildBase(UI):
         )
 
     def guild_side_navbar_ensure(self, upper=None, bottom=None):
-        """
-        确保公会侧边栏能切换到目标页面。
+        """按顶部或底部索引切换侧栏；页面完全加载仍由调用方确认。
 
-        页面是否完全加载由调用方根据需要另行确认。
-
-        Args:
-            upper (int):
-                leader|member
-                1     for lobby.
-                2     for members.
-                3|N/A for apply.
-                4|3   for logistics.
-                5|4   for tech.
-                6|5   for operations.
-            bottom (int):
-                leader|member
-                6|5   for lobby.
-                5|4   for members.
-                4|N/A for apply.
-                3     for logistics.
-                2     for tech.
-                1     for operations.
-
-        Returns:
-            bool: 是否已经确保侧边栏目标项。
+        会长/成员顶部索引：大厅 1/1、成员 2/2、申请 3/无、后勤 4/3、科技 5/4、作战 6/5；
+        底部索引：大厅 6/5、成员 5/4、申请 4/无、后勤 3/3、科技 2/2、作战 1/1。
         """
         if self._guild_side_navbar.get_total(main=self) == 6 and (upper == 3 or bottom == 4):
             logger.warning('Transitions to "apply" is not supported')

@@ -7,13 +7,7 @@ from module.ui.navbar import Navbar, NavbarColorRule, NavbarTarget, NavbarVisual
 class PQShopUI(ShopUI):
     @cached_property
     def _shop_bottom_navbar(self):
-        """
-        shop_bottom_navbar 4 options
-            all.
-            gift.
-            furniture.
-            misc.
-        """
+        """商店底栏依次为全部、礼物、家具、杂项。"""
         shop_navgrid = ButtonGrid(
             origin=(465, 600),
             delta=(200, 0),
@@ -32,21 +26,11 @@ class PQShopUI(ShopUI):
         )
 
     def shop_bottom_navbar_ensure(self, left=None, right=None):
-        """
-        确保私宅商店底部导航栏位置。
-        """
         return self._shop_bottom_navbar.set(self, NavbarTarget(left=left, right=right))
 
     @cached_property
     def _shop_left_navbar(self):
-        """
-        shop_bottom_navbar 4 options
-            home.
-            sirius.
-            noshiro.
-            anchorage.
-            new_jersey.
-        """
+        """商店左栏依次为主页、天狼星、能代、安克雷奇、新泽西。"""
         shop_navgrid = ButtonGrid(
             origin=(152, 158),
             delta=(0, 105),
@@ -65,7 +49,4 @@ class PQShopUI(ShopUI):
         )
 
     def shop_left_navbar_ensure(self, upper=None, bottom=None):
-        """
-        确保私宅商店左侧导航栏位置。
-        """
         return self._shop_left_navbar.set(self, NavbarTarget(upper=upper, bottom=bottom))

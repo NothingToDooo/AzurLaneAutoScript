@@ -13,9 +13,7 @@ class OpsiExplore(OSMap):
         super().__init__(*args, **kwargs)
 
     def _os_explore_task_delay(self):
-        """
-        Delay other OpSi tasks during os_explore
-        """
+        """探索期间推迟其他大世界任务。"""
         logger.info("Delay other OpSi tasks during OpsiExplore")
         with self.config.multi_set():
             next_run = self.config.Scheduler_NextRun
@@ -99,10 +97,7 @@ class OpsiExplore(OSMap):
         self.config.check_task_switch()
 
     def _os_explore(self):
-        """
-        Explore all dangerous zones at the beginning of month.
-        Failed zone id will be set to _os_explore_failed_zone
-        """
+        """月初探索全部危险海域，并把失败海域编号写入 _os_explore_failed_zone。"""
         logger.hr("OS explore", level=1)
         order = self._os_explore_order()
         if not len(order):
@@ -115,7 +110,6 @@ class OpsiExplore(OSMap):
                 continue
             self._run_os_explore_zone(zone)
 
-            # Reached end
             if zone == order[-1]:
                 self._finish_os_explore()
 

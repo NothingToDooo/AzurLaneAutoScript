@@ -15,13 +15,7 @@ class CampaignBase(CampaignBase_):
         return True
 
     def campaign_get_chapter_index(self, name):
-        """
-        Args:
-            name (str, int):
-
-        Returns:
-            int
-        """
+        """将整数或章节名转换为章节序号。"""
         if name == "t1":
             return 1
         if name == "t2":
@@ -35,13 +29,7 @@ class CampaignBase(CampaignBase_):
 
     @staticmethod
     def campaign_separate_name(name):
-        """
-        Args:
-            name (str): Stage name in lowercase, such as 7-2, d3, sp3.
-
-        Returns:
-            tuple[str]: Campaign_name and stage index in lowercase, Such as ['7', '2'], ['d', '3'], ['sp', '3'].
-        """
+        """将 T1～T3 归入 t1、T4～T6 归入 t2，并把 ESP/EX 映射为 ex_sp/ex_ex。"""
         if name in ["t1", "t2", "t3"]:
             return "t1", name[-1]
         if name in ["t4", "t5", "t6"]:

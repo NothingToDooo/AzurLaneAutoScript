@@ -13,7 +13,6 @@ class FleetEquipment(EquipmentChange):
     def fleet_enter(self, fleet):
         self.ui_ensure(page_fleet)
 
-        # 切换到目标舰队编号。
         letter = OCR_FLEET_INDEX
         next_button = equipment_assets.FLEET_NEXT
         prev_button = equipment_assets.FLEET_PREV

@@ -30,7 +30,6 @@ from module.ui.ui import UiIndexControls
 
 class StockCounter(DigitCounter):
     def pre_process(self, image):
-        # Convert to gray scale
         r, g, b = cv2.split(image)
         image = cv2.max(cv2.max(r, g), b)
 
@@ -61,20 +60,7 @@ OCR_SHOP_AMOUNT = Digit(SHOP_AMOUNT, letter=(239, 239, 239), name="OCR_SHOP_AMOU
 
 class ShopClerk(ShopBase, Retirement):
     def shop_get_choice(self, item):
-        """
-        Gets the configuration saved in
-        for the appropriate variant shop
-        i.e. GuildShop_X
-
-        Args:
-            item (Item):
-
-        Returns:
-            str
-
-        Raises:
-            ScriptError
-        """
+        """读取对应商店变体的商品配置；配置不存在时抛出异常。"""
         group = item.group
         if group == "pr":
             postfix = None
@@ -95,8 +81,7 @@ class ShopClerk(ShopBase, Retirement):
             postfix = f"_{item.tier.upper()}"
 
         ugroup = group.upper()
-        # 2025-08-14 new shop UI: when buy PlateT4, if is new ui class,
-        #  class_name will be XXXShop_250814, need get the classname before "_"
+        # 2025-08-14 新 UI 类名带 _250814，配置名仍使用下划线前的原类名。
         class_name = self.__class__.__name__.split("_")[0]
         try:
             return getattr(self.config, f"{class_name}_{ugroup}{postfix}")
@@ -105,29 +90,14 @@ class ShopClerk(ShopBase, Retirement):
             raise
 
     def shop_get_select(self, item):
-        """
-        Gets the appropriate select
-        grid button
-
-        Args:
-            item (Item):
-
-        Returns:
-            Button
-
-        Raises:
-            ScriptError
-        """
-        # Item group must belong in SELECT_ITEM_INFO_MAP
+        """按商品组和配置选择网格按钮；映射无效时抛出 ScriptError。"""
         group = item.group
         if group not in SELECT_ITEM_INFO_MAP:
             logger.critical(f"Unexpected item group '{group}'; expected one of {SELECT_ITEM_INFO_MAP.keys()}")
             raise ScriptError
 
-        # Get configured choice for item
         choice = self.shop_get_choice(item)
 
-        # Get appropriate select button for click
         try:
             item_info = SELECT_ITEM_INFO_MAP[group]
             index = item_info["choices"][choice]
@@ -159,13 +129,6 @@ class ShopClerk(ShopBase, Retirement):
                 raise ScriptError from e
 
     def shop_buy_select_execute(self, item):
-        """
-        Args:
-            item (Item):
-
-        Returns:
-            bool:
-        """
         select = self.shop_get_select(item)
         limit = self._read_shop_select_stock_limit(item)
         self._wait_shop_select_amount_controls(select)
@@ -239,28 +202,16 @@ class ShopClerk(ShopBase, Retirement):
         return read_remain
 
     def shop_buy_amount_execute(self, item):
-        """
-        Args:
-            item (Item):
-
-        Returns:
-            bool:
-
-        Raises:
-            ScriptError
-        """
+        """按库存和货币设置购买数量；数量 OCR 失败时抛出 ScriptError。"""
         index_offset = (40, 20)
 
-        # In case either -/+ shift position, use
-        # shipyard ocr trick to accurately parse
+        # 加减按钮可能移位，先刷新偏移再缩小数量 OCR 区域。
         self.appear(AMOUNT_MINUS, offset=index_offset)
         self.appear(AMOUNT_PLUS, offset=index_offset)
         area = OCR_SHOP_AMOUNT.buttons[0]
         OCR_SHOP_AMOUNT.buttons = [(AMOUNT_MINUS.button[2] + 3, area[1], AMOUNT_PLUS.button[0] - 3, area[3])]
 
-        # Total number that can be purchased
-        # altogether based on clicking max
-        # Needs small delay for stable image
+        # 点击最大值后等待图像稳定，再读取可购总数。
         self.appear_then_click(AMOUNT_MAX, offset=(50, 50))
         self.device.sleep((0.3, 0.5))
         timeout = Timer(5, count=10).start()
@@ -277,7 +228,6 @@ class ShopClerk(ShopBase, Retirement):
             logger.critical("OCR_SHOP_AMOUNT resulted in zero (0); asset may be compromised")
             raise ScriptError
 
-        # Adjust purchase amount if needed
         total = int(self._currency // item.price)
         diff = limit - total
         if diff > 0:
@@ -292,37 +242,15 @@ class ShopClerk(ShopBase, Retirement):
         return True
 
     def shop_interval_clear(self):
-        """
-        Override in variant class
-        if need to clear particular
-        asset intervals
-        """
+        """变体可覆盖以清理额外资源的间隔计时。"""
         self.interval_clear(SHOP_BACK_ARROW)
         self.interval_clear(SHOP_BUY_CONFIRM)
 
     def shop_buy_handle(self, _item):
-        """
-        商店购买流程中的变体处理钩子。
-
-        变体类可覆写该方法处理特殊购买弹窗。
-
-        Args:
-            _item (Item): 当前购买的商品；默认实现不需要。
-
-        Returns:
-            bool: 是否识别并处理了特殊界面。
-        """
+        """供变体处理特殊购买弹窗。"""
         return False
 
     def shop_buy_execute(self, item, skip_first_screenshot=True):
-        """
-        Args:
-            item: Item to check
-            skip_first_screenshot: bool
-
-        Returns:
-            None: exits appropriately therefore successful
-        """
         success = False
         self.shop_interval_clear()
 
@@ -353,19 +281,14 @@ class ShopClerk(ShopBase, Retirement):
                 success = True
                 continue
 
-            # End
             if success and self.appear(SHOP_BACK_ARROW, offset=(30, 30)):
                 break
 
     def shop_buy(self):
-        """
-        Returns:
-            bool: If success, and able to continue.
-        """
+        """购买完成返回 True；货币无法识别或耗尽时返回 False。"""
         for _ in range(12):
             logger.hr("Shop buy", level=2)
-            # Get first for innate delay to ocr
-            # shop currency for accurate parse
+            # 先识别商品，利用其加载时间等待货币 OCR 稳定。
             items = self.shop_get_items()
             self.shop_currency()
             if self._currency <= 0:

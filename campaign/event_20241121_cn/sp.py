@@ -106,7 +106,6 @@ MAP.spawn_data = [
 
 class Config:
     # ===== Start of generated config =====
-    # 旧记录的塞壬候选模板为 ToLoveGoldenDarkness05 和 ToLoveYui02。
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True
     MAP_HAS_MOVABLE_ENEMY = False

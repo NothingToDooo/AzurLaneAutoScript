@@ -117,7 +117,7 @@ MAP.spawn_data = [
 
 class Config(ConfigBase):
     # ===== Start of generated config =====
-    # SirenBoss182 is a breast augmented SirenBoss18
+    # 两者主体相近，但 SirenBoss182 的胸部区域更大，需分别保留模板。
     MAP_SIREN_TEMPLATE = ("SirenBoss18", "SirenBoss182", "SirenBoss19")
     MOVABLE_ENEMY_TURN = (2,)
     MAP_HAS_SIREN = True

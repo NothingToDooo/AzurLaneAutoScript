@@ -60,10 +60,6 @@ def _connection_error_recovery(device, error):
 def retry(func):
     @wraps(func)
     def retry_wrapper(self, *args, **kwargs):
-        """
-        Args:
-            self (AdbSession):
-        """
         recovery = None
         for _ in range(RETRY_TRIES):
             try:
@@ -71,7 +67,6 @@ def retry(func):
                     time.sleep(retry_sleep(_))
                     recovery()
                 return func(self, *args, **kwargs)
-            # 无法自动处理。
             except RequestHumanTakeover:
                 break
             except (AdbError, PackageNotInstalled, OSError) as e:
@@ -118,59 +113,27 @@ class AdbSession(ConnectionAttr):
     _serial_bound_cached_properties = ("cpu_abi", "sdk_ver")
 
     def adb_start_server(self):
-        """
-        触发 adbutils 启动 ADB server。
-        """
         version = self.adb_client.server_version()
         logger.info(f"ADB server version: {version}")
         return version
 
     def adb_shell(self, cmd, stream=False, recvall=True, timeout=10, rstrip=True):
-        """
-        等价于 `adb -s <serial> shell <*cmd>`。
-
-        参数：
-            cmd (list, str):
-            stream (bool)：返回流而不是字符串输出，默认 False。
-            recvall (bool)：stream=True 时读取全部数据，默认 True。
-            timeout (int)：默认 10。
-            rstrip (bool)：移除末尾空行，默认 True。
-
-        返回：
-            stream=False 时返回 str。
-            stream=True 且 recvall=True 时返回 bytes。
-            stream=True 且 recvall=False 时返回 socket。
-        """
+        """stream=False 返回 str；否则按 recvall 返回 bytes 或 socket。"""
         if not isinstance(cmd, str):
             cmd = list(map(str, cmd))
 
         if stream:
             result = self.adb.shell(cmd, stream=stream, timeout=timeout, rstrip=rstrip)
             if recvall:
-                # bytes。
                 return recv_all(result)
-            # socket。
             return result
-        # str。
         return remove_shell_warning(self.adb.shell(cmd, stream=stream, timeout=timeout, rstrip=rstrip))
 
     def adb_getprop(self, name):
-        """
-        获取 Android 系统属性，等价于 `getprop <name>`。
-
-        参数：
-            name (str)：属性名。
-
-        返回：
-            str:
-        """
         return self.adb_shell(["getprop", name]).strip()
 
     @retry
     def resolution_adb(self, cal_rotation=True) -> tuple[int, int]:
-        """
-        使用 ADB 获取设备分辨率。
-        """
         output = self.adb_shell(["wm", "size"])
         result = re.search(r"Physical size:\s*(?P<width>\d+)x(?P<height>\d+)", output)
         if result is None:
@@ -187,9 +150,6 @@ class AdbSession(ConnectionAttr):
         return width, height
 
     def resolution_check(self) -> tuple[int, int]:
-        """
-        检查模拟器分辨率是否为 1280x720。
-        """
         width, height = self.resolution_adb()
         logger.attr("Screen_size", f"{width}x{height}")
         if (width, height) in {(1280, 720), (720, 1280)}:
@@ -202,10 +162,7 @@ class AdbSession(ConnectionAttr):
     @cached_property
     @retry
     def cpu_abi(self) -> str:
-        """
-        返回：
-            str：arm64-v8a、armeabi-v7a、x86、x86_64。
-        """
+        """可能值为 arm64-v8a、armeabi-v7a、x86 或 x86_64。"""
         abi = self.adb_getprop("ro.product.cpu.abi")
         if not len(abi):
             logger.error(f'CPU ABI invalid: "{abi}"')
@@ -214,9 +171,7 @@ class AdbSession(ConnectionAttr):
     @cached_property
     @retry
     def sdk_ver(self) -> int:
-        """
-        Android SDK/API 等级，见 https://apilevels.com/。
-        """
+        """Android SDK/API 等级，见 https://apilevels.com/。"""
         sdk = self.adb_getprop("ro.build.version.sdk")
         try:
             return int(sdk)
@@ -226,22 +181,9 @@ class AdbSession(ConnectionAttr):
         return 0
 
     def adb_forward(self, remote):
-        """
-        执行 `adb forward <local> <remote>`。
+        """复用同 remote 的唯一 TCP forward，否则从 FORWARD_PORT_RANGE 分配端口。
 
-        从 FORWARD_PORT_RANGE 中随机选择端口，或复用已有 forward，同时移除多余的 forward。
-
-        参数：
-            remote (str):
-                tcp:<port>
-                localabstract:<unix domain socket name>
-                localreserved:<unix domain socket name>
-                localfilesystem:<unix domain socket name>
-                dev:<character device name>
-                jdwp:<process pid> (remote only)
-
-        返回：
-            int：端口。
+        remote 遵循 ADB 的 tcp、localabstract、localreserved、localfilesystem、dev 或 jdwp 格式。
         """
         port = 0
         for forward in self.adb.forward_list():
@@ -255,7 +197,6 @@ class AdbSession(ConnectionAttr):
 
         if port:
             return port
-        # 创建新的 forward。
         port = random_port(self.config.FORWARD_PORT_RANGE)
         forward = ForwardItem(self.serial, f"tcp:{port}", remote)
         logger.info(f"Create forward: {forward}")
@@ -263,22 +204,13 @@ class AdbSession(ConnectionAttr):
         return port
 
     def adb_forward_remove(self, local):
-        """
-        等价于 `adb -s <serial> forward --remove <local>`。
+        """移除 ADB forward；目标不存在时仅记录警告。
 
-        移除不存在的 forward 时不抛错。
-
-        ADB server 命令参考：
-        https://cs.android.com/android/platform/superproject/+/master:packages/modules/adb/SERVICES.TXT
-
-        参数：
-            local (str)：例如 'tcp:2437'。
+        协议见 https://cs.android.com/android/platform/superproject/+/master:packages/modules/adb/SERVICES.TXT。
         """
         try:
             self.adb.forward_remove(local)
         except AdbError as e:
-            # 移除不存在的 forward 时不抛错。
-            # adbutils.errors.AdbError: listener 'tcp:8888' not found
             msg = str(e)
             if re.search(r"listener .*? not found", msg):
                 logger.warning(f"{type(e).__name__}: {msg}")
@@ -286,23 +218,11 @@ class AdbSession(ConnectionAttr):
                 raise
 
     def adb_push(self, local, remote):
-        """
-        参数：
-            local (str):
-            remote (str):
-
-        返回：
-            None:
-        """
         logger.info(f"ADB push: {local} -> {remote}")
         return self.adb.push(local, remote)
 
     @staticmethod
     def sleep(second):
-        """
-        参数：
-            second(int, float, tuple):
-        """
         time.sleep(ensure_time(second))
 
     _orientation_description: ClassVar[dict[int, str]] = {
@@ -315,16 +235,7 @@ class AdbSession(ConnectionAttr):
 
     @retry
     def get_orientation(self):
-        """
-        获取设备旋转方向。
-
-        返回：
-            int:
-                0：正常。
-                1：HOME 键在右侧。
-                2：HOME 键在顶部。
-                3：HOME 键在左侧。
-        """
+        """返回旋转方向：0 为正常，1/2/3 分别表示 HOME 键在右/上/左。"""
         display_re = re.compile(
             r".*DisplayViewport{.*valid=true, .*orientation=(?P<orientation>\d+), "
             r".*deviceWidth=(?P<width>\d+), deviceHeight=(?P<height>\d+).*"
@@ -350,10 +261,6 @@ class AdbSession(ConnectionAttr):
 
     @retry
     def list_device(self):
-        """
-        Returns:
-            SelectedGrids[AdbDeviceWithStatus]:
-        """
         devices = []
         try:
             devices.extend(

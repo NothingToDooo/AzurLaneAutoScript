@@ -19,11 +19,7 @@ class CampaignBase(CampaignBase_):
     )
 
     def campaign_set_chapter(self, name, mode="normal"):
-        """
-        Args:
-            name (str): 关卡名称，例如 '7-2'、'd3'、'sp3'。
-            mode (str): 'normal' 或 'hard'。
-        """
+        """按关卡名和 normal/hard 模式切换章节。"""
         chapter, stage = self.campaign_separate_name(name)
 
         if (
@@ -96,13 +92,7 @@ class CampaignBase(CampaignBase_):
 
     @staticmethod
     def campaign_get_chapter_index(name):
-        """
-        Args:
-            name (str, int):
-
-        Returns:
-            int
-        """
+        """将整数或章节名转换为章节序号。"""
         if isinstance(name, int):
             return name
         if name.isdigit():
@@ -114,10 +104,7 @@ class CampaignBase(CampaignBase_):
         raise CampaignNameError
 
     def _campaign_ball_get(self):
-        """
-        Returns:
-            str: 'blue' or 'red'.
-        """
+        """返回球色 blue、red；无法识别时返回 unknown。"""
         color = get_color(self.device.image, BALL.area)
         # Blue: (93, 127, 182), Red: (186, 116, 124)
         index = np.argmax(color)
@@ -129,10 +116,7 @@ class CampaignBase(CampaignBase_):
         return "unknown"
 
     def _campaign_ball_set(self, status):
-        """
-        Args:
-            status (str): 'blue' or 'red'.
-        """
+        """把球色切换为 blue 或 red。"""
         skip_first_screenshot = True
         while 1:
             if skip_first_screenshot:

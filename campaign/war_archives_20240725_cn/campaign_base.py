@@ -15,13 +15,6 @@ class CampaignBase(CampaignBase_):
         return True
 
     def campaign_ensure_mode(self, mode="normal"):
-        """
-        Args:
-            mode (str): 'normal', 'hard', 'ex', 'story'
-
-        Returns:
-            bool: If mode changed.
-        """
         if mode == "hard":
             self.config.override(Campaign_Mode="hard")
 

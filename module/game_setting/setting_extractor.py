@@ -28,7 +28,6 @@ def _strip_code(string):
         if word == "(":
             nested += 1
         if word == ")":
-            # End as last )
             if nested == 1:
                 yield word
                 return
@@ -81,10 +80,9 @@ def _parse_lua_default(typ: str, value: str):
 @dataclass
 class LuaSetting:
     raw: str
-    # typ: "Int", "String", "Float"
+    # Lua 类型仅接受 Int、String 或 Float。
     typ: str
-    # "AUTOFIGHT_BATTERY_SAVEMODE, 0"
-    # "world_help_progress"
+    # 形如 `AUTOFIGHT_BATTERY_SAVEMODE, 0` 或 `world_help_progress`。
     code: str
     duplicate: bool = False
 

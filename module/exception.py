@@ -27,7 +27,7 @@ class CampaignNameError(Exception):
 
 
 class ScriptError(Exception):
-    # This is likely to be a mistake of developers, but sometimes a random issue
+    # 通常表示开发错误，偶尔也可能由随机故障触发。
     pass
 
 
@@ -40,8 +40,7 @@ class GameStuckError(Exception):
 
 
 class GameBugError(Exception):
-    # An error has occurred in Azur Lane game client. Alas is unable to handle.
-    # A restart should fix it.
+    # 游戏客户端异常超出 Alas 的处理范围，通常需要重启。
     pass
 
 
@@ -62,6 +61,5 @@ class GamePageUnknownError(Exception):
 
 
 class RequestHumanTakeover(Exception):
-    # Request human takeover
-    # Alas is unable to handle such error, probably because of wrong settings.
+    # 自动处理失败时请求人工接管，常见原因是配置错误。
     pass

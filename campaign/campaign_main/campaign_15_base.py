@@ -53,21 +53,7 @@ class CampaignBase(CampaignBase_):
         logger.attr("Map has mob move", self.strategy_has_mob_move())
 
     def mob_movable(self, location, target):
-        """
-        Check if mob is movable from location to target.
-        This requires that:
-            1. both location and target are grids in the map (not exceeding the boundaries)
-            2. Manhattan distance between location and target is 1.
-            3. location is a mob fleet
-            4. target is a sea grid
-
-        Args:
-            location (tuple): Location of mob.
-            target (tuple): Destination.
-
-        Returns:
-            bool: if movable.
-        """
+        """仅当起点和终点均在地图内、曼哈顿距离为 1、起点是敌方舰队且终点是海面格时可移动。"""
         location = location_ensure(location)
         target = location_ensure(target)
         movable = True
@@ -114,12 +100,10 @@ class CampaignBase(CampaignBase_):
             else:
                 self.device.screenshot()
 
-            # End
             if self.is_in_strategy_mob_move():
                 self.view.update(image=self.device.image)
             if origin_grid.predict_mob_move_icon():
                 break
-            # Click
             if interval.reached() and self.is_in_strategy_mob_move():
                 self.device.click(origin_grid)
                 interval.reset()
@@ -135,10 +119,8 @@ class CampaignBase(CampaignBase_):
             else:
                 self.device.screenshot()
 
-            # End
             if self.appear(STRATEGY_OPENED, offset=MOB_MOVE_OFFSET):
                 break
-            # Click
             if interval.reached() and self.is_in_strategy_mob_move():
                 self.device.click(target_grid)
                 interval.reset()
@@ -147,20 +129,7 @@ class CampaignBase(CampaignBase_):
                 continue
 
     def _mob_move(self, location, target):
-        """
-        Move mob from location to target, and confirm if successfully moved.
-
-        Args:
-            location (tuple, str, GridInfo): Location of mob.
-            target (tuple, str, GridInfo): Destination.
-
-        Returns:
-            bool: If mob moved.
-
-        Pages:
-            in: MOB_MOVE_CANCEL
-            out: STRATEGY_OPENED
-        """
+        """在 MOB_MOVE_CANCEL 页面选择起点和终点，结束于 STRATEGY_OPENED 页面。"""
         location = location_ensure(location)
         target = location_ensure(target)
         origin_grid, target_grid = self._mob_move_grids(location, target)
@@ -181,20 +150,7 @@ class CampaignBase(CampaignBase_):
         self.map[location].is_enemy = False
 
     def mob_move(self, location, target):
-        """
-        Open strategy, move mob fleet from location to target, close strategy.
-
-        Args:
-            location (tuple, str, GridInfo): Location of mob.
-            target (tuple, str, GridInfo): Destination.
-
-        Returns:
-            bool: If mob moved
-
-        Pages:
-            in: IN_MAP
-            out: IN_MAP
-        """
+        """从 IN_MAP 打开策略页、移动敌方舰队并返回 IN_MAP；无效或次数耗尽时返回 False。"""
         if not self.mob_movable(location, target):
             return False
 

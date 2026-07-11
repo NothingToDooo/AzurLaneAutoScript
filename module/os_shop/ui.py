@@ -26,17 +26,7 @@ SCROLL_DRAG_PAGE_ERROR_MESSAGE = "Scroll drag page error."
 
 class OSShopUI(UI):
     def os_shop_load_ensure(self, skip_first_screenshot=True):
-        """
-        Switching between sidebar clicks for some
-        takes a bit of processing before fully loading
-        like guild logistics
-
-        Args:
-            skip_first_screenshot (bool):
-
-        Returns:
-            bool: Whether expected assets loaded completely
-        """
+        """侧栏切换后等待商店加载；超时抛出 GameStuckError。"""
         ensure_timeout = Timer(3, count=6).start()
         while True:
             if skip_first_screenshot:
@@ -44,24 +34,16 @@ class OSShopUI(UI):
             else:
                 self.device.screenshot()
 
-            # 已进入商店。
             if self.appear(OS_SHOP_CHECK):
                 return True
             logger.warning("OpsiShop is not appear, retrying.")
 
-            # 异常处理。
             if ensure_timeout.reached():
                 raise GameStuckError(OS_SHOP_LOAD_TIMEOUT_MESSAGE)
 
     @cached_property
     def _os_shop_side_navbar(self):
-        """
-        limited_sidebar 4 options
-            NY
-            Liverpool
-            Gibraltar
-            St. Petersburg
-        """
+        """侧栏从上到下为纽约、利物浦、直布罗陀、圣彼得堡。"""
         os_shop_side_navbar = ButtonGrid(
             origin=(44, 266), delta=(0, 87), button_shape=(231, 46), grid_shape=(1, 4), name="OS_SHOP_SIDE_NAVBAR"
         )
@@ -75,41 +57,13 @@ class OSShopUI(UI):
         )
 
     def os_shop_side_navbar_ensure(self, upper=None, bottom=None):
-        """
-        Ensure able to transition to page and
-        page has loaded to completion
-
-        Args:
-            upper (int):
-            limited|regular
-                1     NY
-                2     Liverpool
-                3     Gibraltar
-                4     St. Petersburg
-            bottom (int):
-            limited|regular
-                4     NY
-                3     Liverpool
-                2     Gibraltar
-                1     St. Petersburg
-
-        Returns:
-            bool: if side_navbar set ensured
-
-        Pages:
-            in: PORT_SUPPLY_CHECK
-            out: PORT_SUPPLY_CHECK
-        """
+        """在港口补给页按上序或下序 1 至 4 切换港口侧栏，并等待加载完成。"""
         logger.info(f"OpsiShop side navbar set to {upper or bottom}")
         self.os_shop_load_ensure()
         self._os_shop_side_navbar.set(self, NavbarTarget(upper=upper, bottom=bottom))
 
     def init_slider(self) -> tuple[float, float]:
-        """Initialize the slider
-
-        Returns:
-            Tuple[float, float]: (pre_pos, cur_pos)
-        """
+        """把滚动条置顶并返回 `(前次位置, 当前位置)`；无法恢复时抛出 GameStuckError。"""
         if not OS_SHOP_SCROLL.appear(main=self):
             logger.warning("Scroll does not appear, try to rescue slider")
             self.rescue_slider()
@@ -133,18 +87,7 @@ class OSShopUI(UI):
         self.device.screenshot()
 
     def pre_scroll(self, pre_pos, cur_pos) -> float:
-        """Pretreatment Sliding
-
-        Args:
-            pre_pos: Previous position
-            cur_pos: Current position
-
-        Raise:
-            ScriptError: Slide Page Error
-
-        Returns:
-            cur_pos: Current position
-        """
+        """滚动位置未变化时尝试恢复；连续失败抛出 GameStuckError。"""
         if pre_pos == cur_pos:
             logger.warning("Scroll drag page failed")
             if not OS_SHOP_SCROLL.appear(main=self):
