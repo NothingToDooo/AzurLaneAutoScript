@@ -78,7 +78,7 @@ def atomic_ocr_for_single_lines_raw(self, img_list, cand_alphabet=None) -> list[
 
 `AlOcr.__init__()` 在不加载模型的情况下保存规范化后的 `self._model_name = self._normalize_model_name(model_name)`；`model_name` 属性必须返回实际模型名 `densenet_lite_136-gru`，不能返回构造别名 `densenet-lite-gru`，也不能触发 `ensure_loaded()`。
 
-- [ ] **Step 1: 写 DTO 不变量、CnOCR 字典转换和非法 payload 测试**
+- [x] **Step 1: 写 DTO 不变量、CnOCR 字典转换和非法 payload 测试**
 
 ```python
 def test_extract_raw_result_preserves_text_and_score() -> None:
@@ -96,19 +96,19 @@ def test_extract_raw_result_rejects_malformed_payload(payload: object) -> None:
         AlOcr._extract_raw_result(payload)
 ```
 
-- [ ] **Step 2: 运行测试并确认因结果模块/raw API 不存在而失败**
+- [x] **Step 2: 运行测试并确认因结果模块/raw API 不存在而失败**
 
 Run: `uv run pytest tests/test_ocr_result.py -q`
 
-- [ ] **Step 3: 实现轻量 DTO 和严格第三方边界**
+- [x] **Step 3: 实现轻量 DTO 和严格第三方边界**
 
 `module/ocr/result.py` 不得导入 `cnocr`、OpenCV 或 Pillow，确保 `module/ocr/ocr.py` 运行时引用结果类型不会破坏现有重依赖延迟加载。`_extract_raw_result()` 使用 `numbers.Real` 接受 NumPy 实数，但显式拒绝 `bool`，并统一转成 Python `float`。
 
-- [ ] **Step 4: 写 raw 批量/空列表及旧单张、批量字符串投影测试**
+- [x] **Step 4: 写 raw 批量/空列表及旧单张、批量字符串投影测试**
 
 测试通过 monkeypatch `CnOcr.ocr_for_single_lines`、`AlOcr.set_cand_alphabet` 并把 `AlOcr._model_loaded` 置为 `True` 隔离真实模型会话；导入 `al_ocr.py` 本身仍会导入 CnOCR，不能把它误写成轻量测试。现有 `ocr_for_single_line()` 自己从 raw batch 的第一项投影 `.text`，不能调用会动态分派回字符串方法的 `super().ocr_for_single_line()`。P0 只新增生产调用需要的两个 batch raw 入口，不预建无消费者的 raw 单张包装。
 
-- [ ] **Step 5: 运行定向测试、Ruff、ty 和差异检查**
+- [x] **Step 5: 运行定向测试、Ruff、ty 和差异检查**
 
 Run:
 
@@ -120,7 +120,7 @@ uv run ty check module/ocr/result.py module/ocr/al_ocr.py
 git diff --check
 ```
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 Commit: `refactor: 保留CnOCR原始识别结果`
 
@@ -273,7 +273,7 @@ def require_single[T](
 
 实现时给 fake 方法补齐与生产 Protocol 相同的窄类型标注；若 ty 对测试 duck type 报错，修正 fake 签名，不得用 `Any` 或全局 ignore 绕过。
 
-- [ ] **Step 1: 写合法零、严格 Counter、Duration 范围及字段保留测试**
+- [x] **Step 1: 写合法零、严格 Counter、Duration 范围及字段保留测试**
 
 ```python
 def test_digit_recognize_distinguishes_zero_from_empty() -> None:
@@ -307,7 +307,7 @@ def test_duration_recognize_rejects_invalid_components(text: str) -> None:
 
 另参数化验证 `1:30:00`、`01:30:00`、`13000`、`013000` 成功，`01:3000`、`0130:00` 为 `FORMAT_MISMATCH`。
 
-- [ ] **Step 2: 写旧接口特征测试并确认新严格语义不会外溢**
+- [x] **Step 2: 写旧接口特征测试并确认新严格语义不会外溢**
 
 ```python
 def test_legacy_counter_ocr_keeps_clamping_until_callers_migrate() -> None:
@@ -319,23 +319,23 @@ def test_legacy_counter_ocr_keeps_clamping_until_callers_migrate() -> None:
 
 同时覆盖新 Digit 的多 ROI 结果列表，以及旧 `Ocr.ocr()` 单 ROI 返回标量、多 ROI 返回列表、空 Counter 返回 `(0, 0, 0)`，防止受保护推理入口改变历史形状。
 
-- [ ] **Step 3: 运行测试并确认因 `recognize()` 和严格结果不存在而失败**
+- [x] **Step 3: 运行测试并确认因 `recognize()` 和严格结果不存在而失败**
 
 Run: `uv run pytest tests/test_ocr_result.py -q`
 
-- [ ] **Step 4: 实现最小原始推理入口和三个结构化解析器**
+- [x] **Step 4: 实现最小原始推理入口和三个结构化解析器**
 
 测试 fake engine 同时实现旧 `atomic_ocr_for_single_lines()` 与新 `atomic_ocr_for_single_lines_raw()`；测试子类覆写 `cnocr` 属性返回 fake，不修改全局 `OCR_MODEL` 缓存，也不得实例化真实 CnOCR。Counter 调用 `self.after_process(raw.text)` 后再 fullmatch，以保留 `StockCounter`、`MetaDigitCounter`、`OcrDormFood` 等已有文本修正顺序。
 
 P0 明确保留两条解析路径并允许少量重复：旧 `.ocr()` 继续使用宽松 search/clamp 或旧 Duration 解析，新 `.recognize()` 独立使用 fullmatch/范围校验；在旧调用方迁移完成前，禁止为了复用让 `.ocr()` 简单投影 `.recognize().value`。
 
-- [ ] **Step 5: 增加 Counter 子类后处理在 fullmatch 前生效的特征测试**
+- [x] **Step 5: 增加 Counter 子类后处理在 fullmatch 前生效的特征测试**
 
 至少选择一个纯文本修正 Counter 子类或测试专用子类，把 `"1415"` 修成 `"14/15"`，验证新接口得到 `(14, 1, 15)`；再用测试 Digit 子类把非空 raw 修正成整数，证明 `recognize()` 走 `self.after_process()`，同时锁定旧 Duration 仍接受其历史混合缺冒号输入。不得批量迁移这些生产调用点。
 
 monkeypatch `module.ocr.ocr.logger.attr` 捕获一次成功和一次失败的新结构化调用，断言日志属性包含 profile、score、valid、reason；这锁定 score 不只停留在瞬时对象中，而会进入现有持久日志供后续提取分布。
 
-- [ ] **Step 6: 运行定向检查并提交**
+- [x] **Step 6: 运行定向检查并提交**
 
 Run:
 
@@ -441,7 +441,7 @@ log/ocr_failure/<profile>/<sha256>/
 - 只接受失败结果和非空 `uint8` 图像；processed 必须是 `H×W`，raw 只允许 `H×W` 或 `H×W×3`。非法 dtype、维数或通道数快速失败且不进入 PNG 编码。
 - 第一次不可恢复的 `OSError` 由调用边界记录一次 warning，并把该 store 在当前进程熔断；后续 record 直接返回 `DISABLED`，不再编码、写盘或重复打印 warning。
 
-- [ ] **Step 1: 写首次保存、PNG 往返和 metadata schema 测试**
+- [x] **Step 1: 写首次保存、PNG 往返和 metadata schema 测试**
 
 ```python
 def test_failure_store_writes_complete_bundle(tmp_path: Path) -> None:
@@ -464,25 +464,25 @@ def test_failure_store_writes_complete_bundle(tmp_path: Path) -> None:
 
 先单独构造 `OcrFailureStore(tmp_path / "missing")` 并断言 root 仍不存在；只有第一次成功 record 才创建目录。该断言必须直接检查 `Path.exists()`，不能依赖已忽略 `log/` 的 git 状态。
 
-- [ ] **Step 2: 写持久去重和四级限额测试**
+- [x] **Step 2: 写持久去重和四级限额测试**
 
 同 processed/context 但 score、latency、captured_at 不同仍是 `DUPLICATE`；重新构造 store 后仍能识别已有 digest。改变 reason、model、text、area 或 processed bytes 必须产生新 digest。用小值分别验证 `max_total_samples`、`max_samples_per_profile`、`max_total_bytes` 和 `max_new_samples_per_process`，未知目录不得被计数或删除。
 
-- [ ] **Step 3: 写非法 profile/图像和原子发布失败测试**
+- [x] **Step 3: 写非法 profile/图像和原子发布失败测试**
 
 monkeypatch `atomic_replace()` 抛出 `OSError`，断言没有包含 `metadata.json` 的 final 目录且本次 `.tmp` 被清理；第二次 record 直接返回 `DISABLED` 且不再调用编码/写入。另模拟“发布前另一个 store 已创建同 digest final”，验证返回 `DUPLICATE` 且不覆盖已有 bundle。`../escape`、空数组、float 图像、`H×W×1/2/4` raw、三维 processed 和 valid result 都必须在写文件前失败。
 
-- [ ] **Step 4: 写 metadata 离线解析重放测试**
+- [x] **Step 4: 写 metadata 离线解析重放测试**
 
 读取刚写出的 `metadata.json`，只用其中的 `raw_text`、`score`、`model`、`expected_total` 构造 `RawOcrResult` 并调用 `DigitCounter._parse_result()`；断言重放结果的 `normalized_text`、`valid`、`reason` 和 value 与 metadata 一致。这个测试不调用 fake engine，更不能加载真实模型。
 
-- [ ] **Step 5: 运行测试并确认因 store 不存在而失败**
+- [x] **Step 5: 运行测试并确认因 store 不存在而失败**
 
 Run: `uv run pytest tests/test_ocr_failure_store.py -q`
 
-- [ ] **Step 6: 实现最小同步 store；不加入异步队列、数据库或自动训练集标注**
+- [x] **Step 6: 实现最小同步 store；不加入异步队列、数据库或自动训练集标注**
 
-- [ ] **Step 7: 运行定向检查并提交**
+- [x] **Step 7: 运行定向检查并提交**
 
 Run:
 
@@ -521,9 +521,9 @@ def recognize(
 
 具体 store 第一次不可恢复的 `OSError` 会先熔断自身并向外抛出；OCR 调用边界捕获它，只记录一次不含 OCR 原文的 warning，不能把诊断失败升级成业务失败，结果对象仍原样返回。后续 store 返回 `DISABLED`，调用边界不再 warning。参数校验类 `ValueError` 不吞掉，因为它表示 profile、letter 或调用契约错误。
 
-- [ ] **Step 1: 写 invalid 保存、valid 不保存、重复 invalid 去重测试**
+- [x] **Step 1: 写 invalid 保存、valid 不保存、重复 invalid 去重测试**
 
-- [ ] **Step 2: 写 store 抛 `OSError` 但结构化结果仍返回的测试**
+- [x] **Step 2: 写 store 抛 `OSError` 但结构化结果仍返回的测试**
 
 ```python
 def test_recording_error_does_not_change_recognition_result() -> None:
@@ -536,15 +536,15 @@ def test_recording_error_does_not_change_recognition_result() -> None:
 
 继续调用同一个 store，断言第二次仍返回结构化失败，但编码/写入 fake 没有再次被调用，warning 也只有一条；另用 `letter=[140, 113, 99]` 验证 recorder 实际收到 `(140, 113, 99)`。
 
-- [ ] **Step 3: 运行测试并确认因 recognize 尚未连接 store 而失败**
+- [x] **Step 3: 运行测试并确认因 recognize 尚未连接 store 而失败**
 
 Run: `uv run pytest tests/test_ocr_result.py tests/test_ocr_failure_store.py -q`
 
-- [ ] **Step 4: 实现一个受保护 `_record_failure()`，三个解析器复用该边界**
+- [x] **Step 4: 实现一个受保护 `_record_failure()`，三个解析器复用该边界**
 
 不得让 `RecognitionResult` 持有 NumPy 数组，不得让 `Ocr` 反向依赖 config 或 device；是否启用 store 由业务调用方决定。
 
-- [ ] **Step 5: 运行定向检查并提交**
+- [x] **Step 5: 运行定向检查并提交**
 
 Run:
 
@@ -651,7 +651,7 @@ def make_buyer_with_frames(count: int, *, save_error: bool) -> _TestBuyer:
 
 同文件定义 `valid_counter()`、`invalid_counter()`、`valid_digit()`、`invalid_digit()`，全部直接构造满足 DTO 不变量的 `RecognitionResult[object]`，固定 `latency_seconds=0.0`、profile 和 model；不要用 MagicMock 隐藏调用签名。`SequenceOcr` 为 Counter 记录 `expected_total`，金币调用应记录 `None`。
 
-- [ ] **Step 1: 写“无效计数器 → 下一帧成功”的调用顺序测试**
+- [x] **Step 1: 写“无效计数器 → 下一帧成功”的调用顺序测试**
 
 ```python
 def test_buy_count_retries_counter_before_reading_coins(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -666,17 +666,17 @@ def test_buy_count_retries_counter_before_reading_coins(monkeypatch: pytest.Monk
     assert coins.call_count == 1
 ```
 
-- [ ] **Step 2: 写合法零、业务 total 失败、金币失败重试、全部失败和 SaveError 关闭测试**
+- [x] **Step 2: 写合法零、业务 total 失败、金币失败重试、全部失败和 SaveError 关闭测试**
 
 明确断言传给 Counter fake 的 `expected_total` 始终为 15，`0/0` 返回 `UNEXPECTED_TOTAL` 并且金币 fake 不被调用；断言传给两个 fake OCR 的 `failure_store`：`Error_SaveError=True` 时是模块默认 store，False 时为 `None`。连续失败测试使用有限 generator 进入 `for ... else`，不能等待真实两秒。
 
-- [ ] **Step 3: 运行测试并确认当前代码仍调用旧 `.ocr()` 且失败帧也识别金币**
+- [x] **Step 3: 运行测试并确认当前代码仍调用旧 `.ocr()` 且失败帧也识别金币**
 
 Run: `uv run pytest tests/test_meowfficer_buy.py -q`
 
-- [ ] **Step 4: 迁移唯一业务调用点并保持购买计算不变**
+- [x] **Step 4: 迁移唯一业务调用点并保持购买计算不变**
 
-- [ ] **Step 5: 运行指挥喵与 OCR 定向测试**
+- [x] **Step 5: 运行指挥喵与 OCR 定向测试**
 
 Run:
 
@@ -688,7 +688,7 @@ uv run ty check module/meowfficer/buy.py
 git diff --check
 ```
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 Commit: `fix: 收紧指挥喵购买状态识别`
 
@@ -700,11 +700,11 @@ Commit: `fix: 收紧指挥喵购买状态识别`
 - Modify: `docs/next-generation-framework-and-ocr-roadmap.md`
 - Modify: `docs/superpowers/plans/2026-07-11-cnocr-structured-results-p0.md`（只勾选实际完成项）
 
-- [ ] **Step 1: 在路线图 P0 下补实施状态和真实文件链接**
+- [x] **Step 1: 在路线图 P0 下补实施状态和真实文件链接**
 
 只记录已经完成的结果契约、失败 bundle 和 meow 纵向切片；Duration 虽有结构化解析但尚未迁移生产调用点时必须明确写“接口已具备，调用点待按触碰迁移”。P1～P5 状态不变。
 
-- [ ] **Step 2: 运行依赖、格式、类型、测试和差异全门禁**
+- [x] **Step 2: 运行依赖、格式、类型、测试和差异全门禁**
 
 Run:
 
@@ -726,7 +726,7 @@ Expected: 所有命令退出码为 0；pytest 无新增失败；`git status --sh
 
 - [ ] **Step 4: 修复审查发现后重新运行全门禁**
 
-- [ ] **Step 5: 提交文档状态**
+- [x] **Step 5: 提交文档状态**
 
 Commit: `docs: 记录OCR结构化结果落地状态`
 
@@ -769,12 +769,12 @@ Run: `git push origin docs/next-generation-ocr-roadmap`
 
 ## P0 Exit Checklist
 
-- [ ] CnOCR 原始 text 与 score 在第三方边界被严格保留。
-- [ ] 新 Digit/Counter/Duration 结构化结果能区分合法 0 与失败。
-- [ ] 新 Counter 拒绝部分匹配和 `99/15`，新 Duration 拒绝非法分钟/秒。
-- [ ] 旧 `.ocr()` 返回与未迁移调用点保持兼容。
-- [ ] 失败 bundle 含 raw、processed、metadata，按稳定摘要去重并受容量限制。
-- [ ] 只有显式 store + `Error_SaveError` 才落盘，一般文本 OCR 不自动采集。
-- [ ] 指挥喵 Counter 失败时不再执行金币 OCR，下一帧恢复和金币失败均可重试。
-- [ ] P1～P5、模型替换和 ReplayDevice 未混入本批代码。
+- [x] CnOCR 原始 text 与 score 在第三方边界被严格保留。
+- [x] 新 Digit/Counter/Duration 结构化结果能区分合法 0 与失败。
+- [x] 新 Counter 拒绝部分匹配和 `99/15`，新 Duration 拒绝非法分钟/秒。
+- [x] 旧 `.ocr()` 返回与未迁移调用点保持兼容。
+- [x] 失败 bundle 含 raw、processed、metadata，按稳定摘要去重并受容量限制。
+- [x] 只有显式 store + `Error_SaveError` 才落盘，一般文本 OCR 不自动采集。
+- [x] 指挥喵 Counter 失败时不再执行金币 OCR，下一帧恢复和金币失败均可重试。
+- [x] P1～P5、模型替换和 ReplayDevice 未混入本批代码。
 - [ ] 全量门禁通过，fork 上本分支的 draft PR 已创建或更新，检查状态已核实。

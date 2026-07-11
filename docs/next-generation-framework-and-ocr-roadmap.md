@@ -297,6 +297,14 @@ Replay 读取固定帧并记录语义动作，不启动 ADB、模拟器、WebUI 
 - 首个纵向切片选择 `meow_get_buy_count()`：计数器有效后才识别金币，调用者使用现有循环按 `valid` 重试。
 - 回归样本覆盖空串、合法零、`99/15`、加载中错误和下一帧恢复。
 
+**实施状态（2026-07-12）：**
+
+- 已在 [`RawOcrResult` 与 `RecognitionResult`](../module/ocr/result.py#L7) 建立原始文字、score、规范化结果、业务值、有效性、失败原因、耗时、profile 和模型名契约；[`AlOcr` 原始结果入口](../module/ocr/al_ocr.py#L44)保留第三方 `text` 与 `score`，旧字符串接口继续只做投影。
+- [`Digit` 与 `DigitCounter`](../module/ocr/ocr.py#L227) 已提供严格结构化解析，能够区分合法 `0` 与失败，并拒绝 Counter 部分匹配、`current > total` 和不符合调用点约束的 total。[`Duration`](../module/ocr/ocr.py#L451) 结构化接口已具备，生产调用点待按触碰迁移；旧 `.ocr()` 语义仍保留给未迁移调用方。
+- [`OcrFailureStore`](../module/ocr/failure_store.py#L93) 已按稳定摘要保存 `raw.png`、`processed.png` 与 `metadata.json`，并实施去重、容量限制、原子发布和失败熔断；只有结构化数字调用显式传入 recorder 时才会记录失败，一般文本 OCR 不自动采集。
+- [`meow_get_buy_count()`](../module/meowfficer/buy.py#L19) 已完成首条纵向切片：Counter 无效时跳过金币 OCR，Counter 或金币失败都按下一帧重试，合法零值不被真假判断误伤；有限帧回归见 [`test_meowfficer_buy.py`](../tests/test_meowfficer_buy.py#L140)。
+- P0 的最终严格审查和 fork draft PR 尚待完成；P1～P5 尚未进入实施。
+
 **退出条件：** 失败与合法零值完全可区分；失败样本带有足够上下文，可离线复现相同解析结果；旧调用点行为未被批量改变。
 
 ### P1：删除确定无用的推理与重复资源
