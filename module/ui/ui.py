@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Never, Protocol, TypedDict, TypeIs, Unpack, runtime_checkable
 
 from module.base.button import Button
 from module.base.decorator import run_once
@@ -22,12 +23,19 @@ from module.handler.info_handler import InfoHandler
 from module.logger import logger
 from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION, MAP_PREPARATION_CANCEL, WITHDRAW
 from module.meowfficer.assets import MEOWFFICER_BUY
-from module.ocr.ocr import Ocr
 from module.os_handler.assets import AUTO_SEARCH_REWARD, EXCHANGE_CHECK, RESET_FLEET_PREPARATION, RESET_TICKET_POPUP
 from module.raid import assets as raid_assets
 from module.ui import assets as ui_assets
 from module.ui.page import Page, page_campaign, page_event, page_main, page_main_white, page_sp
 from module.ui_white import assets as ui_white_assets
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator, Sequence
+
+    from module.base.button import MatchOffset
+    from module.base.type_alias import ImageArray
+    from module.device.control import ButtonTarget
+    from module.device.control_options import Duration
 
 UI_CLICK_OPTIONS_CONFLICT_MESSAGE = "options 和散装 UI 点击参数不能混用"
 GAME_NOT_RUNNING_MESSAGE = "Game not running"
@@ -35,24 +43,58 @@ GAME_NOT_RUNNING_MESSAGE = "Game not running"
 
 @dataclass(slots=True)
 class UiClickOptions:
-    appear_button: object = None
-    additional: object = None
-    confirm_wait: int | float = 1
-    offset: object = (30, 30)
-    retry_wait: int | float = 10
+    appear_button: Button | Callable[[], bool] | None = None
+    additional: Callable[[], bool] | None = None
+    confirm_wait: float = 1
+    offset: MatchOffset | None = (30, 30)
+    retry_wait: float = 10
     skip_first_screenshot: bool = False
 
 
 @dataclass(slots=True)
 class UiIndexControls:
-    letter: object
-    prev_button: object
-    next_button: object
+    letter: IndexOcr | Callable[[ImageArray], int]
+    prev_button: Button
+    next_button: Button
     fast: bool = True
-    interval: object = (0.2, 0.3)
+    interval: Duration = (0.2, 0.3)
 
 
-def _ui_click_options(options, settings):
+class UiClickOptionSettings(TypedDict, total=False):
+    appear_button: Button | Callable[[], bool] | None
+    additional: Callable[[], bool] | None
+    confirm_wait: float
+    offset: MatchOffset | None
+    retry_wait: float
+    skip_first_screenshot: bool
+
+
+class AppearSettings(TypedDict, total=False):
+    offset: MatchOffset | None
+    interval: float
+    similarity: float
+    threshold: int
+
+
+@runtime_checkable
+class IndexOcr(Protocol):
+    def ocr_single(self, image: ImageArray) -> int: ...
+
+
+type CheckButton = Button | Callable[[], bool] | list[Button] | tuple[Button, ...]
+
+
+def _is_button_sequence(value: CheckButton) -> TypeIs[list[Button] | tuple[Button, ...]]:
+    return isinstance(value, (list, tuple))
+
+
+type ButtonOption = tuple[Button, AppearSettings]
+
+
+def _ui_click_options(
+    options: UiClickOptions | None,
+    settings: UiClickOptionSettings,
+) -> UiClickOptions:
     if options is None:
         return UiClickOptions(**settings)
     if settings:
@@ -63,17 +105,28 @@ def _ui_click_options(options, settings):
 class UI(InfoHandler):
     ui_current: Page
 
-    def ui_page_appear(self, page, offset=(30, 30), interval=0):
+    def ui_page_appear(
+        self,
+        page: Page,
+        offset: MatchOffset | None = (30, 30),
+        interval: float = 0,
+    ) -> bool:
         if page == page_main:
-            return self.appear(page_main_white.check_button, offset=offset, interval=interval) or self.appear(
-                page_main.check_button, offset=(5, 5), interval=interval
+            return bool(
+                self.appear(page_main_white.check_button, offset=offset, interval=interval)
+                or self.appear(page_main.check_button, offset=(5, 5), interval=interval)
             )
         return self.appear(page.check_button, offset=offset, interval=interval)
 
-    def is_in_main(self, offset=(30, 30), interval=0):
+    def is_in_main(self, offset: MatchOffset | None = (30, 30), interval: float = 0) -> bool:
         return self.ui_page_appear(page_main, offset=offset, interval=interval)
 
-    def ui_main_appear_then_click(self, page, offset=(30, 30), interval=3):
+    def ui_main_appear_then_click(
+        self,
+        page: Page,
+        offset: MatchOffset | None = (30, 30),
+        interval: float = 3,
+    ) -> bool:
         if self.appear(page_main.check_button, offset=offset, interval=interval):
             button = page_main.links[page]
             self.device.click(button)
@@ -84,26 +137,36 @@ class UI(InfoHandler):
             return True
         return False
 
-    def ensure_button_execute(self, button, offset=0):
-        return bool(
-            (isinstance(button, Button) and self.appear(button, offset=offset)) or (callable(button) and button())
-        )
+    def ensure_button_execute(
+        self,
+        button: Button | Callable[[], bool],
+        offset: MatchOffset | None = 0,
+    ) -> bool:
+        if isinstance(button, Button):
+            return self.appear(button, offset=offset)
+        return button()
 
     def ui_click(
         self,
-        click_button,
-        check_button,
-        options=None,
-        **settings,
-    ):
+        click_button: ButtonTarget,
+        check_button: CheckButton,
+        options: UiClickOptions | None = None,
+        **settings: Unpack[UiClickOptionSettings],
+    ) -> None:
         """check_button 可为 Button 或回调；settings 是会转为 UiClickOptions 的旧调用形状。"""
         options = _ui_click_options(options, settings)
         logger.hr("UI click")
-        appear_button = options.appear_button if options.appear_button is not None else click_button
+        if options.appear_button is None:
+            if not isinstance(click_button, Button):
+                message = "非 Button 点击目标必须显式提供 appear_button"
+                raise TypeError(message)
+            appear_button = click_button
+        else:
+            appear_button = options.appear_button
 
-        click_timer = Timer(options.retry_wait, count=options.retry_wait // 0.5)
+        click_timer = Timer(options.retry_wait, count=int(options.retry_wait // 0.5))
         confirm_wait = options.confirm_wait if options.additional is not None else 0
-        confirm_timer = Timer(confirm_wait, count=confirm_wait // 0.5).start()
+        confirm_timer = Timer(confirm_wait, count=int(confirm_wait // 0.5)).start()
         skip_first_screenshot = options.skip_first_screenshot
         while 1:
             if skip_first_screenshot:
@@ -116,10 +179,7 @@ class UI(InfoHandler):
             elif confirm_timer.reached():
                 break
 
-            if click_timer.reached() and (
-                (isinstance(appear_button, Button) and self.appear(appear_button, offset=options.offset))
-                or (callable(appear_button) and appear_button())
-            ):
+            if click_timer.reached() and self.ensure_button_execute(appear_button, offset=options.offset):
                 self.device.click(click_button)
                 click_timer.reset()
                 continue
@@ -127,33 +187,33 @@ class UI(InfoHandler):
             if options.additional is not None and options.additional():
                 continue
 
-    def ui_process_check_button(self, check_button, offset=(30, 30)):
+    def ui_process_check_button(
+        self,
+        check_button: CheckButton,
+        offset: MatchOffset | None = (30, 30),
+    ) -> bool:
         """check_button 可为 Button、回调或 Button 列表/元组。"""
         if isinstance(check_button, Button):
             return self.appear(check_button, offset=offset)
-        if callable(check_button):
-            return check_button()
-        if isinstance(check_button, (list, tuple)):
+        if _is_button_sequence(check_button):
             return any(self.appear(button, offset=offset) for button in check_button)
-        return self.appear(check_button, offset=offset)
+        return check_button()
 
-    def _create_current_page_app_check(self):
+    def _create_current_page_app_check(self) -> Callable[[], None]:
         @run_once
-        def app_check():
+        def app_check() -> None:
             if not self.device.app_is_running():
                 raise GameNotRunningError(GAME_NOT_RUNNING_MESSAGE)
 
         return app_check
 
-    def _take_current_page_screenshot(self, skip_first_screenshot):
+    def _take_current_page_screenshot(self, *, skip_first_screenshot: bool) -> None:
         if skip_first_screenshot and self.device.has_cached_image:
             return
         self.device.screenshot()
 
-    def _match_current_page(self):
+    def _match_current_page(self) -> Page | None:
         for page in Page.iter_pages():
-            if page.check_button is None:
-                continue
             if not self.ui_page_appear(page=page):
                 continue
             logger.attr("UI", page.name)
@@ -161,7 +221,7 @@ class UI(InfoHandler):
             return page
         return None
 
-    def _handle_unknown_current_page(self):
+    def _handle_unknown_current_page(self) -> bool:
         logger.info("Unknown ui page")
         return (
             self._appear_then_click_any(
@@ -174,7 +234,7 @@ class UI(InfoHandler):
             or self.ui_additional()
         )
 
-    def _raise_unknown_current_page_error(self):
+    def _raise_unknown_current_page_error(self) -> Never:
         logger.warning("Unknown ui page")
         logger.attr("DEVICE_STACK", "MuMu + nemu_ipc 截图 + minitouch 控制")
         logger.attr("SERVER", self.config.SERVER)
@@ -184,14 +244,14 @@ class UI(InfoHandler):
         logger.critical("Please switch to a supported page before starting Alas")
         raise GamePageUnknownError
 
-    def ui_get_current_page(self, skip_first_screenshot=True):
+    def ui_get_current_page(self, *, skip_first_screenshot: bool = True) -> Page:
         logger.info("UI get current page")
 
         app_check = self._create_current_page_app_check()
         orientation_timer = Timer(5)
         timeout = Timer(10, count=20).start()
         while 1:
-            self._take_current_page_screenshot(skip_first_screenshot)
+            self._take_current_page_screenshot(skip_first_screenshot=skip_first_screenshot)
             skip_first_screenshot = False
 
             if timeout.reached():
@@ -212,7 +272,14 @@ class UI(InfoHandler):
 
         return self._raise_unknown_current_page_error()
 
-    def ui_goto(self, destination, get_ship=True, offset=(30, 30), skip_first_screenshot=True):
+    def ui_goto(
+        self,
+        destination: Page,
+        *,
+        get_ship: bool = True,
+        offset: MatchOffset | None = (30, 30),
+        skip_first_screenshot: bool = True,
+    ) -> None:
         Page.init_connection(destination)
         self.interval_clear(list(Page.iter_check_buttons()))
 
@@ -230,7 +297,7 @@ class UI(InfoHandler):
 
             clicked = False
             for page in Page.iter_pages():
-                if page.parent is None or page.check_button is None:
+                if page.parent is None:
                     continue
                 if self.appear(page.check_button, offset=offset, interval=5):
                     logger.info(f"Page switch: {page} -> {page.parent}")
@@ -247,7 +314,7 @@ class UI(InfoHandler):
 
         Page.clear_connection()
 
-    def ui_ensure(self, destination, skip_first_screenshot=True):
+    def ui_ensure(self, destination: Page, *, skip_first_screenshot: bool = True) -> bool:
         """返回是否实际发生了页面切换。"""
         logger.hr("UI ensure")
         self.ui_get_current_page(skip_first_screenshot=skip_first_screenshot)
@@ -258,24 +325,25 @@ class UI(InfoHandler):
         self.ui_goto(destination, skip_first_screenshot=True)
         return True
 
-    def ui_goto_main(self):
+    def ui_goto_main(self) -> bool:
         return self.ui_ensure(destination=page_main)
 
-    def ui_goto_campaign(self):
+    def ui_goto_campaign(self) -> bool:
         return self.ui_ensure(destination=page_campaign)
 
-    def ui_goto_event(self):
+    def ui_goto_event(self) -> bool:
         return self.ui_ensure(destination=page_event)
 
-    def ui_goto_sp(self):
+    def ui_goto_sp(self) -> bool:
         return self.ui_ensure(destination=page_sp)
 
     def ui_ensure_index(
         self,
-        index,
-        controls,
-        skip_first_screenshot=False,
-    ):
+        index: int,
+        controls: UiIndexControls,
+        *,
+        skip_first_screenshot: bool = False,
+    ) -> None:
         logger.hr("UI ensure index")
         retry = Timer(1, count=2)
         while 1:
@@ -285,7 +353,9 @@ class UI(InfoHandler):
                 self.device.screenshot()
 
             letter = controls.letter
-            current = letter.ocr(self.device.image) if isinstance(letter, Ocr) else letter(self.device.image)
+            current = (
+                letter.ocr_single(self.device.image) if isinstance(letter, IndexOcr) else letter(self.device.image)
+            )
 
             logger.attr("Index", current)
             diff = index - current
@@ -300,7 +370,15 @@ class UI(InfoHandler):
                     self.device.click(button)
                 retry.reset()
 
-    def ui_back(self, check_button, appear_button=None, offset=(30, 30), retry_wait=10, skip_first_screenshot=False):
+    def ui_back(
+        self,
+        check_button: CheckButton,
+        appear_button: Button | Callable[[], bool] | None = None,
+        offset: MatchOffset | None = (30, 30),
+        retry_wait: float = 10,
+        *,
+        skip_first_screenshot: bool = False,
+    ) -> None:
         return self.ui_click(
             click_button=ui_assets.BACK_ARROW,
             check_button=check_button,
@@ -314,17 +392,17 @@ class UI(InfoHandler):
 
     _opsi_reset_fleet_preparation_click = 0
 
-    def _appear_then_click_any(self, button_options):
+    def _appear_then_click_any(self, button_options: Sequence[ButtonOption]) -> bool:
         return any(self.appear_then_click(button, **kwargs) for button, kwargs in button_options)
 
-    def _return_to_main_from_page(self, page_button):
+    def _return_to_main_from_page(self, page_button: Button) -> bool:
         if not self.appear(page_button, offset=(30, 30), interval=5):
             return False
         logger.info(f"UI additional: {page_button} -> {ui_assets.GOTO_MAIN}")
         return bool(self.appear_then_click(ui_assets.GOTO_MAIN, offset=(30, 30)))
 
-    def _handle_main_daily_popups(self, get_ship):
-        daily_buttons = [
+    def _handle_main_daily_popups(self, *, get_ship: bool) -> bool:
+        daily_buttons: list[ButtonOption] = [
             (LOGIN_ANNOUNCE, {"offset": (30, 30), "interval": 3}),
             (LOGIN_ANNOUNCE_2, {"offset": (30, 30), "interval": 3}),
             (GET_ITEMS_1, {"offset": True, "interval": 3}),
@@ -336,8 +414,8 @@ class UI(InfoHandler):
             return True
         return self.appear_then_click(LOGIN_RETURN_SIGN, offset=(30, 30), interval=3)
 
-    def _handle_main_notice_popups(self):
-        notice_buttons = [
+    def _handle_main_notice_popups(self) -> bool:
+        notice_buttons: list[ButtonOption] = [
             (MONTHLY_PASS_NOTICE, {"offset": (30, 30), "interval": 3}),
             (BATTLE_PASS_NOTICE, {"offset": (30, 30), "interval": 3}),
         ]
@@ -349,17 +427,17 @@ class UI(InfoHandler):
             return True
         return False
 
-    def _handle_main_expired_popups(self):
+    def _handle_main_expired_popups(self) -> bool:
         if self.handle_popup_single(offset=(-6, 48, 54, 88), name="ITEM_EXPIRED"):
             return True
         return self.handle_popup_single_white()
 
-    def _handle_main_routed_pages(self):
+    def _handle_main_routed_pages(self) -> bool:
         return self._return_to_main_from_page(ui_assets.SHIPYARD_CHECK) or self._return_to_main_from_page(
             ui_assets.META_CHECK
         )
 
-    def _handle_main_player_page(self):
+    def _handle_main_player_page(self) -> bool:
         if not self.appear(ui_assets.PLAYER_CHECK, offset=(30, 30), interval=3):
             return False
         logger.info(f"UI additional: {ui_assets.PLAYER_CHECK} -> {ui_assets.GOTO_MAIN}")
@@ -368,7 +446,7 @@ class UI(InfoHandler):
             or self.appear_then_click(ui_assets.BACK_ARROW, offset=(30, 30))
         )
 
-    def ui_page_main_popups(self, get_ship=True):
+    def ui_page_main_popups(self, *, get_ship: bool = True) -> bool:
         """处理主页和奖励页弹窗。"""
         if self.handle_guild_popup_cancel():
             return True
@@ -382,7 +460,7 @@ class UI(InfoHandler):
             or self._handle_main_player_page()
         )
 
-    def ui_page_os_popups(self):
+    def ui_page_os_popups(self) -> bool:
         """处理大世界入口页的重置弹窗。"""
         # 大世界重置可能依次出现剧情确认、重置券、舰队准备和兑换商店。
         if self._opsi_reset_fleet_preparation_click >= 5:
@@ -407,7 +485,7 @@ class UI(InfoHandler):
 
         return False
 
-    def _handle_priority_additional_popups(self, get_ship):
+    def _handle_priority_additional_popups(self, *, get_ship: bool) -> bool:
         # page_os 的弹窗有 confirm 变体，必须先处理。
         if self.ui_page_os_popups():
             return True
@@ -419,14 +497,14 @@ class UI(InfoHandler):
             return True
         return self.handle_story_skip()
 
-    def _handle_game_tips_popup(self):
+    def _handle_game_tips_popup(self) -> bool:
         if not self.appear(GAME_TIPS, offset=(30, 30), interval=2):
             return False
         logger.info(f"UI additional: {GAME_TIPS} -> {ui_assets.GOTO_MAIN}")
         self.device.click(ui_assets.GOTO_MAIN)
         return True
 
-    def _handle_dorm_popups(self):
+    def _handle_dorm_popups(self) -> bool:
         if self.appear(ui_assets.DORM_INFO, offset=(30, 30), similarity=0.75, interval=3):
             self.device.click(ui_assets.DORM_INFO)
             return True
@@ -437,7 +515,7 @@ class UI(InfoHandler):
             ]
         )
 
-    def _handle_meowfficer_popups(self):
+    def _handle_meowfficer_popups(self) -> bool:
         if self.appear_then_click(ui_assets.MEOWFFICER_INFO, offset=(30, 30), interval=3):
             self.interval_reset(GET_SHIP)
             return True
@@ -448,8 +526,8 @@ class UI(InfoHandler):
             return True
         return False
 
-    def _handle_campaign_preparation_popups(self):
-        preparation_buttons = [
+    def _handle_campaign_preparation_popups(self) -> bool:
+        preparation_buttons: list[ButtonOption] = [
             (MAP_PREPARATION, {"offset": (30, 30), "interval": 3}),
             (FLEET_PREPARATION, {"offset": (20, 50), "interval": 3}),
             (raid_assets.RAID_FLEET_PREPARATION, {"offset": (30, 30), "interval": 3}),
@@ -466,7 +544,7 @@ class UI(InfoHandler):
             return True
         return self._handle_withdraw_popup()
 
-    def _handle_withdraw_popup(self):
+    def _handle_withdraw_popup(self) -> bool:
         if not self.appear(WITHDRAW, offset=(30, 30), interval=3):
             return False
         # 2022-04-07 后，从已进入关卡重启再运行 Main，立即撤退可能让客户端卡死。
@@ -481,7 +559,7 @@ class UI(InfoHandler):
         self.interval_reset(WITHDRAW)
         return False
 
-    def _handle_login_popups(self):
+    def _handle_login_popups(self) -> bool:
         return self._appear_then_click_any(
             [
                 (LOGIN_CHECK, {"offset": (30, 30), "interval": 3}),
@@ -489,14 +567,14 @@ class UI(InfoHandler):
             ]
         )
 
-    def _handle_exercise_preparation_popup(self):
+    def _handle_exercise_preparation_popup(self) -> bool:
         if not self.appear(EXERCISE_PREPARATION, interval=3):
             return False
         logger.info(f"UI additional: {EXERCISE_PREPARATION} -> {ui_assets.GOTO_MAIN}")
         self.device.click(ui_assets.GOTO_MAIN)
         return True
 
-    def _handle_white_main_tab_switch(self):
+    def _handle_white_main_tab_switch(self) -> bool:
         if not self.appear(ui_white_assets.MAIN_GOTO_MEMORIES_WHITE, interval=3):
             return False
         logger.info(
@@ -505,7 +583,7 @@ class UI(InfoHandler):
         self.device.click(ui_white_assets.MAIN_TAB_SWITCH_WHITE)
         return True
 
-    def ui_additional(self, get_ship=True):
+    def ui_additional(self, *, get_ship: bool = True) -> bool:
         """处理 UI 切换期间的干扰弹窗；get_ship 控制是否处理获得舰船页面。"""
         return (
             self._handle_priority_additional_popups(get_ship=get_ship)
@@ -519,7 +597,7 @@ class UI(InfoHandler):
             or self._handle_white_main_tab_switch()
         )
 
-    def handle_idle_page(self):
+    def handle_idle_page(self) -> bool:
         timer = self.get_interval_timer(ui_assets.IDLE, interval=3)
         if not timer.reached():
             return False
@@ -540,7 +618,8 @@ class UI(InfoHandler):
             return True
         return False
 
-    def _iter_button_interval_reset_targets(self, button):
+    @staticmethod
+    def _iter_button_interval_reset_targets(button: Button) -> Iterator[Button]:
         if button in (
             ui_assets.MEOWFFICER_GOTO_DORMMENU,
             ui_assets.DORMMENU_GOTO_DORM,
@@ -563,7 +642,7 @@ class UI(InfoHandler):
         if button == ui_assets.SHOP_GOTO_SUPPLY_PACK:
             yield EXCHANGE_CHECK
 
-    def ui_button_interval_reset(self, button):
+    def ui_button_interval_reset(self, button: Button) -> None:
         """重置目标按钮及关联按钮的点击间隔。"""
         for reset_button in self._iter_button_interval_reset_targets(button):
             self.interval_reset(reset_button)
