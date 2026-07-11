@@ -123,8 +123,9 @@ class _TestDuration(Duration):
 
 
 class _SlashCounter(_TestCounter):
-    def after_process(self, result: str) -> str:
-        result = super().after_process(result)
+    @staticmethod
+    def normalize_text(result: str) -> str:
+        result = DigitCounter.normalize_text(result)
         return "14/15" if result == "1415" else result
 
 
@@ -133,12 +134,6 @@ class _IntegerCorrectingDigit(_TestDigit):
         if result == "seven":
             return 7
         return super().after_process(result)
-
-
-class _StringReturningDigit(_TestDigit):
-    def after_process(self, result: str) -> str:
-        del result
-        return "7"
 
 
 class _UnnamedDigit(Digit):
@@ -426,8 +421,9 @@ def test_digit_recognize_uses_dynamic_after_process() -> None:
     assert (result.value, result.normalized_text, result.score) == (7, "7", 0.84)
 
 
-def test_digit_recognize_rejects_non_integer_after_process_result() -> None:
-    digit = _StringReturningDigit(_FakeEngine("seven", 0.84))
+def test_digit_recognize_rejects_non_integer_after_process_result(monkeypatch: pytest.MonkeyPatch) -> None:
+    digit = _TestDigit(_FakeEngine("seven", 0.84))
+    monkeypatch.setattr(digit, "after_process", lambda _result: "7")
 
     result = require_single(digit.recognize(TEST_IMAGE))
 
@@ -520,7 +516,7 @@ def _patch_cnocr_batch(
 
 def extract_raw_result(monkeypatch: pytest.MonkeyPatch, payload: object) -> RawOcrResult:
     _patch_cnocr_batch(monkeypatch, [payload])
-    return _loaded_ocr().ocr_for_single_lines_raw([object()])[0]
+    return _loaded_ocr().ocr_for_single_lines_raw([TEST_IMAGE])[0]
 
 
 def test_extract_raw_result_preserves_text_and_score(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -687,7 +683,7 @@ def test_model_name_is_normalized_without_loading(monkeypatch: pytest.MonkeyPatc
 
 
 def test_raw_batch_preserves_text_and_score(monkeypatch: pytest.MonkeyPatch) -> None:
-    images = [object(), object()]
+    images = [TEST_IMAGE.copy(), TEST_IMAGE.copy()]
     calls = _patch_cnocr_batch(
         monkeypatch,
         [{"text": "14/15", "score": 0.875}, {"text": "01:30:00", "score": 0.625}],
@@ -701,7 +697,7 @@ def test_raw_batch_preserves_text_and_score(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_raw_batch_keeps_empty_list(monkeypatch: pytest.MonkeyPatch) -> None:
-    images: list[object] = []
+    images: list[np.ndarray] = []
     calls = _patch_cnocr_batch(monkeypatch, [])
     ocr = _loaded_ocr()
 
@@ -710,7 +706,7 @@ def test_raw_batch_keeps_empty_list(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_atomic_raw_batch_sets_alphabet_and_preserves_score(monkeypatch: pytest.MonkeyPatch) -> None:
-    image = object()
+    image = TEST_IMAGE.copy()
     _patch_cnocr_batch(monkeypatch, [{"text": "14/15", "score": 0.875}])
     alphabets: list[str | None] = []
     monkeypatch.setattr(AlOcr, "set_cand_alphabet", lambda _ocr, alphabet: alphabets.append(alphabet))
@@ -723,7 +719,7 @@ def test_atomic_raw_batch_sets_alphabet_and_preserves_score(monkeypatch: pytest.
 
 
 def test_atomic_string_batch_projects_text_from_raw_batch(monkeypatch: pytest.MonkeyPatch) -> None:
-    image = object()
+    image = TEST_IMAGE.copy()
     _patch_cnocr_batch(monkeypatch, [{"text": "14/15", "score": 0.875}])
     alphabets: list[str | None] = []
     monkeypatch.setattr(AlOcr, "set_cand_alphabet", lambda _ocr, alphabet: alphabets.append(alphabet))
@@ -744,7 +740,7 @@ def test_detection_ocr_keeps_cnocr_dictionary_path_before_projection(monkeypatch
     ocr.det_model = None
     monkeypatch.setattr(ocr, "_prepare_img", lambda _image: image)
 
-    assert ocr.ocr(image) == ["14/15"]
+    assert ocr.ocr_texts(image) == ["14/15"]
     assert len(calls) == 1
     assert calls[0][0][0] is image
     assert calls[0][1] == 1

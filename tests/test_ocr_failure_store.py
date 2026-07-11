@@ -8,6 +8,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from threading import Barrier
+from typing import TYPE_CHECKING
 
 import numpy as np
 import psutil
@@ -25,6 +26,9 @@ from module.ocr.failure_store import (
 )
 from module.ocr.ocr import DigitCounter
 from module.ocr.result import RawOcrResult, RecognitionFailureReason, RecognitionResult
+
+if TYPE_CHECKING:
+    from module.base.atomic import FileData
 
 RAW_IMAGE = np.arange(36, dtype=np.uint8).reshape(3, 4, 3)
 PROCESSED_IMAGE = np.arange(12, dtype=np.uint8).reshape(3, 4)
@@ -641,7 +645,7 @@ def test_failure_store_cleanup_does_not_follow_replaced_temp_junction(
     def fixed_temp_path(_final_directory: Path) -> str:
         return str(temp_junction)
 
-    def replace_temp_after_writing(path: Path, content: object) -> None:
+    def replace_temp_after_writing(path: Path, content: FileData) -> None:
         write_file(path, content)
         if path.name == "metadata.json":
             shutil.rmtree(temp_junction)
@@ -735,7 +739,7 @@ def test_failure_store_cleans_failed_publish_rethrows_then_disables_without_logg
         encoded_shapes.append(image.shape)
         return encode_png(image)
 
-    def count_file_write(path: Path, content: object) -> None:
+    def count_file_write(path: Path, content: FileData) -> None:
         written_paths.append(Path(path))
         write_file(path, content)
 

@@ -19,6 +19,7 @@ from module.base.atomic import atomic_replace, file_write, folder_rmtree, to_tmp
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from module.base.type_alias import ImageArray
     from module.ocr.result import RecognitionResult
 
 type _RecognitionResult[T] = RecognitionResult[T]
@@ -90,8 +91,8 @@ class OcrFailureRecordStatus(StrEnum):
 @dataclass(frozen=True, slots=True)
 class OcrFailureSample[T]:
     result: _RecognitionResult[T]
-    raw_image: np.ndarray
-    processed_image: np.ndarray
+    raw_image: ImageArray
+    processed_image: ImageArray
     area: tuple[int, int, int, int] | None
     alphabet: str | None
     letter: tuple[int, int, int]
@@ -299,13 +300,13 @@ class OcrFailureStore:
         return True
 
     @staticmethod
-    def _png_bytes(image: np.ndarray) -> bytes:
+    def _png_bytes(image: ImageArray) -> bytes:
         buffer = BytesIO()
         Image.fromarray(image).save(buffer, format="PNG")
         return buffer.getvalue()
 
     @staticmethod
-    def _validate_images(raw_image: np.ndarray, processed_image: np.ndarray) -> None:
+    def _validate_images(raw_image: ImageArray, processed_image: ImageArray) -> None:
         if not isinstance(raw_image, np.ndarray) or not isinstance(processed_image, np.ndarray):
             message = "raw and processed images must be NumPy arrays"
             raise TypeError(message)

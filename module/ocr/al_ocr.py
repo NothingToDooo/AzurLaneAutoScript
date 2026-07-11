@@ -1,6 +1,7 @@
+from collections.abc import Collection, Sequence
 from math import isfinite
 from numbers import Real
-from typing import ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, Protocol, TypedDict, Unpack, cast
 
 import cv2
 import numpy as np
@@ -8,10 +9,35 @@ from cnocr import CnOcr
 from cnocr.utils import data_dir
 from PIL import Image
 
+from module.base.type_alias import FilePath, ImageArray
 from module.logger import logger
 from module.ocr.result import RawOcrResult
 
-_DEFAULT_OCR_ROOT = data_dir()
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from numpy.typing import NDArray
+    from torch import Tensor
+
+type CnOcrImage = str | Path | Image.Image | Tensor | np.ndarray
+type CnOcrLineImage = str | Path | Tensor | np.ndarray
+type _CnOcrResultPayload = dict[str, str | Real | np.ndarray]
+type _ModelArguments = tuple[str, Collection[str] | str | None, FilePath, str]
+
+
+class OcrDetectionOptions(TypedDict, total=False):
+    resized_shape: int | tuple[int, int]
+    preserve_aspect_ratio: bool
+    min_box_size: int
+    box_score_thresh: float
+    batch_size: int
+
+
+class _AlphabetModel(Protocol):
+    def set_cand_alphabet(self, cand_alphabet: Collection[str] | str | None) -> None: ...
+
+
+_DEFAULT_OCR_ROOT: FilePath = data_dir()
 logger.info("OCR dependencies loaded")
 
 
@@ -23,17 +49,17 @@ class AlOcr(CnOcr):
 
     def __init__(
         self,
-        model_name="densenet-lite-gru",
-        cand_alphabet=None,
-        root=_DEFAULT_OCR_ROOT,
-        context="cpu",
-    ):
-        self._args = (model_name, cand_alphabet, root, context)
+        model_name: str = "densenet-lite-gru",
+        cand_alphabet: Collection[str] | str | None = None,
+        root: FilePath = _DEFAULT_OCR_ROOT,
+        context: str = "cpu",
+    ) -> None:
+        self._args: _ModelArguments = (model_name, cand_alphabet, root, context)
         self._model_name = self._normalize_model_name(model_name)
         self._model_loaded = False
 
     @classmethod
-    def _normalize_model_name(cls, model_name) -> str:
+    def _normalize_model_name(cls, model_name: str) -> str:
         return cls.MODEL_NAME_ALIASES.get(model_name, model_name)
 
     @property
@@ -41,14 +67,13 @@ class AlOcr(CnOcr):
         return self._model_name
 
     @staticmethod
-    def _extract_raw_result(result: object) -> RawOcrResult:
+    def _extract_raw_result(result: _CnOcrResultPayload) -> RawOcrResult:
         if not isinstance(result, dict):
             message = "OCR result must be a dictionary"
             raise TypeError(message)
-        payload = cast("dict[object, object]", result)
         try:
-            text = payload["text"]
-            score = payload["score"]
+            text = result["text"]
+            score = result["score"]
         except KeyError as error:
             message = "OCR result must contain text and score"
             raise TypeError(message) from error
@@ -66,11 +91,11 @@ class AlOcr(CnOcr):
 
     def init(
         self,
-        model_name="densenet-lite-gru",
-        cand_alphabet=None,
-        root=_DEFAULT_OCR_ROOT,
-        context="cpu",
-    ):
+        model_name: str = "densenet-lite-gru",
+        cand_alphabet: Collection[str] | str | None = None,
+        root: FilePath = _DEFAULT_OCR_ROOT,
+        context: str = "cpu",
+    ) -> None:
         model_name = self._normalize_model_name(model_name)
         logger.info(f"Loading OCR model: {model_name}")
         if root != _DEFAULT_OCR_ROOT:
@@ -83,12 +108,19 @@ class AlOcr(CnOcr):
             context=context or self.CNOCR_CONTEXT,
         )
 
-    def ensure_loaded(self):
+    def ensure_loaded(self) -> None:
         if not self._model_loaded:
             self.init(*self._args)
             self._model_loaded = True
 
-    def ocr(self, img_fp, rec_batch_size=1, return_cropped_image=False, **det_kwargs):
+    def ocr_texts(
+        self,
+        img_fp: CnOcrImage,
+        rec_batch_size: int = 1,
+        *,
+        return_cropped_image: bool = False,
+        **det_kwargs: Unpack[OcrDetectionOptions],
+    ) -> list[str]:
         self.ensure_loaded()
         return [
             self._extract_raw_result(item).text
@@ -100,30 +132,44 @@ class AlOcr(CnOcr):
             )
         ]
 
-    def ocr_for_single_lines_raw(self, img_list, batch_size=1) -> list[RawOcrResult]:
+    def ocr_for_single_lines_raw(
+        self,
+        img_list: Sequence[CnOcrLineImage],
+        batch_size: int = 1,
+    ) -> list[RawOcrResult]:
         self.ensure_loaded()
         return [
-            self._extract_raw_result(item) for item in super().ocr_for_single_lines(img_list, batch_size=batch_size)
+            self._extract_raw_result(item)
+            for item in super().ocr_for_single_lines(list(img_list), batch_size=batch_size)
         ]
 
-    def set_cand_alphabet(self, cand_alphabet):
+    def set_cand_alphabet(self, cand_alphabet: Collection[str] | str | None) -> None:
         self.ensure_loaded()
-        return self.rec_model.set_cand_alphabet(cand_alphabet)
+        cast("_AlphabetModel", self.rec_model).set_cand_alphabet(cand_alphabet)
 
-    def atomic_ocr_for_single_lines_raw(self, img_list, cand_alphabet=None) -> list[RawOcrResult]:
+    def atomic_ocr_for_single_lines_raw(
+        self,
+        img_list: Sequence[CnOcrLineImage],
+        cand_alphabet: Collection[str] | str | None = None,
+    ) -> list[RawOcrResult]:
         self.set_cand_alphabet(cand_alphabet)
         return self.ocr_for_single_lines_raw(img_list)
 
-    def atomic_ocr_for_single_lines(self, img_list, cand_alphabet=None):
+    def atomic_ocr_for_single_lines(
+        self,
+        img_list: Sequence[CnOcrLineImage],
+        cand_alphabet: Collection[str] | str | None = None,
+    ) -> list[str]:
         return [result.text for result in self.atomic_ocr_for_single_lines_raw(img_list, cand_alphabet=cand_alphabet)]
 
-    def _preprocess_img_array(self, img):
+    @staticmethod
+    def _preprocess_img_array(img: ImageArray) -> NDArray[np.float32]:
         height, width = img.shape[:2]
         new_width = round(32 / height * width)
-        img = cv2.resize(img, (new_width, 32))
-        return np.expand_dims(img, 0).astype("float32") / 255.0
+        resized = cv2.resize(img, (new_width, 32))
+        return cast("NDArray[np.float32]", np.expand_dims(resized, 0).astype(np.float32) / np.float32(255))
 
-    def debug(self, img_list):
-        img_list = [(self._preprocess_img_array(img) * 255.0).astype(np.uint8) for img in img_list]
-        image = cv2.hconcat(img_list)[0, :, :]
+    def debug(self, img_list: Sequence[ImageArray]) -> None:
+        display_images = [(self._preprocess_img_array(img) * 255.0).astype(np.uint8) for img in img_list]
+        image = cv2.hconcat(display_images)[0, :, :]
         Image.fromarray(image).show()
