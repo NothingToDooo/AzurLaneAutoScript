@@ -33,15 +33,7 @@ COMMISSION_ADVICE_FLASHING_BUG_MESSAGE = "Triggered commission list flashing bug
 
 
 def lines_detect(image):
-    """
-    Args:
-        image:
-
-    Returns:
-        np.ndarray: Coordinate Y of the white lines under each commission.
-    """
-    # 通过每个委托下方的白线定位委托条目。
-    # (597, 0, 619, 720) 是只包含白线的区域。
+    """在 (597, 0, 619, 720) 白线区域返回各委托底边的 Y 坐标。"""
     color_height = np.mean(rgb2gray(crop(image, (597, 0, 619, 720), copy=False)), axis=1)
     parameters = {"height": 200, "distance": 100}
     peaks, _ = signal.find_peaks(color_height, **parameters)
@@ -60,15 +52,6 @@ class RewardCommission(UI, InfoHandler):
     max_commission = 4
 
     def _commission_detect(self, image):
-        """
-        Get all commissions from an image.
-
-        Args:
-            image (np.ndarray):
-
-        Returns:
-            SelectedGrids:
-        """
         logger.hr("Commission detect")
         commission = []
         for y in lines_detect(image):
@@ -81,16 +64,7 @@ class RewardCommission(UI, InfoHandler):
         return SelectedGrids(commission)
 
     def commission_detect(self, trial=1, area=None, skip_first_screenshot=True):
-        """
-        Args:
-            trial (int): Retry if has one invalid commission,
-                         usually because info_bar didn't disappear completely.
-            area (tuple):
-            skip_first_screenshot (bool):
-
-        Returns:
-            SelectedGrids:
-        """
+        """检测委托；仅一个条目无效时按 trial 重试，通常是 info_bar 残影所致。"""
         commissions = SelectedGrids([])
         for _ in range(trial):
             if skip_first_screenshot:
@@ -112,15 +86,7 @@ class RewardCommission(UI, InfoHandler):
         return commissions
 
     def _commission_choose(self, daily, urgent):
-        """选择本轮要执行的委托。
-
-        Args:
-            daily (SelectedGrids):
-            urgent (SelectedGrids):
-
-        Returns:
-            SelectedGrids, SelectedGrids: Chosen daily commission, Chosen urgent commission
-        """
+        """返回本轮选择的日常委托和紧急委托。"""
         self.comm_choose = SelectedGrids([])
         total = self._commission_merge_candidates(daily, urgent)
         running_count = self._commission_running_count(total)
@@ -209,7 +175,6 @@ class RewardCommission(UI, InfoHandler):
             logger.info(comm)
 
     def _commission_check(self, commission):
-        """返回委托是否可执行。"""
         return (
             commission.valid
             and commission.status == "pending"
@@ -271,17 +236,12 @@ class RewardCommission(UI, InfoHandler):
         return True
 
     def _commission_scan_list(self):
-        """
-        Returns:
-            SelectedGrids: SelectedGrids containing Commission objects
-        """
         self.device.click_record_clear()
         commission = SelectedGrids([])
         for _ in range(15):
             new = self.commission_detect(trial=2)
             commission = commission.add_by_eq(new)
 
-            # 结束。
             if not self._commission_swipe():
                 break
 
@@ -289,11 +249,7 @@ class RewardCommission(UI, InfoHandler):
         return commission
 
     def _commission_scan_all(self):
-        """
-        Pages:
-            in: page_commission
-            out: page_commission
-        """
+        """在委托页扫描日常与紧急列表，并计算本轮选择。"""
         logger.hr("Commission scan", level=1)
         # 紧急委托列表是懒加载的，先切过去强制刷新。
         self._commission_ensure_mode("urgent")
@@ -342,20 +298,7 @@ class RewardCommission(UI, InfoHandler):
         return daily, urgent
 
     def _commission_start_click(self, comm, is_urgent=False, skip_first_screenshot=True):
-        """启动一个委托。
-
-        Args:
-            comm (Commission):
-            is_urgent (bool):
-            skip_first_screenshot:
-
-        Returns:
-            bool: If success
-
-        Pages:
-            in: page_commission
-            out: page_commission, info_bar, commission details unfold
-        """
+        """在委托页启动项目，成功后详情展开并出现 info_bar。"""
         logger.hr("Commission start")
         self.interval_clear(commission_assets.COMMISSION_ADVICE)
         self.interval_clear(commission_assets.COMMISSION_START)
@@ -437,7 +380,7 @@ class RewardCommission(UI, InfoHandler):
         area = (0, 0, image_size(self.device.image)[0], commission_assets.COMMISSION_ADVICE.button[1])
         current = self.commission_detect(area=area)
         if is_urgent:
-            current.call("convert_to_night")  # 将额外委托转换为夜间委托。
+            current.call("convert_to_night")
         if current.count < 1:
             logger.warning("No selected commission detected, assuming correct")
             return True
@@ -460,11 +403,6 @@ class RewardCommission(UI, InfoHandler):
         return True
 
     def _commission_find_and_start(self, comm, is_urgent=False):
-        """
-        Args:
-            comm (Commission):
-            is_urgent (bool):
-        """
         self.device.click_record_clear()
         comm = copy.deepcopy(comm)
         comm.repeat_count = 1
@@ -477,7 +415,7 @@ class RewardCommission(UI, InfoHandler):
             for _ in range(15):
                 new = self.commission_detect(trial=2)
                 if is_urgent:
-                    new.call("convert_to_night")  # 将额外委托转换为夜间委托。
+                    new.call("convert_to_night")
 
                 # 更新委托位置；不同扫描里的信息相同，但坐标可能不同。
                 current = None
@@ -493,7 +431,6 @@ class RewardCommission(UI, InfoHandler):
                     failed = False
                     break
 
-                # 结束。
                 if not self._commission_swipe():
                     break
 
@@ -512,13 +449,7 @@ class RewardCommission(UI, InfoHandler):
         return False
 
     def commission_start(self):
-        """
-        Scan and Start all chosen commissions.
-
-        Pages:
-            in: page_commission
-            out: page_commission
-        """
+        """在委托页扫描并启动全部选中委托。"""
         self._commission_scan_all()
 
         logger.hr("Commission run", level=1)
@@ -542,18 +473,7 @@ class RewardCommission(UI, InfoHandler):
             logger.info("No commission chose")
 
     def _commission_receive(self, skip_first_screenshot=True):
-        """领取委托奖励。
-
-        Args:
-            skip_first_screenshot:
-
-        Returns:
-            bool: If rewarded.
-
-        Pages:
-            in: page_reward
-            out: page_commission
-        """
+        """从奖励页领取委托奖励并进入委托页，返回是否领到奖励。"""
         logger.hr("Reward receive")
 
         reward = False
@@ -650,14 +570,7 @@ class RewardCommission(UI, InfoHandler):
         return click_timer.reached() and self.ui_additional()
 
     def commission_receive(self):
-        """
-        Returns:
-            bool: If rewarded.
-
-        Pages:
-            in: page_reward
-            out: page_commission
-        """
+        """领取委托奖励并返回是否领到；石油满时最多三次前往宿舍消耗后重试。"""
         for _ in range(3):
             try:
                 return self._commission_receive()
@@ -670,11 +583,7 @@ class RewardCommission(UI, InfoHandler):
         raise RequestHumanTakeover
 
     def run(self):
-        """
-        Pages:
-            in: Any
-            out: page_commission
-        """
+        """从任意页面领取并启动委托，结束于委托页。"""
         self.ui_ensure(page_reward)
         self.commission_receive()
 
@@ -683,7 +592,6 @@ class RewardCommission(UI, InfoHandler):
         self.handle_info_bar()
         self.commission_start()
 
-        # 调度下一次委托。
         total = self.daily.add_by_eq(self.urgent)
         future_finish = sorted([f for f in total.get("finish_time") if f is not None])
         logger.info(f"Commission finish: {[str(f) for f in future_finish]}")
@@ -693,7 +601,6 @@ class RewardCommission(UI, InfoHandler):
             logger.info("No commission running")
             self.config.task_delay(success=False)
 
-        # 必要时延后 GemsFarming。
         if self.config.cross_get(keys="GemsFarming.GemsFarming.CommissionLimit", default=False):
             daily = self.daily.select(category_str="daily", status="pending").count
             filtered_urgent = self.comm_choose.intersect_by_eq(self.urgent.select(status="pending")).count

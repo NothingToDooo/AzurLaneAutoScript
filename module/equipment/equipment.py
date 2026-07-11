@@ -110,7 +110,6 @@ class Equipment(StorageHandler):
             else:
                 self.device.screenshot()
 
-            # 已进入目标页面。
             if self.appear(check_button, offset=(5, 5)):
                 break
 
@@ -233,12 +232,6 @@ class Equipment(StorageHandler):
         logger.info("Equipment take off ended")
 
     def fleet_equipment_take_off(self, enter, long_click, out):
-        """
-        Args:
-            enter (Button): 进入装备编辑的按钮。
-            long_click (bool): 是否长按进入。
-            out (Button): 用于确认退出成功的按钮。
-        """
         logger.hr("Equipment take off")
         self.ship_info_enter(enter, long_click=long_click)
 
@@ -290,13 +283,7 @@ class Equipment(StorageHandler):
         logger.info("Equipment take on ended")
 
     def fleet_equipment_take_on_preset(self, preset_record, enter, long_click, out):
-        """
-        Args:
-            preset_record (list[int]): 装备记录，例如 [3, 1, 1, 1, 1, 1]。
-            enter (Button): 进入装备编辑的按钮。
-            long_click (bool): 是否长按进入。
-            out (Button): 用于确认退出成功的按钮。
-        """
+        """按每艘舰船的 1～3 号预设记录依次换装。"""
         logger.hr("Equipment take on")
         self.ship_info_enter(enter, long_click=long_click)
 

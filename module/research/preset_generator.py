@@ -51,7 +51,7 @@ def translate(string: str, target="series_4_tenrai_only_cube", for_simulate=Fals
     cube = "cube" in target
     string = string.replace("S4-H0.5 > !4-0.5", "0.5")
     string = string.replace("!4-0.5", "0.5")
-    # Add Q0.5 after the last 0.5 selection
+    # 在最后一个 0.5 小时筛选项后插入 Q0.5。
     selections = split_filter(string)
     last_05 = 0
     for index, sele in enumerate(selections):
@@ -113,7 +113,6 @@ if __name__ == "__main__":
                     value = translate(raw_value, target=key)
                     DictItem(key, value)
 
-            # 1
             Comment("""
                 Goal: DR_blurprint=0, PRY_blueprint=0, tanrai_blueprint=150
                 Average time cost: 153.41706666666678
@@ -128,7 +127,6 @@ if __name__ == "__main__":
                 > !4-C8 > !4-C12
             """
             )
-            # 2
             Comment("""
                 Goal: DR_blurprint=0, PRY_blueprint=0, tanrai_blueprint=150
                 Average time cost: 161.37177965277806
@@ -143,7 +141,6 @@ if __name__ == "__main__":
                 > !4-C8 > S4-C12 > !4-C12
             """
             )
-            # 5
             Comment("""
                 Goal: DR_blurprint=513, PRY_blueprint=343, tanrai_blueprint=100
                 Average time cost: 124.67622465277958
@@ -158,7 +155,6 @@ if __name__ == "__main__":
                 > !4-C8 > S4-C12 > !4-C12
             """
             )
-            # 6
             Comment("""
                 Goal: DR_blurprint=513, PRY_blueprint=343, tanrai_blueprint=100
                 Average time cost: 143.56399131945145
@@ -173,7 +169,6 @@ if __name__ == "__main__":
                 > S4-C12 > !4-C8 > !4-C12
             """
             )
-            # 3
             Comment("""
                 Goal: DR_blurprint=513, PRY_blueprint=343, tanrai_blueprint=0
                 Average time cost: 82.0121088194467
@@ -188,7 +183,6 @@ if __name__ == "__main__":
                 > S4-C12 > !4-C8 > !4-C12
             """
             )
-            # 4
             Comment("""
                 Goal: DR_blurprint=513, PRY_blueprint=343, tanrai_blueprint=0
                 Average time cost: 124.71616166666873

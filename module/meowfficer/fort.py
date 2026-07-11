@@ -14,18 +14,7 @@ from module.meowfficer.base import MeowfficerBase
 
 class MeowfficerFort(MeowfficerBase):
     def meow_chores(self, skip_first_screenshot=True):
-        """
-        Loop through all chore mechanics to
-        get fort xp points
-
-        Args:
-            skip_first_screenshot (bool): Skip first
-            screen shot or not
-
-        Pages:
-            in: MEOWFFICER_FORT
-            out: MEOWFFICER_FORT
-        """
+        """在猫窝页循环完成杂务并领取经验。"""
         self.interval_clear(GET_ITEMS_1)
         check_timer = Timer(1, count=2)
         confirm_timer = Timer(1.5, count=4).start()
@@ -35,7 +24,7 @@ class MeowfficerFort(MeowfficerBase):
             else:
                 self.device.screenshot()
 
-            # Accidentally exit fort
+            # 意外退出猫窝时重新进入。
             if self.appear_then_click(MEOWFFICER_FORT_ENTER, offset=(20, 20), interval=3):
                 check_timer.reset()
                 confirm_timer.reset()
@@ -60,7 +49,6 @@ class MeowfficerFort(MeowfficerBase):
                     confirm_timer.reset()
                     continue
 
-            # End
             if self.appear(MEOWFFICER_FORT_CHECK, offset=(20, 20)):
                 if confirm_timer.reached():
                     break
@@ -68,26 +56,15 @@ class MeowfficerFort(MeowfficerBase):
                 confirm_timer.reset()
 
     def meow_fort(self):
-        """
-        Performs fort chores if available,
-        applies to every meowfficer simultaneously
-
-        Pages:
-            in: page_meowfficer
-            out: page_meowfficer
-        """
-        # Check for fort red notification
+        """在指挥喵主页处理对所有指挥喵生效的猫窝杂务。"""
         if not self.appear(MEOWFFICER_FORT_RED_DOT):
             return False
         logger.hr("Meowfficer fort", level=1)
 
-        # Enter MEOWFFICER_FORT window
         self.meow_enter(MEOWFFICER_FORT_ENTER, check_button=MEOWFFICER_FORT_CHECK)
 
-        # Perform fort chore operations
         self.meow_chores()
 
-        # Exit back into page_meowfficer
         self.meow_menu_close()
 
         return True

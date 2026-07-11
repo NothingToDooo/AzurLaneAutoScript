@@ -10,8 +10,7 @@ from module.ui.ui import UI
 
 
 class PQInteract(UI):
-    # Key：目标舰船名称。
-    # Value：按钮元组，格式为 (Room_Entrance, Page_Locale)。
+    # 目标舰船映射到 (房间入口, 所在页面)；后续元素可保存特定气泡位置。
     available_targets: ClassVar[dict[str, tuple[object, ...]]] = {
         "anchorage": (pq_assets.PRIVATE_QUARTERS_SHIP_ANCHORAGE, pq_assets.PRIVATE_QUARTERS_PAGE_LOCALE_BEACH),
         "noshiro": (pq_assets.PRIVATE_QUARTERS_SHIP_NOSHIRO, pq_assets.PRIVATE_QUARTERS_PAGE_LOCALE_BEACH),
@@ -23,11 +22,7 @@ class PQInteract(UI):
     }
 
     def _pq_handle_dialogue(self):
-        """
-        处理目标舰船的对话流程。
-
-        加入大凤后，少数情况下这段对话会卡顿，所以除了进房间外，其他状态也会调用它。
-        """
+        """推进对话；加入大凤后偶尔会卡顿，因此多个房间状态都会调用。"""
 
         # 加载态消失前避免连续点击。
         def after_loading_state():
@@ -47,15 +42,7 @@ class PQInteract(UI):
         )
 
     def _pq_target_appear(self):
-        """
-        检查目标舰船是否出现。
-
-        offset=(100, 100) 可检测安克雷奇、能代、天狼星、新泽西和大凤。后续加入更多舰船时，
-        可以把特定气泡位置也存入 available_targets 元组。
-
-        Returns:
-            bool
-        """
+        """以 100px 偏移检查目标气泡；新舰船可在 available_targets 追加特定气泡位置。"""
         settle_timer = Timer(1.5, count=3).start()
         skip_first_screenshot = True
         while 1:
@@ -64,7 +51,6 @@ class PQInteract(UI):
             else:
                 self.device.screenshot()
 
-            # 目标已出现。
             if self.appear(pq_assets.PRIVATE_QUARTERS_ROOM_TARGET_CHECK_1, offset=(100, 100)):
                 return True
             if self.appear(pq_assets.PRIVATE_QUARTERS_ROOM_TARGET_CHECK_2, offset=(100, 100)):
@@ -72,7 +58,6 @@ class PQInteract(UI):
             if self.appear(pq_assets.PRIVATE_QUARTERS_ROOM_TARGET_CHECK_3, offset=(100, 100)):
                 return True
 
-            # 等待超时。
             if settle_timer.reached():
                 return False
 
@@ -93,15 +78,7 @@ class PQInteract(UI):
         return False
 
     def _pq_goto_room_seek(self, target_ship):
-        """
-        查找目标房间所在页面。
-
-        Args:
-            target_ship (str):
-
-        Returns:
-            bool
-        """
+        """从当前位置向两侧查找目标舰船所在页面。"""
         target_title = target_ship.title().replace("_", " ")
         if target_ship not in self.available_targets:
             logger.error(f"Unsupported target ship: {target_title}, cannot continue subtask")
@@ -118,7 +95,6 @@ class PQInteract(UI):
         if not self.appear(pq_assets.PRIVATE_QUARTERS_PAGE_LEFT, offset=(20, 20)):
             directions.reverse()
 
-        # 执行页面查找。
         skip_first_screenshot = True
         self.interval_clear(directions)
         settle_timer = Timer(1.5, count=3).start()
@@ -129,7 +105,6 @@ class PQInteract(UI):
                 else:
                     self.device.screenshot()
 
-                # 已到达目标页面。
                 if self.appear(page_btn, offset=(20, 20)):
                     logger.info(f"Reached {target_title}'s page")
                     return True
@@ -147,24 +122,12 @@ class PQInteract(UI):
         return False
 
     def _pq_goto_room_check(self):
-        """
-        检查是否正在加载，或被资源下载弹窗阻挡。
-        """
         if self.appear(pq_assets.PRIVATE_QUARTERS_LOADING_CHECK, offset=(20, 20)):
             return True
         return bool(self.appear(POPUP_CANCEL, offset=(20, 20)))
 
     def _pq_goto_room_enter(self, target_ship):
-        """
-        进入目标房间。
-
-        Args:
-            target_ship (str):
-
-        Returns:
-            bool
-        """
-        # 点击目标房间入口后，等待加载或弹窗出现。
+        """进入目标房间；资源未下载或亲密度已满时返回 False。"""
         target_title = target_ship.title().replace("_", " ")
         if target_ship not in self.available_targets:
             logger.error(f"Unsupported target ship: {target_title}, cannot continue subtask")
@@ -182,15 +145,12 @@ class PQInteract(UI):
             skip_first_screenshot=True,
         )
 
-        # 如果出现资源下载弹窗，终止本轮。
         if self.handle_popup_cancel("PRIVATE_QUARTERS_DOWNLOAD_ASSET", offset=(20, 20)):
             logger.error(f"Cannot enter {target_title}'s room, please download the necessary assets first")
             return False
 
-        # 通过点击推进，完全进入目标房间。
         self._pq_handle_dialogue()
 
-        # 目标亲密度已满时终止本轮。
         if self.appear(pq_assets.PRIVATE_QUARTERS_ROOM_TARGET_INTIMACY_MAX, offset=(20, 20)):
             logger.warning(
                 f"{target_title}'s intimacy is maxed, configure to new target or turn off subtask altogether"
@@ -200,10 +160,7 @@ class PQInteract(UI):
         return True
 
     def _pq_goto_room_exit(self):
-        """
-        退出目标房间。
-        """
-        # 少数情况下仍在对话中，退出前先处理掉。
+        """退出房间；少数情况下仍在对话，需先推进完毕。"""
         if not self.appear(pq_assets.PRIVATE_QUARTERS_ROOM_CHECK, offset=(20, 20)) and not self.appear(
             pq_assets.PRIVATE_QUARTERS_INTERACT, offset=(0, 60)
         ):
@@ -220,11 +177,7 @@ class PQInteract(UI):
         self.handle_info_bar()
 
     def pq_interact(self):
-        """
-        执行目标互动流程。
-
-        offset=(0, 60) 用于兼容资产纵向位置；不同亲密度下资产可能偏移。
-        """
+        """执行三轮互动；检查按钮时用 60px 纵向偏移兼容不同亲密度布局。"""
         logger.hr("Interact Start", level=2)
         self._pq_wait_interact_button()
 
@@ -236,7 +189,6 @@ class PQInteract(UI):
         self._pq_goto_room_exit()
 
     def _pq_wait_interact_button(self):
-        """点击目标舰船，等待互动按钮出现。"""
         click_timer = Timer(1.5, count=3).start()
         skip_first_screenshot = True
         while 1:
@@ -245,7 +197,6 @@ class PQInteract(UI):
             else:
                 self.device.screenshot()
 
-            # 已出现互动按钮。
             if self.appear(pq_assets.PRIVATE_QUARTERS_INTERACT, offset=(0, 60)):
                 break
 
@@ -254,7 +205,6 @@ class PQInteract(UI):
                 click_timer.reset()
 
     def _pq_interact_once(self):
-        """执行一轮互动确认。"""
         self.interval_clear([pq_assets.PRIVATE_QUARTERS_INTERACT_CHECK, pq_assets.PRIVATE_QUARTERS_INTERACT])
         self._pq_enter_interact_confirm()
         self._pq_leave_interact_confirm()
@@ -267,7 +217,6 @@ class PQInteract(UI):
             else:
                 self.device.screenshot()
 
-            # 已进入互动确认页。
             if self.appear(pq_assets.PRIVATE_QUARTERS_INTERACT_CHECK, offset=(20, 20)):
                 break
 
@@ -282,7 +231,6 @@ class PQInteract(UI):
             else:
                 self.device.screenshot()
 
-            # 已回到互动按钮状态。
             if self.appear(pq_assets.PRIVATE_QUARTERS_INTERACT, offset=(0, 60)):
                 break
 
@@ -291,18 +239,7 @@ class PQInteract(UI):
                 continue
 
     def pq_goto_room(self, target_ship, retry=3):
-        """
-        进入目标房间。
-
-        初始加载后目标不存在时会重试，最多重试 retry 次。
-
-        Args:
-            target_ship (str):
-            retry  (int):
-
-        Returns:
-            bool
-        """
+        """进入目标房间并返回是否成功；初始加载后目标不存在时最多重试 retry 次。"""
         success = False
         target_title = target_ship.title().replace("_", " ")
         logger.hr(f"Enter {target_title}'s Room", level=1)

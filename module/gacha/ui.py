@@ -24,17 +24,7 @@ GACHA_LOAD_ENSURE_BUTTONS = [
 
 class GachaUI(UI):
     def gacha_load_ensure(self, skip_first_screenshot=True):
-        """
-        Switching between sidebar clicks for some
-        takes a bit of processing before fully loading
-        like guild logistics
-
-        Args:
-            skip_first_screenshot (bool):
-
-        Returns:
-            bool: Whether expected assets loaded completely
-        """
+        """侧栏切换后等待延迟资源加载，超时返回 False。"""
         ensure_timeout = Timer(3, count=6).start()
         while 1:
             if skip_first_screenshot:
@@ -42,12 +32,10 @@ class GachaUI(UI):
             else:
                 self.device.screenshot()
 
-            # End
             results = [self.appear(button) for button in GACHA_LOAD_ENSURE_BUTTONS]
             if any(results):
                 return True
 
-            # Exception
             if ensure_timeout.reached():
                 logger.warning("Wait for loaded assets is incomplete, ensure not guaranteed")
                 return False
@@ -55,20 +43,7 @@ class GachaUI(UI):
 
     @cached_property
     def _gacha_side_navbar(self):
-        """
-        limited_sidebar 5 options
-            build.
-            limited_build.
-            orders.
-            shop.
-            retire.
-
-        regular_sidebar 4 options
-            build.
-            orders.
-            shop.
-            retire.
-        """
+        """限时侧栏依次为建造、限时建造、订单、商店、退役；常规侧栏没有限时建造。"""
         gacha_side_navbar = ButtonGrid(
             origin=(21, 126), delta=(0, 98), button_shape=(60, 80), grid_shape=(1, 5), name="GACHA_SIDE_NAVBAR"
         )
@@ -82,27 +57,10 @@ class GachaUI(UI):
         )
 
     def gacha_side_navbar_ensure(self, upper=None, bottom=None):
-        """
-        确保建造侧边栏已经切换到目标页面，并等待页面加载完成。
+        """按顶部或底部索引切换侧栏并等待加载。
 
-        Args:
-            upper (int):
-            limited|regular
-                1     for build.
-                2|N/A for limited_build.
-                3|2   for orders.
-                4|3   for shop.
-                5|4   for retire.
-            bottom (int):
-            limited|regular
-                5|4   for build.
-                4|N/A for limited_build.
-                3     for orders.
-                2     for shop.
-                1     for retire.
-
-        Returns:
-            bool: 是否已经确保侧边栏目标项。
+        限时/常规顶部索引：建造 1/1、限时建造 2/无、订单 3/2、商店 4/3、退役 5/4；
+        底部索引：建造 5/4、限时建造 4/无、订单 3/3、商店 2/2、退役 1/1。
         """
         retire_upper = 5 if self._gacha_side_navbar.get_total(main=self) == 5 else 4
         if upper == retire_upper or bottom == 1:
@@ -113,18 +71,7 @@ class GachaUI(UI):
 
     @cached_property
     def _construct_bottom_navbar(self):
-        """
-        limited 4 options
-            event.
-            light.
-            heavy.
-            special.
-
-        regular 3 options
-            light.
-            heavy.
-            special.
-        """
+        """限时建造栏为活动、轻型、重型、特型；常规布局没有活动池。"""
         construct_bottom_navbar = ButtonGrid(
             origin=(262, 615), delta=(209, 0), button_shape=(70, 49), grid_shape=(4, 1), name="CONSTRUCT_BOTTOM_NAVBAR"
         )
@@ -139,11 +86,7 @@ class GachaUI(UI):
 
     @cached_property
     def _exchange_bottom_navbar(self):
-        """
-        2 options
-            ships.
-            items.
-        """
+        """兑换栏依次为舰船和物品。"""
         exchange_bottom_navbar = ButtonGrid(
             origin=(569, 637), delta=(208, 0), button_shape=(70, 49), grid_shape=(2, 1), name="EXCHANGE_BOTTOM_NAVBAR"
         )
@@ -157,47 +100,15 @@ class GachaUI(UI):
         )
 
     def _gacha_bottom_navbar(self, is_build=True):
-        """
-        根据 is_build 返回对应的底部导航栏。
-
-        Returns:
-            Navbar
-        """
         if is_build:
             return self._construct_bottom_navbar
         return self._exchange_bottom_navbar
 
     def gacha_bottom_navbar_ensure(self, left=None, right=None, is_build=True):
-        """
-        确保建造或兑换底部导航栏已经切换到目标页面，并等待页面加载完成。
+        """按左右索引切换建造或兑换底栏并等待加载。
 
-        Args:
-            left (int):
-                construct_bottom_navbar
-                limited|regular
-                1|N/A for event.
-                2|1   for light.
-                3|2   for heavy.
-                4|3   for special.
-
-                exchange_bottom_navbar
-                1     for ships.
-                2     for items.
-            right (int):
-                construct_bottom_navbar
-                limited|regular
-                4|N/A for event.
-                3     for light.
-                2     for heavy.
-                1     for special.
-
-                exchange_bottom_navbar
-                2     for ships.
-                1     for items.
-            is_build (bool):
-
-        Returns:
-            bool: 是否已经确保底部导航栏目标项。
+        限时/常规建造左索引：活动 1/无、轻型 2/1、重型 3/2、特型 4/3；
+        右索引：活动 4/无、轻型 3/3、重型 2/2、特型 1/1。兑换栏舰船/物品左索引为 1/2，右索引为 2/1。
         """
         gacha_bottom_navbar = self._gacha_bottom_navbar(is_build)
         if is_build and gacha_bottom_navbar.get_total(main=self) == 3:

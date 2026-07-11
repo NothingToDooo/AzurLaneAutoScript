@@ -23,11 +23,7 @@ class ResearchUI(UI):
         self.wait_until_stable(research_assets.STABLE_CHECKER_CENTER)
 
     def queue_enter(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: is_in_research
-            out: is_in_queue
-        """
+        """从科研页进入队列页。"""
         self.ui_click(
             research_assets.RESEARCH_GOTO_QUEUE,
             check_button=self.is_in_queue,
@@ -37,11 +33,7 @@ class ResearchUI(UI):
         )
 
     def queue_quit(self):
-        """
-        Pages:
-            in: is_in_queue
-            out: is_in_research, project stabled
-        """
+        """退出队列并等待科研项目页稳定。"""
         logger.info("Queue quit")
         for _ in self.loop():
             if self.is_in_research():
@@ -63,10 +55,6 @@ class ResearchUI(UI):
         self.ensure_research_center_stable()
 
     def get_items(self):
-        """
-        Returns:
-            Button:
-        """
         if self.appear(GET_ITEMS_3, offset=(5, 5)):
             if self.image_color_count(GET_ITEMS_3_CHECK, color=(255, 255, 255), threshold=221, count=100):
                 return GET_ITEMS_3
@@ -76,13 +64,7 @@ class ResearchUI(UI):
         return None
 
     def get_research_status(self, image):
-        """
-        Args:
-            image: Screenshot
-
-        Returns:
-            list[str]: List of project status
-        """
+        """返回五个项目的 waiting、running、detail 或 unknown 状态。"""
         out = []
         for _index, status, scaling in zip(range(5), RESEARCH_STATUS, RESEARCH_SCALING, strict=True):
             info = status.crop((0, -40, 200, 0))

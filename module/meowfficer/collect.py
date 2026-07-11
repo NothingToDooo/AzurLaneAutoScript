@@ -33,17 +33,7 @@ class _MeowGetState:
 
 class MeowfficerCollect(MeowfficerBase):
     def _meow_detect_shift(self, skip_first_screenshot=True):
-        """
-        Serves as innate wait mechanism for loading
-        of meowfficer acquisition complete screen
-        During which screen may shift left randomly
-
-        Args:
-            skip_first_screenshot (bool):
-
-        Returns:
-            bool
-        """
+        """等待领取完成页稳定，并返回页面是否随机左移。"""
         flag = False
         confirm_timer = Timer(3, count=6).start()
         while 1:
@@ -52,7 +42,6 @@ class MeowfficerCollect(MeowfficerBase):
             else:
                 self.device.screenshot()
 
-            # 结束：随机左移。
             if self.image_color_count(
                 MEOWFFICER_SHIFT_DETECT, color=MEOWFFICER_SHIFT_DETECT.color, threshold=221, count=650
             ):
@@ -63,7 +52,6 @@ class MeowfficerCollect(MeowfficerBase):
                     break
                 continue
 
-            # 结束：没有位移。
             if self.appear(meow_assets.MEOWFFICER_GET_CHECK, offset=(40, 40)):
                 if flag:
                     confirm_timer.reset()
@@ -79,29 +67,20 @@ class MeowfficerCollect(MeowfficerBase):
         )
 
     def _meow_is_special_talented(self):
-        """
-        检查指挥喵是否至少有一个特殊天赋。
-
-        Returns:
-            bool
-        """
-        # Wait for complete load before examining talents
+        """检查指挥喵是否至少有一个特殊天赋。"""
         logger.info("Wait complete load and examine base talents")
 
         special_talent = False
         grid = MEOWFFICER_TALENT_GRID_2 if self._meow_detect_shift() else MEOWFFICER_TALENT_GRID_1
 
         for btn in grid.buttons:
-            # Empty slot; check for many white pixels
+            # 空槽有大量白色像素，普通天赋的罗马数字只有少量白色像素。
             if self.image_color_count(btn, color=(255, 255, 247), threshold=221, count=200):
                 continue
 
-            # Non-empty slot; check for few white pixels
-            # i.e. roman numerals
             if self.image_color_count(btn, color=(255, 255, 255), threshold=221, count=25):
                 continue
 
-            # Detected special talent
             special_talent = True
 
         log_insert = "Found" if special_talent else "No"
@@ -109,11 +88,7 @@ class MeowfficerCollect(MeowfficerBase):
         return special_talent
 
     def _meow_skip_lock(self):
-        """
-        Applicable to only gold variant meowfficer
-        Handle skip transitions; proceeds slowly
-        with caution to prevent unintentional actions
-        """
+        """仅用于金色指挥喵，缓慢跳过锁定流程以避免误操作。"""
 
         def additional():
             if self.appear(meow_assets.MEOWFFICER_TRAIN_EVALUATE, offset=(20, 20), interval=3):
@@ -121,7 +96,6 @@ class MeowfficerCollect(MeowfficerBase):
                 return True
             return False
 
-        # Trigger lock popup appearance to initiate sequence
         self.ui_click(
             meow_assets.MEOWFFICER_TRAIN_CLICK_SAFE_AREA,
             appear_button=meow_assets.MEOWFFICER_GET_CHECK,
@@ -144,27 +118,13 @@ class MeowfficerCollect(MeowfficerBase):
         self.device.click_record.pop()
 
     def _meow_apply_lock(self, lock=True):
-        """
-        Apply designated lock status onto
-        the acquired trained meowfficer
-        Prevents the meowfficer being used
-        as feed / enhance material
-
-        Args:
-            lock (bool):
-        """
-        # Apply designated lock status
+        """设置新指挥喵锁定状态，避免被用作强化材料。"""
         SWITCH_LOCK.set("lock" if lock else "unlock", main=self)
 
-        # Wait until info bar disappears
         self.ensure_no_info_bar(timeout=1)
 
     def _meow_skip_popup_after_locking(self, skip_first_screenshot=True):
-        """
-        Since 2023-11-16 update, even locked gold meow will still have popup.
-        If gold meow is locked and have popup, click MEOWFFICER_CONFIRM,
-        if gold meow is unlocked, this method should not be executed.
-        """
+        """兼容 2023-11-16 后已锁定金色指挥喵仍出现确认弹窗的流程。"""
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -206,21 +166,7 @@ class MeowfficerCollect(MeowfficerBase):
         )
 
     def meow_get(self, skip_first_screenshot=True):
-        """
-        Transition through all the necessary screens
-        to acquire each trained meowfficer
-        Animation is waited for as the amount can vary
-        Only gold variant meowfficer will prompt for
-        confirmation
-
-        Args:
-            skip_first_screenshot (bool): Skip first
-            screen shot or not
-
-        Pages:
-            in: MEOWFFICER_GET_CHECK
-            out: MEOWFFICER_TRAIN
-        """
+        """从领取页等待数量不定的动画并逐只领取；仅金色会确认，最终回到训练页。"""
         state = _MeowGetState(confirm_timer=Timer(1.5, count=3).start(), skip_first_screenshot=skip_first_screenshot)
         while 1:
             if state.skip_first_screenshot:
@@ -310,22 +256,7 @@ class MeowfficerCollect(MeowfficerBase):
         return True
 
     def meow_collect(self, collect_all=True):
-        """
-        Collect one or all trained meowfficer(s)
-        Completed slots are automatically moved
-        to top of queue, assume to check top-left
-        slot only
-
-        Args:
-            collect_all (bool): Collect all or collect single
-
-        Pages:
-            in: MEOWFFICER_TRAIN
-            out: MEOWFFICER_TRAIN
-
-        Returns:
-            bool: whether collected or not
-        """
+        """在训练页领取一只或全部并返回是否领取；完成槽会自动移到队首，只检查左上槽。"""
         logger.hr("Meowfficer collect", level=2)
 
         if self.appear(meow_assets.MEOWFFICER_TRAIN_COMPLETE, offset=(20, 20)):
@@ -344,7 +275,6 @@ class MeowfficerCollect(MeowfficerBase):
                 skip_first_screenshot=True,
             )
 
-            # Get loop mechanism to collect trained meowfficer(s)
             self.meow_get()
             return True
         return False

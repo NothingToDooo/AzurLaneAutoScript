@@ -42,7 +42,7 @@ class OcrDormFood(DigitCounter):
             for exp in range(40000, 90001, 1000):
                 res = re.match(rf"^(\d+){exp}$", result)
                 if res:
-                    # 10005800 -> 1000/5800
+                    # OCR 可能漏掉 current/total 之间的斜杠。
                     new = f"{res.group(1)}/{exp}"
                     logger.info(f"OcrDormFood result {result} is revised to {new}")
                     result = new
@@ -74,21 +74,12 @@ FOOD_FILTER = Filter(regex=re.compile(r"(\d+)"), attr=["feed"])
 
 class RewardDorm(UI):
     def _dorm_receive_click(self):
-        """
-        Click coins and loves in dorm.
-
-        Returns:
-            int: Receive count.
-
-        Pages:
-            in: page_dorm
-            out: page_dorm, with info_bar
-        """
+        """在宿舍点击金币和爱心，返回领取数并留下 info_bar。"""
         image = MASK_DORM.apply(self.device.image)
         loves = TEMPLATE_DORM_LOVE.match_multi(image, name="DORM_LOVE")
         coins = TEMPLATE_DORM_COIN.match_multi(image, name="DORM_COIN")
         logger.info(f"Dorm loves: {len(loves)}, Dorm coins: {len(coins)}")
-        # Complicated dorm background
+        # 宿舍背景复杂，误匹配时把两类资源都限制为最多 6 个。
         if len(loves) > 6:
             logger.warning("Too many dorm loves, limited to 6")
             loves = loves[:6]
@@ -99,7 +90,7 @@ class RewardDorm(UI):
         count = 0
         for button in loves:
             count += 1
-            # Disable click record check, because may have too many coins or loves.
+            # 金币或爱心可能很多，禁用点击记录检查。
             self.device.click(button, control_check=False)
             self.device.sleep((0.5, 0.8))
         for button in coins:
@@ -136,22 +127,14 @@ class RewardDorm(UI):
         builder.send()
 
     def dorm_view_reset(self):
-        """
-        通过宿舍管理和返回按钮重置宿舍视角。
-
-        Pages:
-            in: page_dorm
-            out: page_dorm
-        """
+        """通过宿舍管理页往返重置宿舍视角。"""
         logger.info("Dorm view reset")
         for _ in self.loop():
-            # End
             if self.appear(dorm_assets.DORM_MANAGE_CHECK, offset=(20, 20)):
                 break
 
             if self.appear_then_click(dorm_assets.DORM_MANAGE, offset=(20, 20), interval=3):
                 continue
-            # 处理所有弹窗。
             if self.ui_additional(get_ship=False):
                 continue
             if self.appear_then_click(dorm_assets.DORM_FURNITURE_CONFIRM, offset=(30, 30), interval=3):
@@ -166,13 +149,7 @@ class RewardDorm(UI):
                 continue
 
     def dorm_collect(self):
-        """
-        使用一键领取按钮收取宿舍里的所有金币和爱心。
-
-        Pages:
-            in: page_dorm
-            out: page_dorm
-        """
+        """在宿舍页一键领取所有金币和爱心。"""
         logger.hr("Dorm collect")
 
         self.ensure_no_info_bar()
@@ -181,19 +158,15 @@ class RewardDorm(UI):
         timeout = Timer(1.5, count=3).start()
 
         for _ in self.loop():
-            # 处理所有弹窗。
             if self.ui_additional(get_ship=False):
                 continue
 
-            # 通过一键领取按钮收取金币和爱心。
             if self.appear_then_click(dorm_assets.DORM_QUICK_COLLECT, offset=(20, 20), interval=1):
                 continue
 
-            # 正常结束。
             if self.info_bar_count() > 0:
                 break
 
-            # 超时结束。
             if timeout.reached():
                 logger.warning("Dorm collect timeout, probably because Alas did not detect the info_bar")
                 break
@@ -211,14 +184,6 @@ class RewardDorm(UI):
         return np.min(rgb2gray(self.image_crop(button, copy=False))) < 127
 
     def _dorm_feed_click(self, button, count):
-        """
-        Args:
-            button (Button): Food button.
-            count (int): Food use count.
-
-        Pages:
-            in: DORM_FEED_CHECK
-        """
         logger.info(f"Dorm feed {button} x {count}")
         if count <= 3:
             for _ in range(count):
@@ -232,21 +197,13 @@ class RewardDorm(UI):
 
         self.popup_interval_clear()
         for _ in self.loop(skip_first=skip_first_screenshot):
-            # 已回到喂食页面。
             if self.appear(dorm_assets.DORM_FEED_CHECK, offset=(20, 20)):
                 break
             if self.handle_popup_cancel("DORM_FEED"):
                 continue
 
     def dorm_food_get(self):
-        """
-        Returns:
-            list[Food]:
-            int: Amount to feed.
-
-        Pages:
-            in: DORM_FEED_CHECK
-        """
+        """在喂食页返回食物列表和待补充量；OCR 无总量时待补充量为 -1。"""
         has_food = [self._dorm_has_food(button) for button in self._dorm_food.buttons]
         amount = self._dorm_food_ocr.ocr(self.device.image)
         amount = [a if hf else 0 for a, hf in zip(amount, has_food, strict=False)]
@@ -258,18 +215,10 @@ class RewardDorm(UI):
         return food, fill
 
     def dorm_feed_once(self):
-        """
-        Returns:
-            bool: If executed.
-
-        Pages:
-            in: DORM_FEED_CHECK
-        """
         timeout = Timer(1.5, count=3).start()
         food: list[Food] = []
         fill: int = 0
         for _ in self.loop():
-            # End
             if timeout.reached():
                 logger.warning("Get dorm food timeout, probably because food is empty")
                 break
@@ -277,7 +226,6 @@ class RewardDorm(UI):
             if self.handle_info_bar():
                 continue
 
-            # Get
             food, fill = self.dorm_food_get()
             if fill == -1:
                 continue
@@ -296,13 +244,7 @@ class RewardDorm(UI):
         return False
 
     def dorm_feed(self):
-        """
-        Returns:
-            int: Executed count.
-
-        Pages:
-            in: DORM_FEED_CHECK
-        """
+        """在喂食页最多执行十轮，返回执行轮数。"""
         logger.hr("Dorm feed")
 
         for n in range(10):
@@ -314,14 +256,9 @@ class RewardDorm(UI):
         return 10
 
     def dorm_feed_enter(self):
-        """
-        Pages:
-            in: DORM_CHECK
-            out: DORM_FEED_CHECK
-        """
+        """从宿舍页进入喂食页，并处理误入的家具页面。"""
         self.interval_clear(DORM_CHECK)
         for _ in self.loop(skip_first=False):
-            # 已进入喂食页面。
             if self.appear(dorm_assets.DORM_FEED_CHECK, offset=(20, 20)):
                 break
 
@@ -347,14 +284,9 @@ class RewardDorm(UI):
                 continue
 
     def dorm_feed_quit(self):
-        """
-        Pages:
-            in: DORM_FEED_CHECK
-            out: DORM_CHECK
-        """
+        """从喂食页返回宿舍页。"""
         self.interval_clear(dorm_assets.DORM_FEED_CHECK)
         for _ in self.loop():
-            # 已回到宿舍页。
             if self.appear(DORM_CHECK):
                 break
 
@@ -369,14 +301,9 @@ class RewardDorm(UI):
                 continue
 
     def dorm_buy_food_enter(self):
-        """
-        Pages:
-            in: DORM_FEED_CHECK
-            out: DORM_BUY_FOOD_CHECK
-        """
+        """从喂食页进入食物购买页。"""
         self.interval_clear(dorm_assets.DORM_FEED_CHECK)
         for _ in self.loop():
-            # 已进入购买食物页面。
             if self.appear(dorm_assets.DORM_BUY_FOOD_CHECK, offset=(20, 20)):
                 break
 
@@ -385,11 +312,7 @@ class RewardDorm(UI):
                 continue
 
     def dorm_buy_food(self, amount):
-        """
-        Pages:
-            in: DORM_BUY_FOOD_CHECK
-            out: DORM_BUY_FOOD_CHECK
-        """
+        """在食物购买页设置购买数量。"""
         logger.hr("Dorm buy food")
         index_offset = (20, 20)
         # 防止加减按钮位置偏移，先用船坞索引 OCR 的方式定位真实按钮。
@@ -408,14 +331,9 @@ class RewardDorm(UI):
         return True
 
     def dorm_buy_food_confirm(self):
-        """
-        Pages:
-            in: DORM_BUY_FOOD_CHECK
-            out: DORM_FEED_CHECK
-        """
+        """确认购买食物并回到喂食页。"""
         self.interval_clear(dorm_assets.DORM_BUY_FOOD_CONFIRM)
         for _ in self.loop():
-            # 已回到喂食页面。
             if self.match_template_color(dorm_assets.DORM_FEED_CHECK, offset=(20, 20)):
                 break
 
@@ -423,14 +341,7 @@ class RewardDorm(UI):
                 continue
 
     def dorm_food_run(self, amount):
-        """
-        Args:
-            amount (int): amount of food to buy
-
-        Pages:
-            in: Any page
-            out: page_dorm
-        """
+        """从任意页面购买指定数量的食物，最后回到宿舍页。"""
         if amount <= 0:
             return
 
@@ -445,11 +356,7 @@ class RewardDorm(UI):
         self.dorm_feed_quit()
 
     def dorm_run(self, feed=True, collect=True, buy_furniture=False):
-        """
-        Pages:
-            in: Any page
-            out: page_dorm
-        """
+        """从任意页面执行已启用的喂食、收集和家具购买，最后停在宿舍页。"""
         if not feed and not collect and not buy_furniture:
             return
 
@@ -474,17 +381,10 @@ class RewardDorm(UI):
             BuyFurniture(self.config, self.device).run()
 
     def get_dorm_ship_amount(self):
-        """
-        Returns:
-            int: Number of ships in dorm
-
-        Pages:
-            in: page_dorm
-        """
+        """在宿舍页 OCR 当前舰船数。"""
         timeout = Timer(2, count=4).start()
         current = 0
         for _ in self.loop():
-            # 处理弹窗。
             if self.appear_then_click(dorm_assets.DORM_FURNITURE_CONFIRM, offset=(30, 30), interval=3):
                 timeout.reset()
                 continue
@@ -507,28 +407,7 @@ class RewardDorm(UI):
         return current
 
     def cal_dorm_delay(self, ships):
-        """
-        (Task to delay) = 20000 / (Food consumption per 15 second) * 15 / 60
-
-        | Ships in dorm | Food consumption per 15 second | Task to delay |
-        | ------------- | ------------------------------ | ------------- |
-        | 0             | 0                              | 278           |
-        | 1             | 5                              | 1000          |
-        | 2             | 9                              | 556           |
-        | 3             | 12                             | 417           |
-        | 4             | 14                             | 358           |
-        | 5             | 16                             | 313           |
-        | 6             | 18                             | 278           |
-
-        Args:
-            ships (int): Number of ships in dorm
-
-        Returns:
-            int: Minutes to delay
-
-        Pages:
-            in: page_dorm
-        """
+        """按 20000 食物和每 15 秒消耗量返回延迟分钟数；舰船数 1～6 对应 1000、556、417、358、313、278。"""
         dict_delay = {
             0: self.config.Scheduler_SuccessInterval,
             1: 1000,
@@ -541,11 +420,7 @@ class RewardDorm(UI):
         return dict_delay.get(ships, self.config.Scheduler_SuccessInterval)
 
     def run(self):
-        """
-        Pages:
-            in: Any page
-            out: page_dorm
-        """
+        """从任意页面执行宿舍任务，结束于宿舍页。"""
         if not self.config.Dorm_Feed and not self.config.Dorm_Collect and not self.config.BuyFurniture_Enable:
             self.config.Scheduler_Enable = False
             self.config.task_stop()
@@ -554,7 +429,6 @@ class RewardDorm(UI):
             feed=self.config.Dorm_Feed, collect=self.config.Dorm_Collect, buy_furniture=self.config.BuyFurniture_Enable
         )
 
-        # Scheduler
         ships = self.get_dorm_ship_amount()
         delay = self.cal_dorm_delay(ships)
         logger.info(f"Ships in dorm: {ships}, task to delay: {delay}")

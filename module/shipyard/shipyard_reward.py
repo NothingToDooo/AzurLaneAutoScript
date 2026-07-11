@@ -28,14 +28,7 @@ class RewardShipyard(ShipyardUI):
     _coin_count = 0
 
     def _shipyard_get_cost(self, amount, rarity=None):
-        """
-        Args:
-            amount (int): Index of the blueprint to buy
-            rarity (str): 'DR', 'PR'
-
-        Returns:
-            int: Prize to buy
-        """
+        """返回指定购买序号与 DR/PR 稀有度的单张蓝图价格。"""
         if rarity is None:
             rarity = self._shipyard_bp_rarity
 
@@ -53,24 +46,7 @@ class RewardShipyard(ShipyardUI):
         raise ScriptError(message)
 
     def _shipyard_calculate(self, start, count, pay=False):
-        """
-        Calculates the maximum number
-        of BPs based on current parameters
-        and _coin_count amount
-
-        Submits payment if 'pay' set to True
-
-        Args:
-            start (int): BUY_PRIZE key to resume at
-            count (int): Total remaining to buy
-            pay (bool): Finalize payment to _coin_count
-
-        Returns:
-            int, int
-                - BUY_PRIZE for next _shipyard_buy_calc
-                  call
-                - Total capable of buying currently
-        """
+        """返回下一购买序号和当前可买数量；pay=True 时同时扣减 _coin_count。"""
         if start <= 0 or count <= 0:
             return start, count
 
@@ -94,28 +70,13 @@ class RewardShipyard(ShipyardUI):
         return i + 1, count
 
     def _shipyard_buy_calc(self, start, count):
-        """
-        Shorthand for _shipyard_calculate all information
-        is relevant
-        """
         return self._shipyard_calculate(start, count, pay=False)
 
     def _shipyard_pay_calc(self, start, count):
-        """
-        Shorthand for _shipyard_calculate partial
-        information is relevant but most importantly
-        finalize payment to _coin_count
-        """
         return self._shipyard_calculate(start, count, pay=True)
 
     def _shipyard_buy(self, count):
-        """
-        Buy up to the configured number of BPs
-        Supports buying in both DEV and FATE
-
-        Args:
-            count (int): Total to buy
-        """
+        """在 DEV 或 FATE 中购买最多 count 张蓝图。"""
         logger.hr("shipyard_buy")
         prev = 1
         start, count = self._shipyard_buy_calc(prev, count)
@@ -134,19 +95,13 @@ class RewardShipyard(ShipyardUI):
 
             self._shipyard_buy_confirm("BP_BUY")
 
-            # Pay for actual amount bought based on 'remain'
-            # which also updates 'start' as a result
-            # Save into 'prev' for next _shipyard_pay_calc
             start, _ = self._shipyard_pay_calc(prev, (count - remain))
             prev = start
 
             start, count = self._shipyard_buy_calc(start, remain)
 
     def _shipyard_use(self, index):
-        """
-        Spend all remaining extraneous BPs
-        Supports using BPs in both DEV and FATE
-        """
+        """在 DEV 或 FATE 中消耗指定舰船的剩余蓝图。"""
         logger.hr("shipyard_use")
         count = self._shipyard_get_bp_count(index)
         while count > 0:
@@ -161,28 +116,11 @@ class RewardShipyard(ShipyardUI):
             count = self._shipyard_get_bp_count(index)
 
     def shipyard_run(self, series, index, count):
-        """
-        Runs shop browse operations
-
-        Args:
-            series (int): 1-4 inclusively, button location
-            index (int): 1-6 inclusively, button location
-                         some series are restricted to 1-5
-            count (int): number to buy after use
-
-        Returns:
-            bool: If shop attempted to run
-                  thereby transition to respective
-                  pages. If no transition took place,
-                  then did not run
-        """
+        """运行系列 1～4、舰船 1～6 的蓝图使用和购买；发生页面跳转即返回 True。"""
         if count <= 0:
             return False
 
-        # Gold difficult to Ocr in page_shipyard
-        # due to both text and number being
-        # right-aligned together
-        # Retrieve information from page_main instead
+        # 船坞页金币标签和数字共同右对齐，OCR 困难，改从主页读取。
         self.ui_ensure(page_main)
         timeout = Timer(1, count=1).start()
         skip_first_screenshot = True
@@ -214,11 +152,7 @@ class RewardShipyard(ShipyardUI):
         return True
 
     def run(self):
-        """
-        Pages:
-            in: Any page
-            out: page_shipyard
-        """
+        """从任意页面执行船坞蓝图任务，结束于船坞页。"""
         if self.config.Shipyard_BuyAmount <= 0 and self.config.ShipyardDr_BuyAmount <= 0:
             self.config.Scheduler_Enable = False
             self.config.task_stop()

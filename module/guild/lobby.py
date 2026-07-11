@@ -13,34 +13,18 @@ from module.ui.assets import GUILD_CHECK
 
 class GuildLobby(GuildBase):
     def guild_lobby_get_report(self):
-        """
-        Returns:
-            Button: 进入公会报告的按钮。
-        """
-        # 在 GUILD_REPORT_AVAILABLE 区域寻找红点。
+        """按报告区域红点位置返回报告图标按钮。"""
         image = color_similarity_2d(self.image_crop(GUILD_REPORT_AVAILABLE, copy=False), color=(255, 8, 8))
         points = np.array(np.where(image > 221)).T[:, ::-1]
         if len(points):
-            # 红点中心。
             points = Points(points).group(threshold=40) + GUILD_REPORT_AVAILABLE.area[:2]
-            # 移到报告图标中心。
+            # 红点位于图标右下方，向左上偏移到报告图标中心。
             area = area_offset((-51, -45, -13, 0), offset=points[0])
             return Button(area=area, color=(255, 255, 255), button=area, name="GUILD_REPORT")
         return None
 
     def _guild_lobby_collect(self, skip_first_screenshot=True):
-        """
-        Performs collect actions if report rewards
-        are present in lobby
-        If already in page_guild but not lobby,
-        this will timeout check and collect next time
-        These rewards are queued and do not need to be
-        collected immediately
-
-        Pages:
-            in: ANY
-            out: ANY
-        """
+        """在任意页面尝试领取排队中的报告奖励；不在大厅时超时并留待下次。"""
         confirm_timer = Timer(1.5, count=3).start()
         click_timer = Timer(3)
         while 1:
@@ -95,13 +79,7 @@ class GuildLobby(GuildBase):
         return False
 
     def guild_lobby(self):
-        """
-        Execute all actions in lobby
-
-        Pages:
-            in: GUILD_LOBBY
-            out: GUILD_LOBBY
-        """
+        """在公会大厅领取报告奖励。"""
         logger.hr("Guild lobby", level=1)
         self._guild_lobby_collect()
         logger.info("Guild lobby collect finished")
