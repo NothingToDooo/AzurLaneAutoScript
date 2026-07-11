@@ -11,13 +11,13 @@ class CampaignBase(CampaignBase_):
         """,
     )
 
-    def campaign_set_chapter_event(self, chapter, mode="normal"):
+    def campaign_set_chapter_event(self, chapter: str, mode: str = "normal") -> bool:
         del mode
         self.ui_goto_event()
         self.campaign_ensure_chapter(chapter)
         return True
 
-    def campaign_get_chapter_index(self, name):
+    def campaign_get_chapter_index(self, name: str | int) -> int:
         """将整数或章节名转换为章节序号。"""
         if name == "t":
             return 1

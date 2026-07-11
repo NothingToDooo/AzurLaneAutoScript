@@ -1,5 +1,10 @@
+from typing import TYPE_CHECKING
+
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap
+
+if TYPE_CHECKING:
+    from module.map.type_alias import GridLocation
 
 from .a1 import Config as ConfigBase
 
@@ -143,5 +148,5 @@ class Campaign(CampaignBase):
     def battle_4(self) -> bool:
         return self.clear_boss()
 
-    def handle_boss_appear_refocus(self, preset=(3, -2)):
+    def handle_boss_appear_refocus(self, preset: GridLocation | None = (3, -2)) -> None:
         return super().handle_boss_appear_refocus(preset)

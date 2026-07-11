@@ -74,7 +74,7 @@ MAP.spawn_data = [
 
 
 class EventGrid(Grid):
-    def predict_current_fleet(self):
+    def predict_current_fleet(self) -> bool:
         count = self.relative_hsv_count(area=(-0.5, -3.5, 0.5, -2.5), h=(141 - 3, 141 + 10), shape=(50, 50))
         # 旧活动截图里模板匹配不稳定，只保留颜色阈值。
         return count >= 200

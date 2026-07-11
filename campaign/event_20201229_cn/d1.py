@@ -52,7 +52,7 @@ _ENEMY_CLEAR_PRIORITY = (
 )
 
 
-def clear_event_priority_enemy(campaign, *, include_scale_1=False):
+def clear_event_priority_enemy(campaign: CampaignBase, *, include_scale_1: bool = False) -> bool:
     if include_scale_1 and campaign.clear_enemy(scale=(1,)):
         return True
 
