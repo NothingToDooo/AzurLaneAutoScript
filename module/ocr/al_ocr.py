@@ -100,28 +100,15 @@ class AlOcr(CnOcr):
             )
         ]
 
-    def ocr_for_single_line(self, img_fp):
-        return self.ocr_for_single_lines_raw([img_fp])[0].text
-
     def ocr_for_single_lines_raw(self, img_list, batch_size=1) -> list[RawOcrResult]:
         self.ensure_loaded()
         return [
             self._extract_raw_result(item) for item in super().ocr_for_single_lines(img_list, batch_size=batch_size)
         ]
 
-    def ocr_for_single_lines(self, img_list, batch_size=1):
-        return [result.text for result in self.ocr_for_single_lines_raw(img_list, batch_size=batch_size)]
-
     def set_cand_alphabet(self, cand_alphabet):
         self.ensure_loaded()
         return self.rec_model.set_cand_alphabet(cand_alphabet)
-
-    def atomic_ocr(self, img_fp, cand_alphabet=None):
-        self.set_cand_alphabet(cand_alphabet)
-        return self.ocr(img_fp)
-
-    def atomic_ocr_for_single_line(self, img_fp, cand_alphabet=None):
-        return self.atomic_ocr_for_single_lines_raw([img_fp], cand_alphabet=cand_alphabet)[0].text
 
     def atomic_ocr_for_single_lines_raw(self, img_list, cand_alphabet=None) -> list[RawOcrResult]:
         self.set_cand_alphabet(cand_alphabet)

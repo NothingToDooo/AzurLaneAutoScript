@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import TypedDict
 
+import cnocr.cn_ocr as cnocr_module
 import numpy as np
 import pytest
 from cnocr import CnOcr
@@ -730,32 +731,6 @@ def test_raw_batch_keeps_empty_list(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls == [(images, 1)]
 
 
-def test_single_line_projects_text_from_raw_batch(monkeypatch: pytest.MonkeyPatch) -> None:
-    image = object()
-    calls = _patch_cnocr_batch(monkeypatch, [{"text": "14/15", "score": 0.875}])
-    monkeypatch.setattr(
-        CnOcr,
-        "ocr_for_single_line",
-        lambda _ocr, _image: pytest.fail("single-line projection bypassed the raw batch"),
-    )
-    ocr = _loaded_ocr()
-
-    assert ocr.ocr_for_single_line(image) == "14/15"
-    assert calls == [([image], 1)]
-
-
-def test_string_batch_projects_text_from_raw_batch(monkeypatch: pytest.MonkeyPatch) -> None:
-    images = [object(), object()]
-    calls = _patch_cnocr_batch(
-        monkeypatch,
-        [{"text": "14/15", "score": 0.875}, {"text": "01:30:00", "score": 0.625}],
-    )
-    ocr = _loaded_ocr()
-
-    assert ocr.ocr_for_single_lines(images, batch_size=4) == ["14/15", "01:30:00"]
-    assert calls == [(images, 4)]
-
-
 def test_atomic_raw_batch_sets_alphabet_and_preserves_score(monkeypatch: pytest.MonkeyPatch) -> None:
     image = object()
     _patch_cnocr_batch(monkeypatch, [{"text": "14/15", "score": 0.875}])
@@ -782,33 +757,16 @@ def test_atomic_string_batch_projects_text_from_raw_batch(monkeypatch: pytest.Mo
     assert alphabets == ["0123456789/"]
 
 
-def test_atomic_single_line_projects_text_from_raw_batch(monkeypatch: pytest.MonkeyPatch) -> None:
-    image = object()
-    calls = _patch_cnocr_batch(monkeypatch, [{"text": "14/15", "score": 0.875}])
-    alphabets: list[str | None] = []
-    monkeypatch.setattr(AlOcr, "set_cand_alphabet", lambda _ocr, alphabet: alphabets.append(alphabet))
-    monkeypatch.setattr(
-        CnOcr,
-        "ocr_for_single_line",
-        lambda _ocr, _image: pytest.fail("atomic single-line projection bypassed the raw batch"),
-    )
+def test_detection_ocr_keeps_cnocr_dictionary_path_before_projection(monkeypatch: pytest.MonkeyPatch) -> None:
+    image = np.full((32, 64), 255, dtype=np.uint8)
+    payloads: list[object] = [{"text": "14/15", "score": 0.875}]
+    calls = _patch_cnocr_batch(monkeypatch, payloads)
+    monkeypatch.setattr(cnocr_module, "line_split", lambda _image, **_kwargs: [(image, None)])
     ocr = _loaded_ocr()
+    ocr.det_model = None
+    monkeypatch.setattr(ocr, "_prepare_img", lambda _image: image)
 
-    assert ocr.atomic_ocr_for_single_line(image, cand_alphabet="0123456789/") == "14/15"
-    assert alphabets == ["0123456789/"]
-    assert calls == [([image], 1)]
-
-
-def test_detection_ocr_keeps_string_projection(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(CnOcr, "ocr", lambda _ocr, _image, **_kwargs: [{"text": "14/15", "score": 0.875}])
-    ocr = _loaded_ocr()
-
-    assert ocr.ocr(object()) == ["14/15"]
-
-
-def test_detection_ocr_rejects_payload_without_score(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(CnOcr, "ocr", lambda _ocr, _image, **_kwargs: [{"text": "14/15"}])
-    ocr = _loaded_ocr()
-
-    with pytest.raises(TypeError):
-        ocr.ocr(object())
+    assert ocr.ocr(image) == ["14/15"]
+    assert len(calls) == 1
+    assert calls[0][0][0] is image
+    assert calls[0][1] == 1
