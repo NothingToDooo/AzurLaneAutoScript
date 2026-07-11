@@ -737,7 +737,7 @@ Commit: `docs: 记录OCR结构化结果落地状态`
 **Files:**
 - No source changes expected.
 
-- [ ] **Step 1: 核对当前分支、工作区、origin 和 GitHub 身份**
+- [x] **Step 1: 核对当前分支、工作区、origin 和 GitHub 身份**
 
 Run:
 
@@ -751,7 +751,7 @@ gh pr list --repo NothingToDooo/AzurLaneAutoScript --head docs/next-generation-o
 
 Expected: 分支仍为 `docs/next-generation-ocr-roadmap`；工作区干净；origin 是 `NothingToDooo/AzurLaneAutoScript`；活动账号为 `NothingToDooo`。计划编写时 live 查询该 head 返回空列表，因此不能假定已有 PR；执行时若仍为空则创建一个 draft，若已经存在则只更新该 PR，绝不创建第二个。
 
-- [ ] **Step 2: 推送当前分支并验证 PR 已包含 P0 提交**
+- [x] **Step 2: 推送当前分支并验证 PR 已包含 P0 提交**
 
 Run:
 
@@ -761,7 +761,7 @@ Run: `git push origin docs/next-generation-ocr-roadmap`
 
 随后按返回的 PR URL 运行：`gh pr view <PR-URL> --json number,url,state,isDraft,headRefOid,commits,statusCheckRollup`
 
-- [ ] **Step 3: 若已有检查，等待结束并读取失败日志；检查通过前不宣称完成**
+- [x] **Step 3: 若已有检查，等待结束并读取失败日志；检查通过前不宣称完成**
 
 新建时保持 draft；复用时保持 PR 的现有 draft/ready 状态。不擅自 merge，不切换默认分支，不修改其他远端分支。
 
@@ -777,4 +777,4 @@ Run: `git push origin docs/next-generation-ocr-roadmap`
 - [x] 只有显式 store + `Error_SaveError` 才落盘，一般文本 OCR 不自动采集。
 - [x] 指挥喵 Counter 失败时不再执行金币 OCR，下一帧恢复和金币失败均可重试。
 - [x] P1～P5、模型替换和 ReplayDevice 未混入本批代码。
-- [ ] 全量门禁通过，fork 上本分支的 draft PR 已创建或更新，检查状态已核实。
+- [x] 全量门禁通过，fork 上本分支的 draft PR 已创建或更新，检查状态已核实。

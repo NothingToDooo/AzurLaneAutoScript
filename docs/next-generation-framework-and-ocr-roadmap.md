@@ -303,7 +303,7 @@ Replay 读取固定帧并记录语义动作，不启动 ADB、模拟器、WebUI 
 - [`Digit` 与 `DigitCounter`](../module/ocr/ocr.py#L227) 已提供严格结构化解析，能够区分合法 `0` 与失败，并拒绝 Counter 部分匹配、`current > total` 和不符合调用点约束的 total。[`Duration`](../module/ocr/ocr.py#L451) 结构化接口已具备，生产调用点待按触碰迁移；旧 `.ocr()` 语义仍保留给未迁移调用方。
 - [`OcrFailureStore`](../module/ocr/failure_store.py#L112) 已按稳定摘要保存 `raw.png`、`processed.png` 与 `metadata.json`，并实施去重、容量限制、原子发布和失败熔断；严格审查后又补齐同进程限额串行化、Windows 路径别名与 reparse point 拒绝、异常日志脱敏。只有结构化数字调用显式传入 recorder 时才会记录失败，一般文本 OCR 不自动采集。
 - [`meow_get_buy_count()`](../module/meowfficer/buy.py#L19) 已完成首条纵向切片：Counter 无效时跳过金币 OCR，Counter 或金币失败都按下一帧重试，合法零值不被真假判断误伤；有限帧回归见 [`test_meowfficer_buy.py`](../tests/test_meowfficer_buy.py#L140)。
-- P0 严格审查已完成，审查发现均已修复；修复后全量门禁为 `1554 passed, 1 skipped`，fork draft PR 尚待创建。P1～P5 尚未进入实施。
+- P0 严格审查已完成，审查发现均已修复；修复后全量门禁为 `1554 passed, 1 skipped`，[fork draft PR #3](https://github.com/NothingToDooo/AzurLaneAutoScript/pull/3) 已创建。P1～P5 尚未进入实施。
 
 **退出条件：** 失败与合法零值完全可区分；失败样本带有足够上下文，可离线复现相同解析结果；旧调用点行为未被批量改变。
 
