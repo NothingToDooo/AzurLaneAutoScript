@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import imageio
 import numpy as np
@@ -7,6 +8,13 @@ from tqdm.contrib.concurrent import process_map
 from module.base.utils import get_bbox, get_color, image_size, load_image
 from module.config.config_manual import ManualConfig as AzurLaneConfig
 from module.logger import logger
+
+if TYPE_CHECKING:
+    from module.base.type_alias import FilePath, ImageArray
+
+type Bounds = tuple[int, int, int, int]
+type MeanColor = tuple[int, int, int]
+type Extraction = tuple[Bounds, MeanColor]
 
 MODULE_FOLDER = "./module"
 BUTTON_FILE = "assets.py"
@@ -18,15 +26,18 @@ HEADER_EXP = [*HEADER_EXP.strip().split("\n"), ""]
 
 
 class ImageExtractor:
-    def __init__(self, module, file):
+    def __init__(self, module: str, file: FilePath) -> None:
         path = Path(file)
         self.module = module
         self.name = path.stem
         self.ext = path.suffix
-        self.area, self.color, self.button, self.file = {}, {}, {}, {}
+        self.area: dict[str, Bounds] = {}
+        self.color: dict[str, MeanColor] = {}
+        self.button: dict[str, Bounds] = {}
+        self.file: dict[str, str] = {}
         self.load()
 
-    def get_file(self, genre=""):
+    def get_file(self, genre: str = "") -> str:
         for ext in [".png", ".gif"]:
             file = f"{self.name}.{genre}{ext}" if genre else f"{self.name}{ext}"
             file = (Path(AzurLaneConfig.ASSETS_FOLDER) / "cn" / self.module / file).as_posix()
@@ -37,35 +48,38 @@ class ImageExtractor:
         file = f"{self.name}.{genre}{ext}" if genre else f"{self.name}{ext}"
         return (Path(AzurLaneConfig.ASSETS_FOLDER) / "cn" / self.module / file).as_posix()
 
-    def extract(self, file):
+    @staticmethod
+    def extract(file: FilePath) -> Extraction:
         if Path(file).suffix == ".gif":
             # GIF 按钮使用第一帧。
-            bbox = None
-            mean = None
-            for frame in imageio.mimread(file):
-                image = frame[:, :, :3] if len(frame.shape) == 3 else frame
-                new_bbox, new_mean = self._extract(image, file)
-                if bbox is None:
-                    bbox = new_bbox
-                elif bbox != new_bbox:
+            frames = imageio.mimread(Path(file))
+            if not frames:
+                message = f"GIF contains no frames: {file}"
+                raise ValueError(message)
+            first: ImageArray = np.asarray(frames[0], dtype=np.uint8)
+            first = first[:, :, :3] if len(first.shape) == 3 else first
+            bbox, mean = ImageExtractor._extract(first, file)
+            for frame in frames[1:]:
+                image: ImageArray = np.asarray(frame, dtype=np.uint8)
+                image = image[:, :, :3] if len(image.shape) == 3 else image
+                new_bbox, _new_mean = ImageExtractor._extract(image, file)
+                if bbox != new_bbox:
                     logger.warning(f"{file} has multiple different bbox, this will cause unexpected behaviour")
-                if mean is None:
-                    mean = new_mean
             return bbox, mean
         image = load_image(file)
-        return self._extract(image, file)
+        return ImageExtractor._extract(image, file)
 
     @staticmethod
-    def _extract(image, file):
+    def _extract(image: ImageArray, file: FilePath) -> Extraction:
         size = image_size(image)
         if size != (1280, 720):
             logger.warning(f"{file} has wrong resolution: {size}")
         bbox = get_bbox(image)
         mean = get_color(image=image, area=bbox)
-        mean = tuple(np.rint(mean).astype(int))
-        return bbox, mean
+        rounded = np.rint(mean).astype(int)
+        return bbox, (int(rounded[0]), int(rounded[1]), int(rounded[2]))
 
-    def load(self):
+    def load(self) -> None:
         file = self.get_file()
         if Path(file).exists():
             area, color = self.extract(file)
@@ -88,40 +102,42 @@ class ImageExtractor:
             raise FileNotFoundError(file)
 
     @property
-    def expression(self):
+    def expression(self) -> str:
         return f"{self.name} = Button(area={self.area}, color={self.color}, button={self.button}, file={self.file})"
 
 
 class TemplateExtractor(ImageExtractor):
-    def extract(self, file):
+    @staticmethod
+    def extract(file: FilePath) -> Extraction:
         image = load_image(file)
         bbox = get_bbox(image)
         mean = get_color(image=image, area=bbox)
-        mean = tuple(np.rint(mean).astype(int))
-        return bbox, mean
+        rounded = np.rint(mean).astype(int)
+        return bbox, (int(rounded[0]), int(rounded[1]), int(rounded[2]))
 
     @property
-    def expression(self):
+    def expression(self) -> str:
         return f"{self.name} = Template(file={self.file})"
 
 
 class ModuleExtractor:
-    def __init__(self, name):
+    def __init__(self, name: str) -> None:
         self.name = name
         self.folder = (Path(AzurLaneConfig.ASSETS_FOLDER) / "cn" / name).as_posix()
 
     @staticmethod
-    def split(file):
+    def split(file: FilePath) -> tuple[str, str, str]:
         path = Path(file)
         name = Path(path.stem)
         return name.stem, name.suffix, path.suffix
 
-    def is_base_image(self, file):
-        _, sub, _ = self.split(file)
+    @staticmethod
+    def is_base_image(file: FilePath) -> bool:
+        _, sub, _ = ModuleExtractor.split(file)
         return sub == ""
 
     @property
-    def expression(self):
+    def expression(self) -> list[str]:
         exp = []
         for path in Path(self.folder).iterdir():
             file = path.name
@@ -144,7 +160,7 @@ class ModuleExtractor:
             imports.append("from module.base.template import Template")
         return [*imports, "", *HEADER_EXP, *exp]
 
-    def write(self):
+    def write(self) -> None:
         folder = Path(MODULE_FOLDER) / self.name
         if not folder.exists():
             folder.mkdir()
@@ -152,7 +168,7 @@ class ModuleExtractor:
             f.writelines(f"{text}\n" for text in self.expression)
 
 
-def worker(module):
+def worker(module: str) -> None:
     me = ModuleExtractor(name=module)
     me.write()
 
@@ -164,7 +180,7 @@ class AssetExtractor:
     `.AREA`、`.COLOR`、`.BUTTON` 后缀分别覆盖对应字段。
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         logger.info("Assets extract")
 
         assets_folder = Path(AzurLaneConfig.ASSETS_FOLDER) / "cn"

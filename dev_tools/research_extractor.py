@@ -1,27 +1,43 @@
 import json
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING, Literal
 
 import module.logger
-from dev_tools.utils import LuaLoader
+from dev_tools.utils import LuaLoader, require_lua_int, require_lua_str, require_lua_table
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from dev_tools.slpp import LuaTable
+    from module.base.type_alias import FilePath
+    from module.research.types import ResearchProjectData
+
+type InputKeyword = Literal["need_coin", "need_cube", "need_part"]
+type EncodedValue = str | int | bool
 
 # 导入 module.logger 会切换到项目根目录。
 _ = module.logger
 
 
 class Item:
-    def __init__(self, data):
+    def __init__(self, data: LuaTable) -> None:
         """按 Lua 三元组的值顺序读取：类型标记、物品 ID、数量。"""
         self.name = ""
-        _, self.id, self.amount = data.values()
+        values = list(data.values())
+        if len(values) != 3:
+            message = f"research item must contain exactly three values: {data!r}"
+            raise ValueError(message)
+        self.id = require_lua_int(values[1], context="research item id")
+        self.amount = require_lua_int(values[2], context="research item amount")
         if self.id == 1:
             self.id = 59001  # 物资在 technology_data_template 里是 1，在 item_data_statistics 里是 59001。
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.name}({self.id}) x {self.amount}"
 
 
-INPUT_KEYWORDS = {
+INPUT_KEYWORDS: dict[InputKeyword, tuple[str, str]] = {
     "need_coin": ("物资", "coin"),
     "need_cube": ("心智魔方", "cube"),
     "need_part": ("部件", "part"),
@@ -147,12 +163,12 @@ SHIP_KEYWORDS = {
 EQUIPMENT_AMOUNT = re.compile(r"(?:拆解|分解|Scrap)\D*(8|15)\D*(?:件装备|pieces? of gear)", re.IGNORECASE)
 
 
-def normalize_name(name):
-    return str(name).replace(" ", "").lower()
+def normalize_name(name: str) -> str:
+    return name.replace(" ", "").lower()
 
 
-def project_consumption(items):
-    data = {}
+def project_consumption(items: Iterable[Item]) -> dict[InputKeyword, bool]:
+    data: dict[InputKeyword, bool] = {}
     for item in items:
         name = normalize_name(item.name)
         for key, keywords in INPUT_KEYWORDS.items():
@@ -161,7 +177,7 @@ def project_consumption(items):
     return data
 
 
-def project_ship(items):
+def project_ship(items: Iterable[Item]) -> str:
     for item in items:
         name = normalize_name(item.name)
         for keyword, ship in SHIP_KEYWORDS.items():
@@ -170,42 +186,68 @@ def project_ship(items):
     return ""
 
 
-def equipment_amount(task):
+def equipment_amount(task: str) -> int:
     result = EQUIPMENT_AMOUNT.search(task)
     return int(result.group(1)) if result else 0
 
 
-def encode_value(value):
+def encode_value(value: EncodedValue) -> str:
     if isinstance(value, str):
         return json.dumps(value, ensure_ascii=False)
     return str(value)
 
 
-def encode_project(data):
-    lines = ["    {"]
-    for key, value in data.items():
-        lines.append(f"        {encode_value(key)}: {encode_value(value)},")
+def encode_project(data: ResearchProjectData) -> list[str]:
+    lines = [
+        "    {",
+        f'        "name": {encode_value(data["name"])},',
+        f'        "series": {encode_value(data["series"])},',
+        f'        "time": {encode_value(data["time"])},',
+    ]
+    lines.extend(
+        f'        "{key}": {encode_value(data[key])},' for key in ("need_coin", "need_cube", "need_part") if key in data
+    )
+    if "ship" in data:
+        lines.append(f'        "ship": {encode_value(data["ship"])},')
+    if "ship_rarity" in data:
+        lines.append(f'        "ship_rarity": {encode_value(data["ship_rarity"])},')
+    if "equipment_amount" in data:
+        lines.append(f'        "equipment_amount": {encode_value(data["equipment_amount"])},')
     lines.append("    },")
     return lines
 
 
 class Project:
-    def __init__(self, data):
-        self.name = data["name"]
-        self.series = int(data["blueprint_version"])
-        self.time = int(data["time"])
-        self.input = [Item(item) for item in data["consume"].values()]
-        self.output = [Item(item) for item in data["drop_client"].values()]
-        self.task_id = int(data["condition"])
+    def __init__(self, data: LuaTable) -> None:
+        self.name = require_lua_str(data["name"], context="research project name")
+        self.series = require_lua_int(data["blueprint_version"], context=f"research project {self.name} series")
+        self.time = require_lua_int(data["time"], context=f"research project {self.name} time")
+        consume = require_lua_table(data["consume"], context=f"research project {self.name} consumption")
+        drop_client = require_lua_table(data["drop_client"], context=f"research project {self.name} output")
+        self.input = [
+            Item(require_lua_table(item, context=f"research project {self.name} input item"))
+            for item in consume.values()
+        ]
+        self.output = [
+            Item(require_lua_table(item, context=f"research project {self.name} output item"))
+            for item in drop_client.values()
+        ]
+        self.task_id = require_lua_int(data["condition"], context=f"research project {self.name} task id")
         self.task = ""
 
-    def encode(self):
-        data = {
+    def encode(self) -> ResearchProjectData:
+        data: ResearchProjectData = {
             "name": self.name,
             "series": self.series,
             "time": self.time,
         }
-        data.update(project_consumption(self.input))
+        consumption = project_consumption(self.input)
+        if consumption.get("need_coin"):
+            data["need_coin"] = True
+        if consumption.get("need_cube"):
+            data["need_cube"] = True
+        if consumption.get("need_part"):
+            data["need_part"] = True
         ship = project_ship(self.output)
         if ship:
             data["ship"] = ship
@@ -217,27 +259,38 @@ class Project:
 
 
 class TechnologyTemplate:
-    def __init__(self):
+    def __init__(self) -> None:
         self.projects = self.load_projects(LuaLoader(FOLDER, server="zh-CN"))
 
-    def load_projects(self, loader):
+    @staticmethod
+    def load_projects(loader: LuaLoader) -> dict[tuple[int, str], Project]:
         tech = loader.load("sharecfg/technology_data_template.lua")
         item = loader.load("sharecfgdata/item_data_statistics.lua")
         virtual_item = loader.load("sharecfgdata/item_virtual_data_statistics.lua")
         item.update(virtual_item)
         task = loader.load("sharecfgdata/task_data_template.lua")
 
-        projects = {}
+        projects: dict[tuple[int, str], Project] = {}
         for tech_key, value in tech.items():
             if tech_key == "all":
                 continue
-            project = Project(value)
+            project_data = require_lua_table(value, context=f"research project {tech_key}")
+            project = Project(project_data)
             if project.task_id:
-                project.task = task[project.task_id]["desc"].replace("\\n", "")
-            for i in project.input:
-                i.name = item[i.id]["name"].strip()
-            for i in project.output:
-                i.name = item[i.id]["name"].strip()
+                task_data = require_lua_table(task[project.task_id], context=f"research task {project.task_id}")
+                project.task = require_lua_str(
+                    task_data["desc"], context=f"research task {project.task_id} description"
+                ).replace("\\n", "")
+            for project_item in project.input:
+                item_data = require_lua_table(item[project_item.id], context=f"research item {project_item.id}")
+                project_item.name = require_lua_str(
+                    item_data["name"], context=f"research item {project_item.id} name"
+                ).strip()
+            for project_item in project.output:
+                item_data = require_lua_table(item[project_item.id], context=f"research item {project_item.id}")
+                project_item.name = require_lua_str(
+                    item_data["name"], context=f"research item {project_item.id} name"
+                ).strip()
 
             project_key = (project.series, project.name)
             if project_key not in projects:
@@ -245,7 +298,7 @@ class TechnologyTemplate:
 
         return projects
 
-    def encode(self):
+    def encode(self) -> list[str]:
         lines = [
             "# 此文件由 dev_tools/research_extractor.py 自动生成。",
             "# 不要手动修改。",
@@ -264,7 +317,7 @@ class TechnologyTemplate:
 
         return lines
 
-    def write(self, file):
+    def write(self, file: FilePath) -> None:
         print(f"writing {file}")
         with Path(file).open("w", encoding="utf-8") as f:
             f.writelines(f"{text}\n" for text in self.encode())
