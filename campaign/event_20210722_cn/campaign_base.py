@@ -18,14 +18,15 @@ class CampaignBase(CampaignBase_):
     """偶像大师联动图分章：第 1 章 SP1～SP4，第 2 章 VSP。"""
 
     @staticmethod
-    def campaign_separate_name(name):
+    def campaign_separate_name(name: str) -> tuple[str, str]:
         """将 vsp/sp 映射为 (ex_sp, 1)，extra* 映射为 (ex_ex, 1)，并兼容连字符、SP 与尾号分解。"""
         if name in {"vsp", "sp"}:
             return "ex_sp", "1"
         if name.startswith("extra"):
             return "ex_ex", "1"
         if "-" in name:
-            return name.split("-")
+            chapter, stage = name.split("-", maxsplit=1)
+            return chapter, stage
         if name.startswith("sp"):
             return "sp", name[-1]
         if name[-1].isdigit():

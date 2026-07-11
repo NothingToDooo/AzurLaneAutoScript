@@ -71,7 +71,7 @@ class CampaignOcr(ModuleBase):
         return result.lower()
 
     @staticmethod
-    def campaign_separate_name(name):
+    def campaign_separate_name(name: str) -> tuple[str, str]:
         """拆分小写关卡名，返回章节和序号，例如 7-2 → ('7', '2')、sp3 → ('sp', '3')。"""
         name = name.strip("-")
         result = None
@@ -80,7 +80,8 @@ class CampaignOcr(ModuleBase):
         elif name.startswith("extra") or name == "ex":
             result = ("ex_ex", "1")
         elif "-" in name:
-            result = name.split("-")
+            chapter, stage = name.split("-", maxsplit=1)
+            result = (chapter, stage)
         elif name.startswith("sp"):
             result = ("sp", name[-1])
         elif name[-1].isdigit():

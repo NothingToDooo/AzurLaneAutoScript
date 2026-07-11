@@ -353,7 +353,7 @@ def test_campaign_folder_policies_fallback_threat_safe_without_3_stars() -> None
         ("sp", ("ex_sp", "1")),
         ("extra", ("ex_ex", "1")),
         ("ex", ("ex_ex", "1")),
-        ("7-2", ["7", "2"]),
+        ("7-2", ("7", "2")),
         ("sp3", ("sp", "3")),
         ("d3", ("d", "3")),
         ("49x", ("", "")),

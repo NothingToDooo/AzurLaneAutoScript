@@ -16,9 +16,11 @@ class Config:
 
 
 class Campaign(CampaignBase, HardEquipment):
+    _EXPECTED_END = "in_stage"
+
     def _expected_end(self, expected):
         del expected
-        return "in_stage"
+        return self._EXPECTED_END
 
     def clear_boss(self):
         grids = self.map.select(is_boss=True)

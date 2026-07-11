@@ -34,12 +34,12 @@ class CampaignBase(CampaignBase_):
         return super(CampaignBase, CampaignBase).campaign_get_chapter_index(name)
 
     @staticmethod
-    def campaign_separate_name(name):
+    def campaign_separate_name(name: str) -> tuple[str, str]:
         """名称含 sss 时映射为 (ex_sp, 1)，含 ex 时映射为 (ex_ex, 1)，其余按通用规则分解。"""
         if "sss" in name:
-            return ["ex_sp", "1"]
+            return "ex_sp", "1"
         if "ex" in name:
-            return ["ex_ex", "1"]
+            return "ex_ex", "1"
 
         return super(CampaignBase, CampaignBase).campaign_separate_name(name)
 

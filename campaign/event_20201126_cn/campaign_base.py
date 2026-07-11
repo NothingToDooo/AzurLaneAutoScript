@@ -40,7 +40,7 @@ class CampaignBase(CampaignBase_):
         return False
 
     @staticmethod
-    def campaign_separate_name(name):
+    def campaign_separate_name(name: str) -> tuple[str, str]:
         """将 vsp、sp 特殊映射为 (ex_sp, 1)，其余按通用规则分解。"""
         if name in {"vsp", "sp"}:
             return "ex_sp", "1"

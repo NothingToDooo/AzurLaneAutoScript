@@ -14,7 +14,7 @@ class CampaignBase(CampaignBase_):
         return False
 
     @staticmethod
-    def campaign_separate_name(name):
+    def campaign_separate_name(name: str) -> tuple[str, str]:
         if name in ["esp", "sp"]:
             return "sp_sp", "2"
         if name == "ex":

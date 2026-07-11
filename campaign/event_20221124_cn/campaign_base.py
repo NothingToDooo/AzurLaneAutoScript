@@ -46,7 +46,7 @@ class CampaignBase(CampaignBase_):
         return super().campaign_set_chapter_event(chapter, mode=mode)
 
     @staticmethod
-    def campaign_separate_name(name):
+    def campaign_separate_name(name: str) -> tuple[str, str]:
         if alias := _CAMPAIGN_NAME_ALIAS.get(name):
             return alias
         for prefix, chapter in _CAMPAIGN_PREFIX_ALIAS:

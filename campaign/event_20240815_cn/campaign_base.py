@@ -34,7 +34,7 @@ class CampaignBase(CampaignBase_):
         self.entrance_timer.reset()
         return True
 
-    def ensure_no_stage_entrance(self, skip_first_screenshot=True):
+    def ensure_no_stage_entrance(self, *, skip_first_screenshot=True):
         logger.info("ensure_no_stage_entrance")
         while 1:
             if skip_first_screenshot:

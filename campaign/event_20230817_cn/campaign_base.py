@@ -41,7 +41,7 @@ class CampaignBase(CampaignBase_):
 
         return None
 
-    def event_20230817_story(self, skip_first_screenshot=True):
+    def event_20230817_story(self, *, skip_first_screenshot=True):
         logger.hr("event_20230817_story", level=2)
         confirm = Timer(1, count=3).start()
         while 1:

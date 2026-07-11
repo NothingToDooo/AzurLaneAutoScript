@@ -9,7 +9,7 @@ class CampaignBase(CampaignBase_):
         self.campaign_ensure_mode_20241219(mode)
 
     @staticmethod
-    def campaign_separate_name(name):
+    def campaign_separate_name(name: str) -> tuple[str, str]:
         """将 tp 特殊映射为 (ex_sp, 1)，其余按通用规则分解。"""
         if name == "tp":
             return "ex_sp", "1"

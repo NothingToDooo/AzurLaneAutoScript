@@ -28,15 +28,15 @@ class CampaignBase(CampaignBase_):
         return super(CampaignBase, CampaignBase).campaign_get_chapter_index(name)
 
     @staticmethod
-    def campaign_separate_name(name):
+    def campaign_separate_name(name: str) -> tuple[str, str]:
         """将 T1～T3 归入 t1、T4～T6 归入 t2，并把 ESP/EX 映射为 ex_sp/ex_ex。"""
         if name in ["t1", "t2", "t3"]:
             return "t1", name[-1]
         if name in ["t4", "t5", "t6"]:
             return "t2", name[-1]
         if "esp" in name:
-            return ["ex_sp", "1"]
+            return "ex_sp", "1"
         if "ex" in name:
-            return ["ex_ex", "1"]
+            return "ex_ex", "1"
 
         return super(CampaignBase, CampaignBase).campaign_separate_name(name)

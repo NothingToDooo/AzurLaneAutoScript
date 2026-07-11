@@ -68,7 +68,7 @@ class CampaignBase(CampaignBase_):
             WAR_ARCHIVES_SCROLL.next_page(main=self, page=0.66)
         return True
 
-    def _search_archives_entrance(self, name, skip_first_screenshot=True):
+    def _search_archives_entrance(self, name, *, skip_first_screenshot=True):
         """滚动搜索档案入口，最多尝试 20 次后放弃。"""
         loading_checked = False
         for _ in range(20):
