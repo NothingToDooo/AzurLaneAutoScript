@@ -26,13 +26,13 @@ SWITCH_LOCK.add_state(
 
 @dataclass(slots=True)
 class _MeowGetState:
-    confirm_timer: object
+    confirm_timer: Timer
     skip_first_screenshot: bool
     count: int = 0
 
 
 class MeowfficerCollect(MeowfficerBase):
-    def _meow_detect_shift(self, skip_first_screenshot=True):
+    def _meow_detect_shift(self, *, skip_first_screenshot: bool = True) -> bool:
         """等待领取完成页稳定，并返回页面是否随机左移。"""
         flag = False
         confirm_timer = Timer(3, count=6).start()
@@ -60,13 +60,13 @@ class MeowfficerCollect(MeowfficerBase):
                     break
         return flag
 
-    def _meow_check_popup_exit(self):
+    def _meow_check_popup_exit(self) -> bool:
         """返回退出锁定弹窗或天赋详情后是否位于可继续页面。"""
         return self.match_template_color(meow_assets.MEOWFFICER_GET_CHECK, offset=(40, 40)) or self.appear(
             meow_assets.MEOWFFICER_TRAIN_START, offset=(20, 20)
         )
 
-    def _meow_is_special_talented(self):
+    def _meow_is_special_talented(self) -> bool:
         """检查指挥喵是否至少有一个特殊天赋。"""
         logger.info("Wait complete load and examine base talents")
 
@@ -87,10 +87,10 @@ class MeowfficerCollect(MeowfficerBase):
         logger.info(f"{log_insert} special talent abilities in meowfficer")
         return special_talent
 
-    def _meow_skip_lock(self):
+    def _meow_skip_lock(self) -> None:
         """仅用于金色指挥喵，缓慢跳过锁定流程以避免误操作。"""
 
-        def additional():
+        def additional() -> bool:
             if self.appear(meow_assets.MEOWFFICER_TRAIN_EVALUATE, offset=(20, 20), interval=3):
                 self.device.click(meow_assets.MEOWFFICER_TRAIN_EVALUATE)
                 return True
@@ -117,13 +117,13 @@ class MeowfficerCollect(MeowfficerBase):
         self.device.click_record.pop()
         self.device.click_record.pop()
 
-    def _meow_apply_lock(self, lock=True):
+    def _meow_apply_lock(self, *, lock: bool = True) -> None:
         """设置新指挥喵锁定状态，避免被用作强化材料。"""
         SWITCH_LOCK.set("lock" if lock else "unlock", main=self)
 
         self.ensure_no_info_bar(timeout=1)
 
-    def _meow_skip_popup_after_locking(self, skip_first_screenshot=True):
+    def _meow_skip_popup_after_locking(self, *, skip_first_screenshot: bool = True) -> None:
         """兼容 2023-11-16 后已锁定金色指挥喵仍出现确认弹窗的流程。"""
         while 1:
             if skip_first_screenshot:
@@ -165,7 +165,7 @@ class MeowfficerCollect(MeowfficerBase):
             )
         )
 
-    def meow_get(self, skip_first_screenshot=True):
+    def meow_get(self, *, skip_first_screenshot: bool = True) -> None:
         """从领取页等待数量不定的动画并逐只领取；仅金色会确认，最终回到训练页。"""
         state = _MeowGetState(confirm_timer=Timer(1.5, count=3).start(), skip_first_screenshot=skip_first_screenshot)
         while 1:
@@ -183,21 +183,21 @@ class MeowfficerCollect(MeowfficerBase):
             if self._meow_get_handle_evaluate():
                 continue
 
-    def _meow_get_finished(self, state):
+    def _meow_get_finished(self, state: _MeowGetState) -> bool:
         if self.appear(meow_assets.MEOWFFICER_TRAIN_START, offset=(20, 20)):
             return state.confirm_timer.reached()
 
         state.confirm_timer.reset()
         return False
 
-    def _meow_get_handle_popup(self, state):
+    def _meow_get_handle_popup(self, state: _MeowGetState) -> bool:
         if not self.handle_meow_popup_dismiss():
             return False
 
         state.confirm_timer.reset()
         return True
 
-    def _meow_get_handle_acquired(self, state):
+    def _meow_get_handle_acquired(self, state: _MeowGetState) -> bool:
         if not self.appear(meow_assets.MEOWFFICER_GET_CHECK, offset=(40, 40), interval=3):
             return False
 
@@ -207,13 +207,13 @@ class MeowfficerCollect(MeowfficerBase):
         state.count += 1
         logger.attr("Meow_get", state.count)
         special_talent = self._meow_is_special_talented()
-        if self._meow_get_handle_gold(special_talent, state):
+        if self._meow_get_handle_gold(state, special_talent=special_talent):
             return True
-        self._meow_get_handle_purple(special_talent)
+        self._meow_get_handle_purple(special_talent=special_talent)
         self._meow_get_continue_next(state)
         return True
 
-    def _meow_get_skip_popup_after_locking(self, state):
+    def _meow_get_skip_popup_after_locking(self, state: _MeowGetState) -> bool:
         if not self.appear(meow_assets.MEOWFFICER_APPLY_UNLOCK, offset=(40, 40)):
             return False
 
@@ -222,7 +222,7 @@ class MeowfficerCollect(MeowfficerBase):
         # 意外退出领取队列。
         return self.appear(meow_assets.MEOWFFICER_TRAIN_START, offset=(20, 20))
 
-    def _meow_get_handle_gold(self, special_talent, state):
+    def _meow_get_handle_gold(self, state: _MeowGetState, *, special_talent: bool) -> bool:
         if not self.appear(meow_assets.MEOWFFICER_GOLD_CHECK, offset=(40, 40)):
             return False
         if self.config.MeowfficerTrain_RetainTalentedGold and special_talent:
@@ -234,20 +234,20 @@ class MeowfficerCollect(MeowfficerBase):
         state.confirm_timer.reset()
         return True
 
-    def _meow_get_handle_purple(self, special_talent):
+    def _meow_get_handle_purple(self, *, special_talent: bool) -> None:
         if not self.appear(meow_assets.MEOWFFICER_PURPLE_CHECK, offset=(40, 40)):
             return
         if self.config.MeowfficerTrain_RetainTalentedPurple and special_talent:
             self._meow_apply_lock()
 
-    def _meow_get_continue_next(self, state):
+    def _meow_get_continue_next(self, state: _MeowGetState) -> None:
         # 多次领取时容易触发异常，通过弹出 click_record 缓解。
         self.device.click(meow_assets.MEOWFFICER_TRAIN_CLICK_SAFE_AREA)
         self.device.click_record.pop()
         state.confirm_timer.reset()
         self.interval_reset(meow_assets.MEOWFFICER_GET_CHECK)
 
-    def _meow_get_handle_evaluate(self):
+    def _meow_get_handle_evaluate(self) -> bool:
         # 点击 MEOWFFICER_TRAIN_FINISH_ALL 后会进入评价页面。
         if not self.appear(meow_assets.MEOWFFICER_TRAIN_EVALUATE, offset=(20, 20), interval=3):
             return False
@@ -255,7 +255,7 @@ class MeowfficerCollect(MeowfficerBase):
         self.device.click(meow_assets.MEOWFFICER_TRAIN_EVALUATE)
         return True
 
-    def meow_collect(self, collect_all=True):
+    def meow_collect(self, *, collect_all: bool = True) -> bool:
         """在训练页领取一只或全部并返回是否领取；完成槽会自动移到队首，只检查左上槽。"""
         logger.hr("Meowfficer collect", level=2)
 

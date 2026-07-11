@@ -15,7 +15,7 @@ MEOWFFICER_CHOOSE = Digit(meow_assets.OCR_MEOWFFICER_CHOOSE, letter=(140, 113, 9
 MEOWFFICER_COINS = Digit(meow_assets.OCR_MEOWFFICER_COINS, letter=(99, 69, 41), threshold=64)
 
 
-def _calculate_meow_buy_count(bought, total, coins, buy_amount, overflow_th):
+def _calculate_meow_buy_count(bought: int, total: int, coins: int, buy_amount: int, overflow_th: int) -> int:
     """按每日基准和金币溢出阈值计算购买数；首箱免费，负阈值禁用溢出购买。"""
     today_left = max(0, total - bought)
     if today_left <= 0:
@@ -51,7 +51,7 @@ def _calculate_meow_buy_count(bought, total, coins, buy_amount, overflow_th):
 
 
 class MeowfficerBuy(MeowfficerBase):
-    def meow_get_buy_count(self, buy_amount, overflow_th):
+    def meow_get_buy_count(self, buy_amount: int, overflow_th: int) -> int:
         """在指挥喵主页 OCR 剩余次数和金币，返回本次购买的 0～15 箱。"""
         failure_store = OCR_FAILURE_STORE if self.config.Error_SaveError else None
         for _ in self.loop(timeout=2):
@@ -81,7 +81,7 @@ class MeowfficerBuy(MeowfficerBase):
 
         return _calculate_meow_buy_count(bought, total, coins, buy_amount, overflow_th)
 
-    def meow_choose(self, count) -> None:
+    def meow_choose(self, count: int) -> None:
         """从主页进入购买页，并把数量设为 1～15。"""
         self.meow_enter(meow_assets.MEOWFFICER_BUY_ENTER, check_button=meow_assets.MEOWFFICER_BUY)
 
@@ -100,7 +100,7 @@ class MeowfficerBuy(MeowfficerBase):
             skip_first_screenshot=True,
         )
 
-    def meow_confirm(self, skip_first_screenshot=True) -> None:
+    def meow_confirm(self, *, skip_first_screenshot: bool = True) -> None:
         """从购买页确认并返回指挥喵主页。"""
         # 这里用简单点击，避免重复点击 MEOWFFICER_BUY。
         logger.hr("Meow confirm")

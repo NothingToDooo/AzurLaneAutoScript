@@ -6,7 +6,7 @@ from module.ui.page import page_meowfficer
 
 
 class RewardMeowfficer(MeowfficerBuy, MeowfficerFort, MeowfficerTrain):
-    def wait_meowfficer_buttons(self, skip_first_screenshot=True):
+    def wait_meowfficer_buttons(self, *, skip_first_screenshot: bool = True) -> None:
         """MEOWFFICER_INFO 和购买入口比主页检查点加载更慢，需额外等待。"""
         while 1:
             if skip_first_screenshot:
@@ -20,7 +20,7 @@ class RewardMeowfficer(MeowfficerBuy, MeowfficerFort, MeowfficerTrain):
             if self.ui_additional():
                 continue
 
-    def run(self):
+    def run(self) -> None:
         """从任意页面执行已启用的购买、强化、训练和猫窝任务，结束于指挥喵主页。"""
         if (
             self.config.Meowfficer_BuyAmount <= 0

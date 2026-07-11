@@ -1,12 +1,19 @@
+from typing import TYPE_CHECKING, Literal, Unpack
+
 from module.base.button import ButtonGrid
 from module.base.timer import Timer
 from module.logger import logger
 from module.meowfficer import assets as meow_assets
 from module.meowfficer.base import MeowfficerBase
 from module.meowfficer.buy import MEOWFFICER_COINS
-from module.ocr.ocr import Digit, DigitCounter, ocr_options
+from module.ocr.ocr import Digit, DigitCounter, OcrOptions, OcrRegions, ocr_options
 from module.ui.assets import MEOWFFICER_GOTO_DORMMENU
 from module.ui.page import page_meowfficer
+
+if TYPE_CHECKING:
+    from module.base.button import Button
+
+type MeowEnhanceResult = Literal["invalid", "coin_limit", "leveled_max", "in_battle", "success"]
 
 MEOWFFICER_SELECT_GRID = ButtonGrid(
     origin=(751, 237), delta=(130, 147), button_shape=(70, 20), grid_shape=(4, 3), name="MEOWFFICER_SELECT_GRID"
@@ -21,10 +28,15 @@ MEOWFFICER_FEED = DigitCounter(meow_assets.OCR_MEOWFFICER_FEED, letter=(131, 121
 
 
 class MeowfficerLevelOcr(Digit):
-    def __init__(self, buttons, options=None, **settings):
+    def __init__(
+        self,
+        buttons: OcrRegions,
+        options: OcrOptions | None = None,
+        **settings: Unpack[OcrOptions],
+    ) -> None:
         super().__init__(buttons, options=ocr_options(options, settings, alphabet="0123456789IDSLV"))
 
-    def after_process(self, result):
+    def after_process(self, result: str) -> int:
         result = result.replace("L", "").replace("V", "").replace(".", "")
         return super().after_process(result)
 
@@ -35,7 +47,7 @@ OCR_MEOWFFICER_ENHANCE_LEVEL = MeowfficerLevelOcr(
 
 
 class MeowfficerEnhance(MeowfficerBase):
-    def _meow_select(self, skip_first_screenshot=True):
+    def _meow_select(self, *, skip_first_screenshot: bool = True) -> None:
         """在 4×3 网格选择强化目标，并以黄白虚线圆确认选中。"""
         index = self.config.MeowfficerTrain_EnhanceIndex - 1
         x = index if index < 4 else index % 4
@@ -59,7 +71,7 @@ class MeowfficerEnhance(MeowfficerBase):
                 self.device.click(MEOWFFICER_FEED_GRID[x, y])
                 click_timer.reset()
 
-    def meow_feed_scan(self):
+    def meow_feed_scan(self) -> list[Button]:
         """在 4×3 喂养网格返回未选中且不超过等级上限的可点击按钮。"""
         clickable = []
 
@@ -79,7 +91,7 @@ class MeowfficerEnhance(MeowfficerBase):
 
         feed_level_list = Digit(
             MEOWFICER_FEED_LEVEL_GRID.buttons, letter=(49, 48, 49), name="FEED_MEOWFFICER_LEVEL"
-        ).ocr(self.device.image)
+        ).ocr_regions(self.device.image)
 
         for index, (button, level) in enumerate(zip(MEOWFFICER_FEED_GRID.buttons, feed_level_list, strict=False)):
             # 到第 11 个按钮时退出；后续位置无法点击，不需要继续验证。
@@ -101,7 +113,7 @@ class MeowfficerEnhance(MeowfficerBase):
         logger.info(f"Total feed material found: {len(clickable)}")
         return clickable
 
-    def meow_feed_select(self):
+    def meow_feed_select(self) -> int:
         """在喂养页选择材料并回到强化页，返回选中数量。"""
         self.interval_clear(
             [
@@ -151,7 +163,7 @@ class MeowfficerEnhance(MeowfficerBase):
             )
         return current
 
-    def meow_feed_enter(self, skip_first_screenshot=True):
+    def meow_feed_enter(self, *, skip_first_screenshot: bool = True) -> bool:
         """进入喂养选择页；连续三次失败通常表示目标已到 30 级。"""
         click_count = 0
         confirm_timer = Timer(3, count=6).start()
@@ -174,7 +186,7 @@ class MeowfficerEnhance(MeowfficerBase):
                 return False
         return False
 
-    def meow_enhance_confirm(self, skip_first_screenshot=True):
+    def meow_enhance_confirm(self, *, skip_first_screenshot: bool = True) -> None:
         """在强化页确认喂养材料，并等待回到同一页面。"""
         self.interval_clear(
             [
@@ -202,7 +214,7 @@ class MeowfficerEnhance(MeowfficerBase):
                 confirm_timer.reset()
                 continue
 
-    def meow_enhance_enter(self, skip_first_screenshot=True):
+    def meow_enhance_enter(self, *, skip_first_screenshot: bool = True) -> bool:
         """从强化入口进入喂养页；目标出战时多次点击后返回 False。"""
         count = 0
         while 1:
@@ -226,14 +238,14 @@ class MeowfficerEnhance(MeowfficerBase):
                 continue
         return False
 
-    def _meow_get_level(self):
+    def _meow_get_level(self) -> int:
         """在强化入口 OCR 1～30 级；无法识别时返回 0。"""
-        level = OCR_MEOWFFICER_ENHANCE_LEVEL.ocr(self.device.image)
+        level = OCR_MEOWFFICER_ENHANCE_LEVEL.ocr_single(self.device.image)
         if level > 30:
             logger.warning(f"Invalid meowfficer level: {level}")
         return level
 
-    def _meow_enhance(self):
+    def _meow_enhance(self) -> MeowEnhanceResult:
         """在主页强化指挥喵，返回 invalid、coin_limit、leveled_max、in_battle 或 success。"""
         logger.hr("Meowfficer enhance", level=1)
         logger.attr("MeowfficerTrain_EnhanceIndex", self.config.MeowfficerTrain_EnhanceIndex)
@@ -245,7 +257,7 @@ class MeowfficerEnhance(MeowfficerBase):
             )
             return "invalid"
 
-        coins = MEOWFFICER_COINS.ocr(self.device.image)
+        coins = MEOWFFICER_COINS.ocr_single(self.device.image)
         if coins < 1000:
             logger.info(f"Coins ({coins}) < 1000. Not enough coins to complete enhancement, skip")
             return "coin_limit"
@@ -281,7 +293,7 @@ class MeowfficerEnhance(MeowfficerBase):
                 break
             self.meow_enhance_confirm()
 
-            coins = MEOWFFICER_COINS.ocr(self.device.image)
+            coins = MEOWFFICER_COINS.ocr_single(self.device.image)
             if coins < 1000:
                 logger.info(f"Remaining coins ({coins}) < 1000. Not enough coins for next enhancement, skip")
                 break
@@ -295,7 +307,7 @@ class MeowfficerEnhance(MeowfficerBase):
         )
         return "success"
 
-    def meow_enhance(self):
+    def meow_enhance(self) -> None:
         """目标达到 30 级时自动递增强化索引。"""
         while 1:
             result = self._meow_enhance()
