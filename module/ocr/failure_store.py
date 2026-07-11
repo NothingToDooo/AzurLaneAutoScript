@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import hashlib
 import json
 import os
@@ -23,6 +21,8 @@ if TYPE_CHECKING:
 
     from module.ocr.result import RecognitionResult
 
+type _RecognitionResult[T] = RecognitionResult[T]
+type _PathIterator = Iterator[Path]
 type _EncodedBundle = tuple[bytes, bytes, bytes]
 
 
@@ -97,7 +97,7 @@ class OcrFailureRecordResult:
 class OcrFailureRecorder(Protocol):
     def record[T](  # noqa: PLR0913
         self,
-        result: RecognitionResult[T],
+        result: _RecognitionResult[T],
         *,
         raw_image: np.ndarray,
         processed_image: np.ndarray,
@@ -128,7 +128,7 @@ class OcrFailureStore:
 
     def record[T](  # noqa: PLR0913
         self,
-        result: RecognitionResult[T],
+        result: _RecognitionResult[T],
         *,
         raw_image: np.ndarray,
         processed_image: np.ndarray,
@@ -157,7 +157,7 @@ class OcrFailureStore:
 
     def _record[T](  # noqa: PLR0913
         self,
-        result: RecognitionResult[T],
+        result: _RecognitionResult[T],
         *,
         raw_image: np.ndarray,
         processed_image: np.ndarray,
@@ -179,9 +179,16 @@ class OcrFailureStore:
             expected_total=expected_total,
         )
         final_directory = self._root / result.profile / digest
-        self._validate_storage_path(final_directory)
-        if self._is_complete_bundle(final_directory):
-            return OcrFailureRecordResult(OcrFailureRecordStatus.DUPLICATE, digest, final_directory)
+        with _STORE_LOCK:
+            if self._disabled:
+                return OcrFailureRecordResult(OcrFailureRecordStatus.DISABLED, "", None)
+            try:
+                record_result, _ = self._check_sample_limits(final_directory, digest)
+            except OSError:
+                self._disabled = True
+                raise
+        if record_result is not None:
+            return record_result
 
         bundle = self._encode_bundle(
             result,
@@ -199,24 +206,49 @@ class OcrFailureStore:
             return OcrFailureRecordResult(OcrFailureRecordStatus.TOO_LARGE, digest, None)
 
         with _STORE_LOCK:
-            self._validate_storage_path(final_directory)
-            if self._is_complete_bundle(final_directory):
-                return OcrFailureRecordResult(OcrFailureRecordStatus.DUPLICATE, digest, final_directory)
-            existing_bundles = list(self._iter_complete_bundles())
-            profile_directory = self._root / result.profile
-            existing_size = sum(self._bundle_disk_size(directory) for directory in existing_bundles)
-            if (
-                self._sample_limit_reached(profile_directory, existing_bundles)
-                or existing_size + bundle_size > self._max_total_bytes
-            ):
-                return OcrFailureRecordResult(OcrFailureRecordStatus.LIMIT_REACHED, digest, None)
-            if not self._publish_bundle(final_directory, bundle):
-                return OcrFailureRecordResult(OcrFailureRecordStatus.DUPLICATE, digest, final_directory)
-            _PROCESS_SAMPLE_BUDGET.new_samples += 1
+            if self._disabled:
+                return OcrFailureRecordResult(OcrFailureRecordStatus.DISABLED, "", None)
+            try:
+                return self._publish_within_limits(final_directory, digest, bundle)
+            except OSError:
+                self._disabled = True
+                raise
+
+    def _check_sample_limits(
+        self,
+        final_directory: Path,
+        digest: str,
+    ) -> tuple[OcrFailureRecordResult | None, list[Path]]:
+        self._validate_storage_path(final_directory)
+        if self._is_complete_bundle(final_directory):
+            result = OcrFailureRecordResult(OcrFailureRecordStatus.DUPLICATE, digest, final_directory)
+            return result, []
+        existing_bundles = list(self._iter_complete_bundles())
+        if self._sample_limit_reached(final_directory.parent, existing_bundles):
+            result = OcrFailureRecordResult(OcrFailureRecordStatus.LIMIT_REACHED, digest, None)
+            return result, existing_bundles
+        return None, existing_bundles
+
+    def _publish_within_limits(
+        self,
+        final_directory: Path,
+        digest: str,
+        bundle: _EncodedBundle,
+    ) -> OcrFailureRecordResult:
+        record_result, existing_bundles = self._check_sample_limits(final_directory, digest)
+        if record_result is not None:
+            return record_result
+        bundle_size = sum(len(content) for content in bundle)
+        existing_size = sum(self._bundle_disk_size(directory) for directory in existing_bundles)
+        if existing_size + bundle_size > self._max_total_bytes:
+            return OcrFailureRecordResult(OcrFailureRecordStatus.LIMIT_REACHED, digest, None)
+        if not self._publish_bundle(final_directory, bundle):
+            return OcrFailureRecordResult(OcrFailureRecordStatus.DUPLICATE, digest, final_directory)
+        _PROCESS_SAMPLE_BUDGET.new_samples += 1
         return OcrFailureRecordResult(OcrFailureRecordStatus.SAVED, digest, final_directory)
 
     @staticmethod
-    def _validate_result[T](result: RecognitionResult[T]) -> None:
+    def _validate_result[T](result: _RecognitionResult[T]) -> None:
         if result.valid:
             message = "OCR failure store accepts only failed recognition results"
             raise ValueError(message)
@@ -226,7 +258,7 @@ class OcrFailureStore:
 
     @staticmethod
     def _encode_bundle[T](  # noqa: PLR0913
-        result: RecognitionResult[T],
+        result: _RecognitionResult[T],
         *,
         digest: str,
         raw_image: np.ndarray,
@@ -290,15 +322,22 @@ class OcrFailureStore:
             self._validate_storage_path(temp_directory)
             atomic_replace(temp_directory, final_directory)
         except ValueError:
-            folder_rmtree(temp_directory)
+            self._cleanup_temp_directory(temp_directory)
             raise
         except OSError:
-            folder_rmtree(temp_directory)
+            self._cleanup_temp_directory(temp_directory)
             self._validate_storage_path(final_directory)
             if self._is_complete_bundle(final_directory):
                 return False
             raise
         return True
+
+    def _cleanup_temp_directory(self, temp_directory: Path) -> None:
+        try:
+            self._validate_storage_path(temp_directory)
+        except ValueError:
+            return
+        folder_rmtree(temp_directory)
 
     def _validate_storage_path(self, path: Path) -> None:
         message = "OCR failure path must stay within its root and contain no reparse points"
@@ -343,7 +382,7 @@ class OcrFailureStore:
 
     @staticmethod
     def _digest[T](  # noqa: PLR0913
-        result: RecognitionResult[T],
+        result: _RecognitionResult[T],
         *,
         processed_image: np.ndarray,
         area: tuple[int, int, int, int] | None,
@@ -397,19 +436,25 @@ class OcrFailureStore:
     def _bundle_disk_size(directory: Path) -> int:
         return sum((directory / name).stat().st_size for name in ("raw.png", "processed.png", "metadata.json"))
 
-    def _iter_complete_bundles(self) -> Iterator[Path]:
+    def _iter_complete_bundles(self) -> _PathIterator:
         if not self._root.is_dir():
             return
         for profile_directory in self._root.iterdir():
             if not _is_valid_profile(profile_directory.name):
                 continue
-            self._validate_storage_path(profile_directory)
+            try:
+                self._validate_storage_path(profile_directory)
+            except ValueError:
+                continue
             if not profile_directory.is_dir():
                 continue
             for bundle_directory in profile_directory.iterdir():
                 if not re.fullmatch(r"[0-9a-f]{64}", bundle_directory.name):
                     continue
-                self._validate_storage_path(bundle_directory)
+                try:
+                    self._validate_storage_path(bundle_directory)
+                except ValueError:
+                    continue
                 if self._is_complete_bundle(bundle_directory):
                     yield bundle_directory
 

@@ -194,10 +194,12 @@ def test_failure_store_record_signatures_are_introspectable() -> None:
     iterator_signature = inspect.signature(OcrFailureStore._iter_complete_bundles)
 
     assert recorder_signature.parameters["expected_total"].default is None
-    assert recorder_signature.return_annotation == "OcrFailureRecordResult"
+    assert str(recorder_signature.parameters["result"].annotation) == "_RecognitionResult[T]"
+    assert recorder_signature.return_annotation is OcrFailureRecordResult
     assert store_signature.parameters["expected_total"].default is None
-    assert store_signature.return_annotation == "OcrFailureRecordResult"
-    assert iterator_signature.return_annotation == "Iterator[Path]"
+    assert str(store_signature.parameters["result"].annotation) == "_RecognitionResult[T]"
+    assert store_signature.return_annotation is OcrFailureRecordResult
+    assert str(iterator_signature.return_annotation) == "_PathIterator"
 
 
 def test_failure_store_writes_complete_bundle(tmp_path: Path) -> None:
@@ -461,6 +463,79 @@ def test_failure_store_enforces_process_limit_without_charging_duplicates(tmp_pa
     assert second.status is OcrFailureRecordStatus.SAVED
     assert duplicate_at_limit.status is OcrFailureRecordStatus.DUPLICATE
     assert rejected.status is OcrFailureRecordStatus.LIMIT_REACHED
+
+
+def test_failure_store_prechecks_sample_limits_before_png_encoding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    encoded_shapes: list[tuple[int, ...]] = []
+    encode_png = OcrFailureStore._png_bytes
+
+    def count_png_encoding(image: np.ndarray) -> bytes:
+        encoded_shapes.append(image.shape)
+        return encode_png(image)
+
+    stores = [
+        OcrFailureStore(tmp_path / "process", max_new_samples_per_process=0),
+        OcrFailureStore(tmp_path / "global", max_total_samples=0),
+        OcrFailureStore(tmp_path / "profile", max_samples_per_profile=0),
+    ]
+    monkeypatch.setattr(OcrFailureStore, "_png_bytes", staticmethod(count_png_encoding))
+
+    records = [
+        store.record(
+            make_invalid_counter_result(),
+            raw_image=RAW_IMAGE,
+            processed_image=PROCESSED_IMAGE,
+            area=(1, 2, 5, 6),
+            alphabet=None,
+            letter=(140, 113, 99),
+            threshold=64,
+        )
+        for store in stores
+    ]
+
+    assert [record.status for record in records] == [OcrFailureRecordStatus.LIMIT_REACHED] * 3
+    assert encoded_shapes == []
+    assert not list(tmp_path.iterdir())
+
+
+def test_failure_store_duplicate_precedes_zero_sample_limits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    saved = OcrFailureStore(tmp_path).record(
+        make_invalid_counter_result(),
+        raw_image=RAW_IMAGE,
+        processed_image=PROCESSED_IMAGE,
+        area=(1, 2, 5, 6),
+        alphabet=None,
+        letter=(140, 113, 99),
+        threshold=64,
+    )
+
+    def fail_encoding(_image: np.ndarray) -> bytes:
+        pytest.fail("duplicate reached PNG encoding")
+
+    monkeypatch.setattr(OcrFailureStore, "_png_bytes", staticmethod(fail_encoding))
+    duplicate = OcrFailureStore(
+        tmp_path,
+        max_total_samples=0,
+        max_samples_per_profile=0,
+        max_new_samples_per_process=0,
+    ).record(
+        make_invalid_counter_result(),
+        raw_image=ALTERNATE_RAW_IMAGE,
+        processed_image=PROCESSED_IMAGE,
+        area=(1, 2, 5, 6),
+        alphabet=None,
+        letter=(140, 113, 99),
+        threshold=64,
+    )
+
+    assert saved.status is OcrFailureRecordStatus.SAVED
+    assert duplicate.status is OcrFailureRecordStatus.DUPLICATE
 
 
 def test_process_sample_budget_is_shared_across_store_instances(tmp_path: Path) -> None:
@@ -908,6 +983,66 @@ def test_failure_store_rejects_existing_temp_junction(
     assert not list(outside.iterdir())
 
 
+def test_failure_store_cleanup_does_not_follow_replaced_temp_junction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "root"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    sentinel = outside / "sentinel.txt"
+    sentinel.write_text("preserve", encoding="utf-8")
+    temp_junction = root / "counter.v1" / "forced.abcdef.tmp"
+    write_file = failure_store_module.file_write
+
+    def fixed_temp_path(_final_directory: Path) -> str:
+        return str(temp_junction)
+
+    def replace_temp_after_writing(path: Path, content: object) -> None:
+        write_file(path, content)
+        if path.name == "metadata.json":
+            shutil.rmtree(temp_junction)
+            create_junction(temp_junction, outside)
+
+    monkeypatch.setattr(failure_store_module, "to_tmp_file", fixed_temp_path)
+    monkeypatch.setattr(failure_store_module, "file_write", replace_temp_after_writing)
+    with pytest.raises(ValueError, match="path"):
+        OcrFailureStore(root).record(
+            make_invalid_counter_result(),
+            raw_image=RAW_IMAGE,
+            processed_image=PROCESSED_IMAGE,
+            area=(1, 2, 5, 6),
+            alphabet=None,
+            letter=(140, 113, 99),
+            threshold=64,
+        )
+
+    assert sentinel.read_text(encoding="utf-8") == "preserve"
+    assert temp_junction.is_junction()
+
+
+@pytest.mark.parametrize("redirect_kind", ["profile", "bundle"])
+def test_structured_counter_ignores_unrelated_junction(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    redirect_kind: str,
+) -> None:
+    root = tmp_path / "root"
+    outside = tmp_path / "outside"
+    redirect = root / "unrelated" if redirect_kind == "profile" else root / "unrelated" / ("a" * 64)
+    create_junction(redirect, outside)
+    counter = _StoreTestCounter("99/15")
+
+    with caplog.at_level(logging.WARNING, logger="alas"):
+        result = counter.recognize(RAW_IMAGE, failure_store=OcrFailureStore(root))
+
+    assert result.reason is RecognitionFailureReason.CURRENT_EXCEEDS_TOTAL
+    assert len(list((root / "TEST_COUNTER").iterdir())) == 1
+    assert redirect.is_junction()
+    assert not list(outside.iterdir())
+    assert not [record for record in caplog.records if "OCR failure recorder" in record.getMessage()]
+
+
 def test_failure_store_rejects_successful_result_before_writing(tmp_path: Path) -> None:
     root = tmp_path / "root"
     result = RecognitionResult(
@@ -1079,6 +1214,50 @@ def test_structured_counter_redacts_concrete_store_error_and_keeps_result(
     assert "failed for 99/15" not in warning
     assert "99/15" not in warning
     assert not [record for record in caplog.records if "OCR failure store disabled" in record.getMessage()]
+
+
+def test_structured_counter_concurrent_store_error_warns_and_publishes_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    store = OcrFailureStore(tmp_path / "root")
+    counter = _StoreTestCounter("99/15")
+    barrier = Barrier(2)
+    encode_bundle = OcrFailureStore._encode_bundle
+    publish_sources: list[Path] = []
+
+    def synchronized_encode_bundle(
+        result: RecognitionResult[tuple[int, int, int]],
+        **kwargs: typing.Unpack[_EncodeBundleKwargs],
+    ) -> tuple[bytes, bytes, bytes]:
+        encoded = encode_bundle(result, **kwargs)
+        barrier.wait(timeout=5)
+        return encoded
+
+    def fail_publish(source: Path, destination: Path) -> None:
+        del destination
+        publish_sources.append(Path(source))
+        message = "concurrent publish failure"
+        raise OSError(message)
+
+    def recognize(_index: int) -> RecognitionResult[tuple[int, int, int]]:
+        return counter.recognize(RAW_IMAGE, failure_store=store)
+
+    monkeypatch.setattr(OcrFailureStore, "_encode_bundle", staticmethod(synchronized_encode_bundle))
+    monkeypatch.setattr(failure_store_module, "atomic_replace", fail_publish)
+    with caplog.at_level(logging.WARNING, logger="alas"), ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(recognize, range(2)))
+
+    assert [result.reason for result in results] == [
+        RecognitionFailureReason.CURRENT_EXCEEDS_TOTAL,
+        RecognitionFailureReason.CURRENT_EXCEEDS_TOTAL,
+    ]
+    assert len(publish_sources) == 1
+    warning_records = [record for record in caplog.records if "OCR failure recorder" in record.getMessage()]
+    assert len(warning_records) == 1
+    assert "OSError" in warning_records[0].getMessage()
+    assert "concurrent publish failure" not in warning_records[0].getMessage()
 
 
 def test_failure_store_treats_competing_complete_publish_as_duplicate(
