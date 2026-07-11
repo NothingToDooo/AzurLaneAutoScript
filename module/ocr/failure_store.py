@@ -21,6 +21,13 @@ if TYPE_CHECKING:
 
 type _EncodedBundle = tuple[bytes, bytes, bytes]
 
+
+@dataclass(slots=True)
+class _ProcessSampleBudget:
+    new_samples: int = 0
+
+
+_PROCESS_SAMPLE_BUDGET = _ProcessSampleBudget()
 _METADATA_FIELDS = frozenset(
     {
         "schema_version",
@@ -47,6 +54,10 @@ _METADATA_FIELDS = frozenset(
     }
 )
 _PROFILE_PATTERN = re.compile(r"[A-Za-z0-9_.-]{1,64}")
+
+
+def _is_valid_profile(profile: str) -> bool:
+    return _PROFILE_PATTERN.fullmatch(profile) is not None and profile not in {".", ".."}
 
 
 class OcrFailureRecordStatus(StrEnum):
@@ -94,7 +105,6 @@ class OcrFailureStore:
         self._max_samples_per_profile = max_samples_per_profile
         self._max_total_bytes = max_total_bytes
         self._max_new_samples_per_process = max_new_samples_per_process
-        self._new_samples = 0
         self._disabled = False
 
     def record[T](  # noqa: PLR0913
@@ -178,7 +188,7 @@ class OcrFailureStore:
 
         if not self._publish_bundle(final_directory, bundle):
             return OcrFailureRecordResult(OcrFailureRecordStatus.DUPLICATE, digest, final_directory)
-        self._new_samples += 1
+        _PROCESS_SAMPLE_BUDGET.new_samples += 1
         return OcrFailureRecordResult(OcrFailureRecordStatus.SAVED, digest, final_directory)
 
     @staticmethod
@@ -186,7 +196,7 @@ class OcrFailureStore:
         if result.valid:
             message = "OCR failure store accepts only failed recognition results"
             raise ValueError(message)
-        if _PROFILE_PATTERN.fullmatch(result.profile) is None or result.profile in {".", ".."}:
+        if not _is_valid_profile(result.profile):
             message = "profile must use 1-64 ASCII letters, digits, underscores, dots, or hyphens without traversal"
             raise ValueError(message)
 
@@ -233,8 +243,9 @@ class OcrFailureStore:
 
     def _sample_limit_reached(self, profile_directory: Path, existing_bundles: list[Path]) -> bool:
         profile_samples = sum(bundle.parent == profile_directory for bundle in existing_bundles)
+        # 所有 store 共享进程计数，每个实例用自己的配置上限解释该计数。
         return (
-            self._new_samples >= self._max_new_samples_per_process
+            _PROCESS_SAMPLE_BUDGET.new_samples >= self._max_new_samples_per_process
             or len(existing_bundles) >= self._max_total_samples
             or profile_samples >= self._max_samples_per_profile
         )
@@ -339,7 +350,7 @@ class OcrFailureStore:
         if not self._root.is_dir():
             return
         for profile_directory in self._root.iterdir():
-            if not profile_directory.is_dir():
+            if not profile_directory.is_dir() or not _is_valid_profile(profile_directory.name):
                 continue
             for bundle_directory in profile_directory.iterdir():
                 if not re.fullmatch(r"[0-9a-f]{64}", bundle_directory.name):

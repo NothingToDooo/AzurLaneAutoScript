@@ -26,6 +26,11 @@ PROCESSED_IMAGE = np.arange(12, dtype=np.uint8).reshape(3, 4)
 ALTERNATE_RAW_IMAGE = 255 - RAW_IMAGE
 
 
+@pytest.fixture(autouse=True)
+def _reset_process_sample_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(failure_store_module._PROCESS_SAMPLE_BUDGET, "new_samples", 0)
+
+
 def make_invalid_counter_result() -> RecognitionResult[tuple[int, int, int]]:
     return RecognitionResult(
         raw_text="99/15",
@@ -42,6 +47,16 @@ def make_invalid_counter_result() -> RecognitionResult[tuple[int, int, int]]:
 
 def bundle_size(directory: Path) -> int:
     return sum(path.stat().st_size for path in directory.iterdir())
+
+
+def copy_bundle_under_profile(source: Path, root: Path, profile: str) -> Path:
+    copied_bundle = root / profile / source.name
+    shutil.copytree(source, copied_bundle)
+    metadata_path = copied_bundle / "metadata.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["profile"] = profile
+    metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+    return copied_bundle
 
 
 @dataclass(frozen=True, slots=True)
@@ -353,6 +368,91 @@ def test_failure_store_enforces_process_limit_without_charging_duplicates(tmp_pa
     assert rejected.status is OcrFailureRecordStatus.LIMIT_REACHED
 
 
+def test_process_sample_budget_is_shared_across_store_instances(tmp_path: Path) -> None:
+    root = tmp_path / "shared"
+    first_store = OcrFailureStore(root, max_new_samples_per_process=1)
+    second_store = OcrFailureStore(root, max_new_samples_per_process=1)
+
+    saved = first_store.record(
+        make_invalid_counter_result(),
+        raw_image=RAW_IMAGE,
+        processed_image=PROCESSED_IMAGE,
+        area=(1, 2, 5, 6),
+        alphabet=None,
+        letter=(140, 113, 99),
+        threshold=64,
+    )
+    duplicate = second_store.record(
+        make_invalid_counter_result(),
+        raw_image=ALTERNATE_RAW_IMAGE,
+        processed_image=PROCESSED_IMAGE,
+        area=(1, 2, 5, 6),
+        alphabet=None,
+        letter=(140, 113, 99),
+        threshold=64,
+    )
+    rejected = second_store.record(
+        make_invalid_counter_result(),
+        raw_image=RAW_IMAGE,
+        processed_image=PROCESSED_IMAGE,
+        area=(1, 2, 5, 7),
+        alphabet=None,
+        letter=(140, 113, 99),
+        threshold=64,
+    )
+
+    assert saved.status is OcrFailureRecordStatus.SAVED
+    assert duplicate.status is OcrFailureRecordStatus.DUPLICATE
+    assert rejected.status is OcrFailureRecordStatus.LIMIT_REACHED
+
+
+def test_process_sample_budget_uses_each_store_limit_against_shared_count(tmp_path: Path) -> None:
+    low_limit_store = OcrFailureStore(tmp_path / "low", max_new_samples_per_process=1)
+    high_limit_store = OcrFailureStore(tmp_path / "high", max_new_samples_per_process=2)
+
+    low_saved = low_limit_store.record(
+        make_invalid_counter_result(),
+        raw_image=RAW_IMAGE,
+        processed_image=PROCESSED_IMAGE,
+        area=(1, 2, 5, 6),
+        alphabet=None,
+        letter=(140, 113, 99),
+        threshold=64,
+    )
+    high_saved = high_limit_store.record(
+        make_invalid_counter_result(),
+        raw_image=RAW_IMAGE,
+        processed_image=PROCESSED_IMAGE,
+        area=(1, 2, 5, 7),
+        alphabet=None,
+        letter=(140, 113, 99),
+        threshold=64,
+    )
+    low_rejected = low_limit_store.record(
+        make_invalid_counter_result(),
+        raw_image=RAW_IMAGE,
+        processed_image=PROCESSED_IMAGE,
+        area=(1, 2, 5, 8),
+        alphabet=None,
+        letter=(140, 113, 99),
+        threshold=64,
+    )
+    high_rejected = high_limit_store.record(
+        make_invalid_counter_result(),
+        raw_image=RAW_IMAGE,
+        processed_image=PROCESSED_IMAGE,
+        area=(1, 2, 5, 9),
+        alphabet=None,
+        letter=(140, 113, 99),
+        threshold=64,
+    )
+
+    assert low_saved.status is OcrFailureRecordStatus.SAVED
+    assert high_saved.status is OcrFailureRecordStatus.SAVED
+    assert low_rejected.status is OcrFailureRecordStatus.LIMIT_REACHED
+    assert high_rejected.status is OcrFailureRecordStatus.LIMIT_REACHED
+
+
 def test_failure_store_rejects_bundle_larger_than_total_byte_budget(tmp_path: Path) -> None:
     root = tmp_path / "too-large"
     store = OcrFailureStore(root, max_total_bytes=1)
@@ -444,6 +544,64 @@ def test_failure_store_ignores_and_preserves_unknown_directories(tmp_path: Path)
     assert unknown_name.is_dir()
     assert invalid_metadata.is_dir()
     assert stale_temp.is_dir()
+
+
+def test_failure_store_ignores_complete_bundle_under_invalid_profile(tmp_path: Path) -> None:
+    measured = OcrFailureStore(tmp_path / "measurement").record(
+        make_invalid_counter_result(),
+        raw_image=RAW_IMAGE,
+        processed_image=PROCESSED_IMAGE,
+        area=(1, 2, 5, 6),
+        alphabet=None,
+        letter=(140, 113, 99),
+        threshold=64,
+    )
+    assert measured.directory is not None
+
+    root = tmp_path / "target"
+    forged_bundle = copy_bundle_under_profile(measured.directory, root, "bad profile")
+
+    saved = OcrFailureStore(root, max_total_samples=1).record(
+        make_invalid_counter_result(),
+        raw_image=RAW_IMAGE,
+        processed_image=PROCESSED_IMAGE,
+        area=(1, 2, 5, 7),
+        alphabet=None,
+        letter=(140, 113, 99),
+        threshold=64,
+    )
+
+    assert saved.status is OcrFailureRecordStatus.SAVED
+    assert forged_bundle.is_dir()
+
+
+def test_failure_store_excludes_invalid_profile_bundle_from_byte_total(tmp_path: Path) -> None:
+    measured = OcrFailureStore(tmp_path / "measurement").record(
+        make_invalid_counter_result(),
+        raw_image=RAW_IMAGE,
+        processed_image=PROCESSED_IMAGE,
+        area=(1, 2, 5, 6),
+        alphabet=None,
+        letter=(140, 113, 99),
+        threshold=64,
+    )
+    assert measured.directory is not None
+    byte_budget = bundle_size(measured.directory) + 16
+
+    root = tmp_path / "target"
+    forged_bundle = copy_bundle_under_profile(measured.directory, root, "bad profile")
+    saved = OcrFailureStore(root, max_total_samples=2, max_total_bytes=byte_budget).record(
+        make_invalid_counter_result(),
+        raw_image=RAW_IMAGE,
+        processed_image=PROCESSED_IMAGE,
+        area=(1, 2, 5, 7),
+        alphabet=None,
+        letter=(140, 113, 99),
+        threshold=64,
+    )
+
+    assert saved.status is OcrFailureRecordStatus.SAVED
+    assert forged_bundle.is_dir()
 
 
 @pytest.mark.parametrize(
@@ -550,12 +708,26 @@ def test_failure_store_cleans_failed_publish_and_disables_after_one_warning(
     root = tmp_path / "root"
     store = OcrFailureStore(root, max_new_samples_per_process=1)
     publish_sources: list[Path] = []
+    encoded_shapes: list[tuple[int, ...]] = []
+    written_paths: list[Path] = []
+    encode_png = OcrFailureStore._png_bytes
+    write_file = failure_store_module.file_write
+
+    def count_png_encoding(image: np.ndarray) -> bytes:
+        encoded_shapes.append(image.shape)
+        return encode_png(image)
+
+    def count_file_write(path: Path, content: object) -> None:
+        written_paths.append(Path(path))
+        write_file(path, content)
 
     def fail_publish(source: Path, destination: Path) -> None:
         del destination
         publish_sources.append(Path(source))
         raise OSError
 
+    monkeypatch.setattr(OcrFailureStore, "_png_bytes", staticmethod(count_png_encoding))
+    monkeypatch.setattr(failure_store_module, "file_write", count_file_write)
     monkeypatch.setattr(failure_store_module, "atomic_replace", fail_publish)
     with caplog.at_level(logging.WARNING, logger="alas"):
         first = store.record(
@@ -579,6 +751,8 @@ def test_failure_store_cleans_failed_publish_and_disables_after_one_warning(
 
     assert first.status is OcrFailureRecordStatus.DISABLED
     assert second.status is OcrFailureRecordStatus.DISABLED
+    assert encoded_shapes == [RAW_IMAGE.shape, PROCESSED_IMAGE.shape]
+    assert [path.name for path in written_paths] == ["raw.png", "processed.png", "metadata.json"]
     assert len(publish_sources) == 1
     assert not publish_sources[0].exists()
     assert not list(root.rglob("metadata.json"))
@@ -601,6 +775,7 @@ def test_failure_store_treats_competing_complete_publish_as_duplicate(
     )
     assert competitor.directory is not None
     competitor_directory = competitor.directory
+    monkeypatch.setattr(failure_store_module._PROCESS_SAMPLE_BUDGET, "new_samples", 0)
     publish_sources: list[Path] = []
 
     def publish_competitor(source: Path, destination: Path) -> None:
