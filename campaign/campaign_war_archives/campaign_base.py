@@ -43,9 +43,6 @@ class CampaignBase(CampaignBase_):
         return button.crop((-12, -12, 44, 32), image=self.device.image, name=name)
 
     def _archives_loading_complete(self):
-        """
-        Check if war archive has finished loading
-        """
         for war_archive_folder in dic_archives_template:
             template = dic_archives_template[war_archive_folder]
             loading_result = template.match(self.device.image)
@@ -159,15 +156,7 @@ class CampaignBase(CampaignBase_):
         return result
 
     def ui_goto_event(self):
-        """
-        Overridden to handle specifically transitions
-        to target ex event in page_archives
-        """
         return self.ui_goto_archives_campaign(mode="ex")
 
     def ui_goto_sp(self):
-        """
-        Overridden to handle specifically transitions
-        to target sp event in page_archives
-        """
         return self.ui_goto_archives_campaign(mode="sp")

@@ -43,13 +43,11 @@ class CampaignBase(CampaignBase_):
         skip_first_screenshot = True
         interval = Timer(5, count=10)
         for _ in self.loop(skip_first=skip_first_screenshot):
-            # End
             if self.is_in_strategy_air_strike():
                 self.view.update(image=self.device.image)
                 del_cached_property(attack_grid, "image_trans")
             if attack_grid.predict_air_strike_icon():
                 break
-            # Click
             if interval.reached() and self.is_in_strategy_air_strike():
                 self.device.click(attack_grid)
                 interval.reset()
@@ -63,10 +61,8 @@ class CampaignBase(CampaignBase_):
             if self._air_strike_appear():
                 interval.reset()
                 continue
-            # End
             if self.appear(STRATEGY_OPENED, offset=AIR_STRIKE_OFFSET):
                 break
-            # Click
             if interval.reached() and self.is_in_strategy_air_strike():
                 self.device.click(AIR_STRIKE_CONFIRM)
                 interval.reset()

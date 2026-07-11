@@ -173,11 +173,9 @@ class Campaign(CampaignBase):
         super().map_data_init(map_)
         self.bored_visited_G3 = False
         self.bored_visited_H2 = False
-        # Only fleet_1
         self.config.FLEET_BOSS = 1
 
     def bored_visit(self):
-        # Visit all grids covered
         if not self.bored_visited_G3:
             self.bored_visited_G3 = True
             if self.clear_chosen_enemy(G3):

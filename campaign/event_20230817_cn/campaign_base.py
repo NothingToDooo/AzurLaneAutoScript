@@ -58,7 +58,6 @@ class CampaignBase(CampaignBase_):
             else:
                 self.device.screenshot()
 
-            # End
             if self.ui_page_appear(page_event):
                 if confirm.reached():
                     break

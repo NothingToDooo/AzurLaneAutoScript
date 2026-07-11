@@ -8,7 +8,7 @@ class Config:
     MAP_SWIPE_MULTIPLY = (1.006, 1.025)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (0.973, 0.991)
 
-    # Disabled because having errors
+    # 该配置会导致错误，因此禁用。
     MAP_SWIPE_PREDICT_WITH_SEA_GRIDS = False
     # Ambushes can be avoid by having more DDs.
     MAP_WALK_TURNING_OPTIMIZE = False
@@ -35,13 +35,7 @@ class CampaignBase(CampaignBase_):
         return False
 
     def pick_up_flare(self, grid):
-        """
-        Args:
-            grid (GridInfo):
-
-        Returns:
-            bool: False
-        """
+        """标记并尝试拾取对应设施，始终返回 False。"""
         grid.is_flare = True
         if grid in self.picked_flare:
             logger.info(f"Flares {grid} already picked up")
@@ -56,13 +50,7 @@ class CampaignBase(CampaignBase_):
         return False
 
     def pick_up_light_house(self, grid):
-        """
-        Args:
-            grid (GridInfo):
-
-        Returns:
-            bool: False
-        """
+        """标记并尝试拾取对应设施，始终返回 False。"""
         if grid in self.picked_light_house:
             logger.info(f"Light house {grid} already picked up")
         elif grid.is_accessible:

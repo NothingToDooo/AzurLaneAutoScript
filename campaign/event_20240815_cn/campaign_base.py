@@ -48,14 +48,12 @@ class CampaignBase(CampaignBase_):
                 self.device.screenshot()
 
             if self.is_in_stage_page():
-                # End
                 try:
                     self._get_stage_name(self.device.image)
                 except IndexError, CampaignNameError:
                     pass
                 else:
                     return True
-                # Click
                 if self.handle_story_entrance():
                     continue
             if self.handle_story_skip():
@@ -68,13 +66,11 @@ class CampaignBase(CampaignBase_):
         return False
 
     def handle_in_stage(self):
-        # 关卡结束后处理剧情入口。
         if self.is_in_stage_page() and self.handle_story_entrance():
             return False
         return super().handle_in_stage()
 
     def handle_get_chapter_additional(self):
-        # Exit when having story entrance
         if self.get_story_entrance():
             raise CampaignNameError
         return super().handle_get_chapter_additional()

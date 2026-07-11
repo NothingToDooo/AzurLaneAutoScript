@@ -114,12 +114,10 @@ class CampaignBase(CampaignBase_):
             else:
                 self.device.screenshot()
 
-            # End
             if self.is_in_strategy_mob_move():
                 self.view.update(image=self.device.image)
             if origin_grid.predict_mob_move_icon():
                 break
-            # Click
             if interval.reached() and self.is_in_strategy_mob_move():
                 self.device.click(origin_grid)
                 interval.reset()
@@ -135,10 +133,8 @@ class CampaignBase(CampaignBase_):
             else:
                 self.device.screenshot()
 
-            # End
             if self.appear(STRATEGY_OPENED, offset=MOB_MOVE_OFFSET):
                 break
-            # Click
             if interval.reached() and self.is_in_strategy_mob_move():
                 self.device.click(target_grid)
                 interval.reset()

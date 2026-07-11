@@ -18,11 +18,7 @@ class CampaignBase(CampaignBase_):
     )
 
     def campaign_set_chapter(self, name, mode="normal"):
-        """
-        Args:
-            name (str): 关卡名称，例如 '7-2'、'd3'、'sp3'。
-            mode (str): 'normal' 或 'hard'。
-        """
+        """按关卡名和 normal/hard 模式切换章节。"""
         chapter, stage = self.campaign_separate_name(name)
 
         if (

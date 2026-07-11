@@ -58,10 +58,8 @@ class CampaignBase(CampaignBase_):
     def event_animation_end(self):
         if not self.appear(EVENT_ANIMATION):
             return False
-        # wait until EVENT_ANIMATION closed
         for _ in self.loop():
             if self.is_event_animation():
                 continue
             break
-        # now in_map
         return True

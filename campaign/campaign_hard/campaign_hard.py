@@ -52,29 +52,23 @@ class Campaign(CampaignBase, HardEquipment):
         while 1:
             self.device.screenshot()
 
-            # Enter campaign
             if campaign_timer.reached() and self.is_in_stage():
                 self.device.click(self.ENTRANCE)
                 campaign_timer.reset()
                 continue
 
-            # Map preparation
             if map_timer.reached() and self.appear(MAP_PREPARATION, offset=(20, 20)):
                 self.device.click(MAP_PREPARATION)
                 map_timer.reset()
                 campaign_timer.reset()
                 continue
 
-            # Fleet preparation
             if fleet_timer.reached() and self.appear(FLEET_PREPARATION, offset=(20, 50)):
                 self.equipment_take_off()
                 self.ui_back(check_button=CAMPAIGN_CHECK, appear_button=FLEET_PREPARATION)
                 break
 
-            # Retire
             if self.handle_retirement():
                 continue
-
-            # Emotion
 
         return True

@@ -28,8 +28,4 @@ class EventGrid(Grid):
 
 
 class CampaignBase(CampaignBase_):
-    """
-    Not all event maps use this, some are the same like the classics
-    """
-
     grid_class = EventGrid

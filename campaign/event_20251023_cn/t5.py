@@ -136,7 +136,7 @@ class Config(ConfigBase):
     MAP_HAS_MYSTERY = False
     # ===== End of generated config =====
 
-    # swipe multiply same as T1
+    # 沿用 T1 的滑动倍率。
 
 
 class Campaign(CampaignBase):

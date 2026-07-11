@@ -54,28 +54,22 @@ class CampaignBase(CampaignBase_):
         Returns:
             tuple[str]: Campaign_name and stage index in lowercase, Such as ['7', '2'], ['d', '3'], ['sp', '3'].
         """
-        if name in {"vsp", "sp"}:  # 活动差异。
+        if name in {"vsp", "sp"}:
             return "ex_sp", "1"
         return CampaignBase_.campaign_separate_name(name)
 
     @staticmethod
     def campaign_get_chapter_index(name):
-        """
-        Args:
-            name (str, int):
-
-        Returns:
-            int
-        """
+        """将整数或章节名转换为章节序号。"""
         if isinstance(name, int):
             return name
         if name.isdigit():
             return int(name)
         if name in ["a", "c", "sp"]:
             return 1
-        if name in ["b", "d", "ex_sp"]:  # 活动差异。
+        if name in ["b", "d", "ex_sp"]:
             return 2
-        if name == "ex_ex":  # 活动差异。
+        if name == "ex_ex":
             return 3
         raise CampaignNameError
 

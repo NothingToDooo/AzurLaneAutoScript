@@ -30,7 +30,7 @@ class CampaignBase(CampaignBase_):
         Returns:
             tuple[str]: Campaign_name and stage index in lowercase, Such as ['7', '2'], ['d', '3'], ['sp', '3'].
         """
-        if name in {"vsp", "sp"}:  # 活动差异。
+        if name in {"vsp", "sp"}:
             return "ex_sp", "1"
         if name.startswith("extra"):
             return "ex_ex", "1"
@@ -45,29 +45,19 @@ class CampaignBase(CampaignBase_):
 
     @staticmethod
     def campaign_get_chapter_index(name):
-        """
-        Args:
-            name (str, int):
-
-        Returns:
-            int
-        """
+        """将整数或章节名转换为章节序号。"""
         if isinstance(name, int):
             return name
         if name.isdigit():
             return int(name)
         if name in ["a", "c", "as", "cs", "sp"]:
             return 1
-        if name in ["b", "d", "bs", "ds", "ex_ex", "ex_sp"]:  # 活动差异。
+        if name in ["b", "d", "bs", "ds", "ex_ex", "ex_sp"]:
             return 2
         raise CampaignNameError
 
     def campaign_set_chapter(self, name, mode="normal"):
-        """
-        Args:
-            name (str): Campaign name, such as '7-2', 'd3', 'sp3'.
-            mode (str): 'normal' or 'hard'.
-        """
+        """按关卡名和 normal/hard 模式切换章节。"""
         chapter, _ = self.campaign_separate_name(name)
 
         if chapter.isdigit():
@@ -86,7 +76,7 @@ class CampaignBase(CampaignBase_):
                 self.campaign_ensure_mode("hard")
             elif chapter == "ex_sp":
                 # 活动差异：EX_SP 不切换 EX 模式。
-                pass  # 活动差异。
+                pass
             self.campaign_ensure_chapter(chapter)
 
         elif chapter == "sp":

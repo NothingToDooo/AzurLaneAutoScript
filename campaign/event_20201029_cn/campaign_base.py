@@ -14,29 +14,19 @@ class CampaignBase(CampaignBase_):
 
     @staticmethod
     def campaign_get_chapter_index(name):
-        """
-        Args:
-            name (str, int):
-
-        Returns:
-            int
-        """
+        """将整数或章节名转换为章节序号。"""
         if isinstance(name, int):
             return name
         if name.isdigit():
             return int(name)
         if name in ["a", "c", "sp"]:
             return 1
-        if name in ["b", "d", "ex_sp"]:  # 活动差异。
+        if name in ["b", "d", "ex_sp"]:
             return 2
         raise CampaignNameError
 
     def campaign_set_chapter(self, name, mode="normal"):
-        """
-        Args:
-            name (str): Campaign name, such as '7-2', 'd3', 'sp3'.
-            mode (str): 'normal' or 'hard'.
-        """
+        """按关卡名和 normal/hard 模式切换章节。"""
         chapter, _stage = self.campaign_separate_name(name)
 
         if chapter.isdigit():
@@ -54,11 +44,12 @@ class CampaignBase(CampaignBase_):
             elif chapter in "cd":
                 self.campaign_ensure_mode("hard")
             elif chapter == "ex_sp":
-                pass  # 活动差异。
+                # EX_SP 不需要切换模式。
+                pass
             self.campaign_ensure_chapter(chapter)
 
         elif chapter == "sp":
-            self.ui_goto_event()  # 活动差异。
+            self.ui_goto_event()
             self.campaign_ensure_chapter(chapter)
 
         else:

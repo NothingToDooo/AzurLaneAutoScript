@@ -18,13 +18,7 @@ class CampaignBase(CampaignBase_):
         return True
 
     def campaign_get_chapter_index(self, name):
-        """
-        Args:
-            name (str, int):
-
-        Returns:
-            int
-        """
+        """将整数或章节名转换为章节序号。"""
         if name == "t":
             return 1
         if name == "tsk":
