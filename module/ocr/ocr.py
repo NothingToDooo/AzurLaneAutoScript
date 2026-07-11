@@ -11,6 +11,9 @@ from module.base.button import Button
 from module.base.decorator import cached_property
 from module.base.utils import _cv_scalar, crop, extract_letters, float2str, rgb2luma
 from module.logger import logger
+
+# Python 3.14 的公开签名检查会求值延迟注解，Protocol 必须在运行时可见。
+from module.ocr.failure_store import OcrFailureRecorder  # noqa: TC001
 from module.ocr.models import OCR_MODEL
 from module.ocr.result import RawOcrResult, RecognitionFailureReason, RecognitionResult
 
@@ -154,6 +157,34 @@ class Ocr:
             text=attributes,
         )
 
+    def _record_failure[T](
+        self,
+        result: RecognitionResult[T],
+        inference: _OcrInference,
+        failure_store: OcrFailureRecorder | None,
+        *,
+        expected_total: int | None = None,
+    ) -> None:
+        if result.valid or failure_store is None:
+            return
+        letter = tuple(int(channel) for channel in self.letter)
+        if len(letter) != 3:
+            message = "letter must contain exactly three channels"
+            raise ValueError(message)
+        try:
+            failure_store.record(
+                result,
+                raw_image=inference.raw_image,
+                processed_image=inference.processed_image,
+                area=inference.area,
+                alphabet=self.alphabet,
+                letter=letter,
+                threshold=self.threshold,
+                expected_total=expected_total,
+            )
+        except OSError as error:
+            logger.warning("OCR failure recorder raised an OSError; recognition result is unchanged: %s", error)
+
     def ocr(self, image, direct_ocr=False):
         """单区域返回字符串，多区域返回字符串列表。
         direct_ocr=True 时 image 是区域图像列表，仅跳过按 buttons 裁剪。
@@ -269,14 +300,21 @@ class Digit(Ocr):
             model=model,
         )
 
-    def recognize(self, image, direct_ocr=False) -> RecognitionResult[int] | list[RecognitionResult[int]]:
+    def recognize(
+        self,
+        image,
+        direct_ocr=False,
+        *,
+        failure_store: OcrFailureRecorder | None = None,
+    ) -> RecognitionResult[int] | list[RecognitionResult[int]]:
         batch = self._infer_raw(image, direct_ocr=direct_ocr)
         results = [
             self._parse_result(item.result, latency_seconds=batch.latency_seconds, model=batch.model)
             for item in batch.items
         ]
-        for result in results:
+        for item, result in zip(batch.items, results, strict=True):
             self._log_recognition(result)
+            self._record_failure(result, item, failure_store)
         if len(batch.items) == 1:
             return results[0]
         return results
@@ -374,6 +412,7 @@ class DigitCounter(Ocr):
         direct_ocr=False,
         *,
         expected_total: int | None = None,
+        failure_store: OcrFailureRecorder | None = None,
     ) -> RecognitionResult[DigitCounterValue]:
         roi_count = len(image) if direct_ocr else len(self.buttons)
         if roi_count != 1:
@@ -387,6 +426,7 @@ class DigitCounter(Ocr):
             expected_total=expected_total,
         )
         self._log_recognition(result)
+        self._record_failure(result, batch.items[0], failure_store, expected_total=expected_total)
         return result
 
     def ocr(self, image, direct_ocr=False):
@@ -479,14 +519,21 @@ class Duration(Ocr):
             model=model,
         )
 
-    def recognize(self, image, direct_ocr=False) -> RecognitionResult[timedelta] | list[RecognitionResult[timedelta]]:
+    def recognize(
+        self,
+        image,
+        direct_ocr=False,
+        *,
+        failure_store: OcrFailureRecorder | None = None,
+    ) -> RecognitionResult[timedelta] | list[RecognitionResult[timedelta]]:
         batch = self._infer_raw(image, direct_ocr=direct_ocr)
         results = [
             self._parse_result(item.result, latency_seconds=batch.latency_seconds, model=batch.model)
             for item in batch.items
         ]
-        for result in results:
+        for item, result in zip(batch.items, results, strict=True):
             self._log_recognition(result)
+            self._record_failure(result, item, failure_store)
         if len(batch.items) == 1:
             return results[0]
         return results

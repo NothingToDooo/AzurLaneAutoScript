@@ -15,6 +15,7 @@ import module.ocr.failure_store as failure_store_module
 from module.ocr.failure_store import (
     OCR_FAILURE_STORE,
     OcrFailureRecorder,
+    OcrFailureRecordResult,
     OcrFailureRecordStatus,
     OcrFailureStore,
 )
@@ -24,6 +25,62 @@ from module.ocr.result import RawOcrResult, RecognitionFailureReason, Recognitio
 RAW_IMAGE = np.arange(36, dtype=np.uint8).reshape(3, 4, 3)
 PROCESSED_IMAGE = np.arange(12, dtype=np.uint8).reshape(3, 4)
 ALTERNATE_RAW_IMAGE = 255 - RAW_IMAGE
+COUNTER_AREA = (0, 0, 4, 3)
+
+
+class _CounterEngine:
+    model_name = "densenet_lite_136-gru"
+
+    def __init__(self, text: str) -> None:
+        self.result = RawOcrResult(text=text, score=0.9)
+
+    def atomic_ocr_for_single_lines_raw(
+        self,
+        image_list: list[np.ndarray],
+        cand_alphabet: str | None = None,
+    ) -> list[RawOcrResult]:
+        del cand_alphabet
+        return [self.result for _ in image_list]
+
+
+class _StoreTestCounter(DigitCounter):
+    def __init__(self, text: str) -> None:
+        self._engine = _CounterEngine(text)
+        super().__init__(COUNTER_AREA, name="TEST_COUNTER")
+
+    @property
+    def cnocr(self) -> _CounterEngine:
+        return self._engine
+
+
+class _FailingRecorder:
+    def __init__(self, error: OSError | ValueError) -> None:
+        self._error = error
+        self._disabled = False
+        self.record_calls = 0
+        self.write_attempts = 0
+        self.letters: list[tuple[int, int, int]] = []
+
+    def record[T](  # noqa: PLR0913
+        self,
+        result: RecognitionResult[T],
+        *,
+        raw_image: np.ndarray,
+        processed_image: np.ndarray,
+        area: tuple[int, int, int, int] | None,
+        alphabet: str | None,
+        letter: tuple[int, int, int],
+        threshold: int,
+        expected_total: int | None = None,
+    ) -> OcrFailureRecordResult:
+        del result, raw_image, processed_image, area, alphabet, threshold, expected_total
+        self.record_calls += 1
+        self.letters.append(letter)
+        if self._disabled:
+            return OcrFailureRecordResult(OcrFailureRecordStatus.DISABLED, "", None)
+        self._disabled = True
+        self.write_attempts += 1
+        raise self._error
 
 
 @pytest.fixture(autouse=True)
@@ -847,3 +904,48 @@ def test_failure_store_metadata_replays_digit_counter_parser_offline(tmp_path: P
     assert replayed.reason is not None
     assert replayed.reason.value == metadata["reason"]
     assert replayed.value == metadata["value"]
+
+
+def test_structured_counter_saves_invalid_skips_valid_and_deduplicates(tmp_path: Path) -> None:
+    store = OcrFailureStore(tmp_path)
+
+    first = _StoreTestCounter("99/15").recognize(RAW_IMAGE, failure_store=store)
+    profile_directory = tmp_path / "TEST_COUNTER"
+    first_bundles = list(profile_directory.iterdir())
+    valid = _StoreTestCounter("14/15").recognize(RAW_IMAGE, failure_store=store)
+    after_valid = list(profile_directory.iterdir())
+    duplicate = _StoreTestCounter("99/15").recognize(RAW_IMAGE, failure_store=store)
+    after_duplicate = list(profile_directory.iterdir())
+
+    assert first.reason is RecognitionFailureReason.CURRENT_EXCEEDS_TOTAL
+    assert valid.valid is True
+    assert duplicate.reason is RecognitionFailureReason.CURRENT_EXCEEDS_TOTAL
+    assert len(first_bundles) == 1
+    assert after_valid == first_bundles
+    assert after_duplicate == first_bundles
+
+
+def test_recording_error_does_not_change_recognition_result(caplog: pytest.LogCaptureFixture) -> None:
+    recorder = _FailingRecorder(OSError("disk full"))
+    counter = _StoreTestCounter("99/15")
+    counter.letter = [140, 113, 99]
+
+    with caplog.at_level(logging.WARNING, logger="alas"):
+        first = counter.recognize(RAW_IMAGE, failure_store=recorder)
+        second = counter.recognize(RAW_IMAGE, failure_store=recorder)
+
+    assert first.reason is RecognitionFailureReason.CURRENT_EXCEEDS_TOTAL
+    assert second.reason is RecognitionFailureReason.CURRENT_EXCEEDS_TOTAL
+    assert recorder.record_calls == 2
+    assert recorder.write_attempts == 1
+    assert recorder.letters == [(140, 113, 99), (140, 113, 99)]
+    warning_records = [record for record in caplog.records if "OCR failure recorder" in record.getMessage()]
+    assert len(warning_records) == 1
+    assert "99/15" not in warning_records[0].getMessage()
+
+
+def test_recorder_value_error_is_not_suppressed() -> None:
+    recorder = _FailingRecorder(ValueError("invalid recorder contract"))
+
+    with pytest.raises(ValueError, match="invalid recorder contract"):
+        _StoreTestCounter("99/15").recognize(RAW_IMAGE, failure_store=recorder)

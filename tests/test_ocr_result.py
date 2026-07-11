@@ -1,5 +1,7 @@
 # ruff: noqa: SLF001
 
+import inspect
+from dataclasses import dataclass
 from datetime import timedelta
 
 import numpy as np
@@ -8,6 +10,7 @@ from cnocr import CnOcr
 
 import module.ocr.ocr as ocr_module
 from module.ocr.al_ocr import AlOcr
+from module.ocr.failure_store import OcrFailureRecordResult, OcrFailureRecordStatus
 from module.ocr.ocr import Digit, DigitCounter, Duration, Ocr
 from module.ocr.result import RawOcrResult, RecognitionFailureReason, RecognitionResult
 
@@ -21,6 +24,7 @@ class _FakeEngine:
     def __init__(self, text: str, score: float) -> None:
         self.result = RawOcrResult(text=text, score=score)
         self.raw_calls = 0
+        self.inference_batches: list[list[np.ndarray]] = []
 
     def atomic_ocr_for_single_lines_raw(
         self,
@@ -29,6 +33,7 @@ class _FakeEngine:
     ) -> list[RawOcrResult]:
         del cand_alphabet
         self.raw_calls += 1
+        self.inference_batches.append(image_list)
         return [self.result for _ in image_list]
 
     def atomic_ocr_for_single_lines(
@@ -38,6 +43,65 @@ class _FakeEngine:
     ) -> list[str]:
         del cand_alphabet
         return [self.result.text for _ in image_list]
+
+
+class _SequenceEngine(_FakeEngine):
+    def __init__(self, results: list[RawOcrResult]) -> None:
+        super().__init__(results[0].text, results[0].score)
+        self.results = results
+
+    def atomic_ocr_for_single_lines_raw(
+        self,
+        image_list: list[np.ndarray],
+        cand_alphabet: str | None = None,
+    ) -> list[RawOcrResult]:
+        del cand_alphabet
+        self.raw_calls += 1
+        self.inference_batches.append(image_list)
+        return self.results
+
+
+@dataclass(frozen=True, slots=True)
+class _RecordedFailure:
+    result: RecognitionResult[object]
+    raw_image: np.ndarray
+    processed_image: np.ndarray
+    area: tuple[int, int, int, int] | None
+    alphabet: str | None
+    letter: tuple[int, int, int]
+    threshold: int
+    expected_total: int | None
+
+
+class _RecordingFailureRecorder:
+    def __init__(self) -> None:
+        self.calls: list[_RecordedFailure] = []
+
+    def record[T](  # noqa: PLR0913
+        self,
+        result: RecognitionResult[T],
+        *,
+        raw_image: np.ndarray,
+        processed_image: np.ndarray,
+        area: tuple[int, int, int, int] | None,
+        alphabet: str | None,
+        letter: tuple[int, int, int],
+        threshold: int,
+        expected_total: int | None = None,
+    ) -> OcrFailureRecordResult:
+        self.calls.append(
+            _RecordedFailure(
+                result=result,
+                raw_image=raw_image,
+                processed_image=processed_image,
+                area=area,
+                alphabet=alphabet,
+                letter=letter,
+                threshold=threshold,
+                expected_total=expected_total,
+            )
+        )
+        return OcrFailureRecordResult(OcrFailureRecordStatus.SAVED, "test-digest", None)
 
 
 class _TestOcr(Ocr):
@@ -180,6 +244,34 @@ def test_counter_recognize_rejects_unexpected_total() -> None:
     assert result.reason is RecognitionFailureReason.UNEXPECTED_TOTAL
 
 
+def test_counter_recognize_records_failure_with_complete_inference_context() -> None:
+    recorder = _RecordingFailureRecorder()
+    counter = make_counter("14/15")
+    counter.letter = [140, 113, 99]
+    counter.threshold = 64
+
+    result = counter.recognize(TEST_IMAGE, expected_total=10, failure_store=recorder)
+
+    assert result.reason is RecognitionFailureReason.UNEXPECTED_TOTAL
+    call = recorder.calls[0]
+    assert call.result is result
+    assert np.array_equal(call.raw_image, TEST_IMAGE)
+    assert call.processed_image is counter.cnocr.inference_batches[0][0]
+    assert (call.area, call.alphabet, call.letter, call.threshold, call.expected_total) == (
+        TEST_AREA,
+        "0123456789/IDSB",
+        (140, 113, 99),
+        64,
+        10,
+    )
+
+
+def test_structured_recognize_signatures_are_introspectable() -> None:
+    for recognize in (Digit.recognize, DigitCounter.recognize, Duration.recognize):
+        signature = inspect.signature(recognize)
+        assert signature.parameters["failure_store"].default is None
+
+
 def test_counter_recognize_rejects_multiple_rois() -> None:
     engine = _FakeEngine("14/15", 0.9)
     counter = _TestCounter(engine, buttons=[TEST_AREA, TEST_AREA])
@@ -280,6 +372,25 @@ def test_digit_recognize_direct_multiple_rois_returns_list() -> None:
     assert [result.value for result in results] == [7, 7]
 
 
+def test_digit_recognize_records_only_invalid_item_from_multiple_rois() -> None:
+    valid_image = TEST_IMAGE.copy()
+    invalid_image = np.full_like(TEST_IMAGE, 255)
+    engine = _SequenceEngine([RawOcrResult("7", 0.9), RawOcrResult("invalid", 0.2)])
+    digit = _TestDigit(engine)
+    recorder = _RecordingFailureRecorder()
+
+    results = digit.recognize([valid_image, invalid_image], direct_ocr=True, failure_store=recorder)
+
+    assert isinstance(results, list)
+    assert [result.valid for result in results] == [True, False]
+    assert len(recorder.calls) == 1
+    call = recorder.calls[0]
+    assert call.result is results[1]
+    assert call.raw_image is invalid_image
+    assert call.processed_image is engine.inference_batches[0][1]
+    assert (call.area, call.expected_total) == (None, None)
+
+
 def test_duration_recognize_returns_list_for_multiple_rois() -> None:
     results = make_duration("01:30:00", buttons=[TEST_AREA, TEST_AREA]).recognize(TEST_IMAGE)
 
@@ -299,6 +410,25 @@ def test_duration_recognize_direct_multiple_rois_returns_list() -> None:
 
     assert isinstance(results, list)
     assert [result.value for result in results] == [timedelta(hours=1, minutes=30)] * 2
+
+
+def test_duration_recognize_records_only_invalid_item_from_multiple_rois() -> None:
+    valid_image = TEST_IMAGE.copy()
+    invalid_image = np.full_like(TEST_IMAGE, 255)
+    engine = _SequenceEngine([RawOcrResult("01:30:00", 0.9), RawOcrResult("01:60:00", 0.2)])
+    duration = _TestDuration(engine)
+    recorder = _RecordingFailureRecorder()
+
+    results = duration.recognize([valid_image, invalid_image], direct_ocr=True, failure_store=recorder)
+
+    assert isinstance(results, list)
+    assert [result.valid for result in results] == [True, False]
+    assert len(recorder.calls) == 1
+    call = recorder.calls[0]
+    assert call.result is results[1]
+    assert call.raw_image is invalid_image
+    assert call.processed_image is engine.inference_batches[0][1]
+    assert (call.area, call.expected_total) == (None, None)
 
 
 def test_counter_recognize_applies_subclass_correction_before_full_match() -> None:
