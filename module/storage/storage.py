@@ -1,6 +1,8 @@
+from typing import TYPE_CHECKING
+
 import numpy as np
 
-from module.base.button import ButtonGrid
+from module.base.button import Button, ButtonGrid
 from module.base.timer import Timer
 from module.base.utils import rgb2gray
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2
@@ -14,6 +16,11 @@ from module.storage import assets as storage_assets
 from module.storage.ui import StorageUI
 from module.ui.assets import BACK_ARROW, STORAGE_CHECK
 from module.ui.scroll import Scroll
+
+if TYPE_CHECKING:
+    from module.base.button import MatchOffset
+    from module.base.template import Template
+    from module.base.type_alias import ImageArray
 
 MATERIAL_SCROLL = Scroll(storage_assets.METERIAL_SCROLL, color=(247, 211, 66))
 
@@ -29,13 +36,14 @@ class StorageFull(Exception):
 
 
 UNKNOWN_BOX_TEMPLATE_RARITY_TEMPLATE = "Unknown box template rarity: {rarity}"
+MULTI_REGION_DIGIT_RESULT_MESSAGE = "storage digit OCR must contain exactly one region"
 
 
 class StorageHandler(StorageUI):
     storage_has_boxes = True
 
     @staticmethod
-    def _storage_box_template(rarity):
+    def _storage_box_template(rarity: int) -> Template:
         if rarity == 1:
             return storage_assets.TEMPLATE_BOX_T1
         if rarity == 2:
@@ -47,7 +55,14 @@ class StorageHandler(StorageUI):
         message = UNKNOWN_BOX_TEMPLATE_RARITY_TEMPLATE.format(rarity=rarity)
         raise ScriptError(message)
 
-    def _handle_use_box_amount(self, amount):
+    @staticmethod
+    def _read_single_digit(ocr: Digit, image: ImageArray) -> int:
+        result = ocr.ocr(image)
+        if isinstance(result, list):
+            raise ScriptError(MULTI_REGION_DIGIT_RESULT_MESSAGE)
+        return result
+
+    def _handle_use_box_amount(self, amount: int) -> int:
         """在数量确认页设置单次开箱数；箱子不足时实际值可能小于请求值。"""
         logger.info("Set box amount")
 
@@ -58,7 +73,7 @@ class StorageHandler(StorageUI):
         current = self._wait_use_box_amount_ocr(ocr, amount)
         return self._adjust_use_box_amount(ocr, amount, current)
 
-    def _wait_use_box_amount_buttons(self, index_offset) -> None:
+    def _wait_use_box_amount_buttons(self, index_offset: MatchOffset) -> None:
         timeout = Timer(1, count=3).start()
         for _ in self.loop():
             # -/+ 按钮可能偏移，这里沿用船坞 OCR 的定位方式提高识别稳定性。
@@ -68,11 +83,11 @@ class StorageHandler(StorageUI):
                 logger.warning("Wait AMOUNT_MINUS AMOUNT_PLUS timeout")
                 break
 
-    def _wait_use_box_amount_ocr(self, ocr, amount: int) -> int:
+    def _wait_use_box_amount_ocr(self, ocr: Digit, amount: int) -> int:
         current = 0
         timeout = Timer(1, count=3).start()
         for _ in self.loop():
-            current = ocr.ocr(self.device.image)
+            current = self._read_single_digit(ocr, self.device.image)
             if 1 <= current <= amount + 10:
                 break
             if timeout.reached():
@@ -80,7 +95,7 @@ class StorageHandler(StorageUI):
                 break
         return current
 
-    def _adjust_use_box_amount(self, ocr, amount: int, current: int) -> int:
+    def _adjust_use_box_amount(self, ocr: Digit, amount: int, current: int) -> int:
         logger.info(f"Set box amount: {amount}")
         skip_first = True
         retry = Timer(1, count=2)
@@ -89,7 +104,7 @@ class StorageHandler(StorageUI):
             if skip_first:
                 skip_first = False
             else:
-                current = ocr.ocr(self.device.image)
+                current = self._read_single_digit(ocr, self.device.image)
             diff = amount - current
             if diff == 0:
                 break
@@ -106,7 +121,7 @@ class StorageHandler(StorageUI):
         logger.info(f"Box amount set to {current}")
         return current
 
-    def _storage_use_one_box(self, button, amount=1):
+    def _storage_use_one_box(self, button: Button, amount: int = 1) -> int:
         """在材料页使用一组装备箱，返回可能不精确的实际数量。
 
         仓库已满时关闭弹窗并抛出 StorageFull；结束后仍在材料页。
@@ -151,7 +166,7 @@ class StorageHandler(StorageUI):
     def _storage_use_box_finished(self, *, success: bool) -> bool:
         return success and self._storage_in_material() and not self.appear(EQUIP_CONFIRM_2, offset=(20, 20))
 
-    def _handle_storage_box_entry(self, button) -> bool:
+    def _handle_storage_box_entry(self, button: Button) -> bool:
         if self._storage_in_material(interval=5):
             self.device.click(button)
             return True
@@ -204,7 +219,13 @@ class StorageHandler(StorageUI):
         )
         raise StorageFull
 
-    def _storage_use_box_in_page(self, rarity, amount, skip_first_screenshot=False):
+    def _storage_use_box_in_page(
+        self,
+        rarity: int,
+        amount: int,
+        *,
+        skip_first_screenshot: bool = False,
+    ) -> int:
         """在当前材料页最多使用 amount 个箱子，返回可能不精确的实际数量。"""
         used = 0
         timeout = Timer(1.5, count=3).start()
@@ -232,7 +253,7 @@ class StorageHandler(StorageUI):
 
         return used
 
-    def _storage_use_box_execute(self, rarity=1, amount=10):
+    def _storage_use_box_execute(self, rarity: int = 1, amount: int = 10) -> int:
         """在材料页最多使用 amount 个 T1 至 T4 箱子，返回可能不精确的实际数量。
 
         仓库已满时抛出 StorageFull，页面保持在材料页。
@@ -262,7 +283,7 @@ class StorageHandler(StorageUI):
 
         return used
 
-    def _storage_disassemble_equipment_execute_once(self, amount=40):
+    def _storage_disassemble_equipment_execute_once(self, amount: int = 40) -> int:
         """在拆解页执行一轮，单轮最多拆解 40 件，并返回实际数量。"""
         amount = min(amount, 40)
         self.interval_clear(
@@ -336,7 +357,7 @@ class StorageHandler(StorageUI):
         prev_disassemble = 0
         while 1:
             self.device.screenshot()
-            disassembled = OCR_DISASSEMBLE_COUNT.ocr(self.device.image)
+            disassembled = self._read_single_digit(OCR_DISASSEMBLE_COUNT, self.device.image)
             if disassembled >= amount:
                 logger.info("Disassemble amount reached expected amount")
                 break
@@ -382,7 +403,7 @@ class StorageHandler(StorageUI):
 
         return disassembled
 
-    def _storage_disassemble_equipment_execute(self, rarity=1, amount=40):
+    def _storage_disassemble_equipment_execute(self, rarity: int = 1, amount: int = 40) -> int:
         """在拆解页按 1 至 5 的稀有度拆解；堆叠选择可能使实际数量超过目标。"""
         disassembled = 0
         self.equipment_filter_set(rarity=rarity)
@@ -407,7 +428,7 @@ class StorageHandler(StorageUI):
         self.equipment_filter_set()
         return disassembled
 
-    def storage_disassemble_equipment(self, rarity=1, amount=15):
+    def storage_disassemble_equipment(self, rarity: int = 1, amount: int = 15) -> int:
         """从任意页面拆解目标数量的 1 至 4 稀有度装备；不足时先开箱。
 
         堆叠选择可能超过目标，结束于仓库拆解页并返回实际数量。
@@ -450,7 +471,7 @@ class StorageHandler(StorageUI):
 
         return disassembled
 
-    def storage_use_box(self, rarity=1, amount=40):
+    def storage_use_box(self, rarity: int = 1, amount: int = 40) -> int:
         """从任意页面清理仓库后最多使用 amount 个 1 至 4 稀有度箱子。
 
         结束于材料页并返回实际开箱数。
@@ -492,7 +513,7 @@ class StorageHandler(StorageUI):
 
         return used
 
-    def handle_storage_full(self, rarity=1, amount=40):
+    def handle_storage_full(self, rarity: int = 1, amount: int = 40) -> bool:
         """出现仓库已满弹窗时拆解 1 至 4 稀有度装备，并恢复到原页面。"""
         if not self.appear(storage_assets.EQUIPMENT_FULL, offset=(30, 30), interval=2):
             return False

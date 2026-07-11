@@ -18,6 +18,8 @@ from module.ui.page import page_storage
 from module.ui.setting import Setting
 from module.ui.ui import UI
 
+type EquipmentRarity = int | str
+
 
 class StorageUI(UI):
     @cached_property
@@ -35,17 +37,17 @@ class StorageUI(UI):
         )
         return setting
 
-    def ui_goto_storage(self):
+    def ui_goto_storage(self) -> bool:
         return self.ui_ensure(destination=page_storage)
 
-    def _wait_until_storage_stable(self):
+    def _wait_until_storage_stable(self) -> None:
         self.wait_until_stable(MATERIAL_STABLE_CHECK)
         self.handle_info_bar()
 
-    def _storage_in_material(self, interval=0):
+    def _storage_in_material(self, interval: float = 0) -> bool:
         return self.match_template_color(MATERIAL_CHECK, offset=(20, 20), interval=interval)
 
-    def _storage_enter_material(self, skip_first_screenshot=True):
+    def _storage_enter_material(self, *, skip_first_screenshot: bool = True) -> None:
         """从仓库任一分页进入材料页。"""
         logger.info("storage enter material")
         while 1:
@@ -72,7 +74,7 @@ class StorageUI(UI):
 
         self.interval_clear(STORAGE_CHECK)
 
-    def _storage_enter_equipment(self, skip_first_screenshot=True):
+    def _storage_enter_equipment(self, *, skip_first_screenshot: bool = True) -> None:
         """从仓库任一分页进入装备页。"""
         logger.info("storage enter equipment")
         while 1:
@@ -99,7 +101,7 @@ class StorageUI(UI):
 
         self.interval_clear(STORAGE_CHECK)
 
-    def _storage_enter_disassemble(self, skip_first_screenshot=True):
+    def _storage_enter_disassemble(self, *, skip_first_screenshot: bool = True) -> None:
         """从仓库任一分页进入拆解页。"""
         logger.info("storage enter disassemble")
         self.appear(STORAGE_CHECK, interval=3)
@@ -128,7 +130,7 @@ class StorageUI(UI):
 
         self.interval_clear(STORAGE_CHECK)
 
-    def _equipment_filter_enter(self):
+    def _equipment_filter_enter(self) -> None:
         logger.info("Equipment filter enter")
         self.interval_clear(STORAGE_CHECK)
         for _ in self.loop():
@@ -146,13 +148,13 @@ class StorageUI(UI):
                 self.device.click(DISASSEMBLE_CONFIRM)
                 continue
 
-    def _equipment_filter_confirm(self):
+    def _equipment_filter_confirm(self) -> None:
         logger.info("Equipment filter confirm")
         self.interval_clear(EQUIPMENT_FILTER_CONFIRM)
         self.ui_click(EQUIPMENT_FILTER_CONFIRM, check_button=STORAGE_CHECK, skip_first_screenshot=True)
         self._wait_until_storage_stable()
 
-    def equipment_filter_set(self, rarity="all"):
+    def equipment_filter_set(self, rarity: EquipmentRarity = "all") -> None:
         """在拆解页设置稀有度；接受 all 或五档名称，也接受数字 1 至 5。"""
         rarity_convert = {
             "1": "common",
