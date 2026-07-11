@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, Literal
+
 from module.base.timer import Timer
 from module.base.utils import rgb2gray
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2
@@ -9,15 +11,23 @@ from module.os.globe_zone import ZoneManager
 from module.os_handler import assets as os_assets
 from module.ui.scroll import Scroll
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from module.base.template import Template
+    from module.device.control import ButtonTarget
+
+type StorageItem = Literal["OBSCURE", "ABYSSAL"]
+
 SCROLL_STORAGE = Scroll(os_assets.STORATE_SCROLL, color=(247, 211, 66))
 UNKNOWN_STORAGE_ITEM_TEMPLATE = "Unknown storage item: {item}"
 
 
 class StorageHandler(GlobeOperation, ZoneManager):
-    def is_in_storage(self):
+    def is_in_storage(self) -> bool:
         return self.appear(os_assets.STORAGE_CHECK, offset=(20, 20))
 
-    def storage_enter(self):
+    def storage_enter(self) -> None:
         """从区域地图进入仓库。"""
         logger.info("Storage enter")
         for _ in self.loop():
@@ -34,12 +44,12 @@ class StorageHandler(GlobeOperation, ZoneManager):
 
         self.handle_info_bar()
 
-    def storage_quit(self):
+    def storage_quit(self) -> None:
         """从仓库返回区域地图。"""
         logger.info("Storage quit")
         self.ui_back(os_assets.STORAGE_ENTER, offset=(200, 5), skip_first_screenshot=True)
 
-    def _storage_item_use(self, button):
+    def _storage_item_use(self, button: ButtonTarget) -> None:
         """在仓库使用物品，处理奖励后仍停留在仓库。"""
         success = False
         get_mission_counter = 0
@@ -83,7 +93,7 @@ class StorageHandler(GlobeOperation, ZoneManager):
             if success and self.appear(os_assets.STORAGE_CHECK, offset=(20, 20)):
                 break
 
-    def storage_logger_use_all(self):
+    def storage_logger_use_all(self) -> None:
         """使用全部记录仪，结束时仓库滚动到底部。"""
         logger.hr("Storage logger use all")
         for _ in self.loop():
@@ -100,7 +110,7 @@ class StorageHandler(GlobeOperation, ZoneManager):
             logger.info("All loggers in storage have been used")
             break
 
-    def storage_sample_use_all(self):
+    def storage_sample_use_all(self) -> None:
         """使用全部适应性样本，页面保持在仓库。"""
         sample_types = [
             os_assets.TEMPLATE_STORAGE_OFFENSE,
@@ -122,13 +132,17 @@ class StorageHandler(GlobeOperation, ZoneManager):
                     break
         logger.info("All samples in storage have been used")
 
-    def tuning_sample_use(self):
+    def tuning_sample_use(self) -> None:
         logger.hr("Turning sample use")
         self.storage_enter()
         self.storage_sample_use_all()
         self.storage_quit()
 
-    def _storage_coordinate_checkout(self, button, types=("OBSCURE",)):
+    def _storage_coordinate_checkout(
+        self,
+        button: ButtonTarget,
+        types: Sequence[StorageItem] = ("OBSCURE",),
+    ) -> None:
         """从仓库结算坐标并进入指定类型的特殊海域。"""
         self.interval_clear([os_assets.STORAGE_CHECK, os_assets.STORAGE_COORDINATE_CHECKOUT])
         self.popup_interval_clear()
@@ -150,7 +164,7 @@ class StorageHandler(GlobeOperation, ZoneManager):
         self.globe_enter(zone=self.name_to_zone(72))
 
     @staticmethod
-    def _storage_item_to_template(item):
+    def _storage_item_to_template(item: StorageItem) -> Template:
         """item 仅接受 OBSCURE 或 ABYSSAL。"""
         if item == "OBSCURE":
             return os_assets.TEMPLATE_STORAGE_OBSCURE
@@ -159,7 +173,7 @@ class StorageHandler(GlobeOperation, ZoneManager):
         message = UNKNOWN_STORAGE_ITEM_TEMPLATE.format(item=item)
         raise ScriptError(message)
 
-    def storage_checkout_item(self, item):
+    def storage_checkout_item(self, item: StorageItem) -> bool:
         """从仓库结算 OBSCURE 或 ABYSSAL 坐标。
 
         成功时进入对应特殊海域；没有坐标时返回原区域地图并返回 False。
@@ -183,7 +197,7 @@ class StorageHandler(GlobeOperation, ZoneManager):
                 return False
         return False
 
-    def storage_get_next_item(self, item, use_logger=True):
+    def storage_get_next_item(self, item: StorageItem, *, use_logger: bool = True) -> bool:
         """从区域地图进入仓库，可先用完记录仪，再结算下一个特殊海域坐标。"""
         logger.hr("OS get next obscure")
         self.storage_enter()

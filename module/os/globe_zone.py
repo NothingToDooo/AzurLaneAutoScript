@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from module.base.decorator import cached_property
@@ -5,6 +7,14 @@ from module.exception import ScriptError
 from module.map.map_grids import SelectedGrids
 from module.os.globe_detection import GLOBE_MAP_SHAPE
 from module.os.map_data import DIC_OS_MAP
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from module.base.type_alias import NumericArray, Point
+
+type ZoneName = Zone | int | str
+type ZoneDataValue = str | int | tuple[int, int]
 
 OS_GLOBE_ZONE_NOT_FOUND_TEMPLATE = "Unable to find OS globe zone: {name}"
 INVALID_HAZARD_LEVEL_TEMPLATE = "Invalid hazard_level of zones: {hazard_level}"
@@ -19,16 +29,16 @@ class Zone:
     # 国区海域名。
     cn: str
     # 信息栏钉选坐标。
-    area_pos: tuple
+    area_pos: tuple[int, int]
     # area_pos + offset_pos 是任务钉选坐标。
-    offset_pos: tuple
+    offset_pos: tuple[int, int]
     # 1 左上，2 右上，3 左下，4 右下，5 中心。
     region: int
 
     is_port: bool
     is_azur_port: bool
 
-    def __init__(self, zone_id, data):
+    def __init__(self, zone_id: int, data: Mapping[str, ZoneDataValue]) -> None:
         self.zone_id = zone_id
         self.__dict__.update(data)
         self.location = self.point_convert(self.area_pos)
@@ -37,38 +47,39 @@ class Zone:
         self.is_azur_port = self.zone_id in [0, 1, 2, 3]
 
     @staticmethod
-    def point_convert(point):
+    def point_convert(point: Point) -> NumericArray:
         """把 world_chapter_colormask.lua 坐标转换到 os_globe_map.png。"""
-        point = np.multiply(point, 1.25)
+        point = np.asarray(point, dtype=float) * 1.25
         # GLOBE_MAP_SHAPE[1] 是 os_globe_map.png 的高度。
         return np.array((point[0], GLOBE_MAP_SHAPE[1] - point[1]))
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"[{self.zone_id}|{self.cn}]"
 
     __repr__ = __str__
 
-    def __eq__(self, other):
-        return self.zone_id == other.zone_id
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, Zone) and self.zone_id == other.zone_id
 
     __hash__ = None
 
 
 class ZoneManager:
+    ZONE_DATA = DIC_OS_MAP
     zone: Zone
 
     @cached_property
-    def zones(self):
-        return SelectedGrids([Zone(zone_id, info) for zone_id, info in DIC_OS_MAP.items()])
+    def zones(self) -> SelectedGrids[Zone]:
+        return SelectedGrids([Zone(zone_id, info) for zone_id, info in self.ZONE_DATA.items()])
 
-    def camera_to_zone(self, camera, region=None):
+    def camera_to_zone(self, camera: Point, region: int | None = None) -> Zone:
         """返回 os_globe_map.png 坐标最近的海域，可限制在指定区域。"""
         zones = self.zones if region is None else self.zones.select(region=region)
         zones = zones.sort_by_camera_distance(camera=camera)
         return zones[0]
 
     @staticmethod
-    def _zone_id_from_name(name):
+    def _zone_id_from_name(name: int | str) -> int | None:
         if isinstance(name, int):
             return name
         if isinstance(name, str) and name.isdigit():
@@ -76,17 +87,17 @@ class ZoneManager:
         return None
 
     @staticmethod
-    def _normalize_zone_name(name):
+    def _normalize_zone_name(name: int | str) -> str:
         return str(name).replace(" ", "").lower()
 
-    def _zone_by_id(self, zone_id, name):
+    def _zone_by_id(self, zone_id: int, name: int | str) -> Zone:
         try:
             return self.zones.select(zone_id=zone_id)[0]
         except IndexError as e:
             message = OS_GLOBE_ZONE_NOT_FOUND_TEMPLATE.format(name=name)
             raise ScriptError(message) from e
 
-    def name_to_zone(self, name):
+    def name_to_zone(self, name: ZoneName) -> Zone:
         """把海域编号或国区名称转为海域；找不到时抛出 ScriptError。"""
         if isinstance(name, Zone):
             return name
@@ -106,7 +117,7 @@ class ZoneManager:
         message = OS_GLOBE_ZONE_NOT_FOUND_TEMPLATE.format(name=parsed_name)
         raise ScriptError(message)
 
-    def zone_nearest_azur_port(self, zone):
+    def zone_nearest_azur_port(self, zone: ZoneName) -> Zone:
         zone = self.name_to_zone(zone)
         ports = self.zones.select(is_azur_port=True).delete(SelectedGrids([self.zone]))
         for port in ports:
@@ -115,7 +126,7 @@ class ZoneManager:
         ports = ports.sort_by_camera_distance(camera=tuple(zone.location))
         return ports[0]
 
-    def zone_select(self, hazard_level):
+    def zone_select(self, hazard_level: int) -> SelectedGrids[Zone]:
         """侵蚀等级 1 至 6 排除区域 5；等级 10 专指区域 5。"""
         if 1 <= hazard_level <= 6:
             return self.zones.select(hazard_level=hazard_level).delete(self.zones.select(region=5))

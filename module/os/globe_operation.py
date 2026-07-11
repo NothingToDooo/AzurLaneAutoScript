@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, Literal
+
 from module.base.timer import Timer
 from module.base.utils import area_pad
 from module.device.control_options import SwipeVectorOptions
@@ -7,6 +9,24 @@ from module.os_handler.action_point import ActionPointHandler
 from module.os_handler.assets import AUTO_SEARCH_REWARD
 from module.os_handler.port import PORT_CHECK
 from module.ui.assets import BACK_ARROW
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from module.base.button import Button
+    from module.os.globe_zone import Zone
+    from module.os_handler.action_point import ActionPointZoneType
+
+type ZoneType = Literal["DANGEROUS", "SAFE", "OBSCURE", "ABYSSAL", "STRONGHOLD", "ARCHIVE"]
+
+_ZONE_TYPE_BY_NAME: dict[str, ZoneType] = {
+    "DANGEROUS": "DANGEROUS",
+    "SAFE": "SAFE",
+    "OBSCURE": "OBSCURE",
+    "ABYSSAL": "ABYSSAL",
+    "STRONGHOLD": "STRONGHOLD",
+    "ARCHIVE": "ARCHIVE",
+}
 
 ZONE_TYPES = [
     os_assets.ZONE_DANGEROUS,
@@ -38,10 +58,10 @@ class RewardUncollectedError(Exception):
 class GlobeOperation(ActionPointHandler):
     _zone_unpin_interval = Timer(0.5)
 
-    def is_in_globe(self):
+    def is_in_globe(self) -> bool:
         return self.appear(os_assets.GLOBE_GOTO_MAP, offset=(20, 20))
 
-    def get_zone_pinned(self):
+    def get_zone_pinned(self) -> Button | None:
         for zone in ZONE_TYPES:
             if self.appear(zone, offset=(20, 20)):
                 for button in ASSETS_PINNED_ZONE:
@@ -51,21 +71,32 @@ class GlobeOperation(ActionPointHandler):
 
         return None
 
-    def is_zone_pinned(self):
+    def is_zone_pinned(self) -> bool:
         return self.get_zone_pinned() is not None
 
     @staticmethod
-    def pinned_to_name(button):
+    def pinned_to_name(button: Button) -> str:
         return button.name.split("_")[1]
 
-    def get_zone_pinned_name(self):
+    def get_zone_pinned_name(self) -> ZoneType | Literal[""]:
         """返回钉选海域类型；未钉选时返回空字符串。"""
         pinned = self.get_zone_pinned()
         if pinned is not None:
-            return self.pinned_to_name(pinned)
+            name = self.pinned_to_name(pinned)
+            return _ZONE_TYPE_BY_NAME.get(name, "")
         return ""
 
-    def handle_zone_pinned(self):
+    @staticmethod
+    def _normalize_zone_types(types: ZoneType | Sequence[ZoneType]) -> Sequence[ZoneType]:
+        if isinstance(types, str):
+            zone_type = _ZONE_TYPE_BY_NAME.get(types)
+            if zone_type is None:
+                message = f"Unknown zone type: {types}"
+                raise ValueError(message)
+            return (zone_type,)
+        return types
+
+    def handle_zone_pinned(self) -> bool:
         if not self._zone_unpin_interval.reached():
             return False
 
@@ -85,7 +116,7 @@ class GlobeOperation(ActionPointHandler):
 
         return False
 
-    def ensure_no_zone_pinned(self):
+    def ensure_no_zone_pinned(self) -> None:
         confirm_timer = Timer(1, count=2).start()
         for _ in self.loop():
             if self.handle_zone_pinned():
@@ -93,7 +124,7 @@ class GlobeOperation(ActionPointHandler):
             elif confirm_timer.reached():
                 break
 
-    def zone_has_switch(self):
+    def zone_has_switch(self) -> bool:
         """海域切换图标会旋转，旧版白块检测不稳定。
 
         2021-07-15 图标缩小并新增 Change Zone 文本后，改为检测文字。
@@ -103,7 +134,7 @@ class GlobeOperation(ActionPointHandler):
     _zone_select_offset = (20, 200)
     _zone_select_similarity = 0.75
 
-    def get_zone_select(self):
+    def get_zone_select(self) -> list[Button]:
         # 降低阈值到 0.75。
         # 原因不明，但字体有时会不同。
         return [
@@ -112,10 +143,10 @@ class GlobeOperation(ActionPointHandler):
             if self.appear(select, offset=self._zone_select_offset, similarity=self._zone_select_similarity)
         ]
 
-    def is_in_zone_select(self):
+    def is_in_zone_select(self) -> bool:
         return len(self.get_zone_select()) > 0
 
-    def ensure_zone_select_expanded(self):
+    def ensure_zone_select_expanded(self) -> list[Button]:
         record = 0
         for _ in range(5):
             selection = self.get_zone_select()
@@ -128,7 +159,7 @@ class GlobeOperation(ActionPointHandler):
         logger.warning("Failed to ensure zone selection expanded, assume expanded")
         return self.get_zone_select()
 
-    def zone_select_enter(self):
+    def zone_select_enter(self) -> None:
         """从海域钉选信息进入海域类型选择页。"""
         self.ui_click(
             os_assets.ZONE_SWITCH,
@@ -137,7 +168,7 @@ class GlobeOperation(ActionPointHandler):
             skip_first_screenshot=True,
         )
 
-    def zone_select_execute(self, button):
+    def zone_select_execute(self, button: Button) -> None:
         """在海域类型选择页选择 SELECT_*，完成后返回海域钉选信息。"""
         logger.info(f"Zone select: {button}")
         for _ in self.loop():
@@ -149,7 +180,7 @@ class GlobeOperation(ActionPointHandler):
             ):
                 continue
 
-    def zone_type_select(self, types=("SAFE", "DANGEROUS")):
+    def zone_type_select(self, types: ZoneType | Sequence[ZoneType] = ("SAFE", "DANGEROUS")) -> bool:
         """按调用方 types 的顺序选择海域类型；允许 DANGEROUS、SAFE、OBSCURE、ABYSSAL、STRONGHOLD、ARCHIVE。
 
         无匹配时回退到 SAFE、DANGEROUS；页面保持在海域钉选信息。
@@ -158,16 +189,15 @@ class GlobeOperation(ActionPointHandler):
             logger.info("Zone has no type to select, skip")
             return True
 
-        if isinstance(types, str):
-            types = [types]
+        selected_types = self._normalize_zone_types(types)
 
         pinned = self.get_zone_pinned_name()
-        if pinned in types:
+        if pinned in selected_types:
             logger.info(f"Already selected at {pinned}")
             return True
 
         for _ in range(3):
-            success, types = self._zone_type_select_once(types)
+            success, selected_types = self._zone_type_select_once(selected_types)
             if success:
                 return True
 
@@ -175,7 +205,7 @@ class GlobeOperation(ActionPointHandler):
         return False
 
     @staticmethod
-    def _zone_select_get_button(selection, types):
+    def _zone_select_get_button(selection: Sequence[Button], types: Sequence[ZoneType]) -> Button | None:
         for raw_type in types:
             button_name = "SELECT_" + raw_type
             for button in selection:
@@ -183,16 +213,24 @@ class GlobeOperation(ActionPointHandler):
                     return button
         return None
 
-    def _zone_select_get_button_with_fallback(self, selection, types):
+    def _zone_select_get_button_with_fallback(
+        self,
+        selection: Sequence[Button],
+        types: Sequence[ZoneType],
+    ) -> tuple[Button, Sequence[ZoneType]]:
         button = self._zone_select_get_button(selection, types)
         if button is not None:
             return button, types
 
         logger.warning("No such zone type to select, fallback to default")
-        fallback = ("SAFE", "DANGEROUS")
-        return self._zone_select_get_button(selection, fallback), fallback
+        fallback: tuple[ZoneType, ...] = ("SAFE", "DANGEROUS")
+        button = self._zone_select_get_button(selection, fallback)
+        if button is None:
+            message = "Zone selection has neither SAFE nor DANGEROUS"
+            raise RuntimeError(message)
+        return button, fallback
 
-    def _zone_type_select_once(self, types):
+    def _zone_type_select_once(self, types: Sequence[ZoneType]) -> tuple[bool, Sequence[ZoneType]]:
         self.zone_select_enter()
         selection = self.ensure_zone_select_expanded()
         logger.attr("Zone_selection", selection)
@@ -201,7 +239,7 @@ class GlobeOperation(ActionPointHandler):
         self.zone_select_execute(button)
         return self.pinned_to_name(button) == self.get_zone_pinned_name(), types
 
-    def zone_has_safe(self):
+    def zone_has_safe(self) -> bool:
         """优先选择 SAFE，否则选择必定存在的 DANGEROUS；页面保持在钉选信息。"""
         if self.get_zone_pinned_name() == "SAFE":
             return True
@@ -214,9 +252,9 @@ class GlobeOperation(ActionPointHandler):
         # 没有 zone_switch，已在 DANGEROUS。
         return False
 
-    def os_globe_goto_map(self, skip_first_screenshot=True):
+    def os_globe_goto_map(self, *, skip_first_screenshot: bool = True) -> None:
         """从全局地图返回区域地图。"""
-        return self.ui_click(
+        self.ui_click(
             os_assets.GLOBE_GOTO_MAP,
             check_button=self.is_in_map,
             offset=(20, 20),
@@ -224,7 +262,7 @@ class GlobeOperation(ActionPointHandler):
             skip_first_screenshot=skip_first_screenshot,
         )
 
-    def os_map_goto_globe(self, unpin=True):
+    def os_map_goto_globe(self, *, unpin: bool = True) -> None:
         """从区域地图进入全局地图；unpin 控制是否关闭已有钉选信息。"""
         click_count = 0
         for _ in self.loop():
@@ -238,7 +276,7 @@ class GlobeOperation(ActionPointHandler):
 
         self._os_map_goto_globe_handle_pinned(unpin=unpin)
 
-    def _os_map_goto_globe_handle_entry(self, click_count):
+    def _os_map_goto_globe_handle_entry(self, click_count: int) -> tuple[bool, int]:
         handled, click_count = self._os_map_goto_globe_click_button(click_count)
         if handled:
             return True, click_count
@@ -248,7 +286,7 @@ class GlobeOperation(ActionPointHandler):
             return True, click_count
         return False, click_count
 
-    def _os_map_goto_globe_click_button(self, click_count):
+    def _os_map_goto_globe_click_button(self, click_count: int) -> tuple[bool, int]:
         if not self.appear_then_click(os_assets.MAP_GOTO_GLOBE, offset=(200, 5), interval=5):
             return False, click_count
 
@@ -262,14 +300,14 @@ class GlobeOperation(ActionPointHandler):
             raise RewardUncollectedError
         return True, click_count
 
-    def _os_map_goto_globe_click_fog(self):
+    def _os_map_goto_globe_click_fog(self) -> bool:
         if self.appear_then_click(os_assets.MAP_GOTO_GLOBE_FOG, interval=5):
             # 只会在据点遇到；即使地图内仍有探索奖励，AL 也不会阻止区域退出。
             self.interval_reset(os_assets.MAP_GOTO_GLOBE)
             return True
         return False
 
-    def _os_map_goto_globe_handle_popup(self):
+    def _os_map_goto_globe_handle_popup(self) -> bool:
         if self.handle_map_event():
             return True
         # 误入港口。
@@ -283,7 +321,7 @@ class GlobeOperation(ActionPointHandler):
         # 离开当前区域时，猫指挥搜索和潜艇可能被终止；搜索奖励会在进入新区后出现。
         return self.handle_popup_confirm("GOTO_GLOBE")
 
-    def _os_map_goto_globe_handle_pinned(self, *, unpin):
+    def _os_map_goto_globe_handle_pinned(self, *, unpin: bool) -> None:
         confirm_timer = Timer(1, count=2).start()
         unpinned = 0
         for _ in self.loop():
@@ -296,7 +334,7 @@ class GlobeOperation(ActionPointHandler):
             elif self.is_zone_pinned():
                 break
 
-    def globe_enter(self, zone):
+    def globe_enter(self, zone: Zone) -> None:
         """从钉选信息进入区域地图；海域未解锁时抛出 OSExploreError。"""
         click_timer = Timer(10)
         click_count = 0
@@ -315,7 +353,7 @@ class GlobeOperation(ActionPointHandler):
             if self._globe_enter_handle_blocker(zone, pinned, click_timer):
                 continue
 
-    def _globe_enter_click_zone(self, zone, click_timer, click_count):
+    def _globe_enter_click_zone(self, zone: Zone, click_timer: Timer, click_count: int) -> tuple[bool, int]:
         if not self.is_zone_pinned():
             return False, click_count
         if self.appear(os_assets.ZONE_LOCKED, offset=(20, 20)):
@@ -331,8 +369,13 @@ class GlobeOperation(ActionPointHandler):
         click_timer.reset()
         return True, click_count + 1
 
-    def _globe_enter_handle_blocker(self, zone, pinned, click_timer):
-        if self.handle_action_point(zone=zone, pinned=pinned):
+    def _globe_enter_handle_blocker(
+        self,
+        zone: Zone,
+        pinned: ActionPointZoneType | Literal[""],
+        click_timer: Timer,
+    ) -> bool:
+        if self.handle_action_point(zone=zone, pinned=pinned or None):
             click_timer.clear()
             return True
         if self.handle_map_event():

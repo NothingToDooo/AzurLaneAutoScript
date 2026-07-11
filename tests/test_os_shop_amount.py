@@ -40,7 +40,7 @@ class _Ocr:
     def __init__(self, values: list[int]) -> None:
         self.values = values
 
-    def ocr(self, _image: object) -> int:
+    def ocr_single(self, _image: object) -> int:
         return self.values.pop(0)
 
 

@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from module.base.timer import Timer
@@ -5,17 +7,20 @@ from module.base.utils import color_similarity_2d
 from module.logger import logger
 from module.map.assets import MAP_CAT_ATTACK
 from module.map.map_operation import MapOperation
-from module.os.globe_zone import ZoneManager
+from module.os.globe_zone import Zone, ZoneManager
 from module.os_handler import assets as os_assets
 from module.os_handler.action_point import ActionPointHandler
 from module.os_handler.map_event import MapEventHandler
 
+if TYPE_CHECKING:
+    from module.base.button import Button
+
 
 class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneManager):
-    def is_in_map_order(self):
+    def is_in_map_order(self) -> bool:
         return self.appear(os_assets.ORDER_CHECK, offset=(20, 20))
 
-    def order_enter(self):
+    def order_enter(self) -> None:
         """从区域地图进入指令页。"""
         logger.info("Order enter")
         for _ in self.loop():
@@ -31,7 +36,7 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
             if self.handle_map_event():
                 continue
 
-    def order_quit(self):
+    def order_quit(self) -> None:
         """从指令页返回区域地图。"""
         logger.info("Order quit")
         self.ui_click(
@@ -41,7 +46,7 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
             skip_first_screenshot=True,
         )
 
-    def order_execute(self, button):
+    def order_execute(self, button: Button) -> bool:
         """在区域地图执行一项导航指令，结束后仍在区域地图。"""
         logger.hr(button)
         self.order_enter()
@@ -60,14 +65,14 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
                 continue
         return False
 
-    def _order_execute_finished(self, confirm_timer):
+    def _order_execute_finished(self, confirm_timer: Timer) -> bool:
         if self.is_in_map():
             return confirm_timer.reached()
 
         confirm_timer.reset()
         return False
 
-    def _order_missing(self, button, missing_timer):
+    def _order_missing(self, button: Button, missing_timer: Timer) -> bool:
         if not self.is_in_map_order() or self.appear(button):
             missing_timer.reset()
             return False
@@ -78,7 +83,13 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
         logger.info(f"Map order not available: {button}")
         return True
 
-    def _order_execute_step(self, button, assume_zone, confirm_timer, missing_timer):
+    def _order_execute_step(
+        self,
+        button: Button,
+        assume_zone: Zone,
+        confirm_timer: Timer,
+        missing_timer: Timer,
+    ) -> bool:
         if self.appear_then_click(button, interval=3):
             return True
         if self.handle_popup_confirm(button.name):
@@ -94,7 +105,7 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
         missing_timer.reset()
         return True
 
-    def wait_until_order_finished(self):
+    def wait_until_order_finished(self) -> None:
         for _ in self.loop():
             if self.is_in_map() and self.appear(os_assets.ORDER_ENTER, offset=(20, 20)):
                 break
@@ -104,7 +115,7 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
             if self.handle_map_cat_attack():
                 continue
 
-    def os_order_execute(self, recon_scan=True, submarine_call=True):
+    def os_order_execute(self, *, recon_scan: bool = True, submarine_call: bool = True) -> None:
         """在区域地图执行指令，侦察与潜艇冷却分别为 30、60 分钟。
 
         冷却中会强制消耗行动力箱，最多分别消耗 10、39 行动力。
@@ -118,7 +129,7 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
 
         self.config.opsi_task_delay(recon_scan=recon_scan, submarine_call=submarine_call)
 
-    def handle_map_cat_attack(self):
+    def handle_map_cat_attack(self) -> bool:
         """猫攻击按钮与大世界 MAP_EXIT 重叠，因此覆盖普通地图处理。"""
         if not self.map_cat_attack_timer.reached():
             return False

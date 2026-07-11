@@ -1,8 +1,14 @@
+from datetime import datetime
+
 import pytest
 
 import module.os.tasks.explore as explore_module
 from module.exception import ScriptError
 from module.os.tasks.explore import OpsiExplore
+
+_NEXT_RUN = datetime(2026, 2, 1, 0, 0)
+_OLD_RUN = datetime(2026, 1, 1, 0, 0)
+_NEXT_RESET = datetime(2026, 3, 1, 0, 0)
 
 
 class _TaskStopped(Exception):
@@ -24,7 +30,7 @@ class _Config:
         self.OpsiExplore_SpecialRadar = True
         self.OpsiFleet_Fleet = 1
         self.OpsiFleet_Submarine = False
-        self.Scheduler_NextRun = "next-run"
+        self.Scheduler_NextRun = _NEXT_RUN
         self.calls = []
 
     def multi_set(self):
@@ -38,7 +44,7 @@ class _Config:
 
     def cross_get(self, keys, default=None):
         self.calls.append(("cross_get", keys, default))
-        return "old-run"
+        return _OLD_RUN
 
     def cross_set(self, keys, value):
         self.calls.append(("cross_set", keys, value))
@@ -121,7 +127,7 @@ def test_os_explore_invalid_last_zone_restarts_from_beginning() -> None:
 
 
 def test_os_explore_skips_safe_zone_runs_next_and_finishes(monkeypatch) -> None:
-    monkeypatch.setattr(explore_module, "get_os_next_reset", lambda: "next-reset")
+    monkeypatch.setattr(explore_module, "get_os_next_reset", lambda: _NEXT_RESET)
     explore = _Explore(globe_results={1: False, 2: True}, combat_results=[0])
 
     with pytest.raises(_TaskStopped):
@@ -132,5 +138,5 @@ def test_os_explore_skips_safe_zone_runs_next_and_finishes(monkeypatch) -> None:
     assert ("os_order_execute", {"recon_scan": False, "submarine_call": False}) in explore.calls
     assert explore.failed_zones == [2]
     assert explore.config.OpsiExplore_LastZone == 0
-    assert ("task_delay", "next-reset") in explore.config.calls
+    assert ("task_delay", _NEXT_RESET) in explore.config.calls
     assert ("task_stop", None) in explore.config.calls

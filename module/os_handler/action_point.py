@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import TYPE_CHECKING, Literal, Never, Protocol, override
 
 import numpy as np
 
@@ -14,6 +15,18 @@ from module.statistics.item import Item, ItemGrid
 from module.ui.assets import OS_CHECK
 from module.ui.ui import UI
 
+if TYPE_CHECKING:
+    from module.config.config import AzurLaneConfig
+    from module.device.device import Device
+
+
+class ActionPointZone(Protocol):
+    hazard_level: int
+    is_port: bool
+
+
+type ActionPointZoneType = Literal["DANGEROUS", "SAFE", "OBSCURE", "ABYSSAL", "STRONGHOLD", "ARCHIVE"]
+
 OCR_ACTION_POINT_REMAIN = Digit(os_assets.ACTION_POINT_REMAIN, letter=(255, 219, 66), name="OCR_ACTION_POINT_REMAIN")
 OCR_ACTION_POINT_REMAIN_OS = Digit(
     os_assets.ACTION_POINT_REMAIN_OS, letter=(239, 239, 239), threshold=160, name="OCR_SHOP_YELLOW_COINS_OS"
@@ -28,8 +41,9 @@ OCR_OS_ADAPTABILITY = Digit(
 
 
 class ActionPointBuyCounter(DigitCounter):
-    def after_process(self, result):
-        result = super().after_process(result)
+    @staticmethod
+    def normalize_text(result: str) -> str:
+        result = DigitCounter.normalize_text(result)
 
         # 可能的结果：0/5、05。
         if result == "05":
@@ -44,7 +58,8 @@ OCR_ACTION_POINT_BUY_REMAIN = ActionPointBuyCounter(
 
 
 class ActionPointItem(Item):
-    def predict_valid(self):
+    @override
+    def predict_valid(self) -> bool:
         return True
 
 
@@ -97,19 +112,24 @@ class ActionPointLimit(Exception):
 
 
 class ActionPointHandler(UI, MapEventHandler):
-    def __init__(self, *args, **kwargs):
-        self._action_point_box = [0, 0, 0, 0]
-        self._action_point_current = 0
-        self._action_point_total = 0
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        config: AzurLaneConfig | str,
+        device: Device | str | None = None,
+        task: str | None = None,
+    ) -> None:
+        self._action_point_box: list[int] = [0, 0, 0, 0]
+        self._action_point_current: int = 0
+        self._action_point_total: int = 0
+        super().__init__(config, device=device, task=task)
 
-    def _is_in_action_point(self):
+    def _is_in_action_point(self) -> bool:
         return self.appear(os_assets.ACTION_POINT_USE, offset=(20, 20))
 
-    def is_current_ap_visible(self):
+    def is_current_ap_visible(self) -> bool:
         return self.match_template_color(os_assets.CURRENT_AP_CHECK, offset=(40, 5), threshold=15)
 
-    def action_point_use(self):
+    def action_point_use(self) -> None:
         prev = self._action_point_current
         self.interval_clear(os_assets.ACTION_POINT_USE)
         for _ in self.loop():
@@ -124,13 +144,13 @@ class ActionPointHandler(UI, MapEventHandler):
             if self._action_point_current > prev:
                 break
 
-    def action_point_update(self):
+    def action_point_update(self) -> None:
         items = ACTION_POINT_ITEMS.predict(self.device.image, name=False, amount=True)
         box = [item.amount for item in items]
-        current = OCR_ACTION_POINT_REMAIN.ocr(self.device.image)
+        current = OCR_ACTION_POINT_REMAIN.ocr_single(self.device.image)
         total = current
         if self.config.OS_ACTION_POINT_BOX_USE:
-            total += np.sum(np.array(box) * tuple(ACTION_POINT_BOX.values()))
+            total += int(np.sum(np.array(box) * tuple(ACTION_POINT_BOX.values())))
         oil = box[0]
 
         logger.info(f"Action points: {current}({total}), oil: {oil}")
@@ -141,11 +161,11 @@ class ActionPointHandler(UI, MapEventHandler):
         if total > 3000:
             self.config.override(OpsiGeneral_DoRandomMapEvent=False)
 
-    def action_point_safe_get(self):
+    def action_point_safe_get(self) -> None:
         self._wait_current_ap_visible()
         self._wait_reliable_action_point()
 
-    def _wait_current_ap_visible(self):
+    def _wait_current_ap_visible(self) -> None:
         timeout = Timer(3, count=6).start()
         for _ in self.loop():
             # 结束。
@@ -159,7 +179,7 @@ class ActionPointHandler(UI, MapEventHandler):
                 timeout.reset()
                 continue
 
-    def _is_reliable_action_point(self):
+    def _is_reliable_action_point(self) -> bool:
         # 当前行动力过高时，大概率是 OCR 误判。
         if self._action_point_current > 600:
             return False
@@ -171,7 +191,7 @@ class ActionPointHandler(UI, MapEventHandler):
         # 或者有石油。页面未完全加载时可能识别成 0 或 1。
         return oil > 100
 
-    def _wait_reliable_action_point(self):
+    def _wait_reliable_action_point(self) -> None:
         skip_first_screenshot = True
         timeout = Timer(1, count=2).start()
         while 1:
@@ -193,7 +213,7 @@ class ActionPointHandler(UI, MapEventHandler):
                 break
 
     @staticmethod
-    def action_point_get_cost(zone, pinned):
+    def action_point_get_cost(zone: ActionPointZone, pinned: ActionPointZoneType) -> int:
         """按 DANGEROUS、SAFE、OBSCURE、ABYSSAL、STRONGHOLD 类型计算行动力消耗。"""
         if pinned == "DANGEROUS":
             cost = ACTION_POINTS_COST[zone.hazard_level] * 2
@@ -214,7 +234,7 @@ class ActionPointHandler(UI, MapEventHandler):
 
         return cost
 
-    def action_point_get_active_button(self):
+    def action_point_get_active_button(self) -> int:
         """返回 0 至 3：石油、20、50、100 行动力箱。"""
         for index, item in enumerate(ACTION_POINT_GRID.buttons):
             area = item.area
@@ -227,7 +247,7 @@ class ActionPointHandler(UI, MapEventHandler):
         logger.warning("Unable to find an active action point box button")
         return 1
 
-    def action_point_set_button(self, index):
+    def action_point_set_button(self, index: int) -> bool:
         for _ in self.loop(timeout=2):
             if self.action_point_get_active_button() == index:
                 return True
@@ -236,7 +256,7 @@ class ActionPointHandler(UI, MapEventHandler):
         logger.warning("FSet action point button timeout")
         return False
 
-    def action_point_get_buy_remain(self):
+    def action_point_get_buy_remain(self) -> int:
         """在 ACTION_POINT_USE 页面读取本周剩余购买次数。"""
         current = 0
         for _ in self.loop(timeout=1):
@@ -252,7 +272,7 @@ class ActionPointHandler(UI, MapEventHandler):
 
         return current
 
-    def action_point_buy(self, preserve=1000):
+    def action_point_buy(self, preserve: int = 1000) -> bool:
         """在 ACTION_POINT_USE 页面用石油购买行动力，并至少保留 preserve 石油。"""
         self.action_point_set_button(0)
         current = self.action_point_get_buy_remain()
@@ -271,7 +291,7 @@ class ActionPointHandler(UI, MapEventHandler):
         logger.info("Not enough oil to buy")
         return False
 
-    def action_point_quit(self):
+    def action_point_quit(self) -> None:
         """从 ACTION_POINT_USE 返回大世界页面。"""
         for _ in self.loop():
             # 行动力弹窗有时没有黑色模糊背景，此时 ACTION_POINT_CANCEL 和 OS_CHECK 会同时出现。
@@ -285,7 +305,15 @@ class ActionPointHandler(UI, MapEventHandler):
             if self.handle_map_event():
                 continue
 
-    def handle_action_point(self, zone, pinned, cost=None, keep_current_ap=True, check_rest_ap=False):
+    def handle_action_point(
+        self,
+        zone: ActionPointZone | str | None,
+        pinned: ActionPointZoneType | None,
+        cost: int | None = None,
+        *,
+        keep_current_ap: bool = True,
+        check_rest_ap: bool = False,
+    ) -> bool:
         """在 ACTION_POINT_USE 补足消耗，可为次日日常保留当前行动力。
 
         今日可恢复量使总量达到 200 时可跳过保留；资源不足抛出 ActionPointLimit。
@@ -296,19 +324,22 @@ class ActionPointHandler(UI, MapEventHandler):
         # 行动力箱有出现动画。
         self.action_point_safe_get()
         if cost is None:
+            if zone is None or isinstance(zone, str) or pinned is None:
+                message = "zone and pinned are required when action point cost is omitted"
+                raise ValueError(message)
             cost = self.action_point_get_cost(zone, pinned)
         buy_checked = False
 
-        if self._can_skip_current_ap_preserve(check_rest_ap):
+        if self._can_skip_current_ap_preserve(check_rest_ap=check_rest_ap):
             keep_current_ap = False
 
-        self._ensure_action_point_above_preserve(keep_current_ap)
+        self._ensure_action_point_above_preserve(keep_current_ap=keep_current_ap)
 
         for _ in range(12):
             if self._has_enough_action_point(cost):
                 return True
 
-            bought, buy_checked = self._try_buy_action_point(buy_checked)
+            bought, buy_checked = self._try_buy_action_point(buy_checked=buy_checked)
             if bought:
                 continue
 
@@ -319,7 +350,7 @@ class ActionPointHandler(UI, MapEventHandler):
         logger.warning("Failed to get action points after 12 trial")
         return False
 
-    def _can_skip_current_ap_preserve(self, check_rest_ap):
+    def _can_skip_current_ap_preserve(self, *, check_rest_ap: bool) -> bool:
         if not check_rest_ap:
             return False
         diff = get_server_next_update("00:00") - datetime.now()
@@ -333,25 +364,25 @@ class ActionPointHandler(UI, MapEventHandler):
         logger.info(f"Current={self._action_point_current}  Rest={today_rest}")
         return True
 
-    def _raise_action_point_limit(self, message):
+    def _raise_action_point_limit(self, message: str) -> Never:
         logger.info(message)
         self.action_point_quit()
         raise ActionPointLimit
 
-    def _ensure_action_point_above_preserve(self, keep_current_ap):
+    def _ensure_action_point_above_preserve(self, *, keep_current_ap: bool) -> None:
         if keep_current_ap and self._action_point_total <= self.config.OS_ACTION_POINT_PRESERVE:
             self._raise_action_point_limit(
                 f"Reach the limit of action points, preserve={self.config.OS_ACTION_POINT_PRESERVE}"
             )
 
-    def _has_enough_action_point(self, cost):
+    def _has_enough_action_point(self, cost: int) -> bool:
         if self._action_point_current < cost:
             return False
         logger.info("Having enough action points")
         self.action_point_quit()
         return True
 
-    def _try_buy_action_point(self, buy_checked):
+    def _try_buy_action_point(self, *, buy_checked: bool) -> tuple[bool, bool]:
         if self.config.OpsiGeneral_BuyActionPointLimit <= 0 or buy_checked:
             return False, buy_checked
         if self.action_point_buy(preserve=self.config.OpsiGeneral_OilLimit):
@@ -359,11 +390,11 @@ class ActionPointHandler(UI, MapEventHandler):
             return True, buy_checked
         return False, True
 
-    def _ensure_action_point_total_enough(self, cost):
+    def _ensure_action_point_total_enough(self, cost: int) -> None:
         if self._action_point_total < cost:
             self._raise_action_point_limit("Not having enough action points")
 
-    def _action_point_box_order(self):
+    def _action_point_box_order(self) -> list[int]:
         boxes = []
         for index in [1, 2, 3]:
             if self._action_point_box[index] <= 0:
@@ -374,7 +405,7 @@ class ActionPointHandler(UI, MapEventHandler):
                 boxes.insert(0, index)
         return boxes
 
-    def _use_best_action_point_box(self):
+    def _use_best_action_point_box(self) -> None:
         boxes = self._action_point_box_order()
         if not boxes:
             self._raise_action_point_limit("No more action point boxes")
@@ -385,7 +416,7 @@ class ActionPointHandler(UI, MapEventHandler):
         self.action_point_set_button(boxes[0])
         self.action_point_use()
 
-    def action_point_enter(self):
+    def action_point_enter(self) -> None:
         """从 OS_CHECK 打开 ACTION_POINT_USE。"""
         for _ in self.loop():
             if self.appear(os_assets.ACTION_POINT_USE, offset=(20, 20)):
@@ -401,10 +432,24 @@ class ActionPointHandler(UI, MapEventHandler):
             if self.appear_then_click(os_assets.AUTO_SEARCH_REWARD, offset=(50, 50)):
                 continue
 
-    def action_point_set(self, zone=None, pinned=None, cost=None, keep_current_ap=True, check_rest_ap=False):
+    def action_point_set(
+        self,
+        zone: ActionPointZone | str | None = None,
+        pinned: ActionPointZoneType | None = None,
+        cost: int | None = None,
+        *,
+        keep_current_ap: bool = True,
+        check_rest_ap: bool = False,
+    ) -> bool:
         """打开行动力弹窗并按 handle_action_point 补足消耗；不足时抛出 ActionPointLimit。"""
         self.action_point_enter()
-        if not self.handle_action_point(zone, pinned, cost, keep_current_ap, check_rest_ap):
+        if not self.handle_action_point(
+            zone,
+            pinned,
+            cost,
+            keep_current_ap=keep_current_ap,
+            check_rest_ap=check_rest_ap,
+        ):
             return False
 
         for _ in self.loop():
@@ -413,7 +458,7 @@ class ActionPointHandler(UI, MapEventHandler):
 
         return True
 
-    def action_point_check(self, amount):
+    def action_point_check(self, amount: int) -> bool:
         self.action_point_enter()
         self.action_point_safe_get()
 

@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, override
+
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2, GET_ITEMS_3
 from module.exception import CampaignEnd
@@ -9,10 +11,16 @@ from module.os_handler.enemy_searching import EnemySearchingHandler
 from module.ui.assets import BACK_ARROW
 from module.ui.switch import Switch
 
+if TYPE_CHECKING:
+    from module.base.base import ModuleBase
+
 
 class FleetLockSwitch(Switch):
-    def handle_additional(self, _main):
+    @override
+    def handle_additional(self, _main: ModuleBase) -> bool:
         # 上一个已清理海域的自动搜索奖励有时会延迟弹出。
+        if not isinstance(_main, MapEventHandler):
+            return False
         return _main.appear_then_click(os_assets.AUTO_SEARCH_REWARD, offset=(50, 50), interval=3)
 
 
@@ -42,7 +50,7 @@ _MAP_EVENT_HANDLERS = (
 class MapEventHandler(EnemySearchingHandler):
     ash_popup_canceled = False
 
-    def handle_map_get_items(self, interval=2):
+    def handle_map_get_items(self, interval: int = 2) -> bool:
         if self.is_in_map():
             return False
 
@@ -54,18 +62,18 @@ class MapEventHandler(EnemySearchingHandler):
 
         return False
 
-    def handle_map_archives(self):
+    def handle_map_archives(self) -> bool:
         if self.appear(os_assets.MAP_ARCHIVES, interval=5):
             logger.info(f"{os_assets.MAP_ARCHIVES} -> {os_assets.CLICK_SAFE_AREA}")
             self.device.click(os_assets.CLICK_SAFE_AREA)
             return True
         return self.appear_then_click(os_assets.MAP_WORLD, offset=(20, 20), interval=5)
 
-    def handle_os_game_tips(self):
+    def handle_os_game_tips(self) -> bool:
         # 首次开启自动搜索时关闭游戏提示。
         return self.appear_then_click(os_assets.OS_GAME_TIPS, offset=(20, 20), interval=3)
 
-    def handle_ash_popup(self):
+    def handle_ash_popup(self) -> bool:
         name = "ASH"
         # 2021-12-09 起 Ash 弹窗不再显示红字，改用 `Ashes Coordinates` 文字识别。
         if (
@@ -80,7 +88,7 @@ class MapEventHandler(EnemySearchingHandler):
             return True
         return False
 
-    def handle_map_event(self):
+    def handle_map_event(self) -> str:
         """返回已处理的事件名；没有事件时返回空字符串。"""
         for handler, event in _MAP_EVENT_HANDLERS:
             if getattr(self, handler)():
@@ -90,14 +98,14 @@ class MapEventHandler(EnemySearchingHandler):
 
     _os_in_map_confirm_timer = Timer(1.5, count=3)
 
-    def handle_os_in_map(self):
+    def handle_os_in_map(self) -> bool:
         """返回当前是否在大世界地图内且已稳定确认。"""
         if self.is_in_map():
             return bool(self._os_in_map_confirm_timer.reached())
         self._os_in_map_confirm_timer.reset()
         return False
 
-    def ensure_no_map_event(self):
+    def ensure_no_map_event(self) -> None:
         self._os_in_map_confirm_timer.reset()
 
         for _ in self.loop():
@@ -106,7 +114,7 @@ class MapEventHandler(EnemySearchingHandler):
             if self.handle_os_in_map():
                 break
 
-    def os_auto_search_quit(self):
+    def os_auto_search_quit(self) -> bool:
         """退出自动搜索，并返回当前地图是否已清空。"""
         confirm_timer = Timer(1.2, count=3).start()
         cleared = False
@@ -148,7 +156,7 @@ class MapEventHandler(EnemySearchingHandler):
 
         return cleared
 
-    def handle_os_auto_search_map_option(self, enable=True):
+    def handle_os_auto_search_map_option(self, *, enable: bool | None = True) -> bool:
         """enable 为 None 时不切换；搜索结束时退出并抛出 CampaignEnd。"""
         if (
             self.match_template_color(os_assets.AUTO_SEARCH_OS_MAP_OPTION_OFF, offset=(5, 120))
@@ -190,7 +198,7 @@ class MapEventHandler(EnemySearchingHandler):
 
         return False
 
-    def handle_os_map_fleet_lock(self, enable=None):
+    def handle_os_map_fleet_lock(self, *, enable: bool | None = None) -> bool:
         # 舰队锁定依赖按钮是否出现在地图上，而不是地图状态。
         # 已经在地图内时不会再显示地图状态。
         if not fleet_lock.appear(main=self):

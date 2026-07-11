@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from module.base.button import Button
@@ -8,18 +10,21 @@ from module.logger import logger
 from module.os.assets import FLEET_1, FLEET_2, FLEET_3, FLEET_4, FLEET_BAR, FLEET_CHOOSE
 from module.os_handler.map_event import MapEventHandler
 
+if TYPE_CHECKING:
+    from module.base.type_alias import ImageArray
+
 
 class FleetSelector:
     FLEET_BAR_SHAPE_Y = 42
     FLEET_BAR_MARGIN_Y = 11
     FLEET_BAR_ACTIVE_STD = 45  # 选中约为 67，未选中约为 12。
 
-    def __init__(self, main):
+    def __init__(self, main: MapEventHandler) -> None:
         self._choose = FLEET_CHOOSE
         self._bar = FLEET_BAR
         self.main = main
 
-    def get(self):
+    def get(self) -> int:
         """返回当前舰队编号 1 至 4；无法识别时返回 0。"""
         for index, button in enumerate([FLEET_1, FLEET_2, FLEET_3, FLEET_4]):
             if self.main.appear(button, offset=(20, 20), similarity=0.75):
@@ -28,7 +33,7 @@ class FleetSelector:
         logger.info("Unknown OpSi fleet")
         return 0
 
-    def bar_opened(self):
+    def bar_opened(self) -> bool:
         # 只检查第 3 至 13 列，并要求至少两个灰色项和一个蓝色项。
         area = self._bar.area
         area = (area[0] + 3, area[1], area[0] + 13, area[3])
@@ -36,7 +41,7 @@ class FleetSelector:
             area, color=(239, 243, 247), threshold=221, count=400
         ) and self.main.image_color_count(area, color=(66, 125, 231), threshold=221, count=150)
 
-    def parse_fleet_bar(self, image):
+    def parse_fleet_bar(self, image: ImageArray) -> list[int]:
         """从下拉菜单截图返回当前选中的舰队编号列表，值域为 1 至 4。"""
         width, height = image_size(image)
         result = []
@@ -49,11 +54,11 @@ class FleetSelector:
         logger.info(f"Current selected: {result}")
         return result
 
-    def selected(self):
+    def selected(self) -> list[int]:
         """返回当前选中的舰队编号列表，编号范围为 1 到 4。"""
         return self.parse_fleet_bar(self.main.image_crop(self._bar, copy=False))
 
-    def get_button(self, index):
+    def get_button(self, index: int) -> Button:
         """把 1 至 4 的舰队编号转换为下拉菜单按钮。"""
         index = 5 - index
         area = area_offset(
@@ -69,7 +74,7 @@ class FleetSelector:
         index = 5 - index
         return Button(area=(), color=(), button=area, name=f"{self._bar}_INDEX_{index}")
 
-    def open(self):
+    def open(self) -> None:
         main = self.main
         click_timer = Timer(3, count=6)
         for _ in main.loop():
@@ -84,7 +89,7 @@ class FleetSelector:
                 main.device.click(self._choose)
                 click_timer.reset()
 
-    def close(self):
+    def close(self) -> None:
         main = self.main
         click_timer = Timer(3, count=6)
         for _ in main.loop():
@@ -95,7 +100,7 @@ class FleetSelector:
                 main.device.click(self._choose)
                 click_timer.reset()
 
-    def click(self, index):
+    def click(self, index: int) -> None:
         """在下拉菜单选择编号 1 至 4 的舰队，并关闭菜单。"""
         main = self.main
         button = self.get_button(index)
@@ -116,7 +121,7 @@ class FleetSelector:
                 main.device.click(button)
                 click_timer.reset()
 
-    def ensure_to_be(self, index):
+    def ensure_to_be(self, index: int) -> bool:
         """确保切换到编号 1 至 4 的舰队，并返回是否发生切换。"""
         confirm_timer = Timer(1.5, count=5).start()
         main = self.main
@@ -144,5 +149,5 @@ class FleetSelector:
 
 class OSFleetSelector(MapEventHandler):
     @cached_property
-    def fleet_selector(self):
+    def fleet_selector(self) -> FleetSelector:
         return FleetSelector(main=self)

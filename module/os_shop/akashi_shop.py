@@ -10,6 +10,9 @@ from module.os_shop.ui import OSShopUI
 
 
 class AkashiShop(OSStatus, OSShopUI, Selector, MapEventHandler):
+    OS_AKASHI_ITEM_ASSET_FOLDER = "./assets/shop/os"
+    OS_AKASHI_COST_ASSET_FOLDER = "./assets/shop/os_cost"
+
     @cached_property
     def os_akashi_shop_items(self) -> ItemGrid:
         shop_grid = ButtonGrid(
@@ -22,8 +25,8 @@ class AkashiShop(OSStatus, OSShopUI, Selector, MapEventHandler):
             counter_area=(85, 170, 134, 186),
             price_area=(52, 132, 132, 165),
         )
-        shop_items.load_template_folder("./assets/shop/os")
-        shop_items.load_cost_template_folder("./assets/shop/os_cost")
+        shop_items.load_template_folder(self.OS_AKASHI_ITEM_ASSET_FOLDER)
+        shop_items.load_cost_template_folder(self.OS_AKASHI_COST_ASSET_FOLDER)
         return shop_items
 
     def os_shop_get_items_in_akashi(self) -> list[Item]:
@@ -33,7 +36,11 @@ class AkashiShop(OSStatus, OSShopUI, Selector, MapEventHandler):
 
         items = self.os_akashi_shop_items.items
         if len(items):
-            min_row = self.os_akashi_shop_items.grids[0, 0].area[1]
+            grids = self.os_akashi_shop_items.grids
+            if grids is None:
+                message = "Akashi shop item grid is not initialized"
+                raise RuntimeError(message)
+            min_row = grids[0, 0].area[1]
             row = [str(item) for item in items if item.button[1] == min_row]
             logger.info(f"Shop row 1: {row}")
             row = [str(item) for item in items if item.button[1] != min_row]

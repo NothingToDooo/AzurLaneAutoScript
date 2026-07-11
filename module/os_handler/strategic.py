@@ -1,8 +1,13 @@
+from typing import TYPE_CHECKING
+
 from module.base.utils import get_color
 from module.logger import logger
 from module.os_handler import assets as os_assets
 from module.os_handler.map_event import MapEventHandler
 from module.ui.scroll import Scroll
+
+if TYPE_CHECKING:
+    from module.base.button import Button
 
 STRATEGIC_SEARCH_SCROLL = Scroll(
     os_assets.STRATEGIC_SEARCH_SCROLL_AREA, color=(247, 211, 66), name="STRATEGIC_SEARCH_SCROLL"
@@ -10,7 +15,7 @@ STRATEGIC_SEARCH_SCROLL = Scroll(
 
 
 class StrategicSearchHandler(MapEventHandler):
-    def strategy_search_enter(self):
+    def strategy_search_enter(self) -> bool:
         logger.info("Strategic search enter")
         self.interval_clear(os_assets.STRATEGIC_SEARCH_MAP_OPTION_OFF)
         for _ in self.loop():
@@ -26,7 +31,7 @@ class StrategicSearchHandler(MapEventHandler):
                 continue
         return False
 
-    def strategic_search_set_tab(self):
+    def strategic_search_set_tab(self) -> None:
         logger.info("Strategic search set tab")
         for _ in self.loop():
             tab_blue = get_color(self.device.image, os_assets.STRATEGIC_SEARCH_TAB_SECURED.area)[2]
@@ -36,7 +41,7 @@ class StrategicSearchHandler(MapEventHandler):
             if tab_blue > 150:
                 break
 
-    def _strategy_search_scroll_appear(self):
+    def _strategy_search_scroll_appear(self) -> bool:
         for _ in self.loop(timeout=2):
             if STRATEGIC_SEARCH_SCROLL.appear(main=self):
                 return True
@@ -44,10 +49,10 @@ class StrategicSearchHandler(MapEventHandler):
         logger.warning("STRATEGIC_SEARCH_SCROLL disappeared confirm")
         return False
 
-    def _strategy_option_selected(self, button):
+    def _strategy_option_selected(self, button: Button) -> bool:
         return self.image_color_count(button.button, color=(156, 255, 82), count=30)
 
-    def strategic_search_set_option(self):
+    def strategic_search_set_option(self) -> bool:
         """设置页异常关闭时返回 False。"""
         logger.info("Strategic search set option")
         self._strategic_search_set_zone_and_merchant()
@@ -59,7 +64,7 @@ class StrategicSearchHandler(MapEventHandler):
         self._strategic_search_set_submit()
         return True
 
-    def _strategic_search_set_zone_and_merchant(self):
+    def _strategic_search_set_zone_and_merchant(self) -> None:
         selected = self._strategy_option_selected
         for _ in self.loop():
             if selected(os_assets.STRATEGIC_SEARCH_ZONEMODE_REPEAT) and selected(
@@ -77,12 +82,12 @@ class StrategicSearchHandler(MapEventHandler):
                 self.device.click(os_assets.STRATEGIC_SEARCH_MERCHANT_STOP)
                 continue
 
-    def _strategic_search_scroll_to_device(self):
+    def _strategic_search_scroll_to_device(self) -> bool:
         STRATEGIC_SEARCH_SCROLL.drag_threshold = 0.1
         STRATEGIC_SEARCH_SCROLL.set(0.5, main=self)
         return self._strategy_search_scroll_appear()
 
-    def _strategic_search_set_device(self):
+    def _strategic_search_set_device(self) -> None:
         selected = self._strategy_option_selected
         for _ in self.loop():
             self._strategic_search_refresh_device_offsets()
@@ -95,18 +100,18 @@ class StrategicSearchHandler(MapEventHandler):
                 self.device.click(os_assets.STRATEGIC_SEARCH_DEVICE_STOP)
                 continue
 
-    def _strategic_search_refresh_device_offsets(self):
+    def _strategic_search_refresh_device_offsets(self) -> None:
         self.appear(os_assets.STRATEGIC_SEARCH_DEVICE_CHECK, offset=(20, 200), similarity=0.7)
         os_assets.STRATEGIC_SEARCH_DEVICE_STOP.load_offset(os_assets.STRATEGIC_SEARCH_DEVICE_CHECK)
         os_assets.STRATEGIC_SEARCH_DEVICE_CONTINUE.load_offset(os_assets.STRATEGIC_SEARCH_DEVICE_CHECK)
 
-    def _strategic_search_scroll_to_submit(self):
+    def _strategic_search_scroll_to_submit(self) -> bool:
         STRATEGIC_SEARCH_SCROLL.drag_threshold = 0.05
         STRATEGIC_SEARCH_SCROLL.edge_add = (0.5, 0.8)
         STRATEGIC_SEARCH_SCROLL.set_bottom(main=self)
         return self._strategy_search_scroll_appear()
 
-    def _strategic_search_set_submit(self):
+    def _strategic_search_set_submit(self) -> None:
         selected = self._strategy_option_selected
         for _ in self.loop():
             self._strategic_search_refresh_submit_offsets()
@@ -119,12 +124,12 @@ class StrategicSearchHandler(MapEventHandler):
                 self.device.click(os_assets.STRATEGIC_SEARCH_SUBMIT_ON)
                 continue
 
-    def _strategic_search_refresh_submit_offsets(self):
+    def _strategic_search_refresh_submit_offsets(self) -> None:
         self.appear(os_assets.STRATEGIC_SEARCH_SUBMIT_CHECK, offset=(20, 20), similarity=0.7)
         os_assets.STRATEGIC_SEARCH_SUBMIT_OFF.load_offset(os_assets.STRATEGIC_SEARCH_SUBMIT_CHECK)
         os_assets.STRATEGIC_SEARCH_SUBMIT_ON.load_offset(os_assets.STRATEGIC_SEARCH_SUBMIT_CHECK)
 
-    def strategic_search_confirm(self):
+    def strategic_search_confirm(self) -> bool:
         logger.info("Strategic search confirm")
         for _ in self.loop():
             if self.appear(os_assets.STRATEGIC_SEARCH_POPUP_CHECK, offset=(20, 20)) and self.handle_popup_confirm(
@@ -135,7 +140,7 @@ class StrategicSearchHandler(MapEventHandler):
                 return True
         return False
 
-    def strategic_search_start(self):
+    def strategic_search_start(self) -> bool:
         """在区域地图启动战略搜索，三次失败后返回 False。"""
         logger.hr("Strategic search start")
         for _ in range(3):

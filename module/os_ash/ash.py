@@ -1,5 +1,7 @@
+from collections.abc import Callable
 from contextlib import suppress
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Literal, override
 
 from module.base.utils import image_left_strip
 from module.combat.assets import BATTLE_PREPARATION
@@ -12,9 +14,14 @@ from module.os_handler.map_event import MapEventHandler
 from module.ui.assets import BACK_ARROW
 from module.ui.ui import UI
 
+if TYPE_CHECKING:
+    from module.base.type_alias import ImageArray
+
+type AshCombatEnd = Literal["in_stage", "with_searching", "no_searching", "in_ui"] | Callable[[], bool]
+
 
 class DailyDigitCounter(DigitCounter):
-    def pre_process(self, image):
+    def pre_process(self, image: ImageArray) -> ImageArray:
         image = super().pre_process(image)
         return image_left_strip(image, threshold=120, length=35)
 
@@ -24,7 +31,7 @@ class AshBeaconFinished(Exception):
 
 
 class AshCombat(Combat):
-    def handle_battle_status(self):
+    def handle_battle_status(self) -> bool:
         if self.is_combat_executing():
             return False
         if self.appear(ash_assets.BATTLE_STATUS, offset=(120, 20), interval=self.battle_status_click_interval):
@@ -36,11 +43,12 @@ class AshCombat(Combat):
             return True
         return bool(super().handle_battle_status())
 
-    def handle_exp_info(self):
+    @override
+    def handle_exp_info(self) -> bool:
         """META 战斗不掉落经验；随机结算背景可能误触发经验识别，因此不处理。"""
         return False
 
-    def handle_battle_preparation(self):
+    def handle_battle_preparation(self) -> bool:
         if super().handle_battle_preparation():
             return True
 
@@ -60,15 +68,29 @@ class AshCombat(Combat):
 
         return False
 
-    def combat(self, *args, expected_end=None, **kwargs):
+    def combat(
+        self,
+        *,
+        balance_hp: bool | None = None,
+        emotion_reduce: bool | None = None,
+        submarine_mode: str | None = None,
+        expected_end: AshCombatEnd | None = None,
+        fleet_index: int = 1,
+    ) -> None:
         with suppress(AshBeaconFinished):
-            super().combat(*args, expected_end=expected_end, **kwargs)
+            super().combat(
+                balance_hp=balance_hp,
+                emotion_reduce=emotion_reduce,
+                submarine_mode=submarine_mode,
+                expected_end=expected_end,
+                fleet_index=fleet_index,
+            )
 
 
 class OSAsh(UI, MapEventHandler):
     _ash_fully_collected = False
 
-    def ash_collect_status(self):
+    def ash_collect_status(self) -> int:
         """返回当前信标收集进度，范围为 0 至 100。"""
         if self._ash_fully_collected:
             return 0
@@ -105,12 +127,14 @@ class OSAsh(UI, MapEventHandler):
 
         return max(status, 0)
 
-    def _support_call_ash_beacon_task(self):
+    def _support_call_ash_beacon_task(self) -> bool:
         next_run = self.config.cross_get(keys="OpsiAshBeacon.Scheduler.NextRun", default=DEFAULT_TIME)
+        if not isinstance(next_run, datetime):
+            next_run = DEFAULT_TIME
         # 距离下次执行还有 30 分钟以上时，可以支援调用。
         return next_run - datetime.now() > timedelta(minutes=30)
 
-    def handle_ash_beacon_attack(self):
+    def handle_ash_beacon_attack(self) -> bool:
         """在区域地图处理信标攻击；结束后仍在区域地图，返回是否发起攻击。"""
         if self.ash_collect_status() >= 100 and self._support_call_ash_beacon_task():
             self.config.task_call(task="OpsiAshBeacon")

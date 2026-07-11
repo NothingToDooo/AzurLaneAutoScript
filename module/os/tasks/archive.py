@@ -6,13 +6,21 @@ from module.os.map import OSMap
 from module.os_handler.assets import EXCHANGE_CHECK, EXCHANGE_ENTER
 from module.shop.shop_voucher import VoucherShop
 
+if TYPE_CHECKING:
+    from module.os.map import RescanMode
+
 
 class OpsiArchive(OSMap):
     if TYPE_CHECKING:
 
-        def os_finish_daily_mission(self, question=True, rescan=None) -> int: ...
+        def os_finish_daily_mission(
+            self,
+            *,
+            question: bool = True,
+            rescan: RescanMode | bool | None = None,
+        ) -> int: ...
 
-    def _os_voucher_enter(self):
+    def _os_voucher_enter(self) -> None:
         self.os_map_goto_globe(unpin=False)
         self.ui_click(
             click_button=EXCHANGE_ENTER,
@@ -22,7 +30,7 @@ class OpsiArchive(OSMap):
             skip_first_screenshot=True,
         )
 
-    def _os_voucher_exit(self):
+    def _os_voucher_exit(self) -> None:
         self.ui_back(
             check_button=EXCHANGE_ENTER,
             appear_button=EXCHANGE_CHECK,
@@ -32,7 +40,7 @@ class OpsiArchive(OSMap):
         )
         self.os_globe_goto_map()
 
-    def os_archive(self):
+    def os_archive(self) -> None:
         """每周清理已有档案海域，并重复购买、清理新档案直至售罄。"""
         if self.is_in_opsi_explore():
             logger.info("OpsiExplore is under scheduling, stop OpsiArchive")

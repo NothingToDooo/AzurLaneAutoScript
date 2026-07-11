@@ -20,8 +20,14 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Protocol
 
+    from module.base.type_alias import Area
+    from module.device.control import ButtonTarget
+
     class OSShopBuyItem(Protocol):
         name: str
+
+        @property
+        def button(self) -> Area: ...
 
     class OSShopAmountItem(OSShopBuyItem, Protocol):
         cost: str
@@ -41,7 +47,7 @@ class _OSShopBuyState:
 
 
 class OSShop(PortShop, AkashiShop):
-    def os_shop_buy_execute(self, button: OSShopBuyItem, skip_first_screenshot=True) -> bool:
+    def os_shop_buy_execute(self, button: OSShopBuyItem, *, skip_first_screenshot: bool = True) -> bool:
         """在 PORT_SUPPLY_CHECK 购买商品并返回是否成功。"""
         state = _OSShopBuyState(button=button)
         self.interval_clear(
@@ -106,7 +112,7 @@ class OSShop(PortShop, AkashiShop):
         state.set_amount_retry += 1
         if not state.amount_finish and state.set_amount_retry > 3:
             logger.warning(f"Item {state.button.name} cant get amount.")
-            self.close_shop_buy_confirm_amount(skip_first_screenshot)
+            self.close_shop_buy_confirm_amount(skip_first_screenshot=skip_first_screenshot)
             return True, True
         return True, False
 
@@ -152,7 +158,7 @@ class OSShop(PortShop, AkashiShop):
         logger.warning("Too many items to buy, stopped")
         return count
 
-    def close_shop_buy_confirm_amount(self, skip_first_screenshot=True):
+    def close_shop_buy_confirm_amount(self, *, skip_first_screenshot: bool = True) -> None:
         """关闭 SHOP_BUY_CONFIRM_AMOUNT 并返回港口补给页。"""
         self.interval_clear([PORT_SUPPLY_CHECK, SHOP_BUY_CONFIRM_AMOUNT])
         while True:
@@ -176,7 +182,7 @@ class OSShop(PortShop, AkashiShop):
                 raise ScriptError(msg)
         return cast("OSShopAmountItem", item)
 
-    def shop_buy_amount_handler(self, item: OSShopBuyItem, skip_first_screenshot=True):
+    def shop_buy_amount_handler(self, item: OSShopBuyItem, *, skip_first_screenshot: bool = True) -> bool:
         """按库存和可用货币设置购买数量；数量 OCR 失败时抛出 ScriptError。"""
         amount_item = self._require_amount_item(item)
         limit = self._shop_buy_amount_read_limit(skip_first_screenshot=skip_first_screenshot)
@@ -201,7 +207,7 @@ class OSShop(PortShop, AkashiShop):
         )
         return True
 
-    def _shop_buy_amount_read_limit(self, skip_first_screenshot=True) -> int:
+    def _shop_buy_amount_read_limit(self, *, skip_first_screenshot: bool = True) -> int:
         retry = Timer(0, count=3)
         retry.start()
         while True:
@@ -209,7 +215,7 @@ class OSShop(PortShop, AkashiShop):
                 skip_first_screenshot = False
             else:
                 self.device.screenshot()
-            limit = OCR_SHOP_AMOUNT.ocr(self.device.image)
+            limit = self._read_shop_amount()
 
             if limit == 0:
                 logger.warning("OCR_SHOP_AMOUNT resulted 0, retrying")
@@ -249,6 +255,9 @@ class OSShop(PortShop, AkashiShop):
             limit = 10
         return limit, set_to_max
 
+    def _read_shop_amount(self) -> int:
+        return OCR_SHOP_AMOUNT.ocr_single(self.device.image)
+
     def _shop_buy_amount_set_to_max(self) -> None:
         skip_first_screenshot = False
         while 1:
@@ -260,7 +269,7 @@ class OSShop(PortShop, AkashiShop):
             if self.appear_then_click(AMOUNT_MAX, offset=(50, 50), interval=3):
                 continue
 
-            if OCR_SHOP_AMOUNT.ocr(self.device.image) > 1:
+            if self._read_shop_amount() > 1:
                 break
 
     def handle_port_supply_buy(self) -> bool:
@@ -310,7 +319,7 @@ class OSShop(PortShop, AkashiShop):
         logger.info(f"Bought {f'{count} items' if count else 'nothing'} in port.")
         return True
 
-    def handle_akashi_supply_buy(self, grid):
+    def handle_akashi_supply_buy(self, grid: ButtonTarget) -> None:
         """从区域地图进入明石商店购买，结束后返回区域地图。"""
         self.ui_click(
             grid,
@@ -323,12 +332,12 @@ class OSShop(PortShop, AkashiShop):
         self.ui_back(appear_button=PORT_SUPPLY_CHECK, check_button=self.is_in_map, skip_first_screenshot=True)
 
     @cached_property
-    def yellow_coins_preserve(self):
+    def yellow_coins_preserve(self) -> int:
         if self.is_cl1_enabled:
             return 100000
         return 35000
 
-    def get_currency_coins(self, item: OSShopAmountItem):
+    def get_currency_coins(self, item: OSShopAmountItem) -> int:
         if item.cost == "YellowCoins":
             if get_os_reset_remain() == 0:
                 return self._shop_yellow_coins - 100
@@ -341,7 +350,7 @@ class OSShop(PortShop, AkashiShop):
         message = UNKNOWN_OS_SHOP_CURRENCY_TEMPLATE.format(cost=item.cost)
         raise ScriptError(message)
 
-    def get_coins_no_limit(self, item: OSShopAmountItem):
+    def get_coins_no_limit(self, item: OSShopAmountItem) -> int:
         if item.cost == "YellowCoins":
             return self._shop_yellow_coins
         if item.cost == "PurpleCoins":
@@ -349,7 +358,7 @@ class OSShop(PortShop, AkashiShop):
         message = UNKNOWN_OS_SHOP_CURRENCY_TEMPLATE.format(cost=item.cost)
         raise ScriptError(message)
 
-    def is_coins_both_not_enough(self):
+    def is_coins_both_not_enough(self) -> bool:
         if get_os_reset_remain() == 0:
             return False
         yellow = self._shop_yellow_coins < self._shop_purple_coins

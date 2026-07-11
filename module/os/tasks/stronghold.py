@@ -4,7 +4,7 @@ from module.os.map import OSMap
 
 
 class OpsiStronghold(OSMap):
-    def clear_stronghold(self):
+    def clear_stronghold(self) -> None:
         """在全球地图查找并清理要塞，然后维修舰队。
 
         行动力不足时抛出 ActionPointLimit；没有要塞时抛出 TaskEnd；舰队耗尽仍未清理时抛出 RequestHumanTakeover。
@@ -28,12 +28,12 @@ class OpsiStronghold(OSMap):
         self.fleet_repair(revert=False)
         self.handle_fleet_resolve(revert=False)
 
-    def os_stronghold(self):
+    def os_stronghold(self) -> None:
         while True:
             self.clear_stronghold()
             self.config.check_task_switch()
 
-    def run_stronghold_one_fleet(self, fleet):
+    def run_stronghold_one_fleet(self, fleet: BossFleet) -> bool:
         """使用指定舰队清理一次要塞，并返回是否全部完成。"""
         self.config.override(OpsiGeneral_DoRandomMapEvent=False, HOMO_EDGE_DETECT=False, STORY_OPTION=0)
         # 舰队可能卡在迷雾中，最多尝试三次。
@@ -52,18 +52,18 @@ class OpsiStronghold(OSMap):
                 prev = self.zone
                 self.globe_goto(self.zone_nearest_azur_port(self.zone))
                 self.handle_fog_block(repair=True)
-                self.globe_goto(prev, types="STRONGHOLD")
+                self.globe_goto(prev, types=("STRONGHOLD",))
                 return False
             logger.info("Auto search stopped, because fleet stuck")
             # 重新进入以重置舰队位置。
             prev = self.zone
             self.globe_goto(self.zone_nearest_azur_port(self.zone))
             self.handle_fog_block(repair=False)
-            self.globe_goto(prev, types="STRONGHOLD")
+            self.globe_goto(prev, types=("STRONGHOLD",))
             continue
         return False
 
-    def run_stronghold(self):
+    def run_stronghold(self) -> bool:
         """让各舰队轮流攻击要塞；成功后进入危险或安全海域，失败时仍在要塞。"""
         logger.hr("Stronghold clear", level=1)
         fleets = self.parse_fleet_filter()

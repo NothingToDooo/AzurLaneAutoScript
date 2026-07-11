@@ -8,10 +8,14 @@ from module.os_handler.assets import OS_MONTHBOSS_HARD, OS_MONTHBOSS_NORMAL
 
 
 class OpsiMonthBoss(OSMap):
-    def get_adaptability(self):
-        return OCR_OS_ADAPTABILITY.ocr(self.device.image)
+    def get_adaptability(self) -> list[int]:
+        adaptability = OCR_OS_ADAPTABILITY.ocr(self.device.image)
+        if isinstance(adaptability, int):
+            message = "OS adaptability OCR requires three regions"
+            raise TypeError(message)
+        return adaptability
 
-    def clear_month_boss(self):
+    def clear_month_boss(self) -> bool:
         """检查适应性和难度后清理月度首领并维修；行动力不足时抛出 ActionPointLimit，首领耗尽时抛出 TaskEnd。"""
         if self.is_in_opsi_explore():
             logger.info("OpsiExplore is under scheduling, stop OpsiMonthBoss")
@@ -61,7 +65,7 @@ class OpsiMonthBoss(OSMap):
         self.month_boss_delay(is_normal=is_normal, result=result)
         return result
 
-    def month_boss_delay(self, is_normal=True, result=True):
+    def month_boss_delay(self, *, is_normal: bool = True, result: bool = True) -> None:
         """按普通或困难模式及清理结果安排下次运行。"""
         if is_normal:
             if result:

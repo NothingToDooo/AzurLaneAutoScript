@@ -33,16 +33,22 @@ class _Config:
         self.overrides: list[dict[str, object]] = []
         self.cross_gets: list[str] = []
         self.delays: list[datetime] = []
-        self.OpsiFleet_Fleet = "fleet_default"
+        self.OpsiFleet_Fleet = 1
+        self.cross_values: dict[str, int | str] = {
+            "OpsiDaily.OpsiFleet.Fleet": 1,
+            "OpsiObscure.OpsiFleet.Fleet": 2,
+            "OpsiAbyssal.OpsiFleetFilter.Filter": "fleet-1 > fleet-2",
+            "OpsiMeowfficerFarming.OpsiFleet.Fleet": 3,
+        }
 
     def override(self, **kwargs: object) -> None:
         self.overrides.append(kwargs)
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    def cross_get(self, keys: str) -> str:
+    def cross_get(self, keys: str) -> int | str:
         self.cross_gets.append(keys)
-        return f"cross:{keys}"
+        return self.cross_values[keys]
 
     def task_delay(self, target: datetime) -> None:
         self.delays.append(target)
@@ -204,7 +210,7 @@ def test_os_cross_month_runs_cleanup_sequence_after_reset(monkeypatch: pytest.Mo
     assert runner.config.overrides == [
         {
             "OpsiGeneral_DoRandomMapEvent": True,
-            "OpsiFleet_Fleet": "cross:OpsiDaily.OpsiFleet.Fleet",
+            "OpsiFleet_Fleet": 1,
             "OpsiFleet_Submarine": False,
         },
         {
@@ -213,9 +219,9 @@ def test_os_cross_month_runs_cleanup_sequence_after_reset(monkeypatch: pytest.Mo
             "STORY_OPTION": 0,
             "OpsiGeneral_UseLogger": True,
             "OpsiObscure_ForceRun": True,
-            "OpsiFleet_Fleet": "cross:OpsiObscure.OpsiFleet.Fleet",
+            "OpsiFleet_Fleet": 2,
             "OpsiFleet_Submarine": False,
-            "OpsiFleetFilter_Filter": "cross:OpsiAbyssal.OpsiFleetFilter.Filter",
+            "OpsiFleetFilter_Filter": "fleet-1 > fleet-2",
             "OpsiAbyssal_ForceRun": True,
         },
         {
@@ -223,7 +229,7 @@ def test_os_cross_month_runs_cleanup_sequence_after_reset(monkeypatch: pytest.Mo
             "OpsiGeneral_BuyActionPointLimit": 0,
             "HOMO_EDGE_DETECT": True,
             "STORY_OPTION": -2,
-            "OpsiFleet_Fleet": "cross:OpsiMeowfficerFarming.OpsiFleet.Fleet",
+            "OpsiFleet_Fleet": 3,
             "OpsiFleet_Submarine": False,
             "OpsiMeowfficerFarming_ActionPointPreserve": 0,
             "OpsiMeowfficerFarming_HazardLevel": 3,
@@ -242,7 +248,7 @@ def test_os_cross_month_runs_cleanup_sequence_after_reset(monkeypatch: pytest.Mo
         ("storage_get_next_item", "ABYSSAL", True),
         ("storage_get_next_item", "OBSCURE", True),
         ("zone_init",),
-        ("fleet_set", "cross:OpsiObscure.OpsiFleet.Fleet"),
+        ("fleet_set", 2),
         ("os_order_execute", True, False),
         ("run_auto_search", "current"),
         ("map_exit",),
@@ -250,7 +256,7 @@ def test_os_cross_month_runs_cleanup_sequence_after_reset(monkeypatch: pytest.Mo
         ("storage_get_next_item", "OBSCURE", True),
         ("zone_select", 3),
         ("globe_goto", 44),
-        ("fleet_set", "cross:OpsiMeowfficerFarming.OpsiFleet.Fleet"),
+        ("fleet_set", 3),
         ("os_order_execute", False, False),
         ("run_auto_search", None),
         ("handle_after_auto_search",),
