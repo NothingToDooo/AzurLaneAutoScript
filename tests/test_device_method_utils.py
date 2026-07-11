@@ -1,19 +1,24 @@
+from typing import TYPE_CHECKING
+
 from module.device.method import utils
+
+if TYPE_CHECKING:
+    import pytest
 
 
 class _Logger:
-    def __init__(self):
+    def __init__(self) -> None:
         self.errors = []
         self.exceptions = []
 
-    def error(self, error):
+    def error(self, error: BaseException) -> None:
         self.errors.append(str(error))
 
-    def exception(self, error):
+    def exception(self, error: BaseException) -> None:
         self.exceptions.append(str(error))
 
 
-def test_handle_adb_error_retries_known_transient_errors(monkeypatch) -> None:
+def test_handle_adb_error_retries_known_transient_errors(monkeypatch: pytest.MonkeyPatch) -> None:
     logger = _Logger()
     monkeypatch.setattr(utils, "logger", logger)
 
@@ -38,7 +43,7 @@ def test_handle_adb_error_retries_known_transient_errors(monkeypatch) -> None:
     assert logger.exceptions == []
 
 
-def test_handle_adb_error_reports_unknown_errors(monkeypatch) -> None:
+def test_handle_adb_error_reports_unknown_errors(monkeypatch: pytest.MonkeyPatch) -> None:
     logger = _Logger()
     reasons = []
     monkeypatch.setattr(utils, "logger", logger)

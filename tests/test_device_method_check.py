@@ -9,7 +9,7 @@ from module.exception import RequestHumanTakeover
 def _device_context(
     *,
     emulator_type: str | None = "MuMuPlayer12",
-):
+) -> Device:
     device = object.__new__(Device)
     device.config = SimpleNamespace()
     vars(device)["_runtime"] = SimpleNamespace(mumu_runtime=SimpleNamespace())

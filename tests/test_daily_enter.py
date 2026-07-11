@@ -1,7 +1,11 @@
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 from module.daily import assets as daily_assets
 from module.daily.daily import Daily
+
+if TYPE_CHECKING:
+    from module.base.button import Button, MatchOffset
 
 
 class _Device:
@@ -9,7 +13,7 @@ class _Device:
         self.clicks = []
         self.screenshot_count = 0
 
-    def click(self, button) -> None:
+    def click(self, button: Button) -> None:
         self.clicks.append(button)
 
     def screenshot(self) -> None:
@@ -33,44 +37,49 @@ class _Daily(Daily):
         self.combat_results = []
 
     @staticmethod
-    def _next(results):
+    def _next(results: list[bool]) -> bool:
         if results:
             return results.pop(0)
         return False
 
-    def set_appear(self, button, *, results: list[bool]) -> None:
+    def set_appear(self, button: Button, *, results: list[bool]) -> None:
         self.appear_results[button.name] = results
 
-    def set_appear_then_click(self, button, *, results: list[bool]) -> None:
+    def set_appear_then_click(self, button: Button, *, results: list[bool]) -> None:
         self.appear_then_click_results[button.name] = results
 
-    def appear(self, button, *_args: object, **_kwargs):
+    def appear(self, button: Button, *_args: object, **_kwargs: object) -> bool:
         return self._next(self.appear_results.setdefault(button.name, []))
 
-    def appear_then_click(self, button, *_args: object, **_kwargs):
+    def appear_then_click(self, button: Button, *_args: object, **_kwargs: object) -> bool:
         result = self._next(self.appear_then_click_results.setdefault(button.name, []))
         if result:
             self.device.click(button)
         return result
 
-    def handle_get_items(self):
+    def handle_get_items(self) -> bool:
         return self._next(self.get_items_results)
 
-    def handle_combat_automation_confirm(self):
+    def handle_combat_automation_confirm(self) -> bool:
         return self._next(self.automation_confirm_results)
 
-    def handle_daily_additional(self):
+    def handle_daily_additional(self) -> bool:
         return self._next(self.additional_results)
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2):
+    def handle_popup_confirm(
+        self,
+        name: str = "",
+        offset: MatchOffset | None = None,
+        interval: float = 2,
+    ) -> bool:
         _ = (name, offset, interval)
         assert name == "DAILY_SKIP"
         return self._next(self.popup_results)
 
-    def info_bar_count(self):
+    def info_bar_count(self) -> int:
         return self._next(self.info_bar_results)
 
-    def combat_appear(self):
+    def combat_appear(self) -> bool:
         return self._next(self.combat_results)
 
 

@@ -19,7 +19,7 @@ class _Logger:
         self.warnings: list[str] = []
         self.criticals: list[str] = []
 
-    def error(self, error) -> None:
+    def error(self, error: BaseException) -> None:
         self.errors.append(str(error))
 
     def warning(self, message: str) -> None:
@@ -39,19 +39,19 @@ class _NemuIpc:
         self.calls.append("reconnect")
 
 
-def _patch_retry_runtime(monkeypatch):
+def _patch_retry_runtime(monkeypatch: pytest.MonkeyPatch) -> _Logger:
     logger = _Logger()
     monkeypatch.setattr(nemu_ipc_module, "logger", logger)
     monkeypatch.setattr(nemu_ipc_module, "time", type("_Time", (), {"sleep": lambda _delay: None}))
     return logger
 
 
-def _run_retry(monkeypatch, error: Exception):
+def _run_retry(monkeypatch: pytest.MonkeyPatch, error: Exception) -> tuple[str, _NemuIpc, _Logger]:
     logger = _patch_retry_runtime(monkeypatch)
     device = _NemuIpc()
 
     @nemu_ipc_module.retry
-    def flaky(target):
+    def flaky(target: _NemuIpc) -> str:
         target.calls.append("run")
         target.run_count += 1
         if target.run_count == 1:
@@ -61,7 +61,7 @@ def _run_retry(monkeypatch, error: Exception):
     return flaky(device), device, logger
 
 
-def test_nemu_ipc_retry_recovers_ipc_error(monkeypatch) -> None:
+def test_nemu_ipc_retry_recovers_ipc_error(monkeypatch: pytest.MonkeyPatch) -> None:
     result, device, logger = _run_retry(monkeypatch, NemuIpcError("lost"))
 
     assert result == "ok"
@@ -69,12 +69,12 @@ def test_nemu_ipc_retry_recovers_ipc_error(monkeypatch) -> None:
     assert device.calls == ["run", "reconnect", "run"]
 
 
-def test_nemu_ipc_retry_stops_on_incompatible_version(monkeypatch) -> None:
+def test_nemu_ipc_retry_stops_on_incompatible_version(monkeypatch: pytest.MonkeyPatch) -> None:
     logger = _patch_retry_runtime(monkeypatch)
     device = _NemuIpc()
 
     @nemu_ipc_module.retry
-    def always_incompatible(target):
+    def always_incompatible(target: _NemuIpc) -> None:
         target.calls.append("run")
         message = "old"
         raise NemuIpcIncompatible(message)
@@ -87,7 +87,7 @@ def test_nemu_ipc_retry_stops_on_incompatible_version(monkeypatch) -> None:
     assert logger.criticals == ["Retry always_incompatible() failed"]
 
 
-def test_nemu_ipc_retry_extends_screenshot_timeout(monkeypatch) -> None:
+def test_nemu_ipc_retry_extends_screenshot_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     logger = _patch_retry_runtime(monkeypatch)
     device = object.__new__(NemuIpcImpl)
     timeouts: list[float] = []
@@ -111,7 +111,7 @@ def test_nemu_ipc_retry_extends_screenshot_timeout(monkeypatch) -> None:
     ]
 
 
-def test_nemu_ipc_retry_retries_native_errors_without_reconnect(monkeypatch) -> None:
+def test_nemu_ipc_retry_retries_native_errors_without_reconnect(monkeypatch: pytest.MonkeyPatch) -> None:
     result, device, logger = _run_retry(monkeypatch, OSError("native"))
 
     assert result == "ok"
@@ -119,7 +119,7 @@ def test_nemu_ipc_retry_retries_native_errors_without_reconnect(monkeypatch) -> 
     assert device.calls == ["run", "run"]
 
 
-def test_nemu_ipc_retry_retries_argument_errors_without_reconnect(monkeypatch) -> None:
+def test_nemu_ipc_retry_retries_argument_errors_without_reconnect(monkeypatch: pytest.MonkeyPatch) -> None:
     result, device, logger = _run_retry(monkeypatch, ctypes.ArgumentError("bad argument"))
 
     assert result == "ok"

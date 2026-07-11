@@ -19,7 +19,7 @@ from module.game_setting.setting_extractor import LuaSetting, SettingExtractor
         ("Bool", '"key", true', None),
     ],
 )
-def test_lua_setting_default(typ: str, code: str, expected) -> None:
+def test_lua_setting_default(typ: str, code: str, expected: float | str | None) -> None:
     setting = LuaSetting(raw="", typ=typ, code=code)
 
     assert setting.default == expected
@@ -35,7 +35,7 @@ def test_lua_setting_duplicate_is_explicit_instance_state() -> None:
     assert duplicate.generated[-1] == "# 重复项"
 
 
-def test_iter_file_from_folder_preserves_walk_order_and_paths(monkeypatch) -> None:
+def test_iter_file_from_folder_preserves_walk_order_and_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     walked = [
         ("root", ["nested"], ["second.lua", "first.lua"]),
         ("root/nested", [], ["third.lua"]),

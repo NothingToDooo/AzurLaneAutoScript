@@ -1,9 +1,15 @@
+from typing import TYPE_CHECKING
+
 import pytest
 
 from module.event_hospital import assets as hospital_assets
 from module.event_hospital import hospital as hospital_module
 from module.event_hospital.hospital import Hospital
 from module.ui.page import page_hospital
+
+if TYPE_CHECKING:
+    from module.base.button import MatchOffset
+    from module.ui.page import Page
 
 
 class _NeverReachedTimer:
@@ -13,7 +19,8 @@ class _NeverReachedTimer:
     def start(self) -> _NeverReachedTimer:
         return self
 
-    def reached(self) -> bool:
+    @staticmethod
+    def reached() -> bool:
         return False
 
     def reset(self) -> None:
@@ -56,7 +63,10 @@ class _Hospital(Hospital):
         return self.in_daily_results.pop(0)
 
     def ui_page_appear(
-        self, page: object, offset=(30, 30), interval: float = 0, *_args: object, **_kwargs: object
+        self,
+        page: Page,
+        offset: MatchOffset | None = (30, 30),
+        interval: float = 0,
     ) -> bool:
         _ = offset
         self.calls.append(("ui_page_appear", page, interval))

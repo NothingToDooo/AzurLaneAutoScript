@@ -1,5 +1,12 @@
+from typing import TYPE_CHECKING, Literal, override
+
 from module.eventstory import assets as eventstory_assets
 from module.eventstory.eventstory import EventStory
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from module.base.button import Button
 
 
 class _FakeDevice:
@@ -8,7 +15,7 @@ class _FakeDevice:
         self.screenshots = 0
         self.click_record_clears = 0
 
-    def click(self, button) -> None:
+    def click(self, button: Button) -> None:
         self.clicks.append(button)
 
     def screenshot(self) -> None:
@@ -19,23 +26,30 @@ class _FakeDevice:
 
 
 class _EventStoryStateContext(EventStory):
-    def __init__(self, *, matching=(), appearing=(), clicking=(), alchemist=False) -> None:
+    def __init__(
+        self,
+        *,
+        matching: Iterable[Button] = (),
+        appearing: Iterable[Button] = (),
+        clicking: Iterable[Button] = (),
+        alchemist: bool = False,
+    ) -> None:
         self.matching = set(matching)
         self.appearing = set(appearing)
         self.clicking = set(clicking)
         self.alchemist = alchemist
 
-    def match_template_color(self, button, *_args: object, **_kwargs):
+    def match_template_color(self, button: Button, *_args: object, **_kwargs: object) -> bool:
         return button in self.matching
 
-    def appear(self, button, *_args: object, **_kwargs):
+    def appear(self, button: Button, *_args: object, **_kwargs: object) -> bool:
         return button in self.appearing
 
-    def appear_then_click(self, button, *_args: object, **_kwargs):
+    def appear_then_click(self, button: Button, *_args: object, **_kwargs: object) -> bool:
         return button in self.clicking
 
-    def get_event_20250724_button(self):
-        return object() if self.alchemist else None
+    def get_event_20250724_button(self) -> Button | None:
+        return eventstory_assets.STORY_FIRST if self.alchemist else None
 
 
 class _EventStoryLoopContext(_EventStoryStateContext):
@@ -44,27 +58,36 @@ class _EventStoryLoopContext(_EventStoryStateContext):
     def __init__(self) -> None:
         super().__init__(clicking=(eventstory_assets.STORY_FIRST,))
         self.device = _FakeDevice()
-        self.combat_executing_results = [False, True]
+        self.combat_executing_results: list[Button | Literal[False]] = [False, eventstory_assets.STORY_FIRST]
         self.story_skip_clears = 0
         self.popup_clears = 0
 
-    def is_combat_executing(self):
+    def is_combat_executing(self) -> Button | Literal[False]:
         return self.combat_executing_results.pop(0)
 
-    def is_combat_loading(self):
+    @override
+    def is_combat_loading(self) -> bool:
         return False
 
-    def handle_story_skip(self):
+    @override
+    def handle_story_skip(self) -> bool:
         return False
 
-    def handle_get_items(self):
+    @override
+    def handle_get_items(self) -> bool:
         return False
 
-    def handle_event_20250724(self, *_args: object, **_kwargs: object):
+    @override
+    def handle_event_20250724(self, *_args: object, **_kwargs: object) -> bool:
         return False
 
-    def interval_clear(self, button, *_args: object, **_kwargs: object) -> None:
-        _ = button
+    @override
+    def interval_clear(
+        self,
+        button: Button | list[Button] | tuple[Button, ...] | None,
+        interval: float = 3,
+    ) -> None:
+        del button, interval
 
     def story_skip_interval_clear(self) -> None:
         self.story_skip_clears += 1

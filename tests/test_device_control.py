@@ -1,14 +1,30 @@
+from typing import TYPE_CHECKING
+
 from module.device import control as control_module
 from module.device.control import Control
-from module.device.control_options import SwipeVectorOptions
+from module.device.control_options import Duration, SwipeVectorOptions
 from module.device.device import Device
+
+if TYPE_CHECKING:
+    import pytest
+
+    from module.base.type_alias import Point
+    from module.base.utils import SwipePathOptions
 
 
 class _Control(Control):
     def __init__(self) -> None:
         self.swipes: list[tuple[object, ...]] = []
 
-    def swipe(self, p1, p2, duration=(0.1, 0.2), name="SWIPE", distance_check=True, **_kwargs: object) -> None:
+    def swipe(
+        self,
+        p1: Point,
+        p2: Point,
+        duration: Duration = (0.1, 0.2),
+        name: str = "SWIPE",
+        *,
+        distance_check: bool = True,
+    ) -> None:
         self.swipes.append((p1, p2, duration, name, distance_check))
 
 
@@ -31,10 +47,10 @@ def test_release_during_wait_releases_nemu_ipc() -> None:
     assert calls == ["released"]
 
 
-def test_swipe_vector_uses_options(monkeypatch) -> None:
+def test_swipe_vector_uses_options(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = []
 
-    def random_path(vector, path_options):
+    def random_path(vector: Point, path_options: SwipePathOptions) -> tuple[Point, Point]:
         calls.append((vector, path_options))
         return (1, 2), (3, 4)
 

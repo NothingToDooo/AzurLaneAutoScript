@@ -13,10 +13,10 @@ class _Logger:
         self.errors: list[str] = []
         self.criticals: list[str] = []
 
-    def error(self, error) -> None:
+    def error(self, error: BaseException) -> None:
         self.errors.append(str(error))
 
-    def critical(self, message) -> None:
+    def critical(self, message: str) -> None:
         self.criticals.append(str(message))
 
 
@@ -37,28 +37,30 @@ class _Minitouch:
         self.run_count = 0
         self.session = _Session(self.calls)
 
-    def _reset_minitouch_connection(self, remove_forward=True) -> None:
+    def _reset_minitouch_connection(self, *, remove_forward: bool = True) -> None:
         self.calls.append(f"reset:{remove_forward}")
 
     def _restart_minitouch_service(self) -> None:
         self.calls.append("restart_service")
 
 
-def _patch_retry_runtime(monkeypatch):
+def _patch_retry_runtime(monkeypatch: pytest.MonkeyPatch) -> _Logger:
     logger = _Logger()
     monkeypatch.setattr(minitouch_module, "logger", logger)
     monkeypatch.setattr(minitouch_module, "time", type("_Time", (), {"sleep": lambda _delay: None}))
     return logger
 
 
-def _run_retry(monkeypatch, error: Exception, *, retryable_adb=True, unknown_host=False):
+def _run_retry(
+    monkeypatch: pytest.MonkeyPatch, error: Exception, *, retryable_adb: bool = True, unknown_host: bool = False
+) -> tuple[str, _Minitouch, _Logger]:
     logger = _patch_retry_runtime(monkeypatch)
     device = _Minitouch()
     monkeypatch.setattr(minitouch_module, "handle_adb_error", lambda _error: retryable_adb)
     monkeypatch.setattr(minitouch_module, "handle_unknown_host_service", lambda _error: unknown_host)
 
     @minitouch_module.retry
-    def flaky(target):
+    def flaky(target: _Minitouch) -> str:
         target.calls.append("run")
         target.run_count += 1
         if target.run_count == 1:
@@ -68,7 +70,7 @@ def _run_retry(monkeypatch, error: Exception, *, retryable_adb=True, unknown_hos
     return flaky(device), device, logger
 
 
-def test_minitouch_retry_recovers_connection_reset(monkeypatch) -> None:
+def test_minitouch_retry_recovers_connection_reset(monkeypatch: pytest.MonkeyPatch) -> None:
     result, device, logger = _run_retry(monkeypatch, ConnectionResetError("lost"))
 
     assert result == "ok"
@@ -76,7 +78,7 @@ def test_minitouch_retry_recovers_connection_reset(monkeypatch) -> None:
     assert device.calls == ["run", "adb_reconnect", "reset:True", "run"]
 
 
-def test_minitouch_retry_recovers_connection_aborted(monkeypatch) -> None:
+def test_minitouch_retry_recovers_connection_aborted(monkeypatch: pytest.MonkeyPatch) -> None:
     result, device, logger = _run_retry(monkeypatch, ConnectionAbortedError("closed"))
 
     assert result == "ok"
@@ -84,7 +86,7 @@ def test_minitouch_retry_recovers_connection_aborted(monkeypatch) -> None:
     assert device.calls == ["run", "adb_reconnect", "reset:True", "run"]
 
 
-def test_minitouch_retry_recovers_occupied_service(monkeypatch) -> None:
+def test_minitouch_retry_recovers_occupied_service(monkeypatch: pytest.MonkeyPatch) -> None:
     result, device, logger = _run_retry(monkeypatch, MinitouchOccupiedError("occupied"))
 
     assert result == "ok"
@@ -92,14 +94,14 @@ def test_minitouch_retry_recovers_occupied_service(monkeypatch) -> None:
     assert device.calls == ["run", "restart_service", "reset:True", "run"]
 
 
-def test_minitouch_retry_recovers_retryable_adb_error(monkeypatch) -> None:
+def test_minitouch_retry_recovers_retryable_adb_error(monkeypatch: pytest.MonkeyPatch) -> None:
     result, device, _ = _run_retry(monkeypatch, AdbError("closed"))
 
     assert result == "ok"
     assert device.calls == ["run", "adb_reconnect", "reset:True", "run"]
 
 
-def test_minitouch_retry_recovers_unknown_host_service(monkeypatch) -> None:
+def test_minitouch_retry_recovers_unknown_host_service(monkeypatch: pytest.MonkeyPatch) -> None:
     result, device, _ = _run_retry(
         monkeypatch, AdbError("unknown host service"), retryable_adb=False, unknown_host=True
     )
@@ -108,7 +110,7 @@ def test_minitouch_retry_recovers_unknown_host_service(monkeypatch) -> None:
     assert device.calls == ["run", "adb_start_server", "adb_reconnect", "reset:True", "run"]
 
 
-def test_minitouch_retry_preserves_forward_on_broken_pipe(monkeypatch) -> None:
+def test_minitouch_retry_preserves_forward_on_broken_pipe(monkeypatch: pytest.MonkeyPatch) -> None:
     result, device, logger = _run_retry(monkeypatch, BrokenPipeError("pipe"))
 
     assert result == "ok"
@@ -116,7 +118,7 @@ def test_minitouch_retry_preserves_forward_on_broken_pipe(monkeypatch) -> None:
     assert device.calls == ["run", "reset:False", "run"]
 
 
-def test_minitouch_retry_resets_connection_on_os_error(monkeypatch) -> None:
+def test_minitouch_retry_resets_connection_on_os_error(monkeypatch: pytest.MonkeyPatch) -> None:
     result, device, logger = _run_retry(monkeypatch, OSError("socket"))
 
     assert result == "ok"
@@ -124,14 +126,14 @@ def test_minitouch_retry_resets_connection_on_os_error(monkeypatch) -> None:
     assert device.calls == ["run", "reset:True", "run"]
 
 
-def test_minitouch_retry_stops_on_unhandled_adb_error(monkeypatch) -> None:
+def test_minitouch_retry_stops_on_unhandled_adb_error(monkeypatch: pytest.MonkeyPatch) -> None:
     logger = _patch_retry_runtime(monkeypatch)
     device = _Minitouch()
     monkeypatch.setattr(minitouch_module, "handle_adb_error", lambda _error: False)
     monkeypatch.setattr(minitouch_module, "handle_unknown_host_service", lambda _error: False)
 
     @minitouch_module.retry
-    def always_boom(target):
+    def always_boom(target: _Minitouch) -> None:
         target.calls.append("run")
         message = "boom"
         raise AdbError(message)
@@ -143,12 +145,12 @@ def test_minitouch_retry_stops_on_unhandled_adb_error(monkeypatch) -> None:
     assert logger.criticals == ["Retry always_boom() failed"]
 
 
-def test_minitouch_retry_hands_over_when_minitouch_missing(monkeypatch) -> None:
+def test_minitouch_retry_hands_over_when_minitouch_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     logger = _patch_retry_runtime(monkeypatch)
     device = _Minitouch()
 
     @minitouch_module.retry
-    def always_missing(target):
+    def always_missing(target: _Minitouch) -> None:
         target.calls.append("run")
         message = "missing"
         raise MinitouchNotInstalledError(message)
@@ -177,7 +179,7 @@ def test_minitouch_rebind_excludes_old_pid_from_new_device_restart() -> None:
     vars(device)["_minitouch_pid"] = "4312"
     adb_calls: list[tuple[str, object]] = []
 
-    def adb_shell(command, **_kwargs):
+    def adb_shell(command: str | list[str | int], **_kwargs: object) -> str:
         adb_calls.append((session.serial, command))
         if isinstance(command, str):
             return "u0_a123 9821 1 S minitouch"

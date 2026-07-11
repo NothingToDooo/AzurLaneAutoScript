@@ -4,6 +4,7 @@ from module.device.platform.emulator_windows import EmulatorManager
 from module.device.runtime import MumuRuntime
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
 
@@ -12,8 +13,8 @@ class _ConfiguredEmulatorManager(EmulatorManager):
         self.configured_emulator_path = path.as_posix()
 
     @staticmethod
-    def iter_running_emulator():
-        return ()
+    def iter_running_emulator() -> Iterator[str]:
+        return iter(())
 
 
 def test_emulator_manager_uses_configured_mumu_path(tmp_path: Path) -> None:

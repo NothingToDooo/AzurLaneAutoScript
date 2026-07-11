@@ -1,4 +1,4 @@
-from typing import ClassVar, TypeVar
+from typing import TYPE_CHECKING, ClassVar, TypeVar
 
 import pytest
 
@@ -7,6 +7,9 @@ from module.handler import assets as handler_assets
 from module.handler import info_handler as info_handler_module
 from module.handler.info_handler import InfoHandler
 from module.os_handler.assets import CLICK_SAFE_AREA as OS_CLICK_SAFE_AREA
+
+if TYPE_CHECKING:
+    from module.base.button import MatchOffset
 
 _T = TypeVar("_T")
 
@@ -96,12 +99,18 @@ class _InfoHandler(InfoHandler):
     def set_story_option_record(self, count: int) -> None:
         self._story_option_record = count
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+    def handle_popup_confirm(
+        self,
+        name: str = "",
+        offset: MatchOffset | None = None,
+        interval: float = 2,
+    ) -> bool:
         _ = (name, offset, interval)
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)

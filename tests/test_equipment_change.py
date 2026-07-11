@@ -1,5 +1,12 @@
+from typing import TYPE_CHECKING
+
 from module.equipment import equipment_change as equipment_change_module
 from module.equipment.equipment_change import EquipmentChange
+
+if TYPE_CHECKING:
+    import pytest
+
+    from module.base.type_alias import Area, Point
 
 
 class _Device:
@@ -28,10 +35,10 @@ class _EquipmentChange(EquipmentChange):
         self._equipment_swipe()
 
 
-def test_equipment_swipe_uses_minitouch_default_distance(monkeypatch) -> None:
+def test_equipment_swipe_uses_minitouch_default_distance(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[object, object, object]] = []
 
-    def random_vector(vector: object, *, box: object, random_range: object):
+    def random_vector(vector: Point, *, box: Area, random_range: Area) -> tuple[Point, Point]:
         calls.append((vector, box, random_range))
         return (1, 2), (3, 4)
 

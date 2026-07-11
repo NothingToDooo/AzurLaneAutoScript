@@ -1,4 +1,4 @@
-from types import SimpleNamespace
+from typing import override
 
 from module.config.server import CN_ACTIVITY, CN_PACKAGE
 from module.device.app_service import AppController
@@ -6,10 +6,14 @@ from module.device.app_service import AppController
 
 class _AppControl(AppController):
     def __init__(self, am_results: list[bool], *, monkey_result: bool) -> None:
-        super().__init__(SimpleNamespace(package=CN_PACKAGE))
         self.am_results = am_results
         self.monkey_result = monkey_result
         self.calls: list[tuple[str, str | None, str | None, bool]] = []
+
+    @property
+    @override
+    def package(self) -> str:
+        return CN_PACKAGE
 
     def _app_start_adb_am(
         self,

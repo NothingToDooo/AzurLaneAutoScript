@@ -1,5 +1,6 @@
 import threading
 from types import SimpleNamespace
+from typing import override
 
 import pytest
 from adbutils.errors import AdbError
@@ -46,7 +47,9 @@ def test_device_mro_keeps_one_connection_spine() -> None:
         assert owned_service not in mro
 
 
-def test_device_builds_runtime_before_first_connection_and_reuses_it_for_recovery(monkeypatch) -> None:
+def test_device_builds_runtime_before_first_connection_and_reuses_it_for_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     attempts: list[tuple[int, object]] = []
     starts: list[object] = []
     instance = SimpleNamespace(type="unused")
@@ -66,11 +69,11 @@ def test_device_builds_runtime_before_first_connection_and_reuses_it_for_recover
         app_controller=object(),
     )
 
-    def create(adb_session):
+    def create(adb_session: Device) -> SimpleNamespace:
         runtime.adb_session = adb_session
         return runtime
 
-    def connection_init(device, config) -> None:
+    def connection_init(device: Device, config: SimpleNamespace) -> None:
         attempts.append((id(device.runtime), device.runtime.adb_session))
         device.config = config
         if len(attempts) < 4:
@@ -234,7 +237,7 @@ def test_adb_restart_releases_services_before_killing_server() -> None:
 
     class _Connection(Connection):
         @property
-        def adb_client(self):
+        def adb_client(self) -> SimpleNamespace:
             calls.append("client")
             return SimpleNamespace(server_kill=lambda: calls.append("server_kill"))
 
@@ -257,7 +260,7 @@ class _RecoveryLogger:
         pass
 
 
-def _failing_runtime(calls: list[str], error: Exception):
+def _failing_runtime(calls: list[str], error: Exception) -> SimpleNamespace:
     def release_serial() -> None:
         calls.append("release")
         raise error
@@ -265,7 +268,7 @@ def _failing_runtime(calls: list[str], error: Exception):
     return SimpleNamespace(release_serial=release_serial)
 
 
-def test_adb_disconnect_continues_after_runtime_cleanup_error(monkeypatch) -> None:
+def test_adb_disconnect_continues_after_runtime_cleanup_error(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
     error = AdbError("old forward")
     logger = _RecoveryLogger()
@@ -281,7 +284,7 @@ def test_adb_disconnect_continues_after_runtime_cleanup_error(monkeypatch) -> No
     assert logger.exceptions == [error]
 
 
-def test_adb_restart_rebuilds_client_after_runtime_cleanup_error(monkeypatch) -> None:
+def test_adb_restart_rebuilds_client_after_runtime_cleanup_error(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
     error = AdbError("old forward")
     logger = _RecoveryLogger()
@@ -290,7 +293,8 @@ def test_adb_restart_rebuilds_client_after_runtime_cleanup_error(monkeypatch) ->
 
     class _RestartConnection(Connection):
         @cached_property
-        def adb_client(self):
+        @override
+        def adb_client(self) -> object:
             calls.append("rebuild_client")
             return new_client
 
@@ -308,7 +312,7 @@ def test_adb_restart_rebuilds_client_after_runtime_cleanup_error(monkeypatch) ->
     assert logger.exceptions == [error]
 
 
-def test_bind_serial_publishes_new_serial_after_runtime_cleanup_error(monkeypatch) -> None:
+def test_bind_serial_publishes_new_serial_after_runtime_cleanup_error(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
     error = AdbError("old forward")
     logger = _RecoveryLogger()
