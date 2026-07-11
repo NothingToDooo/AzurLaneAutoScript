@@ -3,6 +3,7 @@
 import inspect
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import TypedDict
 
 import numpy as np
 import pytest
@@ -16,6 +17,15 @@ from module.ocr.result import RawOcrResult, RecognitionFailureReason, Recognitio
 
 TEST_AREA = (0, 0, 4, 4)
 TEST_IMAGE = np.zeros((4, 4, 3), dtype=np.uint8)
+
+
+class _RecognitionLogPayload(TypedDict):
+    text: str
+    raw_text: str
+    profile: str
+    score: float
+    valid: bool
+    reason: str | None
 
 
 class _FakeEngine:
@@ -63,7 +73,7 @@ class _SequenceEngine(_FakeEngine):
 
 @dataclass(frozen=True, slots=True)
 class _RecordedFailure:
-    result: RecognitionResult[object]
+    result: object
     raw_image: np.ndarray
     processed_image: np.ndarray
     area: tuple[int, int, int, int] | None
@@ -487,9 +497,9 @@ def test_recognize_uses_class_name_as_default_profile() -> None:
 
 
 def test_structured_recognition_logs_success_and_failure_attributes(monkeypatch: pytest.MonkeyPatch) -> None:
-    entries: list[tuple[str, object]] = []
+    entries: list[tuple[str, _RecognitionLogPayload]] = []
 
-    def capture(name: str, text: object) -> None:
+    def capture(name: str, text: _RecognitionLogPayload) -> None:
         entries.append((name, text))
 
     monkeypatch.setattr(ocr_module.logger, "attr", capture)
