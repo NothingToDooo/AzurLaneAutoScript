@@ -7,7 +7,9 @@ from module.exercise import assets as exercise_assets
 from module.logger import logger
 
 if TYPE_CHECKING:
+    from module.base.button import Button
     from module.base.timer import Timer
+    from module.base.type_alias import Area, Color, ImageArray
 
 NEW_HP_BAR_PAUSES = (
     combat_ui_assets.PAUSE_New,
@@ -38,17 +40,22 @@ class HpDaemon(ModuleBase):
     low_hp_confirm_timer: Timer
 
     @staticmethod
-    def _calculate_hp(image, area, options=None, prev_color=(239, 32, 33)):
+    def _calculate_hp(
+        image: ImageArray,
+        area: Area,
+        options: ColorBarOptions | None = None,
+        prev_color: Color = (239, 32, 33),
+    ) -> float:
         """返回指定血条区域的剩余比例，范围为 0～1。"""
         if options is None:
             options = ColorBarOptions(starter=2)
         return color_bar_percentage(image, area, prev_color=prev_color, options=options)
 
     @staticmethod
-    def _hp_options(*, reverse):
+    def _hp_options(*, reverse: bool) -> ColorBarOptions:
         return ColorBarOptions(reverse=reverse, starter=2)
 
-    def _show_hp(self, low_hp_time=0.0):
+    def _show_hp(self, low_hp_time: float = 0.0) -> None:
         attacker_hp = str(int(self.attacker_hp * 100)).rjust(2, "0") + "%"
         defender_hp = str(int(self.defender_hp * 100)).rjust(2, "0") + "%"
         text = f"[{attacker_hp} - {defender_hp}]"
@@ -56,7 +63,7 @@ class HpDaemon(ModuleBase):
             text += f" - Low HP: {str(round(low_hp_time, 3)).ljust(5, '0')}s"
         logger.info(text)
 
-    def _at_low_hp(self, image, pause=combat_ui_assets.PAUSE):
+    def _at_low_hp(self, image: ImageArray, pause: Button | None = combat_ui_assets.PAUSE) -> bool:
         if pause == combat_ui_assets.PAUSE:
             self.attacker_hp = self._calculate_hp(
                 image, area=exercise_assets.ATTACKER_HP_AREA.area, options=self._hp_options(reverse=True)

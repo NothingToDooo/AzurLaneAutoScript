@@ -351,6 +351,11 @@ def test_ocr_many_keeps_list_shape_for_every_cardinality(images: list[np.ndarray
     assert _TestOcr(_FakeEngine("7", 0.9)).ocr_many(images) == ["7"] * len(images)
 
 
+@pytest.mark.parametrize("areas", [[], [TEST_AREA], [TEST_AREA, TEST_AREA]])
+def test_ocr_regions_keeps_list_shape_for_every_cardinality(areas: list[tuple[int, int, int, int]]) -> None:
+    assert _TestOcr(_FakeEngine("7", 0.9), buttons=areas).ocr_regions(TEST_IMAGE) == ["7"] * len(areas)
+
+
 def test_digit_recognize_returns_list_for_multiple_rois() -> None:
     results = make_digit("7", buttons=[TEST_AREA, TEST_AREA]).recognize(TEST_IMAGE)
 

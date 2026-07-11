@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from module.base.timer import Timer
 from module.combat.assets import (
     BATTLE_PREPARATION,
@@ -16,12 +18,15 @@ from module.exercise.opponent import OPPONENT, OpponentChoose
 from module.logger import logger
 from module.ui.assets import EXERCISE_CHECK
 
+if TYPE_CHECKING:
+    from module.base.button import Button
+
 
 class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
-    def _in_exercise(self):
+    def _in_exercise(self) -> bool:
         return self.appear(EXERCISE_CHECK, offset=(20, 20))
 
-    def _combat_preparation(self, skip_first_screenshot=True):
+    def _combat_preparation(self, *, skip_first_screenshot: bool = True) -> None:
         logger.info("Combat preparation")
         self.device.stuck_record_clear()
         self.device.click_record_clear()
@@ -40,7 +45,7 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
                 logger.attr("BattleUI", pause)
                 break
 
-    def _exercise_combat_ended(self, end):
+    def _exercise_combat_ended(self, *, end: bool) -> bool:
         if not (self._in_exercise() or self.appear(BATTLE_PREPARATION, offset=(20, 20))):
             return False
         logger.hr("Combat end")
@@ -48,7 +53,7 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
             logger.warning("Combat ended without end conditions detected")
         return True
 
-    def _handle_exercise_battle_status(self):
+    def _handle_exercise_battle_status(self) -> bool:
         if self.appear(BATTLE_STATUS_S, interval=1):
             logger.info(f"{BATTLE_STATUS_S} -> {CLICK_SAFE_AREA}")
             self.device.click(CLICK_SAFE_AREA)
@@ -60,7 +65,7 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
             return True
         return False
 
-    def _handle_exercise_reward_screens(self, battle_status_detected):
+    def _handle_exercise_reward_screens(self, *, battle_status_detected: bool) -> tuple[bool, bool]:
         if battle_status_detected and self.appear(GET_ITEMS_1, offset=(30, 30), interval=1):
             logger.info(f"{GET_ITEMS_1} -> {CLICK_SAFE_AREA}")
             self.device.click(CLICK_SAFE_AREA)
@@ -78,7 +83,7 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
             return True, True
         return False, False
 
-    def _handle_exercise_quit(self, pause_interval):
+    def _handle_exercise_quit(self, pause_interval: Timer) -> tuple[bool | None, bool]:
         if self.handle_combat_quit():
             pause_interval.reset()
             return True, True
@@ -87,7 +92,13 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
             return None, True
         return None, False
 
-    def _handle_exercise_low_hp(self, p, pause, pause_interval, show_hp_timer):
+    def _handle_exercise_low_hp(
+        self,
+        p: Button | None,
+        pause: Button | None,
+        pause_interval: Timer,
+        show_hp_timer: Timer,
+    ) -> bool:
         if p and self._at_low_hp(image=self.device.image, pause=pause):
             logger.info("Exercise quit")
             if pause_interval.reached():
@@ -99,7 +110,7 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
             self._show_hp()
         return False
 
-    def _handle_exercise_combat_popups(self):
+    def _handle_exercise_combat_popups(self) -> bool:
         return (
             self.handle_popup_confirm("EXERCISE_COMBAT_EXECUTE")
             or self.handle_urgent_commission()
@@ -108,7 +119,12 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
             or self.handle_mission_popup_ack()
         )
 
-    def _update_exercise_combat_pause(self, pause, end):
+    def _update_exercise_combat_pause(
+        self,
+        *,
+        pause: Button | None,
+        end: bool,
+    ) -> tuple[Button | None, Button | None, bool]:
         p = self.is_combat_executing()
         if p:
             if end:
@@ -119,13 +135,13 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
             self.low_hp_confirm_timer.reset()
         return p, pause, end
 
-    def _handle_exercise_reward_result(self, battle_status_detected):
-        handled_reward, reward_end = self._handle_exercise_reward_screens(battle_status_detected)
+    def _handle_exercise_reward_result(self, *, battle_status_detected: bool) -> bool | None:
+        handled_reward, reward_end = self._handle_exercise_reward_screens(battle_status_detected=battle_status_detected)
         if not handled_reward:
             return None
         return reward_end
 
-    def _combat_execute(self):
+    def _combat_execute(self) -> bool:
         """正常结算时返回 True；低血量主动退出时返回 False。"""
         logger.info("Combat execute")
         self.device.stuck_record_clear()
@@ -140,9 +156,9 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
         battle_status_detected = False
         while 1:
             self.device.screenshot()
-            if self._exercise_combat_ended(end):
+            if self._exercise_combat_ended(end=end):
                 break
-            p, pause, end = self._update_exercise_combat_pause(pause, end)
+            p, pause, end = self._update_exercise_combat_pause(pause=pause, end=end)
             if not p and self._handle_exercise_battle_status():
                 success = True
                 end = True
@@ -150,7 +166,7 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
                 continue
 
             # 仅在识别到战斗结算后处理 GET_ITEMS_1，避免误判。
-            reward_end = self._handle_exercise_reward_result(battle_status_detected)
+            reward_end = self._handle_exercise_reward_result(battle_status_detected=battle_status_detected)
             if reward_end is not None:
                 if reward_end:
                     success = True
@@ -168,7 +184,7 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
                 continue
         return success
 
-    def _choose_opponent(self, index, skip_first_screenshot=True):
+    def _choose_opponent(self, index: int, *, skip_first_screenshot: bool = True) -> None:
         """按从左到右的 0～3 索引进入对手准备页。"""
         logger.hr(f"Opponent: {index}")
         opponent_timer = Timer(5)
@@ -192,11 +208,11 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
             if self.appear(BATTLE_PREPARATION, offset=(20, 20)):
                 break
 
-    def _preparation_quit(self):
+    def _preparation_quit(self) -> None:
         logger.info("Preparation quit")
         self.ui_back(check_button=self._in_exercise, appear_button=BATTLE_PREPARATION, skip_first_screenshot=True)
 
-    def _combat(self, opponent):
+    def _combat(self, opponent: int) -> bool:
         """挑战索引 0～3 的对手；低血量退出重试耗尽后返回 False。"""
         self._choose_opponent(opponent)
 
@@ -215,24 +231,24 @@ class ExerciseCombat(HpDaemon, OpponentChoose, ExerciseEquipment, Combat):
         self._preparation_quit()
         return False
 
-    def equipment_take_off_when_finished(self):
+    def equipment_take_off_when_finished(self) -> bool:
         if self.config.EXERCISE_FLEET_EQUIPMENT is None:
             return False
         if not self.equipment_has_take_on:
             return False
 
         self._choose_opponent(0)
-        self.equipment_take_off()
+        self._equipment_take_off()
         self._preparation_quit()
         return True
 
-    def equipment_take_on(self):
+    def equipment_take_on(self) -> bool:
         if self.config.EXERCISE_FLEET_EQUIPMENT is None:
             return False
         if self.equipment_has_take_on:
             return False
 
         self._choose_opponent(0)
-        super().equipment_take_on()
+        self._equipment_take_on()
         self._preparation_quit()
         return True

@@ -297,6 +297,13 @@ class Ocr[OcrValueT = str]:
             return [cast("OcrValueT", results)]
         return cast("list[OcrValueT]", results)
 
+    def ocr_regions(self, image: ImageArray) -> list[OcrValueT]:
+        """从一张源图识别配置的全部区域，并始终返回列表。"""
+        results = self.ocr(image)
+        if len(self.buttons) == 1:
+            return [cast("OcrValueT", results)]
+        return cast("list[OcrValueT]", results)
+
 
 class OcrYuv[OcrValueT = str](Ocr[OcrValueT]):
     """在 RGB 图像的 YUV 亮度通道上识别。"""
