@@ -12,13 +12,7 @@ from module.ui.switch import Switch
 
 class HospitalSwitch(Switch):
     def get(self, main):
-        """
-        Args:
-            main (ModuleBase):
-
-        Returns:
-            str: state name or 'unknown'.
-        """
+        """返回当前页签状态；无法识别时返回 unknown。"""
         for data in self.state_list:
             if main.image_color_count(data["check_button"], color=(33, 77, 189), threshold=221, count=100):
                 return data["state"]
@@ -44,15 +38,7 @@ class Hospital(HospitalClue, HospitalCombat):
         return self.match_template_color(hospital_assets.HOSIPITAL_CLUE_CHECK, offset=(30, 30), interval=interval)
 
     def daily_reward_receive(self):
-        """
-        领取医院每日奖励。
-
-        Returns:
-            bool：是否领取成功。
-
-        Pages:
-            in：page_hospital。
-        """
+        """在医院主页领取每日奖励并返回是否成功，结束后仍在医院主页。"""
         if not self._daily_reward_available():
             return False
 
@@ -128,13 +114,13 @@ class Hospital(HospitalClue, HospitalCombat):
                 continue
 
     def loop_invest(self):
-        """
-        执行当前页面上的所有调查。
+        """强制舰队 1 出战并完成当前调查后领取奖励。
+
+        情绪检查可能抛出 ScriptEnd；任务切换会触发 TaskEnd。战斗后侧栏重置，因此单轮退出。
         """
         self.config.override(Fleet_FleetOrder="fleet1_all_fleet2_standby")
         while 1:
             logger.hr("Loop hospital invest", level=2)
-            # 调度器可能抛出 ScriptEnd。
             self.emotion.check_reduce(battle=1)
 
             entered = self.invest_enter()
@@ -142,11 +128,9 @@ class Hospital(HospitalClue, HospitalCombat):
                 break
             self.hospital_combat()
 
-            # 调度器可能抛出 TaskEnd。
             if self.config.task_switched():
                 self.config.task_stop()
 
-            # 战斗后侧边栏会重置，需要重新从侧边栏循环。
             break
 
         self.claim_invest_reward()
@@ -158,12 +142,12 @@ class Hospital(HospitalClue, HospitalCombat):
         )
 
     def claim_invest_reward(self):
+        """在线索页领取调查奖励，并返回是否成功。"""
         if self.invest_reward_appear():
             logger.info("Invest reward appear")
         else:
             logger.info("No invest reward")
             return False
-        # 领取调查奖励。
         skip_first_screenshot = True
         clicked = True
         self.interval_clear(hospital_assets.HOSIPITAL_CLUE_CHECK)
@@ -184,9 +168,7 @@ class Hospital(HospitalClue, HospitalCombat):
         return False
 
     def loop_aside(self):
-        """
-        执行当前页面上的所有侧边栏任务。
-        """
+        """依次清理地点、角色首屏和角色后续页。"""
         while 1:
             logger.hr("Loop hospital aside", level=1)
             HOSPITAL_TAB.set("LOCATION", main=self)
@@ -215,9 +197,6 @@ class Hospital(HospitalClue, HospitalCombat):
         logger.info("Loop hospital aside end")
 
     def aside_swipe_down(self, skip_first_screenshot=True):
-        """
-        向下滑动直到没有下一页。
-        """
         logger.info("Aside swipe down")
         swiped = False
         interval = Timer(2, count=6)
@@ -242,21 +221,18 @@ class Hospital(HospitalClue, HospitalCombat):
                 continue
 
     def run(self):
-        # 检查活动是否可用。
+        """从任意页面执行医院活动；OilExhausted 延迟重试，ScriptEnd 正常结束，TaskEnd 重新抛出。"""
         if self.event_time_limit_triggered():
             self.config.task_stop()
         self.ui_ensure(page_campaign_menu)
         if self.is_event_entrance_available():
             self.ui_goto(page_hospital)
 
-        # 领取奖励。
         self.daily_reward_receive()
 
-        # 执行医院活动。
         self.clue_enter()
         try:
             self.loop_aside()
-            # 调度下一次执行。
             self.config.task_delay(server_update=True)
         except OilExhausted:
             self.clue_exit()

@@ -369,10 +369,7 @@ class UI(InfoHandler):
         )
 
     def ui_page_main_popups(self, get_ship=True):
-        """
-        处理 page_main、page_reward 上出现的弹窗。
-        """
-        # 公会弹窗。
+        """处理主页和奖励页弹窗。"""
         if self.handle_guild_popup_cancel():
             return True
 
@@ -386,14 +383,8 @@ class UI(InfoHandler):
         )
 
     def ui_page_os_popups(self):
-        """
-        Handle popups appear at page_os
-        """
-        # Opsi reset
-        # - Opsi has reset, handle_story_skip() clicks confirm
-        # - RESET_TICKET_POPUP
-        # - Open exchange shop? handle_popup_confirm() click confirm
-        # - EXCHANGE_CHECK, click BACK_ARROW
+        """处理大世界入口页的重置弹窗。"""
+        # 大世界重置可能依次出现剧情确认、重置券、舰队准备和兑换商店。
         if self._opsi_reset_fleet_preparation_click >= 5:
             logger.critical("Failed to confirm OpSi fleets, too many click on RESET_FLEET_PREPARATION")
             logger.critical("Possible reason #1: You haven't set any fleets in operation siren")
@@ -478,14 +469,8 @@ class UI(InfoHandler):
     def _handle_withdraw_popup(self):
         if not self.appear(WITHDRAW, offset=(30, 30), interval=3):
             return False
-        # 这里故意等待，用来规避 2022-04-07 更新后的客户端卡死问题。
-        # 复现方式（基本稳定）：
-        # - 进入任意关卡，例如 12-4。
-        # - 停止并重启游戏。
-        # - 运行 Alas 的 `Main` 任务。
-        # - Alas 切换到 page_campaign，并从已进入的关卡撤退。
-        # - 客户端卡在 page_campaign W12，点击屏幕任意位置都没有响应。
-        # - 再次重启客户端即可恢复。
+        # 2022-04-07 后，从已进入关卡重启再运行 Main，立即撤退可能让客户端卡死。
+        # 点击前等待并刷新截图；按钮已消失时不再点击。
         logger.info("WITHDRAW button found, wait until map loaded to prevent bugs in game client")
         self.device.sleep(2)
         self.device.screenshot()
@@ -521,12 +506,7 @@ class UI(InfoHandler):
         return True
 
     def ui_additional(self, get_ship=True):
-        """
-        处理 UI 切换期间可能出现的干扰弹窗。
-
-        Args:
-            get_ship:
-        """
+        """处理 UI 切换期间的干扰弹窗；get_ship 控制是否处理获得舰船页面。"""
         return (
             self._handle_priority_additional_popups(get_ship=get_ship)
             or self._handle_game_tips_popup()
@@ -540,10 +520,6 @@ class UI(InfoHandler):
         )
 
     def handle_idle_page(self):
-        """
-        Returns:
-            bool: If handled
-        """
         timer = self.get_interval_timer(ui_assets.IDLE, interval=3)
         if not timer.reached():
             return False
@@ -588,12 +564,7 @@ class UI(InfoHandler):
             yield EXCHANGE_CHECK
 
     def ui_button_interval_reset(self, button):
-        """
-        重置部分按钮的点击间隔，避免误触。
-
-        Args:
-            button (Button):
-        """
+        """重置目标按钮及关联按钮的点击间隔。"""
         for reset_button in self._iter_button_interval_reset_targets(button):
             self.interval_reset(reset_button)
         if button in [raid_assets.RPG_GOTO_STAGE, raid_assets.RPG_GOTO_STORY, raid_assets.RPG_LEAVE_CITY]:

@@ -15,18 +15,16 @@ from module.ui.scroll import Scroll
 
 def merge_two_rects(r1: tuple[int, int, int, int], r2: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
     return (
-        min(r1[0], r2[0]),  # 左
-        min(r1[1], r2[1]),  # 上
-        max(r1[2], r2[2]),  # 右
-        max(r1[3], r2[3]),  # 下
+        min(r1[0], r2[0]),
+        min(r1[1], r2[1]),
+        max(r1[2], r2[2]),
+        max(r1[3], r2[3]),
     )
 
 
 def merge_rows(list_word, merge):
-    # 按纵向位置排序。
     list_word = sorted(list_word, key=lambda x: x[1])
 
-    # 合并同一行文字区域。
     list_row = []
     current_row = []
     current_center = None
@@ -49,33 +47,26 @@ def merge_rows(list_word, merge):
 
 class HospitalClue(HospitalUI):
     def get_clue_list(self) -> list[Button]:
-        """
-        获取侧边栏按钮列表。
-        """
+        """按灰白文字遮罩合并行，返回侧边栏按钮列表。"""
         area = hospital_assets.CLUE_LIST.area
         image = self.image_crop(area, copy=False)
 
-        # 灰色文字遮罩。
         gray = color_similarity_2d(image, color=(132, 134, 148))
         cv2.inRange(gray, 215, 255, dst=gray)
-        # 已选中侧边栏项的白色文字遮罩。
         white = color_similarity_2d(image, color=(255, 255, 255))
         cv2.inRange(white, 215, 255, dst=white)
-        # 清理白色文字周围的灰色遮罩。
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (200, 20))
         white_expanded = cv2.dilate(white, kernel)
         cv2.subtract(gray, white_expanded, dst=gray)
-        # 合并文字遮罩。
         cv2.bitwise_or(gray, white, dst=gray)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         cv2.dilate(gray, kernel, dst=gray)
 
-        # 查找文字矩形。
         list_word = []
         contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for cont in contours:
             rect = cv2.boundingRect(cv2.convexHull(cont).astype(np.float32))
-            # 按文字高度过滤，通常约为 16。
+            # 文字高度通常约为 16，低于 12 视为噪声。
             rect = xywh2xyxy(rect)
             if rect[3] - rect[1] < 12:
                 continue
@@ -87,14 +78,11 @@ class HospitalClue(HospitalUI):
         return [Button(area=rect, color=(), button=rect, name=f"CLUE_LIST_{i}") for i, rect in enumerate(list_row)]
 
     def get_invest_button(self) -> Button | None:
-        """
-        从当前截图中找到未完成的调查按钮。
-        """
+        """返回当前截图中仍有剩余次数的调查按钮；未找到时返回 None。"""
         area = hospital_assets.INVEST_SEARCH.area
         image = self.image_crop(area, copy=False)
         image = rgb2gray(image)
 
-        # 搜索调查按钮。
         buttons = hospital_assets.TEMPLATE_INVEST.match_multi(image)
         buttons += hospital_assets.TEMPLATE_INVEST2.match_multi(image)
         buttons = sorted(buttons, key=lambda b: b.area[1])
@@ -119,7 +107,6 @@ class HospitalClue(HospitalUI):
         if y < 50:
             return None
 
-        # 检查调查按钮下方是否有剩余次数字样。
         if hospital_assets.TEMPLATE_REMAIN_CURRENT.match(image):
             return button
         if hospital_assets.TEMPLATE_REMAIN_TIMES.match(image):
@@ -127,11 +114,7 @@ class HospitalClue(HospitalUI):
         return None
 
     def clue_enter(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: Any sub page of hospital event
-            out: is_in_clue
-        """
+        """从医院任意子页进入线索页。"""
         logger.info("Hospital clue enter")
         self.interval_clear(page_hospital.check_button)
         while 1:
@@ -145,11 +128,7 @@ class HospitalClue(HospitalUI):
                 continue
 
     def clue_exit(self, skip_first_screenshot=True):
-        """
-        Pages:
-            in: Any sub page of hospital event
-            out: page_hospital
-        """
+        """从医院任意子页返回活动主页。"""
         logger.info("Hospital clue exit")
         self.interval_clear(hospital_assets.HOSIPITAL_CLUE_CHECK)
         while 1:
@@ -165,17 +144,7 @@ class HospitalClue(HospitalUI):
                 continue
 
     def invest_enter(self, skip_first_screenshot=True):
-        """
-        Args:
-            skip_first_screenshot:
-
-        Returns:
-            bool: If success to enter
-
-        Pages:
-            in: is_in_clue
-            out: FLEET_PREPARATION
-        """
+        """从线索页进入舰队准备页；没有可调查项目时返回 False。"""
         logger.info("Clue invest")
         self.interval_clear(hospital_assets.HOSIPITAL_CLUE_CHECK)
         while 1:
@@ -202,10 +171,7 @@ class HospitalClue(HospitalUI):
         return False
 
     def iter_invest(self):
-        """
-        Yields:
-            Button:
-        """
+        """按当前页、顶部到下方依次产生调查按钮；无滚动条时只检查当前页。"""
         logger.hr("Iter invest")
         scroll = Scroll(hospital_assets.INVEST_SCROLL, color=(107, 97, 107), name="INVEST_SCROLL")
         # 没有滚动条时，只返回当前页的一个按钮。
@@ -216,18 +182,15 @@ class HospitalClue(HospitalUI):
                 yield button
             return
 
-        # 检查当前页。
         button = self.get_invest_button()
         if button:
             yield button
 
-        # 回到顶部再检查一次。
         if not scroll.at_top(main=self):
             scroll.set_top(main=self)
             button = self.get_invest_button()
             if button:
                 yield button
-        # 逐页向下查找。
         while 1:
             if scroll.at_bottom(main=self):
                 logger.info(f"{scroll.name} reached end")
@@ -252,10 +215,7 @@ class HospitalClue(HospitalUI):
         return self.image_color_count(area, color=(74, 130, 148), threshold=221, count=20)
 
     def iter_aside(self):
-        """
-        Yields:
-            Button:
-        """
+        """依次产生未完成的侧边栏按钮。"""
         list_button = self.get_clue_list()
         for button in list_button:
             if self.is_aside_checked(button):
@@ -263,17 +223,7 @@ class HospitalClue(HospitalUI):
             yield button
 
     def select_aside(self, skip_first_screenshot=True):
-        """
-        Args:
-            skip_first_screenshot:
-
-        Returns:
-            bool: True if success to select any unfinished aside
-                False if all aside finished
-
-        Pages:
-            in: is_in_clue
-        """
+        """在线索页选择未完成侧边任务；全部完成时返回 False。"""
         logger.info("Select aside")
         aside = None
         self.interval_clear(hospital_assets.HOSIPITAL_CLUE_CHECK)
@@ -282,7 +232,6 @@ class HospitalClue(HospitalUI):
                 skip_first_screenshot = False
             else:
                 self.device.screenshot()
-            # 侧边栏已选中。
             if aside is not None and self.is_aside_selected(aside):
                 return True
             if self.is_in_clue(interval=2):

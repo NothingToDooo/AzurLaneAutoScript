@@ -17,7 +17,7 @@ from module.ui.page import page_rpg_stage
 
 class RaidCounterPostMixin(DigitCounter):
     def after_process(self, result):
-        # fix result like "915/", "1515"
+        # 修正 915/、1515 等缺少分隔符的结果。
         result = result.strip("/")
         if result.isdigit() and len(result) > 2 and result.endswith("15"):
             result = f"{result[:-2]}/15"
@@ -31,10 +31,7 @@ class RaidCounter(DigitCounter):
 
 
 class HuanChangCounter(Digit):
-    """
-    The limit on number of raid event "Spring Festive Fiasco" is vertical,
-    Ocr numbers on the top half.
-    """
+    """春节共斗次数纵向排列；返回 (上半部分识别值, 0, 15)。"""
 
     def ocr(self, image, direct_ocr=False):
         result = super().ocr(image, direct_ocr)
@@ -43,23 +40,15 @@ class HuanChangCounter(Digit):
 
 class HuanChangPtOcr(Digit):
     def pre_process(self, image):
-        """
-        Args:
-            image (np.ndarray): Shape (height, width, channel)
-
-        Returns:
-            np.ndarray: Shape (height, width)
-        """
+        """把 H×W×C 截图预处理为 H×W 数字掩码。"""
         image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         image = cv2.threshold(image, 128, 255, cv2.THRESH_BINARY_INV)[1]
         count, cc = cv2.connectedComponents(image)
-        # Calculate connected area, greater than 60 is considered a number,
-        # CN, JP background rightmost is connected but EN is not,
-        # EN need judge both [0, -1] and [-1, -1]
+        # 面积大于 60 的连通域视为数字；英语服需同时排除右上、右下背景连通域。
         num_idx = [
             i for i in range(1, count + 1) if i != cc[0, -1] and i != cc[-1, -1] and np.count_nonzero(cc == i) > 60
         ]
-        image = ~(np.isin(cc, num_idx) * 255)  # Numbers are white, need invert
+        image = ~(np.isin(cc, num_idx) * 255)  # 数字需反相为白色。
         return image.astype(np.uint8)
 
 
@@ -122,13 +111,7 @@ RAID_PT_OCR_NOT_CONFIGURED_TEMPLATE = "Raid PT OCR is not configured: {raid}"
 
 
 def raid_name_shorten(name):
-    """
-    Args:
-        name (str): 共斗活动名，例如 raid_20200624、raid_20210708。
-
-    Returns:
-        str: 按钮名前缀，例如 ESSEX、SURUGA。
-    """
+    """返回共斗活动的资产前缀；活动不受支持时抛出 ScriptError。"""
     if prefix := RAID_NAME_PREFIX.get(name):
         return prefix
     message = UNKNOWN_RAID_NAME_TEMPLATE.format(name=name)
@@ -136,14 +119,7 @@ def raid_name_shorten(name):
 
 
 def raid_entrance(raid, mode):
-    """
-    Args:
-        raid (str): Raid name, such as raid_20200624, raid_20210708.
-        mode (str): easy, normal, hard
-
-    Returns:
-        Button:
-    """
+    """返回 easy、normal、hard 或 ex 共斗入口；资产缺失时抛出 ScriptError。"""
     key = f"{raid_name_shorten(raid)}_RAID_{mode.upper()}"
     return _raid_asset(key)
 
@@ -157,14 +133,7 @@ def _raid_asset(key):
 
 
 def raid_ocr(raid, mode):
-    """
-    Args:
-        raid (str): Raid name, such as raid_20200624, raid_20210708.
-        mode (str): easy, normal, hard, ex
-
-    Returns:
-        DigitCounter:
-    """
+    """返回 easy、normal、hard 或 ex 的剩余次数 OCR；未配置时抛出 ScriptError。"""
     raid = raid_name_shorten(raid)
     key = f"{raid}_OCR_REMAIN_{mode.upper()}"
     button = _raid_asset(key)
@@ -178,13 +147,7 @@ def raid_ocr(raid, mode):
 
 
 def pt_ocr(raid):
-    """
-    Args:
-        raid (str): Raid name, such as raid_20200624, raid_20210708.
-
-    Returns:
-        Digit:
-    """
+    """返回共斗 PT OCR；活动没有 PT 资产时返回 None，配置缺失时抛出 ScriptError。"""
     raid = raid_name_shorten(raid)
     key = f"{raid}_OCR_PT"
     button = getattr(raid_assets, key, None)
@@ -201,27 +164,18 @@ def pt_ocr(raid):
 class Raid(MapOperation, RaidCombat, CampaignEvent):
     @property
     def _raid_has_oil_icon(self):
-        """
-        Game devs are too asshole to drop oil display for UI design
-        https://github.com/LmeSzinc/AzurLaneAutoScript/issues/5214
-        """
+        """共斗 UI 已移除油量显示，固定返回 False；见 issue #5214。"""
         return False
 
     def triggered_stop_condition(self, oil_check=False, pt_check=False, coin_check=False):
-        """
-        Returns:
-            bool: If triggered a stop condition.
-        """
-        # Oil limit
+        """检查油量、PT 和金币停止条件；执行对应调度后返回 True。"""
         if oil_check and self.get_oil() < max(500, self.config.StopCondition_OilLimit):
             logger.hr("Triggered stop condition: Oil limit")
             self.config.task_delay(minute=(120, 240))
             return True
-        # Event limit
         if pt_check and self.event_pt_limit_triggered():
             logger.hr("Triggered stop condition: Event PT limit")
             return True
-        # TaskBalancer
         if coin_check and self.config.TaskBalancer_Enable and self.triggered_task_balancer():
             logger.hr("Triggered stop condition: Coin limit")
             self.handle_task_balancer()
@@ -260,18 +214,13 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
         return True
 
     def combat_preparation(self, balance_hp=False, emotion_reduce=False, auto="combat_auto", fleet_index=1):
-        """
-        Args:
-            balance_hp (bool):
-            emotion_reduce (bool):
-            auto (bool):
-            fleet_index (int):
+        """复用普通战斗准备接口并等待战斗开始。
+
+        balance_hp 故意忽略；auto 控制自动战斗，emotion_reduce 按 fleet_index 扣除心情。
         """
         logger.info("Combat preparation.")
 
-        # Raid 战斗复用普通战斗入口，但不执行普通战斗的血量平衡。
         del balance_hp
-        # 不需要等待，raid_execute_once() 已经处理过。
 
         checked = False
         for _ in self.loop():
@@ -281,15 +230,11 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
             if self._handle_raid_preparation_actions():
                 continue
 
-            # End
             if self._finish_raid_preparation_if_combat_started(emotion_reduce=emotion_reduce, fleet_index=fleet_index):
                 break
 
     def handle_raid_ticket_use(self):
-        """
-        Returns:
-            bool: If clicked.
-        """
+        """按配置确认或取消使用共斗票，并返回是否点击。"""
         if self.appear(raid_assets.TICKET_USE_CONFIRM, offset=(30, 30), interval=1):
             if self.config.Raid_UseTicket:
                 self.device.click(raid_assets.TICKET_USE_CONFIRM)
@@ -300,16 +245,7 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
         return False
 
     def raid_enter(self, mode, raid, skip_first_screenshot=True):
-        """
-        Args:
-            mode:
-            raid:
-            skip_first_screenshot:
-
-        Pages:
-            in: page_raid
-            out: BATTLE_PREPARATION
-        """
+        """从共斗页进入指定活动难度，结束于战斗准备页。"""
         entrance = raid_entrance(raid=raid, mode=mode)
         while 1:
             if skip_first_screenshot:
@@ -318,8 +254,7 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
                 self.device.screenshot()
 
             if self.appear(entrance, offset=(10, 10), interval=5):
-                # Items appear from right
-                # Check PT when entrance appear
+                # 入口从右侧滑入，出现后再检查 PT 停止条件。
                 if self.triggered_stop_condition(pt_check=True):
                     self.config.task_stop()
                 self.device.click(entrance)
@@ -327,11 +262,11 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
             if self.appear_then_click(raid_assets.RAID_FLEET_PREPARATION, offset=(20, 20), interval=5):
                 continue
 
-            # End
             if self.combat_appear():
                 break
 
     def raid_expected_end(self):
+        """奖励弹窗返回 False 继续处理；RPG 和普通共斗分别以关卡页、共斗页结束。"""
         if self.appear_then_click(raid_assets.RAID_REWARDS, offset=(30, 30), interval=3):
             return False
         if self.is_raid_rpg():
@@ -339,15 +274,7 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
         return self.appear(RAID_CHECK, offset=(30, 30))
 
     def raid_execute_once(self, mode, raid):
-        """
-        Args:
-            mode:
-            raid:
-
-        Returns:
-            in: page_raid
-            out: page_raid
-        """
+        """从共斗页完成一次战斗并返回；ex 会临时启用每战潜艇并在结束后恢复。"""
         logger.hr("Raid Execute")
         self.config.override(
             Campaign_Name=f"{raid}_{mode}", Campaign_UseAutoSearch=False, Fleet_FleetOrder="fleet1_all_fleet2_standby"
@@ -367,18 +294,12 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
         logger.hr("Raid End")
 
     def get_event_pt(self):
-        """
-        Returns:
-            int: Raid PT, 0 if raid event is not supported
-
-        Pages:
-            in: page_raid
-        """
+        """在共斗页读取 PT；不支持 OCR 返回 0，超时返回最后一次结果（可能仍是 70000/70001）。"""
         skip_first_screenshot = True
         timeout = Timer(1.5, count=5).start()
         ocr = pt_ocr(self.config.Campaign_Event)
         if ocr is not None:
-            # 70000 seems to be a default value, wait
+            # 70000、70001 是页面未加载完成时的默认值，需要继续等待。
             while 1:
                 if skip_first_screenshot:
                     skip_first_screenshot = False
@@ -401,9 +322,7 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
         return self.config.Campaign_Event == "raid_20240328"
 
     def raid_rpg_swipe(self, skip_first_screenshot=True):
-        """
-        Swipe til the rightmost in RPG raid (raid_20240328)
-        """
+        """在 2024-03-28 RPG 共斗中滑到最右侧。"""
         interval = Timer(1)
         while 1:
             if skip_first_screenshot:
@@ -411,7 +330,6 @@ class Raid(MapOperation, RaidCombat, CampaignEvent):
             else:
                 self.device.screenshot()
 
-            # End
             if self.appear(raid_assets.RPG_RAID_EASY, offset=(10, 10)):
                 logger.info("RPG raid already at rightmost")
                 break

@@ -121,13 +121,9 @@ class HPBalancer(ModuleBase):
         return order
 
     def _gen_exchange_step(self, target):
-        """
-        minitouch 拖动更接近人的手势。
+        """生成把前排原始顺序调整为 target 的 minitouch 拖动步骤。
 
         把第一艘船拖到第三艘时，[0, 1, 2] 会变成 [1, 2, 0]。
-
-        Args:
-            target: 目标顺序，例如 [2, 0, 1]。
         """
         diff = np.array(target) - np.array((0, 1, 2))
         count = np.count_nonzero(diff)

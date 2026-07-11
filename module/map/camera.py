@@ -366,10 +366,8 @@ class Camera(MapOperation):
     def update(self, camera=True, wait_swipe=False, allow_error=False):
         """更新地图截图和相机视图。
 
-        Args:
-            camera: 是否更新相机位置和透视数据。
-            wait_swipe: 是否等待相机回到格子中心。
-            allow_error: 遇到检测错误时是否直接退出本轮更新。
+        camera 控制是否更新相机与透视数据；wait_swipe 等待镜头回到格子中心；
+        allow_error 遇到检测错误时退出本轮。
         """
         error_confirm = Timer(5, count=10).start()
         swipe_wait_timeout = Timer(0.35, count=1).start()

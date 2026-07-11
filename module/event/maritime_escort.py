@@ -19,12 +19,9 @@ class MaritimeEscort(MapOperation, CampaignEvent):
         return False
 
     def run_escort(self):
-        """
-        Just enter and retreat, get about 70% of maximum rewards.
+        """在护航页进入后立即撤退，约获得 70% 奖励；页面保持不变。
 
-        Pages:
-            in: ESCORT_CHECK
-            out: ESCORT_CHECK
+        CampaignEnd 表示次数耗尽，按正常完成处理。
         """
         logger.hr("Maritime escort", level=1)
         try:

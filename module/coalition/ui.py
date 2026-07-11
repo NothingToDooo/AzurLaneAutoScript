@@ -11,7 +11,7 @@ from module.ui.switch import Switch
 
 class NeoncitySwitch(Switch):
     def get(self, main):
-        # check if having red text
+        # 红字表示当前模式。
         for data in self.state_list:
             if main.image_color_count(data["check_button"], color=(123, 41, 41), threshold=221, count=100):
                 return data["state"]
@@ -21,21 +21,13 @@ class NeoncitySwitch(Switch):
 
 class CoalitionUI(Combat):
     def in_coalition(self):
-        # The same as raid
         return self.ui_page_appear(page_coalition, offset=(20, 20))
 
     def in_coalition_20251120_difficulty_selection(self):
         return self.appear(coalition_assets.DAL_DIFFICULTY_EXIT, offset=(20, 20))
 
     def coalition_ensure_mode(self, event, mode):
-        """
-        Args:
-            event (str): Event name.
-            mode (str): 'story' or 'battle'
-
-        Pages:
-            in: in_coalition
-        """
+        """在联合作战页按活动切换 story 或 battle；2025-11-20 活动没有模式开关。"""
         if event == "coalition_20230323":
             mode_switch = Switch("CoalitionMode", offset=(20, 20))
             mode_switch.add_state("story", coalition_assets.FROSTFALL_MODE_STORY)
@@ -67,17 +59,7 @@ class CoalitionUI(Combat):
             logger.warning(f"Unknown coalition campaign mode: {mode}")
 
     def coalition_set_fleet(self, event, mode):
-        """
-        Args:
-            event (str): 活动名称。
-            mode (str): 'single' or 'multi'
-
-        Returns:
-            bool: 是否发生点击。
-
-        Pages:
-            in: FLEET_PREPARATION
-        """
+        """在舰队准备页切换 single 或 multi，并返回是否点击切换。"""
         fleet_switch = Switch("FleetMode", is_selector=True, offset=0)  # 颜色匹配不使用 offset。
         if event == "coalition_20230323":
             fleet_switch.add_state("single", coalition_assets.FROSTFALL_SWITCH_SINGLE)
@@ -111,34 +93,23 @@ class CoalitionUI(Combat):
 
     @staticmethod
     def coalition_get_entrance(event, stage):
-        """
-        Args:
-            event (str): Event name.
-            stage (str): Stage name.
-
-        Returns:
-            Button: Entrance button
-        """
+        """按活动和关卡返回入口按钮；组合不受支持时抛出 CampaignNameError。"""
         dic = {
-            # FROSTFALL
             ("coalition_20230323", "tc1"): coalition_assets.FROSTFALL_TC1,
             ("coalition_20230323", "tc2"): coalition_assets.FROSTFALL_TC2,
             ("coalition_20230323", "tc3"): coalition_assets.FROSTFALL_TC3,
             ("coalition_20230323", "sp"): coalition_assets.FROSTFALL_SP,
             ("coalition_20230323", "ex"): coalition_assets.FROSTFALL_EX,
-            # ACADEMY
             ("coalition_20240627", "easy"): coalition_assets.ACADEMY_EASY,
             ("coalition_20240627", "normal"): coalition_assets.ACADEMY_NORMAL,
             ("coalition_20240627", "hard"): coalition_assets.ACADEMY_HARD,
             ("coalition_20240627", "sp"): coalition_assets.ACADEMY_SP,
             ("coalition_20240627", "ex"): coalition_assets.ACADEMY_EX,
-            # NEONCITY
             ("coalition_20250626", "easy"): coalition_assets.NEONCITY_EASY,
             ("coalition_20250626", "normal"): coalition_assets.NEONCITY_NORMAL,
             ("coalition_20250626", "hard"): coalition_assets.NEONCITY_HARD,
             ("coalition_20250626", "sp"): coalition_assets.NEONCITY_SP,
             ("coalition_20250626", "ex"): coalition_assets.NEONCITY_EX,
-            # DAL
             ("coalition_20251120", "area1-normal"): coalition_assets.DAL_AREA1,
             ("coalition_20251120", "area2-normal"): coalition_assets.DAL_AREA2,
             ("coalition_20251120", "area3-normal"): coalition_assets.DAL_AREA3,
@@ -151,7 +122,6 @@ class CoalitionUI(Combat):
             ("coalition_20251120", "area4-hard"): coalition_assets.DAL_AREA4,
             ("coalition_20251120", "area5-hard"): coalition_assets.DAL_AREA5,
             ("coalition_20251120", "area6-hard"): coalition_assets.DAL_AREA6,
-            # FASHION
             ("coalition_20260122", "easy"): coalition_assets.FASHION_EASY,
             ("coalition_20260122", "normal"): coalition_assets.FASHION_NORMAL,
             ("coalition_20260122", "hard"): coalition_assets.FASHION_HARD,
@@ -167,16 +137,8 @@ class CoalitionUI(Combat):
 
     @staticmethod
     def coalition_20251120_get_entrance_difficulty(event, stage):
-        """
-        Args:
-            event (str): Event name.
-            stage (str): Stage name.
-
-        Returns:
-            Button: Entrance difficulty button
-        """
+        """返回 2025-11-20 活动关卡的难度按钮；组合不受支持时抛出 CampaignNameError。"""
         dic = {
-            # DAL
             ("coalition_20251120", "area1-normal"): coalition_assets.DAL_NORMAL,
             ("coalition_20251120", "area2-normal"): coalition_assets.DAL_NORMAL,
             ("coalition_20251120", "area3-normal"): coalition_assets.DAL_NORMAL,
@@ -199,34 +161,23 @@ class CoalitionUI(Combat):
 
     @staticmethod
     def coalition_get_battles(event, stage):
-        """
-        Args:
-            event (str): Event name.
-            stage (str): Stage name.
-
-        Returns:
-            int: Number of battles
-        """
+        """返回活动关卡的战斗次数；组合不受支持时抛出 CampaignNameError。"""
         dic = {
-            # FROSTFALL
             ("coalition_20230323", "tc1"): 1,
             ("coalition_20230323", "tc2"): 2,
             ("coalition_20230323", "tc3"): 3,
             ("coalition_20230323", "sp"): 1,
             ("coalition_20230323", "ex"): 1,
-            # ACADEMY
             ("coalition_20240627", "easy"): 1,
             ("coalition_20240627", "normal"): 2,
             ("coalition_20240627", "hard"): 3,
             ("coalition_20240627", "sp"): 4,
             ("coalition_20240627", "ex"): 5,
-            # NEONCITY
             ("coalition_20250626", "easy"): 1,
             ("coalition_20250626", "normal"): 2,
             ("coalition_20250626", "hard"): 3,
             ("coalition_20250626", "sp"): 4,
             ("coalition_20250626", "ex"): 5,
-            # DAL
             ("coalition_20251120", "area1-normal"): 2,
             ("coalition_20251120", "area2-normal"): 3,
             ("coalition_20251120", "area3-normal"): 3,
@@ -239,7 +190,6 @@ class CoalitionUI(Combat):
             ("coalition_20251120", "area4-hard"): 3,
             ("coalition_20251120", "area5-hard"): 3,
             ("coalition_20251120", "area6-hard"): 4,
-            # FASHION
             ("coalition_20260122", "easy"): 1,
             ("coalition_20260122", "normal"): 2,
             ("coalition_20260122", "hard"): 3,
@@ -255,13 +205,7 @@ class CoalitionUI(Combat):
 
     @staticmethod
     def coalition_get_fleet_preparation(event):
-        """
-        Args:
-            event (str): 活动名称。
-
-        Returns:
-            Button:
-        """
+        """返回活动专用舰队准备按钮；活动不受支持时抛出 ScriptError。"""
         if event == "coalition_20230323":
             return coalition_assets.FROSTFALL_FLEET_PREPARATION
         if event == "coalition_20240627":
@@ -277,14 +221,9 @@ class CoalitionUI(Combat):
         raise ScriptError
 
     def handle_fleet_preparation(self, event, stage, mode):
-        """
-        Args:
-            event (str): Event name.
-            stage (str): Stage name.
-            mode (str): 'single' or 'multi'
+        """在舰队准备页按 single 或 multi 切换并返回是否点击。
 
-        Returns:
-            bool: If clicked
+        固定舰队关卡直接返回 False；编队不完整时抛出 RequestHumanTakeover。
         """
         stage = stage.lower()
 
@@ -315,11 +254,7 @@ class CoalitionUI(Combat):
         return clicked
 
     def coalition_map_exit(self, event):
-        """
-        Pages:
-            in: BATTLE_PREPARATION, or coalition specific fleet_preparation
-            out: in_coalition
-        """
+        """从战斗或活动舰队准备页返回联合作战页；误到主页时也结束。"""
         logger.info("Coalition map exit")
         fleet_preparation = self.coalition_get_fleet_preparation(event)
         for _ in self.loop():
@@ -401,15 +336,9 @@ class CoalitionUI(Combat):
         return self.handle_combat_automation_confirm() or self.handle_popup_confirm("COALITION")
 
     def enter_map(self, event, stage, mode):
-        """
-        Args:
-            event (str): Event name such as 'coalition_20230323'
-            stage (str): Stage name such as 'TC3'
-            mode (str): 'single' or 'multi'
+        """从联合作战页进入指定活动关卡，按 single 或 multi 编队，结束于战斗准备页。
 
-        Pages:
-            in: in_coalition
-            out: BATTLE_PREPARATION
+        连续点击失败或编队不满足限制时抛出 RequestHumanTakeover。
         """
         button = self.coalition_get_entrance(event, stage)
         button_difficulty = self._coalition_difficulty_button(event, stage)
@@ -426,7 +355,6 @@ class CoalitionUI(Combat):
                 button, button_difficulty, campaign_click, campaign_difficulty_click, fleet_click
             )
 
-            # End
             if self.appear(BATTLE_PREPARATION, offset=(20, 20)):
                 break
 

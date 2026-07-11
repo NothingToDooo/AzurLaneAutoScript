@@ -14,11 +14,7 @@ class RaidRun(Raid, CampaignEvent):
     run_limit: int
 
     def triggered_stop_condition(self, oil_check=False, pt_check=False, coin_check=False):
-        """
-        Returns:
-            bool: If triggered a stop condition.
-        """
-        # Run count limit
+        """检查运行次数及父类停止条件，触发后返回 True。"""
         if self.run_limit and self.config.StopCondition_RunCount <= 0:
             logger.hr("Triggered stop condition: Run count")
             self.config.StopCondition_RunCount = 0
@@ -28,14 +24,7 @@ class RaidRun(Raid, CampaignEvent):
         return super().triggered_stop_condition(oil_check=oil_check, pt_check=pt_check, coin_check=coin_check)
 
     def get_remain(self, mode, skip_first_screenshot=True):
-        """
-        Args:
-            mode (str): easy, normal, hard, ex
-            skip_first_screenshot (bool):
-
-        Returns:
-            int:
-        """
+        """OCR easy、normal、hard 或 ex 剩余次数，等待读数稳定后返回。"""
         confirm_timer = Timer(0.3, count=0)
         prev = 30
         while 1:
@@ -56,7 +45,6 @@ class RaidRun(Raid, CampaignEvent):
                 confirm_timer.reset()
                 continue
 
-            # End
             if remain == prev:
                 if confirm_timer.reached():
                     break
@@ -68,13 +56,7 @@ class RaidRun(Raid, CampaignEvent):
         return remain
 
     def run(self, name="", mode="", total=0):
-        """运行 raid 任务。
-
-        Args:
-            name (str): Raid 名称，如 'raid_20200624'。
-            mode (str): Raid 难度，如 'hard'、'normal'、'easy'。
-            total (int): 总运行次数。
-        """
+        """按活动和难度运行至 total 或停止条件；空参数读取配置，仍缺失时抛出 ScriptError。"""
         name, mode = self._resolve_raid_run_args(name, mode)
         self.run_count = 0
         self.run_limit = self.config.StopCondition_RunCount
