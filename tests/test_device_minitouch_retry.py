@@ -1,4 +1,4 @@
-from types import SimpleNamespace
+from typing import TYPE_CHECKING, Literal, overload
 
 import pytest
 from adbutils.errors import AdbError
@@ -6,6 +6,109 @@ from adbutils.errors import AdbError
 from module.device import minitouch_service as minitouch_module
 from module.device.minitouch_service import MinitouchController, MinitouchNotInstalledError, MinitouchOccupiedError
 from module.exception import RequestHumanTakeover
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from adbutils import AdbConnection
+
+    from module.device.control_options import Duration
+
+
+class _MinitouchConfigDouble:
+    MINITOUCH_FILEPATH_REMOTE = "/data/local/tmp/minitouch"
+
+
+class _MinitouchSessionDouble:
+    def __init__(self, serial: str = "127.0.0.1:16384") -> None:
+        self.serial = serial
+        self.adb_calls: list[tuple[str, str | list[str | int]]] = []
+        self.forward_requests: list[str] = []
+        self.forward_removals: list[str] = []
+        self._config = _MinitouchConfigDouble()
+        self._orientation = 0
+        self._adb_server_result = 0
+        self._forward_port = 12345
+
+    @property
+    def config(self) -> _MinitouchConfigDouble:
+        return self._config
+
+    @property
+    def orientation(self) -> int:
+        return self._orientation
+
+    @overload
+    def adb_shell(
+        self,
+        cmd: str | Iterable[str | int],
+        *,
+        stream: Literal[False] = False,
+        recvall: bool = True,
+        timeout: float | None = 10,
+        rstrip: bool = True,
+    ) -> str: ...
+
+    @overload
+    def adb_shell(
+        self,
+        cmd: str | Iterable[str | int],
+        *,
+        stream: Literal[True],
+        recvall: Literal[True] = True,
+        timeout: float | None = 10,
+        rstrip: bool = True,
+    ) -> bytes: ...
+
+    @overload
+    def adb_shell(
+        self,
+        cmd: str | Iterable[str | int],
+        *,
+        stream: Literal[True],
+        recvall: Literal[False],
+        timeout: float | None = 10,
+        rstrip: bool = True,
+    ) -> AdbConnection: ...
+
+    def adb_shell(
+        self,
+        cmd: str | Iterable[str | int],
+        *,
+        stream: bool = False,
+        recvall: bool = True,
+        timeout: float | None = 10,
+        rstrip: bool = True,
+    ) -> str | bytes | AdbConnection:
+        del recvall, timeout, rstrip
+        command = cmd if isinstance(cmd, str) else list(cmd)
+        self.adb_calls.append((self.serial, command))
+        if stream:
+            message = "streaming adb_shell is not used by this test double"
+            raise AssertionError(message)
+        if isinstance(command, str):
+            return "u0_a123 9821 1 S minitouch"
+        return ""
+
+    def adb_reconnect(self) -> None:
+        pass
+
+    def adb_start_server(self) -> int:
+        return self._adb_server_result
+
+    def adb_forward(self, remote: str) -> int:
+        self.forward_requests.append(remote)
+        return self._forward_port
+
+    def adb_forward_remove(self, local: str) -> None:
+        self.forward_removals.append(local)
+
+    def get_orientation(self) -> int:
+        return self._orientation
+
+    @staticmethod
+    def sleep(second: Duration) -> None:
+        del second
 
 
 class _Logger:
@@ -163,7 +266,7 @@ def test_minitouch_retry_hands_over_when_minitouch_missing(monkeypatch: pytest.M
 
 
 def test_minitouch_release_resource_clears_cached_builder() -> None:
-    device = MinitouchController(SimpleNamespace())
+    device = MinitouchController(_MinitouchSessionDouble())
     device.__dict__["_minitouch_builder"] = object()
 
     device.release_resource()
@@ -174,18 +277,9 @@ def test_minitouch_release_resource_clears_cached_builder() -> None:
 def test_minitouch_rebind_excludes_old_pid_from_new_device_restart() -> None:
     old_serial = "127.0.0.1:16384"
     new_serial = "127.0.0.1:16385"
-    session = SimpleNamespace(serial=old_serial, config=SimpleNamespace(Emulator_Serial=old_serial))
+    session = _MinitouchSessionDouble(old_serial)
     device = MinitouchController(session)
     vars(device)["_minitouch_pid"] = "4312"
-    adb_calls: list[tuple[str, object]] = []
-
-    def adb_shell(command: str | list[str | int], **_kwargs: object) -> str:
-        adb_calls.append((session.serial, command))
-        if isinstance(command, str):
-            return "u0_a123 9821 1 S minitouch"
-        return ""
-
-    session.adb_shell = adb_shell
     device.__dict__["_start_minitouch_service"] = lambda: None
 
     device.release()
@@ -193,6 +287,8 @@ def test_minitouch_rebind_excludes_old_pid_from_new_device_restart() -> None:
     restart_minitouch_service = vars(MinitouchController)["_restart_minitouch_service"]
     restart_minitouch_service(device)
 
-    killed_pids = {command[1] for _, command in adb_calls if isinstance(command, list) and command[:1] == ["kill"]}
+    killed_pids = {
+        command[1] for _, command in session.adb_calls if isinstance(command, list) and command[:1] == ["kill"]
+    }
     assert killed_pids == {"9821"}
-    assert {serial for serial, _ in adb_calls} == {new_serial}
+    assert {serial for serial, _ in session.adb_calls} == {new_serial}
