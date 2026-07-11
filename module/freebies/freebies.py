@@ -7,7 +7,7 @@ from module.logger import logger
 
 
 class Freebies(ModuleBase):
-    def run(self):
+    def run(self) -> None:
         if self.config.BattlePass_Collect:
             logger.hr("Battle pass", level=1)
             BattlePass(self.config, self.device).run()

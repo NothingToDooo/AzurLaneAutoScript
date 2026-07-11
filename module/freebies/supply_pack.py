@@ -1,4 +1,5 @@
 from calendar import day_name
+from typing import TYPE_CHECKING
 
 from module.base.timer import Timer
 from module.campaign.campaign_status import CampaignStatus
@@ -10,13 +11,18 @@ from module.ocr.ocr import Digit
 from module.shop.assets import SHOP_OCR_OIL, SHOP_OCR_OIL_CHECK
 from module.ui.page import page_shop, page_supply_pack
 
+if TYPE_CHECKING:
+    from module.base.button import Button
+
 
 class SupplyPack(CampaignStatus):
-    def _clear_supply_pack_intervals(self, supply_pack):
+    def _clear_supply_pack_intervals(self, supply_pack: Button) -> None:
         for asset in [GET_ITEMS_1, GET_ITEMS_2, supply_pack, BUY_CONFIRM]:
             self.interval_clear(asset)
 
-    def _handle_visible_supply_pack(self, supply_pack, click_count, confirm_timer):
+    def _handle_visible_supply_pack(
+        self, supply_pack: Button, click_count: int, confirm_timer: Timer
+    ) -> tuple[int, bool, bool]:
         if not self.appear(supply_pack, offset=(200, 20), interval=3):
             return click_count, False, False
         if click_count >= 3:
@@ -27,14 +33,14 @@ class SupplyPack(CampaignStatus):
         confirm_timer.reset()
         return click_count + 1, True, False
 
-    def _handle_supply_pack_reward_popup(self, confirm_timer):
+    def _handle_supply_pack_reward_popup(self, confirm_timer: Timer) -> bool:
         for button in [GET_ITEMS_1, GET_ITEMS_2]:
             if self.appear_then_click(button, offset=(30, 30), interval=3):
                 confirm_timer.reset()
                 return True
         return False
 
-    def _supply_pack_buy_finished(self, supply_pack, confirm_timer):
+    def _supply_pack_buy_finished(self, supply_pack: Button, confirm_timer: Timer) -> bool:
         if self.appear(page_supply_pack.check_button, offset=(20, 20)) and not self.appear(
             supply_pack, offset=(20, 20)
         ):
@@ -42,7 +48,7 @@ class SupplyPack(CampaignStatus):
         confirm_timer.reset()
         return False
 
-    def supply_pack_buy(self, supply_pack, skip_first_screenshot=True):
+    def supply_pack_buy(self, supply_pack: Button, *, skip_first_screenshot: bool = True) -> bool:
         """购买指定补给包；确认成功返回 True，连续点击三次仍未完成则放弃。"""
         logger.hr("Supply pack buy")
         self._clear_supply_pack_intervals(supply_pack)
@@ -81,11 +87,11 @@ class SupplyPack(CampaignStatus):
         logger.info(f"Supply pack buy finished, executed={executed}")
         return executed
 
-    def goto_supply_pack(self):
+    def goto_supply_pack(self) -> None:
         """从商店进入补给包页签。"""
         self.ui_goto(page_supply_pack)
 
-    def run(self):
+    def run(self) -> None:
         """从任意页面进入补给包页签，按油量和星期配置领取周礼包。"""
         self.ui_ensure(page_shop)
         self.goto_supply_pack()
@@ -102,7 +108,7 @@ class SupplyPack(CampaignStatus):
 
 
 class SupplyPack250814(SupplyPack):
-    def get_oil(self, skip_first_screenshot=True):
+    def get_oil(self, *, skip_first_screenshot: bool = True) -> int:
         """返回商店页油量；超时或识别失败时为 0。"""
         amount = 0
         timeout = Timer(1, count=2).start()
@@ -120,13 +126,17 @@ class SupplyPack250814(SupplyPack):
                 logger.info("No oil icon")
                 continue
             ocr = Digit(SHOP_OCR_OIL, name="OCR_OIL", letter=(247, 247, 247), threshold=128)
-            amount = ocr.ocr(self.device.image)
+            result = ocr.ocr(self.device.image)
+            if isinstance(result, list):
+                message = "supply-pack oil OCR must contain exactly one region"
+                raise TypeError(message)
+            amount = result
             if amount >= 100:
                 break
 
         return amount
 
-    def goto_supply_pack(self):
+    def goto_supply_pack(self) -> None:
         """从商店通过动态页签按钮进入补给包页。"""
         logger.info("Goto supply pack")
         for _ in self.loop():

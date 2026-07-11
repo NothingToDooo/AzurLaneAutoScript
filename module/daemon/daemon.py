@@ -6,7 +6,7 @@ from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION
 
 
 class AzurLaneDaemon(DaemonBase, CampaignBase):
-    def handle_daemon_combat(self):
+    def handle_daemon_combat(self) -> bool:
         # 战斗中只保持截图轮询，不插入其他操作。
         if self.is_combat_executing():
             return True
@@ -21,20 +21,20 @@ class AzurLaneDaemon(DaemonBase, CampaignBase):
             return True
         return False
 
-    def handle_daemon_map_operation(self):
+    def handle_daemon_map_operation(self) -> bool:
         if self.appear_then_click(MAP_AMBUSH_EVADE, offset=(20, 20)):
             self.device.sleep(1)
             return True
         return bool(self.handle_mystery_items())
 
-    def handle_daemon_map_preparation(self):
+    def handle_daemon_map_preparation(self) -> bool:
         if not self.config.Daemon_EnterMap:
             return False
         if self.appear_then_click(MAP_PREPARATION, offset=(20, 20), interval=2):
             return True
         return bool(self.appear_then_click(FLEET_PREPARATION, offset=(20, 50), interval=2))
 
-    def handle_daemon_misc(self):
+    def handle_daemon_misc(self) -> bool:
         if self.handle_retirement():
             return True
         if self.handle_urgent_commission():
@@ -43,7 +43,7 @@ class AzurLaneDaemon(DaemonBase, CampaignBase):
             return True
         return bool(self.story_skip())
 
-    def run(self):
+    def run(self) -> bool:
         while 1:
             self.device.screenshot()
 

@@ -1,4 +1,5 @@
 import module.freebies.supply_pack as supply_pack_module
+from module.base.button import Button
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2
 from module.freebies.assets import BUY_CONFIRM
 from module.freebies.supply_pack import SupplyPack
@@ -76,7 +77,7 @@ class _FakeSupplyPack(SupplyPack):
 
 
 def test_supply_pack_buy_executes_purchase(monkeypatch) -> None:
-    supply_button = object()
+    supply_button = Button(area=(0, 0, 1, 1), color=(), button=(0, 0, 1, 1), name="SUPPLY_BUTTON")
     _FakeTimer.default_reached_results = (True,)
     monkeypatch.setattr(supply_pack_module, "Timer", _FakeTimer)
     supply_pack = _FakeSupplyPack(
@@ -99,7 +100,7 @@ def test_supply_pack_buy_executes_purchase(monkeypatch) -> None:
 
 
 def test_supply_pack_buy_stops_after_three_failed_clicks(monkeypatch) -> None:
-    supply_button = object()
+    supply_button = Button(area=(0, 0, 1, 1), color=(), button=(0, 0, 1, 1), name="SUPPLY_BUTTON")
     _FakeTimer.default_reached_results = ()
     monkeypatch.setattr(supply_pack_module, "Timer", _FakeTimer)
     supply_pack = _FakeSupplyPack(

@@ -80,7 +80,7 @@ class CampaignStatus(UI):
 
         return ocr.ocr(self.device.image)
 
-    def get_oil(self, skip_first_screenshot=True):
+    def get_oil(self, *, skip_first_screenshot: bool = True) -> int:
         amount = 0
         timeout = Timer(1, count=2).start()
         while 1:

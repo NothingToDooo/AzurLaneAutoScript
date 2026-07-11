@@ -9,7 +9,7 @@ from module.logger import logger
 
 
 class CampaignABCD(EventBase):
-    def run(self, name="", folder="campaign_main", mode="normal", total=0):
+    def run(self, name: str = "", folder: str = "campaign_main", mode: str = "normal", total: int = 0) -> None:
         _ = (name, folder, mode, total)
         stages = [EventStage(file.name) for file in Path(f"./campaign/{self.config.Campaign_Event}").iterdir()]
         stages = self.convert_stages(stages)
