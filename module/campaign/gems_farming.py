@@ -223,7 +223,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
             raise ScriptError(INVALID_GEMS_FARMING_COMMON_DD_MESSAGE)
 
         favourite = self.config.GemsFarming_CommonDD == "favourite"
-        self.dock_favourite_set(favourite, wait_loading=False)
+        self.dock_favourite_set(enable=favourite, wait_loading=False)
         self.dock_sort_method_dsc_set(enable=True, wait_loading=False)
         self.dock_filter_set(index="dd", rarity="common", faction=faction, extra="can_limit_break")
 

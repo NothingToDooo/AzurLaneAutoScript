@@ -145,7 +145,7 @@ def test_tactical_receive_delays_to_tomorrow_when_books_empty(monkeypatch) -> No
     assert tactical.tactical_class_receive() is True
 
     assert tactical.device.clicks == [BOOK_EMPTY_POPUP]
-    assert tactical.tactical_finish == "tomorrow"
+    assert tactical.tactical_finish == ["tomorrow"]
 
 
 def test_tactical_receive_reenters_when_ship_is_preselected(monkeypatch) -> None:

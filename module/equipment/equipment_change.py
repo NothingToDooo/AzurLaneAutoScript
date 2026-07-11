@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import cv2
 import numpy as np
 
@@ -9,6 +11,13 @@ from module.logger import logger
 from module.ui.assets import BACK_ARROW
 from module.ui.scroll import Scroll
 from module.ui.switch import Switch
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
+    from module.base.type_alias import ImageArray
+    from module.config.config import AzurLaneConfig
+    from module.device.device import Device
 
 # 5 个装备按钮。
 EQUIP_INFO_BAR = ButtonGrid(
@@ -28,15 +37,20 @@ equipping_filter.add_state("off", check_button=equipment_assets.EQUIPPING_OFF)
 
 
 class EquipmentChange(Equipment):
-    def __init__(self, *args, **kwargs):
-        self.equipment_list = {}
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        config: AzurLaneConfig | str,
+        device: Device | str | None = None,
+        task: str | None = None,
+    ) -> None:
+        self.equipment_list: dict[int, ImageArray] = {}
+        super().__init__(config, device, task)
 
-    def equipping_set(self, enable=False):
+    def equipping_set(self, *, enable: bool = False) -> None:
         if equipping_filter.set("on" if enable else "off", main=self):
             self.wait_until_stable(equipment_assets.SWIPE_AREA)
 
-    def ship_equipment_record_image(self, index_list=EQUIPMENT_INDEXES):
+    def ship_equipment_record_image(self, index_list: Iterable[int] = EQUIPMENT_INDEXES) -> None:
         """利用强化页与装备状态页尺寸一致的图标记录装备模板。"""
         logger.info("RECORD EQUIPMENT")
         self.ship_side_navbar_ensure(bottom=1)
@@ -86,7 +100,12 @@ class EquipmentChange(Equipment):
 
         logger.info(f"Recorded equipment index list: {list(self.equipment_list.keys())}")
 
-    def ship_equipment_take_on_image(self, index_list=EQUIPMENT_INDEXES, skip_first_screenshot=True):
+    def ship_equipment_take_on_image(
+        self,
+        index_list: Iterable[int] = EQUIPMENT_INDEXES,
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> None:
         logger.info("Take on equipment")
         self.ship_side_navbar_ensure(bottom=2)
 
@@ -104,14 +123,14 @@ class EquipmentChange(Equipment):
                 self.handle_info_bar()
                 self._find_equipment(index)
 
-    def _equipment_swipe(self, distance=190):
+    def _equipment_swipe(self, distance: int = 190) -> None:
         # 两个委托之间的距离是 146px。
         p1, p2 = random_rectangle_vector((0, -distance), box=(620, 67, 1154, 692), random_range=(-20, -5, 20, 5))
         self.device.drag(p1, p2, point_random=(0, 0, 0, 0))
         self.device.sleep(0.3)
         self.device.screenshot()
 
-    def _equip_equipment(self, point, offset=(100, 100)):
+    def _equip_equipment(self, point: Sequence[int], offset: tuple[int, int] = (100, 100)) -> None:
         """从装备状态页穿上装备、确认弹窗并回到舰船侧栏装备页。"""
         logger.info("Equip equipment")
         button = Button(
@@ -128,7 +147,7 @@ class EquipmentChange(Equipment):
             check_button=equipment_assets.SHIP_INFO_EQUIPMENT_CHECK,
         )
 
-    def _find_equipment(self, index):
+    def _find_equipment(self, index: int) -> None:
         """在装备状态页查找之前记录的模板。"""
         enter_button = getattr(equipment_assets, f"EQUIP_TAKE_ON_{index}")
 

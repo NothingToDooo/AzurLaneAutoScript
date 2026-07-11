@@ -1,4 +1,5 @@
 import time
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
@@ -18,9 +19,14 @@ from module.shop.clerk import ShopClerk
 from module.shop.shop_status import ShopStatus
 from module.ui.scroll import AdaptiveScroll
 
+if TYPE_CHECKING:
+    from module.base.base import ModuleBase
+    from module.base.type_alias import BoolArray, NumericArray
+    from module.statistics.item import Item
+
 
 class ShopAdaptiveScroll(AdaptiveScroll):
-    def match_color(self, main):
+    def match_color(self, main: ModuleBase) -> BoolArray:
         area = (self.area[0] - self.background, self.area[1], self.area[2] + self.background, self.area[3])
         image = main.image_crop(area, copy=False)
 
@@ -48,7 +54,7 @@ MEDAL_SHOP_SCROLL_250814.edge_threshold = 0.12
 
 
 class ShopPriceOcr(DigitYuv):
-    def after_process(self, result):
+    def after_process(self, result: str) -> int:
         result = Ocr.after_process(self, result)
         # 改造图纸价格 100 会被误识别为 00。
         if result == "00":
@@ -65,10 +71,10 @@ TEMPLATE_MEDAL_ICON_3 = Template("./assets/shop/cost/Medal_3.png")
 
 class MedalShop2V250814(ShopClerk, ShopStatus):
     @cached_property
-    def shop_filter(self):
+    def shop_filter(self) -> str:
         return self.config.MedalShop2_Filter.strip()
 
-    def _get_medals(self):
+    def _get_medals(self) -> NumericArray:
         """返回各勋章图标左上角坐标组成的二维数组。"""
         area = (265, 317, 999, 635)
         image = self.image_crop(area, copy=True)
@@ -77,7 +83,7 @@ class MedalShop2V250814(ShopClerk, ShopStatus):
         logger.attr("Medals_icon", len(medals))
         return medals
 
-    def wait_until_medal_appear(self, skip_first_screenshot=True):
+    def wait_until_medal_appear(self, *, skip_first_screenshot: bool = True) -> None:
         """进入勋章商店后等待任一勋章图标加载。"""
         timeout = Timer(1, count=3).start()
         while 1:
@@ -94,10 +100,10 @@ class MedalShop2V250814(ShopClerk, ShopStatus):
                 break
 
     @cached_property
-    def shop_grid(self):
+    def shop_grid(self) -> ButtonGrid:
         return self.shop_medal_grid()
 
-    def shop_medal_grid(self):
+    def shop_medal_grid(self) -> ButtonGrid:
         medals = self._get_medals()
         count = len(medals)
         if count == 0:
@@ -130,7 +136,7 @@ class MedalShop2V250814(ShopClerk, ShopStatus):
     shop_template_folder = "./assets/shop/medal"
 
     @cached_property
-    def shop_medal_items(self):
+    def shop_medal_items(self) -> ShopItemGrid250814:
         shop_grid = self.shop_grid
         shop_medal_items = ShopItemGrid250814(
             shop_grid,
@@ -149,21 +155,22 @@ class MedalShop2V250814(ShopClerk, ShopStatus):
     def shop_items(self) -> ShopItemGrid250814:
         return self.shop_medal_items
 
-    def shop_currency(self):
+    def shop_currency(self) -> int:
         self._currency = self.status_get_medal()
         logger.info(f"Medal: {self._currency}")
         return self._currency
 
-    def shop_has_loaded(self, _items):
+    @staticmethod
+    def shop_has_loaded(_items: list[Item]) -> bool:
         """价格仍为默认值 5000 时，真实商品尚未加载，不能购买。"""
         return all(int(item.price) != 5000 for item in _items)
 
-    def shop_interval_clear(self):
+    def shop_interval_clear(self) -> None:
         super().shop_interval_clear()
         self.interval_clear(SHOP_BUY_CONFIRM_SELECT)
         self.interval_clear(SHOP_BUY_CONFIRM_AMOUNT)
 
-    def shop_buy_handle(self, _item):
+    def shop_buy_handle(self, _item: Item) -> bool:
         """处理勋章商店的商品选择或数量确认弹窗。"""
         if self.appear(SHOP_BUY_CONFIRM_SELECT, offset=(20, 20), interval=3):
             self.shop_buy_select_execute(_item)
@@ -176,7 +183,7 @@ class MedalShop2V250814(ShopClerk, ShopStatus):
 
         return False
 
-    def run(self):
+    def run(self) -> None:
         if not self.shop_filter:
             return
 

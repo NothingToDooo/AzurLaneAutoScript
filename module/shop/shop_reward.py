@@ -1,4 +1,3 @@
-from module.shop.assets import NAV_GENERAL, NAV_MONTHLY, TAB_CORE_MONTHLY, TAB_GENERAL, TAB_GUILD, TAB_MEDAL, TAB_MERIT
 from module.shop.shop_core import CoreShop250814
 from module.shop.shop_general import GeneralShop250814
 from module.shop.shop_guild import GuildShop250814
@@ -8,35 +7,35 @@ from module.shop.ui import ShopUI
 
 
 class RewardShop(ShopUI):
-    def run_frequent(self):
+    def run_frequent(self) -> None:
         self.ui_goto_shop()
         self.device.click_record_clear()
-        self.shop_nav_250814.set(NAV_GENERAL, main=self)
-        self.shop_tab_250814.set(TAB_GENERAL, main=self)
+        self.shop_nav_250814.set("general", main=self)
+        self.shop_tab_250814.set("general", main=self)
         GeneralShop250814(self.config, self.device).run()
 
         self.config.task_delay(server_update=True)
 
-    def run_once(self):
+    def run_once(self) -> None:
         self.ui_goto_shop()
         self.device.click_record_clear()
-        self.shop_nav_250814.set(NAV_GENERAL, main=self)
-        self.shop_tab_250814.set(TAB_MERIT, main=self)
+        self.shop_nav_250814.set("general", main=self)
+        self.shop_tab_250814.set("merit", main=self)
         MeritShop250814(self.config, self.device).run()
 
         self.device.click_record_clear()
-        self.shop_nav_250814.set(NAV_GENERAL, main=self)
-        self.shop_tab_250814.set(TAB_GUILD, main=self)
+        self.shop_nav_250814.set("general", main=self)
+        self.shop_tab_250814.set("guild", main=self)
         GuildShop250814(self.config, self.device).run()
 
         self.device.click_record_clear()
-        self.shop_nav_250814.set(NAV_MONTHLY, main=self)
-        self.shop_tab_250814.set(TAB_CORE_MONTHLY, main=self)
+        self.shop_nav_250814.set("monthly", main=self)
+        self.shop_tab_250814.set("core_monthly", main=self)
         CoreShop250814(self.config, self.device).run()
 
         self.device.click_record_clear()
-        self.shop_nav_250814.set(NAV_MONTHLY, main=self)
-        self.shop_tab_250814.set(TAB_MEDAL, main=self)
+        self.shop_nav_250814.set("monthly", main=self)
+        self.shop_tab_250814.set("medal", main=self)
         MedalShop2V250814(self.config, self.device).run()
 
         self.config.task_delay(server_update=True)

@@ -22,8 +22,11 @@ class _FakeGrid:
 class _FakeItem:
     def __init__(self, name, *, known=True, row_y=100) -> None:
         self.name = name
-        self.is_known_item = known
+        self._is_known_item = known
         self.button = (0, row_y)
+
+    def is_known_item(self) -> bool:
+        return self._is_known_item
 
     def __str__(self) -> str:
         return self.name
@@ -34,6 +37,7 @@ class _FakeShopItems:
         self.item_sequences = [list(items) for items in item_sequences]
         self.items = []
         self.grids = _FakeGrid()
+        self.shop_grids = self.grids
         self.predict_calls = []
         self.extract_calls = []
 

@@ -1,6 +1,7 @@
 from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, TypedDict, Unpack
 
-from module.base.button import ButtonGrid, color_similar, get_color
+from module.base.button import Button, ButtonGrid, color_similar, get_color
 from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1
@@ -11,6 +12,12 @@ from module.retire import assets as retire_assets
 from module.ui.scroll import Scroll
 from module.ui.setting import Setting
 from module.ui.switch import Switch
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+type DockFilterValue = str | list[str]
+type DockCheck = Button | Callable[[], bool]
 
 DOCK_SORTING = Switch("Dork_sorting")
 DOCK_SORTING.add_state("Ascending", check_button=retire_assets.SORT_ASC, click_button=retire_assets.SORTING_CLICK)
@@ -45,15 +52,27 @@ class DockFilterOptions:
     extra：no_limit、has_skin、can_retrofit、enhanceable、can_limit_break、not_level_max、can_awaken、can_awaken_plus、special、oath_skin、unique_augment_module、wear_skin、oathed、not_available。
     """
 
-    sort: str | list[str] = "level"
-    index: str | list[str] = "all"
-    faction: str | list[str] = "all"
-    rarity: str | list[str] = "all"
-    extra: str | list[str] = "no_limit"
+    sort: DockFilterValue = "level"
+    index: DockFilterValue = "all"
+    faction: DockFilterValue = "all"
+    rarity: DockFilterValue = "all"
+    extra: DockFilterValue = "no_limit"
     wait_loading: bool = True
 
 
-def dock_filter_options(options=None, settings=None) -> DockFilterOptions:
+class DockFilterSettings(TypedDict, total=False):
+    sort: DockFilterValue
+    index: DockFilterValue
+    faction: DockFilterValue
+    rarity: DockFilterValue
+    extra: DockFilterValue
+    wait_loading: bool
+
+
+def dock_filter_options(
+    options: DockFilterOptions | None = None,
+    settings: DockFilterSettings | None = None,
+) -> DockFilterOptions:
     options = DockFilterOptions() if options is None else options
     if settings:
         options = replace(options, **settings)
@@ -61,7 +80,7 @@ def dock_filter_options(options=None, settings=None) -> DockFilterOptions:
 
 
 class Dock(Equipment):
-    def handle_dock_cards_loading(self, skip_first_screenshot=True):
+    def handle_dock_cards_loading(self, *, skip_first_screenshot: bool = True) -> None:
         # 这里不能用 confirm_timer，只能短暂等待卡片加载。
         timeout = Timer(1.2, count=1).start()
         while 1:
@@ -78,21 +97,21 @@ class Dock(Equipment):
             if timeout.reached():
                 break
 
-    def dock_favourite_set(self, enable=False, wait_loading=True):
+    def dock_favourite_set(self, *, enable: bool = False, wait_loading: bool = True) -> None:
         if DOCK_FAVOURITE.set("on" if enable else "off", main=self) and wait_loading:
             self.handle_dock_cards_loading()
 
-    def _dock_quit_check_func(self):
+    def _dock_quit_check_func(self) -> bool:
         return not self.appear(retire_assets.DOCK_CHECK, offset=(20, 20))
 
-    def dock_quit(self):
+    def dock_quit(self) -> None:
         self.ui_back(check_button=self._dock_quit_check_func, skip_first_screenshot=True)
 
-    def dock_sort_method_dsc_set(self, enable=True, wait_loading=True):
+    def dock_sort_method_dsc_set(self, *, enable: bool = True, wait_loading: bool = True) -> None:
         if DOCK_SORTING.set("Descending" if enable else "Ascending", main=self) and wait_loading:
             self.handle_dock_cards_loading()
 
-    def dock_filter_enter(self):
+    def dock_filter_enter(self) -> None:
         logger.info("Dock filter enter")
         self.interval_clear(retire_assets.DOCK_CHECK)
         for _ in self.loop():
@@ -112,7 +131,12 @@ class Dock(Equipment):
                 self.device.click(retire_assets.GET_ITEMS_1_RETIREMENT_SAVE)
                 continue
 
-    def dock_filter_confirm(self, wait_loading=True, skip_first_screenshot=True):
+    def dock_filter_confirm(
+        self,
+        *,
+        wait_loading: bool = True,
+        skip_first_screenshot: bool = True,
+    ) -> None:
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -230,7 +254,11 @@ class Dock(Equipment):
         )
         return setting
 
-    def dock_filter_set(self, options=None, **settings):
+    def dock_filter_set(
+        self,
+        options: DockFilterOptions | None = None,
+        **settings: Unpack[DockFilterSettings],
+    ) -> None:
         """在船坞页应用 DockFilterOptions，settings 覆盖其中字段。"""
         options = dock_filter_options(options, settings)
         self.dock_filter_enter()
@@ -243,7 +271,7 @@ class Dock(Equipment):
         )
         self.dock_filter_confirm(wait_loading=options.wait_loading)
 
-    def dock_select_one(self, button, skip_first_screenshot=True):
+    def dock_select_one(self, button: Button, *, skip_first_screenshot: bool = True) -> None:
         self.interval_clear(retire_assets.DOCK_CHECK)
         while 1:
             if skip_first_screenshot:
@@ -260,7 +288,7 @@ class Dock(Equipment):
             if self.handle_popup_confirm("DOCK_SELECT"):
                 continue
 
-    def dock_selected(self, skip_first_screenshot=True):
+    def dock_selected(self, *, skip_first_screenshot: bool = True) -> bool:
         """船坞计数为 1/1 时返回 True，0/1 时返回 False。"""
         current = 0
         timeout = Timer(1.5, count=3).start()
@@ -274,13 +302,13 @@ class Dock(Equipment):
                 logger.warning("Get dock_selected timeout, assume not selected")
                 break
 
-            current, _, total = OCR_DOCK_SELECTED.ocr(self.device.image)
+            current, _, total = OCR_DOCK_SELECTED.ocr_single(self.device.image)
             if total == 1:
                 break
 
         return current > 0
 
-    def dock_select_confirm(self, check_button, skip_first_screenshot=True):
+    def dock_select_confirm(self, check_button: DockCheck, *, skip_first_screenshot: bool = True) -> None:
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -295,7 +323,12 @@ class Dock(Equipment):
             if self.handle_popup_confirm("DOCK_SELECT_CONFIRM"):
                 continue
 
-    def dock_enter_first(self, non_npc=True, skip_first_screenshot=True):
+    def dock_enter_first(
+        self,
+        *,
+        non_npc: bool = True,
+        skip_first_screenshot: bool = True,
+    ) -> bool:
         """从船坞进入第一艘可用舰船的详情；non_npc 时跳过首格 NPC。
 
         船坞为空或只有一个 NPC 时返回 False。

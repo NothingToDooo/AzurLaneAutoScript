@@ -22,6 +22,7 @@ class _FakeDevice:
 class _FakeItem:
     name = "Plate"
     group = "plate"
+    tier = "t1"
     price = 2
 
 
@@ -30,7 +31,7 @@ class _FakeStockOcr:
         self.results = list(results)
         self.calls = []
 
-    def ocr(self, image):
+    def ocr_single(self, image):
         self.calls.append(image)
         return self.results.pop(0)
 

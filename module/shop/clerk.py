@@ -1,7 +1,10 @@
 import re
+from typing import TYPE_CHECKING, Protocol, override
 
 import cv2
+import numpy as np
 
+from module.base.button import ButtonGrid
 from module.base.timer import Timer
 from module.exception import ScriptError
 from module.logger import logger
@@ -27,16 +30,39 @@ from module.shop.shop_select_globals import SELECT_ITEM_INFO_MAP
 from module.ui.assets import SHOP_BACK_ARROW
 from module.ui.ui import UiIndexControls
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from module.base.button import Button
+    from module.base.type_alias import ImageArray
+    from module.statistics.item import Item
+
+
+class ShopSelectionItem(Protocol):
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def group(self) -> str | None: ...
+
+    @property
+    def tier(self) -> str | None: ...
+
+    @property
+    def price(self) -> int: ...
+
 
 class StockCounter(DigitCounter):
-    def pre_process(self, image):
+    @override
+    def pre_process(self, image: ImageArray) -> ImageArray:
         r, g, b = cv2.split(image)
-        image = cv2.max(cv2.max(r, g), b)
+        max_channel = cv2.max(cv2.max(r, g), b)
 
-        return 255 - image
+        return np.asarray(255 - max_channel, dtype=np.uint8)
 
-    def after_process(self, result):
-        result = super().after_process(result)
+    @staticmethod
+    def normalize_text(result: str) -> str:
+        result = DigitCounter.normalize_text(result)
 
         if re.match(r"^\d\d$", result):
             # 55 -> 5/5
@@ -59,39 +85,64 @@ OCR_SHOP_AMOUNT = Digit(SHOP_AMOUNT, letter=(239, 239, 239), name="OCR_SHOP_AMOU
 
 
 class ShopClerk(ShopBase, Retirement):
-    def shop_get_choice(self, item):
+    def _shop_pr_series(self) -> str:
+        for _ in range(3):
+            if _:
+                self.device.sleep((0.3, 0.5))
+                self.device.screenshot()
+
+            for index, button in enumerate(SHOP_SELECT_PR, start=1):
+                if self.appear(button, offset=(20, 20)):
+                    return str(index)
+            logger.warning("Failed to detect PR series, app may be lagging or frozen")
+
+        message = "No PR series button is visible"
+        raise ScriptError(message)
+
+    def shop_get_choice(self, item: ShopSelectionItem) -> str:
         """读取对应商店变体的商品配置；配置不存在时抛出异常。"""
         group = item.group
+        if group is None:
+            logger.critical("Cannot select a shop item without a group")
+            raise ScriptError
         if group == "pr":
-            postfix = None
-            for _ in range(3):
-                if _:
-                    self.device.sleep((0.3, 0.5))
-                    self.device.screenshot()
-
-                for idx, btn in enumerate(SHOP_SELECT_PR):
-                    if self.appear(btn, offset=(20, 20)):
-                        postfix = f"{idx + 1}"
-                        break
-
-                if postfix is not None:
-                    break
-                logger.warning("Failed to detect PR series, app may be lagging or frozen")
+            postfix = self._shop_pr_series()
         else:
+            if item.tier is None:
+                logger.critical(f"Cannot select {item.name} without a tier")
+                raise ScriptError
             postfix = f"_{item.tier.upper()}"
 
         ugroup = group.upper()
         # 2025-08-14 新 UI 类名带 _250814，配置名仍使用下划线前的原类名。
         class_name = self.__class__.__name__.split("_")[0]
         try:
-            return getattr(self.config, f"{class_name}_{ugroup}{postfix}")
+            choice = getattr(self.config, f"{class_name}_{ugroup}{postfix}")
         except Exception:
             logger.critical(f"No configuration with name '{class_name}_{ugroup}{postfix}'")
             raise
+        if not isinstance(choice, str):
+            message = f"Shop choice for {item.name} must be a string"
+            raise ScriptError(message)
+        return choice
 
-    def shop_get_select(self, item):
+    def _shop_pr_select(self, grids: dict[str, ButtonGrid], index: int, group: str) -> Button:
+        try:
+            for series_index, button in enumerate(SHOP_SELECT_PR, start=1):
+                if self.appear(button, offset=(20, 20)):
+                    return grids[f"s{series_index}"].buttons[index]
+        except (IndexError, KeyError) as error:
+            logger.critical(f"SELECT_ITEM_INFO_MAP may be malformed; item group '{group}' entry is compromised")
+            raise ScriptError from error
+        message = f"No PR series button is visible for item group '{group}'"
+        raise ScriptError(message)
+
+    def shop_get_select(self, item: ShopSelectionItem) -> Button:
         """按商品组和配置选择网格按钮；映射无效时抛出 ScriptError。"""
         group = item.group
+        if group is None:
+            logger.critical("Cannot select a shop item without a group")
+            raise ScriptError
         if group not in SELECT_ITEM_INFO_MAP:
             logger.critical(f"Unexpected item group '{group}'; expected one of {SELECT_ITEM_INFO_MAP.keys()}")
             raise ScriptError
@@ -107,28 +158,20 @@ class ShopClerk(ShopBase, Retirement):
 
         grid = item_info["grid"]
         if group == "pr":
-            if not isinstance(grid, dict):
+            if isinstance(grid, ButtonGrid):
                 logger.critical(f"SELECT_ITEM_INFO_MAP for item group '{group}' should define series grids")
                 raise ScriptError
-            try:
-                for idx, btn in enumerate(SHOP_SELECT_PR):
-                    if self.appear(btn, offset=(20, 20)):
-                        series_key = f"s{idx + 1}"
-                        return grid[series_key].buttons[index]
-            except Exception as e:
-                logger.critical(f"SELECT_ITEM_INFO_MAP may be malformed; item group '{group}' entry is compromised")
-                raise ScriptError from e
-        else:
-            if isinstance(grid, dict):
-                logger.critical(f"SELECT_ITEM_INFO_MAP for item group '{group}' should define a single grid")
-                raise ScriptError
-            try:
-                return grid.buttons[index]
-            except Exception as e:
-                logger.critical(f"SELECT_ITEM_INFO_MAP may be malformed; item group '{group}' entry is compromised")
-                raise ScriptError from e
+            return self._shop_pr_select(grid, index, group)
+        if not isinstance(grid, ButtonGrid):
+            logger.critical(f"SELECT_ITEM_INFO_MAP for item group '{group}' should define a single grid")
+            raise ScriptError
+        try:
+            return grid.buttons[index]
+        except Exception as e:
+            logger.critical(f"SELECT_ITEM_INFO_MAP may be malformed; item group '{group}' entry is compromised")
+            raise ScriptError from e
 
-    def shop_buy_select_execute(self, item):
+    def shop_buy_select_execute(self, item: ShopSelectionItem) -> bool:
         select = self.shop_get_select(item)
         limit = self._read_shop_select_stock_limit(item)
         self._wait_shop_select_amount_controls(select)
@@ -146,7 +189,7 @@ class ShopClerk(ShopBase, Retirement):
         self.device.click(SHOP_BUY_CONFIRM_SELECT)
         return True
 
-    def _read_shop_select_stock_limit(self, item):
+    def _read_shop_select_stock_limit(self, item: ShopSelectionItem) -> int:
         timeout = Timer(5, count=10).start()
         skip_first_screenshot = True
         limit = 0
@@ -157,7 +200,7 @@ class ShopClerk(ShopBase, Retirement):
                 skip_first_screenshot = False
             else:
                 self.device.screenshot()
-            _, _, limit = OCR_SHOP_SELECT_STOCK.ocr(self.device.image)
+            _, _, limit = OCR_SHOP_SELECT_STOCK.ocr_single(self.device.image)
             if limit:
                 break
 
@@ -168,7 +211,7 @@ class ShopClerk(ShopBase, Retirement):
             raise ScriptError
         return limit
 
-    def _wait_shop_select_amount_controls(self, select):
+    def _wait_shop_select_amount_controls(self, select: Button) -> None:
         click_timer = Timer(3, count=6)
         select_offset = (500, 400)
         while 1:
@@ -182,26 +225,32 @@ class ShopClerk(ShopBase, Retirement):
                 break
             continue
 
-    def _limit_shop_select_amount_by_currency(self, limit, item):
+    def _limit_shop_select_amount_by_currency(self, limit: int, item: ShopSelectionItem) -> int:
         total = int(self._currency // item.price)
         diff = limit - total
         if diff > 0:
             return total
         return limit
 
-    def _shop_select_stock_letter(self, item, limit):
+    @staticmethod
+    def _shop_select_stock_letter(item: ShopSelectionItem, limit: int) -> Callable[[ImageArray], int]:
+        group = item.group
+        if group is None:
+            message = "Cannot read stock for a shop item without a group"
+            raise ScriptError(message)
+
         # 适配 ui_ensure_index，避免库存耗尽时继续加购。
-        def read_remain(image):
-            current, remain, _ = OCR_SHOP_SELECT_STOCK.ocr(image)
+        def read_remain(image: ImageArray) -> int:
+            current, remain, _ = OCR_SHOP_SELECT_STOCK.ocr_single(image)
             if not current:
-                group_case = item.group.title() if len(item.group) > 2 else item.group.upper()
+                group_case = group.title() if len(group) > 2 else group.upper()
                 logger.info(f"{group_case}(s) out of stock; exit to prevent overbuying")
                 return limit
             return remain
 
         return read_remain
 
-    def shop_buy_amount_execute(self, item):
+    def shop_buy_amount_execute(self, item: ShopSelectionItem) -> bool:
         """按库存和货币设置购买数量；数量 OCR 失败时抛出 ScriptError。"""
         index_offset = (40, 20)
 
@@ -220,7 +269,7 @@ class ShopClerk(ShopBase, Retirement):
             if timeout.reached():
                 break
             self.device.screenshot()
-            limit = OCR_SHOP_AMOUNT.ocr(self.device.image)
+            limit = OCR_SHOP_AMOUNT.ocr_single(self.device.image)
             if limit:
                 break
 
@@ -241,16 +290,17 @@ class ShopClerk(ShopBase, Retirement):
         self.device.click(SHOP_BUY_CONFIRM_AMOUNT)
         return True
 
-    def shop_interval_clear(self):
+    def shop_interval_clear(self) -> None:
         """变体可覆盖以清理额外资源的间隔计时。"""
         self.interval_clear(SHOP_BACK_ARROW)
         self.interval_clear(SHOP_BUY_CONFIRM)
 
-    def shop_buy_handle(self, _item):
+    @staticmethod
+    def shop_buy_handle(_item: Item) -> bool:
         """供变体处理特殊购买弹窗。"""
         return False
 
-    def shop_buy_execute(self, item, skip_first_screenshot=True):
+    def shop_buy_execute(self, item: Item, *, skip_first_screenshot: bool = True) -> None:
         success = False
         self.shop_interval_clear()
 
@@ -284,7 +334,7 @@ class ShopClerk(ShopBase, Retirement):
             if success and self.appear(SHOP_BACK_ARROW, offset=(30, 30)):
                 break
 
-    def shop_buy(self):
+    def shop_buy(self) -> bool:
         """购买完成返回 True；货币无法识别或耗尽时返回 False。"""
         for _ in range(12):
             logger.hr("Shop buy", level=2)
