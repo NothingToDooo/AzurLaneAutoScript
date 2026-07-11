@@ -1,5 +1,5 @@
-from types import SimpleNamespace
-from typing import cast
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, TypedDict, override
 
 import numpy as np
 import pytest
@@ -7,14 +7,25 @@ import pytest
 from module.exception import ScriptError
 from module.meowfficer import buy as buy_module
 from module.meowfficer.buy import MeowfficerBuy
-from module.ocr.failure_store import OCR_FAILURE_STORE
+from module.ocr.failure_store import OCR_FAILURE_STORE, OcrFailureStore
 from module.ocr.result import RecognitionFailureReason, RecognitionResult
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
-class SequenceOcr:
-    def __init__(self, results: list[RecognitionResult[object]]) -> None:
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
+
+
+class _OcrCall(TypedDict):
+    expected_total: int | None
+    failure_store: OcrFailureStore | None
+
+
+class SequenceOcr[T]:
+    def __init__(self, results: list[RecognitionResult[T]]) -> None:
         self._results = iter(results)
-        self.calls: list[dict[str, object]] = []
+        self.calls: list[_OcrCall] = []
 
     @property
     def call_count(self) -> int:
@@ -22,48 +33,63 @@ class SequenceOcr:
 
     def recognize(
         self,
-        image: np.ndarray,
+        image: ImageArray,
         *,
         expected_total: int | None = None,
-        failure_store: object | None = None,
-    ) -> RecognitionResult[object]:
+        failure_store: OcrFailureStore | None = None,
+    ) -> RecognitionResult[T]:
         del image
         self.calls.append({"expected_total": expected_total, "failure_store": failure_store})
         return next(self._results)
 
 
-class ListOcr:
-    def __init__(self, result: RecognitionResult[object]) -> None:
+class ListOcr[T]:
+    def __init__(self, result: RecognitionResult[T]) -> None:
         self._result = result
-        self.calls: list[dict[str, object]] = []
+        self.calls: list[_OcrCall] = []
 
     def recognize(
         self,
-        image: np.ndarray,
+        image: ImageArray,
         *,
         expected_total: int | None = None,
-        failure_store: object | None = None,
-    ) -> list[RecognitionResult[object]]:
+        failure_store: OcrFailureStore | None = None,
+    ) -> list[RecognitionResult[T]]:
         del image
         self.calls.append({"expected_total": expected_total, "failure_store": failure_store})
         return [self._result]
 
 
-class _TestBuyer:
-    def __init__(self, frames: list[np.ndarray], *, save_error: bool) -> None:
-        self._frames = frames
-        self.device = SimpleNamespace(image=frames[0])
-        self.config = SimpleNamespace(Error_SaveError=save_error)
+@dataclass(slots=True)
+class _BuyerDevice:
+    image: ImageArray
 
-    def loop(self, skip_first=True, timeout=None):
+
+@dataclass(slots=True)
+class _BuyerConfig:
+    Error_SaveError: bool
+
+
+class _TestBuyer(MeowfficerBuy):
+    config: _BuyerConfig
+    device: _BuyerDevice
+
+    def __init__(self, frames: list[ImageArray], *, save_error: bool) -> None:
+        self._frames = frames
+        self.device = _BuyerDevice(frames[0])
+        self.config = _BuyerConfig(Error_SaveError=save_error)
+
+    @override
+    def loop(
+        self,
+        *,
+        skip_first: bool = True,
+        timeout: float | Timer | None = None,
+    ) -> Iterator[ImageArray]:
         del skip_first, timeout
         for frame in self._frames:
             self.device.image = frame
             yield frame
-
-    def meow_get_buy_count(self, buy_amount: int, overflow_th: int) -> int:
-        buyer = cast("MeowfficerBuy", self)
-        return MeowfficerBuy.meow_get_buy_count(buyer, buy_amount, overflow_th)
 
 
 def make_buyer_with_frames(count: int, *, save_error: bool) -> _TestBuyer:
@@ -71,7 +97,7 @@ def make_buyer_with_frames(count: int, *, save_error: bool) -> _TestBuyer:
     return _TestBuyer(frames, save_error=save_error)
 
 
-def valid_counter(value: tuple[int, int, int]) -> RecognitionResult[object]:
+def valid_counter(value: tuple[int, int, int]) -> RecognitionResult[tuple[int, int, int]]:
     current, _remain, total = value
     text = f"{current}/{total}"
     return RecognitionResult(
@@ -90,7 +116,7 @@ def valid_counter(value: tuple[int, int, int]) -> RecognitionResult[object]:
 def invalid_counter(
     raw_text: str,
     reason: RecognitionFailureReason = RecognitionFailureReason.FORMAT_MISMATCH,
-) -> RecognitionResult[object]:
+) -> RecognitionResult[tuple[int, int, int]]:
     return RecognitionResult(
         raw_text=raw_text,
         normalized_text=raw_text,
@@ -104,7 +130,7 @@ def invalid_counter(
     )
 
 
-def valid_digit(value: int) -> RecognitionResult[object]:
+def valid_digit(value: int) -> RecognitionResult[int]:
     text = str(value)
     return RecognitionResult(
         raw_text=text,
@@ -119,7 +145,7 @@ def valid_digit(value: int) -> RecognitionResult[object]:
     )
 
 
-def invalid_digit(raw_text: str) -> RecognitionResult[object]:
+def invalid_digit(raw_text: str) -> RecognitionResult[int]:
     return RecognitionResult(
         raw_text=raw_text,
         normalized_text=raw_text,

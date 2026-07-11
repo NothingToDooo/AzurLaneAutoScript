@@ -32,7 +32,7 @@ class _Timer:
         return False
 
     def reset(self) -> None:
-        _Timer.reset_count += 1
+        type(self).reset_count += 1
 
 
 class _ClickRecord:
@@ -76,7 +76,8 @@ class _MeowfficerCollect(MeowfficerCollect):
     def get(self) -> None:
         self.meow_get()
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
@@ -100,7 +101,7 @@ class _MeowfficerCollect(MeowfficerCollect):
     def _meow_skip_lock(self) -> None:
         self.calls.append(("_meow_skip_lock",))
 
-    def _meow_apply_lock(self, lock: object = True) -> None:
+    def _meow_apply_lock(self, *, lock: bool = True) -> None:
         self.calls.append(("_meow_apply_lock", lock))
 
     def interval_reset(self, button: object, *_args: object, **_kwargs: object) -> None:

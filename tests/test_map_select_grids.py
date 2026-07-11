@@ -18,7 +18,7 @@ class _Grid:
         return self.name
 
 
-def _names(grids):
+def _names(grids: SelectedGrids[_Grid]) -> list[str]:
     return [grid.name for grid in grids]
 
 

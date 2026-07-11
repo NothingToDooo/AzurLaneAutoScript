@@ -1,25 +1,38 @@
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar, override
 
-from module.minigame.minigame import Minigame
+import numpy as np
+
+from module.minigame.minigame import Minigame, MinigamePlayer
 from module.ui.assets import ACADEMY_GOTO_GAME_ROOM
 from module.ui.page import page_academy, page_game_room
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from module.base.button import Button, MatchOffset
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
+    from module.ui.page import Page
+
 _T = TypeVar("_T")
+
+type _Call = tuple[str] | tuple[str, str] | tuple[str, Page] | tuple[str, Page, MatchOffset | None, float]
 
 
 class _Config:
     def __init__(self) -> None:
-        self.delays: list[dict[str, object]] = []
+        self.delays: list[dict[str, bool]] = []
 
-    def task_delay(self, **kwargs: object) -> None:
+    def task_delay(self, **kwargs: bool) -> None:
         self.delays.append(kwargs)
 
 
 class _Device:
     def __init__(self) -> None:
-        self.clicks: list[object] = []
+        self.clicks: list[Button] = []
+        self.image = np.zeros((2, 2, 3), dtype=np.uint8)
 
-    def click(self, button: object) -> None:
+    def click(self, button: Button) -> None:
         self.clicks.append(button)
 
 
@@ -42,44 +55,75 @@ class _Minigame(Minigame):
     def __init__(self) -> None:
         self.config = _Config()
         self.device = _Device()
-        self.calls: list[tuple[object, ...]] = []
-        self.page_results: dict[object, list[bool]] = {}
+        self.calls: list[_Call] = []
+        self.page_results: dict[Page, list[bool]] = {}
         self.popup_results: list[bool] = []
         self.coin_results: list[int] = []
         self.collect_results: list[bool] = []
         self.minigame_instance: _MinigameInstance | None = None
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
-    def loop(self, *_args: object, **_kwargs: object):
-        return range(5)
+    @override
+    def loop(
+        self,
+        *,
+        skip_first: bool = True,
+        timeout: float | Timer | None = None,
+    ) -> Iterator[ImageArray]:
+        del skip_first, timeout
+        return iter([self.device.image] * 5)
 
-    def ui_ensure(self, destination: object, *_args: object, **_kwargs: object) -> None:
+    @override
+    def ui_ensure(self, destination: Page, *, skip_first_screenshot: bool = True) -> bool:
+        del skip_first_screenshot
         self.calls.append(("ui_ensure", destination))
+        return False
 
-    def ui_page_appear(self, page: object, *_args: object, **kwargs: object) -> bool:
-        self.calls.append(("ui_page_appear", page, kwargs))
+    @override
+    def ui_page_appear(
+        self,
+        page: Page,
+        offset: MatchOffset | None = (30, 30),
+        interval: float = 0,
+    ) -> bool:
+        self.calls.append(("ui_page_appear", page, offset, interval))
         return self._next_result(self.page_results.get(page, []), default=False)
 
-    def handle_popup_confirm(self, name: str = "", *_args: object, **_kwargs: object) -> bool:
+    @override
+    def handle_popup_confirm(
+        self,
+        name: str = "",
+        offset: MatchOffset | None = None,
+        interval: float = 2,
+    ) -> bool:
+        del offset, interval
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 
-    def go_to_main_page(self, *_args: object, **_kwargs: object) -> None:
+    @override
+    def go_to_main_page(self, *, skip_first_screenshot: bool = True) -> None:
+        del skip_first_screenshot
         self.calls.append(("go_to_main_page",))
 
-    def _create_minigame_instance(self, specific_game_name: str) -> _MinigameInstance | None:
+    @override
+    def _create_minigame_instance(self, specific_game_name: str) -> MinigamePlayer | None:
         self.calls.append(("_create_minigame_instance", specific_game_name))
         return self.minigame_instance
 
-    def get_coin_amount(self, *_args: object, **_kwargs: object) -> int:
+    @override
+    def get_coin_amount(self, *, skip_first_screenshot: bool = True) -> int:
+        del skip_first_screenshot
         self.calls.append(("get_coin_amount",))
         return self._next_result(self.coin_results, default=0)
 
-    def collect_coin(self, *_args: object, **_kwargs: object) -> bool:
+    @override
+    def collect_coin(self, *, skip_first_screenshot: bool = True) -> bool:
+        del skip_first_screenshot
         self.calls.append(("collect_coin",))
         return self._next_result(self.collect_results, default=False)
 

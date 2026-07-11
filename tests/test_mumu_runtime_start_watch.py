@@ -1,26 +1,39 @@
-from types import SimpleNamespace
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Literal, Self, overload, override
 
 import pytest
+from adbutils import AdbClient
 
 from module.device import runtime as runtime_module
+from module.device.platform.emulator_base import EmulatorInstanceBase
 from module.device.runtime import MumuRuntime
 from module.map.map_grids import SelectedGrids
 
+if TYPE_CHECKING:
+    from adbutils import AdbConnection
 
-class _AdbClient:
+    from module.device.contracts import AdbCommand
+
+
+class _AdbClient(AdbClient):
     def __init__(self, messages: list[str] | None = None) -> None:
         self.messages = messages or ["connected"]
         self.connect_calls: list[str] = []
         self.disconnect_calls: list[str] = []
 
-    def connect(self, serial: str) -> str:
-        self.connect_calls.append(serial)
+    @override
+    def connect(self, addr: str, timeout: float | None = None) -> str:
+        del timeout
+        self.connect_calls.append(addr)
         if self.messages:
             return self.messages.pop(0)
         return "connected"
 
-    def disconnect(self, serial: str) -> None:
-        self.disconnect_calls.append(serial)
+    @override
+    def disconnect(self, addr: str, raise_error: bool = False) -> str:
+        del raise_error
+        self.disconnect_calls.append(addr)
+        return "disconnected"
 
 
 class _Timer:
@@ -29,15 +42,18 @@ class _Timer:
     def __init__(self, limit: float) -> None:
         self.limit = limit
         self.reached_calls = 0
+        self.wait_calls = 0
+        self.reset_calls = 0
 
-    def start(self):
+    def start(self) -> Self:
         return self
 
     def wait(self) -> None:
-        return None
+        self.wait_calls += 1
 
-    def reset(self) -> None:
-        return None
+    def reset(self) -> Self:
+        self.reset_calls += 1
+        return self
 
     def reached(self) -> bool:
         if self.limit != 180:
@@ -46,48 +62,143 @@ class _Timer:
         return self.reached_calls > self.timeout_after
 
 
-def _device(serial: str, status: str):
-    return SimpleNamespace(serial=serial, status=status)
+@dataclass(frozen=True, slots=True)
+class _Device:
+    serial: str
+    status: str
+
+
+type _ShellResult = str | BaseException
+
+
+class _Session:
+    def __init__(
+        self,
+        *,
+        serial: str,
+        device_batches: list[list[_Device]],
+        shell_results: list[_ShellResult],
+        package_results: list[list[str]],
+        connect_messages: list[str] | None,
+    ) -> None:
+        self.serial = serial
+        self.is_mumu_family = True
+        self.is_mumu12_family = True
+        self.package = "com.bilibili.azurlane"
+        self.adb_client = _AdbClient(connect_messages)
+        self.device_batches = list(device_batches)
+        self.last_devices: list[_Device] = []
+        self.shell_results = shell_results
+        self.package_results = package_results
+        self.shell_calls = 0
+        self.package_calls = 0
+        self.recovery_calls = 0
+        self.prop_calls: list[str] = []
+
+    @overload
+    def adb_shell(
+        self,
+        cmd: AdbCommand,
+        *,
+        stream: Literal[False] = False,
+        recvall: bool = True,
+        timeout: float | None = 10,
+        rstrip: bool = True,
+    ) -> str: ...
+
+    @overload
+    def adb_shell(
+        self,
+        cmd: AdbCommand,
+        *,
+        stream: Literal[True],
+        recvall: Literal[True] = True,
+        timeout: float | None = 10,
+        rstrip: bool = True,
+    ) -> bytes: ...
+
+    @overload
+    def adb_shell(
+        self,
+        cmd: AdbCommand,
+        *,
+        stream: Literal[True],
+        recvall: Literal[False],
+        timeout: float | None = 10,
+        rstrip: bool = True,
+    ) -> AdbConnection: ...
+
+    def adb_shell(
+        self,
+        cmd: AdbCommand,
+        *,
+        stream: bool = False,
+        recvall: bool = True,
+        timeout: float | None = 10,
+        rstrip: bool = True,
+    ) -> str | bytes | AdbConnection:
+        del cmd, recvall, timeout, rstrip
+        if stream:
+            raise AssertionError
+        self.shell_calls += 1
+        result = self.shell_results.pop(0) if self.shell_results else "pong"
+        if isinstance(result, BaseException):
+            raise result
+        return result
+
+    def adb_start_server(self) -> int:
+        self.recovery_calls += 1
+        return 0
+
+    def adb_reconnect(self) -> None:
+        self.recovery_calls += 1
+
+    def detect_package(self) -> None:
+        self.recovery_calls += 1
+
+    def adb_getprop(self, name: str) -> str:
+        self.prop_calls.append(name)
+        return ""
+
+    def list_device(self) -> SelectedGrids[_Device]:
+        if self.device_batches:
+            self.last_devices = self.device_batches.pop(0)
+        return SelectedGrids(self.last_devices)
+
+    def list_known_packages(self, *, show_log: bool = True) -> list[str]:
+        del show_log
+        self.package_calls += 1
+        return self.package_results.pop(0)
+
+
+def _device(serial: str, status: str) -> _Device:
+    return _Device(serial=serial, status=status)
+
+
+class _Runtime(MumuRuntime):
+    session: _Session
+
+    def __init__(self, session: _Session) -> None:
+        super().__init__(session)
 
 
 def _make_runtime(
     *,
     serial: str = "127.0.0.1:16384",
-    device_batches: list[list[object]],
-    shell_results: list[object] | None = None,
+    device_batches: list[list[_Device]],
+    shell_results: list[_ShellResult] | None = None,
     package_results: list[list[str]] | None = None,
     connect_messages: list[str] | None = None,
-):
-    session = SimpleNamespace(serial=serial, adb_client=_AdbClient(connect_messages))
-    runtime = MumuRuntime(session)
-    runtime.__dict__["emulator_instance"] = SimpleNamespace(serial=serial)
-    session.device_batches = list(device_batches)
-    session.last_devices = []
-    session.shell_results = shell_results or ["pong"]
-    session.package_results = package_results or [["com.bilibili.azurlane"]]
-    session.shell_calls = 0
-    session.package_calls = 0
-
-    def list_device():
-        if session.device_batches:
-            session.last_devices = session.device_batches.pop(0)
-        return SelectedGrids(session.last_devices)
-
-    def adb_shell(_command):
-        session.shell_calls += 1
-        result = session.shell_results.pop(0) if session.shell_results else "pong"
-        if isinstance(result, BaseException):
-            raise result
-        return result
-
-    def list_known_packages(show_log=True):
-        del show_log
-        session.package_calls += 1
-        return session.package_results.pop(0)
-
-    session.list_device = list_device
-    session.adb_shell = adb_shell
-    session.list_known_packages = list_known_packages
+) -> _Runtime:
+    session = _Session(
+        serial=serial,
+        device_batches=device_batches,
+        shell_results=shell_results or ["pong"],
+        package_results=package_results or [["com.bilibili.azurlane"]],
+        connect_messages=connect_messages,
+    )
+    runtime = _Runtime(session)
+    runtime.__dict__["emulator_instance"] = EmulatorInstanceBase(serial=serial, name="test", path="test")
     return runtime
 
 

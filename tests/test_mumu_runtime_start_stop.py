@@ -1,7 +1,12 @@
+from typing import TYPE_CHECKING
+
 import pytest
 
 from module.device.platform.emulator_windows import EmulatorInstance
 from module.device.runtime import EmulatorUnknown, MumuRuntime
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class _Runtime(MumuRuntime):
@@ -12,7 +17,7 @@ class _Runtime(MumuRuntime):
         self._emulator_stop(instance)
 
 
-def _mumu12_instance(tmp_path):
+def _mumu12_instance(tmp_path: Path) -> EmulatorInstance:
     executable = tmp_path / "MuMuPlayer-12.0" / "shell" / "MuMuPlayer.exe"
     executable.parent.mkdir(parents=True)
     executable.touch()
@@ -23,7 +28,7 @@ def _mumu12_instance(tmp_path):
     )
 
 
-def _legacy_instance(tmp_path):
+def _legacy_instance(tmp_path: Path) -> EmulatorInstance:
     executable = tmp_path / "nemu" / "EmulatorShell" / "NemuPlayer.exe"
     executable.parent.mkdir(parents=True)
     executable.touch()
@@ -34,7 +39,7 @@ def _legacy_instance(tmp_path):
     )
 
 
-def test_emulator_start_uses_mumu12_manager_api(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_emulator_start_uses_mumu12_manager_api(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     commands: list[list[str]] = []
     monkeypatch.setattr(MumuRuntime, "execute", classmethod(lambda _cls, command: commands.append(command)))
     runtime = object.__new__(_Runtime)
@@ -52,7 +57,7 @@ def test_emulator_start_uses_mumu12_manager_api(monkeypatch: pytest.MonkeyPatch,
     ]
 
 
-def test_emulator_stop_uses_mumu12_manager_api(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_emulator_stop_uses_mumu12_manager_api(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     commands: list[list[str]] = []
     monkeypatch.setattr(MumuRuntime, "execute", classmethod(lambda _cls, command: commands.append(command)))
     runtime = object.__new__(_Runtime)
@@ -70,7 +75,7 @@ def test_emulator_stop_uses_mumu12_manager_api(monkeypatch: pytest.MonkeyPatch, 
     ]
 
 
-def test_legacy_emulator_instance_cannot_start_or_stop(tmp_path) -> None:
+def test_legacy_emulator_instance_cannot_start_or_stop(tmp_path: Path) -> None:
     runtime = object.__new__(_Runtime)
     instance = _legacy_instance(tmp_path)
 

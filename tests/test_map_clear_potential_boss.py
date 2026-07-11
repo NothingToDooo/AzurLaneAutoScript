@@ -1,11 +1,13 @@
 from dataclasses import dataclass
+from typing import override
 
 from module.map.map import Map
 from module.map.map_grids import SelectedGrids
+from module.map_detection.grid_info import GridInfo
 
 
 @dataclass(slots=True)
-class _Grid:
+class _Grid(GridInfo):
     name: str
     weight: int
     cost: int
@@ -16,12 +18,13 @@ class _Grid:
         return self.name
 
 
-class _TrackedSelectedGrids(SelectedGrids):
+class _TrackedSelectedGrids(SelectedGrids[_Grid]):
     def __init__(self, grids: list[_Grid], sort_calls: list[tuple[str, ...]]) -> None:
         super().__init__(grids)
         self.sort_calls = sort_calls
 
-    def sort(self, *args: str):
+    @override
+    def sort(self, *args: str) -> _TrackedSelectedGrids:
         self.sort_calls.append(args)
         sorted_grids = super().sort(*args)
         return _TrackedSelectedGrids(sorted_grids.grids, self.sort_calls)
@@ -47,10 +50,13 @@ class _Campaign(Map):
         self.attempts: list[tuple[str, str]] = []
 
     @property
-    def fleet_boss(self):
+    @override
+    def fleet_boss(self) -> _Campaign:
         return self
 
-    def clear_chosen_enemy(self, grid: _Grid, expected: str = "") -> bool:
+    @override
+    def clear_chosen_enemy(self, grid: GridInfo, expected: str = "") -> bool:
+        assert isinstance(grid, _Grid)
         self.attempts.append((grid.name, expected))
         if grid is self.successful_grid:
             self.battle_count += 1
