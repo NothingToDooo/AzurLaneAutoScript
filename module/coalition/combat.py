@@ -27,7 +27,7 @@ class CoalitionCombat(CoalitionUI, CampaignBase):
                 self.device.screenshot()
 
             # End
-            if self.is_combat_loading():
+            if self.is_combat_loading() or self.is_combat_executing():
                 break
             if self.in_coalition():
                 raise CampaignEnd
@@ -50,6 +50,9 @@ class CoalitionCombat(CoalitionUI, CampaignBase):
             if status_clicked and click_timer.reached() and not click_last.reached():
                 self.device.click(BATTLE_STATUS)
                 click_timer.reset()
+
+    def auto_search_combat_end(self) -> bool:
+        return self.appear(BATTLE_STATUS, offset=(80, 20))
 
     def coalition_combat(self):
         """

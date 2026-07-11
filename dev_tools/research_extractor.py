@@ -44,6 +44,8 @@ DR_SHIP = {
     "nakhimov",
     "goudenleeuw",
     "mecklenburg",
+    "valparaiso",
+    "maximmelmann",
 }
 
 SHIP_KEYWORDS = {
@@ -133,6 +135,16 @@ SHIP_KEYWORDS = {
     "kansas": "kansas",
     "维托里奥": "vittorio",
     "vittorio": "vittorio",
+    "瓦尔帕莱索": "valparaiso",
+    "valparaiso": "valparaiso",
+    "{namecode:565}": "maximmelmann",
+    "maximmelmann": "maximmelmann",
+    "邓肯": "duncan",
+    "duncan": "duncan",
+    "{namecode:313}": "takahashi",
+    "takahashi": "takahashi",
+    "暴风雨": "orage",
+    "orage": "orage",
 }
 
 EQUIPMENT_AMOUNT = re.compile(r"(?:拆解|分解|Scrap)\D*(8|15)\D*(?:件装备|pieces? of gear)", re.IGNORECASE)
@@ -269,4 +281,5 @@ Arguments:
 FOLDER = ""
 SAVE = "module/research/project_data.py"
 
-TechnologyTemplate().write(SAVE)
+if __name__ == "__main__":
+    TechnologyTemplate().write(SAVE)

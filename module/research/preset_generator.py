@@ -10,6 +10,7 @@ TENRAI_NAME_BY_SERIES = {
     6: "203",
     7: "la9",
     8: "305",
+    9: "ta152",
 }
 
 
@@ -104,7 +105,7 @@ if __name__ == "__main__":
         generator.add('"D5 > Q0.5 > G4 > D8 > H1 > H2 > H0.5 > D0.5 > H4"')
     generator.add(")")
     with Dict("DICT_FILTER_PRESET"):
-        for series in [8, 7, 6, 5, 4, 3, 2]:
+        for series in [9, 8, 7, 6, 5, 4, 3, 2]:
 
             def new_filter(series=series, **kwargs):
                 for raw_key, raw_value in kwargs.items():

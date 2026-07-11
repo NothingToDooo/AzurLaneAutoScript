@@ -299,6 +299,9 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
             return True
         return self.handle_mission_popup_ack()
 
+    def auto_search_combat_end(self) -> bool:
+        return False
+
     def _handle_auto_search_combat_execute_end(self):
         if self.is_in_auto_search_menu() or self._handle_auto_search_menu_missing():
             self.device.screenshot_interval_set()
@@ -309,6 +312,8 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
             return True, False
         if any(self.appear(button) for button in AUTO_SEARCH_COMBAT_END_CHECKS) or self.is_auto_search_running():
             self.device.screenshot_interval_set()
+            return True, True
+        if self.auto_search_combat_end():
             return True, True
         return False, False
 

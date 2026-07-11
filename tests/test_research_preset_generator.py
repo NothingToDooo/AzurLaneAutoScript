@@ -13,6 +13,7 @@ from module.research.preset_generator import convert_name
         (6, "203"),
         (7, "la9"),
         (8, "305"),
+        (9, "ta152"),
     ],
 )
 def test_convert_name_maps_tenrai_for_each_supported_series(series: int, equipment_name: str) -> None:
@@ -20,4 +21,4 @@ def test_convert_name_maps_tenrai_for_each_supported_series(series: int, equipme
 
 
 def test_convert_name_keeps_tenrai_for_unknown_series() -> None:
-    assert convert_name("series_4_tenrai_only", 9) == "series_9_tenrai_only"
+    assert convert_name("series_4_tenrai_only", 10) == "series_10_tenrai_only"

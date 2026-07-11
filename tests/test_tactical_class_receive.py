@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import Any, cast
 
 from module.tactical import tactical_class as tactical_module
 from module.tactical.assets import BOOK_EMPTY_POPUP
@@ -107,6 +108,33 @@ class _Tactical(RewardTacticalClass):
         self.interval_clears.append((button, interval))
 
 
+class _TacticalFactionProbe(RewardTacticalClass):
+    config: Any
+    dock_filter: Any
+
+    def __init__(self) -> None:
+        self.config = SimpleNamespace(AddNewStudent_Favorite=False)
+        self.dock_filter = SimpleNamespace(
+            settings={
+                ("faction", "all"): object(),
+                ("faction", "eagle"): object(),
+                ("faction", "meta"): object(),
+                ("faction", "not_available"): object(),
+            }
+        )
+        self.selected_factions: list[str] = []
+
+    def dock_favourite_set(self, *_args: object, **_kwargs: object) -> None:
+        pass
+
+    def dock_filter_set(self, *_args: object, **settings: object) -> None:
+        self.selected_factions = cast("list[str]", settings["faction"])
+
+    def appear(self, button: object, *_args: object, **_kwargs: object) -> bool:
+        _ = button
+        return True
+
+
 def test_tactical_receive_delays_to_tomorrow_when_books_empty(monkeypatch) -> None:
     monkeypatch.setattr(tactical_module, "Timer", lambda *_args, **_kwargs: _Timer())
     monkeypatch.setattr(tactical_module, "get_server_next_update", lambda _server_update: "tomorrow")
@@ -130,3 +158,10 @@ def test_tactical_receive_reenters_when_ship_is_preselected(monkeypatch) -> None
     assert tactical.tactical_class_receive() is True
 
     assert tactical.device.clicks == [BACK_ARROW]
+
+
+def test_select_suitable_ship_excludes_unavailable_faction_slots() -> None:
+    tactical = _TacticalFactionProbe()
+
+    assert tactical.select_suitable_ship() is False
+    assert tactical.selected_factions == ["eagle"]
