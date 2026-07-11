@@ -1,6 +1,12 @@
+from typing import TYPE_CHECKING
+
 from module.base.mask import Mask
 from module.campaign.campaign_base import CampaignBase as CampaignBase_
 from module.map_detection.utils_assets import ASSETS
+
+if TYPE_CHECKING:
+    from module.base.button import Button
+    from module.map.map_base import CampaignMap
 
 MASK_MAP_UI_20211125 = Mask(file="./assets/mask/MASK_MAP_UI_20211125.png")
 
@@ -11,16 +17,16 @@ class CampaignBase(CampaignBase_):
         "TSS1 > TSS2 > TSS3 > TSS4 > TSS5",
     )
 
-    def map_data_init(self, map_):
+    def map_data_init(self, map_: CampaignMap | None) -> None:
         super().map_data_init(map_)
         # Patch ui_mask, get rid of map mechanism
         _ = ASSETS.ui_mask
         ASSETS.ui_mask = MASK_MAP_UI_20211125.image
 
-    def campaign_ensure_mode(self, mode="normal"):
+    def campaign_ensure_mode(self, mode: str = "normal") -> None:
         """该活动不需要切换模式。"""
 
-    def campaign_get_chapter_index(self, name):
+    def campaign_get_chapter_index(self, name: str | int) -> int:
         """将整数或章节名转换为章节序号。"""
         if name == "t":
             return 1
@@ -43,7 +49,7 @@ class CampaignBase(CampaignBase_):
 
         return super(CampaignBase, CampaignBase).campaign_separate_name(name)
 
-    def campaign_get_entrance(self, name):
+    def campaign_get_entrance(self, name: str) -> Button:
         """返回指定关卡的入口按钮。"""
         if name == "sp":
             for stage_name in self.stage_entrance or {}:

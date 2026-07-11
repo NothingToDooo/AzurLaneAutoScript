@@ -154,7 +154,7 @@ class Campaign(CampaignBase):
 
         return self.fleet_boss.clear_boss()
 
-    def catch_camera_repositioning(self):
+    def catch_camera_repositioning(self) -> bool:
         if super().catch_camera_repositioning():
             return True
         destination = getattr(self, "fleet_destination", None)
@@ -167,11 +167,12 @@ class Campaign(CampaignBase):
             return True
         return False
 
-    def map_data_init(self, map_):
+    def map_data_init(self, map_: CampaignMap | None) -> None:
         # Clear mode still has fortress
         self.config.MAP_HAS_FORTRESS = True
         super().map_data_init(map_)
 
-    def handle_clear_mode_config_cover(self):
+    def handle_clear_mode_config_cover(self) -> bool:
         # Preserve fortress data, but release fortress block
         self.map.fortress_data = [self.map.fortress_data[0], ()]
+        return True

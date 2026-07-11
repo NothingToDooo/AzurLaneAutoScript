@@ -6,16 +6,16 @@ from ..campaign_war_archives.campaign_base import CampaignBase as CampaignBase_
 
 
 class CampaignBase(CampaignBase_):
-    def enemy_searching_appear(self):
+    def enemy_searching_appear(self) -> bool:
         if not self.is_in_map():
             return False
 
-        return (
+        return bool(
             red_overlay_transparency(MAP_ENEMY_SEARCHING.color, get_color(self.device.image, MAP_ENEMY_SEARCHING.area))
             > self.MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD
         )
 
-    def handle_exp_info(self):
+    def handle_exp_info(self) -> bool:
         # Random background hits EXP_INFO_B
         if self.ui_page_appear(page_event):
             return False

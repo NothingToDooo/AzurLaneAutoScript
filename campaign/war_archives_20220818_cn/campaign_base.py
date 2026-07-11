@@ -1,10 +1,15 @@
+from typing import TYPE_CHECKING
+
 from module.logger import logger
 
 from ..campaign_war_archives.campaign_base import CampaignBase as CampaignBase_
 
+if TYPE_CHECKING:
+    from module.base.button import Button
+
 
 class CampaignBase(CampaignBase_):
-    def campaign_set_chapter_sp(self, chapter, mode="normal"):
+    def campaign_set_chapter_sp(self, chapter: str, mode: str = "normal") -> bool:
         del mode
         # SP 活动入口仍显示 event UI。
         logger.info("Set chapter SP")
@@ -22,13 +27,13 @@ class CampaignBase(CampaignBase_):
             return "sp_ex", "3"
         return CampaignBase_.campaign_separate_name(name)
 
-    def campaign_get_entrance(self, name):
+    def campaign_get_entrance(self, name: str) -> Button:
         if name == "sp":
             name = "esp"
         return super().campaign_get_entrance(name)
 
     @staticmethod
-    def campaign_get_chapter_index(name):
+    def campaign_get_chapter_index(name: str | int) -> int:
         if name == "sp_sp":
             return 2
         if name == "sp_ex":
