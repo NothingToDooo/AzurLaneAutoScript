@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any, Literal, cast
 from unittest.mock import Mock
 
 from module.coalition.combat import CoalitionCombat
@@ -21,7 +21,7 @@ class _AutoSearchEndProbe(AutoSearchCombat):
     def _handle_auto_search_menu_missing(self) -> bool:
         return False
 
-    def is_combat_executing(self) -> bool:
+    def is_combat_executing(self) -> Literal[False]:
         return False
 
     def handle_get_ship(self) -> bool:

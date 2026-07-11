@@ -116,13 +116,13 @@ def test_coalition_enter_map_clicks_stage_then_fleet_preparation(monkeypatch) ->
     coalition.in_coalition_results = [True, False]
     coalition.fleet_results = [True]
 
-    coalition.enter_map("coalition_20230323", "TC3", "multi")
+    coalition.enter_map("coalition_20230323", "tc3", "multi")
 
     assert coalition.device.clicks == [
         coalition_assets.FROSTFALL_TC3,
         coalition_assets.FROSTFALL_FLEET_PREPARATION,
     ]
-    assert coalition.fleet_preparation_calls == [("coalition_20230323", "TC3", "multi")]
+    assert coalition.fleet_preparation_calls == [("coalition_20230323", "tc3", "multi")]
 
 
 def test_coalition_enter_map_clicks_dal_difficulty(monkeypatch) -> None:
@@ -143,4 +143,4 @@ def test_coalition_enter_map_raises_after_campaign_click_limit(monkeypatch) -> N
     coalition.in_coalition_results = [True] * 6
 
     with pytest.raises(RequestHumanTakeover):
-        coalition.enter_map("coalition_20230323", "TC3", "multi")
+        coalition.enter_map("coalition_20230323", "tc3", "multi")
