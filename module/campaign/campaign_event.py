@@ -12,12 +12,7 @@ from module.war_archives.assets import WAR_ARCHIVES_CAMPAIGN_CHECK
 
 class CampaignEvent(CampaignStatus):
     def _reset_gems_farming(self, tasks):
-        """
-        Reset GemsFarming to 2-4 when event is over
-
-        Args:
-            tasks (list[str]): Task name
-        """
+        """活动结束后把宝石委托重置为 2-4。"""
         for task in tasks:
             if task not in GEMS_FARMINGS:
                 continue
@@ -28,12 +23,7 @@ class CampaignEvent(CampaignStatus):
                 self.config.cross_set(keys=f"{task}.Campaign.Event", value="campaign_main")
 
     def _disable_tasks(self, tasks):
-        """
-        Args:
-            tasks (list[str]): Task name
-        """
         with self.config.multi_set():
-            # Disable normal events
             for task in tasks:
                 if task in GEMS_FARMINGS:
                     continue
@@ -41,21 +31,14 @@ class CampaignEvent(CampaignStatus):
                 logger.info(f"Disable task `{task}`")
                 self.config.cross_set(keys=keys, value=False)
 
-            # Reset GemsFarming
             self._reset_gems_farming(tasks)
 
             logger.info("Reset event time limit")
             self.config.cross_set(keys="EventGeneral.EventGeneral.TimeLimit", value=DEFAULT_TIME)
 
     def event_pt_limit_triggered(self):
-        """
-        Returns:
-            bool:
-
-        Pages:
-            in: page_event or page_sp
-        """
-        # Some may use "100,000"
+        """页面进入：page_event 或 page_sp。"""
+        # 配置值可能包含千位分隔符，例如 100,000。
         limit = int(re.sub(r'[,.\'"，。]', "", str(self.config.EventGeneral_PtLimit)))
         tasks = EVENTS + RAIDS + COALITIONS + GEMS_FARMINGS + HOSPITAL
         command = self.config.Scheduler_Command
@@ -73,13 +56,7 @@ class CampaignEvent(CampaignStatus):
         return False
 
     def event_time_limit_triggered(self):
-        """
-        Returns:
-            bool:
-
-        Pages:
-            in: page_event or page_sp
-        """
+        """页面进入：page_event 或 page_sp。"""
         limit = self.config.EventGeneral_TimeLimit
         tasks = EVENTS + RAIDS + COALITIONS + GEMS_FARMINGS + MARITIME_ESCORTS + HOSPITAL
         command = self.config.Scheduler_Command
@@ -97,17 +74,11 @@ class CampaignEvent(CampaignStatus):
         return False
 
     def triggered_task_balancer(self):
-        """
-        Returns:
-            bool: If triggered task_call
-        Pages:
-            in: page_event or page_sp
-        """
+        """页面进入：page_event 或 page_sp。"""
         limit = self.config.TaskBalancer_CoinLimit
         coin = self.get_coin()
-        # Check Coin
         if coin == 0:
-            # Avoid wrong/zero OCR result
+            # 避免把 OCR 失败的 0 当作真实物资量。
             logger.warning("Coin not found")
             return False
         if self.is_balancer_task():
@@ -125,13 +96,7 @@ class CampaignEvent(CampaignStatus):
         self.config.task_stop()
 
     def is_event_entrance_available(self):
-        """
-        Returns:
-            bool: True if available
-
-        Raises:
-            TaskEnd: If unavailable
-        """
+        """入口不可用时停止当前任务。"""
         if self.appear(CAMPAIGN_MENU_NO_EVENT, offset=(20, 20)):
             logger.info("Event unavailable, disable task")
             tasks = EVENTS + RAIDS + COALITIONS + GEMS_FARMINGS + HOSPITAL
@@ -142,7 +107,6 @@ class CampaignEvent(CampaignStatus):
         return True
 
     def ui_goto_event(self):
-        # Already in page_event, skip event_check.
         if self.ui_get_current_page() == page_event:
             if self.appear(WAR_ARCHIVES_CAMPAIGN_CHECK, offset=(20, 20)):
                 logger.info("At war archives")
@@ -151,14 +115,12 @@ class CampaignEvent(CampaignStatus):
                 logger.info("Already at page_event")
                 return True
         self.ui_goto(page_campaign_menu)
-        # 检查活动入口是否可用。
         if self.is_event_entrance_available():
             self.ui_goto(page_event)
             return True
         return False
 
     def ui_goto_sp(self):
-        # Already in page_event, skip event_check.
         if self.ui_get_current_page() == page_sp:
             if self.appear(WAR_ARCHIVES_CAMPAIGN_CHECK, offset=(20, 20)):
                 logger.info("At war archives")
@@ -167,29 +129,23 @@ class CampaignEvent(CampaignStatus):
                 logger.info("Already at page_sp")
                 return True
         self.ui_goto(page_campaign_menu)
-        # Check event availability
         if self.is_event_entrance_available():
             self.ui_goto(page_sp)
             return True
         return False
 
     def ui_goto_coalition(self):
-        # Already in page_event, skip event_check.
         if self.ui_get_current_page() == page_coalition:
             logger.info("Already at page_coalition")
             return True
         self.ui_goto(page_campaign_menu)
-        # Check event availability
         if self.is_event_entrance_available():
             self.ui_goto(page_coalition)
             return True
         return False
 
     def disable_raid_on_event(self):
-        """
-        Disable raid tasks (or coalition) when entered an event,
-        to be foolproof if user forgot to disable raid tasks when raid is over and another event is ongoing
-        """
+        """进入新活动时禁用用户可能忘记关闭的旧 raid、共斗和护航任务。"""
         command = self.config.Scheduler_Command
         if command not in EVENTS + GEMS_FARMINGS:
             return False
@@ -205,10 +161,7 @@ class CampaignEvent(CampaignStatus):
         return False
 
     def disable_event_on_raid(self):
-        """
-        Disable event tasks when entered an raid or coalition,
-        to be foolproof if user forgot to disable event tasks when event is over and another raid is ongoing
-        """
+        """进入 raid、共斗或护航时禁用用户可能忘记关闭的旧活动任务。"""
         command = self.config.Scheduler_Command
         if command not in RAIDS + COALITIONS + MARITIME_ESCORTS:
             return False
@@ -225,11 +178,6 @@ class CampaignEvent(CampaignStatus):
 
     @staticmethod
     def stage_is_main(name) -> bool:
-        """
-        Predict if given stage name is a event
-
-        Args:
-            name (str): Such as `7-2`, `D3`
-        """
+        """判断 7-2、D3 等关卡名是否属于主线。"""
         regex_main = re.compile(r"\d{1,2}[-_]\d")
         return bool(regex_main.search(name))

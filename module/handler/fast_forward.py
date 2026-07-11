@@ -27,13 +27,7 @@ AUTO_SEARCH.add_state("off", check_button=handler_assets.AUTO_SEARCH_OFF4)
 
 
 def map_files(event):
-    """
-    Args:
-        event (str): Event name under './campaign'
-
-    Returns:
-        list[str]: List of map files, such as ['sp1', 'sp2', 'sp3']
-    """
+    """返回 ./campaign/<event> 下的地图文件名，例如 ['sp1', 'sp2', 'sp3']。"""
     folder = f"./campaign/{event}"
 
     if not Path(folder).exists():
@@ -52,41 +46,23 @@ def map_files(event):
 
 
 def to_map_input_name(name: str) -> str:
-    """
-    Convert to user input names.
-
-    7-2 -> 7-2
-    campaign_7_2 -> 7-2
-    d3 -> D3
-    """
-    # Remove whitespaces
+    """转成用户输入格式：campaign_7_2 → 7-2，d3 → D3。"""
     name = re.sub(r"[ \t\n]", "", name).lower()
-    # B-1 -> B1
     res = re.match(r"([a-zA-Z])+[- ]+(\d+)", name)
     if res:
         name = f"{res.group(1)}{res.group(2)}"
     # 先转回大写，便于移除战役前缀。
     name = str(name).upper()
-    # campaign_7_2 -> 7-2
     return name.replace("CAMPAIGN_", "").replace("_", "-")
 
 
 def to_map_file_name(name: str) -> str:
-    """
-    Convert to the name of map files.
-
-    7-2 -> campaign_7_2
-    campaign_7_2 -> campaign_7_2
-    D3 -> d3
-    """
+    """转成地图文件名：7-2 → campaign_7_2，D3 → d3。"""
     name = str(name).lower()
-    # Remove whitespaces
     name = re.sub(r"[ \t\n]", "", name).lower()
-    # B-1 -> B1
     res = re.match(r"([a-zA-Z])+[- ]+(\d+)", name)
     if res:
         name = f"{res.group(1)}{res.group(2)}"
-    # 7-2 to campaign_7_2
     if name and name[0].isdigit():
         name = "campaign_" + name.replace("-", "_")
     return name
@@ -101,7 +77,7 @@ class FastForwardHandler(AutoSearchHandler):
     map_is_3_stars = False
     map_is_threat_safe = False
     map_has_clear_mode = False
-    map_is_clear_mode = False  # Clear mode == fast forward
+    map_is_clear_mode = False  # Clear mode 即旧称 fast forward。
     map_is_auto_search = False
     map_is_2x_book = False
 
@@ -135,10 +111,6 @@ class FastForwardHandler(AutoSearchHandler):
     map_fleet_checked = False
 
     def map_get_info(self):
-        """
-        Logs:
-            | INFO | [Map_info] 98%, star_1, star_2, star_3, clear, 3_star, green, fast_forward
-        """
         self.map_clear_percentage = self.get_map_clear_percentage()
         self.map_achieved_star_1 = self._is_map_star_active(handler_assets.MAP_STAR_1)
         self.map_achieved_star_2 = self._is_map_star_active(handler_assets.MAP_STAR_2)
@@ -147,14 +119,11 @@ class FastForwardHandler(AutoSearchHandler):
         self.map_is_3_stars = self.map_achieved_star_1 and self.map_achieved_star_2 and self.map_achieved_star_3
         self.map_is_threat_safe = self.appear(handler_assets.MAP_GREEN, offset=(20, 20))
         if self.config.Campaign_Name.lower() == "sp":
-            # Minor issue here
-            # Using auto_search option because clear mode cannot be detected whether on SP
-            # If user manually turn off auto search, alas can't enable it again
+            # SP 无法检测清理模式，只能以自律寻敌按钮代替；玩家手动关闭后 Alas 无法重新启用。
             self.map_has_clear_mode = AUTO_SEARCH.appear(main=self)
         else:
             self.map_has_clear_mode = self.map_is_100_percent_clear and FAST_FORWARD.appear(main=self)
 
-        # 覆盖配置。
         if self.map_achieved_star_1:
             # Boss 刷新前剧情，对应 chapter_template.lua 中的 "story_refresh_boss"。
             self.config.MAP_HAS_MAP_STORY = False
@@ -167,7 +136,6 @@ class FastForwardHandler(AutoSearchHandler):
         self.map_show_info()
 
     def map_show_info(self):
-        # 记录日志。
         logger.attr("MAP_CLEAR_ALL_THIS_TIME", self.config.MAP_CLEAR_ALL_THIS_TIME)
         names = [
             "map_achieved_star_1",
@@ -229,13 +197,7 @@ class FastForwardHandler(AutoSearchHandler):
         return self.image_color_count(button, color=(250, 232, 140), threshold=180, count=35)
 
     def handle_map_fleet_lock(self, enable=None):
-        """
-        Args:
-            enable (bool): Default to None, use Campaign_UseFleetLock.
-
-        Returns:
-            bool: If switched.
-        """
+        """enable 为 None 时使用 Campaign_UseFleetLock。"""
         # 舰队锁定依赖按钮是否出现在地图上，而不是地图状态。
         # 已经在地图内时不会再显示地图状态。
         if not FLEET_LOCK.appear(main=self):
@@ -248,13 +210,7 @@ class FastForwardHandler(AutoSearchHandler):
         return FLEET_LOCK.set(state, main=self)
 
     def map_wait_auto_search(self):
-        """
-        When enabling clear mode (FAST_FORWARD), AUTO_SEARCH has an animation to appear
-        wait until it fully appeared
-
-        Returns:
-            bool: If waited
-        """
+        """启用清理模式后等待自律寻敌按钮完成出现动画。"""
         timeout = Timer(1, count=3).start()
         for _ in self.loop():
             state = AUTO_SEARCH.get(main=self)
@@ -268,13 +224,7 @@ class FastForwardHandler(AutoSearchHandler):
         return False
 
     def handle_auto_search(self):
-        """
-        Returns:
-            bool: If changed
-
-        Pages:
-            in: MAP_PREPARATION
-        """
+        """页面进入：MAP_PREPARATION。"""
         if not AUTO_SEARCH.appear(main=self):
             logger.info("No auto search option.")
             self.map_is_auto_search = False
@@ -284,13 +234,7 @@ class FastForwardHandler(AutoSearchHandler):
         return AUTO_SEARCH.set(state, main=self)
 
     def handle_auto_search_setting(self):
-        """
-        Returns:
-            bool: If changed
-
-        Pages:
-            in: FLEET_PREPARATION
-        """
+        """页面进入：FLEET_PREPARATION。"""
         if not self.map_is_auto_search:
             return False
 
@@ -306,18 +250,12 @@ class FastForwardHandler(AutoSearchHandler):
         return self.config.SUBMARINE and self.config.Submarine_Mode in ["boss_only", "hunt_and_boss"]
 
     def handle_auto_submarine_call_disable(self):
-        """
-        Returns:
-            bool: If changed
-
-        Pages:
-            in: FLEET_PREPARATION
-        """
+        """页面进入：FLEET_PREPARATION。"""
         if self.map_fleet_checked:
             return False
         if not self.is_call_submarine_at_boss:
             return False
-        # 2025.09.22, correct that fleet role settings is unlocked after clear mode
+        # 2025-09-22 起，舰队职责设置需解锁清理模式后才可用。
         if not self.map_is_clear_mode:
             logger.warning("Can not set submarine call because auto search not available, assuming disabled")
             logger.warning(
@@ -332,29 +270,20 @@ class FastForwardHandler(AutoSearchHandler):
         return True
 
     def handle_auto_search_continue(self):
-        """
-        Override AutoSearchHandler definition
-        for 2x book handling if needed
-        """
+        """覆盖通用继续处理，以便同步双倍书设置。"""
         if self.appear(handler_assets.AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset, interval=2):
             self.map_is_2x_book = self.config.Campaign_Use2xBook
             self.handle_2x_book_setting(mode="auto")
             if self.appear_then_click(handler_assets.AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset):
                 self.interval_reset(handler_assets.AUTO_SEARCH_MENU_CONTINUE)
             else:
-                # AUTO_SEARCH_MENU_CONTINUE disappeared after handle_2x_book_setting()
+                # 设置双倍书后继续按钮可能已经消失。
                 pass
             return True
         return False
 
     def get_map_clear_percentage(self):
-        """
-        Returns:
-            float: 0 to 1.
-
-        Pages:
-            in: MAP_PREPARATION
-        """
+        """在 MAP_PREPARATION 返回 0～1 的地图清理比例。"""
         percent = color_bar_percentage(
             self.device.image, area=handler_assets.MAP_CLEAR_PERCENTAGE.area, prev_color=(231, 170, 82)
         )
@@ -363,19 +292,8 @@ class FastForwardHandler(AutoSearchHandler):
         return percent
 
     def campaign_name_increase(self, name):
-        """
-        Increase name to its next stage.
-
-        Args:
-            name (str): Such as `6-1`, `a1`, `campaign_6_1`
-
-        Returns:
-            str: Name of next stage in upper case,
-                or origin name if unable to increase.
-        """
-        # Copy STAGE_INCREASE to avoid potential duplicate inserting
+        """把 6-1、a1 或 campaign_6_1 推进到大写的下一关；无法推进时返回原名。"""
         stage_increase = list(self.STAGE_INCREASE)
-        # Insert custom increase logic
         if self.config.STAGE_INCREASE_AB:
             stage_increase = ["A1 > A2 > A3 > B1 > B2 > B3", *stage_increase]
         custom = self.config.STAGE_INCREASE_CUSTOM
@@ -384,7 +302,6 @@ class FastForwardHandler(AutoSearchHandler):
                 custom = [custom]
             stage_increase = custom + stage_increase
 
-        # Increase stage
         name = to_map_input_name(name)
         for raw_increase in stage_increase:
             increase = [i.strip(" \t\r\n") for i in raw_increase.split(">")]
@@ -392,11 +309,9 @@ class FastForwardHandler(AutoSearchHandler):
                 index = increase.index(name) + 1
                 if index < len(increase):
                     new = increase[index]
-                    # Don't check main stages, assume all exist
-                    # Main stages are named like campaign_7_2, but user inputs 7-2
+                    # 主线文件名与用户输入格式不同，且默认所有主线关卡都存在。
                     if self.config.Campaign_Event == "campaign_main":
                         return new
-                    # Check if map file exist
                     existing = map_files(self.config.Campaign_Event)
                     logger.info(f"Existing files: {existing}")
                     if new.lower() in existing:
@@ -409,7 +324,6 @@ class FastForwardHandler(AutoSearchHandler):
         return name
 
     def triggered_map_stop(self):
-        """返回地图成就停止条件是否已触发。"""
         match self.config.StopCondition_MapAchievement:
             case "100_percent_clear":
                 return self.map_is_100_percent_clear
@@ -423,10 +337,7 @@ class FastForwardHandler(AutoSearchHandler):
                 return False
 
     def handle_map_stop(self):
-        """
-        Modify configs after reaching a stop condition.
-        Disable current task or increase stage.
-        """
+        """达到停止条件后禁用当前任务或推进关卡配置。"""
         if self.config.StopCondition_StageIncrease:
             prev_stage = to_map_input_name(self.config.Campaign_Name)
             next_stage = self.campaign_name_increase(prev_stage)
@@ -440,30 +351,7 @@ class FastForwardHandler(AutoSearchHandler):
             self.config.Scheduler_Enable = False
 
     def _set_2x_book_status(self, status, check_button, box_button, skip_first_screenshot=True):
-        """
-        Set appropriate 2x book setting
-        with corresponding status and buttons
-        Built with retry mechanism that limits to 3
-        attempts that span 3 second intervals each
-
-        Args:
-            status (string):
-                on or off
-            check_button (Button):
-                button to check before attempting to click
-            box_button (Button):
-                button to click and image color count against
-            skip_first_screenshot (bool):
-                namesake
-
-        Returns:
-            bool:
-                True if detected having set correctly
-                False can occur for 2 reasons either
-                assets insufficient to detect properly
-                or 2x book setting is absent
-
-        """
+        """把双倍书设为 on 或 off；每 3 秒重试，超过 3 次或页面无此设置时返回 False。"""
         confirm_timer = Timer(0.3, count=1).start()
         clicked_threshold = 0
         while 1:
@@ -493,17 +381,7 @@ class FastForwardHandler(AutoSearchHandler):
         return False
 
     def handle_2x_book_setting(self, mode="prep"):
-        """
-        Handles 2x book setting if applicable
-
-        Args:
-            mode (string):
-                prep or auto, assume auto if not prep
-
-        Returns:
-            bool:
-                If handled to completion
-        """
+        """mode 为 prep 时处理准备页，其他值处理自律寻敌页。"""
         if not self.map_is_clear_mode:
             return False
         if not hasattr(self, "emotion"):
@@ -532,15 +410,11 @@ class FastForwardHandler(AutoSearchHandler):
         return self.appear(handler_assets.BOOK_POPUP_CHECK, offset=(20, 20)) and self.handle_popup_confirm("2X_BOOK")
 
     def handle_submarine_support_popup(self):
-        """
-        Should be rewritten in W16 submarine base class
-        """
+        """供第 16 章潜艇基类覆盖；默认有意不处理。"""
         return False
 
     def handle_map_walk_speedup(self, skip_first_screenshot=True):
-        """
-        Turn on walk speedup, no reason to turn it off
-        """
+        """只负责开启地图步速，已开启即返回，不会主动关闭。"""
         if not self.config.MAP_HAS_WALK_SPEEDUP:
             return False
 

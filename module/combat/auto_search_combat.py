@@ -31,14 +31,7 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
     auto_search_coin_limit_triggered = False
 
     def _handle_auto_search_menu_missing(self):
-        """
-        Sometimes game is bugged, auto search menu is not shown.
-        After BOSS battle, it enters campaign directly.
-        To handle this, if game in campaign for a certain time, it means auto search ends.
-
-        Returns:
-            bool: If triggered
-        """
+        """处理 Boss 战后不显示自律寻敌菜单的游戏 bug；关卡页停留超时即视为寻敌结束。"""
         if self.is_in_stage():
             if self._auto_search_in_stage_timer.reached():
                 logger.info("Catch auto search menu missing")
@@ -49,20 +42,13 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         return False
 
     def map_offensive_auto_search(self):
-        """
-        Pages:
-            in: in_map, MAP_OFFENSIVE
-            out: is_combat_loading
-        """
+        """页面状态：in_map/MAP_OFFENSIVE → is_combat_loading。"""
         self.interval_reset(AUTO_SEARCH_MAP_OPTION_ON)
         for _ in self.loop():
             if self.handle_auto_search_map_option():
                 self.interval_reset(AUTO_SEARCH_MAP_OPTION_ON)
                 continue
-            # To handle a bug in Azur Lane game client.
-            # Auto search icon shows it's running but it's doing nothing
-            # when Alas exited from retirement and turned it on immediately.
-            # Monkey clicker, disable auto search every 3s, beginning not included
+            # 退出退役后立即开启寻敌时，图标可能显示运行但实际卡住；从第 3 秒起每 3 秒关闭一次。
             if self.appear(
                 AUTO_SEARCH_MAP_OPTION_ON, offset=self._auto_search_offset, interval=3
             ) and self.appear_then_click(AUTO_SEARCH_MAP_OPTION_ON):
@@ -72,32 +58,20 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
             if self.handle_retirement():
                 continue
 
-            # Break
             if self.is_combat_loading():
                 break
 
     def auto_search_watch_fleet(self, checked=False):
-        """
-        Watch fleet index and ship level.
-
-        Args:
-            checked (bool): Watchers are only executed or logged once during fleet moving.
-                            Set True to skip executing again.
-
-        Returns:
-            bool: If executed.
-        """
+        """监控舰队索引和等级；checked 为 True 时跳过本轮重复记录。"""
         prev = self.fleet_current_index
         self.get_fleet_show_index()
         self.get_fleet_current_index()
         if self.fleet_current_index == prev:
-            # Same as current, only print once
             if not checked:
                 logger.info(f"Fleet: {self.fleet_show_index}, fleet_current_index: {self.fleet_current_index}")
                 checked = True
                 self.lv_get(after_battle=True)
         else:
-            # Fleet changed
             logger.info(f"Fleet: {self.fleet_show_index}, fleet_current_index: {self.fleet_current_index}")
             checked = True
             self.lv_get(after_battle=False)
@@ -105,10 +79,7 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         return checked
 
     def auto_search_watch_oil(self, checked=False):
-        """
-        Watch oil.
-        This will set auto_search_oil_limit_triggered.
-        """
+        """监控油量并更新 auto_search_oil_limit_triggered。"""
         if not checked:
             oil = self._get_oil()
             if oil == 0:
@@ -129,10 +100,7 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         return checked
 
     def auto_search_watch_coin(self, checked=False):
-        """
-        Watch coin.
-        This will set auto_search_coin_limit_triggered.
-        """
+        """监控物资并更新 auto_search_coin_limit_triggered。"""
         if not checked:
             limit = self.config.TaskBalancer_CoinLimit
             coin = self.get_coin()
@@ -144,7 +112,6 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
                         logger.info("Reach coin limit")
                         self.auto_search_coin_limit_triggered = True
                     else:
-                        # Enough coin
                         self.auto_search_coin_limit_triggered = False
                 else:
                     if self.auto_search_coin_limit_triggered:
@@ -158,15 +125,7 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         return checked
 
     def _wait_until_in_map(self):
-        """
-        To handle a bug in Azur Lane game client.
-        Auto search icon shows it's running but it's doing nothing
-        when Alas exited from retirement and turned it on immediately.
-
-        Pages:
-            in: Exiting from retirement or enhancement
-            out: in_map()
-        """
+        """规避退出退役或强化后寻敌假运行的游戏 bug；页面退出为 in_map()。"""
         timeout = Timer(3, count=6).start()
         for _ in self.loop():
             if self.is_in_map():
@@ -210,11 +169,7 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         return False
 
     def auto_search_moving(self):
-        """
-        Pages:
-            in: map
-            out: is_combat_loading()
-        """
+        """页面状态：map → is_combat_loading()。"""
         logger.info("Auto search moving")
         self.device.stuck_record_clear()
         checked_fleet = False
@@ -246,7 +201,6 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
             if self.handle_vote_popup():
                 continue
 
-            # End
             if self.is_in_auto_search_menu() or self._handle_auto_search_menu_missing():
                 raise CampaignEnd
             pause = self.is_combat_executing()
@@ -318,15 +272,7 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         return False, False
 
     def auto_search_combat_execute(self, emotion_reduce, fleet_index):
-        """
-        Args:
-            emotion_reduce (bool):
-            fleet_index (int):
-
-        Pages:
-            in: is_combat_loading()
-            out: combat status
-        """
+        """页面状态：is_combat_loading() → combat status。"""
         self._wait_auto_search_combat_execute()
         submarine_mode, auto = self._prepare_auto_search_combat_execute(emotion_reduce, fleet_index)
 
@@ -383,11 +329,7 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
         return False, exp_info
 
     def auto_search_combat_status(self):
-        """
-        Pages:
-            in: any
-            out: is_auto_search_running()
-        """
+        """页面状态：任意页面 → is_auto_search_running()。"""
         logger.info("Auto Search combat status")
         self.device.stuck_record_clear()
         self.device.click_record_clear()
@@ -405,12 +347,7 @@ class AutoSearchCombat(MapOperation, Combat, CampaignStatus):
                 continue
 
     def auto_search_combat(self, emotion_reduce=None, fleet_index=1):
-        """
-        Execute a combat.
-
-        Note that fleet index == 1 is mob fleet, 2 is boss fleet.
-        It's not the fleet index in fleet preparation or auto search setting.
-        """
+        """执行战斗；fleet_index 的 1/2 表示道中/Boss 队，不是编队或寻敌设置中的舰队编号。"""
         emotion_reduce = emotion_reduce if emotion_reduce is not None else self.emotion.is_calculate
 
         self.auto_search_combat_execute(emotion_reduce=emotion_reduce, fleet_index=fleet_index)

@@ -42,13 +42,6 @@ class CampaignOcr(ModuleBase):
 
     @staticmethod
     def campaign_get_chapter_index(name):
-        """
-        Args:
-            name (str, int):
-
-        Returns:
-            int
-        """
         if isinstance(name, int):
             return name
         if name.isdigit():
@@ -71,7 +64,7 @@ class CampaignOcr(ModuleBase):
 
         result = re.sub(r"[0-9I]+-[0-9I]+", replace_func, result, count=1)
 
-        # Convert '72' to '7-2'
+        # 把 72 修正为 7-2。
         if len(result) == 2 and result[0].isdigit():
             result = "-".join(result)
 
@@ -79,13 +72,7 @@ class CampaignOcr(ModuleBase):
 
     @staticmethod
     def campaign_separate_name(name):
-        """
-        Args:
-            name (str): Stage name in lowercase, such as 7-2, d3, sp3.
-
-        Returns:
-            tuple[str]: Campaign_name and stage index in lowercase, Such as ['7', '2'], ['d', '3'], ['sp', '3'].
-        """
+        """拆分小写关卡名，返回章节和序号，例如 7-2 → ('7', '2')、sp3 → ('sp', '3')。"""
         name = name.strip("-")
         result = None
         if name == "sp":
@@ -116,19 +103,7 @@ class CampaignOcr(ModuleBase):
         options=None,
         **settings,
     ):
-        """
-        从截图中匹配关卡入口。
-
-        Args:
-            template (Template):
-            image: 截图。
-            stage_image: 用于查找关卡入口的截图。
-            options (StageMatchOptions): 关卡入口匹配配置。
-            **settings: 覆盖 `StageMatchOptions` 中的字段。
-
-        Returns:
-            list[Button]: Stage clear buttons.
-        """
+        """从 stage_image 匹配入口并返回按钮列表；settings 覆盖 StageMatchOptions。"""
         options = stage_match_options(options, settings)
         digits = []
         stage_image = image if stage_image is None else stage_image
@@ -160,16 +135,7 @@ class CampaignOcr(ModuleBase):
         return rgb2gray(self._stage_image)
 
     def campaign_extract_name_image(self, image):
-        """
-        Find all stage entrance and handle event differences.
-        Stage entrance setting, refers to ManualConfig.STAGE_ENTRANCE
-
-        Args:
-            image: Screenshot
-
-        Returns:
-            list[Button]: List of Buttons of stage entrance.
-        """
+        """按 ManualConfig.STAGE_ENTRANCE 处理活动差异并返回全部关卡入口按钮。"""
         digits = []
 
         if "normal" in self.config.STAGE_ENTRANCE:
@@ -239,13 +205,7 @@ class CampaignOcr(ModuleBase):
 
     @staticmethod
     def _extract_stage_name(image):
-        """
-        Args:
-            image: Cropped image of full stage name, such as '3-4 Counterattack!'
-
-        Returns:
-            Area of stage name, such as the coordinate of '3-4' in the input image.
-        """
+        """从完整关卡名裁图中返回关卡编号区域坐标，例如 Counterattack! 前的 3-4。"""
         x_skip = 10
         interval = 5
         x_color = np.convolve(np.mean(image, axis=0), np.ones(interval), "valid") / interval
@@ -258,15 +218,7 @@ class CampaignOcr(ModuleBase):
         return np.add(area, (-3, -7, 3, 7))
 
     def _get_stage_name(self, image):
-        """
-        Parse stage names from a given image.
-        Set attributes:
-        self.campaign_chapter: str, Name of current chapter.
-        self.stage_entrance: dict. Key, str, stage name. Value, Button, button to enter stage.
-
-        Args:
-            image (np.ndarray):
-        """
+        """解析关卡名，并写入 campaign_chapter 和关卡名到入口按钮的 stage_entrance 映射。"""
         self.stage_entrance = {}
         del_cached_property(self, "_stage_image")
         del_cached_property(self, "_stage_image_gray")
@@ -316,24 +268,11 @@ class CampaignOcr(ModuleBase):
         logger.attr("Stage", ", ".join(self.stage_entrance.keys()))
 
     def handle_get_chapter_additional(self):
-        """
-        Returns:
-            bool: If clicked
-        """
         if self.appear(WITHDRAW, offset=(30, 30)):
             logger.warning("get_chapter_index: WITHDRAW appears")
             raise CampaignNameError
 
     def get_chapter_index(self, skip_first_screenshot=True):
-        """
-        A tricky method for ui_ensure_index
-
-        Args:
-            skip_first_screenshot:
-
-        Returns:
-            int: Chapter index.
-        """
         timeout = Timer(2, count=4).start()
         while 1:
             if skip_first_screenshot:

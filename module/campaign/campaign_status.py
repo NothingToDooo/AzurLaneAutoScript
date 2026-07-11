@@ -19,17 +19,11 @@ class PtOcr(Ocr):
         super().__init__(*args, lang="azur_lane", alphabet="X0123456789", **kwargs)
 
     def pre_process(self, image):
-        """
-        Args:
-            image (np.ndarray): Shape (height, width, channel)
-
-        Returns:
-            np.ndarray: Shape (width, height)
-        """
-        # Use MAX(r, g, b)
+        """把 (高, 宽, 通道) 图像转为同尺寸二维 uint8 OCR 灰度图。"""
+        # 按 RGB 三通道最大值构造反色灰度图。
         r, g, b = cv2.split(cv2.subtract(_cv_scalar((255, 255, 255, 0)), image))
         image = cv2.min(cv2.min(r, g), b)
-        # Remove background, 0-192 => 0-255
+        # 去除背景并把 0～192 拉伸到 0～255。
         image = cv2.multiply(image, _cv_scalar((255 / 192, 255 / 192, 255 / 192, 255 / 192)))
 
         return image.astype(np.uint8)
@@ -40,10 +34,6 @@ OCR_PT = PtOcr(OCR_EVENT_PT)
 
 class CampaignStatus(UI):
     def get_event_pt(self):
-        """
-        Returns:
-            int: PT amount, or 0 if unable to parse
-        """
         pt = OCR_PT.ocr(self.device.image)
 
         res = re.search(r"X(\d+)", pt)
@@ -55,10 +45,6 @@ class CampaignStatus(UI):
         return 0
 
     def get_coin(self, skip_first_screenshot=True):
-        """
-        Returns:
-            int: Coin amount
-        """
         amount = 0
         timeout = Timer(1, count=2).start()
         while 1:
@@ -78,7 +64,7 @@ class CampaignStatus(UI):
         return amount
 
     def _get_oil(self):
-        # Update offset
+        # appear 会更新按钮偏移，后续取色依赖该位置。
         _ = self.appear(OCR_OIL_CHECK)
 
         color = get_color(self.device.image, OCR_OIL_CHECK.button)
@@ -95,10 +81,6 @@ class CampaignStatus(UI):
         return ocr.ocr(self.device.image)
 
     def get_oil(self, skip_first_screenshot=True):
-        """
-        Returns:
-            int: Oil amount
-        """
         amount = 0
         timeout = Timer(1, count=2).start()
         while 1:
@@ -122,7 +104,6 @@ class CampaignStatus(UI):
         return amount
 
     def is_balancer_task(self):
-        """返回当前任务是否为非日常的活动任务。"""
         tasks = [
             "Event",
             "Event2",

@@ -129,12 +129,10 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
     def run(self):
         logger.hr(self.ENTRANCE, level=2)
 
-        # Enter map
         self.emotion.check_reduce(self._map_battle)
         self.ENTRANCE.area = self.ENTRANCE.button
         self.enter_map(self.ENTRANCE, mode=self.config.Campaign_Mode)
 
-        # Map init
         if not self.map_is_auto_search:
             self.handle_map_fleet_lock()
             self.map_init(self.MAP)
@@ -144,7 +142,6 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
             self.lv_reset()
             self.lv_get()
 
-        # Run
         for _ in range(20):
             try:
                 if not self.map_is_auto_search:
@@ -155,7 +152,6 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
                 logger.hr("Campaign end")
                 return True
 
-        # Exception
         logger.warning("Battle function exhausted.")
         if self.config.Error_HandleError:
             logger.warning("ScriptError, Battle function exhausted, Withdrawing")
@@ -166,10 +162,6 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
 
     @cached_property
     def _map_battle(self):
-        """
-        Returns:
-            int: Battle on this map.
-        """
         for data in self.MAP.spawn_data:
             if "boss" in data:
                 if "battle" in data:

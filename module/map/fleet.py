@@ -128,9 +128,7 @@ class Fleet(Camera, AmbushHandler):
         super().__init__(*args, **kwargs)
 
     def round_next(self):
-        """
-        Call this method after fleet arrived.
-        """
+        """舰队到达后推进地图行动轮次。"""
         if not self.config.MAP_HAS_MOVABLE_ENEMY and not self.config.MAP_HAS_MAZE:
             return False
         self.round += 1
@@ -138,9 +136,7 @@ class Fleet(Camera, AmbushHandler):
         return True
 
     def round_battle(self):
-        """
-        清理敌人后更新敌方行动轮次。
-        """
+        """清理敌人后更新敌方行动轮次。"""
         if not self.config.MAP_HAS_MOVABLE_ENEMY:
             return False
         if not self.map.select(is_siren=True):
@@ -162,19 +158,13 @@ class Fleet(Camera, AmbushHandler):
         return True
 
     def round_reset(self):
-        """
-        Call this method after entering map.
-        """
+        """进图后重置地图行动轮次。"""
         self.round = 0
         self.enemy_round = {}
 
     @property
     def round_enemy_turn(self):
-        """
-        Returns:
-            tuple[int]: Enemy moves once after player move X times.
-                        It's a tuple because different enemy may have different X.
-        """
+        """返回各类敌人的移动间隔元组，单位为玩家行动次数。"""
         if self.config.MAP_HAS_MOVABLE_ENEMY:
             if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
                 return tuple(set(list(self.config.MOVABLE_ENEMY_TURN) + list(self.config.MOVABLE_NORMAL_ENEMY_TURN)))
@@ -185,17 +175,7 @@ class Fleet(Camera, AmbushHandler):
 
     @property
     def round_is_new(self):
-        """
-        Usually, MOVABLE_ENEMY_TURN = 2.
-        So a walk round is `player - player - enemy`, player moves twice, enemy moves once.
-
-        Different sirens have different MOVABLE_ENEMY_TURN:
-            2: Non-siren elite, SIREN_CL
-            3: SIREN_CA
-
-        Returns:
-            bool: If it's a new walk round, which means enemies have moved.
-        """
+        """敌人移动后返回 True；通常间隔为 2，SIREN_CA 的间隔为 3。"""
         if not self.config.MAP_HAS_MOVABLE_ENEMY:
             return False
         for enemy in self.enemy_round:
@@ -207,10 +187,7 @@ class Fleet(Camera, AmbushHandler):
 
     @property
     def round_wait(self):
-        """
-        Returns:
-            float: Seconds to wait enemies moving.
-        """
+        """返回等待敌人和迷宫移动的秒数。"""
         second = 0
         if self.config.MAP_HAS_MOVABLE_ENEMY:
             count = 0
@@ -233,22 +210,12 @@ class Fleet(Camera, AmbushHandler):
 
     @property
     def round_maze_changed(self):
-        """
-        Returns:
-            bool: If maze changed at the start of this round.
-        """
+        """返回本轮开始时迷宫是否变化。"""
         if not self.config.MAP_HAS_MAZE:
             return False
         return self.round != 0 and self.round % 3 == 0
 
     def maze_active_on(self, grid):
-        """
-        Args:
-            grid:
-
-        Returns:
-            bool: If maze wall is on a the specific grid.
-        """
         if not self.config.MAP_HAS_MAZE:
             return False
 
@@ -491,13 +458,7 @@ class Fleet(Camera, AmbushHandler):
             raise MapEnemyMoved
 
     def _goto(self, location, expected=""):
-        """Goto a grid directly and handle ambush, air raid, mystery picked up, combat.
-
-        Args:
-            location (tuple, str, GridInfo): Destination.
-            expected (str): Expected result on destination grid, such as 'combat', 'combat_siren', 'mystery'.
-                Will give a waring if arrive with unexpected result.
-        """
+        """直达目标格并处理伏击、空袭、神秘事件和战斗；expected 可为 combat、combat_siren 或 mystery。"""
         location = location_ensure(location)
         self.movable_before = self.map.select(is_siren=True)
         self.movable_before_normal = self.map.select(is_enemy=True)
@@ -521,14 +482,7 @@ class Fleet(Camera, AmbushHandler):
         self._goto_finish(state)
 
     def goto(self, location, expected="", step_optimize=None, turning_optimize=None):
-        """
-        Args:
-            location (tuple, str, GridInfo): Destination.
-            expected (str): Expected result on destination grid, such as 'combat', 'combat_siren', 'mystery'.
-                Will give a waring if arrive with unexpected result.
-            step_optimize (bool): True to walk in fleet step
-            turning_optimize (bool): True to optimize route to reduce ambushes
-        """
+        """按路径前往目标格；expected 值域同 _goto，两个优化参数为 None 时使用地图配置。"""
         location = location_ensure(location)
         step_optimize = self._goto_step_optimize(step_optimize)
         turning_optimize = self._goto_turning_optimize(turning_optimize)
@@ -587,9 +541,7 @@ class Fleet(Camera, AmbushHandler):
             self._goto(retry_node, expected=expected)
 
     def find_path_initial(self):
-        """
-        Call this method after fleet moved or entered map.
-        """
+        """进图或舰队移动后重新计算路径。"""
         if self.fleet_1_location:
             self.map[self.fleet_1_location].is_fleet = True
         if self.fleet_2_location:
@@ -650,22 +602,14 @@ class Fleet(Camera, AmbushHandler):
                     self.map[loca].wipe_out()
 
     def full_scan_carrier(self):
-        """
-        Call this method if get enemy searching in mystery.
-        """
+        """神秘事件触发敌方搜索后扫描新增敌人。"""
         prev = self.map.select(is_enemy=True)
         self.full_scan(mode="carrier")
         diff = self.map.select(is_enemy=True).delete(prev)
         logger.info(f"Carrier spawn: {diff}")
 
     def full_scan_movable(self, enemy_cleared=True):
-        """
-        Call this method if enemy moved.
-
-        Args:
-            enemy_cleared (bool): True if cleared an enemy and need to scan spawn enemies.
-                                  False if just a simple walk and only need to scan movable enemies.
-        """
+        """敌人移动后扫描；enemy_cleared 为 True 时也扫描新刷敌人。"""
         if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
             if self.config.MAP_HAS_MOVABLE_ENEMY:
                 for grid in self.movable_before:
@@ -690,14 +634,7 @@ class Fleet(Camera, AmbushHandler):
             self.track_movable(enemy_cleared=enemy_cleared, siren=True)
 
     def track_movable(self, enemy_cleared=True, siren=True):
-        """
-        Track enemy moving and predict missing enemies.
-
-        Args:
-            enemy_cleared (bool): True if cleared an enemy and need to scan spawn enemies.
-                                  False if just a simple walk and only need to scan movable enemies.
-            siren (bool): True if track sirens, false if track normal enemies
-        """
+        """跟踪移动并推断漏检敌人；siren 区分塞壬与普通敌人。"""
         before, after, spawn, step = self._track_movable_context(siren=siren)
         matched_before, matched_after = match_movable(
             before=before.location,
@@ -956,24 +893,13 @@ class Fleet(Camera, AmbushHandler):
         return self.fleet_submarine_location
 
     def map_init(self, map_):
-        """
-        进入地图后、执行任何地图操作前调用。
-
-        Args:
-            map_ (CampaignMap)：当前战役地图。
-        """
+        """进入地图后、执行任何地图操作前调用。"""
         logger.hr("Map init")
         self.map_data_init(map_)
         self.map_control_init()
 
     def map_data_init(self, map_):
-        """
-        Init map data according to settings and map status.
-        Just data processing, no screenshots and clicks.
-
-        Args:
-            map_ (CampaignMap):
-        """
+        """按配置和地图状态初始化数据，不截图也不点击。"""
         self.fleet_1_location = ()
         self.fleet_2_location = ()
         self.fleet_submarine_location = ()
@@ -1001,10 +927,7 @@ class Fleet(Camera, AmbushHandler):
         )
 
     def map_control_init(self):
-        """
-        Preparation before operations.
-        Such as select strategy, calculate hp and level, init camera position, do first map scan.
-        """
+        """初始化阵型、血量、等级和相机，并执行首次地图扫描。"""
         self.update()
         if not self.handle_fleet_reverse():
             self.fleet_set(index=1)
@@ -1064,14 +987,7 @@ class Fleet(Camera, AmbushHandler):
         return None
 
     def fleet_at(self, grid, fleet=None):
-        """
-        Args:
-            grid (Grid):
-            fleet (int): 1, 2
-
-        Returns:
-            bool: If fleet is at grid.
-        """
+        """fleet 接受 1、2 或 None；None 表示当前舰队。"""
         if fleet is None:
             return self.fleet_current == grid.location
         if fleet == 1:
@@ -1079,14 +995,7 @@ class Fleet(Camera, AmbushHandler):
         return self.fleet_2_location == grid.location
 
     def check_accessibility(self, grid, fleet=None):
-        """
-        Args:
-            grid (Grid):
-            fleet (int, str): 1, 2, 'boss'
-
-        Returns:
-            bool: If accessible.
-        """
+        """fleet 接受 1、2、boss 或 None；None 表示当前舰队。"""
         if fleet is None:
             return grid.is_accessible
         if isinstance(fleet, str) and fleet.isdigit():
@@ -1106,14 +1015,7 @@ class Fleet(Camera, AmbushHandler):
         return result
 
     def brute_find_roadblocks(self, grid, fleet=None):
-        """
-        Args:
-            grid (Grid):
-            fleet (int): 1, 2. Default to current fleet.
-
-        Returns:
-            SelectedGrids:
-        """
+        """用舰队 1/2（默认当前舰队）查找阻路格，返回 SelectedGrids。"""
         if fleet is not None and fleet != self.fleet_current_index:
             backup = self.fleet_current_index
             self.fleet_current_index = fleet
@@ -1159,12 +1061,7 @@ class Fleet(Camera, AmbushHandler):
         return appear
 
     def handle_boss_appear_refocus(self, preset=None):
-        """
-        Refocus to previous camera position after boss appear.
-
-        Args:
-            preset (tuple): (x, y).
-        """
+        """Boss 出现并触发镜头移动后，按 (x, y) 滑动预设恢复原相机位置。"""
         camera = self.camera
         if preset is None:
             preset = self.config.MAP_BOSS_APPEAR_REFOCUS_SWIPE
@@ -1190,19 +1087,7 @@ class Fleet(Camera, AmbushHandler):
         self.fleet_2_formation_fixed = False
 
     def _submarine_goto(self, location):
-        """
-        Move submarine to given location.
-
-        Args:
-            location (tuple, str, GridInfo): Destination.
-
-        Returns:
-            bool: If submarine moved.
-
-        Pages:
-            in: SUBMARINE_MOVE_CONFIRM
-            out: SUBMARINE_MOVE_CONFIRM
-        """
+        """移动潜艇并返回是否发生移动；页面进出均为 SUBMARINE_MOVE_CONFIRM。"""
         location = location_ensure(location)
         moved = True
         while 1:
@@ -1250,19 +1135,7 @@ class Fleet(Camera, AmbushHandler):
         return moved
 
     def submarine_goto(self, location):
-        """
-        Open strategy, move submarine to given location, close strategy.
-
-        Args:
-            location (tuple, str, GridInfo): Destination.
-
-        Returns:
-            bool: If submarine moved
-
-        Pages:
-            in: IN_MAP
-            out: IN_MAP
-        """
+        """经策略页移动潜艇并返回是否移动；页面进出均为 IN_MAP。"""
         self.strategy_open()
         self.strategy_submarine_move_enter()
         if self._submarine_goto(location):
@@ -1277,13 +1150,6 @@ class Fleet(Camera, AmbushHandler):
         return result
 
     def submarine_move_near_boss(self, boss):
-        """
-        Args:
-            boss (tuple, str, GridInfo): Destination.
-
-        Returns:
-            bool: If submarine moved
-        """
         if not (self.is_call_submarine_at_boss and self.map.select(is_submarine_spawn_point=True)):
             return False
         if self.config.Submarine_DistanceToBoss == "use_open_ocean_support":

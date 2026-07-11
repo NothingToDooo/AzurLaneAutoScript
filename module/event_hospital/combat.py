@@ -21,13 +21,6 @@ from module.raid.assets import RAID_FLEET_PREPARATION
 
 class HospitalCombat(Combat, HospitalUI, CampaignEvent):
     def handle_fleet_recommend(self, recommend=True):
-        """
-        Args:
-            recommend:
-
-        Returns:
-            bool: If clicked
-        """
         fleet_1 = FleetOperator(
             assets=FleetOperatorAssets(
                 choose=FLEET_1_CHOOSE,
@@ -88,13 +81,6 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
         return True
 
     def combat_preparation(self, balance_hp=False, emotion_reduce=False, auto="combat_auto", fleet_index=1):
-        """
-        Args:
-            balance_hp (bool):
-            emotion_reduce (bool):
-            auto (bool):
-            fleet_index (int):
-        """
         logger.info("Combat preparation.")
         # 医院战斗复用普通战斗入口，但不执行普通战斗的血量平衡。
         del balance_hp
@@ -122,7 +108,6 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
             if self._handle_hospital_fleet_preparation():
                 continue
 
-            # End
             if self._finish_hospital_preparation_if_combat_started(
                 emotion_reduce=emotion_reduce, fleet_index=fleet_index
             ):
@@ -131,10 +116,7 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
     in_clue_confirm = Timer(0.5, count=2)
 
     def hospital_expected_end(self):
-        """
-        Returns:
-            bool: If combat ended
-        """
+        """战斗结束回调：先处理线索退出，连续确认在线索页后才返回 True。"""
         if self.handle_clue_exit():
             return False
         if self.is_in_clue():
@@ -146,9 +128,5 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
         return False
 
     def hospital_combat(self):
-        """
-        Pages:
-            in: FLEET_PREPARATION
-            out: is_in_clue
-        """
+        """页面状态：FLEET_PREPARATION → is_in_clue。"""
         self.combat(balance_hp=False, expected_end=self.hospital_expected_end)

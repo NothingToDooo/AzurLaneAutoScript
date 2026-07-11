@@ -6,13 +6,7 @@ from module.map_detection.grid_info import GridInfo
 
 
 def location_ensure(location):
-    """
-    Args:
-        location: Grid.
-
-    Returns:
-        tuple(int): Location, such as (4, 3)
-    """
+    """格子对象取 location，格子名转坐标，其他输入原样返回。"""
     if hasattr(location, "location"):
         return location.location
     if isinstance(location, str):
@@ -32,16 +26,7 @@ def camera_1d(shape, sight):
 
 
 def camera_2d(area, sight):
-    """
-    Args:
-        area (tuple[int]): Active area on map. (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-                           For example: If map shape is I9, but row 1, row 9, line A and line I is empty,
-                           area is (1, 1, 8, 8)
-        sight (tuple[int]): Camera sight. (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-
-    Returns:
-        list[tuple]: List of camera location.
-    """
+    """按 (左上 x, 左上 y, 右下 x, 右下 y) 活动区和视野生成相机位置列表。"""
     x = camera_1d(shape=area[2] - area[0], sight=[sight[0], sight[2]])
     y = camera_1d(shape=area[3] - area[1], sight=[sight[1], sight[3]])
     out = np.array(np.meshgrid(x, y)).T.reshape(-1, 2) + area[:2]
@@ -49,13 +34,7 @@ def camera_2d(area, sight):
 
 
 def get_map_active_area(grids):
-    """
-    Args:
-        grids (dict): Key: tuple, location, Value: GridInfo or object with __str__ method.
-
-    Returns:
-        area (tuple): (upper_left_x, upper_left_y, bottom_right_x, bottom_right_y).
-    """
+    """返回地图活动区边界 (左上 x, 左上 y, 右下 x, 右下 y)。"""
 
     def is_active(g):
         g = g.str if isinstance(g, GridInfo) else str(g)
@@ -68,14 +47,7 @@ def get_map_active_area(grids):
 
 
 def camera_spawn_point(camera_list, sp_list):
-    """
-    Args:
-        camera_list (list[tuple]): CampaignMap.camera_data
-        sp_list (list[tuple]):
-
-    Returns:
-        list[tuple]: CampaignMap.camera_data_spawn_point
-    """
+    """从相机位置和出生点坐标生成 camera_data_spawn_point。"""
     camera_sp = []
     camera_list = np.array(camera_list)
     for sp in sp_list:
@@ -86,16 +58,7 @@ def camera_spawn_point(camera_list, sp_list):
 
 
 def random_direction(direction):
-    """
-    Choose a random direction from string. Missing axis will be random, and '' for all random.
-
-    Args:
-        direction (str): 'upper-left', 'upper-right', 'bottom-left',
-        'bottom-right', or 'upper', 'bottom', 'left', 'right', etc.
-
-    Returns:
-        tuple(int): Such as (-1, 1) for bottom-left
-    """
+    """把 upper-left 等方向转为 (x, y)；缺失轴随机，空字符串表示两轴随机。"""
     direction = direction.lower()
     x = 1 if runtime_random.chance() else -1
     y = 1 if runtime_random.chance() else -1
@@ -121,24 +84,7 @@ def combine(before, after, limit):
 
 
 def match_movable(before, spawn, after, fleets, fleet_step=2):
-    """
-    Args:
-        before (list(tuple)): List of location. Before and after are equivalent, you can reverse input.
-                              Will match the previous element in `before` first.
-        spawn (list(tuple)):
-        after (list(tuple)):
-        fleets (list(tuple)):
-        fleet_step (int):
-
-    Returns:
-        list(tuple), list(tuple): Matched before, and after.
-
-    Examples:
-        > before = [(0, 2), (0, 0), (1, 0), (2, 4), (7, 19)]
-        > after = [(7, 9), (0, 3), (0, 1), (1, 1), (2, 5)]
-        > match_movable(before, after)
-        ([(0, 2), (0, 0), (1, 0), (2, 4)], [(0, 3), (0, 1), (1, 1), (2, 5)])
-    """
+    """优先按 before 顺序匹配移动前后坐标，返回 (匹配前坐标列表, 匹配后坐标列表)。"""
     base_weight = -10000
     encourage_weight = -100
     before_len = len(before)

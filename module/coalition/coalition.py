@@ -43,10 +43,6 @@ class Coalition(CoalitionCombat, CampaignEvent):
     run_limit: int
 
     def get_event_pt(self):
-        """
-        Returns:
-            int: PT amount, or 0 if unable to parse
-        """
         event = self.config.Campaign_Event
         if event == "coalition_20230323":
             ocr = Digit(coalition_assets.FROSTFALL_OCR_PT, name="OCR_PT", letter=(198, 158, 82), threshold=128)
@@ -78,30 +74,21 @@ class Coalition(CoalitionCombat, CampaignEvent):
 
     @property
     def _coalition_has_oil_icon(self):
-        """返回当前共斗活动是否显示油量图标。"""
         return self.config.Campaign_Event != "coalition_20260122"
 
     def triggered_stop_condition(self, oil_check=False, pt_check=False):
-        """
-        Returns:
-            bool: 是否触发停止条件。
-        """
-        # 运行次数限制。
         if self.run_limit and self.config.StopCondition_RunCount <= 0:
             logger.hr("Triggered stop condition: Run count")
             self.config.StopCondition_RunCount = 0
             self.config.Scheduler_Enable = False
             return True
-        # 当前页面油量限制。
         if oil_check and self.get_oil() < max(500, self.config.StopCondition_OilLimit):
             logger.hr("Triggered stop condition: Oil limit")
             self.config.task_delay(minute=(120, 240))
             return True
-        # 活动 PT 限制。
         if pt_check and self.event_pt_limit_triggered():
             logger.hr("Triggered stop condition: Event PT limit")
             return True
-        # 任务平衡器。
         if self.run_count >= 1 and self.config.TaskBalancer_Enable and self.triggered_task_balancer():
             logger.hr("Triggered stop condition: Coin limit")
             self.handle_task_balancer()
@@ -110,16 +97,7 @@ class Coalition(CoalitionCombat, CampaignEvent):
         return False
 
     def coalition_execute_once(self, event, stage, fleet):
-        """
-        Args:
-            event:
-            stage:
-            fleet:
-
-        Pages:
-            in: in_coalition
-            out: in_coalition
-        """
+        """页面进出均为 in_coalition。"""
         self.config.override(
             Campaign_Name=f"{event}_{stage}",
             Campaign_UseAutoSearch=False,
@@ -131,7 +109,7 @@ class Coalition(CoalitionCombat, CampaignEvent):
             )
             self.config.override(Emotion_Fleet1Control="prevent_yellow_face")
         if stage == "sp":
-            # Multiple fleets are required in SP
+            # SP 必须使用多舰队。
             self.config.override(
                 Coalition_Fleet="multi",
             )
