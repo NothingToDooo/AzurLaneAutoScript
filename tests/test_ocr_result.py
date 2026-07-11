@@ -324,6 +324,28 @@ def test_legacy_ocr_keeps_single_and_multiple_roi_shapes() -> None:
     assert multiple == ["7", "7"]
 
 
+def test_ocr_single_returns_scalar_for_one_roi() -> None:
+    assert _TestOcr(_FakeEngine("7", 0.9)).ocr_single(TEST_IMAGE) == "7"
+
+
+def test_ocr_single_rejects_multiple_button_rois_before_inference() -> None:
+    engine = _FakeEngine("7", 0.9)
+    ocr = _TestOcr(engine, buttons=[TEST_AREA, TEST_AREA])
+
+    with pytest.raises(ValueError, match="one ROI"):
+        ocr.ocr_single(TEST_IMAGE)
+
+    assert engine.inference_batches == []
+
+
+def test_ocr_single_uses_direct_input_cardinality() -> None:
+    ocr = _TestOcr(_FakeEngine("7", 0.9), buttons=[TEST_AREA, TEST_AREA])
+
+    assert ocr.ocr_single([TEST_IMAGE], direct_ocr=True) == "7"
+    with pytest.raises(ValueError, match="one ROI"):
+        ocr.ocr_single([TEST_IMAGE, TEST_IMAGE], direct_ocr=True)
+
+
 def test_digit_recognize_returns_list_for_multiple_rois() -> None:
     results = make_digit("7", buttons=[TEST_AREA, TEST_AREA]).recognize(TEST_IMAGE)
 

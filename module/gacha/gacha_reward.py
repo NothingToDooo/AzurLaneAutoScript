@@ -26,7 +26,7 @@ WISHING_WELL_MANUAL_CONFIG_MESSAGE = (
 
 @dataclass(slots=True)
 class _GachaFlushState:
-    confirm_timer: object
+    confirm_timer: Timer
     confirm_mode: bool = True
     queue_clean: bool = True
 
@@ -36,7 +36,7 @@ class RewardGacha(GachaUI, Retirement):
     build_cube_count = 0
     build_ticket_count = 0
 
-    def gacha_prep(self, target, skip_first_screenshot=True):
+    def gacha_prep(self, target: int, *, skip_first_screenshot: bool = True) -> bool:
         """从任意建造页打开提交弹窗并设置订单数；无法准备时返回 False。"""
         if not target:
             return False
@@ -94,7 +94,7 @@ class RewardGacha(GachaUI, Retirement):
 
         return True
 
-    def gacha_calculate(self, target_count, gold_cost, cube_cost):
+    def gacha_calculate(self, target_count: int, gold_cost: int, cube_cost: int) -> int:
         """按当前资源返回可提交数量，并从缓存的金币和魔方中扣除消耗。"""
         while 1:
             gold_total = gold_cost * target_count
@@ -115,13 +115,13 @@ class RewardGacha(GachaUI, Retirement):
         self.build_cube_count -= cube_total
         return target_count
 
-    def gacha_goto_pool(self, target_pool):
+    def gacha_goto_pool(self, target_pool: str) -> str:
         """切换建造池并返回实际池名；不可用时回退 light，未配置许愿池时抛错。"""
         # 先切到 light 池。
         self.gacha_bottom_navbar_ensure(right=3, is_build=True)
 
         if target_pool == "wishing_well":
-            if self._gacha_side_navbar.get_total(main=self) != 5:
+            if self._gacha_side_navbar().get_total(main=self) != 5:
                 logger.warning("'wishing_well' is not available, default to 'light' pool")
                 target_pool = "light"
             else:
@@ -143,7 +143,7 @@ class RewardGacha(GachaUI, Retirement):
 
         return target_pool
 
-    def gacha_flush_queue(self, skip_first_screenshot=True):
+    def gacha_flush_queue(self, *, skip_first_screenshot: bool = True) -> None:
         """清空建造队列并回到建造池选择页；船坞满时可能无法完全清空。"""
         self.gacha_side_navbar_ensure(bottom=3)
 
@@ -167,7 +167,7 @@ class RewardGacha(GachaUI, Retirement):
         # 许愿池不显示金币，清空后回普通池以便读取资源。
         self._gacha_leave_wishing_pool()
 
-    def _gacha_queue_already_empty(self, state):
+    def _gacha_queue_already_empty(self, state: _GachaFlushState) -> bool:
         if self.appear(gacha_assets.BUILD_QUEUE_EMPTY, offset=(20, 20)) and state.queue_clean:
             self.gacha_side_navbar_ensure(upper=1)
             return True
@@ -175,7 +175,7 @@ class RewardGacha(GachaUI, Retirement):
         state.queue_clean = False
         return False
 
-    def _gacha_flush_queue_step(self, state):
+    def _gacha_flush_queue_step(self, state: _GachaFlushState) -> bool:
         if self.appear_then_click(gacha_assets.BUILD_FINISH_ORDERS, interval=3):
             state.confirm_timer.reset()
             return True
@@ -188,7 +188,7 @@ class RewardGacha(GachaUI, Retirement):
             return True
         return self._gacha_handle_finish_results(state)
 
-    def _gacha_handle_finish_popup(self, state):
+    def _gacha_handle_finish_popup(self, state: _GachaFlushState) -> bool:
         if not self.handle_popup_confirm("FINISH_ORDERS"):
             return False
 
@@ -199,14 +199,14 @@ class RewardGacha(GachaUI, Retirement):
         state.confirm_timer.reset()
         return True
 
-    def _gacha_handle_ship_rewards(self, state):
+    def _gacha_handle_ship_rewards(self, state: _GachaFlushState) -> bool:
         if self.appear(GET_SHIP, interval=1):
             self.device.click(STORY_SKIP)  # 多订单时快进。
             state.confirm_timer.reset()
             return True
         return self.handle_get_items_ship()
 
-    def _gacha_handle_finish_results(self, state):
+    def _gacha_handle_finish_results(self, state: _GachaFlushState) -> bool:
         if not self.appear(gacha_assets.BUILD_FINISH_RESULTS, offset=(20, 150), interval=3):
             return False
 
@@ -214,19 +214,19 @@ class RewardGacha(GachaUI, Retirement):
         state.confirm_timer.reset()
         return True
 
-    def _gacha_flush_submit_ready(self, state):
+    def _gacha_flush_submit_ready(self, state: _GachaFlushState) -> bool:
         if not (self.appear(gacha_assets.BUILD_SUBMIT_ORDERS) or self.appear(gacha_assets.BUILD_SUBMIT_WW_ORDERS)):
             return False
         return state.confirm_timer.reached()
 
-    def _gacha_leave_wishing_pool(self):
+    def _gacha_leave_wishing_pool(self) -> None:
         if not self.appear(gacha_assets.BUILD_SUBMIT_WW_ORDERS):
             return
 
         logger.info("In wishing pool, go back to normal pools")
         self.gacha_side_navbar_ensure(upper=1)
 
-    def gacha_submit(self, skip_first_screenshot=True):
+    def gacha_submit(self, *, skip_first_screenshot: bool = True) -> None:
         """确认提交弹窗并等待建造订单页。"""
         logger.info("Submit gacha")
         while 1:
@@ -245,14 +245,14 @@ class RewardGacha(GachaUI, Retirement):
             if self.appear(gacha_assets.BUILD_FINISH_ORDERS):
                 break
 
-    def gacha_run(self):
+    def gacha_run(self) -> bool:
         """从任意页面提交建造订单，结束于建造页并返回是否至少成功提交一次。"""
         self.ui_goto_gacha()
 
         self.gacha_flush_queue()
 
-        self.build_coin_count = OCR_COIN.ocr(self.device.image)
-        self.build_cube_count = OCR_BUILD_CUBE_COUNT.ocr(self.device.image)
+        self.build_coin_count = OCR_COIN.ocr_single(self.device.image)
+        self.build_cube_count = OCR_BUILD_CUBE_COUNT.ocr_single(self.device.image)
 
         actual_pool = self.gacha_goto_pool(self.config.Gacha_Pool)
 
@@ -266,7 +266,7 @@ class RewardGacha(GachaUI, Retirement):
         buy = [self.config.Gacha_Amount, 0]
         if actual_pool == "event" and self.config.Gacha_UseTicket:
             if self.appear(gacha_assets.BUILD_TICKET_CHECK, offset=(30, 30)):
-                self.build_ticket_count = OCR_BUILD_TICKET_COUNT.ocr(self.device.image)
+                self.build_ticket_count = OCR_BUILD_TICKET_COUNT.ocr_single(self.device.image)
             else:
                 logger.info("Build ticket not detected, use cubes and coins")
         if self.config.Gacha_Amount > self.build_ticket_count:
@@ -285,7 +285,7 @@ class RewardGacha(GachaUI, Retirement):
 
         return result
 
-    def run(self):
+    def run(self) -> None:
         """从任意页面执行建造任务，结束于建造页。"""
         self.gacha_run()
         self.config.task_delay(server_update=True)

@@ -116,8 +116,10 @@ class Ocr[OcrValueT = str]:
             return [buttons]
         if isinstance(buttons, np.ndarray):
             return [cast("OcrArea", buttons)]
-        if isinstance(buttons, tuple) and len(buttons) == 4 and all(
-            isinstance(value, (int, float, np.integer, np.floating)) for value in buttons
+        if (
+            isinstance(buttons, tuple)
+            and len(buttons) == 4
+            and all(isinstance(value, (int, float, np.integer, np.floating)) for value in buttons)
         ):
             return [cast("OcrArea", buttons)]
         return list(cast("Sequence[OcrRegion]", buttons))
@@ -279,6 +281,14 @@ class Ocr[OcrValueT = str]:
             self.after_process(result) for result in self._ocr_texts(image, direct_ocr=direct_ocr)
         ]
         return self._finish_ocr(results, start_time=start_time)
+
+    def ocr_single(self, image: OcrInput, *, direct_ocr: bool = False) -> OcrValueT:
+        """识别且只识别一个区域；区域数量不为一时拒绝模糊的返回形状。"""
+        roi_count = len(image) if direct_ocr else len(self.buttons)
+        if roi_count != 1:
+            message = "Ocr.ocr_single() accepts exactly one ROI"
+            raise ValueError(message)
+        return cast("OcrValueT", self.ocr(image, direct_ocr=direct_ocr))
 
 
 class OcrYuv[OcrValueT = str](Ocr[OcrValueT]):
