@@ -1,3 +1,5 @@
+from typing import Literal
+
 import numpy as np
 
 from module.base.button import Button
@@ -8,6 +10,8 @@ from ..campaign_war_archives.campaign_base import CampaignBase as CampaignBase_
 
 # Here manually type coordinates, because the ball appears in this event only.
 BALL = Button(area=(589, 279, 685, 374), color=(), button=(589, 279, 685, 374))
+type BallStatus = Literal["blue", "red"]
+type DetectedBallStatus = BallStatus | Literal["unknown"]
 
 
 class CampaignBase(CampaignBase_):
@@ -18,7 +22,7 @@ class CampaignBase(CampaignBase_):
         "HT4 > HT5 > HTS2 > HT6",
     )
 
-    def campaign_set_chapter(self, name, mode="normal"):
+    def campaign_set_chapter(self, name: str, mode: str = "normal") -> None:
         """按关卡名和 normal/hard 模式切换章节。"""
         chapter, stage = self.campaign_separate_name(name)
 
@@ -32,7 +36,7 @@ class CampaignBase(CampaignBase_):
 
         logger.warning(f"Unknown campaign chapter: {chapter}{stage}")
 
-    def campaign_set_chapter_main(self, chapter, mode="normal"):
+    def campaign_set_chapter_main(self, chapter: str, mode: str = "normal") -> bool:
         if not chapter.isdigit():
             return False
 
@@ -43,7 +47,7 @@ class CampaignBase(CampaignBase_):
             self.campaign_ensure_mode("hard")
         return True
 
-    def campaign_set_chapter_event(self, chapter, mode="normal"):
+    def campaign_set_chapter_event(self, chapter: str, mode: str = "normal") -> bool:
         del mode
         mode_by_chapter = {
             "a": "normal",
@@ -61,7 +65,7 @@ class CampaignBase(CampaignBase_):
         self.campaign_ensure_chapter(chapter)
         return True
 
-    def campaign_set_chapter_sp(self, chapter, mode="normal"):
+    def campaign_set_chapter_sp(self, chapter: str, mode: str = "normal") -> bool:
         del mode
         if chapter != "sp":
             return False
@@ -70,7 +74,7 @@ class CampaignBase(CampaignBase_):
         self.campaign_ensure_chapter(chapter)
         return True
 
-    def campaign_set_chapter_ball(self, chapter, stage):
+    def campaign_set_chapter_ball(self, chapter: str, stage: str) -> bool:
         if chapter not in {"t", "ts", "ht", "hts"}:
             return False
 
@@ -81,20 +85,20 @@ class CampaignBase(CampaignBase_):
         return True
 
     @staticmethod
-    def _campaign_ball_status(chapter, stage):
+    def _campaign_ball_status(chapter: str, stage: str) -> BallStatus:
         if chapter in {"t", "ht"} and stage in {"1", "2", "3"}:
             return "blue"
         if chapter in {"ts", "hts"} and stage == "1":
             return "blue"
         return "red"
 
-    def _campaign_ensure_ball_mode(self, chapter):
+    def _campaign_ensure_ball_mode(self, chapter: str) -> None:
         if chapter in {"t", "ts"}:
             self.campaign_ensure_mode("normal")
             return
         self.campaign_ensure_mode("hard")
 
-    def _campaign_ball_get(self):
+    def _campaign_ball_get(self) -> DetectedBallStatus:
         """返回球色 blue、red；无法识别时返回 unknown。"""
         color = get_color(self.device.image, BALL.area)
         # Blue: (93, 127, 182), Red: (186, 116, 124)
@@ -106,7 +110,7 @@ class CampaignBase(CampaignBase_):
         logger.warning(f"Unknown campaign ball color: {color}")
         return "unknown"
 
-    def _campaign_ball_set(self, status):
+    def _campaign_ball_set(self, status: BallStatus) -> None:
         """把球色切换为 blue 或 red。"""
         skip_first_screenshot = True
         while 1:

@@ -1,4 +1,9 @@
+from typing import TYPE_CHECKING
+
 from module.map.map_base import CampaignMap
+
+if TYPE_CHECKING:
+    from module.combat.combat import CombatEnd
 
 from .campaign_base import CampaignBase
 from .ht1 import Config as ConfigBase
@@ -153,9 +158,9 @@ class Campaign(CampaignBase):
     def battle_5(self) -> bool:
         return self.fleet_boss.clear_boss()
 
-    def combat_status(self, *args, **kwargs):
+    def combat_status(self, expected_end: CombatEnd | None = None) -> None:
         if not self.map_is_clear_mode and self.battle_count >= 5:
             # Ignore story battles
             self.device.disable_stuck_detection()
 
-        super().combat_status(*args, **kwargs)
+        super().combat_status(expected_end)

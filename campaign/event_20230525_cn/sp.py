@@ -1,9 +1,13 @@
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from module.base.utils import location2node
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
 from module.map.map_base import CampaignMap
+
+if TYPE_CHECKING:
+    from module.config.config import AzurLaneConfig
+    from module.device.device import Device
 
 from .campaign_base import CampaignBase
 from .config_base import ConfigBase
@@ -169,7 +173,7 @@ actions = {
 }
 
 
-def parse_move(movement: str, step: int):
+def parse_move(movement: str, step: int) -> tuple[int, int]:
     if step % len(movement) != 0:
         raise ScriptError(INVALID_SP_MOVEMENT_MESSAGE)
 
@@ -187,22 +191,27 @@ class Campaign(CampaignBase):
     MAP = MAP
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        config: AzurLaneConfig | str,
+        device: Device | str | None = None,
+        task: str | None = None,
+    ) -> None:
         self.siren_list = [C7, D6, G6, H7]
         self.patched = False
-        self.action = []
-        super().__init__(*args, **kwargs)
+        self.action: list[list[str]] = []
+        super().__init__(config, device, task)
 
-    def execute_actions(self, step):
+    def execute_actions(self, step: int) -> bool:
         for action in self.action[step]:
-            fleet_index, movement, step, battle = action.split("_")
+            fleet_index, movement, movement_step_text, battle = action.split("_")
             src = getattr(self, f"fleet_{fleet_index}_location")
             fleet = getattr(self, f"fleet_{fleet_index}")
-            step = int(step)
-            dx, dy = parse_move(movement, step)
+            movement_step = int(movement_step_text)
+            dx, dy = parse_move(movement, movement_step)
             dst = (src[0] + dx, src[1] + dy)
 
-            logger.info(f"{fleet_index}{movement}({step}): {src} -> {dst}")
+            logger.info(f"{fleet_index}{movement}({movement_step}): {src} -> {dst}")
 
             for _ in range(3):
                 if battle:
