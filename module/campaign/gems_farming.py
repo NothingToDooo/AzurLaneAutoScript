@@ -315,7 +315,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
     _trigger_lv32 = False
     _trigger_emotion = False
 
-    def triggered_stop_condition(self, oil_check=True):
+    def triggered_stop_condition(self, *, oil_check: bool = True) -> bool:
         # 等级上限为 32。
         if self.campaign.config.LV32_TRIGGERED:
             self._trigger_lv32 = True

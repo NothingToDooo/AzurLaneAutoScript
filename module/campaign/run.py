@@ -241,7 +241,7 @@ class CampaignRun(CampaignEvent):
         self.config.Scheduler_Enable = False
         return True
 
-    def _triggered_oil_limit(self, oil_check=True) -> bool:
+    def _triggered_oil_limit(self, *, oil_check: bool = True) -> bool:
         if not oil_check or self.get_oil() >= max(500, self.config.StopCondition_OilLimit):
             return False
 
@@ -265,7 +265,7 @@ class CampaignRun(CampaignEvent):
         self.config.Scheduler_Enable = False
         return True
 
-    def _triggered_event_pt_limit(self, oil_check=True) -> bool:
+    def _triggered_event_pt_limit(self, *, oil_check: bool = True) -> bool:
         if not (oil_check and self.campaign.event_pt_limit_triggered()):
             return False
 
@@ -280,7 +280,7 @@ class CampaignRun(CampaignEvent):
         self.handle_task_balancer()
         return True
 
-    def _triggered_task_balancer_limit(self, oil_check=True) -> bool:
+    def _triggered_task_balancer_limit(self, *, oil_check: bool = True) -> bool:
         if not (
             oil_check and self.run_count >= 1 and self.config.TaskBalancer_Enable and self.triggered_task_balancer()
         ):
@@ -290,16 +290,16 @@ class CampaignRun(CampaignEvent):
         self.handle_task_balancer()
         return True
 
-    def triggered_stop_condition(self, oil_check=True):
+    def triggered_stop_condition(self, *, oil_check: bool = True) -> bool:
         return (
             self._triggered_run_count_limit()
             or self._triggered_reach_level_limit()
-            or self._triggered_oil_limit(oil_check)
+            or self._triggered_oil_limit(oil_check=oil_check)
             or self._triggered_auto_search_oil_limit()
             or self._triggered_get_new_ship_limit()
-            or self._triggered_event_pt_limit(oil_check)
+            or self._triggered_event_pt_limit(oil_check=oil_check)
             or self._triggered_auto_search_coin_limit()
-            or self._triggered_task_balancer_limit(oil_check)
+            or self._triggered_task_balancer_limit(oil_check=oil_check)
         )
 
     def _triggered_app_restart(self):
@@ -325,12 +325,13 @@ class CampaignRun(CampaignEvent):
                 logger.info(f"Stage name {name} is from campaign_main")
                 folder = "campaign_main"
             else:
-                folder = self.config.cross_get("GemsFarming.Campaign.Event")
-                if folder is not None:
-                    logger.info(f"Stage name {name} is from event {folder}")
-                else:
+                configured_folder = self.config.cross_get("GemsFarming.Campaign.Event")
+                if not isinstance(configured_folder, str) or not configured_folder:
                     logger.warning("Cannot get the latest event, fallback to campaign_main")
                     folder = "campaign_main"
+                else:
+                    folder = configured_folder
+                    logger.info(f"Stage name {name} is from event {folder}")
         catalog = self._effective_content_catalog()
         name = _normalize_stage_alias(name, folder, catalog)
         policy_config = cast("StagePolicyConfig", self.config)
