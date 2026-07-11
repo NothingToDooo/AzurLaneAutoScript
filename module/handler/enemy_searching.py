@@ -18,20 +18,20 @@ class EnemySearchingHandler(InfoHandler):
 
     map_is_100_percent_clear = False  # fast_forward.py 会覆盖此状态。
 
-    def enemy_searching_color_initial(self):
+    def enemy_searching_color_initial(self) -> None:
         # 供需要颜色初始化的子类覆盖。
         pass
 
-    def enemy_searching_appear(self):
+    def enemy_searching_appear(self) -> bool:
         if not self.is_in_map():
             return False
 
         return MAP_ENEMY_SEARCHING.match_luma(self.device.image, offset=(5, 5))
 
-    def handle_enemy_flashing(self):
+    def handle_enemy_flashing(self) -> None:
         self.device.sleep(1.2)
 
-    def handle_in_stage(self):
+    def handle_in_stage(self) -> bool:
         if self.is_in_stage():
             if self.in_stage_timer.reached():
                 logger.info(IN_STAGE_MESSAGE)
@@ -43,10 +43,10 @@ class EnemySearchingHandler(InfoHandler):
         self.in_stage_timer.reset()
         return False
 
-    def is_in_stage_page(self):
+    def is_in_stage_page(self) -> bool:
         return any(self.appear(check, offset=(20, 20)) for check in (CAMPAIGN_CHECK, EVENT_CHECK, SP_CHECK))
 
-    def is_stage_page_has_entrance(self):
+    def is_stage_page_has_entrance(self) -> bool:
         """以关卡入口是否可识别判断关卡页已完成加载。"""
         try:
             campaign_extract_name_image = getattr(self, "campaign_extract_name_image", None)
@@ -60,29 +60,31 @@ class EnemySearchingHandler(InfoHandler):
 
         return True
 
-    def is_in_stage(self):
+    def is_in_stage(self) -> bool:
         if not self.is_in_stage_page():
             return False
         return self.is_stage_page_has_entrance()
 
-    def is_in_map(self):
+    def is_in_map(self) -> bool:
         return self.appear(IN_MAP)
 
-    def is_event_animation(self):
+    @staticmethod
+    def is_event_animation() -> bool:
         """供活动子类覆盖，用于识别清敌后的活动动画。"""
         return False
 
-    def handle_auto_search_exit(self):
+    @staticmethod
+    def handle_auto_search_exit() -> bool:
         """供 AutoSearchHandler 覆盖；寻敌等待流程会无条件调用此钩子。"""
         return False
 
     @staticmethod
-    def _reset_enemy_searching_timeout(timeout, *, extend=False):
+    def _reset_enemy_searching_timeout(timeout: Timer, *, extend: bool = False) -> None:
         if extend:
             timeout.limit = 10
         timeout.reset()
 
-    def _handle_enemy_searching_interrupts(self, timeout, *, extend_timeout):
+    def _handle_enemy_searching_interrupts(self, timeout: Timer, *, extend_timeout: bool) -> bool:
         if self.handle_auto_search_exit():
             self._reset_enemy_searching_timeout(timeout, extend=extend_timeout)
             return True
@@ -100,7 +102,7 @@ class EnemySearchingHandler(InfoHandler):
             return True
         return False
 
-    def _handle_enemy_searching_animation_end(self, appeared):
+    def _handle_enemy_searching_animation_end(self, *, appeared: bool) -> tuple[bool, bool]:
         if self.enemy_searching_appear():
             return True, False
         if appeared:
@@ -112,7 +114,7 @@ class EnemySearchingHandler(InfoHandler):
         self.enemy_searching_color_initial()
         return appeared, False
 
-    def handle_in_map_with_enemy_searching(self):
+    def handle_in_map_with_enemy_searching(self) -> bool:
         if not self.is_in_map():
             return False
 
@@ -138,7 +140,7 @@ class EnemySearchingHandler(InfoHandler):
             if self._handle_enemy_searching_interrupts(timeout, extend_timeout=True):
                 continue
 
-            appeared, finished = self._handle_enemy_searching_animation_end(appeared)
+            appeared, finished = self._handle_enemy_searching_animation_end(appeared=appeared)
             if finished:
                 break
             if timeout.reached():
@@ -147,7 +149,7 @@ class EnemySearchingHandler(InfoHandler):
 
         return True
 
-    def handle_in_map_no_enemy_searching(self):
+    def handle_in_map_no_enemy_searching(self) -> bool:
         if not self.is_in_map():
             return False
 

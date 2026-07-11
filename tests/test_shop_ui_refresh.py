@@ -60,8 +60,9 @@ class _FakeShopUI(ShopUI):
     def ui_click(self, *args, **kwargs) -> None:
         self.ui_click_calls.append((args, kwargs))
 
-    def handle_info_bar(self) -> None:
+    def handle_info_bar(self) -> bool:
         self.info_bar_handle_count += 1
+        return True
 
 
 def test_shop_refresh_clicks_available_refresh_and_confirms() -> None:

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from module.combat.assets import GET_ITEMS_1
 from module.handler import assets as handler_assets
 from module.handler.info_handler import InfoHandler
@@ -27,7 +29,7 @@ class StrategyHandler(InfoHandler):
     fleet_1_formation_fixed = False
     fleet_2_formation_fixed = False
 
-    def strategy_open(self, skip_first_screenshot=True):
+    def strategy_open(self, *, skip_first_screenshot: bool = True) -> None:
         logger.info("Strategy open")
         while 1:
             if skip_first_screenshot:
@@ -48,7 +50,7 @@ class StrategyHandler(InfoHandler):
             if self.appear_then_click(GET_ITEMS_1, offset=5):
                 continue
 
-    def strategy_close(self, skip_first_screenshot=True):
+    def strategy_close(self, *, skip_first_screenshot: bool = True) -> None:
         logger.info("Strategy close")
         while 1:
             if skip_first_screenshot:
@@ -62,7 +64,13 @@ class StrategyHandler(InfoHandler):
             if not self.appear(handler_assets.STRATEGY_OPENED, offset=200):
                 break
 
-    def strategy_set_execute(self, formation=None, sub_view=None, sub_hunt=None):
+    def strategy_set_execute(
+        self,
+        formation: Literal["line_ahead", "double_line", "diamond"] | None = None,
+        *,
+        sub_view: bool | None = None,
+        sub_hunt: bool | None = None,
+    ) -> None:
         """在 STRATEGY_OPENED 中设置阵型；formation 接受 line_ahead、double_line、diamond 或 None。"""
         logger.info(f"Strategy set: formation={formation}, submarine_view={sub_view}, submarine_hunt={sub_hunt}")
 
@@ -79,7 +87,7 @@ class StrategyHandler(InfoHandler):
             else:
                 logger.warning("Setting up submarine_hunt but no icon appears")
 
-    def handle_strategy(self, index):
+    def handle_strategy(self, index: int) -> bool:
         if getattr(self, f"fleet_{index}_formation_fixed"):
             return False
         expected_formation = getattr(self.config, f"Fleet_Fleet{index}Formation")
@@ -98,7 +106,7 @@ class StrategyHandler(InfoHandler):
         setattr(self, f"fleet_{index}_formation_fixed", True)
         return True
 
-    def _strategy_get_from_map_buff(self):
+    def _strategy_get_from_map_buff(self) -> Literal["line_ahead", "double_line", "diamond", "unknown"]:
         image = self.image_crop(handler_assets.MAP_BUFF, copy=False)
         if TEMPLATE_FORMATION_2.match(image):
             buff = "double_line"
@@ -112,10 +120,10 @@ class StrategyHandler(InfoHandler):
         logger.attr("Map_buff", buff)
         return buff
 
-    def is_in_strategy_submarine_move(self):
+    def is_in_strategy_submarine_move(self) -> bool:
         return self.appear(handler_assets.SUBMARINE_MOVE_CONFIRM, offset=(20, 20))
 
-    def strategy_submarine_move_enter(self, skip_first_screenshot=True):
+    def strategy_submarine_move_enter(self, *, skip_first_screenshot: bool = True) -> None:
         """页面状态：STRATEGY_OPENED 或 SUBMARINE_MOVE_ENTER → SUBMARINE_MOVE_CONFIRM。"""
         logger.info("Submarine move enter")
         while 1:
@@ -130,7 +138,7 @@ class StrategyHandler(InfoHandler):
             if self.appear(handler_assets.SUBMARINE_MOVE_CONFIRM, offset=(20, 20)):
                 break
 
-    def strategy_submarine_move_confirm(self, skip_first_screenshot=True):
+    def strategy_submarine_move_confirm(self, *, skip_first_screenshot: bool = True) -> None:
         """页面状态：SUBMARINE_MOVE_CONFIRM → STRATEGY_OPENED 或 SUBMARINE_MOVE_ENTER。"""
         logger.info("Submarine move confirm")
         while 1:
@@ -145,7 +153,7 @@ class StrategyHandler(InfoHandler):
             if self.appear(handler_assets.SUBMARINE_MOVE_ENTER, offset=200):
                 break
 
-    def strategy_submarine_move_cancel(self, skip_first_screenshot=True):
+    def strategy_submarine_move_cancel(self, *, skip_first_screenshot: bool = True) -> None:
         """页面状态：SUBMARINE_MOVE_CONFIRM → STRATEGY_OPENED 或 SUBMARINE_MOVE_ENTER。"""
         logger.info("Submarine move cancel")
         while 1:
@@ -160,14 +168,14 @@ class StrategyHandler(InfoHandler):
             if self.appear(handler_assets.SUBMARINE_MOVE_ENTER, offset=200):
                 break
 
-    def is_in_strategy_mob_move(self):
+    def is_in_strategy_mob_move(self) -> bool:
         return self.appear(handler_assets.MOB_MOVE_CANCEL, offset=(20, 20))
 
-    def strategy_has_mob_move(self):
+    def strategy_has_mob_move(self) -> bool:
         """在 STRATEGY_OPENED 中检测道中队移动入口，不改变页面。"""
         return self.match_template_color(handler_assets.MOB_MOVE_ENTER, offset=MOB_MOVE_OFFSET)
 
-    def strategy_mob_move_enter(self, skip_first_screenshot=True):
+    def strategy_mob_move_enter(self, *, skip_first_screenshot: bool = True) -> None:
         """页面状态：STRATEGY_OPENED 或 MOB_MOVE_ENTER → MOB_MOVE_CANCEL。"""
         logger.info("Mob move enter")
         while 1:
@@ -182,7 +190,7 @@ class StrategyHandler(InfoHandler):
             if self.appear_then_click(handler_assets.MOB_MOVE_ENTER, offset=MOB_MOVE_OFFSET, interval=5):
                 continue
 
-    def strategy_mob_move_cancel(self, skip_first_screenshot=True):
+    def strategy_mob_move_cancel(self, *, skip_first_screenshot: bool = True) -> None:
         """页面状态：MOB_MOVE_CANCEL → STRATEGY_OPENED 或 MOB_MOVE_ENTER。"""
         logger.info("Mob move cancel")
         while 1:
@@ -197,14 +205,14 @@ class StrategyHandler(InfoHandler):
             if self.appear_then_click(handler_assets.MOB_MOVE_CANCEL, offset=(20, 20), interval=5):
                 continue
 
-    def is_in_strategy_air_strike(self):
+    def is_in_strategy_air_strike(self) -> bool:
         return self.appear(handler_assets.AIR_STRIKE_CONFIRM, offset=(20, 20))
 
-    def strategy_has_air_strike(self):
+    def strategy_has_air_strike(self) -> bool:
         """在 STRATEGY_OPENED 中检测空袭入口，不改变页面。"""
         return self.match_template_color(handler_assets.AIR_STRIKE_ENTER, offset=(150, 200))
 
-    def strategy_air_strike_enter(self, skip_first_screenshot=True):
+    def strategy_air_strike_enter(self, *, skip_first_screenshot: bool = True) -> None:
         """页面状态：STRATEGY_OPENED 或 AIR_STRIKE_ENTER → AIR_STRIKE_CONFIRM。"""
         logger.info("Air strike enter")
         for _ in self.loop(skip_first=skip_first_screenshot):
@@ -213,7 +221,7 @@ class StrategyHandler(InfoHandler):
             if self.appear_then_click(handler_assets.AIR_STRIKE_ENTER, offset=(150, 200), interval=5):
                 continue
 
-    def strategy_air_strike_cancel(self, skip_first_screenshot=True):
+    def strategy_air_strike_cancel(self, *, skip_first_screenshot: bool = True) -> None:
         """页面状态：AIR_STRIKE_CONFIRM → STRATEGY_OPENED 或 AIR_STRIKE_ENTER。"""
         logger.info("Air strike cancel")
         for _ in self.loop(skip_first=skip_first_screenshot):

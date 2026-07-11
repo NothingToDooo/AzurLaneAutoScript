@@ -1,5 +1,3 @@
-import numpy as np
-
 from module.base.button import ButtonGrid
 from module.base.timer import Timer
 from module.handler import assets as handler_assets
@@ -27,9 +25,9 @@ dic_setting_index_to_name = {v: k for k, v in dic_setting_name_to_index.items()}
 
 
 class AutoSearchHandler(EnemySearchingHandler):
-    def _fleet_sidebar(self):
+    def _fleet_sidebar(self) -> ButtonGrid:
         if FLEET_PREPARATION_CHECK.match(self.device.image, offset=(20, 80)):
-            offset = np.subtract(FLEET_PREPARATION_CHECK.button, FLEET_PREPARATION_CHECK.base_button)[1]
+            offset = int(FLEET_PREPARATION_CHECK.button[1] - FLEET_PREPARATION_CHECK.base_button[1])
         else:
             offset = 0
         logger.attr("_fleet_sidebar_offset", offset)
@@ -37,7 +35,7 @@ class AutoSearchHandler(EnemySearchingHandler):
             origin=(1185, 155 + offset), delta=(0, 111), button_shape=(53, 104), grid_shape=(1, 3), name="FLEET_SIDEBAR"
         )
 
-    def _fleet_preparation_get(self):
+    def _fleet_preparation_get(self) -> int:
         """返回侧栏索引：1 为编队，2 为指挥喵，3 为自律寻敌设置。"""
         current = 0
         total = 0
@@ -58,7 +56,7 @@ class AutoSearchHandler(EnemySearchingHandler):
         logger.attr("Fleet_sidebar", f"{current}/{total}")
         return current
 
-    def fleet_preparation_sidebar_ensure(self, index):
+    def fleet_preparation_sidebar_ensure(self, index: int) -> bool:
         """确保切到 1～5 号侧栏；3 秒内未成功则返回 False。"""
         if index <= 0 or index > 5:
             logger.warning(f"Sidebar index cannot be ensured, {index}, limit 1 through 5 only")
@@ -77,7 +75,7 @@ class AutoSearchHandler(EnemySearchingHandler):
         logger.warning("Sidebar could not be ensured")
         return False
 
-    def _auto_search_set_click(self, setting):
+    def _auto_search_set_click(self, setting: str) -> bool:
         active = []
 
         for index, button in enumerate(AUTO_SEARCH_SETTINGS):
@@ -100,7 +98,7 @@ class AutoSearchHandler(EnemySearchingHandler):
         self.device.click(AUTO_SEARCH_SETTINGS[target_index])
         return False
 
-    def auto_search_setting_ensure(self, setting, skip_first_screenshot=True):
+    def auto_search_setting_ensure(self, setting: str, *, skip_first_screenshot: bool = True) -> bool:
         """setting 接受 fleet1_mob_fleet2_boss、fleet1_boss_fleet2_mob、
         fleet1_all_fleet2_standby、fleet1_standby_fleet2_all、sub_auto_call、sub_standby。
         """
@@ -124,27 +122,27 @@ class AutoSearchHandler(EnemySearchingHandler):
     # MULTIPLE_SORTIE 出现时向左移动 213px。
     _auto_search_menu_offset = (250, 30)
 
-    def is_auto_search_running(self):
+    def is_auto_search_running(self) -> bool:
         return self.appear(handler_assets.AUTO_SEARCH_MAP_OPTION_ON, offset=self._auto_search_offset) and self.appear(
             handler_assets.AUTO_SEARCH_MAP_OPTION_ON
         )
 
-    def handle_auto_search_map_option(self):
+    def handle_auto_search_map_option(self) -> bool:
         return self.appear(
             handler_assets.AUTO_SEARCH_MAP_OPTION_OFF, offset=self._auto_search_offset
         ) and self.appear_then_click(handler_assets.AUTO_SEARCH_MAP_OPTION_OFF, interval=2)
 
-    def is_in_auto_search_menu(self):
+    def is_in_auto_search_menu(self) -> bool:
         return handler_assets.AUTO_SEARCH_MENU_CONTINUE.match_luma(
             self.device.image, offset=self._auto_search_menu_offset
         )
 
-    def handle_auto_search_continue(self):
+    def handle_auto_search_continue(self) -> bool:
         return self.appear_then_click(
             handler_assets.AUTO_SEARCH_MENU_CONTINUE, offset=self._auto_search_menu_offset, interval=2
         )
 
-    def handle_auto_search_exit(self):
+    def handle_auto_search_exit(self) -> bool:
         if self.appear(handler_assets.AUTO_SEARCH_MENU_EXIT, offset=self._auto_search_menu_offset, interval=2):
             # 这里仍是较粗糙的处理，先保留原行为。
             self.device.click(handler_assets.AUTO_SEARCH_MENU_EXIT)
@@ -152,7 +150,7 @@ class AutoSearchHandler(EnemySearchingHandler):
             return True
         return False
 
-    def ensure_auto_search_exit(self, skip_first_screenshot=True):
+    def ensure_auto_search_exit(self, *, skip_first_screenshot: bool = True) -> bool:
         """页面状态：自律寻敌菜单 → 战役、活动或 SP 页面。"""
         if not self.is_in_auto_search_menu():
             return False

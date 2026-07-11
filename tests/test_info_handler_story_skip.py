@@ -2,6 +2,7 @@ from typing import ClassVar, TypeVar
 
 import pytest
 
+from module.base.button import Button
 from module.handler import assets as handler_assets
 from module.handler import info_handler as info_handler_module
 from module.handler.info_handler import InfoHandler
@@ -69,7 +70,7 @@ class _InfoHandler(InfoHandler):
         self.story_black_results: list[bool] = []
         self.appear_results: dict[str, list[bool]] = {}
         self.appear_then_click_results: dict[str, list[bool]] = {}
-        self.option_buttons: list[object] = []
+        self.option_buttons: list[Button] = []
         self.story_popup_timeout = _Timer()
         self._story_option_timer = _Timer()
         self._story_option_confirm = _Timer()
@@ -125,7 +126,7 @@ class _InfoHandler(InfoHandler):
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def _story_option_buttons_2(self) -> list[object]:
+    def _story_option_buttons_2(self) -> list[Button]:
         self.calls.append(("_story_option_buttons_2",))
         return self.option_buttons
 
@@ -152,8 +153,8 @@ def test_story_skip_confirms_popup_during_timeout() -> None:
 
 def test_story_skip_selects_stable_story_option() -> None:
     handler = _InfoHandler()
-    option_a = object()
-    option_b = object()
+    option_a = Button(area=(0, 0, 1, 1), color=(0, 0, 0), button=(0, 0, 1, 1), name="OPTION_A")
+    option_b = Button(area=(1, 0, 2, 1), color=(0, 0, 0), button=(1, 0, 2, 1), name="OPTION_B")
     handler.option_buttons = [option_a, option_b]
     handler.set_story_option_record(2)
     handler.set_story_option_timer(reached=[True])
