@@ -75,7 +75,8 @@ class _InterruptMap(OSMap):
         self.interval_clears: list[object] = []
         self.interval_resets: list[object] = []
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default

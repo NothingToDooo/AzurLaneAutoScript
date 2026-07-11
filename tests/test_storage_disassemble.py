@@ -92,13 +92,15 @@ class _Storage(StorageHandler):
     def confirm_disassemble(self, disassembled: int) -> int:
         return self._confirm_disassemble_equipment(disassembled=disassembled)
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
-    def loop(self, *_args: object, **_kwargs: object):
-        yield from range(20)
+    @staticmethod
+    def loop(*_args: object, **_kwargs: object) -> range:
+        return range(20)
 
     def interval_clear(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_clear", button))
@@ -120,7 +122,7 @@ class _Storage(StorageHandler):
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+    def handle_popup_confirm(self, name: str = "", offset: object = None, interval: float = 2) -> bool:
         _ = (name, offset, interval)
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)

@@ -441,10 +441,11 @@ def test_benchmark_keeps_function_execution_and_task_binding(monkeypatch: pytest
     calls: list[tuple[object, str]] = []
 
     class _Benchmark:
-        def __init__(self, config, task):
+        def __init__(self, config: SimpleNamespace, task: str) -> None:
             calls.append((config, task))
 
-        def run(self) -> None:
+        @staticmethod
+        def run() -> None:
             calls.append(("run", "Benchmark"))
 
     monkeypatch.setattr(benchmark_module, "Benchmark", _Benchmark)

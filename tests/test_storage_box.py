@@ -42,7 +42,8 @@ class _Digit:
     def __init__(self, *_args: object, **_kwargs: object) -> None:
         pass
 
-    def ocr(self, _image: object) -> int:
+    @staticmethod
+    def ocr(_image: object) -> int:
         return _Digit.values.pop(0)
 
 
@@ -78,13 +79,15 @@ class _Storage(StorageHandler):
     def use_one_box(self, button: object, amount: int) -> int:
         return self._storage_use_one_box(button, amount=amount)
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
-    def loop(self, *_args: object, **_kwargs: object):
-        yield from range(20)
+    @staticmethod
+    def loop(*_args: object, **_kwargs: object) -> range:
+        return range(20)
 
     def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
@@ -116,7 +119,13 @@ class _Storage(StorageHandler):
     def interval_reset(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_reset", button))
 
-    def ui_click(self, click_button: object, check_button=None, options=None, **settings: object) -> None:
+    def ui_click(
+        self,
+        click_button: object,
+        check_button: object = None,
+        options: object = None,
+        **settings: object,
+    ) -> None:
         self.calls.append(("ui_click", click_button, check_button, options, settings))
 
 

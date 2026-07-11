@@ -83,19 +83,20 @@ class _Shop(OSShop):
     def handle_amount(self, item: _Item) -> bool:
         return self.shop_buy_amount_handler(item)
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
-    def close_shop_buy_confirm_amount(self, skip_first_screenshot=True, **_kwargs: object) -> None:
+    def close_shop_buy_confirm_amount(self, *, skip_first_screenshot: bool = True, **_kwargs: object) -> None:
         self.calls.append(("close_shop_buy_confirm_amount", skip_first_screenshot))
 
-    def get_currency_coins(self, item, *_args: object, **_kwargs: object) -> int:
+    def get_currency_coins(self, item: _Item, *_args: object, **_kwargs: object) -> int:
         self.calls.append(("get_currency_coins", item))
         return self.currency
 
-    def get_coins_no_limit(self, item, *_args: object, **_kwargs: object) -> int:
+    def get_coins_no_limit(self, item: _Item, *_args: object, **_kwargs: object) -> int:
         self.calls.append(("get_coins_no_limit", item))
         return self.coins
 
@@ -126,7 +127,8 @@ class _BuyShop(OSShop):
     def buy_execute(self, item: _BuyItem) -> bool:
         return self.os_shop_buy_execute(item)
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
@@ -151,17 +153,17 @@ class _BuyShop(OSShop):
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+    def handle_popup_confirm(self, name: str = "", offset: object = None, interval: float = 2) -> bool:
         _ = (name, offset, interval)
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 
-    def shop_buy_amount_handler(self, item, skip_first_screenshot=True) -> bool:
-        _ = skip_first_screenshot
+    def shop_buy_amount_handler(self, item: _BuyItem, *, skip_first_screenshot: bool = True) -> bool:
+        del skip_first_screenshot
         self.calls.append(("shop_buy_amount_handler", item))
         return self._next_result(self.amount_results, default=False)
 
-    def close_shop_buy_confirm_amount(self, skip_first_screenshot: object = True) -> None:
+    def close_shop_buy_confirm_amount(self, *, skip_first_screenshot: bool = True) -> None:
         self.calls.append(("close_shop_buy_confirm_amount", skip_first_screenshot))
 
 

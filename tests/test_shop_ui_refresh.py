@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, override
+
 from module.handler.assets import POPUP_CONFIRM
 from module.shop.assets import (
     SHOP_BUY_CONFIRM_MISTAKE,
@@ -8,19 +10,31 @@ from module.shop.assets import (
 from module.shop.ui import ShopUI
 from module.ui.assets import SHOP_BACK_ARROW
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
+
+    from module.base.button import Button, MatchOffset
+    from module.base.type_alias import Color
+
 
 class _FakeDevice:
     def __init__(self) -> None:
         self.clicked = []
 
-    def click(self, button) -> None:
+    def click(self, button: Button) -> None:
         self.clicked.append(button)
 
 
 class _FakeShopUI(ShopUI):
     device: _FakeDevice
 
-    def __init__(self, *, appear_results=None, color_results=None, popup_results=None) -> None:
+    def __init__(
+        self,
+        *,
+        appear_results: Mapping[Button, Iterable[bool]] | None = None,
+        color_results: Mapping[Color, Iterable[bool]] | None = None,
+        popup_results: Iterable[bool] | None = None,
+    ) -> None:
         self.device = _FakeDevice()
         self.appear_results = {id(button): list(results) for button, results in (appear_results or {}).items()}
         self.color_results = {color: list(results) for color, results in (color_results or {}).items()}
@@ -29,35 +43,47 @@ class _FakeShopUI(ShopUI):
         self.ui_click_calls = []
         self.info_bar_handle_count = 0
 
-    def loop(self, *_args: object, **_kwargs: object):
+    @override
+    def loop(self, *_args: object, **_kwargs: object) -> range:
         return range(6)
 
-    def _pop_button_result(self, button) -> bool:
+    def _pop_button_result(self, button: Button) -> bool:
         results = self.appear_results.get(id(button), [])
         if results:
             return results.pop(0)
         return False
 
-    def appear(self, button, *_args: object, **_kwargs) -> bool:
+    def appear(self, button: Button, *_args: object, **_kwargs: object) -> bool:
         return self._pop_button_result(button)
 
-    def image_color_count(self, button, color, threshold=221, count=50) -> bool:
+    def image_color_count(
+        self,
+        button: Button,
+        color: Color,
+        threshold: int = 221,
+        count: int = 50,
+    ) -> bool:
         _ = (button, threshold, count)
         results = self.color_results.get(color, [])
         if results:
             return results.pop(0)
         return False
 
-    def interval_clear(self, button, *_args: object, **_kwargs: object) -> None:
+    def interval_clear(self, button: Button, *_args: object, **_kwargs: object) -> None:
         self.interval_cleared.append(button)
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+    def handle_popup_confirm(
+        self,
+        name: str = "",
+        offset: MatchOffset | None = None,
+        interval: float = 2,
+    ) -> bool:
         _ = (name, offset, interval)
         if self.popup_results:
             return self.popup_results.pop(0)
         return False
 
-    def ui_click(self, *args, **kwargs) -> None:
+    def ui_click(self, *args: object, **kwargs: object) -> None:
         self.ui_click_calls.append((args, kwargs))
 
     def handle_info_bar(self) -> bool:

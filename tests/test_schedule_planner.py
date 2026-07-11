@@ -185,7 +185,7 @@ def test_config_hoarding_state_is_isolated_between_instances() -> None:
     assert first.is_hoarding_task is False
 
 
-def test_config_copies_legacy_class_default_into_instance(monkeypatch) -> None:
+def test_config_copies_legacy_class_default_into_instance(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(AzurLaneConfig, "is_hoarding_task", False)
     monkeypatch.setattr(AzurLaneConfig, "init_task", lambda _self, _task=None: None)
 

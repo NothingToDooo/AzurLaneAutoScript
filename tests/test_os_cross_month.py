@@ -53,10 +53,12 @@ class _Config:
     def task_delay(self, target: datetime) -> None:
         self.delays.append(target)
 
-    def task_stop(self) -> None:
+    @staticmethod
+    def task_stop() -> None:
         raise TaskEnd
 
-    def task_switched(self) -> bool:
+    @staticmethod
+    def task_switched() -> bool:
         return True
 
 
@@ -67,7 +69,8 @@ class _Zone:
 
 
 class _Zones:
-    def select(self, **_kwargs: object) -> list[_Zone]:
+    @staticmethod
+    def select(**_kwargs: object) -> list[_Zone]:
         return []
 
 
@@ -133,17 +136,25 @@ class _CrossMonthRunner(OpsiCrossMonth):
     def fleet_repair(self, revert: bool = True) -> None:
         self.calls.append(("fleet_repair", revert))
 
-    def fleet_set(self, index=None, skip_first_screenshot=True) -> None:
-        _ = skip_first_screenshot
+    def fleet_set(self, index: int | None = None, *, skip_first_screenshot: bool = True) -> bool:
+        del skip_first_screenshot
         self.calls.append(("fleet_set", index))
+        return True
 
     @override
-    def os_order_execute(self, recon_scan=True, submarine_call=True) -> None:
+    def os_order_execute(self, *, recon_scan: bool = True, submarine_call: bool = True) -> None:
         self.calls.append(("os_order_execute", recon_scan, submarine_call))
 
-    def run_auto_search(self, question=True, rescan=None, after_auto_search=True) -> None:
-        _ = (question, after_auto_search)
+    def run_auto_search(
+        self,
+        *,
+        question: bool = True,
+        rescan: str | bool | None = None,
+        after_auto_search: bool = True,
+    ) -> int:
+        del question, after_auto_search
         self.calls.append(("run_auto_search", rescan))
+        return 0
 
     def handle_after_auto_search(self) -> None:
         self.calls.append(("handle_after_auto_search",))

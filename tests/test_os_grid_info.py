@@ -1,17 +1,41 @@
+from typing import TypedDict, Unpack
+
 import pytest
 
 from module.map_detection.os_grid import OSGridInfo
 from module.os.radar import RadarGrid
 
 
-def _grid(**kwargs):
+class _GridOverrides(TypedDict, total=False):
+    is_ally: bool
+    is_akashi: bool
+    is_scanning_device: bool
+    is_logging_tower: bool
+    is_exploration_reward: bool
+    is_fleet_mechanism: bool
+    is_question: bool
+    is_meowfficer: bool
+    is_exclamation: bool
+    is_resource: bool
+    is_enemy: bool
+    enemy_scale: int
+    enemy_genre: str | None
+
+
+class _RadarGridOverrides(TypedDict, total=False):
+    is_enemy: bool
+    enemy_scale: int
+    enemy_genre: str | None
+
+
+def _grid(**kwargs: Unpack[_GridOverrides]) -> OSGridInfo:
     grid = OSGridInfo()
     for key, value in kwargs.items():
         setattr(grid, key, value)
     return grid
 
 
-def _radar_grid(**kwargs):
+def _radar_grid(**kwargs: Unpack[_RadarGridOverrides]) -> RadarGrid:
     grid = RadarGrid(location=(1, 0), image=None, center=(0, 0), config=object())
     for key, value in kwargs.items():
         setattr(grid, key, value)

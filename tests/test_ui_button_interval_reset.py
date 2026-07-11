@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import pytest
 
 from module.base.timer import Timer
@@ -9,13 +11,16 @@ from module.ui.page import page_fleet, page_main
 from module.ui.ui import UI
 from module.ui_white import assets as ui_white_assets
 
+if TYPE_CHECKING:
+    from module.base.button import Button
+
 
 class _FakeUI(UI):
     def __init__(self) -> None:
         self.reset_buttons = []
         self.interval_timer = {}
 
-    def interval_reset(self, button, *_args: object, **_kwargs: object) -> None:
+    def interval_reset(self, button: Button, *_args: object, **_kwargs: object) -> None:
         self.reset_buttons.append(button)
 
 
@@ -30,7 +35,7 @@ class _FakeUI(UI):
         (ui_white_assets.REWARD_GOTO_TACTICAL_WHITE, [ui_assets.REWARD_GOTO_TACTICAL]),
     ],
 )
-def test_ui_button_interval_reset_single_targets(button, expected) -> None:
+def test_ui_button_interval_reset_single_targets(button: Button, expected: list[Button]) -> None:
     ui = _FakeUI()
 
     UI.ui_button_interval_reset(ui, button)
@@ -48,7 +53,7 @@ def test_ui_button_interval_reset_single_targets(button, expected) -> None:
         (ui_white_assets.MAIN_GOTO_CAMPAIGN_WHITE, [GET_SHIP, ui_assets.RAID_CHECK]),
     ],
 )
-def test_ui_button_interval_reset_keeps_legacy_duplicate_resets(button, expected) -> None:
+def test_ui_button_interval_reset_keeps_legacy_duplicate_resets(button: Button, expected: list[Button]) -> None:
     ui = _FakeUI()
 
     UI.ui_button_interval_reset(ui, button)
@@ -73,7 +78,7 @@ def test_ui_button_interval_reset_covers_page_main_links() -> None:
         raid_assets.RPG_LEAVE_CITY,
     ],
 )
-def test_ui_button_interval_reset_replaces_get_ship_timer_for_rpg_buttons(button) -> None:
+def test_ui_button_interval_reset_replaces_get_ship_timer_for_rpg_buttons(button: Button) -> None:
     ui = _FakeUI()
 
     UI.ui_button_interval_reset(ui, button)

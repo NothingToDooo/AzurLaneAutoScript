@@ -1,21 +1,34 @@
+from typing import TYPE_CHECKING, override
+
 from module.combat.assets import GET_SHIP
 from module.handler.assets import BATTLE_PASS_NEW_SEASON
 from module.ui import assets as ui_assets
 from module.ui.ui import UI
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from module.base.button import Button, MatchOffset
 
 
 class _FakeDevice:
     def __init__(self) -> None:
         self.clicked = []
 
-    def click(self, button) -> None:
+    def click(self, button: Button) -> None:
         self.clicked.append(button)
 
 
 class _FakeUI(UI):
     device: _FakeDevice
 
-    def __init__(self, *, appear_buttons=(), appear_then_click_buttons=(), guild_popup=False) -> None:
+    def __init__(
+        self,
+        *,
+        appear_buttons: Iterable[Button] = (),
+        appear_then_click_buttons: Iterable[Button] = (),
+        guild_popup: bool = False,
+    ) -> None:
         self.device = _FakeDevice()
         self.appear_buttons = list(appear_buttons)
         self.appear_then_click_buttons = list(appear_then_click_buttons)
@@ -23,24 +36,32 @@ class _FakeUI(UI):
         self.appear_calls = []
         self.appear_then_click_calls = []
 
-    def _has_button(self, buttons, button) -> bool:
+    @staticmethod
+    def _has_button(buttons: list[Button], button: Button) -> bool:
         return any(button == item for item in buttons)
 
     def handle_guild_popup_cancel(self) -> bool:
         return self.guild_popup
 
-    def appear_then_click(self, button, *_args: object, **_kwargs) -> bool:
+    def appear_then_click(self, button: Button, *_args: object, **_kwargs: object) -> bool:
         self.appear_then_click_calls.append(button)
         return self._has_button(self.appear_then_click_buttons, button)
 
-    def appear(self, button, *_args: object, **_kwargs) -> bool:
+    def appear(self, button: Button, *_args: object, **_kwargs: object) -> bool:
         self.appear_calls.append(button)
         return self._has_button(self.appear_buttons, button)
 
-    def handle_popup_single(self, name="", offset=None, interval=2) -> bool:
-        _ = (name, offset, interval)
+    @override
+    def handle_popup_single(
+        self,
+        name: str = "",
+        offset: MatchOffset | None = None,
+        interval: float = 2,
+    ) -> bool:
+        del name, offset, interval
         return False
 
+    @override
     def handle_popup_single_white(self, *_args: object, **_kwargs: object) -> bool:
         return False
 

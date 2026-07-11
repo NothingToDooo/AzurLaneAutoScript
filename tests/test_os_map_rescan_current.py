@@ -94,7 +94,8 @@ class _MapRescan(OSMap):
         self._solved_map_event: set[str] = set()
         self._solved_fleet_mechanism = False
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default

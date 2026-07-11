@@ -1,8 +1,16 @@
-from module.research.research import RewardResearch
+from typing import TYPE_CHECKING
+
+import numpy as np
+
+from module.research.research import ResearchProjectInput, RewardResearch
+
+if TYPE_CHECKING:
+    from module.base.type_alias import ImageArray
+    from module.research.ui import ResearchStatus
 
 
 class _Device:
-    image = "screen"
+    image: ImageArray = np.empty((1, 1, 3), dtype=np.uint8)
 
     def __init__(self) -> None:
         self.screenshots = 0
@@ -14,7 +22,14 @@ class _Device:
 class _Receive6thContext(RewardResearch):
     device: _Device
 
-    def __init__(self, *, status, finished=False, receive_result=True, queue_slot=1) -> None:
+    def __init__(
+        self,
+        *,
+        status: list[ResearchStatus],
+        finished: bool = False,
+        receive_result: bool = True,
+        queue_slot: int = 1,
+    ) -> None:
         self.device = _Device()
         self.status = status
         self.finished = finished
@@ -23,24 +38,31 @@ class _Receive6thContext(RewardResearch):
         self.calls = []
         self._research_finished_index = 2
 
-    def get_research_status(self, image):
-        assert image == "screen"
+    def get_research_status(self, image: ImageArray) -> list[ResearchStatus]:
+        assert image is self.device.image
         self.calls.append(("status", None))
         return self.status
 
-    def research_has_finished(self):
+    def research_has_finished(self) -> bool:
         self.calls.append(("finished", None))
         return self.finished
 
-    def research_receive(self, *_args: object, **_kwargs: object):
+    def research_receive(self, *, skip_first_screenshot: bool = True) -> bool:
+        del skip_first_screenshot
         self.calls.append(("receive", None))
         return self.receive_result
 
-    def get_queue_slot(self):
+    def get_queue_slot(self) -> int:
         self.calls.append(("queue_slot", None))
         return self.queue_slot
 
-    def research_project_start(self, project, add_queue=True, skip_first_screenshot=True):
+    def research_project_start(
+        self,
+        project: ResearchProjectInput,
+        *,
+        add_queue: bool = True,
+        skip_first_screenshot: bool = True,
+    ) -> bool:
         self.calls.append(("start", project, add_queue, skip_first_screenshot))
         return True
 

@@ -14,7 +14,7 @@ from module.ocr.failure_store import (
     OcrFailureRecordStatus,
     OcrFailureSample,
 )
-from module.ocr.ocr import Digit, DigitCounter, Duration, Ocr
+from module.ocr.ocr import Digit, DigitCounter, Duration, Ocr, OcrRegions
 from module.ocr.result import RawOcrResult, RecognitionFailureReason, RecognitionResult
 
 TEST_AREA = (0, 0, 4, 4)
@@ -83,7 +83,7 @@ class _RecordingFailureRecorder[T]:
 
 
 class _TestOcr(Ocr):
-    def __init__(self, engine: _FakeEngine, buttons=TEST_AREA) -> None:
+    def __init__(self, engine: _FakeEngine, buttons: OcrRegions = TEST_AREA) -> None:
         self._engine = engine
         super().__init__(buttons, name="TEST_OCR")
 
@@ -93,7 +93,7 @@ class _TestOcr(Ocr):
 
 
 class _TestDigit(Digit):
-    def __init__(self, engine: _FakeEngine, buttons=TEST_AREA) -> None:
+    def __init__(self, engine: _FakeEngine, buttons: OcrRegions = TEST_AREA) -> None:
         self._engine = engine
         super().__init__(buttons, name="TEST_DIGIT")
 
@@ -103,7 +103,7 @@ class _TestDigit(Digit):
 
 
 class _TestCounter(DigitCounter):
-    def __init__(self, engine: _FakeEngine, buttons=TEST_AREA) -> None:
+    def __init__(self, engine: _FakeEngine, buttons: OcrRegions = TEST_AREA) -> None:
         self._engine = engine
         super().__init__(buttons, name="TEST_COUNTER")
 
@@ -113,7 +113,7 @@ class _TestCounter(DigitCounter):
 
 
 class _TestDuration(Duration):
-    def __init__(self, engine: _FakeEngine, buttons=TEST_AREA) -> None:
+    def __init__(self, engine: _FakeEngine, buttons: OcrRegions = TEST_AREA) -> None:
         self._engine = engine
         super().__init__(buttons, name="TEST_DURATION")
 
@@ -146,15 +146,15 @@ class _UnnamedDigit(Digit):
         return self._engine
 
 
-def make_digit(text: str, *, score: float = 0.9, buttons=TEST_AREA) -> _TestDigit:
+def make_digit(text: str, *, score: float = 0.9, buttons: OcrRegions = TEST_AREA) -> _TestDigit:
     return _TestDigit(_FakeEngine(text, score), buttons=buttons)
 
 
-def make_counter(text: str, *, score: float = 0.9, buttons=TEST_AREA) -> _TestCounter:
+def make_counter(text: str, *, score: float = 0.9, buttons: OcrRegions = TEST_AREA) -> _TestCounter:
     return _TestCounter(_FakeEngine(text, score), buttons=buttons)
 
 
-def make_duration(text: str, *, score: float = 0.9, buttons=TEST_AREA) -> _TestDuration:
+def make_duration(text: str, *, score: float = 0.9, buttons: OcrRegions = TEST_AREA) -> _TestDuration:
     return _TestDuration(_FakeEngine(text, score), buttons=buttons)
 
 

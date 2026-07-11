@@ -1,7 +1,11 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Never, override
 
 from module.os.map import OSMap
 from module.ui.page import page_os
+
+if TYPE_CHECKING:
+    from module.os.globe_zone import ZoneName
 
 
 class _Task:
@@ -46,7 +50,8 @@ class _Map(OSMap):
         self.special_zone = special_zone
         self.calls: list[tuple[object, ...]] = []
 
-    def name_to_zone(self, name: object, *_args: object, **_kwargs: object) -> object:
+    @override
+    def name_to_zone(self, name: ZoneName) -> Never:
         message = f"legacy zone override should not run: {name}"
         raise AssertionError(message)
 
@@ -68,8 +73,8 @@ class _Map(OSMap):
     def ui_goto_main(self) -> None:
         self.calls.append(("ui_goto_main",))
 
-    def ui_ensure(self, destination: object, skip_first_screenshot=True) -> None:
-        _ = skip_first_screenshot
+    def ui_ensure(self, destination: object, *, skip_first_screenshot: bool = True) -> None:
+        del skip_first_screenshot
         self.calls.append(("ui_ensure", destination))
 
     def zone_init(self, *_args: object, **_kwargs: object) -> None:
@@ -82,7 +87,7 @@ class _Map(OSMap):
         self.calls.append(("handle_after_auto_search",))
         return False
 
-    def handle_current_fleet_resolve(self, revert=False, **_kwargs: object) -> bool:
+    def handle_current_fleet_resolve(self, *, revert: bool = False, **_kwargs: object) -> bool:
         self.calls.append(("handle_current_fleet_resolve", revert))
         return False
 

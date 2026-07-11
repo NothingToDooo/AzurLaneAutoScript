@@ -1,17 +1,28 @@
+from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import TYPE_CHECKING, Unpack, override
 
 from module.tactical import tactical_class as tactical_module
 from module.tactical.assets import BOOK_EMPTY_POPUP
 from module.tactical.tactical_class import RewardTacticalClass
 from module.ui.assets import BACK_ARROW, REWARD_CHECK
 
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    import pytest
+
+    from module.base.button import Button, MatchOffset
+    from module.retire.dock import DockFilterOptions, DockFilterSettings
+    from module.ui.page import Page
+
 
 class _Timer:
-    def start(self):
+    def start(self) -> _Timer:
         return self
 
-    def reached(self):
+    @staticmethod
+    def reached() -> bool:
         return False
 
     def reset(self) -> None:
@@ -23,7 +34,7 @@ class _Device:
         self.clicks = []
         self.screenshot_count = 0
 
-    def click(self, button) -> None:
+    def click(self, button: Button) -> None:
         self.clicks.append(button)
 
     def screenshot(self) -> None:
@@ -51,91 +62,140 @@ class _Tactical(RewardTacticalClass):
         self.tactical_finish = []
 
     @staticmethod
-    def _next(results):
+    def _next(results: list[bool]) -> bool:
         if results:
             return results.pop(0)
         return False
 
-    def set_appear(self, button, *, results: list[bool]) -> None:
+    def set_appear(self, button: Button, *, results: list[bool]) -> None:
         self.appear_results[button.name] = results
 
-    def appear(self, button, *_args: object, **_kwargs):
+    @override
+    def appear(self, button: Button, *_args: object, **_kwargs: object) -> bool:
         return self._next(self.appear_results.setdefault(button.name, []))
 
-    def appear_then_click(self, button, *_args: object, **_kwargs):
-        _ = button
+    @override
+    def appear_then_click(self, button: Button, *_args: object, **_kwargs: object) -> bool:
+        del button
         return False
 
-    def handle_rapid_training(self):
+    @override
+    def handle_rapid_training(self) -> bool:
         return False
 
-    def _tactical_get_finish(self):
+    @override
+    def _tactical_get_finish(self) -> list[datetime | str]:
+        return []
+
+    @override
+    def ui_main_appear_then_click(
+        self,
+        page: Page,
+        offset: MatchOffset | None = (30, 30),
+        interval: float = 3,
+    ) -> bool:
+        del page, offset, interval
         return False
 
-    def ui_main_appear_then_click(self, page, offset=(30, 30), interval=3):
-        _ = (page, offset, interval)
+    @override
+    def handle_popup_confirm(
+        self,
+        name: str = "",
+        offset: MatchOffset | None = None,
+        interval: float = 2,
+    ) -> bool:
+        del name, offset, interval
         return False
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2):
-        _ = (name, offset, interval)
+    @override
+    def handle_urgent_commission(self) -> bool:
         return False
 
-    def handle_urgent_commission(self):
+    @override
+    def ui_page_main_popups(self, *_args: object, **_kwargs: object) -> bool:
         return False
 
-    def ui_page_main_popups(self, *_args: object, **_kwargs: object):
+    @override
+    def _tactical_books_choose(self) -> bool:
         return False
 
-    def _tactical_books_choose(self):
-        return False
-
-    def handle_game_tips(self):
+    @override
+    def handle_game_tips(self) -> bool:
         return self._next(self.game_tips_results)
 
-    def dock_selected(self, *_args: object, **_kwargs: object):
+    @override
+    def dock_selected(self, *_args: object, **_kwargs: object) -> bool:
         return self._next(self.dock_selected_results)
 
-    def select_suitable_ship(self):
+    @override
+    def select_suitable_ship(self) -> bool:
         return False
 
-    def _tactical_skill_choose(self):
+    @override
+    def _tactical_skill_choose(self) -> bool:
         return False
 
-    def interval_reset(self, button, interval=0) -> None:
+    @override
+    def interval_reset(
+        self,
+        button: Button | list[Button] | tuple[Button, ...] | None,
+        interval: float = 0,
+    ) -> None:
         self.interval_resets.append((button, interval))
 
-    def interval_clear(self, button, interval=0) -> None:
+    @override
+    def interval_clear(
+        self,
+        button: Button | list[Button] | tuple[Button, ...] | None,
+        interval: float = 0,
+    ) -> None:
         self.interval_clears.append((button, interval))
 
 
+@dataclass
+class _FactionConfig:
+    AddNewStudent_Favorite: bool = False
+
+
+class _DockFilterProbe:
+    def __init__(self) -> None:
+        self.settings = {
+            ("faction", "all"): None,
+            ("faction", "eagle"): None,
+            ("faction", "meta"): None,
+            ("faction", "not_available"): None,
+        }
+
+
 class _TacticalFactionProbe(RewardTacticalClass):
-    config: Any
-    dock_filter: Any
+    config: _FactionConfig
+    dock_filter: _DockFilterProbe
 
     def __init__(self) -> None:
-        self.config = SimpleNamespace(AddNewStudent_Favorite=False)
-        self.dock_filter = SimpleNamespace(
-            settings={
-                ("faction", "all"): object(),
-                ("faction", "eagle"): object(),
-                ("faction", "meta"): object(),
-                ("faction", "not_available"): object(),
-            }
-        )
+        self.config = _FactionConfig()
+        self.dock_filter = _DockFilterProbe()
         self.selected_factions: list[str] = []
 
     def dock_favourite_set(self, *_args: object, **_kwargs: object) -> None:
         pass
 
-    def dock_filter_set(self, *_args: object, **settings: object) -> None:
-        self.selected_factions = cast("list[str]", settings["faction"])
+    def dock_filter_set(
+        self,
+        options: DockFilterOptions | None = None,
+        **settings: Unpack[DockFilterSettings],
+    ) -> None:
+        del options
+        faction = settings["faction"]
+        assert isinstance(faction, list)
+        self.selected_factions = faction
 
-    def appear(self, button: object, *_args: object, **_kwargs: object) -> bool:
-        _ = button
+    @override
+    def appear(self, button: Button, *_args: object, **_kwargs: object) -> bool:
+        del button
         return True
 
 
-def test_tactical_receive_delays_to_tomorrow_when_books_empty(monkeypatch) -> None:
+def test_tactical_receive_delays_to_tomorrow_when_books_empty(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(tactical_module, "Timer", lambda *_args, **_kwargs: _Timer())
     monkeypatch.setattr(tactical_module, "get_server_next_update", lambda _server_update: "tomorrow")
     tactical = _Tactical()
@@ -148,7 +208,7 @@ def test_tactical_receive_delays_to_tomorrow_when_books_empty(monkeypatch) -> No
     assert tactical.tactical_finish == ["tomorrow"]
 
 
-def test_tactical_receive_reenters_when_ship_is_preselected(monkeypatch) -> None:
+def test_tactical_receive_reenters_when_ship_is_preselected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(tactical_module, "Timer", lambda *_args, **_kwargs: _Timer())
     tactical = _Tactical()
     tactical.set_appear(tactical_module.DOCK_CHECK, results=[True])

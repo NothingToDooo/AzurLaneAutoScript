@@ -34,7 +34,8 @@ class _Timer:
             return results.pop(0)
         return False
 
-    def reset(self) -> None:
+    @staticmethod
+    def reset() -> None:
         _Timer.reset_count += 1
 
 
@@ -49,19 +50,21 @@ class _MapOrder(MapOrderHandler):
         self.map_event_results: list[bool] = []
         self.cat_attack_results: list[bool] = []
         self.action_point_results: list[bool] = []
+        self.loop_count = 5
         self.enter_count = 0
         self.quit_count = 0
 
     def execute(self, button: _Button) -> bool:
         return self.order_execute(button)
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
-    def loop(self, *_args: object, **_kwargs: object):
-        return range(5)
+    def loop(self, *_args: object, **_kwargs: object) -> range:
+        return range(self.loop_count)
 
     def order_enter(self) -> None:
         self.calls.append(("order_enter",))

@@ -62,7 +62,8 @@ class _Zone:
 
 
 class _Zones:
-    def select(self, **_kwargs: object) -> list[_Zone]:
+    @staticmethod
+    def select(**_kwargs: object) -> list[_Zone]:
         return []
 
 
@@ -134,9 +135,10 @@ class _MeowfficerFarming(OpsiMeowfficerFarming):
     def globe_goto(self, zone: _Zone, *_args: object, **kwargs: object) -> None:
         self.calls.append(("globe_goto", zone.zone_id, kwargs))
 
-    def fleet_set(self, index=None, skip_first_screenshot=True) -> None:
-        _ = skip_first_screenshot
+    def fleet_set(self, index: int | None = None, *, skip_first_screenshot: bool = True) -> bool:
+        del skip_first_screenshot
         self.calls.append(("fleet_set", index))
+        return True
 
     def os_order_execute(self, *_args: object, **kwargs: object) -> None:
         self.calls.append(("os_order_execute", kwargs))

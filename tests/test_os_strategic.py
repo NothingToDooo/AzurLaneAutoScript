@@ -55,12 +55,19 @@ class _StrategicSearch(StrategicSearchHandler):
     def set_option(self) -> bool:
         return self.strategic_search_set_option()
 
-    def loop(self, skip_first=True, timeout: int | None = None, *_args: object, **_kwargs: object) -> range:
-        _ = skip_first
+    def loop(
+        self,
+        *_args: object,
+        skip_first: bool = True,
+        timeout: int | None = None,
+        **_kwargs: object,
+    ) -> range:
+        del skip_first
         self.loop_timeouts.append(timeout)
         return range(5)
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default

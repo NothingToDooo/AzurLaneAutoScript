@@ -1,18 +1,23 @@
+from typing import TYPE_CHECKING
+
 from module.statistics.item import ItemGrid, ItemGridAreas, ItemPredictOptions, item_grid_areas
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping, Sequence
 
 
 class FakeOcr:
-    def __init__(self, values):
+    def __init__(self, values: list[int]) -> None:
         self.values = values
         self.images = None
 
-    def ocr_many(self, images):
+    def ocr_many(self, images: Sequence[str]) -> list[int]:
         self.images = images
         return self.values
 
 
 class FakeItem:
-    def __init__(self, label):
+    def __init__(self, label: str) -> None:
         self.label = label
         self.image = f"image-{label}"
         self.name = "DefaultItem"
@@ -21,12 +26,17 @@ class FakeItem:
         self.price = 0
         self.tag = None
 
-    def crop(self, area):
+    def crop(self, area: str) -> tuple[str, str]:
         return (self.label, area)
 
 
 class FakeItemGrid(ItemGrid):
-    def __init__(self, items, costs, prices):
+    def __init__(
+        self,
+        items: Iterable[FakeItem],
+        costs: Mapping[str, str | None],
+        prices: list[int],
+    ) -> None:
         self.source_items = items
         self.items = []
         self.costs = costs
@@ -36,11 +46,12 @@ class FakeItemGrid(ItemGrid):
         self.amount_ocr = FakeOcr([11, 22, 33])
         self.price_ocr = FakeOcr(prices)
 
-    def _load_image(self, image):
+    def _load_image(self, image: str) -> None:
         assert image == "screen"
         self.items = list(self.source_items)
 
-    def match_template(self, image, similarity=None):
+    @staticmethod
+    def match_template(image: str, similarity: float | None = None) -> str:
         assert similarity is None
         return {
             "image-a": "Oil_2",
@@ -48,11 +59,11 @@ class FakeItemGrid(ItemGrid):
             "image-c": "Gear",
         }[image]
 
-    def match_cost_template(self, item):
+    def match_cost_template(self, item: FakeItem) -> str | None:
         return self.costs[item.label]
 
     @staticmethod
-    def predict_tag(image):
+    def predict_tag(image: tuple[str, str]) -> str:
         return f"tag-{image[0]}"
 
 

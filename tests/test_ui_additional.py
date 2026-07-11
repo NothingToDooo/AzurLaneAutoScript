@@ -1,4 +1,5 @@
 from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, TypedDict, Unpack
 
 from module.combat.assets import GET_SHIP
 from module.handler.assets import GAME_TIPS
@@ -8,6 +9,9 @@ from module.ui import assets as ui_assets
 from module.ui.ui import UI
 from module.ui_white import assets as ui_white_assets
 
+if TYPE_CHECKING:
+    from module.base.button import Button
+
 
 class _FakeDevice:
     def __init__(self) -> None:
@@ -15,10 +19,10 @@ class _FakeDevice:
         self.sleep_calls = []
         self.screenshot_count = 0
 
-    def click(self, button) -> None:
+    def click(self, button: Button) -> None:
         self.clicked.append(button)
 
-    def sleep(self, seconds) -> None:
+    def sleep(self, seconds: float) -> None:
         self.sleep_calls.append(seconds)
 
     def screenshot(self) -> None:
@@ -27,8 +31,8 @@ class _FakeDevice:
 
 @dataclass(frozen=True, slots=True)
 class _FakeUIOptions:
-    appear_buttons: tuple = ()
-    appear_then_click_buttons: tuple = ()
+    appear_buttons: tuple[Button, ...] = ()
+    appear_then_click_buttons: tuple[Button, ...] = ()
     os_popups: bool = False
     popup_confirm: bool = False
     urgent_commission: bool = False
@@ -37,7 +41,21 @@ class _FakeUIOptions:
     idle_page: bool = False
 
 
-def _fake_ui_options(options=None, settings=None) -> _FakeUIOptions:
+class _FakeUISettings(TypedDict, total=False):
+    appear_buttons: tuple[Button, ...]
+    appear_then_click_buttons: tuple[Button, ...]
+    os_popups: bool
+    popup_confirm: bool
+    urgent_commission: bool
+    main_popups: bool
+    story_skip: bool
+    idle_page: bool
+
+
+def _fake_ui_options(
+    options: _FakeUIOptions | None = None,
+    settings: _FakeUISettings | None = None,
+) -> _FakeUIOptions:
     options = _FakeUIOptions() if options is None else options
     if settings:
         options = replace(options, **settings)
@@ -47,7 +65,11 @@ def _fake_ui_options(options=None, settings=None) -> _FakeUIOptions:
 class _FakeUI(UI):
     device: _FakeDevice
 
-    def __init__(self, options=None, **settings) -> None:
+    def __init__(
+        self,
+        options: _FakeUIOptions | None = None,
+        **settings: Unpack[_FakeUISettings],
+    ) -> None:
         options = _fake_ui_options(options, settings)
         self.device = _FakeDevice()
         self.appear_buttons = list(options.appear_buttons)
@@ -62,20 +84,21 @@ class _FakeUI(UI):
         self.popup_confirm_names = []
         self.reset_buttons = []
 
-    def _has_button(self, buttons, button) -> bool:
+    @staticmethod
+    def _has_button(buttons: list[Button], button: Button) -> bool:
         return any(button == item for item in buttons)
 
     def ui_page_os_popups(self) -> bool:
         return self.os_popups
 
-    def handle_popup_confirm(self, name="", *_args: object, **_kwargs: object) -> bool:
+    def handle_popup_confirm(self, name: str = "", *_args: object, **_kwargs: object) -> bool:
         self.popup_confirm_names.append(name)
         return self.popup_confirm
 
     def handle_urgent_commission(self) -> bool:
         return self.urgent_commission
 
-    def ui_page_main_popups(self, get_ship=True) -> bool:
+    def ui_page_main_popups(self, *, get_ship: bool = True) -> bool:
         self.main_popup_get_ship_values.append(get_ship)
         return self.main_popups
 
@@ -85,13 +108,13 @@ class _FakeUI(UI):
     def handle_idle_page(self) -> bool:
         return self.idle_page
 
-    def appear(self, button, *_args: object, **_kwargs) -> bool:
+    def appear(self, button: Button, *_args: object, **_kwargs: object) -> bool:
         return self._has_button(self.appear_buttons, button)
 
-    def appear_then_click(self, button, *_args: object, **_kwargs) -> bool:
+    def appear_then_click(self, button: Button, *_args: object, **_kwargs: object) -> bool:
         return self._has_button(self.appear_then_click_buttons, button)
 
-    def interval_reset(self, button, *_args: object, **_kwargs: object) -> None:
+    def interval_reset(self, button: Button, *_args: object, **_kwargs: object) -> None:
         self.reset_buttons.append(button)
 
 

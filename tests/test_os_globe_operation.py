@@ -82,12 +82,13 @@ class _GlobeOperation(GlobeOperation):
     def enter_globe(self, zone: object) -> None:
         self.globe_enter(zone)
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
-    def loop(self, *_args: object, **_kwargs: object):
+    def loop(self, *_args: object, **_kwargs: object) -> range:
         return range(self.loop_count)
 
     def zone_has_switch(self) -> bool:

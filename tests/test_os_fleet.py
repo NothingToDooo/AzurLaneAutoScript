@@ -68,6 +68,7 @@ class _Fleet(OSFleet):
         self.device = _Device()
         self.radar = _Radar(self)
         self.calls: list[tuple[object, ...]] = []
+        self.loop_count = 5
         self.in_map_results: list[bool] = []
         self.radar_enemy_results: list[bool] = []
         self.radar_question_results: list[bool] = []
@@ -90,13 +91,14 @@ class _Fleet(OSFleet):
     def clear_boss(self, *, has_fleet_step: bool = True, is_month: bool = False) -> bool:
         return self.boss_clear(has_fleet_step=has_fleet_step, is_month=is_month)
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
     def loop(self, *_args: object, **_kwargs: object) -> range:
-        return range(5)
+        return range(self.loop_count)
 
     def update_os(self) -> None:
         self.calls.append(("update_os",))

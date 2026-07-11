@@ -79,7 +79,8 @@ class _GlobeCamera(GlobeCamera):
     def update_globe(self) -> None:
         self.globe_update()
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
@@ -114,7 +115,7 @@ class _GlobeCamera(GlobeCamera):
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 
-    def camera_to_zone(self, camera: object, region=None) -> _Zone:
+    def camera_to_zone(self, camera: object, region: int | None = None) -> _Zone:
         if region is None:
             self.calls.append(("camera_to_zone", camera))
         else:

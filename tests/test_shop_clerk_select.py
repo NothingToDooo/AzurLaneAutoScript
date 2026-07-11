@@ -1,9 +1,17 @@
+from typing import TYPE_CHECKING
+
 import pytest
 
 import module.shop.clerk as shop_clerk
 from module.exception import ScriptError
 from module.shop.assets import SELECT_MINUS, SELECT_PLUS, SHOP_BUY_CONFIRM_SELECT
 from module.shop.clerk import ShopClerk
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
+
+    from module.base.button import Button
+    from module.ui.ui import UiIndexControls
 
 
 class _FakeDevice:
@@ -12,7 +20,7 @@ class _FakeDevice:
         self.clicked = []
         self.screenshot_count = 0
 
-    def click(self, button) -> None:
+    def click(self, button: Button | str) -> None:
         self.clicked.append(button)
 
     def screenshot(self) -> None:
@@ -27,11 +35,11 @@ class _FakeItem:
 
 
 class _FakeStockOcr:
-    def __init__(self, results) -> None:
+    def __init__(self, results: Iterable[tuple[int, int, int]]) -> None:
         self.results = list(results)
         self.calls = []
 
-    def ocr_single(self, image):
+    def ocr_single(self, image: str) -> tuple[int, int, int]:
         self.calls.append(image)
         return self.results.pop(0)
 
@@ -39,7 +47,12 @@ class _FakeStockOcr:
 class _FakeShopClerk(ShopClerk):
     device: _FakeDevice
 
-    def __init__(self, *, currency=0, appear_results=None) -> None:
+    def __init__(
+        self,
+        *,
+        currency: int = 0,
+        appear_results: Mapping[Button, Iterable[bool]] | None = None,
+    ) -> None:
         self.device = _FakeDevice()
         self._currency = currency
         self.appear_results = {id(button): list(results) for button, results in (appear_results or {}).items()}
@@ -47,36 +60,43 @@ class _FakeShopClerk(ShopClerk):
         self.ensure_letter_result = None
         self.selected_items = []
 
-    def shop_get_select(self, item):
+    def shop_get_select(self, item: _FakeItem) -> str:
         self.selected_items.append(item)
         return "select_button"
 
-    def appear(self, button, *_args: object, **_kwargs) -> bool:
+    def appear(self, button: Button, *_args: object, **_kwargs: object) -> bool:
         results = self.appear_results.get(id(button), [])
         if results:
             return results.pop(0)
         return False
 
-    def ui_ensure_index(self, index, controls, *_args: object, **kwargs) -> None:
+    def ui_ensure_index(
+        self,
+        index: int,
+        controls: UiIndexControls,
+        *_args: object,
+        **kwargs: bool,
+    ) -> None:
         self.ensure_calls.append((index, controls, kwargs))
         self.ensure_letter_result = controls.letter(self.device.image)
 
 
 class _ImmediateTimer:
-    def __init__(self, *_args, **_kwargs) -> None:
-        pass
+    def __init__(self, _limit: float, count: int = 0) -> None:
+        del count
 
-    def start(self):
+    def start(self) -> _ImmediateTimer:
         return self
 
-    def reached(self) -> bool:
+    @staticmethod
+    def reached() -> bool:
         return True
 
-    def reset(self):
+    def reset(self) -> _ImmediateTimer:
         return self
 
 
-def test_shop_buy_select_execute_caps_limit_by_currency(monkeypatch) -> None:
+def test_shop_buy_select_execute_caps_limit_by_currency(monkeypatch: pytest.MonkeyPatch) -> None:
     stock_ocr = _FakeStockOcr([(0, 0, 5), (1, 3, 5)])
     monkeypatch.setattr(shop_clerk, "OCR_SHOP_SELECT_STOCK", stock_ocr)
     item = _FakeItem()
@@ -95,7 +115,7 @@ def test_shop_buy_select_execute_caps_limit_by_currency(monkeypatch) -> None:
     assert shop.ensure_letter_result == 3
 
 
-def test_shop_buy_select_execute_raises_when_stock_limit_is_missing(monkeypatch) -> None:
+def test_shop_buy_select_execute_raises_when_stock_limit_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     stock_ocr = _FakeStockOcr([])
     monkeypatch.setattr(shop_clerk, "OCR_SHOP_SELECT_STOCK", stock_ocr)
     monkeypatch.setattr(shop_clerk, "Timer", _ImmediateTimer)

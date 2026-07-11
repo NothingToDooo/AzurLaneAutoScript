@@ -1,22 +1,29 @@
 import inspect
 import queue
 import threading
+from typing import TYPE_CHECKING, Protocol
 
 import pytest
 
 import module.webui.process_manager as process_manager_module
 from module.webui.process_manager import KILL_JOIN_SECONDS, STOP_GRACE_SECONDS, ProcessManager
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
-def _patch_process_boundary(monkeypatch, calls: list[tuple]):
+
+def _patch_process_boundary(monkeypatch: pytest.MonkeyPatch, calls: list[tuple[object, ...]]) -> None:
     class _Logger:
-        def critical(self, message):
+        @staticmethod
+        def critical(message: str) -> None:
             calls.append(("critical", message))
 
-        def info(self, message):
+        @staticmethod
+        def info(message: str) -> None:
             calls.append(("info", message))
 
-        def exception(self, error):
+        @staticmethod
+        def exception(error: BaseException) -> None:
             calls.append(("exception", str(error)))
 
     monkeypatch.setattr(process_manager_module, "set_file_logger", lambda name: calls.append(("file_logger", name)))
@@ -46,7 +53,7 @@ class _Process:
     def is_alive(self) -> bool:
         return self._alive
 
-    def join(self, timeout=None) -> None:
+    def join(self, timeout: float | None = None) -> None:
         self.join_calls.append(timeout)
         if self.exits_on_join:
             self._alive = False
@@ -60,14 +67,32 @@ class _LogThread:
     def __init__(self) -> None:
         self.join_calls: list[int | None] = []
 
-    def join(self, timeout=None) -> None:
+    def join(self, timeout: float | None = None) -> None:
         self.join_calls.append(timeout)
 
-    def is_alive(self) -> bool:
+    @staticmethod
+    def is_alive() -> bool:
         return False
 
 
-def _make_manager(process=None, stop_event=None):
+class _ProcessLike(Protocol):
+    def is_alive(self) -> bool: ...
+
+    def join(self, timeout: float | None = None) -> None: ...
+
+    def kill(self) -> None: ...
+
+
+class _StopEventLike(Protocol):
+    def set(self) -> None: ...
+
+    def is_set(self) -> bool: ...
+
+
+def _make_manager(
+    process: _ProcessLike | None = None,
+    stop_event: _StopEventLike | None = None,
+) -> ProcessManager:
     manager = object.__new__(ProcessManager)
     manager.config_name = "alas"
     manager.renderables = []
@@ -85,17 +110,18 @@ def _make_manager(process=None, stop_event=None):
     return manager
 
 
-def test_run_process_runs_alas_loop(monkeypatch) -> None:
-    calls = []
+def test_run_process_runs_alas_loop(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[object, ...]] = []
     _patch_process_boundary(monkeypatch, calls)
 
     class _Alas:
         stop_event = None
 
-        def __init__(self, config_name):
+        def __init__(self, config_name: str) -> None:
             calls.append(("init", config_name))
 
-        def loop(self):
+        @staticmethod
+        def loop() -> None:
             calls.append(("loop",))
 
     monkeypatch.setattr(process_manager_module, "AzurLaneAutoScript", _Alas)
@@ -107,18 +133,19 @@ def test_run_process_runs_alas_loop(monkeypatch) -> None:
     assert ("info", "[alas] exited. Reason: Finish\n") in calls
 
 
-def test_run_process_wires_stop_event(monkeypatch) -> None:
-    calls = []
+def test_run_process_wires_stop_event(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[object, ...]] = []
     stop_event = _StopEvent()
     _patch_process_boundary(monkeypatch, calls)
 
     class _Alas:
         stop_event = None
 
-        def __init__(self, config_name):
+        def __init__(self, config_name: str) -> None:
             calls.append(("init", config_name))
 
-        def loop(self):
+        @staticmethod
+        def loop() -> None:
             calls.append(("alas_stop_event", _Alas.stop_event is stop_event))
             calls.append(("config_stop_event", process_manager_module.AzurLaneConfig.stop_event is stop_event))
 
@@ -141,15 +168,20 @@ def test_run_process_wires_stop_event(monkeypatch) -> None:
         ("GameManager", "game_manager"),
     ],
 )
-def test_run_process_runs_direct_catalog_task(monkeypatch, config_name: str, command: str) -> None:
-    calls = []
+def test_run_process_runs_direct_catalog_task(
+    monkeypatch: pytest.MonkeyPatch,
+    config_name: str,
+    command: str,
+) -> None:
+    calls: list[tuple[object, ...]] = []
     _patch_process_boundary(monkeypatch, calls)
 
     class _Alas:
-        def __init__(self, config_name):
+        def __init__(self, config_name: str) -> None:
             calls.append(("init", config_name))
 
-        def run(self, task, skip_first_screenshot=False):
+        @staticmethod
+        def run(task: str, *, skip_first_screenshot: bool = False) -> None:
             calls.append(("run", task, skip_first_screenshot))
 
     monkeypatch.setattr(process_manager_module, "AzurLaneAutoScript", _Alas)
@@ -159,8 +191,8 @@ def test_run_process_runs_direct_catalog_task(monkeypatch, config_name: str, com
     assert ("run", command, True) in calls
 
 
-def test_run_process_rejects_scheduled_task(monkeypatch) -> None:
-    calls = []
+def test_run_process_rejects_scheduled_task(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[object, ...]] = []
     _patch_process_boundary(monkeypatch, calls)
 
     ProcessManager.run_process("alas", "Main", queue.Queue())
@@ -168,8 +200,8 @@ def test_run_process_rejects_scheduled_task(monkeypatch) -> None:
     assert ("critical", "No function matched: Main") in calls
 
 
-def test_run_process_rejects_unknown_func(monkeypatch) -> None:
-    calls = []
+def test_run_process_rejects_unknown_func(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[object, ...]] = []
     _patch_process_boundary(monkeypatch, calls)
 
     ProcessManager.run_process("alas", "MissingMod", queue.Queue())
@@ -182,19 +214,21 @@ def test_process_manager_source_has_no_direct_task_allowlist() -> None:
     assert "_AVAILABLE_WEBUI_TASKS" not in source
 
 
-def test_start_creates_stop_event_and_passes_it_to_child(monkeypatch) -> None:
+def test_start_creates_stop_event_and_passes_it_to_child(monkeypatch: pytest.MonkeyPatch) -> None:
     created_event = _StopEvent()
-    calls = []
+    calls: list[tuple[object, ...]] = []
 
     class _StartedProcess:
-        def __init__(self, target, args):
+        def __init__(self, target: Callable[..., None], args: tuple[object, ...]) -> None:
             del target
             calls.append(("process_args", args))
 
-        def start(self) -> None:
+        @staticmethod
+        def start() -> None:
             calls.append(("start",))
 
-        def is_alive(self) -> bool:
+        @staticmethod
+        def is_alive() -> bool:
             return False
 
     monkeypatch.setattr(process_manager_module, "Event", lambda: created_event)

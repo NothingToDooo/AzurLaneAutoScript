@@ -58,12 +58,14 @@ class _ShipyardUI(ShipyardUI):
     def buy_confirm(self, text: str) -> None:
         self._shipyard_buy_confirm(text)
 
-    def _next_result[T](self, results: list[T], *, default: T) -> T:
+    @staticmethod
+    def _next_result[T](results: list[T], *, default: T) -> T:
         if results:
             return results.pop(0)
         return default
 
-    def _button_name(self, button: object) -> str:
+    @staticmethod
+    def _button_name(button: object) -> str:
         return getattr(button, "name", repr(button))
 
     def _shipyard_get_append(self) -> ShipyardMode:
@@ -81,7 +83,7 @@ class _ShipyardUI(ShipyardUI):
         self.calls.append(("appear_then_click", name, kwargs))
         return self._next_result(self.appear_then_click_results.get(name, []), default=False)
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+    def handle_popup_confirm(self, name: str = "", offset: object = None, interval: float = 2) -> bool:
         _ = (name, offset, interval)
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)

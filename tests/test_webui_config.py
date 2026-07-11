@@ -1,9 +1,14 @@
+from typing import TYPE_CHECKING
+
 import yaml
 
 from module.webui.config import WebUIConfig
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
-def test_webui_config_keeps_only_adb_executable(tmp_path) -> None:
+
+def test_webui_config_keeps_only_adb_executable(tmp_path: Path) -> None:
     file = tmp_path / "webui.yaml"
     file.write_text(
         (
@@ -25,7 +30,7 @@ def test_webui_config_keeps_only_adb_executable(tmp_path) -> None:
     assert yaml.safe_load(file.read_text(encoding="utf-8")) == config.config
 
 
-def test_webui_config_writes_default_adb_executable(tmp_path) -> None:
+def test_webui_config_writes_default_adb_executable(tmp_path: Path) -> None:
     file = tmp_path / "webui.yaml"
 
     config = WebUIConfig(file)

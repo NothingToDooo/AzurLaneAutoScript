@@ -1,17 +1,22 @@
+from typing import TYPE_CHECKING
+
 from module.research import series
+
+if TYPE_CHECKING:
+    import pytest
 
 
 class _FakeTemplate:
-    def __init__(self, *, result):
+    def __init__(self, *, result: bool) -> None:
         self.result = result
         self.calls = []
 
-    def match(self, image, *, scaling):
+    def match(self, image: str, *, scaling: float) -> bool:
         self.calls.append((image, scaling))
         return self.result
 
 
-def test_match_series_returns_first_matching_series(monkeypatch) -> None:
+def test_match_series_returns_first_matching_series(monkeypatch: pytest.MonkeyPatch) -> None:
     miss = _FakeTemplate(result=False)
     hit = _FakeTemplate(result=True)
     skipped = _FakeTemplate(result=True)
@@ -24,7 +29,7 @@ def test_match_series_returns_first_matching_series(monkeypatch) -> None:
     assert skipped.calls == []
 
 
-def test_match_series_returns_zero_without_match(monkeypatch) -> None:
+def test_match_series_returns_zero_without_match(monkeypatch: pytest.MonkeyPatch) -> None:
     first = _FakeTemplate(result=False)
     second = _FakeTemplate(result=False)
     monkeypatch.setattr(series, "rgb2gray", lambda image: image)

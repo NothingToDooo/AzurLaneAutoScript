@@ -28,7 +28,8 @@ class _Timer:
             return results.pop(0)
         return False
 
-    def reset(self) -> None:
+    @staticmethod
+    def reset() -> None:
         _Timer.reset_count += 1
 
 
@@ -54,7 +55,7 @@ class _Shop(PQShopClerk):
         self.appear_results: dict[str, list[bool]] = {}
         self.appear_then_click_results: dict[str, list[bool]] = {}
 
-    def loop(self, *_args: object, **_kwargs: object):
+    def loop(self, *_args: object, **_kwargs: object) -> range:
         return range(self.loop_count)
 
     def enter_purchase_confirm(self, item: _Item) -> None:
@@ -63,7 +64,8 @@ class _Shop(PQShopClerk):
     def finish_purchase_confirm(self) -> None:
         self._pq_shop_finish_purchase_confirm()
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default

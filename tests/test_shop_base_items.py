@@ -1,8 +1,13 @@
+from dataclasses import dataclass
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from module.shop.base import ShopBase
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 class _FakeDevice:
@@ -14,13 +19,18 @@ class _FakeDevice:
         self.screenshot_count += 1
 
 
+@dataclass(frozen=True)
+class _GridCell:
+    area: tuple[int, int, int, int]
+
+
 class _FakeGrid:
-    def __getitem__(self, _key):
-        return SimpleNamespace(area=(0, 100, 0, 0))
+    def __getitem__(self, _key: tuple[int, int]) -> _GridCell:
+        return _GridCell(area=(0, 100, 0, 0))
 
 
 class _FakeItem:
-    def __init__(self, name, *, known=True, row_y=100) -> None:
+    def __init__(self, name: str, *, known: bool = True, row_y: int = 100) -> None:
         self.name = name
         self._is_known_item = known
         self.button = (0, row_y)
@@ -33,7 +43,7 @@ class _FakeItem:
 
 
 class _FakeShopItems:
-    def __init__(self, item_sequences) -> None:
+    def __init__(self, item_sequences: Iterable[Iterable[_FakeItem]]) -> None:
         self.item_sequences = [list(items) for items in item_sequences]
         self.items = []
         self.grids = _FakeGrid()
@@ -41,12 +51,12 @@ class _FakeShopItems:
         self.predict_calls = []
         self.extract_calls = []
 
-    def predict(self, image, **kwargs) -> None:
+    def predict(self, image: str, **kwargs: bool) -> None:
         self.predict_calls.append((image, kwargs))
         if self.item_sequences:
             self.items = self.item_sequences.pop(0)
 
-    def extract_template(self, image, folder) -> None:
+    def extract_template(self, image: str, folder: str) -> None:
         self.extract_calls.append((image, folder))
 
 
@@ -54,7 +64,13 @@ class _FakeShopBase(ShopBase):
     config: SimpleNamespace
     device: _FakeDevice
 
-    def __init__(self, shop_items, *, extract_template=False, obstruct_results=()) -> None:
+    def __init__(
+        self,
+        shop_items: _FakeShopItems | None,
+        *,
+        extract_template: bool = False,
+        obstruct_results: Iterable[bool] = (),
+    ) -> None:
         self.device = _FakeDevice()
         self.config = SimpleNamespace(SHOP_EXTRACT_TEMPLATE=extract_template)
         self.shop_template_folder = "templates"
@@ -63,7 +79,7 @@ class _FakeShopBase(ShopBase):
         self.obstruct_calls = 0
         self.has_loaded_calls = []
 
-    def shop_items(self):
+    def shop_items(self) -> _FakeShopItems | None:
         return self._shop_items
 
     def shop_obstruct_handle(self) -> bool:
@@ -72,7 +88,7 @@ class _FakeShopBase(ShopBase):
             return self.obstruct_results.pop(0)
         return False
 
-    def shop_has_loaded(self, _items, *_args: object, **_kwargs: object) -> bool:
+    def shop_has_loaded(self, _items: list[_FakeItem], *_args: object, **_kwargs: object) -> bool:
         self.has_loaded_calls.append(list(_items))
         return True
 

@@ -73,7 +73,8 @@ class _AutoSearchMap(OSMap):
         self.need_repair: list[bool] = []
         self.ash_popup_canceled = True
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
@@ -93,7 +94,7 @@ class _AutoSearchMap(OSMap):
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def handle_os_auto_search_map_option(self, enable: object = True) -> bool:
+    def handle_os_auto_search_map_option(self, *, enable: bool | None = True) -> bool:
         self.calls.append(("handle_os_auto_search_map_option", enable))
         return self._next_result(self.map_option_results, default=False)
 

@@ -32,7 +32,8 @@ class _Timer:
             return results.pop(0)
         return False
 
-    def reset(self) -> None:
+    @staticmethod
+    def reset() -> None:
         _Timer.reset_count += 1
 
 
@@ -46,17 +47,19 @@ class _MissionHandler(MissionHandler):
         self.popup_results: list[bool] = []
         self.get_items_results: list[bool] = []
         self.info_bar_results: list[bool] = []
+        self.loop_count = 5
 
     def enter(self) -> None:
         self.os_mission_enter()
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
-    def loop(self, *_args: object, **_kwargs: object):
-        return range(5)
+    def loop(self, *_args: object, **_kwargs: object) -> range:
+        return range(self.loop_count)
 
     def is_in_os_mission(self) -> bool:
         self.calls.append(("is_in_os_mission",))
