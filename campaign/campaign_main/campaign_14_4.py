@@ -199,7 +199,7 @@ class Campaign(CampaignBase):
                 # Set may_enemy, but keep may_ambush
                 self.map[override_grid.location].may_enemy = override_grid.may_enemy
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.pick_up_light_house(A9)
 
         if self.clear_roadblocks([ROAD_A8, ROAD_H9], weakest=False):
@@ -209,7 +209,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_3(self):
+    def battle_3(self) -> bool:
         self.pick_up_light_house(A9)
         self.pick_up_ammo()
         self.pick_up_flare(H9)
@@ -221,7 +221,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_6(self):
+    def battle_6(self) -> bool:
         self.pick_up_light_house(A9)
         self.pick_up_ammo()
         self.pick_up_flare(H9)
@@ -233,7 +233,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_7(self):
+    def battle_7(self) -> bool:
         self.fleet_boss.pick_up_flare(A5)
 
         return self.fleet_boss.clear_boss()

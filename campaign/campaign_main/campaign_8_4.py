@@ -107,7 +107,7 @@ class Campaign(CampaignBase):
     MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD = 0.45
     MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD = 0.45  # Usually (0.50, 0.53)
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.fleet_2_push_forward()
 
         self.clear_all_mystery()
@@ -121,7 +121,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_4(self):
+    def battle_4(self) -> bool:
         self.clear_all_mystery()
 
         return self.brute_clear_boss()

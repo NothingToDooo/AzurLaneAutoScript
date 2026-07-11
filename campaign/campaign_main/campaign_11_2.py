@@ -128,7 +128,7 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.fleet_2_push_forward()
 
         if self.clear_roadblocks([road_main]):
@@ -138,7 +138,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_6(self):
+    def battle_6(self) -> bool:
         boss = self.map.select(is_boss=True)
         if boss and not self.check_accessibility(boss[0], fleet="boss") and self.clear_roadblocks([road_main]):
             return True

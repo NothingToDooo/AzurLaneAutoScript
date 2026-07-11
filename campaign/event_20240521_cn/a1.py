@@ -210,7 +210,7 @@ class Campaign(CampaignBase):
             return self.battle_boss()
         return super().battle_function()
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.fleet_step >= 3:
             if self.clear_chosen_enemy(E7, expected="siren"):
                 return True
@@ -222,7 +222,7 @@ class Campaign(CampaignBase):
         logger.warning("A1.battle_0() did not cleared siren")
         return self.battle_default()
 
-    def battle_1(self):
+    def battle_1(self) -> bool:
         if self.clear_siren():
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
@@ -230,5 +230,5 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_3(self):
+    def battle_3(self) -> bool:
         return self.clear_boss()

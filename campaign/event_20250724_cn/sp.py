@@ -203,7 +203,7 @@ class Campaign(CampaignBase):
             result = "sp"
         return result
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.clear_siren():
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=2):
@@ -211,7 +211,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         if self.clear_siren():
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
@@ -219,5 +219,5 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_7(self):
+    def battle_7(self) -> bool:
         return self.fleet_boss.clear_boss()

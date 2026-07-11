@@ -79,12 +79,12 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.clear_all_mystery()
 
         return self.battle_default()
 
-    def battle_2(self):
+    def battle_2(self) -> bool:
         self.clear_all_mystery()
 
         if not self.check_accessibility(D4, fleet="boss"):

@@ -73,12 +73,12 @@ class Config(ConfigBase):
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.clear_all_mystery()
 
         return self.battle_default()
 
-    def battle_4(self):
+    def battle_4(self) -> bool:
         self.clear_all_mystery()
 
         boss = self.map.select(is_boss=True)

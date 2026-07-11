@@ -129,7 +129,7 @@ class Campaign(CampaignBase):
         super().handle_clear_mode_config_cover()
         self.config.MAP_HAS_MISSILE_ATTACK = False
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.clear_siren():
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
@@ -137,5 +137,5 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_3(self):
+    def battle_3(self) -> bool:
         return self.clear_boss()

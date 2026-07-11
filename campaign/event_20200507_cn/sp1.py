@@ -31,8 +31,8 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         return self.battle_default()
 
-    def battle_4(self):
+    def battle_4(self) -> bool:
         return self.brute_clear_boss()

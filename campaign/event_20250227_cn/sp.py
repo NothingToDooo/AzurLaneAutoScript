@@ -160,7 +160,7 @@ class Campaign(CampaignBase):
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
     _is_d9 = False
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.fleet_at(D9):
             self._is_d9 = True
 
@@ -171,7 +171,7 @@ class Campaign(CampaignBase):
 
         return True
 
-    def battle_1(self):
+    def battle_1(self) -> bool:
         if self._is_d9:
             self.clear_chosen_enemy(F7)
         else:
@@ -179,7 +179,7 @@ class Campaign(CampaignBase):
 
         return True
 
-    def battle_2(self):
+    def battle_2(self) -> bool:
         if self._is_d9:
             self.clear_chosen_enemy(D7)
         else:
@@ -187,7 +187,7 @@ class Campaign(CampaignBase):
 
         return True
 
-    def battle_3(self):
+    def battle_3(self) -> bool:
         if self._is_d9:
             self.clear_chosen_enemy(F7)
         else:
@@ -195,17 +195,17 @@ class Campaign(CampaignBase):
 
         return True
 
-    def battle_4(self):
+    def battle_4(self) -> bool:
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=2):
             return True
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
             return True
 
         return self.battle_default()
 
-    def battle_7(self):
+    def battle_7(self) -> bool:
         return self.fleet_boss.clear_boss()

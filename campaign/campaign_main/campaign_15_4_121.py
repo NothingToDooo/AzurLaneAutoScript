@@ -117,7 +117,7 @@ class Config(ConfigBase):
 class Campaign(Campaign_15_4):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if not self.map_is_clear_mode and self.map_has_mob_move:
             self.mob_move(J8, K8)
             if K9.is_accessible:
@@ -129,7 +129,7 @@ class Campaign(Campaign_15_4):
 
         return self.battle_default()
 
-    def battle_1(self):
+    def battle_1(self) -> bool:
         if not self.map_is_clear_mode and A1.is_accessible:
             self.clear_chosen_enemy(A1)
             return True
@@ -139,33 +139,33 @@ class Campaign(Campaign_15_4):
 
         return self.battle_default()
 
-    def battle_2(self):
+    def battle_2(self) -> bool:
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
             return True
 
         return self.battle_default()
 
-    def battle_3(self):
+    def battle_3(self) -> bool:
         self.pick_up_ammo()
         self.clear_chosen_enemy(H5, expected="siren")
         return True
 
-    def battle_4(self):
+    def battle_4(self) -> bool:
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
             return True
 
         return self.battle_default()
 
-    def battle_6(self):
+    def battle_6(self) -> bool:
         self.fleet_boss.clear_chosen_enemy(D3, expected="siren")
         self.fleet_1.switch_to()
         return True
 
-    def battle_7(self):
+    def battle_7(self) -> bool:
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
             return True
 
         return self.battle_default()
 
-    def battle_8(self):
+    def battle_8(self) -> bool:
         return self.clear_boss()

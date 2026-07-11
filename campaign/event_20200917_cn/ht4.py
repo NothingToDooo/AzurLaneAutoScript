@@ -171,7 +171,7 @@ class Config(ConfigBase):
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.config.MAP_HAS_MOVABLE_ENEMY:
             self.fleet_2_push_forward()
 
@@ -185,7 +185,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_2(self):
+    def battle_2(self) -> bool:
         if self.clear_siren():
             return True
         if self.map_is_clear_mode:
@@ -196,5 +196,5 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         return self.fleet_boss.clear_boss()

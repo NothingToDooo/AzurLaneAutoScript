@@ -50,10 +50,10 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         return self.battle_default()
 
-    def battle_1(self):
+    def battle_1(self) -> bool:
         return self.clear_boss()
 
     def handle_boss_appear_refocus(self, preset=(-3, 0)):

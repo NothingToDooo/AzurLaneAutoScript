@@ -110,7 +110,7 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.clear_mechanism(mechanism)
 
         return self.clear_boss()

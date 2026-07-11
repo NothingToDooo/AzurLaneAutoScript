@@ -153,13 +153,13 @@ class Config(ConfigBase):
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.clear_filter_enemy("1L > 1M > 2L > 2M > 3L > 2E > 3E > 2C > 3C > 3M", preserve=0):
             return True
 
         return self.battle_default()
 
-    def battle_3(self):
+    def battle_3(self) -> bool:
         self.pick_up_ammo()
 
         if self.clear_filter_enemy("1L > 1M > 2L > 2M > 3L > 2E > 3E > 2C > 3C > 3M", preserve=0):
@@ -167,5 +167,5 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_7(self):
+    def battle_7(self) -> bool:
         return self.fleet_boss.clear_boss()

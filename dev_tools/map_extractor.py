@@ -669,7 +669,7 @@ class MapData:
         return lines
 
     def _get_clear_enemy_battle_lines(self, battle_name, preserve):
-        lines = [f"    def {battle_name}(self):"]
+        lines = [f"    def {battle_name}(self) -> bool:"]
         if self.MAP_SIREN_TEMPLATE:
             lines.extend(("        if self.clear_siren():", "            return True"))
         lines.extend(
@@ -695,7 +695,7 @@ class MapData:
         ]
         if battle >= 6:
             lines.extend(self._get_clear_enemy_battle_lines("battle_5", preserve=0))
-        lines.append(f"    def battle_{self.data['boss_refresh']}(self):")
+        lines.append(f"    def battle_{self.data['boss_refresh']}(self) -> bool:")
         if battle >= 5:
             lines.append("        return self.fleet_boss.clear_boss()")
         else:

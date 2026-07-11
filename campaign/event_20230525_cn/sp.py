@@ -225,7 +225,7 @@ class Campaign(CampaignBase):
 
         return True
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if not self.patched:
             for battle_count in range(1, 7):
                 setattr(self, f"battle_{battle_count}", self.battle_0)
@@ -245,5 +245,5 @@ class Campaign(CampaignBase):
             self.action = actions[fleet_1_x]
         return self.execute_actions(self.battle_count)
 
-    def battle_7(self):
+    def battle_7(self) -> bool:
         return self.fleet_boss.clear_boss()

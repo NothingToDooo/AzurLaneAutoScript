@@ -146,28 +146,28 @@ class Campaign(CampaignBase):
         C8.is_siren = True
         D7.is_siren = True
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.is_left = self.fleet_current == B10.location
         logger.attr("is_left", self.is_left)
         self.goto(C9)
         self.clear_chosen_enemy(C8, expected="siren")
         return True
 
-    def battle_1(self):
+    def battle_1(self) -> bool:
         if self.is_left:
             self.clear_chosen_enemy(D9, expected="siren")
             return True
         self.clear_chosen_enemy(B9, expected="siren")
         return True
 
-    def battle_2(self):
+    def battle_2(self) -> bool:
         if self.is_left:
             self.clear_chosen_enemy(B9, expected="siren")
             return True
         self.clear_chosen_enemy(D9, expected="siren")
         return True
 
-    def battle_3(self):
+    def battle_3(self) -> bool:
         if self.clear_siren():
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=2):
@@ -175,7 +175,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         if self.clear_siren():
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
@@ -183,5 +183,5 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_7(self):
+    def battle_7(self) -> bool:
         return self.fleet_boss.clear_boss()

@@ -94,7 +94,7 @@ class Campaign(CampaignBase):
     MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD = 0.25
     MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD = 0.65
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.clear_roadblocks([road_main]):
             return True
         if self.clear_potential_roadblocks([road_main]):
@@ -102,7 +102,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_4(self):
+    def battle_4(self) -> bool:
         boss = self.map.select(is_boss=True)
         if boss and not self.check_accessibility(boss[0], fleet="boss"):
             if self.clear_roadblocks([road_main]):
