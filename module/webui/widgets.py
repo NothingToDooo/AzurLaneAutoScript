@@ -1,6 +1,7 @@
 import copy
 import json
 from dataclasses import dataclass
+from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from pywebio.exceptions import SessionException
@@ -27,22 +28,23 @@ from module.webui.utils import (
     LIGHT_TERMINAL_THEME,
     LOG_CODE_FORMAT,
     Switch,
+    TaskGenerator,
 )
 
 type ButtonSpec = dict[str, Any] | tuple[str, Any] | list[Any] | str
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator
+    from collections.abc import Callable
 
     from pywebio.io_ctrl import Output
-    from rich.console import ConsoleRenderable
 
+    from module.config.deep import MutableDeepValue
     from module.webui.app import AlasGUI
-    from module.webui.process_manager import ProcessManager
+    from module.webui.process_manager import ProcessManager, Renderable
 
 
 class RichLog:
-    def __init__(self, scope, font_width="0.559") -> None:
+    def __init__(self, scope: str, font_width: str = "0.559") -> None:
         self.scope = scope
         self.font_width = font_width
         self.console = HTMLConsole(
@@ -62,7 +64,7 @@ class RichLog:
         else:
             self.terminal_theme = LIGHT_TERMINAL_THEME
 
-    def render(self, renderable: ConsoleRenderable) -> str:
+    def render(self, renderable: Renderable) -> str:
         with self.console.capture():
             self.console.print(renderable)
 
@@ -73,7 +75,7 @@ class RichLog:
             inline_styles=True,
         )
 
-    def extend(self, text):
+    def extend(self, text: str) -> None:
         if text:
             run_js(
                 f"""$("#pywebio-scope-{self.scope}>div").append(text);
@@ -83,7 +85,7 @@ class RichLog:
             if self.keep_bottom:
                 self.scroll()
 
-    def reset(self):
+    def reset(self) -> None:
         run_js(f"""$("#pywebio-scope-{self.scope}>div").empty();""")
 
     def scroll(self) -> None:
@@ -95,7 +97,7 @@ class RichLog:
     def set_scroll(self, *, keep_bottom: bool) -> None:
         self.keep_bottom = keep_bottom
 
-    def get_width(self):
+    def get_width(self) -> int:
         js = f"""
         let canvas = document.createElement('canvas');
         canvas.style.position = "absolute";
@@ -110,9 +112,11 @@ class RichLog:
         $('#pywebio-scope-{self.scope}').css('font-size').slice(0, -2)/text.width*16;\
         """
         width = eval_js(js)
-        return 80 if width is None else 128 if width > 128 else int(width)
+        if not isinstance(width, (int, float)):
+            return 80
+        return min(int(width), 128)
 
-    def put_log(self, pm: ProcessManager) -> Generator:
+    def put_log(self, pm: ProcessManager) -> TaskGenerator:
         yield
         try:
             while True:
@@ -137,40 +141,36 @@ class RichLog:
 
 @dataclass(slots=True)
 class BinarySwitchOptions:
-    get_state: object
+    get_state: Callable[[], int]
     label_on: str
     label_off: str
-    onclick_on: object
-    onclick_off: object
+    onclick_on: Callable[[], None]
+    onclick_off: Callable[[], None]
     scope: str
     color_on: str = "success"
     color_off: str = "secondary"
 
 
 class BinarySwitchButton(Switch):
-    def __init__(self, options: BinarySwitchOptions):
+    def __init__(self, options: BinarySwitchOptions) -> None:
         self.scope = options.scope
         status = {
-            0: {
-                "func": self.update_button,
-                "args": (
-                    options.label_off,
-                    options.onclick_off,
-                    options.color_off,
-                ),
-            },
-            1: {
-                "func": self.update_button,
-                "args": (
-                    options.label_on,
-                    options.onclick_on,
-                    options.color_on,
-                ),
-            },
+            0: partial(
+                self.update_button,
+                options.label_off,
+                options.onclick_off,
+                options.color_off,
+            ),
+            1: partial(
+                self.update_button,
+                options.label_on,
+                options.onclick_on,
+                options.color_on,
+            ),
         }
         super().__init__(status=status, get_state=options.get_state, name=options.scope)
 
-    def update_button(self, label, onclick, color):
+    def update_button(self, label: str, onclick: Callable[[], None], color: str) -> None:
         clear(self.scope)
         put_button(label=label, onclick=onclick, color=color, scope=self.scope)
 
@@ -231,7 +231,7 @@ def put_arg_input(kwargs: T_Output_Kwargs) -> Output:
     )
 
 
-def product_stored_row(kwargs: T_Output_Kwargs, key, value):
+def product_stored_row(kwargs: T_Output_Kwargs, key: str, value: MutableDeepValue) -> Output:
     kwargs = copy.copy(kwargs)
     name = str(kwargs["name"])
     kwargs["name"] = f"{name}_{key}"
@@ -383,7 +383,7 @@ def put_arg_storage(kwargs: T_Output_Kwargs) -> Output | None:
     kwargs["value"] = json.dumps(kwargs["value"], indent=2, ensure_ascii=False, sort_keys=False, default=str)
     kwargs.setdefault("code", {"lineWrapping": True, "lineNumbers": False, "mode": "json"})
 
-    def clear_callback():
+    def clear_callback() -> None:
         alasgui: AlasGUI = local.gui
         alasgui.modified_config_queue.put({"name": ".".join(name.split("_")), "value": {}})
         # 不直接写 pin[name]，见 PyWebIO issue 459。
@@ -429,7 +429,7 @@ def put_loading_text(
     color: str = "dark",
     fill: bool = False,
     size: str = "auto 2px 1fr",
-):
+) -> Output:
     loading_style = get_loading_style(shape=shape, fill=fill)
     return put_row(
         [

@@ -2,7 +2,7 @@ import sys
 from types import ModuleType
 
 
-def import_fake_pil_module():
+def import_fake_pil_module() -> None:
     fake_pil_module = ModuleType("PIL")
     image_module = ModuleType("PIL.Image")
     vars(image_module)["Image"] = type("MockPILImage", (), {"__init__": None})
@@ -11,6 +11,6 @@ def import_fake_pil_module():
     sys.modules["PIL.Image"] = image_module
 
 
-def remove_fake_pil_module():
+def remove_fake_pil_module() -> None:
     sys.modules.pop("PIL", None)
     sys.modules.pop("PIL.Image", None)

@@ -16,7 +16,7 @@ class WebUIConfig:
         "AdbExecutable": "./.venv/Lib/site-packages/adbutils/binaries/adb.exe",
     }
 
-    def __init__(self, file: str | Path = CONFIG_FILE):
+    def __init__(self, file: str | Path = CONFIG_FILE) -> None:
         object.__setattr__(self, "file", Path(file))
         object.__setattr__(self, "config", self._read())
         for key, value in self.config.items():
@@ -31,7 +31,8 @@ class WebUIConfig:
             config[key] = value
             self.write()
 
-    def _read_yaml(self, file: Path) -> dict[str, object]:
+    @staticmethod
+    def _read_yaml(file: Path) -> dict[str, str]:
         try:
             with file.open(encoding="utf-8") as handle:
                 data = yaml.safe_load(handle) or {}
@@ -39,7 +40,7 @@ class WebUIConfig:
             return {}
         if not isinstance(data, dict):
             return {}
-        return data
+        return {key: value for key, value in data.items() if isinstance(key, str) and isinstance(value, str)}
 
     def _read(self) -> dict[str, str]:
         config = self.DEFAULTS.copy()

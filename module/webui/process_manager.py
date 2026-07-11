@@ -1,7 +1,7 @@
 import queue
 import threading
 from multiprocessing import Event, Process
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar
 
 from rich.console import Console, ConsoleRenderable
 
@@ -21,13 +21,16 @@ STOP_GRACE_SECONDS = 5
 KILL_JOIN_SECONDS = 1
 
 
+type Renderable = ConsoleRenderable | str
+
+
 class ProcessManager:
     _processes: ClassVar[dict[str, ProcessManager]] = {}
 
     def __init__(self, config_name: str = "alas") -> None:
         self.config_name = config_name
         self._renderable_queue: queue.Queue[ConsoleRenderable] = State.manager.Queue()
-        self.renderables: list[ConsoleRenderable] = []
+        self.renderables: list[Renderable] = []
         self.renderables_max_length = 400
         self.renderables_reduce_length = 80
         self._process: Process | None = None
@@ -52,7 +55,7 @@ class ProcessManager:
             self._process.start()
             self.start_log_queue_handler()
 
-    def start_log_queue_handler(self):
+    def start_log_queue_handler(self) -> None:
         if self.thd_log_queue_handler is not None and self.thd_log_queue_handler.is_alive():
             return
         self.thd_log_queue_handler = threading.Thread(target=self._thread_log_queue_handler)
@@ -72,7 +75,7 @@ class ProcessManager:
             process.kill()
             process.join(timeout=KILL_JOIN_SECONDS)
 
-        self.renderables.append(cast("ConsoleRenderable", f"[{self.config_name}] exited. Reason: Manual stop\n"))
+        self.renderables.append(f"[{self.config_name}] exited. Reason: Manual stop\n")
 
     def stop(self) -> None:
         with self._stop_lock:
@@ -124,7 +127,12 @@ class ProcessManager:
         return cls._processes[config_name]
 
     @staticmethod
-    def run_process(config_name, func: str, q: queue.Queue, stop_event: StopEvent | None = None) -> None:
+    def run_process(
+        config_name: str,
+        func: str,
+        q: queue.Queue[ConsoleRenderable],
+        stop_event: StopEvent | None = None,
+    ) -> None:
         set_file_logger(name=config_name)
         set_func_logger(func=q.put)
 
@@ -167,7 +175,7 @@ class ProcessManager:
         if instances is None:
             instances = []
 
-        resolved_instances = set()
+        resolved_instances: set[ProcessManager] = set()
 
         for instance in instances:
             if isinstance(instance, str):

@@ -3,10 +3,11 @@ import json
 import queue
 import threading
 import time
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict, TypeIs
 
 from pywebio import config as webconfig
 from pywebio.input import file_upload, input_group, select
@@ -33,7 +34,7 @@ from pywebio.session import download, go_app, info, local, register_thread, run_
 
 from module.base.atomic import atomic_failure_cleanup
 from module.config.config import AzurLaneConfig, Function
-from module.config.deep import deep_get, deep_iter, deep_set
+from module.config.deep import DeepValue, MutableDeepData, MutableDeepValue, deep_get, deep_iter, deep_set
 from module.config.utils import (
     alas_instance,
     alas_template,
@@ -51,10 +52,10 @@ from module.webui.app_manage_utils import (
     validate_new_config_name,
 )
 from module.webui.base import Frame
-from module.webui.fastapi import asgi_app
+from module.webui.fastapi import AsgiAppOptions, asgi_app
 from module.webui.lang import t
 from module.webui.overview_utils import split_overview_tasks
-from module.webui.pin import put_input, put_select
+from module.webui.pin import call_pywebio_input, put_input, put_select
 from module.webui.process_manager import ProcessManager
 from module.webui.setting import State
 from module.webui.setting_form_utils import GroupOutputContext, iter_group_output_kwargs
@@ -84,30 +85,80 @@ from module.webui.widgets import (
 )
 
 if TYPE_CHECKING:
+    from starlette.applications import Starlette
+
     from module.config.config_updater import ConfigUpdater
 
 
 task_handler = TaskHandler()
 
 
+class MenuDefinition(TypedDict):
+    page: str
+    menu: str
+    tasks: list[str]
+
+
+class ConfigChange(TypedDict):
+    name: str
+    value: MutableDeepValue
+
+
+def _read_menu() -> dict[str, MenuDefinition]:
+    raw_menu = read_file(filepath_args("menu"))
+    menu: dict[str, MenuDefinition] = {}
+    for name, raw_definition in raw_menu.items():
+        if not isinstance(raw_definition, dict):
+            message = f"Menu {name} must be a mapping"
+            raise TypeError(message)
+        page = raw_definition.get("page")
+        mode = raw_definition.get("menu")
+        raw_tasks = raw_definition.get("tasks")
+        if not isinstance(page, str) or not isinstance(mode, str) or not isinstance(raw_tasks, list):
+            message = f"Menu {name} has an invalid definition"
+            raise TypeError(message)
+        tasks: list[str] = []
+        for task in raw_tasks:
+            if not isinstance(task, str):
+                message = f"Menu {name} task names must be strings"
+                raise TypeError(message)
+            tasks.append(task)
+        menu[name] = MenuDefinition(page=page, menu=mode, tasks=tasks)
+    return menu
+
+
+def _is_deep_mapping(value: DeepValue) -> TypeIs[Mapping[str, DeepValue]]:
+    return isinstance(value, Mapping)
+
+
+def _copy_mutable_value(value: DeepValue) -> MutableDeepValue:
+    if value is None or isinstance(value, (bool, int, float, str, datetime)):
+        return value
+    if _is_deep_mapping(value):
+        return {key: _copy_mutable_value(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return tuple(_copy_mutable_value(item) for item in value)
+    return [_copy_mutable_value(item) for item in value]
+
+
 class AlasGUI(Frame):
-    ALAS_MENU: dict[str, dict[str, list[str]]]
-    ALAS_ARGS: dict[str, dict[str, dict[str, dict[str, str]]]]
+    ALAS_MENU: dict[str, MenuDefinition]
+    ALAS_ARGS: MutableDeepData
     theme = "default"
 
     def initial(self) -> None:
-        self.ALAS_MENU = read_file(filepath_args("menu"))
+        self.ALAS_MENU = _read_menu()
         self.ALAS_ARGS = read_file(filepath_args("args"))
         self._init_alas_config_watcher()
 
     def __init__(self) -> None:
         super().__init__()
-        self.modified_config_queue = queue.Queue()
+        self.modified_config_queue: queue.Queue[ConfigChange] = queue.Queue()
         self.alas_name = ""
         self.alas_config = AzurLaneConfig("template")
         self.initial()
-        self.rendered_cache = []
-        self.inst_cache = []
+        self.rendered_cache: list[int] = []
+        self.inst_cache: list[str] = []
         self.load_home = False
         self.af_flag = False
 
@@ -140,10 +191,10 @@ class AlasGUI(Frame):
     def set_aside_status(self) -> None:
         flag = True
 
-        def update(name, seq):
+        def update(name: str, seq: int) -> int:
             with use_scope(f"alas-instance-{seq}", clear=True):
                 icon_html = Icon.RUN
-                rendered_state = ProcessManager.get_manager(inst).state
+                rendered_state = ProcessManager.get_manager(name).state
                 if rendered_state == 1 and self.af_flag:
                     icon_html = icon_html[:31] + " anim-rotate" + icon_html[31:]
                 put_icon_buttons(
@@ -175,8 +226,9 @@ class AlasGUI(Frame):
             aside_name = get_localstorage("aside")
             self.active_button("aside", aside_name)
 
+    @staticmethod
     @use_scope("header_status")
-    def set_status(self, state: int) -> None:
+    def set_status(state: int) -> None:
         """状态值：1 运行，2 未运行，3 异常停止，0 隐藏，-1 不更新。"""
         if state == -1:
             return
@@ -190,7 +242,7 @@ class AlasGUI(Frame):
             put_loading_text(t("Gui.Status.Warning"), shape="grow", color="warning")
 
     @classmethod
-    def set_theme(cls, theme="default") -> None:
+    def set_theme(cls, theme: str = "default") -> None:
         cls.theme = theme
         State.theme = theme
         webconfig(theme=theme)
@@ -269,8 +321,14 @@ class AlasGUI(Frame):
             if self.set_group(group, arg_dict, config, task):
                 self.set_navigator(group)
 
+    @staticmethod
     @use_scope("groups")
-    def set_group(self, group, arg_dict, config, task):
+    def set_group(
+        group: list[str],
+        arg_dict: DeepValue,
+        config: MutableDeepData,
+        task: str,
+    ) -> int:
         group_name = group[0]
 
         output_list: list[Output] = []
@@ -303,8 +361,9 @@ class AlasGUI(Frame):
 
         return len(output_list)
 
+    @staticmethod
     @use_scope("navigator")
-    def set_navigator(self, group):
+    def set_navigator(group: list[str]) -> None:
         js = f"""
             $("#pywebio-scope-groups").scrollTop(
                 $("#pywebio-scope-group_{group[0]}").position().top
@@ -408,7 +467,7 @@ class AlasGUI(Frame):
         self.task_handler.add(log.put_log(self.alas), 0.25, pending_delete=True)
 
     def _init_alas_config_watcher(self) -> None:
-        def put_queue(path, value):
+        def put_queue(path: str, value: MutableDeepValue) -> None:
             self.modified_config_queue.put({"name": path, "value": value})
 
         for path in get_alas_config_listen_path(self.ALAS_ARGS):
@@ -436,7 +495,7 @@ class AlasGUI(Frame):
 
     def _save_config(
         self,
-        modified: dict[str, object],
+        modified: dict[str, MutableDeepValue],
         config_name: str,
         config_updater: ConfigUpdater = State.config_updater,
     ) -> None:
@@ -448,7 +507,7 @@ class AlasGUI(Frame):
 
     def _save_config_unchecked(
         self,
-        modified: dict[str, object],
+        modified: dict[str, MutableDeepValue],
         config_name: str,
         config_updater: ConfigUpdater,
     ) -> None:
@@ -457,20 +516,22 @@ class AlasGUI(Frame):
         config = config_updater.read_file(config_name)
         n = datetime.now()
         for p, v in deep_iter(config, depth=3):
-            if p[-1].endswith("un") and not isinstance(v, bool) and (v - n).days >= 31:
+            if p[-1].endswith("un") and isinstance(v, datetime) and (v - n).days >= 31:
                 deep_set(config, p, "")
         for k, raw_value in modified.copy().items():
-            valuetype = deep_get(self.ALAS_ARGS, k + ".valuetype")
+            raw_valuetype = deep_get(self.ALAS_ARGS, k + ".valuetype")
+            valuetype = raw_valuetype if isinstance(raw_valuetype, str) else None
             v = parse_pin_value(raw_value, valuetype)
-            validate = deep_get(self.ALAS_ARGS, k + ".validate")
+            raw_validate = deep_get(self.ALAS_ARGS, k + ".validate")
+            validate = raw_validate if isinstance(raw_validate, str) else None
             if not str(v):
-                default = deep_get(self.ALAS_ARGS, k + ".value")
+                default = _copy_mutable_value(deep_get(self.ALAS_ARGS, k + ".value"))
                 modified[k] = default
                 deep_set(config, k, default)
                 valid.append(k)
                 pin["_".join(k.split("."))] = default
 
-            elif not validate or re_fullmatch(validate, v):
+            elif not validate or (isinstance(v, str) and re_fullmatch(validate, v)):
                 deep_set(config, k, v)
                 modified[k] = v
                 valid.append(k)
@@ -510,7 +571,7 @@ class AlasGUI(Frame):
                 color="off",
             )
 
-    def put_overview_task_section(self, scope: str, tasks) -> None:
+    def put_overview_task_section(self, scope: str, tasks: Sequence[Function]) -> None:
         clear(scope)
         with use_scope(scope):
             if not tasks:
@@ -689,14 +750,10 @@ class AlasGUI(Frame):
     def ui_add_alas(self) -> None:
         with popup(t("Gui.AddAlas.PopupTitle")) as s:
 
-            def get_unused_name():
-                all_name = alas_instance()
-                for i in range(2, 100):
-                    if f"alas{i}" not in all_name:
-                        return f"alas{i}"
-                return ""
+            def get_unused_name() -> str:
+                return next_alas_instance_name(alas_instance())
 
-            def add():
+            def add() -> None:
                 name = pin["AddAlas_name"]
                 origin = pin["AddAlas_copyfrom"]
 
@@ -720,7 +777,7 @@ class AlasGUI(Frame):
                 self.active_button("aside", self.alas_name)
                 close_popup()
 
-            def put(name=None, origin=None):
+            def put(name: str | None = None, origin: str | None = None) -> None:
                 put_input(
                     name="AddAlas_name",
                     label=t("Gui.AddAlas.NewName"),
@@ -760,8 +817,8 @@ class AlasGUI(Frame):
             del self.alas
         self.set_status(0)
 
-        def set_theme(t):
-            self.set_theme(t)
+        def set_theme(theme: str) -> None:
+            self.set_theme(theme)
             run_js("location.reload()")
 
         with use_scope("content"):
@@ -819,7 +876,7 @@ class AlasGUI(Frame):
             status={
                 True: [
                     lambda: setattr(self, "visible", True),
-                    lambda: self.alas_update_overview_task() if self.page == "Overview" else 0,
+                    lambda: self.alas_update_overview_task() if self.page == "Overview" else None,
                     lambda: self.task_handler.set_current_task_delay(15),
                 ],
                 False: [
@@ -842,12 +899,12 @@ class AlasGUI(Frame):
         self.task_handler.add(visibility_state_switch.g(), 15)
         self.task_handler.start()
 
-        if aside not in ["Home", None]:
+        if aside is not None and aside != "Home":
             self.ui_alas(aside)
 
 
-def app_manage():
-    def _import():
+def app_manage() -> None:
+    def _import() -> None:
         resp = file_upload(
             label=t("Gui.AppManage.Import"),
             placeholder=t("Gui.Text.ChooseFile"),
@@ -870,12 +927,12 @@ def app_manage():
 
         _show_table()
 
-    def _export(config_name: str):
+    def _export(config_name: str) -> None:
         filename = format_export_config_filename(config_name)
         download(filename, Path(filepath_config(config_name)).read_bytes())
 
-    def _new():
-        def validate(s: str):
+    def _new() -> None:
+        def validate(s: str) -> str | None:
             key = validate_new_config_name(s, alas_instance())
             return t(key) if key else None
 
@@ -888,7 +945,8 @@ def app_manage():
                     value=next_alas_instance_name(alas_instance()),
                     validate=validate,
                 ),
-                select(
+                call_pywebio_input(
+                    select,
                     label=t("Gui.AppManage.CopyFrom"),
                     name="copy_from",
                     options=alas_template() + alas_instance(),
@@ -909,7 +967,7 @@ def app_manage():
         toast(t("Gui.AppManage.NewSuccess"), color="success")
         _show_table()
 
-    def _show_table():
+    def _show_table() -> None:
         clear("config_table")
         put_table(
             tdata=[
@@ -958,7 +1016,7 @@ def app_manage():
     _show_table()
 
 
-def debug():
+def debug() -> None:
     """交互式 Python 调试入口。
 
     $ python
@@ -970,13 +1028,13 @@ def debug():
     AlasGUI().run()
 
 
-def startup():
+def startup() -> None:
     State.init()
     lang.reload()
     task_handler.start()
 
 
-def clearup():
+def clearup() -> None:
     """必须在 uvicorn 重新加载 app 前执行。"""
     logger.info("Start clearup")
     ProcessManager.stop_all()
@@ -985,7 +1043,7 @@ def clearup():
     logger.info("Alas closed.")
 
 
-def app():
+def app() -> Starlette:
     parser = argparse.ArgumentParser(description="Alas WebUI 服务")
     parser.add_argument("-k", "--key", type=str, help="WebUI 密码，默认不启用。")
     parser.add_argument(
@@ -1006,7 +1064,7 @@ def app():
 
     atomic_failure_cleanup("./config")
 
-    def index():
+    def index() -> None:
         if key is not None and not login(key):
             logger.warning(f"{info.user_ip} login failed.")
             time.sleep(1.5)
@@ -1016,7 +1074,7 @@ def app():
         local.gui = gui
         gui.run()
 
-    def manage():
+    def manage() -> None:
         if key is not None and not login(key):
             logger.warning(f"{info.user_ip} login failed.")
             time.sleep(1.5)
@@ -1026,8 +1084,7 @@ def app():
 
     return asgi_app(
         applications=[index, manage],
-        static_dir=None,
-        debug=True,
+        options=AsgiAppOptions(debug=True),
         on_startup=[
             startup,
             lambda: ProcessManager.restart_processes(instances=instances),
