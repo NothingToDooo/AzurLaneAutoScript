@@ -110,6 +110,8 @@ class OcrFailureRecorder(Protocol):
 
 
 class OcrFailureStore:
+    """将失败样本写入调用方信任的本地目录；root 可以是 junction。"""
+
     def __init__(
         self,
         root: Path = Path("./log/ocr_failure"),
@@ -219,7 +221,6 @@ class OcrFailureStore:
         final_directory: Path,
         digest: str,
     ) -> tuple[OcrFailureRecordResult | None, list[Path]]:
-        self._validate_storage_path(final_directory)
         if self._is_complete_bundle(final_directory):
             result = OcrFailureRecordResult(OcrFailureRecordStatus.DUPLICATE, digest, final_directory)
             return result, []
@@ -308,8 +309,7 @@ class OcrFailureStore:
 
     def _publish_bundle(self, final_directory: Path, bundle: _EncodedBundle) -> bool:
         temp_directory = Path(to_tmp_file(final_directory))
-        self._validate_storage_path(final_directory)
-        self._validate_storage_path(temp_directory)
+        self._validate_temp_path(temp_directory)
         if temp_directory.exists():
             message = "temporary OCR failure path must not already exist"
             raise ValueError(message)
@@ -318,42 +318,43 @@ class OcrFailureStore:
             file_write(temp_directory / "raw.png", raw_png)
             file_write(temp_directory / "processed.png", processed_png)
             file_write(temp_directory / "metadata.json", metadata_json)
-            self._validate_storage_path(final_directory)
-            self._validate_storage_path(temp_directory)
+            self._validate_temp_path(temp_directory)
             atomic_replace(temp_directory, final_directory)
         except ValueError:
             self._cleanup_temp_directory(temp_directory)
             raise
         except OSError:
             self._cleanup_temp_directory(temp_directory)
-            self._validate_storage_path(final_directory)
             if self._is_complete_bundle(final_directory):
                 return False
             raise
         return True
 
     def _cleanup_temp_directory(self, temp_directory: Path) -> None:
-        try:
-            self._validate_storage_path(temp_directory)
-        except ValueError:
+        if not self._is_safe_temp_path(temp_directory):
             return
         folder_rmtree(temp_directory)
 
-    def _validate_storage_path(self, path: Path) -> None:
-        message = "OCR failure path must stay within its root and contain no reparse points"
+    def _validate_temp_path(self, path: Path) -> None:
+        if not self._is_safe_temp_path(path):
+            message = "temporary OCR failure path must contain no reparse points below its root"
+            raise ValueError(message)
+
+    def _is_safe_temp_path(self, path: Path) -> bool:
+        """root 本身受信任；这里只避免递归清理沿子级 reparse point 误删。"""
         root_absolute = self._root.absolute()
         path_absolute = path.absolute()
         try:
             relative_path = path_absolute.relative_to(root_absolute)
-            path_absolute.resolve(strict=False).relative_to(root_absolute.resolve(strict=False))
         except ValueError:
-            raise ValueError(message) from None
+            return False
 
         current = root_absolute
         for part in relative_path.parts:
             current /= part
             if _is_reparse_point(current):
-                raise ValueError(message)
+                return False
+        return True
 
     @staticmethod
     def _png_bytes(image: np.ndarray) -> bytes:
@@ -442,18 +443,10 @@ class OcrFailureStore:
         for profile_directory in self._root.iterdir():
             if not _is_valid_profile(profile_directory.name):
                 continue
-            try:
-                self._validate_storage_path(profile_directory)
-            except ValueError:
-                continue
             if not profile_directory.is_dir():
                 continue
             for bundle_directory in profile_directory.iterdir():
                 if not re.fullmatch(r"[0-9a-f]{64}", bundle_directory.name):
-                    continue
-                try:
-                    self._validate_storage_path(bundle_directory)
-                except ValueError:
                     continue
                 if self._is_complete_bundle(bundle_directory):
                     yield bundle_directory

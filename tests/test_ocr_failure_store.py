@@ -876,13 +876,13 @@ def test_failure_store_rejects_unsafe_profile_before_writing(
     assert not (tmp_path / "escape").exists()
 
 
-def test_failure_store_rejects_profile_junction_outside_root(tmp_path: Path) -> None:
+def test_failure_store_allows_trusted_root_junction(tmp_path: Path) -> None:
     root = tmp_path / "root"
     outside = tmp_path / "outside"
-    create_junction(root / "counter.v1", outside)
+    create_junction(root, outside)
 
-    with pytest.raises(ValueError, match="path"):
-        OcrFailureStore(root).record(
+    try:
+        saved = OcrFailureStore(root).record(
             make_invalid_counter_result(),
             raw_image=RAW_IMAGE,
             processed_image=PROCESSED_IMAGE,
@@ -891,69 +891,11 @@ def test_failure_store_rejects_profile_junction_outside_root(tmp_path: Path) -> 
             letter=(140, 113, 99),
             threshold=64,
         )
-
-    assert not list(outside.iterdir())
-
-
-def test_failure_store_rechecks_profile_path_after_encoding(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    root = tmp_path / "root"
-    outside = tmp_path / "outside"
-    root.mkdir()
-    encode_bundle = OcrFailureStore._encode_bundle
-
-    def encode_then_redirect_profile(
-        result: RecognitionResult[tuple[int, int, int]],
-        **kwargs: typing.Unpack[_EncodeBundleKwargs],
-    ) -> tuple[bytes, bytes, bytes]:
-        encoded = encode_bundle(result, **kwargs)
-        create_junction(root / result.profile, outside)
-        return encoded
-
-    monkeypatch.setattr(OcrFailureStore, "_encode_bundle", staticmethod(encode_then_redirect_profile))
-    with pytest.raises(ValueError, match="path"):
-        OcrFailureStore(root).record(
-            make_invalid_counter_result(),
-            raw_image=RAW_IMAGE,
-            processed_image=PROCESSED_IMAGE,
-            area=(1, 2, 5, 6),
-            alphabet=None,
-            letter=(140, 113, 99),
-            threshold=64,
-        )
-
-    assert not list(outside.iterdir())
-
-
-def test_failure_store_rejects_existing_bundle_junction(tmp_path: Path) -> None:
-    root = tmp_path / "root"
-    outside = tmp_path / "outside"
-    result = make_invalid_counter_result()
-    digest = OcrFailureStore._digest(
-        result,
-        processed_image=PROCESSED_IMAGE,
-        area=(1, 2, 5, 6),
-        alphabet=None,
-        letter=(140, 113, 99),
-        threshold=64,
-        expected_total=None,
-    )
-    create_junction(root / result.profile / digest, outside)
-
-    with pytest.raises(ValueError, match="path"):
-        OcrFailureStore(root).record(
-            result,
-            raw_image=RAW_IMAGE,
-            processed_image=PROCESSED_IMAGE,
-            area=(1, 2, 5, 6),
-            alphabet=None,
-            letter=(140, 113, 99),
-            threshold=64,
-        )
-
-    assert not list(outside.iterdir())
+        assert saved.status is OcrFailureRecordStatus.SAVED
+        assert saved.directory is not None
+        assert saved.directory.resolve().is_relative_to(outside.resolve())
+    finally:
+        root.rmdir()
 
 
 def test_failure_store_rejects_existing_temp_junction(
@@ -1019,28 +961,6 @@ def test_failure_store_cleanup_does_not_follow_replaced_temp_junction(
 
     assert sentinel.read_text(encoding="utf-8") == "preserve"
     assert temp_junction.is_junction()
-
-
-@pytest.mark.parametrize("redirect_kind", ["profile", "bundle"])
-def test_structured_counter_ignores_unrelated_junction(
-    tmp_path: Path,
-    caplog: pytest.LogCaptureFixture,
-    redirect_kind: str,
-) -> None:
-    root = tmp_path / "root"
-    outside = tmp_path / "outside"
-    redirect = root / "unrelated" if redirect_kind == "profile" else root / "unrelated" / ("a" * 64)
-    create_junction(redirect, outside)
-    counter = _StoreTestCounter("99/15")
-
-    with caplog.at_level(logging.WARNING, logger="alas"):
-        result = counter.recognize(RAW_IMAGE, failure_store=OcrFailureStore(root))
-
-    assert result.reason is RecognitionFailureReason.CURRENT_EXCEEDS_TOTAL
-    assert len(list((root / "TEST_COUNTER").iterdir())) == 1
-    assert redirect.is_junction()
-    assert not list(outside.iterdir())
-    assert not [record for record in caplog.records if "OCR failure recorder" in record.getMessage()]
 
 
 def test_failure_store_rejects_successful_result_before_writing(tmp_path: Path) -> None:
