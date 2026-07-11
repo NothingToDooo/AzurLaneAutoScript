@@ -1,7 +1,7 @@
 import re
 
 from campaign.campaign_war_archives.campaign_base import CampaignBase
-from module.campaign.run import CampaignRun
+from module.campaign.run import CampaignMode, CampaignRun
 from module.logger import logger
 from module.ocr.ocr import DigitCounter
 from module.war_archives.assets import OCR_DATA_KEY_CAMPAIGN, WAR_ARCHIVES_CAMPAIGN_CHECK
@@ -37,6 +37,6 @@ class CampaignWarArchives(CampaignRun, CampaignBase):
         """自律寻敌菜单的模糊背景会遮住 DATA_KEY_CAMPAIGN，因此必须关闭。"""
         return self._AUTO_SEARCH_CONTINUE_ALLOWED
 
-    def run(self, name: str, folder: str = "campaign_main", mode: str = "normal", total: int = 0) -> None:
+    def run(self, name: str, folder: str = "campaign_main", mode: CampaignMode = "normal", total: int = 0) -> None:
         self.config.override(USE_DATA_KEY=True)
         super().run(name, folder=folder, mode=mode, total=total)

@@ -443,7 +443,7 @@ class CampaignRun(CampaignEvent):
             # 困难模式还需检查剩余次数。
             if self.ui_page_appear(page_campaign) and MODE_SWITCH_1.get(main=self) == "normal":
                 ocr_hard_remain = importlib.import_module("module.hard.hard").OCR_HARD_REMAIN
-                remain = ocr_hard_remain.ocr(self.device.image)
+                remain = ocr_hard_remain.ocr_single(self.device.image)
                 if not remain:
                     logger.info("Remaining number of times of hard mode campaign_main is 0, delay task to next day")
                     self.config.task_delay(server_update=True)
