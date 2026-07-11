@@ -194,6 +194,9 @@ ignore = [
     "RUF003",
     # 点击、等待和重试抖动不是安全用途，保留非安全随机数。
     "S311",
+    #docstring需不需要靠实际判断
+    "D",
+    "INP001",
 ]
 [tool.ruff.lint.per-file-ignores]
 "dev_tools/**/*.py" = ["T201"]
