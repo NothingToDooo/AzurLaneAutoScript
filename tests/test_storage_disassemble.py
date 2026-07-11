@@ -1,12 +1,19 @@
 from dataclasses import dataclass
-from typing import ClassVar, TypeVar
+from typing import TYPE_CHECKING, ClassVar, TypeVar, override
 
+import numpy as np
 import pytest
 
 from module.combat.assets import GET_ITEMS_1
 from module.storage import assets as storage_assets
 from module.storage import storage as storage_module
 from module.storage.storage import StorageHandler
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
 
 _T = TypeVar("_T")
 
@@ -37,9 +44,8 @@ class _Timer:
 
 
 class _Device:
-    image = object()
-
     def __init__(self) -> None:
+        self.image = np.zeros((1, 1, 3), dtype=np.uint8)
         self.clicks: list[object] = []
         self.click_record: list[object] = []
         self.screenshot_count = 0
@@ -98,9 +104,10 @@ class _Storage(StorageHandler):
             return results.pop(0)
         return default
 
-    @staticmethod
-    def loop(*_args: object, **_kwargs: object) -> range:
-        return range(20)
+    @override
+    def loop(self, *, skip_first: bool = True, timeout: float | Timer | None = None) -> Iterator[ImageArray]:
+        del skip_first, timeout
+        return iter([self.device.image] * 20)
 
     def interval_clear(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_clear", button))

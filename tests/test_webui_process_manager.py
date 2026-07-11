@@ -47,7 +47,7 @@ class _Process:
     def __init__(self, *, exits_on_join: bool = False) -> None:
         self._alive = True
         self.exits_on_join = exits_on_join
-        self.join_calls: list[int | None] = []
+        self.join_calls: list[float | None] = []
         self.kill_calls = 0
 
     def is_alive(self) -> bool:
@@ -63,16 +63,16 @@ class _Process:
         self._alive = False
 
 
-class _LogThread:
+class _LogThread(threading.Thread):
     def __init__(self) -> None:
-        self.join_calls: list[int | None] = []
+        self.join_calls: list[float | None] = []
+        self._alive = False
 
     def join(self, timeout: float | None = None) -> None:
         self.join_calls.append(timeout)
 
-    @staticmethod
-    def is_alive() -> bool:
-        return False
+    def is_alive(self) -> bool:
+        return self._alive
 
 
 class _ProcessLike(Protocol):
@@ -217,10 +217,12 @@ def test_process_manager_source_has_no_direct_task_allowlist() -> None:
 def test_start_creates_stop_event_and_passes_it_to_child(monkeypatch: pytest.MonkeyPatch) -> None:
     created_event = _StopEvent()
     calls: list[tuple[object, ...]] = []
+    process_args: list[tuple[object, ...]] = []
 
     class _StartedProcess:
         def __init__(self, target: Callable[..., None], args: tuple[object, ...]) -> None:
             del target
+            process_args.append(args)
             calls.append(("process_args", args))
 
         @staticmethod
@@ -242,8 +244,8 @@ def test_start_creates_stop_event_and_passes_it_to_child(monkeypatch: pytest.Mon
 
     assert vars(manager)["_stop_event"] is created_event
     assert calls[0][0] == "process_args"
-    assert calls[0][1][0:2] == ("alas", "alas")
-    assert calls[0][1][3] is created_event
+    assert process_args[0][0:2] == ("alas", "alas")
+    assert process_args[0][3] is created_event
     assert ("start",) in calls
     assert ("log_thread", "alas") in calls
 

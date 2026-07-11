@@ -1,16 +1,20 @@
 from typing import TYPE_CHECKING, override
 
+import numpy as np
+
 import module.reward.reward as reward_module
 from module.combat import assets as combat_assets
 from module.reward import assets as reward_assets
 from module.reward.reward import MissionState, Reward
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
+    from collections.abc import Iterable, Iterator, Mapping
 
     import pytest
 
     from module.base.button import Button, MatchOffset
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
     from module.ui.page import Page
 
 
@@ -38,7 +42,7 @@ class _FakeReward(Reward):
         self,
         *,
         page_results: Iterable[bool] = (),
-        state_results: Iterable[MissionState | None] = (),
+        state_results: Iterable[Button | None] = (),
         appear_then_click_results: Mapping[Button, Iterable[bool]] | None = None,
         mission_popup_results: Iterable[bool] = (),
     ) -> None:
@@ -48,13 +52,15 @@ class _FakeReward(Reward):
             id(button): list(results) for button, results in (appear_then_click_results or {}).items()
         }
         self.mission_popup_results = list(mission_popup_results)
+        self.loop_image = np.zeros((1, 1, 3), dtype=np.uint8)
 
     def receive(self) -> MissionState:
         return self._reward_mission_claim_receive()
 
     @override
-    def loop(self, *_args: object, **_kwargs: object) -> range:
-        return range(6)
+    def loop(self, *, skip_first: bool = True, timeout: float | Timer | None = None) -> Iterator[ImageArray]:
+        del skip_first, timeout
+        return iter([self.loop_image] * 6)
 
     @override
     def ui_page_appear(
@@ -98,8 +104,8 @@ class _FakeReward(Reward):
     def handle_vote_popup() -> bool:
         return False
 
-    @staticmethod
-    def handle_story_skip() -> bool:
+    @override
+    def handle_story_skip(self) -> bool:
         return False
 
     @override

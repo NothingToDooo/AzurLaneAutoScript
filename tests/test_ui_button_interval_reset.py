@@ -20,8 +20,16 @@ class _FakeUI(UI):
         self.reset_buttons = []
         self.interval_timer = {}
 
-    def interval_reset(self, button: Button, *_args: object, **_kwargs: object) -> None:
-        self.reset_buttons.append(button)
+    def interval_reset(
+        self,
+        button: Button | list[Button] | tuple[Button, ...] | None,
+        interval: float = 3,
+    ) -> None:
+        del interval
+        if isinstance(button, (list, tuple)):
+            self.reset_buttons.extend(button)
+        elif button is not None:
+            self.reset_buttons.append(button)
 
 
 @pytest.mark.parametrize(

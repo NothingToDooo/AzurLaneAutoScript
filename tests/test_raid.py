@@ -119,8 +119,9 @@ class _RaidRun(RaidRun):
         del skip_first_screenshot
         self.calls.append(("raid_rpg_swipe",))
 
-    def disable_event_on_raid(self) -> None:
+    def disable_event_on_raid(self) -> bool:
         self.calls.append(("disable_event_on_raid",))
+        return True
 
     def get_remain(self, mode: RaidMode, *, skip_first_screenshot: bool = True) -> int:
         del skip_first_screenshot

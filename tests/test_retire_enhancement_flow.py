@@ -1,14 +1,15 @@
 from typing import TYPE_CHECKING
 
+from module.base.button import Button
 from module.retire import enhancement as enhancement_module
 from module.retire.enhancement import Enhancement, EnhanceShipType
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Callable, Iterable, Sequence
 
     import pytest
 
-    from module.base.button import Button, MatchOffset
+    from module.base.button import MatchOffset
     from module.ui.ui import CheckButton
 
 
@@ -54,14 +55,20 @@ class _Enhancement(Enhancement):
     def ui_back(
         self,
         check_button: CheckButton,
-        appear_button: Button | None = None,
+        appear_button: Button | Callable[[], bool] | None = None,
         offset: MatchOffset | None = (30, 30),
         retry_wait: float = 10,
         *,
         skip_first_screenshot: bool = False,
     ) -> None:
         _ = (appear_button, offset, retry_wait, skip_first_screenshot)
-        self.calls.append(("ui_back", check_button.name))
+        if isinstance(check_button, Button):
+            check_name = check_button.name
+        elif isinstance(check_button, (list, tuple)):
+            check_name = f"{len(check_button)} buttons"
+        else:
+            check_name = type(check_button).__name__
+        self.calls.append(("ui_back", check_name))
 
     def _enhance_quit(self) -> None:
         self.calls.append(("enhance_quit",))

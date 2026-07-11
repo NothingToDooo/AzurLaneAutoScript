@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
+from module.base.base import ModuleBase
 from module.ui.navbar import Navbar, NavbarTarget
 
 if TYPE_CHECKING:
@@ -19,7 +20,9 @@ class _FakeDevice:
         self.screenshot_count += 1
 
 
-class _FakeMain:
+class _FakeMain(ModuleBase):
+    device: _FakeDevice
+
     def __init__(self) -> None:
         self.device = _FakeDevice()
 
@@ -34,14 +37,14 @@ class _FakeNavbar(Navbar):
         self.name = "TEST_NAVBAR"
         self.info_results = list(info_results)
         self.obstruct_results = list(obstruct_results)
-        self.info_mains = []
-        self.obstruct_mains = []
+        self.info_mains: list[ModuleBase] = []
+        self.obstruct_mains: list[ModuleBase] = []
 
-    def get_info(self, main: _FakeMain) -> tuple[int | None, int | None, int | None]:
+    def get_info(self, main: ModuleBase) -> tuple[int | None, int | None, int | None]:
         self.info_mains.append(main)
         return self.info_results.pop(0)
 
-    def _shop_obstruct_handle(self, main: _FakeMain) -> bool:
+    def _shop_obstruct_handle(self, main: ModuleBase) -> bool:
         self.obstruct_mains.append(main)
         if self.obstruct_results:
             return self.obstruct_results.pop(0)

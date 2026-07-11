@@ -1,12 +1,20 @@
-from typing import ClassVar, TypeVar
+from typing import TYPE_CHECKING, ClassVar, TypeVar, override
 
+import numpy as np
 import pytest
 
+from module.base.button import Button
 from module.retire.assets import EQUIP_CONFIRM, EQUIP_CONFIRM_2
 from module.shop.assets import AMOUNT_MINUS, AMOUNT_PLUS
 from module.storage import assets as storage_assets
 from module.storage import storage as storage_module
 from module.storage.storage import StorageHandler
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
 
 _T = TypeVar("_T")
 
@@ -48,9 +56,8 @@ class _Digit:
 
 
 class _Device:
-    image = object()
-
     def __init__(self) -> None:
+        self.image = np.zeros((1, 1, 3), dtype=np.uint8)
         self.clicks: list[object] = []
         self.multi_clicks: list[tuple[object, int, tuple[float, float]]] = []
 
@@ -76,7 +83,7 @@ class _Storage(StorageHandler):
     def handle_box_amount(self, amount: int) -> int:
         return self._handle_use_box_amount(amount)
 
-    def use_one_box(self, button: object, amount: int) -> int:
+    def use_one_box(self, button: Button, amount: int) -> int:
         return self._storage_use_one_box(button, amount=amount)
 
     @staticmethod
@@ -85,9 +92,10 @@ class _Storage(StorageHandler):
             return results.pop(0)
         return default
 
-    @staticmethod
-    def loop(*_args: object, **_kwargs: object) -> range:
-        return range(20)
+    @override
+    def loop(self, *, skip_first: bool = True, timeout: float | Timer | None = None) -> Iterator[ImageArray]:
+        del skip_first, timeout
+        return iter([self.device.image] * 20)
 
     def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)
@@ -153,7 +161,7 @@ def test_handle_use_box_amount_increases_with_retry() -> None:
 
 def test_storage_use_one_box_tracks_amount_until_material_page_returns() -> None:
     storage = _Storage()
-    box = object()
+    box = Button(area=(0, 0, 1, 1), color=(), button=(0, 0, 1, 1), name="BOX")
     storage.storage_in_material_results = [True, False, False, False, True]
     storage.appear_then_click_results[button_key(storage_assets.BOX_USE)] = [True]
     storage.match_template_results[button_key(storage_assets.BOX_AMOUNT_CONFIRM)] = [True, False]
@@ -171,7 +179,7 @@ def test_storage_use_one_box_tracks_amount_until_material_page_returns() -> None
 
 def test_storage_use_one_box_keeps_waiting_after_first_confirm() -> None:
     storage = _Storage()
-    box = object()
+    box = Button(area=(0, 0, 1, 1), color=(), button=(0, 0, 1, 1), name="BOX")
     storage.storage_in_material_results = [False, True]
     storage.appear_then_click_results[button_key(EQUIP_CONFIRM)] = [True]
     storage.appear_results[button_key(EQUIP_CONFIRM_2)] = [False]

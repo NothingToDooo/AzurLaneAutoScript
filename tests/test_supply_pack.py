@@ -84,11 +84,27 @@ class _FakeSupplyPack(SupplyPack):
             return self.popup_results.pop(0)
         return False
 
-    def interval_clear(self, button: Button, *_args: object, **_kwargs: object) -> None:
-        self.interval_cleared.append(button)
+    def interval_clear(
+        self,
+        button: Button | list[Button] | tuple[Button, ...] | None,
+        interval: float = 3,
+    ) -> None:
+        del interval
+        if isinstance(button, (list, tuple)):
+            self.interval_cleared.extend(button)
+        elif button is not None:
+            self.interval_cleared.append(button)
 
-    def interval_reset(self, button: Button, *_args: object, **_kwargs: object) -> None:
-        self.interval_reset_buttons.append(button)
+    def interval_reset(
+        self,
+        button: Button | list[Button] | tuple[Button, ...] | None,
+        interval: float = 3,
+    ) -> None:
+        del interval
+        if isinstance(button, (list, tuple)):
+            self.interval_reset_buttons.extend(button)
+        elif button is not None:
+            self.interval_reset_buttons.append(button)
 
 
 def test_supply_pack_buy_executes_purchase(monkeypatch: pytest.MonkeyPatch) -> None:

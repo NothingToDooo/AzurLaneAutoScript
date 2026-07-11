@@ -1,10 +1,19 @@
-from typing import ClassVar, TypeVar
+from typing import TYPE_CHECKING, ClassVar, TypeVar, override
 
+import numpy as np
 import pytest
 
+from module.base.button import Button
 from module.private_quarters import assets as pq_assets
 from module.private_quarters import clerk as clerk_module
 from module.private_quarters.clerk import PQShopClerk
+from module.statistics.item import Item
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
 
 _T = TypeVar("_T")
 
@@ -35,14 +44,19 @@ class _Timer:
 
 class _Device:
     def __init__(self) -> None:
+        self.image = np.zeros((1, 1, 3), dtype=np.uint8)
         self.clicks: list[object] = []
 
     def click(self, button: object) -> None:
         self.clicks.append(button)
 
 
-class _Item:
-    name = "private-quarters-item"
+def _item() -> Item:
+    image = np.zeros((96, 96, 3), dtype=np.uint8)
+    button = Button(area=(0, 0, 96, 96), color=(), button=(0, 0, 96, 96), name="PQ_ITEM")
+    item = Item(image, button)
+    item.name = "private-quarters-item"
+    return item
 
 
 class _Shop(PQShopClerk):
@@ -55,10 +69,12 @@ class _Shop(PQShopClerk):
         self.appear_results: dict[str, list[bool]] = {}
         self.appear_then_click_results: dict[str, list[bool]] = {}
 
-    def loop(self, *_args: object, **_kwargs: object) -> range:
-        return range(self.loop_count)
+    @override
+    def loop(self, *, skip_first: bool = True, timeout: float | Timer | None = None) -> Iterator[ImageArray]:
+        del skip_first, timeout
+        return iter([self.device.image] * self.loop_count)
 
-    def enter_purchase_confirm(self, item: _Item) -> None:
+    def enter_purchase_confirm(self, item: Item) -> None:
         self._pq_shop_enter_purchase_confirm(item, skip_first_screenshot=True)
 
     def finish_purchase_confirm(self) -> None:
@@ -89,12 +105,13 @@ class _TrackingShop(PQShopClerk):
         self.calls: list[tuple[object, ...]] = []
 
     def buy_execute(self) -> None:
-        self.shop_buy_execute(_Item())
+        self.shop_buy_execute(_item())
 
     def _pq_shop_prepare_buy(self) -> None:
         self.calls.append(("_pq_shop_prepare_buy",))
 
-    def _pq_shop_enter_purchase_confirm(self, item: _Item, *, skip_first_screenshot: bool) -> None:
+    @override
+    def _pq_shop_enter_purchase_confirm(self, item: Item, *, skip_first_screenshot: bool) -> None:
         assert skip_first_screenshot is True
         self.calls.append(("_pq_shop_enter_purchase_confirm", item))
 
@@ -124,7 +141,7 @@ def test_pq_shop_buy_execute_runs_purchase_stages() -> None:
 
 def test_pq_shop_enter_purchase_confirm_clicks_item_and_amount_buttons() -> None:
     shop = _Shop()
-    item = _Item()
+    item = _item()
     shop.loop_count = 4
     shop.appear_results[button_key(pq_assets.PRIVATE_QUARTERS_SHOP_WEEKLY_ROSES_GET)] = [False, False, False, True]
     shop.appear_results[button_key(pq_assets.PRIVATE_QUARTERS_SHOP_WEEKLY_CAKES_GET)] = [False, False, False]

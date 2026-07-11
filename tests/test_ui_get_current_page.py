@@ -137,7 +137,7 @@ def test_ui_get_current_page_screenshots_without_cache(monkeypatch: pytest.Monke
 def test_ui_get_current_page_recovers_with_home_button(monkeypatch: pytest.MonkeyPatch) -> None:
     page = _FakePage()
     monkeypatch.setattr(Page, "iter_pages", lambda: [page])
-    ui = _FakeUI(visible_page=page, visible_after_checks=1, recover_buttons=[ui_assets.GOTO_MAIN])
+    ui = _FakeUI(visible_page=page, visible_after_checks=1, recover_buttons=(ui_assets.GOTO_MAIN,))
 
     assert ui.ui_get_current_page() is page
     assert ui.appear_then_click_calls == [ui_assets.GOTO_MAIN]
@@ -146,7 +146,7 @@ def test_ui_get_current_page_recovers_with_home_button(monkeypatch: pytest.Monke
 def test_ui_get_current_page_recovers_with_additional_handler(monkeypatch: pytest.MonkeyPatch) -> None:
     page = _FakePage()
     monkeypatch.setattr(Page, "iter_pages", lambda: [page])
-    ui = _FakeUI(visible_page=page, visible_after_checks=1, additional_results=[True])
+    ui = _FakeUI(visible_page=page, visible_after_checks=1, additional_results=(True,))
 
     assert ui.ui_get_current_page() is page
     assert ui.appear_then_click_calls == [

@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING, override
 
+import numpy as np
+
 from module.handler.assets import POPUP_CONFIRM
 from module.shop.assets import (
     SHOP_BUY_CONFIRM_MISTAKE,
@@ -11,14 +13,17 @@ from module.shop.ui import ShopUI
 from module.ui.assets import SHOP_BACK_ARROW
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
+    from collections.abc import Iterable, Iterator, Mapping
 
+    from module.base.base import _HasArea
     from module.base.button import Button, MatchOffset
-    from module.base.type_alias import Color
+    from module.base.timer import Timer
+    from module.base.type_alias import Area, Color, ImageArray
 
 
 class _FakeDevice:
     def __init__(self) -> None:
+        self.image = np.zeros((1, 1, 3), dtype=np.uint8)
         self.clicked = []
 
     def click(self, button: Button) -> None:
@@ -44,8 +49,9 @@ class _FakeShopUI(ShopUI):
         self.info_bar_handle_count = 0
 
     @override
-    def loop(self, *_args: object, **_kwargs: object) -> range:
-        return range(6)
+    def loop(self, *, skip_first: bool = True, timeout: float | Timer | None = None) -> Iterator[ImageArray]:
+        del skip_first, timeout
+        return iter([self.device.image] * 6)
 
     def _pop_button_result(self, button: Button) -> bool:
         results = self.appear_results.get(id(button), [])
@@ -56,21 +62,31 @@ class _FakeShopUI(ShopUI):
     def appear(self, button: Button, *_args: object, **_kwargs: object) -> bool:
         return self._pop_button_result(button)
 
+    @override
     def image_color_count(
         self,
-        button: Button,
+        button: ImageArray | Button | _HasArea | Area,
         color: Color,
         threshold: int = 221,
         count: int = 50,
     ) -> bool:
-        _ = (button, threshold, count)
+        del button, threshold, count
         results = self.color_results.get(color, [])
         if results:
             return results.pop(0)
         return False
 
-    def interval_clear(self, button: Button, *_args: object, **_kwargs: object) -> None:
-        self.interval_cleared.append(button)
+    @override
+    def interval_clear(
+        self,
+        button: Button | list[Button] | tuple[Button, ...] | None,
+        interval: float = 3,
+    ) -> None:
+        del interval
+        if isinstance(button, (list, tuple)):
+            self.interval_cleared.extend(button)
+        elif button is not None:
+            self.interval_cleared.append(button)
 
     def handle_popup_confirm(
         self,
