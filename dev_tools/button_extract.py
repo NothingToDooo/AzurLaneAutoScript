@@ -19,11 +19,6 @@ HEADER_EXP = [*HEADER_EXP.strip().split("\n"), ""]
 
 class ImageExtractor:
     def __init__(self, module, file):
-        """
-        Args:
-            module(str):
-            file(str): xxx.png or xxx.gif
-        """
         path = Path(file)
         self.module = module
         self.name = path.stem
@@ -163,11 +158,10 @@ def worker(module):
 
 
 class AssetExtractor:
-    """
-    抽取国区资源并生成 assets.py。
+    """从国区资源生成 `assets.py`。
 
-    资源文件名应使用大写。数字开头的文件会被忽略，`TEMPLATE_` 开头的文件会生成 Template，
-    其他文件会生成 Button。`XXX.AREA.png`、`XXX.COLOR.png`、`XXX.BUTTON.png` 会覆盖对应字段。
+    资源名必须大写；数字前缀会被忽略，`TEMPLATE_` 前缀生成 `Template`，其余生成 `Button`；
+    `.AREA`、`.COLOR`、`.BUTTON` 后缀分别覆盖对应字段。
     """
 
     def __init__(self):
