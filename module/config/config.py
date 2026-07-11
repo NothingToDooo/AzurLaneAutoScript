@@ -1,7 +1,7 @@
 import copy
 from dataclasses import replace
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pywebio
 
@@ -27,7 +27,14 @@ from module.map.map_grids import SelectedGrids
 from module.task_registry import TASK_CATALOG, get_task_by_config_name
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from types import TracebackType
+    from typing import Literal, Never, Self, Unpack
+
     from module.base.stop_event import StopEvent
+    from module.config.config_generated import ConfigOverrides, ConfigValue, RecordUpdates
+    from module.config.deep import DeepPath, DeepValue, MutableDeepData, MutableDeepValue
+    from module.config.utils import TimeInput
 
 MISSING_DELAY_ARGUMENT_MESSAGE = "Missing argument in delay_next_run, should set at least one"
 TASK_CALL_MISSING_TEMPLATE = "Task to call: `{task}` does not exist in user config"
@@ -43,18 +50,19 @@ class TaskEnd(Exception):
 
 
 class Function:
-    def __init__(self, data):
+    def __init__(self, data: DeepValue) -> None:
         self.enable = deep_get(data, keys="Scheduler.Enable", default=False)
         self.command = deep_get(data, keys="Scheduler.Command", default="Unknown")
-        self.next_run = deep_get(data, keys="Scheduler.NextRun", default=DEFAULT_TIME)
+        next_run = deep_get(data, keys="Scheduler.NextRun")
+        self.next_run: ConfigValue = DEFAULT_TIME if next_run is None else cast("ConfigValue", next_run)
 
-    def __str__(self):
+    def __str__(self) -> str:
         enable = "Enable" if self.enable else "Disable"
         return f"{self.command} ({enable}, {self.next_run!s})"
 
     __repr__ = __str__
 
-    def __eq__(self, other):
+    def __eq__[T](self, other: T) -> bool:
         if not isinstance(other, Function):
             return False
 
@@ -63,7 +71,7 @@ class Function:
     __hash__ = None
 
 
-def _function_from_entry(entry: ScheduleEntry, *, next_run: object | None = None) -> Function:
+def _function_from_entry(entry: ScheduleEntry, *, next_run: ConfigValue | None = None) -> Function:
     function = Function({})
     function.enable = entry.enable
     function.command = entry.command
@@ -79,7 +87,7 @@ def _schedule_priority() -> dict[str, int]:
     }
 
 
-def name_to_function(name):
+def name_to_function(name: str) -> Function:
     function = Function({})
     function.command = name
     function.enable = True
@@ -98,35 +106,35 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
     EXERCISE_FLEET_EQUIPMENT: list[int] | None
     EventDaily_LastStage: int | str
 
-    def __setattr__(self, key, value):
+    def __setattr__[T](self, key: str, value: T) -> None:
         bound = self.__dict__.get("bound")
         if bound is not None and key in bound:
             path = bound[key]
-            self.modified[path] = value
+            self.modified[path] = cast("ConfigValue", value)
             if self.auto_update:
                 self.update()
         else:
             super().__setattr__(key, value)
 
-    def __init__(self, config_name, task=None):
+    def __init__(self, config_name: str, task: str | None = None) -> None:
         logger.attr("Server", self.SERVER)
         self.config_name = config_name
         # 原始配置树。
-        self.data = {}
+        self.data: MutableDeepData = {}
         # 待持久化修改，键为配置路径，值为新值；save() 必须原地清空此对象。
-        self.modified = {}
+        self.modified: dict[str, ConfigValue] = {}
         # GeneratedConfig 属性名到原始配置路径的绑定。
-        self.bound = {}
+        self.bound: dict[str, str] = {}
         # 关卡和大世界等仅在当前运行会话生效的配置覆盖。
-        self._runtime_overlay: dict[str, object] = {}
+        self._runtime_overlay: dict[str, ConfigValue] = {}
         self._published_config_fields: set[str] = set()
         # 属性修改后是否立即更新并写回。
         self.auto_update = True
         # 跨配置重载持续生效的强制覆盖。
-        self.overridden = {}
+        self.overridden: dict[str, ConfigValue] = {}
         # pending_task 已到运行时间；waiting_task 尚未到运行时间。
-        self.pending_task = []
-        self.waiting_task = []
+        self.pending_task: list[Function] = []
+        self.waiting_task: list[Function] = []
         # 兼容保留类属性默认值，实际调度状态始终由当前配置实例持有。
         self.is_hoarding_task = type(self).is_hoarding_task
         # 当前任务名对应 AzurLaneAutoScript 的入口方法。
@@ -139,18 +147,18 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             self.task = name_to_function("template")
         self.init_task(task)
 
-    def init_task(self, task=None):
+    def init_task(self, task: str | None = None) -> None:
         if self.is_template_config:
             return
 
         self.load()
         task_name = "Alas" if task is None else task
-        task = name_to_function(task_name)
-        self.bind(task)
-        self.task = task
+        function = name_to_function(task_name)
+        self.bind(function)
+        self.task = function
         self.save()
 
-    def load(self):
+    def load(self) -> None:
         self.data = self.read_file(self.config_name)
         self.config_override()
 
@@ -158,18 +166,22 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             deep_set(self.data, keys=path, value=value)
 
     @staticmethod
-    def _task_name(func):
+    def _task_name(func: Function | str) -> str:
         if isinstance(func, Function):
             return func.command
         return func
 
     @staticmethod
-    def _prepend_missing(items, item) -> None:
+    def _prepend_missing(items: list[str], item: str) -> None:
         if item not in items:
             items.insert(0, item)
 
     @classmethod
-    def task_bind_chain(cls, func, func_list=None) -> list[str]:
+    def task_bind_chain(
+        cls,
+        func: Function | str,
+        func_list: Iterable[str] | None = None,
+    ) -> list[str]:
         task = cls._task_name(func)
         tasks = [] if func_list is None else list(func_list)
 
@@ -182,11 +194,11 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         cls._prepend_missing(tasks, "General")
         return tasks
 
-    def _runtime_overlay_values(self) -> dict[str, object]:
+    def _runtime_overlay_values(self) -> dict[str, ConfigValue]:
         overlay = self.__dict__.get("_runtime_overlay")
         if isinstance(overlay, dict):
-            return overlay
-        overlay = {}
+            return cast("dict[str, ConfigValue]", overlay)
+        overlay: dict[str, ConfigValue] = {}
         self.__dict__["_runtime_overlay"] = overlay
         return overlay
 
@@ -211,7 +223,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         instance_state["resolved"] = snapshot
         instance_state["_published_config_fields"] = set(published)
 
-    def bind(self, func, func_list=None):
+    def bind(self, func: Function | str, func_list: Iterable[str] | None = None) -> None:
         """按 General、Alas、任务通用作用域、当前任务、func_list 额外作用域依次绑定。"""
         task_name = self._task_name(func)
         bind_chain = self.task_bind_chain(func, func_list=func_list)
@@ -225,16 +237,16 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         self._publish_resolved(snapshot)
 
     @property
-    def hoarding(self):
+    def hoarding(self) -> timedelta:
         minutes = int(deep_get(self.data, keys="Alas.Optimization.TaskHoardingDuration", default=0))
         return timedelta(minutes=max(minutes, 0))
 
     @property
-    def close_game(self):
+    def close_game(self) -> bool:
         return deep_get(self.data, keys="Alas.Optimization.CloseGameDuringWait", default=False)
 
     @property
-    def is_actual_task(self):
+    def is_actual_task(self) -> bool:
         return self.task.command.lower() not in ["alas", "template"]
 
     def get_next_task(self, *, now: datetime | None = None) -> ScheduleDecision:
@@ -294,10 +306,10 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         next_run = decision.wake_at if decision.state == "waiting" else decision.entry.next_run
         return _function_from_entry(decision.entry, next_run=next_run)
 
-    def get_next(self):
+    def get_next(self) -> Function:
         return self.function_from_decision(self.get_next_decision())
 
-    def save(self):
+    def save(self) -> bool:
         if not self.modified:
             return False
 
@@ -310,16 +322,16 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         self.write_file(self.config_name, data=self.data)
         return True
 
-    def update(self):
+    def update(self) -> None:
         self.load()
         self.bind(self.task)
         self.save()
 
-    def override(self, **kwargs):
+    def override(self, **kwargs: Unpack[ConfigOverrides]) -> None:
         now = datetime.now().replace(microsecond=0)
-        limited = set()
+        limited: set[str] = set()
 
-        def limit_next_run(tasks, limit):
+        def limit_next_run(tasks: Iterable[str], limit: datetime) -> None:
             for task in tasks:
                 if task in limited:
                     continue
@@ -351,7 +363,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
 
         # 强制覆盖在配置重载后仍然生效，且没有自动恢复入口。
         for arg, value in kwargs.items():
-            self.overridden[arg] = value
+            self.overridden[arg] = cast("ConfigValue", value)
             super().__setattr__(arg, value)
         previous = self.__dict__.get("resolved")
         if kwargs and isinstance(previous, ResolvedTaskConfig):
@@ -365,7 +377,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
 
     config_override = override
 
-    def set_record(self, **kwargs):
+    def set_record(self, **kwargs: Unpack[RecordUpdates]) -> None:
         """设置 `*_Value` 时同步把对应 `*_Record` 更新为当前时间。"""
         with self.multi_set():
             for arg, value in kwargs.items():
@@ -373,31 +385,43 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
                 setattr(self, arg, value)
                 setattr(self, record, datetime.now().replace(microsecond=0))
 
-    def multi_set(self):
+    def multi_set(self) -> MultiSetWrapper:
         """返回批量设置上下文，退出时只更新并保存一次。"""
         return MultiSetWrapper(main=self)
 
-    def cross_get(self, keys, default=None):
+    def cross_get[T: DeepValue](
+        self,
+        keys: DeepPath,
+        default: T | None = None,
+    ) -> DeepValue | T | None:
         """按点分隔字符串或键序列指定的深层路径读取其他任务配置。"""
         return deep_get(self.data, keys=keys, default=default)
 
-    def cross_set(self, keys, value):
+    def cross_set(self, keys: str, value: ConfigValue) -> None:
         """按点分隔字符串或键序列指定的深层路径修改其他任务配置，并按 auto_update 决定是否立即写回。"""
         self.modified[keys] = value
         if self.auto_update:
             self.update()
 
-    def task_delay(self, success=None, server_update=None, target=None, minute=None, task=None):
+    def task_delay(
+        self,
+        *,
+        success: bool | None = None,
+        server_update: Literal[True] | str | list[str] | None = None,
+        target: datetime | str | list[datetime | str] | None = None,
+        minute: TimeInput | None = None,
+        task: str | None = None,
+    ) -> None:
         """设置当前或指定任务的 Scheduler.NextRun；多个候选取最近时间。
 
         success 选择成功或失败间隔；server_update=True 使用配置触发点，也可直接传触发点；
         target 接受时间或列表，minute 接受分钟数或范围。至少应提供一个候选。
         """
 
-        def ensure_delta(delay):
+        def ensure_delta(delay: TimeInput) -> timedelta:
             return timedelta(seconds=int(ensure_time(delay, precision=3) * 60))
 
-        run = []
+        run: list[datetime] = []
         if success is not None:
             interval = self.Scheduler_SuccessInterval if success else self.Scheduler_FailureInterval
             run.append(datetime.now() + ensure_delta(interval))
@@ -413,25 +437,28 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             run.append(datetime.now() + ensure_delta(minute))
 
         if run:
-            run = min(run).replace(microsecond=0)
+            next_run = min(run).replace(microsecond=0)
             kv = dict_to_kv(
-                {
-                    "success": success,
-                    "server_update": server_update,
-                    "target": target,
-                    "minute": minute,
-                },
+                cast(
+                    "dict[str, MutableDeepValue]",
+                    {
+                        "success": success,
+                        "server_update": server_update,
+                        "target": target,
+                        "minute": minute,
+                    },
+                ),
                 allow_none=False,
             )
             if task is None:
                 task = self.task.command
-            logger.info(f"Delay task `{task}` to {run} ({kv})")
-            self.modified[f"{task}.Scheduler.NextRun"] = run
+            logger.info(f"Delay task `{task}` to {next_run} ({kv})")
+            self.modified[f"{task}.Scheduler.NextRun"] = next_run
             self.update()
         else:
             raise ScriptError(MISSING_DELAY_ARGUMENT_MESSAGE)
 
-    def _delay_opsi_tasks(self, task_list, minutes, kv) -> None:
+    def _delay_opsi_tasks(self, task_list: Iterable[str], minutes: int, kv: str) -> None:
         next_run = datetime.now().replace(microsecond=0) + timedelta(minutes=minutes)
         for task in task_list:
             keys = f"{task}.Scheduler.NextRun"
@@ -440,13 +467,13 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
                 logger.info(f"Delay task `{task}` to {next_run} ({kv})")
                 self.modified[keys] = next_run
 
-    def _is_opsi_submarine_call(self, task):
+    def _is_opsi_submarine_call(self, task: str) -> bool:
         return (
             deep_get(self.data, keys=f"{task}.OpsiFleet.Submarine", default=False)
             or "submarine" in deep_get(self.data, keys=f"{task}.OpsiFleetFilter.Filter", default="").lower()
         )
 
-    def _is_opsi_force_run(self, task):
+    def _is_opsi_force_run(self, task: str) -> bool:
         return (
             deep_get(self.data, keys=f"{task}.OpsiExplore.ForceRun", default=False)
             or deep_get(self.data, keys=f"{task}.OpsiObscure.ForceRun", default=False)
@@ -454,14 +481,14 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             or deep_get(self.data, keys=f"{task}.OpsiStronghold.ForceRun", default=False)
         )
 
-    def _is_opsi_special_radar(self, task):
+    def _is_opsi_special_radar(self, task: str) -> bool:
         return deep_get(self.data, keys=f"{task}.OpsiExplore.SpecialRadar", default=False)
 
-    def _opsi_recon_scan_tasks(self):
+    def _opsi_recon_scan_tasks(self) -> SelectedGrids:
         tasks = SelectedGrids(["OpsiExplore", "OpsiObscure", "OpsiStronghold"])
         return tasks.delete(tasks.filter(self._is_opsi_force_run)).delete(tasks.filter(self._is_opsi_special_radar))
 
-    def _opsi_submarine_call_tasks(self):
+    def _opsi_submarine_call_tasks(self) -> SelectedGrids:
         tasks = SelectedGrids(
             [
                 "OpsiExplore",
@@ -477,7 +504,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         return tasks.filter(self._is_opsi_submarine_call).delete(tasks.filter(self._is_opsi_force_run))
 
     @staticmethod
-    def _opsi_ap_limit_tasks():
+    def _opsi_ap_limit_tasks() -> SelectedGrids:
         return SelectedGrids(
             [
                 "OpsiExplore",
@@ -492,7 +519,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         )
 
     @staticmethod
-    def _opsi_cl1_preserve_tasks():
+    def _opsi_cl1_preserve_tasks() -> SelectedGrids:
         return SelectedGrids(
             [
                 "OpsiObscure",
@@ -502,7 +529,14 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             ]
         )
 
-    def opsi_task_delay(self, recon_scan=False, submarine_call=False, ap_limit=False, cl1_preserve=False):
+    def opsi_task_delay(
+        self,
+        *,
+        recon_scan: bool = False,
+        submarine_call: bool = False,
+        ap_limit: bool = False,
+        cl1_preserve: bool = False,
+    ) -> None:
         """批量延迟大世界任务：侦察 27 分钟、潜艇 60 分钟、行动力或 CL1 保留 360 分钟。
 
         距离月重置不足一天时，行动力限制改为 150 分钟。
@@ -533,7 +567,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
 
         self.update()
 
-    def task_call(self, task, force_call=True):
+    def task_call(self, task: str, *, force_call: bool = True) -> bool:
         """把目标任务设为立即到期；force_call=False 时尊重用户的禁用状态。
 
         返回是否成功入队；实际执行仍可能被调度优先级推迟。
@@ -553,13 +587,13 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         return False
 
     @staticmethod
-    def task_stop(message=""):
+    def task_stop(message: str = "") -> Never:
         """抛出 TaskEnd 终止当前任务。"""
         if message:
             raise TaskEnd(message)
         raise TaskEnd
 
-    def task_switched(self):
+    def task_switched(self) -> bool:
         """停止信号已设置或重载配置后下一任务变化时返回 True。"""
         if self.stop_event is not None and self.stop_event.is_set():
             return True
@@ -572,16 +606,16 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         logger.info(f"Switch task `{prev}` to `{new}`")
         return True
 
-    def check_task_switch(self, message=""):
+    def check_task_switch(self, message: str = "") -> None:
         """任务已切换时抛出 TaskEnd。"""
         if self.task_switched():
             self.task_stop(message=message)
 
-    def is_task_enabled(self, task):
+    def is_task_enabled(self, task: str) -> bool:
         return bool(self.cross_get(keys=[task, "Scheduler", "Enable"], default=False))
 
     @property
-    def campaign_name(self):
+    def campaign_name(self) -> str:
         """返回掉落记录子目录名；数字开头时加 `campaign_`，困难模式再加 `_hard`。"""
         name = self.Campaign_Name.lower().replace("-", "_")
         if name[0].isdigit():
@@ -590,7 +624,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             name += "_hard"
         return name
 
-    def merge(self, other):
+    def merge[T](self, other: T) -> Self:
         """合并关卡或任务提供的运行期覆盖，并返回当前配置门面。
 
         覆盖不属于持久解析结果，不能触发配置写回。
@@ -604,7 +638,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
             if hasattr(other, attr):
                 value = getattr(other, attr)
                 if value is not None:
-                    runtime_overlay[attr] = copy.deepcopy(value)
+                    runtime_overlay[attr] = cast("ConfigValue", copy.deepcopy(value))
 
         snapshot = config.__dict__.get("resolved")
         if isinstance(snapshot, ResolvedTaskConfig):
@@ -618,29 +652,29 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         return config
 
     @property
-    def fleet_1(self):
+    def fleet_1(self) -> int:
         return self.Fleet_Fleet1
 
     @property
-    def fleet_2(self):
+    def fleet_2(self) -> int:
         return self.Fleet_Fleet2
 
     @fleet_2.setter
-    def fleet_2(self, value):
+    def fleet_2(self, value: int) -> None:
         self.override(Fleet_Fleet2=value)
 
     @property
-    def submarine(self):
+    def submarine(self) -> int:
         return self.Submarine_Fleet
 
     @submarine.setter
-    def submarine(self, value):
+    def submarine(self, value: int) -> None:
         self.override(Submarine_Fleet=value)
 
     _fleet_boss = 0
 
     @property
-    def fleet_boss(self):
+    def fleet_boss(self) -> int:
         if self._fleet_boss:
             return self._fleet_boss
         if self.Fleet_Fleet2 and self.Fleet_FleetOrder in [
@@ -651,10 +685,10 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         return 1
 
     @fleet_boss.setter
-    def fleet_boss(self, value):
+    def fleet_boss(self, value: int) -> None:
         self._fleet_boss = value
 
-    def temporary(self, **kwargs):
+    def temporary(self, **kwargs: Unpack[ConfigOverrides]) -> ConfigBackup:
         """临时覆盖属性并返回可手动 recover 或作为上下文使用的 ConfigBackup。"""
         backup = ConfigBackup(config=self)
         backup.cover(**kwargs)
@@ -666,41 +700,51 @@ vars(pywebio.pin)["Output"] = OutputConfig
 
 
 class ConfigBackup:
-    def __init__(self, config):
+    def __init__(self, config: AzurLaneConfig) -> None:
         self.config = config
-        self.backup = {}
-        self.kwargs = {}
+        self.backup: dict[str, ConfigValue] = {}
+        self.kwargs: dict[str, ConfigValue] = {}
 
-    def cover(self, **kwargs):
-        self.kwargs = kwargs
+    def cover(self, **kwargs: Unpack[ConfigOverrides]) -> None:
+        self.kwargs = cast("dict[str, ConfigValue]", kwargs)
         for key, value in kwargs.items():
-            self.backup[key] = getattr(self.config, key)
+            self.backup[key] = cast("ConfigValue", getattr(self.config, key))
             setattr(self.config, key, value)
 
-    def recover(self):
+    def recover(self) -> None:
         for key, value in self.backup.items():
             setattr(self.config, key, value)
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         self.recover()
 
 
 class MultiSetWrapper:
-    def __init__(self, main):
+    def __init__(self, main: AzurLaneConfig) -> None:
         self.main = main
         self.in_wrapper = False
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         if self.main.auto_update:
             self.main.auto_update = False
         else:
             self.in_wrapper = True
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         if not self.in_wrapper:
             self.main.update()
             self.main.auto_update = True

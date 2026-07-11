@@ -5,6 +5,8 @@ from pywebio.io_ctrl import Output
 from module.config.server import CN_SERVER
 from module.task_registry import SCHEDULER_PRIORITY_FILTER
 
+type FindPeaksParameter = int | float | tuple[int | float, int | float]
+
 
 class ManualConfig:
     SERVER = CN_SERVER
@@ -186,13 +188,13 @@ class ManualConfig:
     """
     # Parameters for scipy.signal.find_peaks
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.find_peaks.html
-    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
+    INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, FindPeaksParameter]] = {
         "height": (150, 255 - 33),
         "width": (0.9, 10),
         "prominence": 10,
         "distance": 35,
     }
-    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
+    EDGE_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, FindPeaksParameter]] = {
         "height": (255 - 33, 255),
         "prominence": 10,
         "distance": 50,
@@ -264,13 +266,13 @@ class ManualConfig:
     OS_GLOBE_DETECTING_AREA = (0, 0, 1280, 720)
     OS_GLOBE_IMAGE_PAD = 700
     OS_GLOBE_IMAGE_RESIZE = 0.5
-    OS_GLOBE_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
+    OS_GLOBE_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, FindPeaksParameter]] = {
         "height": 100,
         "prominence": 20,
         "distance": 35,
         "wlen": 500,
     }
-    OS_LOCAL_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
+    OS_LOCAL_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, FindPeaksParameter]] = {
         "height": 50,
         "prominence": 20,
         "distance": 35,

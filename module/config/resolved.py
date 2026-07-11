@@ -1,14 +1,17 @@
 import copy
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from module.config.utils import path_to_arg
+
+if TYPE_CHECKING:
+    from module.config.deep import DeepValue, MutableDeepValue
 
 
 @dataclass(frozen=True, slots=True)
 class ResolvedField:
-    value: object
+    value: MutableDeepValue
     source_path: str | None
     is_override: bool = False
 
@@ -40,23 +43,23 @@ class ResolvedTaskConfig:
                 return field
         raise AttributeError(name)
 
-    def __getattr__(self, name: str) -> object:
+    def __getattr__(self, name: str) -> MutableDeepValue:
         return copy.deepcopy(self._get_field(name).value)
 
 
-def _require_mapping(value: object, *, path: str) -> Mapping[object, object]:
+def _require_mapping(value: DeepValue, *, path: str) -> Mapping[str, DeepValue]:
     if not isinstance(value, Mapping):
         message = f"config node must be a mapping: {path}"
         raise TypeError(message)
-    return cast("Mapping[object, object]", value)
+    return cast("Mapping[str, DeepValue]", value)
 
 
 def resolve_task_config(
     *,
     task_name: str,
     bind_chain: Sequence[str],
-    data: Mapping[str, object],
-    overrides: Mapping[str, object],
+    data: Mapping[str, DeepValue],
+    overrides: Mapping[str, MutableDeepValue],
 ) -> ResolvedTaskConfig:
     """按显式绑定链解析一份可原子发布的任务配置快照。"""
     chain = tuple(bind_chain)
@@ -74,7 +77,7 @@ def resolve_task_config(
                 if field_name in fields:
                     continue
                 fields[field_name] = ResolvedField(
-                    value=copy.deepcopy(value),
+                    value=cast("MutableDeepValue", copy.deepcopy(value)),
                     source_path=f"{scope_name}.{relative_path}",
                 )
 
@@ -84,7 +87,7 @@ def resolve_task_config(
             raise TypeError(message)
         existing = fields.get(field_name)
         fields[field_name] = ResolvedField(
-            value=copy.deepcopy(value),
+            value=cast("MutableDeepValue", copy.deepcopy(value)),
             source_path=None if existing is None else existing.source_path,
             is_override=True,
         )
