@@ -1,11 +1,16 @@
 import ctypes
+from typing import TYPE_CHECKING
 
+import numpy as np
 import pytest
 
 from module.device import nemu_ipc_service as nemu_ipc_module
 from module.device.method.pool import JobTimeout
-from module.device.nemu_ipc_service import NemuIpcError, NemuIpcIncompatible
+from module.device.nemu_ipc_service import NemuIpcError, NemuIpcImpl, NemuIpcIncompatible
 from module.exception import RequestHumanTakeover
+
+if TYPE_CHECKING:
+    from module.base.type_alias import ImageArray
 
 
 class _Logger:
@@ -84,20 +89,22 @@ def test_nemu_ipc_retry_stops_on_incompatible_version(monkeypatch) -> None:
 
 def test_nemu_ipc_retry_extends_screenshot_timeout(monkeypatch) -> None:
     logger = _patch_retry_runtime(monkeypatch)
-    device = _NemuIpc()
+    device = object.__new__(NemuIpcImpl)
+    timeouts: list[float] = []
+    run_count = 0
 
-    @nemu_ipc_module.retry
-    def screenshot(target, timeout=0.5):
-        target.calls.append("run")
-        target.timeouts.append(timeout)
-        target.run_count += 1
-        if target.run_count <= 2:
+    def screenshot_once(_device: NemuIpcImpl, timeout: float) -> ImageArray:
+        nonlocal run_count
+        timeouts.append(timeout)
+        run_count += 1
+        if run_count <= 2:
             raise JobTimeout
-        return timeout
+        return np.full((1, 1, 4), round(timeout * 10), dtype=np.uint8)
 
-    assert screenshot(device) == 1
-    assert device.calls == ["run", "run", "run"]
-    assert device.timeouts == [0.5, 0.5, 1]
+    monkeypatch.setattr(NemuIpcImpl, "_screenshot_once", screenshot_once)
+
+    assert device.screenshot()[0, 0, 0] == 10
+    assert timeouts == [0.5, 0.5, 1]
     assert logger.warnings == [
         "Func screenshot() call timeout, retrying: 0",
         "Func screenshot() call timeout, retrying: 1",

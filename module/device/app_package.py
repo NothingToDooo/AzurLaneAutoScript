@@ -7,8 +7,10 @@ from module.logger import logger
 
 
 class AppPackage(AdbSession):
+    package: str
+
     @retry
-    def list_package(self, show_log=True):
+    def list_package(self, *, show_log: bool = True) -> list[str]:
         """优先用较快的 dumpsys，无结果时回退到 pm。"""
         if show_log:
             logger.info("Get package list")
@@ -22,11 +24,11 @@ class AppPackage(AdbSession):
         output = self.adb_shell(["pm", "list", "packages"])
         return re.findall(r"package:([^\s]+)", output)
 
-    def list_known_packages(self, show_log=True):
+    def list_known_packages(self, *, show_log: bool = True) -> list[str]:
         packages = self.list_package(show_log=show_log)
         return [CN_PACKAGE] if CN_PACKAGE in packages else []
 
-    def ensure_package_installed(self, show_log=True) -> None:
+    def ensure_package_installed(self, *, show_log: bool = True) -> None:
         if self.list_known_packages(show_log=show_log):
             return
 
@@ -38,7 +40,7 @@ class AppPackage(AdbSession):
         self.ensure_package_installed()
         logger.attr("PackageName", self.package)
 
-    def detect_package(self):
+    def detect_package(self) -> None:
         logger.hr("Check package")
         self.confirm_fixed_package()
         logger.info(f'找到固定国服客户端包名 "{self.package}"')

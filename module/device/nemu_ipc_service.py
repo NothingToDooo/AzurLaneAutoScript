@@ -4,6 +4,7 @@ import sys
 import time
 from functools import wraps
 from pathlib import Path
+from typing import TYPE_CHECKING, ClassVar, Protocol
 
 import cv2
 import numpy as np
@@ -13,6 +14,22 @@ from module.device.method.pool import WORKER_POOL, JobTimeout
 from module.device.method.utils import RETRY_TRIES, retry_sleep
 from module.exception import RequestHumanTakeover
 from module.logger import logger
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from types import TracebackType
+    from typing import Self
+
+    from module.base.type_alias import ImageArray
+    from module.device.contracts import CaptureRuntime
+    from module.device.platform.emulator_base import EmulatorInstanceBase
+
+type PixelBuffer = ctypes.Array[ctypes.c_ubyte]
+type Recovery = Callable[[], None]
+
+
+class _NemuRetryTarget(Protocol):
+    def reconnect(self) -> None: ...
 
 
 class NemuIpcIncompatible(Exception):
@@ -36,21 +53,21 @@ class CaptureStd:
     见 https://stackoverflow.com/a/17954769。
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.stdout = b""
         self.stderr = b""
 
-    def _redirect_stdout(self, to):
+    def _redirect_stdout(self, to: int) -> None:
         sys.stdout.close()
         os.dup2(to, self.fdout)
         sys.stdout = os.fdopen(self.fdout, "w")
 
-    def _redirect_stderr(self, to):
+    def _redirect_stderr(self, to: int) -> None:
         sys.stderr.close()
         os.dup2(to, self.fderr)
         sys.stderr = os.fdopen(self.fderr, "w")
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         self.fdout = sys.stdout.fileno()
         self.fderr = sys.stderr.fileno()
         self.reader_out, self.writer_out = os.pipe()
@@ -64,7 +81,12 @@ class CaptureStd:
         self._redirect_stderr(to=file_err.fileno())
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         self._redirect_stdout(to=self.old_stdout)
         self._redirect_stderr(to=self.old_stderr)
         os.close(self.old_stdout)
@@ -76,7 +98,7 @@ class CaptureStd:
         os.close(self.reader_err)
 
     @staticmethod
-    def recvall(reader, length=1024) -> bytes:
+    def recvall(reader: int, length: int = 1024) -> bytes:
         fragments = []
         while 1:
             chunk = os.read(reader, length)
@@ -88,14 +110,14 @@ class CaptureStd:
 
 
 class CaptureNemuIpc(CaptureStd):
-    instance = None
+    instance: ClassVar[CaptureNemuIpc | None] = None
 
-    def is_capturing(self):
+    def is_capturing(self) -> bool:
         """只让最外层包装器重定向，嵌套实例不做任何操作。"""
         cls = self.__class__
         return isinstance(cls.instance, cls) and cls.instance != self
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         if self.is_capturing():
             return self
 
@@ -103,7 +125,12 @@ class CaptureNemuIpc(CaptureStd):
         CaptureNemuIpc.instance = self
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         if self.is_capturing():
             return
 
@@ -113,12 +140,12 @@ class CaptureNemuIpc(CaptureStd):
         self.check_stdout()
         self.check_stderr()
 
-    def check_stdout(self):
+    def check_stdout(self) -> None:
         if not self.stdout:
             return
         logger.info(f"NemuIpc stdout: {self.stdout}")
 
-    def check_stderr(self):
+    def check_stderr(self) -> None:
         if not self.stderr:
             return
         logger.error(f"NemuIpc stderr: {self.stderr}")
@@ -134,19 +161,16 @@ class CaptureNemuIpc(CaptureStd):
             raise NemuIpcError(NEMU_IPC_INSTANCE_DEAD_MESSAGE)
 
 
-def _noop_recovery():
+def _noop_recovery() -> None:
     pass
 
 
-def _apply_retry_timeout(func_name, trial, kwargs):
-    if func_name != "screenshot":
-        return
-    timeout = retry_sleep(trial)
-    if timeout > 0:
-        kwargs["timeout"] = timeout
-
-
-def _nemu_ipc_error_recovery(self, error, func_name, trial):
+def _nemu_ipc_error_recovery(
+    self: _NemuRetryTarget,
+    error: NemuIpcIncompatible | JobTimeout | NemuIpcError | OSError | ValueError | ctypes.ArgumentError,
+    func_name: str,
+    trial: int,
+) -> Recovery | None:
     if isinstance(error, NemuIpcIncompatible):
         logger.error(error)
         return None
@@ -162,33 +186,40 @@ def _nemu_ipc_error_recovery(self, error, func_name, trial):
     return None
 
 
-def retry(func):
-    @wraps(func)
-    def retry_wrapper(self, *args, **kwargs):
-        recovery = None
-        func_name = func.__name__
-        for trial in range(RETRY_TRIES):
-            _apply_retry_timeout(func_name, trial, kwargs)
-            try:
-                if callable(recovery):
-                    time.sleep(retry_sleep(trial))
-                    recovery()
-                return func(self, *args, **kwargs)
-            except RequestHumanTakeover:
+def _run_with_retry[TargetT: _NemuRetryTarget, ResultT](
+    target: TargetT, func_name: str, invoke: Callable[[int], ResultT]
+) -> ResultT:
+    recovery: Recovery | None = None
+    for trial in range(RETRY_TRIES):
+        try:
+            if recovery is not None:
+                time.sleep(retry_sleep(trial))
+                recovery()
+            return invoke(trial)
+        except RequestHumanTakeover:
+            break
+        except (NemuIpcIncompatible, JobTimeout, NemuIpcError, OSError, ValueError, ctypes.ArgumentError) as error:
+            recovery = _nemu_ipc_error_recovery(target, error, func_name, trial)
+            if recovery is None:
                 break
-            except (NemuIpcIncompatible, JobTimeout, NemuIpcError, OSError, ValueError, ctypes.ArgumentError) as e:
-                recovery = _nemu_ipc_error_recovery(self, e, func_name, trial)
-                if recovery is None:
-                    break
 
-        logger.critical(f"Retry {func.__name__}() failed")
-        raise RequestHumanTakeover
+    logger.critical(f"Retry {func_name}() failed")
+    raise RequestHumanTakeover
+
+
+def retry[TargetT: _NemuRetryTarget, **P, ResultT](
+    func: Callable[[TargetT, *P.args], ResultT],
+) -> Callable[[TargetT, *P.args], ResultT]:
+    @wraps(func)
+    def retry_wrapper(self: TargetT, *args: P.args, **kwargs: P.kwargs) -> ResultT:
+        func_name = getattr(func, "__name__", type(func).__name__)
+        return _run_with_retry(self, func_name, lambda _trial: func(self, *args, **kwargs))
 
     return retry_wrapper
 
 
 class NemuIpcImpl:
-    def __init__(self, nemu_folder: str, instance_id: int, display_id: int = 0):
+    def __init__(self, nemu_folder: str, instance_id: int, display_id: int = 0) -> None:
         """nemu_folder 是 MuMu12 安装目录，instance_id 从 0 开始。
 
         关闭后台保活时 display_id 始终为 0。
@@ -232,7 +263,7 @@ class NemuIpcImpl:
         self.width = 0
         self.height = 0
 
-    def connect(self, on_thread=True):
+    def connect(self, *, on_thread: bool = True) -> None:
         if self.connect_id > 0:
             return
 
@@ -245,11 +276,10 @@ class NemuIpcImpl:
 
         self.connect_id = connect_id
 
-    @retry
-    def connect_with_retry(self, on_thread=True):
-        self.connect(on_thread=on_thread)
+    def connect_with_retry(self, *, on_thread: bool = True) -> None:
+        _run_with_retry(self, "connect_with_retry", lambda _trial: self.connect(on_thread=on_thread))
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         if self.connect_id == 0:
             return
 
@@ -257,19 +287,26 @@ class NemuIpcImpl:
 
         self.connect_id = 0
 
-    def reconnect(self):
+    def reconnect(self) -> None:
         self.disconnect()
         self.connect()
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         self.connect()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         self.disconnect()
 
     @staticmethod
-    def run_func(func, *args, on_thread=True, timeout=0.5):
+    def run_func[*ArgsT, ResultT](
+        func: Callable[[*ArgsT], ResultT], *args: *ArgsT, on_thread: bool = True, timeout: float = 0.5
+    ) -> ResultT:
         """on_thread=True 时在工作线程运行同步函数，timeout 秒后抛出 JobTimeout。
 
         底层调用还可抛出 NemuIpcIncompatible 或 NemuIpcError。
@@ -281,23 +318,27 @@ class NemuIpcImpl:
         else:
             result = func(*args)
 
+        func_name = getattr(func, "__name__", type(func).__name__)
         err = False
-        if func.__name__ == "_screenshot":
-            pass
-        elif func.__name__ == "nemu_connect":
+        if func_name == "_screenshot":
+            return result
+        if not isinstance(result, int):
+            message = f"Native function {func_name} returned non-integer result: {type(result).__name__}"
+            raise TypeError(message)
+        if func_name == "nemu_connect":
             if result == 0:
                 err = True
         elif result > 0:
             err = True
         # 再调用一次以捕获 C 库写到 stdout/stderr 的真实错误。
         if err:
-            logger.warning(f"Failed to call {func.__name__}, result={result}")
+            logger.warning(f"Failed to call {func_name}, result={result}")
             with CaptureNemuIpc():
                 func(*args)
 
         return result
 
-    def get_resolution(self, on_thread=True):
+    def get_resolution(self, *, on_thread: bool = True) -> None:
         """结果写入 self.width 和 self.height，不直接返回。"""
         if self.connect_id == 0:
             self.connect()
@@ -321,7 +362,7 @@ class NemuIpcImpl:
         self.width = width_ptr.contents.value
         self.height = height_ptr.contents.value
 
-    def _screenshot(self):
+    def _screenshot(self) -> PixelBuffer:
         if self.connect_id == 0:
             self.connect(on_thread=False)
         self.get_resolution(on_thread=False)
@@ -343,10 +384,9 @@ class NemuIpcImpl:
             raise NemuIpcError(NEMU_IPC_SCREENSHOT_FAILED_MESSAGE)
 
         # 返回像素指针，避免在线程 Job 间传递整张图像。
-        return pixels_pointer
+        return pixels_pointer.contents
 
-    @retry
-    def screenshot(self, timeout=0.5):
+    def _screenshot_once(self, timeout: float) -> ImageArray:
         """timeout 单位为秒，重试时动态延长。
 
         返回上下颠倒的 RGBA 数组，形状为 (height, width, 4)。
@@ -354,15 +394,22 @@ class NemuIpcImpl:
         if self.connect_id == 0:
             self.connect()
 
-        pixels_pointer = self.run_func(self._screenshot, timeout=timeout)
+        pixels = self.run_func(self._screenshot, timeout=timeout)
 
-        return np.ctypeslib.as_array(pixels_pointer.contents).reshape((self.height, self.width, 4))
+        return np.ctypeslib.as_array(pixels).reshape((self.height, self.width, 4))
+
+    def screenshot(self, timeout: float = 0.5) -> ImageArray:
+        def invoke(trial: int) -> ImageArray:
+            retry_timeout = retry_sleep(trial)
+            return self._screenshot_once(retry_timeout if retry_timeout > 0 else timeout)
+
+        return _run_with_retry(self, "screenshot", invoke)
 
 
 class NemuIpcCapture:
     """只负责 MuMu nemu_ipc 截图及其连接生命周期。"""
 
-    def __init__(self, mumu_runtime) -> None:
+    def __init__(self, mumu_runtime: CaptureRuntime) -> None:
         self.mumu_runtime = mumu_runtime
 
     @cached_property
@@ -376,9 +423,10 @@ class NemuIpcCapture:
             logger.info(f"当前个人版不支持 MuMuPlayerGlobal：{instance.path}")
             raise RequestHumanTakeover
         try:
+            instance_id = _require_mumu_instance_id(instance)
             impl = NemuIpcImpl(
                 nemu_folder=instance.emulator.abspath("../"),
-                instance_id=instance.mumu_player_12_id,
+                instance_id=instance_id,
                 display_id=0,
             )
             impl.connect_with_retry()
@@ -400,12 +448,20 @@ class NemuIpcCapture:
     def nemu_ipc_release(self) -> None:
         self.release()
 
-    def screenshot_nemu_ipc(self):
-        image = self.nemu_ipc.screenshot()
-
-        image = cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
+    def screenshot_nemu_ipc(self) -> ImageArray:
+        source = self.nemu_ipc.screenshot()
+        image = np.empty((*source.shape[:2], 3), dtype=np.uint8)
+        cv2.cvtColor(source, cv2.COLOR_BGRA2BGR, dst=image)
         cv2.flip(image, 0, dst=image)
         return image
 
-    def screenshot(self):
+    def screenshot(self) -> ImageArray:
         return self.screenshot_nemu_ipc()
+
+
+def _require_mumu_instance_id(instance: EmulatorInstanceBase) -> int:
+    instance_id = instance.mumu_player_12_id
+    if instance_id is None:
+        message = f"Unable to determine MuMu instance id from {instance.name}"
+        raise NemuIpcError(message)
+    return instance_id

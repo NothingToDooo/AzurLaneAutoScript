@@ -1,12 +1,13 @@
 import os
 import sys
+from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 import adbutils
 from adbutils import AdbClient, AdbDevice
 
-from module.base.decorator import cached_property, del_cached_property
+from module.base.decorator import del_cached_property
 from module.config.config import AzurLaneConfig
 from module.device.mumu import MUMU12_SERIAL_EXAMPLE, is_mumu12_serial, revise_mumu12_serial
 from module.exception import RequestHumanTakeover
@@ -15,6 +16,11 @@ from module.webui.setting import State
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+
+@runtime_checkable
+class _Releasable(Protocol):
+    def release_resource(self) -> None: ...
 
 
 class ConnectionAttr:
@@ -33,7 +39,7 @@ class ConnectionAttr:
         "./.venv/Lib/site-packages/adbutils/binaries/adb.exe",
     )
 
-    def __init__(self, config):
+    def __init__(self, config: AzurLaneConfig | str) -> None:
         logger.hr("Device", level=1)
         if isinstance(config, str):
             self.config = AzurLaneConfig(config, task=None)
@@ -67,9 +73,8 @@ class ConnectionAttr:
         if serial == self.serial:
             return False
 
-        release_resource = getattr(self, "release_resource", None)
-        if callable(release_resource):
-            release_resource()
+        if isinstance(self, _Releasable):
+            self.release_resource()
 
         for name in self._iter_serial_bound_cached_properties():
             del_cached_property(self, name)
@@ -79,7 +84,7 @@ class ConnectionAttr:
         self.serial = serial
         return True
 
-    def serial_check(self):
+    def serial_check(self) -> None:
         # 兼容常见手填错误。
         new = revise_mumu12_serial(self.serial)
         if new != self.serial:
@@ -101,15 +106,15 @@ class ConnectionAttr:
             return 0
 
     @cached_property
-    def is_mumu12_family(self):
+    def is_mumu12_family(self) -> bool:
         return is_mumu12_serial(self.serial)
 
     @cached_property
-    def is_mumu_family(self):
+    def is_mumu_family(self) -> bool:
         return self.is_mumu12_family
 
     @cached_property
-    def adb_binary(self):
+    def adb_binary(self) -> str:
         file = State.webui_config.AdbExecutable
         file = file.replace("\\", "/")
         if Path(file).exists():

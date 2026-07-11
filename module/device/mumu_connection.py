@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from adbutils.errors import AdbError
 
 from module.device.method.pool import WORKER_POOL
@@ -7,9 +9,14 @@ from module.device.mumu_discovery import MumuDeviceDiscovery
 from module.exception import EmulatorNotRunningError, RequestHumanTakeover
 from module.logger import logger
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from module.map.map_grids import SelectedGrids
+
 
 class MumuTcpConnection(MumuDeviceDiscovery):
-    def _cleanup_adb_device_statuses(self, devices):
+    def _cleanup_adb_device_statuses(self, devices: SelectedGrids) -> None:
         for device in devices:
             if device.status == "offline":
                 logger.warning(f"Device {device.serial} is offline, disconnect it before connecting")
@@ -27,14 +34,14 @@ class MumuTcpConnection(MumuDeviceDiscovery):
     def _is_mumu_tcp_serial(serial: str) -> bool:
         return is_mumu12_serial(serial)
 
-    def _ensure_mumu_tcp_serial(self):
+    def _ensure_mumu_tcp_serial(self) -> None:
         """个人分支不兼容 emulator-* 或真机 serial。"""
         if self._is_mumu_tcp_serial(self.serial):
             return
         logger.critical(f'当前个人分支只支持 MuMu12 TCP serial，例如 "{MUMU12_SERIAL_EXAMPLE}"，当前为 "{self.serial}"')
         raise RequestHumanTakeover
 
-    def _recover_mumu12_shifted_port(self):
+    def _recover_mumu12_shifted_port(self) -> bool:
         """MuMu12 端口被占用时会漂移；返回是否已在相邻端口找到新 serial。"""
         if not self.is_mumu12_family:
             return False
@@ -45,7 +52,7 @@ class MumuTcpConnection(MumuDeviceDiscovery):
         self.detect_device()
         return self.serial != before
 
-    def _handle_adb_connect_refused(self):
+    def _handle_adb_connect_refused(self) -> bool:
         """返回 True 表示 MuMu12 已通过相邻端口恢复连接。"""
         if self._recover_mumu12_shifted_port():
             return True
@@ -58,7 +65,7 @@ class MumuTcpConnection(MumuDeviceDiscovery):
         连接拒绝后由平台层补充诊断。
         """
 
-    def _connect_adb_tcp_serial(self):
+    def _connect_adb_tcp_serial(self) -> bool:
         """最多尝试 3 次；旧 ADB server 抢占时，首次可能只会杀掉旧进程。"""
         for _ in range(3):
             msg = self.adb_client.connect(self.serial)
@@ -77,7 +84,7 @@ class MumuTcpConnection(MumuDeviceDiscovery):
 
         return False
 
-    def adb_connect(self):
+    def adb_connect(self) -> bool:
         devices = self.list_device()
         self._cleanup_adb_device_statuses(devices)
         self._ensure_mumu_tcp_serial()
@@ -89,8 +96,8 @@ class MumuTcpConnection(MumuDeviceDiscovery):
         self.detect_device()
         return False
 
-    def adb_brute_force_connect(self, serial_list):
-        def connect(s):
+    def adb_brute_force_connect(self, serial_list: Iterable[str]) -> None:
+        def connect(s: str) -> str:
             try:
                 msg = self.adb_client.connect(s)
             except AdbError, OSError:

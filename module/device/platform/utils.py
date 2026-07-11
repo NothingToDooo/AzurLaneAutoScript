@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, overload
+from typing import TYPE_CHECKING, overload
 
 import psutil
 
@@ -8,24 +8,24 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
 
-class cached_property[T]:
+class cached_property[OwnerT, ValueT]:
     """仅计算一次并写回实例属性，删除该属性即可重置。
 
     基于 https://github.com/pydanny/cached-property 并加入类型支持；实现来源：
     https://github.com/bottlepy/bottle/commit/fa7733e075da0d790d809aa3d2f53071897e6f76
     """
 
-    def __init__(self, func: Callable[..., T]):
+    def __init__(self, func: Callable[[OwnerT], ValueT]) -> None:
         self.func = func
         self.func_name = getattr(func, "__name__", type(func).__name__)
 
     @overload
-    def __get__(self, obj: None, cls: type[Any] | None = None) -> cached_property[T]: ...
+    def __get__(self, obj: None, cls: type[OwnerT] | None = None) -> cached_property[OwnerT, ValueT]: ...
 
     @overload
-    def __get__(self, obj: object, cls: type[Any] | None = None) -> T: ...
+    def __get__(self, obj: OwnerT, cls: type[OwnerT] | None = None) -> ValueT: ...
 
-    def __get__(self, obj, cls=None):
+    def __get__(self, obj: OwnerT | None, cls: type[OwnerT] | None = None) -> cached_property[OwnerT, ValueT] | ValueT:
         if obj is None:
             return self
 
@@ -33,7 +33,7 @@ class cached_property[T]:
         return value
 
 
-def iter_folder(folder, is_dir=False, ext=None):
+def iter_folder(folder: str | Path, *, is_dir: bool = False, ext: str | None = None) -> Iterable[str]:
     try:
         files = list(Path(folder).iterdir())
     except FileNotFoundError:
@@ -52,25 +52,25 @@ def iter_folder(folder, is_dir=False, ext=None):
 
 @dataclass
 class DataProcessInfo:
-    proc: Any
+    proc: psutil.Process
     pid: int
 
     @cached_property
-    def name(self):
+    def name(self) -> str:
         try:
             return self.proc.name()
         except psutil.Error:
             return ""
 
     @cached_property
-    def cmdline(self):
+    def cmdline(self) -> str:
         try:
             cmdline = self.proc.cmdline()
         except psutil.Error:
             cmdline = []
         return " ".join(cmdline).replace(r"\\", "/").replace("\\", "/")
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'DataProcessInfo(name="{self.name}", pid={self.pid}, cmdline="{self.cmdline}")'
 
     __repr__ = __str__

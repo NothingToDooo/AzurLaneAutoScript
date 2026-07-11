@@ -2,7 +2,7 @@ import collections
 import traceback
 from datetime import datetime
 from pathlib import Path
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from module.base.timer import Timer
 from module.config.utils import get_server_next_update
@@ -21,8 +21,15 @@ from module.exception import (
 from module.handler.assets import GET_MISSION
 from module.logger import logger
 
+if TYPE_CHECKING:
+    from module.base.type_alias import ImageArray
+    from module.config.config import AzurLaneConfig
+    from module.device.contracts import AppControllerService, CaptureService, ControllerService, MumuRuntimeService
+    from module.device.control import ButtonTarget
+    from module.device.platform.emulator_base import EmulatorInstanceBase, EmulatorManagerBase
 
-def show_function_call():
+
+def show_function_call() -> None:
     stack = traceback.extract_stack()
     func_list = []
     for row in stack:
@@ -32,7 +39,7 @@ def show_function_call():
     max_filename = max(len(row[0]) for row in func_list)
     max_linenum = max(len(row[1]) for row in func_list) + 1
 
-    def format_(file, line, func):
+    def format_(file: str, line: str, func: str) -> str:
         file = file.rjust(max_filename, " ")
         line = f"L{line}".rjust(max_linenum, " ")
         if not func.startswith("<"):
@@ -46,17 +53,18 @@ def show_function_call():
 class Device(Screenshot, Control, Connection):
     stuck_long_wait_list: ClassVar[tuple[str, ...]] = ("BATTLE_STATUS_S", "PAUSE", "LOGIN_CHECK")
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, config: AzurLaneConfig | str) -> None:
         self.detect_record: set[str] = set()
         self.click_record: collections.deque[str] = collections.deque(maxlen=15)
         self.stuck_detection_enabled = True
         self.stuck_timer = Timer(60, count=60).start()
         self.stuck_timer_long = Timer(180, count=180).start()
+        self._init_screenshot_state()
         self._runtime = DeviceRuntime.create(self)
 
         for trial in range(4):
             try:
-                super().__init__(*args, **kwargs)
+                super().__init__(config)
                 break
             except EmulatorNotRunningError as e:
                 if trial >= 3:
@@ -82,49 +90,49 @@ class Device(Screenshot, Control, Connection):
         return self._runtime
 
     @property
-    def mumu_runtime(self):
+    def mumu_runtime(self) -> MumuRuntimeService:
         return self.runtime.mumu_runtime
 
     @property
-    def capture(self):
+    def capture(self) -> CaptureService:
         return self.runtime.capture
 
     @property
-    def controller(self):
+    def controller(self) -> ControllerService:
         return self.runtime.controller
 
     @property
-    def app_controller(self):
+    def app_controller(self) -> AppControllerService:
         return self.runtime.app_controller
 
     @property
-    def emulator_manager(self):
+    def emulator_manager(self) -> EmulatorManagerBase:
         return self.mumu_runtime.emulator_manager
 
     @property
-    def emulator_instance(self):
+    def emulator_instance(self) -> EmulatorInstanceBase | None:
         return self.mumu_runtime.emulator_instance
 
     @emulator_instance.setter
-    def emulator_instance(self, value) -> None:
+    def emulator_instance(self, value: EmulatorInstanceBase | None) -> None:
         self.mumu_runtime.__dict__["emulator_instance"] = value
 
-    def find_emulator_instance(self, serial: str):
+    def find_emulator_instance(self, serial: str) -> EmulatorInstanceBase | None:
         return self.mumu_runtime.find_emulator_instance(serial)
 
-    def emulator_start(self):
+    def emulator_start(self) -> bool:
         return self.mumu_runtime.emulator_start()
 
-    def emulator_stop(self):
+    def emulator_stop(self) -> bool:
         return self.mumu_runtime.emulator_stop()
 
-    def emulator_start_watch(self):
+    def emulator_start_watch(self) -> bool:
         return self.mumu_runtime.emulator_start_watch()
 
-    def check_mumu_app_keep_alive(self):
+    def check_mumu_app_keep_alive(self) -> bool:
         return self.mumu_runtime.check_mumu_app_keep_alive()
 
-    def check_mumu_bridge_network(self):
+    def check_mumu_bridge_network(self) -> bool:
         return self.mumu_runtime.check_mumu_bridge_network()
 
     def _check_after_connected(self) -> None:
@@ -133,7 +141,7 @@ class Device(Screenshot, Control, Connection):
     def _diagnose_adb_connect_refused(self) -> None:
         self.mumu_runtime.diagnose_adb_connect_refused()
 
-    def screenshot_nemu_ipc(self):
+    def screenshot_nemu_ipc(self) -> ImageArray:
         return self.capture.screenshot()
 
     def nemu_ipc_release(self) -> None:
@@ -145,19 +153,19 @@ class Device(Screenshot, Control, Connection):
     def app_is_running(self) -> bool:
         return self.app_controller.is_running()
 
-    def _app_start_service(self):
+    def _app_start_service(self) -> None:
         return self.app_controller.start()
 
-    def _app_stop_service(self):
+    def _app_stop_service(self) -> None:
         return self.app_controller.stop()
 
-    def method_check(self):
+    def method_check(self) -> None:
         instance = self.emulator_instance
         if instance is None or instance.type != EmulatorBase.MuMuPlayer12:
             logger.critical("当前个人版只保留 MuMu + nemu_ipc 截图 + minitouch 控制，当前需要 MuMu12 实例")
             raise RequestHumanTakeover
 
-    def handle_night_commission(self, daily_trigger="21:00", threshold=30):
+    def handle_night_commission(self, daily_trigger: str = "21:00", threshold: int = 30) -> bool:
         """仅在 daily_trigger 前后 threshold 秒内处理夜间委托。"""
         update = get_server_next_update(daily_trigger=daily_trigger)
         now = datetime.now()
@@ -172,7 +180,7 @@ class Device(Screenshot, Control, Connection):
 
         return False
 
-    def screenshot(self):
+    def screenshot(self) -> ImageArray:
         self.stuck_record_check()
 
         super().screenshot()
@@ -182,22 +190,22 @@ class Device(Screenshot, Control, Connection):
 
         return self.image
 
-    def release_during_wait(self):
+    def release_during_wait(self) -> None:
         self.capture.release()
 
-    def get_orientation(self):
+    def get_orientation(self) -> int:
         """屏幕方向变化时触发底层回调。"""
         return super().get_orientation()
 
-    def stuck_record_add(self, button):
+    def stuck_record_add(self, button: ButtonTarget | str) -> None:
         self.detect_record.add(str(button))
 
-    def stuck_record_clear(self):
+    def stuck_record_clear(self) -> None:
         self.detect_record = set()
         self.stuck_timer.reset()
         self.stuck_timer_long.reset()
 
-    def stuck_record_check(self):
+    def stuck_record_check(self) -> bool:
         """检测到长时间无进展时抛出 GameStuckError。"""
         if not self.stuck_detection_enabled:
             return False
@@ -223,18 +231,18 @@ class Device(Screenshot, Control, Connection):
         message = "Game died"
         raise GameNotRunningError(message)
 
-    def handle_control_check(self, button):
+    def handle_control_check(self, button: ButtonTarget | str) -> None:
         self.stuck_record_clear()
         self.click_record_add(button)
         self.click_record_check()
 
-    def click_record_add(self, button):
+    def click_record_add(self, button: ButtonTarget | str) -> None:
         self.click_record.append(str(button))
 
-    def click_record_clear(self):
+    def click_record_clear(self) -> None:
         self.click_record.clear()
 
-    def click_record_remove(self, button):
+    def click_record_remove(self, button: ButtonTarget | str) -> int:
         """移除所有匹配记录并返回移除数量。"""
         removed = 0
         maxlen = self.click_record.maxlen
@@ -248,7 +256,7 @@ class Device(Screenshot, Control, Connection):
 
         return removed
 
-    def click_record_check(self):
+    def click_record_check(self) -> bool:
         """点击模式异常重复时抛出 GameTooManyClickError。"""
         if not self.stuck_detection_enabled:
             return False
@@ -272,12 +280,12 @@ class Device(Screenshot, Control, Connection):
             raise GameTooManyClickError(message)
         return False
 
-    def disable_stuck_detection(self):
+    def disable_stuck_detection(self) -> None:
         """禁用卡死检测及其处理，用于半自动流程和调试。"""
         logger.info("Disable stuck detection")
         self.stuck_detection_enabled = False
 
-    def app_start(self):
+    def app_start(self) -> None:
         if not self.config.Error_HandleError:
             logger.critical("No app stop/start, because HandleError disabled")
             logger.critical("Please enable Alas.Error.HandleError or manually login to AzurLane")
@@ -287,7 +295,7 @@ class Device(Screenshot, Control, Connection):
         self.click_record_clear()
         return result
 
-    def app_stop(self):
+    def app_stop(self) -> None:
         if not self.config.Error_HandleError:
             logger.critical("No app stop/start, because HandleError disabled")
             logger.critical("Please enable Alas.Error.HandleError or manually login to AzurLane")
