@@ -1,4 +1,6 @@
-from typing import ClassVar
+from math import isfinite
+from numbers import Real
+from typing import ClassVar, cast
 
 import cv2
 import numpy as np
@@ -7,6 +9,7 @@ from cnocr.utils import data_dir
 from PIL import Image
 
 from module.logger import logger
+from module.ocr.result import RawOcrResult
 
 _DEFAULT_OCR_ROOT = data_dir()
 logger.info("OCR dependencies loaded")
@@ -26,17 +29,40 @@ class AlOcr(CnOcr):
         context="cpu",
     ):
         self._args = (model_name, cand_alphabet, root, context)
+        self._model_name = self._normalize_model_name(model_name)
         self._model_loaded = False
 
     @classmethod
     def _normalize_model_name(cls, model_name) -> str:
         return cls.MODEL_NAME_ALIASES.get(model_name, model_name)
 
+    @property
+    def model_name(self) -> str:
+        return self._model_name
+
     @staticmethod
-    def _extract_text(result):
-        if isinstance(result, dict):
-            return result.get("text", "")
-        return result
+    def _extract_raw_result(result: object) -> RawOcrResult:
+        if not isinstance(result, dict):
+            message = "OCR result must be a dictionary"
+            raise TypeError(message)
+        payload = cast("dict[object, object]", result)
+        try:
+            text = payload["text"]
+            score = payload["score"]
+        except KeyError as error:
+            message = "OCR result must contain text and score"
+            raise TypeError(message) from error
+        if not isinstance(text, str):
+            message = "OCR result text must be a string"
+            raise TypeError(message)
+        if isinstance(score, bool) or not isinstance(score, Real):
+            message = "OCR result score must be a real number"
+            raise TypeError(message)
+        score = float(score)
+        if not isfinite(score) or not 0 <= score <= 1:
+            message = "OCR result score must be finite and between 0 and 1"
+            raise ValueError(message)
+        return RawOcrResult(text=text, score=score)
 
     def init(
         self,
@@ -65,7 +91,7 @@ class AlOcr(CnOcr):
     def ocr(self, img_fp, rec_batch_size=1, return_cropped_image=False, **det_kwargs):
         self.ensure_loaded()
         return [
-            self._extract_text(item)
+            self._extract_raw_result(item).text
             for item in super().ocr(
                 img_fp,
                 rec_batch_size=rec_batch_size,
@@ -74,29 +100,22 @@ class AlOcr(CnOcr):
             )
         ]
 
-    def ocr_for_single_line(self, img_fp):
+    def ocr_for_single_lines_raw(self, img_list, batch_size=1) -> list[RawOcrResult]:
         self.ensure_loaded()
-        return self._extract_text(super().ocr_for_single_line(img_fp))
-
-    def ocr_for_single_lines(self, img_list, batch_size=1):
-        self.ensure_loaded()
-        return [self._extract_text(item) for item in super().ocr_for_single_lines(img_list, batch_size=batch_size)]
+        return [
+            self._extract_raw_result(item) for item in super().ocr_for_single_lines(img_list, batch_size=batch_size)
+        ]
 
     def set_cand_alphabet(self, cand_alphabet):
         self.ensure_loaded()
         return self.rec_model.set_cand_alphabet(cand_alphabet)
 
-    def atomic_ocr(self, img_fp, cand_alphabet=None):
+    def atomic_ocr_for_single_lines_raw(self, img_list, cand_alphabet=None) -> list[RawOcrResult]:
         self.set_cand_alphabet(cand_alphabet)
-        return self.ocr(img_fp)
-
-    def atomic_ocr_for_single_line(self, img_fp, cand_alphabet=None):
-        self.set_cand_alphabet(cand_alphabet)
-        return self.ocr_for_single_line(img_fp)
+        return self.ocr_for_single_lines_raw(img_list)
 
     def atomic_ocr_for_single_lines(self, img_list, cand_alphabet=None):
-        self.set_cand_alphabet(cand_alphabet)
-        return self.ocr_for_single_lines(img_list)
+        return [result.text for result in self.atomic_ocr_for_single_lines_raw(img_list, cand_alphabet=cand_alphabet)]
 
     def _preprocess_img_array(self, img):
         height, width = img.shape[:2]
