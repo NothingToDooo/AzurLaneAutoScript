@@ -158,7 +158,7 @@ class Config(ConfigBase):
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_function(self):
+    def battle_function(self) -> bool:
         if not self.config.MAP_CLEAR_ALL_THIS_TIME:
             return super().battle_function()
 

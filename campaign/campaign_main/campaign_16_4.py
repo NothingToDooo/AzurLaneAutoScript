@@ -156,7 +156,7 @@ class Campaign(CampaignBase):
     F5_is_moved = False
     use_single_fleet = False
 
-    def map_init(self, map_):
+    def map_init(self, map_: CampaignMap | None) -> None:
         super().map_init(map_)
         self.F5_is_moved = False
         self.map_has_mob_move = self.use_support_fleet and self.map_is_clear_mode
@@ -228,7 +228,7 @@ class Campaign(CampaignBase):
 
         return self._battle_4_clear_path_to_boss()
 
-    def _battle_4_clear_boss_if_accessible(self):
+    def _battle_4_clear_boss_if_accessible(self) -> bool:
         boss = self.map.select(is_boss=True)
         if not boss:
             return False
@@ -243,7 +243,7 @@ class Campaign(CampaignBase):
 
         return self.fleet_boss.clear_boss()
 
-    def _battle_4_clear_path_to_boss(self):
+    def _battle_4_clear_path_to_boss(self) -> bool:
         if self.clear_roadblocks([road_main]):
             return True
         if self.clear_potential_roadblocks([road_main]):

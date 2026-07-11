@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 from module.base.timer import Timer
 from module.handler.assets import STRATEGY_OPENED
@@ -6,9 +6,15 @@ from module.handler.strategy import MOB_MOVE_OFFSET
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
 from module.map.utils import location_ensure
-from module.map_detection.grid import GridInfo
+from module.map_detection.grid_info import GridInfo
 
 from .campaign_support_fleet import CampaignBase as CampaignBase_
+
+if TYPE_CHECKING:
+    from module.base.type_alias import Point
+    from module.map.type_alias import GridLocation, GridMode
+    from module.map.utils import HasLocation
+    from module.map_detection.grid import Grid
 
 
 class Config:
@@ -28,7 +34,7 @@ class Config:
 
 
 class W15GridInfo(GridInfo):
-    def merge(self, info, mode="normal"):
+    def merge(self, info: GridInfo, mode: GridMode = "normal") -> bool:
         # 将 Boss 视作 Siren。
         if info.is_boss and not self.is_land and self.may_siren:
             self.is_siren = True
@@ -44,7 +50,13 @@ class CampaignBase(CampaignBase_):
 
     map_has_mob_move = True
 
-    def strategy_set_execute(self, formation=None, sub_view=None, sub_hunt=None):
+    def strategy_set_execute(
+        self,
+        formation: Literal["line_ahead", "double_line", "diamond"] | None = None,
+        *,
+        sub_view: bool | None = None,
+        sub_hunt: bool | None = None,
+    ) -> None:
         super().strategy_set_execute(
             formation=formation,
             sub_view=sub_view,
@@ -52,7 +64,11 @@ class CampaignBase(CampaignBase_):
         )
         logger.attr("Map has mob move", self.strategy_has_mob_move())
 
-    def mob_movable(self, location, target):
+    def mob_movable(
+        self,
+        location: HasLocation | str | Point,
+        target: HasLocation | str | Point,
+    ) -> bool:
         """仅当起点和终点均在地图内、曼哈顿距离为 1、起点是敌方舰队且终点是海面格时可移动。"""
         location = location_ensure(location)
         target = location_ensure(target)
@@ -81,16 +97,14 @@ class CampaignBase(CampaignBase_):
 
         return movable
 
-    def _mob_move_grids(self, location, target):
+    def _mob_move_grids(self, location: GridLocation, target: GridLocation) -> tuple[Grid, Grid]:
         view_target = SelectedGrids([self.map[location], self.map[target]]).sort_by_camera_distance(self.camera)[1]
         self.in_sight(view_target)
         origin_grid = self.convert_global_to_local(location)
-        origin_grid.__str__ = location
         target_grid = self.convert_global_to_local(target)
-        target_grid.__str__ = target
         return origin_grid, target_grid
 
-    def _select_mob_move_origin(self, origin_grid):
+    def _select_mob_move_origin(self, origin_grid: Grid) -> None:
         logger.info("Select mob to move")
         skip_first_screenshot = True
         interval = Timer(2, count=4)
@@ -109,7 +123,7 @@ class CampaignBase(CampaignBase_):
                 interval.reset()
                 continue
 
-    def _select_mob_move_target(self, target_grid):
+    def _select_mob_move_target(self, target_grid: Grid) -> None:
         logger.info("Select target grid")
         skip_first_screenshot = True
         interval = Timer(2, count=4)
@@ -128,7 +142,7 @@ class CampaignBase(CampaignBase_):
             if self.handle_popup_confirm("MOB_MOVE"):
                 continue
 
-    def _mob_move(self, location, target):
+    def _mob_move(self, location: HasLocation | str | Point, target: HasLocation | str | Point) -> None:
         """在 MOB_MOVE_CANCEL 页面选择起点和终点，结束于 STRATEGY_OPENED 页面。"""
         location = location_ensure(location)
         target = location_ensure(target)
@@ -136,7 +150,7 @@ class CampaignBase(CampaignBase_):
         self._select_mob_move_origin(origin_grid)
         self._select_mob_move_target(target_grid)
 
-    def _mob_move_info_change(self, location, target):
+    def _mob_move_info_change(self, location: HasLocation | str | Point, target: HasLocation | str | Point) -> None:
         location = location_ensure(location)
         target = location_ensure(target)
         self.map[target].enemy_scale = self.map[location].enemy_scale
@@ -149,7 +163,7 @@ class CampaignBase(CampaignBase_):
         self.map[target].may_enemy = True
         self.map[location].is_enemy = False
 
-    def mob_move(self, location, target):
+    def mob_move(self, location: HasLocation | str | Point, target: HasLocation | str | Point) -> bool:
         """从 IN_MAP 打开策略页、移动敌方舰队并返回 IN_MAP；无效或次数耗尽时返回 False。"""
         if not self.mob_movable(location, target):
             return False

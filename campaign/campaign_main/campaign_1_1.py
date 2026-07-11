@@ -1,7 +1,10 @@
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap
+
+if TYPE_CHECKING:
+    from module.map.type_alias import GridLocation
 
 MAP = CampaignMap()
 MAP.shape = "G1"
@@ -56,5 +59,5 @@ class Campaign(CampaignBase):
     def battle_1(self) -> bool:
         return self.clear_boss()
 
-    def handle_boss_appear_refocus(self, preset=(-3, 0)):
+    def handle_boss_appear_refocus(self, preset: GridLocation | None = (-3, 0)) -> None:
         return super().handle_boss_appear_refocus(preset)

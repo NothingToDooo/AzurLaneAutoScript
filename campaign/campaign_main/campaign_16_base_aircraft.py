@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from module.base.decorator import del_cached_property
 from module.base.timer import Timer
@@ -9,6 +9,11 @@ from module.logger import logger
 from module.map.utils import location_ensure
 
 from .campaign_15_base import CampaignBase as CampaignBase_
+
+if TYPE_CHECKING:
+    from module.base.type_alias import Point
+    from module.map.type_alias import GridLocation
+    from module.map.utils import HasLocation
 
 
 class Config:
@@ -28,16 +33,15 @@ class CampaignBase(CampaignBase_):
     MAP_AIR_STRIKE_OVERLAY_TRANSPARENCY_THRESHOLD = 0.35
     ENEMY_FILTER = "1L > 1M > 1E > 2L > 3L > 2M > 2E > 1C > 2C > 3M > 3E > 3C"
 
-    def _air_strike_appear(self):
-        return (
+    def _air_strike_appear(self) -> bool:
+        return bool(
             red_overlay_transparency(MAP_AIR_STRIKE.color, get_color(self.device.image, MAP_AIR_STRIKE.area))
             > self.MAP_AIR_STRIKE_OVERLAY_TRANSPARENCY_THRESHOLD
         )
 
-    def _air_strike(self, location):
+    def _air_strike(self, location: GridLocation) -> None:
         self.in_sight(location)
         attack_grid = self.convert_global_to_local(location)
-        attack_grid.__str__ = location
 
         logger.info("Select grid to air strike")
         skip_first_screenshot = True
@@ -68,7 +72,7 @@ class CampaignBase(CampaignBase_):
                 interval.reset()
                 continue
 
-    def air_strike(self, location):
+    def air_strike(self, location: HasLocation | str | Point) -> bool:
         """从地图打开策略页，对 X=(x, y) 空袭后返回地图。
 
         覆盖 [x-2, y-1, x+2, y]：上排 OOOOO，下排 OOXOO。

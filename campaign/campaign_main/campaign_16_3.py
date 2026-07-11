@@ -129,7 +129,7 @@ class Campaign(CampaignBase):
     MAP = MAP
     use_single_fleet = False
 
-    def map_init(self, map_):
+    def map_init(self, map_: CampaignMap | None) -> None:
         super().map_init(map_)
         self.map_has_mob_move = self.use_support_fleet and self.map_is_clear_mode
         self.use_single_fleet = "standby" in self.config.Fleet_FleetOrder
