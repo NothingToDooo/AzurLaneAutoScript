@@ -1,39 +1,45 @@
 import logging
 from collections.abc import Callable
+from typing import Literal, TypedDict, Unpack
 
 from rich.console import Console, ConsoleRenderable, RenderableType
 from rich.highlighter import RegexHighlighter
 from rich.logging import RichHandler
+from rich.style import Style
+from rich.text import Text
 from rich.theme import Theme
 
 class HTMLConsole(Console): ...
 class Highlighter(RegexHighlighter): ...
 
 class RichRenderableHandler(RichHandler):
-    def __init__(
-        self,
-        *args,
-        func: Callable[[ConsoleRenderable], None] | None = ...,
-        **kwargs,
-    ) -> None: ...
+    def set_render_callback(self, func: Callable[[ConsoleRenderable], None] | None) -> None: ...
     def emit_renderable(self, renderable: ConsoleRenderable) -> None: ...
 
 class RenderOptions:
     sep: str
     end: str
-    justify: object
-    emoji: object
-    markup: object
-    highlight: object
+    justify: Literal["default", "left", "center", "right", "full"] | None
+    emoji: bool | None
+    markup: bool | None
+    highlight: bool | None
     def __init__(
         self,
         sep: str = ...,
         end: str = ...,
-        justify: object = ...,
-        emoji: object = ...,
-        markup: object = ...,
-        highlight: object = ...,
+        justify: Literal["default", "left", "center", "right", "full"] | None = ...,
+        emoji: bool | None = ...,
+        markup: bool | None = ...,
+        highlight: bool | None = ...,
     ) -> None: ...
+
+class RenderOptionSettings(TypedDict, total=False):
+    sep: str
+    end: str
+    justify: Literal["default", "left", "center", "right", "full"] | None
+    emoji: bool | None
+    markup: bool | None
+    highlight: bool | None
 
 WEB_THEME: Theme
 
@@ -56,11 +62,11 @@ def set_func_logger(
 ) -> None: ...
 def render_options(
     options: RenderOptions | None = ...,
-    settings: dict[str, object] | None = ...,
+    settings: RenderOptionSettings | None = ...,
 ) -> RenderOptions: ...
 def emit_renderables(
     *objects: RenderableType,
-    **kwargs,
+    **settings: Unpack[RenderOptionSettings],
 ) -> None: ...
 
 class AlasLogger(logging.Logger):
@@ -68,28 +74,28 @@ class AlasLogger(logging.Logger):
 
     def rule(
         self,
-        title: str = "",
+        title: str | Text = "",
         *,
         characters: str = "-",
-        style: str = "rule.line",
+        style: str | Style = "rule.line",
         end: str = "\n",
-        align: str = "center",
+        align: Literal["left", "center", "right"] = "center",
     ) -> None: ...
     def hr(
         self,
-        title,
+        title: object,
         level: int = 3,
     ) -> None: ...
     def attr(
         self,
-        name,
-        text,
+        name: object,
+        text: object,
     ) -> None: ...
     def attr_align(
         self,
-        name,
-        text,
-        front="",
+        name: object,
+        text: object,
+        front: str = "",
         align: int = 22,
     ) -> None: ...
     def set_file_logger(

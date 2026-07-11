@@ -4,14 +4,16 @@ import string
 import time
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NoReturn, cast
+from typing import TYPE_CHECKING, NoReturn
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from module.base.type_alias import FilePath
+
 WINDOWS_MAX_ATTEMPT = 5
 WINDOWS_RETRY_DELAY = 0.05
-type FilePath = str | os.PathLike[str]
+type FileData = str | bytes | bytearray | memoryview
 
 
 def _as_path(file: FilePath) -> Path:
@@ -96,34 +98,30 @@ def atomic_replace(replace_from: FilePath, replace_to: FilePath) -> None:
     _raise_after_retry(replace_to, "replace")
 
 
-def _write_once(file: FilePath, data: object) -> None:
-    path = _as_path(file)
+def _write_to_path(path: Path, data: FileData) -> None:
     if isinstance(data, str):
-        mode = "w"
-        encoding = "utf-8"
-        newline = ""
-    else:
-        mode = "wb"
-        encoding = None
-        newline = None
-        if isinstance(data, bytes | bytearray):
-            data = memoryview(data)
-
-    try:
-        with path.open(mode=mode, encoding=encoding, newline=newline) as handle:
-            handle.write(cast("Any", data))
+        with path.open(mode="w", encoding="utf-8", newline="") as handle:
+            handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
+    else:
+        with path.open(mode="wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+
+
+def _write_once(file: FilePath, data: FileData) -> None:
+    path = _as_path(file)
+    try:
+        _write_to_path(path, data)
     except FileNotFoundError:
         if path.parent != Path():
             path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open(mode=mode, encoding=encoding, newline=newline) as handle:
-            handle.write(cast("Any", data))
-            handle.flush()
-            os.fsync(handle.fileno())
+        _write_to_path(path, data)
 
 
-def file_write(file: FilePath, data: object) -> None:
+def file_write(file: FilePath, data: FileData) -> None:
     _write_once(file, data)
 
 
@@ -162,7 +160,7 @@ def file_write_stream(file: FilePath, data_generator: Iterable[str] | Iterable[b
     return True
 
 
-def atomic_write(file: FilePath, data: object) -> None:
+def atomic_write(file: FilePath, data: FileData) -> None:
     temp = to_tmp_file(file)
     file_write(temp, data)
     replace_tmp(temp, file)

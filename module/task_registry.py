@@ -15,8 +15,11 @@ class CampaignConfig(Protocol):
 
 
 class TaskRunner(Protocol):
-    config: CampaignConfig
-    device: object
+    @property
+    def config(self) -> CampaignConfig: ...
+
+    @property
+    def device(self) -> object: ...
 
 
 type TaskArgsFactory = Callable[[TaskRunner], tuple[tuple[object, ...], dict[str, object]]]

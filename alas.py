@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timedelta
 from importlib import import_module
 from pathlib import Path
-from typing import TYPE_CHECKING, NoReturn
+from typing import TYPE_CHECKING, NoReturn, cast
 
 from module.base.decorator import cached_property, del_cached_property
 from module.base.naming import camel_to_snake
@@ -24,11 +24,17 @@ from module.logger import get_log_file, logger
 from module.task_registry import get_task_spec
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from module.base.stop_event import StopEvent
+    from module.base.type_alias import ImageArray
     from module.config.schedule import ScheduleDecision
+    from module.device.device import Device
+    from module.handler.login import LoginHandler
+    from module.ui.ui import UI
 
 
-def _load_attr(module_name: str, attr_name: str):
+def _load_attr(module_name: str, attr_name: str) -> object:
     """按需加载重模块里的对象。"""
     module = import_module(module_name)
     return getattr(module, attr_name)
@@ -44,7 +50,7 @@ class AzurLaneAutoScript:
         self.failure_record = {}
 
     @cached_property
-    def config(self):
+    def config(self) -> AzurLaneConfig:
         try:
             return AzurLaneConfig(config_name=self.config_name)
         except RequestHumanTakeover:
@@ -52,9 +58,9 @@ class AzurLaneAutoScript:
             sys.exit(1)
 
     @cached_property
-    def device(self):
+    def device(self) -> Device:
         try:
-            device_class = _load_attr("module.device.device", "Device")
+            device_class = cast("type[Device]", _load_attr("module.device.device", "Device"))
             return device_class(config=self.config)
         except RequestHumanTakeover:
             logger.critical("Request human takeover")
@@ -127,9 +133,18 @@ class AzurLaneAutoScript:
 
     def save_error_log(self) -> None:
         """保存最近 60 张截图，并把当前日志写入错误目录。"""
-        save_image = _load_attr("module.base.utils", "save_image")
-        handle_sensitive_image = _load_attr("module.handler.sensitive_info", "handle_sensitive_image")
-        handle_sensitive_logs = _load_attr("module.handler.sensitive_info", "handle_sensitive_logs")
+        save_image = cast(
+            "Callable[[ImageArray, str], None]",
+            _load_attr("module.base.utils", "save_image"),
+        )
+        handle_sensitive_image = cast(
+            "Callable[[ImageArray], ImageArray]",
+            _load_attr("module.handler.sensitive_info", "handle_sensitive_image"),
+        )
+        handle_sensitive_logs = cast(
+            "Callable[[list[str]], list[str]]",
+            _load_attr("module.handler.sensitive_info", "handle_sensitive_logs"),
+        )
 
         if self.config.Error_SaveError:
             error_dir = Path("./log/error")
@@ -154,16 +169,16 @@ class AzurLaneAutoScript:
                 f.writelines(lines)
 
     def restart(self) -> None:
-        login_handler_class = _load_attr("module.handler.login", "LoginHandler")
+        login_handler_class = cast("type[LoginHandler]", _load_attr("module.handler.login", "LoginHandler"))
         login_handler_class(self.config, device=self.device).app_restart()
 
     def start(self) -> None:
-        login_handler_class = _load_attr("module.handler.login", "LoginHandler")
+        login_handler_class = cast("type[LoginHandler]", _load_attr("module.handler.login", "LoginHandler"))
         login_handler_class(self.config, device=self.device).app_start()
 
     def goto_main(self) -> None:
-        login_handler_class = _load_attr("module.handler.login", "LoginHandler")
-        ui_class = _load_attr("module.ui.ui", "UI")
+        login_handler_class = cast("type[LoginHandler]", _load_attr("module.handler.login", "LoginHandler"))
+        ui_class = cast("type[UI]", _load_attr("module.ui.ui", "UI"))
 
         if self.device.app_is_running():
             logger.info("App is already running, goto main page")

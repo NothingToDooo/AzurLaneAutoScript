@@ -2,9 +2,10 @@ import datetime
 import logging
 import os
 import sys
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
+from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, Literal, cast
+from typing import TYPE_CHECKING, ClassVar, Literal, TypedDict, Unpack, cast
 
 from rich.console import Console, ConsoleOptions, ConsoleRenderable, NewLine, RenderableType
 from rich.highlighter import NullHighlighter, RegexHighlighter
@@ -16,25 +17,36 @@ from rich.traceback import Traceback
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from typing import Concatenate
+
+    from rich.text import Text
 
     class AlasLogger(logging.Logger):
         log_file: str
 
-        def hr(self, title, level=3) -> None: ...
+        def hr(self, title: object, level: int = 3) -> None: ...
 
-        def attr(self, name, text) -> None: ...
+        def attr(self, name: object, text: object) -> None: ...
 
-        def attr_align(self, name, text, front="", align=22) -> None: ...
+        def attr_align(self, name: object, text: object, front: str = "", align: int = 22) -> None: ...
 
-        def set_file_logger(self, name=...) -> None: ...
+        def set_file_logger(self, name: str = ...) -> None: ...
 
         def set_func_logger(self, func: Callable[[ConsoleRenderable], None]) -> None: ...
 
-        def rule(self, title="", *, characters="─", style="rule.line", end="\n", align="center") -> None: ...
+        def rule(
+            self,
+            title: str | Text = "",
+            *,
+            characters: str = "─",
+            style: str | Style = "rule.line",
+            end: str = "\n",
+            align: Literal["left", "center", "right"] = "center",
+        ) -> None: ...
 
 
-def empty_function(*args, **kwargs):
-    pass
+def empty_function(*args: object, **kwargs: object) -> None:
+    del args, kwargs
 
 
 # cnocr 会设置根日志器；禁用 basicConfig 可避免同一消息重复输出。
@@ -45,18 +57,22 @@ RichHandler.KEYWORDS = []
 
 
 class RichFileHandler(RichHandler):
-    def __init__(self, *args, file_handler: logging.FileHandler, **kwargs):
-        super().__init__(*args, **kwargs)
+    _file_handler: logging.FileHandler | None = None
+
+    def set_file_handler(self, file_handler: logging.FileHandler) -> None:
         self._file_handler = file_handler
 
     def close(self) -> None:
-        self._file_handler.close()
+        if self._file_handler is not None:
+            self._file_handler.close()
+            self._file_handler = None
         super().close()
 
 
 class RichRenderableHandler(RichHandler):
-    def __init__(self, *args, func: Callable[[ConsoleRenderable], None] | None = None, **kwargs):
-        super().__init__(*args, **kwargs)
+    _func: Callable[[ConsoleRenderable], None] | None = None
+
+    def set_render_callback(self, func: Callable[[ConsoleRenderable], None] | None) -> None:
         self._func = func
 
     def emit_renderable(self, renderable: ConsoleRenderable) -> None:
@@ -169,7 +185,7 @@ os.chdir(Path(__file__).resolve().parents[1])
 pyw_name = Path(sys.argv[0]).stem
 
 
-def set_file_logger(name=pyw_name):
+def set_file_logger(name: str = pyw_name) -> None:
     today = datetime.datetime.now(tz=datetime.UTC).astimezone().date()
     log_file = f"./log/{today}_{name}.txt"
     Path("./log").mkdir(parents=True, exist_ok=True)
@@ -183,7 +199,6 @@ def set_file_logger(name=pyw_name):
     )
 
     hdlr = RichFileHandler(
-        file_handler=file_handler,
         console=file_console,
         show_path=False,
         show_time=False,
@@ -193,6 +208,7 @@ def set_file_logger(name=pyw_name):
         tracebacks_extra_lines=3,
         highlighter=NullHighlighter(),
     )
+    hdlr.set_file_handler(file_handler)
     hdlr.setFormatter(file_formatter)
 
     for handler in logger.handlers[:]:
@@ -212,7 +228,7 @@ def get_log_file() -> str:
     return log_file
 
 
-def set_func_logger(func):
+def set_func_logger(func: Callable[[ConsoleRenderable], None]) -> None:
     console = HTMLConsole(
         force_terminal=False,
         force_interactive=False,
@@ -224,7 +240,6 @@ def set_func_logger(func):
         theme=WEB_THEME,
     )
     hdlr = RichRenderableHandler(
-        func=func,
         console=console,
         show_path=False,
         show_time=False,
@@ -234,6 +249,7 @@ def set_func_logger(func):
         tracebacks_extra_lines=2,
         highlighter=Highlighter(),
     )
+    hdlr.set_render_callback(func)
     hdlr.setFormatter(web_formatter)
     logger.handlers = [h for h in logger.handlers if not isinstance(h, RichRenderableHandler)]
     logger.addHandler(hdlr)
@@ -249,21 +265,39 @@ class RenderOptions:
     highlight: bool | None = None
 
 
-def render_options(options=None, settings=None) -> RenderOptions:
+class RenderOptionSettings(TypedDict, total=False):
+    sep: str
+    end: str
+    justify: Literal["default", "left", "center", "right", "full"] | None
+    emoji: bool | None
+    markup: bool | None
+    highlight: bool | None
+
+
+def render_options(
+    options: RenderOptions | None = None,
+    settings: RenderOptionSettings | None = None,
+) -> RenderOptions:
     options = RenderOptions() if options is None else options
-    if settings:
-        options = replace(options, **settings)
-    return options
+    if not settings:
+        return options
+    return RenderOptions(
+        sep=settings.get("sep", options.sep),
+        end=settings.get("end", options.end),
+        justify=settings.get("justify", options.justify),
+        emoji=settings.get("emoji", options.emoji),
+        markup=settings.get("markup", options.markup),
+        highlight=settings.get("highlight", options.highlight),
+    )
 
 
 def _get_renderables(
     self: Console,
-    *objects,
-    options=None,
-    **settings,
+    *objects: RenderableType,
+    **settings: Unpack[RenderOptionSettings],
 ) -> list[ConsoleRenderable]:
     """参考 rich.console.Console.print() 收集可渲染对象。"""
-    options = render_options(options, settings)
+    options = render_options(settings=settings)
     if not objects:
         objects = (NewLine(),)
 
@@ -283,21 +317,28 @@ def _get_renderables(
     return renderables
 
 
-def emit_renderables(*objects: RenderableType, **kwargs) -> None:
+def emit_renderables(*objects: RenderableType, **settings: Unpack[RenderOptionSettings]) -> None:
     for hdlr in logger.handlers:
         if isinstance(hdlr, RichRenderableHandler):
-            for renderable in _get_renderables(hdlr.console, *objects, **kwargs):
+            for renderable in _get_renderables(hdlr.console, *objects, **settings):
                 hdlr.emit_renderable(renderable)
         elif isinstance(hdlr, RichHandler):
-            hdlr.console.print(*objects)
+            hdlr.console.print(*objects, **settings)
 
 
-def rule(title="", *, characters="─", style="rule.line", end="\n", align="center"):
+def rule(
+    title: str | Text = "",
+    *,
+    characters: str = "─",
+    style: str | Style = "rule.line",
+    end: str = "\n",
+    align: Literal["left", "center", "right"] = "center",
+) -> None:
     rule = Rule(title=title, characters=characters, style=style, end=end, align=align)
     emit_renderables(rule)
 
 
-def hr(title, level=3):
+def hr(title: object, level: int = 3) -> None:
     title = str(title).upper()
     if level == 1:
         logger.rule(title, characters="═")
@@ -313,11 +354,11 @@ def hr(title, level=3):
         logger.rule(characters="═")
 
 
-def attr(name, text):
+def attr(name: object, text: object) -> None:
     logger.info("[%s] %s", name, text)
 
 
-def attr_align(name, text, front="", align=22):
+def attr_align(name: object, text: object, front: str = "", align: int = 22) -> None:
     name = str(name).rjust(align)
     if front:
         name = front + name[len(front) :]
@@ -331,7 +372,7 @@ class LoggerDemoError(Exception):
 LOGGER_DEMO_ERROR_MESSAGE = "Exception"
 
 
-def show():
+def show() -> None:
     logger.info("INFO")
     logger.warning("WARNING")
     logger.debug("DEBUG")
@@ -347,8 +388,11 @@ def show():
     raise LoggerDemoError(LOGGER_DEMO_ERROR_MESSAGE)
 
 
-def error_convert(func):
-    def error_wrapper(msg, *args, **kwargs):
+def error_convert[**P, ReturnT](
+    func: Callable[Concatenate[object, P], ReturnT],
+) -> Callable[Concatenate[object, P], ReturnT]:
+    @wraps(func)
+    def error_wrapper(msg: object, *args: P.args, **kwargs: P.kwargs) -> ReturnT:
         if isinstance(msg, Exception):
             msg = f"{type(msg).__name__}: {msg}"
         return func(msg, *args, **kwargs)

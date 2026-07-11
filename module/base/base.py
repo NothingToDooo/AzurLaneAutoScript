@@ -2,6 +2,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from importlib import import_module
+from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
 import cv2
 import numpy as np
@@ -10,13 +11,30 @@ from PIL import Image
 from module.base.button import Button
 from module.base.decorator import cached_property
 from module.base.timer import Timer
-from module.base.utils import area_offset, color_similarity_2d, crop, ensure_int, get_color, image_size, load_image
+from module.base.utils import area_offset, color_similarity_2d, crop, get_color, image_size, load_image
 from module.combat.emotion import Emotion
 from module.config.config import AzurLaneConfig
 from module.device.device import Device
 from module.logger import logger
 from module.map_detection.utils import fit_points
 from module.webui.setting import cached_class_property
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from module.base.button import MatchOffset
+    from module.base.type_alias import Area, Color, ImageArray
+
+
+@runtime_checkable
+class _HasArea(Protocol):
+    @property
+    def area(self) -> Area: ...
+
+
+class _HasName(Protocol):
+    @property
+    def name(self) -> str: ...
 
 
 class ModuleBase:
@@ -25,40 +43,39 @@ class ModuleBase:
 
     EARLY_OCR_IMPORT = False
 
-    def __init__(self, config, device=None, task=None):
+    def __init__(
+        self,
+        config: AzurLaneConfig | str,
+        device: Device | str | None = None,
+        task: str | None = None,
+    ) -> None:
         """config 可传配置对象或配置名；device 可复用对象、按序列号新建，或省略后新建。
 
         task 仅供开发时绑定；未指定时使用默认配置。
         """
-        if isinstance(config, AzurLaneConfig):
+        if isinstance(config, str):
+            self.config = AzurLaneConfig(config, task=task)
+        else:
             self.config = config
             if task is not None:
                 self.config.init_task(task)
-        elif isinstance(config, str):
-            self.config = AzurLaneConfig(config, task=task)
-        else:
-            logger.warning("Alas ModuleBase received an unknown config, assume it is AzurLaneConfig")
-            self.config = config
 
-        if isinstance(device, Device):
-            self.device = device
-        elif device is None:
+        if device is None:
             self.device = Device(config=self.config)
         elif isinstance(device, str):
             self.config.override(Emulator_Serial=device)
             self.device = Device(config=self.config)
         else:
-            logger.warning("Alas ModuleBase received an unknown device, assume it is Device")
             self.device = device
 
-        self.interval_timer = {}
+        self.interval_timer: dict[str, Timer] = {}
         self.early_ocr_import()
 
     @cached_property
     def emotion(self) -> Emotion:
         return Emotion(config=self.config)
 
-    def early_ocr_import(self):
+    def early_ocr_import(self) -> None:
         """截图是 I/O 密集，OCR 导入是 CPU 密集；后台导入可缩短启动等待。"""
         if ModuleBase.EARLY_OCR_IMPORT:
             return
@@ -69,7 +86,7 @@ class ModuleBase:
             logger.info("No ocr in daemon task, skip early_ocr_import")
             return
 
-        def do_ocr_import():
+        def do_ocr_import() -> None:
             while 1:
                 if self.device.has_cached_image:
                     break
@@ -86,12 +103,12 @@ class ModuleBase:
         ModuleBase.EARLY_OCR_IMPORT = True
 
     @cached_class_property
-    def worker(cls):
+    def worker(cls) -> ThreadPoolExecutor:
         """共享单线程后台池，提交的任务不得阻塞主流程。"""
         logger.hr("Creating worker")
         return ThreadPoolExecutor(1)
 
-    def loop(self, skip_first=True, timeout=None):
+    def loop(self, *, skip_first: bool = True, timeout: float | Timer | None = None) -> Iterator[ImageArray]:
         """循环产出最新截图；skip_first 可复用已有截图，timeout 可传秒数或 Timer。"""
         if timeout is not None:
             if isinstance(timeout, Timer):
@@ -114,7 +131,14 @@ class ModuleBase:
                 self.device.screenshot()
                 yield self.device.image
 
-    def appear(self, button, offset=0, interval=0, similarity=0.85, threshold=10):
+    def appear(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 10,
+    ) -> bool:
         """offset 启用模板匹配，否则按区域颜色判断；interval 限制连续触发频率。
 
         similarity 范围为 0～1；threshold 范围为 0～255，且越小越相似。
@@ -142,7 +166,14 @@ class ModuleBase:
 
         return appear
 
-    def match_template_color(self, button, offset=(20, 20), interval=0, similarity=0.85, threshold=30):
+    def match_template_color(
+        self,
+        button: Button,
+        offset: MatchOffset = (20, 20),
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 30,
+    ) -> bool:
         """先匹配模板再校验颜色；interval 限制连续触发频率。"""
         self.device.stuck_record_add(button)
 
@@ -164,13 +195,22 @@ class ModuleBase:
 
         return appear
 
-    def appear_then_click(self, button, offset=0, interval=0, similarity=0.85, threshold=30):
+    def appear_then_click(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 30,
+    ) -> bool:
         appear = self.appear(button, offset=offset, interval=interval, similarity=similarity, threshold=threshold)
         if appear:
             self.device.click(button)
         return appear
 
-    def wait_until_appear(self, button, offset=0, skip_first_screenshot=False):
+    def wait_until_appear(
+        self, button: Button, offset: MatchOffset | None = 0, *, skip_first_screenshot: bool = False
+    ) -> None:
         while 1:
             if skip_first_screenshot:
                 skip_first_screenshot = False
@@ -179,17 +219,24 @@ class ModuleBase:
             if self.appear(button, offset=offset):
                 break
 
-    def wait_until_appear_then_click(self, button, offset=0):
+    def wait_until_appear_then_click(self, button: Button, offset: MatchOffset | None = 0) -> None:
         self.wait_until_appear(button, offset=offset)
         self.device.click(button)
 
-    def wait_until_disappear(self, button, offset=0):
+    def wait_until_disappear(self, button: Button, offset: MatchOffset | None = 0) -> None:
         while 1:
             self.device.screenshot()
             if not self.appear(button, offset=offset):
                 break
 
-    def wait_until_stable(self, button, timer=None, timeout=None, skip_first_screenshot=True):
+    def wait_until_stable(
+        self,
+        button: Button,
+        timer: Timer | None = None,
+        timeout: Timer | None = None,
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> None:
         button.reset_match_state()
         if timer is None:
             timer = Timer(0.3, count=1)
@@ -217,20 +264,37 @@ class ModuleBase:
                 logger.warning(f"wait_until_stable({button}) timeout")
                 break
 
-    def image_crop(self, button, copy=True):
-        if isinstance(button, Button) or hasattr(button, "area"):
+    def image_crop(self, button: Button | _HasArea | Area, *, copy: bool = True) -> ImageArray:
+        if isinstance(button, (Button, _HasArea)):
             return crop(self.device.image, button.area, copy=copy)
         return crop(self.device.image, button, copy=copy)
 
-    def image_color_count(self, button, color, threshold=221, count=50):
+    def image_color_count(
+        self,
+        button: ImageArray | Button | _HasArea | Area,
+        color: Color,
+        threshold: int = 221,
+        count: int = 50,
+    ) -> bool:
         """判断区域内是否有超过 count 个像素达到颜色阈值；255 表示完全相同。"""
-        image = button if isinstance(button, np.ndarray) else self.image_crop(button, copy=False)
+        if isinstance(button, np.ndarray) and button.ndim >= 2:
+            image = cast("ImageArray", button)
+        else:
+            area_or_button = cast("Button | _HasArea | Area", button)
+            image = self.image_crop(area_or_button, copy=False)
         mask = color_similarity_2d(image, color=color)
         cv2.inRange(mask, threshold, 255, dst=mask)
         sum_ = cv2.countNonZero(mask)
         return sum_ > count
 
-    def image_color_button(self, area, color, color_threshold=250, encourage=5, name="COLOR_BUTTON"):
+    def image_color_button(
+        self,
+        area: Area,
+        color: Color,
+        color_threshold: int = 250,
+        encourage: int = 5,
+        name: str = "COLOR_BUTTON",
+    ) -> Button | None:
         """在区域内查找纯色块并生成按钮；color_threshold 为 0～255，encourage 为半径。
 
         没有足够匹配像素时返回 None。
@@ -241,18 +305,20 @@ class ModuleBase:
             return None
 
         point = fit_points(points, mod=image_size(image), encourage=encourage)
-        point = ensure_int(point + area[:2])
+        point_array = point + area[:2]
+        point = (int(point_array[0]), int(point_array[1]))
         button_area = area_offset((-encourage, -encourage, encourage, encourage), offset=point)
         color = get_color(self.device.image, button_area)
         return Button(area=button_area, color=color, button=button_area, name=name)
 
-    def get_interval_timer(self, button, interval=5, renew=False) -> Timer:
-        if hasattr(button, "name"):
-            name = button.name
-        elif callable(button):
-            name = button.__name__
-        else:
-            name = str(button)
+    def get_interval_timer(
+        self,
+        button: _HasName | str,
+        interval: float = 5,
+        *,
+        renew: bool = False,
+    ) -> Timer:
+        name = button if isinstance(button, str) else button.name
 
         try:
             timer = self.interval_timer[name]
@@ -266,9 +332,9 @@ class ModuleBase:
         else:
             return timer
 
-    def interval_reset(self, button, interval=3):
+    def interval_reset(self, button: Button | list[Button] | tuple[Button, ...] | None, interval: float = 3) -> None:
         if isinstance(button, (list, tuple)):
-            for b in button:
+            for b in cast("list[Button] | tuple[Button, ...]", button):
                 self.interval_reset(b)
             return
 
@@ -278,9 +344,9 @@ class ModuleBase:
             else:
                 self.interval_timer[button.name] = Timer(interval).reset()
 
-    def interval_clear(self, button, interval=3):
+    def interval_clear(self, button: Button | list[Button] | tuple[Button, ...] | None, interval: float = 3) -> None:
         if isinstance(button, (list, tuple)):
-            for b in button:
+            for b in cast("list[Button] | tuple[Button, ...]", button):
                 self.interval_clear(b)
             return
 
@@ -293,11 +359,11 @@ class ModuleBase:
     _image_file = ""
 
     @property
-    def image_file(self):
+    def image_file(self) -> str:
         return self._image_file
 
     @image_file.setter
-    def image_file(self, value):
+    def image_file(self, value: str | Image.Image | ImageArray) -> None:
         """开发调试入口：用本地文件或 PIL 图像替换设备截图。"""
         if isinstance(value, Image.Image):
             value = np.array(value)

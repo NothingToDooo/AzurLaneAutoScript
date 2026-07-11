@@ -15,11 +15,11 @@ def test_emit_renderables_accepts_keyword_settings() -> None:
     renderables = []
     handler = RichRenderableHandler(
         console=console,
-        func=renderables.append,
         show_time=False,
         show_level=False,
         show_path=False,
     )
+    handler.set_render_callback(renderables.append)
 
     previous_handlers = logger.handlers
     try:
