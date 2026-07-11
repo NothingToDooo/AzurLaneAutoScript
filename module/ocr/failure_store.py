@@ -1,18 +1,22 @@
+from __future__ import annotations
+
 import hashlib
 import json
+import os
 import re
+import stat
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from io import BytesIO
 from pathlib import Path
+from threading import Lock
 from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 from PIL import Image
 
 from module.base.atomic import atomic_replace, file_write, folder_rmtree, to_tmp_file
-from module.logger import logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -28,6 +32,7 @@ class _ProcessSampleBudget:
 
 
 _PROCESS_SAMPLE_BUDGET = _ProcessSampleBudget()
+_STORE_LOCK = Lock()
 _METADATA_FIELDS = frozenset(
     {
         "schema_version",
@@ -57,7 +62,21 @@ _PROFILE_PATTERN = re.compile(r"[A-Za-z0-9_.-]{1,64}")
 
 
 def _is_valid_profile(profile: str) -> bool:
-    return _PROFILE_PATTERN.fullmatch(profile) is not None and profile not in {".", ".."}
+    return (
+        _PROFILE_PATTERN.fullmatch(profile) is not None
+        and profile not in {".", ".."}
+        and not os.path.isreserved(profile)
+    )
+
+
+def _is_reparse_point(path: Path) -> bool:
+    if path.is_symlink() or path.is_junction():
+        return True
+    try:
+        attributes = path.lstat().st_file_attributes
+    except AttributeError, FileNotFoundError:
+        return False
+    return bool(attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
 
 
 class OcrFailureRecordStatus(StrEnum):
@@ -132,10 +151,9 @@ class OcrFailureStore:
                 threshold=threshold,
                 expected_total=expected_total,
             )
-        except OSError as error:
+        except OSError:
             self._disabled = True
-            logger.warning("OCR failure store disabled after an unrecoverable OSError: %s", error)
-            return OcrFailureRecordResult(OcrFailureRecordStatus.DISABLED, "", None)
+            raise
 
     def _record[T](  # noqa: PLR0913
         self,
@@ -161,12 +179,9 @@ class OcrFailureStore:
             expected_total=expected_total,
         )
         final_directory = self._root / result.profile / digest
+        self._validate_storage_path(final_directory)
         if self._is_complete_bundle(final_directory):
             return OcrFailureRecordResult(OcrFailureRecordStatus.DUPLICATE, digest, final_directory)
-        existing_bundles = list(self._iter_complete_bundles())
-        profile_directory = self._root / result.profile
-        if self._sample_limit_reached(profile_directory, existing_bundles):
-            return OcrFailureRecordResult(OcrFailureRecordStatus.LIMIT_REACHED, digest, None)
 
         bundle = self._encode_bundle(
             result,
@@ -182,13 +197,22 @@ class OcrFailureStore:
         bundle_size = sum(len(content) for content in bundle)
         if bundle_size > self._max_total_bytes:
             return OcrFailureRecordResult(OcrFailureRecordStatus.TOO_LARGE, digest, None)
-        existing_size = sum(self._bundle_disk_size(directory) for directory in existing_bundles)
-        if existing_size + bundle_size > self._max_total_bytes:
-            return OcrFailureRecordResult(OcrFailureRecordStatus.LIMIT_REACHED, digest, None)
 
-        if not self._publish_bundle(final_directory, bundle):
-            return OcrFailureRecordResult(OcrFailureRecordStatus.DUPLICATE, digest, final_directory)
-        _PROCESS_SAMPLE_BUDGET.new_samples += 1
+        with _STORE_LOCK:
+            self._validate_storage_path(final_directory)
+            if self._is_complete_bundle(final_directory):
+                return OcrFailureRecordResult(OcrFailureRecordStatus.DUPLICATE, digest, final_directory)
+            existing_bundles = list(self._iter_complete_bundles())
+            profile_directory = self._root / result.profile
+            existing_size = sum(self._bundle_disk_size(directory) for directory in existing_bundles)
+            if (
+                self._sample_limit_reached(profile_directory, existing_bundles)
+                or existing_size + bundle_size > self._max_total_bytes
+            ):
+                return OcrFailureRecordResult(OcrFailureRecordStatus.LIMIT_REACHED, digest, None)
+            if not self._publish_bundle(final_directory, bundle):
+                return OcrFailureRecordResult(OcrFailureRecordStatus.DUPLICATE, digest, final_directory)
+            _PROCESS_SAMPLE_BUDGET.new_samples += 1
         return OcrFailureRecordResult(OcrFailureRecordStatus.SAVED, digest, final_directory)
 
     @staticmethod
@@ -252,18 +276,45 @@ class OcrFailureStore:
 
     def _publish_bundle(self, final_directory: Path, bundle: _EncodedBundle) -> bool:
         temp_directory = Path(to_tmp_file(final_directory))
+        self._validate_storage_path(final_directory)
+        self._validate_storage_path(temp_directory)
+        if temp_directory.exists():
+            message = "temporary OCR failure path must not already exist"
+            raise ValueError(message)
         raw_png, processed_png, metadata_json = bundle
         try:
             file_write(temp_directory / "raw.png", raw_png)
             file_write(temp_directory / "processed.png", processed_png)
             file_write(temp_directory / "metadata.json", metadata_json)
+            self._validate_storage_path(final_directory)
+            self._validate_storage_path(temp_directory)
             atomic_replace(temp_directory, final_directory)
+        except ValueError:
+            folder_rmtree(temp_directory)
+            raise
         except OSError:
             folder_rmtree(temp_directory)
+            self._validate_storage_path(final_directory)
             if self._is_complete_bundle(final_directory):
                 return False
             raise
         return True
+
+    def _validate_storage_path(self, path: Path) -> None:
+        message = "OCR failure path must stay within its root and contain no reparse points"
+        root_absolute = self._root.absolute()
+        path_absolute = path.absolute()
+        try:
+            relative_path = path_absolute.relative_to(root_absolute)
+            path_absolute.resolve(strict=False).relative_to(root_absolute.resolve(strict=False))
+        except ValueError:
+            raise ValueError(message) from None
+
+        current = root_absolute
+        for part in relative_path.parts:
+            current /= part
+            if _is_reparse_point(current):
+                raise ValueError(message)
 
     @staticmethod
     def _png_bytes(image: np.ndarray) -> bytes:
@@ -350,11 +401,15 @@ class OcrFailureStore:
         if not self._root.is_dir():
             return
         for profile_directory in self._root.iterdir():
-            if not profile_directory.is_dir() or not _is_valid_profile(profile_directory.name):
+            if not _is_valid_profile(profile_directory.name):
+                continue
+            self._validate_storage_path(profile_directory)
+            if not profile_directory.is_dir():
                 continue
             for bundle_directory in profile_directory.iterdir():
                 if not re.fullmatch(r"[0-9a-f]{64}", bundle_directory.name):
                     continue
+                self._validate_storage_path(bundle_directory)
                 if self._is_complete_bundle(bundle_directory):
                     yield bundle_directory
 
