@@ -17,7 +17,7 @@ class CampaignHard(CampaignRun):
     equipment_has_take_on = False
     campaign: Campaign
 
-    def run(self, name="", folder="campaign_main", mode="normal", total=0):
+    def run(self, name: str = "", folder: str = "campaign_main", mode: str = "normal", total: int = 0) -> None:
         _ = (name, folder, mode, total)
         logger.hr("Campaign hard", level=1)
         name = to_map_file_name(self.config.Hard_HardStage)
