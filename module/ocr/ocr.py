@@ -183,7 +183,7 @@ class Ocr:
                 expected_total=expected_total,
             )
         except OSError as error:
-            logger.warning("OCR failure recorder raised an OSError; recognition result is unchanged: %s", error)
+            logger.warning("OCR failure recorder raised %s; recognition result is unchanged", type(error).__name__)
 
     def ocr(self, image, direct_ocr=False):
         """单区域返回字符串，多区域返回字符串列表。

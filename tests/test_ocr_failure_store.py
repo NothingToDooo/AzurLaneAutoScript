@@ -926,7 +926,7 @@ def test_structured_counter_saves_invalid_skips_valid_and_deduplicates(tmp_path:
 
 
 def test_recording_error_does_not_change_recognition_result(caplog: pytest.LogCaptureFixture) -> None:
-    recorder = _FailingRecorder(OSError("disk full"))
+    recorder = _FailingRecorder(OSError("failed for 99/15"))
     counter = _StoreTestCounter("99/15")
     counter.letter = [140, 113, 99]
 
