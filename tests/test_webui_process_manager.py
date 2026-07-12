@@ -407,7 +407,7 @@ def test_stop_reports_killed_after_grace_timeout() -> None:
     assert stop_event.set_calls == 1
     assert process.join_calls == [STOP_GRACE_SECONDS, KILL_JOIN_SECONDS]
     assert process.kill_calls == 1
-    assert run.renderable_queue.get_nowait() is None
+    assert run.renderable_queue.empty()
     assert manager.outcome is not None
     assert manager.outcome.status is ProcessOutcomeStatus.KILLED
 
@@ -441,6 +441,25 @@ def test_monitor_drains_tail_logs_and_publishes_outcome() -> None:
     assert manager.renderables == [tail]
     assert manager.outcome is not None
     assert manager.outcome.status is ProcessOutcomeStatus.FINISHED
+
+
+def test_monitor_drains_killed_process_tail_without_child_sentinel() -> None:
+    process = _Process(alive=False, exitcode=-9)
+    manager = ProcessManager()
+    run = _attach_run(manager, process)
+    run.stop_status = ProcessOutcomeStatus.KILLED
+    tail = Text("tail before forced kill")
+    run.renderable_queue.put(tail)
+
+    manager.start_log_queue_handler()
+    monitor = manager.thd_log_queue_handler
+    assert monitor is not None
+    monitor.join(timeout=2)
+
+    assert not monitor.is_alive()
+    assert manager.renderables == [tail]
+    assert manager.outcome is not None
+    assert manager.outcome.status is ProcessOutcomeStatus.KILLED
 
 
 def test_monitor_reports_missing_child_outcome() -> None:

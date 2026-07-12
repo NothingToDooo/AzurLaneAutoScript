@@ -208,7 +208,6 @@ class ProcessManager:
             logger.warning(f"[{self.config_name}] did not stop gracefully, killing process")
             process.kill()
             process.join(timeout=KILL_JOIN_SECONDS)
-            run.renderable_queue.put(None)
 
     def stop(self) -> None:
         with self._lifecycle_lock:
@@ -246,7 +245,8 @@ class ProcessManager:
             self._append_renderable(renderable)
 
         run.process.join(timeout=KILL_JOIN_SECONDS)
-        child_outcome = self._read_child_outcome(run, timeout=QUEUE_DRAIN_SECONDS)
+        outcome_timeout = 0 if run.stop_status is not None else QUEUE_DRAIN_SECONDS
+        child_outcome = self._read_child_outcome(run, timeout=outcome_timeout)
         self._publish_outcome(run, child_outcome)
         logger.info("End of process monitor loop")
 
