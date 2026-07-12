@@ -24,10 +24,7 @@ from module.logger import get_log_file, logger
 from module.task_registry import get_task_spec
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from module.base.stop_event import StopEvent
-    from module.base.type_alias import ImageArray
     from module.config.schedule import ScheduleDecision
     from module.device.device import Device
     from module.handler.login import LoginHandler
@@ -81,11 +78,12 @@ class AzurLaneAutoScript:
     ) -> bool:
         if isinstance(error, GameNotRunningError):
             logger.warning(error)
+            self._save_error_log_safely()
             self.config.task_call("Restart")
             return False
         if isinstance(error, (GameStuckError, GameTooManyClickError)):
             logger.error(error)
-            self.save_error_log()
+            self._save_error_log_safely()
             logger.warning(f"Game stuck, {self.device.package} will be restarted in 10 seconds")
             logger.warning("If you are playing by hand, please stop Alas")
             self.config.task_call("Restart")
@@ -93,7 +91,7 @@ class AzurLaneAutoScript:
             return False
 
         logger.warning(error)
-        self.save_error_log()
+        self._save_error_log_safely()
         logger.warning("An error has occurred in Azur Lane game client, Alas is unable to handle")
         logger.warning(f"Restarting {self.device.package} to fix it")
         self.config.task_call("Restart")
@@ -103,18 +101,21 @@ class AzurLaneAutoScript:
     def _exit_on_fatal_run_error(self, error: GamePageUnknownError | ScriptError | RequestHumanTakeover) -> NoReturn:
         if isinstance(error, GamePageUnknownError):
             logger.critical("Game page unknown")
-            self.save_error_log()
+            self._save_error_log_safely()
         elif isinstance(error, ScriptError):
             logger.exception(error)
             logger.critical("This is likely to be a mistake of developers, but sometimes just random issues")
+            self._save_error_log_safely()
         else:
             logger.critical("Request human takeover")
+            if "device" in vars(self):
+                self._save_error_log_safely()
         sys.exit(1)
 
     def _exit_on_unexpected_run_error(self, error: Exception) -> NoReturn:
         # 任务崩溃边界：保存现场并退出，避免调度循环继续运行在未知状态。
         logger.exception(error)
-        self.save_error_log()
+        self._save_error_log_safely()
         sys.exit(1)
 
     def run(self, command: str, *, skip_first_screenshot: bool = False) -> bool:
@@ -131,31 +132,27 @@ class AzurLaneAutoScript:
         else:
             return True
 
-    def save_error_log(self) -> None:
-        """保存最近 60 张截图，并把当前日志写入错误目录。"""
-        save_image = cast(
-            "Callable[[ImageArray, str], None]",
-            _load_attr("module.base.utils", "save_image"),
-        )
-        handle_sensitive_image = cast(
-            "Callable[[ImageArray], ImageArray]",
-            _load_attr("module.handler.sensitive_info", "handle_sensitive_image"),
-        )
-        handle_sensitive_logs = cast(
-            "Callable[[list[str]], list[str]]",
-            _load_attr("module.handler.sensitive_info", "handle_sensitive_logs"),
-        )
+    def _save_error_log_safely(self) -> None:
+        try:
+            self.save_error_log()
+        except Exception:  # noqa: BLE001
+            logger.exception("Failed to save error diagnostics")
 
+    def save_error_log(self) -> None:
+        """保存最近业务截图、可回放动作与当前日志。"""
         if self.config.Error_SaveError:
             error_dir = Path("./log/error")
-            error_dir.mkdir(exist_ok=True)
+            error_dir.mkdir(parents=True, exist_ok=True)
             folder = error_dir / str(int(time.time() * 1000))
             logger.warning(f"Saving error: {folder}")
             folder.mkdir()
-            for data in self.device.screenshot_deque:
-                image_time = datetime.strftime(data["time"], "%Y-%m-%d_%H-%M-%S-%f")
-                image = handle_sensitive_image(data["image"])
-                save_image(image, str(folder / f"{image_time}.png"))
+            replay_dump = self.device.replay_recorder.dump(folder)
+            if replay_dump.trace_path is not None:
+                logger.warning("Saved replay trace")
+            elif replay_dump.blockers:
+                logger.warning(
+                    f"Replay trace skipped because of unsupported or unbound actions: {replay_dump.blockers}"
+                )
             with Path(get_log_file()).open(encoding="utf-8") as f:
                 lines = f.readlines()
                 start = 0
@@ -164,7 +161,6 @@ class AzurLaneAutoScript:
                     if re.match(r"^═{15,}$", line):
                         start = index
                 lines = lines[start - 2 :]
-                lines = handle_sensitive_logs(lines)
             with (folder / "log.txt").open("w", encoding="utf-8") as f:
                 f.writelines(lines)
 

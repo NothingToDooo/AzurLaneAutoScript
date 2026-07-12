@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from module.device.contracts import AppControllerService, CaptureService, ControllerService, MumuRuntimeService
     from module.device.control import ButtonTarget
     from module.device.platform.emulator_base import EmulatorInstanceBase, EmulatorManagerBase
+    from module.replay.trace import RecordedAction
 
 
 def show_function_call() -> None:
@@ -235,6 +236,14 @@ class Device(Screenshot, Control, Connection):
         self.stuck_record_clear()
         self.click_record_add(button)
         self.click_record_check()
+
+    def replay_record_action(self, action: RecordedAction) -> None:
+        if self.config.Error_SaveError:
+            self.replay_recorder.record_action(action)
+
+    def replay_mark_unsupported_action(self, action: str) -> None:
+        if self.config.Error_SaveError:
+            self.replay_recorder.mark_unsupported_action(action)
 
     def click_record_add(self, button: ButtonTarget | str) -> None:
         self.click_record.append(str(button))

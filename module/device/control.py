@@ -13,6 +13,7 @@ from module.base.utils import (
 )
 from module.device.control_options import SwipeVectorOptions
 from module.logger import logger
+from module.replay.trace import ClickAction, RecordedAction, SwipeAction
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -41,6 +42,14 @@ class Control:
         # Device 会覆盖这个检查入口。
         pass
 
+    def replay_record_action(self, action: RecordedAction) -> None:
+        # Device 会把动作绑定到最近截图。
+        del self, action
+
+    def replay_mark_unsupported_action(self, action: str) -> None:
+        # ReplayDevice 尚不支持的控制会阻止错误包发布伪完整 trace。
+        del self, action
+
     @property
     def minitouch_builder(self) -> CommandBuilder:
         return self.controller.minitouch_builder
@@ -65,6 +74,7 @@ class Control:
             self.handle_control_check(button)
         x, y = random_rectangle_point(button.button)
         x, y = ensure_int(x, y)
+        self.replay_record_action(ClickAction(target=str(button)))
         logger.info(f"Click {point2str(x, y)} @ {button}")
         self.click_minitouch(x, y)
 
@@ -84,6 +94,7 @@ class Control:
         x, y = random_rectangle_point(button.button)
         x, y = ensure_int(x, y)
         duration_value = float(ensure_time(duration))
+        self.replay_mark_unsupported_action("long_click")
         logger.info(f"Click {point2str(x, y)} @ {button}, {duration_value}")
         self.long_click_minitouch(x, y, duration_value)
 
@@ -107,6 +118,7 @@ class Control:
             logger.info("Swipe distance < 10px, dropped")
             return
 
+        self.replay_record_action(SwipeAction(start=start, end=end))
         self.swipe_minitouch(start, end)
 
     def swipe_vector(self, vector: Point, options: SwipeVectorOptions | None = None) -> None:
@@ -135,5 +147,6 @@ class Control:
         self.handle_control_check(name)
         start = _ensure_point(p1)
         end = _ensure_point(p2)
+        self.replay_mark_unsupported_action("drag")
         logger.info(f"Drag {point2str(*start)} -> {point2str(*end)}")
         self.drag_minitouch(start, end, point_random=point_random)
