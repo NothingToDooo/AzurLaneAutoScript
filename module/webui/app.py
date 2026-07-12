@@ -35,6 +35,7 @@ from pywebio.session import download, go_app, info, local, register_thread, run_
 from module.base.atomic import atomic_failure_cleanup
 from module.config.config import AzurLaneConfig, Function
 from module.config.deep import DeepValue, MutableDeepData, MutableDeepValue, deep_get, deep_iter, deep_set
+from module.config.resolved import resolve_task_config
 from module.config.utils import (
     alas_instance,
     alas_template,
@@ -88,6 +89,7 @@ if TYPE_CHECKING:
     from starlette.applications import Starlette
 
     from module.config.config_updater import ConfigUpdater
+    from module.config.resolved import ResolvedField, ResolvedTaskConfig
 
 
 task_handler = TaskHandler()
@@ -308,18 +310,32 @@ class AlasGUI(Frame):
 
         put_scope("_groups", [put_none(), put_scope("groups"), put_scope("navigator")])
 
+        config, snapshot = self._resolve_task_settings(task)
         task_help: str = t(f"Task.{task}.help")
+        task_info = []
         if task_help:
-            put_scope(
-                "group__info",
-                scope="groups",
-                content=[put_text(task_help).style("font-size: 1rem")],
-            )
+            task_info.append(put_text(task_help).style("font-size: 1rem"))
+        task_info.append(put_text(self._bind_chain_help(snapshot)).style("--arg-help--"))
+        put_scope("group__info", scope="groups", content=task_info)
 
-        config = self.alas_config.read_file(self.alas_name)
+        resolved_fields = snapshot.fields
         for group, arg_dict in deep_iter(self.ALAS_ARGS[task], depth=1):
-            if self.set_group(group, arg_dict, config, task):
+            if self.set_group(group, arg_dict, config, task, resolved_fields):
                 self.set_navigator(group)
+
+    def _resolve_task_settings(self, task: str) -> tuple[MutableDeepData, ResolvedTaskConfig]:
+        config = self.alas_config.read_file(self.alas_name)
+        snapshot = resolve_task_config(
+            task_name=task,
+            bind_chain=self.alas_config.task_bind_chain(task),
+            data=config,
+            overrides=self.alas_config.overridden,
+        )
+        return config, snapshot
+
+    @staticmethod
+    def _bind_chain_help(snapshot: ResolvedTaskConfig) -> str:
+        return t("Gui.Text.ConfigBindChain", " → ".join(snapshot.bind_chain))
 
     @staticmethod
     @use_scope("groups")
@@ -328,6 +344,7 @@ class AlasGUI(Frame):
         arg_dict: DeepValue,
         config: MutableDeepData,
         task: str,
+        resolved_fields: Mapping[str, ResolvedField],
     ) -> int:
         group_name = group[0]
 
@@ -339,6 +356,7 @@ class AlasGUI(Frame):
                 arg_dict=arg_dict,
                 config=config,
                 translate=t,
+                resolved_fields=resolved_fields,
             )
         ):
             o = put_output(output_kwargs)
@@ -673,11 +691,13 @@ class AlasGUI(Frame):
             )
         )
 
-        config = self.alas_config.read_file(self.alas_name)
+        config, snapshot = self._resolve_task_settings(task)
+        put_text(self._bind_chain_help(snapshot), scope="groups").style("--arg-help--")
+        resolved_fields = snapshot.fields
         for group, arg_dict in deep_iter(self.ALAS_ARGS[task], depth=1):
             if group[0] == "Storage":
                 continue
-            self.set_group(group, arg_dict, config, task)
+            self.set_group(group, arg_dict, config, task, resolved_fields)
 
         run_js(
             """

@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from module.base.stop_event import StopEvent
     from module.config.config_generated import ConfigOverrides, ConfigValue, RecordUpdates
     from module.config.deep import DeepPath, DeepValue, MutableDeepData, MutableDeepValue
+    from module.config.resolved import ConfigIssue
     from module.config.utils import TimeInput
 
 MISSING_DELAY_ARGUMENT_MESSAGE = "Missing argument in delay_next_run, should set at least one"
@@ -121,6 +122,8 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         self.config_name = config_name
         # 原始配置树。
         self.data: MutableDeepData = {}
+        # 最近一次磁盘配置解析产生的只读诊断。
+        self.config_issues: tuple[ConfigIssue, ...] = ()
         # 待持久化修改，键为配置路径，值为新值；save() 必须原地清空此对象。
         self.modified: dict[str, ConfigValue] = {}
         # GeneratedConfig 属性名到原始配置路径的绑定。
@@ -159,7 +162,7 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         self.save()
 
     def load(self) -> None:
-        self.data = self.read_file(self.config_name)
+        self.data, self.config_issues = self.read_file_with_issues(self.config_name)
         self.config_override()
 
         for path, value in self.modified.items():

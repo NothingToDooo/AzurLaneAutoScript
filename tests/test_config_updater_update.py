@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from module.config.config_updater import ConfigUpdater
 from module.config.deep import deep_get
+from module.config.resolved import ConfigIssue
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -70,12 +71,76 @@ def test_config_update_preserves_visible_values_and_resets_hidden_runtime_values
     }
 
 
+def test_config_update_reports_fallbacks_and_hidden_resets_without_missing_field_noise() -> None:
+    updater = _make_updater(
+        {
+            "Demo": {
+                "Group": {
+                    "Choice": _arg("safe", typ="select", option=["safe"]),
+                    "Blank": _arg(2),
+                    "Hidden": _arg(3, display="hide"),
+                    "Locked": _arg(4, typ="lock"),
+                    "Missing": _arg(5),
+                }
+            }
+        }
+    )
+
+    updated, issues = updater.config_update_with_issues(
+        {
+            "Demo": {
+                "Group": {
+                    "Choice": "legacy",
+                    "Blank": "",
+                    "Hidden": "30",
+                    "Locked": "40",
+                }
+            }
+        }
+    )
+
+    assert deep_get(updated, keys="Demo.Group") == {
+        "Choice": "safe",
+        "Blank": 2,
+        "Hidden": 3,
+        "Locked": 4,
+        "Missing": 5,
+    }
+    assert issues == (
+        ConfigIssue(path="Demo.Group.Choice", raw="legacy", resolved="safe", reason="invalid_option"),
+        ConfigIssue(path="Demo.Group.Blank", raw="", resolved=2, reason="default_fallback"),
+        ConfigIssue(path="Demo.Group.Hidden", raw="30", resolved=3, reason="hidden_reset"),
+        ConfigIssue(path="Demo.Group.Locked", raw="40", resolved=4, reason="default_fallback"),
+    )
+    assert (
+        updater.config_update(
+            {
+                "Demo": {
+                    "Group": {
+                        "Choice": "legacy",
+                        "Blank": "",
+                        "Hidden": "30",
+                        "Locked": "40",
+                    }
+                }
+            }
+        )
+        == updated
+    )
+
+
 def test_config_update_template_uses_defaults() -> None:
     updater = _make_updater({"Demo": {"Group": {"Value": _arg(1)}}})
 
     updated = updater.config_update({"Demo": {"Group": {"Value": "10"}}}, is_template=True)
 
     assert deep_get(updated, keys="Demo.Group.Value") == 1
+
+    _updated, issues = updater.config_update_with_issues(
+        {"Demo": {"Group": {"Value": "10"}}},
+        is_template=True,
+    )
+    assert issues == ()
 
 
 def test_config_update_keeps_old_hazard_leveling_enable_on_new_meowfficer_task() -> None:
@@ -86,10 +151,18 @@ def test_config_update_keeps_old_hazard_leveling_enable_on_new_meowfficer_task()
         }
     )
 
-    updated = updater.config_update({"OpsiHazard1Leveling": {"Scheduler": {"Enable": True}}})
+    updated, issues = updater.config_update_with_issues({"OpsiHazard1Leveling": {"Scheduler": {"Enable": True}}})
 
     assert deep_get(updated, keys="OpsiHazard1Leveling.Scheduler.Enable") is True
     assert deep_get(updated, keys="OpsiMeowfficerFarming.Scheduler.Enable") is True
+    assert issues == (
+        ConfigIssue(
+            path="OpsiMeowfficerFarming.Scheduler.Enable",
+            raw=False,
+            resolved=True,
+            reason="migration",
+        ),
+    )
 
 
 def test_config_update_refreshes_event_campaign_and_stage_defaults() -> None:
@@ -114,7 +187,7 @@ def test_config_update_refreshes_event_campaign_and_stage_defaults() -> None:
         }
     )
 
-    updated = updater.config_update(
+    updated, issues = updater.config_update_with_issues(
         {
             "Event": {"Campaign": {"Event": "old_event", "Name": "12-4"}},
             "GemsFarming": {"Campaign": {"Event": "old_event"}},
@@ -125,6 +198,17 @@ def test_config_update_refreshes_event_campaign_and_stage_defaults() -> None:
     assert deep_get(updated, keys="Event.Campaign") == {"Event": "event_2026", "Name": "D3"}
     assert deep_get(updated, keys="GemsFarming.Campaign.Event") == "gems_event"
     assert deep_get(updated, keys="Coalition.Campaign.Name") == "area1-normal"
+    assert issues == (
+        ConfigIssue(
+            path="Event.Campaign.Event",
+            raw="old_event",
+            resolved="event_2026",
+            reason="invalid_option",
+        ),
+        ConfigIssue(path="GemsFarming.Campaign.Event", raw="old_event", resolved="gems_event", reason="invalid_option"),
+        ConfigIssue(path="Event.Campaign.Name", raw="12-4", resolved="D3", reason="migration"),
+        ConfigIssue(path="Coalition.Campaign.Name", raw="7-2", resolved="area1-normal", reason="migration"),
+    )
 
 
 def test_config_update_keeps_war_archives_away_from_campaign_main_even_for_template() -> None:
@@ -142,3 +226,6 @@ def test_config_update_keeps_war_archives_away_from_campaign_main_even_for_templ
     updated = updater.config_update({}, is_template=True)
 
     assert deep_get(updated, keys="WarArchives.Campaign") == {"Event": "archive_2026", "Name": "D3"}
+
+    _updated, issues = updater.config_update_with_issues({}, is_template=True)
+    assert issues == ()
