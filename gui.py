@@ -12,11 +12,6 @@ DEFAULT_WEBUI_PORT = 22267
 def main() -> None:
     parser = argparse.ArgumentParser(description="Alas WebUI 服务")
     parser.add_argument(
-        "--host",
-        type=str,
-        help=f"监听地址，默认 {DEFAULT_WEBUI_HOST}。",
-    )
-    parser.add_argument(
         "-p",
         "--port",
         type=int,
@@ -29,16 +24,15 @@ def main() -> None:
         type=str,
         help="启动时自动运行指定配置。",
     )
-    args, _ = parser.parse_known_args()
+    args = parser.parse_args()
 
-    host = args.host or DEFAULT_WEBUI_HOST
     port = args.port or DEFAULT_WEBUI_PORT
 
     logger.hr("启动配置")
-    logger.attr("Host", host)
+    logger.attr("Host", DEFAULT_WEBUI_HOST)
     logger.attr("Port", port)
     prepare_pywebio_imports()
-    uvicorn.run("module.webui.app:app", host=host, port=port, factory=True, log_config=None)
+    uvicorn.run("module.webui.app:app", host=DEFAULT_WEBUI_HOST, port=port, factory=True, log_config=None)
 
 
 if __name__ == "__main__":

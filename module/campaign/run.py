@@ -26,6 +26,7 @@ from module.content.stage_loader import StageLoader, StageSpecLoader
 from module.exception import CampaignEnd, RequestHumanTakeover, ScriptEnd
 from module.handler.fast_forward import map_files, to_map_file_name
 from module.logger import logger
+from module.notify import handle_notify
 from module.ui.page import page_campaign
 
 if TYPE_CHECKING:
@@ -227,6 +228,17 @@ class CampaignRun(CampaignEvent):
         self._commit_campaign_load(state)
         return True
 
+    def _notify_campaign_finished(self, reason: str) -> None:
+        try:
+            handle_notify(
+                self.config.Error_OnePushConfig,
+                title=f"Alas <{self.config.config_name}> campaign finished",
+                content=f"<{self.config.config_name}> {self.name} {reason}",
+            )
+        except Exception:  # noqa: BLE001
+            # 停止条件已成立，通知失败不能改变停止结果。
+            logger.error("SMTP notify failed unexpectedly")
+
     def _triggered_run_count_limit(self) -> bool:
         if not (self.run_limit and self.config.StopCondition_RunCount <= 0):
             return False
@@ -234,6 +246,7 @@ class CampaignRun(CampaignEvent):
         logger.hr("Triggered stop condition: Run count")
         self.config.StopCondition_RunCount = 0
         self.config.Scheduler_Enable = False
+        self._notify_campaign_finished("reached run count limit")
         return True
 
     def _triggered_reach_level_limit(self) -> bool:
@@ -242,6 +255,7 @@ class CampaignRun(CampaignEvent):
 
         logger.hr(f"Triggered stop condition: Reach level {self.config.StopCondition_ReachLevel}")
         self.config.Scheduler_Enable = False
+        self._notify_campaign_finished("reached level limit")
         return True
 
     def _triggered_oil_limit(self, *, oil_check: bool = True) -> bool:
@@ -266,6 +280,7 @@ class CampaignRun(CampaignEvent):
 
         logger.hr("Triggered stop condition: Get new ship")
         self.config.Scheduler_Enable = False
+        self._notify_campaign_finished("got new ship")
         return True
 
     def _triggered_event_pt_limit(self, *, oil_check: bool = True) -> bool:

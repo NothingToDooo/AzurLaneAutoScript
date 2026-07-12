@@ -21,6 +21,7 @@ from module.exception import (
     ScriptError,
 )
 from module.logger import get_log_file, logger
+from module.notify import handle_notify
 from module.task_registry import get_task_spec
 
 if TYPE_CHECKING:
@@ -61,7 +62,21 @@ class AzurLaneAutoScript:
             return device_class(config=self.config)
         except RequestHumanTakeover:
             logger.critical("Request human takeover")
+            self._notify_crash("RequestHumanTakeover")
             sys.exit(1)
+
+    def _notify_safely(self, *, title: str, content: str) -> None:
+        try:
+            handle_notify(self.config.Error_OnePushConfig, title=title, content=content)
+        except Exception:  # noqa: BLE001
+            # 通知是旁路能力，任何实现错误都不能替换原任务结果。
+            logger.error("SMTP notify failed unexpectedly")
+
+    def _notify_crash(self, reason: str) -> None:
+        self._notify_safely(
+            title=f"Alas <{self.config_name}> crashed",
+            content=f"<{self.config_name}> {reason}",
+        )
 
     def _execute_run_command(self, command: str, *, skip_first_screenshot: bool = False) -> None:
         if not skip_first_screenshot:
@@ -110,12 +125,14 @@ class AzurLaneAutoScript:
             logger.critical("Request human takeover")
             if "device" in vars(self):
                 self._save_error_log_safely()
+        self._notify_crash(type(error).__name__)
         sys.exit(1)
 
     def _exit_on_unexpected_run_error(self, error: Exception) -> NoReturn:
         # 任务崩溃边界：保存现场并退出，避免调度循环继续运行在未知状态。
         logger.exception(error)
         self._save_error_log_safely()
+        self._notify_crash("Exception occurred")
         sys.exit(1)
 
     def run(self, command: str, *, skip_first_screenshot: bool = False) -> bool:
@@ -314,6 +331,10 @@ class AzurLaneAutoScript:
                     "Please contact developers or try to fix it yourself.",
                 )
                 logger.critical("Request human takeover")
+                self._notify_safely(
+                    title=f"Alas <{self.config_name}> crashed",
+                    content=f"<{self.config_name}> RequestHumanTakeover\nTask `{task}` failed 3 or more times.",
+                )
                 sys.exit(1)
 
             if success:

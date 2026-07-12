@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
+from adbutils import adb_path
 
 from module.device import connection_attr as connection_attr_module
 from module.device.connection_attr import ConnectionAttr
@@ -13,6 +15,7 @@ from module.device.runtime import DeviceRuntime
 from module.exception import RequestHumanTakeover
 
 if TYPE_CHECKING:
+    from module.config.config import AzurLaneConfig
     from module.device.contracts import ControllerService
 
 
@@ -59,6 +62,18 @@ def _make_connection(serial: str) -> Device:
     connection.serial = serial
     vars(connection)["_runtime"] = DeviceRuntime.create(connection)
     return connection
+
+
+def test_connection_attr_publishes_selected_adb_binary_to_adbutils(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ADBUTILS_ADB_PATH", raising=False)
+
+    config = cast("AzurLaneConfig", SimpleNamespace(Emulator_Serial="127.0.0.1:16384"))
+    connection = ConnectionAttr(config)
+
+    assert os.environ["ADBUTILS_ADB_PATH"] == connection.adb_binary
+    assert adb_path() == connection.adb_binary
 
 
 @dataclass(frozen=True)

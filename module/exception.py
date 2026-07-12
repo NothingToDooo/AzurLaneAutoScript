@@ -63,3 +63,7 @@ class GamePageUnknownError(Exception):
 class RequestHumanTakeover(Exception):
     # 自动处理失败时请求人工接管，常见原因是配置错误。
     pass
+
+
+class HardNotSatisfied(RequestHumanTakeover):
+    """困难关卡舰队要求未满足，允许 GemsFarming 先补齐空位。"""

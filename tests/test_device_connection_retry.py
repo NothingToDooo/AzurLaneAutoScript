@@ -111,6 +111,16 @@ def test_connection_retry_recovers_missing_package(monkeypatch: pytest.MonkeyPat
     assert device.calls == ["run", "detect_package", "run"]
 
 
+def test_connection_retry_starts_adb_server_when_connection_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    result, device, logger = _run_retry(monkeypatch, ConnectionRefusedError("adb server is stopped"))
+
+    assert result == "ok"
+    assert logger.errors == ["adb server is stopped"]
+    assert device.calls == ["run", "adb_start_server", "run"]
+
+
 def test_connection_retry_keeps_os_error_as_plain_retry(monkeypatch: pytest.MonkeyPatch) -> None:
     result, device, logger = _run_retry(monkeypatch, OSError("pipe"))
 

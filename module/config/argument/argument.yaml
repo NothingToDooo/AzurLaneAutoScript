@@ -24,9 +24,17 @@ Emulator:
   Serial:
     value: 127.0.0.1:16384
     valuetype: str
+  MuMuPath:
+    value: C:/Program Files/Netease/MuMu Player 12/nx_main/MuMuNxMain.exe
+    type: textarea
 Error:
   HandleError: true
   SaveError: true
+  # 保留旧字段名以无损读取现有配置，运行时只支持 SMTP。
+  OnePushConfig:
+    type: textarea
+    mode: yaml
+    value: 'provider: null'
   ScreenshotLength: 12
 Optimization:
   ScreenshotInterval: 0.3
@@ -181,16 +189,25 @@ C124LargeLeveling:
     value: 3
     option: [ 3, 4, 5 ]
 GemsFarming:
+  ChangeFlagship:
+    value: ship
+    option: [ ship, ship_equip ]
   CommonCV:
     value: any
     option: [ any, langley, bogue, ranger, hermes ]
   ChangeVanguard:
     value: ship
-    option: [ disabled, ship ]
+    option: [ disabled, ship, ship_equip ]
   CommonDD:
     value: any
     option: [ any, favourite, aulick_or_foote , cassin_or_downes, z20_or_z21 ]
   CommissionLimit: true
+EquipmentCode:
+  ExportToConfig: true
+  Config:
+    type: textarea
+    mode: yaml
+    value: |-
 
 # ==================== Event ====================
 

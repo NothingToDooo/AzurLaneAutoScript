@@ -1,13 +1,14 @@
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, TypedDict, override
 
+import pytest
+
+from module.exception import HardNotSatisfied, RequestHumanTakeover
 from module.map import assets as map_assets
 from module.map import map_fleet_preparation as fleet_preparation_module
-from module.map.map_fleet_preparation import FleetOperatorAssets, FleetPreparation
+from module.map.map_fleet_preparation import FleetOperator, FleetOperatorAssets, FleetPreparation
 
 if TYPE_CHECKING:
-    import pytest
-
     from module.base.button import Button, MatchOffset
 
 
@@ -150,3 +151,15 @@ def test_fleet_preparation_fast_clears_submarine_when_not_configured(monkeypatch
     ]
     assert preparation.device.screenshot_count == 1
     assert ("submarine", "clear") in preparation.calls
+
+
+def test_hard_not_satisfied_remains_a_human_takeover_signal(monkeypatch: pytest.MonkeyPatch) -> None:
+    operator = object.__new__(FleetOperator)
+    operator.main = SimpleNamespace(config=SimpleNamespace(Campaign_Name="3-4"))
+    monkeypatch.setattr(operator, "is_hard_satisfied", lambda: False)
+    monkeypatch.setattr(FleetOperator, "__str__", lambda _self: "fleet1")
+
+    with pytest.raises(HardNotSatisfied) as exc_info:
+        operator.raise_hard_not_satisfied()
+
+    assert isinstance(exc_info.value, RequestHumanTakeover)

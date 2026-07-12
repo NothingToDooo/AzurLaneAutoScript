@@ -4,10 +4,10 @@ from module.base.button import Button, ButtonGrid
 from module.base.timer import Timer
 from module.device.control_options import SwipeVectorOptions
 from module.equipment import assets as equipment_assets
+from module.equipment.equipment_code import EquipmentCodeHandler
 from module.logger import logger
 from module.retire.assets import DOCK_CHECK
 from module.retire.assets import EQUIP_CONFIRM as RETIRE_EQUIP_CONFIRM
-from module.storage.storage import StorageHandler
 from module.ui.assets import BACK_ARROW
 from module.ui.navbar import Navbar, NavbarColorRule, NavbarTarget, NavbarVisualRules
 
@@ -34,7 +34,7 @@ _SHIP_SIDE_NAVBAR = Navbar(
 )
 
 
-class Equipment(StorageHandler):
+class Equipment(EquipmentCodeHandler):
     equipment_has_take_on = False
 
     def _ship_view_swipe(self, distance: int, check_button: Button = equipment_assets.EQUIPMENT_OPEN) -> bool:

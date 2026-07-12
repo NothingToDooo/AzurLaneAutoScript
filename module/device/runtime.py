@@ -1,7 +1,7 @@
 import ctypes
 from dataclasses import dataclass
 from functools import cached_property
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import psutil
 from adbutils.errors import AdbError
@@ -60,7 +60,8 @@ class MumuRuntime(MumuRuntimeBase):
 
     @cached_property
     def emulator_manager(self) -> EmulatorManager:
-        return EmulatorManager()
+        session = cast("DeviceSession", self.session)
+        return EmulatorManager(session.config.Emulator_MuMuPath)
 
     @classmethod
     def execute(cls, command: Sequence[str]) -> psutil.Popen:

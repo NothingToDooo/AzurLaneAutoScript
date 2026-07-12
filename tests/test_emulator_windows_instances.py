@@ -14,13 +14,13 @@ def _touch_exe(path: Path) -> Path:
     return path
 
 
-def _write_nemu(folder: Path, hostport: str | None = None) -> None:
-    folder.mkdir(parents=True)
+def _write_nemu(folder: Path, hostport: str | None = None, *, filename: str = "instance.nemu") -> None:
+    folder.mkdir(parents=True, exist_ok=True)
     if hostport is None:
         text = "<Machine></Machine>"
     else:
         text = f'<Forwarding name="port2" proto="1" hostip="127.0.0.1" hostport="{hostport}" guestport="5555"/>'
-    (folder / "instance.nemu").write_text(text, encoding="utf-8")
+    (folder / filename).write_text(text, encoding="utf-8")
 
 
 def test_legacy_nemu_player_is_not_supported(tmp_path: Path) -> None:
@@ -74,6 +74,34 @@ def test_iter_instances_normalizes_legacy_hostport_to_mumu12_default_serial(tmp_
     assert len(instances) == 1
     assert instances[0].serial == "127.0.0.1:16416"
     assert instances[0].name == "MuMuPlayer-12.0-1"
+
+
+def test_iter_instances_deduplicates_identical_nemu_files(tmp_path: Path) -> None:
+    exe = _touch_exe(tmp_path / "shell" / "MuMuPlayer.exe")
+    folder = tmp_path / "vms" / "MuMuPlayer-12.0-1"
+    _write_nemu(folder, hostport="16416", filename="instance.nemu")
+    _write_nemu(folder, hostport="16416", filename="instance-copy.nemu")
+    emulator = Emulator(exe.as_posix())
+
+    instances = list(emulator.iter_instances())
+
+    assert [(instance.serial, instance.name, instance.path) for instance in instances] == [
+        ("127.0.0.1:16416", "MuMuPlayer-12.0-1", emulator.path)
+    ]
+
+
+def test_iter_instances_keeps_distinct_names_with_same_serial(tmp_path: Path) -> None:
+    exe = _touch_exe(tmp_path / "shell" / "MuMuPlayer.exe")
+    _write_nemu(tmp_path / "vms" / "MuMuPlayer-12.0-0", hostport="16384")
+    _write_nemu(tmp_path / "vms" / "MuMuPlayer-12.0-1", hostport="16384")
+    emulator = Emulator(exe.as_posix())
+
+    instances = list(emulator.iter_instances())
+
+    assert [(instance.serial, instance.name) for instance in instances] == [
+        ("127.0.0.1:16384", "MuMuPlayer-12.0-0"),
+        ("127.0.0.1:16384", "MuMuPlayer-12.0-1"),
+    ]
 
 
 def test_mumu_global_name_is_not_supported(tmp_path: Path) -> None:

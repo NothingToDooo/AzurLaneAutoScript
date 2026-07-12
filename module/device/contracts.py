@@ -70,6 +70,10 @@ class MinitouchConfig(Protocol):
     MINITOUCH_FILEPATH_REMOTE: str
 
 
+class DeviceConfig(MinitouchConfig, Protocol):
+    Emulator_MuMuPath: str
+
+
 class MinitouchSession(AdbShellSession, Protocol):
     @property
     def config(self) -> MinitouchConfig: ...
@@ -112,7 +116,8 @@ class MumuSession(RetrySession, Protocol):
 
 
 class DeviceSession(MinitouchSession, MumuSession, Protocol):
-    pass
+    @property
+    def config(self) -> DeviceConfig: ...
 
 
 class CaptureRuntime(Protocol):

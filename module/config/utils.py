@@ -203,9 +203,23 @@ def path_to_arg(path: str) -> str:
     return path.replace(".", "_")
 
 
+def _redact_config_value(key: str, value: MutableDeepValue) -> MutableDeepValue | str:
+    """配置日志中隐藏旧 OnePushConfig 内嵌的 SMTP 凭据。"""
+    normalized = key.replace(".", "").replace("_", "").casefold()
+    if normalized.endswith("onepushconfig"):
+        return "<redacted>"
+    return value
+
+
 def dict_to_kv(dictionary: Mapping[str, MutableDeepValue], *, allow_none: bool = True) -> str:
-    """把字典格式化为 `path='Scheduler.ServerUpdate', value=True` 形式。"""
-    return ", ".join([f"{k}={v!r}" for k, v in dictionary.items() if allow_none or v is not None])
+    """把字典格式化为日志键值，并隐藏内嵌 SMTP 凭据。"""
+    return ", ".join(
+        [
+            f"{key}={_redact_config_value(key, value)!r}"
+            for key, value in dictionary.items()
+            if allow_none or value is not None
+        ]
+    )
 
 
 def server_time_offset() -> timedelta:

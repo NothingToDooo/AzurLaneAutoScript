@@ -8,6 +8,7 @@ import pytest
 import module.config.utils as config_utils
 from module.config.utils import (
     alas_template,
+    dict_to_kv,
     get_server_last_update,
     get_server_next_update,
     parse_value,
@@ -58,6 +59,20 @@ def test_parse_value_converts_config_strings() -> None:
 
     for raw, expected in values.items():
         assert parse_value(raw, {}) == expected
+
+
+def test_config_log_redacts_legacy_smtp_yaml() -> None:
+    credential_value = "sensitive-value-must-not-enter-logs"
+    output = dict_to_kv(
+        {
+            "Alas.Error.OnePushConfig": f"provider: smtp\npassword: {credential_value}",
+            "GemsFarming.Scheduler.Enable": True,
+        }
+    )
+
+    assert credential_value not in output
+    assert "Alas.Error.OnePushConfig='<redacted>'" in output
+    assert "GemsFarming.Scheduler.Enable=True" in output
 
 
 def test_server_update_selects_nearest_nonempty_trigger(monkeypatch: pytest.MonkeyPatch) -> None:
