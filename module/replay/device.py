@@ -1,8 +1,8 @@
 from collections.abc import Sequence
 
-import cv2
 import numpy as np
 
+from module.base.utils import load_image
 from module.replay.trace import ClickAction, RecordedAction, ReplayFrame, SwipeAction
 
 type ImageArray = np.ndarray
@@ -56,10 +56,11 @@ class ReplayDevice:
 
         frame_index = self._next_frame_index
         frame = self._frames[frame_index]
-        image = cv2.imread(str(frame.image_path), cv2.IMREAD_COLOR)
-        if image is None:
+        try:
+            image = load_image(frame.image_path)
+        except OSError as error:
             message = f"Unable to load replay frame {frame_index}: {frame.image_path}"
-            raise ReplayImageLoadError(message)
+            raise ReplayImageLoadError(message) from error
 
         self.image = image
         self._active_frame_index = frame_index
@@ -74,6 +75,9 @@ class ReplayDevice:
         if not isinstance(expected, ClickAction) or expected.target != target:
             self._raise_action_mismatch(expected=expected, actual=f"click {target!r}")
         self._next_action_index += 1
+
+    def stuck_record_add(self, _button: object) -> None:
+        """回放不做真实设备卡死检测。"""
 
     def swipe(
         self,
