@@ -1,15 +1,19 @@
 import queue
 import threading
+import time
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from multiprocessing import Event, Process
 from typing import TYPE_CHECKING, ClassVar
 
-from rich.console import Console, ConsoleRenderable
+from rich.console import ConsoleRenderable
 
 from alas import AzurLaneAutoScript
 from module.config.config import AzurLaneConfig
 from module.logger import logger, set_file_logger, set_func_logger
 from module.task_registry import get_direct_task_command
 from module.webui.fake_pil_module import remove_fake_pil_module
+from module.webui.process_outcome import ProcessOutcome, ProcessOutcomeStatus
 from module.webui.setting import State
 
 if TYPE_CHECKING:
@@ -19,9 +23,106 @@ if TYPE_CHECKING:
 
 STOP_GRACE_SECONDS = 5
 KILL_JOIN_SECONDS = 1
+QUEUE_POLL_SECONDS = 0.1
+QUEUE_DRAIN_SECONDS = 1
+MONITOR_JOIN_SECONDS = 3
+MAX_OUTCOME_MESSAGE_LENGTH = 500
 
 
 type Renderable = ConsoleRenderable | str
+type RenderableQueueItem = ConsoleRenderable | None
+
+
+@dataclass(slots=True)
+class _ProcessRun:
+    command: str
+    process: Process
+    renderable_queue: queue.Queue[RenderableQueueItem]
+    outcome_queue: queue.Queue[ProcessOutcome]
+    stop_status: ProcessOutcomeStatus | None = None
+    monitor: threading.Thread | None = None
+
+
+def _short_message(error: BaseException) -> str:
+    message = " ".join(str(error).splitlines()).strip() or type(error).__name__
+    return message[:MAX_OUTCOME_MESSAGE_LENGTH]
+
+
+def _new_outcome(
+    status: ProcessOutcomeStatus,
+    *,
+    config_name: str,
+    command: str,
+    exception_type: str | None = None,
+    message: str | None = None,
+) -> ProcessOutcome:
+    return ProcessOutcome(
+        status=status,
+        config_name=config_name,
+        command=command,
+        exception_type=exception_type,
+        message=message,
+        finished_at=datetime.now(UTC),
+    )
+
+
+def _completion_outcome(config_name: str, command: str, stop_event: StopEvent | None) -> ProcessOutcome:
+    status = (
+        ProcessOutcomeStatus.MANUAL_STOP
+        if stop_event is not None and stop_event.is_set()
+        else ProcessOutcomeStatus.FINISHED
+    )
+    return _new_outcome(status, config_name=config_name, command=command)
+
+
+def _execute_process(config_name: str, func: str, stop_event: StopEvent | None) -> ProcessOutcome:
+    AzurLaneConfig.stop_event = stop_event
+    if func == "alas":
+        if stop_event is not None:
+            AzurLaneAutoScript.stop_event = stop_event
+        AzurLaneAutoScript(config_name=config_name).loop()
+        return _completion_outcome(config_name, func, stop_event)
+
+    command = get_direct_task_command(func)
+    if command is None:
+        message = f"No function matched: {func}"
+        logger.critical(message)
+        return _new_outcome(
+            ProcessOutcomeStatus.FAILED,
+            config_name=config_name,
+            command=func,
+            exception_type="LookupError",
+            message=message,
+        )
+    if not AzurLaneAutoScript(config_name=config_name).run(command, skip_first_screenshot=True):
+        return _new_outcome(
+            ProcessOutcomeStatus.FAILED,
+            config_name=config_name,
+            command=func,
+            exception_type="TaskFailed",
+            message=f"Task returned failure: {command}",
+        )
+    return _completion_outcome(config_name, func, stop_event)
+
+
+def _system_exit_outcome(
+    error: SystemExit,
+    *,
+    config_name: str,
+    command: str,
+    stop_event: StopEvent | None,
+) -> ProcessOutcome:
+    if stop_event is not None and stop_event.is_set():
+        return _new_outcome(ProcessOutcomeStatus.MANUAL_STOP, config_name=config_name, command=command)
+    if error.code in {None, 0}:
+        return _new_outcome(ProcessOutcomeStatus.FINISHED, config_name=config_name, command=command)
+    return _new_outcome(
+        ProcessOutcomeStatus.FAILED,
+        config_name=config_name,
+        command=command,
+        exception_type=type(error).__name__,
+        message=_short_message(error),
+    )
 
 
 class ProcessManager:
@@ -29,96 +130,187 @@ class ProcessManager:
 
     def __init__(self, config_name: str = "alas") -> None:
         self.config_name = config_name
-        self._renderable_queue: queue.Queue[ConsoleRenderable] = State.manager.Queue()
         self.renderables: list[Renderable] = []
         self.renderables_max_length = 400
         self.renderables_reduce_length = 80
-        self._process: Process | None = None
+        self._run: _ProcessRun | None = None
         self._stop_event: StopEvent | None = None
-        self._stop_lock = threading.Lock()
+        self._lifecycle_lock = threading.Lock()
+        self._outcome_lock = threading.Lock()
+        self._outcome: ProcessOutcome | None = None
         self.thd_log_queue_handler: threading.Thread | None = None
 
     def start(self, func: str | None, ev: StopEvent | None = None) -> None:
-        if not self.alive:
-            if func is None:
-                func = "alas"
+        with self._lifecycle_lock:
+            if self.alive:
+                return
+            self._join_monitor()
+            command = "alas" if func is None else func
+            renderable_queue: queue.Queue[RenderableQueueItem] = State.manager.Queue()
+            outcome_queue: queue.Queue[ProcessOutcome] = State.manager.Queue()
             self._stop_event = Event() if ev is None else ev
-            self._process = Process(
+            process = Process(
                 target=ProcessManager.run_process,
                 args=(
                     self.config_name,
-                    func,
-                    self._renderable_queue,
+                    command,
+                    renderable_queue,
+                    outcome_queue,
                     self._stop_event,
                 ),
             )
-            self._process.start()
-            self.start_log_queue_handler()
+            run = _ProcessRun(
+                command=command,
+                process=process,
+                renderable_queue=renderable_queue,
+                outcome_queue=outcome_queue,
+            )
+            self._run = run
+            with self._outcome_lock:
+                self._outcome = None
+            process.start()
+            self.start_log_queue_handler(run)
 
-    def start_log_queue_handler(self) -> None:
-        if self.thd_log_queue_handler is not None and self.thd_log_queue_handler.is_alive():
+    def _join_monitor(self) -> None:
+        monitor = self.thd_log_queue_handler
+        if monitor is None or not monitor.is_alive():
             return
-        self.thd_log_queue_handler = threading.Thread(target=self._thread_log_queue_handler)
-        self.thd_log_queue_handler.start()
+        monitor.join(timeout=MONITOR_JOIN_SECONDS)
+        if monitor.is_alive():
+            logger.warning("Process monitor is still draining its queue")
 
-    def _stop_process(self) -> None:
-        process = self._process
-        if process is None or not process.is_alive():
+    def start_log_queue_handler(self, run: _ProcessRun | None = None) -> None:
+        if run is None:
+            run = self._run
+        if run is None:
+            message = "Cannot start process monitor before a process run"
+            raise RuntimeError(message)
+        if run.monitor is not None and run.monitor.is_alive():
+            return
+        monitor = threading.Thread(target=self._thread_log_queue_handler, args=(run,))
+        run.monitor = monitor
+        if self._run is run:
+            self.thd_log_queue_handler = monitor
+        monitor.start()
+
+    def _stop_process(self, run: _ProcessRun) -> None:
+        process = run.process
+        if not process.is_alive():
             return
 
+        run.stop_status = ProcessOutcomeStatus.MANUAL_STOP
         if self._stop_event is not None:
             self._stop_event.set()
             process.join(timeout=STOP_GRACE_SECONDS)
 
         if process.is_alive():
+            run.stop_status = ProcessOutcomeStatus.KILLED
             logger.warning(f"[{self.config_name}] did not stop gracefully, killing process")
             process.kill()
             process.join(timeout=KILL_JOIN_SECONDS)
 
-        self.renderables.append(f"[{self.config_name}] exited. Reason: Manual stop\n")
-
     def stop(self) -> None:
-        with self._stop_lock:
-            if self.alive:
-                self._stop_process()
-                if self._process is not None and not self._process.is_alive():
+        with self._lifecycle_lock:
+            run = self._run
+            if run is not None and run.process.is_alive():
+                self._stop_process(run)
+                if not run.process.is_alive():
                     self._stop_event = None
-            if self.thd_log_queue_handler is not None:
-                self.thd_log_queue_handler.join(timeout=1)
-                if self.thd_log_queue_handler.is_alive():
-                    logger.warning("Log queue handler thread does not stop within 1 seconds")
+            self._join_monitor()
+            if run is not None:
+                self._publish_outcome(run, self._read_child_outcome(run, timeout=0))
         logger.info(f"[{self.config_name}] exited")
 
-    def _thread_log_queue_handler(self) -> None:
-        while self.alive:
+    def _append_renderable(self, renderable: ConsoleRenderable) -> None:
+        self.renderables.append(renderable)
+        if len(self.renderables) > self.renderables_max_length:
+            self.renderables = self.renderables[self.renderables_reduce_length :]
+
+    def _thread_log_queue_handler(self, run: _ProcessRun) -> None:
+        stopped_deadline: float | None = None
+        while True:
             try:
-                log = self._renderable_queue.get(timeout=1)
+                renderable = run.renderable_queue.get(timeout=QUEUE_POLL_SECONDS)
             except queue.Empty:
-                continue
-            self.renderables.append(log)
-            if len(self.renderables) > self.renderables_max_length:
-                self.renderables = self.renderables[self.renderables_reduce_length :]
-        logger.info("End of log queue handler loop")
+                if run.process.is_alive():
+                    stopped_deadline = None
+                    continue
+                if stopped_deadline is None:
+                    stopped_deadline = time.monotonic() + QUEUE_DRAIN_SECONDS
+                if time.monotonic() < stopped_deadline:
+                    continue
+                break
+            if renderable is None:
+                break
+            self._append_renderable(renderable)
+
+        run.process.join(timeout=KILL_JOIN_SECONDS)
+        outcome_timeout = 0 if run.stop_status is not None else QUEUE_DRAIN_SECONDS
+        child_outcome = self._read_child_outcome(run, timeout=outcome_timeout)
+        self._publish_outcome(run, child_outcome)
+        logger.info("End of process monitor loop")
+
+    @staticmethod
+    def _read_child_outcome(run: _ProcessRun, *, timeout: float) -> ProcessOutcome | None:
+        try:
+            outcome = run.outcome_queue.get(timeout=timeout) if timeout else run.outcome_queue.get_nowait()
+        except queue.Empty:
+            return None
+        while True:
+            try:
+                outcome = run.outcome_queue.get_nowait()
+            except queue.Empty:
+                return outcome
+
+    def _publish_outcome(self, run: _ProcessRun, child_outcome: ProcessOutcome | None) -> None:
+        with self._outcome_lock:
+            if self._run is not run:
+                return
+            if run.stop_status is not None:
+                self._outcome = _new_outcome(
+                    run.stop_status,
+                    config_name=self.config_name,
+                    command=run.command,
+                )
+                return
+            if child_outcome is not None:
+                self._outcome = child_outcome
+                return
+            if self._outcome is not None:
+                return
+            exit_code = getattr(run.process, "exitcode", None)
+            self._outcome = _new_outcome(
+                ProcessOutcomeStatus.FAILED,
+                config_name=self.config_name,
+                command=run.command,
+                exception_type="MissingProcessOutcome",
+                message=f"Process exited without an outcome (exitcode={exit_code})",
+            )
 
     @property
     def alive(self) -> bool:
-        if self._process is not None:
-            return self._process.is_alive()
-        return False
+        return self._run is not None and self._run.process.is_alive()
+
+    @property
+    def outcome(self) -> ProcessOutcome | None:
+        run = self._run
+        if run is not None:
+            child_outcome = self._read_child_outcome(run, timeout=0)
+            if child_outcome is not None:
+                self._publish_outcome(run, child_outcome)
+        with self._outcome_lock:
+            return self._outcome
 
     @property
     def state(self) -> int:
         if self.alive:
             return 1
-        if len(self.renderables) == 0:
-            return 2
-        console = Console(no_color=True)
-        with console.capture() as capture:
-            console.print(self.renderables[-1])
-        s = capture.get().strip()
-        if s.endswith(("Reason: Manual stop", "Reason: Finish")):
-            return 2
-        return 3
+        outcome = self.outcome
+        if outcome is None:
+            return 2 if self._run is None else 3
+        if outcome.status in {ProcessOutcomeStatus.FAILED, ProcessOutcomeStatus.KILLED}:
+            return 3
+        return 2
 
     @classmethod
     def get_manager(cls, config_name: str) -> ProcessManager:
@@ -130,31 +322,47 @@ class ProcessManager:
     def run_process(
         config_name: str,
         func: str,
-        q: queue.Queue[ConsoleRenderable],
+        renderable_queue: queue.Queue[RenderableQueueItem],
+        outcome_queue: queue.Queue[ProcessOutcome],
         stop_event: StopEvent | None = None,
     ) -> None:
-        set_file_logger(name=config_name)
-        set_func_logger(func=q.put)
-
-        # 子进程会使用真实 PIL，需要移除 WebUI 进程里的伪模块。
-        remove_fake_pil_module()
-
-        AzurLaneConfig.stop_event = stop_event
+        outcome: ProcessOutcome | None = None
         try:
-            if func == "alas":
-                if stop_event is not None:
-                    AzurLaneAutoScript.stop_event = stop_event
-                AzurLaneAutoScript(config_name=config_name).loop()
-            else:
-                command = get_direct_task_command(func)
-                if command is None:
-                    logger.critical(f"No function matched: {func}")
-                else:
-                    AzurLaneAutoScript(config_name=config_name).run(command, skip_first_screenshot=True)
-            logger.info(f"[{config_name}] exited. Reason: Finish\n")
-        # WebUI 子进程边界：把未知异常写入 renderable 队列，否则页面看不到堆栈。
+            set_file_logger(name=config_name)
+            set_func_logger(func=renderable_queue.put)
+            remove_fake_pil_module()
+            outcome = _execute_process(config_name, func, stop_event)
+        except SystemExit as error:
+            outcome = _system_exit_outcome(
+                error,
+                config_name=config_name,
+                command=func,
+                stop_event=stop_event,
+            )
+            raise
         except Exception as error:  # noqa: BLE001
             logger.exception(error)
+            outcome = _new_outcome(
+                ProcessOutcomeStatus.FAILED,
+                config_name=config_name,
+                command=func,
+                exception_type=type(error).__name__,
+                message=_short_message(error),
+            )
+        finally:
+            if outcome is None:
+                outcome = _new_outcome(
+                    ProcessOutcomeStatus.FAILED,
+                    config_name=config_name,
+                    command=func,
+                    exception_type="ProcessExit",
+                    message="Process exited before producing an outcome",
+                )
+            logger.info(f"[{config_name}] exited. Reason: {outcome.status.value}\n")
+            try:
+                outcome_queue.put(outcome)
+            finally:
+                renderable_queue.put(None)
 
     @classmethod
     def running_instances(cls) -> list[ProcessManager]:
@@ -171,12 +379,10 @@ class ProcessManager:
         ev: StopEvent | None = None,
     ) -> None:
         logger.hr("Restart alas")
-
         if instances is None:
             instances = []
 
         resolved_instances: set[ProcessManager] = set()
-
         for instance in instances:
             if isinstance(instance, str):
                 resolved_instances.add(ProcessManager.get_manager(instance))

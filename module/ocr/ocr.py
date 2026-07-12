@@ -14,6 +14,7 @@ from module.base.decorator import cached_property
 from module.base.type_alias import Area, Color, ImageArray, NumericArray, Scalar
 from module.base.utils import _cv_scalar, crop, extract_letters, float2str, rgb2luma
 from module.logger import logger
+from module.ocr.metrics import OCR_METRICS
 from module.ocr.models import OCR_MODEL
 from module.ocr.result import RawOcrResult, RecognitionFailureReason, RecognitionResult
 
@@ -21,12 +22,6 @@ from module.ocr.result import RawOcrResult, RecognitionFailureReason, Recognitio
 class _OcrEngine(Protocol):
     @property
     def model_name(self) -> str: ...
-
-    def atomic_ocr_for_single_lines(
-        self,
-        image_list: list[ImageArray],
-        cand_alphabet: str | None = None,
-    ) -> list[str]: ...
 
     def atomic_ocr_for_single_lines_raw(
         self,
@@ -188,6 +183,11 @@ class Ocr[OcrValueT = str]:
         start_time = time.perf_counter()
         raw_results = engine.atomic_ocr_for_single_lines_raw(processed_images, self.alphabet)
         latency_seconds = time.perf_counter() - start_time
+        OCR_METRICS.observe(
+            self._profile,
+            latency_seconds=latency_seconds,
+            processed_widths=[int(image.shape[1]) for image in processed_images],
+        )
         items = tuple(
             _OcrInference(
                 raw_image=raw_image,
@@ -206,9 +206,7 @@ class Ocr[OcrValueT = str]:
         return _OcrInferenceBatch(items=items, latency_seconds=latency_seconds, model=engine.model_name)
 
     def _ocr_texts(self, image: OcrInput, *, direct_ocr: bool) -> list[str]:
-        raw_images, _ = self._raw_images(image, direct_ocr=direct_ocr)
-        processed_images = [self.pre_process(raw_image) for raw_image in raw_images]
-        return ["".join(result) for result in self.cnocr.atomic_ocr_for_single_lines(processed_images, self.alphabet)]
+        return [inference.result.text for inference in self._infer_raw(image, direct_ocr=direct_ocr).items]
 
     def _finish_ocr(
         self,

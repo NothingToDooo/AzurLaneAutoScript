@@ -9,7 +9,8 @@ from module.base.atomic import atomic_write
 from module.base.decorator import cached_property
 from module.base.timer import timer
 from module.config.config_manual import ManualConfig
-from module.config.deep import deep_default, deep_get, deep_iter, deep_set
+from module.config.deep import deep_default, deep_exist, deep_get, deep_iter, deep_set
+from module.config.resolved import ConfigIssue, ConfigIssueReason
 from module.config.utils import (
     LANGUAGES,
     data_to_type,
@@ -693,58 +694,173 @@ class ConfigUpdater:
             or (display == "hide" and typ != "stored")
         )
 
-    def _rebuild_config_from_args(self, old: MutableDeepData, *, is_template: bool) -> MutableDeepData:
+    @staticmethod
+    def _record_issue(
+        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]],
+        *,
+        path: str,
+        raw: DeepValue,
+        resolved: DeepValue,
+        reason: ConfigIssueReason,
+    ) -> None:
+        if raw == resolved or path in pending:
+            return
+        pending[path] = cast("MutableDeepValue", deepcopy(raw)), reason
+
+    @staticmethod
+    def _has_invalid_config_option(value: DeepValue, data: dict[str, MutableDeepValue]) -> bool:
+        options = data.get("option")
+        return isinstance(options, list) and value not in cast("list[DeepValue]", options)
+
+    def _rebuild_config_from_args(
+        self,
+        old: MutableDeepData,
+        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]],
+        *,
+        is_template: bool,
+    ) -> MutableDeepData:
         new: MutableDeepData = {}
         for keys, raw_data in deep_iter(self.args, depth=3):
             if not isinstance(raw_data, dict):
                 message = f"Invalid generated argument at {'.'.join(keys)}"
                 raise TypeError(message)
             data = cast("dict[str, MutableDeepValue]", raw_data)
+            path = ".".join(keys)
+            exists = deep_exist(old, keys)
             value = deep_get(old, keys=keys, default=data["value"])
             if self._should_reset_config_value(value, data, is_template=is_template):
+                if exists and not is_template:
+                    reason: ConfigIssueReason = (
+                        "hidden_reset"
+                        if data.get("display") == "hide" and data["type"] != "stored"
+                        else "default_fallback"
+                    )
+                    self._record_issue(
+                        pending,
+                        path=path,
+                        raw=value,
+                        resolved=data["value"],
+                        reason=reason,
+                    )
                 value = data["value"]
+            elif self._has_invalid_config_option(value, data):
+                self._record_issue(
+                    pending,
+                    path=path,
+                    raw=value,
+                    resolved=data["value"],
+                    reason="invalid_option",
+                )
             parsed = cast("MutableDeepValue", parse_value(value, data=data))
             deep_set(new, keys=keys, value=parsed)
         return new
 
-    @staticmethod
-    def _migrate_opsi_hazard_leveling_enable(new: MutableDeepData) -> None:
-        if deep_get(new, keys="OpsiHazard1Leveling.Scheduler.Enable"):
-            deep_set(new, keys="OpsiMeowfficerFarming.Scheduler.Enable", value=True)
+    def _migrate_opsi_hazard_leveling_enable(
+        self,
+        old: MutableDeepData,
+        new: MutableDeepData,
+        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]],
+    ) -> None:
+        source_path = "OpsiHazard1Leveling.Scheduler.Enable"
+        if not deep_get(new, keys=source_path):
+            return
+        target_path = "OpsiMeowfficerFarming.Scheduler.Enable"
+        raw = deep_get(new, keys=target_path, default=False)
+        deep_set(new, keys=target_path, value=True)
+        if deep_exist(old, source_path):
+            self._record_issue(pending, path=target_path, raw=raw, resolved=True, reason="migration")
 
-    def _refresh_latest_campaign_event(self, new: MutableDeepData, tasks: Iterable[str]) -> None:
+    def _refresh_latest_campaign_event(
+        self,
+        old: MutableDeepData,
+        new: MutableDeepData,
+        tasks: Iterable[str],
+        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]],
+    ) -> None:
         for task in tasks:
-            opts = deep_get(self.args, keys=f"{task}.Campaign.Event.option", default=[])
-            if opts and deep_get(new, keys=f"{task}.Campaign.Event", default="campaign_main") not in opts:
-                deep_set(new, keys=f"{task}.Campaign.Event", value=opts[0])
+            path = f"{task}.Campaign.Event"
+            options = deep_get(self.args, keys=f"{path}.option", default=[])
+            raw = deep_get(new, keys=path, default="campaign_main")
+            if options and raw not in options:
+                resolved = options[0]
+                deep_set(new, keys=path, value=resolved)
+                if deep_exist(old, path):
+                    self._record_issue(pending, path=path, raw=raw, resolved=resolved, reason="migration")
 
-    def _keep_war_archives_away_from_campaign_main(self, new: MutableDeepData) -> None:
+    def _keep_war_archives_away_from_campaign_main(
+        self,
+        old: MutableDeepData,
+        new: MutableDeepData,
+        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]],
+    ) -> None:
         for task in WAR_ARCHIVES:
-            opts = deep_get(self.args, keys=f"{task}.Campaign.Event.option", default=[])
-            if opts and deep_get(new, keys=f"{task}.Campaign.Event", default="campaign_main") == "campaign_main":
-                deep_set(new, keys=f"{task}.Campaign.Event", value=opts[0])
+            path = f"{task}.Campaign.Event"
+            options = deep_get(self.args, keys=f"{path}.option", default=[])
+            raw = deep_get(new, keys=path, default="campaign_main")
+            if options and raw == "campaign_main":
+                resolved = options[0]
+                deep_set(new, keys=path, value=resolved)
+                if deep_exist(old, path):
+                    self._record_issue(pending, path=path, raw=raw, resolved=resolved, reason="migration")
+
+    def _replace_default_campaign_stage(
+        self,
+        old: MutableDeepData,
+        new: MutableDeepData,
+        tasks: Iterable[str],
+        stage: str,
+        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]],
+    ) -> None:
+        for task in tasks:
+            path = f"{task}.Campaign.Name"
+            raw = deep_get(new, keys=path, default="12-4")
+            if raw in ["7-2", "12-4"]:
+                deep_set(new, keys=path, value=stage)
+                if deep_exist(old, path):
+                    self._record_issue(pending, path=path, raw=raw, resolved=stage, reason="migration")
 
     @staticmethod
-    def _replace_default_campaign_stage(new: MutableDeepData, tasks: Iterable[str], stage: str) -> None:
-        for task in tasks:
-            if deep_get(new, keys=f"{task}.Campaign.Name", default="12-4") in ["7-2", "12-4"]:
-                deep_set(new, keys=f"{task}.Campaign.Name", value=stage)
+    def _finalize_issues(
+        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]],
+        resolved: MutableDeepData,
+    ) -> tuple[ConfigIssue, ...]:
+        return tuple(
+            ConfigIssue(
+                path=path,
+                raw=deepcopy(raw),
+                resolved=cast("MutableDeepValue", deepcopy(deep_get(resolved, keys=path))),
+                reason=reason,
+            )
+            for path, (raw, reason) in pending.items()
+        )
 
-    def config_update(self, old: MutableDeepData, *, is_template: bool = False) -> MutableDeepData:
-        new = self._rebuild_config_from_args(old, is_template=is_template)
-        self._migrate_opsi_hazard_leveling_enable(new)
+    def config_update_with_issues(
+        self,
+        old: MutableDeepData,
+        *,
+        is_template: bool = False,
+    ) -> tuple[MutableDeepData, tuple[ConfigIssue, ...]]:
+        """迁移配置并返回只读诊断；配置结果与 ``config_update()`` 完全相同。"""
+        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]] = {}
+        new = self._rebuild_config_from_args(old, pending, is_template=is_template)
+        self._migrate_opsi_hazard_leveling_enable(old, new, pending)
 
         # 更新到最新活动。
         if not is_template:
-            self._refresh_latest_campaign_event(new, EVENTS + RAIDS + COALITIONS + GEMS_FARMINGS)
+            self._refresh_latest_campaign_event(old, new, EVENTS + RAIDS + COALITIONS + GEMS_FARMINGS, pending)
         # 作战档案不允许使用 campaign_main。
-        self._keep_war_archives_away_from_campaign_main(new)
+        self._keep_war_archives_away_from_campaign_main(old, new, pending)
 
         # 活动任务不允许默认关卡 12-4。
-        self._replace_default_campaign_stage(new, EVENTS + WAR_ARCHIVES, "D3")
-        self._replace_default_campaign_stage(new, COALITIONS, "area1-normal")
+        self._replace_default_campaign_stage(old, new, EVENTS + WAR_ARCHIVES, "D3", pending)
+        self._replace_default_campaign_stage(old, new, COALITIONS, "area1-normal", pending)
 
-        return self._override(new)
+        resolved = self._override(new)
+        return resolved, self._finalize_issues(pending, resolved)
+
+    def config_update(self, old: MutableDeepData, *, is_template: bool = False) -> MutableDeepData:
+        updated, _issues = self.config_update_with_issues(old, is_template=is_template)
+        return updated
 
     @staticmethod
     def _override(data: MutableDeepData) -> MutableDeepData:
@@ -760,8 +876,18 @@ class ConfigUpdater:
 
     def read_file(self, config_name: str, *, is_template: bool = False) -> MutableDeepData:
         """读取并迁移 `./config/{config_name}.json`，只返回结果而不立即写回。"""
+        data, _issues = self.read_file_with_issues(config_name, is_template=is_template)
+        return data
+
+    def read_file_with_issues(
+        self,
+        config_name: str,
+        *,
+        is_template: bool = False,
+    ) -> tuple[MutableDeepData, tuple[ConfigIssue, ...]]:
+        """读取并迁移配置，同时返回本次解析产生的诊断。"""
         old = read_file(filepath_config(config_name))
-        return self.config_update(old, is_template=is_template)
+        return self.config_update_with_issues(old, is_template=is_template)
 
     @staticmethod
     def write_file(config_name: str, data: MutableDeepData) -> None:

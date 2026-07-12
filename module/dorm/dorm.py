@@ -124,6 +124,7 @@ class RewardDorm(UI):
         timeout = Timer(count // 5 + 5).start()
         x, y = random_rectangle_point(button.button)
         builder = self.device.minitouch_builder
+        self.device.replay_mark_unsupported_action("dorm_feed_long_tap")
         builder.down(x, y).commit()
         builder.send()
 

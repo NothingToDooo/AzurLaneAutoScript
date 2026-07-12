@@ -27,7 +27,7 @@ Emulator:
 Error:
   HandleError: true
   SaveError: true
-  ScreenshotLength: 1
+  ScreenshotLength: 12
 Optimization:
   ScreenshotInterval: 0.3
   CombatScreenshotInterval: 1.0

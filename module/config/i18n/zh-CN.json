@@ -2450,6 +2450,10 @@
     },
     "Text": {
       "InvalidFeedBack": "格式错误。 示例：{0}",
+      "ConfigBindChain": "配置绑定（前者优先）：{0}",
+      "ConfigSource": "来源：{0}",
+      "ConfigRuntime": "仅运行时",
+      "ConfigOverride": "运行时覆盖",
       "Clear": "清除",
       "EnterPassword": "输入密码",
       "ChooseFile": "选择文件"

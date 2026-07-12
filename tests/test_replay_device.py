@@ -12,6 +12,7 @@ from module.replay import (
     ReplayFrame,
     ReplayFrameIncompleteError,
     ReplayFramesExhaustedError,
+    ReplayImageLoadError,
     ReplayIncompleteError,
     SwipeAction,
     read_trace,
@@ -159,6 +160,29 @@ def test_screenshot_activates_next_frame_and_sets_image(tmp_path: Path) -> None:
 
     assert device.image is image
     assert image.shape == (720, 1280, 3)
+    assert image[0, 0].tolist() == [1, 2, 3]
+
+
+@pytest.mark.parametrize("image_name", ["missing.png", "invalid.png"])
+def test_screenshot_wraps_image_load_errors(tmp_path: Path, image_name: str) -> None:
+    image_path = tmp_path / image_name
+    if image_name == "invalid.png":
+        image_path.write_bytes(b"not a PNG image")
+    device = ReplayDevice((ReplayFrame(image_path=image_path),))
+
+    with pytest.raises(ReplayImageLoadError, match=r"Unable to load replay frame 0"):
+        device.screenshot()
+
+
+def test_stuck_record_add_is_a_no_op(tmp_path: Path) -> None:
+    image_path = tmp_path / "frame.png"
+    _make_image(image_path, (1, 2, 3))
+    device = ReplayDevice((ReplayFrame(image_path=image_path),))
+
+    device.stuck_record_add(_Button("DAILY_ENTER_CHECK"))
+    device.screenshot()
+
+    device.assert_complete()
 
 
 def test_click_and_swipe_consume_semantic_actions_in_order(tmp_path: Path) -> None:

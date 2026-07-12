@@ -1,12 +1,22 @@
 import copy
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 from module.config.utils import path_to_arg
 
 if TYPE_CHECKING:
     from module.config.deep import DeepValue, MutableDeepValue
+
+type ConfigIssueReason = Literal["invalid_option", "default_fallback", "hidden_reset", "migration"]
+
+
+@dataclass(frozen=True, slots=True)
+class ConfigIssue:
+    path: str
+    raw: MutableDeepValue
+    resolved: MutableDeepValue
+    reason: ConfigIssueReason
 
 
 @dataclass(frozen=True, slots=True)

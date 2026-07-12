@@ -25,6 +25,8 @@
 - 模型研究结论保留为长期附录；只有真实语料和独立迁移计划就绪后才启动模型替换。
 - 不建设多平台插件系统、通用工作流 DSL、微服务或一次性重写现有状态机。
 
+截至 2026-07-12，P0、P1 的工程产出以及 P3、P4 已完成；P2 已具备运行期真实轨迹采集和回放设备边界，等待正常使用中自然产生的 popup 与 Daily 连续帧晋升为固定 fixture。P5 继续受 P2 的真实业务回放门禁约束，不提前建立 Operation 基类或搬迁任务目录。
+
 ## 2. 研究范围与判断标准
 
 ### 2.1 运行约束
@@ -321,8 +323,10 @@ Replay 读取固定帧并记录语义动作，不启动 ADB、模拟器、WebUI 
 
 - [`dorm_food_get()`](../module/dorm/dorm.py#L206) 已只裁剪并识别颜色前置判断确认存在的食物槽；合法 `0` 保持有效，任一食物数量失败时跳过本帧填充量 OCR，并由现有外层循环进入下一帧。
 - 食物数量与填充量均使用结构化结果，并按 `Error_SaveError` 接入现有失败样本存储；空槽不提交空批次，槽位与固定食物表使用严格长度契约。
-- [`test_dorm_food.py`](../tests/test_dorm_food.py) 覆盖混合空槽、合法零、空批次、食物数量失败、填充量失败和下一帧恢复。当前全量门禁为 `1552 passed, 1 skipped`。
-- 模型会话共享、串行字符集边界、profile 统计和同步预热尚未实施，P1 退出条件尚未满足。
+- [`OcrRuntime`](../module/ocr/models.py) 已让 `azur_lane` 与 `cnocr` 共用唯一的惰性 CnOCR 会话；同一把锁覆盖首次加载、候选字符集切换、整批推理和释放，初始化失败不会缓存半初始化会话，释放也会等待在途推理完成。
+- [OCR profile 统计](../module/ocr/metrics.py) 已覆盖旧值接口和结构化接口共用的 raw 推理边界，按 profile 累计调用次数、总耗时、最大耗时、ROI 数量和固定宽度直方图；统计不保留逐次耗时或图像。多 ROI 的批次耗时只累计一次，宽度取预处理后的实际输入。
+- [`test_ocr_runtime.py`](../tests/test_ocr_runtime.py)、[`test_ocr_metrics.py`](../tests/test_ocr_metrics.py) 和 [`test_ocr_result.py`](../tests/test_ocr_result.py) 已覆盖共享惰性会话、并发字符集隔离、释放等待、失败重建、并发统计、空批次以及旧值／结构化路径的共同观测。当前全量门禁为 `1579 passed, 1 skipped`。
+- 当前没有实测证据表明首次模型加载侵占业务 timeout，因此没有增加同步模型预热；既有 `early_ocr_import()` 仍只提前导入依赖，不创建模型会话。P1 的运行时与观测子项已落地，退出条件仍等待真实运行统计，并继续按触碰审计其他可确定跳过的推理。
 
 **退出条件：** 每项优化都有调用次数或内存数据证明收益；结果逐项一致；没有全局缓存、全局批处理或并发字符集切换。
 
@@ -333,7 +337,15 @@ Replay 读取固定帧并记录语义动作，不启动 ADB、模拟器、WebUI 
 - 只补 `ModuleBase.appear()` 所需的 `stuck_record_add()`，以及真实构造需要时的只读 `has_cached_image`。
 - 使用真实 `InfoHandler.handle_popup_confirm()` 跑通“模板判断 → 语义点击 → trace 完整消费”，测试不得覆写 `appear()`。
 - 使用真实 `Daily.daily_enter()` 覆盖“点击入口 → 进入战斗”和“领奖 → 返回任务页”两个 2～3 帧场景。
-- fixture 使用去除 UID 的真实截图，不导入 ADB、MuMu、WebUI 或真实 DeviceRuntime。
+- fixture 使用本机正常运行产生的真实截图，不导入 ADB、MuMu、WebUI 或真实 DeviceRuntime。
+
+**实施状态（2026-07-12）：**
+
+- [`ReplayRecorder`](../module/replay/recorder.py) 已直接取代原截图 deque：连续无动作截图只保留最新一张，发生 click/swipe 后冻结动作前帧，有限环形窗口不会被 0.1 秒轮询空帧迅速挤满；默认窗口由 1 调整为 12，不新增配置真相。
+- [`Control`](../module/device/control.py) 在参数校验完成、真实控制下发前记录按钮语义名或规范化滑动端点；短滑动不记录，ReplayDevice 尚不支持的 long click/drag 以及宿舍直连 minitouch 的长按喂食都会阻止发布伪完整 `trace.json`。
+- 错误目录先保存本机真实截图，最后用现有 [`write_trace()`](../module/replay/trace.py) 发布 `trace.json`；游戏未运行、卡死、未知页面、`ScriptError` 和未知异常均尝试保存现场，诊断写盘失败不会替换原始业务错误。个人版本地错误包不做图片或日志脱敏，也不会自动上传。
+- [`ReplayDevice`](../module/replay/device.py) 已使用项目统一图片读取并补齐 `stuck_record_add()`；采集器、控制动作绑定、内部截图重试和错误包集成已有独立测试。
+- 不再从公开 issue 拼接不连续截图，也不要求手工走流程截图。真实 `handle_popup_confirm()` 与 `Daily.daily_enter()` fixture 将从正常运行产生的私有错误包中挑选并复核；在连续样本出现前，P2 退出条件仍未满足。
 
 **退出条件：** ReplayDevice 不再只有自身测试；至少一条通用 handler 和一条业务流程使用生产实现完成回放。
 
@@ -345,6 +357,13 @@ Replay 读取固定帧并记录语义动作，不启动 ADB、模拟器、WebUI 
 - outcome 保存 config、command、异常类型、短消息和结束时间。
 - 日志线程在进程退出且队列排空后结束，Rich 日志继续保留完整 traceback。
 - `ProcessManager.state` 和 WebUI 三色状态读取 outcome，不再解析最后一条日志文字。
+
+**实施状态（2026-07-12）：**
+
+- 已增加不可变、可序列化的 [`ProcessOutcome`](../module/webui/process_outcome.py)，明确区分正常完成、失败、手动停止和强杀，并保存 config、command、异常类型、短消息与结束时间。
+- [`ProcessManager`](../module/webui/process_manager.py) 每次运行创建独立日志与 outcome 队列；父进程停止意图决定手动停止／强杀结果，WebUI 状态不再解析最后一条日志。
+- 监视线程在自然退出时等待子进程 outcome，并在所有退出路径排空日志尾部；强杀不会用父进程 sentinel 抢在子进程日志前结束消费。
+- 正常完成、未知异常、手动停止、强杀、尾部日志与连续重启均已有确定测试。
 
 **退出条件：** 正常完成、未知异常、手动停止和强杀都有确定测试，最终异常日志不会因进程退出竞态丢失。
 
@@ -358,6 +377,13 @@ Replay 读取固定帧并记录语义动作，不启动 ADB、模拟器、WebUI 
 - 资源生成工具汇总错误分辨率和悬空引用，不强制加载生产资源。
 - 新活动继续默认使用 manifest、StageSpec 和有限策略。
 
+**实施状态（2026-07-12）：**
+
+- 已增加冻结的 [`ConfigIssue`](../module/config/resolved.py)，覆盖非法选项、默认回退、隐藏字段重置和迁移；原配置更新、持久化和返回协议不变，同一路径只保留首个根因。
+- WebUI 已展示任务 bind chain、字段 source path 和运行时 override，不建立第二份配置解析逻辑。
+- 已增加只读 [`ResourceSnapshot`](../module/base/resource.py)，报告注册、加载、类型分布和最近释放数量；读取 snapshot 不触发资源加载。
+- 资源生成工具已聚合错误分辨率、孤立 sidecar、不可读图片和生成文件悬空引用，并通过 AST 校验引用而不导入生产资源；当前仓库真实扫描为零问题。
+
 **退出条件：** 诊断只观察现有行为，不改变配置解析结果、持久化格式或资源释放策略。
 
 ### P5：有回放保护后再扩大 Operation 与任务域
@@ -368,6 +394,12 @@ Replay 读取固定帧并记录语义动作，不启动 ADB、模拟器、WebUI 
 - 外层 while、Timer 和领域终止条件暂留原方法，不建立 Operation 继承树。
 - 至少出现三个同形流程后，才考虑共同循环驱动器。
 - 新业务进入 `tasks/<domain>`；旧业务按触碰迁移，稳定状态机保持不动。
+
+**实施状态（2026-07-12）：**
+
+- 尚未开始生产抽象，这是门禁的预期结果而不是遗漏。运行期自然采集解决的是 fixture 获取成本，不会替代真实 `handle_popup_confirm()` 和两条 Daily 连续回放。
+- 当前 `daily_enter()` 已有足够清晰的私有步骤边界，但现有测试仍覆写感知方法，只能锁定控制流，不能证明真实模板状态、动作优先级和跨帧 `reward_received` 转移，因此不据此提取 Perception 或 Operation。
+- 在真实回放稳定前不建立空 `tasks/` 目录、不迁移 Daily、不创建 Operation 继承树或共同循环驱动器。首批提取仍限定为不可变 observation 与单步决策，外层循环、Timer 和终止条件留在原方法。
 
 **退出条件：** Operation 不直接拥有设备实现细节，Perception 不执行动作，旧行为有特征测试或回放锁定；新功能不增加配置、资源或任务身份的第二份真相。
 

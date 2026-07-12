@@ -425,7 +425,7 @@ class GeneratedConfig:
     # 配置组 `Error`
     Error_HandleError = True
     Error_SaveError = True
-    Error_ScreenshotLength = 1
+    Error_ScreenshotLength = 12
 
     # 配置组 `Optimization`
     Optimization_ScreenshotInterval = 0.3

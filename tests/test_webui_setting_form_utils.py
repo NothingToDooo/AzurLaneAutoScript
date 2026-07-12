@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from module.config.resolved import ResolvedField
 from module.webui.setting_form_utils import (
     GroupOutputContext,
     SettingOutputContext,
@@ -25,6 +26,7 @@ def test_build_setting_output_kwargs_normalizes_visible_input() -> None:
             arg_config={"type": "input", "value": "default", "option": ["a", "b"]},
             config={"Demo": {"Scheduler": {"NextRun": datetime(2026, 1, 2, 3, 4, 5)}}},
             translate=_translate,
+            resolved_field=None,
         )
     )
 
@@ -49,6 +51,7 @@ def test_build_setting_output_kwargs_skips_hidden_and_gems_single_event() -> Non
             arg_config={"type": "input", "value": "", "display": "hide"},
             config={},
             translate=_translate,
+            resolved_field=None,
         )
     )
     gems_event = build_setting_output_kwargs(
@@ -59,6 +62,7 @@ def test_build_setting_output_kwargs_skips_hidden_and_gems_single_event() -> Non
             arg_config={"type": "select", "value": "event", "option": ["event"]},
             config={},
             translate=_translate,
+            resolved_field=None,
         )
     )
 
@@ -81,12 +85,34 @@ def test_build_setting_output_kwargs_marks_disabled_and_single_bold_select_as_st
             },
             config={},
             translate=_translate,
+            resolved_field=None,
         )
     )
 
     assert output is not None
     assert output["disabled"] is True
     assert output["widget_type"] == "state"
+
+
+def test_build_setting_output_kwargs_appends_source_and_runtime_override() -> None:
+    output = build_setting_output_kwargs(
+        SettingOutputContext(
+            task="Demo",
+            group_name="Group",
+            arg_name="Value",
+            arg_config={"type": "input", "value": "default"},
+            config={"Demo": {"Group": {"Value": "configured"}}},
+            translate=_translate,
+            resolved_field=ResolvedField(
+                value="runtime",
+                source_path="General.Group.Value",
+                is_override=True,
+            ),
+        )
+    )
+
+    assert output is not None
+    assert output["help"] == "Gui.Text.ConfigSource:General.Group.Value · Gui.Text.ConfigOverride"
 
 
 def test_iter_group_output_kwargs_yields_only_visible_settings() -> None:
@@ -101,8 +127,16 @@ def test_iter_group_output_kwargs_yields_only_visible_settings() -> None:
                 },
                 config={},
                 translate=_translate,
+                resolved_fields={
+                    "Group_Visible": ResolvedField(
+                        value="ok",
+                        source_path=None,
+                        is_override=True,
+                    )
+                },
             )
         )
     )
 
     assert [output["name"] for output in outputs] == ["Demo_Group_Visible"]
+    assert outputs[0]["help"] == "Gui.Text.ConfigSource:Gui.Text.ConfigRuntime · Gui.Text.ConfigOverride"

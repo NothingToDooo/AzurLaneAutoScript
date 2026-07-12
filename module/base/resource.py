@@ -1,5 +1,7 @@
 import re
 import sys
+from collections import Counter
+from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
@@ -10,6 +12,21 @@ from module.ocr.models import OCR_MODEL
 
 if TYPE_CHECKING:
     from module.base.type_alias import FilePath
+
+
+@dataclass(frozen=True, slots=True)
+class ResourceTypeSnapshot:
+    resource_type: str
+    registered: int
+    loaded: int
+
+
+@dataclass(frozen=True, slots=True)
+class ResourceSnapshot:
+    registered: int
+    loaded: int
+    by_type: tuple[ResourceTypeSnapshot, ...]
+    last_released: int
 
 
 def get_assets_from_file(file: FilePath, regex: re.Pattern[str]) -> set[str]:
@@ -35,6 +52,16 @@ def _preserved_ui_assets() -> frozenset[str]:
 class Resource:
     instances: ClassVar[dict[FilePath, Resource]] = {}
     cached: ClassVar[tuple[str, ...]] = ()
+    last_released: ClassVar[int] = 0
+
+    _image_state_fields: ClassVar[tuple[str, ...]] = (
+        "_image",
+        "image",
+        "_image_binary",
+        "image_binary",
+        "_image_luma",
+        "image_luma",
+    )
 
     def resource_add(self, key: FilePath) -> None:
         Resource.instances[key] = self
@@ -43,11 +70,35 @@ class Resource:
         for property_name in self.cached:
             del_cached_property(self, property_name)
 
+    @staticmethod
+    def is_loaded(obj: Resource) -> bool:
+        """Inspect instance state without evaluating lazy image properties."""
+        try:
+            state = vars(obj)
+        except TypeError:
+            return False
+        return any(state.get(field) is not None for field in Resource._image_state_fields if field in state)
+
     @classmethod
-    def is_loaded(cls, obj: Resource) -> bool:
-        missing = object()
-        unloaded = getattr(obj, "_image", missing) is None or getattr(obj, "image", missing) is None
-        return not unloaded
+    def snapshot(cls) -> ResourceSnapshot:
+        """Return diagnostics for resources that are already registered."""
+        resources = tuple(cls.instances.values())
+        registered_by_type = Counter(type(obj).__name__ for obj in resources)
+        loaded_by_type = Counter(type(obj).__name__ for obj in resources if cls.is_loaded(obj))
+        by_type = tuple(
+            ResourceTypeSnapshot(
+                resource_type=resource_type,
+                registered=registered,
+                loaded=loaded_by_type[resource_type],
+            )
+            for resource_type, registered in sorted(registered_by_type.items())
+        )
+        return ResourceSnapshot(
+            registered=len(resources),
+            loaded=sum(loaded_by_type.values()),
+            by_type=by_type,
+            last_released=cls.last_released,
+        )
 
     @classmethod
     def resource_show(cls) -> None:
@@ -63,21 +114,20 @@ class Resource:
 
 
 def release_resources(next_task: str = "") -> None:
-    # OCR 通常加载两个约 20MB 的模型；下一任务马上使用时保留对应缓存。
-    if "Opsi" in next_task or "commission" in next_task:
-        models = []
-    elif next_task:
-        models = ["cnocr"]
-    else:
-        models = ["azur_lane", "cnocr"]
-    for model in models:
-        del_cached_property(OCR_MODEL, model)
+    # 下一任务马上使用时保留唯一的 OCR 会话，进入空闲等待时完整释放。
+    if not next_task:
+        OCR_MODEL.release()
 
+    released = 0
     for obj in Resource.instances.values():
         # 保留 UI 切换需要的资源。
         if next_task and str(obj) in _preserved_ui_assets():
             continue
+        was_loaded = Resource.is_loaded(obj)
         obj.resource_release()
+        if was_loaded and not Resource.is_loaded(obj):
+            released += 1
+    Resource.last_released = released
 
     # 只在地图检测资源已经加载时释放，避免为了清缓存反而导入重资源。
     utils_assets = sys.modules.get("module.map_detection.utils_assets")

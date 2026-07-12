@@ -8,9 +8,11 @@ import module.dorm.dorm as dorm_module
 from module.dorm.dorm import Food, RewardDorm
 from module.ocr.failure_store import OCR_FAILURE_STORE, OcrFailureRecorder
 from module.ocr.result import RecognitionFailureReason, RecognitionResult
+from module.replay.recorder import ReplayRecorder
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
+    from pathlib import Path
 
     from module.base.base import _HasArea
     from module.base.button import Button
@@ -171,6 +173,59 @@ class _DormFeedLoop(RewardDorm):
         return next(self.results)
 
 
+class _LongTapBuilder:
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+
+    def down(self, _x: int, _y: int) -> _LongTapBuilder:
+        self.events.append("down")
+        return self
+
+    def move(self, _x: int, _y: int) -> _LongTapBuilder:
+        self.events.append("move")
+        return self
+
+    def up(self) -> _LongTapBuilder:
+        self.events.append("up")
+        return self
+
+    def commit(self) -> _LongTapBuilder:
+        return self
+
+    def wait(self, _milliseconds: int) -> _LongTapBuilder:
+        return self
+
+    def send(self) -> None:
+        self.events.append("send")
+
+
+class _LongTapDevice:
+    def __init__(self, recorder: ReplayRecorder) -> None:
+        self.recorder = recorder
+        self.events: list[str] = []
+        self.minitouch_builder = _LongTapBuilder(self.events)
+
+    def replay_mark_unsupported_action(self, action: str) -> None:
+        self.events.append(f"unsupported:{action}")
+        self.recorder.mark_unsupported_action(action)
+
+    def screenshot(self) -> None:
+        self.recorder.record_frame(TEST_IMAGE)
+
+
+class _DormLongTap(RewardDorm):
+    def __init__(self, device: _LongTapDevice) -> None:
+        self.device = cast("Device", device)
+
+    @override
+    def _dorm_has_food(self, button: Button) -> bool:
+        del button
+        return False
+
+    def feed_long_tap(self, button: Button, count: int) -> None:
+        self._dorm_feed_long_tap(button, count)
+
+
 def test_dorm_food_get_only_recognizes_present_slots_and_accepts_zero(monkeypatch: pytest.MonkeyPatch) -> None:
     food_ocr = _FoodOcr([_valid_digit(0), _valid_digit(11)])
     fill_ocr = _FillOcr(_valid_fill((10000, 30000, 40000)))
@@ -244,3 +299,19 @@ def test_dorm_feed_once_retries_after_invalid_frame(monkeypatch: pytest.MonkeyPa
     assert dorm.dorm_feed_once() is False
     assert dorm.food_get_calls == 2
     assert food_filter.loaded == ""
+
+
+def test_dorm_feed_long_tap_blocks_incomplete_replay_trace(tmp_path: Path) -> None:
+    recorder = ReplayRecorder(max_frames=2)
+    recorder.record_frame(TEST_IMAGE)
+    device = _LongTapDevice(recorder)
+    dorm = _DormLongTap(device)
+    button = cast("Button", SimpleNamespace(button=(10, 20, 30, 40)))
+
+    dorm.feed_long_tap(button, count=1)
+    result = recorder.dump(tmp_path)
+
+    assert device.events[0] == "unsupported:dorm_feed_long_tap"
+    assert "down" in device.events
+    assert result.trace_path is None
+    assert result.blockers == ("dorm_feed_long_tap",)

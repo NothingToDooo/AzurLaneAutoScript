@@ -64,6 +64,10 @@ AppManage:
 
 Text:
   InvalidFeedBack:
+  ConfigBindChain:
+  ConfigSource:
+  ConfigRuntime:
+  ConfigOverride:
   Clear:
   EnterPassword:
   ChooseFile:

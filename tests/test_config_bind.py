@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from module.config.config import AzurLaneConfig, name_to_function
+from module.config.resolved import ConfigIssue
 from module.os.config import OSConfig
 
 if TYPE_CHECKING:
@@ -214,7 +215,8 @@ def test_runtime_overlay_survives_update_and_rebind_without_writing() -> None:
     config.merge(SimpleNamespace(Campaign_Name="SP"))
     config.config_name = "alas"
     config.task = name_to_function("TaskA")
-    vars(config)["read_file"] = lambda _name: copy.deepcopy(stored)
+    issue = ConfigIssue(path="TaskA.Campaign.Name", raw="12-4", resolved="D3", reason="migration")
+    vars(config)["read_file_with_issues"] = lambda _name: (copy.deepcopy(stored), (issue,))
     vars(config)["config_override"] = lambda: None
     vars(config)["write_file"] = lambda *_args, **_kwargs: pytest.fail("runtime overlay must not write config")
 
@@ -223,6 +225,7 @@ def test_runtime_overlay_survives_update_and_rebind_without_writing() -> None:
 
     assert config.Campaign_Name == "SP"
     assert config.resolved.fields["Campaign_Name"].value == "D3"
+    assert config.config_issues == (issue,)
     assert config.modified == {}
 
 
@@ -277,7 +280,7 @@ def test_update_applies_config_override_only_once() -> None:
     config.config_name = "alas"
     config.task = name_to_function("Alas")
     calls: list[str] = []
-    vars(config)["read_file"] = lambda _name: {}
+    vars(config)["read_file_with_issues"] = lambda _name: ({}, ())
     vars(config)["config_override"] = lambda: calls.append("override")
     vars(config)["bind"] = lambda _task: calls.append("bind")
     vars(config)["save"] = lambda: calls.append("save")

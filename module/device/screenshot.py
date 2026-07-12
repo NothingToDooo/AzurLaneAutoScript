@@ -1,7 +1,5 @@
 import time
-from collections import deque
-from datetime import datetime
-from typing import TYPE_CHECKING, Literal, TypedDict
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 from PIL import Image
@@ -11,6 +9,7 @@ from module.base.timer import Timer
 from module.base.utils import get_color, image_size, limit_in, save_image
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
+from module.replay.recorder import ReplayRecorder
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -18,11 +17,6 @@ if TYPE_CHECKING:
     from module.base.type_alias import FilePath, ImageArray
     from module.config.config import AzurLaneConfig
     from module.device.contracts import CaptureService
-
-
-class ScreenshotRecord(TypedDict):
-    time: datetime
-    image: ImageArray
 
 
 class Screenshot:
@@ -48,12 +42,12 @@ class Screenshot:
 
             self.image = self._handle_orientated_image(self.image)
 
-            if self.config.Error_SaveError:
-                self.screenshot_deque.append({"time": datetime.now(), "image": self.image})
-
             if self.check_screen_size() and self.check_screen_black():
                 break
             continue
+
+        if self.config.Error_SaveError:
+            self.replay_recorder.record_frame(self.image)
 
         return self.image
 
@@ -82,15 +76,15 @@ class Screenshot:
         return image
 
     @cached_property
-    def screenshot_deque(self) -> deque[ScreenshotRecord]:
+    def replay_recorder(self) -> ReplayRecorder:
         try:
             length = int(self.config.Error_ScreenshotLength)
-        except ValueError as e:
+        except (TypeError, ValueError) as e:
             logger.error(f"Error_ScreenshotLength={self.config.Error_ScreenshotLength} is not an integer")
             raise RequestHumanTakeover from e
         # 限制在 1~300。
         length = max(1, min(length, 300))
-        return deque(maxlen=length)
+        return ReplayRecorder(max_frames=length)
 
     def screenshot_interval_clear(self) -> None:
         self._screenshot_interval.clear()
