@@ -321,8 +321,10 @@ Replay 读取固定帧并记录语义动作，不启动 ADB、模拟器、WebUI 
 
 - [`dorm_food_get()`](../module/dorm/dorm.py#L206) 已只裁剪并识别颜色前置判断确认存在的食物槽；合法 `0` 保持有效，任一食物数量失败时跳过本帧填充量 OCR，并由现有外层循环进入下一帧。
 - 食物数量与填充量均使用结构化结果，并按 `Error_SaveError` 接入现有失败样本存储；空槽不提交空批次，槽位与固定食物表使用严格长度契约。
-- [`test_dorm_food.py`](../tests/test_dorm_food.py) 覆盖混合空槽、合法零、空批次、食物数量失败、填充量失败和下一帧恢复。当前全量门禁为 `1552 passed, 1 skipped`。
-- 模型会话共享、串行字符集边界、profile 统计和同步预热尚未实施，P1 退出条件尚未满足。
+- [`OcrRuntime`](../module/ocr/models.py) 已让 `azur_lane` 与 `cnocr` 共用唯一的惰性 CnOCR 会话；同一把锁覆盖首次加载、候选字符集切换、整批推理和释放，初始化失败不会缓存半初始化会话，释放也会等待在途推理完成。
+- [OCR profile 统计](../module/ocr/metrics.py) 已覆盖旧值接口和结构化接口共用的 raw 推理边界，按 profile 累计调用次数、总耗时、最大耗时、ROI 数量和固定宽度直方图；统计不保留逐次耗时或图像。多 ROI 的批次耗时只累计一次，宽度取预处理后的实际输入。
+- [`test_ocr_runtime.py`](../tests/test_ocr_runtime.py)、[`test_ocr_metrics.py`](../tests/test_ocr_metrics.py) 和 [`test_ocr_result.py`](../tests/test_ocr_result.py) 已覆盖共享惰性会话、并发字符集隔离、释放等待、失败重建、并发统计、空批次以及旧值／结构化路径的共同观测。当前全量门禁为 `1579 passed, 1 skipped`。
+- 当前没有实测证据表明首次模型加载侵占业务 timeout，因此没有增加同步模型预热；既有 `early_ocr_import()` 仍只提前导入依赖，不创建模型会话。P1 的运行时与观测子项已落地，退出条件仍等待真实运行统计，并继续按触碰审计其他可确定跳过的推理。
 
 **退出条件：** 每项优化都有调用次数或内存数据证明收益；结果逐项一致；没有全局缓存、全局批处理或并发字符集切换。
 

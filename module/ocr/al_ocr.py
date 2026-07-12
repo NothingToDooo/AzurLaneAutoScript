@@ -6,10 +6,8 @@ from typing import TYPE_CHECKING, ClassVar, Protocol, TypedDict, Unpack, cast
 import cv2
 import numpy as np
 from cnocr import CnOcr
-from cnocr.utils import data_dir
 from PIL import Image
 
-from module.base.type_alias import FilePath, ImageArray
 from module.logger import logger
 from module.ocr.result import RawOcrResult
 
@@ -19,10 +17,12 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
     from torch import Tensor
 
+    from module.base.type_alias import ImageArray
+
 type CnOcrImage = str | Path | Image.Image | Tensor | np.ndarray
 type CnOcrLineImage = str | Path | Tensor | np.ndarray
 type _CnOcrResultPayload = dict[str, str | Real | np.ndarray]
-type _ModelArguments = tuple[str, Collection[str] | str | None, FilePath, str]
+type _ModelArguments = tuple[str, Collection[str] | str | None, str]
 
 
 class OcrDetectionOptions(TypedDict, total=False):
@@ -37,7 +37,6 @@ class _AlphabetModel(Protocol):
     def set_cand_alphabet(self, cand_alphabet: Collection[str] | str | None) -> None: ...
 
 
-_DEFAULT_OCR_ROOT: FilePath = data_dir()
 logger.info("OCR dependencies loaded")
 
 
@@ -51,10 +50,9 @@ class AlOcr(CnOcr):
         self,
         model_name: str = "densenet-lite-gru",
         cand_alphabet: Collection[str] | str | None = None,
-        root: FilePath = _DEFAULT_OCR_ROOT,
         context: str = "cpu",
     ) -> None:
-        self._args: _ModelArguments = (model_name, cand_alphabet, root, context)
+        self._args: _ModelArguments = (model_name, cand_alphabet, context)
         self._model_name = self._normalize_model_name(model_name)
         self._model_loaded = False
 
@@ -93,13 +91,10 @@ class AlOcr(CnOcr):
         self,
         model_name: str = "densenet-lite-gru",
         cand_alphabet: Collection[str] | str | None = None,
-        root: FilePath = _DEFAULT_OCR_ROOT,
         context: str = "cpu",
     ) -> None:
         model_name = self._normalize_model_name(model_name)
         logger.info(f"Loading OCR model: {model_name}")
-        if root != _DEFAULT_OCR_ROOT:
-            logger.warning(f"Custom MXNet OCR model root is ignored by CnOcr 2.x: {root}")
 
         super().__init__(
             rec_model_name=model_name,

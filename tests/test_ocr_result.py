@@ -14,6 +14,7 @@ from module.ocr.failure_store import (
     OcrFailureRecordStatus,
     OcrFailureSample,
 )
+from module.ocr.metrics import OcrMetrics
 from module.ocr.ocr import Digit, DigitCounter, Duration, Ocr, OcrRegions
 from module.ocr.result import RawOcrResult, RecognitionFailureReason, RecognitionResult
 
@@ -47,14 +48,6 @@ class _FakeEngine:
         self.raw_calls += 1
         self.inference_batches.append(image_list)
         return [self.result for _ in image_list]
-
-    def atomic_ocr_for_single_lines(
-        self,
-        image_list: list[np.ndarray],
-        cand_alphabet: str | None = None,
-    ) -> list[str]:
-        del cand_alphabet
-        return [self.result.text for _ in image_list]
 
 
 class _SequenceEngine(_FakeEngine):
@@ -484,6 +477,61 @@ def test_recognize_copies_batch_latency_model_and_explicit_profile(monkeypatch: 
     assert [result.latency_seconds for result in results] == [0.25, 0.25]
     assert [result.model for result in results] == [_FakeEngine.model_name] * 2
     assert [result.profile for result in results] == ["TEST_DIGIT"] * 2
+
+
+def test_legacy_and_structured_paths_share_profile_metrics(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _TrimmedDigit(_TestDigit):
+        def pre_process(self, image: np.ndarray) -> np.ndarray:
+            return super().pre_process(image)[:, :32]
+
+    metrics = OcrMetrics()
+    timestamps = iter([10.0, 10.25, 20.0, 20.5])
+    monkeypatch.setattr(ocr_module, "OCR_METRICS", metrics)
+    monkeypatch.setattr(ocr_module.time, "perf_counter", lambda: next(timestamps))
+    ocr = _TrimmedDigit(_FakeEngine("7", 0.9))
+    ocr.SHOW_LOG = False
+    narrow = np.zeros((4, 32, 3), dtype=np.uint8)
+    medium = np.zeros((4, 33, 3), dtype=np.uint8)
+    wide = np.zeros((4, 513, 3), dtype=np.uint8)
+
+    assert ocr.ocr_many([narrow, medium]) == [7, 7]
+    result = require_single(ocr.recognize([wide], direct_ocr=True))
+
+    profile = metrics.snapshot()["TEST_DIGIT"]
+    assert result.latency_seconds == 0.5
+    assert profile.call_count == 2
+    assert profile.total_latency_seconds == 0.75
+    assert profile.max_latency_seconds == 0.5
+    assert profile.roi_count == 3
+    assert dict(profile.processed_width_histogram) == {
+        32: 3,
+        64: 0,
+        96: 0,
+        128: 0,
+        192: 0,
+        256: 0,
+        384: 0,
+        512: 0,
+        None: 0,
+    }
+
+
+def test_empty_legacy_batch_records_call_without_roi_widths(monkeypatch: pytest.MonkeyPatch) -> None:
+    metrics = OcrMetrics()
+    timestamps = iter([10.0, 10.0])
+    monkeypatch.setattr(ocr_module, "OCR_METRICS", metrics)
+    monkeypatch.setattr(ocr_module.time, "perf_counter", lambda: next(timestamps))
+    engine = _FakeEngine("7", 0.9)
+    ocr = _TestDigit(engine)
+    ocr.SHOW_LOG = False
+
+    assert ocr.ocr_many([]) == []
+
+    profile = metrics.snapshot()["TEST_DIGIT"]
+    assert engine.raw_calls == 1
+    assert profile.call_count == 1
+    assert profile.roi_count == 0
+    assert sum(count for _limit, count in profile.processed_width_histogram) == 0
 
 
 def test_recognize_uses_class_name_as_default_profile() -> None:

@@ -63,15 +63,9 @@ class Resource:
 
 
 def release_resources(next_task: str = "") -> None:
-    # OCR 通常加载两个约 20MB 的模型；下一任务马上使用时保留对应缓存。
-    if "Opsi" in next_task or "commission" in next_task:
-        models = []
-    elif next_task:
-        models = ["cnocr"]
-    else:
-        models = ["azur_lane", "cnocr"]
-    for model in models:
-        del_cached_property(OCR_MODEL, model)
+    # 下一任务马上使用时保留唯一的 OCR 会话，进入空闲等待时完整释放。
+    if not next_task:
+        OCR_MODEL.release()
 
     for obj in Resource.instances.values():
         # 保留 UI 切换需要的资源。
