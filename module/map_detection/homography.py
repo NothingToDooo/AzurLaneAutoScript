@@ -1,5 +1,5 @@
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import cv2
 import numpy as np
@@ -23,7 +23,11 @@ from module.map_detection.utils import (
 from module.map_detection.utils_assets import ASSETS
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator, Sequence
+
+    from module.base.type_alias import FilePath, ImageArray, NumericArray, Point, Scalar, Size
     from module.config.config import AzurLaneConfig
+    from module.map.type_alias import GridLocation
 
 NO_HOMOGRAPHY_INPUT_MESSAGE = "No data feed to load_homography, please input at least one."
 FREE_TILE_NOT_FOUND_MESSAGE = "Failed to find a free tile"
@@ -32,30 +36,30 @@ FREE_TILE_NOT_FOUND_MESSAGE = "Failed to find a free tile"
 class Homography:
     """从截图估计单应矩阵，并生成各网格的四角坐标。"""
 
-    image: np.ndarray
+    image: ImageArray
     config: AzurLaneConfig
     # 四条边可为 bool，或实现 __bool__。
-    left_edge: int | None
-    right_edge: int | None
-    lower_edge: int | None
-    upper_edge: int | None
+    left_edge: Scalar | bool | None
+    right_edge: Scalar | bool | None
+    lower_edge: Scalar | bool | None
+    upper_edge: Scalar | bool | None
 
-    homo_storage: tuple
-    homo_data: np.ndarray
-    homo_invt: np.ndarray
-    homo_size: tuple
-    homo_loca: np.ndarray
+    homo_storage: tuple[Size, list[tuple[Scalar, Scalar]]]
+    homo_data: NumericArray
+    homo_invt: NumericArray
+    homo_size: tuple[int, int]
+    homo_loca: NumericArray
     homo_loaded: bool
 
-    map_inner: np.ndarray
-    _map_edge_count: tuple
+    map_inner: NumericArray
+    _map_edge_count: tuple[int, int]
 
-    def __init__(self, config):
+    def __init__(self, config: AzurLaneConfig) -> None:
         self.config = config
         self.homo_loaded = False
 
     @cached_property
-    def ui_mask_homo_stroke(self):
+    def ui_mask_homo_stroke(self) -> ImageArray:
         mask = ASSETS.ui_mask_os if self.config.Scheduler_Command.startswith("Opsi") else ASSETS.ui_mask
         image = cv2.warpPerspective(mask, self.homo_data, self.homo_size)
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
@@ -66,16 +70,22 @@ class Homography:
         image[-pad:, :] = 0
         image[:, :pad] = 0
         image[:, -pad:] = 0
-        return image
+        return cast("ImageArray", image)
 
-    def load(self, image):
+    def load(self, image: ImageArray) -> None:
         """加载 (720, 1280, 3) 截图。"""
         if not self.homo_loaded:
             self.load_homography(storage=self.config.HOMO_STORAGE, image=image)
 
         self.detect(image)
 
-    def load_homography(self, storage=None, perspective=None, image=None, file=None):
+    def load_homography(
+        self,
+        storage: tuple[Size, Sequence[Point]] | None = None,
+        perspective: Perspective | None = None,
+        image: ImageArray | None = None,
+        file: FilePath | None = None,
+    ) -> None:
         """从 storage、Perspective、截图或文件加载单应矩阵。
         storage 形状为 ((x, y), [左上, 右上, 左下, 右下])。
         """
@@ -100,16 +110,17 @@ class Homography:
         else:
             raise MapDetectionError(NO_HOMOGRAPHY_INPUT_MESSAGE)
 
-    def find_homography(self, size, src_pts, overflow=True):
+    def find_homography(self, size: Size, src_pts: Sequence[Point] | NumericArray, *, overflow: bool = True) -> None:
         """由网格尺寸和四角坐标求单应矩阵。
         overflow=True 保留完整变换图，否则只保留有效内接区域。
         """
+        src_pts = np.asarray(src_pts, dtype=float).copy()
         self.homo_storage = (size, [(x, y) for x, y in np.round(src_pts, 3)])
         logger.attr("homo_storage", self.homo_storage)
 
-        src_pts = np.array(src_pts) - self.config.DETECTING_AREA[:2]
+        src_pts -= self.config.DETECTING_AREA[:2]
         dst_pts = src_pts[0] + area2corner((0, 0, *np.multiply(size, self.config.HOMO_TILE)))
-        homo = cv2.getPerspectiveTransform(src_pts.astype(np.float32), dst_pts.astype(np.float32))
+        homo = cast("NumericArray", cv2.getPerspectiveTransform(src_pts.astype(np.float32), dst_pts.astype(np.float32)))
 
         area = area2corner(self.config.DETECTING_AREA) - self.config.DETECTING_AREA[:2]
         transformed = perspective_transform(area, data=homo)
@@ -121,14 +132,16 @@ class Homography:
             inner = np.array((max(x0, x2), max(y0, y1), min(x1, x3), min(y2, y3)))
             transformed -= inner[:2]
             size = np.ceil(inner[2:] - inner[:2]).astype(int)
-        homo = cv2.getPerspectiveTransform(area.astype(np.float32), transformed.astype(np.float32))
+        homo = cast(
+            "NumericArray", cv2.getPerspectiveTransform(area.astype(np.float32), transformed.astype(np.float32))
+        )
 
         self.homo_data = homo
-        self.homo_invt = cv2.invert(homo)[1]
+        self.homo_invt = cast("NumericArray", cv2.invert(homo)[1])
         self.homo_size = tuple(size.tolist())
         self.homo_loaded = True
 
-    def detect(self, image):
+    def detect(self, image: ImageArray) -> None:
         """在截图中定位网格与边界，返回是否成功。"""
         start_time = time.time()
         self.image = image
@@ -137,7 +150,7 @@ class Homography:
 
         image_trans = cv2.warpPerspective(image, self.homo_data, self.homo_size)
 
-        image_edge = cv2.Canny(image_trans, *self.config.HOMO_CANNY_THRESHOLD)
+        image_edge = cast("ImageArray", cv2.Canny(image_trans, *self.config.HOMO_CANNY_THRESHOLD))
         cv2.bitwise_and(image_edge, self.ui_mask_homo_stroke, dst=image_edge)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         cv2.morphologyEx(image_edge, cv2.MORPH_CLOSE, kernel, dst=image_edge)
@@ -177,7 +190,9 @@ class Homography:
         )
         logger.info(f"Edges: {left_edge}{upper_edge}{right_edge}   homo_loca: {point2str(*self.homo_loca, length=3)}")
 
-    def search_tile_center(self, image, threshold_good=0.9, threshold=0.8, encourage=1.0):
+    def search_tile_center(
+        self, image: ImageArray, threshold_good: float = 0.9, threshold: float = 0.8, encourage: float = 1.0
+    ) -> bool:
         """主路径：在单通道图中搜索空格中心，返回是否成功。
         `len(res[res > 0.8])` 比 `np.sum(res > 0.8)` 快约三倍。
         """
@@ -200,7 +215,7 @@ class Homography:
         logger.attr_align("tile_center", f"{float2str(similarity)} ({message})")
         return message != "bad match"
 
-    def search_tile_corner(self, image, threshold=0.8, encourage=1.0):
+    def search_tile_corner(self, image: ImageArray, threshold: float = 0.8, encourage: float = 1.0) -> bool:
         """后备路径：在单通道图中搜索空格角点，误差约 0.5～1 像素。"""
         similarity = 0
         location = np.empty((0, 2))
@@ -223,7 +238,13 @@ class Homography:
         logger.attr_align("tile_corner", f"{float2str(similarity)} ({message})")
         return message != "bad match"
 
-    def search_tile_rectangle(self, image, threshold=10, encourage=5.1, close_kernel=(5, 10, 15, 20, 25)):
+    def search_tile_rectangle(
+        self,
+        image: ImageArray,
+        threshold: int = 10,
+        encourage: float = 5.1,
+        close_kernel: tuple[int, ...] = (5, 10, 15, 20, 25),
+    ) -> bool:
         """末级后备：从单通道图的矩形轮廓定位角点，误差约 2 像素。"""
         location = np.empty((0, 2))
         for kernel_size in close_kernel:
@@ -251,7 +272,7 @@ class Homography:
         logger.attr_align("tile_rectangle", f"{len(location)} rectangles ({message})")
         return message != "bad match"
 
-    def detect_edges(self, image, hough_th=120, theta_th=0.005, edge_th=9):
+    def detect_edges(self, image: ImageArray, hough_th: int = 120, theta_th: float = 0.005, edge_th: float = 9) -> None:
         """在单通道图中检测地图边缘；theta_th 单位为度，edge_th 单位为像素。"""
         lines = cv2.HoughLines(image, 1, np.pi / 180, hough_th)
         if lines is None:
@@ -268,28 +289,30 @@ class Homography:
         area = perspective_transform(area, self.homo_data)
         mid_left, _, mid_right, _ = area.flatten()
 
-        hori = lines[(np.deg2rad(90 - theta_th) < theta) & (theta < np.deg2rad(90 + theta_th))]
-        hori = Lines(hori, is_horizontal=True).group()
+        horizontal_lines = Lines(
+            lines[(np.deg2rad(90 - theta_th) < theta) & (theta < np.deg2rad(90 + theta_th))],
+            is_horizontal=True,
+        ).group()
         vert = lines[(theta < np.deg2rad(theta_th)) | (np.deg2rad(180 - theta_th) < theta)]
         vert = [[-rho, theta - np.pi] if rho < 0 else [rho, theta] for rho, theta in vert]
         vert = [[rho, theta] for rho, theta in vert if mid_left < rho < mid_right]
-        vert = Lines(vert, is_horizontal=False).group()
+        vertical_lines = Lines(vert, is_horizontal=False).group()
 
-        self._map_edge_count = (len(vert), len(hori))
+        self._map_edge_count = (len(vertical_lines), len(horizontal_lines))
 
-        if hori:
-            hori = hori.rho
-            diff = (hori - self.homo_loca[1]) % self.config.HOMO_TILE[1]
-            hori = hori[(diff < edge_th) | (diff > self.config.HOMO_TILE[1] - edge_th)]
-        if vert:
-            vert = vert.rho
-            diff = (vert - self.homo_loca[0]) % self.config.HOMO_TILE[0]
-            vert = vert[(diff < edge_th) | (diff > self.config.HOMO_TILE[0] - edge_th)]
+        horizontal = horizontal_lines.rho
+        if horizontal_lines:
+            diff = (horizontal - self.homo_loca[1]) % self.config.HOMO_TILE[1]
+            horizontal = horizontal[(diff < edge_th) | (diff > self.config.HOMO_TILE[1] - edge_th)]
+        vertical = vertical_lines.rho
+        if vertical_lines:
+            diff = (vertical - self.homo_loca[0]) % self.config.HOMO_TILE[0]
+            vertical = vertical[(diff < edge_th) | (diff > self.config.HOMO_TILE[0] - edge_th)]
 
-        self.lower_edge, self.upper_edge = separate_edges(hori, inner=self.map_inner[1])
-        self.left_edge, self.right_edge = separate_edges(vert, inner=self.map_inner[0])
+        self.lower_edge, self.upper_edge = separate_edges(horizontal, inner=self.map_inner[1])
+        self.left_edge, self.right_edge = separate_edges(vertical, inner=self.map_inner[0])
 
-    def generate(self, edge_th=9):
+    def generate(self, edge_th: float = 9) -> Iterator[tuple[GridLocation, NumericArray]]:
         """逐格产出 ((x, y), [左上, 右上, 左下, 右下])。"""
         area = [
             self.left_edge - edge_th if self.left_edge else 0,
@@ -307,7 +330,7 @@ class Homography:
         points = perspective_transform(points, data=self.homo_invt) + self.config.DETECTING_AREA[:2]
         yield from points_to_area_generator(points.reshape(*shape[::-1], 2), shape=shape)
 
-    def to_perspective(self):
+    def to_perspective(self) -> tuple[Lines, Lines]:
         """返回 (水平线集, 垂直线集)。"""
         grids = dict(self.generate())
         shape = np.max(list(grids.keys()), axis=0)
@@ -320,7 +343,7 @@ class Homography:
             vert = vert.add(Points(grids[(x, 0)][1]).link(grids[(x, shape[1])][3]))
         return hori, vert
 
-    def draw(self, lines=None, bg=None, expend=0):
+    def draw(self, lines: Lines | None = None, bg: ImageArray | None = None, expend: int = 0) -> None:
         if lines is None:
             hori, vert = self.to_perspective()
             lines = hori.add(vert)

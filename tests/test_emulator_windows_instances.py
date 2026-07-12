@@ -84,7 +84,7 @@ def test_mumu_global_name_is_not_supported(tmp_path: Path) -> None:
         path=exe.as_posix(),
     )
 
-    assert instance.MuMuPlayer12_id is None
+    assert instance.mumu_player_12_id is None
 
 
 def test_iter_instances_ignores_mumu_global_folder(tmp_path: Path) -> None:

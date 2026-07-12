@@ -12,6 +12,7 @@ from module.template import assets as template_assets
 
 if TYPE_CHECKING:
     from module.base.template import Template
+    from module.map.type_alias import GridMode
 
 _OS_DIRECT_MERGE_FLAGS = (
     "is_ally",
@@ -48,11 +49,11 @@ class OSGridInfo(GridInfo):
     is_radar_scanned = False
 
     @property
-    def is_interactive_only(self):
+    def is_interactive_only(self) -> bool:
         # 舰队不能移动到这个格子，只能在相邻格交互。
         return self.is_ally or self.is_akashi
 
-    def encode(self):
+    def encode(self) -> str:
         dic = {
             "AL": "is_ally",
             "AK": "is_akashi",
@@ -62,7 +63,7 @@ class OSGridInfo(GridInfo):
             "FM": "is_fleet_mechanism",
         }
         for key, value in dic.items():
-            if self.__getattribute__(value):
+            if getattr(self, value):
                 return key
 
         if self.is_siren:
@@ -83,12 +84,12 @@ class OSGridInfo(GridInfo):
             "==": "is_radar_scanned",
         }
         for key, value in dic.items():
-            if self.__getattribute__(value):
+            if getattr(self, value):
                 return key
 
         return "--"
 
-    def merge(self, info, mode="normal"):
+    def merge(self, info: GridInfo | RadarGrid, mode: GridMode = "normal") -> bool:
         """合并大型作战地图或雷达结果；仅支持 normal 模式。"""
         if mode != "normal":
             message = f"{NORMAL_SCAN_MODE_ONLY_MESSAGE}: {mode}"
@@ -105,15 +106,15 @@ class OSGridInfo(GridInfo):
 
         return True
 
-    def _merge_direct_marker(self, info):
+    def _merge_direct_marker(self, info: GridInfo | RadarGrid) -> bool:
         for flag in _OS_DIRECT_MERGE_FLAGS:
             if getattr(info, flag, False):
                 setattr(self, flag, True)
                 return True
         return False
 
-    def _merge_enemy(self, info, mode=None):
-        _ = mode
+    def _merge_enemy(self, info: GridInfo | RadarGrid, mode: GridMode = "normal") -> bool:
+        del mode
         if not getattr(info, "is_enemy", False):
             return False
 
@@ -127,7 +128,7 @@ class OSGridInfo(GridInfo):
             self.enemy_genre = enemy_genre
         return True
 
-    def wipe_out(self):
+    def wipe_out(self) -> None:
         """舰队踏入格子后清除大型作战动态目标状态。"""
         super().wipe_out()
 
@@ -141,7 +142,7 @@ class OSGridInfo(GridInfo):
         self.is_exploration_reward = False
         self.is_fleet_mechanism = False
 
-    def reset(self):
+    def reset(self) -> None:
         """进入地图后重置雷达与友军临时状态。"""
         super().reset()
 
@@ -151,7 +152,7 @@ class OSGridInfo(GridInfo):
 
 
 class OSGridPredictor(GridPredictor):
-    def predict(self):
+    def predict(self) -> None:
         self.enemy_genre = self.predict_enemy_genre()
         # 暂不识别资源点、指挥喵和友军，避免增加整体识别耗时。
         self.is_akashi = self.enemy_genre == "Akashi"
@@ -172,11 +173,11 @@ class OSGridPredictor(GridPredictor):
             self.is_siren = True
             self.enemy_scale = 0
 
-    def predict_fleet(self):
+    def predict_fleet(self) -> bool:
         # 大世界没有弹药图标。
         return super().predict_current_fleet()
 
-    def predict_sea(self):
+    def predict_sea(self) -> bool:
         color = cv2.mean(self.image_trans)
         if not min(color[1], color[2]) > color[0] + 20:
             return False
@@ -199,7 +200,7 @@ class OSGridPredictor(GridPredictor):
         "LoggingTower": os_assets.TEMPLATE_LoggingTowerUpper,
     }
 
-    def predict_enemy_genre(self):
+    def predict_enemy_genre(self) -> str | None:
         image = rgb2gray(self.relative_crop((-0.5, -1, 0.5, 0), shape=(60, 60)))
         for name, template in self._os_template_enemy.items():
             if template.match(image):
@@ -212,7 +213,7 @@ class OSGridPredictor(GridPredictor):
 
         return None
 
-    def predict_enemy_scale(self):
+    def predict_enemy_scale(self) -> int:
         """返回敌舰规模：2 中型，3 大型，0 未知；1 已禁用。"""
         point = (-0.385, 0.815)
         size = (0.53, 0.53)
@@ -231,30 +232,30 @@ class OSGridPredictor(GridPredictor):
 
         return scale
 
-    def predict_resource(self):
+    def predict_resource(self) -> bool:
         image = rgb2gray(self.relative_crop((-0.5, -1, 0.5, 0), shape=(60, 60)))
         return template_assets.TEMPLATE_OS_Resource.match(image, similarity=0.85)
 
-    def predict_meowfficer(self):
+    def predict_meowfficer(self) -> bool:
         image = rgb2gray(self.image_trans)
         return template_assets.TEMPLATE_OS_Meowfficer.match(image, similarity=0.85)
 
-    def predict_ally(self):
+    def predict_ally(self) -> bool:
         # 每日任务友方运输船。
         image = rgb2gray(self.relative_crop((-0.5, -0.5, 0.5, 0.5), shape=(60, 60)))
         return template_assets.TEMPLATE_OS_AllyCargo.match(image, similarity=0.85)
 
-    def predict_akashi(self):
+    def predict_akashi(self) -> bool:
         image = rgb2gray(self.relative_crop((-0.5, -1, 0.5, 0), shape=(60, 60)))
         return template_assets.TEMPLATE_SIREN_Akashi.match(image, similarity=0.85)
 
-    def predict_caught_by_siren(self):
+    def predict_caught_by_siren(self) -> bool:
         # 检测“In action”的红色斜线背景。
         return (
             self.relative_rgb_count(area=(-1, -0.5, 0, 0.5), color=(255, 109, 91), shape=(50, 50), threshold=221) > 120
         )
 
-    def predict_fleet_mechanism(self):
+    def predict_fleet_mechanism(self) -> bool:
         area = self.grid2screen(np.array([(0, 0), (1, 0.2)]))
         area = np.rint(area.flatten()).astype(int).tolist()
         # 颜色应该是青色。
@@ -280,7 +281,7 @@ class OSGridPredictor(GridPredictor):
         image = rgb2gray(self.image_trans)
         sim, button = os_assets.TEMPLATE_FleetMechanism.match_result(image)
         point = (53, 37)
-        distance = np.linalg.norm(np.subtract(button.area[:2], point))
+        distance = np.linalg.norm(np.asarray(button.area[:2], dtype=float) - point)
         return not (distance > 5 or sim < 0.3)
 
 

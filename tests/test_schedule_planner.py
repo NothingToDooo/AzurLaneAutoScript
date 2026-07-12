@@ -1,20 +1,28 @@
 from dataclasses import FrozenInstanceError
 from datetime import UTC, datetime, timedelta
-from typing import get_type_hints
+from typing import TYPE_CHECKING, get_type_hints
 
 import pytest
 
 from module.config.config import AzurLaneConfig
 from module.config.schedule import ScheduleEntry, SchedulePlanner
 
+if TYPE_CHECKING:
+    from module.config.deep import MutableDeepValue
+
 NOW = datetime(2026, 7, 10, 12, 0)
 
 
-def _entry(command: str, next_run: object, *, enable: bool = True) -> ScheduleEntry:
+def _entry(command: str, next_run: MutableDeepValue, *, enable: bool = True) -> ScheduleEntry:
     return ScheduleEntry(enable=enable, command=command, next_run=next_run)
 
 
-def _schedule_config(next_run: object, *, hoarding_minutes: int = 5) -> AzurLaneConfig:
+def _deep_dict(value: MutableDeepValue) -> dict[str, MutableDeepValue]:
+    assert isinstance(value, dict)
+    return value
+
+
+def _schedule_config(next_run: MutableDeepValue, *, hoarding_minutes: int = 5) -> AzurLaneConfig:
     config = object.__new__(AzurLaneConfig)
     config.data = {
         "Alas": {"Optimization": {"TaskHoardingDuration": hoarding_minutes}},
@@ -157,7 +165,9 @@ def test_config_facade_uses_fake_clock_and_adds_hoarding_only_to_wake_time() -> 
     assert decision.state == "waiting"
     assert decision.wake_at == NOW + timedelta(minutes=5)
     assert config.waiting_task[0].next_run == NOW
-    assert config.data["Main"]["Scheduler"]["NextRun"] == NOW
+    main = _deep_dict(config.data["Main"])
+    scheduler = _deep_dict(main["Scheduler"])
+    assert scheduler["NextRun"] == NOW
     assert config.is_hoarding_task is True
 
 
@@ -185,7 +195,7 @@ def test_config_hoarding_state_is_isolated_between_instances() -> None:
     assert first.is_hoarding_task is False
 
 
-def test_config_copies_legacy_class_default_into_instance(monkeypatch) -> None:
+def test_config_copies_legacy_class_default_into_instance(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(AzurLaneConfig, "is_hoarding_task", False)
     monkeypatch.setattr(AzurLaneConfig, "init_task", lambda _self, _task=None: None)
 

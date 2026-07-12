@@ -1,7 +1,13 @@
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, Literal, override
 
 from module.combat import assets as combat_assets
 from module.os_combat import combat as os_combat
+
+if TYPE_CHECKING:
+    from module.base.button import Button, MatchOffset
+    from module.device.control import ButtonTarget
+    from module.device.control_options import Duration
 
 
 class _FakeDevice:
@@ -15,16 +21,16 @@ class _FakeDevice:
         self.stuck_clears = 0
         self.click_clears = 0
 
-    def click(self, button) -> None:
+    def click(self, button: ButtonTarget) -> None:
         self.clicks.append(button)
 
-    def sleep(self, duration) -> None:
+    def sleep(self, duration: Duration) -> None:
         self.sleeps.append(duration)
 
     def screenshot(self) -> None:
         self.screenshots += 1
 
-    def screenshot_interval_set(self, interval=None) -> None:
+    def screenshot_interval_set(self, interval: float | Literal["combat"] | None = None) -> None:
         self.intervals.append(interval)
 
     def stuck_record_clear(self) -> None:
@@ -38,21 +44,40 @@ class _ExpInfoContext(os_combat.Combat):
     battle_status_click_interval = 3
     device: _FakeDevice
 
-    def __init__(self, *, appearing) -> None:
+    def __init__(self, *, appearing: tuple[Button, ...]) -> None:
         self.device = _FakeDevice()
         self.appearing = set(appearing)
         self.appear_then_click_calls = []
         self.appear_calls = []
 
-    def is_combat_executing(self):
+    @override
+    def is_combat_executing(self) -> Literal[False]:
         return False
 
-    def appear_then_click(self, button, *_args: object, **_kwargs: object):
+    @override
+    def appear_then_click(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 30,
+    ) -> bool:
+        del offset, interval, similarity, threshold
         self.appear_then_click_calls.append(button)
         return button in self.appearing
 
-    def appear(self, button, *_args: object, **kwargs):
-        self.appear_calls.append((button, kwargs))
+    @override
+    def appear(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 10,
+    ) -> bool:
+        del offset, similarity, threshold
+        self.appear_calls.append((button, {"interval": interval}))
         return button in self.appearing
 
 
@@ -67,34 +92,42 @@ class _AutoSearchCombatContext(os_combat.Combat):
         self.submarine_modes = []
         self.submarine_resets = 0
 
-    def handle_combat_automation_confirm(self):
+    @override
+    def handle_combat_automation_confirm(self) -> bool:
         return False
 
-    def handle_os_auto_search_map_option(self, enable=True):
+    @override
+    def handle_os_auto_search_map_option(self, *, enable: bool | None = True) -> bool:
         self.map_option_calls.append(enable)
         return len(self.map_option_calls) == 1
 
-    def is_combat_executing(self):
+    @override
+    def is_combat_executing(self) -> Literal[False]:
         return False
 
-    def is_in_map(self):
+    @override
+    def is_in_map(self) -> bool:
         return len(self.map_option_calls) >= 2
 
     def submarine_call_reset(self) -> None:
         self.submarine_resets += 1
 
-    def handle_submarine_call(self, submarine="do_not_use", *_args: object, **_kwargs: object):
+    @override
+    def handle_submarine_call(self, submarine: str = "do_not_use") -> bool:
         self.submarine_modes.append(submarine)
         return False
 
-    def handle_auto_search_battle_status(self):
+    @override
+    def handle_auto_search_battle_status(self) -> bool:
         return False
 
-    def handle_auto_search_exp_info(self):
+    @override
+    def handle_auto_search_exp_info(self) -> bool:
         return False
 
-    def handle_map_event(self):
-        return False
+    @override
+    def handle_map_event(self) -> str:
+        return ""
 
 
 def test_handle_exp_info_uses_ordered_os_exp_buttons() -> None:

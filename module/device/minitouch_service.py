@@ -3,6 +3,7 @@ import threading
 import time
 from dataclasses import dataclass
 from functools import wraps
+from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 from adbutils.errors import AdbError
@@ -15,21 +16,51 @@ from module.device.method.utils import RETRY_TRIES, handle_adb_error, handle_unk
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
-def random_normal_distribution(a, b, n=5):
-    return np.mean(runtime_random.uniform(a, b, size=n))
+    from adbutils import AdbConnection
+    from numpy.typing import NDArray
+
+    from module.base.type_alias import Area, Point
+    from module.device.contracts import MinitouchConfig, MinitouchSession
+
+type Recovery = Callable[[], None]
+type SwipePoint = tuple[int, int]
 
 
-def random_theta():
+class _CommandTarget(Protocol):
+    max_x: int
+    max_y: int
+
+    @property
+    def orientation(self) -> int: ...
+
+    def minitouch_send(self, builder: CommandBuilder) -> str | None: ...
+
+
+class _MinitouchRecoveryTarget(Protocol):
+    session: MinitouchSession
+
+    def _reset_minitouch_connection(self, *, remove_forward: bool = True) -> None: ...
+
+    def _restart_minitouch_service(self) -> None: ...
+
+
+def random_normal_distribution(a: float, b: float, n: int = 5) -> float:
+    return float(np.mean(runtime_random.uniform(a, b, size=n)))
+
+
+def random_theta() -> NDArray[np.float64]:
     theta = runtime_random.uniform(0, 2 * np.pi)
     return np.array([np.sin(theta), np.cos(theta)])
 
 
-def random_rho(dis):
+def random_rho(dis: float) -> float:
     return random_normal_distribution(-dis, dis)
 
 
-def insert_swipe(p0, p3, speed=15, min_distance=10):
+def insert_swipe(p0: Point, p3: Point, speed: float = 15, min_distance: float = 10) -> list[SwipePoint]:
     """在 p0 与 p3 间生成三阶贝塞尔路径点。
 
     speed 单位为像素/10ms，相邻输出点至少相距 min_distance 像素。
@@ -71,7 +102,7 @@ def insert_swipe(p0, p3, speed=15, min_distance=10):
     else:
         points = [p0, p3]
 
-    return points
+    return [(int(point[0]), int(point[1])) for point in points]
 
 
 @dataclass(slots=True)
@@ -111,23 +142,24 @@ class CommandBuilder:
 
     def __init__(
         self,
-        controller,
-        contact=0,
-        handle_orientation=True,
-    ):
+        controller: _CommandTarget,
+        contact: int = 0,
+        *,
+        handle_orientation: bool = True,
+    ) -> None:
         self.controller = controller
-        self.commands = []
+        self.commands: list[Command] = []
         self.delay = 0
         self.contact = contact
         self.handle_orientation = handle_orientation
 
     @property
-    def orientation(self):
+    def orientation(self) -> int:
         if self.handle_orientation:
             return self.controller.orientation
         return 0
 
-    def convert(self, x, y):
+    def convert(self, x: int, y: int) -> SwipePoint:
         max_x, max_y = self.controller.max_x, self.controller.max_y
         orientation = self.orientation
 
@@ -150,40 +182,40 @@ class CommandBuilder:
         x, y = int(x / 1280 * max_x), int(y / 720 * max_y)
         return x, y
 
-    def commit(self):
+    def commit(self) -> CommandBuilder:
         r"""添加 minitouch 命令：'c\n'。"""
         self.commands.append(Command("c"))
         return self
 
-    def reset(self):
+    def reset(self) -> CommandBuilder:
         r"""添加 minitouch 命令：'r\n'。"""
         self.commands.append(Command("r"))
         return self
 
-    def wait(self, ms=10):
+    def wait(self, ms: int = 10) -> CommandBuilder:
         r"""添加 minitouch 命令：'w <ms>\n'。"""
         self.commands.append(Command("w", ms=ms))
         self.delay += ms
         return self
 
-    def up(self):
+    def up(self) -> CommandBuilder:
         r"""添加 minitouch 命令：'u <contact>\n'。"""
         self.commands.append(Command("u", contact=self.contact))
         return self
 
-    def down(self, x, y, pressure=100):
+    def down(self, x: int, y: int, pressure: int = 100) -> CommandBuilder:
         r"""添加 minitouch 命令：'d <contact> <x> <y> <pressure>\n'。"""
         x, y = self.convert(x, y)
         self.commands.append(Command("d", contact=self.contact, position=(x, y), pressure=pressure))
         return self
 
-    def move(self, x, y, pressure=100):
+    def move(self, x: int, y: int, pressure: int = 100) -> CommandBuilder:
         r"""添加 minitouch 命令：'m <contact> <x> <y> <pressure>\n'。"""
         x, y = self.convert(x, y)
         self.commands.append(Command("m", contact=self.contact, position=(x, y), pressure=pressure))
         return self
 
-    def clear(self):
+    def clear(self) -> CommandBuilder:
         self.commands = []
         self.delay = 0
         return self
@@ -193,10 +225,10 @@ class CommandBuilder:
         self._check_empty(out)
         return out
 
-    def send(self):
+    def send(self) -> str | None:
         return self.controller.minitouch_send(builder=self)
 
-    def _check_empty(self, text=None):
+    def _check_empty(self, text: str | None = None) -> bool:
         """只有 commit、wait 或 sync 的列表视为空命令。"""
         empty = True
         for command in self.commands:
@@ -222,27 +254,27 @@ MINITOUCH_OCCUPIED_MESSAGE = (
 MINITOUCH_EMPTY_DATA_MESSAGE = "Received empty data from minitouch, probably because minitouch is not installed"
 
 
-def _reset_minitouch_after_adb_reconnect(self):
+def _reset_minitouch_after_adb_reconnect(self: _MinitouchRecoveryTarget) -> None:
     self.session.adb_reconnect()
     self._reset_minitouch_connection()
 
 
-def _restart_adb_server_and_reset_minitouch(self):
+def _restart_adb_server_and_reset_minitouch(self: _MinitouchRecoveryTarget) -> None:
     self.session.adb_start_server()
     self.session.adb_reconnect()
     self._reset_minitouch_connection()
 
 
-def _restart_minitouch_service_and_reset(self):
+def _restart_minitouch_service_and_reset(self: _MinitouchRecoveryTarget) -> None:
     self._restart_minitouch_service()
     self._reset_minitouch_connection()
 
 
-def _reset_minitouch_without_forward(self):
+def _reset_minitouch_without_forward(self: _MinitouchRecoveryTarget) -> None:
     self._reset_minitouch_connection(remove_forward=False)
 
 
-def _minitouch_adb_error_recovery(self, error):
+def _minitouch_adb_error_recovery(self: _MinitouchRecoveryTarget, error: AdbError) -> Recovery | None:
     if handle_adb_error(error):
         return lambda: _reset_minitouch_after_adb_reconnect(self)
     if handle_unknown_host_service(error):
@@ -250,7 +282,10 @@ def _minitouch_adb_error_recovery(self, error):
     return None
 
 
-def _minitouch_error_recovery(self, error):
+def _minitouch_error_recovery(
+    self: _MinitouchRecoveryTarget,
+    error: AdbError | MinitouchNotInstalledError | MinitouchOccupiedError | OSError,
+) -> Recovery | None:
     if isinstance(error, (ConnectionResetError, ConnectionAbortedError)):
         logger.error(error)
         return lambda: _reset_minitouch_after_adb_reconnect(self)
@@ -271,10 +306,12 @@ def _minitouch_error_recovery(self, error):
     return None
 
 
-def retry(func):
+def retry[TargetT: _MinitouchRecoveryTarget, **P, ResultT](
+    func: Callable[[TargetT, *P.args], ResultT],
+) -> Callable[[TargetT, *P.args], ResultT]:
     @wraps(func)
-    def retry_wrapper(self, *args, **kwargs):
-        recovery = None
+    def retry_wrapper(self: TargetT, *args: P.args, **kwargs: P.kwargs) -> ResultT:
+        recovery: Recovery | None = None
         for _ in range(RETRY_TRIES):
             try:
                 if callable(recovery):
@@ -288,7 +325,8 @@ def retry(func):
                 if recovery is None:
                     break
 
-        logger.critical(f"Retry {func.__name__}() failed")
+        func_name = getattr(func, "__name__", type(func).__name__)
+        logger.critical(f"Retry {func_name}() failed")
         raise RequestHumanTakeover
 
     return retry_wrapper
@@ -297,22 +335,22 @@ def retry(func):
 class MinitouchController:
     """持有 minitouch 连接、转发、线程与命令构建器。"""
 
-    def __init__(self, session) -> None:
+    def __init__(self, session: MinitouchSession) -> None:
         self.session = session
         self._minitouch_port = 0
         self._minitouch_client: socket.socket | None = None
         self._minitouch_pid = ""
-        self._minitouch_stream = None
+        self._minitouch_stream: AdbConnection | None = None
         self.max_x = 1280
         self.max_y = 720
         self._minitouch_init_thread: threading.Thread | None = None
 
     @property
-    def config(self):
+    def config(self) -> MinitouchConfig:
         return self.session.config
 
     @property
-    def orientation(self):
+    def orientation(self) -> int:
         return self.session.orientation
 
     def release(self) -> None:
@@ -343,7 +381,7 @@ class MinitouchController:
     def release_resource(self) -> None:
         self.release()
 
-    def _close_minitouch_client(self):
+    def _close_minitouch_client(self) -> None:
         client = self._minitouch_client
         if client is None:
             return
@@ -353,7 +391,7 @@ class MinitouchController:
             logger.error(e)
         self._minitouch_client = None
 
-    def _close_minitouch_stream(self):
+    def _close_minitouch_stream(self) -> None:
         stream = self._minitouch_stream
         if stream is None:
             return
@@ -365,7 +403,7 @@ class MinitouchController:
                 logger.error(e)
         self._minitouch_stream = None
 
-    def _reset_minitouch_connection(self, remove_forward=True):
+    def _reset_minitouch_connection(self, *, remove_forward: bool = True) -> None:
         self._close_minitouch_client()
         if remove_forward and self._minitouch_port:
             self.session.adb_forward_remove(f"tcp:{self._minitouch_port}")
@@ -373,7 +411,7 @@ class MinitouchController:
         self._minitouch_pid = ""
         del_cached_property(self, "_minitouch_builder")
 
-    def _ensure_minitouch_executable(self):
+    def _ensure_minitouch_executable(self) -> None:
         path = self.config.MINITOUCH_FILEPATH_REMOTE
         self.session.adb_shell(["chmod", "755", path])
         state = self.session.adb_shell(f"if [ -x {path} ]; then echo ok; else echo missing; fi").strip()
@@ -382,7 +420,7 @@ class MinitouchController:
         message = f"未找到可执行的 minitouch：{path}。请先把 MuMu 当前 ABI 对应的 minitouch 推送到这个路径。"
         raise MinitouchNotInstalledError(message)
 
-    def _start_minitouch_service(self):
+    def _start_minitouch_service(self) -> None:
         if self._minitouch_stream is not None:
             return
         path = self.config.MINITOUCH_FILEPATH_REMOTE
@@ -399,7 +437,7 @@ class MinitouchController:
                 pids.add(parts[1])
         return pids
 
-    def _restart_minitouch_service(self):
+    def _restart_minitouch_service(self) -> None:
         logger.info("Restart minitouch")
         self._close_minitouch_client()
         self._close_minitouch_stream()
@@ -411,12 +449,12 @@ class MinitouchController:
 
     @cached_property
     @retry
-    def _minitouch_builder(self):
+    def _minitouch_builder(self) -> CommandBuilder:
         self.minitouch_init()
         return CommandBuilder(self)
 
     @property
-    def minitouch_builder(self):
+    def minitouch_builder(self) -> CommandBuilder:
         if self._minitouch_init_thread is not None:
             if self._minitouch_init_thread is not threading.current_thread():
                 self._minitouch_init_thread.join()
@@ -424,12 +462,12 @@ class MinitouchController:
 
         return self._minitouch_builder
 
-    def early_minitouch_init(self):
+    def early_minitouch_init(self) -> None:
         """截图阶段异步预热 minitouch，使首次点击快约 0.05 秒。"""
         if has_cached_property(self, "_minitouch_builder"):
             return
 
-        def early_minitouch_init_func():
+        def early_minitouch_init_func() -> None:
             _ = self._minitouch_builder
 
         thread = threading.Thread(target=early_minitouch_init_func, daemon=True)
@@ -439,7 +477,7 @@ class MinitouchController:
     def early_init(self) -> None:
         self.early_minitouch_init()
 
-    def minitouch_init(self):
+    def minitouch_init(self) -> None:
         logger.hr("MiniTouch init")
         max_x, max_y = 1280, 720
         max_contacts = 2
@@ -496,7 +534,7 @@ class MinitouchController:
         logger.info(f"minitouch running on port: {self._minitouch_port}, pid: {self._minitouch_pid}")
         logger.info(f"max_contact: {max_contacts}; max_x: {max_x}; max_y: {max_y}; max_pressure: {max_pressure}")
 
-    def minitouch_send(self, builder: CommandBuilder):
+    def minitouch_send(self, builder: CommandBuilder) -> None:
         content = builder.to_minitouch()
         byte_content = content.encode("utf-8")
         client = self._minitouch_client
@@ -509,28 +547,28 @@ class MinitouchController:
         builder.clear()
 
     @retry
-    def click_minitouch(self, x, y):
+    def click_minitouch(self, x: int, y: int) -> None:
         builder = self.minitouch_builder
         builder.down(x, y).commit()
         builder.up().commit()
         builder.send()
 
-    def click(self, x, y):
+    def click(self, x: int, y: int) -> None:
         return self.click_minitouch(x, y)
 
     @retry
-    def long_click_minitouch(self, x, y, duration=1.0):
+    def long_click_minitouch(self, x: int, y: int, duration: float = 1.0) -> None:
         duration = int(duration * 1000)
         builder = self.minitouch_builder
         builder.down(x, y).commit().wait(duration)
         builder.up().commit()
         builder.send()
 
-    def long_click(self, x, y, duration=1.0):
+    def long_click(self, x: int, y: int, duration: float = 1.0) -> None:
         return self.long_click_minitouch(x, y, duration)
 
     @retry
-    def swipe_minitouch(self, p1, p2):
+    def swipe_minitouch(self, p1: Point, p2: Point) -> None:
         points = insert_swipe(p0=p1, p3=p2)
         builder = self.minitouch_builder
 
@@ -544,11 +582,11 @@ class MinitouchController:
         builder.up().commit()
         builder.send()
 
-    def swipe(self, p1, p2):
+    def swipe(self, p1: Point, p2: Point) -> None:
         return self.swipe_minitouch(p1, p2)
 
     @retry
-    def drag_minitouch(self, p1, p2, point_random=(-10, -10, 10, 10)):
+    def drag_minitouch(self, p1: Point, p2: Point, point_random: Area = (-10, -10, 10, 10)) -> None:
         p1 = np.array(p1) - random_rectangle_point(point_random)
         p2 = np.array(p2) - random_rectangle_point(point_random)
         points = insert_swipe(p0=p1, p3=p2, speed=20)
@@ -568,5 +606,5 @@ class MinitouchController:
         builder.up().commit()
         builder.send()
 
-    def drag(self, p1, p2, point_random=(-10, -10, 10, 10)):
+    def drag(self, p1: Point, p2: Point, point_random: Area = (-10, -10, 10, 10)) -> None:
         return self.drag_minitouch(p1, p2, point_random=point_random)

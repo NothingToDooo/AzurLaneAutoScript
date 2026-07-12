@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import cv2
 import numpy as np
 
@@ -10,22 +12,28 @@ from module.logger import logger
 from module.os.assets import MAP_GOTO_GLOBE, MAP_GOTO_GLOBE_FOG, ZONE_PINNED
 from module.os.globe_detection import GLOBE_MAP_SHAPE, GlobeDetection
 from module.os.globe_operation import GlobeOperation
-from module.os.globe_zone import ZoneManager
+from module.os.globe_zone import Zone, ZoneManager, ZoneName
 from module.os_ash.assets import ASH_QUIT, ASH_SHOWDOWN
 from module.os_handler.assets import ACTION_POINT_CANCEL, ACTION_POINT_USE, AUTO_SEARCH_REWARD
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from module.base.type_alias import Area, NumericArray, Point
+    from module.map.map_grids import SelectedGrids
 
 
 class GlobeCamera(GlobeOperation, ZoneManager):
     globe: GlobeDetection
-    globe_camera: tuple
+    globe_camera: Point
 
-    def _globe_init(self):
+    def _globe_init(self) -> None:
         """执行全局地图操作前必须先初始化检测器。"""
         if not hasattr(self, "globe"):
             self.globe = GlobeDetection(self.config)
             self.globe.load_globe_map()
 
-    def globe_update(self):
+    def globe_update(self) -> None:
         # 处理偶发黑屏截图。
         timeout = Timer(5, count=10).start()
         while 1:
@@ -46,14 +54,14 @@ class GlobeCamera(GlobeOperation, ZoneManager):
 
         self._globe_update_load_camera()
 
-    def _globe_update_handle_blocker(self):
+    def _globe_update_handle_blocker(self) -> bool:
         if self._globe_update_handle_goto():
             return True
         if self._globe_update_handle_popup():
             return True
         return self._globe_update_leave_wrong_page()
 
-    def _globe_update_handle_goto(self):
+    def _globe_update_handle_goto(self) -> bool:
         # 逻辑来自 os_map_goto_globe()；这里也可能误入地图。
         if self.appear_then_click(MAP_GOTO_GLOBE, offset=(200, 5), interval=3):
             # 只用于初始化 MAP_GOTO_GLOBE_FOG 的 interval timer。
@@ -65,7 +73,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
             return True
         return False
 
-    def _globe_update_handle_popup(self):
+    def _globe_update_handle_popup(self) -> bool:
         if self.handle_map_event():
             return True
         # AUTO_SEARCH_REWARD 弹窗出现较慢。
@@ -74,7 +82,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
         # 离开当前区域时，猫指挥搜索和潜艇可能被终止；搜索奖励会在进入新区后出现。
         return self.handle_popup_confirm("GOTO_GLOBE")
 
-    def _globe_update_leave_wrong_page(self):
+    def _globe_update_leave_wrong_page(self) -> bool:
         # 不明原因误入 META 页面时退回。
         if self.appear(ASH_SHOWDOWN, offset=(20, 20), interval=3):
             self.device.click(ASH_QUIT)
@@ -85,14 +93,15 @@ class GlobeCamera(GlobeOperation, ZoneManager):
             return True
         return False
 
-    def _globe_update_load_camera(self):
+    def _globe_update_load_camera(self) -> None:
         self._globe_init()
         self.globe.load(self.device.image)
         self.globe_camera = self.globe.center_loca
         center = self.camera_to_zone(self.globe.center_loca)
         logger.attr("Globe_center", center.zone_id)
 
-    def globe_swipe(self, vector, box=(20, 220, 980, 620)):
+    def globe_swipe(self, vector: Point, box: Area = (20, 220, 980, 620)) -> None:
+        vector = np.asarray(vector, dtype=float)
         name = "GLOBE_SWIPE_" + "_".join([str(round(x)) for x in vector])
         if np.linalg.norm(vector) <= 25:
             logger.warning(f"Globe swipe to short: {vector}")
@@ -107,8 +116,8 @@ class GlobeCamera(GlobeOperation, ZoneManager):
 
         self.globe_update()
 
-    def globe_wait_until_stable(self):
-        prev = self.globe_camera
+    def globe_wait_until_stable(self) -> None:
+        prev = np.asarray(self.globe_camera, dtype=float)
         interval = Timer(1)
         confirm = Timer(0.5, count=1).start()
         for _n in range(10):
@@ -118,7 +127,8 @@ class GlobeCamera(GlobeOperation, ZoneManager):
 
             self.globe_update()
 
-            if np.linalg.norm(np.subtract(self.globe_camera, prev)) < 10:
+            camera = np.asarray(self.globe_camera, dtype=float)
+            if np.linalg.norm(np.subtract(camera, prev)) < 10:
                 if confirm.reached():
                     logger.info("Globe map stabled")
                     break
@@ -128,23 +138,28 @@ class GlobeCamera(GlobeOperation, ZoneManager):
             if self.handle_zone_pinned():
                 continue
 
-            prev = self.globe_camera
+            prev = camera
 
-    def globe2screen(self, points):
-        points = np.array(points) - self.globe_camera + self.globe.homo_center
+    def globe2screen(self, points: Sequence[Point] | NumericArray) -> NumericArray:
+        points = np.array(points) - np.asarray(self.globe_camera) + self.globe.homo_center
         return self.globe.globe2screen(points).round()
 
-    def screen2globe(self, points):
+    def screen2globe(self, points: Sequence[Point] | NumericArray) -> NumericArray:
         points = self.globe.screen2globe(points).round()
-        return points - self.globe.homo_center + self.globe_camera
+        return points - self.globe.homo_center + np.asarray(self.globe_camera)
 
-    def zone_to_button(self, zone):
+    def zone_to_button(self, zone: Zone) -> Button:
         pinned = self.globe2screen([zone.location])[0]
         # pinned 是实际标记位置的左下角。
         area = area_offset((0, -10, 16, 0), offset=pinned)
         return Button(area=area, color=(), button=area, name=f"ZONE_{zone.zone_id}")
 
-    def globe_in_sight(self, zone, swipe_limit=(620, 340), sight=(20, 220, 980, 620)):
+    def globe_in_sight(
+        self,
+        zone: ZoneName,
+        swipe_limit: Point = (620, 340),
+        sight: Area = (20, 220, 980, 620),
+    ) -> None:
         zone = self.name_to_zone(zone)
 
         while 1:
@@ -154,15 +169,20 @@ class GlobeCamera(GlobeOperation, ZoneManager):
             area = (400, 200, GLOBE_MAP_SHAPE[0] - 400, GLOBE_MAP_SHAPE[1] - 250)
             loca = point_limit(zone.location, area=area)
             vector = np.array(loca) - self.globe_camera
-            vector = vector / self.config.OS_GLOBE_SWIPE_MULTIPLY
+            vector /= self.config.OS_GLOBE_SWIPE_MULTIPLY
             swipe = tuple(np.min([np.abs(vector), swipe_limit], axis=0) * np.sign(vector))
             self.globe_swipe(swipe)
 
-    def get_globe_pinned_zone(self):
+    def get_globe_pinned_zone(self) -> Zone:
         location = self.screen2globe([ZONE_PINNED.button[:2]])[0] + (0, 5)
         return self.camera_to_zone(location)
 
-    def globe_wait_until_zone_pinned(self, zone, skip_first_screenshot=True):
+    def globe_wait_until_zone_pinned(
+        self,
+        zone: ZoneName,
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> bool:
         """等待指定海域被钉选；超时返回 False。"""
         zone = self.name_to_zone(zone)
         timeout = Timer(5, count=5).start()
@@ -181,7 +201,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
                 return False
         return False
 
-    def globe_focus_to(self, zone):
+    def globe_focus_to(self, zone: ZoneName) -> None:
         """先调用 globe_update，再把全局地图聚焦并钉选指定海域。
 
         页面保持在 IN_GLOBE，结束时显示 ZONE_ENTRANCE。
@@ -200,7 +220,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
             if self.globe_wait_until_zone_pinned(zone):
                 break
 
-    def _globe_predict_stronghold(self, zone):
+    def _globe_predict_stronghold(self, zone: ZoneName) -> bool:
         """调用前必须先用 globe_in_sight 把海域移入视野。"""
         zone = self.name_to_zone(zone)
         # 二维地图上的红色漩涡中心。
@@ -223,7 +243,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
         # 漩涡中心通常接近 HSV (338, 74.9, 100)。
         return bool(285 < h <= 360 and s > 45 and v > 45)
 
-    def _find_siren_stronghold(self, zones):
+    def _find_siren_stronghold(self, zones: SelectedGrids[Zone]) -> Zone | None:
         """调用前必须先执行 globe_update；找到后仍在全局地图并钉选目标。"""
         sight = (20, 220, 980, 620)
         while zones:
@@ -250,7 +270,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
         logger.info("Find siren stronghold finished")
         return None
 
-    def find_siren_stronghold(self):
+    def find_siren_stronghold(self) -> Zone | None:
         """在全局地图查找要塞；找到后钉选目标，找不到返回 None。"""
         logger.hr("Find siren stronghold", level=1)
         region = self.camera_to_zone(self.globe_camera).region
@@ -265,7 +285,7 @@ class GlobeCamera(GlobeOperation, ZoneManager):
             region = zones[0].region
 
         index = order.index(region)
-        order = order * 2
+        order *= 2
         order = order[index : index + 4]
         for region in order:
             logger.hr(f"Find siren stronghold in region {region}", level=2)

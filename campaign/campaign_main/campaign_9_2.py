@@ -82,7 +82,7 @@ road_main = RoadGrids([C3, C2, [C1, D2], F1, H1, H2, H3, H4])
 
 
 class Config:
-    SUBMARINE = 0
+    submarine = 0
     MAP_HAS_MYSTERY = True
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 40
     EDGE_LINES_HOUGHLINES_THRESHOLD = 40
@@ -106,7 +106,7 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.fleet_at(D5, fleet=2):
             self.map.weight_data = """
                 10 10 30 10 10 20 30 40 10
@@ -138,7 +138,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         boss = self.map.select(is_boss=True)
         if boss and not self.check_accessibility(boss[0], fleet="boss") and self.clear_roadblocks([road_main]):
             return True

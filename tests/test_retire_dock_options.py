@@ -1,11 +1,20 @@
-from typing import Any
+from typing import TYPE_CHECKING, override
+
+import numpy as np
 
 from module.retire import assets as retire_assets
 from module.retire.dock import Dock, DockFilterOptions, dock_filter_options
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
+
 
 class _Device:
     def __init__(self) -> None:
+        self.image = np.zeros((1, 1, 3), dtype=np.uint8)
         self.screenshot_count = 0
 
     def screenshot(self) -> None:
@@ -13,7 +22,7 @@ class _Device:
 
 
 class _DockFilterProbe(Dock):
-    device: Any
+    device: _Device
 
     def __init__(self) -> None:
         self.device = _Device()
@@ -21,11 +30,14 @@ class _DockFilterProbe(Dock):
         self.appear_then_click_calls: list[tuple[object, dict[str, object]]] = []
         self.confirm_results: list[bool] = []
 
+    @override
     def interval_clear(self, button: object, *_args: object, **_kwargs: object) -> None:
         _ = button
 
-    def loop(self, *_args: object, **_kwargs: object):
-        return range(1)
+    @override
+    def loop(self, *, skip_first: bool = True, timeout: float | Timer | None = None) -> Iterator[ImageArray]:
+        del skip_first, timeout
+        return iter((self.device.image,))
 
     def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         self.appear_calls.append((button, kwargs))

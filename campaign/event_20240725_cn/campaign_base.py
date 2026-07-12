@@ -2,7 +2,7 @@ from module.campaign.campaign_base import CampaignBase as CampaignBase_
 
 
 class CampaignBase(CampaignBase_):
-    def campaign_ensure_mode(self, mode="normal"):
+    def campaign_ensure_mode(self, mode: str = "normal") -> None:
         if mode == "hard":
             self.config.override(Campaign_Mode="hard")
 

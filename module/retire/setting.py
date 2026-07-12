@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from module.base.decorator import cached_property
 from module.retire.assets import (
@@ -17,6 +17,8 @@ from module.ui.ui import UI
 if TYPE_CHECKING:
     from module.base.button import Button
 
+type QuickRetireFilter5 = Literal["keep_limit_break", "all"]
+
 
 class QuickRetireSetting(Setting):
     def is_option_active(self, option: Button) -> bool:
@@ -24,7 +26,7 @@ class QuickRetireSetting(Setting):
 
 
 class QuickRetireSettingHandler(UI):
-    def _retire_setting_enter(self):
+    def _retire_setting_enter(self) -> None:
         """从退役页进入快速退役设置。"""
         self.ui_click(
             RETIRE_SETTING_ENTER,
@@ -34,7 +36,7 @@ class QuickRetireSettingHandler(UI):
             skip_first_screenshot=True,
         )
 
-    def _retire_setting_quit(self):
+    def _retire_setting_quit(self) -> None:
         """从快速退役设置返回退役页。"""
         self.ui_click(
             RETIRE_SETTING_QUIT,
@@ -68,7 +70,7 @@ class QuickRetireSettingHandler(UI):
         )
         return setting
 
-    def quick_retire_setting_set(self, filter_5="all"):
+    def quick_retire_setting_set(self, filter_5: QuickRetireFilter5 | None = "all") -> None:
         """前三项固定优先 R、E、N，满破同名舰固定不保留。
 
         第五项接受 keep_limit_break、all 或 None，结束后返回退役页。
@@ -77,5 +79,6 @@ class QuickRetireSettingHandler(UI):
         self.retire_setting.set(filter_5=filter_5)
         self._retire_setting_quit()
 
-    def server_support_quick_retire_setting_fallback(self):
+    @staticmethod
+    def server_support_quick_retire_setting_fallback() -> bool:
         return True

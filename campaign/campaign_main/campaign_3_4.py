@@ -85,7 +85,7 @@ class Config(Config31):
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.fleet_2_push_forward()
 
         if self.fleet_2_rescue(H3):
@@ -93,7 +93,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_3(self):
+    def battle_3(self) -> bool:
         if not self.check_accessibility(H3, fleet="boss"):
             return self.battle_default()
 

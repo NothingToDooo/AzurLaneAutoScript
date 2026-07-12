@@ -118,7 +118,7 @@ class Campaign(CampaignBase):
     MAP = MAP
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.fleet_2_push_forward()
         if self.clear_roadblocks([ROAD_MAIN], strongest=True):
             return True
@@ -128,10 +128,10 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_3(self):
+    def battle_3(self) -> bool:
         self.clear_all_mystery()
 
         return self.battle_0()
 
-    def battle_7(self):
+    def battle_7(self) -> bool:
         return self.fleet_boss.clear_boss()

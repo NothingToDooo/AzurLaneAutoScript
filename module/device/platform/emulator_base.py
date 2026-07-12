@@ -1,17 +1,21 @@
 import re
-import typing as t
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from module.device.mumu import is_mumu12_serial
-from module.device.platform.utils import cached_property, iter_folder
+from module.device.platform.utils import iter_folder
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
 
 
-def abspath(path):
+def abspath(path: str | Path) -> str:
     return Path(path).resolve().as_posix()
 
 
-def remove_duplicated_path(paths):
+def remove_duplicated_path(paths: Iterable[str]) -> list[str]:
     paths = sorted(set(paths))
     dic = {}
     for path in paths:
@@ -28,7 +32,7 @@ class EmulatorInstanceBase:
     # 模拟器可执行文件路径
     path: str
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'{self.type}(serial="{self.serial}", name="{self.name}", path="{self.path}")'
 
     @cached_property
@@ -36,10 +40,10 @@ class EmulatorInstanceBase:
         return self.emulator.type
 
     @cached_property
-    def emulator(self):
+    def emulator(self) -> EmulatorBase:
         return EmulatorBase(self.path)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, str) and self.type == other:
             return True
         if isinstance(other, (list, tuple)) and self.type in other:
@@ -48,14 +52,14 @@ class EmulatorInstanceBase:
             return super().__eq__(other) and self.type == other.type
         return super().__eq__(other)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(str(self))
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return True
 
     @cached_property
-    def MuMuPlayer12_id(self):
+    def mumu_player_12_id(self) -> int | None:
         """支持 MuMuPlayer-12.0-* 、MuMuPlayer-15.0-* 和 YXArkNights-12.0-* ；其他名称返回 None。"""
         res = re.search(r"MuMuPlayer-12.0-(\d+)", self.name)
         if res:
@@ -69,7 +73,7 @@ class EmulatorInstanceBase:
 
         return None
 
-    def mumu_vms_config(self, file):
+    def mumu_vms_config(self, file: str) -> str:
         return self.emulator.abspath(f"../vms/{self.name}/configs/{file}")
 
 
@@ -82,37 +86,43 @@ class EmulatorBase:
         del path
         return ""
 
-    def iter_instances(self) -> t.Iterable[EmulatorInstanceBase]:
-        return []
+    def iter_instances(self) -> Iterable[EmulatorInstanceBase]:
+        if self.type:
+            message = f"iter_instances() is not implemented for {self.type}"
+            raise NotImplementedError(message)
+        return ()
 
-    def iter_adb_binaries(self) -> t.Iterable[str]:
-        return []
+    def iter_adb_binaries(self) -> Iterable[str]:
+        if self.type:
+            message = f"iter_adb_binaries() is not implemented for {self.type}"
+            raise NotImplementedError(message)
+        return ()
 
-    def __init__(self, path):
+    def __init__(self, path: str) -> None:
         self.path = path.replace("\\", "/")
         parent = Path(path).parent
         self.dir = "" if parent == Path() else str(parent).replace("\\", "/")
         self.type = self.__class__.path_to_type(path)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, str) and self.type == other:
             return True
         if isinstance(other, (list, tuple)) and self.type in other:
             return True
         return super().__eq__(other)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'{self.type}(path="{self.path}")'
 
     __repr__ = __str__
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.path)
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return True
 
-    def abspath(self, path, folder=None):
+    def abspath(self, path: str | Path, folder: str | Path | None = None) -> str:
         if folder is None:
             folder = self.dir
         return abspath(Path(folder) / path)
@@ -121,15 +131,15 @@ class EmulatorBase:
     def is_emulator(cls, path: str) -> bool:
         return bool(cls.path_to_type(path))
 
-    def list_folder(self, folder, is_dir=False, ext=None):
+    def list_folder(self, folder: str | Path, *, is_dir: bool = False, ext: str | None = None) -> list[str]:
         folder = self.abspath(folder)
         return list(iter_folder(folder, is_dir=is_dir, ext=ext))
 
 
 class EmulatorManagerBase:
     @staticmethod
-    def iter_running_emulator():
-        return
+    def iter_running_emulator() -> Iterator[str]:
+        return iter(())
 
     @cached_property
     def all_emulators(self) -> list[EmulatorBase]:

@@ -2,7 +2,7 @@ from ..campaign_war_archives.campaign_base import CampaignBase as CampaignBase_
 
 
 class CampaignBase(CampaignBase_):
-    def campaign_set_chapter_event(self, chapter, mode="normal"):
+    def campaign_set_chapter_event(self, chapter: str, mode: str = "normal") -> bool:
         del mode
         self.ui_goto_sp()
         if chapter in ["a", "b", "as", "bs", "t", "ts", "tss"]:
@@ -14,7 +14,7 @@ class CampaignBase(CampaignBase_):
         self.campaign_ensure_chapter(chapter)
         return True
 
-    def campaign_ensure_mode(self, mode="normal"):
+    def campaign_ensure_mode(self, mode: str = "normal") -> None:
         if mode == "hard":
             self.config.override(Campaign_Mode="hard")
 

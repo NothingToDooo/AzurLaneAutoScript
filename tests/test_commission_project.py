@@ -1,28 +1,63 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
 from datetime import timedelta
+from typing import TYPE_CHECKING, TypedDict, override
 
 from module.commission.project import Commission
 
+if TYPE_CHECKING:
+    from typing import Unpack
 
-def _commission(**overrides):
-    commission = Commission.__new__(Commission)
-    attrs = {
-        "valid": True,
-        "genre": "major_comm",
-        "status": "pending",
-        "category_str": "major",
-        "duration": timedelta(hours=1),
-        "expire": timedelta(seconds=0),
-        "repeat_count": 1,
-        "name": "委托",
-    }
-    attrs.update(overrides)
-    for key, value in attrs.items():
-        setattr(commission, key, value)
+    from module.commission.project import CommissionStatus
 
-    def suffix_match(_other):
-        return attrs.get("suffix_matches", True)
 
-    commission.suffix_match = suffix_match
+class _Commission(Commission):
+    suffix_matches: bool
+
+    @override
+    def suffix_match(self, other: Commission, similarity: float = 0.75) -> bool:
+        del other, similarity
+        return self.suffix_matches
+
+
+@dataclass(frozen=True)
+class _CommissionSpec:
+    valid: bool = True
+    genre: str = "major_comm"
+    status: CommissionStatus = "pending"
+    category_str: str = "major"
+    duration: timedelta = timedelta(hours=1)
+    expire: timedelta = timedelta()
+    repeat_count: int = 1
+    name: str = "委托"
+    suffix_matches: bool = True
+
+
+class _CommissionOverrides(TypedDict, total=False):
+    valid: bool
+    genre: str
+    status: CommissionStatus
+    category_str: str
+    duration: timedelta
+    expire: timedelta
+    repeat_count: int
+    name: str
+    suffix_matches: bool
+
+
+def _commission(**overrides: Unpack[_CommissionOverrides]) -> _Commission:
+    spec = _CommissionSpec(**overrides)
+    commission = _Commission.__new__(_Commission)
+    commission.valid = spec.valid
+    commission.genre = spec.genre
+    commission.status = spec.status
+    commission.category_str = spec.category_str
+    commission.duration = spec.duration
+    commission.expire = spec.expire
+    commission.repeat_count = spec.repeat_count
+    commission.name = spec.name
+    commission.suffix_matches = spec.suffix_matches
     return commission
 
 

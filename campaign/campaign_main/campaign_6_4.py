@@ -108,14 +108,14 @@ road_boss = RoadGrids(
 
 
 class Config:
-    FLEET_BOSS = 1
+    fleet_boss = 1
     MAP_MYSTERY_HAS_CARRIER = True
 
 
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.fleet_2_step_on(step_on, roadblocks=[road_boss]):
             return True
 
@@ -127,10 +127,10 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         self.clear_all_mystery()
 
-        if self.config.FLEET_BOSS == 1:
+        if self.config.fleet_boss == 1:
             self.pick_up_ammo()
 
         boss = self.map.select(is_boss=True)

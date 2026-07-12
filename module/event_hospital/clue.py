@@ -1,4 +1,6 @@
 from functools import reduce
+from operator import itemgetter
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
@@ -12,8 +14,14 @@ from module.raid.assets import RAID_FLEET_PREPARATION
 from module.ui.page import page_hospital
 from module.ui.scroll import Scroll
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
 
-def merge_two_rects(r1: tuple[int, int, int, int], r2: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+type Rect = tuple[int, int, int, int]
+type WordRect = tuple[Rect, int]
+
+
+def merge_two_rects(r1: Rect, r2: Rect) -> Rect:
     return (
         min(r1[0], r2[0]),
         min(r1[1], r2[1]),
@@ -22,17 +30,17 @@ def merge_two_rects(r1: tuple[int, int, int, int], r2: tuple[int, int, int, int]
     )
 
 
-def merge_rows(list_word, merge):
-    list_word = sorted(list_word, key=lambda x: x[1])
+def merge_rows(list_word: Iterable[WordRect], merge: int) -> list[Rect]:
+    list_word = sorted(list_word, key=itemgetter(1))
 
-    list_row = []
-    current_row = []
-    current_center = None
+    list_row: list[Rect] = []
+    current_row: list[Rect] = []
+    current_center: int | None = None
     for rect, center_y in list_word:
         if not current_row:
             current_row.append(rect)
             current_center = center_y
-        elif abs(center_y - current_center) <= merge:
+        elif current_center is not None and abs(center_y - current_center) <= merge:
             current_row.append(rect)
         else:
             list_row.append(reduce(merge_two_rects, current_row))
@@ -62,12 +70,13 @@ class HospitalClue(HospitalUI):
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         cv2.dilate(gray, kernel, dst=gray)
 
-        list_word = []
+        list_word: list[WordRect] = []
         contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for cont in contours:
             rect = cv2.boundingRect(cv2.convexHull(cont).astype(np.float32))
             # 文字高度通常约为 16，低于 12 视为噪声。
-            rect = xywh2xyxy(rect)
+            converted = xywh2xyxy(rect)
+            rect = (int(converted[0]), int(converted[1]), int(converted[2]), int(converted[3]))
             if rect[3] - rect[1] < 12:
                 continue
             center_y = (rect[1] + rect[3]) // 2
@@ -113,7 +122,7 @@ class HospitalClue(HospitalUI):
             return button
         return None
 
-    def clue_enter(self, skip_first_screenshot=True):
+    def clue_enter(self, *, skip_first_screenshot: bool = True) -> None:
         """从医院任意子页进入线索页。"""
         logger.info("Hospital clue enter")
         self.interval_clear(page_hospital.check_button)
@@ -127,7 +136,7 @@ class HospitalClue(HospitalUI):
             if self.handle_clue_exit():
                 continue
 
-    def clue_exit(self, skip_first_screenshot=True):
+    def clue_exit(self, *, skip_first_screenshot: bool = True) -> None:
         """从医院任意子页返回活动主页。"""
         logger.info("Hospital clue exit")
         self.interval_clear(hospital_assets.HOSIPITAL_CLUE_CHECK)
@@ -143,7 +152,7 @@ class HospitalClue(HospitalUI):
             if self.appear_then_click(hospital_assets.HOSIPITAL_CLUE_CHECK, offset=(20, 20), interval=2):
                 continue
 
-    def invest_enter(self, skip_first_screenshot=True):
+    def invest_enter(self, *, skip_first_screenshot: bool = True) -> bool:
         """从线索页进入舰队准备页；没有可调查项目时返回 False。"""
         logger.info("Clue invest")
         self.interval_clear(hospital_assets.HOSIPITAL_CLUE_CHECK)
@@ -170,7 +179,7 @@ class HospitalClue(HospitalUI):
                 continue
         return False
 
-    def iter_invest(self):
+    def iter_invest(self) -> Iterator[Button]:
         """按当前页、顶部到下方依次产生调查按钮；无滚动条时只检查当前页。"""
         logger.hr("Iter invest")
         scroll = Scroll(hospital_assets.INVEST_SCROLL, color=(107, 97, 107), name="INVEST_SCROLL")
@@ -214,7 +223,7 @@ class HospitalClue(HospitalUI):
         area = (search[0], area[1], 308, area[3])
         return self.image_color_count(area, color=(74, 130, 148), threshold=221, count=20)
 
-    def iter_aside(self):
+    def iter_aside(self) -> Iterator[Button]:
         """依次产生未完成的侧边栏按钮。"""
         list_button = self.get_clue_list()
         for button in list_button:
@@ -222,7 +231,7 @@ class HospitalClue(HospitalUI):
                 continue
             yield button
 
-    def select_aside(self, skip_first_screenshot=True):
+    def select_aside(self, *, skip_first_screenshot: bool = True) -> bool:
         """在线索页选择未完成侧边任务；全部完成时返回 False。"""
         logger.info("Select aside")
         aside = None

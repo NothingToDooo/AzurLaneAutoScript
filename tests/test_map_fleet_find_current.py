@@ -1,4 +1,11 @@
+from typing import TYPE_CHECKING, override
+
 from module.map.fleet import Fleet
+from module.map_detection.grid import Grid
+from module.map_detection.grid_info import GridInfo
+
+if TYPE_CHECKING:
+    from module.base.type_alias import Point
 
 _Location = tuple[int, int]
 _MaybeLocation = _Location | tuple[()]
@@ -6,16 +13,16 @@ _MaybeLocation = _Location | tuple[()]
 
 class _Config:
     POOR_MAP_DATA = False
-    FLEET_2 = False
+    fleet_2 = False
 
 
-class _Grid:
+class _Grid(GridInfo):
     def __init__(
         self,
         location: _Location,
         *,
-        is_current_fleet: object = False,
-        is_spawn_point: object = True,
+        is_current_fleet: bool = False,
+        is_spawn_point: bool = True,
     ) -> None:
         self.location = location
         self.is_current_fleet = is_current_fleet
@@ -25,11 +32,12 @@ class _Grid:
         return f"_Grid({self.location})"
 
 
-class _LocalGrid:
-    def __init__(self, current: object) -> None:
+class _LocalGrid(Grid):
+    def __init__(self, *, current: bool) -> None:
         self.current = current
 
-    def predict_current_fleet(self) -> object:
+    @override
+    def predict_current_fleet(self) -> bool:
         return self.current
 
 
@@ -76,7 +84,7 @@ class _Fleet(Fleet):
         self.fleet_1_location = ()
         self.fleet_2_location = ()
         self.calls: list[tuple[object, ...]] = []
-        self.local_current_results: dict[tuple[int, int], object] = {}
+        self.local_current_results: dict[_Location, bool] = {}
 
     def find_all_fleets(self) -> None:
         self.calls.append(("find_all_fleets",))
@@ -84,13 +92,20 @@ class _Fleet(Fleet):
     def show_fleet(self) -> None:
         self.calls.append(("show_fleet", self.fleet_1_location, self.fleet_2_location))
 
-    def in_sight(self, location: _Grid, sight=None, **kwargs: object) -> bool:
-        self.calls.append(("in_sight", location.location, sight, kwargs))
-        return False
+    @override
+    def in_sight(
+        self,
+        location: GridInfo | str | Point,
+        sight: tuple[int, int, int, int] | None = None,
+    ) -> None:
+        assert isinstance(location, _Grid)
+        self.calls.append(("in_sight", location.location, sight))
 
-    def convert_global_to_local(self, location: _Grid, *_args: object, **_kwargs: object) -> _LocalGrid:
+    @override
+    def convert_global_to_local(self, location: GridInfo | str | Point) -> _LocalGrid:
+        assert isinstance(location, _Grid)
         self.calls.append(("convert_global_to_local", location.location))
-        return _LocalGrid(self.local_current_results.get(location.location, False))
+        return _LocalGrid(current=self.local_current_results.get(location.location, False))
 
 
 def test_find_current_fleet_uses_single_detected_fleet_without_second_fleet() -> None:
@@ -107,7 +122,7 @@ def test_find_current_fleet_uses_single_detected_fleet_without_second_fleet() ->
 
 def test_find_current_fleet_predicts_missing_second_fleet_from_spawn_points() -> None:
     fleet = _Fleet()
-    fleet.config.FLEET_2 = True
+    fleet.config.fleet_2 = True
     detected = _Grid((1, 1), is_current_fleet=False)
     another = _Grid((2, 2))
     fleet.map.set_select({"is_fleet": True, "is_spawn_point": True}, _Selected([detected]))

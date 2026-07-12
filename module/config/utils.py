@@ -3,6 +3,7 @@ import random
 import string
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING, Literal, NotRequired, Protocol, TypedDict, cast
 
 import yaml
 from yaml.representer import SafeRepresenter
@@ -10,11 +11,33 @@ from yaml.representer import SafeRepresenter
 from module.base.atomic import atomic_read_bytes, atomic_read_text, atomic_write
 from module.logger import logger
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping, Sequence
+
+    from yaml.nodes import ScalarNode
+
+    from module.config.deep import DeepValue, MutableDeepData, MutableDeepValue
+
+type FilePath = str | Path
+type TimeScalar = int | float
+type TimeInput = TimeScalar | str | tuple[TimeScalar, TimeScalar]
+type InputType = Literal["checkbox", "select", "textarea", "input"]
+
+
+class ScalarRepresenter(Protocol):
+    def represent_scalar(self, tag: str, value: str, style: str | None = None) -> ScalarNode: ...
+
+
+class ArgumentDefinition(TypedDict):
+    value: MutableDeepValue
+    option: NotRequired[list[MutableDeepValue]]
+
+
 LANGUAGES = ["zh-CN"]
 DEFAULT_TIME = datetime(2020, 1, 1, 0, 0)
 
 
-def str_presenter(dumper, data):
+def str_presenter(dumper: ScalarRepresenter, data: str) -> ScalarNode:
     if len(data.splitlines()) > 1:
         return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
     return dumper.represent_scalar("tag:yaml.org,2002:str", data)
@@ -24,53 +47,55 @@ yaml.add_representer(str, str_presenter)
 SafeRepresenter.add_representer(str, str_presenter)
 
 
-def filepath_args(filename="args"):
+def filepath_args(filename: str = "args") -> str:
     return f"./module/config/argument/{filename}.json"
 
 
-def filepath_argument(filename):
+def filepath_argument(filename: str) -> str:
     return f"./module/config/argument/{filename}.yaml"
 
 
-def filepath_i18n(lang):
+def filepath_i18n(lang: str) -> str:
     return (Path("./module/config/i18n") / f"{lang}.json").as_posix()
 
 
-def filepath_config(filename):
+def filepath_config(filename: str) -> str:
     return (Path("./config") / f"{filename}.json").as_posix()
 
 
-def filepath_code():
+def filepath_code() -> str:
     return "./module/config/config_generated.py"
 
 
-def read_file(file):
+def read_file(file: FilePath) -> MutableDeepData:
     """读取 YAML 或 JSON；文件不存在、为空或扩展名不支持时返回空字典。"""
+    file = Path(file)
     logger.debug(f"read: {file}")
-    if file.endswith(".json"):
+    if file.suffix == ".json":
         content = atomic_read_bytes(file)
         if not content:
             return {}
-        return json.loads(content)
-    if file.endswith(".yaml"):
+        return cast("MutableDeepData", json.loads(content))
+    if file.suffix == ".yaml":
         content = atomic_read_text(file)
         data = list(yaml.safe_load_all(content))
         if len(data) == 1:
             data = data[0]
         if not data:
             data = {}
-        return data
+        return cast("MutableDeepData", data)
     logger.warning(f"Unsupported config file extension: {file}")
     return {}
 
 
-def write_file(file, data):
+def write_file(file: FilePath, data: MutableDeepData | list[MutableDeepData]) -> None:
     """原子写入 YAML 或 JSON；不支持的扩展名只记录警告。"""
+    file = Path(file)
     logger.debug(f"write: {file}")
-    if file.endswith(".json"):
+    if file.suffix == ".json":
         content = json.dumps(data, indent=2, ensure_ascii=False, sort_keys=False, default=str)
         atomic_write(file, content)
-    elif file.endswith(".yaml"):
+    elif file.suffix == ".yaml":
         if isinstance(data, list):
             content = yaml.safe_dump_all(
                 data, default_flow_style=False, encoding="utf-8", allow_unicode=True, sort_keys=False
@@ -84,7 +109,7 @@ def write_file(file, data):
         logger.warning(f"Unsupported config file extension: {file}")
 
 
-def iter_folder(folder, is_dir=False, ext=None):
+def iter_folder(folder: FilePath, *, is_dir: bool = False, ext: str | None = None) -> Iterable[str]:
     """产出目录项路径；is_dir 仅取目录，ext 按 `.yaml` 形式筛选文件。"""
     for sub in Path(folder).iterdir():
         if is_dir:
@@ -97,13 +122,13 @@ def iter_folder(folder, is_dir=False, ext=None):
             yield sub.as_posix()
 
 
-def alas_template():
+def alas_template() -> list[str]:
     return ["template"] if Path("./config/template.json").exists() else []
 
 
-def alas_instance():
+def alas_instance() -> list[str]:
     """列出 template 以外的顶层 JSON 实例；没有实例时回退为 `alas`。"""
-    out = []
+    out: list[str] = []
     for path in Path("./config").iterdir():
         name = path.stem
         extension = path.suffix
@@ -118,7 +143,7 @@ def alas_instance():
     return out
 
 
-def _parse_numeric_value(value: str):
+def _parse_numeric_value(value: str) -> int | float | str:
     parser = float if "." in value else int
     try:
         return parser(value)
@@ -126,14 +151,14 @@ def _parse_numeric_value(value: str):
         return value
 
 
-def _parse_datetime_value(value: str):
+def _parse_datetime_value(value: str) -> datetime | str:
     try:
         return datetime.fromisoformat(value)
     except ValueError:
         return value
 
 
-def _parse_string_value(value: str):
+def _parse_string_value(value: str) -> bool | int | float | str | datetime | None:
     if value == "":
         return None
     if value in {"true", "True"}:
@@ -148,37 +173,37 @@ def _parse_string_value(value: str):
     return _parse_datetime_value(value)
 
 
-def parse_value(value, data):
+def parse_value(value: DeepValue, data: Mapping[str, DeepValue]) -> DeepValue:
     """把配置字符串转换成 bool、数字或 datetime；非法选项回退到定义的默认值。"""
-    if "option" in data and value not in data["option"]:
+    option = data.get("option")
+    if isinstance(option, list) and value not in cast("list[DeepValue]", option):
         return data["value"]
     if not isinstance(value, str):
         return value
     return _parse_string_value(value)
 
 
-def data_to_type(data, **kwargs):
+def data_to_type(data: ArgumentDefinition, *, arg: str) -> InputType:
     """按值类型映射 UI 控件：bool→checkbox、有选项→select、Filter→textarea，其余为 input。"""
-    kwargs.update(data)
-    if isinstance(kwargs["value"], bool):
+    if isinstance(data["value"], bool):
         return "checkbox"
-    if kwargs.get("option"):
+    if data.get("option"):
         return "select"
-    if "Filter" in kwargs["arg"]:
+    if "Filter" in arg:
         return "textarea"
     return "input"
 
 
-def data_to_path(data):
+def data_to_path(data: Mapping[str, str]) -> str:
     """返回 `<func>.<group>.<arg>` 路径。"""
     return ".".join([data.get(attr, "") for attr in ["func", "group", "arg"]])
 
 
-def path_to_arg(path):
+def path_to_arg(path: str) -> str:
     return path.replace(".", "_")
 
 
-def dict_to_kv(dictionary, allow_none=True):
+def dict_to_kv(dictionary: Mapping[str, MutableDeepValue], *, allow_none: bool = True) -> str:
     """把字典格式化为 `path='Scheduler.ServerUpdate', value=True` 形式。"""
     return ", ".join([f"{k}={v!r}" for k, v in dictionary.items() if allow_none or v is not None])
 
@@ -188,15 +213,17 @@ def server_time_offset() -> timedelta:
     return timedelta()
 
 
-def random_normal_distribution_int(a, b, n=3):
+def random_normal_distribution_int(a: TimeScalar, b: TimeScalar, n: int = 3) -> int:
     """不依赖 NumPy，取 n 个闭区间 [a, b] 内均匀随机整数的均值模拟正态分布。"""
+    a = round(a)
+    b = round(b)
     if a < b:
         output = sum(random.randint(a, b) for _ in range(n)) / n
         return round(output)
     return b
 
 
-def ensure_time(second, n=3, precision=3):
+def ensure_time(second: TimeInput, n: int = 3, precision: int = 3) -> TimeScalar:
     """把秒数或 `10,30`、`10-30`、(10, 30) 归一化为秒；区间按近似正态分布取值。"""
     if isinstance(second, tuple):
         multiply = 10**precision
@@ -214,7 +241,7 @@ def ensure_time(second, n=3, precision=3):
     return second
 
 
-def get_os_next_reset():
+def get_os_next_reset() -> datetime:
     diff = server_time_offset()
     server_now = datetime.now() - diff
     server_reset = (server_now.replace(day=1) + timedelta(days=32)).replace(
@@ -223,7 +250,7 @@ def get_os_next_reset():
     return server_reset + diff
 
 
-def get_os_reset_remain():
+def get_os_reset_remain() -> int:
     next_reset = get_os_next_reset()
     now = datetime.now()
     logger.attr("OpsiNextReset", next_reset)
@@ -233,7 +260,7 @@ def get_os_reset_remain():
     return remain
 
 
-def get_server_next_update(daily_trigger):
+def get_server_next_update(daily_trigger: str | Sequence[str]) -> datetime:
     """接受 `HH:MM` 列表或逗号分隔字符串，返回最近的下一次服务器触发时间。"""
     if isinstance(daily_trigger, str):
         daily_trigger = daily_trigger.replace(" ", "").split(",")
@@ -253,7 +280,7 @@ def get_server_next_update(daily_trigger):
     return min(trigger)
 
 
-def get_server_last_update(daily_trigger):
+def get_server_last_update(daily_trigger: str | Sequence[str]) -> datetime:
     """接受 `HH:MM` 列表或逗号分隔字符串，返回最近的上一次服务器触发时间。"""
     if isinstance(daily_trigger, str):
         daily_trigger = daily_trigger.replace(" ", "").split(",")
@@ -273,7 +300,7 @@ def get_server_last_update(daily_trigger):
     return max(trigger)
 
 
-def nearest_future(future, interval=120):
+def nearest_future(future: Sequence[datetime | str], interval: int = 120) -> datetime:
     """返回最早未来时间；相邻时间差小于 interval 秒时合并到较晚者。"""
     future = [datetime.fromisoformat(f) if isinstance(f, str) else f for f in future]
     future = sorted(future)
@@ -285,7 +312,7 @@ def nearest_future(future, interval=120):
     return next_run
 
 
-def get_nearest_weekday_date(target):
+def get_nearest_weekday_date(target: int) -> datetime:
     """返回下一个 target 星期的零点；target 为 0～6，当天也顺延到下一周。"""
     diff = server_time_offset()
     server_now = datetime.now() - diff
@@ -298,30 +325,30 @@ def get_nearest_weekday_date(target):
     return server_reset + diff
 
 
-def get_server_weekday():
+def get_server_weekday() -> int:
     diff = server_time_offset()
     server_now = datetime.now() - diff
     return server_now.weekday()
 
 
-def get_server_monthday():
+def get_server_monthday() -> int:
     diff = server_time_offset()
     server_now = datetime.now() - diff
     return server_now.day
 
 
-def random_id(length=32):
+def random_id(length: int = 32) -> str:
     return "".join(random.sample(string.ascii_lowercase + string.digits, length))
 
 
-def to_list(text, length=1):
+def to_list(text: str, length: int = 1) -> list[int]:
     """把逗号分隔整数转为列表；单个整数会重复到 length，例如 `3`→`[3, 3]`。"""
     if text.isdigit():
         return [int(text)] * length
     return [int(letter.strip()) for letter in text.split(",")]
 
 
-def type_to_str(typ):
+def type_to_str(typ: type[MutableDeepValue] | MutableDeepValue) -> str:
     """把类型或对象转为不含尖括号的类型名，避免被解析为 HTML 标签。"""
     if not isinstance(typ, type):
         typ = type(typ).__name__

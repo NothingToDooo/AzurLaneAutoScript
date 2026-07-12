@@ -5,7 +5,7 @@ from module.template.assets import TEMPLATE_ENEMY_BOSS
 
 
 class EventGrid(Grid):
-    def predict_enemy_genre(self):
+    def predict_enemy_genre(self) -> str | None:
         if self.enemy_scale:
             return ""
 
@@ -16,7 +16,7 @@ class EventGrid(Grid):
 
         return super().predict_enemy_genre()
 
-    def predict_boss(self):
+    def predict_boss(self) -> bool:
         if self.enemy_genre == "Siren_Siren":
             return False
         return super().predict_boss()

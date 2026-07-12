@@ -2,16 +2,31 @@ import re
 from collections.abc import Sized
 from contextlib import suppress
 from pathlib import Path
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 import numpy as np
 import yaml
 
 import module.logger
-from dev_tools.utils import LuaLoader
+from dev_tools.utils import LuaLoader, require_lua_int, require_lua_str, require_lua_table
 from module.base.utils import location2node
 from module.content.errors import ContentValidationError
 from module.map.utils import camera_2d, camera_spawn_point, get_map_active_area
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator, Mapping, Sequence
+
+    from yaml.nodes import ScalarNode
+
+    from dev_tools.slpp import LuaTable, LuaValue
+    from module.base.type_alias import FilePath
+
+type GridLocation = tuple[int, int]
+type SpawnField = Literal["enemy", "siren", "mystery"]
+type SpawnRule = dict[str, int]
+type StageScalar = str | int | bool
+type StageValue = StageScalar | Sequence[StageValue] | Mapping[str, StageValue] | Mapping[int, StageValue]
+type BattleDocument = dict[int, dict[str, str | int]]
 
 # 导入 module.logger 会切换到项目根目录。
 _ = module.logger
@@ -22,19 +37,19 @@ KEYWORD = "2020001"
 SELECT = True
 OVERWRITE = True
 IS_WAR_ARCHIVES = False
-STRATEGY = None
+STRATEGY: str | None = None
 ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
 
 class _LuaDataStore:
     __slots__ = ("chapter", "chapter_loop", "expectation", "map_event_list", "map_event_template")
 
-    def __init__(self):
-        self.chapter = {}
-        self.chapter_loop = {}
-        self.map_event_list = {}
-        self.map_event_template = {}
-        self.expectation = {}
+    def __init__(self) -> None:
+        self.chapter: LuaTable = {}
+        self.chapter_loop: LuaTable = {}
+        self.map_event_list: LuaTable = {}
+        self.map_event_template: LuaTable = {}
+        self.expectation: LuaTable = {}
 
 
 _LUA_DATA = _LuaDataStore()
@@ -48,17 +63,17 @@ class _StageDumper(yaml.SafeDumper):
     pass
 
 
-def _represent_literal(dumper, value):
+def _represent_literal(dumper: _StageDumper, value: _LiteralString) -> ScalarNode:
     return dumper.represent_scalar("tag:yaml.org,2002:str", value, style="|")
 
 
 _StageDumper.add_representer(_LiteralString, _represent_literal)
 
 
-def _validate_strategy_reference(strategy, *, pack_id=None):
+def _validate_strategy_reference(strategy: str | None, *, pack_id: str | None = None) -> None:
     if strategy is None:
         return
-    module_name, separator, export_name = strategy.partition(":") if isinstance(strategy, str) else ("", "", "")
+    module_name, separator, export_name = strategy.partition(":")
     if (
         separator != ":"
         or not module_name.startswith("campaign.")
@@ -72,7 +87,7 @@ def _validate_strategy_reference(strategy, *, pack_id=None):
         raise ContentValidationError(message)
 
 
-def _validate_output_strategy(path, strategy):
+def _validate_output_strategy(path: FilePath, strategy: str | None) -> None:
     output_root = Path(path)
     if strategy is None:
         return
@@ -82,7 +97,18 @@ def _validate_output_strategy(path, strategy):
     _validate_strategy_reference(strategy, pack_id=output_root.parent.name)
 
 
-DIC_SIREN_NAME_CHI_TO_ENG = {
+def _active_area(map_data: Mapping[GridLocation, str]) -> tuple[int, int, int, int]:
+    area = get_map_active_area(map_data)
+    return int(area[0]), int(area[1]), int(area[2]), int(area[3])
+
+
+def _optional_lua_table(value: LuaValue | None, *, context: str) -> LuaTable | None:
+    if value is None:
+        return None
+    return require_lua_table(value, context=context)
+
+
+DIC_SIREN_NAME_CHI_TO_ENG: dict[str, str] = {
     # Siren Winter's Crown, Fallen Wings
     "sairenquzhu": "DD",
     "sairenqingxun": "CL",
@@ -377,13 +403,16 @@ class MapData:
         100: "++",  # Dock in Empyreal Tragicomedy
     }
 
-    def __init__(self, data, data_loop):
+    def __init__(self, data: LuaTable, data_loop: LuaTable | None) -> None:
         self.data = data
         self.data_loop = data_loop
-        self.chapter_name = data["chapter_name"].replace("–", "-")
-        self.name = data["name"]
+        map_context = f"chapter {data.get('id', '<unknown>')}"
+        self.chapter_name = require_lua_str(data["chapter_name"], context=f"{map_context} chapter name").replace(
+            "–", "-"
+        )
+        self.name = require_lua_str(data["name"], context=f"{map_context} name")
         self.profiles = data["profiles"]
-        self.map_id = data["id"]
+        self.map_id = require_lua_int(data["id"], context=f"{map_context} id")
 
         try:
             self._set_event_enemy_data()
@@ -397,23 +426,27 @@ class MapData:
                 print(f"{k} = {v}")
             raise
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.map_id} {self.chapter_name} {self.name}"
 
     __repr__ = __str__
 
-    def _set_event_enemy_data(self):
+    def _set_event_enemy_data(self) -> None:
         self.event_enemy_data = None
         self.event_enemy_data_loop = None
         if self.map_id not in _LUA_DATA.map_event_list:
             return
 
-        event_list = _LUA_DATA.map_event_list[self.map_id]
-        self.event_enemy_data = self.extract_event_enemy_data(event_list["event_list"])
+        event_list = require_lua_table(_LUA_DATA.map_event_list[self.map_id], context=f"map {self.map_id} event list")
+        event_data = require_lua_table(event_list["event_list"], context=f"map {self.map_id} event enemies")
+        self.event_enemy_data = self.extract_event_enemy_data(event_data)
         if self.data_loop is not None:
-            self.event_enemy_data_loop = self.extract_event_enemy_data(event_list["event_list_loop"])
+            event_data_loop = require_lua_table(
+                event_list["event_list_loop"], context=f"map {self.map_id} loop event enemies"
+            )
+            self.event_enemy_data_loop = self.extract_event_enemy_data(event_data_loop)
 
-    def _set_spawn_data(self):
+    def _set_spawn_data(self) -> None:
         self.spawn_data = self.parse_spawn_data(self.data, self.event_enemy_data)
         if self.data_loop is None:
             self.spawn_data_loop = None
@@ -425,53 +458,74 @@ class MapData:
         ):
             self.spawn_data_loop = None
 
-    def _set_map_data(self):
-        self.map_data = self.parse_map_data(self.data["grids"], self.event_enemy_data)
-        self.shape = tuple(np.max(list(self.map_data.keys()), axis=0))
+    def _set_map_data(self) -> None:
+        grids = require_lua_table(self.data["grids"], context=f"map {self.map_id} grids")
+        self.map_data = self.parse_map_data(grids, self.event_enemy_data)
+        shape = np.max(list(self.map_data), axis=0)
+        self.shape = (int(shape[0]), int(shape[1]))
         if self.data_loop is None:
             self.map_data_loop = None
             return
 
-        self.map_data_loop = self.parse_map_data(self.data_loop["grids"], self.event_enemy_data_loop)
+        loop_grids = require_lua_table(self.data_loop["grids"], context=f"map {self.map_id} loop grids")
+        self.map_data_loop = self.parse_map_data(loop_grids, self.event_enemy_data_loop)
         if all(d1 == d2 for d1, d2 in zip(self.map_data.values(), self.map_data_loop.values(), strict=True)):
             self.map_data_loop = None
 
-    def _set_portal_data(self):
-        self.portal = []
+    def _set_portal_data(self) -> None:
+        self.portal: list[tuple[str, str]] = []
 
-    def _set_land_based_data(self):
+    def _set_land_based_data(self) -> None:
         land_based_rotation_dict = {1: "up", 2: "down", 3: "left", 4: "right"}
-        self.land_based = []
-        if not isinstance(self.data["land_based"], dict):
+        self.land_based: list[list[str]] = []
+        land_based = self.data["land_based"]
+        if not isinstance(land_based, dict):
             return
 
-        for lb in self.data["land_based"].values():
-            y, x, r = lb.values()
-            if r not in land_based_rotation_dict:
+        for land_based_value in land_based.values():
+            entry = require_lua_table(land_based_value, context=f"map {self.map_id} land-based entry")
+            values = list(entry.values())
+            if len(values) != 3:
+                message = f"map {self.map_id} land-based entry must contain y, x, and rotation"
+                raise ValueError(message)
+            y = require_lua_int(values[0], context=f"map {self.map_id} land-based y")
+            x = require_lua_int(values[1], context=f"map {self.map_id} land-based x")
+            rotation = require_lua_int(values[2], context=f"map {self.map_id} land-based rotation")
+            if rotation not in land_based_rotation_dict:
                 continue
-            self.land_based.append([location2node((x, y)), land_based_rotation_dict[r]])
+            self.land_based.append([location2node((x, y)), land_based_rotation_dict[rotation]])
 
-    def _iter_siren_ids(self):
+    def _iter_siren_ids(self) -> Iterator[int]:
         # 部分活动的普通/循环模式海妖配置不同，需要合并。
-        sirens = list(self.data["ai_expedition_list"].values())
-        if self.data_loop is not None and self.data_loop["ai_expedition_list"] is not None:
-            sirens += list(self.data_loop["ai_expedition_list"].values())
-        return sirens
+        siren_table = require_lua_table(
+            self.data["ai_expedition_list"], context=f"map {self.map_id} siren expedition list"
+        )
+        sirens = list(siren_table.values())
+        if self.data_loop is not None:
+            loop_value = self.data_loop["ai_expedition_list"]
+            if loop_value is not None:
+                loop_sirens = require_lua_table(loop_value, context=f"map {self.map_id} loop siren expedition list")
+                sirens.extend(loop_sirens.values())
+        for siren_id in sirens:
+            yield require_lua_int(siren_id, context=f"map {self.map_id} siren id")
 
-    def _add_siren_config(self, siren_id):
+    def _add_siren_config(self, siren_id: int) -> None:
         if siren_id == 1:
             return
 
-        exped_data = _LUA_DATA.expectation.get(siren_id, {})
-        name = exped_data.get("icon", str(siren_id))
+        exped_data = require_lua_table(_LUA_DATA.expectation.get(siren_id, {}), context=f"siren expedition {siren_id}")
+        icon = exped_data.get("icon")
+        name = str(siren_id) if icon is None else require_lua_str(icon, context=f"siren expedition {siren_id} icon")
         name = DIC_SIREN_NAME_CHI_TO_ENG.get(name, name)
         if name not in self.MAP_SIREN_TEMPLATE:
             self.MAP_SIREN_TEMPLATE.append(name)
-        self.MOVABLE_ENEMY_TURN.add(int(exped_data.get("ai_mov", 2)))
+        self.MOVABLE_ENEMY_TURN.add(
+            require_lua_int(exped_data.get("ai_mov", 2), context=f"siren expedition {siren_id} movement")
+        )
 
-    def _set_config_data(self):
-        self.MAP_SIREN_TEMPLATE = []
-        self.MOVABLE_ENEMY_TURN = set()
+    def _set_config_data(self) -> None:
+        self.MAP_SIREN_TEMPLATE: list[str] = []
+        self.MOVABLE_ENEMY_TURN: set[int] = set()
         for siren_id in self._iter_siren_ids():
             self._add_siren_config(siren_id)
 
@@ -482,88 +536,122 @@ class MapData:
         self.MAP_HAS_MYSTERY = sum(b.get("mystery", 0) for b in self.spawn_data) > 0
         self.MAP_HAS_PORTAL = bool(self.portal)
         self.MAP_HAS_LAND_BASED = bool(self.land_based)
-        for n in range(1, 4):
-            setattr(self, f"STAR_REQUIRE_{n}", self.data[f"star_require_{n}"])
+        for number in range(1, 4):
+            requirement = require_lua_int(
+                self.data[f"star_require_{number}"], context=f"map {self.map_id} star requirement {number}"
+            )
+            setattr(self, f"STAR_REQUIRE_{number}", requirement)
 
-    def parse_map_data(self, grids, event_enemy_data=None):
-        map_data = {}
-        offset_y = min(grid[0] for grid in grids.values())
-        offset_x = min(grid[1] for grid in grids.values())
-        for grid in grids.values():
-            loca = (grid[1] - offset_x, grid[0] - offset_y)
-            info = "++" if not grid[2] else self.dic_grid_info.get(grid[3], "??")
+    def parse_map_data(
+        self, grids: LuaTable, event_enemy_data: list[LuaTable] | None = None
+    ) -> dict[GridLocation, str]:
+        map_data: dict[GridLocation, str] = {}
+        grid_rows = [require_lua_table(grid, context=f"map {self.map_id} grid") for grid in grids.values()]
+        offset_y = min(require_lua_int(grid[0], context=f"map {self.map_id} grid y") for grid in grid_rows)
+        offset_x = min(require_lua_int(grid[1], context=f"map {self.map_id} grid x") for grid in grid_rows)
+        for grid in grid_rows:
+            y = require_lua_int(grid[0], context=f"map {self.map_id} grid y")
+            x = require_lua_int(grid[1], context=f"map {self.map_id} grid x")
+            is_land = require_lua_int(grid[2], context=f"map {self.map_id} grid land flag")
+            grid_type = require_lua_int(grid[3], context=f"map {self.map_id} grid type")
+            loca = (x - offset_x, y - offset_y)
+            info = "++" if not is_land else self.dic_grid_info.get(grid_type, "??")
             if info == "??":
-                print(f"Unknown grid info. grid={location2node(loca)}, info={grid[3]}")
+                print(f"Unknown grid info. grid={location2node(loca)}, info={grid_type}")
             map_data[loca] = info
-        if isinstance(event_enemy_data, list):
+        if event_enemy_data is not None:
             for wave in event_enemy_data:
-                for enemy in wave.values():
-                    loca = (enemy[1][1] - offset_x, enemy[1][0] - offset_y)
+                for enemy_value in wave.values():
+                    enemy = require_lua_table(enemy_value, context=f"map {self.map_id} event enemy")
+                    position = require_lua_table(enemy[1], context=f"map {self.map_id} event enemy position")
+                    enemy_y = require_lua_int(position[0], context=f"map {self.map_id} event enemy y")
+                    enemy_x = require_lua_int(position[1], context=f"map {self.map_id} event enemy x")
+                    loca = (enemy_x - offset_x, enemy_y - offset_y)
                     map_data[loca] = "ME"
 
         return map_data
 
     @staticmethod
-    def _add_spawn_count(spawn_data, index, field, count):
+    def _add_spawn_count(spawn_data: list[SpawnRule], index: int, field: SpawnField, count: int) -> None:
         if count:
             spawn = spawn_data[index]
             spawn[field] = spawn.get(field, 0) + count
 
     @staticmethod
-    def _add_refresh_counts(spawn_data, refresh_data, field):
+    def _add_refresh_counts(spawn_data: list[SpawnRule], refresh_data: LuaTable, field: SpawnField) -> None:
         for index, count in refresh_data.items():
-            MapData._add_spawn_count(spawn_data, index, field, count)
+            MapData._add_spawn_count(
+                spawn_data,
+                require_lua_int(index, context=f"{field} refresh battle"),
+                field,
+                require_lua_int(count, context=f"{field} refresh count"),
+            )
 
     @staticmethod
-    def _get_battle_count(data):
+    def _get_battle_count(data: LuaTable) -> int:
+        enemy_refresh = require_lua_table(data["enemy_refresh"], context="enemy refresh")
         try:
-            enemy_refresh_max = max(data["enemy_refresh"].keys())
+            enemy_refresh_max = max(require_lua_int(index, context="enemy refresh battle") for index in enemy_refresh)
         except ValueError:
             return 0
-        return max(data["boss_refresh"], enemy_refresh_max)
+        boss_refresh = require_lua_int(data["boss_refresh"], context="boss refresh")
+        return max(boss_refresh, enemy_refresh_max)
 
     @staticmethod
-    def parse_spawn_data(data, event_enemy_data=None):
+    def parse_spawn_data(data: LuaTable, event_enemy_data: list[LuaTable] | None = None) -> list[SpawnRule]:
         battle_count = MapData._get_battle_count(data)
         spawn_data = [{"battle": index} for index in range(battle_count + 1)]
 
-        MapData._add_refresh_counts(spawn_data, data["enemy_refresh"], "enemy")
-        if isinstance(event_enemy_data, list):
+        enemy_refresh = require_lua_table(data["enemy_refresh"], context="enemy refresh")
+        MapData._add_refresh_counts(spawn_data, enemy_refresh, "enemy")
+        if event_enemy_data is not None:
             for index, wave in enumerate(event_enemy_data):
                 if isinstance(wave, Sized):
                     MapData._add_spawn_count(spawn_data, index, "enemy", len(wave))
-        if "".join([str(item) for item in data["elite_refresh"].values()]) != "100":  # 部分原始数据有误。
-            MapData._add_refresh_counts(spawn_data, data["elite_refresh"], "enemy")
-        MapData._add_refresh_counts(spawn_data, data["ai_refresh"], "siren")
-        MapData._add_refresh_counts(spawn_data, data["box_refresh"], "mystery")
+        elite_refresh = require_lua_table(data["elite_refresh"], context="elite refresh")
+        if "".join([str(item) for item in elite_refresh.values()]) != "100":  # 部分原始数据有误。
+            MapData._add_refresh_counts(spawn_data, elite_refresh, "enemy")
+        ai_refresh = require_lua_table(data["ai_refresh"], context="siren refresh")
+        MapData._add_refresh_counts(spawn_data, ai_refresh, "siren")
+        box_refresh = require_lua_table(data["box_refresh"], context="mystery refresh")
+        MapData._add_refresh_counts(spawn_data, box_refresh, "mystery")
+        boss_refresh = require_lua_int(data["boss_refresh"], context="boss refresh")
         with suppress(IndexError):
-            spawn_data[data["boss_refresh"]]["boss"] = 1
+            spawn_data[boss_refresh]["boss"] = 1
 
         return spawn_data
 
-    def extract_event_enemy_data(self, data):
-        extracted_data = []
-        for event_id in data.values():
-            event = _LUA_DATA.map_event_template[event_id]
-            extracted_data.extend(effect[1] for effect in event["effect"].values() if effect[0] == "enemy")
+    @staticmethod
+    def extract_event_enemy_data(data: LuaTable) -> list[LuaTable]:
+        extracted_data: list[LuaTable] = []
+        for event_id_value in data.values():
+            event_id = require_lua_int(event_id_value, context="map event id")
+            event = require_lua_table(_LUA_DATA.map_event_template[event_id], context=f"map event {event_id}")
+            effects = require_lua_table(event["effect"], context=f"map event {event_id} effects")
+            for effect_value in effects.values():
+                effect = require_lua_table(effect_value, context=f"map event {event_id} effect")
+                if require_lua_str(effect[0], context=f"map event {event_id} effect type") != "enemy":
+                    continue
+                extracted_data.append(require_lua_table(effect[1], context=f"map event {event_id} enemy wave"))
         return extracted_data
 
-    def map_file_name(self):
+    def map_file_name(self) -> str:
         name = self.chapter_name.replace("-", "_").lower()
         if name[0].isdigit():
             name = f"campaign_{name}"
         return name + ".py"
 
-    def _get_base_import(self, has_modified_campaign_base):
+    @staticmethod
+    def _get_base_import(*, has_modified_campaign_base: bool) -> str:
         if IS_WAR_ARCHIVES:
             return "from ..campaign_war_archives.campaign_base import CampaignBase"
         if has_modified_campaign_base:
             return "from .campaign_base import CampaignBase"
         return "from module.campaign.campaign_base import CampaignBase"
 
-    def _get_import_lines(self, has_modified_campaign_base):
+    def _get_import_lines(self, *, has_modified_campaign_base: bool) -> list[str]:
         lines = [
-            self._get_base_import(has_modified_campaign_base),
+            self._get_base_import(has_modified_campaign_base=has_modified_campaign_base),
             "from module.map.map_base import CampaignMap",
         ]
         if self.chapter_name[-1].isdigit():
@@ -573,13 +661,13 @@ class MapData:
         lines.append("")
         return lines
 
-    def _get_map_data_rows(self):
+    def _get_map_data_rows(self) -> list[str]:
         return [
             "    " + " ".join(self.map_data.get((x, y), "??") for x in range(self.shape[0] + 1))
             for y in range(self.shape[1] + 1)
         ]
 
-    def _get_map_data_loop_rows(self):
+    def _get_map_data_loop_rows(self) -> list[str]:
         map_data_loop = self.map_data_loop
         if map_data_loop is None:
             return []
@@ -587,7 +675,7 @@ class MapData:
             "    " + " ".join(map_data_loop[(x, y)] for x in range(self.shape[0] + 1)) for y in range(self.shape[1] + 1)
         ]
 
-    def _get_flatten_lines(self):
+    def _get_flatten_lines(self) -> list[str]:
         return [
             *(
                 ", ".join(location2node((x, y)) for x in range(self.shape[0] + 1)) + ", \\"
@@ -598,12 +686,12 @@ class MapData:
             "",
         ]
 
-    def _get_map_lines(self):
+    def _get_map_lines(self) -> list[str]:
         lines = [
             f"MAP = CampaignMap('{self.chapter_name}')",
             f"MAP.shape = '{location2node(self.shape)}'",
         ]
-        camera_data = camera_2d(get_map_active_area(self.map_data), sight=(-3, -1, 3, 2))
+        camera_data = camera_2d(_active_area(self.map_data), sight=(-3, -1, 3, 2))
         lines.append(f"MAP.camera_data = {[location2node(loca) for loca in camera_data]}")
         camera_sp = camera_spawn_point(camera_data, sp_list=[k for k, v in self.map_data.items() if v == "SP"])
         lines.append(f"MAP.camera_data_spawn_point = {[location2node(loca) for loca in camera_sp]}")
@@ -631,54 +719,61 @@ class MapData:
         lines.extend(self._get_flatten_lines())
         return lines
 
-    def _get_config_class_line(self):
+    def _get_config_class_line(self) -> str:
         if self.chapter_name[-1].isdigit():
             _chap, stage = self.chapter_name[:-1], self.chapter_name[-1]
             if stage != "1":
                 return "class Config(ConfigBase):"
         return "class Config:"
 
-    def _get_config_lines(self):
+    def _get_config_lines(self) -> list[str]:
         lines = [
             self._get_config_class_line(),
             "    # ===== Start of generated config =====",
         ]
         if self.MAP_SIREN_TEMPLATE:
-            lines.append(f"    MAP_SIREN_TEMPLATE = {self.MAP_SIREN_TEMPLATE}")
-            lines.append(f"    MOVABLE_ENEMY_TURN = {tuple(self.MOVABLE_ENEMY_TURN)}")
-            lines.append("    MAP_HAS_SIREN = True")
-            lines.append(f"    MAP_HAS_MOVABLE_ENEMY = {self.MAP_HAS_MOVABLE_ENEMY}")
-        lines.append(f"    MAP_HAS_MAP_STORY = {self.MAP_HAS_MAP_STORY}")
-        lines.append(f"    MAP_HAS_FLEET_STEP = {self.MAP_HAS_FLEET_STEP}")
-        lines.append(f"    MAP_HAS_AMBUSH = {self.MAP_HAS_AMBUSH}")
-        lines.append(f"    MAP_HAS_MYSTERY = {self.MAP_HAS_MYSTERY}")
+            lines.extend(
+                (
+                    f"    MAP_SIREN_TEMPLATE = {self.MAP_SIREN_TEMPLATE}",
+                    f"    MOVABLE_ENEMY_TURN = {tuple(self.MOVABLE_ENEMY_TURN)}",
+                    "    MAP_HAS_SIREN = True",
+                    f"    MAP_HAS_MOVABLE_ENEMY = {self.MAP_HAS_MOVABLE_ENEMY}",
+                )
+            )
+        lines.extend(
+            (
+                f"    MAP_HAS_MAP_STORY = {self.MAP_HAS_MAP_STORY}",
+                f"    MAP_HAS_FLEET_STEP = {self.MAP_HAS_FLEET_STEP}",
+                f"    MAP_HAS_AMBUSH = {self.MAP_HAS_AMBUSH}",
+                f"    MAP_HAS_MYSTERY = {self.MAP_HAS_MYSTERY}",
+            )
+        )
         if self.MAP_HAS_PORTAL:
             lines.append(f"    MAP_HAS_PORTAL = {self.MAP_HAS_PORTAL}")
         if self.MAP_HAS_LAND_BASED:
             lines.append(f"    MAP_HAS_LAND_BASED = {self.MAP_HAS_LAND_BASED}")
-        lines.extend(
-            f"    STAR_REQUIRE_{n} = 0" for n in range(1, 4) if self.__getattribute__(f"STAR_REQUIRE_{n}") != n
-        )
-        lines.append("    # ===== End of generated config =====")
-        lines.append("")
-        lines.append("")
+        lines.extend(f"    STAR_REQUIRE_{n} = 0" for n in range(1, 4) if getattr(self, f"STAR_REQUIRE_{n}") != n)
+        lines.extend(("    # ===== End of generated config =====", "", ""))
         return lines
 
-    def _get_clear_enemy_battle_lines(self, battle_name, preserve):
-        lines = [f"    def {battle_name}(self):"]
+    def _get_clear_enemy_battle_lines(self, battle_name: str, preserve: int) -> list[str]:
+        lines = [f"    def {battle_name}(self) -> bool:"]
         if self.MAP_SIREN_TEMPLATE:
-            lines.append("        if self.clear_siren():")
-            lines.append("            return True")
-        lines.append(f"        if self.clear_filter_enemy(self.ENEMY_FILTER, preserve={preserve}):")
-        lines.append("            return True")
-        lines.append("")
-        lines.append("        return self.battle_default()")
-        lines.append("")
+            lines.extend(("        if self.clear_siren():", "            return True"))
+        lines.extend(
+            (
+                f"        if self.clear_filter_enemy(self.ENEMY_FILTER, preserve={preserve}):",
+                "            return True",
+                "",
+                "        return self.battle_default()",
+                "",
+            )
+        )
         return lines
 
-    def _get_campaign_lines(self):
-        battle = self.data["boss_refresh"]
-        preserve = self.data["boss_refresh"] - 5 if battle >= 5 else 0
+    def _get_campaign_lines(self) -> list[str]:
+        battle = require_lua_int(self.data["boss_refresh"], context=f"map {self.chapter_name} boss refresh")
+        preserve = battle - 5 if battle >= 5 else 0
         lines = [
             "class Campaign(CampaignBase):",
             "    MAP = MAP",
@@ -688,31 +783,31 @@ class MapData:
         ]
         if battle >= 6:
             lines.extend(self._get_clear_enemy_battle_lines("battle_5", preserve=0))
-        lines.append(f"    def battle_{self.data['boss_refresh']}(self):")
+        lines.append(f"    def battle_{battle}(self) -> bool:")
         if battle >= 5:
             lines.append("        return self.fleet_boss.clear_boss()")
         else:
             lines.append("        return self.clear_boss()")
         return lines
 
-    def get_file_lines(self, has_modified_campaign_base):
+    def get_file_lines(self, *, has_modified_campaign_base: bool) -> list[str]:
         return [
-            *self._get_import_lines(has_modified_campaign_base),
+            *self._get_import_lines(has_modified_campaign_base=has_modified_campaign_base),
             *self._get_map_lines(),
             *self._get_config_lines(),
             *self._get_campaign_lines(),
         ]
 
-    def stage_file_name(self):
+    def stage_file_name(self) -> str:
         return Path(self.map_file_name()).with_suffix(".yaml").name
 
-    def _stage_map_document(self):
-        camera_data = camera_2d(get_map_active_area(self.map_data), sight=(-3, -1, 3, 2))
+    def _stage_map_document(self) -> dict[str, StageValue]:
+        camera_data = camera_2d(_active_area(self.map_data), sight=(-3, -1, 3, 2))
         camera_sp = camera_spawn_point(
             camera_data,
             sp_list=[key for key, value in self.map_data.items() if value == "SP"],
         )
-        document = {
+        document: dict[str, StageValue] = {
             "name": self.chapter_name,
             "shape": location2node(self.shape),
             "camera_data": [location2node(location) for location in camera_data],
@@ -733,8 +828,8 @@ class MapData:
             document["spawn_data_loop"] = self.spawn_data_loop
         return document
 
-    def _stage_config_document(self):
-        document = {}
+    def _stage_config_document(self) -> dict[str, StageValue]:
+        document: dict[str, StageValue] = {}
         if self.MAP_SIREN_TEMPLATE:
             document["MAP_SIREN_TEMPLATE"] = list(self.MAP_SIREN_TEMPLATE)
             document["MOVABLE_ENEMY_TURN"] = sorted(self.MOVABLE_ENEMY_TURN)
@@ -754,8 +849,8 @@ class MapData:
                 document[f"STAR_REQUIRE_{number}"] = 0
         return document
 
-    def _stage_battle_document(self, *, strategy=None):
-        boss_battle = self.data["boss_refresh"]
+    def _stage_battle_document(self, *, strategy: str | None = None) -> BattleDocument:
+        boss_battle = require_lua_int(self.data["boss_refresh"], context=f"map {self.chapter_name} boss refresh")
         if boss_battle < 5:
             if strategy is None:
                 message = (
@@ -767,14 +862,14 @@ class MapData:
                 return {}
         preserve = boss_battle - 5 if boss_battle >= 5 else 0
         clear_policy = "siren_then_filtered_enemy" if self.MAP_SIREN_TEMPLATE else "filtered_enemy_then_default"
-        battles = {0: {"policy": clear_policy, "preserve": preserve}}
+        battles: BattleDocument = {0: {"policy": clear_policy, "preserve": preserve}}
         if boss_battle >= 6:
             battles[5] = {"policy": clear_policy, "preserve": 0}
         if boss_battle >= 5:
             battles[boss_battle] = {"policy": "fleet_boss"}
         return battles
 
-    def stage_document(self, *, strategy=None):
+    def stage_document(self, *, strategy: str | None = None) -> dict[str, StageValue]:
         _validate_strategy_reference(strategy)
         return {
             "schema_version": 1,
@@ -784,7 +879,7 @@ class MapData:
             "battles": self._stage_battle_document(strategy=strategy),
         }
 
-    def render_stage_yaml(self, *, strategy=None):
+    def render_stage_yaml(self, *, strategy: str | None = None) -> str:
         return yaml.dump(
             self.stage_document(strategy=strategy),
             Dumper=_StageDumper,
@@ -793,7 +888,14 @@ class MapData:
             width=120,
         )
 
-    def write_stage(self, path, *, strategy=None, overwrite=False, check=False):
+    def write_stage(
+        self,
+        path: FilePath,
+        *,
+        strategy: str | None = None,
+        overwrite: bool = False,
+        check: bool = False,
+    ) -> bool:
         _validate_output_strategy(path, strategy)
         file = Path(path) / self.stage_file_name()
         content = self.render_stage_yaml(strategy=strategy)
@@ -807,7 +909,7 @@ class MapData:
         file.write_text(content, encoding="utf-8", newline="\n")
         return True
 
-    def write(self, path):
+    def write(self, path: FilePath) -> bool:
         file = Path(path) / self.map_file_name()
         has_modified_campaign_base = Path(path, "campaign_base.py").exists()
         if has_modified_campaign_base:
@@ -828,71 +930,81 @@ class MapData:
 
 
 class ChapterTemplate:
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     @staticmethod
-    def _is_extra_chapter(name):
+    def _is_extra_chapter(name: str) -> bool:
         name = name.lower().replace(".", "")
         return name in ["extra", "ex"]
 
     @staticmethod
-    def _get_event_id(map_id):
+    def _get_event_id(map_id: int) -> int:
         return (map_id - 2100000) // 20 + 21000 if map_id // 10000 == 210 else map_id // 10000
 
     @staticmethod
-    def _iter_chapter_data():
-        for map_id, raw_data in _LUA_DATA.chapter.items():
-            if not isinstance(map_id, int) or ChapterTemplate._is_extra_chapter(raw_data["chapter_name"]):
+    def _iter_chapter_data() -> Iterator[tuple[int, LuaTable]]:
+        for map_id, raw_value in _LUA_DATA.chapter.items():
+            if not isinstance(map_id, int):
+                continue
+            raw_data = require_lua_table(raw_value, context=f"chapter {map_id}")
+            chapter_name = require_lua_str(raw_data["chapter_name"], context=f"chapter {map_id} name")
+            if ChapterTemplate._is_extra_chapter(chapter_name):
                 continue
             yield map_id, raw_data
 
     @staticmethod
-    def _create_map_data(map_id, raw_data):
-        return MapData(raw_data, _LUA_DATA.chapter_loop.get(map_id))
+    def _create_map_data(map_id: int, raw_data: LuaTable) -> MapData:
+        loop_data = _optional_lua_table(_LUA_DATA.chapter_loop.get(map_id), context=f"chapter {map_id} loop")
+        return MapData(raw_data, loop_data)
 
-    def _find_maps_by_name(self, name):
-        maps = []
+    def _find_maps_by_name(self, name: str) -> list[MapData]:
+        maps: list[MapData] = []
         for map_id, raw_data in self._iter_chapter_data():
-            if not re.search(name, raw_data["name"]):
+            map_name = require_lua_str(raw_data["name"], context=f"chapter {map_id} name")
+            if not re.search(name, map_name):
                 continue
             data = self._create_map_data(map_id, raw_data)
             print(f"Found map: {data}")
             maps.append(data)
         return maps
 
-    def _find_maps_by_id(self, map_id):
-        data = MapData(_LUA_DATA.chapter[map_id], _LUA_DATA.chapter_loop.get(map_id))
+    @staticmethod
+    def _find_maps_by_id(map_id: int) -> list[MapData]:
+        raw_data = require_lua_table(_LUA_DATA.chapter[map_id], context=f"chapter {map_id}")
+        loop_data = _optional_lua_table(_LUA_DATA.chapter_loop.get(map_id), context=f"chapter {map_id} loop")
+        data = MapData(raw_data, loop_data)
         print(f"Found map: {data}")
         return [data]
 
-    def _select_event_maps(self, map_id):
+    def _select_event_maps(self, map_id: int) -> list[MapData]:
         event_id = self._get_event_id(map_id)
-        maps = []
+        maps: list[MapData] = []
         for current_map_id, raw_data in self._iter_chapter_data():
-            if self._get_event_id(raw_data["id"]) != event_id:
+            current_event_id = require_lua_int(raw_data["id"], context=f"chapter {current_map_id} id")
+            if self._get_event_id(current_event_id) != event_id:
                 continue
             data = self._create_map_data(current_map_id, raw_data)
             print(f"Selected: {data}")
             maps.append(data)
         return maps
 
-    def _select_maps(self, maps, select):
+    def _select_maps(self, maps: Sequence[MapData], *, select: bool) -> list[MapData]:
         print("<<< SELECT MAP >>>")
         if select:
             selected_maps = self._select_event_maps(maps[0].map_id)
         else:
-            selected_maps = maps[:1]
+            selected_maps = list(maps[:1])
             print(f"Selected: {selected_maps[0]}")
         print()
         return selected_maps
 
-    def _find_maps(self, name):
+    def _find_maps(self, name: str | int) -> list[MapData]:
         if isinstance(name, str):
             return self._find_maps_by_name(name)
         return self._find_maps_by_id(name)
 
-    def get_chapter_by_name(self, name, select=False):
+    def get_chapter_by_name(self, name: str, *, select: bool = False) -> list[MapData]:
         """按字符串关键词或数字字符串查找地图。
 
         地图 ID 例如 11004（第 10 章困难 4 图）和 1140017（活动图 D2）。
@@ -900,19 +1012,20 @@ class ChapterTemplate:
         `select=False` 仅取首个命中，`select=True` 选取同活动全部地图。
         """
         print("<<< SEARCH MAP >>>")
-        name = name.strip()
-        name = int(name) if name.isdigit() else name
-        print(f"Searching: {name}")
-        maps = self._find_maps(name)
+        normalized_name = name.strip()
+        query: str | int = int(normalized_name) if normalized_name.isdigit() else normalized_name
+        print(f"Searching: {query}")
+        maps = self._find_maps(query)
 
         if not maps:
             print("No maps found")
             return []
         print()
 
-        return self._select_maps(maps, select)
+        return self._select_maps(maps, select=select)
 
-    def extract(self, maps, folder, *, strategy=None):
+    @staticmethod
+    def extract(maps: Sequence[MapData], folder: FilePath, *, strategy: str | None = None) -> None:
         _validate_output_strategy(folder, strategy)
         print("<<< CONFIRM >>>")
         print("Please confirm selected the correct maps before extracting.\nInput any key and press ENTER to continue")
@@ -939,7 +1052,7 @@ Arguments:
 """
 
 
-def main():
+def main() -> None:
     loader = LuaLoader(FILE, server="CN")
     _LUA_DATA.chapter = loader.load("./sharecfgdata/chapter_template.lua")
     _LUA_DATA.chapter_loop = loader.load("./sharecfgdata/chapter_template_loop.lua")

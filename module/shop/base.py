@@ -1,4 +1,5 @@
 import re
+from typing import TYPE_CHECKING, Unpack
 
 import numpy as np
 
@@ -9,9 +10,12 @@ from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_3, GET_SHIP
 from module.logger import logger
 from module.shop.assets import SHOP_CLICK_SAFE_AREA
-from module.statistics.item import Item, ItemGrid, item_predict_options
+from module.statistics.item import Item, ItemGrid, ItemPredictOptions, ItemPredictSettings, item_predict_options
 from module.tactical.tactical_class import Book
 from module.ui.ui import UI
+
+if TYPE_CHECKING:
+    from module.base.type_alias import ImageArray
 
 FILTER_REGEX = re.compile(
     r"^(array|book|box|bulin|cat"
@@ -40,19 +44,32 @@ FILTER_REGEX = re.compile(
     flags=re.IGNORECASE,
 )
 FILTER_ATTR = ("group", "sub_genre", "tier")
-FILTER = Filter(FILTER_REGEX, FILTER_ATTR)
+FILTER: Filter[Item] = Filter(FILTER_REGEX, FILTER_ATTR)
 
 
-class ShopItem_250814(Item):
+class ShopItem250814(Item):
     """未售商品计算值为 0.36，已售低于 0.2，因此有效阈值取 0.3。"""
 
-    def predict_valid(self):
+    def predict_valid(self) -> bool:
         mean = np.mean(np.max(self.image, axis=2) > 139)
-        return mean > 0.3
+        return bool(mean > 0.3)
 
 
-class ShopItemGrid(ItemGrid):
-    def predict(self, image, options=None, **settings):
+class ShopItemGrid(ItemGrid[Item]):
+    @property
+    def shop_grids(self) -> ButtonGrid:
+        """商店商品网格必须绑定可点击按钮。"""
+        if self.grids is None:
+            message = "shop item grid requires button grids"
+            raise RuntimeError(message)
+        return self.grids
+
+    def predict(
+        self,
+        image: ImageArray,
+        options: ItemPredictOptions | None = None,
+        **settings: Unpack[ItemPredictSettings],
+    ) -> list[Item]:
         options = item_predict_options(options, settings)
         super().predict(image, options=options)
         for item in self.items:
@@ -80,12 +97,12 @@ class ShopItemGrid(ItemGrid):
         return self.items
 
 
-class ShopItemGrid_250814(ShopItemGrid):
-    item_class = ShopItem_250814
+class ShopItemGrid250814(ShopItemGrid):
+    item_class = ShopItem250814
 
-    def get_soldout_count(self, image):
+    def get_soldout_count(self, image: ImageArray) -> int:
         count = 0
-        for button in self.grids.buttons:
+        for button in self.shop_grids.buttons:
             item = self.item_class(image, button)
             if not item.is_valid:
                 count += 1
@@ -96,30 +113,39 @@ class ShopItemGrid_250814(ShopItemGrid):
 class ShopBase(UI):
     _currency = 0
     shop_template_folder = ""
+    shop_filter_default = ""
+    shop_item_grid: ShopItemGrid | None = None
+    shop_grid_origin = (265, 238)
+    shop_grid_delta = (169, 223)
 
     @cached_property
-    def shop_filter(self):
-        return ""
+    def shop_filter(self) -> str:
+        return self.shop_filter_default
 
     @cached_property
-    def shop_grid(self):
+    def shop_grid(self) -> ButtonGrid:
         """2025-08-14 新版商店 UI 的商品网格。"""
         return ButtonGrid(
-            origin=(265, 238), delta=(169, 223), button_shape=(64, 64), grid_shape=(5, 2), name="SHOP_GRID"
+            origin=self.shop_grid_origin,
+            delta=self.shop_grid_delta,
+            button_shape=(64, 64),
+            grid_shape=(5, 2),
+            name="SHOP_GRID",
         )
 
-    def shop_items(self):
+    def shop_items(self) -> ShopItemGrid | None:
         """基类返回 None，商店变体返回各自的 ShopItemGrid。"""
-        return
+        return self.shop_item_grid
 
-    def shop_currency(self):
+    def shop_currency(self) -> int:
         return self._currency
 
-    def shop_has_loaded(self, _items):
+    @staticmethod
+    def shop_has_loaded(_items: list[Item]) -> bool:
         """变体加载检查钩子；用于等待默认商品和价格被真实数据替换。"""
         return True
 
-    def shop_detect_items(self, image=None):
+    def shop_detect_items(self, image: ImageArray | None = None) -> list[Item]:
         """在指定截图上识别商品，供测试使用。"""
         if image is None:
             image = self.device.image
@@ -131,9 +157,9 @@ class ShopBase(UI):
 
         self._shop_extract_template(shop_items, image)
         shop_items.predict(image, name=True, amount=False, cost=True, price=True, tag=False)
-        return self._log_shop_items(shop_items.items, shop_items.grids)
+        return self._log_shop_items(shop_items.items, shop_items.shop_grids)
 
-    def _shop_extract_template(self, shop_items, image):
+    def _shop_extract_template(self, shop_items: ShopItemGrid, image: ImageArray) -> None:
         if not self.config.SHOP_EXTRACT_TEMPLATE:
             return
         if self.shop_template_folder:
@@ -142,7 +168,8 @@ class ShopBase(UI):
             return
         logger.warning("SHOP_EXTRACT_TEMPLATE enabled but shop_template_folder is not set, skip extracting")
 
-    def _log_shop_items(self, items, grids):
+    @staticmethod
+    def _log_shop_items(items: list[Item], grids: ButtonGrid) -> list[Item]:
         if len(items):
             min_row = grids[0, 0].area[1]
             row = [str(item) for item in items if item.button[1] == min_row]
@@ -153,7 +180,7 @@ class ShopBase(UI):
         logger.info("No shop items found")
         return []
 
-    def shop_obstruct_handle(self):
+    def shop_obstruct_handle(self) -> bool:
         if self.appear(GET_SHIP, interval=1):
             logger.info(f"Shop obstruct: {GET_SHIP} -> {SHOP_CLICK_SAFE_AREA}")
             self.device.click(SHOP_CLICK_SAFE_AREA)
@@ -171,12 +198,13 @@ class ShopBase(UI):
 
         return False
 
-    def _shop_items_still_loading(self, items, record):
-        known = len([item for item in items if item.is_known_item])
+    @staticmethod
+    def _shop_items_still_loading(items: list[Item], record: int) -> tuple[bool, int]:
+        known = len([item for item in items if item.is_known_item()])
         logger.attr("Item detected", known)
         return known == 0 or known != record, known
 
-    def _wait_shop_items_loaded(self, shop_items, skip_first_screenshot):
+    def _wait_shop_items_loaded(self, shop_items: ShopItemGrid, *, skip_first_screenshot: bool) -> None:
         record = 0
         timeout = Timer(3, count=9).start()
         while 1:
@@ -204,29 +232,30 @@ class ShopBase(UI):
             if self.shop_has_loaded(items):
                 break
 
-    def shop_get_items(self, skip_first_screenshot=True):
+    def shop_get_items(self, *, skip_first_screenshot: bool = True) -> list[Item]:
         shop_items = self.shop_items()
         if shop_items is None:
             logger.warning("Expected type 'ShopItemGrid' but was None")
             return []
 
         self._wait_shop_items_loaded(shop_items, skip_first_screenshot=skip_first_screenshot)
-        return self._log_shop_items(shop_items.items, shop_items.grids)
+        return self._log_shop_items(shop_items.items, shop_items.shop_grids)
 
-    def shop_check_item(self, item):
+    def shop_check_item(self, item: Item) -> bool:
         return item.price <= self._currency
 
-    def shop_check_custom_item(self, _item):
+    @staticmethod
+    def shop_check_custom_item(_item: Item) -> bool:
         """供变体处理无法用过滤字符串描述的商品。"""
         return False
 
-    def shop_get_item_to_buy(self, items):
+    def shop_get_item_to_buy(self, items: list[Item]) -> Item | None:
         for item in items:
             if self.shop_check_custom_item(item):
                 return item
 
         FILTER.load(self.shop_filter)
-        filtered = FILTER.apply(items, self.shop_check_item)
+        filtered = [item for item in FILTER.apply(items, self.shop_check_item) if not isinstance(item, str)]
 
         if not filtered:
             return None

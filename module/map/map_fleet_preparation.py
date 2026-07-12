@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
@@ -20,6 +21,9 @@ from module.handler.info_handler import InfoHandler
 from module.logger import logger
 from module.map import assets as map_assets
 
+if TYPE_CHECKING:
+    from module.base.type_alias import ImageArray
+
 
 @dataclass(slots=True)
 class FleetOperatorAssets:
@@ -39,7 +43,7 @@ class FleetOperator:
 
     OFFSET = (-20, -80, 20, 5)
 
-    def __init__(self, assets, main):
+    def __init__(self, assets: FleetOperatorAssets, main: InfoHandler) -> None:
         self._choose = assets.choose
         self._advice = assets.advice
         self._bar = assets.bar
@@ -55,13 +59,13 @@ class FleetOperator:
             assets.hard_satisfied.load_offset(assets.clear)
 
     @property
-    def clear_button(self):
+    def clear_button(self) -> Button:
         return self._clear
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self._choose)[:-7]
 
-    def parse_fleet_bar(self, image):
+    def parse_fleet_bar(self, image: ImageArray) -> list[int]:
         """返回下拉菜单中已选的舰队编号列表，编号范围为 1～6。"""
         width, height = image_size(image)
         result = []
@@ -73,7 +77,7 @@ class FleetOperator:
         logger.info(f"Current selected: {result}")
         return result
 
-    def get_button(self, index):
+    def get_button(self, index: int) -> Button:
         """把 1～6 的舰队编号映射为下拉菜单按钮。"""
         bar = self._bar.button
         area = area_offset(
@@ -87,13 +91,13 @@ class FleetOperator:
         )
         return Button(area=(), color=(), button=area, name=f"{self._bar}_INDEX_{index}")
 
-    def allow(self):
+    def allow(self) -> bool:
         return self.main.appear(self._clear, offset=FleetOperator.OFFSET)
 
-    def is_hard(self):
+    def is_hard(self) -> bool:
         return self.main.appear(self._advice, offset=FleetOperator.OFFSET)
 
-    def is_hard_satisfied(self):
+    def is_hard_satisfied(self) -> bool | None:
         """以浅橙色限制线判断困难图是否达标；非困难模式返回 None。"""
         if not self.is_hard():
             return None
@@ -106,7 +110,7 @@ class FleetOperator:
         lines = len(peaks)
         return lines > 0
 
-    def raise_hard_not_satisfied(self):
+    def raise_hard_not_satisfied(self) -> None:
         if self.is_hard_satisfied() is False:
             stage = self.main.config.Campaign_Name
             logger.critical(
@@ -114,7 +118,7 @@ class FleetOperator:
             )
             raise RequestHumanTakeover
 
-    def clear(self, skip_first_screenshot=True):
+    def clear(self, *, skip_first_screenshot: bool = True) -> None:
         main = self.main
         click_timer = Timer(3, count=6)
         while 1:
@@ -136,7 +140,7 @@ class FleetOperator:
                     main.device.click(self._clear)
                     click_timer.reset()
 
-    def recommend(self, skip_first_screenshot=True):
+    def recommend(self, *, skip_first_screenshot: bool = True) -> None:
         main = self.main
         click_timer = Timer(3, count=6)
         while 1:
@@ -152,7 +156,7 @@ class FleetOperator:
                 main.device.click(self._choose)
                 click_timer.reset()
 
-    def open(self, skip_first_screenshot=True):
+    def open(self, *, skip_first_screenshot: bool = True) -> None:
         main = self.main
         click_timer = Timer(3, count=6)
         while 1:
@@ -168,7 +172,7 @@ class FleetOperator:
                 main.device.click(self._choose)
                 click_timer.reset()
 
-    def close(self, skip_first_screenshot=True):
+    def close(self, *, skip_first_screenshot: bool = True) -> None:
         main = self.main
         click_timer = Timer(3, count=6)
         while 1:
@@ -184,7 +188,7 @@ class FleetOperator:
                 main.device.click(self._choose)
                 click_timer.reset()
 
-    def click(self, index, skip_first_screenshot=True):
+    def click(self, index: int, *, skip_first_screenshot: bool = True) -> None:
         """选择 1～6 号舰队并关闭下拉菜单。"""
         main = self.main
         button = self.get_button(index)
@@ -204,11 +208,11 @@ class FleetOperator:
                 main.device.click(button)
                 click_timer.reset()
 
-    def selected(self):
+    def selected(self) -> list[int]:
         """返回当前选择的舰队编号列表，编号范围为 1～6。"""
         return self.parse_fleet_bar(self.main.image_crop(self._bar.button, copy=False))
 
-    def in_use(self):
+    def in_use(self) -> bool:
         # 裁剪 FLEET_*_IN_USE 以避开 info_bar，也能避免额外处理 info_bar。
         image = self.main.image_crop(self._in_use.button, copy=False)
 
@@ -220,15 +224,15 @@ class FleetOperator:
             return True
 
         gray = rgb2gray(image)
-        return np.std(gray.flatten(), ddof=1) > self.FLEET_IN_USE_STD
+        return bool(np.std(gray.flatten(), ddof=1) > self.FLEET_IN_USE_STD)
 
-    def bar_opened(self):
+    def bar_opened(self) -> bool:
         # 检查列表区域最右列的亮度。
         luma = rgb2gray(self.main.image_crop(self._bar.button, copy=False))[:, -1]
         # FLEET_PREPARATION is about 146~155
         return np.sum(luma > 168) / luma.size > 0.5
 
-    def ensure_to_be(self, index):
+    def ensure_to_be(self, index: int) -> None:
         """确保选中 1～6 号中的指定舰队。"""
         self.open()
         if index in self.selected():
@@ -241,7 +245,7 @@ class FleetPreparation(InfoHandler):
     map_fleet_checked = False
     map_is_hard_mode = False
 
-    def _load_fleet_asset_offsets(self):
+    def _load_fleet_asset_offsets(self) -> None:
         if self.appear(map_assets.FLEET_1_CLEAR, offset=FleetOperator.OFFSET):
             AUTO_SEARCH_SET_MOB.load_offset(map_assets.FLEET_1_CLEAR)
             AUTO_SEARCH_SET_BOSS.load_offset(map_assets.FLEET_1_CLEAR)
@@ -252,14 +256,14 @@ class FleetPreparation(InfoHandler):
             AUTO_SEARCH_SET_SUB_STANDBY.load_offset(map_assets.SUBMARINE_CLEAR)
 
     @staticmethod
-    def _fleet_2_in_use_button():
+    def _fleet_2_in_use_button() -> Button:
         y = map_assets.FLEET_1_CLEAR.button[1] - map_assets.FLEET_1_CLEAR.area[1]
         if y < -10:
             logger.info("FLEET_1_CLEAR moves up, load W15 assets")
             return map_assets.FLEET_2_IN_USE_W15
         return map_assets.FLEET_2_IN_USE
 
-    def _fleet_operators(self):
+    def _fleet_operators(self) -> tuple[FleetOperator, FleetOperator, FleetOperator]:
         fleet_1 = FleetOperator(
             assets=FleetOperatorAssets(
                 choose=map_assets.FLEET_1_CHOOSE,
@@ -295,7 +299,9 @@ class FleetPreparation(InfoHandler):
         )
         return fleet_1, fleet_2, submarine
 
-    def _check_fleet_hard_satisfied(self, fleet_1, fleet_2, submarine):
+    def _check_fleet_hard_satisfied(
+        self, fleet_1: FleetOperator, fleet_2: FleetOperator, submarine: FleetOperator
+    ) -> bool:
         h1, h2, h3 = fleet_1.is_hard_satisfied(), fleet_2.is_hard_satisfied(), submarine.is_hard_satisfied()
         logger.info(f"Hard satisfied: Fleet_1: {h1}, Fleet_2: {h2}, Submarine: {h3}")
         if self.config.Fleet_Fleet1:
@@ -304,18 +310,18 @@ class FleetPreparation(InfoHandler):
             fleet_2.raise_hard_not_satisfied()
         if self.config.Submarine_Fleet:
             submarine.raise_hard_not_satisfied()
-        return h1 or h2 or h3
+        return bool(h1 or h2 or h3)
 
-    def _handle_hard_mode_fleet_preparation(self, submarine):
+    def _handle_hard_mode_fleet_preparation(self, submarine: FleetOperator) -> None:
         logger.info("Hard Campaign. No fleet preparation")
         # 如果用户未设置潜艇舰队，清空潜艇。
         if submarine.allow():
             if not self.config.Submarine_Fleet:
                 submarine.clear()
         else:
-            self.config.SUBMARINE = 0
+            self.config.submarine = 0
 
-    def _prepare_submarine_fleet(self, fleet_2, submarine):
+    def _prepare_submarine_fleet(self, fleet_2: FleetOperator, submarine: FleetOperator) -> bool:
         # 缓存 submarine.allow()，避免设置 fleet_2 后结果不一致。
         # 展开的 fleet_2 可能覆盖潜艇按钮。
         map_allow_submarine = submarine.allow()
@@ -342,7 +348,7 @@ class FleetPreparation(InfoHandler):
             self.device.screenshot()
         return True
 
-    def _prepare_surface_fleets(self, fleet_1, fleet_2):
+    def _prepare_surface_fleets(self, fleet_1: FleetOperator, fleet_2: FleetOperator) -> None:
         if self.config.Fleet_Fleet2:
             # 强制重新设置一次。
             # AL 不再把编号较小的舰队当作第一舰队，因此舰队可能被反转。
@@ -354,15 +360,15 @@ class FleetPreparation(InfoHandler):
             fleet_2.clear()
         fleet_1.ensure_to_be(self.config.Fleet_Fleet1)
 
-    def _finalize_submarine_fleet(self, submarine, map_allow_submarine):
+    def _finalize_submarine_fleet(self, submarine: FleetOperator, *, map_allow_submarine: bool) -> None:
         # 再次检查潜艇是否为空。
         if map_allow_submarine:
             if not self.config.Submarine_Fleet:
                 submarine.clear()
         else:
-            self.config.SUBMARINE = 0
+            self.config.submarine = 0
 
-    def fleet_preparation(self):
+    def fleet_preparation(self) -> bool:
         logger.info(f"Using fleet: {[self.config.Fleet_Fleet1, self.config.Fleet_Fleet2, self.config.Submarine_Fleet]}")
         if self.map_fleet_checked:
             return False
@@ -379,6 +385,6 @@ class FleetPreparation(InfoHandler):
         map_allow_submarine = self._prepare_submarine_fleet(fleet_2, submarine)
 
         self._prepare_surface_fleets(fleet_1, fleet_2)
-        self._finalize_submarine_fleet(submarine, map_allow_submarine)
+        self._finalize_submarine_fleet(submarine, map_allow_submarine=map_allow_submarine)
 
         return True

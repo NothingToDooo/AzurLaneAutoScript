@@ -1,10 +1,15 @@
+from typing import TYPE_CHECKING
+
 from module.base.runtime_random import runtime_random
 from module.logger import logger
 from module.os.map import OSMap
 
+if TYPE_CHECKING:
+    from module.os.map import RescanMode
+
 
 class OpsiDaily(OSMap):
-    def os_port_mission(self):
+    def os_port_mission(self) -> None:
         """访问所有港口并完成港口日常任务。"""
         logger.hr("OS port mission", level=1)
         ports = [0, 7, 5, 2, 6, 1, 4, 3]
@@ -19,7 +24,12 @@ class OpsiDaily(OSMap):
             self.run_auto_search()
             self.handle_after_auto_search()
 
-    def os_finish_daily_mission(self, question=True, rescan=None):
+    def os_finish_daily_mission(
+        self,
+        *,
+        question: bool = True,
+        rescan: RescanMode | bool | None = None,
+    ) -> int:
         """完成全部大世界日常任务并返回数量；应先运行港口日常以领取任务。
 
         question 和 rescan 直接传给 run_auto_search。
@@ -40,14 +50,14 @@ class OpsiDaily(OSMap):
             self.os_order_execute(
                 recon_scan=False, submarine_call=self.config.OpsiFleet_Submarine and result != "pinned_at_archive_zone"
             )
-            self.run_auto_search(question, rescan)
+            self.run_auto_search(question=question, rescan=rescan)
             self.handle_after_auto_search()
             count += 1
             self.config.check_task_switch()
 
         return count
 
-    def os_daily(self):
+    def os_daily(self) -> None:
         # os_mission_overview_accept() 已经能处理旧任务，不需要先完成已有任务。
 
         # 每日清理调适样本。

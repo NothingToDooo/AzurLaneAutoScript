@@ -21,7 +21,7 @@ class MailSelectSetting(Setting):
 
 class MailWhite(UI):
     @cached_property
-    def mail_select_setting(self):
+    def mail_select_setting(self) -> MailSelectSetting:
         setting = MailSelectSetting("Mail", main=self)
         setting.reset_first = False
         setting.need_deselect = True
@@ -40,7 +40,7 @@ class MailWhite(UI):
         return setting
 
     @cached_property
-    def mail_select_all_setting(self):
+    def mail_select_all_setting(self) -> MailSelectSetting:
         setting = MailSelectSetting("MailAll", main=self)
         setting.reset_first = False
         setting.add_setting(
@@ -51,7 +51,7 @@ class MailWhite(UI):
         )
         return setting
 
-    def _mail_enter(self, skip_first_screenshot=True):
+    def _mail_enter(self, *, skip_first_screenshot: bool = True) -> bool:
         """从白色主页或邮件管理进入批量领取页；无邮件返回 False。"""
         logger.info("Mail enter")
         self.interval_clear([freebies_assets.MAIL_MANAGE])
@@ -84,7 +84,7 @@ class MailWhite(UI):
                 continue
         return False
 
-    def _mail_quit(self, skip_first_screenshot=True):
+    def _mail_quit(self, *, skip_first_screenshot: bool = True) -> None:
         """从邮件内任意页面退出到白色主页。"""
         logger.info("Mail quit")
         self.interval_clear(
@@ -117,7 +117,7 @@ class MailWhite(UI):
             if self._handle_mail_reward():
                 continue
 
-    def _handle_mail_reward(self):
+    def _handle_mail_reward(self) -> bool:
         if self.appear(GET_ITEMS_1, offset=(30, 30), interval=3):
             logger.info(f"{GET_ITEMS_1} -> {freebies_assets.MAIL_BATCH_CLAIM}")
             self.device.click(freebies_assets.MAIL_BATCH_CLAIM)
@@ -128,7 +128,7 @@ class MailWhite(UI):
             return True
         return False
 
-    def _mail_claim_execute(self, skip_first_screenshot=True):
+    def _mail_claim_execute(self, *, skip_first_screenshot: bool = True) -> bool:
         """在批量领取页领取邮件，以信息条是否出现作为成功结果。"""
         self.handle_info_bar()
         self.interval_clear(
@@ -162,7 +162,7 @@ class MailWhite(UI):
         logger.info(f"Mail claim success: {success}")
         return success
 
-    def _mail_delete(self, skip_first_screenshot=True):
+    def _mail_delete(self, *, skip_first_screenshot: bool = True) -> bool:
         """在批量删除页完成删除，结束后仍停留在该页。"""
         self.handle_info_bar()
         self.interval_clear([freebies_assets.MAIL_BATCH_DELETE])
@@ -190,11 +190,12 @@ class MailWhite(UI):
 
     def mail_claim(
         self,
-        merit=True,
-        maintenance=False,
-        trade_license=False,
-        delete=True,
-    ):
+        *,
+        merit: bool = True,
+        maintenance: bool = False,
+        trade_license: bool = False,
+        delete: bool = True,
+    ) -> None:
         """从白色主页或邮件管理页按开关领取邮件，并可选删除；完成后返回白色主页。"""
         if not self._mail_enter():
             return
@@ -225,7 +226,7 @@ class MailWhite(UI):
 
         self._mail_quit()
 
-    def run(self):
+    def run(self) -> bool:
         merit = self.config.Mail_ClaimMerit
         maintenance = self.config.Mail_ClaimMaintenance
         trade_license = self.config.Mail_ClaimTradeLicense

@@ -3,14 +3,16 @@ from module.logger import logger
 
 
 class DailyEquipment(FleetEquipment):
-    def fleet_enter(self, fleet=None):
-        fleet = self.config.FLEET_DAILY
-        if isinstance(fleet, list):
-            logger.info(f"Multiple daily fleets are set, change equipment only for the first one. fleet: {fleet}")
-            fleet = fleet[0]
-        super().fleet_enter(fleet)
+    def fleet_enter(self, fleet: int | None = None) -> None:
+        selected_fleet = self.config.FLEET_DAILY if fleet is None else fleet
+        if isinstance(selected_fleet, list):
+            logger.info(
+                f"Multiple daily fleets are set, change equipment only for the first one. fleet: {selected_fleet}"
+            )
+            selected_fleet = selected_fleet[0]
+        super().fleet_enter(selected_fleet)
 
-    def equipment_take_on(self):
+    def equipment_take_on(self) -> bool:
         if self.config.FLEET_DAILY_EQUIPMENT is None:
             return False
         if self.equipment_has_take_on:
@@ -23,7 +25,7 @@ class DailyEquipment(FleetEquipment):
         self.device.sleep(1)
         return True
 
-    def equipment_take_off(self):
+    def equipment_take_off(self) -> bool:
         if self.config.FLEET_DAILY_EQUIPMENT is None:
             return False
         if not self.equipment_has_take_on:

@@ -16,7 +16,8 @@ Localization_skin = true
 
 
 class AzurLaneUncensored(LoginHandler):
-    def create_level1_uncensored(self):
+    @staticmethod
+    def create_level1_uncensored() -> None:
         logger.info("创建本地反和谐文件")
         folder = "./files"
         with suppress(FileNotFoundError):
@@ -25,7 +26,7 @@ class AzurLaneUncensored(LoginHandler):
         with (Path(folder) / "localization.txt").open("w", encoding="utf-8") as f:
             f.write(localization_txt)
 
-    def run(self):
+    def run(self) -> None:
         folder = "./toolkit/AzurLaneUncensored"
 
         logger.hr("生成反和谐文件", level=1)

@@ -1,5 +1,6 @@
 from dataclasses import dataclass, replace
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, TypedDict, Unpack
 
 import pytest
 
@@ -10,18 +11,21 @@ from module.ui.page import Page
 from module.ui.ui import UI
 from module.ui_white import assets as ui_white_assets
 
+if TYPE_CHECKING:
+    from module.base.button import Button
 
-class _FakePage:
-    def __init__(self, name="page_test", check_button=None) -> None:
+
+class _FakePage(Page):
+    def __init__(self, name: str = "page_test", check_button: Button = ui_assets.GOTO_MAIN) -> None:
         self.name = name
-        self.check_button = check_button or object()
+        self.check_button = check_button
 
     def __str__(self) -> str:
         return self.name
 
 
 class _FakeDevice:
-    def __init__(self, *, has_cached_image=True, app_running=True) -> None:
+    def __init__(self, *, has_cached_image: bool = True, app_running: bool = True) -> None:
         self.has_cached_image = has_cached_image
         self.app_running = app_running
         self.screenshot_count = 0
@@ -41,15 +45,27 @@ class _FakeDevice:
 
 @dataclass(frozen=True, slots=True)
 class _FakeUIOptions:
-    visible_page: object = None
+    visible_page: Page | None = None
     visible_after_checks: int = 0
-    recover_buttons: tuple = ()
-    additional_results: tuple = ()
+    recover_buttons: tuple[Button, ...] = ()
+    additional_results: tuple[bool, ...] = ()
     has_cached_image: bool = True
     app_running: bool = True
 
 
-def _fake_ui_options(options=None, settings=None) -> _FakeUIOptions:
+class _FakeUISettings(TypedDict, total=False):
+    visible_page: Page | None
+    visible_after_checks: int
+    recover_buttons: tuple[Button, ...]
+    additional_results: tuple[bool, ...]
+    has_cached_image: bool
+    app_running: bool
+
+
+def _fake_ui_options(
+    options: _FakeUIOptions | None = None,
+    settings: _FakeUISettings | None = None,
+) -> _FakeUIOptions:
     options = _FakeUIOptions() if options is None else options
     if settings:
         options = replace(options, **settings)
@@ -61,7 +77,11 @@ class _FakeUI(UI):
     device: _FakeDevice
     ui_current: Page | None
 
-    def __init__(self, options=None, **settings) -> None:
+    def __init__(
+        self,
+        options: _FakeUIOptions | None = None,
+        **settings: Unpack[_FakeUISettings],
+    ) -> None:
         options = _fake_ui_options(options, settings)
         self.device = _FakeDevice(has_cached_image=options.has_cached_image, app_running=options.app_running)
         self.config = SimpleNamespace(
@@ -76,26 +96,26 @@ class _FakeUI(UI):
         self.additional_results = list(options.additional_results)
         self.additional_calls = 0
 
-    def ui_page_appear(self, page, *_args: object, **_kwargs) -> bool:
+    def ui_page_appear(self, page: Page, *_args: object, **_kwargs: object) -> bool:
         self.page_check_count += 1
         return page is self.visible_page and self.page_check_count > self.visible_after_checks
 
-    def appear_then_click(self, button, *_args: object, **_kwargs) -> bool:
+    def appear_then_click(self, button: Button, *_args: object, **_kwargs: object) -> bool:
         self.appear_then_click_calls.append(button)
         if self.recover_buttons and button == self.recover_buttons[0]:
             self.recover_buttons.pop(0)
             return True
         return False
 
-    def ui_additional(self, get_ship=True, *_args: object, **_kwargs: object) -> bool:
-        _ = get_ship
+    def ui_additional(self, *, get_ship: bool = True) -> bool:
+        del get_ship
         self.additional_calls += 1
         if self.additional_results:
             return self.additional_results.pop(0)
         return False
 
 
-def test_ui_get_current_page_uses_cached_first_screenshot(monkeypatch) -> None:
+def test_ui_get_current_page_uses_cached_first_screenshot(monkeypatch: pytest.MonkeyPatch) -> None:
     page = _FakePage()
     monkeypatch.setattr(Page, "iter_pages", lambda: [page])
     ui = _FakeUI(visible_page=page, has_cached_image=True)
@@ -105,7 +125,7 @@ def test_ui_get_current_page_uses_cached_first_screenshot(monkeypatch) -> None:
     assert ui.device.screenshot_count == 0
 
 
-def test_ui_get_current_page_screenshots_without_cache(monkeypatch) -> None:
+def test_ui_get_current_page_screenshots_without_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     page = _FakePage()
     monkeypatch.setattr(Page, "iter_pages", lambda: [page])
     ui = _FakeUI(visible_page=page, has_cached_image=False)
@@ -114,19 +134,19 @@ def test_ui_get_current_page_screenshots_without_cache(monkeypatch) -> None:
     assert ui.device.screenshot_count == 1
 
 
-def test_ui_get_current_page_recovers_with_home_button(monkeypatch) -> None:
+def test_ui_get_current_page_recovers_with_home_button(monkeypatch: pytest.MonkeyPatch) -> None:
     page = _FakePage()
     monkeypatch.setattr(Page, "iter_pages", lambda: [page])
-    ui = _FakeUI(visible_page=page, visible_after_checks=1, recover_buttons=[ui_assets.GOTO_MAIN])
+    ui = _FakeUI(visible_page=page, visible_after_checks=1, recover_buttons=(ui_assets.GOTO_MAIN,))
 
     assert ui.ui_get_current_page() is page
     assert ui.appear_then_click_calls == [ui_assets.GOTO_MAIN]
 
 
-def test_ui_get_current_page_recovers_with_additional_handler(monkeypatch) -> None:
+def test_ui_get_current_page_recovers_with_additional_handler(monkeypatch: pytest.MonkeyPatch) -> None:
     page = _FakePage()
     monkeypatch.setattr(Page, "iter_pages", lambda: [page])
-    ui = _FakeUI(visible_page=page, visible_after_checks=1, additional_results=[True])
+    ui = _FakeUI(visible_page=page, visible_after_checks=1, additional_results=(True,))
 
     assert ui.ui_get_current_page() is page
     assert ui.appear_then_click_calls == [
@@ -137,7 +157,7 @@ def test_ui_get_current_page_recovers_with_additional_handler(monkeypatch) -> No
     assert ui.additional_calls == 1
 
 
-def test_ui_get_current_page_raises_when_app_is_not_running(monkeypatch) -> None:
+def test_ui_get_current_page_raises_when_app_is_not_running(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(Page, "iter_pages", list)
     ui = _FakeUI(app_running=False)
 

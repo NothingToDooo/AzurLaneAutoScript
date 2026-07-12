@@ -1,24 +1,29 @@
+from typing import TYPE_CHECKING
+
 from module.base.decorator import cached_property
 from module.logger import logger
-from module.shop.base import ShopItemGrid_250814
+from module.shop.base import ShopItemGrid250814
 from module.shop.clerk import ShopClerk
 from module.shop.shop_status import ShopStatus
 from module.shop.ui import ShopUI
 
+if TYPE_CHECKING:
+    from module.statistics.item import Item
 
-class GeneralShop_250814(ShopClerk, ShopUI, ShopStatus):
+
+class GeneralShop250814(ShopClerk, ShopUI, ShopStatus):
     gems = 0
     shop_template_folder = "./assets/shop/general"
 
     @cached_property
-    def shop_filter(self):
+    def shop_filter(self) -> str:
         return self.config.GeneralShop_Filter.strip()
 
     @cached_property
-    def shop_general_items(self):
+    def shop_general_items(self) -> ShopItemGrid250814:
         shop_grid = self.shop_grid
 
-        shop_general_items = ShopItemGrid_250814(
+        shop_general_items = ShopItemGrid250814(
             shop_grid,
             templates={},
             template_area=(25, 20, 82, 72),
@@ -30,12 +35,12 @@ class GeneralShop_250814(ShopClerk, ShopUI, ShopStatus):
         shop_general_items.load_cost_template_folder("./assets/shop/cost")
         return shop_general_items
 
-    def shop_items(self):
+    def shop_items(self) -> ShopItemGrid250814:
         return self.shop_general_items
 
     currency_rechecked = 0
 
-    def shop_currency(self):
+    def shop_currency(self) -> int:
         while 1:
             self._currency = self.status_get_gold_coins()
             self.gems = self.status_get_gems()
@@ -49,7 +54,7 @@ class GeneralShop_250814(ShopClerk, ShopUI, ShopStatus):
 
         return self._currency
 
-    def shop_check_item(self, item):
+    def shop_check_item(self, item: Item) -> bool:
         if item.cost == "Coins":
             return item.price <= self._currency
 
@@ -58,7 +63,7 @@ class GeneralShop_250814(ShopClerk, ShopUI, ShopStatus):
 
         return False
 
-    def shop_check_custom_item(self, _item):
+    def shop_check_custom_item(self, _item: Item) -> bool:
         if self.config.GeneralShop_ConsumeCoins and self._currency >= 550000 and _item.cost == "Coins":
             return True
 
@@ -71,7 +76,7 @@ class GeneralShop_250814(ShopClerk, ShopUI, ShopStatus):
         logger.info(f"Item {_item} is considered to be an equip skin box")
         return self._currency >= _item.price
 
-    def run(self):
+    def run(self) -> None:
         if not self.shop_filter:
             return
 

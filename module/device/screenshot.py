@@ -1,9 +1,9 @@
 import time
 from collections import deque
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Literal, TypedDict
 
-import cv2
+import numpy as np
 from PIL import Image
 
 from module.base.decorator import cached_property
@@ -15,25 +15,31 @@ from module.logger import logger
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    import numpy as np
+    from module.base.type_alias import FilePath, ImageArray
+    from module.config.config import AzurLaneConfig
+    from module.device.contracts import CaptureService
+
+
+class ScreenshotRecord(TypedDict):
+    time: datetime
+    image: ImageArray
 
 
 class Screenshot:
-    image: np.ndarray
+    image: ImageArray
     app_is_running: Callable[[], bool]
-    capture: Any
-    config: Any
-    get_orientation: Callable[[], object]
+    capture: CaptureService
+    config: AzurLaneConfig
+    get_orientation: Callable[[], int]
     orientation: int
     serial: str
 
-    def __init__(self, *args, **kwargs):
+    def _init_screenshot_state(self) -> None:
         self._screen_size_checked = False
         self._screen_black_checked = False
         self._screenshot_interval = Timer(0.1)
-        super().__init__(*args, **kwargs)
 
-    def screenshot(self):
+    def screenshot(self) -> ImageArray:
         self._screenshot_interval.wait()
         self._screenshot_interval.reset()
 
@@ -52,10 +58,10 @@ class Screenshot:
         return self.image
 
     @property
-    def has_cached_image(self):
+    def has_cached_image(self) -> bool:
         return hasattr(self, "image") and self.image is not None
 
-    def _handle_orientated_image(self, image):
+    def _handle_orientated_image(self, image: ImageArray) -> ImageArray:
         width, height = image_size(self.image)
         if width == 1280 and height == 720:
             return image
@@ -64,11 +70,11 @@ class Screenshot:
         if self.orientation == 0:
             pass
         elif self.orientation == 1:
-            image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            image = np.rot90(image, 1).copy()
         elif self.orientation == 2:
-            image = cv2.rotate(image, cv2.ROTATE_180)
+            image = np.rot90(image, 2).copy()
         elif self.orientation == 3:
-            image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+            image = np.rot90(image, -1).copy()
         else:
             message = f"Invalid device orientation: {self.orientation}"
             raise ScriptError(message)
@@ -76,7 +82,7 @@ class Screenshot:
         return image
 
     @cached_property
-    def screenshot_deque(self):
+    def screenshot_deque(self) -> deque[ScreenshotRecord]:
         try:
             length = int(self.config.Error_ScreenshotLength)
         except ValueError as e:
@@ -89,43 +95,43 @@ class Screenshot:
     def screenshot_interval_clear(self) -> None:
         self._screenshot_interval.clear()
 
-    def screenshot_interval_set(self, interval=None):
+    def screenshot_interval_set(self, interval: float | Literal["combat"] | None = None) -> None:
         """interval 为截图间隔秒数；None 读取默认配置，'combat' 读取战斗配置。"""
         if interval is None:
             origin = self.config.Optimization_ScreenshotInterval
-            interval = limit_in(origin, 0.1, 0.3)
-            if interval != origin:
-                logger.warning(f"Optimization.ScreenshotInterval {origin} is revised to {interval}")
-                self.config.Optimization_ScreenshotInterval = interval
+            checked_interval = float(limit_in(origin, 0.1, 0.3))
+            if checked_interval != origin:
+                logger.warning(f"Optimization.ScreenshotInterval {origin} is revised to {checked_interval}")
+                self.config.Optimization_ScreenshotInterval = checked_interval
             # 当前个人版固定使用 nemu_ipc 截图，可以使用更低的默认截图间隔。
-            interval = limit_in(origin, 0.1, 0.2)
+            interval_value = float(limit_in(origin, 0.1, 0.2))
         elif interval == "combat":
             origin = self.config.Optimization_CombatScreenshotInterval
-            interval = limit_in(origin, 0.3, 1.0)
-            if interval != origin:
-                logger.warning(f"Optimization.CombatScreenshotInterval {origin} is revised to {interval}")
-                self.config.Optimization_CombatScreenshotInterval = interval
+            interval_value = float(limit_in(origin, 0.3, 1.0))
+            if interval_value != origin:
+                logger.warning(f"Optimization.CombatScreenshotInterval {origin} is revised to {interval_value}")
+                self.config.Optimization_CombatScreenshotInterval = interval_value
         elif isinstance(interval, (int, float)):
-            pass
+            interval_value = float(interval)
         else:
             logger.warning(f"Unknown screenshot interval: {interval}")
             message = f"Unknown screenshot interval: {interval}"
             raise ScriptError(message)
-        if interval != self._screenshot_interval.limit:
-            logger.info(f"Screenshot interval set to {interval}s")
-            self._screenshot_interval.limit = interval
+        if interval_value != self._screenshot_interval.limit:
+            logger.info(f"Screenshot interval set to {interval_value}s")
+            self._screenshot_interval.limit = interval_value
 
-    def image_show(self, image=None):
+    def image_show(self, image: ImageArray | None = None) -> None:
         if image is None:
             image = self.image
         Image.fromarray(image).show()
 
-    def image_save(self, file=None):
+    def image_save(self, file: FilePath | None = None) -> None:
         if file is None:
             file = f"{int(time.time() * 1000)}.png"
         save_image(self.image, file)
 
-    def check_screen_size(self):
+    def check_screen_size(self) -> bool:
         """调用前必须已截图，期望方向校正后为 1280x720。"""
         if self._screen_size_checked:
             return True
@@ -155,7 +161,7 @@ class Screenshot:
             raise RequestHumanTakeover
         return False
 
-    def check_screen_black(self):
+    def check_screen_black(self) -> bool:
         if self._screen_black_checked:
             return True
         # 某些模拟器偶尔会返回纯黑截图。

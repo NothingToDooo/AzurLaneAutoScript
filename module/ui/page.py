@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING, ClassVar
 if TYPE_CHECKING:
     from collections.abc import Iterator, ValuesView
 
+    from module.base.button import Button
+
 from module.coalition import assets as coalition_assets
 from module.event_hospital.assets import HOSIPITAL_CHECK
 from module.freebies.assets import MAIL_ENTER
@@ -22,7 +24,7 @@ class Page:
             page.parent = None
 
     @classmethod
-    def init_connection(cls, destination) -> None:
+    def init_connection(cls, destination: Page) -> None:
         """从目标页反向填充各页面的 parent，供 UI 导航沿跳转链前进。"""
         cls.clear_connection()
 
@@ -46,28 +48,28 @@ class Page:
         return cls.all_pages.values()
 
     @classmethod
-    def iter_check_buttons(cls) -> Iterator[object]:
+    def iter_check_buttons(cls) -> Iterator[Button]:
         for page in cls.all_pages.values():
             yield page.check_button
 
-    def __init__(self, check_button):
+    def __init__(self, check_button: Button) -> None:
         self.check_button = check_button
-        self.links = {}
+        self.links: dict[Page, Button] = {}
         text = traceback.extract_stack()[-2].line or ""
         self.name = text[: text.find("=")].strip()
-        self.parent = None
+        self.parent: Page | None = None
         Page.all_pages[self.name] = self
 
-    def __eq__(self, other):
-        return self.name == other.name
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, Page) and self.name == other.name
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.name)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
-    def link(self, button, destination):
+    def link(self, button: Button, destination: Page) -> None:
         self.links[destination] = button
 
 
@@ -88,9 +90,6 @@ page_fleet.link(button=ui_assets.GOTO_MAIN, destination=page_main)
 page_main_white = Page(ui_white_assets.MAIN_GOTO_CAMPAIGN_WHITE)
 page_main_white.link(button=ui_white_assets.MAIN_GOTO_CAMPAIGN_WHITE, destination=page_campaign_menu)
 page_main_white.link(button=ui_white_assets.MAIN_GOTO_FLEET_WHITE, destination=page_fleet)
-
-page_unknown = Page(None)
-page_unknown.link(button=ui_assets.GOTO_MAIN, destination=page_main)
 
 # 练习页只从战役菜单进入。
 page_exercise = Page(ui_assets.EXERCISE_CHECK)

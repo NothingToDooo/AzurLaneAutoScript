@@ -74,12 +74,14 @@ class _LoginHandler(LoginHandler):
     def login(self) -> bool:
         return self._handle_app_login()
 
-    def _next_result[T](self, results: list[T], *, default: T) -> T:
+    @staticmethod
+    def _next_result[T](results: list[T], *, default: T) -> T:
         if results:
             return results.pop(0)
         return default
 
-    def _button_name(self, button: object) -> str:
+    @staticmethod
+    def _button_name(button: object) -> str:
         return getattr(button, "name", repr(button))
 
     def is_in_main(self, *_args: object, **_kwargs: object) -> bool:

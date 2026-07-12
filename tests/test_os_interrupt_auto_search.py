@@ -1,11 +1,19 @@
-from typing import ClassVar, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Literal, TypeVar, override
 
+import numpy as np
 import pytest
 
+from module.base.button import Button
 from module.os import map as map_module
 from module.os.map import OSMap
 
 _T = TypeVar("_T")
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
 
 
 def button_key(button: object) -> str:
@@ -39,9 +47,10 @@ class _Timer:
 
 class _Device:
     def __init__(self) -> None:
-        self.clicks: list[object] = []
+        self.image = np.zeros((2, 2, 3), dtype=np.uint8)
+        self.clicks: list[Button] = []
 
-    def click(self, button: object) -> None:
+    def click(self, button: Button) -> None:
         self.clicks.append(button)
 
 
@@ -64,7 +73,7 @@ class _InterruptMap(OSMap):
         self.loop_count = 1
         self.in_main_results: list[bool] = []
         self.appear_then_click_results: dict[str, list[bool]] = {}
-        self.combat_executing_results: list[object | None] = []
+        self.combat_executing_results: list[Button | Literal[False]] = []
         self.combat_quit_results: list[bool] = []
         self.combat_quit_reconfirm_results: list[bool] = []
         self.ui_additional_results: list[bool] = []
@@ -75,13 +84,21 @@ class _InterruptMap(OSMap):
         self.interval_clears: list[object] = []
         self.interval_resets: list[object] = []
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
-    def loop(self, *_args: object, **_kwargs: object) -> range:
-        return range(self.loop_count)
+    @override
+    def loop(
+        self,
+        *,
+        skip_first: bool = True,
+        timeout: float | Timer | None = None,
+    ) -> Iterator[ImageArray]:
+        del skip_first, timeout
+        return iter([self.device.image] * self.loop_count)
 
     def is_in_main(self, *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("is_in_main",))
@@ -96,9 +113,10 @@ class _InterruptMap(OSMap):
         self.calls.append(("interval_clear", button))
         self.interval_clears.append(button)
 
-    def is_combat_executing(self) -> object | None:
+    @override
+    def is_combat_executing(self) -> Button | Literal[False]:
         self.calls.append(("is_combat_executing",))
-        return self._next_result(self.combat_executing_results, default=None)
+        return self._next_result(self.combat_executing_results, default=False)
 
     def interval_reset(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_reset", button))
@@ -154,7 +172,7 @@ def test_interrupt_auto_search_clears_reward_popup() -> None:
 
 def test_interrupt_auto_search_clicks_pause_when_combat_is_executing() -> None:
     runner = _InterruptMap()
-    pause_button = object()
+    pause_button = Button(area=(), color=(), button=(), name="PAUSE_TEST")
     runner.combat_executing_results = [pause_button]
     _Timer.reached_results = {0: [True]}
 
@@ -179,7 +197,7 @@ def test_interrupt_auto_search_tracks_loading_until_combat_executes() -> None:
     runner = _InterruptMap()
     runner.loop_count = 2
     runner.combat_loading_results = [True]
-    runner.combat_executing_results = ["combat"]
+    runner.combat_executing_results = [Button(area=(), color=(), button=(), name="COMBAT_TEST")]
     _Timer.reached_results = {0: [False, False]}
 
     runner.interrupt_auto_search()

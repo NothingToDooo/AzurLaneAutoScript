@@ -85,7 +85,7 @@ class Config(Config51):
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.clear_roadblocks([road_center]):
             return True
         if self.clear_potential_roadblocks([road_ring]):
@@ -93,7 +93,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_4(self):
+    def battle_4(self) -> bool:
         boss = self.map.select(is_boss=True)
         if boss and not self.check_accessibility(boss[0], fleet="boss"):
             if self.clear_roadblocks([road_center]):

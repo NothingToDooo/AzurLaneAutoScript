@@ -85,13 +85,13 @@ road_middle = RoadGrids([D5, F3])
 step_on = SelectedGrids([D5, F3])
 # There's one enemy spawn along with boss, so have to make sure there are multiple roads are cleared.
 # Here use separate roads instead of RoadGrids.combine().
-road_H1 = RoadGrids([F3, [F1, G2, H3]])
-road_A6 = RoadGrids([D5, [B5, C6]])
-road_A1_left = RoadGrids([A4, A3])
-road_A1_upper = RoadGrids([F1, E1, D1, C1])
-road_H6_bottom = RoadGrids([D6, E6, F6])
-road_H6_right = RoadGrids([[H3, G4], [G4, H4], [H4, G5]])
-road_MY = RoadGrids([[B2, C1]])
+ROAD_H1 = RoadGrids([F3, [F1, G2, H3]])
+ROAD_A6 = RoadGrids([D5, [B5, C6]])
+ROAD_A1_LEFT = RoadGrids([A4, A3])
+ROAD_A1_UPPER = RoadGrids([F1, E1, D1, C1])
+ROAD_H6_BOTTOM = RoadGrids([D6, E6, F6])
+ROAD_H6_RIGHT = RoadGrids([[H3, G4], [G4, H4], [H4, G5]])
+ROAD_MY = RoadGrids([[B2, C1]])
 
 
 class Config(ConfigBase):
@@ -101,24 +101,24 @@ class Config(ConfigBase):
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.fleet_2_step_on(step_on, roadblocks=[road_middle]):
             return True
 
         self.clear_all_mystery()
 
-        if self.clear_roadblocks([road_A6, road_H1, road_A1_left, road_A1_upper, road_H6_bottom, road_H6_right]):
+        if self.clear_roadblocks([ROAD_A6, ROAD_H1, ROAD_A1_LEFT, ROAD_A1_UPPER, ROAD_H6_BOTTOM, ROAD_H6_RIGHT]):
             return True
         if self.clear_potential_roadblocks(
-            [road_A6, road_H1, road_A1_left, road_A1_upper, road_H6_bottom, road_H6_right]
+            [ROAD_A6, ROAD_H1, ROAD_A1_LEFT, ROAD_A1_UPPER, ROAD_H6_BOTTOM, ROAD_H6_RIGHT]
         ):
             return True
-        if self.clear_roadblocks([road_MY]):
+        if self.clear_roadblocks([ROAD_MY]):
             return True
-        if self.clear_first_roadblocks([road_A6, road_H1, road_A1_left, road_A1_upper, road_H6_bottom, road_H6_right]):
+        if self.clear_first_roadblocks([ROAD_A6, ROAD_H1, ROAD_A1_LEFT, ROAD_A1_UPPER, ROAD_H6_BOTTOM, ROAD_H6_RIGHT]):
             return True
 
         return self.battle_default()
 
-    def battle_4(self):
+    def battle_4(self) -> bool:
         return self.brute_clear_boss()

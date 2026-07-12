@@ -1,7 +1,4 @@
-# ruff: noqa: SLF001
-
 import inspect
-from dataclasses import dataclass
 from datetime import timedelta
 from typing import TypedDict
 
@@ -12,8 +9,12 @@ from cnocr import CnOcr
 
 import module.ocr.ocr as ocr_module
 from module.ocr.al_ocr import AlOcr
-from module.ocr.failure_store import OcrFailureRecordResult, OcrFailureRecordStatus
-from module.ocr.ocr import Digit, DigitCounter, Duration, Ocr
+from module.ocr.failure_store import (
+    OcrFailureRecordResult,
+    OcrFailureRecordStatus,
+    OcrFailureSample,
+)
+from module.ocr.ocr import Digit, DigitCounter, Duration, Ocr, OcrRegions
 from module.ocr.result import RawOcrResult, RecognitionFailureReason, RecognitionResult
 
 TEST_AREA = (0, 0, 4, 4)
@@ -72,51 +73,17 @@ class _SequenceEngine(_FakeEngine):
         return self.results
 
 
-@dataclass(frozen=True, slots=True)
-class _RecordedFailure:
-    result: object
-    raw_image: np.ndarray
-    processed_image: np.ndarray
-    area: tuple[int, int, int, int] | None
-    alphabet: str | None
-    letter: tuple[int, int, int]
-    threshold: int
-    expected_total: int | None
-
-
-class _RecordingFailureRecorder:
+class _RecordingFailureRecorder[T]:
     def __init__(self) -> None:
-        self.calls: list[_RecordedFailure] = []
+        self.calls: list[OcrFailureSample[T]] = []
 
-    def record[T](  # noqa: PLR0913
-        self,
-        result: RecognitionResult[T],
-        *,
-        raw_image: np.ndarray,
-        processed_image: np.ndarray,
-        area: tuple[int, int, int, int] | None,
-        alphabet: str | None,
-        letter: tuple[int, int, int],
-        threshold: int,
-        expected_total: int | None = None,
-    ) -> OcrFailureRecordResult:
-        self.calls.append(
-            _RecordedFailure(
-                result=result,
-                raw_image=raw_image,
-                processed_image=processed_image,
-                area=area,
-                alphabet=alphabet,
-                letter=letter,
-                threshold=threshold,
-                expected_total=expected_total,
-            )
-        )
+    def record(self, sample: OcrFailureSample[T]) -> OcrFailureRecordResult:
+        self.calls.append(sample)
         return OcrFailureRecordResult(OcrFailureRecordStatus.SAVED, "test-digest", None)
 
 
 class _TestOcr(Ocr):
-    def __init__(self, engine: _FakeEngine, buttons=TEST_AREA) -> None:
+    def __init__(self, engine: _FakeEngine, buttons: OcrRegions = TEST_AREA) -> None:
         self._engine = engine
         super().__init__(buttons, name="TEST_OCR")
 
@@ -126,7 +93,7 @@ class _TestOcr(Ocr):
 
 
 class _TestDigit(Digit):
-    def __init__(self, engine: _FakeEngine, buttons=TEST_AREA) -> None:
+    def __init__(self, engine: _FakeEngine, buttons: OcrRegions = TEST_AREA) -> None:
         self._engine = engine
         super().__init__(buttons, name="TEST_DIGIT")
 
@@ -136,7 +103,7 @@ class _TestDigit(Digit):
 
 
 class _TestCounter(DigitCounter):
-    def __init__(self, engine: _FakeEngine, buttons=TEST_AREA) -> None:
+    def __init__(self, engine: _FakeEngine, buttons: OcrRegions = TEST_AREA) -> None:
         self._engine = engine
         super().__init__(buttons, name="TEST_COUNTER")
 
@@ -146,7 +113,7 @@ class _TestCounter(DigitCounter):
 
 
 class _TestDuration(Duration):
-    def __init__(self, engine: _FakeEngine, buttons=TEST_AREA) -> None:
+    def __init__(self, engine: _FakeEngine, buttons: OcrRegions = TEST_AREA) -> None:
         self._engine = engine
         super().__init__(buttons, name="TEST_DURATION")
 
@@ -156,8 +123,9 @@ class _TestDuration(Duration):
 
 
 class _SlashCounter(_TestCounter):
-    def after_process(self, result: str) -> str:
-        result = super().after_process(result)
+    @staticmethod
+    def normalize_text(result: str) -> str:
+        result = DigitCounter.normalize_text(result)
         return "14/15" if result == "1415" else result
 
 
@@ -166,12 +134,6 @@ class _IntegerCorrectingDigit(_TestDigit):
         if result == "seven":
             return 7
         return super().after_process(result)
-
-
-class _StringReturningDigit(_TestDigit):
-    def after_process(self, result: str) -> str:
-        del result
-        return "7"
 
 
 class _UnnamedDigit(Digit):
@@ -184,15 +146,15 @@ class _UnnamedDigit(Digit):
         return self._engine
 
 
-def make_digit(text: str, *, score: float = 0.9, buttons=TEST_AREA) -> _TestDigit:
+def make_digit(text: str, *, score: float = 0.9, buttons: OcrRegions = TEST_AREA) -> _TestDigit:
     return _TestDigit(_FakeEngine(text, score), buttons=buttons)
 
 
-def make_counter(text: str, *, score: float = 0.9, buttons=TEST_AREA) -> _TestCounter:
+def make_counter(text: str, *, score: float = 0.9, buttons: OcrRegions = TEST_AREA) -> _TestCounter:
     return _TestCounter(_FakeEngine(text, score), buttons=buttons)
 
 
-def make_duration(text: str, *, score: float = 0.9, buttons=TEST_AREA) -> _TestDuration:
+def make_duration(text: str, *, score: float = 0.9, buttons: OcrRegions = TEST_AREA) -> _TestDuration:
     return _TestDuration(_FakeEngine(text, score), buttons=buttons)
 
 
@@ -362,6 +324,38 @@ def test_legacy_ocr_keeps_single_and_multiple_roi_shapes() -> None:
     assert multiple == ["7", "7"]
 
 
+def test_ocr_single_returns_scalar_for_one_roi() -> None:
+    assert _TestOcr(_FakeEngine("7", 0.9)).ocr_single(TEST_IMAGE) == "7"
+
+
+def test_ocr_single_rejects_multiple_button_rois_before_inference() -> None:
+    engine = _FakeEngine("7", 0.9)
+    ocr = _TestOcr(engine, buttons=[TEST_AREA, TEST_AREA])
+
+    with pytest.raises(ValueError, match="one ROI"):
+        ocr.ocr_single(TEST_IMAGE)
+
+    assert engine.inference_batches == []
+
+
+def test_ocr_single_uses_direct_input_cardinality() -> None:
+    ocr = _TestOcr(_FakeEngine("7", 0.9), buttons=[TEST_AREA, TEST_AREA])
+
+    assert ocr.ocr_single([TEST_IMAGE], direct_ocr=True) == "7"
+    with pytest.raises(ValueError, match="one ROI"):
+        ocr.ocr_single([TEST_IMAGE, TEST_IMAGE], direct_ocr=True)
+
+
+@pytest.mark.parametrize("images", [[], [TEST_IMAGE], [TEST_IMAGE, TEST_IMAGE]])
+def test_ocr_many_keeps_list_shape_for_every_cardinality(images: list[np.ndarray]) -> None:
+    assert _TestOcr(_FakeEngine("7", 0.9)).ocr_many(images) == ["7"] * len(images)
+
+
+@pytest.mark.parametrize("areas", [[], [TEST_AREA], [TEST_AREA, TEST_AREA]])
+def test_ocr_regions_keeps_list_shape_for_every_cardinality(areas: list[tuple[int, int, int, int]]) -> None:
+    assert _TestOcr(_FakeEngine("7", 0.9), buttons=areas).ocr_regions(TEST_IMAGE) == ["7"] * len(areas)
+
+
 def test_digit_recognize_returns_list_for_multiple_rois() -> None:
     results = make_digit("7", buttons=[TEST_AREA, TEST_AREA]).recognize(TEST_IMAGE)
 
@@ -459,8 +453,9 @@ def test_digit_recognize_uses_dynamic_after_process() -> None:
     assert (result.value, result.normalized_text, result.score) == (7, "7", 0.84)
 
 
-def test_digit_recognize_rejects_non_integer_after_process_result() -> None:
-    digit = _StringReturningDigit(_FakeEngine("seven", 0.84))
+def test_digit_recognize_rejects_non_integer_after_process_result(monkeypatch: pytest.MonkeyPatch) -> None:
+    digit = _TestDigit(_FakeEngine("seven", 0.84))
+    monkeypatch.setattr(digit, "after_process", lambda _result: "7")
 
     result = require_single(digit.recognize(TEST_IMAGE))
 
@@ -530,9 +525,11 @@ def test_structured_recognition_logs_success_and_failure_attributes(monkeypatch:
 
 
 def _loaded_ocr() -> AlOcr:
-    ocr = AlOcr()
-    ocr._model_loaded = True
-    return ocr
+    class _LoadedAlOcr(AlOcr):
+        def ensure_loaded(self) -> None:
+            pass
+
+    return _LoadedAlOcr()
 
 
 def _patch_cnocr_batch(
@@ -549,14 +546,19 @@ def _patch_cnocr_batch(
     return calls
 
 
-def test_extract_raw_result_preserves_text_and_score() -> None:
-    result = AlOcr._extract_raw_result({"text": "14/15", "score": 0.875})
+def extract_raw_result(monkeypatch: pytest.MonkeyPatch, payload: object) -> RawOcrResult:
+    _patch_cnocr_batch(monkeypatch, [payload])
+    return _loaded_ocr().ocr_for_single_lines_raw([TEST_IMAGE])[0]
+
+
+def test_extract_raw_result_preserves_text_and_score(monkeypatch: pytest.MonkeyPatch) -> None:
+    result = extract_raw_result(monkeypatch, {"text": "14/15", "score": 0.875})
 
     assert result == RawOcrResult(text="14/15", score=0.875)
 
 
-def test_extract_raw_result_accepts_numpy_real_score() -> None:
-    result = AlOcr._extract_raw_result({"text": "14/15", "score": np.float32(0.875)})
+def test_extract_raw_result_accepts_numpy_real_score(monkeypatch: pytest.MonkeyPatch) -> None:
+    result = extract_raw_result(monkeypatch, {"text": "14/15", "score": np.float32(0.875)})
 
     assert result == RawOcrResult(text="14/15", score=0.875)
     assert type(result.score) is float
@@ -566,27 +568,33 @@ def test_extract_raw_result_accepts_numpy_real_score() -> None:
     "payload",
     [None, "14/15", {}, {"text": 14, "score": 0.9}, {"text": "14/15", "score": float("nan")}],
 )
-def test_extract_raw_result_rejects_malformed_payload(payload: object) -> None:
+def test_extract_raw_result_rejects_malformed_payload(monkeypatch: pytest.MonkeyPatch, payload: object) -> None:
     with pytest.raises((TypeError, ValueError)):
-        AlOcr._extract_raw_result(payload)
+        extract_raw_result(monkeypatch, payload)
 
 
 @pytest.mark.parametrize("payload", [{"text": "14/15"}, {"score": 0.9}])
-def test_extract_raw_result_translates_missing_fields_to_type_error(payload: object) -> None:
+def test_extract_raw_result_translates_missing_fields_to_type_error(
+    monkeypatch: pytest.MonkeyPatch,
+    payload: object,
+) -> None:
     with pytest.raises(TypeError):
-        AlOcr._extract_raw_result(payload)
+        extract_raw_result(monkeypatch, payload)
 
 
 @pytest.mark.parametrize("score", [True, False, "0.9", None])
-def test_extract_raw_result_rejects_non_real_score(score: object) -> None:
+def test_extract_raw_result_rejects_non_real_score(monkeypatch: pytest.MonkeyPatch, score: object) -> None:
     with pytest.raises(TypeError):
-        AlOcr._extract_raw_result({"text": "14/15", "score": score})
+        extract_raw_result(monkeypatch, {"text": "14/15", "score": score})
 
 
 @pytest.mark.parametrize("score", [float("-inf"), -0.001, 1.001, float("inf")])
-def test_extract_raw_result_rejects_non_finite_or_out_of_range_score(score: float) -> None:
+def test_extract_raw_result_rejects_non_finite_or_out_of_range_score(
+    monkeypatch: pytest.MonkeyPatch,
+    score: float,
+) -> None:
     with pytest.raises(ValueError, match="finite and between"):
-        AlOcr._extract_raw_result({"text": "14/15", "score": score})
+        extract_raw_result(monkeypatch, {"text": "14/15", "score": score})
 
 
 def test_recognition_result_accepts_consistent_success_and_failure() -> None:
@@ -703,13 +711,11 @@ def test_model_name_is_normalized_without_loading(monkeypatch: pytest.MonkeyPatc
 
     ocr = AlOcr(model_name="densenet-lite-gru")
 
-    assert ocr._model_loaded is False
-    assert ocr._model_name == "densenet_lite_136-gru"
     assert ocr.model_name == "densenet_lite_136-gru"
 
 
 def test_raw_batch_preserves_text_and_score(monkeypatch: pytest.MonkeyPatch) -> None:
-    images = [object(), object()]
+    images = [TEST_IMAGE.copy(), TEST_IMAGE.copy()]
     calls = _patch_cnocr_batch(
         monkeypatch,
         [{"text": "14/15", "score": 0.875}, {"text": "01:30:00", "score": 0.625}],
@@ -723,7 +729,7 @@ def test_raw_batch_preserves_text_and_score(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_raw_batch_keeps_empty_list(monkeypatch: pytest.MonkeyPatch) -> None:
-    images: list[object] = []
+    images: list[np.ndarray] = []
     calls = _patch_cnocr_batch(monkeypatch, [])
     ocr = _loaded_ocr()
 
@@ -732,7 +738,7 @@ def test_raw_batch_keeps_empty_list(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_atomic_raw_batch_sets_alphabet_and_preserves_score(monkeypatch: pytest.MonkeyPatch) -> None:
-    image = object()
+    image = TEST_IMAGE.copy()
     _patch_cnocr_batch(monkeypatch, [{"text": "14/15", "score": 0.875}])
     alphabets: list[str | None] = []
     monkeypatch.setattr(AlOcr, "set_cand_alphabet", lambda _ocr, alphabet: alphabets.append(alphabet))
@@ -745,7 +751,7 @@ def test_atomic_raw_batch_sets_alphabet_and_preserves_score(monkeypatch: pytest.
 
 
 def test_atomic_string_batch_projects_text_from_raw_batch(monkeypatch: pytest.MonkeyPatch) -> None:
-    image = object()
+    image = TEST_IMAGE.copy()
     _patch_cnocr_batch(monkeypatch, [{"text": "14/15", "score": 0.875}])
     alphabets: list[str | None] = []
     monkeypatch.setattr(AlOcr, "set_cand_alphabet", lambda _ocr, alphabet: alphabets.append(alphabet))
@@ -766,7 +772,7 @@ def test_detection_ocr_keeps_cnocr_dictionary_path_before_projection(monkeypatch
     ocr.det_model = None
     monkeypatch.setattr(ocr, "_prepare_img", lambda _image: image)
 
-    assert ocr.ocr(image) == ["14/15"]
+    assert ocr.ocr_texts(image) == ["14/15"]
     assert len(calls) == 1
     assert calls[0][0][0] is image
     assert calls[0][1] == 1

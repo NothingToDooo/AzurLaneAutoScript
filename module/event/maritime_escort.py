@@ -9,16 +9,16 @@ OCR_REMAIN = DigitCounter(event_assets.ESCORT_REMAIN, letter=(148, 255, 99), thr
 
 
 class MaritimeEscort(MapOperation, CampaignEvent):
-    def is_in_escort(self):
+    def is_in_escort(self) -> bool:
         return self.appear(event_assets.ESCORT_CHECK, offset=(20, 20))
 
-    def handle_in_stage(self):
+    def handle_in_stage(self) -> bool:
         if self.is_in_escort():
             return bool(self.in_stage_timer.reached())
         self.in_stage_timer.reset()
         return False
 
-    def run_escort(self):
+    def run_escort(self) -> None:
         """在护航页进入后立即撤退，约获得 70% 奖励；页面保持不变。
 
         CampaignEnd 表示次数耗尽，按正常完成处理。
@@ -32,7 +32,7 @@ class MaritimeEscort(MapOperation, CampaignEvent):
 
         logger.info("Maritime escort finished")
 
-    def run(self):
+    def run(self) -> None:
         if self.event_time_limit_triggered():
             self.config.task_stop()
 

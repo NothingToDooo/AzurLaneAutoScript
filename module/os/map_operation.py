@@ -21,7 +21,7 @@ ZONE_NAME_EDGE_CHARS = "\\/-—–－"
 ZONE_NAME_CN_SUFFIX_CHARS = "安全隐秘塞壬要塞深渊海域-"
 
 
-def strip_zone_name_edges(name):
+def strip_zone_name_edges(name: str) -> str:
     start = 0
     end = len(name)
     while start < end and name[start] in ZONE_NAME_EDGE_CHARS:
@@ -31,7 +31,7 @@ def strip_zone_name_edges(name):
     return name[start:end]
 
 
-def rstrip_zone_name_chars(name, chars):
+def rstrip_zone_name_chars(name: str, chars: str) -> str:
     end = len(name)
     while end > 0 and name[end - 1] in chars:
         end -= 1
@@ -42,24 +42,28 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
     zone: Zone
     is_zone_name_hidden = False
 
-    def is_meowfficer_searching(self):
+    def get_current_zone_from_globe(self) -> Zone:
+        message = f"{type(self).__name__} must implement get_current_zone_from_globe()"
+        raise NotImplementedError(message)
+
+    def is_meowfficer_searching(self) -> bool:
         """在区域地图返回猫指挥搜索是否进行中。"""
         return self.appear(MEOWFFICER_SEARCHING, offset=(10, 10))
 
-    def get_meowfficer_searching_percentage(self):
+    def get_meowfficer_searching_percentage(self) -> float:
         """在猫指挥搜索进行中返回进度，范围为 0 至 1。"""
         return color_bar_percentage(
             self.device.image, area=MEOWFFICER_SEARCHING_PERCENTAGE.area, prev_color=(74, 223, 255)
         )
 
-    def get_zone_name(self):
+    def get_zone_name(self) -> str:
         ocr = Ocr(MAP_NAME, lang="cnocr", letter=(214, 231, 255), threshold=127, name="OCR_OS_MAP_NAME")
-        name = ocr.ocr(self.device.image)
+        name = ocr.ocr_single(self.device.image)
         name = strip_zone_name_edges(name)
         self.is_zone_name_hidden = "安全" in name
         return name.split("-", 1)[0] if "-" in name else rstrip_zone_name_chars(name, ZONE_NAME_CN_SUFFIX_CHARS)
 
-    def get_current_zone(self):
+    def get_current_zone(self) -> Zone:
         """返回当前 Zone；海域名解析失败时抛出 MapDetectionError 或 ScriptError。"""
         name = self.get_zone_name()
         logger.info(f"Map name processed: {name}")
@@ -71,7 +75,7 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
         self.zone_config_set()
         return self.zone
 
-    def zone_config_set(self):
+    def zone_config_set(self) -> None:
         if self.zone.region == 5:
             self.config.HOMO_EDGE_COLOR_RANGE = (0, 8)
             self.config.MAP_ENSURE_EDGE_INSIGHT_CORNER = "bottom"
@@ -79,7 +83,7 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
             self.config.HOMO_EDGE_COLOR_RANGE = (0, 33)
             self.config.MAP_ENSURE_EDGE_INSIGHT_CORNER = ""
 
-    def _handle_zone_init_blocker(self, timeout):
+    def _handle_zone_init_blocker(self, timeout: Timer) -> bool:
         # 这些可见状态会挡住地图名 OCR，先处理再重试。
         if self.handle_map_event():
             timeout.reset()
@@ -100,7 +104,7 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
             return True
         return False
 
-    def _try_get_current_zone_from_map(self, timeout):
+    def _try_get_current_zone_from_map(self, timeout: Timer) -> Zone | None:
         if not self.is_in_map():
             timeout.reset()
             return None
@@ -109,19 +113,13 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
         except MapDetectionError:
             return None
 
-    def _fallback_zone_init(self, fallback_init):
+    def _fallback_zone_init(self, *, fallback_init: bool) -> Zone | None:
         if not fallback_init:
             return None
         logger.warning("Unable to get zone name, get current zone from globe map instead")
-        get_current_zone_from_globe = getattr(self, "get_current_zone_from_globe", None)
-        if callable(get_current_zone_from_globe):
-            return get_current_zone_from_globe()
-        logger.warning("OperationSiren.get_current_zone_from_globe() not exists")
-        if not self.is_in_map():
-            logger.warning("Trying to get zone name, but not in OS map")
-        return self.get_current_zone()
+        return self.get_current_zone_from_globe()
 
-    def zone_init(self, fallback_init=True):
+    def zone_init(self, *, fallback_init: bool = True) -> Zone | None:
         """进入新海域后初始化 self.zone，并处理地图事件和海域名动画。
 
         解析失败时，fallback_init 控制是否从全球地图兜底；仍失败则抛出 MapDetectionError。
@@ -141,13 +139,13 @@ class OSMapOperation(MapOrderHandler, MissionHandler, PortHandler, StorageHandle
             if zone is not None:
                 return zone
 
-        return self._fallback_zone_init(fallback_init)
+        return self._fallback_zone_init(fallback_init=fallback_init)
 
-    def is_in_special_zone(self):
+    def is_in_special_zone(self) -> bool:
         """返回当前是否位于隐秘、深渊或要塞海域。"""
         return self.appear(MAP_EXIT, offset=(20, 20))
 
-    def map_exit(self):
+    def map_exit(self) -> None:
         """从特殊海域退出到进入前的普通海域，结束时仍在区域地图。"""
         logger.hr("Map exit")
         confirm_timer = Timer(1, count=2)

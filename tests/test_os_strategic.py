@@ -1,5 +1,6 @@
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar, override
 
+import numpy as np
 import pytest
 
 from module.os_handler import assets as os_assets
@@ -8,6 +9,12 @@ from module.os_handler.strategic import StrategicSearchHandler
 
 _T = TypeVar("_T")
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
+
 
 def button_key(button: object) -> str:
     return str(getattr(button, "name", repr(button)))
@@ -15,6 +22,7 @@ def button_key(button: object) -> str:
 
 class _Device:
     def __init__(self) -> None:
+        self.image = np.zeros((2, 2, 3), dtype=np.uint8)
         self.clicks: list[object] = []
 
     def click(self, button: object) -> None:
@@ -50,17 +58,24 @@ class _StrategicSearch(StrategicSearchHandler):
         self.device = _Device()
         self.selected_results: dict[str, list[bool]] = {}
         self.appear_calls: list[tuple[str, dict[str, object]]] = []
-        self.loop_timeouts: list[int | None] = []
+        self.loop_timeouts: list[float | Timer | None] = []
 
     def set_option(self) -> bool:
         return self.strategic_search_set_option()
 
-    def loop(self, skip_first=True, timeout: int | None = None, *_args: object, **_kwargs: object) -> range:
-        _ = skip_first
+    @override
+    def loop(
+        self,
+        *,
+        skip_first: bool = True,
+        timeout: float | Timer | None = None,
+    ) -> Iterator[ImageArray]:
+        del skip_first
         self.loop_timeouts.append(timeout)
-        return range(5)
+        return iter([self.device.image] * 5)
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default

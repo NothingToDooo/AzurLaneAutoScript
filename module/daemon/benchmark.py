@@ -1,4 +1,5 @@
 import time
+from typing import TYPE_CHECKING
 
 import numpy as np
 from rich.table import Table
@@ -9,10 +10,19 @@ from module.base.utils import random_rectangle_point
 from module.campaign.campaign_ui import CampaignUI
 from module.daemon.daemon_base import DaemonBase
 from module.exception import RequestHumanTakeover
-from module.logger import logger
+from module.logger import emit_renderables, logger
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
+
+    from module.config.config import AzurLaneConfig
+
+type BenchmarkResult = float | str
+type BenchmarkRecord = tuple[str, BenchmarkResult]
+type SpeedLevel = tuple[float, str, str]
 
 
-def float2str(n, decimal=3):
+def float2str(n: float | str, decimal: int = 3) -> str:
     if not isinstance(n, (float, int)):
         return str(n)
     return float2str_(n, decimal=decimal) + "s"
@@ -34,7 +44,11 @@ _CLICK_SPEED_LEVELS = (
 )
 
 
-def _evaluate_speed(cost, levels, fallback):
+def _evaluate_speed(
+    cost: float | str,
+    levels: Sequence[SpeedLevel],
+    fallback: tuple[str, str],
+) -> Text:
     if not isinstance(cost, (float, int)):
         return Text(cost, style="bold bright_red")
 
@@ -49,9 +63,10 @@ class Benchmark(DaemonBase, CampaignUI):
     TEST_TOTAL = 15
     TEST_BEST = int(TEST_TOTAL * 0.8)
 
-    def benchmark_test(self, func, *args, **kwargs):
+    def benchmark_test[R, **P](self, func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> BenchmarkResult:
         logger.hr("Benchmark test", level=2)
-        logger.info(f"Testing function: {func.__name__}")
+        function_name = getattr(func, "__name__", type(func).__name__)
+        logger.info(f"Testing function: {function_name}")
         record = []
 
         for n in range(1, self.TEST_TOTAL + 1):
@@ -61,7 +76,7 @@ class Benchmark(DaemonBase, CampaignUI):
                 func(*args, **kwargs)
             except RequestHumanTakeover:
                 logger.critical("RequestHumanTakeover")
-                logger.warning(f"Benchmark tests failed on func: {func.__name__}")
+                logger.warning(f"Benchmark tests failed on func: {function_name}")
                 return "Failed"
 
             cost = time.perf_counter() - start
@@ -74,15 +89,19 @@ class Benchmark(DaemonBase, CampaignUI):
         return average
 
     @staticmethod
-    def evaluate_screenshot(cost):
+    def evaluate_screenshot(cost: float | str) -> Text:
         return _evaluate_speed(cost, _SCREENSHOT_SPEED_LEVELS, ("Ultra Slow", "bold bright_red"))
 
     @staticmethod
-    def evaluate_click(cost):
+    def evaluate_click(cost: float | str) -> Text:
         return _evaluate_speed(cost, _CLICK_SPEED_LEVELS, ("Very Slow", "bright_red"))
 
     @staticmethod
-    def show(test, data, evaluate_func):
+    def show(
+        test: str,
+        data: Sequence[BenchmarkRecord],
+        evaluate_func: Callable[[BenchmarkResult], Text],
+    ) -> None:
         table = Table(show_lines=True)
         table.add_column(test, header_style="bright_cyan", style="cyan", no_wrap=True)
         table.add_column("Time", style="magenta")
@@ -93,9 +112,9 @@ class Benchmark(DaemonBase, CampaignUI):
                 float2str(row[1]),
                 evaluate_func(row[1]),
             )
-        logger.print(table, justify="center")
+        emit_renderables(table, justify="center")
 
-    def benchmark(self, screenshot: tuple[str, ...] = (), click: tuple[str, ...] = ()):
+    def benchmark(self, screenshot: tuple[str, ...] = (), click: tuple[str, ...] = ()) -> tuple[str, str]:
         logger.hr("Benchmark", level=1)
         logger.info(f"Testing screenshot methods: {screenshot}")
         logger.info(f"Testing click methods: {click}")
@@ -107,23 +126,23 @@ class Benchmark(DaemonBase, CampaignUI):
             "minitouch": self.device.click_minitouch,
         }
 
-        screenshot_result = []
+        screenshot_result: list[BenchmarkRecord] = []
         for method in screenshot:
             result = self.benchmark_test(screenshot_methods[method])
-            screenshot_result.append([method, result])
+            screenshot_result.append((method, result))
 
         area = (124, 4, 649, 106)  # 避开危险操作的点击区域。
-        click_result = []
+        click_result: list[BenchmarkRecord] = []
         for method in click:
             x, y = random_rectangle_point(area)
             result = self.benchmark_test(click_methods[method], x, y)
-            click_result.append([method, result])
+            click_result.append((method, result))
 
-        def compare(res):
-            res = res[1]
-            if not isinstance(res, (int, float)):
+        def compare(result: BenchmarkRecord) -> float:
+            cost = result[1]
+            if not isinstance(cost, int | float):
                 return 100
-            return res
+            return float(cost)
 
         logger.hr("Benchmark Results", level=1)
         fastest_screenshot = "nemu_ipc"
@@ -153,7 +172,7 @@ class Benchmark(DaemonBase, CampaignUI):
 
         return tuple(screenshot), tuple(click)
 
-    def run(self):
+    def run(self) -> None:
         self.ensure_campaign_ui("7-2", mode="normal")
 
         logger.attr("TestScene", self.config.Benchmark_TestScene)
@@ -161,7 +180,7 @@ class Benchmark(DaemonBase, CampaignUI):
         self.benchmark(screenshot, click)
 
 
-def run_benchmark(config):
+def run_benchmark(config: AzurLaneConfig | str) -> bool:
     try:
         Benchmark(config, task="Benchmark").run()
     except RequestHumanTakeover:

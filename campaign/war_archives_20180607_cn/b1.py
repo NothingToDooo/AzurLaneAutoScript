@@ -113,7 +113,7 @@ road_main = RoadGrids([H5, G4, F3, E2, D4])
 
 
 class Config:
-    SUBMARINE = 0
+    submarine = 0
 
     POOR_MAP_DATA = True
     MAP_HAS_AMBUSH = False
@@ -151,7 +151,7 @@ class Campaign(CampaignBase):
     MAP = MAP
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.clear_siren():
             return True
         if self.clear_roadblocks([road_main]):
@@ -161,5 +161,5 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         return self.fleet_boss.clear_boss()

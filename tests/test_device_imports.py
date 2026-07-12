@@ -24,8 +24,6 @@ def test_legacy_device_services_do_not_inherit_connection() -> None:
         importlib.import_module("module.device.app_control").AppControl,
         importlib.import_module("module.device.method.minitouch").Minitouch,
         importlib.import_module("module.device.method.nemu_ipc").NemuIpc,
-        importlib.import_module("module.device.platform.platform_base").PlatformBase,
-        importlib.import_module("module.device.platform.platform_windows").PlatformWindows,
     )
 
     assert all(Connection not in cls.__mro__ for cls in classes)
@@ -38,10 +36,7 @@ def test_legacy_device_services_do_not_inherit_connection() -> None:
         "import module.device.runtime",
         "import module.device.method.minitouch",
         "import module.device.method.nemu_ipc",
-        "import module.device.platform.platform_base",
-        "import module.device.platform.platform_windows",
         "import module.device.device",
-        "from module.device.platform import Platform",
     ],
 )
 def test_device_modules_import_in_cold_interpreters(statement: str) -> None:

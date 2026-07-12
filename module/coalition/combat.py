@@ -1,3 +1,5 @@
+from typing import override
+
 from module.base.timer import Timer
 from module.campaign.campaign_base import CampaignBase
 from module.coalition.assets import COALITION_REWARD_CONFIRM
@@ -10,7 +12,7 @@ from module.os_ash.assets import BATTLE_STATUS
 class CoalitionCombat(CoalitionUI, CampaignBase):
     battle_status_click_interval = 2
 
-    def coalition_combat_re_enter(self, skip_first_screenshot=True):
+    def coalition_combat_re_enter(self, *, skip_first_screenshot: bool = True) -> None:
         """页面状态：battle_status → is_combat_executing。"""
         logger.info("Coalition combat re-enter")
         status_clicked = False
@@ -46,10 +48,11 @@ class CoalitionCombat(CoalitionUI, CampaignBase):
                 self.device.click(BATTLE_STATUS)
                 click_timer.reset()
 
+    @override
     def auto_search_combat_end(self) -> bool:
         return self.appear(BATTLE_STATUS, offset=(80, 20))
 
-    def coalition_combat(self):
+    def coalition_combat(self) -> None:
         """页面进出均为 is_coalition。"""
         self.battle_count = 0
         self.combat_preparation(emotion_reduce=False)

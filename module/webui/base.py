@@ -67,7 +67,7 @@ class Frame(Base):
 
     @staticmethod
     @use_scope("header_title", clear=True)
-    def set_title(text=""):
+    def set_title(text: str = "") -> None:
         put_text(text)
 
     @staticmethod
@@ -89,7 +89,7 @@ class Frame(Base):
         )
 
     @staticmethod
-    def active_button(position, value) -> None:
+    def active_button(position: str, value: str | None) -> None:
         run_js(
             f"""
             $("button.btn-{position}").removeClass("btn-{position}-active");
@@ -98,7 +98,7 @@ class Frame(Base):
         )
 
     @staticmethod
-    def pin_set_invalid_mark(keys) -> None:
+    def pin_set_invalid_mark(keys: str | list[str]) -> None:
         if isinstance(keys, str):
             keys = [keys]
         keys = ["_".join(key.split(".")) for key in keys]
@@ -107,7 +107,7 @@ class Frame(Base):
             run_js(js)
 
     @staticmethod
-    def pin_remove_invalid_mark(keys) -> None:
+    def pin_remove_invalid_mark(keys: str | list[str]) -> None:
         if isinstance(keys, str):
             keys = [keys]
         keys = ["_".join(key.split(".")) for key in keys]

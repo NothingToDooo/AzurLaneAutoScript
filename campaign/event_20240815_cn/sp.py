@@ -164,13 +164,13 @@ class Campaign(CampaignBase):
     MAP = MAP
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
-    def map_data_init(self, map_):
+    def map_data_init(self, map_: CampaignMap | None) -> None:
         super().map_data_init(map_)
         E5.is_siren = True
         D6.is_siren = True
         F6.is_siren = True
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.clear_siren():
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=2):
@@ -178,7 +178,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         if self.clear_siren():
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
@@ -186,5 +186,5 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_7(self):
+    def battle_7(self) -> bool:
         return self.fleet_boss.clear_boss()

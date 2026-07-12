@@ -1,3 +1,6 @@
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Literal
+
 import numpy as np
 
 from module.base.button import Button
@@ -15,6 +18,13 @@ from module.map.assets import MAP_OFFENSIVE
 from module.retire.retirement import Retirement
 from module.template.assets import TEMPLATE_COMBAT_LOADING
 from module.ui.assets import BACK_ARROW, EXERCISE_CHECK, MUNITIONS_CHECK
+
+if TYPE_CHECKING:
+    from module.base.button import MatchOffset
+    from module.base.type_alias import ImageArray
+
+type CombatEnd = Literal["in_stage", "with_searching", "no_searching", "in_ui"] | Callable[[], bool]
+type CombatUiMatcher = Literal["match_luma", "match_template_color"]
 
 # 自动战斗暂停按钮皮肤很多，顺序很重要：相似皮肤先用颜色匹配，PAUSE_Star 必须早于 PAUSE_Nurse。
 _COMBAT_EXECUTING_BUTTONS = (
@@ -69,16 +79,19 @@ _GET_ITEM_CHECKS = (
     combat_assets.GET_ITEMS_2,
     combat_assets.GET_ITEMS_3,
 )
-_EXPECTED_END_HANDLERS = {
-    "in_stage": "handle_in_stage",
-    "with_searching": "handle_in_map_with_enemy_searching",
-    "no_searching": "handle_in_map_no_enemy_searching",
-}
 
 
-def _match_first_combat_ui_button(image, buttons, offset):
+def _match_first_combat_ui_button(
+    image: ImageArray,
+    buttons: Sequence[tuple[Button, CombatUiMatcher]],
+    offset: MatchOffset,
+) -> Button | Literal[False]:
     for button, matcher in buttons:
-        if getattr(button, matcher)(image, offset=offset):
+        if matcher == "match_luma":
+            matched = button.match_luma(image, offset=offset)
+        else:
+            matched = button.match_template_color(image, offset=offset)
+        if matched:
             return button
     return False
 
@@ -87,7 +100,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
     _automation_set_timer = Timer(1)
     battle_status_click_interval = 0
 
-    def combat_appear(self):
+    def combat_appear(self) -> bool:
         if self.config.Campaign_UseFleetLock and not self.is_in_map() and self.is_combat_loading():
             return True
 
@@ -98,7 +111,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             and self.handle_combat_automation_confirm()
         )
 
-    def map_offensive(self, skip_first_screenshot=True):
+    def map_offensive(self, *, skip_first_screenshot: bool = True) -> None:
         """页面状态：地图内或 MAP_OFFENSIVE → 战斗入口。"""
         while 1:
             if skip_first_screenshot:
@@ -118,7 +131,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             if self.combat_appear():
                 break
 
-    def is_combat_loading(self):
+    def is_combat_loading(self) -> bool:
         image = self.image_crop((0, 620, 1280, 690), copy=False)
         # 国服、英文服和台服一致，日服字符更小。
         similarity, button = TEMPLATE_COMBAT_LOADING.match_luma_result(image)
@@ -130,12 +143,12 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             return True
         return False
 
-    def is_combat_executing(self):
+    def is_combat_executing(self) -> Button | Literal[False]:
         """返回当前匹配到的暂停按钮；未匹配时返回 False。"""
         self.device.stuck_record_add(combat_ui_assets.PAUSE)
         return _match_first_combat_ui_button(self.device.image, _COMBAT_EXECUTING_BUTTONS, offset=(10, 10))
 
-    def handle_combat_quit(self, offset=(20, 20), interval=3):
+    def handle_combat_quit(self, offset: MatchOffset = (20, 20), interval: float = 3) -> bool:
         timer = self.get_interval_timer(combat_ui_assets.QUIT, interval=interval)
         if not timer.reached():
             return False
@@ -146,7 +159,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
                 return True
         return False
 
-    def handle_combat_quit_reconfirm(self, interval=2):
+    def handle_combat_quit_reconfirm(self, interval: float = 2) -> bool:
         # QUIT_RECONFIRM 的间隔必须短于 QUIT，才能在一次 QUIT 间隔内重试。
         if self.appear_then_click(combat_assets.QUIT_RECONFIRM, offset=(20, 20), interval=interval):
             # 重置 QUIT 计时，避免重复点击取消重确认。
@@ -154,17 +167,17 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             return True
         return False
 
-    def ensure_combat_oil_loaded(self):
+    def ensure_combat_oil_loaded(self) -> None:
         self.wait_until_stable(combat_assets.COMBAT_OIL_LOADING)
 
-    def handle_combat_automation_confirm(self):
+    def handle_combat_automation_confirm(self) -> bool:
         if self.appear(combat_assets.AUTOMATION_CONFIRM_CHECK, threshold=30, interval=1):
             self.appear_then_click(combat_assets.AUTOMATION_CONFIRM, offset=(20, 20))
             return True
 
         return False
 
-    def _handle_combat_preparation_action(self, auto, balance_hp):
+    def _handle_combat_preparation_action(self, *, auto: str, balance_hp: bool) -> bool:
         return (
             (
                 self.appear(combat_assets.BATTLE_PREPARATION, offset=(20, 20))
@@ -178,7 +191,14 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             or self.handle_story_skip()
         )
 
-    def combat_preparation(self, balance_hp=False, emotion_reduce=False, auto="combat_auto", fleet_index=1):
+    def combat_preparation(
+        self,
+        *,
+        balance_hp: bool = False,
+        emotion_reduce: bool = False,
+        auto: str = "combat_auto",
+        fleet_index: int = 1,
+    ) -> None:
         logger.info("Combat preparation.")
         self.device.stuck_record_clear()
         self.device.click_record_clear()
@@ -207,10 +227,10 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
                     self.device.screenshot_interval_set("combat")
                 break
 
-    def handle_battle_preparation(self):
+    def handle_battle_preparation(self) -> bool:
         return self.appear_then_click(combat_assets.BATTLE_PREPARATION, offset=(20, 20), interval=2)
 
-    def handle_combat_automation_set(self, auto):
+    def handle_combat_automation_set(self, *, auto: bool) -> bool:
         if not self._automation_set_timer.reached():
             return False
 
@@ -236,7 +256,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
         return False
 
-    def _emergency_repair_available(self):
+    def _emergency_repair_available(self) -> bool:
         if not self.appear(combat_assets.BATTLE_PREPARATION, offset=(20, 20)):
             return False
         if not self.appear(combat_assets.EMERGENCY_REPAIR_AVAILABLE):
@@ -253,7 +273,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         self.wait_until_stable(stable_checker)
         return self.appear(combat_assets.EMERGENCY_REPAIR_AVAILABLE)
 
-    def _emergency_repair_hp_valid(self):
+    def _emergency_repair_hp_valid(self) -> bool:
         if not len(self.hp):
             return False
         if max(self.hp[:3]) <= 0.001 or max(self.hp[3:]) <= 0.001:
@@ -261,16 +281,16 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             return False
         return True
 
-    def _emergency_repair_needed(self):
+    def _emergency_repair_needed(self) -> bool:
         hp = np.array(self.hp)
         hp = hp[hp > 0.001]
-        return (
+        return bool(
             (len(hp) and np.min(hp) < self.config.HpControl_RepairUseSingleThreshold)
             or max(self.hp[:3]) < self.config.HpControl_RepairUseMultiThreshold
             or max(self.hp[3:]) < self.config.HpControl_RepairUseMultiThreshold
         )
 
-    def handle_emergency_repair_use(self):
+    def handle_emergency_repair_use(self) -> bool:
         if not self.config.HpControl_UseEmergencyRepair:
             return False
 
@@ -288,7 +308,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
         self.interval_clear(combat_assets.EMERGENCY_REPAIR_CONFIRM)
         return True
 
-    def _handle_common_combat_popup(self, popup):
+    def _handle_common_combat_popup(self, popup: str) -> bool:
         return (
             self.handle_popup_confirm(popup)
             or self.handle_urgent_commission()
@@ -297,15 +317,15 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             or self.handle_mission_popup_ack()
         )
 
-    def _handle_manual_weapon_release(self, auto):
+    def _handle_manual_weapon_release(self, auto: str) -> bool:
         return (
             auto != "combat_auto"
             and self.auto_mode_checked
-            and self.is_combat_executing()
+            and bool(self.is_combat_executing())
             and self.handle_combat_weapon_release()
         )
 
-    def _handle_combat_execute_action(self, auto, submarine, confirm_timer):
+    def _handle_combat_execute_action(self, auto: str, submarine: str, confirm_timer: Timer) -> bool:
         return (
             (not confirm_timer.reached() and self.handle_combat_automation_confirm())
             or self.handle_story_skip()
@@ -316,7 +336,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             or self._handle_common_combat_popup("COMBAT_EXECUTE")
         )
 
-    def combat_execute(self, auto="combat_auto", submarine="do_not_use"):
+    def combat_execute(self, *, auto: str = "combat_auto", submarine: str = "do_not_use") -> None:
         """auto 接受 combat_auto、combat_manual、stand_still_in_the_middle、hide_in_bottom_left。
 
         submarine 接受 do_not_use、hunt_only、every_combat。
@@ -337,7 +357,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             if self.handle_battle_status() or self.handle_get_items():
                 break
 
-    def handle_battle_status(self):
+    def handle_battle_status(self) -> bool:
         if self.is_combat_executing():
             return False
         for button, warning in _BATTLE_STATUS_BUTTONS:
@@ -350,7 +370,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
         return False
 
-    def handle_get_items(self):
+    def handle_get_items(self) -> bool:
         for button in _GET_ITEM_CHECKS:
             if self.appear(button, offset=5, interval=self.battle_status_click_interval):
                 self.device.click(combat_assets.GET_ITEMS_1)
@@ -361,7 +381,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
         return False
 
-    def handle_exp_info(self):
+    def handle_exp_info(self) -> bool:
         if self.is_combat_executing():
             return False
         if self.appear_then_click(combat_assets.EXP_INFO_S):
@@ -376,7 +396,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
         return False
 
-    def handle_get_ship(self):
+    def handle_get_ship(self) -> bool:
         if self.appear_then_click(combat_assets.GET_SHIP, interval=1):
             if self.appear(combat_assets.NEW_SHIP):
                 logger.info("Get a new SHIP")
@@ -385,7 +405,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
         return False
 
-    def handle_combat_mis_click(self):
+    def handle_combat_mis_click(self) -> bool:
         if self.appear(MUNITIONS_CHECK, offset=(20, 20), interval=5):
             logger.info(f"{MUNITIONS_CHECK} -> {BACK_ARROW}")
             self.device.click(BACK_ARROW)
@@ -397,17 +417,20 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
         return False
 
-    def _combat_status_expected_end_reached(self, expected_end):
-        handler_name = _EXPECTED_END_HANDLERS.get(expected_end)
-        if handler_name is not None:
-            return getattr(self, handler_name)()
+    def _combat_status_expected_end_reached(self, expected_end: CombatEnd | None) -> bool:
+        if expected_end == "in_stage":
+            return self.handle_in_stage()
+        if expected_end == "with_searching":
+            return self.handle_in_map_with_enemy_searching()
+        if expected_end == "no_searching":
+            return self.handle_in_map_no_enemy_searching()
         if expected_end == "in_ui":
             return self.appear(BACK_ARROW, offset=(30, 30))
         if callable(expected_end):
             return expected_end()
         return False
 
-    def _handle_combat_status_progress(self, battle_status, exp_info):
+    def _handle_combat_status_progress(self, *, battle_status: bool, exp_info: bool) -> tuple[bool, bool, bool]:
         if battle_status:
             if self.handle_exp_info():
                 return True, battle_status, True
@@ -421,7 +444,7 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             return True, battle_status, True
         return False, battle_status, exp_info
 
-    def _handle_combat_status_result(self, battle_status, exp_info):
+    def _handle_combat_status_result(self, *, battle_status: bool, exp_info: bool) -> tuple[bool, bool, bool]:
         if not exp_info and self.handle_get_ship():
             return True, battle_status, exp_info
         if self.handle_get_items():
@@ -433,10 +456,13 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
             return True, battle_status, exp_info
         return self._handle_combat_status_progress(battle_status=battle_status, exp_info=exp_info)
 
-    def combat_status(self, expected_end=None):
+    def combat_status(self, expected_end: CombatEnd | None = None) -> None:
         """expected_end 可为 in_stage、with_searching、no_searching、in_ui、回调或 None。"""
         logger.info("Combat status")
-        logger.attr("expected_end", expected_end.__name__ if callable(expected_end) else expected_end)
+        expected_end_name = (
+            getattr(expected_end, "__name__", type(expected_end).__name__) if callable(expected_end) else expected_end
+        )
+        logger.attr("expected_end", expected_end_name)
         self.device.screenshot_interval_set()
         self.device.stuck_record_clear()
         self.device.click_record_clear()
@@ -467,12 +493,13 @@ class Combat(Level, HPBalancer, Retirement, SubmarineCall, CombatAuto, CombatMan
 
     def combat(
         self,
-        balance_hp=None,
-        emotion_reduce=None,
-        submarine_mode=None,
-        expected_end=None,
-        fleet_index=1,
-    ):
+        *,
+        balance_hp: bool | None = None,
+        emotion_reduce: bool | None = None,
+        submarine_mode: str | None = None,
+        expected_end: CombatEnd | None = None,
+        fleet_index: int = 1,
+    ) -> None:
         """执行战斗；None 参数回退用户配置，fleet_index 为 1 或 2。
 
         submarine_mode 接受 do_not_use、hunt_only、every_combat；expected_end 的值域同 combat_status。

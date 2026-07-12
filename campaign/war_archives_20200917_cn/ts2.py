@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import ClassVar, Never
 
 from module.exception import CampaignEnd
 from module.map.map_base import CampaignMap
@@ -130,7 +130,7 @@ class Config(ConfigBase):
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> Never:
         self.goto(A8, expected="story")
         self.goto(E7, expected="story")
         self.goto(B1, expected="story")

@@ -138,7 +138,7 @@ class Config(ConfigBase):
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.pick_up_light_house(J7)
 
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=1):
@@ -146,7 +146,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         self.pick_up_light_house(J7)
 
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
@@ -154,7 +154,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_6(self):
+    def battle_6(self) -> bool:
         self.fleet_boss.pick_up_flare(D5)
 
         return self.fleet_boss.clear_boss()

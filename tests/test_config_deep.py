@@ -1,13 +1,22 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 
 from module.config.deep import deep_iter
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
+
+    from module.config.deep import DeepValue
+
 
 class _MappingLike:
-    def __init__(self, data):
+    def __init__(self, data: Mapping[str, DeepValue]) -> None:
         self.data = data
 
-    def items(self):
+    def items(self) -> Iterable[tuple[str, DeepValue]]:
         return self.data.items()
 
 

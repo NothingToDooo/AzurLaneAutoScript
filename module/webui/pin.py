@@ -1,59 +1,84 @@
 """扩展 pywebio.pin，使 put_xxx() 接受 **other_html_attrs。"""
 
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable, Mapping, Sequence
+from typing import TYPE_CHECKING
 
 from pywebio.input import checkbox, select, textarea
 from pywebio.input import input as pywebio_input
 from pywebio.output import OutputPosition
-from pywebio.pin import _pin_output, check_dom_name_value
+from pywebio.pin import _pin_output, check_dom_name_value  # noqa: PLC2701
 
 if TYPE_CHECKING:
     from pywebio.io_ctrl import Output
 
-type PinOptions = list[dict[str, Any] | tuple[Any, ...] | list[Any] | str]
+type PinPrimitive = str | int | float | bool | None
+type PinInputValue = PinPrimitive | Sequence[PinInputValue] | Mapping[str, PinInputValue]
+type PinCallback = Callable[[PinInputValue], str | None] | Callable[[PinInputValue], None]
+type PinKeywordValue = PinInputValue | PinCallback
+type PinOption = Mapping[str, PinPrimitive] | str
+type PinOptions = Sequence[PinOption]
 
 
-def _pop_pin_options(kwargs):
-    return kwargs.pop("scope", None), kwargs.pop("position", OutputPosition.BOTTOM)
+def call_pywebio_input[ResultT](
+    func: Callable[..., ResultT],
+    /,
+    **kwargs: PinKeywordValue,
+) -> ResultT:
+    """调用带动态 HTML 属性的 PyWebIO 输入函数。"""
+    return func(**kwargs)
 
 
-def put_input(name, type="text", **kwargs) -> Output:  # noqa: A002 - 保持 pywebio.input.input() 兼容参数名。
+def _pop_pin_options(kwargs: dict[str, PinKeywordValue]) -> tuple[str | None, int | str]:
+    scope = kwargs.pop("scope", None)
+    if scope is not None and not isinstance(scope, str):
+        message = "pin scope must be a string"
+        raise TypeError(message)
+    position = kwargs.pop("position", OutputPosition.BOTTOM)
+    if not isinstance(position, (int, str)):
+        message = "pin position must be an integer or string"
+        raise TypeError(message)
+    return scope, position
+
+
+def put_input(name: str, input_type: str = "text", **kwargs: PinKeywordValue) -> Output:
     check_dom_name_value(name, "pin `name`")
     scope, position = _pop_pin_options(kwargs)
     kwargs.setdefault("label", "")
-    single_input_return = pywebio_input(
+    single_input_return = call_pywebio_input(
+        pywebio_input,
         name=name,
-        type=type,
+        type=input_type,
         **kwargs,
     )
     return _pin_output(single_input_return, scope, position)
 
 
-def put_textarea(name, **kwargs) -> Output:
+def put_textarea(name: str, **kwargs: PinKeywordValue) -> Output:
     check_dom_name_value(name, "pin `name`")
     scope, position = _pop_pin_options(kwargs)
     kwargs.setdefault("label", "")
     kwargs.setdefault("rows", 6)
-    single_input_return = textarea(
+    single_input_return = call_pywebio_input(
+        textarea,
         name=name,
         **kwargs,
     )
     return _pin_output(single_input_return, scope, position)
 
 
-def put_select(name, options: PinOptions | None = None, **kwargs) -> Output:
+def put_select(name: str, options: PinOptions | None = None, **kwargs: PinKeywordValue) -> Output:
     check_dom_name_value(name, "pin `name`")
     scope, position = _pop_pin_options(kwargs)
     kwargs.setdefault("label", "")
-    options = [] if options is None else options
-    single_input_return = select(name=name, options=options, **kwargs)
+    normalized_options: list[PinOption] = [] if options is None else list(options)
+    single_input_return = call_pywebio_input(select, name=name, options=normalized_options, **kwargs)
     return _pin_output(single_input_return, scope, position)
 
 
-def put_checkbox(name, options: PinOptions | None = None, **kwargs) -> Output:
+def put_checkbox(name: str, options: PinOptions | None = None, **kwargs: PinKeywordValue) -> Output:
     check_dom_name_value(name, "pin `name`")
     scope, position = _pop_pin_options(kwargs)
     kwargs.setdefault("label", "")
-    options = [] if options is None else options
-    single_input_return = checkbox(name=name, options=options, **kwargs)
+    normalized_options: list[PinOption] = [] if options is None else list(options)
+    single_input_return = call_pywebio_input(checkbox, name=name, options=normalized_options, **kwargs)
     return _pin_output(single_input_return, scope, position)

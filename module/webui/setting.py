@@ -17,16 +17,18 @@ class cached_class_property[T]:
     class AliasConflict(ValueError):
         """缓存属性名与生成的缓存字段名冲突。"""
 
-    def __init__(self, func: Callable[..., T]):
+    def __init__(self, func: Callable[..., T]) -> None:
         self.__func__ = func
         func_name = getattr(func, "__name__", type(func).__name__)
         self.__cache_name__ = "_{}_".format(func_name.strip("_"))
         if self.__cache_name__ == func_name:
             raise self.AliasConflict(self.__cache_name__)
 
-    def __get__(self, instance, cls=None) -> T:
+    def __get__(self, instance: None, cls: type | None = None) -> T:
+        del instance
         if cls is None:
-            cls = type(instance)
+            message = "cached class property requires an owner class"
+            raise TypeError(message)
 
         try:
             return vars(cls)[self.__cache_name__]
@@ -54,9 +56,9 @@ class State:
         cls._clearup = True
 
     @cached_class_property
-    def webui_config(cls) -> WebUIConfig:
+    def webui_config(cls: type[State]) -> WebUIConfig:
         return WebUIConfig()
 
     @cached_class_property
-    def config_updater(cls) -> ConfigUpdater:
+    def config_updater(cls: type[State]) -> ConfigUpdater:
         return ConfigUpdater()

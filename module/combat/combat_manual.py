@@ -7,10 +7,10 @@ class CombatManual(ModuleBase):
     auto_mode_switched = False
     manual_executed = False
 
-    def combat_manual_reset(self):
+    def combat_manual_reset(self) -> None:
         self.manual_executed = False
 
-    def handle_combat_stand_still_in_the_middle(self, auto):
+    def handle_combat_stand_still_in_the_middle(self, auto: str) -> bool:
         if auto != "stand_still_in_the_middle":
             return False
         # 从自动切到手动时舰队通常已在中间；继续下移反而会移到最底部。
@@ -20,26 +20,26 @@ class CombatManual(ModuleBase):
         self.device.long_click(MOVE_DOWN, duration=0.8)
         return True
 
-    def handle_combat_stand_still_bottom_left(self, auto):
+    def handle_combat_stand_still_bottom_left(self, auto: str) -> bool:
         if auto != "hide_in_bottom_left":
             return False
 
         self.device.long_click(MOVE_LEFT_DOWN, duration=(3.5, 5.5))
         return True
 
-    def handle_combat_stand_still_upper_left(self, auto):
+    def handle_combat_stand_still_upper_left(self, auto: str) -> bool:
         if auto != "hide_in_upper_left":
             return False
 
         self.device.long_click(MOVE_LEFT_UP, duration=(1.5, 3.5))
         return True
 
-    def handle_combat_weapon_release(self):
+    def handle_combat_weapon_release(self) -> bool:
         if self.appear_then_click(READY_AIR_RAID, interval=10):
             return True
         return self.appear_then_click(READY_TORPEDO, interval=10)
 
-    def handle_combat_manual(self, auto):
+    def handle_combat_manual(self, auto: str) -> bool:
         if self.manual_executed or not self.auto_mode_checked:
             return False
 

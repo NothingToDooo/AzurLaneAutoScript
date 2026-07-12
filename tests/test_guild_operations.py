@@ -2,13 +2,19 @@ from typing import ClassVar, TypeVar
 
 import pytest
 
+from module.base.button import Button
 from module.exception import GameBugError
 from module.guild import assets as guild_assets
 from module.guild import operations as operations_module
 from module.guild.operations import GuildOperations
 
 _T = TypeVar("_T")
-_Entrance = tuple[list[object], list[object]]
+_Entrance = tuple[list[Button], list[Button]]
+
+
+def make_button(name: str) -> Button:
+    area = (0, 0, 10, 10)
+    return Button(area=area, color=(255, 255, 255), button=area, name=name)
 
 
 def button_key(button: object) -> str:
@@ -60,7 +66,7 @@ class _ProgressOcr:
     def __init__(self, values: tuple[int, int, int]) -> None:
         self.values = values
 
-    def ocr(self, _image: object) -> tuple[int, int, int]:
+    def ocr_single(self, _image: object) -> tuple[int, int, int]:
         return self.values
 
 
@@ -88,7 +94,8 @@ class _GuildOperations(GuildOperations):
     def dispatch_enter(self) -> bool:
         return self._guild_operations_dispatch_enter()
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
@@ -187,8 +194,8 @@ def test_guild_operations_dispatch_enter_returns_false_without_entrance() -> Non
 
 def test_guild_operations_dispatch_enter_expands_then_enters() -> None:
     guild = _GuildOperations()
-    expand_button = object()
-    enter_button = object()
+    expand_button = make_button("expand")
+    enter_button = make_button("enter")
     guild.appear_results[button_key(guild_assets.GUILD_OPERATIONS_ACTIVE_CHECK)] = [True, True]
     guild.appear_results[button_key(guild_assets.GUILD_DISPATCH_RECOMMEND)] = [True]
     guild.entrance_results = [([expand_button], [enter_button]), ([expand_button], [enter_button])]

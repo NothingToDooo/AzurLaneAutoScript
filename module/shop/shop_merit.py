@@ -1,22 +1,22 @@
 from module.base.decorator import cached_property
 from module.logger import logger
-from module.shop.base import ShopItemGrid_250814
+from module.shop.base import ShopItemGrid250814
 from module.shop.clerk import ShopClerk
 from module.shop.shop_status import ShopStatus
 from module.shop.ui import ShopUI
 
 
-class MeritShop_250814(ShopClerk, ShopUI, ShopStatus):
+class MeritShop250814(ShopClerk, ShopUI, ShopStatus):
     shop_template_folder = "./assets/shop/merit"
 
     @cached_property
-    def shop_filter(self):
+    def shop_filter(self) -> str:
         return self.config.MeritShop_Filter.strip()
 
     @cached_property
-    def shop_merit_items(self):
+    def shop_merit_items(self) -> ShopItemGrid250814:
         shop_grid = self.shop_grid
-        shop_merit_items = ShopItemGrid_250814(
+        shop_merit_items = ShopItemGrid250814(
             shop_grid,
             templates={},
             template_area=(25, 20, 82, 72),
@@ -28,15 +28,15 @@ class MeritShop_250814(ShopClerk, ShopUI, ShopStatus):
         shop_merit_items.load_cost_template_folder("./assets/shop/cost")
         return shop_merit_items
 
-    def shop_items(self):
+    def shop_items(self) -> ShopItemGrid250814:
         return self.shop_merit_items
 
-    def shop_currency(self):
+    def shop_currency(self) -> int:
         self._currency = self.status_get_merit()
         logger.info(f"Merit: {self._currency}")
         return self._currency
 
-    def run(self):
+    def run(self) -> None:
         if not self.shop_filter:
             return
 

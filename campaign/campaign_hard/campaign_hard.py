@@ -1,3 +1,5 @@
+from typing import Literal
+
 from module.base.timer import Timer
 from module.campaign.campaign_base import CampaignBase
 from module.exception import CampaignEnd
@@ -16,11 +18,13 @@ class Config:
 
 
 class Campaign(CampaignBase, HardEquipment):
-    def _expected_end(self, expected):
-        del expected
-        return "in_stage"
+    _EXPECTED_END: Literal["in_stage"] = "in_stage"
 
-    def clear_boss(self):
+    def _expected_end(self, expected: str) -> Literal["in_stage"]:
+        del expected
+        return self._EXPECTED_END
+
+    def clear_boss(self) -> bool:
         grids = self.map.select(is_boss=True)
         grids = grids.add(self.map.select(may_boss=True, is_enemy=True))
         logger.info(f"May boss: {self.map.select(may_boss=True)}")
@@ -38,7 +42,7 @@ class Campaign(CampaignBase, HardEquipment):
 
         return False
 
-    def equipment_take_off_when_finished(self):
+    def equipment_take_off_when_finished(self) -> bool:
         if self.config.FLEET_HARD_EQUIPMENT is None:
             return False
         if not self.equipment_has_take_on:

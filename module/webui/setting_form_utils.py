@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from module.config.deep import deep_get, deep_iter
+from module.config.deep import DeepValue, deep_get, deep_iter
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -14,7 +14,7 @@ class SettingOutputContext:
     group_name: str
     arg_name: str
     arg_config: dict
-    config: dict
+    config: DeepValue
     translate: Callable[..., str]
 
 
@@ -22,8 +22,8 @@ class SettingOutputContext:
 class GroupOutputContext:
     task: str
     group_name: str
-    arg_dict: dict
-    config: dict
+    arg_dict: DeepValue
+    config: DeepValue
     translate: Callable[..., str]
 
 
@@ -79,6 +79,9 @@ def build_setting_output_kwargs(context: SettingOutputContext) -> dict | None:
 
 def iter_group_output_kwargs(context: GroupOutputContext) -> Iterator[dict]:
     for arg, arg_config in deep_iter(context.arg_dict, depth=1):
+        if not isinstance(arg_config, dict):
+            message = f"Setting {'.'.join(arg)} must be a mapping"
+            raise TypeError(message)
         output_kwargs = build_setting_output_kwargs(
             SettingOutputContext(
                 task=context.task,

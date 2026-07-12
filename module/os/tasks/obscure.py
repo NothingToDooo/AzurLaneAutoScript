@@ -4,7 +4,7 @@ from module.os.map import OSMap
 
 
 class OpsiObscure(OSMap):
-    def clear_obscure(self):
+    def clear_obscure(self) -> None:
         """清理一个隐秘海域；行动力不足时抛出 ActionPointLimit。"""
         logger.hr("OS clear obscure", level=1)
         self.cl1_ap_preserve()
@@ -34,7 +34,7 @@ class OpsiObscure(OSMap):
         self.map_exit()
         self.handle_after_auto_search()
 
-    def os_obscure(self):
+    def os_obscure(self) -> None:
         while True:
             self.clear_obscure()
             if self.config.OpsiObscure_ForceRun:

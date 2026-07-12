@@ -1,8 +1,15 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, override
+
 import pytest
 
 from alas import AzurLaneAutoScript
 from module.config.config import TaskEnd
 from module.exception import GameNotRunningError, GamePageUnknownError, GameStuckError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class _RunConfig:
@@ -27,27 +34,36 @@ class _RunDevice:
         self.sleep_calls.append(seconds)
 
 
-def _make_runner():
-    runner = object.__new__(AzurLaneAutoScript)
-    runner.config = _RunConfig()
-    runner.device = _RunDevice()
-    runner.error_log_calls = 0
+class _RunRunner(AzurLaneAutoScript):
+    config: _RunConfig
+    device: _RunDevice
 
-    def save_error_log() -> None:
-        runner.error_log_calls += 1
+    def __init__(self) -> None:
+        self.config = _RunConfig()
+        self.device = _RunDevice()
+        self.error_log_calls = 0
+        self.command_calls = 0
+        self.task: Callable[[], None] = lambda: None
 
-    runner.save_error_log = save_error_log
-    return runner
+    def sample_task(self) -> None:
+        self.task()
+
+    @override
+    def save_error_log(self) -> None:
+        self.error_log_calls += 1
+
+
+def _make_runner() -> _RunRunner:
+    return _RunRunner()
 
 
 def test_run_executes_command_method() -> None:
     runner = _make_runner()
-    runner.command_calls = 0
 
     def sample_task() -> None:
         runner.command_calls += 1
 
-    runner.sample_task = sample_task
+    runner.task = sample_task
 
     assert runner.run("sample_task")
     assert runner.device.screenshot_calls == 1
@@ -60,7 +76,7 @@ def test_run_treats_task_end_as_success() -> None:
     def sample_task() -> None:
         raise TaskEnd
 
-    runner.sample_task = sample_task
+    runner.task = sample_task
 
     assert runner.run("sample_task")
 
@@ -72,7 +88,7 @@ def test_run_schedules_restart_when_game_is_not_running() -> None:
     def sample_task() -> None:
         raise GameNotRunningError(message)
 
-    runner.sample_task = sample_task
+    runner.task = sample_task
 
     assert not runner.run("sample_task")
     assert runner.config.task_calls == ["Restart"]
@@ -85,7 +101,7 @@ def test_run_saves_error_log_for_stuck_game() -> None:
     def sample_task() -> None:
         raise GameStuckError(message)
 
-    runner.sample_task = sample_task
+    runner.task = sample_task
 
     assert not runner.run("sample_task")
     assert runner.error_log_calls == 1
@@ -99,7 +115,7 @@ def test_run_exits_on_unknown_page() -> None:
     def sample_task() -> None:
         raise GamePageUnknownError
 
-    runner.sample_task = sample_task
+    runner.task = sample_task
 
     with pytest.raises(SystemExit) as error:
         runner.run("sample_task")

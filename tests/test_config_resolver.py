@@ -1,10 +1,20 @@
 import copy
 from dataclasses import FrozenInstanceError
-from typing import cast
+from typing import TYPE_CHECKING
 
 import pytest
 
 from module.config.resolved import resolve_task_config
+
+if TYPE_CHECKING:
+    from module.config.deep import DeepValue, MutableDeepData, MutableDeepValue
+
+
+def _nested_items(value: MutableDeepValue) -> list[MutableDeepValue]:
+    assert isinstance(value, dict)
+    items = value["items"]
+    assert isinstance(items, list)
+    return items
 
 
 def test_resolver_keeps_first_value_and_full_source_path() -> None:
@@ -49,9 +59,9 @@ def test_resolver_marks_overrides_without_inventing_persistent_paths() -> None:
 
 
 def test_resolver_deep_copies_input_and_every_output_container() -> None:
-    nested: dict[str, list[object]] = {"items": [1, {"name": "original"}]}
-    data = {"General": {"Nested": {"Value": nested}}}
-    overrides = {"Runtime_List": ["original"]}
+    nested: MutableDeepData = {"items": [1, {"name": "original"}]}
+    data: MutableDeepData = {"General": {"Nested": {"Value": nested}}}
+    overrides: MutableDeepData = {"Runtime_List": ["original"]}
     snapshot = resolve_task_config(
         task_name="Alas",
         bind_chain=("General", "Alas"),
@@ -59,14 +69,17 @@ def test_resolver_deep_copies_input_and_every_output_container() -> None:
         overrides=overrides,
     )
 
-    cast("dict[str, str]", nested["items"][1])["name"] = "input-mutated"
-    overrides["Runtime_List"].append("input-mutated")
-    first = cast("dict[str, list[object]]", snapshot.Nested_Value)
-    first["items"].append("output-mutated")
+    input_record = _nested_items(nested)[1]
+    assert isinstance(input_record, dict)
+    input_record["name"] = "input-mutated"
+    runtime_list = overrides["Runtime_List"]
+    assert isinstance(runtime_list, list)
+    runtime_list.append("input-mutated")
+    first = snapshot.Nested_Value
+    _nested_items(first).append("output-mutated")
     second = snapshot.Nested_Value
     fields = snapshot.fields
-    field_value = cast("dict[str, list[object]]", fields["Nested_Value"].value)
-    field_value["items"].append("field-mutated")
+    _nested_items(fields["Nested_Value"].value).append("field-mutated")
     paths = snapshot.bound_paths
     paths["Nested_Value"] = "changed"
 
@@ -100,7 +113,7 @@ def test_resolved_snapshot_is_frozen_and_deepcopy_safe() -> None:
         {"General": {"Shared": []}},
     ],
 )
-def test_resolver_rejects_malformed_scope_data(data: dict) -> None:
+def test_resolver_rejects_malformed_scope_data(data: dict[str, DeepValue]) -> None:
     with pytest.raises(TypeError, match="mapping"):
         resolve_task_config(
             task_name="Alas",

@@ -1,19 +1,23 @@
 import re
+from typing import TYPE_CHECKING
 
 from module.logger import logger
 
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Sequence
 
-class Filter:
-    def __init__(self, regex, attr, preset=()):
+
+class Filter[T]:
+    def __init__(self, regex: str | re.Pattern[str], attr: Sequence[str], preset: Iterable[str] = ()) -> None:
         if isinstance(regex, str):
             regex = re.compile(regex)
         self.regex = regex
         self.attr = attr
         self.preset = tuple(p.lower() for p in preset)
-        self.filter_raw = []
-        self.filter = []
+        self.filter_raw: list[str] = []
+        self.filter: list[list[str | None]] = []
 
-    def load(self, string):
+    def load(self, string: str) -> None:
         """用 `>` 连接筛选项，同时接受 `＞﹥›˃ᐳ❯` 等近似字符。"""
         string = str(string)
         string = re.sub(r"[ \t\r\n]", "", string)
@@ -21,12 +25,12 @@ class Filter:
         self.filter_raw = string.split(">")
         self.filter = [self.parse_filter(f) for f in self.filter_raw]
 
-    def is_preset(self, filter_value):
-        return len(filter_value) and filter_value.lower() in self.preset
+    def is_preset(self, filter_value: str) -> bool:
+        return bool(filter_value) and filter_value.lower() in self.preset
 
-    def apply(self, objs, func=None):
+    def apply(self, objs: Iterable[T], func: Callable[[T], bool] | None = None) -> list[T | str]:
         """按已加载条件筛选对象并保留预设字符串；func 返回真时保留对应对象。"""
-        out = []
+        out: list[T | str] = []
         for raw_filter, parsed_filter in zip(self.filter_raw, self.filter, strict=True):
             if self.is_preset(raw_filter):
                 preset = raw_filter.lower()
@@ -38,29 +42,30 @@ class Filter:
                         out.append(obj)
 
         if func is not None:
-            objs, out = out, []
-            for obj in objs:
+            filtered: list[T | str] = []
+            for obj in out:
                 if isinstance(obj, str) or func(obj):
-                    out.append(obj)
+                    filtered.append(obj)
                 else:
                     # 回调拒绝的对象不进入结果。
                     pass
+            out = filtered
 
         return out
 
-    def applys(self, objs, funcs):
+    def applys(self, objs: Iterable[T], funcs: Iterable[Callable[[T], bool]]) -> list[T | str]:
         return self.apply(objs, func=lambda x: all(func(x) for func in funcs))
 
-    def apply_filter_to_obj(self, obj, filter_value):
+    def apply_filter_to_obj(self, obj: T, filter_value: Sequence[str | None]) -> bool:
         for attr, value in zip(self.attr, filter_value, strict=True):
             if not value:
                 continue
-            if str(obj.__getattribute__(attr)).lower() != str(value):
+            if str(getattr(obj, attr)).lower() != str(value):
                 return False
 
         return True
 
-    def parse_filter(self, string):
+    def parse_filter(self, string: str) -> list[str | None]:
         string = string.replace(" ", "").lower()
         result = re.search(self.regex, string)
 
@@ -68,7 +73,7 @@ class Filter:
             return [string]
 
         if result and len(string) and result.span()[1]:
-            return [result.group(index + 1) for index, attr in enumerate(self.attr)]
+            return [result.group(index + 1) for index, _attr in enumerate(self.attr)]
         logger.warning(f'Invalid filter: "{string}". This selector does not match the regex, nor a preset.')
         # 无效筛选器用不可能匹配的哨兵表示，避免意外选中对象。
         return ["1nVa1d"] + [None] * (len(self.attr) - 1)

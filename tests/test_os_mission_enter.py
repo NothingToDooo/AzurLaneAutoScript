@@ -1,5 +1,6 @@
-from typing import ClassVar, TypeVar
+from typing import TYPE_CHECKING, ClassVar, TypeVar, override
 
+import numpy as np
 import pytest
 
 from module.os.assets import GLOBE_GOTO_MAP
@@ -8,6 +9,12 @@ from module.os_handler import mission as mission_module
 from module.os_handler.mission import MissionHandler
 
 _T = TypeVar("_T")
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
 
 
 def button_key(button: object) -> str:
@@ -32,12 +39,21 @@ class _Timer:
             return results.pop(0)
         return False
 
-    def reset(self) -> None:
+    @staticmethod
+    def reset() -> None:
         _Timer.reset_count += 1
 
 
-class _MissionHandler(MissionHandler):
+class _Device:
     def __init__(self) -> None:
+        self.image = np.zeros((2, 2, 3), dtype=np.uint8)
+
+
+class _MissionHandler(MissionHandler):
+    device: _Device
+
+    def __init__(self) -> None:
+        self.device = _Device()
         self.calls: list[tuple[object, ...]] = []
         self.in_mission_results: list[bool] = []
         self.appear_results: dict[str, list[bool]] = {}
@@ -46,17 +62,26 @@ class _MissionHandler(MissionHandler):
         self.popup_results: list[bool] = []
         self.get_items_results: list[bool] = []
         self.info_bar_results: list[bool] = []
+        self.loop_count = 5
 
     def enter(self) -> None:
         self.os_mission_enter()
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
-    def loop(self, *_args: object, **_kwargs: object):
-        return range(5)
+    @override
+    def loop(
+        self,
+        *,
+        skip_first: bool = True,
+        timeout: float | Timer | None = None,
+    ) -> Iterator[ImageArray]:
+        del skip_first, timeout
+        return iter([self.device.image] * self.loop_count)
 
     def is_in_os_mission(self) -> bool:
         self.calls.append(("is_in_os_mission",))

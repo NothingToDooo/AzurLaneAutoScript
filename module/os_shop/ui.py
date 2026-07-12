@@ -25,7 +25,9 @@ SCROLL_DRAG_PAGE_ERROR_MESSAGE = "Scroll drag page error."
 
 
 class OSShopUI(UI):
-    def os_shop_load_ensure(self, skip_first_screenshot=True):
+    OS_SHOP_SIDE_NAVBAR_ORIGIN = (44, 266)
+
+    def os_shop_load_ensure(self, *, skip_first_screenshot: bool = True) -> bool:
         """侧栏切换后等待商店加载；超时抛出 GameStuckError。"""
         ensure_timeout = Timer(3, count=6).start()
         while True:
@@ -42,10 +44,14 @@ class OSShopUI(UI):
                 raise GameStuckError(OS_SHOP_LOAD_TIMEOUT_MESSAGE)
 
     @cached_property
-    def _os_shop_side_navbar(self):
+    def _os_shop_side_navbar(self) -> Navbar:
         """侧栏从上到下为纽约、利物浦、直布罗陀、圣彼得堡。"""
         os_shop_side_navbar = ButtonGrid(
-            origin=(44, 266), delta=(0, 87), button_shape=(231, 46), grid_shape=(1, 4), name="OS_SHOP_SIDE_NAVBAR"
+            origin=self.OS_SHOP_SIDE_NAVBAR_ORIGIN,
+            delta=(0, 87),
+            button_shape=(231, 46),
+            grid_shape=(1, 4),
+            name="OS_SHOP_SIDE_NAVBAR",
         )
 
         return Navbar(
@@ -56,7 +62,7 @@ class OSShopUI(UI):
             ),
         )
 
-    def os_shop_side_navbar_ensure(self, upper=None, bottom=None):
+    def os_shop_side_navbar_ensure(self, upper: int | None = None, bottom: int | None = None) -> None:
         """在港口补给页按上序或下序 1 至 4 切换港口侧栏，并等待加载完成。"""
         logger.info(f"OpsiShop side navbar set to {upper or bottom}")
         self.os_shop_load_ensure()
@@ -76,7 +82,7 @@ class OSShopUI(UI):
                 raise GameStuckError(SCROLL_DRAG_PAGE_ERROR_MESSAGE)
         return -1.0, 0.0
 
-    def rescue_slider(self, distance=200):
+    def rescue_slider(self, distance: int = 200) -> None:
         detection_area = (1130, 230, 1170, 710)
         direction_vector = (0, distance)
         p1, p2 = random_rectangle_vector(
@@ -86,7 +92,7 @@ class OSShopUI(UI):
         self.device.click(OS_SHOP_SAFE_AREA)
         self.device.screenshot()
 
-    def pre_scroll(self, pre_pos, cur_pos) -> float:
+    def pre_scroll(self, pre_pos: float, cur_pos: float) -> float:
         """滚动位置未变化时尝试恢复；连续失败抛出 GameStuckError。"""
         if pre_pos == cur_pos:
             logger.warning("Scroll drag page failed")

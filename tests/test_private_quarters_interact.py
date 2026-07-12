@@ -61,7 +61,8 @@ class _PrivateQuarters(PQInteract):
     def interact_once(self) -> None:
         self._pq_interact_once()
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default

@@ -1,10 +1,15 @@
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from campaign.event_20240521_cn.campaign_base import CurrentFleetGrid
 from module.base.utils import location2node
 from module.campaign.campaign_base import CampaignBase
 from module.logger import logger
 from module.map.map_base import CampaignMap
+from module.map.utils import location_ensure
+
+if TYPE_CHECKING:
+    from module.base.type_alias import Point
+    from module.map_detection.grid_info import GridInfo
 
 from .d1 import Config as ConfigBase
 
@@ -181,7 +186,12 @@ class Campaign(CampaignBase):
     MAP = MAP
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
-    def in_sight(self, location, sight=None):
+    def in_sight(
+        self,
+        location: GridInfo | str | Point,
+        sight: tuple[int, int, int, int] | None = None,
+    ) -> None:
+        location = location_ensure(location)
         logger.info(f"In sight: {location2node(location)}")
         x, y = location
         if x >= 7 and y <= 4:
@@ -197,7 +207,7 @@ class Campaign(CampaignBase):
 
         return super().in_sight(location, sight=sight)
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.clear_siren():
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=1):
@@ -205,7 +215,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         if self.clear_siren():
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
@@ -213,5 +223,5 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_6(self):
+    def battle_6(self) -> bool:
         return self.fleet_boss.clear_boss()

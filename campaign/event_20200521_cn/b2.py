@@ -30,7 +30,7 @@ MAP.wall_data = """
 
 
 class Config(ConfigBase):
-    FLEET_BOSS = 2
+    fleet_boss = 2
 
     MAP_HAS_WALL = True
     MAP_SIREN_TEMPLATE = ("Algerie", "Vauquelin")

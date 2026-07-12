@@ -59,7 +59,7 @@ MAP.spawn_data = [
 
 
 class Config:
-    FLEET_BOSS = 1
+    fleet_boss = 1
     MAP_MYSTERY_HAS_CARRIER = True
 
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 40
@@ -83,7 +83,7 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.fleet_2_push_forward()
 
         if self.fleet_2_rescue(G2):
@@ -93,7 +93,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_3(self):
+    def battle_3(self) -> bool:
         self.clear_all_mystery()
 
         if not self.check_accessibility(G2, fleet="boss"):

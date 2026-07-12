@@ -5,10 +5,10 @@ import sys
 import threading
 import time
 import traceback
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn, TypeIs
 
 import pywebio
 from pywebio.exceptions import SessionException
@@ -19,12 +19,14 @@ from pywebio.session import eval_js, register_thread, run_js
 from rich.console import Console
 from rich.terminal_theme import TerminalTheme
 
-from module.config.deep import deep_iter
+from module.config.deep import DeepValue, MutableDeepValue, deep_iter
 from module.logger import logger
 from module.webui.setting import State
 
 if TYPE_CHECKING:
     from queue import Queue
+
+    from pywebio.session.base import Session
 
 RE_DATETIME = (
     r"\d{4}\-(0\d|1[0-2])\-([0-2]\d|[3][0-1]) "
@@ -92,15 +94,28 @@ LIGHT_TERMINAL_THEME = TerminalTheme(
 
 
 class QueueHandler:
-    def __init__(self, q: Queue) -> None:
+    def __init__(self, q: Queue[str]) -> None:
         self.queue = q
 
-    def write(self, s: str):
+    def write(self, s: str) -> None:
         self.queue.put(s)
 
 
+type TaskGenerator = Generator[None, TaskHandler | None]
+
+
+def _is_task_generator(value: Callable[[], None] | TaskGenerator) -> TypeIs[TaskGenerator]:
+    return isinstance(value, Generator)
+
+
 class Task:
-    def __init__(self, g: Generator, delay: float, next_run: float | None = None, name: str | None = None) -> None:
+    def __init__(
+        self,
+        g: TaskGenerator,
+        delay: float,
+        next_run: float | None = None,
+        name: str | None = None,
+    ) -> None:
         self.g = g
         g.send(None)
         self.delay = delay
@@ -113,7 +128,7 @@ class Task:
     def __next__(self) -> None:
         return next(self.g)
 
-    def send(self, obj) -> None:
+    def send(self, obj: TaskHandler | None) -> None:
         return self.g.send(obj)
 
     __repr__ = __str__
@@ -123,16 +138,19 @@ class TaskHandler:
     def __init__(self) -> None:
         self.tasks: list[Task] = []
         self.pending_remove_tasks: list[Task] = []
-        self._task = None
+        self._task: Task | None = None
         self._thread: threading.Thread | None = None
         self._alive = False
         self._lock = threading.Lock()
 
-    def add(self, func, delay: float, *, pending_delete: bool = False) -> None:
-        if isinstance(func, Callable):
-            g = get_generator(func)
-        elif isinstance(func, Generator):
-            g = func
+    def add(
+        self,
+        func: Callable[[], None] | TaskGenerator,
+        delay: float,
+        *,
+        pending_delete: bool = False,
+    ) -> None:
+        g = func if _is_task_generator(func) else get_generator(func)
         self.add_task(Task(g, delay), pending_delete=pending_delete)
 
     def add_task(self, task: Task, *, pending_delete: bool = False) -> None:
@@ -174,7 +192,7 @@ class TaskHandler:
         if self._task is not None:
             self._task.delay = delay
 
-    def get_task(self, name) -> Task | None:
+    def get_task(self, name: str) -> Task | None:
         with self._lock:
             for task in self.tasks:
                 if task.name == name:
@@ -244,84 +262,108 @@ class WebIOTaskHandler(TaskHandler):
         return thread
 
 
+type SwitchState = int
+type SwitchAction = Callable[[], None]
+type SwitchStatus = Callable[[SwitchState], None] | Mapping[SwitchState, SwitchAction | Sequence[SwitchAction]]
+type SwitchStateSource = Callable[[], SwitchState] | Generator[SwitchState]
+
+
+def _is_state_generator(value: SwitchStateSource) -> TypeIs[Generator[SwitchState]]:
+    return isinstance(value, Generator)
+
+
+def _is_action_sequence(value: SwitchAction | Sequence[SwitchAction]) -> TypeIs[Sequence[SwitchAction]]:
+    return isinstance(value, Sequence)
+
+
+def _is_status_mapping(
+    value: SwitchStatus,
+) -> TypeIs[Mapping[SwitchState, SwitchAction | Sequence[SwitchAction]]]:
+    return isinstance(value, Mapping)
+
+
 class Switch:
-    def __init__(self, status, get_state, name=None):
+    def __init__(
+        self,
+        status: SwitchStatus,
+        get_state: SwitchStateSource,
+        name: str | None = None,
+    ) -> None:
         """status 可为状态回调，或状态到回调／任务字典列表的映射。
         get_state 可为返回当前状态的回调或逐次产出状态的生成器。
         """
         self._lock = threading.Lock()
         self.name = name
         self.status = status
-        self.get_state = get_state
-        if isinstance(get_state, Generator):
+        self._generator: Generator[SwitchState]
+        if _is_state_generator(get_state):
             self._generator = get_state
-        elif isinstance(get_state, Callable):
-            self._generator = self._get_state()
+            self._get_state_callback: Callable[[], SwitchState] | None = None
+        else:
+            self._get_state_callback = get_state
+            self._generator = self._state_changes()
 
-    @staticmethod
-    def get_state():
-        pass
-
-    def _get_state(self):
+    def _state_changes(self) -> Generator[SwitchState]:
         """仅在回调结果变化时产出新状态，否则产出 -1。"""
-        previous_status = self.get_state()
+        get_state = self._get_state_callback
+        if get_state is None:
+            message = "state callback is unavailable for generator-backed switches"
+            raise RuntimeError(message)
+        previous_status = get_state()
         yield previous_status
         while True:
-            status = self.get_state()
+            status = get_state()
             if previous_status != status:
                 previous_status = status
                 yield previous_status
                 continue
             yield -1
 
-    def switch(self):
+    def switch(self) -> None:
         with self._lock:
-            r = next(self._generator)
-        if callable(self.status):
-            self.status(r)
-        elif r in self.status:
-            f = self.status[r]
-            if isinstance(f, (dict, Callable)):
-                f = [f]
-            for raw_task in f:
-                task = {"func": raw_task} if isinstance(raw_task, Callable) else raw_task
-                func = task["func"]
-                args = task.get("args", ())
-                kwargs = task.get("kwargs", {})
-                func(*args, **kwargs)
+            state = next(self._generator)
+        status = self.status
+        if _is_status_mapping(status):
+            if state not in status:
+                return
+            actions = status[state]
+            if not _is_action_sequence(actions):
+                actions = (actions,)
+            for action in actions:
+                action()
+            return
+        status(state)
 
-    def g(self) -> Generator:
+    def g(self) -> TaskGenerator:
         g = get_generator(self.switch)
-        name = self.name or getattr(self.get_state, "__name__", type(self.get_state).__name__)
-        g.__name__ = f"Switch_{name}_refresh"
+        state_source = self._get_state_callback or self._generator
+        self.name = self.name or getattr(state_source, "__name__", type(state_source).__name__)
         return g
 
 
-def get_generator(func: Callable):
-    def _g():
+def get_generator(func: Callable[[], None]) -> TaskGenerator:
+    def _g() -> TaskGenerator:
         yield
         while True:
             yield func()
 
-    g = _g()
-    g.__name__ = getattr(func, "__name__", type(func).__name__)
-    return g
+    return _g()
 
 
-def filepath_css(filename):
+def filepath_css(filename: str) -> str:
     return f"./assets/gui/css/{filename}.css"
 
 
-def filepath_icon(filename):
+def filepath_icon(filename: str) -> str:
     return f"./assets/gui/icon/{filename}.svg"
 
 
-def add_css(filepath):
+def add_css(filepath: str | Path) -> None:
     css = Path(filepath).read_text(encoding="utf-8").replace("\n", "")
     run_js(f"""$('head').append('<style>{css}</style>')""")
 
 
-def _read(path):
+def _read(path: str | Path) -> str:
     return Path(path).read_text(encoding="utf-8")
 
 
@@ -333,16 +375,21 @@ class Icon:
     ADD = _read(filepath_icon("add"))
 
 
-str2type = {
-    "str": str,
-    "float": float,
-    "int": int,
-    "bool": bool,
-    "ignore": lambda x: x,
-}
+def _parse_typed_pin_value(val: MutableDeepValue, valuetype: str) -> MutableDeepValue:
+    if valuetype == "str":
+        return str(val)
+    if valuetype == "float":
+        return float(str(val))
+    if valuetype == "int":
+        return int(str(val))
+    if valuetype == "bool":
+        return bool(val)
+    if valuetype == "ignore":
+        return val
+    raise KeyError(valuetype)
 
 
-def parse_pin_value(val, valuetype: str | None = None):
+def parse_pin_value(val: MutableDeepValue, valuetype: str | None = None) -> MutableDeepValue:
     """
     input、textarea 返回 str。
     select 返回选项值（str 或 int）。
@@ -350,20 +397,18 @@ def parse_pin_value(val, valuetype: str | None = None):
     """
     if isinstance(val, list):
         return bool(val)
-    if valuetype:
-        return str2type[valuetype](val)
-    if isinstance(val, (int, float)):
+    if valuetype is not None:
+        return _parse_typed_pin_value(val, valuetype)
+    if not isinstance(val, str):
         return val
     try:
         v = float(val)
     except ValueError:
         return val
-    if v.is_integer():
-        return int(v)
-    return v
+    return int(v) if v.is_integer() else v
 
 
-def to_pin_value(val):
+def to_pin_value(val: MutableDeepValue) -> MutableDeepValue:
     """把 bool 转为 PyWebIO checkbox 使用的列表值。"""
     if val is True:
         return [True]
@@ -372,7 +417,7 @@ def to_pin_value(val):
     return val
 
 
-def login(password):
+def login(password: str) -> bool:
     if get_localstorage("password") == str(password):
         return True
     pwd = pywebio_input(label="Please login below.", type=PASSWORD, placeholder="PASSWORD")
@@ -383,21 +428,25 @@ def login(password):
     return False
 
 
-def get_window_visibility_state():
+def get_window_visibility_state() -> bool:
     ret = eval_js("document.visibilityState")
     return ret != "hidden"
 
 
 # https://pywebio.readthedocs.io/zh_CN/latest/cookbook.html#cookie-and-localstorage-manipulation
-def set_localstorage(key, value):
-    return run_js("localStorage.setItem(key, value)", key=key, value=value)
+def set_localstorage(key: str, value: str) -> None:
+    run_js("localStorage.setItem(key, value)", key=key, value=value)
 
 
-def get_localstorage(key):
-    return eval_js("localStorage.getItem(key)", key=key)
+def get_localstorage(key: str) -> str | None:
+    value = eval_js("localStorage.getItem(key)", key=key)
+    if value is None or isinstance(value, str):
+        return value
+    message = f"localStorage value for {key} must be a string"
+    raise TypeError(message)
 
 
-def re_fullmatch(pattern, string):
+def re_fullmatch(pattern: str, string: str) -> bool:
     if pattern == "datetime":
         try:
             datetime.datetime.fromisoformat(string)
@@ -405,10 +454,10 @@ def re_fullmatch(pattern, string):
             return False
         else:
             return True
-    return re.fullmatch(pattern=pattern, string=string)
+    return re.fullmatch(pattern=pattern, string=string) is not None
 
 
-def get_next_time(t: datetime.time):
+def get_next_time(t: datetime.time) -> int:
     now = datetime.datetime.now(tz=datetime.UTC).astimezone().time()
     second = (t.hour - now.hour) * 3600 + (t.minute - now.minute) * 60 + (t.second - now.second)
     if second < 0:
@@ -416,7 +465,7 @@ def get_next_time(t: datetime.time):
     return second
 
 
-def on_task_exception(self):
+def on_task_exception(self: Session) -> None:
     del self
     logger.exception("An internal error occurred in the application")
     toast_msg = "应用发生内部错误"
@@ -451,7 +500,7 @@ class WebUITestError(Exception):
 WEBUI_TEST_ERROR_MESSAGE = "quq"
 
 
-def raise_exception(x=3):
+def raise_exception(x: int = 3) -> NoReturn:
     """用于手动测试 WebUI 异常展示。"""
     if x > 0:
         raise_exception(x - 1)
@@ -459,8 +508,8 @@ def raise_exception(x=3):
         raise WebUITestError(WEBUI_TEST_ERROR_MESSAGE)
 
 
-def get_alas_config_listen_path(args):
+def get_alas_config_listen_path(args: DeepValue) -> Iterator[list[str]]:
     for path, d in deep_iter(args, depth=3):
-        if d.get("display") in ["readonly", "hide"]:
+        if isinstance(d, Mapping) and d.get("display") in ["readonly", "hide"]:
             continue
         yield path

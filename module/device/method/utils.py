@@ -11,7 +11,7 @@ RETRY_TRIES = 5
 RETRY_DELAY = 3
 
 
-def is_port_using(port_num):
+def is_port_using(port_num: int) -> bool:
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(2)
 
@@ -25,14 +25,14 @@ def is_port_using(port_num):
         s.close()
 
 
-def random_port(port_range):
+def random_port(port_range: tuple[int, int]) -> int:
     new_port = random.choice(list(range(*port_range)))
     if is_port_using(new_port):
         return random_port(port_range)
     return new_port
 
 
-def recv_all(stream, chunk_size=4096, recv_interval=0.000) -> bytes:
+def recv_all(stream: AdbConnection | socket.socket, chunk_size: int = 4096, recv_interval: float = 0.000) -> bytes:
     """recv_interval 单位为秒；服务端接收建议用 0.001，10 秒无数据抛出 AdbTimeout。"""
     if isinstance(stream, AdbConnection):
         stream = stream.conn
@@ -56,7 +56,7 @@ def recv_all(stream, chunk_size=4096, recv_interval=0.000) -> bytes:
         raise AdbTimeout(message) from e
 
 
-def possible_reasons(*args):
+def possible_reasons(*args: str) -> None:
     for index, reason in enumerate(args):
         reason_number = index + 1
         logger.critical(f"Possible reason #{reason_number}: {reason}")
@@ -70,7 +70,7 @@ class ImageTruncated(Exception):
     pass
 
 
-def retry_sleep(trial):
+def retry_sleep(trial: int) -> int:
     # 前两次尝试不等待。
     if trial in {0, 1}:
         return 0
@@ -93,7 +93,7 @@ def is_retryable_adb_error(text: str) -> bool:
     return text == "rest" or any(snippet in text for snippet in _RETRYABLE_ADB_ERROR_SNIPPETS)
 
 
-def handle_adb_error(e):
+def handle_adb_error(e: BaseException) -> bool:
     text = str(e)
     if is_retryable_adb_error(text):
         logger.error(e)
@@ -106,7 +106,7 @@ def handle_adb_error(e):
     return False
 
 
-def handle_unknown_host_service(e):
+def handle_unknown_host_service(e: BaseException) -> bool:
     text = str(e)
     if "unknown host service" in text:
         # AdbError(unknown host service)

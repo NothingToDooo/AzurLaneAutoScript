@@ -1,9 +1,22 @@
-import typing as t
 from pathlib import Path
+from typing import TYPE_CHECKING, Self
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from types import TracebackType
+
+type CodeScalar = str | int | float | bool | None
 
 
 class TabWrapper:
-    def __init__(self, generator, prefix="", suffix="", newline=True):
+    def __init__(
+        self,
+        generator: CodeGenerator,
+        prefix: str = "",
+        suffix: str = "",
+        *,
+        newline: bool = True,
+    ) -> None:
         self.generator = generator
         self.prefix = prefix
         self.suffix = suffix
@@ -11,41 +24,47 @@ class TabWrapper:
 
         self.nested = False
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         if not self.nested and self.prefix:
             self.generator.add(self.prefix, newline=self.newline)
         self.generator.tab_count += 1
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         self.generator.tab_count -= 1
         if self.suffix:
             self.generator.add(self.suffix)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.prefix
 
-    def set_nested(self, suffix=""):
+    def set_nested(self, suffix: str = "") -> None:
         self.nested = True
         self.suffix += suffix
 
 
 class CodeGenerator:
-    def __init__(self):
+    def __init__(self) -> None:
         self.tab_count = 0
-        self.lines = []
+        self.lines: list[str] = []
 
-    def generate(self) -> t.Iterable[str]:
+    @staticmethod
+    def generate() -> Iterator[str]:
         yield ""
 
-    def add(self, line, comment=False, newline=True):
+    def add(self, line: str, *, comment: bool = False, newline: bool = True) -> None:
         self.lines.append(self._line_with_tabs(line, comment=comment, newline=newline))
 
-    def write(self, file: str):
+    def write(self, file: str | Path) -> None:
         lines = "".join(self.lines)
         Path(file).write_text(lines, encoding="utf-8", newline="")
 
-    def _line_with_tabs(self, line, comment=False, newline=True):
+    def _line_with_tabs(self, line: str, *, comment: bool = False, newline: bool = True) -> str:
         if comment:
             line = "# " + line
         out = "    " * self.tab_count + line
@@ -53,7 +72,7 @@ class CodeGenerator:
             out += "\n"
         return out
 
-    def _repr(self, obj):
+    def _repr(self, obj: CodeScalar | TabWrapper) -> str:
         if isinstance(obj, str) and "\n" in obj:
             out = '"""\n'
             with self.tab():
@@ -64,39 +83,45 @@ class CodeGenerator:
             return out
         return repr(obj)
 
-    def tab(self):
+    def tab(self) -> TabWrapper:
         return TabWrapper(self)
 
-    def Empty(self):
+    def empty(self) -> None:
         self.add("")
 
-    def Import(self, text, empty=2):
+    def import_(self, text: str, empty: int = 2) -> None:
         for raw_line in text.strip().split("\n"):
             line = raw_line.strip()
             self.add(line)
         for _ in range(empty):
-            self.Empty()
+            self.empty()
 
-    def Value(self, key=None, value=None, type_=None, **kwargs):
+    def value(
+        self,
+        key: str | None = None,
+        value: CodeScalar = None,
+        type_: str | None = None,
+        **kwargs: CodeScalar,
+    ) -> None:
         if key is not None:
             if type_ is not None:
                 self.add(f"{key}: {type_} = {self._repr(value)}")
             else:
                 self.add(f"{key} = {self._repr(value)}")
         for kw_key, kw_value in kwargs.items():
-            self.Value(kw_key, kw_value)
+            self.value(kw_key, kw_value)
 
-    def Comment(self, text):
+    def comment(self, text: str) -> None:
         for raw_line in text.strip().split("\n"):
             line = raw_line.strip()
             self.add(line, comment=True)
 
-    def List(self, key=None):
+    def list_(self, key: str | None = None) -> TabWrapper:
         if key is not None:
             return TabWrapper(self, prefix=str(key) + " = [", suffix="]")
         return TabWrapper(self, prefix="[", suffix="]", newline=False)
 
-    def ListItem(self, value):
+    def list_item(self, value: CodeScalar | TabWrapper) -> TabWrapper | None:
         if isinstance(value, TabWrapper):
             value.set_nested(suffix=",")
             self.add(f"{self._repr(value)}")
@@ -104,12 +129,16 @@ class CodeGenerator:
         self.add(f"{self._repr(value)},")
         return None
 
-    def Dict(self, key=None):
+    def dict_(self, key: str | None = None) -> TabWrapper:
         if key is not None:
             return TabWrapper(self, prefix=str(key) + " = {", suffix="}")
         return TabWrapper(self, prefix="{", suffix="}", newline=False)
 
-    def DictItem(self, key=None, value=None):
+    def dict_item(
+        self,
+        key: CodeScalar = None,
+        value: CodeScalar | TabWrapper = None,
+    ) -> TabWrapper | None:
         if isinstance(value, TabWrapper):
             value.set_nested(suffix=",")
             if key is not None:
@@ -119,12 +148,16 @@ class CodeGenerator:
             self.add(f"{self._repr(key)}: {self._repr(value)},")
         return None
 
-    def Object(self, object_class, key=None):
+    def object_(self, object_class: str, key: str | None = None) -> TabWrapper:
         if key is not None:
             return TabWrapper(self, prefix=f"{key} = {object_class}(", suffix=")")
         return TabWrapper(self, prefix=f"{object_class}(", suffix=")", newline=False)
 
-    def ObjectAttr(self, key=None, value=None):
+    def object_attr(
+        self,
+        key: str | None = None,
+        value: CodeScalar | TabWrapper = None,
+    ) -> TabWrapper | None:
         if isinstance(value, TabWrapper):
             value.set_nested(suffix=",")
             if key is None:
@@ -138,18 +171,18 @@ class CodeGenerator:
             self.add(f"{key}={self._repr(value)},")
         return None
 
-    def Class(self, name, inherit=None):
+    def class_(self, name: str, inherit: str | None = None) -> TabWrapper:
         if inherit is not None:
             return TabWrapper(self, prefix=f"class {name}({inherit}):")
         return TabWrapper(self, prefix=f"class {name}:")
 
-    def Def(self, name, args=""):
+    def def_(self, name: str, args: str = "") -> TabWrapper:
         return TabWrapper(self, prefix=f"def {name}({args}):")
 
 
 generator = CodeGenerator()
-Import = generator.Import
-Value = generator.Value
-Comment = generator.Comment
-Dict = generator.Dict
-DictItem = generator.DictItem
+import_ = generator.import_
+value = generator.value
+comment = generator.comment
+dict_ = generator.dict_
+dict_item = generator.dict_item

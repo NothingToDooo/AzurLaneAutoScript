@@ -1,4 +1,4 @@
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -15,12 +15,17 @@ from module.map_detection.view import View
 from module.os.map_operation import OSMapOperation
 from module.os.radar import Radar
 
+if TYPE_CHECKING:
+    from module.base.type_alias import Area, ImageArray, Point
+    from module.map.type_alias import GridLocation
+    from module.map.utils import HasLocation
+
 
 class OSCamera(OSMapOperation, Camera):
     radar: Radar
-    fleet_current: tuple
+    fleet_current: GridLocation
 
-    def _map_swipe(self, vector, box=(239, 128, 993, 628)):
+    def _map_swipe(self, vector: Point, box: Area = (239, 128, 993, 628)) -> bool:
         return super()._map_swipe(vector, box=box)
 
     @staticmethod
@@ -43,7 +48,7 @@ class OSCamera(OSMapOperation, Camera):
         msg = "OS map view backend homo_loca has invalid type"
         raise TypeError(msg)
 
-    def _view_init(self):
+    def _view_init(self) -> None:
         if not hasattr(self, "view"):
             storage = ((10, 7), [(110.307, 103.657), (1012.311, 103.657), (-32.959, 600.567), (1113.057, 600.567)])
             view = View(self.config, mode="os", grid_class=OSGrid)
@@ -52,14 +57,19 @@ class OSCamera(OSMapOperation, Camera):
             self.view = view
 
     @cached_property
-    def radar(self):
+    def radar(self) -> Radar:
         return Radar(self.config)
 
-    def predict_radar(self):
+    def predict_radar(self) -> None:
         self.radar.predict(self.device.image)
         self.radar.show()
 
-    def grid_is_in_sight(self, grid, camera=None, sight=None):
+    def grid_is_in_sight(
+        self,
+        grid: HasLocation | str | Point,
+        camera: HasLocation | str | Point | None = None,
+        sight: tuple[int, int, int, int] | None = None,
+    ) -> bool:
         location = location_ensure(grid)
         camera = location_ensure(camera) if camera is not None else self.camera
         if sight is None:
@@ -80,7 +90,7 @@ class OSCamera(OSMapOperation, Camera):
             x = 0
         return x == 0 and y == 0
 
-    def _get_map_outside_button(self):
+    def _get_map_outside_button(self) -> Button | None:
         for _ in range(2):
             backend = self.view.backend
             if self.view.left_edge:
@@ -88,13 +98,13 @@ class OSCamera(OSMapOperation, Camera):
                 if not isinstance(edge, Lines):
                     self.ensure_edge_insight()
                     continue
-                area = (113, 185, edge.get_x(290), 290)
+                area = (113, 185, float(edge.get_x(290)[0]), 290)
             elif self.view.right_edge:
                 edge = backend.right_edge
                 if not isinstance(edge, Lines):
                     self.ensure_edge_insight()
                     continue
-                area = (edge.get_x(360), 360, 1280, 560)
+                area = (float(edge.get_x(360)[0]), 360, 1280, 560)
             else:
                 logger.info("No left edge or right edge")
                 self.ensure_edge_insight()
@@ -103,7 +113,7 @@ class OSCamera(OSMapOperation, Camera):
             return Button(area=area, color=(), button=area, name="MAP_OUTSIDE")
         return None
 
-    def update_os(self):
+    def update_os(self) -> None:
         self._view_init()
 
         try:
@@ -112,8 +122,8 @@ class OSCamera(OSMapOperation, Camera):
             logger.warning(e)
             logger.warning("Assuming camera is focused on grid center")
 
-            def empty(*args, **kwargs):
-                pass
+            def empty(_image: ImageArray) -> None:
+                return None
 
             backend = self._homography_backend(self.view)
             backup = backend.load
@@ -126,7 +136,7 @@ class OSCamera(OSMapOperation, Camera):
             self.view.load(self.device.image)
             vars(backend)["load"] = backup
 
-    def convert_radar_to_local(self, location):
+    def convert_radar_to_local(self, location: HasLocation | str | Point) -> OSGrid:
         """把雷达坐标转换为本地视野格子。
 
         游戏偶尔不会把镜头聚焦到当前舰队，此时必须改用实际舰队位置校正。
@@ -140,6 +150,9 @@ class OSCamera(OSMapOperation, Camera):
             logger.warning(f"Convert radar to local, but found multiple current fleets: {fleets}")
             fleets = fleets.sort_by_camera_distance(self.view.center_loca)
             center = fleets[0].location
+            if center is None:
+                message = "Current fleet grid has no location"
+                raise MapDetectionError(message)
             logger.warning(f"Assuming the nearest fleet to camera canter is current fleet: {location2node(center)}")
         else:
             logger.warning(
@@ -147,6 +160,10 @@ class OSCamera(OSMapOperation, Camera):
                 f"Assuming camera center is current fleet: {location2node(self.view.center_loca)}"
             )
             center = self.view.center_loca
+
+        if center is None:
+            message = "Current fleet grid has no location"
+            raise MapDetectionError(message)
 
         try:
             local = self.view[np.add(location, center)]
@@ -158,5 +175,8 @@ class OSCamera(OSMapOperation, Camera):
             center = self.view.center_loca
             local = self.view[np.add(location, center)]
 
+        if not isinstance(local, OSGrid) or local.location is None:
+            message = "Radar target is not an initialized OS grid"
+            raise MapDetectionError(message)
         logger.info(f"Radar {location} -> Local {location2node(local.location)} (fleet={location2node(center)})")
         return local

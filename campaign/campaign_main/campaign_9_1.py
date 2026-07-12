@@ -78,7 +78,7 @@ step_on = SelectedGrids([F3, E4])
 
 
 class Config:
-    SUBMARINE = 0
+    submarine = 0
     HOMO_STORAGE = ((9, 5), [(214.274, 100.482), (1300.358, 100.482), (79.666, 584.209), (1505.19, 584.209)])
     MAP_ENSURE_EDGE_INSIGHT_CORNER = "bottom"
 
@@ -86,7 +86,7 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.fleet_2_step_on(step_on, roadblocks=[road_main]):
             return True
 
@@ -97,7 +97,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         boss = self.map.select(is_boss=True)
         if boss and not self.check_accessibility(boss[0], fleet="boss") and self.clear_roadblocks([road_main]):
             return True

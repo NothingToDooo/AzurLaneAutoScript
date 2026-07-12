@@ -1,22 +1,27 @@
+from typing import TYPE_CHECKING
+
 from module.base.decorator import cached_property
 from module.logger import logger
 from module.shop.assets import SHOP_BUY_CONFIRM_AMOUNT
-from module.shop.base import ShopItemGrid_250814
+from module.shop.base import ShopItemGrid250814
 from module.shop.clerk import ShopClerk
 from module.shop.shop_status import ShopStatus
 
+if TYPE_CHECKING:
+    from module.statistics.item import Item
 
-class CoreShop_250814(ShopClerk, ShopStatus):
+
+class CoreShop250814(ShopClerk, ShopStatus):
     shop_template_folder = "./assets/shop/core"
 
     @cached_property
-    def shop_filter(self):
+    def shop_filter(self) -> str:
         return self.config.CoreShop_Filter.strip()
 
     @cached_property
-    def shop_core_items(self):
+    def shop_core_items(self) -> ShopItemGrid250814:
         shop_grid = self.shop_grid
-        shop_core_items = ShopItemGrid_250814(
+        shop_core_items = ShopItemGrid250814(
             shop_grid,
             templates={},
             template_area=(25, 20, 82, 72),
@@ -28,19 +33,19 @@ class CoreShop_250814(ShopClerk, ShopStatus):
         shop_core_items.load_cost_template_folder("./assets/shop/cost")
         return shop_core_items
 
-    def shop_items(self):
+    def shop_items(self) -> ShopItemGrid250814:
         return self.shop_core_items
 
-    def shop_currency(self):
+    def shop_currency(self) -> int:
         self._currency = self.status_get_core()
         logger.info(f"Core: {self._currency}")
         return self._currency
 
-    def shop_interval_clear(self):
+    def shop_interval_clear(self) -> None:
         super().shop_interval_clear()
         self.interval_clear(SHOP_BUY_CONFIRM_AMOUNT)
 
-    def shop_buy_handle(self, _item):
+    def shop_buy_handle(self, _item: Item) -> bool:
         """处理核心商店的数量确认弹窗。"""
         if self.appear(SHOP_BUY_CONFIRM_AMOUNT, offset=(20, 20), interval=3):
             self.shop_buy_amount_execute(_item)
@@ -49,7 +54,7 @@ class CoreShop_250814(ShopClerk, ShopStatus):
 
         return False
 
-    def run(self):
+    def run(self) -> None:
         if not self.shop_filter:
             return
 

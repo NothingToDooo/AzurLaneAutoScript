@@ -1,5 +1,10 @@
+from typing import TYPE_CHECKING
+
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap
+
+if TYPE_CHECKING:
+    from module.map.type_alias import GridLocation
 
 MAP = CampaignMap()
 MAP.shape = "H3"
@@ -26,8 +31,8 @@ MAP.spawn_data = [
 
 
 class Config:
-    SUBMARINE = 0
-    FLEET_BOSS = 2
+    submarine = 0
+    fleet_boss = 2
 
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 40
     EDGE_LINES_HOUGHLINES_THRESHOLD = 40
@@ -41,16 +46,16 @@ class Campaign(CampaignBase):
     MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD = 0.45
     MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD = 0.45
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.clear_all_mystery()
         self.fleet_2_push_forward()
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         self.clear_all_mystery()
 
         return self.fleet_boss.brute_clear_boss()
 
-    def handle_boss_appear_refocus(self, preset=(-3, -2)):
+    def handle_boss_appear_refocus(self, preset: GridLocation | None = (-3, -2)) -> None:
         return super().handle_boss_appear_refocus(preset)

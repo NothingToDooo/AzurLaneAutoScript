@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, cast
+
 import numpy as np
 
 from module.base.utils import get_color
@@ -10,6 +12,9 @@ from module.ocr.ocr import Digit
 from module.ui.assets import BACK_ARROW, DAILY_CHECK
 from module.ui.page import page_campaign_menu, page_daily
 from module.ui.ui import UiIndexControls
+
+if TYPE_CHECKING:
+    from module.base.button import Button
 
 DAILY_MISSION_LIST = [
     daily_assets.DAILY_MISSION_1,
@@ -24,10 +29,10 @@ OCR_DAILY_FLEET_INDEX = Digit(
 
 class Daily(Combat, DailyEquipment):
     daily_current: int
-    daily_checked: list
+    daily_checked: list[int]
     emergency_module_development = False
 
-    def is_active(self):
+    def is_active(self) -> bool:
         color = get_color(image=self.device.image, area=daily_assets.DAILY_ACTIVE.area)
         color = np.array(color).astype(float)
         color = (np.max(color) + np.min(color)) / 2
@@ -38,27 +43,27 @@ class Daily(Combat, DailyEquipment):
             logger.attr(f"Daily_{self.daily_current}", "inactive")
         return active
 
-    def _wait_daily_switch(self):
+    def _wait_daily_switch(self) -> None:
         self.device.sleep((1, 1.2))
 
-    def next(self):
+    def next(self) -> None:
         self.daily_current += 1
         logger.info(f"Switch to {self.daily_current}")
         self.device.click(daily_assets.DAILY_NEXT)
         self._wait_daily_switch()
         self.device.screenshot()
 
-    def prev(self):
+    def prev(self) -> None:
         self.daily_current -= 1
         logger.info(f"Switch to {self.daily_current}")
         self.device.click(daily_assets.DAILY_PREV)
         self._wait_daily_switch()
         self.device.screenshot()
 
-    def handle_daily_additional(self):
+    def handle_daily_additional(self) -> bool:
         return bool(self.handle_guild_popup_cancel())
 
-    def get_daily_stage_and_fleet(self):
+    def get_daily_stage_and_fleet(self) -> tuple[int, int]:
         """返回 (关卡 0～3, 舰队 0～6)；0 表示跳过、手动处理或无配置。"""
         if self.emergency_module_development:
             # 索引依次为限时兵装、商船护送、海域突进、斩首、战术研修、破交、兵装训练。
@@ -123,22 +128,22 @@ class Daily(Combat, DailyEquipment):
         return int(stage), int(fleet)
 
     @property
-    def supply_line_disruption_index(self):
+    def supply_line_disruption_index(self) -> int:
         return 2
 
     @property
-    def empty_index(self):
+    def empty_index(self) -> int:
         return 4
 
-    def daily_execute(self, remain=3, stage=1, fleet=1):
+    def daily_execute(self, remain: int = 3, stage: int = 1, fleet: int = 1) -> bool:
         """在每日页执行剩余次数；stage 为 1～3、fleet 为 1～6，锁定时返回 False。"""
         logger.hr(f"Daily {self.daily_current}", level=2)
         logger.info(f"remain={remain}, stage={stage}, fleet={fleet}")
 
-        def daily_enter_check():
+        def daily_enter_check() -> bool:
             return self.appear(daily_assets.DAILY_ENTER_CHECK, threshold=30)
 
-        def daily_end():
+        def daily_end() -> bool:
             if self.appear(BATTLE_PREPARATION, offset=(20, 20), interval=2):
                 self.device.click(BACK_ARROW)
             return self.appear(daily_assets.DAILY_ENTER_CHECK, threshold=30) or self.appear(BACK_ARROW, offset=(30, 30))
@@ -186,7 +191,7 @@ class Daily(Combat, DailyEquipment):
         self.device.sleep((1, 1.2))
         return True
 
-    def daily_enter(self, button, skip_first_screenshot=True):
+    def daily_enter(self, button: Button, *, skip_first_screenshot: bool = True) -> bool:
         """从 DAILY_ENTER_CHECK 进入任务；出现战斗返回 True，跳过或领奖完成返回 False。"""
         reward_received = False
         while 1:
@@ -205,30 +210,30 @@ class Daily(Combat, DailyEquipment):
             if self._handle_daily_enter_popup():
                 continue
 
-            result = self._daily_enter_result(reward_received)
+            result = self._daily_enter_result(reward_received=reward_received)
             if result is not None:
                 return result
         return False
 
-    def _click_daily_entry_if_ready(self, button):
+    def _click_daily_entry_if_ready(self, button: Button) -> bool:
         if not self.appear(daily_assets.DAILY_ENTER_CHECK, threshold=30, interval=5):
             return False
         self.device.click(button)
         return True
 
-    def _handle_daily_run_choice(self):
+    def _handle_daily_run_choice(self) -> bool:
         if self.config.Daily_UseDailySkip:
             return self.appear_then_click(daily_assets.DAILY_SKIP, offset=(20, 20), interval=5)
         return self.appear_then_click(daily_assets.DAILY_NORMAL_RUN, offset=(20, 20), interval=5)
 
-    def _handle_daily_enter_popup(self):
+    def _handle_daily_enter_popup(self) -> bool:
         return (
             self.handle_combat_automation_confirm()
             or self.handle_daily_additional()
             or self.handle_popup_confirm("DAILY_SKIP")
         )
 
-    def _daily_enter_result(self, reward_received):
+    def _daily_enter_result(self, *, reward_received: bool) -> bool | None:
         if self.appear(daily_assets.DAILY_SKIP, offset=(20, 20)):
             if reward_received:
                 return False
@@ -240,14 +245,14 @@ class Daily(Combat, DailyEquipment):
             return True
         return None
 
-    def daily_check(self, n=None):
+    def daily_check(self, n: int | None = None) -> None:
         if not n:
             n = self.daily_current
         self.daily_checked.append(n)
         logger.info(f"Checked daily {n}")
         logger.info(f"Checked_list: {self.daily_checked}")
 
-    def daily_run_one(self):
+    def daily_run_one(self) -> None:
         logger.hr("Daily run one", level=1)
         self.ui_ensure(page_daily)
         self.device.sleep(0.2)
@@ -290,7 +295,7 @@ class Daily(Combat, DailyEquipment):
                 self.daily_check()
                 self.next()
                 continue
-            remain = OCR_REMAIN.ocr(self.device.image)
+            remain = cast("int", OCR_REMAIN.ocr(self.device.image))
             if remain == 0:
                 self.daily_check()
                 self.next()
@@ -301,7 +306,7 @@ class Daily(Combat, DailyEquipment):
             self.ui_goto(page_campaign_menu)
             break
 
-    def daily_run(self):
+    def daily_run(self) -> None:
         self.daily_checked = [0]
 
         while 1:
@@ -314,7 +319,7 @@ class Daily(Combat, DailyEquipment):
                 logger.info("Daily clear complete.")
                 break
 
-    def run(self):
+    def run(self) -> None:
         """从任意页面处理每日任务，结束于每日页或战役菜单。"""
         self.daily_run()
 

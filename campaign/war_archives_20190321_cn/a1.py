@@ -74,7 +74,7 @@ MAP.spawn_data = [
 
 
 class EventGrid(Grid):
-    def predict_current_fleet(self):
+    def predict_current_fleet(self) -> bool:
         count = self.relative_hsv_count(area=(-0.5, -3.5, 0.5, -2.5), h=(141 - 3, 141 + 10), shape=(50, 50))
         # 旧活动截图里模板匹配不稳定，只保留颜色阈值。
         return count >= 200
@@ -94,11 +94,11 @@ class Campaign(CampaignBase):
     MAP = MAP
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.fleet_2_push_forward():
             return True
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         return self.fleet_boss.clear_boss()

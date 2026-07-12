@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from module.awaken import assets as awaken_assets
 from module.base.timer import Timer
@@ -17,19 +17,26 @@ UNEXPECTED_AWAKEN_COST_RESULT_TEMPLATE = "Unexpected _get_awaken_cost result: {r
 UNEXPECTED_AWAKEN_ONCE_RESULT_TEMPLATE = "Unexpected awaken_once result: {result}"
 UNEXPECTED_AWAKEN_SHIP_RESULT_TEMPLATE = "Unexpected awaken_ship result: {result}"
 UNKNOWN_AWAKEN_LEVEL_CAP_TEMPLATE = "Unknown Awaken_LevelCap={level_cap}"
+MULTI_REGION_SHIP_LEVEL_MESSAGE = "ship level OCR must contain exactly one region"
+
+type AwakenCostState = bool | Literal["unexpected_array", "invalid"]
+type AwakenCostFailure = Literal["unexpected_array", "insufficient", "timeout"]
+type AwakenOnceResult = Literal["no_exp", "unexpected_array", "insufficient", "timeout", "success"]
+type AwakenShipResult = Literal["level_max", "insufficient", "no_exp", "timeout"]
+type AwakenRunResult = Literal["insufficient", "finish", "timeout"]
 
 
 class ShipLevel(Digit):
-    def after_process(self, result):
-        result = super().after_process(result)
-        if result < 100 or result > 125:
+    def after_process(self, result: str) -> int:
+        value = super().after_process(result)
+        if value < 100 or value > 125:
             logger.warning("Unexpected ship level")
-            result = 0
-        return result
+            value = 0
+        return value
 
 
 class Awaken(Dock):
-    def _get_button_state(self, button: Button):
+    def _get_button_state(self, button: Button) -> bool | None:
         """返回资源是否充足；当前唤醒不需要该资源时返回 None。"""
         # COST_ARRAY 缺失时，COST_COIN 和 COST_CHIP 会右移 54px。
         if button.match(self.device.image, offset=(75, 20)):
@@ -39,7 +46,7 @@ class Awaken(Dock):
             return not self.image_color_count(area, color=(214, 53, 33), threshold=180, count=16)
         return None
 
-    def _get_awaken_cost(self, use_array=False):
+    def _get_awaken_cost(self, *, use_array: bool = False) -> AwakenCostState:
         """返回资源是否充足，或 unexpected_array、invalid 识别状态。"""
         coin = self._get_button_state(awaken_assets.COST_COIN)
         chip = self._get_button_state(awaken_assets.COST_CHIP)
@@ -47,8 +54,8 @@ class Awaken(Dock):
 
         logger.attr("AwakenCost", {"coin": coin, "chip": chip, "array": array})
 
-        def is_right_moved(button):
-            return button.button[0] - button.area[0] > 20
+        def is_right_moved(button: Button) -> bool:
+            return bool(button.button[0] - button.area[0] > 20)
 
         if array is not None:
             if not use_array:
@@ -78,13 +85,13 @@ class Awaken(Dock):
         logger.warning("Invalid awaken cost")
         return "invalid"
 
-    def handle_awaken_finish(self):
+    def handle_awaken_finish(self) -> bool:
         return self.appear_then_click(awaken_assets.AWAKEN_FINISH, offset=(20, 20), interval=1)
 
-    def is_in_awaken(self):
+    def is_in_awaken(self) -> bool:
         return awaken_assets.SHIP_LEVEL_CHECK.match_luma(self.device.image, similarity=0.7)
 
-    def awaken_popup_close(self, skip_first_screenshot=True):
+    def awaken_popup_close(self, *, skip_first_screenshot: bool = True) -> None:
         logger.info("Awaken popup close")
         self.interval_clear(awaken_assets.AWAKEN_CANCEL)
         while 1:
@@ -100,20 +107,25 @@ class Awaken(Dock):
             if self.handle_awaken_finish():
                 continue
 
-    def awaken_once(self, use_array=False, skip_first_screenshot=True):
+    def awaken_once(
+        self,
+        *,
+        use_array: bool = False,
+        skip_first_screenshot: bool = True,
+    ) -> AwakenOnceResult:
         """在唤醒页执行一次，返回 no_exp、unexpected_array、insufficient、timeout 或 success。"""
         logger.hr("Awaken once", level=2)
         result = self._wait_awaken_confirm_button(skip_first_screenshot=skip_first_screenshot)
         if result is not None:
             return result
 
-        result = self._wait_awaken_cost(use_array)
+        result = self._wait_awaken_cost(use_array=use_array)
         if result is not None:
             return result
 
         return self._confirm_awaken_once()
 
-    def _wait_awaken_confirm_button(self, skip_first_screenshot=True):
+    def _wait_awaken_confirm_button(self, *, skip_first_screenshot: bool = True) -> Literal["no_exp"] | None:
         interval = Timer(3, count=6)
         while 1:
             if skip_first_screenshot:
@@ -134,7 +146,7 @@ class Awaken(Dock):
 
         return None
 
-    def _wait_awaken_cost(self, use_array):
+    def _wait_awaken_cost(self, *, use_array: bool) -> AwakenCostFailure | None:
         logger.info("Get awaken cost")
         timeout = Timer(2, count=6).start()
         skip_first_screenshot = True
@@ -144,7 +156,7 @@ class Awaken(Dock):
             else:
                 self.device.screenshot()
 
-            result = self._get_awaken_cost(use_array)
+            result = self._get_awaken_cost(use_array=use_array)
             if result is True:
                 return None
             handled = self._handle_awaken_cost_unready(result, timeout)
@@ -152,7 +164,11 @@ class Awaken(Dock):
                 return handled
         return None
 
-    def _handle_awaken_cost_unready(self, result, timeout):
+    def _handle_awaken_cost_unready(
+        self,
+        result: AwakenCostState,
+        timeout: Timer,
+    ) -> AwakenCostFailure | None:
         if result == "unexpected_array":
             self.awaken_popup_close()
             return result
@@ -171,7 +187,7 @@ class Awaken(Dock):
             return "timeout"
         return None
 
-    def _confirm_awaken_once(self):
+    def _confirm_awaken_once(self) -> Literal["success"]:
         logger.info("Awaken confirm")
         self.interval_clear(awaken_assets.AWAKEN_CONFIRM)
         # 如果经验足够到达下一次唤醒上限，唤醒弹窗可能要 10 秒才出现，点击关闭也需要约 2 秒。
@@ -185,14 +201,14 @@ class Awaken(Dock):
             else:
                 self.device.screenshot()
 
-            should_break, finished = self._handle_awaken_confirm_step(timeout, finished)
+            should_break, finished = self._handle_awaken_confirm_step(timeout, finished=finished)
             if should_break:
                 break
 
         self.device.click_record_clear()
         return "success"
 
-    def _handle_awaken_confirm_step(self, timeout, finished):
+    def _handle_awaken_confirm_step(self, timeout: Timer, *, finished: bool) -> tuple[bool, bool]:
         if timeout.reached():
             logger.warning("Awaken confirm timeout")
             self.awaken_popup_close()
@@ -208,7 +224,7 @@ class Awaken(Dock):
             return False, True
         return False, finished
 
-    def get_ship_level(self, skip_first_screenshot=True):
+    def get_ship_level(self, *, skip_first_screenshot: bool = True) -> int:
         """OCR 100～125 级；识别失败时返回 0。"""
         ocr = ShipLevel(awaken_assets.OCR_SHIP_LEVEL, letter=(255, 255, 255), threshold=128, name="ShipLevel")
         timeout = Timer(2, count=4).start()
@@ -220,7 +236,10 @@ class Awaken(Dock):
                 self.device.screenshot()
 
             if self.is_in_awaken():
-                level = ocr.ocr(self.device.image)
+                level_result = ocr.ocr(self.device.image)
+                if isinstance(level_result, list):
+                    raise ScriptError(MULTI_REGION_SHIP_LEVEL_MESSAGE)
+                level = level_result
                 if level > 0:
                     return level
             if timeout.reached():
@@ -228,7 +247,12 @@ class Awaken(Dock):
                 return level
         return level
 
-    def awaken_ship(self, use_array=False, skip_first_screenshot=True):
+    def awaken_ship(
+        self,
+        *,
+        use_array: bool = False,
+        skip_first_screenshot: bool = True,
+    ) -> AwakenShipResult:
         """在唤醒页重复唤醒至经验不足或达到 120/125 级。
 
         返回 level_max、insufficient、no_exp 或 timeout。
@@ -247,25 +271,24 @@ class Awaken(Dock):
                 if level >= stop_level:
                     logger.info("Awaken ship ended at stop_level")
                     return "level_max"
-                result = self.awaken_once(use_array)
-                if result == "success":
-                    continue
-                if result in ["insufficient", "no_exp"]:
-                    return result
-                if result == "unexpected_array":
-                    # 可能只是误入唤醒确认页，重跑 awaken_once 会重新检查。
-                    continue
-                if result == "timeout":
-                    # 获取资源超时，重试通常可以恢复。
-                    continue
-                message = UNEXPECTED_AWAKEN_ONCE_RESULT_TEMPLATE.format(result=result)
-                raise ScriptError(message)
+                result = self.awaken_once(use_array=use_array)
+                match result:
+                    case "insufficient":
+                        return "insufficient"
+                    case "no_exp":
+                        return "no_exp"
+                    case "success" | "unexpected_array" | "timeout":
+                        # 误入确认页或资源识别超时通常可由下一轮恢复。
+                        continue
+                    case _:
+                        message = UNEXPECTED_AWAKEN_ONCE_RESULT_TEMPLATE.format(result=result)
+                        raise ScriptError(message)
             return "timeout"
 
         logger.warning("Too many awaken trial on one ship")
         return "timeout"
 
-    def awaken_exit(self, skip_first_screenshot=True):
+    def awaken_exit(self, *, skip_first_screenshot: bool = True) -> None:
         """从唤醒页退回船坞。"""
         logger.info("Awaken exit")
         interval = Timer(3)
@@ -291,7 +314,7 @@ class Awaken(Dock):
                 self.device.click(page_main.links[page_dock])
                 continue
 
-    def awaken_run(self, use_array=False, favourite=False):
+    def awaken_run(self, *, use_array: bool = False, favourite: bool = False) -> AwakenRunResult:
         """从任意页面唤醒符合筛选的舰船，返回 insufficient、finish 或 timeout 并停在船坞。"""
         logger.hr("Awaken run", level=1)
         self.ui_ensure(page_dock)
@@ -312,7 +335,7 @@ class Awaken(Dock):
                 result = "finish"
                 break
 
-            result = self.awaken_ship(use_array)
+            result = self.awaken_ship(use_array=use_array)
             self.awaken_exit()
             if result in ["no_exp", "level_max"]:
                 continue
@@ -327,7 +350,7 @@ class Awaken(Dock):
 
         return result
 
-    def run(self):
+    def run(self) -> None:
         favourite = self.config.Awaken_Favourite
         if self.config.Awaken_LevelCap == "level125":
             result = self.awaken_run(use_array=True, favourite=favourite)

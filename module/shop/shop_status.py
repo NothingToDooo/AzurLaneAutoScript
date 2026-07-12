@@ -13,23 +13,23 @@ OCR_SHOP_VOUCHER = Digit(SHOP_VOUCHER, letter=(255, 255, 255), name="OCR_SHOP_VO
 
 
 class ShopStatus(UI):
-    def status_get_gold_coins(self):
-        return OCR_SHOP_GOLD_COINS.ocr(self.device.image)
+    def status_get_gold_coins(self) -> int:
+        return OCR_SHOP_GOLD_COINS.ocr_single(self.device.image)
 
-    def status_get_gems(self):
-        return OCR_SHOP_GEMS.ocr(self.device.image)
+    def status_get_gems(self) -> int:
+        return OCR_SHOP_GEMS.ocr_single(self.device.image)
 
-    def status_get_medal(self):
-        return OCR_SHOP_MEDAL.ocr(self.device.image)
+    def status_get_medal(self) -> int:
+        return OCR_SHOP_MEDAL.ocr_single(self.device.image)
 
-    def status_get_merit(self):
-        return OCR_SHOP_MERIT.ocr(self.device.image)
+    def status_get_merit(self) -> int:
+        return OCR_SHOP_MERIT.ocr_single(self.device.image)
 
-    def status_get_guild_coins(self):
-        return OCR_SHOP_GUILD_COINS.ocr(self.device.image)
+    def status_get_guild_coins(self) -> int:
+        return OCR_SHOP_GUILD_COINS.ocr_single(self.device.image)
 
-    def status_get_core(self):
-        return OCR_SHOP_CORE.ocr(self.device.image)
+    def status_get_core(self) -> int:
+        return OCR_SHOP_CORE.ocr_single(self.device.image)
 
-    def status_get_voucher(self):
-        return OCR_SHOP_VOUCHER.ocr(self.device.image)
+    def status_get_voucher(self) -> int:
+        return OCR_SHOP_VOUCHER.ocr_single(self.device.image)

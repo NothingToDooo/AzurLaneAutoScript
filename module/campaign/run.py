@@ -4,7 +4,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 from module.campaign.campaign_base import CampaignBase
 from module.campaign.campaign_event import CampaignEvent
@@ -30,6 +30,8 @@ from module.ui.page import page_campaign
 
 if TYPE_CHECKING:
     from module.config.config import AzurLaneConfig
+
+type CampaignMode = Literal["normal", "hard"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,7 +135,8 @@ class CampaignRun(CampaignEvent):
             and (self.loaded_stage is not None) == is_stage
         )
 
-    def _stage_for_reference(self, name: str, folder: str) -> str:
+    @staticmethod
+    def _stage_for_reference(name: str, folder: str) -> str:
         if folder.startswith("campaign_"):
             return "-".join(name.split("_")[1:3])
         if folder.startswith(("event", "war_archives")):
@@ -241,7 +244,7 @@ class CampaignRun(CampaignEvent):
         self.config.Scheduler_Enable = False
         return True
 
-    def _triggered_oil_limit(self, oil_check=True) -> bool:
+    def _triggered_oil_limit(self, *, oil_check: bool = True) -> bool:
         if not oil_check or self.get_oil() >= max(500, self.config.StopCondition_OilLimit):
             return False
 
@@ -265,7 +268,7 @@ class CampaignRun(CampaignEvent):
         self.config.Scheduler_Enable = False
         return True
 
-    def _triggered_event_pt_limit(self, oil_check=True) -> bool:
+    def _triggered_event_pt_limit(self, *, oil_check: bool = True) -> bool:
         if not (oil_check and self.campaign.event_pt_limit_triggered()):
             return False
 
@@ -280,7 +283,7 @@ class CampaignRun(CampaignEvent):
         self.handle_task_balancer()
         return True
 
-    def _triggered_task_balancer_limit(self, oil_check=True) -> bool:
+    def _triggered_task_balancer_limit(self, *, oil_check: bool = True) -> bool:
         if not (
             oil_check and self.run_count >= 1 and self.config.TaskBalancer_Enable and self.triggered_task_balancer()
         ):
@@ -290,33 +293,38 @@ class CampaignRun(CampaignEvent):
         self.handle_task_balancer()
         return True
 
-    def triggered_stop_condition(self, oil_check=True):
+    def triggered_stop_condition(self, *, oil_check: bool = True) -> bool:
         return (
             self._triggered_run_count_limit()
             or self._triggered_reach_level_limit()
-            or self._triggered_oil_limit(oil_check)
+            or self._triggered_oil_limit(oil_check=oil_check)
             or self._triggered_auto_search_oil_limit()
             or self._triggered_get_new_ship_limit()
-            or self._triggered_event_pt_limit(oil_check)
+            or self._triggered_event_pt_limit(oil_check=oil_check)
             or self._triggered_auto_search_coin_limit()
-            or self._triggered_task_balancer_limit(oil_check)
+            or self._triggered_task_balancer_limit(oil_check=oil_check)
         )
 
-    def _triggered_app_restart(self):
+    def _triggered_app_restart(self) -> bool:
         if not self.campaign.emotion.is_ignore and self.campaign.emotion.triggered_bug():
             logger.info("Triggered restart avoid emotion bug")
             return True
 
         return False
 
-    def handle_app_restart(self):
+    def handle_app_restart(self) -> bool:
         if self._triggered_app_restart():
             self.config.task_call("Restart")
             return True
 
         return False
 
-    def handle_stage_name(self, name, folder, mode="normal"):
+    def handle_stage_name(
+        self,
+        name: str,
+        folder: str,
+        mode: CampaignMode = "normal",
+    ) -> tuple[str, str]:
         """归一化活动别名并返回 (关卡名, 活动目录)；vsp、muse sp 等特殊 SP 统一映射到 sp.py。"""
         name = to_map_file_name(name)
         # 宝石委托按关卡名自动选择活动或主线目录。
@@ -325,12 +333,13 @@ class CampaignRun(CampaignEvent):
                 logger.info(f"Stage name {name} is from campaign_main")
                 folder = "campaign_main"
             else:
-                folder = self.config.cross_get("GemsFarming.Campaign.Event")
-                if folder is not None:
-                    logger.info(f"Stage name {name} is from event {folder}")
-                else:
+                configured_folder = self.config.cross_get("GemsFarming.Campaign.Event")
+                if not isinstance(configured_folder, str) or not configured_folder:
                     logger.warning("Cannot get the latest event, fallback to campaign_main")
                     folder = "campaign_main"
+                else:
+                    folder = configured_folder
+                    logger.info(f"Stage name {name} is from event {folder}")
         catalog = self._effective_content_catalog()
         name = _normalize_stage_alias(name, folder, catalog)
         policy_config = cast("StagePolicyConfig", self.config)
@@ -348,21 +357,21 @@ class CampaignRun(CampaignEvent):
         _apply_campaign_folder_policies(folder, policy_config, catalog)
         return name, folder
 
-    def can_use_auto_search_continue(self):
+    def can_use_auto_search_continue(self) -> bool:
         # 自律寻敌菜单内无法更新地图信息；设置地图成就条件时必须关闭。
         if self.config.StopCondition_MapAchievement != "non_stop":
             return False
 
         return self.run_count > 0 and self.campaign.map_is_auto_search
 
-    def handle_commission_notice(self):
+    def handle_commission_notice(self) -> None:
         """在 page_campaign 检查委托通知；命中时切换委托任务并抛出 TaskEnd。"""
         if self.campaign.commission_notice_show_at_campaign():
             logger.info("Commission notice found")
             self.config.task_call("Commission", force_call=True)
             self.config.task_stop("Commission notice found")
 
-    def _ensure_campaign_run_ui(self, mode) -> None:
+    def _ensure_campaign_run_ui(self, mode: CampaignMode) -> None:
         self.device.stuck_record_clear()
         self.device.click_record_clear()
         if not self.device.has_cached_image:
@@ -404,7 +413,13 @@ class CampaignRun(CampaignEvent):
 
         return False
 
-    def run(self, name, folder="campaign_main", mode="normal", total=0):
+    def run(
+        self,
+        name: str,
+        folder: str = "campaign_main",
+        mode: CampaignMode = "normal",
+        total: int = 0,
+    ) -> None:
         """运行指定地图文件；mode 接受 normal 或 hard。"""
         name, folder = self.handle_stage_name(name, folder, mode=mode)
         self.config.override(Campaign_Name=name, Campaign_Event=folder)
@@ -428,7 +443,7 @@ class CampaignRun(CampaignEvent):
             # 困难模式还需检查剩余次数。
             if self.ui_page_appear(page_campaign) and MODE_SWITCH_1.get(main=self) == "normal":
                 ocr_hard_remain = importlib.import_module("module.hard.hard").OCR_HARD_REMAIN
-                remain = ocr_hard_remain.ocr(self.device.image)
+                remain = ocr_hard_remain.ocr_single(self.device.image)
                 if not remain:
                     logger.info("Remaining number of times of hard mode campaign_main is 0, delay task to next day")
                     self.config.task_delay(server_update=True)

@@ -1,13 +1,24 @@
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, override
+
+import numpy as np
 
 from module.combat import combat
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from module.base.button import Button, MatchOffset
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
+    from module.combat.combat import CombatEnd
 
 
 class _FakeDevice:
     def __init__(self) -> None:
-        self.clicks: list[object] = []
+        self.clicks: list[Button] = []
 
-    def click(self, button) -> None:
+    def click(self, button: Button) -> None:
         self.clicks.append(button)
 
 
@@ -15,7 +26,13 @@ class _EmergencyRepairContext(combat.Combat):
     config: SimpleNamespace
     device: _FakeDevice
 
-    def __init__(self, *, hp, appearing=(), confirm=False) -> None:
+    def __init__(
+        self,
+        *,
+        hp: list[int | float],
+        appearing: tuple[Button, ...] = (),
+        confirm: bool = False,
+    ) -> None:
         self.config = SimpleNamespace(
             HpControl_UseEmergencyRepair=True,
             HpControl_RepairUseSingleThreshold=0.2,
@@ -25,30 +42,64 @@ class _EmergencyRepairContext(combat.Combat):
         self.appearing = set(appearing)
         self.confirm = confirm
         self.device = _FakeDevice()
-        self.wait_disappear_calls = []
-        self.wait_stable_calls = []
-        self.interval_clears = []
+        self.wait_disappear_calls: list[tuple[Button, dict[str, MatchOffset | None]]] = []
+        self.wait_stable_calls: list[Button] = []
+        self.interval_clears: list[Button | list[Button] | tuple[Button, ...] | None] = []
 
-    def appear_then_click(self, button, *_args: object, **_kwargs):
+    @override
+    def appear_then_click(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 30,
+    ) -> bool:
+        del offset, interval, similarity, threshold
         return button == combat.combat_assets.EMERGENCY_REPAIR_CONFIRM and self.confirm
 
-    def appear(self, button, *_args: object, **_kwargs):
+    @override
+    def appear(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 10,
+    ) -> bool:
+        del offset, interval, similarity, threshold
         return button in self.appearing
 
-    def wait_until_disappear(self, button, *_args: object, **kwargs) -> None:
-        self.wait_disappear_calls.append((button, kwargs))
+    @override
+    def wait_until_disappear(self, button: Button, offset: MatchOffset | None = 0) -> None:
+        self.wait_disappear_calls.append((button, {"offset": offset}))
 
-    def wait_until_stable(self, button, *_args: object, **_kwargs: object) -> None:
+    @override
+    def wait_until_stable(
+        self,
+        button: Button,
+        timer: Timer | None = None,
+        timeout: Timer | None = None,
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> None:
+        del timer, timeout, skip_first_screenshot
         self.wait_stable_calls.append(button)
 
-    def interval_clear(self, button, *_args: object, **_kwargs: object) -> None:
+    @override
+    def interval_clear(
+        self,
+        button: Button | list[Button] | tuple[Button, ...] | None,
+        interval: float = 3,
+    ) -> None:
+        del interval
         self.interval_clears.append(button)
 
 
 class _CombatLoopContext(combat.Combat):
     device: SimpleNamespace
 
-    def __init__(self, *, iterations) -> None:
+    def __init__(self, *, iterations: int) -> None:
         self.iterations = iterations
         self.device = SimpleNamespace(
             screenshot_interval_set=lambda *_args, **_kwargs: None,
@@ -56,8 +107,10 @@ class _CombatLoopContext(combat.Combat):
             click_record_clear=lambda: None,
         )
 
-    def loop(self, *_args: object, **_kwargs: object):
-        yield from range(self.iterations)
+    def loop(self, *, skip_first: bool = True, timeout: float | Timer | None = None) -> Iterator[ImageArray]:
+        del skip_first, timeout
+        for _ in range(self.iterations):
+            yield np.zeros((1, 1, 3), dtype=np.uint8)
 
 
 class _CombatExecuteContext(_CombatLoopContext):
@@ -75,124 +128,158 @@ class _CombatExecuteContext(_CombatLoopContext):
     def combat_manual_reset(self) -> None:
         pass
 
-    def handle_combat_automation_confirm(self):
+    @override
+    def handle_combat_automation_confirm(self) -> bool:
         return False
 
-    def handle_story_skip(self):
+    @override
+    def handle_story_skip(self) -> bool:
         return False
 
-    def handle_combat_auto(self, auto, *_args: object, **_kwargs: object):
-        _ = auto
+    @override
+    def handle_combat_auto(self, auto: str) -> bool:
+        del auto
         return False
 
-    def handle_combat_manual(self, auto, *_args: object, **_kwargs: object):
-        _ = auto
+    @override
+    def handle_combat_manual(self, auto: str) -> bool:
+        del auto
         return False
 
-    def handle_submarine_call(self, submarine="do_not_use", *_args: object, **_kwargs: object):
-        _ = submarine
+    @override
+    def handle_submarine_call(self, submarine: str = "do_not_use") -> bool:
+        del submarine
         return False
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2):
-        _ = (name, offset, interval)
+    @override
+    def handle_popup_confirm(
+        self,
+        name: str = "",
+        offset: MatchOffset | None = None,
+        interval: float = 2,
+    ) -> bool:
+        del offset, interval
         self.popup_calls.append(name)
         return len(self.popup_calls) == 1
 
-    def handle_urgent_commission(self):
+    @override
+    def handle_urgent_commission(self) -> bool:
         return False
 
-    def handle_guild_popup_cancel(self):
+    @override
+    def handle_guild_popup_cancel(self) -> bool:
         return False
 
-    def handle_vote_popup(self):
+    @override
+    def handle_vote_popup(self) -> bool:
         return False
 
-    def handle_mission_popup_ack(self):
+    @override
+    def handle_mission_popup_ack(self) -> bool:
         return False
 
-    def handle_battle_status(self):
+    def handle_battle_status(self) -> bool:
         self.status_calls += 1
         return True
 
-    def handle_get_items(self):
+    @override
+    def handle_get_items(self) -> bool:
         return False
 
 
 class _CombatStatusContext(_CombatLoopContext):
     config: SimpleNamespace
 
-    def __init__(self, *, iterations=1) -> None:
+    def __init__(self, *, iterations: int = 1) -> None:
         super().__init__(iterations=iterations)
         self.config = SimpleNamespace(GET_SHIP_TRIGGERED=False)
-        self.story_skip_results = []
-        self.get_ship_results = []
-        self.get_items_results = []
-        self.popup_results = []
-        self.battle_status_results = []
-        self.exp_info_results = []
-        self.in_stage_results = []
-        self.enemy_searching_results = []
-        self.auto_search_exit_results = []
-        self.mis_click_results = []
-        self.appear_calls = []
+        self.story_skip_results: list[bool] = []
+        self.get_ship_results: list[bool] = []
+        self.get_items_results: list[bool] = []
+        self.popup_results: list[bool] = []
+        self.battle_status_results: list[bool] = []
+        self.exp_info_results: list[bool] = []
+        self.in_stage_results: list[bool] = []
+        self.enemy_searching_results: list[bool] = []
+        self.auto_search_exit_results: list[bool] = []
+        self.mis_click_results: list[bool] = []
+        self.appear_calls: list[tuple[Button, dict[str, MatchOffset | None]]] = []
         self.battle_status_calls = 0
 
     @staticmethod
-    def _next(results):
+    def _next(results: list[bool]) -> bool:
         if results:
             return results.pop(0)
         return False
 
-    def handle_story_skip(self):
+    def handle_story_skip(self) -> bool:
         return self._next(self.story_skip_results)
 
-    def handle_get_ship(self):
+    def handle_get_ship(self) -> bool:
         return self._next(self.get_ship_results)
 
-    def handle_get_items(self):
+    def handle_get_items(self) -> bool:
         return self._next(self.get_items_results)
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2):
-        _ = (name, offset, interval)
+    def handle_popup_confirm(
+        self,
+        name: str = "",
+        offset: MatchOffset | None = None,
+        interval: float = 2,
+    ) -> bool:
+        del name, offset, interval
         return self._next(self.popup_results)
 
-    def handle_battle_status(self):
+    def handle_battle_status(self) -> bool:
         self.battle_status_calls += 1
         return self._next(self.battle_status_results)
 
-    def handle_exp_info(self):
+    def handle_exp_info(self) -> bool:
         return self._next(self.exp_info_results)
 
-    def handle_urgent_commission(self):
+    @override
+    def handle_urgent_commission(self) -> bool:
         return False
 
-    def handle_guild_popup_cancel(self):
+    @override
+    def handle_guild_popup_cancel(self) -> bool:
         return False
 
-    def handle_vote_popup(self):
+    @override
+    def handle_vote_popup(self) -> bool:
         return False
 
-    def handle_mission_popup_ack(self):
+    @override
+    def handle_mission_popup_ack(self) -> bool:
         return False
 
-    def handle_auto_search_exit(self):
+    def handle_auto_search_exit(self) -> bool:
         return self._next(self.auto_search_exit_results)
 
-    def handle_combat_mis_click(self):
+    def handle_combat_mis_click(self) -> bool:
         return self._next(self.mis_click_results)
 
-    def handle_in_stage(self):
+    def handle_in_stage(self) -> bool:
         return self._next(self.in_stage_results)
 
-    def handle_in_map_with_enemy_searching(self):
+    def handle_in_map_with_enemy_searching(self) -> bool:
         return self._next(self.enemy_searching_results)
 
-    def handle_in_map_no_enemy_searching(self):
+    @override
+    def handle_in_map_no_enemy_searching(self) -> bool:
         return False
 
-    def appear(self, button, *_args: object, **kwargs):
-        self.appear_calls.append((button, kwargs))
-        return button == combat.BACK_ARROW and kwargs == {"offset": (30, 30)}
+    def appear(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 10,
+    ) -> bool:
+        del interval, similarity, threshold
+        self.appear_calls.append((button, {"offset": offset}))
+        return button == combat.BACK_ARROW and offset == (30, 30)
 
 
 class _CombatOrchestrationContext(combat.Combat):
@@ -207,23 +294,39 @@ class _CombatOrchestrationContext(combat.Combat):
             Submarine_Mode="every_combat",
         )
         vars(self)["emotion"] = SimpleNamespace(is_calculate=False)
-        self.preparation_calls = []
-        self.execute_calls = []
-        self.status_calls = []
+        self.preparation_calls: list[dict[str, bool | str | int]] = []
+        self.execute_calls: list[dict[str, str]] = []
+        self.status_calls: list[dict[str, CombatEnd | None]] = []
 
-    def combat_preparation(self, *_args: object, **kwargs) -> None:
-        self.preparation_calls.append(kwargs)
+    def combat_preparation(
+        self,
+        *,
+        balance_hp: bool = False,
+        emotion_reduce: bool = False,
+        auto: str = "combat_auto",
+        fleet_index: int = 1,
+    ) -> None:
+        self.preparation_calls.append(
+            {
+                "balance_hp": balance_hp,
+                "emotion_reduce": emotion_reduce,
+                "auto": auto,
+                "fleet_index": fleet_index,
+            }
+        )
 
-    def combat_execute(self, *_args: object, **kwargs) -> None:
-        self.execute_calls.append(kwargs)
+    def combat_execute(self, *, auto: str = "combat_auto", submarine: str = "do_not_use") -> None:
+        self.execute_calls.append({"auto": auto, "submarine": submarine})
 
-    def combat_status(self, *_args: object, **kwargs) -> None:
-        self.status_calls.append(kwargs)
+    def combat_status(self, expected_end: CombatEnd | None = None) -> None:
+        self.status_calls.append({"expected_end": expected_end})
 
 
 def test_combat_orchestrates_config_defaults_for_selected_fleet() -> None:
     handler = _CombatOrchestrationContext()
-    expected_end = object()
+
+    def expected_end() -> bool:
+        return False
 
     handler.combat(expected_end=expected_end, fleet_index=2)
 

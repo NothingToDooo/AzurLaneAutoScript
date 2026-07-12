@@ -7,19 +7,41 @@ from module.logger import logger
 from module.map.map_grids import SelectedGrids
 from module.os.map import OSMap
 
+if TYPE_CHECKING:
+    from module.os.map import RescanMode
+
 INVALID_OPSI_NEXT_RESET_TEMPLATE = "Invalid OpsiNextReset: {next_reset} < {now}"
 
 
 class OpsiCrossMonth(OSMap):
     if TYPE_CHECKING:
 
-        def os_finish_daily_mission(self, question=True, rescan=None) -> int: ...
+        def os_finish_daily_mission(
+            self,
+            *,
+            question: bool = True,
+            rescan: RescanMode | bool | None = None,
+        ) -> int: ...
 
-    def os_cross_month_end(self):
+    def _cross_config_int(self, path: str) -> int:
+        value = self.config.cross_get(path)
+        if isinstance(value, bool) or not isinstance(value, int):
+            message = f"Cross-task config {path} must be an integer"
+            raise ScriptError(message)
+        return value
+
+    def _cross_config_str(self, path: str) -> str:
+        value = self.config.cross_get(path)
+        if not isinstance(value, str):
+            message = f"Cross-task config {path} must be a string"
+            raise ScriptError(message)
+        return value
+
+    def os_cross_month_end(self) -> None:
         self.config.task_delay(target=get_os_next_reset() - timedelta(minutes=10))
         self.config.task_stop()
 
-    def os_cross_month(self):
+    def os_cross_month(self) -> None:
         next_reset = get_os_next_reset()
         self._validate_opsi_cross_month_start(next_reset)
         self._wait_until_opsi_reset(next_reset)
@@ -28,7 +50,7 @@ class OpsiCrossMonth(OSMap):
         self._clear_opsi_monthly_items()
         self._run_opsi_meowfficer_farming_after_reset()
 
-    def _validate_opsi_cross_month_start(self, next_reset):
+    def _validate_opsi_cross_month_start(self, next_reset: datetime) -> None:
         now = datetime.now()
         logger.attr("OpsiNextReset", next_reset)
 
@@ -47,7 +69,7 @@ class OpsiCrossMonth(OSMap):
             )
             self.os_cross_month_end()
 
-    def _wait_until_opsi_reset(self, next_reset):
+    def _wait_until_opsi_reset(self, next_reset: datetime) -> None:
         logger.hr("Wait until OpSi reset", level=1)
         logger.warning("ALAS is now waiting for next OpSi reset, please DO NOT touch the game during wait")
         while True:
@@ -60,18 +82,18 @@ class OpsiCrossMonth(OSMap):
 
         logger.hr("OpSi reset", level=3)
 
-    def _disable_opsi_cross_month_switches(self):
-        def false_func(*_args, **_kwargs):
+    def _disable_opsi_cross_month_switches(self) -> None:
+        def false_func() -> bool:
             return False
 
         vars(self)["is_in_opsi_explore"] = false_func
         vars(self.config)["task_switched"] = false_func
 
-    def _clear_opsi_daily_after_reset(self):
+    def _clear_opsi_daily_after_reset(self) -> None:
         logger.hr("OpSi clear daily", level=1)
         self.config.override(
             OpsiGeneral_DoRandomMapEvent=True,
-            OpsiFleet_Fleet=self.config.cross_get("OpsiDaily.OpsiFleet.Fleet"),
+            OpsiFleet_Fleet=self._cross_config_int("OpsiDaily.OpsiFleet.Fleet"),
             OpsiFleet_Submarine=False,
         )
         count = 0
@@ -95,7 +117,7 @@ class OpsiCrossMonth(OSMap):
             if success:
                 break
 
-    def _clear_opsi_monthly_items(self):
+    def _clear_opsi_monthly_items(self) -> None:
         logger.hr("OS clear abyssal", level=1)
         self.config.override(
             OpsiGeneral_DoRandomMapEvent=False,
@@ -103,9 +125,9 @@ class OpsiCrossMonth(OSMap):
             STORY_OPTION=0,
             OpsiGeneral_UseLogger=True,
             OpsiObscure_ForceRun=True,
-            OpsiFleet_Fleet=self.config.cross_get("OpsiObscure.OpsiFleet.Fleet"),
+            OpsiFleet_Fleet=self._cross_config_int("OpsiObscure.OpsiFleet.Fleet"),
             OpsiFleet_Submarine=False,
-            OpsiFleetFilter_Filter=self.config.cross_get("OpsiAbyssal.OpsiFleetFilter.Filter"),
+            OpsiFleetFilter_Filter=self._cross_config_str("OpsiAbyssal.OpsiFleetFilter.Filter"),
             OpsiAbyssal_ForceRun=True,
         )
         self._clear_opsi_abyssal_items()
@@ -113,7 +135,7 @@ class OpsiCrossMonth(OSMap):
         logger.hr("OS clear obscure", level=1)
         self._clear_opsi_obscure_items()
 
-    def _clear_opsi_abyssal_items(self):
+    def _clear_opsi_abyssal_items(self) -> None:
         while self.storage_get_next_item("ABYSSAL", use_logger=True):
             self.zone_init()
             result = self.run_abyssal()
@@ -121,7 +143,7 @@ class OpsiCrossMonth(OSMap):
                 self.map_exit()
             self.fleet_repair(revert=False)
 
-    def _clear_opsi_obscure_items(self):
+    def _clear_opsi_obscure_items(self) -> None:
         while self.storage_get_next_item("OBSCURE", use_logger=True):
             self.zone_init()
             self.fleet_set(self.config.OpsiFleet_Fleet)
@@ -130,14 +152,14 @@ class OpsiCrossMonth(OSMap):
             self.map_exit()
             self.handle_after_auto_search()
 
-    def _run_opsi_meowfficer_farming_after_reset(self):
+    def _run_opsi_meowfficer_farming_after_reset(self) -> None:
         logger.hr("OS meowfficer farming, hazard_level=3", level=1)
         self.config.override(
             OpsiGeneral_DoRandomMapEvent=True,
             OpsiGeneral_BuyActionPointLimit=0,
             HOMO_EDGE_DETECT=True,
             STORY_OPTION=-2,
-            OpsiFleet_Fleet=self.config.cross_get("OpsiMeowfficerFarming.OpsiFleet.Fleet"),
+            OpsiFleet_Fleet=self._cross_config_int("OpsiMeowfficerFarming.OpsiFleet.Fleet"),
             OpsiFleet_Submarine=False,
             OpsiMeowfficerFarming_ActionPointPreserve=0,
             OpsiMeowfficerFarming_HazardLevel=3,

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from module.base.timer import Timer
 from module.config.utils import get_server_last_update
@@ -22,12 +23,14 @@ DRBP_BUY_PRIZE = {
 }
 INVALID_SHIPYARD_RARITY_TEMPLATE = "Invalid rarity in _shipyard_get_cost: {rarity}"
 
+type ShipyardRarity = Literal["PR", "DR"]
+
 
 class RewardShipyard(ShipyardUI):
-    _shipyard_bp_rarity = "PR"
+    _shipyard_bp_rarity: ShipyardRarity = "PR"
     _coin_count = 0
 
-    def _shipyard_get_cost(self, amount, rarity=None):
+    def _shipyard_get_cost(self, amount: int, rarity: ShipyardRarity | None = None) -> int:
         """返回指定购买序号与 DR/PR 稀有度的单张蓝图价格。"""
         if rarity is None:
             rarity = self._shipyard_bp_rarity
@@ -45,7 +48,7 @@ class RewardShipyard(ShipyardUI):
         message = INVALID_SHIPYARD_RARITY_TEMPLATE.format(rarity=rarity)
         raise ScriptError(message)
 
-    def _shipyard_calculate(self, start, count, pay=False):
+    def _shipyard_calculate(self, start: int, count: int, *, pay: bool = False) -> tuple[int, int]:
         """返回下一购买序号和当前可买数量；pay=True 时同时扣减 _coin_count。"""
         if start <= 0 or count <= 0:
             return start, count
@@ -69,13 +72,13 @@ class RewardShipyard(ShipyardUI):
             logger.info(f"Can buy all {count} BPs")
         return i + 1, count
 
-    def _shipyard_buy_calc(self, start, count):
+    def _shipyard_buy_calc(self, start: int, count: int) -> tuple[int, int]:
         return self._shipyard_calculate(start, count, pay=False)
 
-    def _shipyard_pay_calc(self, start, count):
+    def _shipyard_pay_calc(self, start: int, count: int) -> tuple[int, int]:
         return self._shipyard_calculate(start, count, pay=True)
 
-    def _shipyard_buy(self, count):
+    def _shipyard_buy(self, count: int) -> None:
         """在 DEV 或 FATE 中购买最多 count 张蓝图。"""
         logger.hr("shipyard_buy")
         prev = 1
@@ -100,7 +103,7 @@ class RewardShipyard(ShipyardUI):
 
             start, count = self._shipyard_buy_calc(start, remain)
 
-    def _shipyard_use(self, index):
+    def _shipyard_use(self, index: int) -> None:
         """在 DEV 或 FATE 中消耗指定舰船的剩余蓝图。"""
         logger.hr("shipyard_use")
         count = self._shipyard_get_bp_count(index)
@@ -115,7 +118,7 @@ class RewardShipyard(ShipyardUI):
 
             count = self._shipyard_get_bp_count(index)
 
-    def shipyard_run(self, series, index, count):
+    def shipyard_run(self, series: int, index: int, count: int) -> bool:
         """运行系列 1～4、舰船 1～6 的蓝图使用和购买；发生页面跳转即返回 True。"""
         if count <= 0:
             return False
@@ -151,7 +154,7 @@ class RewardShipyard(ShipyardUI):
 
         return True
 
-    def run(self):
+    def run(self) -> None:
         """从任意页面执行船坞蓝图任务，结束于船坞页。"""
         if self.config.Shipyard_BuyAmount <= 0 and self.config.ShipyardDr_BuyAmount <= 0:
             self.config.Scheduler_Enable = False

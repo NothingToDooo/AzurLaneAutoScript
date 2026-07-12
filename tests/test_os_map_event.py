@@ -1,61 +1,85 @@
+from typing import TYPE_CHECKING, override
+
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2
 from module.os_handler import assets as os_assets
 from module.os_handler.map_event import MapEventHandler
+
+if TYPE_CHECKING:
+    from module.base.button import Button, MatchOffset
+    from module.device.control import ButtonTarget
 
 
 class _FakeDevice:
     def __init__(self) -> None:
         self.clicks = []
 
-    def click(self, button) -> None:
+    def click(self, button: ButtonTarget) -> None:
         self.clicks.append(button)
 
 
 class _MapGetItemsContext(MapEventHandler):
     device: _FakeDevice
 
-    def __init__(self, *, in_map=False, appearing=()) -> None:
+    def __init__(self, *, in_map: bool = False, appearing: tuple[Button, ...] = ()) -> None:
         self._in_map = in_map
         self.appearing = set(appearing)
         self.appear_calls = []
         self.device = _FakeDevice()
 
-    def is_in_map(self):
+    @override
+    def is_in_map(self) -> bool:
         return self._in_map
 
-    def appear(self, button, *_args: object, **kwargs):
-        self.appear_calls.append((button, kwargs))
+    @override
+    def appear(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 10,
+    ) -> bool:
+        del offset, similarity, threshold
+        self.appear_calls.append((button, {"interval": interval}))
         return button in self.appearing
 
 
 class _MapEventContext(MapEventHandler):
-    def __init__(self, results) -> None:
+    def __init__(self, results: dict[str, bool]) -> None:
         self.results = results
         self.calls = []
 
-    def _handle(self, name):
+    def _handle(self, name: str) -> bool:
         self.calls.append(name)
         return self.results.get(name, False)
 
-    def handle_map_get_items(self, *_args: object, **_kwargs: object):
+    @override
+    def handle_map_get_items(self, interval: float = 5) -> bool:
+        del interval
         return self._handle("map_get_items")
 
-    def handle_os_game_tips(self):
+    @override
+    def handle_os_game_tips(self) -> bool:
         return self._handle("os_game_tips")
 
-    def handle_map_archives(self):
+    @override
+    def handle_map_archives(self) -> bool:
         return self._handle("map_archives")
 
-    def handle_guild_popup_cancel(self):
+    @override
+    def handle_guild_popup_cancel(self) -> bool:
         return self._handle("guild_popup_cancel")
 
-    def handle_ash_popup(self):
+    @override
+    def handle_ash_popup(self) -> bool:
         return self._handle("ash_popup")
 
-    def handle_urgent_commission(self):
+    @override
+    def handle_urgent_commission(self) -> bool:
         return self._handle("urgent_commission")
 
-    def handle_story_skip(self):
+    @override
+    def handle_story_skip(self) -> bool:
         return self._handle("story_skip")
 
 

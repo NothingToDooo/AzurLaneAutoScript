@@ -1,7 +1,7 @@
 import time
 import warnings
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import cv2
 import numpy as np
@@ -15,7 +15,12 @@ from module.map_detection.utils import Lines, Points, get_map_inner, points_to_a
 from module.map_detection.utils_assets import ASSETS
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from module.base.type_alias import ImageArray, NumericArray, Point, Scalar
     from module.config.config import AzurLaneConfig
+    from module.config.config_manual import FindPeaksParameter
+    from module.map.type_alias import GridLocation
 
 warnings.filterwarnings("ignore")
 
@@ -27,7 +32,7 @@ VANISH_POINT_TOO_CLOSE_MESSAGE = "Vanish point and distant point too close"
 @dataclass(frozen=True, slots=True)
 class LineDetectionOptions:
     is_horizontal: bool
-    peak_params: dict
+    peak_params: dict[str, FindPeaksParameter]
     hough_threshold: int
     theta_threshold: float
     pad: int = 0
@@ -36,7 +41,7 @@ class LineDetectionOptions:
 class Perspective:
     """从地图截图检测透视消失点、远点与网格线。"""
 
-    image: np.ndarray
+    image: ImageArray
     config: AzurLaneConfig
     # 四条边可为 bool，或实现 __bool__。
     left_edge: Lines
@@ -47,14 +52,14 @@ class Perspective:
     horizontal: Lines
     vertical: Lines
     crossings: Points
-    vanish_point: tuple
-    distant_point: tuple
-    map_inner: np.ndarray
+    vanish_point: NumericArray
+    distant_point: tuple[Scalar, Scalar]
+    map_inner: NumericArray
 
-    def __init__(self, config):
+    def __init__(self, config: AzurLaneConfig) -> None:
         self.config = config
 
-    def load(self, image):
+    def load(self, image: ImageArray) -> None:
         """加载 (720, 1280, 3) 截图。"""
         start_time = time.time()
         self.image = image
@@ -146,7 +151,7 @@ class Perspective:
             f"Vertical: {len(self.vertical)} ({len(vertical)} inner, {len(edge_v)} edge)"
         )
 
-    def load_image(self, image):
+    def load_image(self, image: ImageArray) -> ImageArray:
         """裁剪检测区域并屏蔽 UI，返回反色单通道图。"""
         image = rgb2gray(crop(image, self.config.DETECTING_AREA, copy=False))
         cv2.bitwise_and(image, ASSETS.ui_mask, dst=image)
@@ -154,7 +159,14 @@ class Perspective:
         return image
 
     @staticmethod
-    def find_peaks(image, is_horizontal, param, pad=0, mask=None):
+    def find_peaks(
+        image: ImageArray,
+        *,
+        is_horizontal: bool,
+        param: dict[str, FindPeaksParameter],
+        pad: int = 0,
+        mask: ImageArray | None = None,
+    ) -> ImageArray:
         """沿指定轴提取峰值，应用可选填充与二维掩码后保持原图形状。"""
         if is_horizontal:
             image = image.T
@@ -171,9 +183,10 @@ class Perspective:
             out = out.T
         if mask is not None:
             out &= mask
-        return out
+        return cast("ImageArray", out)
 
-    def hough_lines(self, image, is_horizontal, threshold, theta):
+    @staticmethod
+    def hough_lines(image: ImageArray, *, is_horizontal: bool, threshold: int, theta: float) -> Lines:
         """从峰值图提取水平或垂直 Lines；theta 的单位为度。"""
         lines = cv2.HoughLines(image, 1, np.pi / 180, threshold)
         if lines is None:
@@ -186,7 +199,7 @@ class Perspective:
             lines = [[-rho, theta - np.pi] if rho < 0 else [rho, theta] for rho, theta in lines]
         return Lines(lines, is_horizontal=is_horizontal)
 
-    def detect_lines(self, image, options):
+    def detect_lines(self, image: ImageArray, options: LineDetectionOptions) -> Lines:
         peaks = self.find_peaks(
             image,
             is_horizontal=options.is_horizontal,
@@ -202,11 +215,16 @@ class Perspective:
         )
 
     @staticmethod
-    def show_array(arr):
+    def show_array(arr: NumericArray) -> None:
         image = Image.fromarray(arr.astype(np.uint8), mode="L")
         image.show()
 
-    def draw(self, lines=None, bg=None, expend=0):
+    def draw(
+        self,
+        lines: Lines | None = None,
+        bg: ImageArray | Image.Image | None = None,
+        expend: int = 0,
+    ) -> None:
         image = (self.image if bg is None else bg).copy()
         if isinstance(image, np.ndarray):
             image = Image.fromarray(image)
@@ -228,34 +246,34 @@ class Perspective:
 
         image.show()
 
-    def _vanish_point_value(self, point):
+    def _vanish_point_value(self, point: Point) -> Scalar:
         """衡量候选点接近透视消失点的程度，值越小越好。"""
         # 加 0.001 避免 log10(0)。
         return np.sum(np.log10(np.abs(self.vertical.distance_to_point(point)) + 0.001))
 
-    def _distant_point_value(self, x):
+    def _distant_point_value(self, x: NumericArray) -> Scalar:
         """衡量候选点接近透视远点的程度，值越小越好。"""
         links = self.crossings.link((x[0], self.vanish_point[1]))
         mid = np.sort(links.mid)
         # 加 0.001 避免 log10(0)。
         return np.sum(np.log10(np.diff(mid) + 0.001))
 
-    def mid_cleanse(self, mids, is_horizontal, threshold=3):
+    def mid_cleanse(self, mids: NumericArray, *, is_horizontal: bool, threshold: float = 3) -> NumericArray:
         """拟合等距线中点，返回 DETECTING_AREA 内的有效 mids；threshold 单位为像素。"""
         right_distant_point = (self.vanish_point[0] * 2 - self.distant_point[0], self.distant_point[1])
         encourage = self.config.COINCIDENT_POINT_ENCOURAGE_DISTANCE**2
 
-        def convert_to_x(ys):
+        def convert_to_x(ys: NumericArray) -> NumericArray:
             return Points([[self.config.SCREEN_CENTER[0], y] for y in ys]).link(right_distant_point).mid
 
-        def convert_to_y(xs):
+        def convert_to_y(xs: NumericArray) -> NumericArray:
             return (
                 Points([[x, self.config.SCREEN_CENTER[1]] for x in xs])
                 .link(right_distant_point)
                 .get_y(x=self.config.SCREEN_CENTER[0])
             )
 
-        def coincident_point_value(point):
+        def coincident_point_value(point: NumericArray) -> Scalar:
             """衡量候选点接近重合点的程度，值越小越好。"""
             x, y = point
             # 不要直接使用到点距离。
@@ -310,18 +328,22 @@ class Perspective:
 
         return mids
 
-    def line_cleanse(self, lines, inner, edge, threshold=3):
+    def line_cleanse(self, lines: Lines, inner: Lines, edge: Lines, threshold: float = 3) -> tuple[Lines, Lines, Lines]:
         origin = lines.mid
         clean = self.mid_cleanse(origin, is_horizontal=lines.is_horizontal, threshold=threshold)
 
-        edge = edge.mid
-        inner = inner.mid
-        inner_clean = [inner_mid for inner_mid in inner if np.any(np.abs(inner_mid - clean) < 5)]
+        edge_mids = edge.mid
+        inner_mids = inner.mid
+        inner_clean = [inner_mid for inner_mid in inner_mids if np.any(np.abs(inner_mid - clean) < 5)]
         if len(inner_clean) > 0:
-            edge = edge[(edge > np.max(inner_clean) - threshold) | (edge < np.min(inner_clean) + threshold)]
-        edge = [c for c in clean if np.any(np.abs(c - edge) < 5)]
+            edge_mids = edge_mids[
+                (edge_mids > np.max(inner_clean) - threshold) | (edge_mids < np.min(inner_clean) + threshold)
+            ]
+        matching_edges = [candidate for candidate in clean if np.any(np.abs(candidate - edge_mids) < 5)]
 
-        lower, upper = separate_edges(edge, inner=self.map_inner[1] if lines.is_horizontal else self.map_inner[0])
+        lower, upper = separate_edges(
+            matching_edges, inner=self.map_inner[1] if lines.is_horizontal else self.map_inner[0]
+        )
 
         if lower:
             clean = clean[clean > lower - threshold]
@@ -355,7 +377,7 @@ class Perspective:
 
         return lines, lower, upper
 
-    def generate(self):
+    def generate(self) -> Iterator[tuple[GridLocation, NumericArray]]:
         """逐格产出 ((x, y), [左上, 右上, 左下, 右下])。"""
         points = self.horizontal.cross(self.vertical).points
         yield from points_to_area_generator(points, shape=(len(self.vertical), len(self.horizontal)))

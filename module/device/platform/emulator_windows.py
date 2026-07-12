@@ -1,6 +1,6 @@
 import re
-import typing as t
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import psutil
 
@@ -16,10 +16,13 @@ from module.device.platform.emulator_base import (
 )
 from module.device.platform.utils import cached_property, iter_folder
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 
 class EmulatorInstance(EmulatorInstanceBase):
     @cached_property
-    def emulator(self):
+    def emulator(self) -> Emulator:
         return Emulator(self.path)
 
 
@@ -34,7 +37,7 @@ class Emulator(EmulatorBase):
         return ""
 
     @staticmethod
-    def multi_to_single(exe: str):
+    def multi_to_single(exe: str) -> Iterator[str]:
         """将多开管理器路径转为单实例可执行文件路径。"""
         if "MuMuMultiPlayer.exe" in exe:
             yield exe.replace("MuMuMultiPlayer.exe", "MuMuPlayer.exe")
@@ -44,7 +47,7 @@ class Emulator(EmulatorBase):
             yield exe
 
     @staticmethod
-    def single_to_console(exe: str):
+    def single_to_console(exe: str) -> str:
         if "MuMuPlayer.exe" in exe:
             return exe.replace("MuMuPlayer.exe", "MuMuManager.exe")
         # MuMuPlayer12 5.0
@@ -70,15 +73,15 @@ class Emulator(EmulatorBase):
         else:
             return serial
 
-    def iter_instances(self):
+    def iter_instances(self) -> Iterator[EmulatorInstance]:
         if self == Emulator.MuMuPlayer12:
             yield from self._iter_vbox_instances()
 
-    def _iter_vbox_instances(self):
+    def _iter_vbox_instances(self) -> Iterator[EmulatorInstance]:
         for folder in self.list_folder("../vms", is_dir=True):
             yield from self._iter_vbox_folder_instances(folder)
 
-    def _iter_vbox_folder_instances(self, folder):
+    def _iter_vbox_folder_instances(self, folder: str) -> Iterator[EmulatorInstance]:
         name = Path(folder).name
         if "MuMuPlayerGlobal" in name:
             return
@@ -93,16 +96,17 @@ class Emulator(EmulatorBase):
             if is_mumu12_serial(serial):
                 yield instance
                 continue
-            if instance.MuMuPlayer12_id is not None:
-                instance.serial = self._mumu12_default_serial(instance)
+            instance_id = instance.mumu_player_12_id
+            if instance_id is not None:
+                instance.serial = self._mumu12_default_serial(instance_id)
                 yield instance
 
     @staticmethod
-    def _mumu12_default_serial(instance):
+    def _mumu12_default_serial(instance_id: int) -> str:
         # MuMu12 v4.0.4 默认实例的 vbox 配置可能没有转发记录。
-        return f"127.0.0.1:{16384 + 32 * instance.MuMuPlayer12_id}"
+        return f"127.0.0.1:{16384 + 32 * instance_id}"
 
-    def iter_adb_binaries(self) -> t.Iterable[str]:
+    def iter_adb_binaries(self) -> Iterator[str]:
         if self != Emulator.MuMuPlayer12:
             return
 
@@ -117,7 +121,7 @@ class Emulator(EmulatorBase):
 
 
 class EmulatorManager(EmulatorManagerBase):
-    def iter_configured_emulator(self):
+    def iter_configured_emulator(self) -> Iterator[str]:
         """仅用于调试或测试时显式注入的 MuMu 路径。"""
         path = getattr(self, "configured_emulator_path", "")
         if not path:
@@ -127,7 +131,7 @@ class EmulatorManager(EmulatorManagerBase):
                 yield file
 
     @staticmethod
-    def iter_running_emulator():
+    def iter_running_emulator() -> Iterator[str]:
         """产生正在运行的模拟器路径，可能重复。"""
         for pid in psutil.pids():
             proc = psutil.Process(pid)
@@ -144,10 +148,7 @@ class EmulatorManager(EmulatorManagerBase):
 
     @cached_property
     def all_emulators(self) -> list[Emulator]:
-        exe = set()
-
-        for file in self.iter_configured_emulator():
-            exe.add(file)
+        exe = set(self.iter_configured_emulator())
         for file in self.iter_running_emulator() or ():
             if Path(file).exists():
                 exe.add(file)

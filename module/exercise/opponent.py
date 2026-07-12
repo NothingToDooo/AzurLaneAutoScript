@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from module.base.button import ButtonGrid
@@ -8,6 +10,11 @@ from module.ocr.ocr import Digit
 from module.ui.assets import BACK_ARROW
 from module.ui.ui import UI
 
+if TYPE_CHECKING:
+    from module.base.type_alias import ImageArray
+    from module.config.config import AzurLaneConfig
+    from module.device.device import Device
+
 OPPONENT = ButtonGrid(origin=(104, 77), delta=(244, 0), button_shape=(212, 304), grid_shape=(4, 1))
 
 # easiest 模式以满编最高等级 6×125 为上限，并把战力缩放到等级评分量级。
@@ -16,7 +23,7 @@ PWR_FACTOR = 100
 
 
 class Level(Digit):
-    def pre_process(self, image):
+    def pre_process(self, image: ImageArray) -> ImageArray:
         image = super().pre_process(image)
         image = image_left_strip(image, threshold=85, length=22)
 
@@ -25,7 +32,7 @@ class Level(Digit):
 
 
 class Opponent:
-    def __init__(self, main_image, fleet_image, index):
+    def __init__(self, main_image: ImageArray, fleet_image: ImageArray, index: int) -> None:
         self.index = index
         self.power = self.get_power(image=main_image)
         self.level = self.get_level(image=fleet_image)
@@ -35,7 +42,7 @@ class Opponent:
         logger.attr(f"OPPONENT_{index}", " ".join([power[0], *level[:3], "|", power[1], *level[3:]]))
 
     @staticmethod
-    def get_level(image):
+    def get_level(image: ImageArray) -> list[int]:
         """从 EXERCISE_PREPARATION 截图返回六个舰船等级。"""
         level = []
         level += ButtonGrid(
@@ -46,17 +53,17 @@ class Opponent:
         ).buttons
 
         level = Level(level, name="LEVEL", letter=(255, 255, 255), threshold=128)
-        return level.ocr(image)
+        return level.ocr_regions(image)
 
-    def get_power(self, image):
+    def get_power(self, image: ImageArray) -> list[int]:
         """从演习主页截图返回当前对手的前后排战力。"""
         grids = ButtonGrid(origin=(222, 257), delta=(244, 30), button_shape=(72, 28), grid_shape=(4, 2), name="POWER")
         power = [grids[self.index, 0], grids[self.index, 1]]
 
         power = Digit(power, name="POWER", letter=(255, 223, 57), threshold=128)
-        return power.ocr(image)
+        return power.ocr_regions(image)
 
-    def get_priority(self, method="max_exp"):
+    def get_priority(self, method: str = "max_exp") -> float:
         """按选择策略计算当前对手评分；数值越高越优先。"""
         if "easiest" in method:
             level = (1 - (np.sum(self.level) / MAX_LVL_SUM)) * 100
@@ -65,16 +72,21 @@ class Opponent:
             priority = level - avg_team_pwr
         else:
             priority = np.sum(self.level) / 6
-        return priority
+        return float(priority)
 
 
 class OpponentChoose(UI):
-    def __init__(self, *args, **kwargs):
-        self.main_image = None
-        self.opponents = []
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        config: AzurLaneConfig | str,
+        device: Device | str | None = None,
+        task: str | None = None,
+    ) -> None:
+        self.main_image: ImageArray | None = None
+        self.opponents: list[Opponent] = []
+        super().__init__(config=config, device=device, task=task)
 
-    def _opponent_fleet_check_all(self):
+    def _opponent_fleet_check_all(self) -> None:
         self.opponents = []
         self.main_image = self.device.image
 
@@ -95,8 +107,8 @@ class OpponentChoose(UI):
                 skip_first_screenshot=True,
             )
 
-    def _opponent_sort(self, method="max_exp"):
+    def _opponent_sort(self, method: str = "max_exp") -> list[int]:
         """按评分从高到低返回四个对手索引。"""
         order = np.argsort([-x.get_priority(method) for x in self.opponents])
         logger.attr("Order", str(order))
-        return order
+        return [int(index) for index in order]

@@ -107,16 +107,16 @@ class Config(ConfigBase):
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_function(self):
+    def battle_function(self) -> bool:
         if self.config.MAP_CLEAR_ALL_THIS_TIME and self.battle_count == 0 and not self.map_is_clear_mode:
             func = self.FUNCTION_NAME_BASE + str(self.battle_count)
             logger.info(f"Using function: {func}")
-            func = self.__getattribute__(func)
+            func = getattr(self, func)
             return func()
 
         return super().battle_function()
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if not self.map_is_clear_mode and self.map_has_mob_move:
             self.mob_move(B3, C3)
             if B1.is_accessible:
@@ -128,17 +128,17 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_1(self):
+    def battle_1(self) -> bool:
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=1):
             return True
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
             return True
 
         return self.battle_default()
 
-    def battle_6(self):
+    def battle_6(self) -> bool:
         return self.fleet_boss.clear_boss()

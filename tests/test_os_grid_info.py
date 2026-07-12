@@ -1,18 +1,45 @@
+from typing import TypedDict, Unpack
+
 import pytest
 
+from module.config.config import AzurLaneConfig
 from module.map_detection.os_grid import OSGridInfo
 from module.os.radar import RadarGrid
 
+_CONFIG = object.__new__(AzurLaneConfig)
 
-def _grid(**kwargs):
+
+class _GridOverrides(TypedDict, total=False):
+    is_ally: bool
+    is_akashi: bool
+    is_scanning_device: bool
+    is_logging_tower: bool
+    is_exploration_reward: bool
+    is_fleet_mechanism: bool
+    is_question: bool
+    is_meowfficer: bool
+    is_exclamation: bool
+    is_resource: bool
+    is_enemy: bool
+    enemy_scale: int
+    enemy_genre: str | None
+
+
+class _RadarGridOverrides(TypedDict, total=False):
+    is_enemy: bool
+    enemy_scale: int
+    enemy_genre: str | None
+
+
+def _grid(**kwargs: Unpack[_GridOverrides]) -> OSGridInfo:
     grid = OSGridInfo()
     for key, value in kwargs.items():
         setattr(grid, key, value)
     return grid
 
 
-def _radar_grid(**kwargs):
-    grid = RadarGrid(location=(1, 0), image=None, center=(0, 0), config=object())
+def _radar_grid(**kwargs: Unpack[_RadarGridOverrides]) -> RadarGrid:
+    grid = RadarGrid(location=(1, 0), image=None, center=(0, 0), config=_CONFIG)
     for key, value in kwargs.items():
         setattr(grid, key, value)
     return grid
@@ -40,7 +67,9 @@ def test_os_grid_info_merge_requires_normal_mode() -> None:
 )
 def test_os_grid_info_merge_sets_first_matching_marker(flag: str) -> None:
     grid = _grid()
-    assert grid.merge(_grid(**{flag: True})) is True
+    source = _grid()
+    setattr(source, flag, True)
+    assert grid.merge(source) is True
     assert getattr(grid, flag) is True
 
 

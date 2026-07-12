@@ -1,4 +1,9 @@
+from typing import TYPE_CHECKING
+
 from module.map.map_base import CampaignMap
+
+if TYPE_CHECKING:
+    from module.combat.combat import CombatEnd
 
 from .campaign_base import CampaignBase
 from .t1 import Config as ConfigBase
@@ -135,7 +140,7 @@ class Campaign(CampaignBase):
     MAP = MAP
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.map_is_clear_mode:
             if self.clear_siren():
                 return True
@@ -146,12 +151,12 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_4(self):
+    def battle_4(self) -> bool:
         return self.clear_boss()
 
-    def combat_status(self, *args, **kwargs):
+    def combat_status(self, expected_end: CombatEnd | None = None) -> None:
         if not self.map_is_clear_mode and self.battle_count >= 4:
             # Ignore story battles
             self.device.disable_stuck_detection()
 
-        super().combat_status(*args, **kwargs)
+        super().combat_status(expected_end)

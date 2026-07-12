@@ -1,5 +1,7 @@
 from importlib import import_module
+from typing import TYPE_CHECKING, cast
 
+from module.base.base import ModuleBase
 from module.base.timer import Timer
 from module.combat.combat import Combat
 from module.logger import logger
@@ -8,13 +10,16 @@ from module.os_ash.assets import DOSSIER_LIST
 from module.ui.page import page_meta
 from module.ui.ui import UI
 
+if TYPE_CHECKING:
+    from module.os_ash.meta import OpsiAshBeacon
+
 
 class BeaconReward(Combat, UI):
-    def meta_reward_notice_appear(self):
+    def meta_reward_notice_appear(self) -> bool:
         """返回 META 奖励红点是否出现。"""
         return self.appear(mr_assets.META_REWARD_NOTICE, threshold=30)
 
-    def meta_reward_receive(self, skip_first_screenshot=True):
+    def meta_reward_receive(self, *, skip_first_screenshot: bool = True) -> bool:
         """从 META 页或奖励页领取奖励，结束于 REWARD_CHECK 并返回是否实际领取。"""
         logger.hr("Meta reward receive", level=1)
         confirm_timer = Timer(1, count=3).start()
@@ -53,13 +58,13 @@ class BeaconReward(Combat, UI):
         logger.info(f"Meta reward receive finished, received={received}")
         return received
 
-    def meta_sync_notice_appear(self, interval=0):
+    def meta_sync_notice_appear(self, interval: float = 0) -> bool:
         """返回同步奖励入口是否出现。"""
         return self.appear(mr_assets.SYNC_REWARD_NOTICE, threshold=30, interval=interval) or self.appear(
             mr_assets.SYNC_TAP, threshold=30, interval=interval
         )
 
-    def meta_sync_receive(self, skip_first_screenshot=True):
+    def meta_sync_receive(self, *, skip_first_screenshot: bool = True) -> bool:
         """领取同步奖励并返回是否实际领取；未满 100% 停在 SYNC_ENTER，满 100% 停在 REWARD_ENTER。"""
         logger.hr("Meta sync receive", level=1)
         received = False
@@ -99,7 +104,7 @@ class BeaconReward(Combat, UI):
         logger.info(f"Meta sync receive finished, received={received}")
         return received
 
-    def meta_wait_reward_page(self, skip_first_screenshot=True):
+    def meta_wait_reward_page(self, *, skip_first_screenshot: bool = True) -> None:
         """等待圆形加载动画结束，最多两秒。"""
         timeout = Timer(2, count=6).start()
         while 1:
@@ -127,7 +132,7 @@ class BeaconReward(Combat, UI):
                 logger.info("meta_wait_reward_page ends at reward red dot")
                 break
 
-    def run(self):
+    def run(self) -> None:
         self.ui_ensure(page_meta)
         self.meta_wait_reward_page()
 
@@ -146,7 +151,7 @@ class BeaconReward(Combat, UI):
 
 
 class DossierReward(Combat, UI):
-    def meta_reward_notice_appear(self):
+    def meta_reward_notice_appear(self) -> bool:
         """在档案 META 页判断奖励红点是否出现。"""
         self.device.screenshot()
         if self.appear(mr_assets.DOSSIER_REWARD_RECEIVE, offset=(-40, 10, -10, 40), similarity=0.7):
@@ -155,7 +160,7 @@ class DossierReward(Combat, UI):
         logger.info("No dossier reward red dot")
         return False
 
-    def meta_reward_enter(self, skip_first_screenshot=True):
+    def meta_reward_enter(self, *, skip_first_screenshot: bool = True) -> None:
         """从档案 META 页进入 DOSSIER_REWARD_CHECK。"""
         logger.info("Dossier reward enter")
         while 1:
@@ -171,7 +176,7 @@ class DossierReward(Combat, UI):
             if self.appear(mr_assets.DOSSIER_REWARD_CHECK, offset=(20, 20)):
                 break
 
-    def meta_reward_receive(self, skip_first_screenshot=True):
+    def meta_reward_receive(self, *, skip_first_screenshot: bool = True) -> bool:
         """在档案奖励页领取全部奖励，返回是否实际领取。"""
         logger.hr("Dossier reward receive", level=1)
         confirm_timer = Timer(1, count=3).start()
@@ -208,16 +213,19 @@ class DossierReward(Combat, UI):
         logger.info(f"Dossier reward receive finished, received={received}")
         return received
 
-    def run(self):
-        opsi_ash_beacon_class = import_module("module.os_ash.meta").OpsiAshBeacon
+    def run(self) -> None:
+        opsi_ash_beacon_class = cast(
+            "type[OpsiAshBeacon]",
+            import_module("module.os_ash.meta").OpsiAshBeacon,
+        )
         opsi_ash_beacon_class(self.config, self.device).ensure_dossier_page()
         if self.meta_reward_notice_appear():
             self.meta_reward_enter()
             self.meta_reward_receive()
 
 
-class MetaReward(BeaconReward, DossierReward):
-    def run(self, category="beacon"):
+class MetaReward(ModuleBase):
+    def run(self, category: str = "beacon") -> None:
         if category == "beacon":
             BeaconReward(self.config, self.device).run()
         elif category == "dossier":

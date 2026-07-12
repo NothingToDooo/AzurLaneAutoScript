@@ -1,7 +1,7 @@
 from datetime import datetime
+from typing import TYPE_CHECKING, Literal
 
 from module.base.button import ButtonGrid
-from module.base.decorator import cached_property
 from module.base.utils import get_color
 from module.exception import GameBugError
 from module.logger import logger
@@ -9,13 +9,20 @@ from module.ocr.ocr import Duration
 from module.research import assets as research_assets
 from module.research.ui import ResearchUI
 
+if TYPE_CHECKING:
+    from module.base.button import Button
+
 OCR_QUEUE_REMAIN = Duration(
     research_assets.QUEUE_REMAIN, letter=(255, 255, 255), threshold=128, name="OCR_QUEUE_REMAIN"
 )
+QUEUE_STATUS_GRIDS = ButtonGrid(
+    origin=(18, 259), delta=(0, 40.5), button_shape=(25, 25), grid_shape=(1, 5), name="QUEUE_STATUS"
+)
+type QueueStatus = Literal["finished", "running", "waiting", "empty"]
 
 
 class ResearchQueue(ResearchUI):
-    def research_queue_add(self, skip_first_screenshot=True):
+    def research_queue_add(self, *, skip_first_screenshot: bool = True) -> bool:
         """从项目详情入队并回到稳定科研页；要求不满足时返回 False。"""
         logger.hr("Research queue add")
         # research_project_start() 刚点击过确认弹窗，需清除点击间隔。
@@ -45,18 +52,12 @@ class ResearchQueue(ResearchUI):
         self.ensure_research_center_stable()
         return True
 
-    def _research_queue_add_available(self):
+    def _research_queue_add_available(self) -> bool:
         # 取完整按钮而非文字区域；可用色约为 (90, 142, 203)，不可用色约为 (153, 160, 170)。
         r, g, b = get_color(self.device.image, research_assets.RESEARCH_QUEUE_ADD.button)
         return b - min(r, g) > 60
 
-    @cached_property
-    def queue_status_grids(self):
-        return ButtonGrid(
-            origin=(18, 259), delta=(0, 40.5), button_shape=(25, 25), grid_shape=(1, 5), name="QUEUE_STATUS"
-        )
-
-    def _queue_status_detect(self, button):
+    def _queue_status_detect(self, button: Button) -> QueueStatus:
         """按左侧图标颜色返回 finished、running、waiting 或 empty。"""
         center = button.crop((7, 7, 21, 21))
         if self.image_color_count(center, color=(255, 158, 57), threshold=180, count=20):
@@ -71,9 +72,9 @@ class ResearchQueue(ResearchUI):
         logger.warning(f"Unknown queue status from {button}, assume running")
         return "running"
 
-    def get_queue_slot(self):
+    def get_queue_slot(self) -> int:
         """在队列页返回空槽数量。"""
-        status = [self._queue_status_detect(button) for button in self.queue_status_grids.buttons]
+        status = [self._queue_status_detect(button) for button in QUEUE_STATUS_GRIDS.buttons]
         logger.info(f"Research queue: {status}")
         status.reverse()
         for index, s in enumerate(status):
@@ -84,7 +85,7 @@ class ResearchQueue(ResearchUI):
         logger.attr("Research queue slot", index)
         return index
 
-    def get_research_ended(self):
+    def get_research_ended(self) -> datetime:
         """返回首个项目结束时间；队列异常时抛出 GameBugError，空队列返回当前时间。"""
         if self.image_color_count(research_assets.QUEUE_REMAIN, color=(123, 125, 123), threshold=235, count=100):
             logger.error(
@@ -95,6 +96,6 @@ class ResearchQueue(ResearchUI):
             logger.info("Research queue empty")
             return datetime.now()
 
-        end_time = datetime.now() + OCR_QUEUE_REMAIN.ocr(self.device.image)
+        end_time = datetime.now() + OCR_QUEUE_REMAIN.ocr_single(self.device.image)
         logger.info(f"The first research ended at: {end_time}")
         return end_time

@@ -167,7 +167,7 @@ class Campaign(CampaignBase):
     MAP = MAP
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.clear_all_mystery()
 
         if self.clear_siren():
@@ -177,7 +177,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         self.clear_all_mystery()
 
         if self.clear_siren():
@@ -187,5 +187,5 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_6(self):
+    def battle_6(self) -> bool:
         return self.fleet_boss.clear_boss()

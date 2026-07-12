@@ -7,7 +7,7 @@ from module.ui.page import page_campaign_menu, page_event
 
 
 class CampaignBaseT(CampaignBase_):
-    def ui_goto_event(self):
+    def ui_goto_event(self) -> bool:
         if self.appear(EVENT_20250724_PT_ICON, offset=(20, 20)) and self.ui_page_appear(page_event):
             logger.info("Already at EVENT_20250724")
             return True
@@ -19,7 +19,7 @@ class CampaignBaseT(CampaignBase_):
 
 
 class CampaignBaseTS(CampaignBaseT):
-    def campaign_set_chapter_20241219(self, chapter, stage, mode="combat"):
+    def campaign_set_chapter_20241219(self, chapter: str, stage: str, mode: str = "combat") -> bool:
         # TS 是困难模式。
         if self.config.MAP_CHAPTER_SWITCH_20241219 and chapter == "ts":
             self.ui_goto_event()
@@ -29,18 +29,18 @@ class CampaignBaseTS(CampaignBaseT):
             return True
         return super().campaign_set_chapter_20241219(chapter, stage, mode)
 
-    def handle_exp_info(self):
+    def handle_exp_info(self) -> bool:
         # Extra confirm button in chapter TS
         if self.appear_then_click(ALCHEMIST_MATERIAL_CONFIRM, offset=(20, 20), interval=1):
             return False
         return super().handle_exp_info()
 
-    def get_map_clear_percentage(self):
+    def get_map_clear_percentage(self) -> float:
         if AUTO_SEARCH.appear(main=self):
             return 1.00
         return super().get_map_clear_percentage()
 
-    def map_get_info(self):
+    def map_get_info(self) -> None:
         super().map_get_info()
 
         # Chapter TS don't have clear percentage

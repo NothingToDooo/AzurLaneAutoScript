@@ -61,6 +61,7 @@ class _StrictLoader(yaml.SafeLoader):
 def _construct_unique_mapping(
     loader: _StrictLoader,
     node: yaml.MappingNode,
+    *,
     deep: object = False,
 ) -> dict[object, object]:
     mapping: dict[object, object] = {}

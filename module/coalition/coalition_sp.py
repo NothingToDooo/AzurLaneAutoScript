@@ -5,7 +5,7 @@ from module.config.config import TaskEnd
 
 
 class CoalitionSP(Coalition):
-    def run(self, event="", mode="", fleet="", total=0):
+    def run(self, event: str = "", mode: str = "", fleet: str = "", total: int = 0) -> None:
         with suppress(TaskEnd):
             super().run(event=event, mode=mode or "sp", fleet=fleet, total=total or 1)
         if self.run_count > 0:

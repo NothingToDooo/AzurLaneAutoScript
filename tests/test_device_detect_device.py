@@ -4,7 +4,13 @@ from module.device.connection import Connection
 from module.map.map_grids import SelectedGrids
 
 
-def _device(serial: str, *, status: str = "device", may_mumu12_family: bool = False, port: int = 0):
+def _device(
+    serial: str,
+    *,
+    status: str = "device",
+    may_mumu12_family: bool = False,
+    port: int = 0,
+) -> SimpleNamespace:
     return SimpleNamespace(
         serial=serial,
         status=status,
@@ -13,15 +19,15 @@ def _device(serial: str, *, status: str = "device", may_mumu12_family: bool = Fa
     )
 
 
-def _mumu12(serial: str):
+def _mumu12(serial: str) -> SimpleNamespace:
     return _device(serial, may_mumu12_family=True, port=int(serial.split(":")[1]))
 
 
 def _make_connection(
     *,
     serial: str,
-    device_batches: list[list[object]],
-):
+    device_batches: list[list[SimpleNamespace]],
+) -> Connection:
     connection = object.__new__(Connection)
     connection.serial = serial
     connection.config = SimpleNamespace(Emulator_Serial=serial)
@@ -29,7 +35,7 @@ def _make_connection(
     connection.last_devices = []
     connection.list_calls = 0
 
-    def list_device():
+    def list_device() -> SelectedGrids[SimpleNamespace]:
         connection.list_calls += 1
         if connection.device_batches:
             connection.last_devices = connection.device_batches.pop(0)

@@ -1,10 +1,22 @@
+from dataclasses import dataclass
 from datetime import datetime
+from typing import TYPE_CHECKING, override
 
 import pytest
 
 from module.config.config import TaskEnd
+from module.map.map_grids import SelectedGrids
+from module.os.globe_zone import Zone
 from module.os.tasks import meowfficer_farming
 from module.os.tasks.meowfficer_farming import OpsiMeowfficerFarming
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from module.os.globe_operation import ZoneType
+    from module.os.globe_zone import ZoneName
+    from module.os.map import RescanMode
+    from module.os_handler.action_point import ActionPointZone, ActionPointZoneType
 
 
 class _Task:
@@ -49,39 +61,28 @@ class _Config:
         raise TaskEnd
 
 
+@dataclass
 class _Cooldown:
-    def __init__(self, next_run: datetime) -> None:
-        self.next_run = next_run
+    next_run: datetime
 
 
-class _Zone:
-    def __init__(self, zone_id: int, location: tuple[int, int]) -> None:
-        self.zone_id = zone_id
-        self.location = location
-
-
-class _Zones:
-    def select(self, **_kwargs: object) -> list[_Zone]:
-        return []
-
-
-class _ZoneSet:
-    def __init__(self, zones: list[_Zone]) -> None:
-        self.zones = zones
-
-    def delete(self, _zones: object) -> _ZoneSet:
-        return self
-
-    def sort_by_clock_degree(self, **_kwargs: object) -> _ZoneSet:
-        return self
-
-    def __getitem__(self, index: int) -> _Zone:
-        return self.zones[index]
+def _zone(zone_id: int) -> Zone:
+    return Zone(
+        zone_id,
+        {
+            "shape": "A1",
+            "hazard_level": 3,
+            "cn": f"zone-{zone_id}",
+            "area_pos": (0, 0),
+            "offset_pos": (0, 0),
+            "region": 1,
+        },
+    )
 
 
 class _MeowfficerFarming(OpsiMeowfficerFarming):
     config: _Config
-    zone: _Zone
+    zone: Zone
 
     def __init__(self) -> None:
         self.config = _Config()
@@ -92,8 +93,13 @@ class _MeowfficerFarming(OpsiMeowfficerFarming):
         self.action_point_limit = 500
         self.yellow_coins = 0
         self.in_opsi_explore = False
-        self.zone = _Zone(zone_id=1, location=(1, 1))
-        self.zones = _Zones()
+        self.zone = _zone(1)
+        self._zones = SelectedGrids[Zone]([])
+
+    @property
+    @override
+    def zones(self) -> SelectedGrids[Zone]:
+        return self._zones
 
     @property
     def is_cl1_enabled(self) -> bool:
@@ -119,32 +125,75 @@ class _MeowfficerFarming(OpsiMeowfficerFarming):
         self.calls.append(("is_in_opsi_explore",))
         return self.in_opsi_explore
 
-    def action_point_set(self, *_args: object, **kwargs: object) -> None:
-        self.calls.append(("action_point_set", kwargs))
+    @override
+    def action_point_set(
+        self,
+        zone: ActionPointZone | str | None = None,
+        pinned: ActionPointZoneType | None = None,
+        cost: int | None = None,
+        *,
+        keep_current_ap: bool = True,
+        check_rest_ap: bool = False,
+    ) -> bool:
+        del zone, pinned
+        self.calls.append(
+            (
+                "action_point_set",
+                {"cost": cost, "keep_current_ap": keep_current_ap, "check_rest_ap": check_rest_ap},
+            )
+        )
+        return True
 
-    def name_to_zone(self, name: int, *_args: object, **_kwargs: object) -> _Zone:
+    @override
+    def name_to_zone(self, name: ZoneName) -> Zone:
+        assert isinstance(name, int)
         self.calls.append(("name_to_zone", name))
-        return _Zone(zone_id=name, location=(9, 9))
+        return _zone(name)
 
-    def zone_select(self, hazard_level: int) -> _ZoneSet:
+    @override
+    def zone_select(self, hazard_level: int) -> SelectedGrids[Zone]:
         self.calls.append(("zone_select", hazard_level))
-        return _ZoneSet([_Zone(zone_id=44, location=(4, 4))])
+        return SelectedGrids([_zone(44)])
 
-    def globe_goto(self, zone: _Zone, *_args: object, **kwargs: object) -> None:
+    @override
+    def globe_goto(
+        self,
+        zone: ZoneName,
+        types: ZoneType | Sequence[ZoneType] = ("SAFE", "DANGEROUS"),
+        *,
+        refresh: bool = False,
+        stop_if_safe: bool = False,
+    ) -> bool:
+        del types, stop_if_safe
+        assert isinstance(zone, Zone)
+        kwargs = {"refresh": True} if refresh else {}
         self.calls.append(("globe_goto", zone.zone_id, kwargs))
+        return True
 
-    def fleet_set(self, index=None, skip_first_screenshot=True) -> None:
-        _ = skip_first_screenshot
+    def fleet_set(self, index: int | None = None, *, skip_first_screenshot: bool = True) -> bool:
+        del skip_first_screenshot
         self.calls.append(("fleet_set", index))
+        return True
 
     def os_order_execute(self, *_args: object, **kwargs: object) -> None:
         self.calls.append(("os_order_execute", kwargs))
 
-    def run_auto_search(self, *_args: object, **_kwargs: object) -> None:
+    @override
+    def run_auto_search(
+        self,
+        *,
+        question: bool = True,
+        rescan: RescanMode | bool | None = None,
+        after_auto_search: bool = True,
+    ) -> int:
+        del question, rescan, after_auto_search
         self.calls.append(("run_auto_search",))
+        return 0
 
-    def handle_after_auto_search(self) -> None:
+    @override
+    def handle_after_auto_search(self) -> bool:
         self.calls.append(("handle_after_auto_search",))
+        return False
 
 
 def test_os_meowfficer_farming_runs_configured_target_zone() -> None:

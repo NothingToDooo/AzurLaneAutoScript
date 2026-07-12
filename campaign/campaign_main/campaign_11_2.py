@@ -1,8 +1,11 @@
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap
 from module.map.map_grids import RoadGrids
+
+if TYPE_CHECKING:
+    from module.map.type_alias import GridLocation
 
 MAP = CampaignMap("11-2")
 MAP.shape = "K6"
@@ -128,7 +131,7 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.fleet_2_push_forward()
 
         if self.clear_roadblocks([road_main]):
@@ -138,12 +141,12 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_6(self):
+    def battle_6(self) -> bool:
         boss = self.map.select(is_boss=True)
         if boss and not self.check_accessibility(boss[0], fleet="boss") and self.clear_roadblocks([road_main]):
             return True
 
         return self.fleet_boss.clear_boss()
 
-    def handle_boss_appear_refocus(self, preset=(-3, -2)):
+    def handle_boss_appear_refocus(self, preset: GridLocation | None = (-3, -2)) -> None:
         return super().handle_boss_appear_refocus(preset)

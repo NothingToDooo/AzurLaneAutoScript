@@ -1,6 +1,20 @@
+from typing import TYPE_CHECKING, TypedDict
+
 from module.base.timer import Timer
 from module.exception import ScriptError
 from module.logger import logger
+
+if TYPE_CHECKING:
+    from module.base.base import ModuleBase
+    from module.base.button import Button, MatchOffset
+
+
+class SwitchState(TypedDict):
+    state: str
+    check_button: Button
+    click_button: Button
+    offset: MatchOffset
+
 
 UNKNOWN_STATE_NAME_MESSAGE = 'Cannot use "unknown" as state name'
 INVALID_SWITCH_STATE_TEMPLATE = "Switch {name} received an invalid state: {state}"
@@ -12,16 +26,28 @@ class Switch:
     is_selector=True 时点击目标项；否则点击当前开关位置。
     """
 
-    def __init__(self, name="Switch", is_selector=False, offset=0):
+    def __init__(
+        self,
+        name: str = "Switch",
+        *,
+        is_selector: bool = False,
+        offset: MatchOffset = 0,
+    ) -> None:
         self.name = name
         self.is_selector = is_selector
         self._offset = offset
-        self.state_list = []
+        self.state_list: list[SwitchState] = []
         self.set_unknown_timer = Timer(5, count=10)
         self.set_click_timer = Timer(1, count=2)
         self.wait_timeout = Timer(2, count=4)
 
-    def add_state(self, state, check_button, click_button=None, offset=0):
+    def add_state(
+        self,
+        state: str,
+        check_button: Button,
+        click_button: Button | None = None,
+        offset: MatchOffset = 0,
+    ) -> None:
         """'unknown' 是检测保留值，不能注册为状态名。"""
         if state == "unknown":
             raise ScriptError(UNKNOWN_STATE_NAME_MESSAGE)
@@ -35,19 +61,19 @@ class Switch:
         )
 
     @property
-    def offset(self):
+    def offset(self) -> MatchOffset:
         return self._offset
 
     @offset.setter
-    def offset(self, value):
+    def offset(self, value: MatchOffset) -> None:
         self._offset = value
         for data in self.state_list:
             data["offset"] = value
 
-    def appear(self, main):
+    def appear(self, main: ModuleBase) -> bool:
         return self.get(main=main) != "unknown"
 
-    def get(self, main):
+    def get(self, main: ModuleBase) -> str:
         """未匹配任何已知状态时返回 'unknown'。"""
         for data in self.state_list:
             if main.appear(data["check_button"], offset=data["offset"]):
@@ -55,11 +81,11 @@ class Switch:
 
         return "unknown"
 
-    def click(self, state, main):
+    def click(self, state: str, main: ModuleBase) -> None:
         button = self.get_data(state)["click_button"]
         main.device.click(button)
 
-    def get_data(self, state):
+    def get_data(self, state: str) -> SwitchState:
         """状态未注册时抛出 ScriptError。"""
         for row in self.state_list:
             if row["state"] == state:
@@ -68,11 +94,17 @@ class Switch:
         message = INVALID_SWITCH_STATE_TEMPLATE.format(name=self.name, state=state)
         raise ScriptError(message)
 
-    def handle_additional(self, _main):
+    def handle_additional(self, _main: ModuleBase) -> bool:  # noqa: PLR6301
         """额外弹窗处理钩子；默认表示未处理。"""
         return False
 
-    def set(self, state, main, skip_first_screenshot=True):
+    def set(
+        self,
+        state: str,
+        main: ModuleBase,
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> bool:
         logger.info(f"{self.name} set to {state}")
         self.get_data(state)
 
@@ -114,10 +146,9 @@ class Switch:
                 changed = True
                 click_timer.reset()
                 unknown_timer.reset()
-
         return changed
 
-    def wait(self, main, skip_first_screenshot=True):
+    def wait(self, main: ModuleBase, *, skip_first_screenshot: bool = True) -> bool:
         timeout = self.wait_timeout.reset()
         while 1:
             if skip_first_screenshot:

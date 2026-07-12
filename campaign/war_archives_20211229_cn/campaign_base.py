@@ -11,6 +11,7 @@ class CampaignBase(CampaignBase_):
         "T1 > T2 > T3 > T4",
     )
 
-    def handle_clear_mode_config_cover(self):
-        super().handle_clear_mode_config_cover()
+    def handle_clear_mode_config_cover(self) -> bool:
+        handled = super().handle_clear_mode_config_cover()
         self.config.MAP_HAS_MISSILE_ATTACK = True
+        return handled

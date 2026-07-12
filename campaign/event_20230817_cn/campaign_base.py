@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from module.base.timer import Timer
 from module.base.utils import crop, rgb2gray
 from module.campaign.assets import (
@@ -9,9 +11,12 @@ from module.campaign.campaign_base import CampaignBase as CampaignBase_
 from module.logger import logger
 from module.ui.page import page_event
 
+if TYPE_CHECKING:
+    from module.base.button import Button
+
 
 class CampaignBase(CampaignBase_):
-    def handle_chapter_additional(self):
+    def handle_chapter_additional(self) -> bool:
         """该活动以剧情作为关卡入口，需先清完剧情才能解锁关卡。"""
         if self.get_story_button():
             self.event_20230817_story()
@@ -19,7 +24,7 @@ class CampaignBase(CampaignBase_):
         logger.info("No event_20230817_story")
         return False
 
-    def get_story_button(self):
+    def get_story_button(self) -> Button | None:
         """识别活动剧情按钮（约 26ms），未检测到时返回 None。"""
         # Story before A1, E0-1 ~ E0-3
         if self.appear(EVENT_20230817_STORY, offset=(20, 100)):
@@ -41,7 +46,7 @@ class CampaignBase(CampaignBase_):
 
         return None
 
-    def event_20230817_story(self, skip_first_screenshot=True):
+    def event_20230817_story(self, *, skip_first_screenshot: bool = True) -> None:
         logger.hr("event_20230817_story", level=2)
         confirm = Timer(1, count=3).start()
         while 1:
@@ -65,7 +70,7 @@ class CampaignBase(CampaignBase_):
             if button:
                 self.device.click(button)
 
-    def is_stage_page_has_entrance(self):
+    def is_stage_page_has_entrance(self) -> bool:
         if self.get_story_button():
             return True
         return super().is_stage_page_has_entrance()

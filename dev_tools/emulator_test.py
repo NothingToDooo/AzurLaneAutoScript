@@ -8,8 +8,8 @@ from module.device.device import Device
 
 
 class EmulatorChecker(Device):
-    def stress_test(self):
-        record = []
+    def stress_test(self) -> None:
+        record: list[float] = []
         count = 0
         self.screenshot_nemu_ipc()
         while 1:

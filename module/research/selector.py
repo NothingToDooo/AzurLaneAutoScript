@@ -15,7 +15,7 @@ from module.research.assets import (
     RESEARCH_COST_CHECKER,
 )
 from module.research.preset import DICT_FILTER_PRESET, FILTER_STRING_CHEAPEST, FILTER_STRING_SHORTEST
-from module.research.project import research_detect
+from module.research.project import ResearchProject, research_detect
 from module.research.ui import ResearchUI
 
 RESEARCH_ENTRANCE = [ENTRANCE_1, ENTRANCE_2, ENTRANCE_3, ENTRANCE_4, ENTRANCE_5]
@@ -39,19 +39,15 @@ FILTER_REGEX = re.compile(
 )
 FILTER_ATTR = ("series", "ship", "ship_rarity", "genre", "number", "duration")
 FILTER_PRESET = ("shortest", "cheapest", "reset")
-FILTER = Filter(FILTER_REGEX, FILTER_ATTR, FILTER_PRESET)
-_RESEARCH_RESOURCE_RULES = (
-    ("need_cube", "Research_UseCube"),
-    ("need_coin", "Research_UseCoin"),
-    ("need_part", "Research_UsePart"),
-)
+FILTER = Filter[ResearchProject](FILTER_REGEX, FILTER_ATTR, FILTER_PRESET)
+type ResearchPriority = list[ResearchProject | str]
 
 
 class ResearchSelector(ResearchUI):
-    projects: list
-    storage_has_boxes = True
+    projects: list[ResearchProject]
+    storage_has_boxes: bool = True
 
-    def research_goto_detail(self, index, skip_first_screenshot=True):
+    def research_goto_detail(self, index: int, *, skip_first_screenshot: bool = True) -> None:
         logger.info(f"Research goto detail (project {index})")
         click_timer = Timer(10)
         while 1:
@@ -69,7 +65,7 @@ class ResearchSelector(ResearchUI):
                 self.wait_until_appear(RESEARCH_COST_CHECKER, offset=(20, 20), skip_first_screenshot=True)
                 break
 
-    def research_detect(self):
+    def research_detect(self) -> None:
         timeout = Timer(5, count=5).start()
         while 1:
             projects = research_detect(self.device.image)
@@ -89,7 +85,7 @@ class ResearchSelector(ResearchUI):
 
         self.projects = projects
 
-    def research_sort_filter(self, enforce=False):
+    def research_sort_filter(self, *, enforce: bool = False) -> ResearchPriority:
         """按预设返回 ResearchProject 与 shortest、cheapest、reset 等指令的优先级列表。"""
         preset = self.config.Research_PresetFilter
         if preset == "custom":
@@ -123,24 +119,31 @@ class ResearchSelector(ResearchUI):
         logger.attr("Filter_sort", " > ".join([str(project) for project in priority]))
         return priority
 
-    def _research_check(self, project, enforce=False):
+    def _research_check(self, project: ResearchProject, *, enforce: bool = False) -> bool:
         if not project.valid:
             return False
-        if not self._research_resource_allowed(project, enforce):
+        if not self._research_resource_allowed(project, enforce=enforce):
             return False
         return self._research_genre_allowed(project)
 
-    def _research_resource_allowed(self, project, enforce):
+    def _research_resource_allowed(self, project: ResearchProject, *, enforce: bool) -> bool:
         is_05 = str(project.duration) == "0.5"
-        for need_attr, config_attr in _RESEARCH_RESOURCE_RULES:
-            if getattr(project, need_attr) and not self._research_resource_config_allowed(
-                getattr(self.config, config_attr), is_05, enforce
+        resource_rules = (
+            (project.need_cube, self.config.Research_UseCube),
+            (project.need_coin, self.config.Research_UseCoin),
+            (project.need_part, self.config.Research_UsePart),
+        )
+        for required, config in resource_rules:
+            if required and not self._research_resource_config_allowed(
+                config,
+                is_05=is_05,
+                enforce=enforce,
             ):
                 return False
         return True
 
     @staticmethod
-    def _research_resource_config_allowed(config, is_05, enforce):
+    def _research_resource_config_allowed(config: str, *, is_05: bool, enforce: bool) -> bool:
         if config == "do_not_use":
             return False
         if enforce:
@@ -149,14 +152,14 @@ class ResearchSelector(ResearchUI):
             return False
         return not (config == "only_05_hour" and not is_05)
 
-    def _research_genre_allowed(self, project):
+    def _research_genre_allowed(self, project: ResearchProject) -> bool:
         genre = project.genre.upper()
         # B 类收益低且前置条件不稳定；T 类前置条件不满足时无法入队。
         if genre in {"B", "T"}:
             return False
         return self.storage_has_boxes or genre != "E" or project.equipment_amount == 0
 
-    def research_sort_shortest(self, enforce):
+    def research_sort_shortest(self, *, enforce: bool) -> ResearchPriority:
         """返回按耗时排序的项目与预设指令列表。"""
         FILTER.load(FILTER_STRING_SHORTEST)
         priority = FILTER.apply(self.projects, func=partial(self._research_check, enforce=enforce))
@@ -164,7 +167,7 @@ class ResearchSelector(ResearchUI):
         logger.attr("Filter_sort", " > ".join([str(project) for project in priority]))
         return priority
 
-    def research_sort_cheapest(self, enforce):
+    def research_sort_cheapest(self, *, enforce: bool) -> ResearchPriority:
         """返回按消耗排序的项目与预设指令列表。"""
         FILTER.load(FILTER_STRING_CHEAPEST)
         priority = FILTER.apply(self.projects, func=partial(self._research_check, enforce=enforce))

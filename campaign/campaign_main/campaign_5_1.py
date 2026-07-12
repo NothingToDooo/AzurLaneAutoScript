@@ -83,7 +83,7 @@ MAP.spawn_data = [
 
 
 class Config:
-    FLEET_BOSS = 1
+    fleet_boss = 1
     MAP_MYSTERY_HAS_CARRIER = True
 
     INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
@@ -105,12 +105,12 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.clear_all_mystery()
 
         return self.battle_default()
 
-    def battle_4(self):
+    def battle_4(self) -> bool:
         self.clear_all_mystery()
 
         boss = self.map.select(is_boss=True)

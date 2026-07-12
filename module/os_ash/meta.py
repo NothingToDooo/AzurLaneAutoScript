@@ -1,7 +1,8 @@
 import re
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
+from module.base.button import Button
 from module.base.timer import Timer
 from module.combat.assets import BATTLE_PREPARATION
 from module.logger import logger
@@ -15,7 +16,11 @@ from module.ui.page import page_reward
 from module.ui.ui import UI
 
 if TYPE_CHECKING:
-    from module.base.button import Button
+    from module.base.type_alias import Area
+    from module.config.config import AzurLaneConfig
+    from module.device.device import Device
+
+type MetaCategory = Literal["beacon", "dossier", "undefined"]
 
 
 class MetaState(Enum):
@@ -30,8 +35,9 @@ OCR_META_DAMAGE = Digit(ash_assets.META_DAMAGE, name="OCR_META_DAMAGE")
 
 
 class MetaDigitCounter(DigitCounter):
-    def after_process(self, result):
-        result = super().after_process(result)
+    @staticmethod
+    def normalize_text(result: str) -> str:
+        result = DigitCounter.normalize_text(result)
 
         # 00/200 -> 100/200
         if result.startswith("00/"):
@@ -52,56 +58,70 @@ class MetaDigitCounter(DigitCounter):
 
 
 class Meta(UI, MapEventHandler):
-    def digit_ocr_point_and_check(self, button: Button, check_number: int):
-        point_ocr = MetaDigitCounter(button, letter=(235, 235, 235), threshold=160, name="POINT_OCR")
+    def digit_ocr_point_and_check(self, button: Button | Area, check_number: int) -> bool:
+        if isinstance(button, Button):
+            region = button
+        else:
+            if len(button) != 4:
+                message = "META point OCR area must contain four coordinates"
+                raise ValueError(message)
+            region = (button[0], button[1], button[2], button[3])
+        point_ocr = MetaDigitCounter(region, letter=(235, 235, 235), threshold=160, name="POINT_OCR")
         point, _, _ = point_ocr.ocr(self.device.image)
         return point >= check_number
 
-    def handle_map_event(self):
-        if super().handle_map_event():
-            return True
+    def handle_map_event(self) -> str:
+        event = super().handle_map_event()
+        if event:
+            return event
         if self.appear_then_click(ash_assets.META_AUTO_CONFIRM, offset=(20, 20), interval=2):
             logger.info("Find auto attack complete")
-            return True
+            return "meta_auto_confirm"
         if self.appear(ash_assets.HELP_CONFIRM, offset=(30, 30), interval=2):
             logger.info("Accidentally click HELP_ENTER")
             self.device.click(BACK_ARROW)
-            return True
+            return "help_confirm"
         if self.appear(BATTLE_PREPARATION, offset=(30, 30), interval=2):
             logger.info("Wrong click into battle preparation page")
             self.device.click(BACK_ARROW)
-            return True
+            return "battle_preparation"
         if self.handle_popup_cancel("META"):
-            return True
-        return self.appear_then_click(ash_assets.META_ENTRANCE, offset=(20, 300), interval=2)
+            return "meta_popup_cancel"
+        clicked = self.appear_then_click(ash_assets.META_ENTRANCE, offset=(20, 300), interval=2)
+        return "meta_entrance" if clicked else ""
 
 
 class OpsiAshBeacon(Meta):
-    def __init__(self, *args, **kwargs):
-        self._meta_receive = []
-        self._meta_category = "undefined"
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        config: AzurLaneConfig | str,
+        device: Device | str | None = None,
+        task: str | None = None,
+    ) -> None:
+        self._meta_receive: list[MetaCategory] = []
+        self._meta_category: MetaCategory = "undefined"
+        super().__init__(config, device=device, task=task)
 
-    def _handle_attacking_meta_state(self):
+    def _handle_attacking_meta_state(self) -> None:
         if not self._pre_attack():
             return
         if self._satisfy_attack_condition():
             self._make_an_attack()
 
-    def _set_completed_meta_category(self):
+    def _set_completed_meta_category(self) -> None:
         if self.appear(ash_assets.BEACON_LIST, offset=(20, 20)):
             self._meta_category = "beacon"
         elif self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20)):
             self._meta_category = "dossier"
 
-    def _handle_completed_meta_state(self):
+    def _handle_completed_meta_state(self) -> None:
         self._set_completed_meta_category()
         self._handle_ash_beacon_reward()
         if self._meta_category not in self._meta_receive:
             self._meta_receive.append(self._meta_category)
         self.config.check_task_switch()
 
-    def _attack_meta(self, skip_first_screenshot=True):
+    def _attack_meta(self, *, skip_first_screenshot: bool = True) -> None:
         """处理 META 攻击事件，页面保持在 META。"""
         while 1:
             if skip_first_screenshot:
@@ -126,11 +146,11 @@ class OpsiAshBeacon(Meta):
                 self._handle_completed_meta_state()
                 continue
 
-    def _make_an_attack(self):
+    def _make_an_attack(self) -> None:
         """从 ASH_START 发起 META 战斗，结束于 META、ASH_START 或奖励页。"""
         logger.hr("Begin meta combat", level=2)
 
-        def expected_end():
+        def expected_end() -> bool:
             if self.appear(BATTLE_PREPARATION, offset=(30, 30), interval=2):
                 logger.info("Wrong click into battle preparation page")
                 self.device.click(BACK_ARROW)
@@ -148,7 +168,7 @@ class OpsiAshBeacon(Meta):
         combat = AshCombat(config=self.config, device=self.device)
         combat.combat(expected_end=expected_end, emotion_reduce=False)
 
-    def _handle_ash_beacon_reward(self, skip_first_screenshot=True):
+    def _handle_ash_beacon_reward(self, *, skip_first_screenshot: bool = True) -> None:
         """从奖励页领取 META 奖励，结束于 META 页面。"""
         while 1:
             if skip_first_screenshot:
@@ -170,7 +190,7 @@ class OpsiAshBeacon(Meta):
             if self.appear(ash_assets.META_ENTRANCE, offset=(20, 300), interval=2):
                 continue
 
-    def _satisfy_attack_condition(self):
+    def _satisfy_attack_condition(self) -> bool:
         """
         检查当前 META 是否可以攻击。
 
@@ -193,11 +213,11 @@ class OpsiAshBeacon(Meta):
             self.config.task_stop()
         return True
 
-    def _get_meta_damage(self):
+    def _get_meta_damage(self) -> int:
         self._ensure_meta_inner_page_damage()
-        return OCR_META_DAMAGE.ocr(self.device.image)
+        return OCR_META_DAMAGE.ocr_single(self.device.image)
 
-    def _ensure_meta_inner_page_damage(self, skip_first_screenshot=True):
+    def _ensure_meta_inner_page_damage(self, *, skip_first_screenshot: bool = True) -> None:
         """从 META 详情切到伤害页；调用前须位于 META 或 ASH_START。"""
         while 1:
             if skip_first_screenshot:
@@ -213,7 +233,7 @@ class OpsiAshBeacon(Meta):
                 self.appear_then_click(ash_assets.META_INNER_PAGE_NOT_DAMAGE, offset=(20, 20), interval=2)
                 continue
 
-    def _pre_attack(self):
+    def _pre_attack(self) -> bool:
         """攻击前请求信标支援；档案仅在国服和英语服启用自动攻击。"""
         if self.appear(ash_assets.BEACON_LIST, offset=(20, 20)):
             needs_assist = self.config.OpsiAshBeacon_OneHitMode or self.config.OpsiAshBeacon_RequestAssist
@@ -226,13 +246,13 @@ class OpsiAshBeacon(Meta):
             return True
         return False
 
-    def _ask_for_help(self):
+    def _ask_for_help(self) -> bool:
         """在 META 页请求三类支援；请求后目标已被击杀时返回 False。"""
         self._enter_help_page()
         self._send_help_requests()
         return self._confirm_help_request()
 
-    def _enter_help_page(self):
+    def _enter_help_page(self) -> None:
         skip_first_screenshot = True
         while 1:
             if skip_first_screenshot:
@@ -248,7 +268,7 @@ class OpsiAshBeacon(Meta):
                 self.device.click(BACK_ARROW)
                 continue
 
-    def _send_help_requests(self):
+    def _send_help_requests(self) -> None:
         # 简单点击即可，漏点几次也不影响最终确认。
         self.device.click(ash_assets.HELP_3)
         self.device.sleep((0.1, 0.3))
@@ -256,7 +276,7 @@ class OpsiAshBeacon(Meta):
         self.device.sleep((0.1, 0.3))
         self.device.click(ash_assets.HELP_1)
 
-    def _confirm_help_request(self):
+    def _confirm_help_request(self) -> bool:
         skip_first_screenshot = True
         while 1:
             if skip_first_screenshot:
@@ -275,7 +295,7 @@ class OpsiAshBeacon(Meta):
                 continue
         return False
 
-    def _dossier_auto_attack(self):
+    def _dossier_auto_attack(self) -> bool:
         """在尚未自动攻击的 META 页面启动档案自动攻击，并返回是否成功。"""
         timeout = Timer(10, count=20).start()
         skip_first_screenshot = True
@@ -303,7 +323,7 @@ class OpsiAshBeacon(Meta):
                 continue
         return False
 
-    def _begin_meta_from_main_page(self):
+    def _begin_meta_from_main_page(self) -> bool | None:
         if not self.appear(ash_assets.ASH_SHOWDOWN, offset=(30, 30), interval=2):
             return None
         if self._check_beacon_point():
@@ -317,7 +337,7 @@ class OpsiAshBeacon(Meta):
             logger.info("None dossier has been selected")
         return False
 
-    def _begin_meta_from_beacon_page(self):
+    def _begin_meta_from_beacon_page(self) -> bool | None:
         if not self.appear(ash_assets.BEACON_LIST, offset=(20, 20), interval=2):
             return None
         if self._check_beacon_point():
@@ -325,7 +345,7 @@ class OpsiAshBeacon(Meta):
             logger.info("Begin a beacon")
         return True
 
-    def _begin_meta_from_dossier_page(self):
+    def _begin_meta_from_dossier_page(self) -> bool | None:
         if not self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20), interval=2):
             return None
         if self.config.OpsiAshBeacon_AttackMode == "current_dossier" and self._check_dossier_point():
@@ -336,7 +356,7 @@ class OpsiAshBeacon(Meta):
         self.appear_then_click(ash_assets.ASH_QUIT, offset=(10, 10), interval=2)
         return True
 
-    def _begin_meta(self):
+    def _begin_meta(self) -> bool:
         """根据当前 META 页面选择或开始一个目标。
 
         META 主页会按配置进入信标或档案；信标页和档案页会尝试开始目标，
@@ -364,7 +384,7 @@ class OpsiAshBeacon(Meta):
             return self.digit_ocr_point_and_check(ash_assets.META_DOSSIER_DATA.button, 100)
         return False
 
-    def _get_state(self):
+    def _get_state(self) -> MetaState:
         if not self._in_meta_page():
             return MetaState.UNDEFINED
         if self.appear(ash_assets.BEACON_LIST, offset=(20, 20)) or self.appear(
@@ -379,14 +399,14 @@ class OpsiAshBeacon(Meta):
             return MetaState.INIT
         return MetaState.UNDEFINED
 
-    def _in_meta_page(self):
+    def _in_meta_page(self) -> bool:
         return (
             self.appear(ash_assets.ASH_SHOWDOWN, offset=(30, 30))
             or self.appear(ash_assets.BEACON_LIST, offset=(20, 20))
             or self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20))
         )
 
-    def _ensure_meta_page(self, skip_first_screenshot=True):
+    def _ensure_meta_page(self, *, skip_first_screenshot: bool = True) -> bool:
         logger.info("Ensure beacon attack page")
         while 1:
             if skip_first_screenshot:
@@ -403,7 +423,7 @@ class OpsiAshBeacon(Meta):
                 continue
         return False
 
-    def ensure_dossier_page(self, skip_first_screenshot=True):
+    def ensure_dossier_page(self, *, skip_first_screenshot: bool = True) -> bool:
         self.ui_ensure(page_reward)
         self._ensure_meta_page()
         logger.info("Ensure dossier meta page")
@@ -423,12 +443,12 @@ class OpsiAshBeacon(Meta):
                 continue
         return False
 
-    def _begin_beacon(self):
+    def _begin_beacon(self) -> None:
         logger.hr("Meta Beacon Attack")
         self._ensure_meta_page()
         self._attack_meta()
 
-    def run(self):
+    def run(self) -> None:
         self.ui_ensure(page_reward)
         self._begin_beacon()
 
@@ -440,7 +460,7 @@ class OpsiAshBeacon(Meta):
 
 
 class AshBeaconAssist(Meta):
-    def _attack_meta(self, skip_first_screenshot=True):
+    def _attack_meta_assist(self, *, skip_first_screenshot: bool = True) -> bool:
         timeout = Timer(3, count=9).start()
         appeared = False
         while 1:
@@ -467,11 +487,11 @@ class AshBeaconAssist(Meta):
 
         return appeared
 
-    def _make_an_attack(self):
+    def _make_an_attack(self) -> None:
         """在 META 支援页完成一次支援战斗，结束后仍在支援页。"""
         logger.hr("Begin meta assist combat", level=2)
 
-        def expected_end():
+        def expected_end() -> bool:
             if self.appear(BATTLE_PREPARATION, offset=(30, 30), interval=2):
                 logger.info("Wrong click into battle preparation page")
                 self.device.click(BACK_ARROW)
@@ -491,7 +511,7 @@ class AshBeaconAssist(Meta):
         combat = AshCombat(config=self.config, device=self.device)
         combat.combat(expected_end=expected_end, emotion_reduce=False)
 
-    def _ensure_meta_level(self):
+    def _ensure_meta_level(self) -> None:
         """等待信标等级加载后选择满足配置等级的目标。"""
         # 刚进入信标列表时等级不会立即显示。
         tier = self.config.OpsiAshAssist_Tier
@@ -505,7 +525,7 @@ class AshBeaconAssist(Meta):
                 logger.warning("Waiting for beacon tier timeout")
         current = -1
         for _ in range(5):
-            current = OCR_BEACON_TIER.ocr(self.device.image)
+            current = OCR_BEACON_TIER.ocr_single(self.device.image)
             if current >= tier:
                 break
             self.device.click(ash_assets.BEACON_NEXT)
@@ -515,10 +535,10 @@ class AshBeaconAssist(Meta):
             logger.info(f"Tier {tier} beacon not found after 5 trial, use current beacon")
         logger.info("Find a beacon in level:" + str(current))
 
-    def _in_meta_assist_page(self):
+    def _in_meta_assist_page(self) -> bool:
         return self.appear(ash_assets.BEACON_MY, offset=(20, 20))
 
-    def _ensure_meta_assist_page(self, skip_first_screenshot=True):
+    def _ensure_meta_assist_page(self, *, skip_first_screenshot: bool = True) -> bool:
         logger.info("Ensure beacon assist page")
         while 1:
             if skip_first_screenshot:
@@ -544,12 +564,12 @@ class AshBeaconAssist(Meta):
                 continue
         return False
 
-    def _begin_meta_assist(self):
+    def _begin_meta_assist(self) -> bool:
         logger.hr("Meta Beacon Assist")
         self._ensure_meta_assist_page()
-        return self._attack_meta(skip_first_screenshot=False)
+        return self._attack_meta_assist(skip_first_screenshot=False)
 
-    def run(self):
+    def run(self) -> None:
         self.ui_ensure(page_reward)
 
         if self._begin_meta_assist():

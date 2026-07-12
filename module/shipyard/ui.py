@@ -1,6 +1,6 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Literal, override
 
-from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.base.utils import area_pad
 from module.campaign.campaign_status import OCR_COIN
@@ -41,6 +41,12 @@ from module.ui.navbar import Navbar, NavbarColorRule, NavbarTarget, NavbarVisual
 from module.ui.page import page_main_white
 from module.ui.ui import UI
 
+if TYPE_CHECKING:
+    from module.base.base import ModuleBase
+    from module.base.button import Button
+
+type ShipyardMode = Literal["DEV", "FATE"]
+
 SHIPYARD_TOTAL_OCR = {
     "DEV": OCR_SHIPYARD_TOTAL_DEV,
     "FATE": OCR_SHIPYARD_TOTAL_FATE,
@@ -61,21 +67,28 @@ SHIPYARD_CONFIRM_BUTTONS = {
 
 @dataclass(slots=True)
 class _ShipyardBuyConfirmState:
-    button: object
+    button: Button
     ocr_timer: Timer
     confirm_timer: Timer
     success: bool = False
 
 
 class ShipyardNavbar(Navbar):
-    def is_button_active(self, button, main):
+    @override
+    def is_button_active(self, button: Button, main: ModuleBase) -> bool:
         active_blue = main.image_color_count(button, color=(33, 113, 222), threshold=221, count=400)
         odin_shoulder = main.image_color_count(button, color=(41, 85, 165), threshold=221, count=400)
         return active_blue or odin_shoulder
 
 
+_SHIPYARD_BOTTOM_NAVBAR = ShipyardNavbar(
+    grids=SHIPYARD_FACE_GRID,
+    visual=NavbarVisualRules(inactive=NavbarColorRule(color=(49, 60, 82), threshold=221, count=50)),
+)
+
+
 class ShipyardUI(UI):
-    def _shipyard_cannot_strengthen(self):
+    def _shipyard_cannot_strengthen(self) -> bool:
         if (
             self.appear(SHIPYARD_PROGRESS_DEV, offset=(20, 20))
             or self.appear(SHIPYARD_PROGRESS_FATE, offset=(20, 20))
@@ -86,13 +99,13 @@ class ShipyardUI(UI):
             return True
         return False
 
-    def _shipyard_get_append(self):
+    def _shipyard_get_append(self) -> ShipyardMode:
         """返回当前界面的 FATE 或 DEV 后缀。"""
         if self.appear(SHIPYARD_IN_FATE, offset=(20, 20)):
             return "FATE"
         return "DEV"
 
-    def _shipyard_get_total(self):
+    def _shipyard_get_total(self) -> tuple[Button, Button, int]:
         """按当前 DEV/FATE 布局返回加号、减号和 OCR 数量。"""
         # 这里的游戏 UI 很乱，DEV/FATE 和 MAX 按钮组合都会改变布局。
         # 有 MAX 按钮时形态类似：
@@ -109,9 +122,9 @@ class ShipyardUI(UI):
         area = ocr.buttons[0]
         ocr.buttons = [(minus.button[2] + 3, area[1], plus.button[0] - 3, area[3])]
 
-        return plus, minus, ocr.ocr(self.device.image)
+        return plus, minus, ocr.ocr_single(self.device.image)
 
-    def _shipyard_ensure_index(self, count, skip_first_screenshot=True):
+    def _shipyard_ensure_index(self, count: int, *, skip_first_screenshot: bool = True) -> int | None:
         """尽量把数量调到 count，返回界面无法消耗的剩余蓝图数。"""
         if count < 0:
             logger.warning("_shipyard_ensure_index --> Non-positive 'count' cannot continue")
@@ -131,24 +144,25 @@ class ShipyardUI(UI):
 
             diff = count - current
             button = plus if diff > 0 else minus
-            self.device.multi_click(button, n=diff, interval=(0.3, 0.5))
+            self.device.multi_click(button, n=abs(diff), interval=(0.3, 0.5))
             self.device.sleep((0.3, 0.5))
 
         logger.info(f"Current interface does not allow consumption of {count} BPs\n")
         logger.info(f"Capable of consuming at most {current} of the {count} BPs")
         return diff
 
-    def _shipyard_get_bp_count(self, index=0):
+    def _shipyard_get_bp_count(self, index: int = 0) -> int:
         """OCR 从 1 开始的舰船索引对应蓝图数；索引无效时返回 -1。"""
         if index <= 0 or index > len(SHIPYARD_BP_COUNT_GRID.buttons):
             logger.warning(f"Cannot parse for count from index {index}")
             return -1
 
-        result = OCR_SHIPYARD_BP_COUNT_GRID.ocr(self.device.image)
+        images = [self.image_crop(button, copy=False) for button in SHIPYARD_BP_COUNT_GRID.buttons]
+        result = OCR_SHIPYARD_BP_COUNT_GRID.ocr_many(images)
 
         return result[index - 1]
 
-    def _shipyard_in_ui(self):
+    def _shipyard_in_ui(self) -> bool:
         """返回当前是否位于船坞开发界面。"""
         return (
             self.appear(SHIPYARD_CHECK, offset=(20, 20))
@@ -156,7 +170,7 @@ class ShipyardUI(UI):
             or self.appear(SHIPYARD_IN_FATE, offset=(20, 20))
         )
 
-    def _shipyard_set_series(self, series=1, skip_first_screenshot=True):
+    def _shipyard_set_series(self, series: int = 1, *, skip_first_screenshot: bool = True) -> bool:
         """切换到指定科研系列；索引越界时返回 False。"""
         if series <= 0 or series > len(SHIPYARD_SERIES_GRID.buttons):
             logger.warning(f"Research Series {series} is not selectable")
@@ -178,15 +192,13 @@ class ShipyardUI(UI):
 
         return True
 
-    @cached_property
-    def _shipyard_bottom_navbar(self):
-        """系列内舰船导航位置会随科研进度变化。"""
-        return ShipyardNavbar(
-            grids=SHIPYARD_FACE_GRID,
-            visual=NavbarVisualRules(inactive=NavbarColorRule(color=(49, 60, 82), threshold=221, count=50)),
-        )
-
-    def shipyard_bottom_navbar_ensure(self, left=None, right=None, skip_first_screenshot=True):
+    def shipyard_bottom_navbar_ensure(
+        self,
+        left: int | None = None,
+        right: int | None = None,
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> bool:
         """按左右索引切换舰船并等待延迟资源加载完成。"""
         if left is None and right is not None:
             left = right
@@ -196,7 +208,7 @@ class ShipyardUI(UI):
             return False
 
         ensured = False
-        if self._shipyard_bottom_navbar.set(
+        if _SHIPYARD_BOTTOM_NAVBAR.set(
             self, NavbarTarget(left=left, right=right), skip_first_screenshot=skip_first_screenshot
         ):
             ensured = True
@@ -216,16 +228,22 @@ class ShipyardUI(UI):
 
         return ensured
 
-    def shipyard_set_focus(self, series=1, index=1, skip_first_screenshot=True):
+    def shipyard_set_focus(
+        self,
+        series: int = 1,
+        index: int = 1,
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> bool:
         """聚焦系列和舰船索引；第三系列起仅支持 1～5。"""
         if series > 2 and index > 5:
             logger.warning(f"Research Series {series} is limited to indexes 1-5, cannot set focus to index {index}")
             return False
-        return self._shipyard_set_series(series, skip_first_screenshot) and self.shipyard_bottom_navbar_ensure(
-            left=index, skip_first_screenshot=skip_first_screenshot
-        )
+        return self._shipyard_set_series(
+            series, skip_first_screenshot=skip_first_screenshot
+        ) and self.shipyard_bottom_navbar_ensure(left=index, skip_first_screenshot=skip_first_screenshot)
 
-    def _shipyard_get_ship(self, skip_first_screenshot=True):
+    def _shipyard_get_ship(self, *, skip_first_screenshot: bool = True) -> None:
         """处理科研完成到获得舰船的过渡页面。"""
         confirm_timer = Timer(1, count=2).start()
         while 1:
@@ -256,7 +274,7 @@ class ShipyardUI(UI):
             else:
                 confirm_timer.reset()
 
-    def _shipyard_buy_confirm(self, text, skip_first_screenshot=True):
+    def _shipyard_buy_confirm(self, text: str, *, skip_first_screenshot: bool = True) -> None:
         append = self._shipyard_get_append()
         state = _ShipyardBuyConfirmState(
             button=SHIPYARD_CONFIRM_BUTTONS[append],
@@ -280,7 +298,7 @@ class ShipyardUI(UI):
             if self._shipyard_buy_confirm_finished(state):
                 break
 
-    def _handle_shipyard_confirm_ocr_check(self, state):
+    def _handle_shipyard_confirm_ocr_check(self, state: _ShipyardBuyConfirmState) -> bool:
         if not state.ocr_timer.reached():
             return False
 
@@ -293,7 +311,7 @@ class ShipyardUI(UI):
         state.ocr_timer.reset()
         return True
 
-    def _handle_shipyard_confirm_popups(self, text, state):
+    def _handle_shipyard_confirm_popups(self, text: str, state: _ShipyardBuyConfirmState) -> bool:
         if self.handle_popup_confirm(text):
             self._reset_shipyard_confirm_timers(state)
             return True
@@ -309,22 +327,23 @@ class ShipyardUI(UI):
             return True
         return False
 
-    def _mark_shipyard_confirm_success(self, state) -> None:
+    def _mark_shipyard_confirm_success(self, state: _ShipyardBuyConfirmState) -> None:
         self.interval_reset(state.button)
         state.success = True
         self._reset_shipyard_confirm_timers(state)
 
-    def _reset_shipyard_confirm_timers(self, state) -> None:
+    @staticmethod
+    def _reset_shipyard_confirm_timers(state: _ShipyardBuyConfirmState) -> None:
         state.ocr_timer.reset()
         state.confirm_timer.reset()
 
-    def _shipyard_buy_confirm_finished(self, state):
+    def _shipyard_buy_confirm_finished(self, state: _ShipyardBuyConfirmState) -> bool:
         if state.success and self._shipyard_in_ui():
             return state.confirm_timer.reached()
         state.confirm_timer.reset()
         return False
 
-    def _shipyard_buy_enter(self):
+    def _shipyard_buy_enter(self) -> bool:
         if self.appear(SHIPYARD_RESEARCH_INCOMPLETE, offset=(20, 20)) or self.appear(
             SHIPYARD_RESEARCH_IN_PROGRESS, offset=(20, 20)
         ):
@@ -340,7 +359,7 @@ class ShipyardUI(UI):
 
         return True
 
-    def _shipyard_get_coin(self):
+    def _shipyard_get_coin(self) -> int:
         if self.ui_page_appear(page_main_white):
-            return MAIN_OCR_COIN.ocr(self.device.image)
-        return OCR_COIN.ocr(self.device.image)
+            return MAIN_OCR_COIN.ocr_single(self.device.image)
+        return OCR_COIN.ocr_single(self.device.image)

@@ -2,6 +2,7 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import date
 from functools import lru_cache
+from operator import itemgetter
 from pathlib import Path
 from typing import cast
 
@@ -54,6 +55,7 @@ class _StrictLoader(yaml.SafeLoader):
 def _construct_unique_mapping(
     loader: _StrictLoader,
     node: yaml.MappingNode,
+    *,
     deep: object = False,
 ) -> dict[object, object]:
     mapping: dict[object, object] = {}
@@ -419,7 +421,7 @@ def _display_width(text: str) -> int:
 def render_campaign_readme(packs: Iterable[EventPack]) -> str:
     """从活动清单纯渲染 README，不读取或写入其他文件。"""
     rows = [(release.order, release, str(pack.pack_id)) for pack in packs for release in pack.releases]
-    rows.sort(key=lambda item: item[0])
+    rows.sort(key=itemgetter(0))
     data = [("开放日期", "目录", "国服名称")]
     data.extend(
         (

@@ -1,28 +1,39 @@
+from typing import TYPE_CHECKING, Literal, override
+
+import numpy as np
+
 from module.combat.assets import BATTLE_PREPARATION, BATTLE_STATUS_S, GET_ITEMS_1
 from module.exercise import combat as exercise_combat
 from module.exercise.assets import CLICK_SAFE_AREA
 from module.exercise.combat import ExerciseCombat
 from module.ui.assets import EXERCISE_CHECK
 
+if TYPE_CHECKING:
+    import pytest
+
+    from module.base.button import Button, MatchOffset
+    from module.base.type_alias import ImageArray
+
 
 class _Timer:
     def __init__(self) -> None:
         self.reset_count = 0
 
-    def start(self):
+    def start(self) -> _Timer:
         return self
 
-    def reached(self):
+    @staticmethod
+    def reached() -> bool:
         return False
 
-    def reset(self):
+    def reset(self) -> None:
         self.reset_count += 1
 
 
 class _Device:
     def __init__(self) -> None:
-        self.image = "screen"
-        self.clicks = []
+        self.image = np.zeros((1, 1, 3), dtype=np.uint8)
+        self.clicks: list[Button] = []
         self.screenshot_count = 0
         self.stuck_clear_count = 0
         self.click_clear_count = 0
@@ -36,7 +47,7 @@ class _Device:
     def screenshot(self) -> None:
         self.screenshot_count += 1
 
-    def click(self, button) -> None:
+    def click(self, button: Button) -> None:
         self.clicks.append(button)
 
 
@@ -45,73 +56,106 @@ class _ExerciseCombat(ExerciseCombat):
 
     def __init__(self) -> None:
         self.device = _Device()
-        self.exercise_results = []
-        self.preparation_results = []
-        self.executing_results = []
-        self.battle_status_results = []
-        self.get_items_results = []
+        self.exercise_results: list[bool] = []
+        self.preparation_results: list[bool] = []
+        self.executing_results: list[Button | Literal[False]] = []
+        self.battle_status_results: list[bool] = []
+        self.get_items_results: list[bool] = []
 
     @staticmethod
-    def _next(results):
+    def _next[T](results: list[T], *, default: T) -> T:
         if results:
             return results.pop(0)
-        return False
+        return default
 
-    def appear(self, button, *_args: object, **_kwargs):
+    @override
+    def appear(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 10,
+    ) -> bool:
+        del offset, interval, similarity, threshold
         if button == EXERCISE_CHECK:
-            return self._next(self.exercise_results)
+            return self._next(self.exercise_results, default=False)
         if button == BATTLE_PREPARATION:
-            return self._next(self.preparation_results)
+            return self._next(self.preparation_results, default=False)
         if button == BATTLE_STATUS_S:
-            return self._next(self.battle_status_results)
+            return self._next(self.battle_status_results, default=False)
         if button == GET_ITEMS_1:
-            return self._next(self.get_items_results)
+            return self._next(self.get_items_results, default=False)
         return False
 
-    def is_combat_executing(self):
-        return self._next(self.executing_results)
+    def is_combat_executing(self) -> Button | Literal[False]:
+        return self._next(self.executing_results, default=False)
 
-    def appear_then_click(self, button, *_args: object, **_kwargs):
-        _ = button
+    @override
+    def appear_then_click(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 30,
+    ) -> bool:
+        del button, offset, interval, similarity, threshold
         return False
 
-    def handle_combat_quit(self, *_args: object, **_kwargs: object):
+    @override
+    def handle_combat_quit(self, offset: MatchOffset = (20, 20), interval: float = 3) -> bool:
+        del offset, interval
         return False
 
-    def handle_combat_quit_reconfirm(self, *_args: object, **_kwargs: object):
+    @override
+    def handle_combat_quit_reconfirm(self, interval: float = 2) -> bool:
+        del interval
         return False
 
-    def _at_low_hp(self, image: object, pause=None, **_kwargs: object):
+    @override
+    def _at_low_hp(self, image: ImageArray, pause: Button | None = None) -> bool:
         del image, pause
         return False
 
-    def _show_hp(self, *_args: object, **_kwargs: object) -> None:
-        pass
+    @override
+    def _show_hp(self, low_hp_time: float = 0.0) -> None:
+        del low_hp_time
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2):
-        _ = (name, offset, interval)
+    @override
+    def handle_popup_confirm(
+        self,
+        name: str = "",
+        offset: MatchOffset | None = None,
+        interval: float = 2,
+    ) -> bool:
+        del name, offset, interval
         return False
 
-    def handle_urgent_commission(self):
+    @override
+    def handle_urgent_commission(self) -> bool:
         return False
 
-    def handle_guild_popup_cancel(self):
+    @override
+    def handle_guild_popup_cancel(self) -> bool:
         return False
 
-    def handle_vote_popup(self):
+    @override
+    def handle_vote_popup(self) -> bool:
         return False
 
-    def handle_mission_popup_ack(self):
+    @override
+    def handle_mission_popup_ack(self) -> bool:
         return False
 
-    def run_combat_execute(self):
+    def run_combat_execute(self) -> bool:
         return self._combat_execute()
 
 
-def test_exercise_battle_status_is_handled_after_leaving_combat_ui(monkeypatch) -> None:
+def test_exercise_battle_status_is_handled_after_leaving_combat_ui(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(exercise_combat, "Timer", lambda *_args, **_kwargs: _Timer())
     combat = _ExerciseCombat()
-    pause_button = object()
+    pause_button = BATTLE_PREPARATION
     combat.exercise_results = [False, False, True]
     combat.executing_results = [pause_button, False]
     combat.battle_status_results = [True]
@@ -121,7 +165,7 @@ def test_exercise_battle_status_is_handled_after_leaving_combat_ui(monkeypatch) 
     assert combat.device.clicks == [CLICK_SAFE_AREA]
 
 
-def test_exercise_get_items_waits_for_battle_status(monkeypatch) -> None:
+def test_exercise_get_items_waits_for_battle_status(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(exercise_combat, "Timer", lambda *_args, **_kwargs: _Timer())
     combat = _ExerciseCombat()
     combat.exercise_results = [False, True]

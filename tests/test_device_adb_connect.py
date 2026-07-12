@@ -24,23 +24,27 @@ class _AdbClient:
 
 
 class _DiagnosticConnection(Connection):
+    adb_client: _AdbClient
+    devices: list[SimpleNamespace]
+    detect_calls: int
+    brute_force_calls: list[list[str]]
     refused_diagnose_calls: int
 
     def _diagnose_adb_connect_refused(self) -> None:
         self.refused_diagnose_calls += 1
 
 
-def _device(serial: str, status: str):
+def _device(serial: str, status: str) -> SimpleNamespace:
     return SimpleNamespace(serial=serial, status=status)
 
 
 def _make_connection(
     *,
     serial: str = "127.0.0.1:16384",
-    devices: list[object] | None = None,
+    devices: list[SimpleNamespace] | None = None,
     connect_messages: list[str] | None = None,
     detect_serial: str | None = None,
-):
+) -> _DiagnosticConnection:
     connection = object.__new__(_DiagnosticConnection)
     connection.serial = serial
     connection.adb_client = _AdbClient(connect_messages)
@@ -49,7 +53,7 @@ def _make_connection(
     connection.brute_force_calls = []
     connection.refused_diagnose_calls = 0
 
-    def list_device():
+    def list_device() -> list[SimpleNamespace]:
         return connection.devices
 
     def detect_device() -> None:
@@ -152,12 +156,17 @@ def test_connection_release_resource_is_base_hook() -> None:
     assert connection.__dict__["_minitouch_builder"] is marker
 
 
-def _make_reconnect_connection(devices: list[object]):
-    connection = object.__new__(Connection)
+class _ReconnectConnection(Connection):
+    devices: list[object]
+    calls: list[str]
+
+
+def _make_reconnect_connection(devices: list[object]) -> _ReconnectConnection:
+    connection = object.__new__(_ReconnectConnection)
     connection.devices = devices
     connection.calls = []
 
-    def list_device():
+    def list_device() -> list[object]:
         connection.calls.append("list_device")
         return connection.devices
 

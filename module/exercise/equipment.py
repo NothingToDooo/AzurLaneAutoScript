@@ -5,7 +5,7 @@ from module.exercise.assets import EQUIP_EDIT_ACTIVE, EQUIP_EDIT_INACTIVE, EQUIP
 
 
 class ExerciseEquipment(EquipmentChange):
-    def _active_edit(self):
+    def _active_edit(self) -> None:
         timer = Timer(5)
         while 1:
             self.device.screenshot()
@@ -17,7 +17,7 @@ class ExerciseEquipment(EquipmentChange):
                 self.device.sleep((0.2, 0.3))
                 break
 
-    def _inactive_edit(self):
+    def _inactive_edit(self) -> None:
         timer = Timer(5)
         while 1:
             self.device.screenshot()
@@ -29,7 +29,7 @@ class ExerciseEquipment(EquipmentChange):
                 self.device.sleep((0.2, 0.3))
                 break
 
-    def equipment_take_on(self):
+    def _equipment_take_on(self) -> None:
         self._active_edit()
         self.fleet_equipment_take_on_preset(
             preset_record=self.config.EXERCISE_FLEET_EQUIPMENT,
@@ -39,7 +39,7 @@ class ExerciseEquipment(EquipmentChange):
         )
         self._inactive_edit()
 
-    def equipment_take_off(self):
+    def _equipment_take_off(self) -> None:
         self._active_edit()
         self.fleet_equipment_take_off(enter=EQUIP_ENTER, long_click=True, out=BATTLE_PREPARATION)
         self._inactive_edit()

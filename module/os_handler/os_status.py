@@ -45,12 +45,14 @@ class OSStatus(UI):
             "OpsiDaily",
         ]
 
-        def func(task: Function):
+        def func(task: Function) -> bool:
+            next_run = task.next_run
             return (
                 task.command in cd_tasks
                 and task.enable
-                and task.next_run != update
-                and task.next_run - now <= timedelta(minutes=60)
+                and isinstance(next_run, datetime)
+                and next_run != update
+                and next_run - now <= timedelta(minutes=60)
             )
 
         tasks = SelectedGrids(self.config.pending_task + self.config.waiting_task).filter(func).sort("next_run")
@@ -60,7 +62,7 @@ class OSStatus(UI):
         yellow_coins = 0
         timeout = Timer(2, count=3).start()
         for _ in self.loop():
-            yellow_coins = OCR_SHOP_YELLOW_COINS.ocr(self.device.image)
+            yellow_coins = OCR_SHOP_YELLOW_COINS.ocr_single(self.device.image)
             if timeout.reached():
                 logger.warning("Get yellow coins timeout")
                 break
@@ -75,10 +77,10 @@ class OSStatus(UI):
 
     def get_purple_coins(self) -> int:
         if self.appear(OS_SHOP_CHECK):
-            return OCR_OS_SHOP_PURPLE_COINS.ocr(self.device.image)
-        return OCR_SHOP_PURPLE_COINS.ocr(self.device.image)
+            return OCR_OS_SHOP_PURPLE_COINS.ocr_single(self.device.image)
+        return OCR_SHOP_PURPLE_COINS.ocr_single(self.device.image)
 
-    def os_shop_get_coins(self):
+    def os_shop_get_coins(self) -> None:
         self._shop_yellow_coins = self.get_yellow_coins()
         self._shop_purple_coins = self.get_purple_coins()
         logger.info(f"Yellow coins: {self._shop_yellow_coins}, purple coins: {self._shop_purple_coins}")

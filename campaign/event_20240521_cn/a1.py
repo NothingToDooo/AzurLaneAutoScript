@@ -1,9 +1,12 @@
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from campaign.event_20240521_cn.campaign_base import CurrentFleetGrid
 from module.campaign.campaign_base import CampaignBase
 from module.logger import logger
 from module.map.map_base import CampaignMap
+
+if TYPE_CHECKING:
+    from module.map.fleet import FleetLocation
 
 MAP = CampaignMap("A1")
 MAP.shape = "I9"
@@ -158,35 +161,36 @@ class Campaign(CampaignBase):
     MAP = MAP
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
     grid_class = CurrentFleetGrid
-    bored_visited_G3 = False
-    bored_visited_H2 = False
+    bored_visited_g3 = False
+    bored_visited_h2 = False
 
-    def find_current_fleet(self):
+    def find_current_fleet(self) -> FleetLocation:
         logger.hr("Find current fleet")
         logger.info("No fleet scan, assume fleet_1 at D5")
         self.fleet_1 = D5.location
-        if self.config.FLEET_2:
+        if self.config.fleet_2:
             logger.info("No fleet scan, assume fleet_2 at F5")
             self.fleet_2 = F5.location
+        return self.fleet_current
 
-    def map_data_init(self, map_):
+    def map_data_init(self, map_: CampaignMap | None) -> None:
         super().map_data_init(map_)
-        self.bored_visited_G3 = False
-        self.bored_visited_H2 = False
-        self.config.FLEET_BOSS = 1
+        self.bored_visited_g3 = False
+        self.bored_visited_h2 = False
+        self.config.fleet_boss = 1
 
-    def bored_visit(self):
-        if not self.bored_visited_G3:
-            self.bored_visited_G3 = True
+    def bored_visit(self) -> bool:
+        if not self.bored_visited_g3:
+            self.bored_visited_g3 = True
             if self.clear_chosen_enemy(G3):
                 return True
-        if not self.bored_visited_H2:
-            self.bored_visited_H2 = True
+        if not self.bored_visited_h2:
+            self.bored_visited_h2 = True
             if self.clear_chosen_enemy(H2):
                 return True
         return False
 
-    def battle_function(self):
+    def battle_function(self) -> bool:
         if self.battle_count == 0:
             return self.battle_0()
 
@@ -199,7 +203,7 @@ class Campaign(CampaignBase):
                 .delete(self.map.select(is_boss=True))
             )
             logger.info(f"Enemy remain: {remain}")
-            logger.info(f"bored_visited_G3: {self.bored_visited_G3}, bored_visited_H2: {self.bored_visited_H2}")
+            logger.info(f"bored_visited_g3: {self.bored_visited_g3}, bored_visited_h2: {self.bored_visited_h2}")
             if remain.count > 0:
                 if self.clear_siren():
                     return True
@@ -210,7 +214,7 @@ class Campaign(CampaignBase):
             return self.battle_boss()
         return super().battle_function()
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.fleet_step >= 3:
             if self.clear_chosen_enemy(E7, expected="siren"):
                 return True
@@ -222,7 +226,7 @@ class Campaign(CampaignBase):
         logger.warning("A1.battle_0() did not cleared siren")
         return self.battle_default()
 
-    def battle_1(self):
+    def battle_1(self) -> bool:
         if self.clear_siren():
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
@@ -230,5 +234,5 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_3(self):
+    def battle_3(self) -> bool:
         return self.clear_boss()

@@ -5,17 +5,16 @@ from module.map_detection.perspective import Perspective
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
-    from typing import Any
 
-    import numpy as np
-
+    from module.base.type_alias import ImageArray, NumericArray
     from module.config.config import AzurLaneConfig
+    from module.map.type_alias import GridLocation
 
 type DetectionBackend = Homography | Perspective
 
 
 class MapDetector:
-    image: np.ndarray
+    image: ImageArray
     config: AzurLaneConfig
 
     left_edge: bool
@@ -24,13 +23,13 @@ class MapDetector:
     upper_edge: bool
     backend: DetectionBackend
 
-    generate: Callable[..., Iterable[tuple[tuple[int, int], Any]]]
+    generate: Callable[[], Iterable[tuple[GridLocation, NumericArray]]]
 
-    def __init__(self, config):
+    def __init__(self, config: AzurLaneConfig) -> None:
         self.config = config
         self.detector_set_backend()
 
-    def detector_set_backend(self, name=""):
+    def detector_set_backend(self, name: str = "") -> None:
         """name 应为 `homography` 或 `perspective`；空值读取配置。"""
         if not name:
             name = self.config.DETECTION_BACKEND
@@ -40,7 +39,7 @@ class MapDetector:
         else:
             self.backend = Perspective(config=self.config)
 
-    def load(self, image):
+    def load(self, image: ImageArray) -> None:
         """加载 (720, 1280, 3) 截图。"""
         self.backend.load(image)
 

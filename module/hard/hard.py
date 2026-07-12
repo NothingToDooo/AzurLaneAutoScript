@@ -17,7 +17,7 @@ class CampaignHard(CampaignRun):
     equipment_has_take_on = False
     campaign: Campaign
 
-    def run(self, name="", folder="campaign_main", mode="normal", total=0):
+    def run(self, name: str = "", folder: str = "campaign_main", mode: str = "normal", total: int = 0) -> None:
         _ = (name, folder, mode, total)
         logger.hr("Campaign hard", level=1)
         name = to_map_file_name(self.config.Hard_HardStage)
@@ -38,7 +38,7 @@ class CampaignHard(CampaignRun):
         self.campaign.device.image = self.device.image
         self.campaign.ensure_campaign_ui(name=self.config.Hard_HardStage, mode="hard")
 
-        remain = OCR_HARD_REMAIN.ocr(self.device.image)
+        remain = OCR_HARD_REMAIN.ocr_single(self.device.image)
         logger.attr("Remain", remain)
         for _n in range(remain):
             self.campaign.run()

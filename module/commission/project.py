@@ -1,6 +1,7 @@
 import hashlib
 import re
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Literal
 
 import cv2
 import numpy as np
@@ -12,10 +13,16 @@ from module.commission.project_data import dictionary_cn
 from module.logger import logger
 from module.ocr.ocr import Duration, Ocr
 
+if TYPE_CHECKING:
+    from module.base.type_alias import Area, ImageArray
+    from module.config.config import AzurLaneConfig
+
+type CommissionStatus = Literal["finished", "running", "pending"]
+
 COMMISSION_COMPARE_THRESHOLD = timedelta(seconds=120)
 URGENT_BOX_TAGS = ("NYB", "BIW")
 
-COMMISSION_FILTER = Filter(
+COMMISSION_FILTER: Filter[Commission] = Filter(
     regex=re.compile(
         r"(major|daily|extra|urgent|night)?"
         r"-?"
@@ -29,7 +36,7 @@ COMMISSION_FILTER = Filter(
 )
 
 
-def crop_suffix_image(image, area):
+def crop_suffix_image(image: ImageArray, area: Area) -> ImageArray | None:
     """裁剪委托名的黑字白底后缀；无后缀时返回 None。"""
     name_image = crop(image, area)
     name_image = extract_letters(name_image, letter=(255, 255, 255), threshold=128).astype(np.uint8)
@@ -57,7 +64,7 @@ def crop_suffix_image(image, area):
     return extract_letters(image, letter=(255, 255, 255), threshold=128).astype(np.uint8)
 
 
-def image_hash(image):
+def image_hash(image: ImageArray | None) -> str:
     if image is None:
         return ""
 
@@ -69,11 +76,11 @@ class Commission:
     name: str
     valid: bool
     # 裁剪后的后缀图，黑字白底；没有后缀时为 None。
-    suffix_image: np.ndarray
+    suffix_image: ImageArray | None
     suffix_hash: str
     genre: str
     # 状态值为 finished、running、pending。
-    status: str
+    status: CommissionStatus
     duration: timedelta
     expire: timedelta
     # 过滤分类为 major、daily、extra、urgent、night。
@@ -83,7 +90,7 @@ class Commission:
     duration_hour: str
     duration_hm: str
 
-    def __init__(self, image, y, config):
+    def __init__(self, image: ImageArray, y: int, config: AzurLaneConfig) -> None:
         self.config = config
         self.y = y
         self.area = (188, y - 119, 1199, y)
@@ -105,12 +112,12 @@ class Commission:
             self.duration_hour = str(int(self.duration.total_seconds() / 36) / 100).strip(".0")
             self.duration_hm = str(self.duration).rsplit(":", 1)[0]
 
-    def commission_parse(self):
+    def commission_parse(self) -> None:
         area = area_offset((176, 23, 420, 53), self.area[0:2])
         button = Button(area=area, color=(), button=area, name="COMMISSION")
         ocr = Ocr(button, lang="cnocr", threshold=256)
         self.button = button
-        result = ocr.ocr(self.image).upper()
+        result = ocr.ocr_single(self.image).upper()
         self.name = result
         self.genre = self.commission_name_parse(self.name)
 
@@ -120,7 +127,7 @@ class Commission:
         area = area_offset((290, 68, 390, 95), self.area[0:2])
         button = Button(area=area, color=(), button=area, name="DURATION")
         ocr = Duration(button)
-        self.duration = ocr.ocr(self.image)
+        self.duration = ocr.ocr_single(self.image)
 
         area = area_offset((-49, 68, -45, 84), self.area[0:2])
         button = Button(area=area, color=(189, 65, 66), button=area, name="IS_URGENT")
@@ -128,18 +135,18 @@ class Commission:
             area = area_offset((-49, 67, 45, 94), self.area[0:2])
             button = Button(area=area, color=(), button=area, name="EXPIRE")
             ocr = Duration(button)
-            self.expire = ocr.ocr(self.image)
+            self.expire = ocr.ocr_single(self.image)
         else:
             self.expire = timedelta(seconds=0)
 
         area = area_offset((179, 71, 187, 93), self.area[0:2])
-        dic = {0: "finished", 1: "running", 2: "pending"}
+        statuses: dict[int, CommissionStatus] = {0: "finished", 1: "running", 2: "pending"}
         color = np.array(get_color(self.image, area))
         if self.genre == "daily_event":
             color -= [50, 30, 20]
-        self.status = dic[int(np.argmax(color))]
+        self.status = statuses[int(np.argmax(color))]
 
-    def __str__(self):
+    def __str__(self) -> str:
         name = f"{self.name} | {self.suffix_hash}" if self.suffix_hash else self.name
         if not self.valid:
             return f"{name} (Invalid)"
@@ -152,27 +159,27 @@ class Commission:
         return f"{name} ({info})"
 
     @staticmethod
-    def _timedelta_close(left, right):
+    def _timedelta_close(left: timedelta, right: timedelta) -> bool:
         return left - COMMISSION_COMPARE_THRESHOLD <= right <= left + COMMISSION_COMPARE_THRESHOLD
 
-    def _expire_matches(self, other):
+    def _expire_matches(self, other: Commission) -> bool:
         if bool(self.expire) != bool(other.expire):
             return False
         return not self.expire or self._timedelta_close(self.expire, other.expire)
 
-    def _urgent_box_tags_match(self, other):
+    def _urgent_box_tags_match(self, other: Commission) -> bool:
         self_name = self.name.upper()
         other_name = other.name.upper()
         return all((tag in self_name) == (tag in other_name) for tag in URGENT_BOX_TAGS)
 
-    def _suffix_required_match(self, other):
+    def _suffix_required_match(self, other: Commission) -> bool:
         if self.category_str == "daily":
             return self.suffix_match(other)
         if self.genre in {"extra_oil", "night_oil"}:
             return self.suffix_match(other)
         return True
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Commission):
             return False
 
@@ -188,16 +195,16 @@ class Commission:
             and self._suffix_required_match(other)
         )
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(f"{self.genre}_{self.name}")
 
-    def suffix_match(self, other, similarity=0.75):
+    def suffix_match(self, other: Commission, similarity: float = 0.75) -> bool:
         if self.suffix_image is None and other.suffix_image is None:
             return True
         if self.suffix_image is None or other.suffix_image is None:
             return False
 
-        def match(image, template):
+        def match(image: ImageArray, template: ImageArray) -> float:
             template = crop(template, (3, 3, template.shape[1] - 3, template.shape[0] - 3), copy=False)
             if image.shape[0] < template.shape[0] or image.shape[1] < template.shape[1]:
                 return 0.0
@@ -209,7 +216,7 @@ class Commission:
         sim = max(match(self.suffix_image, other.suffix_image), match(other.suffix_image, self.suffix_image))
         return sim >= similarity
 
-    def parse_time(self, string):
+    def parse_time(self, string: str) -> timedelta | None:
         """解析 HH:MM:SS；无效时标记委托无效并返回 None。"""
         string = string.replace("D", "0")  # OCR 会把 0 识别为 D。
         result = re.search(r"(\d+):(\d+):(\d+)", string)
@@ -220,7 +227,7 @@ class Commission:
         result = [int(s) for s in result.groups()]
         return timedelta(hours=result[0], minutes=result[1], seconds=result[2])
 
-    def commission_name_parse(self, string):
+    def commission_name_parse(self, string: str) -> str:
         """把委托名解析为 urgent_gem 等类型；未知名称会标记为无效。"""
         if self.is_event_commission():
             return "daily_event"
@@ -233,29 +240,29 @@ class Commission:
         self.valid = False
         return ""
 
-    def is_event_commission(self):
+    def is_event_commission(self) -> bool:
         # 2023.04.27 Vacation Lane 复刻，粉黄渐变类似偶像大师活动。
         area = area_offset((5, 5, 30, 30), self.area[0:2])
         return color_similar(color1=get_color(self.image, area), color2=(235, 173, 161), threshold=30)
 
-    def convert_to_night(self):
+    def convert_to_night(self) -> None:
         if self.valid and self.category_str == "extra":
             self.category_str = "night"
             self.genre = f"{self.category_str}_{self.genre_str}"
 
-    def convert_to_running(self):
+    def convert_to_running(self) -> None:
         if self.valid:
             self.status = "running"
             self.create_time = datetime.now()
 
     @property
-    def finish_time(self):
+    def finish_time(self) -> datetime | None:
         if self.valid and self.status == "running":
             return (self.create_time + self.duration).replace(microsecond=0)
         return None
 
     @staticmethod
-    def beautify_name(name):
+    def beautify_name(name: str) -> str:
         name = name.strip()
         name = re.sub(r"VI$", "Ⅵ", name)
         name = re.sub(r"IV$", "Ⅳ", name)

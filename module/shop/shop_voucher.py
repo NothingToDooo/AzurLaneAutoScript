@@ -1,4 +1,5 @@
 import re
+from typing import TYPE_CHECKING
 
 from module.base.button import ButtonGrid
 from module.base.decorator import cached_property, del_cached_property
@@ -20,13 +21,17 @@ from module.shop.shop_status import ShopStatus
 from module.ui.assets import BACK_ARROW
 from module.ui.scroll import Scroll
 
+if TYPE_CHECKING:
+    from module.base.type_alias import NumericArray
+    from module.statistics.item import Item
+
 PRICE_OCR = DigitYuv([], letter=(255, 223, 57), threshold=128, name="Price_ocr")
 VOUCHER_SHOP_SCROLL = Scroll(VOUCHER_SHOP_SCROLL_AREA, color=(255, 255, 255))
 TEMPLATE_VOUCHER_ICON = Template("./assets/shop/cost/Voucher.png")
 FILTER_REGEX_VOUCHER = re.compile(r"(logger)(archive|unlock)?(t[1-6])?", flags=re.IGNORECASE)
 
 
-def voucher_redirect(value):
+def voucher_redirect(value: str) -> str:
     """过滤兑换券商店中不应该由用户直接配置的 Logger 关键字。"""
     matches = re.findall(FILTER_REGEX_VOUCHER, value)
     if not matches:
@@ -49,10 +54,10 @@ def voucher_redirect(value):
 
 class VoucherShop(ShopClerk, ShopStatus):
     @cached_property
-    def shop_filter(self):
+    def shop_filter(self) -> str:
         return voucher_redirect(self.config.OpsiVoucher_Filter.strip())
 
-    def _get_vouchers(self):
+    def _get_vouchers(self) -> NumericArray:
         """返回各兑换券图标左上角坐标组成的二维数组。"""
         left_column = self.image_crop((305, 306, 1256, 646), copy=False)
         vouchers = TEMPLATE_VOUCHER_ICON.match_multi(left_column, similarity=0.75, threshold=5)
@@ -60,7 +65,7 @@ class VoucherShop(ShopClerk, ShopStatus):
         logger.attr("Vouchers_icon", len(vouchers))
         return vouchers
 
-    def wait_until_voucher_appear(self, skip_first_screenshot=True):
+    def wait_until_voucher_appear(self, *, skip_first_screenshot: bool = True) -> None:
         """进入兑换券商店后等待任一兑换券图标加载。"""
         timeout = Timer(1, count=3).start()
         while 1:
@@ -77,7 +82,7 @@ class VoucherShop(ShopClerk, ShopStatus):
                 break
 
     @cached_property
-    def shop_grid(self):
+    def shop_grid(self) -> ButtonGrid:
         vouchers = self._get_vouchers()
         count = len(vouchers)
         if count == 0:
@@ -114,7 +119,7 @@ class VoucherShop(ShopClerk, ShopStatus):
     shop_template_folder = "./assets/shop/voucher"
 
     @cached_property
-    def shop_voucher_items(self):
+    def shop_voucher_items(self) -> ShopItemGrid:
         shop_grid = self.shop_grid
         shop_voucher_items = ShopItemGrid(
             shop_grid, templates={}, amount_area=(60, 74, 96, 95), price_area=(52, 132, 132, 162)
@@ -126,15 +131,15 @@ class VoucherShop(ShopClerk, ShopStatus):
         shop_voucher_items.price_ocr = PRICE_OCR
         return shop_voucher_items
 
-    def shop_items(self):
+    def shop_items(self) -> ShopItemGrid:
         return self.shop_voucher_items
 
-    def shop_currency(self):
+    def shop_currency(self) -> int:
         self._currency = self.status_get_voucher()
         logger.info(f"Voucher: {self._currency}")
         return self._currency
 
-    def shop_interval_clear(self):
+    def shop_interval_clear(self) -> None:
         self.interval_clear(BACK_ARROW)
         self.interval_clear(SHOP_BUY_CONFIRM)
         self.interval_clear(
@@ -146,7 +151,7 @@ class VoucherShop(ShopClerk, ShopStatus):
             ]
         )
 
-    def shop_buy_handle(self, _item):
+    def shop_buy_handle(self, _item: Item) -> bool:
         """处理兑换券商店的选择、数量或兑换确认弹窗。"""
         if self.appear(SHOP_BUY_CONFIRM_SELECT, offset=(20, 20), interval=3):
             self.shop_buy_select_execute(_item)
@@ -161,7 +166,7 @@ class VoucherShop(ShopClerk, ShopStatus):
         # 购买数量为 1 时会出现 `Exchange` 按钮。
         return self.appear_then_click(SHOP_BUY_CONFIRM_AMOUNT, offset=(-20, -160, 20, -120), interval=3)
 
-    def shop_buy_execute(self, item, skip_first_screenshot=True):
+    def shop_buy_execute(self, item: Item, *, skip_first_screenshot: bool = True) -> None:
         success = False
         self.shop_interval_clear()
 
@@ -195,7 +200,7 @@ class VoucherShop(ShopClerk, ShopStatus):
             if success and self.appear(BACK_ARROW, offset=(30, 30)):
                 break
 
-    def run(self):
+    def run(self) -> None:
         if not self.shop_filter:
             return
 
@@ -213,7 +218,7 @@ class VoucherShop(ShopClerk, ShopStatus):
             del_cached_property(self, "shop_voucher_items")
             continue
 
-    def run_once(self):
+    def run_once(self) -> bool:
         """临时只筛选 LoggerArchive，并尝试购买一个档案记录仪。"""
         self.shop_filter = "LoggerArchive"
 

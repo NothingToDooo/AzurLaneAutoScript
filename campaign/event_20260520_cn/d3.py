@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from module.base.utils import color_similarity_2d, location2node
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap, location_ensure
@@ -5,6 +7,10 @@ from module.map_detection.grid import Grid
 from module.template.assets import TEMPLATE_FLEET_CURRENT
 
 from .d1 import Config as ConfigBase
+
+if TYPE_CHECKING:
+    from module.base.type_alias import Point
+    from module.map_detection.grid_info import GridInfo
 
 MAP = CampaignMap("D3")
 MAP.shape = "I9"
@@ -147,7 +153,7 @@ class Config(ConfigBase):
 
 
 class GridCurrentFleet(Grid):
-    def predict_current_fleet(self):
+    def predict_current_fleet(self) -> bool:
         # D3 的当前舰队标识较弱，先降低颜色阈值再做模板确认。
         count = self.relative_hsv_count(area=(-0.5, -3.5, 0.5, -2.5), h=(141 - 3, 141 + 10), shape=(50, 50))
         if count < 150:
@@ -163,7 +169,11 @@ class Campaign(CampaignBase):
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
     grid_class = GridCurrentFleet
 
-    def in_sight(self, location, sight=None):
+    def in_sight(
+        self,
+        location: GridInfo | str | Point,
+        sight: tuple[int, int, int, int] | None = None,
+    ) -> None:
         # Focus E3 when insight E3, to avoid ammo icon covered by pillar
         location = location_ensure(location)
         node = location2node(location)
@@ -171,7 +181,7 @@ class Campaign(CampaignBase):
             return self.focus_to("E3")
         return super().in_sight(location, sight=sight)
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.clear_siren():
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=1):
@@ -179,7 +189,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         if self.clear_siren():
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
@@ -187,5 +197,5 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_6(self):
+    def battle_6(self) -> bool:
         return self.fleet_boss.clear_boss()

@@ -1,5 +1,6 @@
-from module.base.button import ButtonGrid
-from module.base.decorator import cached_property
+from typing import TYPE_CHECKING
+
+from module.base.button import Button, ButtonGrid
 from module.base.timer import Timer
 from module.device.control_options import SwipeVectorOptions
 from module.equipment import assets as equipment_assets
@@ -10,16 +11,33 @@ from module.storage.storage import StorageHandler
 from module.ui.assets import BACK_ARROW
 from module.ui.navbar import Navbar, NavbarColorRule, NavbarTarget, NavbarVisualRules
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
 SWIPE_DISTANCE = 250
 SWIPE_RANDOM_RANGE = (-40, -20, 40, 20)
 # 同时兼容蓝色（收起）和橙色（展开）按钮。
 vars(equipment_assets.EQUIPMENT_OPEN)["match"] = equipment_assets.EQUIPMENT_OPEN.match_luma
 
+_SHIP_SIDE_NAVBAR = Navbar(
+    grids=ButtonGrid(
+        origin=(21, 118),
+        delta=(0, 94.5),
+        button_shape=(60, 75),
+        grid_shape=(1, 5),
+        name="SHIP_SIDE_NAVBAR",
+    ),
+    visual=NavbarVisualRules(
+        active=NavbarColorRule(color=(247, 255, 173), threshold=221),
+        inactive=NavbarColorRule(color=(140, 162, 181), threshold=221, count=50),
+    ),
+)
+
 
 class Equipment(StorageHandler):
     equipment_has_take_on = False
 
-    def _ship_view_swipe(self, distance, check_button=equipment_assets.EQUIPMENT_OPEN):
+    def _ship_view_swipe(self, distance: int, check_button: Button = equipment_assets.EQUIPMENT_OPEN) -> bool:
         swipe_count = 0
         swipe_timer = Timer(5, count=10)
         self.handle_info_bar()
@@ -40,10 +58,10 @@ class Equipment(StorageHandler):
         return False
 
     @staticmethod
-    def _ship_view_should_swipe(swipe_timer):
+    def _ship_view_should_swipe(swipe_timer: Timer) -> bool:
         return not swipe_timer.started() or swipe_timer.reached()
 
-    def _ship_view_swipe_once(self, distance, check_button, swipe_timer):
+    def _ship_view_swipe_once(self, distance: int, check_button: Button, swipe_timer: Timer) -> bool:
         swipe_timer.reset()
         self.device.swipe_vector(
             vector=(distance, 0),
@@ -57,7 +75,7 @@ class Equipment(StorageHandler):
         )
         return self._ship_view_wait_after_swipe(check_button)
 
-    def _ship_view_wait_after_swipe(self, check_button):
+    def _ship_view_wait_after_swipe(self, check_button: Button) -> bool:
         skip_first_screenshot = True
         while 1:
             if skip_first_screenshot:
@@ -74,7 +92,7 @@ class Equipment(StorageHandler):
                 continue
         return False
 
-    def _ship_view_swipe_result(self, check_button, swipe_count):
+    def _ship_view_swipe_result(self, check_button: Button, swipe_count: int) -> bool | None:
         if self.appear(RETIRE_EQUIP_CONFIRM, offset=(30, 30)):
             logger.info("RETIRE_EQUIP_CONFIRM popup in _ship_view_swipe()")
             return False
@@ -89,19 +107,20 @@ class Equipment(StorageHandler):
             return True
         return None
 
-    def ship_view_next(self, check_button=equipment_assets.EQUIPMENT_OPEN):
+    def ship_view_next(self, check_button: Button = equipment_assets.EQUIPMENT_OPEN) -> bool:
         return self._ship_view_swipe(distance=-SWIPE_DISTANCE, check_button=check_button)
 
-    def ship_view_prev(self, check_button=equipment_assets.EQUIPMENT_OPEN):
+    def ship_view_prev(self, check_button: Button = equipment_assets.EQUIPMENT_OPEN) -> bool:
         return self._ship_view_swipe(distance=SWIPE_DISTANCE, check_button=check_button)
 
     def ship_info_enter(
         self,
-        click_button,
-        check_button=equipment_assets.EQUIPMENT_OPEN,
-        long_click=True,
-        skip_first_screenshot=True,
-    ):
+        click_button: Button,
+        check_button: Button = equipment_assets.EQUIPMENT_OPEN,
+        *,
+        long_click: bool = True,
+        skip_first_screenshot: bool = True,
+    ) -> None:
         enter_timer = Timer(10)
 
         while 1:
@@ -127,26 +146,7 @@ class Equipment(StorageHandler):
             if self.handle_game_tips():
                 continue
 
-    @cached_property
-    def _ship_side_navbar(self):
-        """侧栏按舰船状态分为三种布局。
-
-        科研布局：科研、装备、详情；常规布局：强化、突破、装备、详情；
-        改造布局：改造、强化、突破、装备、详情。
-        """
-        ship_side_navbar = ButtonGrid(
-            origin=(21, 118), delta=(0, 94.5), button_shape=(60, 75), grid_shape=(1, 5), name="SHIP_SIDE_NAVBAR"
-        )
-
-        return Navbar(
-            grids=ship_side_navbar,
-            visual=NavbarVisualRules(
-                active=NavbarColorRule(color=(247, 255, 173), threshold=221),
-                inactive=NavbarColorRule(color=(140, 162, 181), threshold=221, count=50),
-            ),
-        )
-
-    def ship_side_navbar_ensure(self, upper=None, bottom=None):
+    def ship_side_navbar_ensure(self, upper: int | None = None, bottom: int | None = None) -> bool:
         """按顶部或底部索引切换侧栏；页面加载仍由调用方确认。
 
         科研/常规/改造顶部索引：科研 1/无/无、改造 无/无/1、强化 无/1/2、
@@ -154,13 +154,13 @@ class Equipment(StorageHandler):
         改造 无/无/5、强化 无/4/4、突破 无/3/3、装备 2/2/2、详情 1/1/1。
         返回是否切换成功。
         """
-        if self._ship_side_navbar.get_total(main=self) == 3 and (upper == 1 or bottom == 3):
+        if _SHIP_SIDE_NAVBAR.get_total(main=self) == 3 and (upper == 1 or bottom == 3):
             logger.warning('Transitions to "research" is not supported')
             return False
 
-        return self._ship_side_navbar.set(self, NavbarTarget(upper=upper, bottom=bottom))
+        return _SHIP_SIDE_NAVBAR.set(self, NavbarTarget(upper=upper, bottom=bottom))
 
-    def ship_equipment_take_off(self, skip_first_screenshot=True):
+    def ship_equipment_take_off(self, *, skip_first_screenshot: bool = True) -> None:
         logger.info("Equipment take off")
         bar_timer = Timer(5)
         off_timer = Timer(5)
@@ -205,7 +205,7 @@ class Equipment(StorageHandler):
 
         logger.info("Equipment take off ended")
 
-    def fleet_equipment_take_off(self, enter, long_click, out):
+    def fleet_equipment_take_off(self, enter: Button, *, long_click: bool, out: Button) -> None:
         logger.hr("Equipment take off")
         self.ship_info_enter(enter, long_click=long_click)
 
@@ -222,7 +222,7 @@ class Equipment(StorageHandler):
         self.ui_back(out)
         self.equipment_has_take_on = False
 
-    def ship_equipment_take_on_preset(self, index, skip_first_screenshot=True):
+    def ship_equipment_take_on_preset(self, index: int, *, skip_first_screenshot: bool = True) -> None:
         logger.info("Equipment take on preset")
         bar_timer = Timer(5)
         on_timer = Timer(5)
@@ -256,8 +256,18 @@ class Equipment(StorageHandler):
 
         logger.info("Equipment take on ended")
 
-    def fleet_equipment_take_on_preset(self, preset_record, enter, long_click, out):
+    def fleet_equipment_take_on_preset(
+        self,
+        preset_record: Sequence[int] | None,
+        enter: Button,
+        *,
+        long_click: bool,
+        out: Button,
+    ) -> None:
         """按每艘舰船的 1～3 号预设记录依次换装。"""
+        if preset_record is None:
+            message = "equipment preset record is required"
+            raise ValueError(message)
         logger.hr("Equipment take on")
         self.ship_info_enter(enter, long_click=long_click)
 

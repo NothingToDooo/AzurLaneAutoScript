@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, Never
+
 import cv2
 
 from module.base.timer import Timer
@@ -10,13 +12,16 @@ from module.map.map_fleet_preparation import FleetPreparation
 from module.retire.retirement import Retirement
 from module.ui.assets import BACK_ARROW, DAILY_CHECK
 
+if TYPE_CHECKING:
+    from module.base.button import Button
+
 MAP_ACHIEVEMENT_REACHED_TEMPLATE = "Reach condition: {condition}"
 MAP_WITHDRAW_MESSAGE = "Withdraw"
 
 
 class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHandler):
     map_cat_attack_timer = Timer(2)
-    map_clear_percentage_prev = -1
+    map_clear_percentage_prev: float = -1.0
     map_clear_percentage_timer = Timer(0.3, count=1)
 
     # 屏幕上显示的舰队。
@@ -25,7 +30,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
     # 在 fleet_current_index 中，1 表示道中队，2 表示 Boss 队。
     fleet_current_index = 1
 
-    def get_fleet_show_index(self):
+    def get_fleet_show_index(self) -> int:
         """在地图页识别屏幕显示的舰队，并返回 1 或 2。"""
         if self.appear(map_assets.FLEET_NUM_1, offset=(20, 20)):
             self.fleet_show_index = 1
@@ -37,14 +42,14 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         self.fleet_show_index = 1
         return 1
 
-    def get_fleet_current_index(self):
+    def get_fleet_current_index(self) -> int:
         if self.fleets_reversed:
             self.fleet_current_index = 3 - self.fleet_show_index
             return self.fleet_current_index
         self.fleet_current_index = self.fleet_show_index
         return self.fleet_current_index
 
-    def fleet_set(self, index=None, skip_first_screenshot=True):
+    def fleet_set(self, index: int | None = None, *, skip_first_screenshot: bool = True) -> bool:
         logger.info(f"Fleet set to {index}")
         timeout = Timer(5, count=10).start()
         count = 0
@@ -81,7 +86,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         return count > 0
 
     @staticmethod
-    def _check_enter_map_clicks(button, campaign_click, fleet_click):
+    def _check_enter_map_clicks(button: Button, campaign_click: int, fleet_click: int) -> None:
         if campaign_click > 5:
             logger.critical(f"Failed to enter {button}, too many click on {button}")
             logger.critical("Possible reason #1: You haven't reached the commander level to unlock this stage.")
@@ -97,14 +102,14 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         )
         raise RequestHumanTakeover
 
-    def _handle_daily_misclick(self):
+    def _handle_daily_misclick(self) -> bool:
         if not self.appear(DAILY_CHECK, offset=(20, 20), interval=3):
             return False
         logger.info(f"{DAILY_CHECK} -> {BACK_ARROW}")
         self.device.click(BACK_ARROW)
         return True
 
-    def _handle_map_preparation_entry(self, mode, map_timer, campaign_timer):
+    def _handle_map_preparation_entry(self, mode: str, map_timer: Timer, campaign_timer: Timer) -> bool:
         if not map_timer.reached() or not self.handle_map_mode_switch(mode) or not self.handle_map_preparation():
             return False
         self.map_get_info()
@@ -121,7 +126,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         campaign_timer.reset()
         return True
 
-    def _handle_fleet_preparation_entry(self, mode, fleet_timer, campaign_timer):
+    def _handle_fleet_preparation_entry(self, mode: str, fleet_timer: Timer, campaign_timer: Timer) -> bool:
         if not fleet_timer.reached() or not self.appear(map_assets.FLEET_PREPARATION, offset=(20, 50)):
             return False
         if mode in {"normal", "hard"}:
@@ -135,7 +140,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         campaign_timer.reset()
         return True
 
-    def _handle_enter_map_interrupts(self, campaign_timer):
+    def _handle_enter_map_interrupts(self, campaign_timer: Timer) -> bool:
         if self.handle_auto_search_continue():
             campaign_timer.reset()
             return True
@@ -156,20 +161,20 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
             return True
         return False
 
-    def _click_stage_entrance(self, button, campaign_timer):
+    def _click_stage_entrance(self, button: Button, campaign_timer: Timer) -> bool:
         if not campaign_timer.reached() or not self.appear_then_click(button):
             return False
         campaign_timer.reset()
         return True
 
-    def _is_combat_loading_appeared(self):
+    def _is_combat_loading_appeared(self) -> bool:
         is_combat_loading = getattr(self, "is_combat_loading", None)
         if callable(is_combat_loading) and is_combat_loading():
             logger.warning("Entered map with is_combat_loading appeared")
             return True
         return False
 
-    def _enter_map_finished(self):
+    def _enter_map_finished(self) -> bool:
         if self.map_is_auto_search:
             if self.is_auto_search_running():
                 logger.info("is_auto_search_running appeared")
@@ -177,7 +182,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
             return self._is_combat_loading_appeared()
         return self._is_combat_loading_appeared() or self.handle_in_map_with_enemy_searching()
 
-    def enter_map(self, button, mode="normal", skip_first_screenshot=True):
+    def enter_map(self, button: Button, mode: str = "normal", *, skip_first_screenshot: bool = True) -> bool:
         """进入关卡；mode 接受 normal 或 hard。"""
         logger.hr("Enter map")
         campaign_timer = Timer(5)
@@ -186,8 +191,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         campaign_click = 0
         fleet_click = 0
         checked_in_map = False
-        self.stage_entrance = button
-        self.map_clear_percentage_prev = -1
+        self.map_clear_percentage_prev = -1.0
         self.map_clear_percentage_timer.reset()
 
         while 1:
@@ -225,7 +229,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
 
         return True
 
-    def enter_map_cancel(self, skip_first_screenshot=True):
+    def enter_map_cancel(self, *, skip_first_screenshot: bool = True) -> bool:
         logger.hr("Enter map cancel")
         while 1:
             if skip_first_screenshot:
@@ -245,7 +249,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
 
         return True
 
-    def handle_map_mode_switch(self, mode):
+    def handle_map_mode_switch(self, mode: str) -> bool:
         """确保 normal 或 hard 模式；地图无模式开关时直接视为满足。"""
         if not self.config.MAP_HAS_MODE_SWITCH:
             return True
@@ -257,7 +261,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         logger.attr("MAP_MODE_SWITCH", "unknown")
         return False
 
-    def _handle_map_mode_switch_normal(self):
+    def _handle_map_mode_switch_normal(self) -> bool:
         if self.match_template_color(map_assets.MAP_MODE_SWITCH_NORMAL, offset=(20, 20)):
             logger.attr("MAP_MODE_SWITCH", "normal")
             return True
@@ -268,7 +272,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
             self.interval_reset(map_assets.MAP_MODE_SWITCH_HARD)
         return False
 
-    def _handle_map_mode_switch_hard(self):
+    def _handle_map_mode_switch_hard(self) -> bool:
         if self._is_mod_switch_hard_appear(active=True):
             logger.attr("MAP_MODE_SWITCH", "hard")
             return True
@@ -278,10 +282,10 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
             self.device.click(map_assets.MAP_MODE_SWITCH_HARD)
         return False
 
-    def _is_mod_switch_hard_appear(self, active=True, interval=0):
+    def _is_mod_switch_hard_appear(self, *, active: bool = True, interval: float = 0) -> bool:
         if interval:
-            interval = self.get_interval_timer(map_assets.MAP_MODE_SWITCH_HARD, interval=interval)
-            if not interval.reached():
+            interval_timer = self.get_interval_timer(map_assets.MAP_MODE_SWITCH_HARD, interval=interval)
+            if not interval_timer.reached():
                 return False
 
         for button in [
@@ -298,7 +302,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
                 return True
         return False
 
-    def _is_mod_switch_hard_active(self, button):
+    def _is_mod_switch_hard_active(self, button: Button) -> bool:
         image = self.image_crop(button.button)
         r, g, b = cv2.split(image)
         cv2.max(r, g, dst=r)
@@ -309,7 +313,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         total = r.shape[0] * r.shape[1]
         return sum_ / total > 0.5
 
-    def handle_map_preparation(self):
+    def handle_map_preparation(self) -> bool:
         """返回地图准备页是否出现且地图信息动画已稳定。"""
         if not self._map_preparation_appeared():
             return False
@@ -322,15 +326,15 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
 
         return self._map_clear_percentage_stable()
 
-    def _map_preparation_appeared(self):
+    def _map_preparation_appeared(self) -> bool:
         if self.appear(map_assets.MAP_PREPARATION, offset=(20, 20)):
             return True
 
-        self.map_clear_percentage_prev = -1
+        self.map_clear_percentage_prev = -1.0
         self.map_clear_percentage_timer.reset()
         return False
 
-    def _map_preparation_has_no_percentage_wait(self):
+    def _map_preparation_has_no_percentage_wait(self) -> bool:
         if not self.config.MAP_HAS_CLEAR_PERCENTAGE:
             logger.attr("MAP_HAS_CLEAR_PERCENTAGE", self.config.MAP_HAS_CLEAR_PERCENTAGE)
             return True
@@ -339,7 +343,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
             return True
         return False
 
-    def _map_clear_percentage_stable(self):
+    def _map_clear_percentage_stable(self) -> bool:
         percent = self.get_map_clear_percentage()
         logger.attr("Map_clear_percentage", f"{int(percent * 100)}%")
         # 百分比会从 100% 开始，再从 0% 增加到实际值。
@@ -353,7 +357,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         self.map_clear_percentage_timer.reset()
         return False
 
-    def withdraw(self, skip_first_screenshot=True):
+    def withdraw(self, *, skip_first_screenshot: bool = True) -> Never:
         logger.hr("Map withdraw")
         while 1:
             if skip_first_screenshot:
@@ -375,7 +379,7 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
             if self.handle_in_stage():
                 raise CampaignEnd(MAP_WITHDRAW_MESSAGE)
 
-    def handle_map_cat_attack(self):
+    def handle_map_cat_attack(self) -> bool:
         if not self.map_cat_attack_timer.reached():
             return False
         if self.image_color_count(map_assets.MAP_CAT_ATTACK, color=(255, 231, 123), threshold=221, count=100):
@@ -395,12 +399,12 @@ class MapOperation(MysteryHandler, FleetPreparation, Retirement, FastForwardHand
         return False
 
     @property
-    def fleets_reversed(self):
-        if not self.config.FLEET_2:
+    def fleets_reversed(self) -> bool:
+        if not self.config.fleet_2:
             return False
         return self.config.Fleet_FleetOrder in ["fleet1_boss_fleet2_mob", "fleet1_standby_fleet2_all"]
 
-    def handle_fleet_reverse(self):
+    def handle_fleet_reverse(self) -> bool:
         if not self.map_is_hard_mode and self.config.Fleet_FleetOrder in [
             "fleet1_boss_fleet2_mob",
             "fleet1_standby_fleet2_all",

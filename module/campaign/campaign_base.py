@@ -19,28 +19,28 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
     FUNCTION_NAME_BASE = "battle_"
     MAP: CampaignMap
 
-    def battle_default(self):
+    def battle_default(self) -> bool:
         if self.clear_enemy():
             return True
 
         logger.warning("No battle executed.")
         return False
 
-    def battle_boss(self):
+    def battle_boss(self) -> bool:
         if self.brute_clear_boss():
             return True
 
         logger.warning("No battle executed.")
         return False
 
-    def battle_function(self):
+    def battle_function(self) -> bool:
         if self.config.MAP_CLEAR_ALL_THIS_TIME:
             return self._battle_clear_all()
         if self.config.POOR_MAP_DATA:
             return self._battle_with_poor_map_data()
         return self._battle_by_count()
 
-    def _battle_with_poor_map_data(self):
+    def _battle_with_poor_map_data(self) -> bool:
         logger.info("Using function: battle_with_poor_map_data")
         if self.fleet_2_break_siren_caught():
             return True
@@ -59,7 +59,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
 
         return False
 
-    def _battle_clear_all(self):
+    def _battle_clear_all(self) -> bool:
         logger.info("Using function: clear_all")
         if self.fleet_2_break_siren_caught():
             return True
@@ -79,7 +79,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
             return self._clear_remaining_enemy_for_clear_all()
         return self.battle_boss()
 
-    def _clear_remaining_enemy_for_clear_all(self):
+    def _clear_remaining_enemy_for_clear_all(self) -> bool:
         if self.config.MAP_HAS_MOVABLE_NORMAL_ENEMY:
             if self.clear_any_enemy(sort=("cost_2",)):
                 return True
@@ -91,7 +91,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
         self.clear_mechanism()
         return self.battle_default()
 
-    def _battle_by_count(self):
+    def _battle_by_count(self) -> bool:
         func_name = self.FUNCTION_NAME_BASE + "default"
         for extra_battle in range(10):
             candidate = self.FUNCTION_NAME_BASE + str(self.battle_count - extra_battle)
@@ -100,9 +100,9 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
                 break
 
         logger.info(f"Using function: {func_name}")
-        return self.__getattribute__(func_name)()
+        return getattr(self, func_name)()
 
-    def execute_a_battle(self):
+    def execute_a_battle(self) -> bool:
         logger.hr(f"{self.FUNCTION_NAME_BASE}{self.battle_count}", level=2)
         prev = self.battle_count
         result = False
@@ -126,7 +126,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
 
         return result
 
-    def run(self):
+    def run(self) -> None:
         logger.hr(self.ENTRANCE, level=2)
 
         self.emotion.check_reduce(self._map_battle)
@@ -150,18 +150,18 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
                     self.auto_search_execute_a_battle()
             except CampaignEnd:
                 logger.hr("Campaign end")
-                return True
+                return
 
         logger.warning("Battle function exhausted.")
         if self.config.Error_HandleError:
             logger.warning("ScriptError, Battle function exhausted, Withdrawing")
             with suppress(CampaignEnd):
                 self.withdraw()
-            return False
+            return
         raise ScriptError(BATTLE_FUNCTION_EXHAUSTED_MESSAGE)
 
     @cached_property
-    def _map_battle(self):
+    def _map_battle(self) -> int:
         for data in self.MAP.spawn_data:
             if "boss" in data:
                 if "battle" in data:
@@ -171,7 +171,7 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
         logger.warning("No boss data found in spawn_data")
         return 0
 
-    def auto_search_execute_a_battle(self):
+    def auto_search_execute_a_battle(self) -> None:
         logger.hr(f"{self.FUNCTION_NAME_BASE}{self.battle_count}", level=2)
         self.auto_search_moving()
         self.auto_search_combat(fleet_index=self.fleet_show_index)

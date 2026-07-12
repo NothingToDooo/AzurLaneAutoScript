@@ -11,7 +11,7 @@ class _Logger:
         self.errors: list[str] = []
         self.criticals: list[str] = []
 
-    def error(self, error) -> None:
+    def error(self, error: BaseException) -> None:
         self.errors.append(str(error))
 
     def critical(self, message: str) -> None:
@@ -26,28 +26,31 @@ class _Connection:
     def adb_reconnect(self) -> None:
         self.calls.append("adb_reconnect")
 
-    def adb_start_server(self) -> None:
+    def adb_start_server(self) -> int:
         self.calls.append("adb_start_server")
+        return 0
 
     def detect_package(self) -> None:
         self.calls.append("detect_package")
 
 
-def _patch_retry_runtime(monkeypatch):
+def _patch_retry_runtime(monkeypatch: pytest.MonkeyPatch) -> _Logger:
     logger = _Logger()
     monkeypatch.setattr(adb_session_module, "logger", logger)
     monkeypatch.setattr(adb_session_module, "time", type("_Time", (), {"sleep": lambda _delay: None}))
     return logger
 
 
-def _run_retry(monkeypatch, error: Exception, *, retryable_adb=True, unknown_host=False):
+def _run_retry(
+    monkeypatch: pytest.MonkeyPatch, error: Exception, *, retryable_adb: bool = True, unknown_host: bool = False
+) -> tuple[str, _Connection, _Logger]:
     logger = _patch_retry_runtime(monkeypatch)
     device = _Connection()
     monkeypatch.setattr(adb_session_module, "handle_adb_error", lambda _error: retryable_adb)
     monkeypatch.setattr(adb_session_module, "handle_unknown_host_service", lambda _error: unknown_host)
 
     @adb_session_module.retry
-    def flaky(target):
+    def flaky(target: _Connection) -> str:
         target.calls.append("run")
         target.run_count += 1
         if target.run_count == 1:
@@ -57,7 +60,7 @@ def _run_retry(monkeypatch, error: Exception, *, retryable_adb=True, unknown_hos
     return flaky(device), device, logger
 
 
-def test_connection_retry_recovers_connection_reset(monkeypatch) -> None:
+def test_connection_retry_recovers_connection_reset(monkeypatch: pytest.MonkeyPatch) -> None:
     result, device, logger = _run_retry(monkeypatch, ConnectionResetError("lost"))
 
     assert result == "ok"
@@ -65,14 +68,14 @@ def test_connection_retry_recovers_connection_reset(monkeypatch) -> None:
     assert device.calls == ["run", "adb_reconnect", "run"]
 
 
-def test_connection_retry_recovers_retryable_adb_error(monkeypatch) -> None:
+def test_connection_retry_recovers_retryable_adb_error(monkeypatch: pytest.MonkeyPatch) -> None:
     result, device, _ = _run_retry(monkeypatch, AdbError("closed"))
 
     assert result == "ok"
     assert device.calls == ["run", "adb_reconnect", "run"]
 
 
-def test_connection_retry_recovers_unknown_host_service(monkeypatch) -> None:
+def test_connection_retry_recovers_unknown_host_service(monkeypatch: pytest.MonkeyPatch) -> None:
     result, device, _ = _run_retry(
         monkeypatch, AdbError("unknown host service"), retryable_adb=False, unknown_host=True
     )
@@ -81,14 +84,14 @@ def test_connection_retry_recovers_unknown_host_service(monkeypatch) -> None:
     assert device.calls == ["run", "adb_start_server", "adb_reconnect", "run"]
 
 
-def test_connection_retry_stops_on_unhandled_adb_error(monkeypatch) -> None:
+def test_connection_retry_stops_on_unhandled_adb_error(monkeypatch: pytest.MonkeyPatch) -> None:
     logger = _patch_retry_runtime(monkeypatch)
     device = _Connection()
     monkeypatch.setattr(adb_session_module, "handle_adb_error", lambda _error: False)
     monkeypatch.setattr(adb_session_module, "handle_unknown_host_service", lambda _error: False)
 
     @adb_session_module.retry
-    def always_boom(target):
+    def always_boom(target: _Connection) -> None:
         target.calls.append("run")
         message = "boom"
         raise AdbError(message)
@@ -100,7 +103,7 @@ def test_connection_retry_stops_on_unhandled_adb_error(monkeypatch) -> None:
     assert logger.criticals == ["Retry always_boom() failed"]
 
 
-def test_connection_retry_recovers_missing_package(monkeypatch) -> None:
+def test_connection_retry_recovers_missing_package(monkeypatch: pytest.MonkeyPatch) -> None:
     result, device, logger = _run_retry(monkeypatch, PackageNotInstalled("pkg"))
 
     assert result == "ok"
@@ -108,7 +111,7 @@ def test_connection_retry_recovers_missing_package(monkeypatch) -> None:
     assert device.calls == ["run", "detect_package", "run"]
 
 
-def test_connection_retry_keeps_os_error_as_plain_retry(monkeypatch) -> None:
+def test_connection_retry_keeps_os_error_as_plain_retry(monkeypatch: pytest.MonkeyPatch) -> None:
     result, device, logger = _run_retry(monkeypatch, OSError("pipe"))
 
     assert result == "ok"

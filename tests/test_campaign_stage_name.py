@@ -1,3 +1,4 @@
+from operator import itemgetter
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -145,7 +146,7 @@ def test_stage_loop_alias_preserves_reverse_modulo_boundary(run_count: int, expe
 
 def test_stage_loop_alias_uses_random_choice_for_zero_count(monkeypatch: pytest.MonkeyPatch) -> None:
     config = _LoopConfig(run_count=0)
-    monkeypatch.setattr("module.content.campaign_policy.random.choice", lambda stages: stages[2])
+    monkeypatch.setattr("module.content.campaign_policy.random.choice", itemgetter(2))
 
     name, is_stage_loop = _resolve_stage_loop_alias("th", "event_20221124_cn", config)
 
@@ -352,14 +353,14 @@ def test_campaign_folder_policies_fallback_threat_safe_without_3_stars() -> None
         ("sp", ("ex_sp", "1")),
         ("extra", ("ex_ex", "1")),
         ("ex", ("ex_ex", "1")),
-        ("7-2", ["7", "2"]),
+        ("7-2", ("7", "2")),
         ("sp3", ("sp", "3")),
         ("d3", ("d", "3")),
         ("49x", ("", "")),
         ("unknown", ("", "")),
     ],
 )
-def test_campaign_separate_name(name, expected) -> None:
+def test_campaign_separate_name(name: str, expected: tuple[str, str]) -> None:
     assert CampaignOcr.campaign_separate_name(name) == expected
 
 

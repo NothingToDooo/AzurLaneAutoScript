@@ -1,21 +1,30 @@
 from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, TypedDict, Unpack, override
 
 import module.freebies.battle_pass as battle_pass_module
 from module.freebies.assets import REWARD_RECEIVE, REWARD_RECEIVE_SP, REWARD_RECEIVE_WHITE
 from module.freebies.battle_pass import BattlePass
 from module.ui.assets import BATTLE_PASS_CHECK
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
+
+    import pytest
+
+    from module.base.button import Button, MatchOffset
+
 
 class _FakeTimer:
     default_reached_results: tuple[bool, ...] = ()
 
-    def __init__(self, *_args, **_kwargs) -> None:
+    def __init__(self, limit: float, count: int = 0) -> None:
+        del limit, count
         self.reached_results: list[bool] = list(self.__class__.default_reached_results)
 
-    def start(self):
+    def start(self) -> _FakeTimer:
         return self
 
-    def reset(self):
+    def reset(self) -> _FakeTimer:
         return self
 
     def reached(self) -> bool:
@@ -26,10 +35,10 @@ class _FakeTimer:
 
 class _FakeDevice:
     def __init__(self) -> None:
-        self.clicked = []
+        self.clicked: list[Button] = []
         self.screenshot_count = 0
 
-    def click(self, button) -> None:
+    def click(self, button: Button) -> None:
         self.clicked.append(button)
 
     def screenshot(self) -> None:
@@ -38,16 +47,29 @@ class _FakeDevice:
 
 @dataclass(frozen=True, slots=True)
 class _FakeBattlePassOptions:
-    appear_results: dict[object, tuple[bool, ...]] | None = None
-    appear_then_click_results: dict[object, tuple[bool, ...]] | None = None
-    match_results: dict[object, tuple[bool, ...]] | None = None
-    popup_results: tuple[bool, ...] | None = None
-    get_items_results: tuple[bool, ...] = ()
-    get_ship_results: tuple[bool, ...] = ()
-    get_skin_results: tuple[bool, ...] = ()
+    appear_results: Mapping[Button, Iterable[bool]] | None = None
+    appear_then_click_results: Mapping[Button, Iterable[bool]] | None = None
+    match_results: Mapping[Button, Iterable[bool]] | None = None
+    popup_results: Iterable[bool] | None = None
+    get_items_results: Iterable[bool] = ()
+    get_ship_results: Iterable[bool] = ()
+    get_skin_results: Iterable[bool] = ()
 
 
-def _fake_battle_pass_options(options=None, settings=None) -> _FakeBattlePassOptions:
+class _FakeBattlePassSettings(TypedDict, total=False):
+    appear_results: Mapping[Button, Iterable[bool]] | None
+    appear_then_click_results: Mapping[Button, Iterable[bool]] | None
+    match_results: Mapping[Button, Iterable[bool]] | None
+    popup_results: Iterable[bool] | None
+    get_items_results: Iterable[bool]
+    get_ship_results: Iterable[bool]
+    get_skin_results: Iterable[bool]
+
+
+def _fake_battle_pass_options(
+    options: _FakeBattlePassOptions | None = None,
+    settings: _FakeBattlePassSettings | None = None,
+) -> _FakeBattlePassOptions:
     options = _FakeBattlePassOptions() if options is None else options
     if settings:
         options = replace(options, **settings)
@@ -57,7 +79,11 @@ def _fake_battle_pass_options(options=None, settings=None) -> _FakeBattlePassOpt
 class _FakeBattlePass(BattlePass):
     device: _FakeDevice
 
-    def __init__(self, options=None, **settings) -> None:
+    def __init__(
+        self,
+        options: _FakeBattlePassOptions | None = None,
+        **settings: Unpack[_FakeBattlePassSettings],
+    ) -> None:
         options = _fake_battle_pass_options(options, settings)
         self.device = _FakeDevice()
         self.appear_results = {id(button): list(results) for button, results in (options.appear_results or {}).items()}
@@ -70,23 +96,57 @@ class _FakeBattlePass(BattlePass):
         self.get_ship_results = list(options.get_ship_results)
         self.get_skin_results = list(options.get_skin_results)
 
-    def _pop_button_result(self, results_by_button, button) -> bool:
+    @staticmethod
+    def _pop_button_result(results_by_button: dict[int, list[bool]], button: Button) -> bool:
         results = results_by_button.get(id(button), [])
         if results:
             return results.pop(0)
         return False
 
-    def appear(self, button, *_args: object, **_kwargs) -> bool:
+    @override
+    def appear(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 10,
+    ) -> bool:
+        del offset, interval, similarity, threshold
         return self._pop_button_result(self.appear_results, button)
 
-    def appear_then_click(self, button, *_args: object, **_kwargs) -> bool:
+    @override
+    def appear_then_click(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 30,
+    ) -> bool:
+        del offset, interval, similarity, threshold
         return self._pop_button_result(self.appear_then_click_results, button)
 
-    def match_template_color(self, button, *_args: object, **_kwargs) -> bool:
+    @override
+    def match_template_color(
+        self,
+        button: Button,
+        offset: MatchOffset = (20, 20),
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 30,
+    ) -> bool:
+        del offset, interval, similarity, threshold
         return self._pop_button_result(self.match_results, button)
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
-        _ = (name, offset, interval)
+    @override
+    def handle_popup_confirm(
+        self,
+        name: str = "",
+        offset: MatchOffset | None = None,
+        interval: float = 2,
+    ) -> bool:
+        del name, offset, interval
         if self.popup_results:
             return self.popup_results.pop(0)
         return False
@@ -107,7 +167,7 @@ class _FakeBattlePass(BattlePass):
         return False
 
 
-def test_battle_pass_receive_marks_received_after_get_items(monkeypatch) -> None:
+def test_battle_pass_receive_marks_received_after_get_items(monkeypatch: pytest.MonkeyPatch) -> None:
     _FakeTimer.default_reached_results = (True,)
     monkeypatch.setattr(battle_pass_module, "Timer", _FakeTimer)
     battle_pass = _FakeBattlePass(
@@ -130,7 +190,7 @@ def test_battle_pass_receive_marks_received_after_get_items(monkeypatch) -> None
     assert battle_pass.battle_status_click_interval == 2
 
 
-def test_battle_pass_receive_returns_false_without_rewards(monkeypatch) -> None:
+def test_battle_pass_receive_returns_false_without_rewards(monkeypatch: pytest.MonkeyPatch) -> None:
     _FakeTimer.default_reached_results = (True,)
     monkeypatch.setattr(battle_pass_module, "Timer", _FakeTimer)
     battle_pass = _FakeBattlePass(

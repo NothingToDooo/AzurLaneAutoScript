@@ -1,7 +1,7 @@
 import re
 from contextlib import suppress
 from numbers import Number
-from typing import Any, ClassVar
+from typing import ClassVar
 
 # 来源：https://github.com/LmeSzinc/slpp，原项目：https://github.com/SirAnthony/slpp。
 # 稀疏数字键表保持为字典，避免错误压缩为列表。
@@ -14,11 +14,11 @@ ERRORS = {
     "mfnumber_dec_point": "Malformed number (no digits after decimal point).",
     "mfnumber_sci": "Malformed number (bad scientific format).",
 }
-SORTABLE_KEY_TYPES = (str, int, float, bool, tuple)
-
-
-def sequential(lst):
-    return bool(lst) and lst == list(range(len(lst)))
+type LuaScalar = str | int | float | bool | None
+type LuaKey = str | int | float | bool
+type LuaValue = LuaScalar | list[LuaValue] | LuaTable
+type LuaTable = dict[LuaKey, LuaValue]
+type LuaEncodable = LuaScalar | bytes | list[LuaEncodable] | tuple[LuaEncodable, ...] | dict[LuaKey, LuaEncodable]
 
 
 class ParseError(Exception):
@@ -26,7 +26,7 @@ class ParseError(Exception):
 
 
 class SLPP:
-    def __init__(self):
+    def __init__(self) -> None:
         self.text = ""
         self.ch: str | None = ""
         self.at = 0
@@ -37,8 +37,8 @@ class SLPP:
         self.newline = "\n"
         self.tab = "\t"
 
-    def decode(self, text):
-        if not text or not isinstance(text, str):
+    def decode(self, text: str) -> LuaValue:
+        if not text:
             return None
         # 不能用正则删除 Lua 注释，字符串中的连续短横线会被误伤。
         self.text = text
@@ -47,11 +47,18 @@ class SLPP:
         self.next_chr()
         return self.value()
 
-    def encode(self, obj):
+    def decode_table(self, text: str) -> LuaTable:
+        value = self.decode(text)
+        if not isinstance(value, dict):
+            message = "Expected a Lua table."
+            raise ParseError(message)
+        return value
+
+    def encode(self, obj: LuaEncodable) -> str:
         self.depth = 0
         return self.__encode(obj)
 
-    def __encode(self, obj):
+    def __encode(self, obj: LuaEncodable) -> str:
         s = ""
         tab = self.tab
         newline = self.newline
@@ -90,14 +97,14 @@ class SLPP:
             s += f"{newline}{tab * self.depth}}}"
         return s
 
-    def white(self):
+    def white(self) -> None:
         while self.ch:
             if self.space.match(self.ch):
                 self.next_chr()
             else:
                 break
 
-    def next_chr(self):
+    def next_chr(self) -> bool | None:
         if self.at >= self.len:
             self.ch = None
             return None
@@ -105,7 +112,7 @@ class SLPP:
         self.at += 1
         return True
 
-    def value(self):
+    def value(self) -> LuaValue:
         self.white()
         if not self.ch:
             return None
@@ -119,7 +126,7 @@ class SLPP:
             return self.number()
         return self.word()
 
-    def string(self, end=None):
+    def string(self, end: str | None = None) -> str:
         s = ""
         start = self.ch
         if end == "[":
@@ -141,32 +148,21 @@ class SLPP:
                 s += self.ch
         raise ParseError(ERRORS["unexp_end_string"])
 
-    def _consume_empty_object(self):
+    def _consume_empty_object(self) -> bool:
         if self.ch != "}":
             return False
         self.depth -= 1
         self.next_chr()
         return True
 
-    def _object_as_sequence(self, data):
-        if any(isinstance(key, SORTABLE_KEY_TYPES) for key in data):
-            return data
-        keys = sorted(data)
-        if not sequential(keys):
-            return data
-        result = []
-        for key, value in data.items():
-            result.insert(key, value)
-        return result
-
-    def _close_object(self, data, pending_key, index):
+    def _close_object(self, data: LuaTable, pending_key: LuaValue, index: int) -> LuaTable:
         self.depth -= 1
         self.next_chr()
         if pending_key is not None:
             data[index] = pending_key
-        return self._object_as_sequence(data)
+        return data
 
-    def _read_object_item(self, data, index):
+    def _read_object_item(self, data: LuaTable, index: int) -> tuple[LuaValue, int]:
         key = self.value()
         if self.ch == "]":
             self.next_chr()
@@ -179,14 +175,17 @@ class SLPP:
         self.next_chr()
         self.white()
         if separator == "=":
+            if not isinstance(key, (str, int, float, bool)):
+                message = "Lua table keys must be scalar values."
+                raise ParseError(message)
             data[key] = self.value()
         else:
             data[index] = key
         return None, index + 1
 
-    def object(self):
-        data = {}
-        pending_key = None
+    def object(self) -> LuaTable:
+        data: LuaTable = {}
+        pending_key: LuaValue = None
         index = 0
         self.depth += 1
         self.next_chr()
@@ -207,9 +206,9 @@ class SLPP:
             pending_key, index = self._read_object_item(data, index)
         raise ParseError(ERRORS["unexp_end_table"])
 
-    words: ClassVar[dict[str, Any]] = {"true": True, "false": False, "nil": None}
+    words: ClassVar[dict[str, LuaScalar]] = {"true": True, "false": False, "nil": None}
 
-    def word(self):
+    def word(self) -> LuaScalar:
         s = ""
         ch = self.ch
         if ch is None:
@@ -225,37 +224,37 @@ class SLPP:
             self.next_chr()
         return self.words.get(s, s)
 
-    def number(self):
-        def next_digit(err):
-            n = self.ch
-            self.next_chr()
-            if not self.ch or not self.ch.isdigit():
-                raise ParseError(err)
-            return n
+    def _next_number_token(self, error: str) -> str:
+        token = self.ch or ""
+        self.next_chr()
+        if not token or not self.ch or not self.ch.isdigit():
+            raise ParseError(error)
+        return token
 
-        def require_exponent_sign():
-            if not self.ch or self.ch not in ("+", "-"):
-                raise ParseError(ERRORS["mfnumber_sci"])
-
+    def _number_text(self) -> str:
         n = ""
-        try:
-            if self.ch == "-":
-                n += next_digit(ERRORS["mfnumber_minus"])
+        if self.ch == "-":
+            n += self._next_number_token(ERRORS["mfnumber_minus"])
+        n += self.digit()
+        if n == "0" and self.ch in ["x", "X"]:
+            n += self.ch
+            self.next_chr()
+            return n + self.hex()
+        if self.ch == ".":
+            n += self._next_number_token(ERRORS["mfnumber_dec_point"])
             n += self.digit()
-            if n == "0" and self.ch in ["x", "X"]:
-                n += self.ch
-                self.next_chr()
-                n += self.hex()
-            else:
-                if self.ch and self.ch == ".":
-                    n += next_digit(ERRORS["mfnumber_dec_point"])
-                    n += self.digit()
-                if self.ch and self.ch in ["e", "E"]:
-                    n += self.ch
-                    self.next_chr()
-                    require_exponent_sign()
-                    n += next_digit(ERRORS["mfnumber_sci"])
-                    n += self.digit()
+        if self.ch in ["e", "E"]:
+            n += self.ch
+            self.next_chr()
+            if self.ch not in ("+", "-"):
+                raise ParseError(ERRORS["mfnumber_sci"])
+            n += self._next_number_token(ERRORS["mfnumber_sci"])
+            n += self.digit()
+        return n
+
+    def number(self) -> int | float:
+        try:
+            n = self._number_text()
         except ParseError as e:
             print(e)
             return 0
@@ -263,14 +262,14 @@ class SLPP:
             return int(n, 0)
         return float(n)
 
-    def digit(self):
+    def digit(self) -> str:
         n = ""
         while self.ch and self.ch.isdigit():
             n += self.ch
             self.next_chr()
         return n
 
-    def hex(self):
+    def hex(self) -> str:
         n = ""
         while self.ch and (self.ch in "ABCDEFabcdef" or self.ch.isdigit()):
             n += self.ch

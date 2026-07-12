@@ -1,24 +1,29 @@
+from typing import TYPE_CHECKING
+
 from module.handler import enemy_searching as enemy_searching_module
 from module.handler.enemy_searching import EnemySearchingHandler
 
+if TYPE_CHECKING:
+    import pytest
+
 
 class _Timer:
-    def __init__(self, results=None):
+    def __init__(self, results: list[bool] | None = None) -> None:
         self.results = list(results or [])
         self.limit = 0
         self.reset_count = 0
         self.start_count = 0
 
-    def start(self):
+    def start(self) -> _Timer:
         self.start_count += 1
         return self
 
-    def reached(self):
+    def reached(self) -> bool:
         if not self.results:
             return False
         return self.results.pop(0)
 
-    def reset(self):
+    def reset(self) -> None:
         self.reset_count += 1
 
 
@@ -31,7 +36,7 @@ class _Device:
     def screenshot(self) -> None:
         self.screenshot_count += 1
 
-    def sleep(self, value) -> None:
+    def sleep(self, value: float) -> None:
         self.sleep_calls.append(value)
 
 
@@ -55,48 +60,48 @@ class _EnemySearching(EnemySearchingHandler):
         self.flashing_count = 0
 
     @staticmethod
-    def _next(results):
+    def _next(results: list[bool]) -> bool:
         if results:
             return results.pop(0)
         return False
 
-    def is_in_map(self):
+    def is_in_map(self) -> bool:
         return self._next(self.in_map_results)
 
-    def is_event_animation(self):
+    def is_event_animation(self) -> bool:
         return self._next(self.event_animation_results)
 
-    def handle_in_stage(self):
+    def handle_in_stage(self) -> bool:
         return self._next(self.in_stage_results)
 
-    def is_combat_loading(self):
+    def is_combat_loading(self) -> bool:
         return self._next(self.combat_loading_results)
 
-    def handle_auto_search_exit(self):
+    def handle_auto_search_exit(self) -> bool:
         return self._next(self.auto_search_exit_results)
 
-    def handle_vote_popup(self):
+    def handle_vote_popup(self) -> bool:
         return self._next(self.vote_results)
 
-    def handle_story_skip(self):
+    def handle_story_skip(self) -> bool:
         return self._next(self.story_results)
 
-    def ensure_no_story(self, *_args: object, **_kwargs: object):
+    def ensure_no_story(self, *_args: object, **_kwargs: object) -> None:
         self.ensure_no_story_count += 1
 
-    def handle_guild_popup_cancel(self):
+    def handle_guild_popup_cancel(self) -> bool:
         return self._next(self.guild_results)
 
-    def handle_urgent_commission(self):
+    def handle_urgent_commission(self) -> bool:
         return self._next(self.urgent_results)
 
-    def enemy_searching_appear(self):
+    def enemy_searching_appear(self) -> bool:
         return self._next(self.enemy_appear_results)
 
-    def enemy_searching_color_initial(self):
+    def enemy_searching_color_initial(self) -> None:
         self.color_initial_count += 1
 
-    def handle_enemy_flashing(self):
+    def handle_enemy_flashing(self) -> None:
         self.flashing_count += 1
 
 
@@ -109,7 +114,7 @@ def test_enemy_searching_returns_false_outside_map() -> None:
     assert handler.device.screenshot_count == 0
 
 
-def test_enemy_searching_waits_for_overlay_to_disappear(monkeypatch) -> None:
+def test_enemy_searching_waits_for_overlay_to_disappear(monkeypatch: pytest.MonkeyPatch) -> None:
     handler = _EnemySearching()
     handler.in_map_results = [True, True, True]
     handler.enemy_appear_results = [True, False]
@@ -123,7 +128,7 @@ def test_enemy_searching_waits_for_overlay_to_disappear(monkeypatch) -> None:
     assert handler.device.screenshot_count == 3
 
 
-def test_enemy_searching_story_skip_keeps_fallthrough_to_timeout(monkeypatch) -> None:
+def test_enemy_searching_story_skip_keeps_fallthrough_to_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     handler = _EnemySearching()
     handler.in_map_results = [True, True]
     handler.story_results = [True]

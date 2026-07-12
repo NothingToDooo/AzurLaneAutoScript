@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from module.base.decorator import cached_property, del_cached_property
 from module.config.deep import deep_get
@@ -14,8 +15,11 @@ from module.exception import RequestHumanTakeover
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
 
+if TYPE_CHECKING:
+    from module.device.contracts import MumuSession
 
-def serial_to_id(serial: str):
+
+def serial_to_id(serial: str) -> int | None:
     """MuMu 端口映射为实例 ID：16384 -> 0，16416 及其相邻端口 -> 1。
 
     无法推算时返回 None。
@@ -36,7 +40,7 @@ class MumuRuntimeBase:
 
     emulator_manager: EmulatorManagerBase
 
-    def __init__(self, session) -> None:
+    def __init__(self, session: MumuSession) -> None:
         self.session = session
 
     @property
@@ -180,7 +184,7 @@ class MumuRuntimeBase:
         if instance_id is None:
             return None
 
-        select = instances.select(MuMuPlayer12_id=instance_id)
+        select = instances.select(mumu_player_12_id=instance_id)
         # 这里只是试探，因此 select.count == 1 时不单独记录日志。
         if select.count == 1:
             return self._log_found_emulator_instance(select[0])

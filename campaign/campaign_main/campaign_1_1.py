@@ -1,7 +1,10 @@
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from module.campaign.campaign_base import CampaignBase
 from module.map.map_base import CampaignMap
+
+if TYPE_CHECKING:
+    from module.map.type_alias import GridLocation
 
 MAP = CampaignMap()
 MAP.shape = "G1"
@@ -26,8 +29,8 @@ MAP.spawn_data = [
 
 
 class Config:
-    FLEET_2 = 0
-    SUBMARINE = 0
+    fleet_2 = 0
+    submarine = 0
     INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (120, 255 - 49),
         "width": (1.5, 10),
@@ -50,11 +53,11 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         return self.battle_default()
 
-    def battle_1(self):
+    def battle_1(self) -> bool:
         return self.clear_boss()
 
-    def handle_boss_appear_refocus(self, preset=(-3, 0)):
+    def handle_boss_appear_refocus(self, preset: GridLocation | None = (-3, 0)) -> None:
         return super().handle_boss_appear_refocus(preset)

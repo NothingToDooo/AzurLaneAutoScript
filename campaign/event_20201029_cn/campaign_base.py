@@ -7,7 +7,7 @@ class CampaignBase(CampaignBase_):
     """该联动活动分章：第 1 章 SP1～SP5，第 2 章 uSP，第 3 章 EX；模式切换无意义。"""
 
     @staticmethod
-    def campaign_get_chapter_index(name):
+    def campaign_get_chapter_index(name: str | int) -> int:
         """将整数或章节名转换为章节序号。"""
         if isinstance(name, int):
             return name
@@ -19,7 +19,7 @@ class CampaignBase(CampaignBase_):
             return 2
         raise CampaignNameError
 
-    def campaign_set_chapter(self, name, mode="normal"):
+    def campaign_set_chapter(self, name: str, mode: str = "normal") -> None:
         """按关卡名和 normal/hard 模式切换章节。"""
         chapter, _stage = self.campaign_separate_name(name)
 
@@ -49,7 +49,7 @@ class CampaignBase(CampaignBase_):
         else:
             logger.warning(f"Unknown campaign chapter: {name}")
 
-    def is_event_animation(self):
+    def is_event_animation(self) -> bool:
         appear = self.image_color_count((286, 342, 994, 422), color=(255, 255, 255), count=10000)
         if appear:
             logger.info("Live start!")

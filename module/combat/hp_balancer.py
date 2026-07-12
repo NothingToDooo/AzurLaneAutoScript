@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from module.base.base import ModuleBase
@@ -6,49 +8,62 @@ from module.base.utils import color_bar_percentage
 from module.config.utils import to_list
 from module.logger import logger
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator, Sequence
+
+    from module.base.type_alias import Area
+    from module.config.config import AzurLaneConfig
+    from module.device.device import Device
+
 # 血条上的前景色。
 COLOR_HP_GREEN = (156, 235, 57)
 COLOR_HP_RED = (99, 44, 24)
-SCOUT_POSITION = [(403, 421), (625, 369), (821, 326)]
+SCOUT_POSITION = ((403, 421), (625, 369), (821, 326))
 
 
 class HPBalancer(ModuleBase):
     fleet_current_index = 1
     fleet_show_index = 1
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        config: AzurLaneConfig | str,
+        device: Device | str | None = None,
+        task: str | None = None,
+    ) -> None:
         self._hp: dict[int, list[float]] = {}
         self._hp_has_ship: dict[int, list[bool]] = {}
-        super().__init__(*args, **kwargs)
+        super().__init__(config=config, device=device, task=task)
 
     @property
-    def hp(self):
+    def hp(self) -> list[float]:
         """返回当前舰队六个位置的血量比例，范围为 0.0～1.0。"""
         return self._hp[self.fleet_current_index]
 
     @hp.setter
-    def hp(self, value):
+    def hp(self, value: list[float]) -> None:
         self._hp[self.fleet_current_index] = value
 
     @property
-    def hp_has_ship(self):
+    def hp_has_ship(self) -> list[bool]:
         return self._hp_has_ship[self.fleet_current_index]
 
     @hp_has_ship.setter
-    def hp_has_ship(self, value):
+    def hp_has_ship(self, value: list[bool]) -> None:
         self._hp_has_ship[self.fleet_current_index] = value
 
-    def _calculate_hp(self, area):
+    def _calculate_hp(self, area: Area) -> float:
         """按血条颜色计算 0.0～1.0 的血量比例。"""
         return max(
             color_bar_percentage(self.device.image, area=area, prev_color=COLOR_HP_RED),
             color_bar_percentage(self.device.image, area=area, prev_color=COLOR_HP_GREEN),
         )
 
-    def _hp_grid(self):
+    @staticmethod
+    def _hp_grid() -> ButtonGrid:
         return ButtonGrid(origin=(35, 206), delta=(0, 100), button_shape=(66, 4), grid_shape=(1, 6))
 
-    def hp_get(self):
+    def hp_get(self) -> list[float]:
         """识别六个位置的血量比例并缓存；前排返回值会应用平衡权重。"""
         weight = self.config.HpControl_HpBalanceWeight
         if "，" in self.config.HpControl_HpBalanceWeight:
@@ -60,7 +75,7 @@ class HPBalancer(ModuleBase):
         weight = to_list(weight)
         scout = np.array(hp[3:]) * np.array(weight) / np.max(weight)
 
-        self.hp = hp[:3] + scout.tolist()
+        self.hp = hp[:3] + [float(value) for value in scout]
         if self.fleet_current_index not in self._hp_has_ship:
             self.hp_has_ship = [bool(hp > 0.3) for hp in self.hp]
 
@@ -78,17 +93,17 @@ class HPBalancer(ModuleBase):
 
         return self.hp
 
-    def hp_reset(self):
+    def hp_reset(self) -> None:
         """进入地图后清空血量和舰船位置缓存。"""
         self._hp = {}
         self._hp_has_ship = {}
 
-    def _scout_position_change(self, p1, p2):
+    def _scout_position_change(self, p1: int, p2: int) -> None:
         """交换前排 0～2 号位置；拖动手势需带少量纵向偏移。"""
         logger.info(f"scout_position_change ({p1}, {p2})")
         self.device.drag(p1=SCOUT_POSITION[p1], p2=SCOUT_POSITION[p2])
 
-    def _expected_scout_order(self, hp):
+    def _expected_scout_order(self, hp: Sequence[float]) -> list[int]:
         count = np.count_nonzero(hp)
         threshold = self.config.HpControl_HpBalanceThreshold
 
@@ -120,7 +135,8 @@ class HPBalancer(ModuleBase):
 
         return order
 
-    def _gen_exchange_step(self, target):
+    @staticmethod
+    def _gen_exchange_step(target: Sequence[int]) -> Iterator[tuple[int, int]]:
         """生成把前排原始顺序调整为 target 的 minitouch 拖动步骤。
 
         把第一艘船拖到第三艘时，[0, 1, 2] 会变成 [1, 2, 0]。
@@ -141,12 +157,13 @@ class HPBalancer(ModuleBase):
                 yield (1, 0)
             else:
                 # 两个错位时直接交换错位位置，可覆盖 0、2、1 和 1、0、2。
-                yield tuple(np.nonzero(diff)[0])
+                indices = np.nonzero(diff)[0]
+                yield int(indices[0]), int(indices[1])
         elif count == 0:
             # 目标顺序与原始顺序相同，不需要交换。
             pass
 
-    def hp_balance(self):
+    def hp_balance(self) -> bool:
         if self.config.Campaign_UseFleetLock:
             return False
 
@@ -157,7 +174,7 @@ class HPBalancer(ModuleBase):
 
         return True
 
-    def hp_retreat_triggered(self):
+    def hp_retreat_triggered(self) -> bool:
         if self.config.HpControl_UseLowHpRetreat:
             hp = np.array(self.hp)[self.hp_has_ship]
             if np.any(hp < self.config.HpControl_LowHpRetreatThreshold):

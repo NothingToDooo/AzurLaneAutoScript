@@ -2,7 +2,10 @@
 import collections.abc  # noqa: TC003
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal, cast
+from typing import TYPE_CHECKING, Literal, cast
+
+if TYPE_CHECKING:
+    from module.config.deep import MutableDeepValue
 
 NAIVE_CLOCK_MESSAGE = "now must be a naive local datetime"
 
@@ -13,7 +16,7 @@ type ScheduleState = Literal["ready", "waiting", "error", "empty"]
 class ScheduleEntry:
     enable: bool
     command: str
-    next_run: object
+    next_run: MutableDeepValue
 
 
 @dataclass(frozen=True, slots=True)

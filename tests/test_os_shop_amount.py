@@ -1,5 +1,7 @@
-from typing import ClassVar, TypeVar
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, ClassVar, TypeVar, override
 
+import numpy as np
 import pytest
 
 from module.os_shop import shop as shop_module
@@ -8,6 +10,12 @@ from module.shop.assets import AMOUNT_MAX
 from module.ui.ui import UiIndexControls
 
 _T = TypeVar("_T")
+
+if TYPE_CHECKING:
+    from module.base.button import MatchOffset
+    from module.base.type_alias import Area, ImageArray
+    from module.device.control import ButtonTarget
+    from module.os_shop.shop import OSShopAmountItem, OSShopBuyItem
 
 
 def button_key(button: object) -> str:
@@ -39,35 +47,36 @@ class _Ocr:
     def __init__(self, values: list[int]) -> None:
         self.values = values
 
-    def ocr(self, _image: object) -> int:
+    def ocr_single(self, _image: ImageArray) -> int:
         return self.values.pop(0)
 
 
 class _Device:
-    image = object()
-
     def __init__(self) -> None:
+        self.image = np.zeros((2, 2, 3), dtype=np.uint8)
         self.screenshot_count = 0
-        self.clicks: list[object] = []
+        self.clicks: list[ButtonTarget] = []
 
-    def click(self, button: object) -> None:
+    def click(self, button: ButtonTarget) -> None:
         self.clicks.append(button)
 
     def screenshot(self) -> None:
         self.screenshot_count += 1
 
 
+@dataclass(kw_only=True)
 class _Item:
-    name = "item"
-    cost = "YellowCoins"
+    price: int
+    count: int
+    name: str = "item"
+    cost: str = "YellowCoins"
+    button: Area = (0, 0, 1, 1)
 
-    def __init__(self, *, price: int, count: int) -> None:
-        self.price = price
-        self.count = count
 
-
+@dataclass(slots=True)
 class _BuyItem:
-    name = "buy-item"
+    name: str = "buy-item"
+    button: Area = (0, 0, 1, 1)
 
 
 class _Shop(OSShop):
@@ -83,19 +92,25 @@ class _Shop(OSShop):
     def handle_amount(self, item: _Item) -> bool:
         return self.shop_buy_amount_handler(item)
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
-    def close_shop_buy_confirm_amount(self, skip_first_screenshot=True, **_kwargs: object) -> None:
+    @override
+    def close_shop_buy_confirm_amount(self, *, skip_first_screenshot: bool = True) -> None:
         self.calls.append(("close_shop_buy_confirm_amount", skip_first_screenshot))
 
-    def get_currency_coins(self, item, *_args: object, **_kwargs: object) -> int:
+    @override
+    def get_currency_coins(self, item: OSShopAmountItem) -> int:
+        assert isinstance(item, _Item)
         self.calls.append(("get_currency_coins", item))
         return self.currency
 
-    def get_coins_no_limit(self, item, *_args: object, **_kwargs: object) -> int:
+    @override
+    def get_coins_no_limit(self, item: OSShopAmountItem) -> int:
+        assert isinstance(item, _Item)
         self.calls.append(("get_coins_no_limit", item))
         return self.coins
 
@@ -107,8 +122,15 @@ class _Shop(OSShop):
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)
 
-    def ui_ensure_index(self, index: int, controls: object, *_args: object, **kwargs: object) -> None:
-        self.calls.append(("ui_ensure_index", index, controls, kwargs))
+    @override
+    def ui_ensure_index(
+        self,
+        index: int,
+        controls: UiIndexControls,
+        *,
+        skip_first_screenshot: bool = False,
+    ) -> None:
+        self.calls.append(("ui_ensure_index", index, controls, {"skip_first_screenshot": skip_first_screenshot}))
 
 
 class _BuyShop(OSShop):
@@ -126,7 +148,8 @@ class _BuyShop(OSShop):
     def buy_execute(self, item: _BuyItem) -> bool:
         return self.os_shop_buy_execute(item)
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
@@ -151,17 +174,19 @@ class _BuyShop(OSShop):
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+    def handle_popup_confirm(self, name: str = "", offset: MatchOffset | None = None, interval: float = 2) -> bool:
         _ = (name, offset, interval)
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
 
-    def shop_buy_amount_handler(self, item, skip_first_screenshot=True) -> bool:
-        _ = skip_first_screenshot
+    @override
+    def shop_buy_amount_handler(self, item: OSShopBuyItem, *, skip_first_screenshot: bool = True) -> bool:
+        del skip_first_screenshot
+        assert isinstance(item, _BuyItem)
         self.calls.append(("shop_buy_amount_handler", item))
         return self._next_result(self.amount_results, default=False)
 
-    def close_shop_buy_confirm_amount(self, skip_first_screenshot: object = True) -> None:
+    def close_shop_buy_confirm_amount(self, *, skip_first_screenshot: bool = True) -> None:
         self.calls.append(("close_shop_buy_confirm_amount", skip_first_screenshot))
 
 

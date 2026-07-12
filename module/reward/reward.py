@@ -1,4 +1,6 @@
-from module.base.button import ButtonGrid
+from typing import Literal
+
+from module.base.button import Button, ButtonGrid
 from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.combat import assets as combat_assets
@@ -9,9 +11,11 @@ from module.ui.page import page_main, page_mission, page_reward
 from module.ui.ui import UI
 from module.ui_white.assets import MISSION_NOTICE_WHITE
 
+type MissionState = Button | Literal["timeout"]
+
 
 class Reward(UI):
-    def reward_receive(self, oil, coin, exp):
+    def reward_receive(self, *, oil: bool, coin: bool, exp: bool) -> bool:
         """在奖励页按开关领取资源；全部关闭返回 False，否则完成轮询后返回 True。"""
         if not oil and not coin and not exp:
             return False
@@ -53,7 +57,7 @@ class Reward(UI):
         logger.info("Reward receive end")
         return True
 
-    def _reward_get_state(self):
+    def _reward_get_state(self) -> Button | None:
         """返回四种任务按钮状态之一，无法判断时返回 None。"""
         if self.appear(reward_assets.MISSION_MULTI, offset=(20, 20)):
             return reward_assets.MISSION_MULTI
@@ -65,7 +69,7 @@ class Reward(UI):
             return reward_assets.MISSION_UNFINISH
         return None
 
-    def _reward_mission_claim_click(self):
+    def _reward_mission_claim_click(self) -> bool:
         """在任务页点击可领取按钮，返回是否已点击并进入奖励弹窗。"""
         clicked = False
         click_interval = Timer(1, count=2)
@@ -86,7 +90,7 @@ class Reward(UI):
                     return clicked
         return clicked
 
-    def _reward_mission_receive_state(self, timeout):
+    def _reward_mission_receive_state(self, timeout: Timer) -> MissionState | None:
         if not self.ui_page_appear(page_mission):
             timeout.reset()
             return None
@@ -99,7 +103,7 @@ class Reward(UI):
             return "timeout"
         return None
 
-    def _handle_reward_mission_receive_popup(self):
+    def _handle_reward_mission_receive_popup(self) -> bool:
         if self._appear_then_click_any(
             [
                 (combat_assets.GET_ITEMS_1, {"offset": (30, 30), "interval": 1}),
@@ -115,7 +119,7 @@ class Reward(UI):
             or self.handle_popup_confirm("MISSION_REWARD")
         )
 
-    def _reward_mission_claim_receive(self):
+    def _reward_mission_claim_receive(self) -> MissionState:
         """处理奖励弹窗并返回任务按钮状态；两秒超时返回 'timeout'。"""
         logger.info("Mission claim receive")
         timeout = Timer(2, count=6).start()
@@ -127,7 +131,7 @@ class Reward(UI):
                 continue
         return "timeout"
 
-    def _reward_wait_mission_list(self):
+    def _reward_wait_mission_list(self) -> MissionState:
         """在任务页等待任一任务状态；一秒超时返回 'timeout'。"""
         timeout = Timer(1, count=2).start()
         for _ in self.loop():
@@ -138,7 +142,7 @@ class Reward(UI):
                 return "timeout"
         return "timeout"
 
-    def _reward_mission_collect(self):
+    def _reward_mission_collect(self) -> MissionState:
         """领取当前任务页奖励，返回最终按钮状态或 'timeout'。"""
         state = self._reward_wait_mission_list()
         while 1:
@@ -169,12 +173,12 @@ class Reward(UI):
 
         return state
 
-    def _reward_mission_all(self):
+    def _reward_mission_all(self) -> MissionState:
         """切到全部任务并返回最终任务状态。"""
         self.reward_side_navbar_ensure(upper=1)
         return self._reward_mission_collect()
 
-    def _reward_mission_weekly(self):
+    def _reward_mission_weekly(self) -> MissionState | Literal[False]:
         """有周常红点时领取并返回最终状态；无红点返回 False。"""
         if not self.image_color_count(
             reward_assets.MISSION_WEEKLY_RED_DOT, color=(206, 81, 66), threshold=221, count=20
@@ -185,7 +189,7 @@ class Reward(UI):
         self.reward_side_navbar_ensure(upper=5)
         return self._reward_mission_collect()
 
-    def reward_mission_notice(self):
+    def reward_mission_notice(self) -> bool:
         """在主页判断普通或白色 UI 的任务通知是否出现。"""
         if self.appear(reward_assets.MISSION_NOTICE):
             logger.info("Found mission notice MISSION_NOTICE")
@@ -196,7 +200,7 @@ class Reward(UI):
 
         return False
 
-    def reward_mission(self, daily=True, weekly=True):
+    def reward_mission(self, *, daily: bool = True, weekly: bool = True) -> bool:
         """从主页进入任务页按开关领取；该流程固定返回 False。"""
         if not daily and not weekly:
             return False
@@ -213,22 +217,29 @@ class Reward(UI):
         return False
 
     @cached_property
-    def _reward_side_navbar(self):
+    def _reward_side_navbar(self) -> Navbar:
         """侧栏从上到下依次为全部、主线、支线、日常、周常、活动。"""
-        reward_side_navbar = ButtonGrid(
-            origin=(21, 118), delta=(0, 94.5), button_shape=(60, 75), grid_shape=(1, 6), name="REWARD_SIDE_NAVBAR"
-        )
+        return self._build_reward_side_navbar()
 
+    @staticmethod
+    def _build_reward_side_navbar() -> Navbar:
+        reward_side_navbar = ButtonGrid(
+            origin=(21, 118),
+            delta=(0, 94.5),
+            button_shape=(60, 75),
+            grid_shape=(1, 6),
+            name="REWARD_SIDE_NAVBAR",
+        )
         return Navbar(
             grids=reward_side_navbar,
             visual=NavbarVisualRules(active=NavbarColorRule(color=(247, 255, 173))),
         )
 
-    def reward_side_navbar_ensure(self, upper=None, bottom=None):
+    def reward_side_navbar_ensure(self, *, upper: int | None = None, bottom: int | None = None) -> bool:
         """按上方 1～6 或下方逆序 1～6 选择侧栏；不等待目标页面加载。"""
         return self._reward_side_navbar.set(self, NavbarTarget(upper=upper, bottom=bottom))
 
-    def run(self):
+    def run(self) -> None:
         """从任意页面领取资源和任务奖励，结束于主页或任务页。"""
         self.ui_ensure(page_reward)
         self.reward_receive(

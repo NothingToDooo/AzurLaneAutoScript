@@ -3,7 +3,7 @@ from module.guild.assets import BATTLE_STATUS_CF, EXP_INFO_CF
 
 
 class RaidCombat(Combat):
-    def handle_battle_status(self):
+    def handle_battle_status(self) -> bool:
         if self.is_combat_executing():
             return False
         if super().handle_battle_status():
@@ -15,13 +15,13 @@ class RaidCombat(Combat):
 
         return False
 
-    def handle_get_items(self):
+    def handle_get_items(self) -> bool:
         if super().handle_get_items():
             self.interval_reset(BATTLE_STATUS_CF)
             return True
         return False
 
-    def handle_exp_info(self):
+    def handle_exp_info(self) -> bool:
         if self.is_combat_executing():
             return False
         if super().handle_exp_info():

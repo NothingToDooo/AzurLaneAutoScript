@@ -1,26 +1,29 @@
-import copy
 from typing import TYPE_CHECKING
 
 from module.base.button import Button, ButtonGrid
 from module.base.timer import Timer
-from module.config.utils import dict_to_kv
 from module.exception import ScriptError
 from module.logger import logger
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from module.base.base import ModuleBase
+
+type SettingOption = str | int
+type SettingChoice = SettingOption | Sequence[SettingOption] | None
 
 INVALID_DEFAULT_OPTION_TEMPLATE = 'Define option_default="{default}", but default is not in option_names={options}'
 
 
 class Setting:
-    def __init__(self, name="Setting", main: ModuleBase | None = None):
+    def __init__(self, name: str = "Setting", main: ModuleBase | None = None) -> None:
         self.name = name
         self._main: ModuleBase | None = main
         self.reset_first = True
         self.need_deselect = False
-        self.settings: dict[tuple[str, str], Button] = {}
-        self.settings_default: dict[str, str] = {}
+        self.settings: dict[tuple[str, SettingOption], Button] = {}
+        self.settings_default: dict[str, SettingOption] = {}
 
     @property
     def main(self) -> ModuleBase:
@@ -33,7 +36,13 @@ class Setting:
     def main(self, value: ModuleBase | None) -> None:
         self._main = value
 
-    def add_setting(self, setting, option_buttons, option_names, option_default):
+    def add_setting(
+        self,
+        setting: str,
+        option_buttons: ButtonGrid | Sequence[Button],
+        option_names: Sequence[SettingOption],
+        option_default: SettingOption,
+    ) -> None:
         """option_buttons 与 option_names 必须等长，option_default 必须在 option_names 中。"""
         if isinstance(option_buttons, ButtonGrid):
             option_buttons = option_buttons.buttons
@@ -50,12 +59,12 @@ class Setting:
             option, color=(181, 142, 90), threshold=235, count=250
         ) or self.main.image_color_count(option, color=(74, 117, 189), threshold=235, count=250)
 
-    def _product_setting_status(self, **kwargs) -> dict[Button, bool]:
+    def _product_setting_status(self, **kwargs: SettingChoice) -> dict[Button, bool]:
         """kwargs 的值可为单选项、选项列表或 None；None 表示不修改该项。
 
         返回 Button 到目标启用状态的映射，bool 表示该按钮是否应激活。
         """
-        required_options = copy.deepcopy(self.settings_default)
+        required_options: dict[str, SettingChoice] = dict(self.settings_default)
         required_options.update(kwargs)
 
         status: dict[Button, bool] = {}
@@ -63,13 +72,13 @@ class Setting:
             setting, option_name = key
             required = required_options[setting]
             if required is not None:
-                required = required if isinstance(required, list) else [required]
-                status[option_button] = option_name in required
+                required_options_for_setting = (required,) if isinstance(required, (str, int)) else required
+                status[option_button] = option_name in required_options_for_setting
 
         return status
 
-    def show_active_buttons(self):
-        active = []
+    def show_active_buttons(self) -> None:
+        active: list[str] = []
         for key, option_button in self.settings.items():
             setting, option_name = key
             if self.is_option_active(option_button):
@@ -87,10 +96,10 @@ class Setting:
                 click.append(option_button)
         return click
 
-    def _set_execute(self, **kwargs):
+    def _set_execute(self, **kwargs: SettingChoice) -> bool:
         status = self._product_setting_status(**kwargs)
 
-        logger.info(f"Setting options {self.name}, {dict_to_kv(kwargs)}")
+        logger.info(f"Setting options {self.name}, {kwargs}")
         skip_first_screenshot = True
         retry = Timer(1, count=2)
         timeout = Timer(10, count=20).start()
@@ -115,7 +124,7 @@ class Setting:
                 return True
         return False
 
-    def set(self, **kwargs):
+    def set(self, **kwargs: SettingChoice) -> bool:
         """kwargs 的值可为单选项、选项列表或 None；None 表示不修改该项。"""
         if self.reset_first:
             self._set_execute()

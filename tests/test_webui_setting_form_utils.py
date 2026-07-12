@@ -8,7 +8,7 @@ from module.webui.setting_form_utils import (
 )
 
 
-def _translate(key: str, *args) -> str:
+def _translate(key: str, *args: str) -> str:
     if key.endswith(".help"):
         return ""
     if args:

@@ -1,11 +1,31 @@
 from datetime import date
 from pathlib import Path
+from typing import TYPE_CHECKING, override
 
 from module.config.config_updater import ConfigGenerator
 from module.config.deep import deep_get
 from module.config.utils import filepath_args, read_file
 from module.content.manifest import load_event_manifests
 from module.content.models import ContentId, EventPack, EventRelease
+
+if TYPE_CHECKING:
+    from module.config.deep import MutableDeepData
+
+
+class _Generator(ConfigGenerator):
+    def __init__(self, packs: list[EventPack]) -> None:
+        self._args: MutableDeepData = {}
+        self._event_packs = tuple(packs)
+
+    @property
+    @override
+    def args(self) -> MutableDeepData:
+        return self._args
+
+    @property
+    @override
+    def event_packs(self) -> tuple[EventPack, ...]:
+        return self._event_packs
 
 
 def _release(opened_on: str, order: int, name_cn: str | None = "活动") -> EventRelease:
@@ -21,11 +41,8 @@ def _pack(pack_id: str, kind: str, *releases: EventRelease) -> EventPack:
     )
 
 
-def _generator(packs: list[EventPack]) -> ConfigGenerator:
-    generator = object.__new__(ConfigGenerator)
-    generator.args = {}
-    generator.event_packs = tuple(packs)
-    return generator
+def _generator(packs: list[EventPack]) -> _Generator:
+    return _Generator(packs)
 
 
 def _option_names(generator: ConfigGenerator, task: str) -> list[str]:
@@ -120,16 +137,18 @@ def test_insert_event_same_date_uses_descending_release_order_and_deduplicates_p
 
 def test_insert_event_replaces_stale_campaign_main_and_duplicate_options() -> None:
     generator = _generator([_pack("event_latest", "event", _release("2026-01-01", 10))])
-    generator.args = {
-        "Event": {
-            "Campaign": {
-                "Event": {
-                    "option": ["campaign_main", "event_stale", "event_stale"],
-                    "option_bold": ["event_stale"],
+    generator.args.update(
+        {
+            "Event": {
+                "Campaign": {
+                    "Event": {
+                        "option": ["campaign_main", "event_stale", "event_stale"],
+                        "option_bold": ["event_stale"],
+                    }
                 }
             }
         }
-    }
+    )
 
     generator.insert_event()
 

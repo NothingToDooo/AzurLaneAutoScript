@@ -11,7 +11,7 @@ PORT_CHECK = os_assets.PORT_GOTO_SUPPLY
 
 
 class PortHandler(OSShop):
-    def port_enter(self):
+    def port_enter(self) -> None:
         """从区域地图进入港口。"""
         logger.info("Port enter")
         for _ in self.loop():
@@ -24,14 +24,14 @@ class PortHandler(OSShop):
         # 底部按钮有出现动画。
         # ui_click 已经确保等待完成。
 
-    def port_quit(self, skip_first_screenshot=True):
+    def port_quit(self, *, skip_first_screenshot: bool = True) -> None:
         """从港口返回区域地图，并等待底部按钮动画结束。"""
         logger.info("Port quit")
         self.ui_back(appear_button=PORT_CHECK, check_button=self.is_in_map, skip_first_screenshot=skip_first_screenshot)
         # 底部按钮有出现动画。
         self.wait_os_map_buttons()
 
-    def port_mission_accept(self):
+    def port_mission_accept(self) -> bool:
         """在港口领取全部任务；2022-01-13 后任务已只显示在总览中。
 
         达到任务上限时返回 False，页面保持在港口。
@@ -65,7 +65,7 @@ class PortHandler(OSShop):
         self.ui_back(appear_button=os_assets.PORT_MISSION_CHECK, check_button=PORT_CHECK, skip_first_screenshot=True)
         return success
 
-    def port_shop_enter(self):
+    def port_shop_enter(self) -> None:
         """从港口进入补给商店，并等待商品动画结束。"""
         self.ui_click(
             os_assets.PORT_GOTO_SUPPLY,
@@ -77,11 +77,11 @@ class PortHandler(OSShop):
         self.device.sleep(0.5)
         self.device.screenshot()
 
-    def port_shop_quit(self):
+    def port_shop_quit(self) -> None:
         """从补给商店返回港口。"""
         self.ui_back(appear_button=PORT_SUPPLY_CHECK, check_button=PORT_CHECK, skip_first_screenshot=True)
 
-    def port_dock_repair(self):
+    def port_dock_repair(self) -> None:
         """在港口维修全部舰船，页面保持在港口。"""
         self.ui_click(
             os_assets.PORT_GOTO_DOCK,

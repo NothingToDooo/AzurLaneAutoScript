@@ -1,13 +1,16 @@
 from types import SimpleNamespace
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from module.daemon.daemon import AzurLaneDaemon
 from module.daemon.os_daemon import AzurLaneDaemon as OpsiDaemon
 from module.daemon.os_daemon import ContinuousCombat
 from module.exception import CampaignEnd
 
+if TYPE_CHECKING:
+    from module.combat.combat import CombatEnd
 
-def _ignore_expected_end(expected_end) -> None:
+
+def _ignore_expected_end(expected_end: CombatEnd | None) -> None:
     del expected_end
 
 
@@ -34,7 +37,7 @@ def test_handle_daemon_combat_prepares_and_finishes_battle_status() -> None:
 
 
 def test_handle_daemon_combat_treats_campaign_end_as_handled() -> None:
-    def raise_campaign_end():
+    def raise_campaign_end() -> None:
         raise CampaignEnd
 
     daemon = SimpleNamespace(
@@ -61,7 +64,7 @@ def test_handle_daemon_map_operation_sleeps_after_ambush_evade() -> None:
 
 
 def test_handle_daemon_map_preparation_skips_clicks_when_disabled() -> None:
-    def unexpected_click():
+    def unexpected_click() -> None:
         message = "disabled map preparation should not click"
         raise AssertionError(message)
 
@@ -74,7 +77,7 @@ def test_handle_daemon_map_preparation_skips_clicks_when_disabled() -> None:
 
 
 def test_handle_os_daemon_combat_treats_continuous_combat_as_handled() -> None:
-    def raise_continuous_combat():
+    def raise_continuous_combat() -> None:
         raise ContinuousCombat
 
     daemon = SimpleNamespace(

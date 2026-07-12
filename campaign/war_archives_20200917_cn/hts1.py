@@ -93,7 +93,7 @@ class Config:
     # ===== End of generated config =====
 
     STAGE_ENTRANCE = ("blue",)
-    FLEET_2 = 0
+    fleet_2 = 0
     MAP_IS_ONE_TIME_STAGE = True
     INTERNAL_LINES_FIND_PEAKS_PARAMETERS: ClassVar[dict[str, object]] = {
         "height": (150, 255 - 17),
@@ -114,11 +114,11 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.clear_siren():
             return True
 
         return self.battle_default()
 
-    def battle_3(self):
+    def battle_3(self) -> bool:
         return self.clear_boss()

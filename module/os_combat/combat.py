@@ -1,9 +1,14 @@
+from collections.abc import Callable
+from typing import Literal
+
 from module.combat import assets as combat_assets
 from module.combat.combat import Combat as Combat_
 from module.logger import logger
 from module.os_combat import assets as os_combat_assets
 from module.os_handler import assets as os_assets
 from module.os_handler.map_event import MapEventHandler
+
+type CombatEnd = Literal["in_stage", "with_searching", "no_searching", "in_ui"] | Callable[[], bool]
 
 _OS_EXP_INFO_BUTTONS = (
     combat_assets.EXP_INFO_S,
@@ -27,7 +32,7 @@ class ContinuousCombat(Exception):
 
 
 class Combat(Combat_, MapEventHandler):
-    def combat_appear(self):
+    def combat_appear(self) -> bool:
         if self.is_in_map():
             return False
 
@@ -40,7 +45,14 @@ class Combat(Combat_, MapEventHandler):
             return True
         return self.appear(combat_assets.BATTLE_PREPARATION_WITH_OVERLAY) and self.handle_combat_automation_confirm()
 
-    def combat_preparation(self, balance_hp=False, emotion_reduce=False, auto="combat_auto", fleet_index=1):
+    def combat_preparation(
+        self,
+        *,
+        balance_hp: bool = False,
+        emotion_reduce: bool = False,
+        auto: str = "combat_auto",
+        fleet_index: int = 1,
+    ) -> None:
         logger.info("Combat preparation.")
         self.device.stuck_record_clear()
         self.device.click_record_clear()
@@ -71,7 +83,7 @@ class Combat(Combat_, MapEventHandler):
                 logger.attr("BattleUI", pause)
                 break
 
-    def handle_exp_info(self):
+    def handle_exp_info(self) -> bool:
         if self.is_combat_executing():
             return False
         for button in _OS_EXP_INFO_BUTTONS:
@@ -81,7 +93,7 @@ class Combat(Combat_, MapEventHandler):
 
         return False
 
-    def handle_get_items(self):
+    def handle_get_items(self) -> bool:
         """识别掉落后点击安全区域，避免直接点击掉落按钮。"""
         if getattr(self, "_disable_handle_get_items", False):
             return False
@@ -106,7 +118,7 @@ class Combat(Combat_, MapEventHandler):
 
         return False
 
-    def _os_combat_expected_end(self):
+    def _os_combat_expected_end(self) -> bool:
         if self.handle_map_event():
             return False
         if self.combat_appear():
@@ -114,7 +126,7 @@ class Combat(Combat_, MapEventHandler):
 
         return self.handle_os_in_map()
 
-    def combat_status(self, expected_end=None):
+    def combat_status(self, expected_end: CombatEnd | None = None) -> None:
         if expected_end is None:
             expected_end = self._os_combat_expected_end
         # 禁用普通掉落处理，只使用地图掉落处理。
@@ -124,20 +136,34 @@ class Combat(Combat_, MapEventHandler):
         finally:
             self._disable_handle_get_items = False
 
-    def combat(self, *args, **kwargs):
+    def combat(
+        self,
+        *,
+        balance_hp: bool | None = None,
+        emotion_reduce: bool | None = None,
+        submarine_mode: str | None = None,
+        expected_end: CombatEnd | None = None,
+        fleet_index: int = 1,
+    ) -> None:
         """塞壬扫描装置可能无间隔触发两场伏击，因此额外识别连续战斗。"""
         for count in range(3):
             if count >= 2:
                 logger.warning("Too many continuous combat")
 
             try:
-                super().combat(*args, **kwargs)
+                super().combat(
+                    balance_hp=balance_hp,
+                    emotion_reduce=emotion_reduce,
+                    submarine_mode=submarine_mode,
+                    expected_end=expected_end,
+                    fleet_index=fleet_index,
+                )
                 break
             except ContinuousCombat:
                 logger.info("Continuous combat detected")
                 continue
 
-    def handle_auto_search_battle_status(self):
+    def handle_auto_search_battle_status(self) -> bool:
         for button, warning in _OS_AUTO_SEARCH_BATTLE_STATUS_BUTTONS:
             if self.appear(button, interval=self.battle_status_click_interval):
                 logger.warning(warning)
@@ -147,7 +173,7 @@ class Combat(Combat_, MapEventHandler):
 
         return False
 
-    def handle_auto_search_exp_info(self):
+    def handle_auto_search_exp_info(self) -> bool:
         for button in _OS_AUTO_SEARCH_EXP_INFO_BUTTONS:
             if self.appear_then_click(button):
                 self.device.sleep((0.25, 0.5))
@@ -155,7 +181,7 @@ class Combat(Combat_, MapEventHandler):
 
         return False
 
-    def _auto_search_combat_wait_execute(self):
+    def _auto_search_combat_wait_execute(self) -> None:
         while 1:
             self.device.screenshot()
 
@@ -171,7 +197,7 @@ class Combat(Combat_, MapEventHandler):
             if self.is_in_map():
                 break
 
-    def _auto_search_combat_execute(self, submarine_mode):
+    def _auto_search_combat_execute(self, submarine_mode: str) -> bool | None:
         success = True
         while 1:
             self.device.screenshot()
@@ -199,7 +225,7 @@ class Combat(Combat_, MapEventHandler):
 
         return success
 
-    def auto_search_combat(self):
+    def auto_search_combat(self) -> bool | None:
         """从战斗加载推进到结算；返回 True，无法确认结果时返回 None。"""
         logger.info("Auto search combat loading")
         self.device.stuck_record_clear()

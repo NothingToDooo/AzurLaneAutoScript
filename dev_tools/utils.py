@@ -1,9 +1,12 @@
 import re
+from os import PathLike
 from pathlib import Path
 
 from tqdm import tqdm
 
-from dev_tools.slpp import slpp
+from dev_tools.slpp import LuaTable, LuaValue, slpp
+
+type FilePath = str | PathLike[str]
 
 
 class LuaLoader:
@@ -11,20 +14,20 @@ class LuaLoader:
 
     server_alias = (("zh-CN", "zh-cn", "cn", "CN"),)
 
-    def __init__(self, folder, server="zh-CN"):
+    def __init__(self, folder: FilePath, server: str = "zh-CN") -> None:
         self.folder = folder
         self._server = ""
         self.server = server
 
     @property
-    def server(self):
+    def server(self) -> str:
         return self._server
 
     @server.setter
-    def server(self, value):
+    def server(self, value: str) -> None:
         self._server = self.get_alias(value)
 
-    def get_alias(self, server):
+    def get_alias(self, server: str) -> str:
         for alias_list in self.server_alias:
             if server in alias_list:
                 for alias in alias_list:
@@ -34,10 +37,11 @@ class LuaLoader:
 
         return server
 
-    def filepath(self, path):
+    def filepath(self, path: FilePath) -> str:
         return (Path(self.folder) / self.server / path).as_posix()
 
-    def _find_matching_brace(self, text, start_index):
+    @staticmethod
+    def _find_matching_brace(text: str, start_index: int) -> int:
         depth = 0
         in_string = None
         escape = False
@@ -60,7 +64,8 @@ class LuaLoader:
                     return i
         return -1
 
-    def _infer_base_name(self, file, keyword):
+    @staticmethod
+    def _infer_base_name(file: FilePath, keyword: str | None) -> str:
         if keyword:
             keyword = keyword.strip()
             if keyword.startswith("pg.base."):
@@ -70,19 +75,19 @@ class LuaLoader:
             return keyword
         return Path(file).stem
 
-    def _load_pg_base_entries(self, text, base_name):
+    def _load_pg_base_entries(self, text: str, base_name: str) -> LuaTable:
         pattern = rf"pg\.base\.{re.escape(base_name)}\[(\d+)\]\s*=\s*\{{"
-        result = {}
+        result: LuaTable = {}
         for m in re.finditer(pattern, text):
             start = m.end() - 1
             end = self._find_matching_brace(text, start)
             if end == -1:
                 continue
             table_text = text[start : end + 1]
-            result[int(m.group(1))] = slpp.decode(table_text)
+            result[int(m.group(1))] = slpp.decode_table(table_text)
         return result
 
-    def _load_file(self, file, keyword=None):
+    def _load_file(self, file: FilePath, keyword: str | None = None) -> LuaTable:
         text = Path(self.filepath(file)).read_text(encoding="utf-8")
 
         if "pg.base." in text:
@@ -95,10 +100,10 @@ class LuaLoader:
                 if result:
                     return result
 
-        result = {}
+        result: LuaTable = {}
         if text.startswith("_G"):
             text = "{" + text + "}"
-            result = slpp.decode(text)
+            result = slpp.decode_table(text)
         else:
             if keyword:
                 print(f"Finding keyword: {keyword}")
@@ -107,14 +112,14 @@ class LuaLoader:
                 pattern = r"\{\s*\n(.*?)^\}"
             m = re.search(pattern, text, re.DOTALL | re.MULTILINE)
             if m:
-                result = slpp.decode("{" + m.group(1) + "}")
+                result = slpp.decode_table("{" + m.group(1) + "}")
         return result
 
-    def load(self, path, keyword=None):
+    def load(self, path: FilePath, keyword: str | None = None) -> LuaTable:
         """读取相对 `{folder}/{server}` 的 Lua 文件或目录，并返回合并后的字典。"""
         print(f"Loading {path}")
         if Path(self.filepath(path)).is_dir():
-            result = {}
+            result: LuaTable = {}
             for file in tqdm(Path(self.filepath(path)).iterdir()):
                 result.update(self._load_file(f"./{path}/{file.name}", keyword=keyword))
         else:
@@ -122,6 +127,27 @@ class LuaLoader:
 
         print(f"{len(result.keys())} items loaded")
         return result
+
+
+def require_lua_table(value: LuaValue, *, context: str) -> LuaTable:
+    if not isinstance(value, dict):
+        message = f"{context} must be a Lua table"
+        raise TypeError(message)
+    return value
+
+
+def require_lua_int(value: LuaValue, *, context: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool):
+        message = f"{context} must be an integer"
+        raise TypeError(message)
+    return value
+
+
+def require_lua_str(value: LuaValue, *, context: str) -> str:
+    if not isinstance(value, str):
+        message = f"{context} must be a string"
+        raise TypeError(message)
+    return value
 
 
 if __name__ == "__main__":

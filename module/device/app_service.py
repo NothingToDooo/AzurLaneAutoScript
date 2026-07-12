@@ -1,9 +1,13 @@
 import re
+from typing import TYPE_CHECKING
 
 from module.config.server import CN_ACTIVITY
 from module.device.method.utils import PackageNotInstalled
 from module.device.service_retry import session_retry
 from module.logger import logger
+
+if TYPE_CHECKING:
+    from module.device.contracts import RetrySession
 
 
 class AppController:
@@ -11,7 +15,7 @@ class AppController:
 
     _PACKAGE_RE = re.compile(r"(?P<package>[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)/")
 
-    def __init__(self, session) -> None:
+    def __init__(self, session: RetrySession) -> None:
         self.session = session
 
     @property
@@ -24,10 +28,10 @@ class AppController:
     def is_running(self) -> bool:
         return self.app_is_running()
 
-    def start(self):
+    def start(self) -> None:
         return self.app_start()
 
-    def stop(self):
+    def stop(self) -> None:
         return self.app_stop()
 
     def app_current(self) -> str:
@@ -39,7 +43,7 @@ class AppController:
         return ""
 
     @session_retry
-    def _app_current_from_adb(self, command) -> str:
+    def _app_current_from_adb(self, command: list[str]) -> str:
         output = self.session.adb_shell(command)
         for line in output.splitlines():
             if any(keyword in line for keyword in ("mCurrentFocus", "mFocusedApp", "topResumedActivity")):
@@ -53,7 +57,7 @@ class AppController:
         logger.attr("Package_name", package)
         return package == self.package
 
-    def app_start(self):
+    def app_start(self) -> None:
         logger.info(f"App start: {self.package}")
         if self._app_start_adb_am(self.package, CN_ACTIVITY, allow_failure=True):
             return
@@ -64,12 +68,12 @@ class AppController:
 
         logger.error("app_start: All trials failed")
 
-    def app_stop(self):
+    def app_stop(self) -> None:
         logger.info(f"App stop: {self.package}")
         self.app_stop_adb()
 
     @session_retry
-    def _app_start_adb_monkey(self, package_name=None, allow_failure=False):
+    def _app_start_adb_monkey(self, package_name: str | None = None, *, allow_failure: bool = False) -> bool:
         if not package_name:
             package_name = self.package
         output = self.session.adb_shell(
@@ -86,7 +90,9 @@ class AppController:
         return "Events injected" in output
 
     @session_retry
-    def _app_start_adb_am(self, package_name=None, activity_name=None, allow_failure=False):
+    def _app_start_adb_am(
+        self, package_name: str | None = None, activity_name: str | None = None, *, allow_failure: bool = False
+    ) -> bool:
         if not package_name:
             package_name = self.package
         if not activity_name:
@@ -115,7 +121,7 @@ class AppController:
         return True
 
     @session_retry
-    def app_stop_adb(self, package_name=None):
+    def app_stop_adb(self, package_name: str | None = None) -> None:
         if not package_name:
             package_name = self.package
         self.session.adb_shell(["am", "force-stop", package_name])

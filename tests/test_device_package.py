@@ -31,7 +31,7 @@ class _PackageDevice(AppPackage):
         self.serial = "127.0.0.1:16384"
         self.packages = packages
 
-    def list_package(self, show_log=True):
+    def list_package(self, *, show_log: bool = True) -> list[str]:
         del show_log
         return self.packages
 

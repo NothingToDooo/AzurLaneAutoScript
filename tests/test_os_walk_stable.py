@@ -1,7 +1,18 @@
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar, override
 
+import numpy as np
+
+from module.base.timer import Timer
 from module.os import fleet as fleet_module
 from module.os.fleet import OSFleet
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    import pytest
+
+    from module.base.button import Button, MatchOffset
+    from module.base.type_alias import ImageArray
 
 UNEXPECTED_GLOBE_RECOVERY_MESSAGE = "unexpected globe recovery"
 UNEXPECTED_STORAGE_RECOVERY_MESSAGE = "unexpected storage recovery"
@@ -9,17 +20,17 @@ UNEXPECTED_MISSION_RECOVERY_MESSAGE = "unexpected mission recovery"
 UNEXPECTED_ORDER_RECOVERY_MESSAGE = "unexpected order recovery"
 
 
-class _Timer:
+class _Timer(Timer):
     created: ClassVar[list[_Timer]] = []
 
     def __init__(self, *_args: object, reached_results: list[bool] | None = None, **_kwargs: object) -> None:
         self.reached_results = list(reached_results or [])
         self.reset_count = 0
-        self.started = False
+        self.has_started = False
         _Timer.created.append(self)
 
     def start(self) -> _Timer:
-        self.started = True
+        self.has_started = True
         return self
 
     def reset(self) -> _Timer:
@@ -34,6 +45,7 @@ class _Timer:
 
 class _Device:
     def __init__(self) -> None:
+        self.image = np.zeros((2, 2, 3), dtype=np.uint8)
         self.interval_values: list[float | None] = []
         self.sleep_values: list[float] = []
         self.click_record_clear_count = 0
@@ -90,60 +102,86 @@ class _WalkStableFleet(OSFleet):
             return results.pop(0)
         return default
 
-    def loop(self, skip_first=True, timeout=None, **_kwargs: object) -> range:
-        _ = timeout
+    @override
+    def loop(
+        self,
+        *,
+        skip_first: bool = True,
+        timeout: float | Timer | None = None,
+    ) -> Iterator[ImageArray]:
+        del timeout
         self.loop_skip_first_values.append(skip_first)
-        return range(self.loop_count)
+        return iter([self.device.image] * self.loop_count)
 
     def handle_map_event(self) -> str:
         return self._next_result(self.map_event_results, "")
 
+    @override
     def handle_retirement(self) -> bool:
         return False
 
+    @override
     def handle_walk_out_of_step(self) -> bool:
         return False
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
-        _ = (name, offset, interval)
+    @override
+    def handle_popup_confirm(
+        self,
+        name: str = "",
+        offset: MatchOffset | None = None,
+        interval: float = 2,
+    ) -> bool:
+        del name, offset, interval
         return False
 
+    @override
     def is_in_globe(self) -> bool:
         return False
 
+    @override
     def os_globe_goto_map(self, *_args: object, **_kwargs: object) -> None:
         raise AssertionError(UNEXPECTED_GLOBE_RECOVERY_MESSAGE)
 
+    @override
     def is_in_storage(self) -> bool:
         return False
 
+    @override
     def storage_quit(self) -> None:
         raise AssertionError(UNEXPECTED_STORAGE_RECOVERY_MESSAGE)
 
+    @override
     def is_in_os_mission(self) -> bool:
         return False
 
+    @override
     def os_mission_quit(self) -> None:
         raise AssertionError(UNEXPECTED_MISSION_RECOVERY_MESSAGE)
 
+    @override
     def handle_os_game_tips(self) -> bool:
         return False
 
+    @override
     def is_in_map_order(self) -> bool:
         return False
 
+    @override
     def order_quit(self) -> None:
         raise AssertionError(UNEXPECTED_ORDER_RECOVERY_MESSAGE)
 
+    @override
     def combat_appear(self) -> bool:
         return False
 
-    def appear(self, button: object, *_args: object, **_kwargs: object) -> bool:
-        _ = button
+    @override
+    def appear(self, button: Button, *_args: object, **_kwargs: object) -> bool:
+        del button
         return False
 
-    def appear_then_click(self, button: object, *_args: object, **_kwargs: object) -> bool:
-        _ = button
+    @override
+    def appear_then_click(self, button: Button, *_args: object, **_kwargs: object) -> bool:
+        del button
         return False
 
     def enemy_searching_appear(self) -> bool:
@@ -171,7 +209,7 @@ class _WalkStableFleet(OSFleet):
         return True
 
 
-def test_wait_until_walk_stable_clears_story_click_record(monkeypatch) -> None:
+def test_wait_until_walk_stable_clears_story_click_record(monkeypatch: pytest.MonkeyPatch) -> None:
     _Timer.created = []
     monkeypatch.setattr(fleet_module, "Timer", _Timer)
     fleet = _WalkStableFleet()
@@ -186,7 +224,7 @@ def test_wait_until_walk_stable_clears_story_click_record(monkeypatch) -> None:
     assert fleet.device.interval_values == [0.35, None]
 
 
-def test_wait_until_walk_stable_confirms_arrival_after_enemy_searching(monkeypatch) -> None:
+def test_wait_until_walk_stable_confirms_arrival_after_enemy_searching(monkeypatch: pytest.MonkeyPatch) -> None:
     _Timer.created = []
     monkeypatch.setattr(fleet_module, "Timer", _Timer)
     fleet = _WalkStableFleet()
@@ -202,7 +240,7 @@ def test_wait_until_walk_stable_confirms_arrival_after_enemy_searching(monkeypat
     assert fleet.update_os_count == 1
 
 
-def test_wait_until_walk_stable_returns_empty_result_for_plain_arrival(monkeypatch) -> None:
+def test_wait_until_walk_stable_returns_empty_result_for_plain_arrival(monkeypatch: pytest.MonkeyPatch) -> None:
     _Timer.created = []
     monkeypatch.setattr(fleet_module, "Timer", _Timer)
     fleet = _WalkStableFleet()

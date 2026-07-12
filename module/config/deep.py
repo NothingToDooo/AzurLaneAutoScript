@@ -1,4 +1,20 @@
 from collections import deque
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from datetime import datetime
+from typing import Protocol, cast, overload, runtime_checkable
+
+type DeepKey = str | int
+type DeepPath = str | Sequence[DeepKey]
+type DeepScalar = bool | int | float | str | datetime | None
+type DeepValue = DeepScalar | Sequence[DeepValue] | Mapping[str, DeepValue]
+type MutableDeepValue = DeepScalar | list[MutableDeepValue] | tuple[MutableDeepValue, ...] | dict[str, MutableDeepValue]
+type MutableDeepData = dict[str, MutableDeepValue]
+
+
+@runtime_checkable
+class SupportsItems(Protocol):
+    def items(self) -> Iterable[tuple[str, DeepValue]]: ...
+
 
 # deep_* 位于热路径；实测键存在时直接索引最快，缺失时先检查成员最快。
 
@@ -12,199 +28,154 @@ def _validate_depth_range(min_depth: int, depth: int) -> None:
     raise ValueError(message)
 
 
-def deep_get(d, keys, default=None):
+def _deep_item(current: DeepValue, key: DeepKey) -> DeepValue:
+    if isinstance(current, Mapping) and isinstance(key, str):
+        mapping = cast("Mapping[str, DeepValue]", current)
+        return mapping[key]
+    if isinstance(current, Sequence) and not isinstance(current, str) and isinstance(key, int):
+        sequence = cast("Sequence[DeepValue]", current)
+        return sequence[key]
+    raise KeyError
+
+
+@overload
+def deep_get(d: DeepValue, keys: DeepPath) -> DeepValue | None: ...
+
+
+@overload
+def deep_get(d: DeepValue, keys: DeepPath, default: None) -> DeepValue | None: ...
+
+
+@overload
+def deep_get[T: DeepValue](d: DeepValue, keys: DeepPath, default: T) -> T: ...
+
+
+def deep_get[T: DeepValue](d: DeepValue, keys: DeepPath, default: T | None = None) -> DeepValue | T | None:
     """按点分隔字符串或键序列访问嵌套字典、列表；路径无效时返回 default。"""
-    if type(keys) is str:
-        keys = keys.split(".")
-
-    try:
-        for k in keys:
-            d = d[k]
-    except KeyError:
-        return default
-    except IndexError:
-        return default
-    except TypeError:
-        return default
-    else:
-        return d
+    normalized_keys: Sequence[DeepKey] = keys.split(".") if type(keys) is str else keys
+    current = d
+    for key in normalized_keys:
+        try:
+            current = _deep_item(current, key)
+        except KeyError, IndexError:
+            return default
+    return current
 
 
-def deep_get_with_error(d, keys):
+def deep_get_with_error(d: DeepValue, keys: DeepPath) -> DeepValue:
     """按点分隔字符串或键序列访问嵌套值；缺键、越界或类型错误统一抛出 KeyError。"""
-    if type(keys) is str:
-        keys = keys.split(".")
-
-    try:
-        for k in keys:
-            d = d[k]
-    except IndexError as e:
-        raise KeyError from e
-    except TypeError as e:
-        raise KeyError from e
-    else:
-        return d
+    normalized_keys: Sequence[DeepKey] = keys.split(".") if type(keys) is str else keys
+    current = d
+    for key in normalized_keys:
+        try:
+            current = _deep_item(current, key)
+        except (IndexError, TypeError) as error:
+            raise KeyError from error
+    return current
 
 
-def deep_exist(d, keys):
+def deep_exist(d: DeepValue, keys: DeepPath) -> bool:
     """判断点分隔字符串或键序列指定的嵌套路径是否存在。"""
-    if type(keys) is str:
-        keys = keys.split(".")
-
     try:
-        for k in keys:
-            d = d[k]
+        deep_get_with_error(d, keys)
     except KeyError:
         return False
-    except IndexError:
-        return False
-    except TypeError:
-        return False
-    else:
-        return True
-
-
-def _replace_parent_with_dict(prev_d, prev_k2, prev_k, value) -> bool:
-    if prev_d is None or prev_k2 is None:
-        return False
-    prev_d[prev_k2] = {prev_k: value}
     return True
 
 
-def deep_set(d, keys, value):
+def _mapping_path(keys: DeepPath) -> list[str]:
+    normalized_keys = keys.split(".") if type(keys) is str else list(keys)
+    if not normalized_keys or not all(isinstance(key, str) for key in normalized_keys):
+        message = "deep mutation paths must contain at least one string key"
+        raise ValueError(message)
+    return normalized_keys
+
+
+def deep_set(d: MutableDeepData, keys: DeepPath, value: MutableDeepValue) -> None:
     """按点分隔字符串或键序列原地写入嵌套字典，并创建或替换非字典中间层。"""
-    if type(keys) is str:
-        keys = keys.split(".")
-
-    first = True
-    exist = True
-    prev_d = None
-    prev_k = None
-    prev_k2 = None
-    try:
-        for k in keys:
-            if first:
-                prev_d = d
-                prev_k = k
-                first = False
-                continue
-            try:
-                if exist and prev_k in d:
-                    prev_d = d
-                    d = d[prev_k]
-                else:
-                    exist = False
-                    new = {}
-                    d[prev_k] = new
-                    d = new
-            except TypeError:
-                exist = False
-                d = {}
-                if not _replace_parent_with_dict(prev_d, prev_k2, prev_k, d):
-                    return
-
-            prev_k2 = prev_k
-            prev_k = k
-    except TypeError:
-        return
-
-    try:
-        d[prev_k] = value
-    except TypeError:
-        _replace_parent_with_dict(prev_d, prev_k2, prev_k, value)
-        return
-    else:
-        return
+    path = _mapping_path(keys)
+    current = d
+    for key in path[:-1]:
+        child = current.get(key)
+        if not isinstance(child, dict):
+            child = {}
+            current[key] = child
+        current = child
+    current[path[-1]] = value
 
 
-def deep_default(d, keys, value):
+def deep_default(d: MutableDeepData, keys: DeepPath, value: MutableDeepValue) -> None:
     """仅在末键缺失时写入默认值，并创建或替换非字典中间层。"""
-    if type(keys) is str:
-        keys = keys.split(".")
-
-    first = True
-    exist = True
-    prev_d = None
-    prev_k = None
-    prev_k2 = None
-    try:
-        for k in keys:
-            if first:
-                prev_d = d
-                prev_k = k
-                first = False
-                continue
-            try:
-                if exist and prev_k in d:
-                    prev_d = d
-                    d = d[prev_k]
-                else:
-                    exist = False
-                    new = {}
-                    d[prev_k] = new
-                    d = new
-            except TypeError:
-                exist = False
-                d = {}
-                if not _replace_parent_with_dict(prev_d, prev_k2, prev_k, d):
-                    return
-
-            prev_k2 = prev_k
-            prev_k = k
-    except TypeError:
-        return
-
-    try:
-        d.setdefault(prev_k, value)
-    except AttributeError:
-        _replace_parent_with_dict(prev_d, prev_k2, prev_k, value)
-        return
-    else:
-        return
+    path = _mapping_path(keys)
+    current = d
+    for key in path[:-1]:
+        child = current.get(key)
+        if not isinstance(child, dict):
+            child = {}
+            current[key] = child
+        current = child
+    current.setdefault(path[-1], value)
 
 
-def deep_pop(d, keys, default=None):
+@overload
+def deep_pop(d: MutableDeepValue, keys: DeepPath) -> MutableDeepValue | None: ...
+
+
+@overload
+def deep_pop[T: MutableDeepValue](d: MutableDeepValue, keys: DeepPath, default: T) -> MutableDeepValue | T: ...
+
+
+def deep_pop[T: MutableDeepValue](
+    d: MutableDeepValue,
+    keys: DeepPath,
+    default: T | None = None,
+) -> MutableDeepValue | T | None:
     """从嵌套字典或列表弹出路径末项；路径无效时返回 default。"""
-    if type(keys) is str:
-        keys = keys.split(".")
-
+    normalized_keys: Sequence[DeepKey] = keys.split(".") if type(keys) is str else keys
+    current = d
     try:
-        for k in keys[:-1]:
-            d = d[k]
-        # 不传 pop 默认值，才能同时支持列表索引。
-        return d.pop(keys[-1])
-    except KeyError:
+        for key in normalized_keys[:-1]:
+            if isinstance(current, dict) and isinstance(key, str):
+                mapping = current
+                current = mapping[key]
+                continue
+            if isinstance(current, list) and isinstance(key, int):
+                sequence = current
+                current = sequence[key]
+                continue
+            return default
+        last_key = normalized_keys[-1]
+        if isinstance(current, dict) and isinstance(last_key, str):
+            return current.pop(last_key)
+        if isinstance(current, list) and isinstance(last_key, int):
+            return current.pop(last_key)
+    except KeyError, IndexError:
         return default
-    except TypeError:
-        return default
-    except IndexError:
-        return default
-    except AttributeError:
-        return default
+    return default
 
 
-def deep_iter_depth1(data):
+def deep_iter_depth1(data: SupportsItems | DeepValue) -> Iterator[tuple[str, DeepValue]]:
     """产出一层字典的 (key, value)；非映射输入不产出内容。"""
-    try:
+    if isinstance(data, SupportsItems):
         yield from data.items()
-    except AttributeError:
-        return
-    else:
-        return
 
 
-def deep_iter_depth2(data):
+def deep_iter_depth2(data: SupportsItems | DeepValue) -> Iterator[tuple[str, str, DeepValue]]:
     """产出二层字典的 (key1, key2, value)；非映射输入不产出内容。"""
-    try:
-        for k1, v1 in data.items():
-            if type(v1) is dict:
-                for k2, v2 in v1.items():
-                    yield k1, k2, v2
-    except AttributeError:
+    if not isinstance(data, SupportsItems):
         return
+    for k1, v1 in data.items():
+        if type(v1) is dict:
+            mapping = cast("dict[str, DeepValue]", v1)
+            for k2, v2 in mapping.items():
+                yield k1, k2, v2
 
 
-def deep_iter(data, min_depth=None, depth=3):
+def deep_iter(
+    data: SupportsItems | DeepValue,
+    min_depth: int | None = None,
+    depth: int = 3,
+) -> Iterator[tuple[list[str], DeepValue]]:
     """广度遍历嵌套字典，产出 min_depth 到 depth 的 (键路径, 值)。
 
     仅深入 dict；深度范围不满足 `1 <= min_depth <= depth` 时抛出 ValueError。
@@ -213,21 +184,21 @@ def deep_iter(data, min_depth=None, depth=3):
         min_depth = depth
     _validate_depth_range(min_depth, depth)
 
-    try:
-        queue = deque([([], data.items())])
-    except AttributeError:
+    if not isinstance(data, SupportsItems):
         return
+    queue: deque[tuple[list[str], Iterable[tuple[str, DeepValue]]]] = deque([([], data.items())])
 
     current = 1
     while current <= depth:
-        new_queue = deque()
+        new_queue: deque[tuple[list[str], Iterable[tuple[str, DeepValue]]]] = deque()
         for key, items in queue:
             for k, v in items:
                 subkey = [*key, k]
                 if current == depth:
                     yield subkey, v
                 elif type(v) is dict:
-                    new_queue.append((subkey, v.items()))
+                    mapping = cast("dict[str, DeepValue]", v)
+                    new_queue.append((subkey, mapping.items()))
                 elif current >= min_depth:
                     yield subkey, v
         queue = new_queue

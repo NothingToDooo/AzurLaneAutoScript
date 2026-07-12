@@ -76,7 +76,7 @@ road_mystery = RoadGrids([[C4, D5], D4, G2, [G1, H2]])
 
 
 class Config:
-    FLEET_BOSS = 1
+    fleet_boss = 1
     MAP_MYSTERY_HAS_CARRIER = True
 
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 40
@@ -89,7 +89,7 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.fleet_2_step_on(step_on, roadblocks=[road_boss]):
             return True
 
@@ -105,7 +105,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_4(self):
+    def battle_4(self) -> bool:
         self.clear_all_mystery()
 
         boss = self.map.select(is_boss=True)

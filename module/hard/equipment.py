@@ -4,7 +4,7 @@ from module.map.assets import FLEET_PREPARATION
 
 
 class HardEquipment(EquipmentChange):
-    def equipment_take_on(self):
+    def equipment_take_on(self) -> bool:
         if self.config.FLEET_HARD_EQUIPMENT is None:
             return False
         if self.equipment_has_take_on:
@@ -16,7 +16,7 @@ class HardEquipment(EquipmentChange):
         )
         return True
 
-    def equipment_take_off(self):
+    def equipment_take_off(self) -> bool:
         if self.config.FLEET_HARD_EQUIPMENT is None:
             return False
         if not self.equipment_has_take_on:

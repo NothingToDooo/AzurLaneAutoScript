@@ -67,8 +67,7 @@ class ReplayDevice:
         self._next_action_index = 0
         return image
 
-    # 与真实 Device 保持位置参数兼容，回放对象才能直接注入现有流程。
-    def click(self, button: object, control_check: bool = True) -> None:  # noqa: FBT001
+    def click(self, button: object, *, control_check: bool = True) -> None:
         del control_check
         target = str(button)
         expected = self._next_expected_action(actual=f"click {target!r}")
@@ -76,14 +75,14 @@ class ReplayDevice:
             self._raise_action_mismatch(expected=expected, actual=f"click {target!r}")
         self._next_action_index += 1
 
-    # 与真实 Device 保持位置参数兼容，包括 Scroll 使用的可选参数。
     def swipe(
         self,
         p1: PointInput,
         p2: PointInput,
         duration: float | tuple[float, float] = (0.1, 0.2),
         name: str = "SWIPE",
-        distance_check: bool = True,  # noqa: FBT001
+        *,
+        distance_check: bool = True,
     ) -> None:
         del duration, name
         normalized_start = _normalize_point(p1, field_name="p1")

@@ -13,7 +13,7 @@ from module.meowfficer.base import MeowfficerBase
 
 
 class MeowfficerFort(MeowfficerBase):
-    def meow_chores(self, skip_first_screenshot=True):
+    def meow_chores(self, *, skip_first_screenshot: bool = True) -> None:
         """在猫窝页循环完成杂务并领取经验。"""
         self.interval_clear(GET_ITEMS_1)
         check_timer = Timer(1, count=2)
@@ -55,7 +55,7 @@ class MeowfficerFort(MeowfficerBase):
             else:
                 confirm_timer.reset()
 
-    def meow_fort(self):
+    def meow_fort(self) -> bool:
         """在指挥喵主页处理对所有指挥喵生效的猫窝杂务。"""
         if not self.appear(MEOWFFICER_FORT_RED_DOT):
             return False

@@ -53,7 +53,7 @@ _ENEMY_CLEAR_PRIORITY = (
 )
 
 
-def clear_event_priority_enemy(campaign, include_scale_1=False):
+def clear_event_priority_enemy(campaign: CampaignBase, *, include_scale_1: bool = False) -> bool:
     if include_scale_1 and campaign.clear_enemy(scale=(1,)):
         return True
 
@@ -180,7 +180,7 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.clear_siren():
             return True
         if clear_event_priority_enemy(self, include_scale_1=True):
@@ -188,5 +188,5 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         return self.fleet_boss.clear_boss()

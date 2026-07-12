@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from random import choice
+from typing import TYPE_CHECKING, Literal
 
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1
@@ -9,7 +10,22 @@ from module.ocr.ocr import DigitCounter
 from module.retire import assets as retire_assets
 from module.retire.dock import Dock
 
-VALID_SHIP_TYPES = ["dd", "ss", "cl", "ca", "bb", "cv", "repair", "others"]
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+type EnhanceShipType = Literal["dd", "ss", "cl", "ca", "bb", "cv", "repair", "others"]
+type EnhanceState = Literal[
+    "state_enhance_check",
+    "state_enhance_ready",
+    "state_enhance_recommend",
+    "state_enhance_attempt",
+    "state_enhance_confirm",
+    "state_enhance_fail",
+    "state_enhance_success",
+    "state_enhance_exit",
+]
+
+VALID_SHIP_TYPES: tuple[EnhanceShipType, ...] = ("dd", "ss", "cl", "ca", "bb", "cv", "repair", "others")
 OCR_DOCK_AMOUNT = DigitCounter(retire_assets.DOCK_AMOUNT, letter=(255, 255, 255), threshold=192)
 TOO_MANY_ENHANCE_STATE_TRANSITIONS_MESSAGE = "Too many state transitions"
 UNKNOWN_ENHANCE_STATE_FUNCTION_TEMPLATE = "Unknown state function: {state}"
@@ -19,12 +35,15 @@ UNKNOWN_ENHANCE_STATE_FUNCTION_TEMPLATE = "Unknown state function: {state}"
 class _EnhanceChooseContext:
     ship_count: int
     need_to_skip: bool = False
-    state_list: list[str] = field(default_factory=list)
+    state_list: list[EnhanceState] = field(default_factory=list)
+
+
+type EnhanceStateHandler = Callable[[_EnhanceChooseContext], EnhanceState | bool]
 
 
 class Enhancement(Dock):
     @property
-    def _retire_amount(self):
+    def _retire_amount(self) -> int:
         if self.config.Retirement_RetireMode == "one_click_retire":
             return 3000
         if self.config.Retirement_RetireMode == "old_retire":
@@ -34,13 +53,17 @@ class Enhancement(Dock):
                 return 10
         return 3000
 
-    def _enhance_enter(self, favourite=False, ship_type=None):
+    def _enhance_enter(
+        self,
+        *,
+        favourite: bool = False,
+        ship_type: EnhanceShipType | None = None,
+    ) -> bool:
         """从船坞进入强化页；筛选后无可用舰船时返回 False。"""
         if favourite:
             self.dock_favourite_set(enable=True, wait_loading=False)
 
         if ship_type is not None:
-            ship_type = str(ship_type)
             self.dock_filter_set(extra="enhanceable", index=ship_type)
         else:
             self.dock_filter_set(extra="enhanceable")
@@ -50,13 +73,13 @@ class Enhancement(Dock):
 
         return self.dock_enter_first()
 
-    def _enhance_quit(self):
+    def _enhance_quit(self) -> None:
         """从强化页返回船坞，并重置收藏与筛选状态。"""
         self.ui_back(retire_assets.DOCK_CHECK)
         self.dock_favourite_set(enable=False, wait_loading=False)
         self.dock_filter_set()
 
-    def _enhance_confirm(self, skip_first_screenshot=True):
+    def _enhance_confirm(self, *, skip_first_screenshot: bool = True) -> None:
         """确认强化并等待信息栏消失，结束于强化页。"""
         confirm_timer = Timer(1.5, count=3).start()
         while 1:
@@ -84,7 +107,7 @@ class Enhancement(Dock):
             else:
                 confirm_timer.reset()
 
-    def _enhance_state_check(self, context):
+    def _enhance_state_check(self, context: _EnhanceChooseContext) -> EnhanceState:
         # 检查基础条件，能继续强化时进入 ready。
         context.need_to_skip = False
         if context.ship_count <= 0:
@@ -96,7 +119,7 @@ class Enhancement(Dock):
         self.wait_until_appear(retire_assets.ENHANCE_RECOMMEND, offset=(5, 5), skip_first_screenshot=True)
         return "state_enhance_ready"
 
-    def _enhance_state_ready(self, _context):
+    def _enhance_state_ready(self, _context: _EnhanceChooseContext) -> EnhanceState:
         # 等待推荐强化按钮出现。
         if self.appear_then_click(retire_assets.ENHANCE_RECOMMEND, offset=(5, 5), interval=0.3):
             logger.info("Set enhancement material by recommendation.")
@@ -104,7 +127,7 @@ class Enhancement(Dock):
 
         return "state_enhance_ready"
 
-    def _enhance_state_recommend(self, _context):
+    def _enhance_state_recommend(self, _context: _EnhanceChooseContext) -> EnhanceState:
         # 判断强化素材是否已经放入槽位。
         if not retire_assets.EMPTY_ENHANCE_SLOT_PLUS.match(self.device.image):
             logger.info("Material found. Try enhancing...")
@@ -116,7 +139,7 @@ class Enhancement(Dock):
 
         return "state_enhance_ready"
 
-    def _enhance_state_attempt(self, _context):
+    def _enhance_state_attempt(self, _context: _EnhanceChooseContext) -> EnhanceState:
         # 等待强化确认按钮出现。
         if (
             self.appear_then_click(retire_assets.ENHANCE_CONFIRM, offset=(5, 5), interval=0.3)
@@ -128,7 +151,7 @@ class Enhancement(Dock):
 
         return "state_enhance_attempt"
 
-    def _enhance_state_confirm(self, context):
+    def _enhance_state_confirm(self, context: _EnhanceChooseContext) -> EnhanceState:
         # 出现确认弹窗表示强化成功，否则视为失败。
         if self.appear(retire_assets.EQUIP_CONFIRM, offset=(30, 30)):
             logger.info("Enhancement Successful")
@@ -144,7 +167,7 @@ class Enhancement(Dock):
 
         return "state_enhance_attempt"
 
-    def _enhance_state_fail(self, context):
+    def _enhance_state_fail(self, context: _EnhanceChooseContext) -> EnhanceState:
         # 避免断网导致误判。
         if self.appear(retire_assets.EQUIP_CONFIRM, offset=(30, 30)):
             return "state_enhance_confirm"
@@ -161,14 +184,14 @@ class Enhancement(Dock):
         return "state_enhance_exit"
 
     @staticmethod
-    def _enhance_state_success(_context):
+    def _enhance_state_success(_context: _EnhanceChooseContext) -> bool:
         return True
 
     @staticmethod
-    def _enhance_state_exit(_context):
+    def _enhance_state_exit(_context: _EnhanceChooseContext) -> bool:
         return False
 
-    def _enhance_state_handlers(self):
+    def _enhance_state_handlers(self) -> dict[EnhanceState, EnhanceStateHandler]:
         return {
             "state_enhance_check": self._enhance_state_check,
             "state_enhance_ready": self._enhance_state_ready,
@@ -180,7 +203,7 @@ class Enhancement(Dock):
             "state_enhance_exit": self._enhance_state_exit,
         }
 
-    def _clear_enhance_state_click_record(self, state_list):
+    def _clear_enhance_state_click_record(self, state_list: list[EnhanceState]) -> None:
         if state_list[-2:] == ["state_enhance_recommend", "state_enhance_fail"]:
             names = ["ENHANCE_RECOMMEND", "SHIP_SWIPE"]
         elif state_list[-3:] == ["state_enhance_attempt", "state_enhance_confirm", "state_enhance_fail"]:
@@ -194,14 +217,18 @@ class Enhancement(Dock):
         state_list.clear()
 
     @staticmethod
-    def _check_enhance_state_loop(state_list):
+    def _check_enhance_state_loop(state_list: list[EnhanceState]) -> None:
         if len(state_list) <= 30:
             return
         logger.critical(f"Too many state transitions: {state_list}")
         raise GameStuckError(TOO_MANY_ENHANCE_STATE_TRANSITIONS_MESSAGE)
 
     @staticmethod
-    def _run_enhance_state(handlers, state, context):
+    def _run_enhance_state(
+        handlers: dict[EnhanceState, EnhanceStateHandler],
+        state: EnhanceState,
+        context: _EnhanceChooseContext,
+    ) -> EnhanceState | bool:
         try:
             handler = handlers[state]
         except KeyError as e:
@@ -210,12 +237,12 @@ class Enhancement(Dock):
             raise ScriptError(message) from e
         return handler(context)
 
-    def _enhance_choose(self, ship_count, skip_first_screenshot=True):
+    def _enhance_choose(self, ship_count: int, *, skip_first_screenshot: bool = True) -> tuple[bool, int]:
         """在强化页按页面状态推进；ship_count 必须为正整数，返回状态和剩余数量。"""
         context = _EnhanceChooseContext(ship_count=ship_count)
         handlers = self._enhance_state_handlers()
-        state = "state_enhance_check"
-        while isinstance(state, str):
+        state: EnhanceState = "state_enhance_check"
+        while True:
             if skip_first_screenshot:
                 skip_first_screenshot = False
             else:
@@ -226,11 +253,12 @@ class Enhancement(Dock):
                 self._clear_enhance_state_click_record(context.state_list)
             context.state_list.append(state)
             self._check_enhance_state_loop(context.state_list)
-            state = self._run_enhance_state(handlers, state, context)
+            result = self._run_enhance_state(handlers, state, context)
+            if isinstance(result, bool):
+                return result, context.ship_count
+            state = result
 
-        return state, context.ship_count
-
-    def enhance_ships(self, favourite=None):
+    def enhance_ships(self, *, favourite: bool | None = None) -> int:
         """按配置顺序强化并返回已消耗的素材舰船总数；无效舰种会随机选择，结束于船坞页。"""
         if favourite is None:
             favourite = self.config.Enhance_ShipToEnhance == "favourite"
@@ -252,7 +280,7 @@ class Enhancement(Dock):
         self._enhance_quit()
         return total
 
-    def _enhance_ship_types(self):
+    def _enhance_ship_types(self) -> list[str | None]:
         if self.config.Enhance_Filter is None:
             return [None]
 
@@ -263,17 +291,24 @@ class Enhancement(Dock):
         return ship_types
 
     @staticmethod
-    def _available_enhance_ship_types(ship_types):
-        available_ship_types = VALID_SHIP_TYPES.copy()
+    def _available_enhance_ship_types(ship_types: list[str | None]) -> list[EnhanceShipType]:
+        available_ship_types = list(VALID_SHIP_TYPES)
         for ship_type in ship_types:
-            if ship_type in available_ship_types:
-                available_ship_types.remove(ship_type)
+            for available_ship_type in available_ship_types:
+                if ship_type == available_ship_type:
+                    available_ship_types.remove(available_ship_type)
+                    break
         return available_ship_types
 
     @staticmethod
-    def _resolve_enhance_ship_type(requested_ship_type, available_ship_types):
-        if requested_ship_type is None or requested_ship_type in VALID_SHIP_TYPES:
-            return requested_ship_type
+    def _resolve_enhance_ship_type(
+        requested_ship_type: str | None,
+        available_ship_types: list[EnhanceShipType],
+    ) -> EnhanceShipType | Literal[False] | None:
+        if requested_ship_type is None:
+            return None
+        if requested_ship_type in VALID_SHIP_TYPES:
+            return VALID_SHIP_TYPES[VALID_SHIP_TYPES.index(requested_ship_type)]
         if not available_ship_types:
             logger.info("No more ship types for ALAS to choose from, skipping iteration")
             return False
@@ -282,7 +317,13 @@ class Enhancement(Dock):
         available_ship_types.remove(ship_type)
         return ship_type
 
-    def _enhance_ship_type(self, favourite, ship_type, total):
+    def _enhance_ship_type(
+        self,
+        ship_type: EnhanceShipType | None,
+        total: int,
+        *,
+        favourite: bool,
+    ) -> int:
         logger.info(f"Favourite={favourite}, Ship Type={ship_type}")
 
         if not self._enhance_enter(favourite=favourite, ship_type=ship_type):
@@ -301,10 +342,10 @@ class Enhancement(Dock):
         self.ui_back(retire_assets.DOCK_CHECK)
         return enhanced
 
-    def _enhance_handler(self):
+    def _enhance_handler(self) -> tuple[int, int]:
         """处理船坞已满时的强化，返回已消耗的强化素材舰船数和剩余船坞容量。"""
         total = self.enhance_ships()
-        _, remain, _ = OCR_DOCK_AMOUNT.ocr(self.device.image)
+        _, remain, _ = OCR_DOCK_AMOUNT.ocr_single(self.device.image)
 
         self.dock_quit()
         self.config.DOCK_FULL_TRIGGERED = True

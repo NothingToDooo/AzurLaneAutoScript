@@ -1,7 +1,34 @@
+from typing import TypedDict, Unpack
+
 from module.map_detection.grid_info import GridInfo
 
 
-def _grid(**kwargs):
+class _GridOverrides(TypedDict, total=False):
+    is_land: bool
+    is_submarine_spawn_point: bool
+    may_enemy: bool
+    may_boss: bool
+    may_mystery: bool
+    may_ammo: bool
+    may_siren: bool
+    is_enemy: bool
+    is_boss: bool
+    is_mystery: bool
+    is_ammo: bool
+    is_fleet: bool
+    is_current_fleet: bool
+    is_submarine: bool
+    is_siren: bool
+    enemy_scale: int
+    enemy_genre: str | None
+    is_cleared: bool
+    is_caught_by_siren: bool
+    is_movable: bool
+    is_fortress: bool
+    is_missile_attack: bool
+
+
+def _grid(**kwargs: Unpack[_GridOverrides]) -> GridInfo:
     grid = GridInfo()
     for key, value in kwargs.items():
         setattr(grid, key, value)

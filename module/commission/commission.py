@@ -1,5 +1,6 @@
 import copy
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 from scipy import signal
@@ -25,6 +26,13 @@ from module.ui.switch import Switch
 from module.ui.ui import UI
 from module.ui_white.assets import REWARD_1_WHITE, REWARD_GOTO_COMMISSION_WHITE
 
+if TYPE_CHECKING:
+    from module.base.button import Button
+    from module.base.type_alias import Area, ImageArray
+
+type CommissionChoice = Commission | str
+type CommissionMode = Literal["daily", "urgent"]
+
 COMMISSION_SWITCH = Switch("Commission_switch", is_selector=True)
 COMMISSION_SWITCH.add_state("daily", commission_assets.COMMISSION_DAILY)
 COMMISSION_SWITCH.add_state("urgent", commission_assets.COMMISSION_URGENT)
@@ -32,28 +40,27 @@ COMMISSION_SCROLL = Scroll(commission_assets.COMMISSION_SCROLL_AREA, color=(247,
 COMMISSION_ADVICE_FLASHING_BUG_MESSAGE = "Triggered commission list flashing bug"
 
 
-def lines_detect(image):
+def lines_detect(image: ImageArray) -> list[int]:
     """在 (597, 0, 619, 720) 白线区域返回各委托底边的 Y 坐标。"""
     color_height = np.mean(rgb2gray(crop(image, (597, 0, 619, 720), copy=False)), axis=1)
     parameters = {"height": 200, "distance": 100}
     peaks, _ = signal.find_peaks(color_height, **parameters)
     # 67 是委托列表头部高度。
     # 117 是单个委托卡片高度。
-    peaks = [y for y in peaks if y > 67 + 117]
-    return np.array(peaks)
+    return [int(y) for y in peaks if y > 67 + 117]
 
 
 class RewardCommission(UI, InfoHandler):
-    daily: SelectedGrids
-    urgent: SelectedGrids
-    daily_choose: SelectedGrids
-    urgent_choose: SelectedGrids
-    comm_choose: SelectedGrids
+    daily: SelectedGrids[Commission]
+    urgent: SelectedGrids[Commission]
+    daily_choose: SelectedGrids[Commission]
+    urgent_choose: SelectedGrids[Commission]
+    comm_choose: SelectedGrids[Commission]
     max_commission = 4
 
-    def _commission_detect(self, image):
+    def _commission_detect(self, image: ImageArray) -> SelectedGrids[Commission]:
         logger.hr("Commission detect")
-        commission = []
+        commission: list[Commission] = []
         for y in lines_detect(image):
             comm = Commission(image, y=y, config=self.config)
             logger.attr("Commission", comm)
@@ -63,7 +70,13 @@ class RewardCommission(UI, InfoHandler):
 
         return SelectedGrids(commission)
 
-    def commission_detect(self, trial=1, area=None, skip_first_screenshot=True):
+    def commission_detect(
+        self,
+        trial: int = 1,
+        area: Area | None = None,
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> SelectedGrids[Commission]:
         """检测委托；仅一个条目无效时按 trial 重试，通常是 info_bar 残影所致。"""
         commissions = SelectedGrids([])
         for _ in range(trial):
@@ -85,7 +98,11 @@ class RewardCommission(UI, InfoHandler):
         logger.info("trials of commission detect exhausted, stop")
         return commissions
 
-    def _commission_choose(self, daily, urgent):
+    def _commission_choose(
+        self,
+        daily: SelectedGrids[Commission],
+        urgent: SelectedGrids[Commission],
+    ) -> tuple[SelectedGrids[Commission], SelectedGrids[Commission]]:
         """返回本轮选择的日常委托和紧急委托。"""
         self.comm_choose = SelectedGrids([])
         total = self._commission_merge_candidates(daily, urgent)
@@ -95,14 +112,18 @@ class RewardCommission(UI, InfoHandler):
         preset, string = self._commission_filter_string()
         run = self._commission_apply_filter(total, preset=preset, string=string)
         run = self._commission_fill_shortest(run, daily=daily, running_count=running_count)
-        self.comm_choose = run
+        self.comm_choose = SelectedGrids(choice for choice in run if not isinstance(choice, str))
 
         if running_count >= self.max_commission:
             return SelectedGrids([]), SelectedGrids([])
 
         return self._commission_split_choices(run, daily=daily, urgent=urgent, running_count=running_count)
 
-    def _commission_merge_candidates(self, daily, urgent):
+    def _commission_merge_candidates(
+        self,
+        daily: SelectedGrids[Commission],
+        urgent: SelectedGrids[Commission],
+    ) -> SelectedGrids[Commission]:
         total = daily.add_by_eq(urgent)
         # 后缀更大的委托总是在后缀更小的委托下方，反转后优先选择高后缀委托。
         total = total[::-1]
@@ -110,10 +131,10 @@ class RewardCommission(UI, InfoHandler):
         return total
 
     @staticmethod
-    def _commission_running_count(total) -> int:
+    def _commission_running_count(total: SelectedGrids[Commission]) -> int:
         return sum(1 for comm in total if comm.status == "running")
 
-    def _commission_filter_string(self):
+    def _commission_filter_string(self) -> tuple[str, str]:
         preset = self.config.Commission_PresetFilter
         if preset == "custom":
             return preset, self.config.Commission_CustomFilter
@@ -122,7 +143,7 @@ class RewardCommission(UI, InfoHandler):
         return preset, DICT_FILTER_PRESET[preset]
 
     @staticmethod
-    def _commission_resolve_filter_preset(preset):
+    def _commission_resolve_filter_preset(preset: str) -> str:
         if f"{preset}_night" in DICT_FILTER_PRESET:
             start_time = get_server_last_update("02:00")
             end_time = get_server_last_update("21:00")
@@ -134,15 +155,27 @@ class RewardCommission(UI, InfoHandler):
         logger.warning(f"Preset not found: {preset}, use default preset")
         return GeneratedConfig.Commission_PresetFilter
 
-    def _commission_apply_filter(self, total, *, preset: str, string: str):
+    def _commission_apply_filter(
+        self,
+        total: SelectedGrids[Commission],
+        *,
+        preset: str,
+        string: str,
+    ) -> SelectedGrids[CommissionChoice]:
         logger.attr("Commission Filter", preset)
         COMMISSION_FILTER.load(string)
         run = COMMISSION_FILTER.apply(total.grids, func=self._commission_check)
         logger.attr("Filter_sort", " > ".join([str(c) for c in run]))
         return SelectedGrids(run)
 
-    def _commission_fill_shortest(self, run, *, daily, running_count: int):
-        no_shortest = run.delete(SelectedGrids(["shortest"]))
+    def _commission_fill_shortest(
+        self,
+        run: SelectedGrids[CommissionChoice],
+        *,
+        daily: SelectedGrids[Commission],
+        running_count: int,
+    ) -> SelectedGrids[CommissionChoice]:
+        no_shortest = run.delete(SelectedGrids[CommissionChoice](["shortest"]))
         if no_shortest.count + running_count >= self.max_commission:
             return run
         if not daily.count:
@@ -157,16 +190,24 @@ class RewardCommission(UI, InfoHandler):
         logger.attr("Filter_sort", " > ".join([str(c) for c in run]))
         return run
 
-    def _commission_split_choices(self, run, *, daily, urgent, running_count: int):
+    def _commission_split_choices(
+        self,
+        run: SelectedGrids[CommissionChoice],
+        *,
+        daily: SelectedGrids[Commission],
+        urgent: SelectedGrids[Commission],
+        running_count: int,
+    ) -> tuple[SelectedGrids[Commission], SelectedGrids[Commission]]:
         run = run[: self.max_commission - running_count]
-        daily_choose = run.intersect_by_eq(daily)
-        urgent_choose = run.intersect_by_eq(urgent)
+        commissions = SelectedGrids(choice for choice in run if not isinstance(choice, str))
+        daily_choose = commissions.intersect_by_eq(daily)
+        urgent_choose = commissions.intersect_by_eq(urgent)
         self._log_commission_choices("daily", daily_choose)
         self._log_commission_choices("urgent", urgent_choose)
         return daily_choose, urgent_choose
 
     @staticmethod
-    def _log_commission_choices(name: str, choices) -> None:
+    def _log_commission_choices(name: CommissionMode, choices: SelectedGrids[Commission]) -> None:
         if not choices:
             return
 
@@ -174,14 +215,14 @@ class RewardCommission(UI, InfoHandler):
         for comm in choices:
             logger.info(comm)
 
-    def _commission_check(self, commission):
+    def _commission_check(self, commission: Commission) -> bool:
         return (
             commission.valid
             and commission.status == "pending"
             and (self.config.Commission_DoMajorCommission or commission.category_str != "major")
         )
 
-    def _commission_ensure_mode(self, mode):
+    def _commission_ensure_mode(self, mode: CommissionMode) -> bool:
         if COMMISSION_SWITCH.set(mode, main=self):
             # 日常委托超过 4 个时通常会有 5 个，紧急委托则是 1 到 4 个。
             # 委托列表的滚动动画会导致最上方条目漏检。
@@ -206,7 +247,7 @@ class RewardCommission(UI, InfoHandler):
             return True
         return False
 
-    def _commission_mode_reset(self):
+    def _commission_mode_reset(self) -> bool:
         logger.hr("Commission mode reset")
         if self.appear(commission_assets.COMMISSION_DAILY):
             current, another = "daily", "urgent"
@@ -221,7 +262,7 @@ class RewardCommission(UI, InfoHandler):
 
         return True
 
-    def _commission_swipe(self):
+    def _commission_swipe(self) -> bool:
         if COMMISSION_SCROLL.appear(main=self):
             if COMMISSION_SCROLL.at_bottom(main=self):
                 return False
@@ -229,13 +270,13 @@ class RewardCommission(UI, InfoHandler):
             return True
         return False
 
-    def _commission_swipe_to_top(self):
+    def _commission_swipe_to_top(self) -> bool:
         if not COMMISSION_SCROLL.appear(main=self):
             return False
         COMMISSION_SCROLL.set_top(main=self, skip_first_screenshot=True)
         return True
 
-    def _commission_scan_list(self):
+    def _commission_scan_list(self) -> SelectedGrids[Commission]:
         self.device.click_record_clear()
         commission = SelectedGrids([])
         for _ in range(15):
@@ -248,7 +289,7 @@ class RewardCommission(UI, InfoHandler):
         self.device.click_record_clear()
         return commission
 
-    def _commission_scan_all(self):
+    def _commission_scan_all(self) -> tuple[SelectedGrids[Commission], SelectedGrids[Commission]]:
         """在委托页扫描日常与紧急列表，并计算本轮选择。"""
         logger.hr("Commission scan", level=1)
         # 紧急委托列表是懒加载的，先切过去强制刷新。
@@ -297,7 +338,13 @@ class RewardCommission(UI, InfoHandler):
         self.daily_choose, self.urgent_choose = self._commission_choose(self.daily, self.urgent)
         return daily, urgent
 
-    def _commission_start_click(self, comm, is_urgent=False, skip_first_screenshot=True):
+    def _commission_start_click(
+        self,
+        comm: Commission,
+        *,
+        is_urgent: bool = False,
+        skip_first_screenshot: bool = True,
+    ) -> bool:
         """在委托页启动项目，成功后详情展开并出现 info_bar。"""
         logger.hr("Commission start")
         self.interval_clear(commission_assets.COMMISSION_ADVICE)
@@ -342,7 +389,7 @@ class RewardCommission(UI, InfoHandler):
         logger.warning(COMMISSION_ADVICE_FLASHING_BUG_MESSAGE)
         raise GameStuckError(COMMISSION_ADVICE_FLASHING_BUG_MESSAGE)
 
-    def _handle_commission_start_button(self, comm_timer) -> bool:
+    def _handle_commission_start_button(self, comm_timer: Timer) -> bool:
         if self.match_template_color(commission_assets.COMMISSION_START, offset=(5, 20), interval=7):
             self.device.click(commission_assets.COMMISSION_START)
             self.interval_reset(commission_assets.COMMISSION_ADVICE)
@@ -354,7 +401,7 @@ class RewardCommission(UI, InfoHandler):
             return True
         return False
 
-    def _handle_commission_dock_back(self, comm_timer) -> bool:
+    def _handle_commission_dock_back(self, comm_timer: Timer) -> bool:
         if not self.appear(DOCK_CHECK, offset=(20, 20), interval=3):
             return False
 
@@ -363,7 +410,13 @@ class RewardCommission(UI, InfoHandler):
         comm_timer.reset()
         return True
 
-    def _handle_commission_advice(self, comm, *, is_urgent: bool, comm_timer) -> bool | None:
+    def _handle_commission_advice(
+        self,
+        comm: Commission,
+        *,
+        is_urgent: bool,
+        comm_timer: Timer,
+    ) -> bool | None:
         if not self.appear(commission_assets.COMMISSION_ADVICE, offset=(5, 20), interval=7):
             return None
 
@@ -376,7 +429,7 @@ class RewardCommission(UI, InfoHandler):
         comm_timer.reset()
         return True
 
-    def _commission_advice_matches(self, comm, *, is_urgent: bool) -> bool:
+    def _commission_advice_matches(self, comm: Commission, *, is_urgent: bool) -> bool:
         area = (0, 0, image_size(self.device.image)[0], commission_assets.COMMISSION_ADVICE.button[1])
         current = self.commission_detect(area=area)
         if is_urgent:
@@ -393,7 +446,7 @@ class RewardCommission(UI, InfoHandler):
         logger.warning("Selected to the wrong commission")
         return False
 
-    def _handle_commission_entry(self, comm, comm_timer) -> bool:
+    def _handle_commission_entry(self, comm: Commission, comm_timer: Timer) -> bool:
         if not comm_timer.reached():
             return False
 
@@ -402,7 +455,7 @@ class RewardCommission(UI, InfoHandler):
         comm_timer.reset()
         return True
 
-    def _commission_find_and_start(self, comm, is_urgent=False):
+    def _commission_find_and_start(self, comm: Commission, *, is_urgent: bool = False) -> bool:
         self.device.click_record_clear()
         comm = copy.deepcopy(comm)
         comm.repeat_count = 1
@@ -448,7 +501,7 @@ class RewardCommission(UI, InfoHandler):
         self.device.click_record_clear()
         return False
 
-    def commission_start(self):
+    def commission_start(self) -> None:
         """在委托页扫描并启动全部选中委托。"""
         self._commission_scan_all()
 
@@ -472,7 +525,7 @@ class RewardCommission(UI, InfoHandler):
         if not self.daily_choose and not self.urgent_choose:
             logger.info("No commission chose")
 
-    def _commission_receive(self, skip_first_screenshot=True):
+    def _commission_receive(self, *, skip_first_screenshot: bool = True) -> bool:
         """从奖励页领取委托奖励并进入委托页，返回是否领到奖励。"""
         logger.hr("Reward receive")
 
@@ -517,7 +570,7 @@ class RewardCommission(UI, InfoHandler):
         # 留在委托页时，委托奖励可能弹出过慢，导致 UI 切换卡住。
         return self.ui_page_appear(page_commission, offset=(20, 20))
 
-    def _handle_commission_reward_save(self, click_timer) -> bool:
+    def _handle_commission_reward_save(self, click_timer: Timer) -> bool:
         for button in (
             commission_assets.EXP_INFO_S_REWARD,
             combat_assets.GET_ITEMS_1,
@@ -528,7 +581,7 @@ class RewardCommission(UI, InfoHandler):
                 return True
         return False
 
-    def _click_commission_reward_save(self, button, click_timer) -> bool:
+    def _click_commission_reward_save(self, button: Button, click_timer: Timer) -> bool:
         if not self.appear(button, interval=1):
             return False
 
@@ -537,7 +590,7 @@ class RewardCommission(UI, InfoHandler):
         click_timer.reset()
         return True
 
-    def _handle_commission_reward_buttons(self, click_timer) -> bool | None:
+    def _handle_commission_reward_buttons(self, click_timer: Timer) -> bool | None:
         if not click_timer.reached():
             return None
 
@@ -560,16 +613,16 @@ class RewardCommission(UI, InfoHandler):
         if self.config.SERVER == "cn" and self.appear(commission_assets.OIL_MAXED, offset=(20, 20), interval=3):
             raise OilMaxed
 
-    def _handle_commission_get_ship(self, click_timer) -> bool:
+    def _handle_commission_get_ship(self, click_timer: Timer) -> bool:
         if not click_timer.reached():
             return False
         # 最后检查 GET_SHIP，以处理主界面随机白底。
         return self._click_commission_reward_save(combat_assets.GET_SHIP, click_timer)
 
-    def _handle_commission_additional(self, click_timer) -> bool:
+    def _handle_commission_additional(self, click_timer: Timer) -> bool:
         return click_timer.reached() and self.ui_additional()
 
-    def commission_receive(self):
+    def commission_receive(self) -> bool:
         """领取委托奖励并返回是否领到；石油满时最多三次前往宿舍消耗后重试。"""
         for _ in range(3):
             try:
@@ -582,7 +635,7 @@ class RewardCommission(UI, InfoHandler):
         logger.critical("Failed to handle oil maxed after 3 trial")
         raise RequestHumanTakeover
 
-    def run(self):
+    def run(self) -> None:
         """从任意页面领取并启动委托，结束于委托页。"""
         self.ui_ensure(page_reward)
         self.commission_receive()

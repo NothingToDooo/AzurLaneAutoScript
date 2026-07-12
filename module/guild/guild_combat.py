@@ -1,9 +1,12 @@
+from typing import override
+
 from module.combat.combat import Combat
 from module.guild.assets import BATTLE_STATUS_CF, EXP_INFO_CF
 
 
 class GuildCombat(Combat):
-    def handle_battle_status(self):
+    @override
+    def handle_battle_status(self) -> bool:
         if self.is_combat_executing():
             return False
         if super().handle_battle_status():
@@ -15,13 +18,15 @@ class GuildCombat(Combat):
 
         return False
 
-    def handle_get_items(self):
+    @override
+    def handle_get_items(self) -> bool:
         if super().handle_get_items():
             self.interval_reset(BATTLE_STATUS_CF)
             return True
         return False
 
-    def handle_exp_info(self):
+    @override
+    def handle_exp_info(self) -> bool:
         if self.is_combat_executing():
             return False
         if super().handle_exp_info():

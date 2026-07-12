@@ -1,7 +1,7 @@
 import importlib
 import sys
 from types import ModuleType
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 import pytest
 
@@ -228,7 +228,13 @@ def test_generated_stage_yaml_is_accepted_by_native_loader(
     assert vars(loaded.config_class)["MAP_SIREN_TEMPLATE"] == ("SirenOne",)
 
 
-def _make_early_boss(stage, *, boss_battle: int = 4) -> None:
+class _EarlyBossStage(Protocol):
+    chapter_name: str
+    data: dict[str, int]
+    spawn_data: list[dict[str, int]]
+
+
+def _make_early_boss(stage: _EarlyBossStage, *, boss_battle: int = 4) -> None:
     stage.chapter_name = "T1"
     stage.data["boss_refresh"] = boss_battle
     stage.spawn_data = [{"battle": battle} for battle in range(boss_battle + 1)]
@@ -268,12 +274,12 @@ def test_early_boss_after_zero_keeps_only_clear_policy_before_strategy(
 
 
 class _EarlyBossStrategy(CampaignBase):
-    def battle_4(self):
+    def battle_4(self) -> bool:
         return self.clear_boss()
 
 
 class _BossZeroStrategy(CampaignBase):
-    def battle_0(self):
+    def battle_0(self) -> bool:
         return self.clear_boss()
 
 

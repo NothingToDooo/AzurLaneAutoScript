@@ -1,10 +1,13 @@
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 import pytest
 
 from module.handler.assets import LOGIN_ANNOUNCE
 from module.shipyard import ui as shipyard_ui
-from module.shipyard.ui import SHIPYARD_CONFIRM_BUTTONS, ShipyardUI
+from module.shipyard.ui import SHIPYARD_CONFIRM_BUTTONS, ShipyardMode, ShipyardUI
+
+if TYPE_CHECKING:
+    from module.base.button import Button
 
 
 class _Timer:
@@ -44,7 +47,7 @@ class _ShipyardUI(ShipyardUI):
     def __init__(self) -> None:
         self.device = _Device()
         self.calls: list[tuple[object, ...]] = []
-        self.append = "DEV"
+        self.append: ShipyardMode = "DEV"
         self.appear_then_click_results: dict[str, list[bool]] = {}
         self.popup_results: list[bool] = []
         self.story_results: list[bool] = []
@@ -55,15 +58,17 @@ class _ShipyardUI(ShipyardUI):
     def buy_confirm(self, text: str) -> None:
         self._shipyard_buy_confirm(text)
 
-    def _next_result[T](self, results: list[T], *, default: T) -> T:
+    @staticmethod
+    def _next_result[T](results: list[T], *, default: T) -> T:
         if results:
             return results.pop(0)
         return default
 
-    def _button_name(self, button: object) -> str:
+    @staticmethod
+    def _button_name(button: object) -> str:
         return getattr(button, "name", repr(button))
 
-    def _shipyard_get_append(self) -> str:
+    def _shipyard_get_append(self) -> ShipyardMode:
         self.calls.append(("_shipyard_get_append",))
         return self.append
 
@@ -78,7 +83,7 @@ class _ShipyardUI(ShipyardUI):
         self.calls.append(("appear_then_click", name, kwargs))
         return self._next_result(self.appear_then_click_results.get(name, []), default=False)
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+    def handle_popup_confirm(self, name: str = "", offset: object = None, interval: float = 2) -> bool:
         _ = (name, offset, interval)
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)
@@ -95,9 +100,10 @@ class _ShipyardUI(ShipyardUI):
         self.calls.append(("_shipyard_in_ui",))
         return self._next_result(self.in_ui_results, default=False)
 
-    def _shipyard_get_total(self) -> tuple[None, None, int]:
+    def _shipyard_get_total(self) -> tuple[Button, Button, int]:
         self.calls.append(("_shipyard_get_total",))
-        return None, None, self.total_results.pop(0)
+        button = SHIPYARD_CONFIRM_BUTTONS[self.append]
+        return button, button, self.total_results.pop(0)
 
 
 @pytest.fixture(autouse=True)

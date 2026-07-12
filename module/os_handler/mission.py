@@ -1,4 +1,5 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
+from typing import Literal
 
 import numpy as np
 
@@ -10,7 +11,7 @@ from module.map_detection.utils import fit_points
 from module.os.assets import GLOBE_GOTO_MAP
 from module.os.globe_detection import GLOBE_MAP_SHAPE
 from module.os.globe_operation import GlobeOperation
-from module.os.globe_zone import ZoneManager
+from module.os.globe_zone import Zone, ZoneManager
 from module.os_handler import assets as os_assets
 
 
@@ -18,10 +19,18 @@ class MissionAtCurrentZone(Exception):
     pass
 
 
+type MissionCheckoutResult = Literal[
+    False,
+    "pinned_at_archive_zone",
+    "pinned_at_mission_zone",
+    "already_at_mission_zone",
+]
+
+
 class MissionHandler(GlobeOperation, ZoneManager):
     _os_mission_submitted = False
 
-    def get_mission_zone(self):
+    def get_mission_zone(self) -> Zone:
         area = (341, 72, 1217, 648)
         # 黄色感叹号的像素点。
         image = color_similarity_2d(self.image_crop(area, copy=False), color=(255, 207, 66))
@@ -36,10 +45,10 @@ class MissionHandler(GlobeOperation, ZoneManager):
 
         return self.camera_to_zone(tuple(point))
 
-    def is_in_os_mission(self):
+    def is_in_os_mission(self) -> bool:
         return self.appear(os_assets.MISSION_CHECK, offset=(20, 20))
 
-    def os_mission_enter(self):
+    def os_mission_enter(self) -> None:
         """从 MISSION_ENTER 进入任务列表并领取奖励，结束于 MISSION_CHECK。"""
         logger.info("OS mission enter")
         confirm_timer = Timer(2, count=6).start()
@@ -49,7 +58,7 @@ class MissionHandler(GlobeOperation, ZoneManager):
             if self._os_mission_enter_step(confirm_timer):
                 continue
 
-    def _os_mission_enter_finished(self, confirm_timer):
+    def _os_mission_enter_finished(self, confirm_timer: Timer) -> bool:
         if not self.is_in_os_mission():
             confirm_timer.reset()
             return False
@@ -69,7 +78,7 @@ class MissionHandler(GlobeOperation, ZoneManager):
         confirm_timer.reset()
         return False
 
-    def _os_mission_enter_step(self, confirm_timer):
+    def _os_mission_enter_step(self, confirm_timer: Timer) -> bool:
         if self._os_mission_click_entry_buttons(confirm_timer):
             return True
         if self.handle_popup_confirm("MISSION_FINISH"):
@@ -84,7 +93,7 @@ class MissionHandler(GlobeOperation, ZoneManager):
             return True
         return False
 
-    def _os_mission_click_entry_buttons(self, confirm_timer):
+    def _os_mission_click_entry_buttons(self, confirm_timer: Timer) -> bool:
         for button, offset, interval in (
             (os_assets.MISSION_ENTER, (200, 5), 5),
             (os_assets.MISSION_FINISH, (20, 20), 2),
@@ -94,7 +103,7 @@ class MissionHandler(GlobeOperation, ZoneManager):
                 return True
         return False
 
-    def os_mission_quit(self):
+    def os_mission_quit(self) -> None:
         logger.info("OS mission quit")
         for _ in self.loop():
             # 部分任务弹窗没有黑色模糊背景，此时 MISSION_QUIT 和地图会同时出现。
@@ -103,7 +112,7 @@ class MissionHandler(GlobeOperation, ZoneManager):
             if self.appear_then_click(os_assets.MISSION_QUIT, offset=(20, 20), interval=3):
                 continue
 
-    def os_get_next_mission(self):
+    def os_get_next_mission(self) -> MissionCheckoutResult:
         """领取后游戏会直接切换至目标海域，已在目标海域时只显示信息栏。
 
         返回 pinned_at_mission_zone、already_at_mission_zone 或 pinned_at_archive_zone；
@@ -149,7 +158,7 @@ class MissionHandler(GlobeOperation, ZoneManager):
                 continue
         return False
 
-    def os_mission_overview_accept(self):
+    def os_mission_overview_accept(self) -> bool:
         """在区域地图领取任务总览中的全部任务；达到任务上限时返回 False。"""
         logger.hr("OS mission overview accept", level=1)
         self.os_map_goto_globe(unpin=False)
@@ -189,9 +198,11 @@ class MissionHandler(GlobeOperation, ZoneManager):
         self.os_globe_goto_map()
         return success
 
-    def is_in_opsi_explore(self):
+    def is_in_opsi_explore(self) -> bool:
         enable = self.config.is_task_enabled("OpsiExplore")
         next_run = self.config.cross_get(keys="OpsiExplore.Scheduler.NextRun", default=DEFAULT_TIME)
+        if not isinstance(next_run, datetime):
+            next_run = DEFAULT_TIME
         next_reset = get_os_next_reset()
         logger.attr("OpsiNextReset", next_reset)
         logger.attr("OpsiExplore", (enable, next_run))

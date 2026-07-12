@@ -1,5 +1,20 @@
+from typing import TYPE_CHECKING, override
+
+from module.base.button import Button
 from module.map import assets as map_assets
 from module.map.map_operation import MapOperation
+
+if TYPE_CHECKING:
+    from module.base.button import MatchOffset
+
+
+type _Call = (
+    tuple[str]
+    | tuple[str, str]
+    | tuple[str, bool, float]
+    | tuple[str, str, MatchOffset | None]
+    | tuple[str, str, MatchOffset, float]
+)
 
 
 class _Config:
@@ -9,23 +24,24 @@ class _Config:
 
 
 class _Device:
-    def __init__(self, calls):
+    def __init__(self, calls: list[_Call]) -> None:
         self.calls = calls
 
-    def click(self, button):
+    def click(self, button: Button) -> None:
         self.calls.append(("click", button.name))
 
 
 class _Timer:
-    def __init__(self, reached=False):
+    def __init__(self, *, reached: bool = False) -> None:
         self.is_reached = reached
         self.reset_count = 0
 
-    def reached(self):
+    def reached(self) -> bool:
         return self.is_reached
 
-    def reset(self):
+    def reset(self) -> _Timer:
         self.reset_count += 1
+        return self
 
 
 class _MapOperation(MapOperation):
@@ -35,8 +51,8 @@ class _MapOperation(MapOperation):
     map_clear_percentage: float
     map_clear_percentage_timer: _Timer
 
-    def __init__(self):
-        self.calls = []
+    def __init__(self) -> None:
+        self.calls: list[_Call] = []
         self.config = _Config()
         self.device = _Device(self.calls)
         self.normal_switch_visible = False
@@ -48,28 +64,61 @@ class _MapOperation(MapOperation):
         self.map_clear_percentage = 0
         self.map_clear_percentage_timer = _Timer()
 
-    def match_template_color(self, button, offset=(0, 0), interval=0, *_args: object, **_kwargs: object):
+    @override
+    def match_template_color(
+        self,
+        button: Button,
+        offset: MatchOffset = (20, 20),
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 30,
+    ) -> bool:
+        del similarity, threshold
         self.calls.append(("match_template_color", button.name, offset, interval))
         return self.normal_switch_visible
 
-    def _is_mod_switch_hard_appear(self, active=True, interval=0):
+    @override
+    def _is_mod_switch_hard_appear(self, *, active: bool = True, interval: float = 0) -> bool:
         self.calls.append(("hard_switch_appear", active, interval))
         if active:
             return self.hard_switch_active
         return self.hard_switch_visible
 
-    def interval_reset(self, button, *_args: object, **_kwargs: object):
-        self.calls.append(("interval_reset", button.name))
+    @override
+    def interval_reset(
+        self,
+        button: Button | list[Button] | tuple[Button, ...] | None,
+        interval: float = 3,
+    ) -> None:
+        del interval
+        if button is None:
+            return
+        if isinstance(button, Button):
+            self.calls.append(("interval_reset", button.name))
+            return
+        for item in button:
+            self.calls.append(("interval_reset", item.name))
 
-    def appear(self, button, offset=(0, 0), *_args: object, **_kwargs: object):
+    @override
+    def appear(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 10,
+    ) -> bool:
+        del interval, similarity, threshold
         self.calls.append(("appear", button.name, offset))
         return self.map_preparation_visible
 
-    def info_bar_count(self):
+    @override
+    def info_bar_count(self) -> int:
         self.calls.append(("info_bar_count",))
-        return self.info_bar_visible
+        return int(self.info_bar_visible)
 
-    def get_map_clear_percentage(self):
+    @override
+    def get_map_clear_percentage(self) -> float:
         self.calls.append(("get_map_clear_percentage",))
         return self.map_clear_percentage
 

@@ -20,12 +20,12 @@ class AmbushHandler(Combat):
     MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD = 0.35  # 实测通常为 0.50～0.53。
     MAP_AIR_RAID_CONFIRM_SECOND = 0.5
 
-    def ambush_color_initial(self):
+    def ambush_color_initial(self) -> None:
         handler_assets.MAP_AMBUSH.load_color(self.device.image)
         handler_assets.MAP_AIR_RAID.load_color(self.device.image)
 
-    def _ambush_appear(self):
-        return (
+    def _ambush_appear(self) -> bool:
+        return bool(
             red_overlay_transparency(
                 handler_assets.MAP_AMBUSH.color,
                 get_color(self.device.image, handler_assets.MAP_AMBUSH.area),
@@ -33,8 +33,8 @@ class AmbushHandler(Combat):
             > self.MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD
         )
 
-    def _air_raid_appear(self):
-        return (
+    def _air_raid_appear(self) -> bool:
+        return bool(
             red_overlay_transparency(
                 handler_assets.MAP_AIR_RAID.color,
                 get_color(self.device.image, handler_assets.MAP_AIR_RAID.area),
@@ -42,7 +42,7 @@ class AmbushHandler(Combat):
             > self.MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD
         )
 
-    def _handle_air_raid(self):
+    def _handle_air_raid(self) -> None:
         logger.info("Map air raid")
         disappear = Timer(self.MAP_AIR_RAID_CONFIRM_SECOND).start()
         timeout = Timer(2.5, count=2).start()
@@ -57,7 +57,7 @@ class AmbushHandler(Combat):
             elif disappear.reached():
                 break
 
-    def _handle_ambush_evade(self):
+    def _handle_ambush_evade(self) -> None:
         logger.info("Map ambushed")
         self.wait_until_appear(handler_assets.MAP_AMBUSH_EVADE, offset=(30, 30))
         self.handle_info_bar()
@@ -87,7 +87,7 @@ class AmbushHandler(Combat):
             if self.combat_appear():
                 self.combat(fleet_index=self.fleet_show_index)
 
-    def _handle_ambush_attack(self):
+    def _handle_ambush_attack(self) -> None:
         logger.info("Map ambushed")
         self.wait_until_appear(handler_assets.MAP_AMBUSH_ATTACK, offset=(30, 30))
 
@@ -111,12 +111,12 @@ class AmbushHandler(Combat):
         logger.attr("Ambush_evade", "attack")
         self.combat(expected_end="no_searching", fleet_index=self.fleet_show_index)
 
-    def _handle_ambush(self):
+    def _handle_ambush(self) -> None:
         if self.config.Campaign_AmbushEvade:
             return self._handle_ambush_evade()
         return self._handle_ambush_attack()
 
-    def handle_ambush(self):
+    def handle_ambush(self) -> bool:
         if not self.config.MAP_HAS_AMBUSH:
             return False
 
@@ -133,7 +133,7 @@ class AmbushHandler(Combat):
 
         return False
 
-    def handle_walk_out_of_step(self):
+    def handle_walk_out_of_step(self) -> bool:
         if not self.config.MAP_HAS_FLEET_STEP:
             return False
         if not self.info_bar_count():

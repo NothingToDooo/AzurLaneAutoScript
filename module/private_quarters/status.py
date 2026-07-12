@@ -12,12 +12,12 @@ OCR_SHOP_PRICE = Digit([], letter=(64, 72, 77), name="OCR_SHOP_PRICE")
 
 
 class PQStatus(ShopStatus):
-    def status_get_gold_coins(self):
-        return OCR_SHOP_GOLD_COINS.ocr(self.device.image)
+    def status_get_gold_coins(self) -> int:
+        return OCR_SHOP_GOLD_COINS.ocr_single(self.device.image)
 
-    def status_get_gems(self):
-        return OCR_SHOP_GEMS.ocr(self.device.image)
+    def status_get_gems(self) -> int:
+        return OCR_SHOP_GEMS.ocr_single(self.device.image)
 
-    def status_get_daily_count(self):
+    def status_get_daily_count(self) -> int:
         count, _, _ = OCR_DAILY_COUNT.ocr(self.device.image)
         return count

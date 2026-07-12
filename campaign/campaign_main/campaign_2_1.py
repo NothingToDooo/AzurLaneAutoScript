@@ -1,8 +1,11 @@
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 from module.map.map_base import CampaignMap
 
 from .campaign_2_base import CampaignBase
+
+if TYPE_CHECKING:
+    from module.map.type_alias import GridLocation
 
 MAP = CampaignMap()
 MAP.shape = "F4"
@@ -54,7 +57,7 @@ MAP.spawn_data = [
 
 
 class Config:
-    FLEET_BOSS = 1
+    fleet_boss = 1
 
     INTERNAL_LINES_HOUGHLINES_THRESHOLD = 40
     EDGE_LINES_HOUGHLINES_THRESHOLD = 40
@@ -79,12 +82,12 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.clear_all_mystery()
 
         return self.battle_default()
 
-    def battle_2(self):
+    def battle_2(self) -> bool:
         self.clear_all_mystery()
 
         if not self.check_accessibility(D4, fleet="boss"):
@@ -92,5 +95,5 @@ class Campaign(CampaignBase):
 
         return self.fleet_boss.clear_boss()
 
-    def handle_boss_appear_refocus(self, preset=(0, -2)):
+    def handle_boss_appear_refocus(self, preset: GridLocation | None = (0, -2)) -> None:
         return super().handle_boss_appear_refocus(preset)

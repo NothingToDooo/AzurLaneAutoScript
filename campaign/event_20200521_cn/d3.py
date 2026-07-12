@@ -68,7 +68,7 @@ class Config(ConfigBase):
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.clear_siren():
             return True
         if self.clear_enemy(scale=(2,), genre=["light", "main", "enemy", "carrier"]):
@@ -78,7 +78,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         if self.clear_enemy(scale=(1,)):
             return True
         if self.clear_enemy(scale=(2,), genre=["light", "main", "enemy", "carrier"]):
@@ -88,5 +88,5 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_6(self):
+    def battle_6(self) -> bool:
         return self.fleet_boss.brute_clear_boss()

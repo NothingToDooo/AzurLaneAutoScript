@@ -1,12 +1,52 @@
-from typing import ClassVar, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Literal, TypeVar, override
 
+import numpy as np
 import pytest
 
 from module.os import assets as os_assets
 from module.os import globe_operation as globe_operation_module
 from module.os.globe_operation import GlobeOperation, OSExploreError, RewardUncollectedError
+from module.os.globe_zone import Zone
 
 _T = TypeVar("_T")
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator, Sequence
+
+    from module.base.button import Button
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
+    from module.os.globe_operation import ZoneType
+
+
+def _zone(zone_id: int = 1) -> Zone:
+    return Zone(
+        zone_id,
+        {
+            "shape": "A1",
+            "hazard_level": 1,
+            "cn": f"zone-{zone_id}",
+            "area_pos": (0, 0),
+            "offset_pos": (0, 0),
+            "region": 1,
+        },
+    )
+
+
+def _zone_type_for_button(button: Button) -> ZoneType:
+    if button is os_assets.SELECT_DANGEROUS:
+        return "DANGEROUS"
+    if button is os_assets.SELECT_SAFE:
+        return "SAFE"
+    if button is os_assets.SELECT_OBSCURE:
+        return "OBSCURE"
+    if button is os_assets.SELECT_ABYSSAL:
+        return "ABYSSAL"
+    if button is os_assets.SELECT_STRONGHOLD:
+        return "STRONGHOLD"
+    if button is os_assets.SELECT_ARCHIVE:
+        return "ARCHIVE"
+    raise AssertionError
 
 
 def button_key(button: object) -> str:
@@ -43,9 +83,10 @@ class _Timer:
 
 class _Device:
     def __init__(self) -> None:
-        self.clicks: list[object] = []
+        self.image = np.zeros((2, 2, 3), dtype=np.uint8)
+        self.clicks: list[Button] = []
 
-    def click(self, button: object) -> None:
+    def click(self, button: Button) -> None:
         self.clicks.append(button)
 
 
@@ -54,9 +95,9 @@ class _GlobeOperation(GlobeOperation):
 
     def __init__(self) -> None:
         self.has_switch = True
-        self.pinned_name = ""
-        self.selection_results: list[list[object]] = []
-        self.executed_buttons: list[object] = []
+        self.pinned_name: ZoneType | Literal[""] = ""
+        self.selection_results: list[list[Button]] = []
+        self.executed_buttons: list[Button] = []
         self.enter_count = 0
         self.update_pinned_on_execute = True
         self.device = _Device()
@@ -66,48 +107,59 @@ class _GlobeOperation(GlobeOperation):
         self.in_map_results: list[bool] = []
         self.appear_then_click_results: dict[str, list[bool]] = {}
         self.appear_results: dict[str, list[bool]] = {}
-        self.map_event_results: list[bool] = []
+        self.map_event_results: list[str] = []
         self.popup_results: list[bool] = []
         self.action_point_results: list[bool] = []
         self.handle_zone_pinned_results: list[bool] = []
         self.zone_pinned_results: list[bool] = []
         self.interval_resets: list[str] = []
 
-    def select_zone_type(self, types: tuple[str, ...] | list[str] | str = ("SAFE", "DANGEROUS")) -> bool:
+    def select_zone_type(self, types: ZoneType | Sequence[ZoneType] = ("SAFE", "DANGEROUS")) -> bool:
         return self.zone_type_select(types)
 
     def goto_globe(self, *, unpin: bool = True) -> None:
         self.os_map_goto_globe(unpin=unpin)
 
-    def enter_globe(self, zone: object) -> None:
+    def enter_globe(self, zone: Zone) -> None:
         self.globe_enter(zone)
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
-    def loop(self, *_args: object, **_kwargs: object):
-        return range(self.loop_count)
+    @override
+    def loop(
+        self,
+        *,
+        skip_first: bool = True,
+        timeout: float | Timer | None = None,
+    ) -> Iterator[ImageArray]:
+        del skip_first, timeout
+        return iter([self.device.image] * self.loop_count)
 
     def zone_has_switch(self) -> bool:
         return self.has_switch
 
-    def get_zone_pinned_name(self) -> str:
+    @override
+    def get_zone_pinned_name(self) -> ZoneType | Literal[""]:
         return self.pinned_name
 
     def zone_select_enter(self) -> None:
         self.enter_count += 1
 
-    def ensure_zone_select_expanded(self) -> list[object]:
+    @override
+    def ensure_zone_select_expanded(self) -> list[Button]:
         if self.selection_results:
             return self.selection_results.pop(0)
         return []
 
-    def zone_select_execute(self, button: object) -> None:
+    @override
+    def zone_select_execute(self, button: Button) -> None:
         self.executed_buttons.append(button)
         if self.update_pinned_on_execute:
-            self.pinned_name = self.pinned_to_name(button)
+            self.pinned_name = _zone_type_for_button(button)
 
     def is_in_globe(self) -> bool:
         self.calls.append(("is_in_globe",))
@@ -132,9 +184,10 @@ class _GlobeOperation(GlobeOperation):
         self.calls.append(("interval_reset", key))
         self.interval_resets.append(key)
 
-    def handle_map_event(self) -> bool:
+    @override
+    def handle_map_event(self) -> str:
         self.calls.append(("handle_map_event",))
-        return self._next_result(self.map_event_results, default=False)
+        return self._next_result(self.map_event_results, default="")
 
     def handle_popup_confirm(self, name: str = "", *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_popup_confirm", name))
@@ -261,7 +314,7 @@ def test_globe_enter_clicks_zone_entrance() -> None:
     operation.zone_pinned_results = [True]
     _Timer.reached_results = {0: [True]}
 
-    operation.enter_globe(zone="zone-1")
+    operation.enter_globe(zone=_zone())
 
     assert operation.device.clicks == [os_assets.ZONE_ENTRANCE]
     assert _Timer.reset_count == 1
@@ -274,7 +327,7 @@ def test_globe_enter_raises_when_zone_locked() -> None:
     operation.appear_results[button_key(os_assets.ZONE_LOCKED)] = [True]
 
     with pytest.raises(OSExploreError):
-        operation.enter_globe(zone="zone-1")
+        operation.enter_globe(zone=_zone())
 
     assert operation.device.clicks == []
 
@@ -286,13 +339,14 @@ def test_globe_enter_clears_click_timer_after_action_point_handler() -> None:
     operation.zone_pinned_results = [False]
     operation.action_point_results = [True]
 
-    operation.enter_globe(zone="zone-1")
+    zone = _zone()
+    operation.enter_globe(zone=zone)
 
     assert _Timer.clear_count == 1
     assert (
         "handle_action_point",
         {
-            "zone": "zone-1",
+            "zone": zone,
             "pinned": "DANGEROUS",
         },
     ) in operation.calls

@@ -70,7 +70,7 @@ class Config(ConfigBase):
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         # Even adding these precautions, there is still possibility that F2 and E1 spawns at the same time.
         # However adding these can reduce the other possibilities.
         if self.clear_roadblocks([road_main]):
@@ -80,7 +80,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_3(self):
+    def battle_3(self) -> bool:
         if not self.check_accessibility(G1, fleet="boss"):
             if self.clear_roadblocks([road_main]):
                 return True

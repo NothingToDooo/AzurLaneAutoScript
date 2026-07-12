@@ -1,11 +1,19 @@
-from typing import ClassVar, TypeVar
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, ClassVar, TypeVar, override
 
+import numpy as np
 import pytest
 
 from module.combat.assets import GET_ITEMS_1
 from module.storage import assets as storage_assets
 from module.storage import storage as storage_module
 from module.storage.storage import StorageHandler
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
 
 _T = TypeVar("_T")
 
@@ -36,9 +44,8 @@ class _Timer:
 
 
 class _Device:
-    image = object()
-
     def __init__(self) -> None:
+        self.image = np.zeros((1, 1, 3), dtype=np.uint8)
         self.clicks: list[object] = []
         self.click_record: list[object] = []
         self.screenshot_count = 0
@@ -51,9 +58,9 @@ class _Device:
         self.screenshot_count += 1
 
 
+@dataclass
 class _Item:
-    def __init__(self, amount: int) -> None:
-        self.amount = amount
+    amount: int
 
 
 class _EquipmentItems:
@@ -91,13 +98,16 @@ class _Storage(StorageHandler):
     def confirm_disassemble(self, disassembled: int) -> int:
         return self._confirm_disassemble_equipment(disassembled=disassembled)
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
-    def loop(self, *_args: object, **_kwargs: object):
-        yield from range(20)
+    @override
+    def loop(self, *, skip_first: bool = True, timeout: float | Timer | None = None) -> Iterator[ImageArray]:
+        del skip_first, timeout
+        return iter([self.device.image] * 20)
 
     def interval_clear(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_clear", button))
@@ -119,7 +129,7 @@ class _Storage(StorageHandler):
         self.calls.append(("appear_then_click", key, kwargs))
         return self._next_result(self.appear_then_click_results.get(key, []), default=False)
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2) -> bool:
+    def handle_popup_confirm(self, name: str = "", offset: object = None, interval: float = 2) -> bool:
         _ = (name, offset, interval)
         self.calls.append(("handle_popup_confirm", name))
         return self._next_result(self.popup_results, default=False)

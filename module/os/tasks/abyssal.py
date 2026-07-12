@@ -5,7 +5,7 @@ from module.os.map import OSMap
 
 
 class OpsiAbyssal(OSMap):
-    def delay_abyssal(self, result=True):
+    def delay_abyssal(self, *, result: bool = True) -> None:
         """根据是否仍有深渊坐标安排下次运行。"""
         if get_os_reset_remain() == 0:
             logger.info("Just less than 1 day to OpSi reset, delay 2.5 hours")
@@ -15,7 +15,7 @@ class OpsiAbyssal(OSMap):
             self.config.task_delay(server_update=True)
             self.config.task_stop()
 
-    def clear_abyssal(self):
+    def clear_abyssal(self) -> None:
         """使用一个深渊坐标、击败首领并维修舰队。
 
         行动力不足时抛出 ActionPointLimit；坐标耗尽时抛出 TaskEnd；舰队耗尽仍未击败时抛出 RequestHumanTakeover。
@@ -37,7 +37,7 @@ class OpsiAbyssal(OSMap):
         self.fleet_repair(revert=False)
         self.delay_abyssal()
 
-    def os_abyssal(self):
+    def os_abyssal(self) -> None:
         while True:
             self.clear_abyssal()
             self.config.check_task_switch()

@@ -1,9 +1,10 @@
 import runpy
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
+from typing import TYPE_CHECKING
 
 import cv2
+import numpy as np
 import pytest
 
 from module.base.filter import Filter
@@ -17,6 +18,9 @@ from module.research.project import ResearchProject
 from module.research.project_data import LIST_RESEARCH_PROJECT
 from module.research.selector import FILTER_ATTR, FILTER_PRESET, FILTER_REGEX
 from module.research.series import RESEARCH_SERIES_TEMPLATES, match_series
+
+if TYPE_CHECKING:
+    from module.config.deep import MutableDeepValue
 
 DEFAULT_S9_PRESET = "series_9_blueprint_ta152"
 S9_PRESET_KEYS = {
@@ -62,6 +66,30 @@ S8_E_PROJECT_NAMES = {
     "E-864-MI",
     "E-887-MI",
 }
+
+
+def _deep_dict(value: MutableDeepValue) -> dict[str, MutableDeepValue]:
+    assert isinstance(value, dict)
+    return value
+
+
+def _deep_string(value: MutableDeepValue) -> str:
+    assert isinstance(value, str)
+    return value
+
+
+def _deep_string_list(value: MutableDeepValue) -> list[str]:
+    assert isinstance(value, list)
+    assert all(isinstance(item, str) for item in value)
+    return [item for item in value if isinstance(item, str)]
+
+
+def _filter_value(value: MutableDeepValue) -> str | list[str]:
+    if isinstance(value, str):
+        return value
+    return _deep_string_list(value)
+
+
 S8_E_PROJECT_TIMES = {
     "E-180-MI": 21600,
     "E-136-MI": 21600,
@@ -198,7 +226,7 @@ def test_series_nine_template_is_registered_first_and_matches_itself() -> None:
     assert RESEARCH_SERIES_TEMPLATES[0] == (template, 9)
     assert Path(template.file).is_file()
     template_image = load_image(template.file)
-    screenshot = cv2.cvtColor(template_image, cv2.COLOR_GRAY2RGB)
+    screenshot = np.asarray(cv2.cvtColor(template_image, cv2.COLOR_GRAY2RGB), dtype=np.uint8)
     assert match_series(screenshot, scaling=1.0) == 9
 
 
@@ -226,7 +254,7 @@ def test_series_nine_compact_fields_follow_runtime_contract() -> None:
 
     assert series_eight_e_times == S8_E_PROJECT_TIMES
     for row in series_nine:
-        name = cast("str", row["name"])
+        name = row["name"]
         prefix, number, _ = name.split("-")
         actual_flags = {flag for flag in ("need_coin", "need_cube", "need_part") if row.get(flag, False)}
         expected_equipment_amount = {"E-031-MI": 8, "E-315-MI": 15}.get(name, 0)
@@ -290,26 +318,32 @@ def test_series_nine_config_defaults_and_chinese_labels_are_generated() -> None:
         "series_9_ta152_only",
     ]
 
-    assert argument["Research"]["PresetFilter"]["value"] == DEFAULT_S9_PRESET
-    assert argument["Research"]["PresetFilter"]["option"][:4] == expected_options
-    assert args["Research"]["Research"]["PresetFilter"]["value"] == DEFAULT_S9_PRESET
-    assert args["Research"]["Research"]["PresetFilter"]["option"][:4] == expected_options
+    argument_research = _deep_dict(argument["Research"])
+    argument_preset = _deep_dict(argument_research["PresetFilter"])
+    args_research = _deep_dict(_deep_dict(args["Research"])["Research"])
+    args_preset = _deep_dict(args_research["PresetFilter"])
+    template_research = _deep_dict(_deep_dict(template["Research"])["Research"])
+    i18n_preset = _deep_dict(_deep_dict(i18n["Research"])["PresetFilter"])
+
+    assert _deep_string(argument_preset["value"]) == DEFAULT_S9_PRESET
+    assert _deep_string_list(argument_preset["option"])[:4] == expected_options
+    assert _deep_string(args_preset["value"]) == DEFAULT_S9_PRESET
+    assert _deep_string_list(args_preset["option"])[:4] == expected_options
     assert GeneratedConfig.Research_PresetFilter == DEFAULT_S9_PRESET
-    assert template["Research"]["Research"]["PresetFilter"] == DEFAULT_S9_PRESET
-    assert split_filter(argument["Research"]["CustomFilter"]) == split_filter(DICT_FILTER_PRESET[DEFAULT_S9_PRESET])
-    assert split_filter(GeneratedConfig.Research_CustomFilter) == split_filter(DICT_FILTER_PRESET[DEFAULT_S9_PRESET])
-    assert split_filter(template["Research"]["Research"]["CustomFilter"]) == split_filter(
+    assert _deep_string(template_research["PresetFilter"]) == DEFAULT_S9_PRESET
+    assert split_filter(_filter_value(argument_research["CustomFilter"])) == split_filter(
         DICT_FILTER_PRESET[DEFAULT_S9_PRESET]
     )
-    assert (
-        i18n["Research"]["PresetFilter"]
-        | {
-            "series_9_blueprint_ta152": "九期 蓝图+Ta152",
-            "series_9_blueprint_only": "九期 仅蓝图",
-            "series_9_ta152_only": "九期 仅Ta152",
-        }
-        == i18n["Research"]["PresetFilter"]
+    assert split_filter(GeneratedConfig.Research_CustomFilter) == split_filter(DICT_FILTER_PRESET[DEFAULT_S9_PRESET])
+    assert split_filter(_filter_value(template_research["CustomFilter"])) == split_filter(
+        DICT_FILTER_PRESET[DEFAULT_S9_PRESET]
     )
+    expected_labels = {
+        "series_9_blueprint_ta152": "九期 蓝图+Ta152",
+        "series_9_blueprint_only": "九期 仅蓝图",
+        "series_9_ta152_only": "九期 仅Ta152",
+    }
+    assert all(i18n_preset.get(key) == label for key, label in expected_labels.items())
 
 
 def test_research_extractor_maps_series_nine_without_import_side_effects() -> None:

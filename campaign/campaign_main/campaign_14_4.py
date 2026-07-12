@@ -173,8 +173,8 @@ OVERRIDE.map_data = """
     -- ME -- -- ME -- ME ME ME -- --
     -- -- -- -- -- -- -- -- -- ME --
 """
-road_A8 = RoadGrids([B8])
-road_H9 = RoadGrids(
+ROAD_A8 = RoadGrids([B8])
+ROAD_H9 = RoadGrids(
     [
         [H8, I8, J9],
     ]
@@ -192,48 +192,52 @@ class Config(ConfigBase):
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def map_data_init(self, map_):
+    def map_data_init(self, map_: CampaignMap | None) -> None:
         super().map_data_init(map_)
         if not self.map_is_clear_mode:
             for override_grid in OVERRIDE:
                 # Set may_enemy, but keep may_ambush
-                self.map[override_grid.location].may_enemy = override_grid.may_enemy
+                location = override_grid.location
+                if location is None:
+                    message = "14-4 override grid is missing its map location"
+                    raise RuntimeError(message)
+                self.map[location].may_enemy = override_grid.may_enemy
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.pick_up_light_house(A9)
 
-        if self.clear_roadblocks([road_A8, road_H9], weakest=False):
+        if self.clear_roadblocks([ROAD_A8, ROAD_H9], weakest=False):
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=1):
             return True
 
         return self.battle_default()
 
-    def battle_3(self):
+    def battle_3(self) -> bool:
         self.pick_up_light_house(A9)
         self.pick_up_ammo()
         self.pick_up_flare(H9)
 
-        if self.clear_roadblocks([road_A8, road_H9], weakest=False):
+        if self.clear_roadblocks([ROAD_A8, ROAD_H9], weakest=False):
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=1):
             return True
 
         return self.battle_default()
 
-    def battle_6(self):
+    def battle_6(self) -> bool:
         self.pick_up_light_house(A9)
         self.pick_up_ammo()
         self.pick_up_flare(H9)
 
-        if self.clear_roadblocks([road_A8, road_H9], weakest=False):
+        if self.clear_roadblocks([ROAD_A8, ROAD_H9], weakest=False):
             return True
         if self.clear_filter_enemy(self.ENEMY_FILTER, preserve=0):
             return True
 
         return self.battle_default()
 
-    def battle_7(self):
+    def battle_7(self) -> bool:
         self.fleet_boss.pick_up_flare(A5)
 
         return self.fleet_boss.clear_boss()

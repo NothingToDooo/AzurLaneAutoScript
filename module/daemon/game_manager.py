@@ -3,7 +3,7 @@ from module.logger import logger
 
 
 class GameManager(LoginHandler):
-    def run(self):
+    def run(self) -> None:
         logger.hr("Force Stop AzurLane", level=1)
         self.device.app_stop()
         logger.info("Force Stop finished")

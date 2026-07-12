@@ -35,7 +35,8 @@ class _Timer:
             return results.pop(0)
         return False
 
-    def reset(self) -> None:
+    @staticmethod
+    def reset() -> None:
         _Timer.reset_count += 1
 
 
@@ -65,7 +66,8 @@ class _Equipment(Equipment):
     def swipe(self) -> bool:
         return self._ship_view_swipe(distance=-250)
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default

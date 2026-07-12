@@ -1,24 +1,29 @@
+from typing import TYPE_CHECKING
+
 from module.device.app_package import AppPackage
 from module.logger import logger
+
+if TYPE_CHECKING:
+    from module.map.map_grids import SelectedGrids
 
 
 class MumuDeviceDiscovery(AppPackage):
     @staticmethod
-    def _log_available_devices(available):
+    def _log_available_devices(available: SelectedGrids) -> None:
         for device in available:
             logger.info(device.serial)
         if not len(available):
             logger.info("No available devices")
 
     @staticmethod
-    def _log_unavailable_devices(devices, available):
+    def _log_unavailable_devices(devices: SelectedGrids, available: SelectedGrids) -> None:
         unavailable = devices.delete(available)
         if len(unavailable):
             logger.info("Here are the devices detected but unavailable")
             for device in unavailable:
                 logger.info(f"{device.serial} ({device.status})")
 
-    def _list_and_log_detected_devices(self):
+    def _list_and_log_detected_devices(self) -> tuple[SelectedGrids, SelectedGrids]:
         logger.info("Here are the available MuMu12 TCP serials, copy one to Alas.Emulator.Serial")
         devices = self.list_device()
         available = devices.select(status="device", may_mumu12_family=True)
@@ -26,7 +31,7 @@ class MumuDeviceDiscovery(AppPackage):
         self._log_unavailable_devices(devices, available)
         return devices, available
 
-    def _redirect_shifted_mumu12_port(self, available):
+    def _redirect_shifted_mumu12_port(self, available: SelectedGrids) -> None:
         """
         如果 MuMu12 动态端口发生小范围切换，只更新运行时 serial。
         """
@@ -49,7 +54,7 @@ class MumuDeviceDiscovery(AppPackage):
                 self.bind_serial(device.serial)
                 break
 
-    def detect_device(self):
+    def detect_device(self) -> None:
         """
         查找当前可用的 MuMu12 TCP serial。
         """

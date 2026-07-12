@@ -1,6 +1,11 @@
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
+from module.base.base import ModuleBase
 from module.ui.navbar import Navbar, NavbarTarget
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 class _FakeDevice:
@@ -8,32 +13,38 @@ class _FakeDevice:
         self.clicked = []
         self.screenshot_count = 0
 
-    def click(self, button) -> None:
+    def click(self, button: str) -> None:
         self.clicked.append(button)
 
     def screenshot(self) -> None:
         self.screenshot_count += 1
 
 
-class _FakeMain:
+class _FakeMain(ModuleBase):
+    device: _FakeDevice
+
     def __init__(self) -> None:
         self.device = _FakeDevice()
 
 
 class _FakeNavbar(Navbar):
-    def __init__(self, info_results, obstruct_results=()) -> None:
+    def __init__(
+        self,
+        info_results: Iterable[tuple[int | None, int | None, int | None]],
+        obstruct_results: Iterable[bool] = (),
+    ) -> None:
         self.grids = SimpleNamespace(buttons=["button_0", "button_1", "button_2"])
         self.name = "TEST_NAVBAR"
         self.info_results = list(info_results)
         self.obstruct_results = list(obstruct_results)
-        self.info_mains = []
-        self.obstruct_mains = []
+        self.info_mains: list[ModuleBase] = []
+        self.obstruct_mains: list[ModuleBase] = []
 
-    def get_info(self, main):
+    def get_info(self, main: ModuleBase) -> tuple[int | None, int | None, int | None]:
         self.info_mains.append(main)
         return self.info_results.pop(0)
 
-    def _shop_obstruct_handle(self, main):
+    def _shop_obstruct_handle(self, main: ModuleBase) -> bool:
         self.obstruct_mains.append(main)
         if self.obstruct_results:
             return self.obstruct_results.pop(0)

@@ -4,7 +4,7 @@ from module.logger import logger
 
 
 class CampaignBase(CampaignBase_):
-    def campaign_set_chapter_20241219(self, chapter, stage, mode="combat"):
+    def campaign_set_chapter_20241219(self, chapter: str, stage: str, mode: str = "combat") -> bool:
         if chapter in ["t", "ht"]:
             if self._campaign_name_is_hard(f"{chapter}{stage}"):
                 self.config.override(Campaign_Mode="hard")

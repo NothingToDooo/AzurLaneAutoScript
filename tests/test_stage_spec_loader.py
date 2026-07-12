@@ -418,12 +418,12 @@ def test_loader_accepts_policy_declared_only_for_loop_boss(tmp_path: Path) -> No
 
 
 class _BossZeroStrategy(CampaignBase):
-    def battle_0(self):
+    def battle_0(self) -> bool:
         return self.clear_boss()
 
 
 class _BossOneStrategy(CampaignBase):
-    def battle_1(self):
+    def battle_1(self) -> bool:
         return self.clear_boss()
 
 

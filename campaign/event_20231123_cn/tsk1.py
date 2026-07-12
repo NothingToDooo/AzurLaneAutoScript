@@ -81,12 +81,12 @@ class Config:
     MAP_SWIPE_MULTIPLY = (1.187, 1.209)
     MAP_SWIPE_MULTIPLY_MINITOUCH = (1.148, 1.169)
     MAP_IS_ONE_TIME_STAGE = True
-    FLEET_2 = 0
+    fleet_2 = 0
 
 
 class Campaign(CampaignBase):
     MAP = MAP
     ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         return self.clear_boss()

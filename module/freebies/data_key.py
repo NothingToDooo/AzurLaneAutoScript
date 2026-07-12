@@ -10,7 +10,7 @@ DATA_KEY = DigitCounter(freebies_assets.OCR_DATA_KEY, letter=(255, 247, 247), th
 
 
 class DataKey(UI):
-    def _data_key_collect(self, skip_first_screenshot=True):
+    def _data_key_collect(self, *, skip_first_screenshot: bool = True) -> None:
         """在档案页领取数据钥匙，结束时仍在档案页并显示 DATA_KEY_COLLECTED。"""
         logger.hr("Data Key Collect")
         while 1:
@@ -37,7 +37,7 @@ class DataKey(UI):
                 logger.info("Data key collect finished")
                 break
 
-    def data_key_collect(self):
+    def data_key_collect(self) -> bool:
         """在档案页按容量领取数据钥匙；ForceCollect 可忽略满容量，未领取返回 False。"""
         if self.appear(freebies_assets.DATA_KEY_COLLECTED, offset=(20, 20)):
             logger.info("Data key has been collected")
@@ -52,7 +52,7 @@ class DataKey(UI):
         self._data_key_collect()
         return True
 
-    def run(self):
+    def run(self) -> None:
         """从任意页面进入档案页处理数据钥匙。"""
         self.ui_ensure(page_archives)
 

@@ -16,7 +16,7 @@ from module.ui_white.assets import POPUP_CONFIRM_WHITE_BATTLEPASS
 
 
 class BattlePass(Combat, UI):
-    def battle_pass_red_dot_appear(self):
+    def battle_pass_red_dot_appear(self) -> bool:
         """在 page_reward 判断战令入口红点是否出现。"""
         if self.appear(REWARD_GOTO_BATTLE_PASS, offset=(50, 150)):
             # 从 REWARD_GOTO_BATTLE_PASS 读取偏移，因为入口可能不在最上方。
@@ -31,13 +31,13 @@ class BattlePass(Combat, UI):
         logger.warning("No battle pass entrance")
         return False
 
-    def handle_battle_pass_popup(self):
+    def handle_battle_pass_popup(self) -> bool:
         return self.appear_then_click(PURCHASE_POPUP, offset=(20, 20), interval=2)
 
-    def battle_pass_enter(self):
+    def battle_pass_enter(self) -> None:
         """从 page_reward 进入战令页。"""
 
-        def appear_button():
+        def appear_button() -> bool:
             return self.appear(REWARD_GOTO_BATTLE_PASS, offset=(50, 150))
 
         self.ui_click(
@@ -48,7 +48,7 @@ class BattlePass(Combat, UI):
             skip_first_screenshot=True,
         )
 
-    def _handle_battle_pass_reward_button(self, confirm_timer):
+    def _handle_battle_pass_reward_button(self, confirm_timer: Timer) -> bool:
         if self.appear_then_click(REWARD_RECEIVE, offset=(20, 20), interval=3):
             confirm_timer.reset()
             return True
@@ -61,7 +61,7 @@ class BattlePass(Combat, UI):
             return True
         return False
 
-    def _handle_battle_pass_confirm_popup(self, confirm_timer):
+    def _handle_battle_pass_confirm_popup(self, confirm_timer: Timer) -> bool:
         if self.handle_battle_pass_popup():
             confirm_timer.reset()
             return True
@@ -74,13 +74,13 @@ class BattlePass(Combat, UI):
             return True
         return False
 
-    def _handle_battle_pass_reward_result(self, confirm_timer):
+    def _handle_battle_pass_reward_result(self, confirm_timer: Timer) -> bool:
         if self.handle_get_items() or self.handle_get_ship() or self.handle_get_skin():
             confirm_timer.reset()
             return True
         return False
 
-    def _battle_pass_receive_finished(self, confirm_timer):
+    def _battle_pass_receive_finished(self, confirm_timer: Timer) -> bool:
         if (
             self.appear(BATTLE_PASS_CHECK, offset=(20, 20))
             and not self.appear(REWARD_RECEIVE, offset=(20, 20))
@@ -90,7 +90,7 @@ class BattlePass(Combat, UI):
         confirm_timer.reset()
         return False
 
-    def battle_pass_receive(self, skip_first_screenshot=True):
+    def battle_pass_receive(self, *, skip_first_screenshot: bool = True) -> bool:
         """在战令页领取全部可领奖励，返回是否实际领取。"""
         logger.hr("Battle pass receive", level=1)
         self.battle_status_click_interval = 2
@@ -116,7 +116,7 @@ class BattlePass(Combat, UI):
         logger.info(f"Battle pass receive finished, received={received}")
         return received
 
-    def run(self):
+    def run(self) -> None:
         self.ui_ensure(page_reward)
 
         if self.battle_pass_red_dot_appear():

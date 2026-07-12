@@ -129,12 +129,12 @@ class Campaign(CampaignBase):
     MAP = MAP
     use_single_fleet = False
 
-    def map_init(self, map_):
+    def map_init(self, map_: CampaignMap | None) -> None:
         super().map_init(map_)
         self.map_has_mob_move = self.use_support_fleet and self.map_is_clear_mode
         self.use_single_fleet = "standby" in self.config.Fleet_FleetOrder
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.map_has_mob_move:
             if self.mob_move(C3, C2):
                 return self.clear_chosen_enemy(D6)
@@ -142,7 +142,7 @@ class Campaign(CampaignBase):
 
         return self.clear_chosen_enemy(C3)
 
-    def battle_1(self):
+    def battle_1(self) -> bool:
         if self.map_has_mob_move:
             self.mob_move(E6, E5)
             if not self.use_single_fleet:
@@ -155,10 +155,10 @@ class Campaign(CampaignBase):
             self.air_strike(E3)
         return self.clear_chosen_enemy(D3)
 
-    def battle_2(self):
+    def battle_2(self) -> bool:
         return self.clear_chosen_enemy(F3)
 
-    def battle_3(self):
+    def battle_3(self) -> bool:
         boss = self.map.select(is_boss=True)
         if boss:
             if not self.check_accessibility(boss[0], fleet="boss"):

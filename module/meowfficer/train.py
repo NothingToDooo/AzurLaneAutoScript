@@ -1,4 +1,4 @@
-from copy import deepcopy
+from typing import TYPE_CHECKING
 
 from module.base.button import ButtonGrid
 from module.base.timer import Timer
@@ -7,6 +7,10 @@ from module.meowfficer import assets as meow_assets
 from module.meowfficer.collect import MeowfficerCollect
 from module.meowfficer.enhance import MeowfficerEnhance
 from module.ocr.ocr import Digit, DigitCounter
+
+if TYPE_CHECKING:
+    from module.config.config import AzurLaneConfig
+    from module.device.device import Device
 
 MEOWFFICER_CAPACITY = DigitCounter(meow_assets.OCR_MEOWFFICER_CAPACITY, letter=(131, 121, 123), threshold=64)
 MEOWFFICER_QUEUE = DigitCounter(meow_assets.OCR_MEOWFFICER_QUEUE, letter=(131, 121, 123), threshold=64)
@@ -22,11 +26,16 @@ MEOWFFICER_BOX_COUNT = Digit(
 
 
 class MeowfficerTrain(MeowfficerCollect, MeowfficerEnhance):
-    def __init__(self, *args, **kwargs):
-        self._box_count = [0, 0, 0]
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        config: AzurLaneConfig | str,
+        device: Device | str | None = None,
+        task: str | None = None,
+    ) -> None:
+        self._box_count: list[int] = [0, 0, 0]
+        super().__init__(config, device, task)
 
-    def _meow_queue_enter(self, skip_first_screenshot=True):
+    def _meow_queue_enter(self, *, skip_first_screenshot: bool = True) -> bool:
         """进入猫箱排队页，最多尝试三次。"""
         timeout_count = 3
         self.handle_info_bar()
@@ -52,7 +61,7 @@ class MeowfficerTrain(MeowfficerCollect, MeowfficerEnhance):
                 return False
         return False
 
-    def _meow_nqueue(self, skip_first_screenshot=True):
+    def _meow_nqueue(self, *, skip_first_screenshot: bool = True) -> None:
         """在训练页自动填满空槽，稀有猫箱优先。"""
         # 循环处理上一步操作可能引发的页面跳转。
         confirm_timer = Timer(1.5, count=3).start()
@@ -80,10 +89,10 @@ class MeowfficerTrain(MeowfficerCollect, MeowfficerEnhance):
             else:
                 confirm_timer.reset()
 
-    def _meow_rqueue(self):
+    def _meow_rqueue(self) -> None:
         """在训练页手动填满空槽，普通猫箱优先。"""
         # 使用本地箱数保证多次点击后的计数准确。
-        local_count = deepcopy(self._box_count)
+        local_count = self._box_count.copy()
         buttons = MEOWFFICER_BOX_GRID.buttons
         while 1:
             # 可排队数量。
@@ -109,7 +118,7 @@ class MeowfficerTrain(MeowfficerCollect, MeowfficerEnhance):
 
         self._meow_nqueue()
 
-    def meow_queue(self, ascending=True):
+    def meow_queue(self, *, ascending: bool = True) -> None:
         """在训练页排队；ascending=True 按蓝、紫、金顺序，否则反向。"""
         logger.hr("Meowfficer queue", level=1)
         if not self._meow_queue_enter():
@@ -134,7 +143,7 @@ class MeowfficerTrain(MeowfficerCollect, MeowfficerEnhance):
             logger.info("Queue in descending order (Gold > Purple > Blue)")
             self._meow_nqueue()
 
-    def meow_train(self):
+    def meow_train(self) -> bool:
         """在指挥喵主页领取训练结果并重新排队猫箱。"""
         logger.hr("Meowfficer train", level=1)
 
@@ -143,7 +152,7 @@ class MeowfficerTrain(MeowfficerCollect, MeowfficerEnhance):
         logger.attr("Meowfficer_capacity_remain", remain)
 
         # 读取箱子数量，供其他辅助函数使用。
-        self._box_count = MEOWFFICER_BOX_COUNT.ocr(self.device.image)
+        self._box_count = MEOWFFICER_BOX_COUNT.ocr_regions(self.device.image)
 
         logger.attr("MeowfficerTrain_Mode", self.config.MeowfficerTrain_Mode)
         collected = False

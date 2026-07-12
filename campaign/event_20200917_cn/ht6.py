@@ -172,7 +172,7 @@ class Config(ConfigBase):
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.fleet_2_protect():
             return True
 
@@ -185,7 +185,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_2(self):
+    def battle_2(self) -> bool:
         if self.clear_siren():
             return True
         if self.clear_enemy(scale=(2,)):
@@ -195,7 +195,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_5(self):
+    def battle_5(self) -> bool:
         if self.clear_enemy(scale=(1,)):
             return True
         if self.clear_enemy(scale=(2,)):
@@ -203,5 +203,5 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_6(self):
+    def battle_6(self) -> bool:
         return self.fleet_boss.clear_boss()

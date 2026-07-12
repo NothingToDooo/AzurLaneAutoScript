@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, override
+
 from module.base.timer import Timer
 from module.coalition import assets as coalition_assets
 from module.combat.assets import BATTLE_PREPARATION
@@ -8,25 +10,43 @@ from module.ui.assets import BACK_ARROW
 from module.ui.page import page_coalition
 from module.ui.switch import Switch
 
+if TYPE_CHECKING:
+    from module.base.base import ModuleBase
+    from module.base.button import Button
+    from module.coalition.contracts import (
+        CoalitionEvent,
+        CoalitionFleetMode,
+        CoalitionPageMode,
+        CoalitionPageState,
+        CoalitionStage,
+    )
+
 
 class NeoncitySwitch(Switch):
-    def get(self, main):
+    @override
+    def get(self, main: ModuleBase) -> CoalitionPageState:
         # 红字表示当前模式。
         for data in self.state_list:
             if main.image_color_count(data["check_button"], color=(123, 41, 41), threshold=221, count=100):
-                return data["state"]
+                state = data["state"]
+                if state == "story":
+                    return "story"
+                if state == "battle":
+                    return "battle"
+                message = f"Neoncity switch received an invalid state: {state}"
+                raise ScriptError(message)
 
         return "unknown"
 
 
 class CoalitionUI(Combat):
-    def in_coalition(self):
+    def in_coalition(self) -> bool:
         return self.ui_page_appear(page_coalition, offset=(20, 20))
 
-    def in_coalition_20251120_difficulty_selection(self):
+    def in_coalition_20251120_difficulty_selection(self) -> bool:
         return self.appear(coalition_assets.DAL_DIFFICULTY_EXIT, offset=(20, 20))
 
-    def coalition_ensure_mode(self, event, mode):
+    def coalition_ensure_mode(self, event: CoalitionEvent, mode: CoalitionPageMode) -> None:
         """在联合作战页按活动切换 story 或 battle；2025-11-20 活动没有模式开关。"""
         if event == "coalition_20230323":
             mode_switch = Switch("CoalitionMode", offset=(20, 20))
@@ -55,10 +75,8 @@ class CoalitionUI(Combat):
             mode_switch.set("story", main=self)
         elif mode == "battle":
             mode_switch.set("battle", main=self)
-        else:
-            logger.warning(f"Unknown coalition campaign mode: {mode}")
 
-    def coalition_set_fleet(self, event, mode):
+    def coalition_set_fleet(self, event: CoalitionEvent, mode: CoalitionFleetMode) -> bool:
         """在舰队准备页切换 single 或 multi，并返回是否点击切换。"""
         fleet_switch = Switch("FleetMode", is_selector=True, offset=0)  # 颜色匹配不使用 offset。
         if event == "coalition_20230323":
@@ -88,11 +106,11 @@ class CoalitionUI(Combat):
         if mode == "multi":
             fleet_switch.set("multi", main=self)
             return True
-        logger.warning(f"Unknown coalition fleet mode: {mode}")
-        return False
+        message = f"Unsupported coalition fleet mode: {mode}"
+        raise ScriptError(message)
 
     @staticmethod
-    def coalition_get_entrance(event, stage):
+    def coalition_get_entrance(event: CoalitionEvent, stage: CoalitionStage) -> Button:
         """按活动和关卡返回入口按钮；组合不受支持时抛出 CampaignNameError。"""
         dic = {
             ("coalition_20230323", "tc1"): coalition_assets.FROSTFALL_TC1,
@@ -128,7 +146,6 @@ class CoalitionUI(Combat):
             ("coalition_20260122", "sp"): coalition_assets.FASHION_SP,
             ("coalition_20260122", "ex"): coalition_assets.FASHION_EX,
         }
-        stage = stage.lower()
         try:
             return dic[(event, stage)]
         except KeyError as e:
@@ -136,7 +153,7 @@ class CoalitionUI(Combat):
             raise CampaignNameError from e
 
     @staticmethod
-    def coalition_20251120_get_entrance_difficulty(event, stage):
+    def coalition_20251120_get_entrance_difficulty(event: CoalitionEvent, stage: CoalitionStage) -> Button:
         """返回 2025-11-20 活动关卡的难度按钮；组合不受支持时抛出 CampaignNameError。"""
         dic = {
             ("coalition_20251120", "area1-normal"): coalition_assets.DAL_NORMAL,
@@ -152,7 +169,6 @@ class CoalitionUI(Combat):
             ("coalition_20251120", "area5-hard"): coalition_assets.DAL_HARD,
             ("coalition_20251120", "area6-hard"): coalition_assets.DAL_HARD,
         }
-        stage = stage.lower()
         try:
             return dic[(event, stage)]
         except KeyError as e:
@@ -160,7 +176,7 @@ class CoalitionUI(Combat):
             raise CampaignNameError from e
 
     @staticmethod
-    def coalition_get_battles(event, stage):
+    def coalition_get_battles(event: CoalitionEvent, stage: CoalitionStage) -> int:
         """返回活动关卡的战斗次数；组合不受支持时抛出 CampaignNameError。"""
         dic = {
             ("coalition_20230323", "tc1"): 1,
@@ -196,7 +212,6 @@ class CoalitionUI(Combat):
             ("coalition_20260122", "sp"): 4,
             ("coalition_20260122", "ex"): 5,
         }
-        stage = stage.lower()
         try:
             return dic[(event, stage)]
         except KeyError as e:
@@ -204,7 +219,7 @@ class CoalitionUI(Combat):
             raise CampaignNameError from e
 
     @staticmethod
-    def coalition_get_fleet_preparation(event):
+    def coalition_get_fleet_preparation(event: CoalitionEvent) -> Button:
         """返回活动专用舰队准备按钮；活动不受支持时抛出 ScriptError。"""
         if event == "coalition_20230323":
             return coalition_assets.FROSTFALL_FLEET_PREPARATION
@@ -220,13 +235,11 @@ class CoalitionUI(Combat):
         logger.error(f"FLEET_PREPARATION is not defined in event {event}")
         raise ScriptError
 
-    def handle_fleet_preparation(self, event, stage, mode):
+    def handle_fleet_preparation(self, event: CoalitionEvent, stage: CoalitionStage, mode: CoalitionFleetMode) -> bool:
         """在舰队准备页按 single 或 multi 切换并返回是否点击。
 
         固定舰队关卡直接返回 False；编队不完整时抛出 RequestHumanTakeover。
         """
-        stage = stage.lower()
-
         # TC1 和 SP 没有舰队切换。
         if event == "coalition_20230323" and stage in ["tc1", "sp"]:
             return False
@@ -253,7 +266,7 @@ class CoalitionUI(Combat):
 
         return clicked
 
-    def coalition_map_exit(self, event):
+    def coalition_map_exit(self, *, event: CoalitionEvent) -> None:
         """从战斗或活动舰队准备页返回联合作战页；误到主页时也结束。"""
         logger.info("Coalition map exit")
         fleet_preparation = self.coalition_get_fleet_preparation(event)
@@ -276,15 +289,19 @@ class CoalitionUI(Combat):
                 continue
 
     @staticmethod
-    def _coalition_difficulty_button(event, stage):
+    def _coalition_difficulty_button(event: CoalitionEvent, stage: CoalitionStage) -> Button | None:
         if event != "coalition_20251120":
             return None
         return CoalitionUI.coalition_20251120_get_entrance_difficulty(event, stage)
 
     @staticmethod
     def _check_coalition_enter_clicks(
-        button, button_difficulty, campaign_click, campaign_difficulty_click, fleet_click
-    ):
+        button: Button,
+        button_difficulty: Button | None,
+        campaign_click: int,
+        campaign_difficulty_click: int,
+        fleet_click: int,
+    ) -> None:
         if campaign_click > 5:
             logger.critical(f"Failed to enter {button}, too many click on {button}")
             logger.critical("Possible reason #1: You haven't cleared previous stage to unlock the stage.")
@@ -304,14 +321,19 @@ class CoalitionUI(Combat):
         )
         raise RequestHumanTakeover
 
-    def _click_coalition_stage(self, button, campaign_timer):
+    def _click_coalition_stage(self, button: Button, campaign_timer: Timer) -> bool:
         if not campaign_timer.reached() or not self.in_coalition():
             return False
         self.device.click(button)
         campaign_timer.reset()
         return True
 
-    def _click_coalition_difficulty(self, event, button_difficulty, campaign_difficulty_timer):
+    def _click_coalition_difficulty(
+        self,
+        event: CoalitionEvent,
+        button_difficulty: Button | None,
+        campaign_difficulty_timer: Timer,
+    ) -> bool:
         if event != "coalition_20251120" or not button_difficulty:
             return False
         if not campaign_difficulty_timer.reached() or not self.in_coalition_20251120_difficulty_selection():
@@ -320,7 +342,7 @@ class CoalitionUI(Combat):
         campaign_difficulty_timer.reset()
         return True
 
-    def _handle_coalition_enter_interrupts(self, campaign_timer):
+    def _handle_coalition_enter_interrupts(self, campaign_timer: Timer) -> bool:
         if self.handle_auto_search_continue():
             campaign_timer.reset()
             return True
@@ -335,7 +357,7 @@ class CoalitionUI(Combat):
             return True
         return self.handle_combat_automation_confirm() or self.handle_popup_confirm("COALITION")
 
-    def enter_map(self, event, stage, mode):
+    def enter_map(self, event: CoalitionEvent, stage: CoalitionStage, mode: CoalitionFleetMode) -> None:
         """从联合作战页进入指定活动关卡，按 single 或 multi 编队，结束于战斗准备页。
 
         连续点击失败或编队不满足限制时抛出 RequestHumanTakeover。

@@ -1,13 +1,34 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from module.config.config_updater import ConfigUpdater
+from module.config.deep import deep_get
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from module.config.deep import DeepValue
 
 
-def _arg(value, typ: str = "input", **kwargs):
-    return {"value": value, "type": typ, **kwargs}
+def _arg(
+    value: DeepValue,
+    typ: str = "input",
+    *,
+    option: list[str] | None = None,
+    display: str | None = None,
+) -> dict[str, DeepValue]:
+    argument: dict[str, DeepValue] = {"value": value, "type": typ}
+    if option is not None:
+        argument["option"] = option
+    if display is not None:
+        argument["display"] = display
+    return argument
 
 
-def _make_updater(args: dict):
+def _make_updater(args: Mapping[str, DeepValue]) -> ConfigUpdater:
     updater = object.__new__(ConfigUpdater)
-    updater.args = args
+    vars(updater)["args"] = args
     return updater
 
 
@@ -40,7 +61,7 @@ def test_config_update_preserves_visible_values_and_resets_hidden_runtime_values
         }
     )
 
-    assert updated["Demo"]["Group"] == {
+    assert deep_get(updated, keys="Demo.Group") == {
         "Visible": 10,
         "Blank": 2,
         "Hidden": 3,
@@ -54,7 +75,7 @@ def test_config_update_template_uses_defaults() -> None:
 
     updated = updater.config_update({"Demo": {"Group": {"Value": "10"}}}, is_template=True)
 
-    assert updated["Demo"]["Group"]["Value"] == 1
+    assert deep_get(updated, keys="Demo.Group.Value") == 1
 
 
 def test_config_update_keeps_old_hazard_leveling_enable_on_new_meowfficer_task() -> None:
@@ -67,8 +88,8 @@ def test_config_update_keeps_old_hazard_leveling_enable_on_new_meowfficer_task()
 
     updated = updater.config_update({"OpsiHazard1Leveling": {"Scheduler": {"Enable": True}}})
 
-    assert updated["OpsiHazard1Leveling"]["Scheduler"]["Enable"] is True
-    assert updated["OpsiMeowfficerFarming"]["Scheduler"]["Enable"] is True
+    assert deep_get(updated, keys="OpsiHazard1Leveling.Scheduler.Enable") is True
+    assert deep_get(updated, keys="OpsiMeowfficerFarming.Scheduler.Enable") is True
 
 
 def test_config_update_refreshes_event_campaign_and_stage_defaults() -> None:
@@ -101,9 +122,9 @@ def test_config_update_refreshes_event_campaign_and_stage_defaults() -> None:
         }
     )
 
-    assert updated["Event"]["Campaign"] == {"Event": "event_2026", "Name": "D3"}
-    assert updated["GemsFarming"]["Campaign"]["Event"] == "gems_event"
-    assert updated["Coalition"]["Campaign"]["Name"] == "area1-normal"
+    assert deep_get(updated, keys="Event.Campaign") == {"Event": "event_2026", "Name": "D3"}
+    assert deep_get(updated, keys="GemsFarming.Campaign.Event") == "gems_event"
+    assert deep_get(updated, keys="Coalition.Campaign.Name") == "area1-normal"
 
 
 def test_config_update_keeps_war_archives_away_from_campaign_main_even_for_template() -> None:
@@ -120,4 +141,4 @@ def test_config_update_keeps_war_archives_away_from_campaign_main_even_for_templ
 
     updated = updater.config_update({}, is_template=True)
 
-    assert updated["WarArchives"]["Campaign"] == {"Event": "archive_2026", "Name": "D3"}
+    assert deep_get(updated, keys="WarArchives.Campaign") == {"Event": "archive_2026", "Name": "D3"}

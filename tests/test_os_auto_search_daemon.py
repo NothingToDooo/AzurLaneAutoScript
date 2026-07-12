@@ -1,5 +1,6 @@
-from typing import ClassVar, TypeVar
+from typing import TYPE_CHECKING, ClassVar, TypeVar, override
 
+import numpy as np
 import pytest
 
 from module.exception import RequestHumanTakeover
@@ -7,6 +8,12 @@ from module.os import map as map_module
 from module.os.map import OSMap
 
 _T = TypeVar("_T")
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from module.base.timer import Timer
+    from module.base.type_alias import ImageArray
 
 
 def button_key(button: object) -> str:
@@ -38,6 +45,7 @@ class _Timer:
 
 class _Device:
     def __init__(self) -> None:
+        self.image = np.zeros((2, 2, 3), dtype=np.uint8)
         self.stuck_record_clear_count = 0
 
     def stuck_record_clear(self) -> None:
@@ -73,13 +81,21 @@ class _AutoSearchMap(OSMap):
         self.need_repair: list[bool] = []
         self.ash_popup_canceled = True
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
-    def loop(self, *_args: object, **_kwargs: object) -> range:
-        return range(self.loop_count)
+    @override
+    def loop(
+        self,
+        *,
+        skip_first: bool = True,
+        timeout: float | Timer | None = None,
+    ) -> Iterator[ImageArray]:
+        del skip_first, timeout
+        return iter([self.device.image] * self.loop_count)
 
     def hp_reset(self) -> None:
         self.calls.append(("hp_reset",))
@@ -93,7 +109,7 @@ class _AutoSearchMap(OSMap):
         self.calls.append(("appear", key, kwargs))
         return self._next_result(self.appear_results.get(key, []), default=False)
 
-    def handle_os_auto_search_map_option(self, enable: object = True) -> bool:
+    def handle_os_auto_search_map_option(self, *, enable: bool | None = True) -> bool:
         self.calls.append(("handle_os_auto_search_map_option", enable))
         return self._next_result(self.map_option_results, default=False)
 
@@ -115,8 +131,10 @@ class _AutoSearchMap(OSMap):
         self.calls.append(("auto_search_combat",))
         return self._next_result(self.auto_search_combat_results, default=False)
 
-    def hp_get(self) -> None:
+    @override
+    def hp_get(self) -> list[float]:
         self.calls.append(("hp_get",))
+        return []
 
     def handle_map_event(self) -> str:
         self.calls.append(("handle_map_event",))

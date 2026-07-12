@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast, get_type_hints
 
@@ -37,7 +38,7 @@ class _RunnerConfig:
         self.merged: list[object] = []
         self.merge_hook: Callable[[], None] | None = None
 
-    def merge(self, config: object):
+    def merge(self, config: object) -> _RunnerConfig:
         if self.merge_hook is not None:
             self.merge_hook()
         self.merged.append(config)
@@ -224,7 +225,8 @@ class _HardCampaign:
     def ensure_campaign_ui(self, *, name: str, mode: str) -> None:
         self.ensure_ui_calls.append((name, mode))
 
-    def run(self) -> None:
+    @staticmethod
+    def run() -> None:
         pytest.fail("OCR 剩余次数为 0 时不应运行战役")
 
     def ensure_auto_search_exit(self) -> None:
@@ -299,50 +301,74 @@ class _RunCampaign:
         self.ensure_calls.append((name, mode))
 
 
-def _make_runner(*, stop_triggered: bool = False):
+@dataclass(frozen=True)
+class _AfterRunHarness:
+    runner: CampaignRun
+    config: _AfterRunConfig
+    campaign: _AfterRunCampaign
+
+
+def _make_runner(*, stop_triggered: bool = False) -> _AfterRunHarness:
     runner = object.__new__(CampaignRun)
-    runner.config = _AfterRunConfig()
-    runner.campaign = _AfterRunCampaign()
+    config = _AfterRunConfig()
+    campaign = _AfterRunCampaign()
+    runner.config = config
+    runner.campaign = campaign
     runner.run_count = 0
     runner.is_stage_loop = False
-    runner.stop_oil_checks = []
 
     def triggered_stop_condition(*, oil_check: bool = True) -> bool:
-        runner.stop_oil_checks.append(oil_check)
+        del oil_check
         return stop_triggered
 
     runner.triggered_stop_condition = triggered_stop_condition
-    return runner
+    return _AfterRunHarness(runner, config, campaign)
 
 
-def _make_ui_runner(*, auto_search_continue: bool = False):
+@dataclass
+class _RunHooks:
+    disable_raid_calls: int = 0
+    commission_notice_calls: int = 0
+
+
+@dataclass(frozen=True)
+class _UiRunHarness:
+    runner: CampaignRun
+    device: _RunDevice
+    campaign: _RunCampaign
+    hooks: _RunHooks
+
+
+def _make_ui_runner(*, auto_search_continue: bool = False) -> _UiRunHarness:
     runner = object.__new__(CampaignRun)
-    runner.device = _RunDevice()
-    runner.campaign = _RunCampaign()
+    device = _RunDevice()
+    campaign = _RunCampaign()
+    hooks = _RunHooks()
+    runner.device = device
+    runner.campaign = campaign
     runner.stage = "d3"
-    runner.disable_raid_calls = 0
-    runner.commission_notice_calls = 0
 
     def can_use_auto_search_continue() -> bool:
         return auto_search_continue
 
-    def disable_raid_on_event() -> None:
-        runner.disable_raid_calls += 1
+    def disable_raid_on_event() -> bool:
+        hooks.disable_raid_calls += 1
+        return False
 
     def handle_commission_notice() -> None:
-        runner.commission_notice_calls += 1
+        hooks.commission_notice_calls += 1
 
     runner.can_use_auto_search_continue = can_use_auto_search_continue
     runner.disable_raid_on_event = disable_raid_on_event
     runner.handle_commission_notice = handle_commission_notice
-    return runner
+    return _UiRunHarness(runner, device, campaign, hooks)
 
 
-def _handle_after_run(runner) -> bool:
+def _handle_after_run(runner: CampaignRun) -> bool:
     return getattr(runner, AFTER_RUN_METHOD)()
 
 
-def _ensure_run_ui(runner, mode: str = "normal") -> None:
+def _ensure_run_ui(runner: CampaignRun, mode: str = "normal") -> None:
     getattr(runner, ENSURE_UI_METHOD)(mode)
 
 
@@ -596,7 +622,7 @@ def test_campaign_hard_loads_behavior_through_helper_seam(monkeypatch: pytest.Mo
         "import_module",
         lambda _name, _package: SimpleNamespace(MAP=selected_map),
     )
-    monkeypatch.setattr(hard_module.OCR_HARD_REMAIN, "ocr", lambda _image: 0)
+    monkeypatch.setattr(hard_module.OCR_HARD_REMAIN, "ocr_single", lambda _image: 0)
 
     runner.run()
 
@@ -611,87 +637,87 @@ def test_campaign_hard_loads_behavior_through_helper_seam(monkeypatch: pytest.Mo
 
 
 def test_after_run_updates_run_count() -> None:
-    runner = _make_runner()
-    runner.config.StopCondition_RunCount = 2
+    harness = _make_runner()
+    harness.config.StopCondition_RunCount = 2
 
-    assert not _handle_after_run(runner)
-    assert runner.run_count == 1
-    assert runner.config.StopCondition_RunCount == 1
+    assert not _handle_after_run(harness.runner)
+    assert harness.runner.run_count == 1
+    assert harness.config.StopCondition_RunCount == 1
 
 
 def test_after_run_stops_when_stop_condition_triggers() -> None:
-    runner = _make_runner(stop_triggered=True)
-    runner.config.StopCondition_RunCount = 2
+    harness = _make_runner(stop_triggered=True)
+    harness.config.StopCondition_RunCount = 2
 
-    assert _handle_after_run(runner)
-    assert runner.run_count == 1
-    assert runner.config.StopCondition_RunCount == 1
+    assert _handle_after_run(harness.runner)
+    assert harness.runner.run_count == 1
+    assert harness.config.StopCondition_RunCount == 1
 
 
 def test_after_run_stops_on_one_time_stage() -> None:
-    runner = _make_runner()
-    runner.campaign.config.MAP_IS_ONE_TIME_STAGE = True
+    harness = _make_runner()
+    harness.campaign.config.MAP_IS_ONE_TIME_STAGE = True
 
-    assert _handle_after_run(runner)
-    assert runner.campaign.map_stop_calls == 1
+    assert _handle_after_run(harness.runner)
+    assert harness.campaign.map_stop_calls == 1
 
 
 def test_after_run_stops_on_stage_loop() -> None:
-    runner = _make_runner()
-    runner.is_stage_loop = True
+    harness = _make_runner()
+    harness.runner.is_stage_loop = True
 
-    assert _handle_after_run(runner)
+    assert _handle_after_run(harness.runner)
 
 
 def test_after_run_stops_on_scheduler_switch() -> None:
-    runner = _make_runner()
-    runner.config.is_task_switched = True
+    harness = _make_runner()
+    harness.config.is_task_switched = True
 
     with pytest.raises(_TaskStopped):
-        _handle_after_run(runner)
+        _handle_after_run(harness.runner)
 
-    assert runner.campaign.auto_search_exit_calls == 1
-    assert runner.config.task_stop_calls == 1
+    assert harness.campaign.auto_search_exit_calls == 1
+    assert harness.config.task_stop_calls == 1
 
 
 def test_ensure_run_ui_takes_fresh_screenshot_when_needed() -> None:
-    runner = _make_ui_runner()
-    runner.device.has_cached_image = False
+    harness = _make_ui_runner()
+    harness.device.has_cached_image = False
 
-    _ensure_run_ui(runner, mode="hard")
+    _ensure_run_ui(harness.runner, mode="hard")
 
-    assert runner.device.stuck_clear_calls == 1
-    assert runner.device.click_clear_calls == 1
-    assert runner.device.screenshot_calls == 1
-    assert runner.campaign.device.image == "fresh"
-    assert runner.campaign.ensure_calls == [("d3", "hard")]
-    assert runner.disable_raid_calls == 1
-    assert runner.commission_notice_calls == 1
+    assert harness.device.stuck_clear_calls == 1
+    assert harness.device.click_clear_calls == 1
+    assert harness.device.screenshot_calls == 1
+    assert harness.campaign.device.image == "fresh"
+    assert harness.campaign.ensure_calls == [("d3", "hard")]
+    assert harness.hooks.disable_raid_calls == 1
+    assert harness.hooks.commission_notice_calls == 1
 
 
 def test_ensure_run_ui_retreats_when_already_in_map() -> None:
-    runner = _make_ui_runner()
-    runner.campaign.in_map = True
+    harness = _make_ui_runner()
+    harness.campaign.in_map = True
 
-    _ensure_run_ui(runner)
+    _ensure_run_ui(harness.runner)
 
-    assert runner.campaign.withdraw_calls == 1
-    assert runner.campaign.ensure_calls == [("d3", "normal")]
+    assert harness.campaign.withdraw_calls == 1
+    assert harness.campaign.ensure_calls == [("d3", "normal")]
 
 
 def test_ensure_run_ui_keeps_usable_auto_search_menu() -> None:
-    runner = _make_ui_runner(auto_search_continue=True)
-    runner.campaign.in_auto_search_menu = True
+    harness = _make_ui_runner(auto_search_continue=True)
+    harness.campaign.in_auto_search_menu = True
 
-    _ensure_run_ui(runner)
+    _ensure_run_ui(harness.runner)
 
-    assert runner.campaign.ensure_calls == []
+    assert harness.campaign.ensure_calls == []
 
 
 def test_ensure_run_ui_closes_unusable_auto_search_menu() -> None:
-    runner = _make_ui_runner(auto_search_continue=False)
-    runner.campaign.in_auto_search_menu = True
+    harness = _make_ui_runner(auto_search_continue=False)
+    harness.campaign.in_auto_search_menu = True
 
-    _ensure_run_ui(runner)
+    _ensure_run_ui(harness.runner)
 
-    assert runner.campaign.ensure_calls == [("d3", "normal")]
+    assert harness.campaign.ensure_calls == [("d3", "normal")]

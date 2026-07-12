@@ -1,5 +1,14 @@
+from typing import TYPE_CHECKING
+
 from module.campaign.campaign_base import CampaignBase as CampaignBase_
 from module.logger import logger
+
+if TYPE_CHECKING:
+    from module.config.config import AzurLaneConfig
+    from module.device.device import Device
+    from module.map.map_base import CampaignMap
+    from module.map_detection.grid import Grid
+    from module.map_detection.grid_info import GridInfo
 
 
 class Config:
@@ -17,24 +26,29 @@ class Config:
 class CampaignBase(CampaignBase_):
     ENEMY_FILTER = "1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M"
 
-    def __init__(self, *args, **kwargs):
-        self.picked_light_house = []
-        self.picked_flare = []
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        config: AzurLaneConfig | str,
+        device: Device | str | None = None,
+        task: str | None = None,
+    ) -> None:
+        self.picked_light_house: list[GridInfo] = []
+        self.picked_flare: list[GridInfo] = []
+        super().__init__(config=config, device=device, task=task)
 
-    def map_data_init(self, map_):
+    def map_data_init(self, map_: CampaignMap | None) -> None:
         super().map_data_init(map_)
         self.picked_light_house = []
         self.picked_flare = []
 
-    def handle_mystery_items(self, button=None):
+    def handle_mystery_items(self, button: Grid | None = None) -> bool:
         """
         处理照明弹获得弹窗，但不把它算作常规 mystery。
         """
         super().handle_mystery_items(button=button)
         return False
 
-    def pick_up_flare(self, grid):
+    def pick_up_flare(self, grid: GridInfo) -> bool:
         """标记并尝试拾取对应设施，始终返回 False。"""
         grid.is_flare = True
         if grid in self.picked_flare:
@@ -49,7 +63,7 @@ class CampaignBase(CampaignBase_):
 
         return False
 
-    def pick_up_light_house(self, grid):
+    def pick_up_light_house(self, grid: GridInfo) -> bool:
         """标记并尝试拾取对应设施，始终返回 False。"""
         if grid in self.picked_light_house:
             logger.info(f"Light house {grid} already picked up")

@@ -31,7 +31,7 @@ class _Timer:
         return False
 
     def reset(self) -> None:
-        _Timer.reset_count += 1
+        type(self).reset_count += 1
 
 
 class _Device:
@@ -60,7 +60,8 @@ class _Meowfficer(MeowfficerBase):
     def close_menu(self) -> None:
         self.meow_menu_close()
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default

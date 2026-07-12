@@ -1,9 +1,14 @@
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1, GET_ITEMS_2, GET_SHIP
 from module.logger import logger
 from module.shop.assets import SHOP_CLICK_SAFE_AREA
+
+if TYPE_CHECKING:
+    from module.base.base import ModuleBase
+    from module.base.button import Button, ButtonGrid
 
 
 @dataclass(slots=True, frozen=True)
@@ -27,18 +32,18 @@ class NavbarTarget:
     bottom: int | None = None
 
     @property
-    def left_index(self):
+    def left_index(self) -> int | None:
         if self.left is not None:
             return self.left
         return self.upper
 
     @property
-    def right_index(self):
+    def right_index(self) -> int | None:
         if self.right is not None:
             return self.right
         return self.bottom
 
-    def format(self):
+    def format(self) -> str:
         return " ".join(
             f"{key}={value}"
             for key, value in [
@@ -50,42 +55,48 @@ class NavbarTarget:
             if value is not None
         )
 
-    def is_empty(self):
+    def is_empty(self) -> bool:
         return self.left is None and self.right is None and self.upper is None and self.bottom is None
 
 
 class Navbar:
-    def __init__(self, grids, *, visual=None, name=None):
+    def __init__(
+        self,
+        grids: ButtonGrid,
+        *,
+        visual: NavbarVisualRules | None = None,
+        name: str | None = None,
+    ) -> None:
         self.grids = grids
         self.visual = visual if visual is not None else NavbarVisualRules()
         self.name = name if name is not None else grids.name
 
-    def is_button_active(self, button, main):
+    def is_button_active(self, button: Button, main: ModuleBase) -> bool:
         active = self.visual.active
         return main.image_color_count(button, color=active.color, threshold=active.threshold, count=active.count)
 
-    def is_button_inactive(self, button, main):
+    def is_button_inactive(self, button: Button, main: ModuleBase) -> bool:
         inactive = self.visual.inactive
         return main.image_color_count(button, color=inactive.color, threshold=inactive.threshold, count=inactive.count)
 
-    def get_info(self, main):
+    def get_info(self, main: ModuleBase) -> tuple[int | None, int | None, int | None]:
         """返回活动项、最左可见项和最右可见项的索引。"""
-        total = []
-        active = []
+        total: list[int] = []
+        active_items: list[int] = []
         for index, button in enumerate(self.grids.buttons):
             if self.is_button_active(button, main=main):
                 total.append(index)
-                active.append(index)
+                active_items.append(index)
             elif self.is_button_inactive(button, main=main):
                 total.append(index)
 
-        if len(active) == 0:
+        if len(active_items) == 0:
             active = None
-        elif len(active) == 1:
-            active = active[0]
+        elif len(active_items) == 1:
+            active = active_items[0]
         else:
-            logger.warning(f"Too many active nav items found in {self.name}, items: {active}")
-            active = active[0]
+            logger.warning(f"Too many active nav items found in {self.name}, items: {active_items}")
+            active = active_items[0]
 
         if len(total) < 2:
             logger.warning(f"Too few nav items found in {self.name}, items: {total}")
@@ -96,16 +107,16 @@ class Navbar:
 
         return active, left, right
 
-    def get_active(self, main):
+    def get_active(self, main: ModuleBase) -> int | None:
         return self.get_info(main=main)[0]
 
-    def get_total(self, main):
+    def get_total(self, main: ModuleBase) -> int:
         _, left, right = self.get_info(main=main)
         if left is None or right is None:
             return 0
         return right - left + 1
 
-    def _shop_obstruct_handle(self, main):
+    def _shop_obstruct_handle(self, main: ModuleBase) -> bool:
         """仅商店导航栏需要先关闭遮挡项。"""
         if self.name not in ["SHOP_BOTTOM_NAVBAR", "GUILD_SIDE_NAVBAR"]:
             return False
@@ -122,13 +133,20 @@ class Navbar:
 
         return False
 
-    def _resolve_set_target(self, target):
+    @staticmethod
+    def _resolve_set_target(target: NavbarTarget) -> tuple[int | None, int | None, str] | None:
         if target.is_empty():
             logger.warning("Invalid index to set, must set an index from 1 direction")
             return None
         return target.left_index, target.right_index, target.format()
 
-    def _index_from_visible_range(self, minimum, maximum, left, right):
+    @staticmethod
+    def _index_from_visible_range(
+        minimum: int | None,
+        maximum: int | None,
+        left: int | None,
+        right: int | None,
+    ) -> int | None:
         if minimum is None or maximum is None:
             return None
         if left is not None:
@@ -137,7 +155,16 @@ class Navbar:
             return maximum - right + 1
         return None
 
-    def _target_index_to_set(self, minimum, maximum, left, right, text):
+    def _target_index_to_set(
+        self,
+        minimum: int | None,
+        maximum: int | None,
+        left: int | None,
+        right: int | None,
+        text: str,
+    ) -> int | None:
+        if minimum is None or maximum is None:
+            return None
         index = self._index_from_visible_range(minimum=minimum, maximum=maximum, left=left, right=right)
         if index is None:
             return None
@@ -149,7 +176,13 @@ class Navbar:
             return None
         return index
 
-    def set(self, main, target, skip_first_screenshot=True):
+    def set(
+        self,
+        main: ModuleBase,
+        target: NavbarTarget,
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> bool:
         """target 从指定边缘开始按 1 计数，返回是否成功切换。"""
         resolved = self._resolve_set_target(target)
         if resolved is None:

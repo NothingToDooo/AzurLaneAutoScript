@@ -1,5 +1,14 @@
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Never, override
+
 from module.os.map import OSMap
 from module.ui.page import page_os
+
+if TYPE_CHECKING:
+    from module.base.button import MatchOffset
+    from module.os.globe_zone import ZoneName
+    from module.os.map import RescanMode
+    from module.ui.page import Page
 
 
 class _Task:
@@ -18,9 +27,9 @@ class _Config:
         self.override_calls.append(kwargs)
 
 
+@dataclass
 class _Zone:
-    def __init__(self, zone_id: int) -> None:
-        self.zone_id = zone_id
+    zone_id: int
 
 
 class _Map(OSMap):
@@ -44,7 +53,8 @@ class _Map(OSMap):
         self.special_zone = special_zone
         self.calls: list[tuple[object, ...]] = []
 
-    def name_to_zone(self, name: object, *_args: object, **_kwargs: object) -> object:
+    @override
+    def name_to_zone(self, name: ZoneName) -> Never:
         message = f"legacy zone override should not run: {name}"
         raise AssertionError(message)
 
@@ -59,16 +69,27 @@ class _Map(OSMap):
     def os_globe_goto_map(self, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("os_globe_goto_map",))
 
-    def ui_page_appear(self, page: object, *_args: object, **_kwargs: object) -> bool:
+    @override
+    def ui_page_appear(
+        self,
+        page: Page,
+        offset: MatchOffset | None = (30, 30),
+        interval: float = 0,
+    ) -> bool:
+        del offset, interval
         self.calls.append(("ui_page_appear", page))
         return self.os_page_visible
 
-    def ui_goto_main(self) -> None:
+    @override
+    def ui_goto_main(self) -> bool:
         self.calls.append(("ui_goto_main",))
+        return True
 
-    def ui_ensure(self, destination: object, skip_first_screenshot=True) -> None:
-        _ = skip_first_screenshot
+    @override
+    def ui_ensure(self, destination: Page, *, skip_first_screenshot: bool = True) -> bool:
+        del skip_first_screenshot
         self.calls.append(("ui_ensure", destination))
+        return True
 
     def zone_init(self, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("zone_init",))
@@ -80,7 +101,7 @@ class _Map(OSMap):
         self.calls.append(("handle_after_auto_search",))
         return False
 
-    def handle_current_fleet_resolve(self, revert=False, **_kwargs: object) -> bool:
+    def handle_current_fleet_resolve(self, *, revert: bool = False, **_kwargs: object) -> bool:
         self.calls.append(("handle_current_fleet_resolve", revert))
         return False
 
@@ -91,11 +112,22 @@ class _Map(OSMap):
     def map_exit(self) -> None:
         self.calls.append(("map_exit",))
 
-    def handle_ash_beacon_attack(self) -> None:
+    @override
+    def handle_ash_beacon_attack(self) -> bool:
         self.calls.append(("handle_ash_beacon_attack",))
+        return False
 
-    def run_auto_search(self, *_args: object, **kwargs: object) -> None:
-        self.calls.append(("run_auto_search", kwargs))
+    @override
+    def run_auto_search(
+        self,
+        *,
+        question: bool = True,
+        rescan: RescanMode | bool | None = None,
+        after_auto_search: bool = True,
+    ) -> int:
+        del question, after_auto_search
+        self.calls.append(("run_auto_search", {"rescan": rescan}))
+        return 0
 
 
 def test_os_init_applies_personal_defaults_without_legacy_bound_overrides() -> None:

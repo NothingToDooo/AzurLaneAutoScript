@@ -1,16 +1,30 @@
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, TypedDict, override
 
 from module.map import assets as map_assets
 from module.map import map_fleet_preparation as fleet_preparation_module
-from module.map.map_fleet_preparation import FleetPreparation
+from module.map.map_fleet_preparation import FleetOperatorAssets, FleetPreparation
+
+if TYPE_CHECKING:
+    import pytest
+
+    from module.base.button import Button, MatchOffset
+
+
+class _OperatorConfig(TypedDict, total=False):
+    hard: bool
+    allow: list[bool]
+
+
+type _Call = tuple[str, str] | tuple[str, str, int]
 
 
 class _Device:
     def __init__(self) -> None:
-        self.clicks = []
+        self.clicks: list[Button] = []
         self.screenshot_count = 0
 
-    def click(self, button) -> None:
+    def click(self, button: Button) -> None:
         self.clicks.append(button)
 
     def screenshot(self) -> None:
@@ -20,7 +34,7 @@ class _Device:
 class _FakeFleetOperator:
     OFFSET = (0, 0)
 
-    def __init__(self, assets, main) -> None:
+    def __init__(self, assets: FleetOperatorAssets, main: _FleetPreparation) -> None:
         self.main = main
         self.clear_button = assets.clear
         self.name = {
@@ -33,14 +47,14 @@ class _FakeFleetOperator:
         self.allow_results = list(config.get("allow", []))
         self.main.operators[self.name] = self
 
-    def is_hard_satisfied(self):
+    def is_hard_satisfied(self) -> bool:
         self.main.calls.append((self.name, "is_hard_satisfied"))
         return self.hard_result
 
     def raise_hard_not_satisfied(self) -> None:
         self.main.calls.append((self.name, "raise_hard_not_satisfied"))
 
-    def allow(self):
+    def allow(self) -> bool:
         self.main.calls.append((self.name, "allow"))
         if self.allow_results:
             return self.allow_results.pop(0)
@@ -49,7 +63,7 @@ class _FakeFleetOperator:
     def clear(self) -> None:
         self.main.calls.append((self.name, "clear"))
 
-    def ensure_to_be(self, index) -> None:
+    def ensure_to_be(self, index: int) -> None:
         self.main.calls.append((self.name, "ensure_to_be", index))
 
 
@@ -69,21 +83,31 @@ class _FleetPreparation(FleetPreparation):
             Fleet_Fleet1=fleet1,
             Fleet_Fleet2=fleet2,
             Submarine_Fleet=submarine,
-            SUBMARINE=submarine_enabled,
+            submarine=submarine_enabled,
         )
         self.device = _Device()
         self.map_fleet_checked = False
         self.map_is_hard_mode = False
-        self.operator_configs = {}
-        self.operators = {}
-        self.calls = []
+        self.operator_configs: dict[str, _OperatorConfig] = {}
+        self.operators: dict[str, _FakeFleetOperator] = {}
+        self.calls: list[_Call] = []
+        self.appear_calls: list[Button] = []
 
-    def appear(self, button, *_args: object, **_kwargs):
-        _ = button
+    @override
+    def appear(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 10,
+    ) -> bool:
+        del offset, interval, similarity, threshold
+        self.appear_calls.append(button)
         return False
 
 
-def test_fleet_preparation_skips_hard_mode_and_clears_unconfigured_submarine(monkeypatch) -> None:
+def test_fleet_preparation_skips_hard_mode_and_clears_unconfigured_submarine(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(fleet_preparation_module, "FleetOperator", _FakeFleetOperator)
     preparation = _FleetPreparation()
     preparation.operator_configs = {"submarine": {"hard": True, "allow": [True]}}
@@ -94,7 +118,7 @@ def test_fleet_preparation_skips_hard_mode_and_clears_unconfigured_submarine(mon
     assert ("submarine", "clear") in preparation.calls
 
 
-def test_fleet_preparation_sets_two_fleets_in_config_order(monkeypatch) -> None:
+def test_fleet_preparation_sets_two_fleets_in_config_order(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(fleet_preparation_module, "FleetOperator", _FakeFleetOperator)
     preparation = _FleetPreparation(fleet1=1, fleet2=2)
     preparation.operator_configs = {"submarine": {"allow": [False]}}
@@ -107,10 +131,10 @@ def test_fleet_preparation_sets_two_fleets_in_config_order(monkeypatch) -> None:
         ("fleet1", "ensure_to_be", 1),
         ("fleet2", "ensure_to_be", 2),
     ]
-    assert preparation.config.SUBMARINE == 0
+    assert preparation.config.submarine == 0
 
 
-def test_fleet_preparation_fast_clears_submarine_when_not_configured(monkeypatch) -> None:
+def test_fleet_preparation_fast_clears_submarine_when_not_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(fleet_preparation_module, "FleetOperator", _FakeFleetOperator)
     preparation = _FleetPreparation(fleet1=1, fleet2=0, submarine=0)
     preparation.operator_configs = {

@@ -118,7 +118,7 @@ class Config:
 class Campaign(CampaignBase):
     MAP = MAP
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         if self.fleet_2_step_on(step_on, roadblocks=[roadblocks_d4]):
             return True
 
@@ -129,7 +129,7 @@ class Campaign(CampaignBase):
 
         return self.battle_default()
 
-    def battle_6(self):
+    def battle_6(self) -> bool:
         boss = self.map.select(is_boss=True)
         if (
             boss

@@ -2,7 +2,7 @@ import importlib
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -27,6 +27,9 @@ from module.task_registry import (
     get_direct_task_command,
     get_task_spec,
 )
+
+if TYPE_CHECKING:
+    from module.config.deep import MutableDeepValue
 
 LEGACY_SCHEDULER_PRIORITY = """
 Restart
@@ -102,13 +105,31 @@ INTERNAL_SCHEDULED_COMMANDS = {
 SCOPE_ONLY_NODES = {"Alas", "General", "EventGeneral", "OpsiGeneral"}
 
 
-def _task_nodes() -> list[tuple[str, str, dict]]:
+def _deep_dict(value: MutableDeepValue) -> dict[str, MutableDeepValue]:
+    assert isinstance(value, dict)
+    return value
+
+
+def _deep_string(value: MutableDeepValue) -> str:
+    assert isinstance(value, str)
+    return value
+
+
+def _deep_string_list(value: MutableDeepValue) -> list[str]:
+    assert isinstance(value, list)
+    assert all(isinstance(item, str) for item in value)
+    return [item for item in value if isinstance(item, str)]
+
+
+def _task_nodes() -> list[tuple[str, str, dict[str, MutableDeepValue]]]:
     raw = read_file("module/config/argument/task.yaml")
-    return [
-        (task_group, task_name, node)
-        for task_group, group_data in raw.items()
-        for task_name, node in group_data.get("tasks", {}).items()
-    ]
+    nodes: list[tuple[str, str, dict[str, MutableDeepValue]]] = []
+    for task_group, group_value in raw.items():
+        group_data = _deep_dict(group_value)
+        tasks = _deep_dict(group_data.get("tasks", {}))
+        for task_name, node_value in tasks.items():
+            nodes.append((task_group, task_name, _deep_dict(node_value)))
+    return nodes
 
 
 def _legacy_priority_order() -> list[str]:
@@ -120,7 +141,9 @@ def _legacy_priority_order() -> list[str]:
         functions.append(function)
     priority_filter = Filter(regex=r"(.*)", attr=["command"])
     priority_filter.load(LEGACY_SCHEDULER_PRIORITY)
-    return [function.command for function in priority_filter.apply(functions)]
+    prioritized = priority_filter.apply(functions)
+    assert all(isinstance(function, Function) for function in prioritized)
+    return [function.command for function in prioritized if isinstance(function, Function)]
 
 
 def _render_generated_config_files(folder: Path) -> dict[str, bytes]:
@@ -252,18 +275,17 @@ def test_task_yaml_commands_are_unique_catalog_entries_with_matching_modes() -> 
     scope_nodes = set()
 
     for task_group, task_name, node in _task_nodes():
-        assert isinstance(node, dict)
         assert set(node) <= {"command", "groups"}
-        assert isinstance(node.get("groups"), list)
-        command = node.get("command")
-        if command is None:
+        groups = tuple(_deep_string_list(node.get("groups", [])))
+        command_value = node.get("command")
+        if command_value is None:
             scope_nodes.add(task_name)
             continue
+        command = _deep_string(command_value)
 
         assert command not in command_nodes
         assert command in TASK_CATALOG
         assert command_to_config_name(command) == task_name
-        groups = tuple(node["groups"])
         command_nodes[command] = (task_group, task_name, groups)
         launch_mode = TASK_CATALOG[command].launch_mode
         if "Scheduler" in groups:
@@ -294,7 +316,7 @@ def test_task_catalog_scopes_and_launch_modes_are_complete() -> None:
 
 @pytest.mark.parametrize(
     ("task_name", "command"),
-    [(task_name, node["command"]) for _group, task_name, node in _task_nodes() if "command" in node],
+    [(task_name, _deep_string(node["command"])) for _group, task_name, node in _task_nodes() if "command" in node],
 )
 def test_all_config_commands_keep_legacy_bind_chain(task_name: str, command: str) -> None:
     extra_scope = "CallerScope"
@@ -312,8 +334,11 @@ def test_task_yaml_scheduler_command_remains_pascal_case_node_name() -> None:
     args = ConfigGenerator().args
 
     for _task_group, task_name, node in _task_nodes():
-        if "command" in node and "Scheduler" in node["groups"]:
-            assert args[task_name]["Scheduler"]["Command"]["value"] == task_name
+        if "command" in node and "Scheduler" in _deep_string_list(node["groups"]):
+            task_args = _deep_dict(args[task_name])
+            scheduler = _deep_dict(task_args["Scheduler"])
+            command = _deep_dict(scheduler["Command"])
+            assert command["value"] == task_name
 
 
 def test_config_generator_rejects_unknown_and_duplicate_commands() -> None:
@@ -414,7 +439,9 @@ def test_priority_matches_legacy_filter_first_match_order() -> None:
         function = Function({})
         function.command = name
         functions.append(function)
-    assert [function.command for function in derived_filter.apply(functions)] == legacy_order
+    filtered = derived_filter.apply(functions)
+    assert all(isinstance(function, Function) for function in filtered)
+    assert [function.command for function in filtered if isinstance(function, Function)] == legacy_order
 
 
 def test_only_direct_commands_resolve_for_webui_launch() -> None:
@@ -441,10 +468,11 @@ def test_benchmark_keeps_function_execution_and_task_binding(monkeypatch: pytest
     calls: list[tuple[object, str]] = []
 
     class _Benchmark:
-        def __init__(self, config, task):
+        def __init__(self, config: SimpleNamespace, task: str) -> None:
             calls.append((config, task))
 
-        def run(self) -> None:
+        @staticmethod
+        def run() -> None:
             calls.append(("run", "Benchmark"))
 
     monkeypatch.setattr(benchmark_module, "Benchmark", _Benchmark)

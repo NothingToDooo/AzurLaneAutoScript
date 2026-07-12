@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from module.campaign.assets import EVENT_20221124_ENTRANCE, EVENT_20221124_PT_ICON
 from module.campaign.campaign_base import CampaignBase as CampaignBase_
 from module.combat.assets import GET_ITEMS_1_RYZA
@@ -5,7 +7,12 @@ from module.handler.assets import MYSTERY_ITEM
 from module.handler.fast_forward import AUTO_SEARCH
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
+from module.map_detection.grid_info import GridInfo
 from module.ui.page import page_campaign_menu, page_event
+
+if TYPE_CHECKING:
+    from module.base.button import Button
+    from module.map_detection.grid import Grid
 
 _CAMPAIGN_NAME_ALIAS = {
     "ex": ("t4", "1"),
@@ -25,7 +32,7 @@ class CampaignBase(CampaignBase_):
         "TH1 > TH2 > TH3 > TH4 > TH5",
     )
 
-    def ui_goto_event(self):
+    def ui_goto_event(self) -> bool:
         if self.appear(EVENT_20221124_PT_ICON, offset=(20, 20)) and self.ui_page_appear(page_event):
             logger.info("Already at EVENT_20221124")
             return True
@@ -37,7 +44,7 @@ class CampaignBase(CampaignBase_):
             return True
         return False
 
-    def campaign_set_chapter_event(self, chapter, mode="normal"):
+    def campaign_set_chapter_event(self, chapter: str, mode: str = "normal") -> bool:
         if chapter.startswith("t"):
             self.ui_goto_event()
             self.campaign_ensure_chapter(chapter)
@@ -46,7 +53,7 @@ class CampaignBase(CampaignBase_):
         return super().campaign_set_chapter_event(chapter, mode=mode)
 
     @staticmethod
-    def campaign_separate_name(name):
+    def campaign_separate_name(name: str) -> tuple[str, str]:
         if alias := _CAMPAIGN_NAME_ALIAS.get(name):
             return alias
         for prefix, chapter in _CAMPAIGN_PREFIX_ALIAS:
@@ -56,7 +63,7 @@ class CampaignBase(CampaignBase_):
         return CampaignBase_.campaign_separate_name(name)
 
     @staticmethod
-    def campaign_get_chapter_index(name):
+    def campaign_get_chapter_index(name: str | int) -> int:
         if name == "t4":
             return 4
         if name == "t3":
@@ -68,12 +75,12 @@ class CampaignBase(CampaignBase_):
 
         return CampaignBase_.campaign_get_chapter_index(name)
 
-    def campaign_get_entrance(self, name):
+    def campaign_get_entrance(self, name: str) -> Button:
         if name == "sp":
             name = "asp"
         return super().campaign_get_entrance(name)
 
-    def map_get_info(self):
+    def map_get_info(self) -> None:
         name = str(self.config.Campaign_Name).lower()
         super().map_get_info()
 
@@ -84,7 +91,7 @@ class CampaignBase(CampaignBase_):
             self.map_has_clear_mode = appear
             self.map_show_info()
 
-    def handle_mystery_items(self, button=None):
+    def handle_mystery_items(self, button: Grid | None = None) -> bool:
         # 处理该活动使用的特殊 GET_ITEMS_1。
         if super().handle_mystery_items(button):
             return True
@@ -96,12 +103,11 @@ class CampaignBase(CampaignBase_):
             return True
         return False
 
-    def clear_map_items(self, grids):
+    def clear_map_items(self, grids: GridInfo | list[GridInfo]) -> None:
         """按距离顺序清理单个 GridInfo 或 GridInfo 列表中的地图道具格。"""
-        if not isinstance(grids, list):
-            grids = [grids]
-        grids = SelectedGrids(grids).sort("cost")
-        for grid in grids:
+        grid_list = [grids] if isinstance(grids, GridInfo) else grids
+        selected = SelectedGrids(grid_list).sort("cost")
+        for grid in selected:
             logger.hr("Clear map item")
             logger.info(f"Clear map item on {grid}")
             self.goto(grid)

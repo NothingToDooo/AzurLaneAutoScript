@@ -5,7 +5,7 @@ from module.ui.page import page_guild, page_main
 
 
 class RewardGuild(GuildLobby, GuildLogistics, GuildOperations):
-    def run(self):
+    def run(self) -> None:
         """从主页执行公会大厅、后勤和作战任务，最后回到主页。"""
         if not self.config.GuildLogistics_Enable and not self.config.GuildOperation_Enable:
             self.config.Scheduler_Enable = False

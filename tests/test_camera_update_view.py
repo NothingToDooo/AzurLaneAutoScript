@@ -1,37 +1,47 @@
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, Unpack, override
 
+import numpy as np
 import pytest
 
 import module.map.camera as camera_module
 from module.exception import CampaignEnd, GameNotRunningError, MapDetectionError
 from module.map.camera import Camera
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from module.base.button import Button, MatchOffset
+    from module.base.type_alias import Area, ImageArray, Point
+    from module.device.control import ButtonTarget
+    from module.ui.ui import CheckButton, UiClickOptions, UiClickOptionSettings
+
 
 class _View:
     def __init__(self, *, error: MapDetectionError | None = None) -> None:
         self.error = error
-        self.loaded_images = []
-        self.updated_images = []
+        self.loaded_images: list[ImageArray] = []
+        self.updated_images: list[ImageArray] = []
         self.center_offset = (0.5, 0.5)
 
-    def load(self, image) -> None:
+    def load(self, image: ImageArray) -> None:
         self.loaded_images.append(image)
         if self.error is not None:
             raise self.error
 
-    def update(self, *, image) -> None:
+    def update(self, *, image: ImageArray) -> None:
         self.updated_images.append(image)
 
 
 class _Device:
     def __init__(self) -> None:
-        self.image = object()
-        self.clicked = []
+        self.image = np.zeros((1, 1, 3), dtype=np.uint8)
+        self.clicked: list[ButtonTarget] = []
         self.is_running = True
         self.screenshot_count = 0
         self.interval_clear_count = 0
 
-    def click(self, button) -> None:
+    def click(self, button: ButtonTarget) -> None:
         self.clicked.append(button)
 
     def app_is_running(self) -> bool:
@@ -58,7 +68,7 @@ class _Camera(Camera):
         self.stage_visible = False
         self.story_visible = False
         self.popup_confirmed = False
-        self.visible_assets = []
+        self.visible_assets: list[Button] = []
         self.calls = []
         self.swipes = []
 
@@ -71,10 +81,21 @@ class _Camera(Camera):
     def info_bar_count(self) -> bool:
         return self.info_bar_visible
 
-    def handle_info_bar(self) -> None:
+    @override
+    def handle_info_bar(self) -> bool:
         self.calls.append(("handle_info_bar",))
+        return True
 
-    def appear(self, button, offset=0, *_args: object, **_kwargs: object) -> bool:
+    @override
+    def appear(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 10,
+    ) -> bool:
+        del interval, similarity, threshold
         self.calls.append(("appear", button, offset))
         return any(button is visible for visible in self.visible_assets)
 
@@ -82,24 +103,38 @@ class _Camera(Camera):
         self.calls.append(("handle_story_skip",))
         return self.story_visible
 
-    def ensure_no_story(self, skip_first_screenshot=True, **_kwargs: object) -> None:
+    @override
+    def ensure_no_story(self, *, skip_first_screenshot: bool = True) -> None:
         self.calls.append(("ensure_no_story", skip_first_screenshot))
 
     def is_in_stage(self) -> bool:
         self.calls.append(("is_in_stage",))
         return self.stage_visible
 
-    def enter_map_cancel(self, *_args: object, **_kwargs: object) -> None:
+    @override
+    def enter_map_cancel(self, *, skip_first_screenshot: bool = True) -> bool:
+        del skip_first_screenshot
         self.calls.append(("enter_map_cancel",))
+        return True
 
-    def ensure_auto_search_exit(self, *_args: object, **_kwargs: object) -> None:
+    @override
+    def ensure_auto_search_exit(self, *, skip_first_screenshot: bool = True) -> bool:
+        del skip_first_screenshot
         self.calls.append(("ensure_auto_search_exit",))
+        return True
 
     def is_in_map(self) -> bool:
         self.calls.append(("is_in_map",))
         return True
 
-    def ui_click(self, click_button, check_button=None, options=None, **settings) -> None:
+    @override
+    def ui_click(
+        self,
+        click_button: ButtonTarget,
+        check_button: CheckButton,
+        options: UiClickOptions | None = None,
+        **settings: Unpack[UiClickOptionSettings],
+    ) -> None:
         kwargs = dict(settings)
         if check_button is not None:
             kwargs["check_button"] = check_button
@@ -107,16 +142,17 @@ class _Camera(Camera):
             kwargs["options"] = options
         self.calls.append(("ui_click", click_button, kwargs))
 
-    def handle_popup_confirm(self, name="", *_args: object, **_kwargs: object) -> bool:
+    def handle_popup_confirm(self, name: str = "", *_args: object, **_kwargs: object) -> bool:
         self.calls.append(("handle_popup_confirm", name))
         return self.popup_confirmed
 
-    def _map_swipe(self, vector, box=(123, 159, 1175, 628)):
+    @override
+    def _map_swipe(self, vector: Point, box: Area = (123, 159, 1175, 628)) -> bool:
         del box
         self.swipes.append(tuple(vector))
         return True
 
-    def update_view_for_test(self):
+    def update_view_for_test(self) -> bool:
         return self._update_view()
 
 
@@ -129,18 +165,19 @@ class _CameraWithOsQuit(_Camera):
 
 
 class _UpdateCamera(_Camera):
-    def __init__(self, *, update_results, command: str = "Main") -> None:
+    def __init__(self, *, update_results: Iterable[bool | BaseException], command: str = "Main") -> None:
         super().__init__(command=command)
         self.update_results = list(update_results)
         self.view_data_update_count = 0
 
-    def _update_view(self):
+    @override
+    def _update_view(self) -> bool:
         result = self.update_results.pop(0)
         if isinstance(result, BaseException):
             raise result
         return result
 
-    def _update_view_data(self):
+    def _update_view_data(self) -> bool:
         self.view_data_update_count += 1
         return True
 
@@ -180,7 +217,11 @@ def test_update_view_handles_info_bar_before_terminal_stage() -> None:
         (camera_module.GAME_TIPS, (20, 20), camera_module.GAME_TIPS),
     ],
 )
-def test_update_view_clicks_recoverable_overlay(visible_asset, offset, clicked_button) -> None:
+def test_update_view_clicks_recoverable_overlay(
+    visible_asset: Button,
+    offset: MatchOffset,
+    clicked_button: Button,
+) -> None:
     camera = _failing_camera()
     camera.visible_assets.append(visible_asset)
 
@@ -206,7 +247,11 @@ def test_update_view_clears_story_overlay() -> None:
         (camera_module.AUTO_SEARCH_MENU_CONTINUE, ("ensure_auto_search_exit",), "auto search menu"),
     ],
 )
-def test_update_view_converts_terminal_campaign_screens_to_campaign_end(visible_asset, expected_call, message) -> None:
+def test_update_view_converts_terminal_campaign_screens_to_campaign_end(
+    visible_asset: Button,
+    expected_call: tuple[str],
+    message: str,
+) -> None:
     camera = _failing_camera()
     camera.visible_assets.append(visible_asset)
 

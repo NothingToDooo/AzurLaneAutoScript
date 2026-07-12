@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import cv2
 import numpy as np
 from scipy import signal
@@ -12,20 +14,26 @@ from module.logger import logger
 from module.os_handler.assets import CLICK_SAFE_AREA as OS_CLICK_SAFE_AREA
 from module.ui_white.assets import POPUP_CANCEL_WHITE, POPUP_CONFIRM_WHITE, POPUP_SINGLE_WHITE
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
-def info_letter_preprocess(image):
-    image = image.astype(float)
-    image = (image - 64) / 0.75
-    image[image > 255] = 255
-    image[image < 0] = 0
-    return image.astype("uint8")
+    from module.base.button import MatchOffset
+    from module.base.type_alias import ImageArray
+
+
+def info_letter_preprocess(image: ImageArray) -> ImageArray:
+    processed = image.astype(float)
+    processed = (processed - 64) / 0.75
+    processed[processed > 255] = 255
+    processed[processed < 0] = 0
+    return processed.astype(np.uint8)
 
 
 class InfoHandler(ModuleBase):
-    def info_bar_count(self):
+    def info_bar_count(self) -> int:
         """按顶部蓝线识别信息条数量。"""
         image = self.image_crop(handler_assets.INFO_BAR_AREA, copy=False)
-        line = cv2.reduce(image, 1, cv2.REDUCE_AVG)
+        line = np.asarray(cv2.reduce(image, 1, cv2.REDUCE_AVG), dtype=np.uint8)
         line = color_similarity_2d(line, color=(107, 158, 255))[:, 0]
 
         parameters = {
@@ -37,20 +45,20 @@ class InfoHandler(ModuleBase):
         peaks, _ = signal.find_peaks(line, **parameters)
         return len(peaks)
 
-    def wait_until_info_bar_disappear(self):
+    def wait_until_info_bar_disappear(self) -> None:
         while 1:
             self.device.screenshot()
             if not self.info_bar_count():
                 break
 
-    def handle_info_bar(self):
+    def handle_info_bar(self) -> bool:
         if self.info_bar_count():
             self.wait_until_info_bar_disappear()
             return True
         return False
 
-    def ensure_no_info_bar(self, timeout=0.6, skip_first_screenshot=True):
-        timeout = Timer(timeout).start()
+    def ensure_no_info_bar(self, timeout: float = 0.6, *, skip_first_screenshot: bool = True) -> bool:
+        timeout_timer = Timer(timeout).start()
         handled = False
         while 1:
             if skip_first_screenshot:
@@ -61,14 +69,14 @@ class InfoHandler(ModuleBase):
             if self.handle_info_bar():
                 handled = True
 
-            if timeout.reached():
+            if timeout_timer.reached():
                 break
 
         return handled
 
     _popup_offset = (3, 30)
 
-    def handle_popup_confirm(self, name="", offset=None, interval=2):
+    def handle_popup_confirm(self, name: str = "", offset: MatchOffset | None = None, interval: float = 2) -> bool:
         if offset is None:
             offset = self._popup_offset
         if self.appear(handler_assets.POPUP_CANCEL, offset=offset) and self.appear(
@@ -85,7 +93,7 @@ class InfoHandler(ModuleBase):
             return True
         return False
 
-    def handle_popup_cancel(self, name="", offset=None, interval=2):
+    def handle_popup_cancel(self, name: str = "", offset: MatchOffset | None = None, interval: float = 2) -> bool:
         if offset is None:
             offset = self._popup_offset
         if self.appear(handler_assets.POPUP_CONFIRM, offset=offset) and self.appear(
@@ -102,7 +110,7 @@ class InfoHandler(ModuleBase):
             return True
         return False
 
-    def handle_popup_single(self, name="", offset=None, interval=2):
+    def handle_popup_single(self, name: str = "", offset: MatchOffset | None = None, interval: float = 2) -> bool:
         if offset is None:
             offset = self._popup_offset
         if self.appear(handler_assets.GET_MISSION, offset=offset, interval=interval):
@@ -114,10 +122,10 @@ class InfoHandler(ModuleBase):
 
         return False
 
-    def handle_popup_single_white(self, interval=2):
+    def handle_popup_single_white(self, interval: float = 2) -> bool:
         return self.appear_then_click(POPUP_SINGLE_WHITE, offset=(20, 20), interval=interval)
 
-    def popup_interval_clear(self):
+    def popup_interval_clear(self) -> None:
         self.interval_clear(
             [
                 handler_assets.POPUP_CANCEL,
@@ -129,7 +137,7 @@ class InfoHandler(ModuleBase):
 
     _hot_fix_check_wait = Timer(6)
 
-    def handle_urgent_commission(self):
+    def handle_urgent_commission(self) -> bool:
         appear = self.appear(handler_assets.GET_MISSION, offset=True, interval=2)
         if appear:
             logger.info("Get urgent commission")
@@ -155,7 +163,7 @@ class InfoHandler(ModuleBase):
 
         return appear
 
-    def handle_combat_low_emotion(self):
+    def handle_combat_low_emotion(self) -> bool:
         if not self.emotion.is_ignore:
             return False
 
@@ -165,7 +173,7 @@ class InfoHandler(ModuleBase):
             self.interval_reset(handler_assets.AUTO_SEARCH_MAP_OPTION_OFF)
         return result
 
-    def handle_use_data_key(self):
+    def handle_use_data_key(self) -> bool:
         if not self.config.USE_DATA_KEY:
             return False
 
@@ -203,14 +211,15 @@ class InfoHandler(ModuleBase):
 
         return False
 
-    def handle_vote_popup(self):
+    @staticmethod
+    def handle_vote_popup() -> bool:
         # 投票弹窗已于 2023 年移除。
         return False
 
-    def handle_get_skin(self):
+    def handle_get_skin(self) -> bool:
         return self.appear_then_click(handler_assets.GET_SKIN, offset=(20, 20), interval=2)
 
-    def handle_get_items_ship(self):
+    def handle_get_items_ship(self) -> bool:
         """兼容 2026-06-12 起获得舰船时使用的独立 GET_ITEMS 弹窗。"""
         if self.appear(handler_assets.GET_ITEMS_SHIP_1, offset=5, interval=2):
             self.device.click(handler_assets.GET_ITEMS_SHIP_1)
@@ -218,7 +227,7 @@ class InfoHandler(ModuleBase):
 
         return False
 
-    def handle_guild_popup_confirm(self):
+    def handle_guild_popup_confirm(self) -> bool:
         if self.appear(handler_assets.GUILD_POPUP_CANCEL, offset=self._popup_offset) and self.appear(
             handler_assets.GUILD_POPUP_CONFIRM, offset=self._popup_offset, interval=2
         ):
@@ -227,7 +236,7 @@ class InfoHandler(ModuleBase):
 
         return False
 
-    def handle_guild_popup_cancel(self):
+    def handle_guild_popup_cancel(self) -> bool:
         if self.appear(handler_assets.GUILD_POPUP_CONFIRM, offset=self._popup_offset) and self.appear(
             handler_assets.GUILD_POPUP_CANCEL, offset=self._popup_offset, interval=2
         ):
@@ -236,7 +245,7 @@ class InfoHandler(ModuleBase):
 
         return False
 
-    def handle_mission_popup_go(self):
+    def handle_mission_popup_go(self) -> bool:
         if self.appear(handler_assets.MISSION_POPUP_ACK, offset=self._popup_offset) and self.appear(
             handler_assets.MISSION_POPUP_GO, offset=self._popup_offset, interval=2
         ):
@@ -245,7 +254,7 @@ class InfoHandler(ModuleBase):
 
         return False
 
-    def handle_mission_popup_ack(self):
+    def handle_mission_popup_ack(self) -> bool:
         if self.appear(handler_assets.MISSION_POPUP_GO, offset=self._popup_offset) and self.appear(
             handler_assets.MISSION_POPUP_ACK, offset=self._popup_offset, interval=2
         ):
@@ -263,7 +272,7 @@ class InfoHandler(ModuleBase):
     _story_option_record = 0
     _story_option_confirm = Timer(0.3, count=0)
 
-    def _story_option_buttons(self):
+    def _story_option_buttons(self) -> list[Button]:
         """返回从上到下的剧情选项按钮；未识别时返回空列表。"""
         # 检测区域至少覆盖 3 个选项。
         story_option_area = (730, 188, 1140, 480)
@@ -298,7 +307,7 @@ class InfoHandler(ModuleBase):
 
         return buttons
 
-    def _story_option_buttons_2(self):
+    def _story_option_buttons_2(self) -> list[Button]:
         """返回从上到下的新版剧情选项按钮；未识别时返回空列表。"""
         # 检测区域至少覆盖 3 个选项。
         story_option_area = (330, 135, 980, 555)
@@ -338,7 +347,7 @@ class InfoHandler(ModuleBase):
 
         return buttons
 
-    def _is_story_black(self):
+    def _is_story_black(self) -> bool:
         color = get_color(self.device.image, area=handler_assets.STORY_LETTER_BLACK.area)
         # 深色背景、少量文字的剧情。
         # STORY_LETTER_BLACK.color 是 (16, 20, 16)。
@@ -347,7 +356,7 @@ class InfoHandler(ModuleBase):
         # 黑色背景、少量文字的剧情。
         return color_similar(color, (0, 0, 0), threshold=10)
 
-    def story_skip(self):
+    def story_skip(self) -> bool:
         """2023-09-14 起检查中部白色 STORY_SKIP_3，但仍点击旧 STORY_SKIP。"""
         if self._handle_story_popup_confirm():
             return True
@@ -385,7 +394,7 @@ class InfoHandler(ModuleBase):
             return self._handle_story_option_buttons(options)
         return False
 
-    def _handle_story_option_buttons(self, options) -> bool:
+    def _handle_story_option_buttons(self, options: Sequence[Button]) -> bool:
         options_count = len(options)
         logger.attr("Story_options", options_count)
         if not options_count:
@@ -408,7 +417,7 @@ class InfoHandler(ModuleBase):
         self._story_option_confirm.reset()
         return True
 
-    def _story_option_select(self, options):
+    def _story_option_select(self, options: Sequence[Button]) -> Button:
         try:
             return options[self.config.STORY_OPTION]
         except IndexError:
@@ -443,11 +452,11 @@ class InfoHandler(ModuleBase):
 
         return False
 
-    def story_skip_interval_clear(self):
+    def story_skip_interval_clear(self) -> None:
         self.interval_clear(handler_assets.STORY_SKIP_3)
         self.interval_clear(handler_assets.STORY_LETTERS_ONLY)
 
-    def handle_story_skip(self):
+    def handle_story_skip(self) -> bool:
         # 复刻活动在 clear mode 下仍可能有剧情。
         # clear mode 通常没有剧情，但 B3/D3 在威胁安全前仍有剧情。
         # 威胁安全后不再有剧情。
@@ -456,7 +465,7 @@ class InfoHandler(ModuleBase):
 
         return self.story_skip()
 
-    def ensure_no_story(self, skip_first_screenshot=True):
+    def ensure_no_story(self, *, skip_first_screenshot: bool = True) -> None:
         logger.info("Ensure no story")
         story_timer = Timer(3, count=6).start()
         while 1:
@@ -471,14 +480,14 @@ class InfoHandler(ModuleBase):
             if story_timer.reached():
                 break
 
-    def handle_map_after_combat_story(self):
+    def handle_map_after_combat_story(self) -> bool:
         if not self.config.MAP_HAS_MAP_STORY:
             return False
 
         self.ensure_no_story()
         return True
 
-    def handle_game_tips(self):
+    def handle_game_tips(self) -> bool:
         if self.appear(handler_assets.GAME_TIPS, offset=(20, 20), interval=2) and self.image_color_count(
             handler_assets.GAME_TIPS.button, color=(40, 40, 40), threshold=240, count=50
         ):
@@ -497,20 +506,20 @@ class InfoHandler(ModuleBase):
 
         return False
 
-    def manjuu_count(self):
+    def manjuu_count(self) -> int:
         image = self.image_crop(handler_assets.MANJUU_AREA, copy=False)
         # Manjuu 表情会拉伸和缩小，默认 0.85 无法稳定匹配。
         # 使用 0.8 匹配变形后的表情。
         buttons = handler_assets.TEMPLATE_MANJUU.match_multi(image, similarity=0.8, name="INFO_MANJUU")
         return len(buttons)
 
-    def wait_until_manjuu_disappear(self):
+    def wait_until_manjuu_disappear(self) -> None:
         while 1:
             self.device.screenshot()
             if not self.manjuu_count():
                 break
 
-    def handle_manjuu(self):
+    def handle_manjuu(self) -> bool:
         count = self.manjuu_count()
         if count > 2:
             logger.info(f"Manjuu count: {count}, waiting for manjuu to disappear")

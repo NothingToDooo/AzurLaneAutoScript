@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, TypeVar, cast
+from typing import TypeVar
 
 import pytest
 
@@ -11,9 +11,6 @@ from module.exception import CampaignEnd
 from module.handler.assets import AUTO_SEARCH_MAP_OPTION_OFF
 from module.map.map_base import CampaignMap
 from module.ui.assets import BACK_ARROW
-
-if TYPE_CHECKING:
-    from typing import Any
 
 _T = TypeVar("_T")
 
@@ -55,7 +52,8 @@ class _GemsCampaign(GemsCampaignOverride):
         self.stage_results: list[bool] = []
         self.map_results: list[bool] = []
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
@@ -92,12 +90,6 @@ class _GemsCampaign(GemsCampaignOverride):
         self.calls.append(("is_in_map",))
         return self._next_result(self.map_results, default=False)
 
-    def withdraw(self, *_args: object, **_kwargs: object) -> None:
-        self.calls.append(("withdraw",))
-
-    def enter_map_cancel(self, *_args: object, **_kwargs: object) -> None:
-        self.calls.append(("enter_map_cancel",))
-
 
 class _TestGemsOverride(CampaignBase):
     pass
@@ -125,11 +117,10 @@ def test_gems_farming_uses_loaded_stage_campaign_class(monkeypatch: pytest.Monke
     device = object()
     runner.module = None
 
-    def load_stage(self: object, name: str, folder: str = "campaign_main") -> bool:
+    def load_stage(_self: CampaignRun, name: str, folder: str = "campaign_main") -> bool:
         _ = (name, folder)
-        runner_state = cast("Any", self)
-        runner_state.loaded_stage = LoadedStage(_Config, _TestLoadedCampaign, CampaignMap("TEST"))
-        runner_state.campaign = _TestLoadedCampaign(config=merged_config, device=device)
+        runner.loaded_stage = LoadedStage(_Config, _TestLoadedCampaign, CampaignMap("TEST"))
+        runner.campaign = _TestLoadedCampaign(config=merged_config, device=device)
         return True
 
     monkeypatch.setattr(CampaignRun, "load_campaign", load_stage)
@@ -179,13 +170,14 @@ def test_low_emotion_withdraw_raises_after_stage_return() -> None:
     assert campaign.device.screenshot_count == 1
 
 
-def test_low_emotion_withdraw_backs_out_then_withdraws_from_map() -> None:
+def test_low_emotion_withdraw_backs_out_then_withdraws_from_map(monkeypatch: pytest.MonkeyPatch) -> None:
     campaign = _GemsCampaign()
     campaign.config.GemsFarming_ChangeVanguard = "enabled"
     campaign.cancel_results = [True, False, False]
     campaign.appear_results[button_key(gems_module.BATTLE_PREPARATION)] = [True, False]
     campaign.stage_results = [False]
     campaign.map_results = [True]
+    monkeypatch.setattr(campaign, "withdraw", lambda **_kwargs: campaign.calls.append(("withdraw",)))
 
     with pytest.raises(CampaignEnd, match=gems_module.EMOTION_WITHDRAW_MESSAGE):
         campaign.handle_combat_low_emotion()

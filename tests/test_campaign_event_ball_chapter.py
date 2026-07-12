@@ -1,3 +1,5 @@
+from typing import Literal
+
 import pytest
 
 from campaign.event_20200917_cn.campaign_base import CampaignBase as Event20200917Base
@@ -5,27 +7,39 @@ from campaign.event_20230525_cn.campaign_base import CampaignBase as Event202305
 from campaign.war_archives_20200917_cn.campaign_base import CampaignBase as WarArchives20200917Base
 from campaign.war_archives_20230525_cn.campaign_base import CampaignBase as WarArchives20230525Base
 
+type _Call = tuple[str] | tuple[str, str | int]
+type _BallStatus = Literal["blue", "red"]
+
 
 class _RecordingCampaign:
     def __init__(self) -> None:
-        self.calls = []
+        self.calls: list[_Call] = []
 
-    def ui_goto_campaign(self) -> None:
+    def ui_goto_campaign(self) -> bool:
         self.calls.append(("ui_goto_campaign",))
+        return True
 
-    def ui_goto_event(self) -> None:
+    def ui_goto_event(self) -> bool:
         self.calls.append(("ui_goto_event",))
+        return True
 
-    def ui_goto_sp(self) -> None:
+    def ui_goto_sp(self) -> bool:
         self.calls.append(("ui_goto_sp",))
+        return True
 
-    def campaign_ensure_mode(self, mode) -> None:
+    def campaign_ensure_mode(self, mode: str) -> None:
         self.calls.append(("mode", mode))
 
-    def campaign_ensure_chapter(self, chapter) -> None:
+    def campaign_ensure_chapter(
+        self,
+        chapter: str | int,
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> None:
+        del skip_first_screenshot
         self.calls.append(("chapter", chapter))
 
-    def _campaign_ball_set(self, status) -> None:
+    def _campaign_ball_set(self, status: _BallStatus) -> None:
         self.calls.append(("ball", status))
 
 
@@ -81,7 +95,11 @@ class _WarArchives20230525Campaign(_RecordingCampaign, WarArchives20230525Base):
         ),
     ],
 )
-def test_20200917_event_ball_chapter_keeps_original_order(campaign_cls, name, expected_calls) -> None:
+def test_20200917_event_ball_chapter_keeps_original_order(
+    campaign_cls: type[_Event20200917Campaign | _WarArchives20200917Campaign],
+    name: str,
+    expected_calls: list[_Call],
+) -> None:
     campaign = campaign_cls()
 
     campaign.campaign_set_chapter(name)
@@ -125,7 +143,11 @@ def test_20200917_event_ball_chapter_keeps_original_order(campaign_cls, name, ex
         ),
     ],
 )
-def test_20230525_event_ball_chapter_keeps_original_order(campaign_cls, name, expected_calls) -> None:
+def test_20230525_event_ball_chapter_keeps_original_order(
+    campaign_cls: type[_Event20230525Campaign | _WarArchives20230525Campaign],
+    name: str,
+    expected_calls: list[_Call],
+) -> None:
     campaign = campaign_cls()
 
     campaign.campaign_set_chapter(name)
@@ -142,7 +164,16 @@ def test_20230525_event_ball_chapter_keeps_original_order(campaign_cls, name, ex
         _WarArchives20230525Campaign,
     ],
 )
-def test_event_ball_campaign_keeps_regular_chapter_routes(campaign_cls) -> None:
+def test_event_ball_campaign_keeps_regular_chapter_routes(
+    campaign_cls: (
+        type[
+            _Event20200917Campaign
+            | _WarArchives20200917Campaign
+            | _Event20230525Campaign
+            | _WarArchives20230525Campaign
+        ]
+    ),
+) -> None:
     campaign = campaign_cls()
 
     campaign.campaign_set_chapter("7-2", mode="hard")

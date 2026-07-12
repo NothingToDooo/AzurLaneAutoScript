@@ -1,14 +1,20 @@
+from datetime import datetime
+from typing import TYPE_CHECKING
+
 from module.config.utils import get_os_reset_remain
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
 from module.map.map_grids import SelectedGrids
 from module.os.map import OSMap
 
+if TYPE_CHECKING:
+    from module.os.globe_zone import Zone
+
 WRONG_ZONE_INPUT_MESSAGE = "wrong input, task stopped"
 
 
 class OpsiMeowfficerFarming(OSMap):
-    def os_meowfficer_farming(self):
+    def os_meowfficer_farming(self) -> None:
         """执行大世界猫窝刷图。"""
         logger.hr(f"OS meowfficer farming, hazard_level={self.config.OpsiMeowfficerFarming_HazardLevel}", level=1)
         preserve = self._prepare_meowfficer_farming()
@@ -24,7 +30,7 @@ class OpsiMeowfficerFarming(OSMap):
             zone, refresh = self._next_meowfficer_farming_zone()
             self._run_meowfficer_farming_zone(zone, refresh=refresh)
 
-    def _prepare_meowfficer_farming(self):
+    def _prepare_meowfficer_farming(self) -> int:
         if self.is_cl1_enabled and self.config.OpsiMeowfficerFarming_ActionPointPreserve < 1000:
             logger.info("With CL1 leveling enabled, set action point preserve to 1000")
             self.config.OpsiMeowfficerFarming_ActionPointPreserve = 1000
@@ -46,7 +52,7 @@ class OpsiMeowfficerFarming(OSMap):
         logger.attr("Task cooling down", cd)
         # 每月最后一天 OpsiObscure 和 OpsiAbyssal 调度很密，避免排到它们后面。
         remain = get_os_reset_remain()
-        if cd is not None and remain > 0:
+        if cd is not None and remain > 0 and isinstance(cd.next_run, datetime):
             logger.info("Having task cooling down, delay OpsiMeowfficerFarming after it")
             self.config.task_delay(target=cd.next_run)
             self.config.task_stop()
@@ -57,14 +63,14 @@ class OpsiMeowfficerFarming(OSMap):
             self.config.task_delay(server_update=True)
             self.config.task_stop()
 
-    def _apply_meowfficer_action_point_preserve(self, preserve) -> None:
+    def _apply_meowfficer_action_point_preserve(self, preserve: int) -> None:
         self.config.OS_ACTION_POINT_PRESERVE = preserve
         if self._should_ignore_action_point_for_ash():
             logger.info("Ash beacon not fully collected, ignore action point limit temporarily")
             self.config.OS_ACTION_POINT_PRESERVE = 0
         logger.attr("OS_ACTION_POINT_PRESERVE", self.config.OS_ACTION_POINT_PRESERVE)
 
-    def _should_ignore_action_point_for_ash(self):
+    def _should_ignore_action_point_for_ash(self) -> bool:
         return (
             self.config.is_task_enabled("OpsiAshBeacon")
             and not self._ash_fully_collected
@@ -81,7 +87,7 @@ class OpsiMeowfficerFarming(OSMap):
             keep_current_ap = False
         self.action_point_set(cost=0, keep_current_ap=keep_current_ap, check_rest_ap=check_rest_ap)
 
-    def _next_meowfficer_farming_zone(self):
+    def _next_meowfficer_farming_zone(self) -> tuple[Zone, bool]:
         if self.config.OpsiMeowfficerFarming_TargetZone != 0:
             return self._configured_meowfficer_farming_zone(), True
 
@@ -94,14 +100,14 @@ class OpsiMeowfficerFarming(OSMap):
         )
         return zones[0], False
 
-    def _configured_meowfficer_farming_zone(self):
+    def _configured_meowfficer_farming_zone(self) -> Zone:
         try:
             return self.name_to_zone(self.config.OpsiMeowfficerFarming_TargetZone)
         except ScriptError as e:
             logger.warning(f"wrong zone_id input:{self.config.OpsiMeowfficerFarming_TargetZone}")
             raise RequestHumanTakeover(WRONG_ZONE_INPUT_MESSAGE) from e
 
-    def _run_meowfficer_farming_zone(self, zone, *, refresh) -> None:
+    def _run_meowfficer_farming_zone(self, zone: Zone, *, refresh: bool) -> None:
         logger.hr(f"OS meowfficer farming, zone_id={zone.zone_id}", level=1)
         if refresh:
             self.globe_goto(zone, refresh=True)

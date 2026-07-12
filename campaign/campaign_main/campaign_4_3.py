@@ -69,12 +69,12 @@ class Campaign(CampaignBase):
     MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD = 0.25
     MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD = 0.65
 
-    def battle_0(self):
+    def battle_0(self) -> bool:
         self.clear_all_mystery()
 
         return self.battle_default()
 
-    def battle_3(self):
+    def battle_3(self) -> bool:
         self.clear_all_mystery()
 
         boss = self.map.select(is_boss=True)

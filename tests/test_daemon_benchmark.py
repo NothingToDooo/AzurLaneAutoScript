@@ -20,7 +20,7 @@ from module.daemon.benchmark import Benchmark
         (1.000, "Ultra Slow"),
     ],
 )
-def test_evaluate_screenshot(cost, expected: str) -> None:
+def test_evaluate_screenshot(cost: str | float, expected: str) -> None:
     assert Benchmark.evaluate_screenshot(cost).plain == expected
 
 
@@ -34,7 +34,7 @@ def test_evaluate_screenshot(cost, expected: str) -> None:
         (0.400, "Very Slow"),
     ],
 )
-def test_evaluate_click(cost, expected: str) -> None:
+def test_evaluate_click(cost: str | float, expected: str) -> None:
     assert Benchmark.evaluate_click(cost).plain == expected
 
 
@@ -55,7 +55,7 @@ def test_get_test_methods_uses_fixed_personal_stack(
     assert benchmark.get_test_methods() == expected
 
 
-def test_benchmark_keeps_first_result_when_costs_tie(monkeypatch) -> None:
+def test_benchmark_keeps_first_result_when_costs_tie(monkeypatch: pytest.MonkeyPatch) -> None:
     class TieCost(float):
         pass
 

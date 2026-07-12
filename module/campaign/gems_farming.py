@@ -1,7 +1,7 @@
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from module.campaign.campaign_base import CampaignBase
-from module.campaign.run import CampaignRun
+from module.campaign.run import CampaignMode, CampaignRun
 from module.combat.assets import BATTLE_PREPARATION
 from module.equipment.assets import FLEET_ENTER, FLEET_ENTER_FLAGSHIP
 from module.equipment.fleet_equipment import FleetEquipment
@@ -28,17 +28,22 @@ from module.ui.assets import BACK_ARROW
 from module.ui.page import page_fleet
 
 if TYPE_CHECKING:
-    from typing import Any
+    from collections.abc import Sequence
+
+    from module.base.button import Button
+    from module.base.template import Template
+    from module.retire.scanner import Ship
 
 SIM_VALUE = 0.92
 EMOTION_WITHDRAW_MESSAGE = "Emotion withdraw"
 INVALID_GEMS_FARMING_COMMON_DD_MESSAGE = "Invalid GemsFarming_CommonDD"
 INVALID_COMMON_DD_SETTING_TEMPLATE = "Invalid CommonDD setting: {common_dd}"
 GEMS_FARMING_CAMPAIGN_MODULE_MISSING_MESSAGE = "Gems farming campaign module is not loaded"
+UNCACHED_SHIP_SCAN_MESSAGE = "Uncached ship scan must return ships"
 
 
 class GemsCampaignOverride(CampaignBase):
-    def handle_combat_low_emotion(self):
+    def handle_combat_low_emotion(self) -> bool:
         """启用前排更换时，低心情会撤出战斗并更换旗舰和前排。"""
         if self.config.GemsFarming_ChangeVanguard == "disabled":
             return self._handle_low_emotion_ignore()
@@ -51,14 +56,14 @@ class GemsCampaignOverride(CampaignBase):
         self._withdraw_for_low_emotion()
         raise CampaignEnd(EMOTION_WITHDRAW_MESSAGE)
 
-    def _handle_low_emotion_ignore(self):
+    def _handle_low_emotion_ignore(self) -> bool:
         result = self.handle_popup_confirm("IGNORE_LOW_EMOTION")
         if result:
             # 避免点击 AUTO_SEARCH_MAP_OPTION_OFF。
             self.interval_reset(AUTO_SEARCH_MAP_OPTION_OFF)
         return result
 
-    def _withdraw_for_low_emotion(self):
+    def _withdraw_for_low_emotion(self) -> None:
         while 1:
             self.device.screenshot()
             handled, finished = self._low_emotion_withdraw_step()
@@ -67,7 +72,7 @@ class GemsCampaignOverride(CampaignBase):
             if handled:
                 continue
 
-    def _low_emotion_withdraw_step(self):
+    def _low_emotion_withdraw_step(self) -> tuple[bool, bool]:
         if self._low_emotion_skip_dialogs():
             return True, False
         if self._low_emotion_leave_battle_preparation():
@@ -76,17 +81,17 @@ class GemsCampaignOverride(CampaignBase):
             return True, False
         return self._low_emotion_finish_withdraw()
 
-    def _low_emotion_skip_dialogs(self):
+    def _low_emotion_skip_dialogs(self) -> bool:
         return self.handle_story_skip() or self.handle_popup_cancel("IGNORE_LOW_EMOTION")
 
-    def _low_emotion_leave_battle_preparation(self):
+    def _low_emotion_leave_battle_preparation(self) -> bool:
         if not self.appear(BATTLE_PREPARATION, offset=(20, 20), interval=2):
             return False
 
         self.device.click(BACK_ARROW)
         return True
 
-    def _low_emotion_finish_withdraw(self):
+    def _low_emotion_finish_withdraw(self) -> tuple[bool, bool]:
         if self.is_in_stage():
             return True, True
         if self.is_in_map():
@@ -97,39 +102,40 @@ class GemsCampaignOverride(CampaignBase):
             return True, True
         return False, False
 
-    def _low_emotion_at_preparation(self):
+    def _low_emotion_at_preparation(self) -> bool:
         return self.appear(FLEET_PREPARATION, offset=(20, 50), interval=2) or self.appear(
             MAP_PREPARATION, offset=(20, 20), interval=2
         )
 
 
 class GemsFarming(CampaignRun, FleetEquipment, Dock):
-    def load_campaign(self, name, folder="campaign_main"):
-        super().load_campaign(name, folder)
+    @staticmethod
+    def _campaign_with_gems_override(campaign_class: type[CampaignBase]) -> type[CampaignBase]:
+        return type("GemsCampaign", (GemsCampaignOverride, campaign_class), {})
+
+    def load_campaign(self, name: str, folder: str = "campaign_main") -> bool:
+        loaded = super().load_campaign(name, folder=folder)
 
         loaded_stage = self.loaded_stage
         if loaded_stage is None:
             raise ScriptError(GEMS_FARMING_CAMPAIGN_MODULE_MISSING_MESSAGE)
-        campaign_class = cast("Any", loaded_stage.campaign_class)
-
-        class GemsCampaign(GemsCampaignOverride, campaign_class):
-            pass
-
-        self.campaign = GemsCampaign(device=self.campaign.device, config=self.campaign.config)
+        campaign_class = self._campaign_with_gems_override(loaded_stage.campaign_class)
+        self.campaign = campaign_class(device=self.campaign.device, config=self.campaign.config)
         self.campaign.config.override(Emotion_Mode="ignore")
         self.campaign.config.override(EnemyPriority_EnemyScaleBalanceWeight="S1_enemy_first")
+        return loaded
 
     @property
-    def change_vanguard(self):
+    def change_vanguard(self) -> bool:
         return "ship" in self.config.GemsFarming_ChangeVanguard
 
     @property
-    def fleet_to_attack(self):
+    def fleet_to_attack(self) -> int:
         if self.config.Fleet_FleetOrder == "fleet1_standby_fleet2_all":
             return self.config.Fleet_Fleet2
         return self.config.Fleet_Fleet1
 
-    def flagship_change(self):
+    def flagship_change(self) -> bool:
         """更换旗舰及装备；GemsFarming_CommonCV 为 any 时只更换装备。"""
         logger.hr("Change flagship", level=1)
         self.fleet_enter(self.fleet_to_attack)
@@ -137,7 +143,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         logger.hr("Change flagship", level=2)
         return self.flagship_change_execute()
 
-    def vanguard_change(self):
+    def vanguard_change(self) -> bool:
         """更换前排及其装备。"""
         logger.hr("Change vanguard", level=1)
         logger.attr("ChangeVanguard", self.config.GemsFarming_ChangeVanguard)
@@ -146,17 +152,23 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         logger.hr("Change vanguard", level=2)
         return self.vanguard_change_execute()
 
-    def _dock_reset(self):
+    def _dock_reset(self) -> None:
         self.dock_favourite_set(enable=False, wait_loading=False)
         self.dock_sort_method_dsc_set(wait_loading=False)
         self.dock_filter_set()
 
-    def _ship_change_confirm(self, button):
+    def _ship_change_confirm(self, button: Button) -> None:
         self.dock_select_one(button)
         self._dock_reset()
         self.dock_select_confirm(check_button=page_fleet.check_button)
 
-    def get_common_rarity_cv(self):
+    def _scan_ships(self, scanner: ShipScanner, *, output: bool = True) -> list[Ship]:
+        ships = scanner.scan(self.device.image, output=output)
+        if ships is None:
+            raise RuntimeError(UNCACHED_SHIP_SCAN_MESSAGE)
+        return ships
+
+    def get_common_rarity_cv(self) -> list[Ship]:
         """按配置选择普通航母；any 表示 1～33 级，并要求调用方随后执行 _dock_reset()。"""
         self.dock_favourite_set(enable=False, wait_loading=False)
         self.dock_sort_method_dsc_set(enable=False, wait_loading=False)
@@ -168,12 +180,12 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         scanner.disable("rarity")
 
         if self.config.GemsFarming_CommonCV == "any":
-            ships = scanner.scan(self.device.image)
+            ships = self._scan_ships(scanner)
             if ships:
                 return ships
 
             scanner.set_limitation(fleet=0)
-            return scanner.scan(self.device.image, output=False)
+            return self._scan_ships(scanner, output=False)
 
         template = {
             "BOGUE": TEMPLATE_BOGUE,
@@ -182,7 +194,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
             "RANGER": TEMPLATE_RANGER,
         }[f"{self.config.GemsFarming_CommonCV.upper()}"]
 
-        ships = scanner.scan(self.device.image)
+        ships = self._scan_ships(scanner)
         if ships:
             # 当前舰船可用，无需更换。
             return ships
@@ -190,7 +202,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         scanner.set_limitation(fleet=0)
         candidates = [
             ship
-            for ship in scanner.scan(self.device.image, output=False) or []
+            for ship in self._scan_ships(scanner, output=False)
             if template.match(self.image_crop(ship.button, copy=False), similarity=SIM_VALUE)
         ]
 
@@ -203,11 +215,11 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
 
         return [
             ship
-            for ship in scanner.scan(self.device.image) or []
+            for ship in self._scan_ships(scanner)
             if template.match(self.image_crop(ship.button, copy=False), similarity=SIM_VALUE)
         ]
 
-    def get_common_rarity_dd(self):
+    def get_common_rarity_dd(self) -> list[Ship]:
         """选择心情大于 10 的普通驱逐；国服要求 100 级，其他服 70 级，并要求随后执行 _dock_reset()。"""
         if self.config.GemsFarming_CommonDD == "any":
             faction = ["eagle", "iron"]
@@ -223,7 +235,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
             raise ScriptError(INVALID_GEMS_FARMING_COMMON_DD_MESSAGE)
 
         favourite = self.config.GemsFarming_CommonDD == "favourite"
-        self.dock_favourite_set(favourite, wait_loading=False)
+        self.dock_favourite_set(enable=favourite, wait_loading=False)
         self.dock_sort_method_dsc_set(enable=True, wait_loading=False)
         self.dock_filter_set(index="dd", rarity="common", faction=faction, extra="can_limit_break")
 
@@ -233,7 +245,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         scanner.disable("rarity")
 
         if self.config.GemsFarming_CommonDD in ["any", "favourite", "z20_or_z21"]:
-            return scanner.scan(self.device.image)
+            return self._scan_ships(scanner)
 
         candidates = self.find_candidates(self.get_templates(self.config.GemsFarming_CommonDD), scanner)
         if candidates:
@@ -244,12 +256,12 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
 
         return self.find_candidates(self.get_templates(self.config.GemsFarming_CommonDD), scanner)
 
-    def find_candidates(self, template, scanner):
-        candidates = []
+    def find_candidates(self, template: Sequence[Template], scanner: ShipScanner) -> list[Ship]:
+        candidates: list[Ship] = []
         for item in template:
             candidates = [
                 ship
-                for ship in scanner.scan(self.device.image, output=False)
+                for ship in self._scan_ships(scanner, output=False)
                 if item.match(self.image_crop(ship.button, copy=False), similarity=SIM_VALUE)
             ]
             if candidates:
@@ -257,7 +269,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         return candidates
 
     @staticmethod
-    def get_templates(common_dd):
+    def get_templates(common_dd: str) -> list[Template]:
         if common_dd == "aulick_or_foote":
             return [TEMPLATE_AULICK, TEMPLATE_FOOTE]
         if common_dd == "cassin_or_downes":
@@ -266,7 +278,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         logger.error(message)
         raise ScriptError(message)
 
-    def flagship_change_execute(self):
+    def flagship_change_execute(self) -> bool:
         """页面进出均为 page_fleet。"""
         for _ in self.loop():
             if self.appear(DOCK_CHECK, offset=(20, 20)):
@@ -289,7 +301,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         self.ui_back(check_button=page_fleet.check_button)
         return False
 
-    def vanguard_change_execute(self):
+    def vanguard_change_execute(self) -> bool:
         """页面进出均为 page_fleet。"""
         for _ in self.loop():
             if self.appear(DOCK_CHECK, offset=(20, 20)):
@@ -315,7 +327,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
     _trigger_lv32 = False
     _trigger_emotion = False
 
-    def triggered_stop_condition(self, oil_check=True):
+    def triggered_stop_condition(self, *, oil_check: bool = True) -> bool:
         # 等级上限为 32。
         if self.campaign.config.LV32_TRIGGERED:
             self._trigger_lv32 = True
@@ -329,7 +341,13 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
 
         return super().triggered_stop_condition(oil_check=oil_check)
 
-    def run(self, name, folder="campaign_main", mode="normal", total=0):
+    def run(
+        self,
+        name: str,
+        folder: str = "campaign_main",
+        mode: CampaignMode = "normal",
+        total: int = 0,
+    ) -> None:
         """运行指定地图文件；mode 接受 normal 或 hard。"""
         self.config.override(STOP_IF_REACH_LV32=True)
 

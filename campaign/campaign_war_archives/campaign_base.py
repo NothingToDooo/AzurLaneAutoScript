@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, Literal
+
 from module.campaign.campaign_base import CampaignBase as CampaignBase_
 from module.exception import RequestHumanTakeover
 from module.logger import logger
@@ -15,6 +17,9 @@ from module.war_archives.assets import (
 )
 from module.war_archives.dictionary import dic_archives_template
 
+if TYPE_CHECKING:
+    from module.base.button import Button
+
 WAR_ARCHIVES_SWITCH = Switch("War_Archives_switch", is_selector=True)
 WAR_ARCHIVES_SWITCH.add_state("ex", WAR_ARCHIVES_EX_ON)
 WAR_ARCHIVES_SWITCH.add_state("sp", WAR_ARCHIVES_SP_ON)
@@ -25,7 +30,7 @@ class CampaignBase(CampaignBase_):
     first_run = True
     ENEMY_FILTER = "1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M"
 
-    def _get_archives_entrance(self, name):
+    def _get_archives_entrance(self, name: str) -> Button | None:
         """按活动目录名取得模板并识别对应档案入口。"""
         template = dic_archives_template[name]
 
@@ -35,7 +40,7 @@ class CampaignBase(CampaignBase_):
 
         return button.crop((-12, -12, 44, 32), image=self.device.image, name=name)
 
-    def _archives_loading_complete(self):
+    def _archives_loading_complete(self) -> bool:
         for war_archive_folder in dic_archives_template:
             template = dic_archives_template[war_archive_folder]
             loading_result = template.match(self.device.image)
@@ -44,22 +49,22 @@ class CampaignBase(CampaignBase_):
 
         return False
 
-    def _discard_archives_scroll_record(self):
+    def _discard_archives_scroll_record(self) -> None:
         while self.device.click_record and self.device.click_record[-1] == "WAR_ARCHIVES_SCROLL":
             self.device.click_record.pop()
 
-    def _ensure_archives_search_page(self):
+    def _ensure_archives_search_page(self) -> bool:
         recovered = False
         while not self.appear(WAR_ARCHIVES_CHECK):
             self.ui_ensure(destination=page_archives)
             recovered = True
         return recovered
 
-    def _wait_archives_loaded(self):
+    def _wait_archives_loaded(self) -> None:
         while not self._archives_loading_complete():
             self.device.screenshot()
 
-    def _advance_archives_scroll(self):
+    def _advance_archives_scroll(self) -> bool:
         if not WAR_ARCHIVES_SCROLL.appear(main=self):
             return False
         if WAR_ARCHIVES_SCROLL.at_bottom(main=self):
@@ -68,7 +73,7 @@ class CampaignBase(CampaignBase_):
             WAR_ARCHIVES_SCROLL.next_page(main=self, page=0.66)
         return True
 
-    def _search_archives_entrance(self, name, skip_first_screenshot=True):
+    def _search_archives_entrance(self, name: str, *, skip_first_screenshot: bool = True) -> Button | None:
         """滚动搜索档案入口，最多尝试 20 次后放弃。"""
         loading_checked = False
         for _ in range(20):
@@ -104,7 +109,7 @@ class CampaignBase(CampaignBase_):
         logger.warning("Failed to find archives entrance")
         return None
 
-    def ui_goto_archives_campaign(self, mode="ex"):
+    def ui_goto_archives_campaign(self, mode: Literal["ex", "sp"] = "ex") -> bool:
         """切换档案模式并进入目标活动地图。"""
         # 首次运行无论当前位置都从档案页重新进入；后续若仍在目标地图且未触发奖励或停止条件则直接复用。
         result = True
@@ -133,8 +138,8 @@ class CampaignBase(CampaignBase_):
 
         return result
 
-    def ui_goto_event(self):
+    def ui_goto_event(self) -> bool:
         return self.ui_goto_archives_campaign(mode="ex")
 
-    def ui_goto_sp(self):
+    def ui_goto_sp(self) -> bool:
         return self.ui_goto_archives_campaign(mode="sp")

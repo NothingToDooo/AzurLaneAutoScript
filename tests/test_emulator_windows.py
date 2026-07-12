@@ -1,9 +1,10 @@
 from typing import TYPE_CHECKING
 
 from module.device.platform.emulator_windows import EmulatorManager
-from module.device.platform.platform_windows import PlatformWindows
+from module.device.runtime import MumuRuntime
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
 
@@ -12,8 +13,8 @@ class _ConfiguredEmulatorManager(EmulatorManager):
         self.configured_emulator_path = path.as_posix()
 
     @staticmethod
-    def iter_running_emulator():
-        return ()
+    def iter_running_emulator() -> Iterator[str]:
+        return iter(())
 
 
 def test_emulator_manager_uses_configured_mumu_path(tmp_path: Path) -> None:
@@ -27,10 +28,10 @@ def test_emulator_manager_uses_configured_mumu_path(tmp_path: Path) -> None:
     assert emulators[0].path == executable.as_posix()
 
 
-def test_platform_windows_caches_emulator_manager() -> None:
-    platform = object.__new__(PlatformWindows)
+def test_mumu_runtime_caches_emulator_manager() -> None:
+    runtime = object.__new__(MumuRuntime)
 
-    manager = platform.emulator_manager
+    manager = runtime.emulator_manager
 
     assert isinstance(manager, EmulatorManager)
-    assert platform.emulator_manager is manager
+    assert runtime.emulator_manager is manager

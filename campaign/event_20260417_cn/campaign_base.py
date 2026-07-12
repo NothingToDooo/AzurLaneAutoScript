@@ -16,7 +16,7 @@ EVENT_ANIMATION = Button(
 
 
 class CampaignBase(CampaignBase_):
-    def ui_goto_event(self):
+    def ui_goto_event(self) -> bool:
         if self.appear(EVENT_20260417_PT_ICON, offset=(40, 20)) and self.ui_page_appear(page_event):
             logger.info("Already at EVENT_20260417")
             return True
@@ -37,20 +37,20 @@ class CampaignBase(CampaignBase_):
         return False
 
     @staticmethod
-    def campaign_ocr_result_process(result):
+    def campaign_ocr_result_process(result: str) -> str:
         result = CampaignBase_.campaign_ocr_result_process(result)
         if result in ["ysp", "usp", "vsp"]:
             result = "sp"
         return result
 
-    def is_event_animation(self):
+    def is_event_animation(self) -> bool:
         """返回活动战斗后动画是否出现。"""
         appear = self.appear(EVENT_ANIMATION)
         if appear:
             logger.info("DOA animation, waiting")
         return appear
 
-    def event_animation_end(self):
+    def event_animation_end(self) -> bool:
         if not self.appear(EVENT_ANIMATION):
             return False
         for _ in self.loop():

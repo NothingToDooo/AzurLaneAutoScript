@@ -1,4 +1,4 @@
-from typing import ClassVar, TypeVar
+from typing import ClassVar, TypeVar, override
 
 import pytest
 
@@ -31,7 +31,8 @@ class _Timer:
             return results.pop(0)
         return False
 
-    def reset(self) -> None:
+    @staticmethod
+    def reset() -> None:
         _Timer.reset_count += 1
 
 
@@ -66,13 +67,21 @@ class _RewardGacha(RewardGacha):
     def flush(self) -> None:
         self.gacha_flush_queue()
 
-    def _next_result(self, results: list[_T], *, default: _T) -> _T:
+    @staticmethod
+    def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
             return results.pop(0)
         return default
 
-    def gacha_side_navbar_ensure(self, *_args: object, **kwargs: object) -> None:
+    @override
+    def gacha_side_navbar_ensure(self, *, upper: int | None = None, bottom: int | None = None) -> bool:
+        kwargs = {}
+        if upper is not None:
+            kwargs["upper"] = upper
+        if bottom is not None:
+            kwargs["bottom"] = bottom
         self.calls.append(("gacha_side_navbar_ensure", kwargs))
+        return True
 
     def appear(self, button: object, *_args: object, **kwargs: object) -> bool:
         key = button_key(button)

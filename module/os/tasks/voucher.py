@@ -6,7 +6,7 @@ from module.shop.shop_voucher import VoucherShop
 
 
 class OpsiVoucher(OSMap):
-    def _os_voucher_enter(self):
+    def _os_voucher_enter(self) -> None:
         self.os_map_goto_globe(unpin=False)
         self.ui_click(
             click_button=EXCHANGE_ENTER,
@@ -16,7 +16,7 @@ class OpsiVoucher(OSMap):
             skip_first_screenshot=True,
         )
 
-    def _os_voucher_exit(self):
+    def _os_voucher_exit(self) -> None:
         self.ui_back(
             check_button=EXCHANGE_ENTER,
             appear_button=EXCHANGE_CHECK,
@@ -26,7 +26,7 @@ class OpsiVoucher(OSMap):
         )
         self.os_globe_goto_map()
 
-    def os_voucher(self):
+    def os_voucher(self) -> None:
         logger.hr("OS voucher", level=1)
         self._os_voucher_enter()
         VoucherShop(self.config, self.device).run()

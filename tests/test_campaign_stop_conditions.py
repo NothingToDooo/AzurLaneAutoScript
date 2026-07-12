@@ -30,8 +30,14 @@ class _StopCampaign:
         return self.event_pt_triggered
 
 
-def _make_runner(*, oil: int = 1000, task_balancer_triggered: bool = False):
-    runner = object.__new__(CampaignRun)
+class _StopRunner(CampaignRun):
+    config: _StopConfig
+    campaign: _StopCampaign
+    task_balancer_calls: int
+
+
+def _make_runner(*, oil: int = 1000, task_balancer_triggered: bool = False) -> _StopRunner:
+    runner = object.__new__(_StopRunner)
     runner.config = _StopConfig()
     runner.campaign = _StopCampaign()
     runner.run_limit = 0

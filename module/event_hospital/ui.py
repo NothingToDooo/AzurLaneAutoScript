@@ -8,10 +8,10 @@ from module.ui.ui import UI
 
 
 class HospitalUI(UI):
-    def is_in_clue(self, interval=0):
+    def is_in_clue(self, interval: float = 0) -> bool:
         return self.appear(hospital_assets.HOSIPITAL_CLUE_CHECK, offset=(20, 20), interval=interval)
 
-    def handle_get_clue(self):
+    def handle_get_clue(self) -> bool:
         if self.appear_then_click(hospital_assets.GET_CLUE, offset=(20, 20), interval=1):
             return True
         if self.appear(hospital_assets.GET_CLUE_TEXT, offset=(20, 20), interval=1):
@@ -20,7 +20,7 @@ class HospitalUI(UI):
             return True
         return False
 
-    def handle_clue_exit(self):
+    def handle_clue_exit(self) -> bool:
         if self.appear_then_click(hospital_assets.HOSPITAL_BATTLE_EXIT, offset=(20, 20), interval=2):
             return True
         if self.ui_page_appear(page_hospital, interval=2):

@@ -1,23 +1,28 @@
+from typing import TYPE_CHECKING
+
 from module.base.decorator import cached_property
 from module.logger import logger
 from module.shop.assets import SHOP_BUY_CONFIRM_SELECT
-from module.shop.base import ShopItemGrid_250814
+from module.shop.base import ShopItemGrid250814
 from module.shop.clerk import ShopClerk
 from module.shop.shop_status import ShopStatus
 from module.shop.ui import ShopUI
 
+if TYPE_CHECKING:
+    from module.statistics.item import Item
 
-class GuildShop_250814(ShopClerk, ShopUI, ShopStatus):
+
+class GuildShop250814(ShopClerk, ShopUI, ShopStatus):
     shop_template_folder = "./assets/shop/guild"
 
     @cached_property
-    def shop_filter(self):
+    def shop_filter(self) -> str:
         return self.config.GuildShop_Filter.strip()
 
     @cached_property
-    def shop_guild_items(self):
+    def shop_guild_items(self) -> ShopItemGrid250814:
         shop_grid = self.shop_grid
-        shop_guild_items = ShopItemGrid_250814(
+        shop_guild_items = ShopItemGrid250814(
             shop_grid,
             templates={},
             template_area=(25, 20, 82, 72),
@@ -30,19 +35,19 @@ class GuildShop_250814(ShopClerk, ShopUI, ShopStatus):
         shop_guild_items.load_cost_template_folder("./assets/shop/cost")
         return shop_guild_items
 
-    def shop_items(self):
+    def shop_items(self) -> ShopItemGrid250814:
         return self.shop_guild_items
 
-    def shop_currency(self):
+    def shop_currency(self) -> int:
         self._currency = self.status_get_guild_coins()
         logger.info(f"Guild coins: {self._currency}")
         return self._currency
 
-    def shop_interval_clear(self):
+    def shop_interval_clear(self) -> None:
         super().shop_interval_clear()
         self.interval_clear(SHOP_BUY_CONFIRM_SELECT)
 
-    def shop_buy_handle(self, _item):
+    def shop_buy_handle(self, _item: Item) -> bool:
         """处理舰队商店的商品选择弹窗。"""
         if self.appear(SHOP_BUY_CONFIRM_SELECT, offset=(20, 20), interval=3):
             self.shop_buy_select_execute(_item)
@@ -51,7 +56,7 @@ class GuildShop_250814(ShopClerk, ShopUI, ShopStatus):
 
         return False
 
-    def run(self):
+    def run(self) -> None:
         if not self.shop_filter:
             return
 
