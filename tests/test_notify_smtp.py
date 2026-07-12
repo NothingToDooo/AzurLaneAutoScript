@@ -1,6 +1,6 @@
 from email.message import EmailMessage
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 import module.notify.notify as notify_module
 from module.notify import handle_notify
@@ -40,6 +40,7 @@ port: 465
     assert sent
     smtp.assert_not_called()
     smtp_ssl.assert_called_once_with("smtp.example.com", 465, timeout=notify_module.SMTP_TIMEOUT_SECONDS)
+    client.starttls.assert_not_called()
     client.login.assert_called_once_with(user="sender@example.com", password=LOGIN_VALUE)
     message = client.send_message.call_args.args[0]
     assert isinstance(message, EmailMessage)
@@ -49,7 +50,58 @@ port: 465
     assert message.get_content().rstrip() == "RequestHumanTakeover"
 
 
-def test_explicit_non_ssl_and_to_recipients_use_plain_smtp(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_smtp_port_587_defaults_to_starttls_before_login(monkeypatch: pytest.MonkeyPatch) -> None:
+    context, client = _smtp_context()
+    smtp = MagicMock(return_value=context)
+    smtp_ssl = MagicMock()
+    monkeypatch.setattr(notify_module.smtplib, "SMTP", smtp)
+    monkeypatch.setattr(notify_module.smtplib, "SMTP_SSL", smtp_ssl)
+
+    sent = handle_notify(
+        """
+provider: smtp
+host: smtp.example.com
+user: sender@example.com
+password: secret-value
+port: 587
+""",
+        title="Campaign finished",
+        content="Reached run count limit",
+    )
+
+    assert sent
+    smtp.assert_called_once_with("smtp.example.com", 587, timeout=notify_module.SMTP_TIMEOUT_SECONDS)
+    smtp_ssl.assert_not_called()
+    assert [method_call[0] for method_call in client.method_calls] == ["starttls", "login", "send_message"]
+    client.starttls.assert_called_once_with(context=ANY)
+    client.login.assert_called_once_with(user="sender@example.com", password=LOGIN_VALUE)
+
+
+def test_starttls_failure_never_attempts_login(monkeypatch: pytest.MonkeyPatch) -> None:
+    context, client = _smtp_context()
+    client.starttls.side_effect = notify_module.smtplib.SMTPException("TLS unavailable")
+    smtp = MagicMock(return_value=context)
+    monkeypatch.setattr(notify_module.smtplib, "SMTP", smtp)
+
+    sent = handle_notify(
+        """
+provider: smtp
+host: smtp.example.com
+user: sender@example.com
+password: secret-value
+port: 587
+""",
+        title="Ignored",
+        content="Ignored",
+    )
+
+    assert not sent
+    client.starttls.assert_called_once_with(context=ANY)
+    client.login.assert_not_called()
+    client.send_message.assert_not_called()
+
+
+def test_nonstandard_port_with_ssl_false_uses_plain_smtp(monkeypatch: pytest.MonkeyPatch) -> None:
     context, client = _smtp_context()
     smtp = MagicMock(return_value=context)
     smtp_ssl = MagicMock()
@@ -62,7 +114,7 @@ provider: SMTP
 host: smtp.example.com
 user: sender@example.com
 password: secret-value
-port: 465
+port: 2525
 ssl: false
 to:
   - first@example.com
@@ -73,10 +125,39 @@ to:
     )
 
     assert sent
-    smtp.assert_called_once_with("smtp.example.com", 465, timeout=notify_module.SMTP_TIMEOUT_SECONDS)
+    smtp.assert_called_once_with("smtp.example.com", 2525, timeout=notify_module.SMTP_TIMEOUT_SECONDS)
     smtp_ssl.assert_not_called()
+    client.starttls.assert_not_called()
+    assert [method_call[0] for method_call in client.method_calls] == ["login", "send_message"]
     message = client.send_message.call_args.args[0]
     assert message["To"] == "first@example.com, second@example.com"
+
+
+def test_smtp_port_587_with_ssl_false_still_uses_starttls(monkeypatch: pytest.MonkeyPatch) -> None:
+    context, client = _smtp_context()
+    smtp = MagicMock(return_value=context)
+    smtp_ssl = MagicMock()
+    monkeypatch.setattr(notify_module.smtplib, "SMTP", smtp)
+    monkeypatch.setattr(notify_module.smtplib, "SMTP_SSL", smtp_ssl)
+
+    sent = handle_notify(
+        """
+provider: smtp
+host: smtp.example.com
+user: sender@example.com
+password: secret-value
+port: 587
+ssl: false
+""",
+        title="Campaign finished",
+        content="Reached run count limit",
+    )
+
+    assert sent
+    smtp.assert_called_once_with("smtp.example.com", 587, timeout=notify_module.SMTP_TIMEOUT_SECONDS)
+    smtp_ssl.assert_not_called()
+    assert [method_call[0] for method_call in client.method_calls] == ["starttls", "login", "send_message"]
+    client.starttls.assert_called_once_with(context=ANY)
 
 
 def test_smtp_failure_does_not_log_password_or_raise(monkeypatch: pytest.MonkeyPatch) -> None:

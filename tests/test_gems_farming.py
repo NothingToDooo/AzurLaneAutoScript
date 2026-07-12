@@ -12,9 +12,11 @@ from module.content.legacy_stage import LoadedStage
 from module.exception import CampaignEnd, HardNotSatisfied
 from module.handler.assets import AUTO_SEARCH_MAP_OPTION_OFF
 from module.map.map_base import CampaignMap
+from module.retire.scanner import Ship
 from module.ui.assets import BACK_ARROW
 
 if TYPE_CHECKING:
+    from module.base.button import Button
     from module.config.config import AzurLaneConfig
 
 _T = TypeVar("_T")
@@ -296,7 +298,7 @@ def test_hard_fleet_preparation_fills_empty_slots_then_retries() -> None:
 
 
 class _EquipmentChangeRunner(GemsFarming):
-    def __init__(self) -> None:
+    def __init__(self, *, appear_results: list[bool] | None = None) -> None:
         self.config = cast(
             "AzurLaneConfig",
             SimpleNamespace(
@@ -305,15 +307,19 @@ class _EquipmentChangeRunner(GemsFarming):
                 Fleet_Fleet1=1,
                 Fleet_Fleet2=2,
                 GemsFarming_ChangeFlagship="ship_equip",
+                GemsFarming_ChangeVanguard="ship_equip",
             ),
         )
         self.operations: list[str] = []
+        self.appear_results = list(appear_results or [])
 
     def _goto_fleet(self) -> None:
         self.operations.append("goto")
 
     @override
     def appear(self, *_args: object, **_kwargs: object) -> bool:
+        if self.appear_results:
+            return self.appear_results.pop(0)
         return False
 
     def _change_equipment(self, *_args: object, take_on: bool, **_kwargs: object) -> None:
@@ -323,12 +329,115 @@ class _EquipmentChangeRunner(GemsFarming):
         self.operations.append("change_ship")
         return True
 
+    def vanguard_change_execute(self) -> bool:
+        self.operations.append("change_ship")
+        return True
+
 
 def test_flagship_change_wraps_ship_replacement_with_equipment_code() -> None:
     runner = _EquipmentChangeRunner()
 
     assert runner.flagship_change() is True
     assert runner.operations == ["goto", "take_off", "change_ship", "take_on"]
+
+
+@pytest.mark.parametrize("position", ["flagship", "vanguard"])
+def test_empty_slot_does_not_mount_equipment_without_take_off(position: str) -> None:
+    runner = _EquipmentChangeRunner(appear_results=[True, False])
+
+    change = runner.flagship_change if position == "flagship" else runner.vanguard_change
+    assert change() is True
+    assert runner.operations == ["goto", "change_ship"]
+    assert runner.appear_results == [False]
+
+
+class _CvSearchRunner(GemsFarming):
+    def __init__(self, *, find_results: list[list[Ship]]) -> None:
+        self.config = cast(
+            "AzurLaneConfig",
+            SimpleNamespace(
+                GemsFarming_CommonCV="bogue",
+                Fleet_FleetOrder="fleet1_all_fleet2_standby",
+                Fleet_Fleet1=1,
+                Fleet_Fleet2=2,
+            ),
+        )
+        self.find_results = find_results
+        self.sort_orders: list[bool] = []
+
+    @override
+    def dock_favourite_set(self, *, enable: bool = False, wait_loading: bool = True) -> None:
+        del enable, wait_loading
+
+    def dock_sort_method_dsc_set(self, *, enable: bool = True, wait_loading: bool = True) -> None:
+        del wait_loading
+        self.sort_orders.append(enable)
+
+    @override
+    def dock_filter_set(self, options: object = None, **settings: object) -> None:
+        del options, settings
+
+    def find_candidates(self, *_args: object, **_kwargs: object) -> list[Ship]:
+        return self.find_results.pop(0)
+
+
+def test_cv_search_starts_at_low_levels_before_reversing_specific_fallback() -> None:
+    candidate = Ship(button=cast("Button", object()), level=1, emotion=100)
+    runner = _CvSearchRunner(find_results=[[], [], [candidate]])
+
+    assert runner.get_common_rarity_cv() == [candidate]
+    assert runner.sort_orders == [False, True]
+
+
+class _FlagshipSelectionRunner(GemsFarming):
+    def __init__(self, *, mode: str) -> None:
+        self.config = cast(
+            "AzurLaneConfig",
+            SimpleNamespace(
+                Campaign_Mode=mode,
+                Fleet_FleetOrder="fleet1_all_fleet2_standby",
+            ),
+        )
+        self.campaign = cast(
+            "CampaignBase",
+            SimpleNamespace(map_battle_count=0, emotion=SimpleNamespace(reduce_per_battle=2)),
+        )
+        self.low_ready_button = cast("Button", object())
+        self.candidates = [
+            Ship(button=cast("Button", object()), level=1, emotion=20),
+            Ship(button=self.low_ready_button, level=1, emotion=100),
+            Ship(button=cast("Button", object()), level=31, emotion=150),
+        ]
+        self.selected_button: Button | None = None
+        self._new_fleet_emotion = 0
+
+    @override
+    def ship_info_enter(self, *_args: object, **_kwargs: object) -> None:
+        pass
+
+    def get_common_rarity_cv(self, *, max_level: int = 31, min_emotion: int = 0) -> list[Ship]:
+        del max_level, min_emotion
+        return self.candidates
+
+    def _ship_change_confirm(self, button: Button, *, check_button: Button) -> None:
+        del check_button
+        self.selected_button = button
+
+    @override
+    def _hard_unmount(self, button: Button, *, ship_name: str) -> None:
+        del button, ship_name
+
+    @override
+    def _enter_hard_dock(self, button: Button) -> None:
+        del button
+
+
+@pytest.mark.parametrize("mode", ["normal", "hard"])
+def test_flagship_change_prefers_low_level_then_high_emotion(mode: str) -> None:
+    runner = _FlagshipSelectionRunner(mode=mode)
+
+    assert runner.flagship_change_execute() is True
+    assert runner.selected_button is runner.low_ready_button
 
 
 class _RunCountGemsFarming(GemsFarming):

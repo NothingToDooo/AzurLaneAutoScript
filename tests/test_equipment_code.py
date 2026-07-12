@@ -75,16 +75,59 @@ def test_equipment_code_rejects_non_mapping_yaml() -> None:
 def test_equipment_code_clear_exports_missing_code(monkeypatch: pytest.MonkeyPatch) -> None:
     handler = _handler("DD: null")
     applied: list[str | None] = []
+
+    def apply(code: str | None = None) -> bool:
+        assert handler.last_code == "MC8xLzIvMy80XDA="
+        applied.append(code)
+        return True
+
     monkeypatch.setattr(handler, "equipment_code_supported", lambda: True)
     monkeypatch.setattr(handler, "_code_enter", lambda: None)
     monkeypatch.setattr(handler, "current_ship", lambda: "DD")
     monkeypatch.setattr(handler, "_code_export", lambda: "MC8xLzIvMy80XDA=")
-    monkeypatch.setattr(handler, "_code_apply", lambda code=None: not applied.append(code))
+    monkeypatch.setattr(handler, "_code_apply", apply)
 
     assert handler.code_clear() is True
     assert handler.last_code == "MC8xLzIvMy80XDA="
     assert handler.get_code("DD") == "MC8xLzIvMy80XDA="
     assert applied == [None]
+
+
+def test_equipment_code_clear_keeps_saved_code_for_restore(monkeypatch: pytest.MonkeyPatch) -> None:
+    handler = _handler("DD: saved-code")
+    applied: list[str | None] = []
+
+    def apply(code: str | None = None) -> bool:
+        assert handler.last_code == "saved-code"
+        applied.append(code)
+        return True
+
+    monkeypatch.setattr(handler, "equipment_code_supported", lambda: True)
+    monkeypatch.setattr(handler, "_code_enter", lambda: None)
+    monkeypatch.setattr(handler, "current_ship", lambda: "DD")
+    monkeypatch.setattr(handler, "_code_export", lambda: pytest.fail("saved code must not be exported again"))
+    monkeypatch.setattr(handler, "_code_apply", apply)
+
+    assert handler.code_clear() is True
+    assert handler.last_code == "saved-code"
+    assert applied == [None]
+
+
+def test_equipment_code_clear_without_code_or_export_does_not_clear(monkeypatch: pytest.MonkeyPatch) -> None:
+    handler = _handler("DD: null")
+    handler.config.EquipmentCode_ExportToConfig = False
+    exports: list[None] = []
+    applied: list[str | None] = []
+    monkeypatch.setattr(handler, "equipment_code_supported", lambda: True)
+    monkeypatch.setattr(handler, "_code_enter", lambda: None)
+    monkeypatch.setattr(handler, "current_ship", lambda: "DD")
+    monkeypatch.setattr(handler, "_code_export", lambda: exports.append(None))
+    monkeypatch.setattr(handler, "_code_apply", lambda code=None: not applied.append(code))
+
+    assert handler.code_clear() is False
+    assert handler.last_code is None
+    assert exports == []
+    assert applied == []
 
 
 def test_equipment_code_apply_falls_back_to_last_export(monkeypatch: pytest.MonkeyPatch) -> None:

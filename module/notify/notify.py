@@ -1,4 +1,5 @@
 import smtplib
+import ssl
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from email.message import EmailMessage
@@ -9,6 +10,7 @@ import yaml
 from module.logger import logger
 
 SMTP_TIMEOUT_SECONDS: Final = 15
+SMTP_STARTTLS_PORT: Final = 587
 
 
 class _EmailConfigError(ValueError):
@@ -23,6 +25,7 @@ class _EmailConfig:
     recipients: tuple[str, ...]
     port: int
     use_ssl: bool
+    use_starttls: bool
 
 
 def _load_mapping(raw_config: str) -> dict[str, object]:
@@ -90,6 +93,11 @@ def _load_ssl(config: Mapping[str, object], port: int) -> bool:
     return value
 
 
+def _load_starttls(*, port: int, use_ssl: bool) -> bool:
+    """587 是显式 TLS 提交端口；无论 ssl 为 false 还是未填写，都先升级连接。"""
+    return not use_ssl and port == SMTP_STARTTLS_PORT
+
+
 def _load_email_config(raw_config: str) -> _EmailConfig | None:
     config = _load_mapping(raw_config)
     provider = config.get("provider")
@@ -101,13 +109,15 @@ def _load_email_config(raw_config: str) -> _EmailConfig | None:
 
     user = _required_text(config, "user")
     port = _load_port(config)
+    use_ssl = _load_ssl(config, port)
     return _EmailConfig(
         host=_required_text(config, "host"),
         user=user,
         password=_required_text(config, "password", strip=False),
         recipients=_load_recipients(config, user),
         port=port,
-        use_ssl=_load_ssl(config, port),
+        use_ssl=use_ssl,
+        use_starttls=_load_starttls(port=port, use_ssl=use_ssl),
     )
 
 
@@ -123,6 +133,8 @@ def _build_message(config: _EmailConfig, *, title: str, content: str) -> EmailMe
 def _send_email(config: _EmailConfig, message: EmailMessage) -> None:
     client_class = smtplib.SMTP_SSL if config.use_ssl else smtplib.SMTP
     with client_class(config.host, config.port, timeout=SMTP_TIMEOUT_SECONDS) as client:
+        if config.use_starttls:
+            client.starttls(context=ssl.create_default_context())
         client.login(user=config.user, password=config.password)
         refused = client.send_message(message)
     if refused:

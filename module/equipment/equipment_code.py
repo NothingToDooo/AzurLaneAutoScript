@@ -282,12 +282,17 @@ class EquipmentCodeHandler(StorageHandler):
 
         self._code_enter()
         name = self.current_ship() if name is None else name
-        if self.config.EquipmentCode_ExportToConfig and self.get_code(name) is None:
+        code = self.get_code(name)
+        if code is None and self.config.EquipmentCode_ExportToConfig:
             code = self._code_export()
             if code is None:
                 return False
-            self.last_code = code
             self.set_code(name, code)
+        if code is None:
+            logger.error(f"No equipment code is available for {name}, refuse to clear equipments")
+            return False
+
+        self.last_code = code
         return self._code_apply()
 
     def code_apply(self, name: str | None = None) -> bool:

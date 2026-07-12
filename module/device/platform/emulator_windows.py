@@ -157,7 +157,7 @@ class EmulatorManager(EmulatorManagerBase):
 
     @staticmethod
     def iter_installed_emulator() -> Iterator[str]:
-        """从 Windows 卸载信息定位已安装的 MuMu12。"""
+        """从 Windows 卸载信息定位已安装的 MuMu12，每个安装优先返回 nx_main。"""
         key_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MuMuPlayer"
         for root in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
             try:
@@ -170,6 +170,7 @@ class EmulatorManager(EmulatorManagerBase):
                 executable = Path(install_location, relative_path)
                 if executable.is_file():
                     yield executable.as_posix()
+                    break
 
     @cached_property
     def all_emulators(self) -> list[Emulator]:

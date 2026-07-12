@@ -33,7 +33,7 @@ def test_emulator_manager_uses_configured_mumu_path(tmp_path: Path) -> None:
     assert emulators[0].path == executable.as_posix()
 
 
-def test_emulator_manager_discovers_stopped_mumu_from_windows_registry(
+def test_emulator_manager_prefers_nx_main_for_stopped_mumu_registry_install(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -41,6 +41,9 @@ def test_emulator_manager_discovers_stopped_mumu_from_windows_registry(
     executable = install_location / "nx_main" / "MuMuNxMain.exe"
     executable.parent.mkdir(parents=True)
     executable.touch()
+    legacy_executable = install_location / "shell" / "MuMuPlayer.exe"
+    legacy_executable.parent.mkdir(parents=True)
+    legacy_executable.touch()
 
     def open_key(root: object, key_path: str) -> nullcontext[object]:
         assert key_path == r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MuMuPlayer"

@@ -316,6 +316,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         logger.attr("ChangeFlagship", self.config.GemsFarming_ChangeFlagship)
         self._goto_fleet()
         button = self.fleet_backline_1_button
+        equipment_taken_off = False
 
         if self.change_flagship_equip and not self.appear(button, offset=(20, 20)):
             logger.hr("Unmount flagship equipments", level=2)
@@ -324,11 +325,12 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
                 equipment_assets.FLEET_DETAIL_ENTER_FLAGSHIP,
                 take_on=False,
             )
+            equipment_taken_off = True
 
         logger.hr("Change flagship", level=2)
         success = self.flagship_change_execute()
 
-        if self.change_flagship_equip and not self.appear(button, offset=(20, 20)):
+        if equipment_taken_off:
             logger.hr("Mount flagship equipments", level=2)
             self._change_equipment(
                 button,
@@ -343,15 +345,17 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         logger.attr("ChangeVanguard", self.config.GemsFarming_ChangeVanguard)
         self._goto_fleet()
         button = self.fleet_vanguard_1_button
+        equipment_taken_off = False
 
         if self.change_vanguard_equip and not self.appear(button, offset=(20, 20)):
             logger.hr("Unmount vanguard equipments", level=2)
             self._change_equipment(button, equipment_assets.FLEET_DETAIL_ENTER, take_on=False)
+            equipment_taken_off = True
 
         logger.hr("Change vanguard", level=2)
         success = self.vanguard_change_execute()
 
-        if self.change_vanguard_equip and not self.appear(button, offset=(20, 20)):
+        if equipment_taken_off:
             logger.hr("Mount vanguard equipments", level=2)
             self._change_equipment(button, equipment_assets.FLEET_DETAIL_ENTER, take_on=True)
         return success
@@ -404,7 +408,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
     def get_common_rarity_cv(self, *, max_level: int = 31, min_emotion: int = 0) -> list[Ship]:
         """选择满足等级和心情要求的普通航母。"""
         self.dock_favourite_set(enable=False, wait_loading=False)
-        self.dock_sort_method_dsc_set(enable=True, wait_loading=False)
+        self.dock_sort_method_dsc_set(enable=False, wait_loading=False)
         self.dock_filter_set(index="cv", rarity="common", extra="enhanceable", sort="total")
 
         logger.hr("FINDING FLAGSHIP")
@@ -427,7 +431,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
             return candidates
 
         logger.info("No specific CV was found, try reversed order.")
-        self.dock_sort_method_dsc_set(enable=False)
+        self.dock_sort_method_dsc_set(enable=True)
         return self.find_candidates(templates, scanner, output=True)
 
     def get_dd_faction(self) -> str | list[str]:
@@ -497,6 +501,16 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         else:
             self._new_fleet_emotion = emotion
 
+    def _select_low_level_cv(self, candidates: Sequence[Ship]) -> Ship:
+        """优先选择低等级航母；同等级时选择心情更高的舰船。"""
+        return min(
+            candidates,
+            key=lambda candidate: (
+                self._ship_attribute(candidate, "level"),
+                -self._ship_attribute(candidate, "emotion"),
+            ),
+        )
+
     def _normal_flagship_change_execute(self) -> bool:
         self.ship_info_enter(
             equipment_assets.FLEET_ENTER_FLAGSHIP,
@@ -506,13 +520,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         )
         candidates = self.get_common_rarity_cv(min_emotion=self.min_emotion)
         if candidates:
-            ship = max(
-                candidates,
-                key=lambda candidate: (
-                    self._ship_attribute(candidate, "level"),
-                    self._ship_attribute(candidate, "emotion"),
-                ),
-            )
+            ship = self._select_low_level_cv(candidates)
             self._record_new_ship_emotion(ship)
             self._ship_change_confirm(ship.button, check_button=page_fleet.check_button)
             logger.info("Change flagship success")
@@ -558,13 +566,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
 
         candidates = self.get_common_rarity_cv(max_level=31, min_emotion=self.min_emotion)
         if candidates:
-            ship = max(
-                candidates,
-                key=lambda candidate: (
-                    self._ship_attribute(candidate, "level"),
-                    self._ship_attribute(candidate, "emotion"),
-                ),
-            )
+            ship = self._select_low_level_cv(candidates)
             self._record_new_ship_emotion(ship)
             self._ship_change_confirm(ship.button, check_button=FLEET_PREPARATION)
             logger.info("Change flagship success")
@@ -573,13 +575,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         logger.info("Change flagship failed, try using leveled or exhausted CVs")
         candidates = self.get_common_rarity_cv(max_level=100)
         if candidates:
-            ship = min(
-                candidates,
-                key=lambda candidate: (
-                    self._ship_attribute(candidate, "level"),
-                    -self._ship_attribute(candidate, "emotion"),
-                ),
-            )
+            ship = self._select_low_level_cv(candidates)
             self._record_new_ship_emotion(ship)
             self._ship_change_confirm(ship.button, check_button=FLEET_PREPARATION)
             return False
