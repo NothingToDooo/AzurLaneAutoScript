@@ -152,14 +152,17 @@ class AdbSession(ConnectionAttr):
                 text=True,
                 timeout=10,
             )
-        except subprocess.CalledProcessError as error:
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
             stdout = (error.stdout or "").strip()
             stderr = (error.stderr or "").strip()
             for output in (stdout, stderr):
                 if output:
                     logger.error(output)
 
-            message = f"ADB start-server failed with exit code {error.returncode}"
+            if isinstance(error, subprocess.TimeoutExpired):
+                message = f"ADB start-server timed out after {error.timeout} seconds"
+            else:
+                message = f"ADB start-server failed with exit code {error.returncode}"
             reason = stderr or stdout
             if reason:
                 message = f"{message}: {reason}"

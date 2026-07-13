@@ -87,3 +87,40 @@ def test_adb_start_server_translates_process_failure_and_logs_output(monkeypatch
 
     assert raised.value.__cause__ is process_error
     assert logger.errors == ["daemon stdout", "cannot bind listener"]
+
+
+def test_adb_start_server_translates_timeout_and_logs_partial_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    adb_binary = "C:/Alas/bin/adb/adb.exe"
+    command = [adb_binary, "-P", "65037", "start-server"]
+    timeout_error = subprocess.TimeoutExpired(
+        cmd=command,
+        timeout=10,
+        output="partial stdout\n",
+        stderr="startup stalled\n",
+    )
+    logger = _Logger()
+    server_version_called = False
+    monkeypatch.setenv("ANDROID_ADB_SERVER_PORT", "65037")
+
+    def fail_to_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        raise timeout_error
+
+    def server_version() -> int:
+        nonlocal server_version_called
+        server_version_called = True
+        return 0
+
+    monkeypatch.setattr(adb_session_module.subprocess, "run", fail_to_run)
+    monkeypatch.setattr(adb_session_module, "logger", logger)
+    session = object.__new__(AdbSession)
+    vars(session).update(
+        adb_binary=adb_binary,
+        adb_client=SimpleNamespace(server_version=server_version),
+    )
+
+    with pytest.raises(OSError, match=r"ADB start-server timed out after 10 seconds: startup stalled") as raised:
+        session.adb_start_server()
+
+    assert raised.value.__cause__ is timeout_error
+    assert logger.errors == ["partial stdout", "startup stalled"]
+    assert not server_version_called

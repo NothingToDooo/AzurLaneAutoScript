@@ -3,6 +3,7 @@ import ssl
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from email.message import EmailMessage
+from enum import Enum, auto
 from typing import Final
 
 import yaml
@@ -17,6 +18,12 @@ class _EmailConfigError(ValueError):
     pass
 
 
+class _EmailTransport(Enum):
+    PLAIN = auto()
+    IMPLICIT_TLS = auto()
+    STARTTLS = auto()
+
+
 @dataclass(frozen=True, slots=True)
 class _EmailConfig:
     host: str
@@ -24,8 +31,7 @@ class _EmailConfig:
     password: str = field(repr=False)
     recipients: tuple[str, ...]
     port: int
-    use_ssl: bool
-    use_starttls: bool
+    transport: _EmailTransport
 
 
 def _load_mapping(raw_config: str) -> dict[str, object]:
@@ -74,6 +80,7 @@ def _load_recipients(config: Mapping[str, object], user: str) -> tuple[str, ...]
 
 
 def _load_port(config: Mapping[str, object]) -> int:
+    """0 由 smtplib 按传输模式解析为 25 或 465，与旧 OnePush 语义一致。"""
     value = config.get("port", 0)
     if value is None:
         return 0
@@ -83,19 +90,34 @@ def _load_port(config: Mapping[str, object]) -> int:
     return value
 
 
-def _load_ssl(config: Mapping[str, object], port: int) -> bool:
-    value = config.get("ssl")
+def _load_optional_bool(config: Mapping[str, object], key: str) -> bool | None:
+    value = config.get(key)
     if value is None:
-        return port == smtplib.SMTP_SSL_PORT
+        return None
     if not isinstance(value, bool):
-        message = "SMTP ssl must be a boolean"
+        message = f"SMTP {key} must be a boolean"
         raise _EmailConfigError(message)
     return value
 
 
-def _load_starttls(*, port: int, use_ssl: bool) -> bool:
-    """587 是显式 TLS 提交端口；无论 ssl 为 false 还是未填写，都先升级连接。"""
-    return not use_ssl and port == SMTP_STARTTLS_PORT
+def _load_transport(config: Mapping[str, object], port: int) -> _EmailTransport:
+    """把旧 OnePush 的 ssl/starttls 组合归一化为唯一传输模式。"""
+    use_ssl = _load_optional_bool(config, "ssl")
+    use_starttls = _load_optional_bool(config, "starttls")
+
+    # 旧 ALAS 文档把 587 与 ssl:true 搭配使用；按端口语义恢复为 STARTTLS。
+    if port == SMTP_STARTTLS_PORT:
+        return _EmailTransport.STARTTLS
+    if use_ssl and use_starttls:
+        message = "SMTP ssl and starttls cannot both be true"
+        raise _EmailConfigError(message)
+    if use_starttls:
+        return _EmailTransport.STARTTLS
+    if use_ssl is None:
+        use_ssl = port == smtplib.SMTP_SSL_PORT
+    if use_ssl:
+        return _EmailTransport.IMPLICIT_TLS
+    return _EmailTransport.PLAIN
 
 
 def _load_email_config(raw_config: str) -> _EmailConfig | None:
@@ -109,15 +131,13 @@ def _load_email_config(raw_config: str) -> _EmailConfig | None:
 
     user = _required_text(config, "user")
     port = _load_port(config)
-    use_ssl = _load_ssl(config, port)
     return _EmailConfig(
         host=_required_text(config, "host"),
         user=user,
         password=_required_text(config, "password", strip=False),
         recipients=_load_recipients(config, user),
         port=port,
-        use_ssl=use_ssl,
-        use_starttls=_load_starttls(port=port, use_ssl=use_ssl),
+        transport=_load_transport(config, port),
     )
 
 
@@ -131,7 +151,7 @@ def _build_message(config: _EmailConfig, *, title: str, content: str) -> EmailMe
 
 
 def _send_email(config: _EmailConfig, message: EmailMessage) -> None:
-    if config.use_ssl:
+    if config.transport is _EmailTransport.IMPLICIT_TLS:
         client = smtplib.SMTP_SSL(
             config.host,
             config.port,
@@ -142,7 +162,7 @@ def _send_email(config: _EmailConfig, message: EmailMessage) -> None:
         client = smtplib.SMTP(config.host, config.port, timeout=SMTP_TIMEOUT_SECONDS)
 
     with client as connected_client:
-        if config.use_starttls:
+        if config.transport is _EmailTransport.STARTTLS:
             connected_client.starttls(context=ssl.create_default_context())
         connected_client.login(user=config.user, password=config.password)
         refused = connected_client.send_message(message)
