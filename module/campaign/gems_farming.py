@@ -645,17 +645,15 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         return self._normal_vanguard_change_execute()
 
     def hard_fleet_prepare(self) -> bool:
-        """困难模式退役后，用宝石队候选舰船补齐前后排空位。"""
-        prepared = False
+        """困难模式退役后补齐空位；所有替换都有效时才允许重试进图。"""
+        change_results: list[bool] = []
         if self.appear(self.fleet_backline_1_button, offset=(20, 20)):
             logger.info("Backline is empty, change flagship")
-            self.flagship_change()
-            prepared = True
+            change_results.append(self.flagship_change())
         if self.appear(self.fleet_vanguard_1_button, offset=(20, 20)):
             logger.info("Vanguard is empty, change vanguard")
-            self.vanguard_change()
-            prepared = True
-        return prepared
+            change_results.append(self.vanguard_change())
+        return bool(change_results) and all(change_results)
 
     _trigger_lv32 = False
     _trigger_emotion = False

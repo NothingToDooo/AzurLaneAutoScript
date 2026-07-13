@@ -297,6 +297,57 @@ def test_hard_fleet_preparation_fills_empty_slots_then_retries() -> None:
     assert runner.prepare_calls == 1
 
 
+class _HardFleetPrepareResultRunner(GemsFarming):
+    def __init__(self, *, flagship_result: bool, vanguard_result: bool) -> None:
+        self.config = cast(
+            "AzurLaneConfig",
+            SimpleNamespace(
+                Campaign_Mode="hard",
+                Fleet_FleetOrder="fleet1_all_fleet2_standby",
+            ),
+        )
+        self.flagship_result = flagship_result
+        self.vanguard_result = vanguard_result
+        self.change_calls: list[str] = []
+
+    @override
+    def appear(self, *_args: object, **_kwargs: object) -> bool:
+        return True
+
+    @override
+    def flagship_change(self) -> bool:
+        self.change_calls.append("flagship")
+        return self.flagship_result
+
+    @override
+    def vanguard_change(self) -> bool:
+        self.change_calls.append("vanguard")
+        return self.vanguard_result
+
+
+@pytest.mark.parametrize(
+    ("flagship_result", "vanguard_result", "expected"),
+    [
+        (True, True, True),
+        (False, True, False),
+        (True, False, False),
+    ],
+)
+def test_hard_fleet_prepare_requires_every_replacement_to_succeed(
+    *,
+    flagship_result: bool,
+    vanguard_result: bool,
+    expected: bool,
+) -> None:
+    runner = _HardFleetPrepareResultRunner(
+        flagship_result=flagship_result,
+        vanguard_result=vanguard_result,
+    )
+
+    assert runner.hard_fleet_prepare() is expected
+    assert runner.change_calls == ["flagship", "vanguard"]
+
+
 class _EquipmentChangeRunner(GemsFarming):
     def __init__(self, *, appear_results: list[bool] | None = None) -> None:
         self.config = cast(
