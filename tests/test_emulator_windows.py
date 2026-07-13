@@ -23,7 +23,7 @@ class _ConfiguredEmulatorManager(EmulatorManager):
 
 
 def test_emulator_manager_uses_configured_mumu_path(tmp_path: Path) -> None:
-    executable = tmp_path / "MuMuPlayer-12.0" / "shell" / "MuMuPlayer.exe"
+    executable = tmp_path / "MuMu Player 12" / "nx_main" / "MuMuNxMain.exe"
     executable.parent.mkdir(parents=True)
     executable.touch()
 
@@ -41,6 +41,36 @@ def test_emulator_manager_prefers_nx_main_for_stopped_mumu_registry_install(
     executable = install_location / "nx_main" / "MuMuNxMain.exe"
     executable.parent.mkdir(parents=True)
     executable.touch()
+
+    def open_key(root: object, key_path: str) -> nullcontext[object]:
+        assert key_path == r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MuMuPlayer"
+        if root == "current_user":
+            raise FileNotFoundError
+        return nullcontext(object())
+
+    def query_value_ex(_key: object, value_name: str) -> tuple[str, int]:
+        assert value_name == "InstallLocation"
+        return install_location.as_posix(), 1
+
+    registry = SimpleNamespace(
+        HKEY_CURRENT_USER="current_user",
+        HKEY_LOCAL_MACHINE="local_machine",
+        OpenKey=open_key,
+        QueryValueEx=query_value_ex,
+    )
+    monkeypatch.setattr(emulator_windows_module, "winreg", registry)
+    monkeypatch.setattr(EmulatorManager, "iter_running_emulator", staticmethod(lambda: iter(())))
+
+    emulators = EmulatorManager().all_emulators
+
+    assert [emulator.path for emulator in emulators] == [executable.as_posix()]
+
+
+def test_emulator_manager_rejects_legacy_shell_registry_install(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    install_location = tmp_path / "MuMuPlayer-12.0"
     legacy_executable = install_location / "shell" / "MuMuPlayer.exe"
     legacy_executable.parent.mkdir(parents=True)
     legacy_executable.touch()
@@ -64,7 +94,27 @@ def test_emulator_manager_prefers_nx_main_for_stopped_mumu_registry_install(
     monkeypatch.setattr(emulator_windows_module, "winreg", registry)
     monkeypatch.setattr(EmulatorManager, "iter_running_emulator", staticmethod(lambda: iter(())))
 
-    emulators = EmulatorManager().all_emulators
+    assert EmulatorManager().all_emulators == []
+
+
+def test_emulator_manager_ignores_running_legacy_shell_for_configured_nx_main(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    install_location = tmp_path / "MuMu Player 12"
+    executable = install_location / "nx_main" / "MuMuNxMain.exe"
+    executable.parent.mkdir(parents=True)
+    executable.touch()
+    legacy_executable = install_location / "shell" / "MuMuPlayer.exe"
+    legacy_executable.parent.mkdir(parents=True)
+    legacy_executable.touch()
+    monkeypatch.setattr(
+        EmulatorManager,
+        "iter_running_emulator",
+        staticmethod(lambda: iter((legacy_executable.as_posix(),))),
+    )
+
+    emulators = EmulatorManager(executable.as_posix()).all_emulators
 
     assert [emulator.path for emulator in emulators] == [executable.as_posix()]
 

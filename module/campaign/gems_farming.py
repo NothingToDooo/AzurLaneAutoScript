@@ -500,10 +500,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
 
     def _record_new_ship_emotion(self, ship: Ship) -> None:
         emotion = self._ship_attribute(ship, "emotion")
-        if self._new_fleet_emotion:
-            self._new_fleet_emotion = min(emotion, self._new_fleet_emotion)
-        else:
-            self._new_fleet_emotion = emotion
+        self._new_fleet_emotion = min(emotion, self._new_fleet_emotion)
 
     def _select_low_level_cv(self, candidates: Sequence[Ship]) -> Ship:
         """优先选择低等级航母；同等级时选择心情更高的舰船。"""
@@ -665,7 +662,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
 
     _trigger_lv32 = False
     _trigger_emotion = False
-    _new_fleet_emotion = 0
+    _new_fleet_emotion: int
 
     def triggered_stop_condition(self, *, oil_check: bool = True) -> bool:
         # 等级上限为 32。

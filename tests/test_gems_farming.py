@@ -362,14 +362,16 @@ class _HardFleetPrepareResultRunner(GemsFarming):
     def flagship_change(self) -> bool:
         self.change_calls.append("flagship")
         if self.flagship_emotion is not None:
-            self._new_fleet_emotion = min(self._new_fleet_emotion, self.flagship_emotion)
+            ship = Ship(button=cast("Button", object()), level=1, emotion=self.flagship_emotion)
+            self._record_new_ship_emotion(ship)
         return self.flagship_result
 
     @override
     def vanguard_change(self) -> bool:
         self.change_calls.append("vanguard")
         if self.vanguard_emotion is not None:
-            self._new_fleet_emotion = min(self._new_fleet_emotion, self.vanguard_emotion)
+            ship = Ship(button=cast("Button", object()), level=100, emotion=self.vanguard_emotion)
+            self._record_new_ship_emotion(ship)
         return self.vanguard_result
 
 
@@ -407,6 +409,20 @@ def test_hard_fleet_prepare_records_lowest_current_and_replacement_emotion() -> 
 
     assert runner.hard_fleet_prepare() is True
     assert runner.records == [{"Emotion_Fleet1Value": 30}]
+
+
+@pytest.mark.parametrize("current_emotion", [0, 80])
+def test_hard_fleet_prepare_keeps_zero_as_lowest_emotion(current_emotion: int) -> None:
+    runner = _HardFleetPrepareResultRunner(
+        flagship_result=False,
+        vanguard_result=True,
+        current_emotion=current_emotion,
+        flagship_emotion=0,
+        vanguard_emotion=120,
+    )
+
+    assert runner.hard_fleet_prepare() is False
+    assert runner.records == [{"Emotion_Fleet1Value": 0}]
 
 
 class _EquipmentChangeRunner(GemsFarming):
@@ -564,7 +580,7 @@ class _FlagshipSelectionRunner(GemsFarming):
             Ship(button=cast("Button", object()), level=31, emotion=150),
         ]
         self.selected_button: Button | None = None
-        self._new_fleet_emotion = 0
+        self._new_fleet_emotion = 150
 
     @override
     def ship_info_enter(self, *_args: object, **_kwargs: object) -> None:

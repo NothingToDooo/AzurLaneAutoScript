@@ -41,7 +41,7 @@ def test_legacy_mumux_player_is_not_supported(tmp_path: Path) -> None:
 
 
 def test_iter_instances_falls_back_to_mumu12_default_serial(tmp_path: Path) -> None:
-    exe = _touch_exe(tmp_path / "shell" / "MuMuPlayer.exe")
+    exe = _touch_exe(tmp_path / "nx_main" / "MuMuNxMain.exe")
     _write_nemu(tmp_path / "vms" / "MuMuPlayer-12.0-2")
     emulator = Emulator(exe.as_posix())
 
@@ -65,7 +65,7 @@ def test_all_emulator_serials_keeps_only_mumu_tcp_serials() -> None:
 
 
 def test_iter_instances_normalizes_legacy_hostport_to_mumu12_default_serial(tmp_path: Path) -> None:
-    exe = _touch_exe(tmp_path / "shell" / "MuMuPlayer.exe")
+    exe = _touch_exe(tmp_path / "nx_main" / "MuMuNxMain.exe")
     _write_nemu(tmp_path / "vms" / "MuMuPlayer-12.0-1", hostport="7555")
     emulator = Emulator(exe.as_posix())
 
@@ -77,7 +77,7 @@ def test_iter_instances_normalizes_legacy_hostport_to_mumu12_default_serial(tmp_
 
 
 def test_iter_instances_deduplicates_identical_nemu_files(tmp_path: Path) -> None:
-    exe = _touch_exe(tmp_path / "shell" / "MuMuPlayer.exe")
+    exe = _touch_exe(tmp_path / "nx_main" / "MuMuNxMain.exe")
     folder = tmp_path / "vms" / "MuMuPlayer-12.0-1"
     _write_nemu(folder, hostport="16416", filename="instance.nemu")
     _write_nemu(folder, hostport="16416", filename="instance-copy.nemu")
@@ -91,7 +91,7 @@ def test_iter_instances_deduplicates_identical_nemu_files(tmp_path: Path) -> Non
 
 
 def test_iter_instances_keeps_distinct_names_with_same_serial(tmp_path: Path) -> None:
-    exe = _touch_exe(tmp_path / "shell" / "MuMuPlayer.exe")
+    exe = _touch_exe(tmp_path / "nx_main" / "MuMuNxMain.exe")
     _write_nemu(tmp_path / "vms" / "MuMuPlayer-12.0-0", hostport="16384")
     _write_nemu(tmp_path / "vms" / "MuMuPlayer-12.0-1", hostport="16384")
     emulator = Emulator(exe.as_posix())
@@ -105,7 +105,7 @@ def test_iter_instances_keeps_distinct_names_with_same_serial(tmp_path: Path) ->
 
 
 def test_mumu_global_name_is_not_supported(tmp_path: Path) -> None:
-    exe = _touch_exe(tmp_path / "shell" / "MuMuPlayer.exe")
+    exe = _touch_exe(tmp_path / "nx_main" / "MuMuNxMain.exe")
     instance = EmulatorInstance(
         serial="",
         name="MuMuPlayerGlobal-12.0-0",
@@ -116,7 +116,7 @@ def test_mumu_global_name_is_not_supported(tmp_path: Path) -> None:
 
 
 def test_iter_instances_ignores_mumu_global_folder(tmp_path: Path) -> None:
-    exe = _touch_exe(tmp_path / "shell" / "MuMuPlayer.exe")
+    exe = _touch_exe(tmp_path / "nx_main" / "MuMuNxMain.exe")
     _write_nemu(tmp_path / "vms" / "MuMuPlayerGlobal-12.0-0", hostport="16384")
     _write_nemu(tmp_path / "vms" / "MuMuPlayer-12.0-1", hostport="16416")
     emulator = Emulator(exe.as_posix())
