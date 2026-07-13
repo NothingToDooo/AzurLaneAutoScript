@@ -239,7 +239,8 @@ class EquipmentCodeHandler(StorageHandler):
 
     def _code_apply(self, code: str | None = None) -> bool:
         for _ in range(5):
-            self._code_preview_clear()
+            if not self._code_preview_clear():
+                continue
             if code is not None and code != EMPTY_CODE and not self._code_input(code):
                 continue
             if self._code_confirm():

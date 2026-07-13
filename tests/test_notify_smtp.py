@@ -20,10 +20,13 @@ def _smtp_context() -> tuple[MagicMock, MagicMock]:
 
 def test_smtp_port_465_uses_ssl_and_defaults_receiver_to_user(monkeypatch: pytest.MonkeyPatch) -> None:
     context, client = _smtp_context()
+    tls_context = MagicMock()
     smtp = MagicMock()
     smtp_ssl = MagicMock(return_value=context)
     monkeypatch.setattr(notify_module.smtplib, "SMTP", smtp)
     monkeypatch.setattr(notify_module.smtplib, "SMTP_SSL", smtp_ssl)
+    create_default_context = MagicMock(return_value=tls_context)
+    monkeypatch.setattr(notify_module.ssl, "create_default_context", create_default_context)
 
     sent = handle_notify(
         """
@@ -39,7 +42,13 @@ port: 465
 
     assert sent
     smtp.assert_not_called()
-    smtp_ssl.assert_called_once_with("smtp.example.com", 465, timeout=notify_module.SMTP_TIMEOUT_SECONDS)
+    create_default_context.assert_called_once_with()
+    smtp_ssl.assert_called_once_with(
+        "smtp.example.com",
+        465,
+        timeout=notify_module.SMTP_TIMEOUT_SECONDS,
+        context=tls_context,
+    )
     client.starttls.assert_not_called()
     client.login.assert_called_once_with(user="sender@example.com", password=LOGIN_VALUE)
     message = client.send_message.call_args.args[0]

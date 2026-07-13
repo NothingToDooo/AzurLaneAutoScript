@@ -37,6 +37,9 @@ class _EquipmentCodeHarness(EquipmentCodeHandler):
         self._broadcast_input("ADB_EDITOR_CODE", code=6)
         self._restore_input_method(previous)
 
+    def apply_code(self, code: str | None = None) -> bool:
+        return self._code_apply(code)
+
     def export_code(self) -> str | None:
         return self._code_export()
 
@@ -141,6 +144,22 @@ def test_equipment_code_apply_falls_back_to_last_export(monkeypatch: pytest.Monk
 
     assert handler.code_apply() is True
     assert applied == ["MC8xLzIvMy80XDA="]
+
+
+def test_code_apply_retries_without_input_when_preview_clear_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    handler = _handler()
+    clear_attempts: list[None] = []
+
+    def clear_preview() -> bool:
+        clear_attempts.append(None)
+        return False
+
+    monkeypatch.setattr(handler, "_code_preview_clear", clear_preview)
+    monkeypatch.setattr(handler, "_code_input", lambda _code: pytest.fail("input must wait for preview clear"))
+    monkeypatch.setattr(handler, "_code_confirm", lambda: pytest.fail("confirm must wait for preview clear"))
+
+    assert handler.apply_code("MC8xLzIvMy80XDA=") is False
+    assert len(clear_attempts) == 5
 
 
 def test_fast_input_ime_uses_adb_and_restores_previous_ime() -> None:

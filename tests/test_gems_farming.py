@@ -298,16 +298,43 @@ def test_hard_fleet_preparation_fills_empty_slots_then_retries() -> None:
 
 
 class _HardFleetPrepareResultRunner(GemsFarming):
-    def __init__(self, *, flagship_result: bool, vanguard_result: bool) -> None:
+    def __init__(
+        self,
+        *,
+        flagship_result: bool,
+        vanguard_result: bool,
+        current_emotion: int = 100,
+        flagship_emotion: int | None = None,
+        vanguard_emotion: int | None = None,
+    ) -> None:
+        self.records: list[dict[str, int]] = []
+
+        def set_record(**kwargs: int) -> None:
+            self.records.append(kwargs)
+
+        config = SimpleNamespace(
+            Campaign_Mode="hard",
+            Fleet_FleetOrder="fleet1_all_fleet2_standby",
+            set_record=set_record,
+        )
         self.config = cast(
             "AzurLaneConfig",
+            config,
+        )
+        self.campaign = cast(
+            "CampaignBase",
             SimpleNamespace(
-                Campaign_Mode="hard",
-                Fleet_FleetOrder="fleet1_all_fleet2_standby",
+                config=config,
+                emotion=SimpleNamespace(
+                    fleet_1=SimpleNamespace(current=current_emotion),
+                    update=lambda: None,
+                ),
             ),
         )
         self.flagship_result = flagship_result
         self.vanguard_result = vanguard_result
+        self.flagship_emotion = flagship_emotion
+        self.vanguard_emotion = vanguard_emotion
         self.change_calls: list[str] = []
 
     @override
@@ -317,11 +344,15 @@ class _HardFleetPrepareResultRunner(GemsFarming):
     @override
     def flagship_change(self) -> bool:
         self.change_calls.append("flagship")
+        if self.flagship_emotion is not None:
+            self._new_fleet_emotion = min(self._new_fleet_emotion, self.flagship_emotion)
         return self.flagship_result
 
     @override
     def vanguard_change(self) -> bool:
         self.change_calls.append("vanguard")
+        if self.vanguard_emotion is not None:
+            self._new_fleet_emotion = min(self._new_fleet_emotion, self.vanguard_emotion)
         return self.vanguard_result
 
 
@@ -348,12 +379,31 @@ def test_hard_fleet_prepare_requires_every_replacement_to_succeed(
     assert runner.change_calls == ["flagship", "vanguard"]
 
 
+def test_hard_fleet_prepare_records_lowest_current_and_replacement_emotion() -> None:
+    runner = _HardFleetPrepareResultRunner(
+        flagship_result=True,
+        vanguard_result=True,
+        current_emotion=80,
+        flagship_emotion=120,
+        vanguard_emotion=30,
+    )
+
+    assert runner.hard_fleet_prepare() is True
+    assert runner.records == [{"Emotion_Fleet1Value": 30}]
+
+
 class _EquipmentChangeRunner(GemsFarming):
-    def __init__(self, *, appear_results: list[bool] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        appear_results: list[bool] | None = None,
+        change_result: bool = True,
+        mode: str = "normal",
+    ) -> None:
         self.config = cast(
             "AzurLaneConfig",
             SimpleNamespace(
-                Campaign_Mode="normal",
+                Campaign_Mode=mode,
                 Fleet_FleetOrder="fleet1_all_fleet2_standby",
                 Fleet_Fleet1=1,
                 Fleet_Fleet2=2,
@@ -363,6 +413,7 @@ class _EquipmentChangeRunner(GemsFarming):
         )
         self.operations: list[str] = []
         self.appear_results = list(appear_results or [])
+        self.change_result = change_result
 
     def _goto_fleet(self) -> None:
         self.operations.append("goto")
@@ -378,11 +429,11 @@ class _EquipmentChangeRunner(GemsFarming):
 
     def flagship_change_execute(self) -> bool:
         self.operations.append("change_ship")
-        return True
+        return self.change_result
 
     def vanguard_change_execute(self) -> bool:
         self.operations.append("change_ship")
-        return True
+        return self.change_result
 
 
 def test_flagship_change_wraps_ship_replacement_with_equipment_code() -> None:
@@ -400,6 +451,32 @@ def test_empty_slot_does_not_mount_equipment_without_take_off(position: str) -> 
     assert change() is True
     assert runner.operations == ["goto", "change_ship"]
     assert runner.appear_results == [False]
+
+
+@pytest.mark.parametrize(
+    ("position", "slot_is_empty", "expected_operations"),
+    [
+        ("flagship", True, ["goto", "take_off", "change_ship"]),
+        ("vanguard", True, ["goto", "take_off", "change_ship"]),
+        ("flagship", False, ["goto", "take_off", "change_ship", "take_on"]),
+        ("vanguard", False, ["goto", "take_off", "change_ship", "take_on"]),
+    ],
+)
+def test_hard_mode_mounts_equipment_only_when_replacement_occupies_slot(
+    position: str,
+    *,
+    slot_is_empty: bool,
+    expected_operations: list[str],
+) -> None:
+    runner = _EquipmentChangeRunner(
+        appear_results=[False, slot_is_empty],
+        change_result=False,
+        mode="hard",
+    )
+
+    change = runner.flagship_change if position == "flagship" else runner.vanguard_change
+    assert change() is False
+    assert runner.operations == expected_operations
 
 
 class _CvSearchRunner(GemsFarming):

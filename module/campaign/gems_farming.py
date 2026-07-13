@@ -330,7 +330,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         logger.hr("Change flagship", level=2)
         success = self.flagship_change_execute()
 
-        if equipment_taken_off:
+        if equipment_taken_off and not self.appear(button, offset=(20, 20)):
             logger.hr("Mount flagship equipments", level=2)
             self._change_equipment(
                 button,
@@ -355,7 +355,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         logger.hr("Change vanguard", level=2)
         success = self.vanguard_change_execute()
 
-        if equipment_taken_off:
+        if equipment_taken_off and not self.appear(button, offset=(20, 20)):
             logger.hr("Mount vanguard equipments", level=2)
             self._change_equipment(button, equipment_assets.FLEET_DETAIL_ENTER, take_on=True)
         return success
@@ -646,6 +646,8 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
 
     def hard_fleet_prepare(self) -> bool:
         """困难模式退役后补齐空位；所有替换都有效时才允许重试进图。"""
+        self.campaign.emotion.update()
+        self._new_fleet_emotion = self.campaign.emotion.fleet_1.current
         change_results: list[bool] = []
         if self.appear(self.fleet_backline_1_button, offset=(20, 20)):
             logger.info("Backline is empty, change flagship")
@@ -653,6 +655,8 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         if self.appear(self.fleet_vanguard_1_button, offset=(20, 20)):
             logger.info("Vanguard is empty, change vanguard")
             change_results.append(self.vanguard_change())
+        if change_results:
+            self.campaign.config.set_record(Emotion_Fleet1Value=self._new_fleet_emotion)
         return bool(change_results) and all(change_results)
 
     _trigger_lv32 = False

@@ -131,12 +131,21 @@ def _build_message(config: _EmailConfig, *, title: str, content: str) -> EmailMe
 
 
 def _send_email(config: _EmailConfig, message: EmailMessage) -> None:
-    client_class = smtplib.SMTP_SSL if config.use_ssl else smtplib.SMTP
-    with client_class(config.host, config.port, timeout=SMTP_TIMEOUT_SECONDS) as client:
+    if config.use_ssl:
+        client = smtplib.SMTP_SSL(
+            config.host,
+            config.port,
+            timeout=SMTP_TIMEOUT_SECONDS,
+            context=ssl.create_default_context(),
+        )
+    else:
+        client = smtplib.SMTP(config.host, config.port, timeout=SMTP_TIMEOUT_SECONDS)
+
+    with client as connected_client:
         if config.use_starttls:
-            client.starttls(context=ssl.create_default_context())
-        client.login(user=config.user, password=config.password)
-        refused = client.send_message(message)
+            connected_client.starttls(context=ssl.create_default_context())
+        connected_client.login(user=config.user, password=config.password)
+        refused = connected_client.send_message(message)
     if refused:
         raise smtplib.SMTPRecipientsRefused(refused)
 
