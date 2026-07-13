@@ -1,4 +1,5 @@
 import re
+import subprocess
 import time
 from functools import wraps
 from typing import TYPE_CHECKING, ClassVar, Literal, overload
@@ -37,6 +38,10 @@ def _noop_recovery() -> None:
     pass
 
 
+def _start_adb_server(device: AdbRecoverySession) -> None:
+    _ = device.adb_start_server()
+
+
 def _restart_adb_server_and_reconnect(device: AdbRecoverySession) -> None:
     device.adb_start_server()
     device.adb_reconnect()
@@ -63,6 +68,8 @@ def _connection_error_recovery(
         return device.detect_package
     if isinstance(error, OSError):
         logger.error(error)
+        if isinstance(error, ConnectionRefusedError) or getattr(error, "winerror", None) == 10061:
+            return lambda: _start_adb_server(device)
         return _noop_recovery
     return None
 
@@ -134,6 +141,37 @@ class AdbSession(ConnectionAttr):
         raise NotImplementedError(message)
 
     def adb_start_server(self) -> int:
+        command = [self.adb_binary, "-P", str(self.adb_server_port), "start-server"]
+        logger.info(f"Start ADB server: {command}")
+        try:
+            completed = subprocess.run(  # noqa: S603
+                command,
+                capture_output=True,
+                check=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+                text=True,
+                timeout=10,
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            stdout = (error.stdout or "").strip()
+            stderr = (error.stderr or "").strip()
+            for output in (stdout, stderr):
+                if output:
+                    logger.error(output)
+
+            if isinstance(error, subprocess.TimeoutExpired):
+                message = f"ADB start-server timed out after {error.timeout} seconds"
+            else:
+                message = f"ADB start-server failed with exit code {error.returncode}"
+            reason = stderr or stdout
+            if reason:
+                message = f"{message}: {reason}"
+            raise OSError(message) from error
+
+        for output in (completed.stdout.strip(), completed.stderr.strip()):
+            if output:
+                logger.info(output)
+
         version = self.adb_client.server_version()
         logger.info(f"ADB server version: {version}")
         return version

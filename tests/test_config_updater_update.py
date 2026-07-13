@@ -165,6 +165,53 @@ def test_config_update_keeps_old_hazard_leveling_enable_on_new_meowfficer_task()
     )
 
 
+def test_config_update_migrates_legacy_emulator_path_to_mumu_path() -> None:
+    updater = _make_updater(
+        {
+            "Alas": {
+                "Emulator": {
+                    "MuMuPath": _arg("C:/Program Files/Netease/MuMu Player 12/nx_main/MuMuNxMain.exe"),
+                }
+            }
+        }
+    )
+    legacy_path = "D:/MuMu/nx_main/MuMuNxMain.exe"
+
+    updated, issues = updater.config_update_with_issues(
+        {"Alas": {"EmulatorInfo": {"path": legacy_path}}},
+    )
+
+    assert deep_get(updated, keys="Alas.Emulator.MuMuPath") == legacy_path
+    assert issues == (
+        ConfigIssue(
+            path="Alas.Emulator.MuMuPath",
+            raw=None,
+            resolved=legacy_path,
+            reason="migration",
+        ),
+    )
+
+
+def test_config_update_preserves_legacy_onepush_field_for_smtp() -> None:
+    updater = _make_updater(
+        {
+            "Alas": {
+                "Error": {
+                    "OnePushConfig": _arg("provider: null", typ="textarea"),
+                }
+            }
+        }
+    )
+    smtp_config = "provider: smtp\nhost: smtp.example.com\nuser: alas@example.com\npassword: secret\nport: 465"
+
+    updated, issues = updater.config_update_with_issues(
+        {"Alas": {"Error": {"OnePushConfig": smtp_config}}},
+    )
+
+    assert deep_get(updated, keys="Alas.Error.OnePushConfig") == smtp_config
+    assert issues == ()
+
+
 def test_config_update_refreshes_event_campaign_and_stage_defaults() -> None:
     updater = _make_updater(
         {

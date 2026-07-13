@@ -267,12 +267,12 @@
       "help": ""
     },
     "Benchmark": {
-      "name": "性能测试",
-      "help": ""
+      "name": "Task.Benchmark.name",
+      "help": "Task.Benchmark.help"
     },
     "AzurLaneUncensored": {
-      "name": "反和谐",
-      "help": ""
+      "name": "Task.AzurLaneUncensored.name",
+      "help": "Task.AzurLaneUncensored.help"
     },
     "GameManager": {
       "name": "游戏管理器(未完成)",
@@ -319,6 +319,10 @@
     "Serial": {
       "name": "模拟器 Serial",
       "help": ""
+    },
+    "MuMuPath": {
+      "name": "MuMu 可执行文件",
+      "help": "用于在模拟器尚未运行时定位并启动 MuMu12。"
     }
   },
   "Error": {
@@ -333,6 +337,10 @@
     "SaveError": {
       "name": "出错时，保存 Log 和截图",
       "help": ""
+    },
+    "OnePushConfig": {
+      "name": "SMTP 邮件设置",
+      "help": "发生无法处理的异常或触发停止条件时发送邮件。仅支持 provider: smtp；收件人未填写时使用 user。"
     },
     "ScreenshotLength": {
       "name": "出错时，保留最后 X 张截图",
@@ -949,6 +957,12 @@
       "name": "刷紧急委托",
       "help": "警告: 这个功能可以让玩家获取少量的钻石，但不是一个能高效获取钻石的方法\n玩碧蓝航线不久的玩家, 很容易迷信零破和低耗等, 而忽视了角色养成\n运行这个功能只会让你自己感觉很充实, 而你的帐号实际零提升\n这个功能的主要用途，是让阵容成型的玩家获取额外的魔方，请理性地把钻石当作副产物\n\n这个功能将在旗舰32级之后更换旗舰\n关于紧急委托刷新机制, 可阅读 https://bbs.nga.cn/read.php?tid=27134956\n委托油耗比: A3 > A1 > 2-4 > 2-1, 有活动图时建议选活动图, 2-1会拣问号有更多物资\n一队会完成所有的战斗, 前排应当为百级零破驱逐带输出装, 后排应该为33级及以下白皮零破航母\n二队应提供跨队支援（跨队弹幕、跨队辅助）"
     },
+    "ChangeFlagship": {
+      "name": "更换旗舰",
+      "help": "旗舰达到更换条件时选择新的低等级白皮航母；可同时按装备码更换装备。",
+      "ship": "更换舰船",
+      "ship_equip": "更换舰船和装备"
+    },
     "CommonCV": {
       "name": "指定旗舰航母",
       "help": "",
@@ -960,9 +974,10 @@
     },
     "ChangeVanguard": {
       "name": "更换前排",
-      "help": "当前排红脸时更换前排，选择不更换则会强制红脸出击\n换前排通过找一艘心情不低于10、等级100的白鹰或铁血的白皮驱逐完成，所以尽量保证有足够多的驱逐。国服以外则为等级70的白鹰白船驱逐。",
+      "help": "当前排红脸时更换前排；可同时按装备码更换装备。候选为心情不低于10、等级100的白鹰或铁血白皮驱逐。",
       "disabled": "不更换",
-      "ship": "更换舰船"
+      "ship": "更换舰船",
+      "ship_equip": "更换舰船和装备"
     },
     "CommonDD": {
       "name": "指定前排",
@@ -976,6 +991,20 @@
     "CommissionLimit": {
       "name": "防止紧急委托数量过多",
       "help": "在7x24运行时防止紧急委托数量过多做不完每日委托，建议在委托过滤器仅选择短时长高收益委托"
+    }
+  },
+  "EquipmentCode": {
+    "_info": {
+      "name": "装备码",
+      "help": "为刷紧急委托的旗舰和前排保存、导出并应用装备码。"
+    },
+    "ExportToConfig": {
+      "name": "导出配置",
+      "help": "仅在对应配置为空时写入当前装备码。"
+    },
+    "Config": {
+      "name": "具体配置",
+      "help": "YAML 格式的舰船名称到装备码映射。"
     }
   },
   "EventGeneral": {
@@ -2355,15 +2384,15 @@
   },
   "Benchmark": {
     "_info": {
-      "name": "性能测试",
-      "help": "测试当前个人版固定设备栈的速度：MuMu + nemu_ipc 截图 + minitouch 控制"
+      "name": "Benchmark._info.name",
+      "help": "Benchmark._info.help"
     },
     "TestScene": {
-      "name": "测试场景",
-      "help": "",
-      "screenshot_click": "截图+点击速度测试",
-      "screenshot": "截图速度测试",
-      "click": "点击速度测试"
+      "name": "Benchmark.TestScene.name",
+      "help": "Benchmark.TestScene.help",
+      "screenshot_click": "screenshot_click",
+      "screenshot": "screenshot",
+      "click": "click"
     }
   },
   "GameManager": {

@@ -770,6 +770,24 @@ class ConfigUpdater:
         if deep_exist(old, source_path):
             self._record_issue(pending, path=target_path, raw=raw, resolved=True, reason="migration")
 
+    def _migrate_mumu_executable_path(
+        self,
+        old: MutableDeepData,
+        new: MutableDeepData,
+        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]],
+    ) -> None:
+        """把旧通用模拟器路径迁移到个人版 MuMu 可执行文件路径。"""
+        source_path = "Alas.EmulatorInfo.path"
+        target_path = "Alas.Emulator.MuMuPath"
+        source = deep_get(old, keys=source_path, default=None)
+        if not isinstance(source, str) or not source.strip():
+            return
+        raw = deep_get(old, keys=target_path, default=None)
+        if isinstance(raw, str) and raw.strip():
+            return
+        deep_set(new, keys=target_path, value=source)
+        self._record_issue(pending, path=target_path, raw=raw, resolved=source, reason="migration")
+
     def _refresh_latest_campaign_event(
         self,
         old: MutableDeepData,
@@ -843,6 +861,8 @@ class ConfigUpdater:
         """迁移配置并返回只读诊断；配置结果与 ``config_update()`` 完全相同。"""
         pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]] = {}
         new = self._rebuild_config_from_args(old, pending, is_template=is_template)
+        if not is_template:
+            self._migrate_mumu_executable_path(old, new, pending)
         self._migrate_opsi_hazard_leveling_enable(old, new, pending)
 
         # 更新到最新活动。

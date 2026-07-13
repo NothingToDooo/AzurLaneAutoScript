@@ -18,7 +18,7 @@ class _Runtime(MumuRuntime):
 
 
 def _mumu12_instance(tmp_path: Path) -> EmulatorInstance:
-    executable = tmp_path / "MuMuPlayer-12.0" / "shell" / "MuMuPlayer.exe"
+    executable = tmp_path / "MuMu Player 12" / "nx_main" / "MuMuNxMain.exe"
     executable.parent.mkdir(parents=True)
     executable.touch()
     return EmulatorInstance(
@@ -48,7 +48,7 @@ def test_emulator_start_uses_mumu12_manager_api(monkeypatch: pytest.MonkeyPatch,
 
     assert commands == [
         [
-            (tmp_path / "MuMuPlayer-12.0" / "shell" / "MuMuManager.exe").as_posix(),
+            (tmp_path / "MuMu Player 12" / "nx_main" / "MuMuManager.exe").as_posix(),
             "api",
             "-v",
             "1",
@@ -66,7 +66,7 @@ def test_emulator_stop_uses_mumu12_manager_api(monkeypatch: pytest.MonkeyPatch, 
 
     assert commands == [
         [
-            (tmp_path / "MuMuPlayer-12.0" / "shell" / "MuMuManager.exe").as_posix(),
+            (tmp_path / "MuMu Player 12" / "nx_main" / "MuMuManager.exe").as_posix(),
             "api",
             "-v",
             "1",

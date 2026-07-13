@@ -9,7 +9,9 @@
 - 只保留 MuMu。
 - 设备截图固定 `nemu_ipc`。
 - 设备控制固定 `minitouch`。
-- WebUI 保留，作为主要入口。
+- WebUI 只监听本机，作为主要入口。
+- 保留 SMTP 邮件通知；旧配置键 `OnePushConfig` 仅用于兼容已有配置。
+- `GemsFarming` 保留困难模式、装备码、潜艇和独立心情控制。
 - Python 固定 3.14.6。
 - 依赖和运行环境由 `uv` 管理。
 - 项目直接运行，不做打包、安装器、自更新或通用分发。
@@ -21,6 +23,9 @@
 ```powershell
 uv sync
 ```
+
+从旧版本迁移时，将原 `config/alas.json` 复制到当前仓库。配置加载会保留 SMTP 与
+`GemsFarming` 增强字段，并把旧 `EmulatorInfo.path` 迁移到 MuMu 专用路径。
 
 启动 WebUI：
 

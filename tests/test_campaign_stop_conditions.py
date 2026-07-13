@@ -1,9 +1,17 @@
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
+import module.campaign.run as campaign_run_module
 from module.campaign.run import CampaignRun
+
+if TYPE_CHECKING:
+    import pytest
 
 
 class _StopConfig:
+    Error_OnePushConfig = "provider: null"
+    config_name = "alas"
+
     def __init__(self) -> None:
         self.StopCondition_RunCount = 1
         self.StopCondition_ReachLevel = 0
@@ -42,6 +50,7 @@ def _make_runner(*, oil: int = 1000, task_balancer_triggered: bool = False) -> _
     runner.campaign = _StopCampaign()
     runner.run_limit = 0
     runner.run_count = 0
+    runner.name = "12-4"
     runner.task_balancer_calls = 0
 
     def get_oil() -> int:
@@ -59,23 +68,41 @@ def _make_runner(*, oil: int = 1000, task_balancer_triggered: bool = False) -> _
     return runner
 
 
-def test_run_count_limit_disables_scheduler() -> None:
+def test_run_count_limit_disables_scheduler_and_notifies(monkeypatch: pytest.MonkeyPatch) -> None:
     runner = _make_runner()
     runner.run_limit = 1
     runner.config.StopCondition_RunCount = 0
+    notifications: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        campaign_run_module,
+        "handle_notify",
+        lambda raw_config, *, title, content: notifications.append((raw_config, title, content)),
+    )
 
     assert runner.triggered_stop_condition()
     assert runner.config.StopCondition_RunCount == 0
     assert not runner.config.Scheduler_Enable
+    assert notifications == [
+        ("provider: null", "Alas <alas> campaign finished", "<alas> 12-4 reached run count limit"),
+    ]
 
 
-def test_reach_level_limit_disables_scheduler() -> None:
+def test_reach_level_limit_disables_scheduler_and_notifies(monkeypatch: pytest.MonkeyPatch) -> None:
     runner = _make_runner()
     runner.config.StopCondition_ReachLevel = 120
     runner.campaign.config.LV_TRIGGERED = True
+    notifications: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        campaign_run_module,
+        "handle_notify",
+        lambda raw_config, *, title, content: notifications.append((raw_config, title, content)),
+    )
 
     assert runner.triggered_stop_condition()
     assert not runner.config.Scheduler_Enable
+    assert notifications == [
+        ("provider: null", "Alas <alas> campaign finished", "<alas> 12-4 reached level limit"),
+    ]
 
 
 def test_oil_limit_delays_current_task() -> None:
@@ -100,10 +127,35 @@ def test_auto_search_oil_limit_delays_current_task() -> None:
     assert runner.config.delays == [{"minute": (120, 240)}]
 
 
-def test_get_new_ship_limit_disables_scheduler() -> None:
+def test_get_new_ship_limit_disables_scheduler_and_notifies(monkeypatch: pytest.MonkeyPatch) -> None:
     runner = _make_runner()
     runner.config.StopCondition_GetNewShip = True
     runner.campaign.config.GET_SHIP_TRIGGERED = True
+    notifications: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        campaign_run_module,
+        "handle_notify",
+        lambda raw_config, *, title, content: notifications.append((raw_config, title, content)),
+    )
+
+    assert runner.triggered_stop_condition()
+    assert not runner.config.Scheduler_Enable
+    assert notifications == [
+        ("provider: null", "Alas <alas> campaign finished", "<alas> 12-4 got new ship"),
+    ]
+
+
+def test_notification_failure_does_not_change_stop_result(monkeypatch: pytest.MonkeyPatch) -> None:
+    runner = _make_runner()
+    runner.run_limit = 1
+    runner.config.StopCondition_RunCount = 0
+
+    def fail_notify(raw_config: str, *, title: str, content: str) -> bool:
+        del raw_config, title, content
+        message = "notification implementation failed"
+        raise RuntimeError(message)
+
+    monkeypatch.setattr(campaign_run_module, "handle_notify", fail_notify)
 
     assert runner.triggered_stop_condition()
     assert not runner.config.Scheduler_Enable

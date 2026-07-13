@@ -8,7 +8,7 @@ from scipy import signal
 from module.base.button import Button
 from module.base.timer import Timer
 from module.base.utils import area_offset, color_similar, color_similarity_2d, get_color, image_size, rgb2gray
-from module.exception import RequestHumanTakeover
+from module.exception import HardNotSatisfied
 from module.handler.assets import (
     AUTO_SEARCH_SET_ALL,
     AUTO_SEARCH_SET_BOSS,
@@ -116,7 +116,7 @@ class FleetOperator:
             logger.critical(
                 f'Stage "{stage}" is a hard mode, please prepare your fleet "{self!s}" in game before running Alas'
             )
-            raise RequestHumanTakeover
+            raise HardNotSatisfied
 
     def clear(self, *, skip_first_screenshot: bool = True) -> None:
         main = self.main

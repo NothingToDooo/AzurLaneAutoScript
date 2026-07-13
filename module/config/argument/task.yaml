@@ -68,9 +68,12 @@ Farm:
       groups:
         - Scheduler
         - GemsFarming
+        - EquipmentCode
         - Campaign
         - StopCondition
         - Fleet
+        - Submarine
+        - Emotion
 
 # ==================== Event ====================
 

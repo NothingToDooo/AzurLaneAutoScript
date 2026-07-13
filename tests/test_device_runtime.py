@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 
 class _MinitouchConfigDouble:
     MINITOUCH_FILEPATH_REMOTE = "/data/local/tmp/minitouch"
+    Emulator_MuMuPath = "C:/MuMu/MuMuNxMain.exe"
 
 
 class _DeviceSessionDouble:
@@ -544,12 +545,17 @@ def test_adb_restart_releases_services_before_killing_server() -> None:
             calls.append("client")
             return SimpleNamespace(server_kill=lambda: calls.append("server_kill"))
 
+        @override
+        def adb_start_server(self) -> int:
+            calls.append("start_server")
+            return 41
+
     connection = object.__new__(_Connection)
     vars(connection)["_runtime"] = SimpleNamespace(release_serial=lambda: calls.append("release"))
 
     connection.adb_restart()
 
-    assert calls[:3] == ["release", "client", "server_kill"]
+    assert calls == ["release", "client", "server_kill", "start_server"]
 
 
 class _RecoveryLogger:
@@ -601,6 +607,12 @@ def test_adb_restart_rebuilds_client_after_runtime_cleanup_error(monkeypatch: py
             calls.append("rebuild_client")
             return new_client
 
+        @override
+        def adb_start_server(self) -> int:
+            calls.append("start_server")
+            _ = self.adb_client
+            return 41
+
     connection = object.__new__(_RestartConnection)
     vars(connection).update(
         _runtime=_failing_runtime(calls, error),
@@ -610,7 +622,7 @@ def test_adb_restart_rebuilds_client_after_runtime_cleanup_error(monkeypatch: py
 
     connection.adb_restart()
 
-    assert calls == ["release", "server_kill", "rebuild_client"]
+    assert calls == ["release", "server_kill", "start_server", "rebuild_client"]
     assert connection.adb_client is new_client
     assert logger.exceptions == [error]
 

@@ -171,6 +171,11 @@ class CampaignBase(CampaignUI, Map, AutoSearchCombat):
         logger.warning("No boss data found in spawn_data")
         return 0
 
+    @property
+    def map_battle_count(self) -> int:
+        """返回从进图到 Boss 战结束的预计战斗次数。"""
+        return self._map_battle
+
     def auto_search_execute_a_battle(self) -> None:
         logger.hr(f"{self.FUNCTION_NAME_BASE}{self.battle_count}", level=2)
         self.auto_search_moving()

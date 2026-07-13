@@ -4,7 +4,6 @@ from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-import adbutils
 from adbutils import AdbClient, AdbDevice
 
 from module.base.decorator import del_cached_property
@@ -47,11 +46,9 @@ class ConnectionAttr:
             self.config = config
 
         logger.attr("AdbBinary", self.adb_binary)
-
-        def adb_path() -> str:
-            return self.adb_binary
-
-        vars(adbutils)["adb_path"] = adb_path
+        # adbutils 的各子模块在导入时会绑定 adb_path 函数；官方环境变量是唯一能让
+        # 这些调用统一使用当前项目 ADB binary 的入口。
+        os.environ["ADBUTILS_ADB_PATH"] = self.adb_binary
         _ = self.adb_client
 
         self.serial = str(self.config.Emulator_Serial)
@@ -131,16 +128,20 @@ class ConnectionAttr:
         return "adb"
 
     @cached_property
-    def adb_client(self) -> AdbClient:
-        host = "127.0.0.1"
+    def adb_server_port(self) -> int:
         port = 5037
-
         env = os.environ.get("ANDROID_ADB_SERVER_PORT", None)
         if env is not None:
             try:
                 port = int(env)
             except ValueError:
                 logger.warning(f"Invalid environ variable ANDROID_ADB_SERVER_PORT={port}, using default port")
+        return port
+
+    @cached_property
+    def adb_client(self) -> AdbClient:
+        host = "127.0.0.1"
+        port = self.adb_server_port
 
         logger.attr("AdbClient", f"AdbClient({host}, {port})")
         return AdbClient(host, port)

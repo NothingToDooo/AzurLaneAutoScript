@@ -140,8 +140,10 @@ class ConfigOverrides(TypedDict, total=False):
     Scheduler_FailureInterval: int
     Scheduler_ServerUpdate: str
     Emulator_Serial: str
+    Emulator_MuMuPath: str
     Error_HandleError: bool
     Error_SaveError: bool
+    Error_OnePushConfig: str
     Error_ScreenshotLength: int
     Optimization_ScreenshotInterval: float
     Optimization_CombatScreenshotInterval: float
@@ -210,10 +212,13 @@ class ConfigOverrides(TypedDict, total=False):
     C124LargeLeveling_NonLargeEnterTolerance: int
     C124LargeLeveling_NonLargeRetreatTolerance: int
     C124LargeLeveling_PickupAmmo: int
+    GemsFarming_ChangeFlagship: str
     GemsFarming_CommonCV: str
     GemsFarming_ChangeVanguard: str
     GemsFarming_CommonDD: str
     GemsFarming_CommissionLimit: bool
+    EquipmentCode_ExportToConfig: bool
+    EquipmentCode_Config: str | None
     EventGeneral_PtLimit: int
     EventGeneral_TimeLimit: datetime.datetime
     TaskBalancer_Enable: bool
@@ -421,10 +426,12 @@ class GeneratedConfig:
 
     # 配置组 `Emulator`
     Emulator_Serial = "127.0.0.1:16384"
+    Emulator_MuMuPath = "C:/Program Files/Netease/MuMu Player 12/nx_main/MuMuNxMain.exe"
 
     # 配置组 `Error`
     Error_HandleError = True
     Error_SaveError = True
+    Error_OnePushConfig = "provider: null"
     Error_ScreenshotLength = 12
 
     # 配置组 `Optimization`
@@ -558,13 +565,19 @@ class GeneratedConfig:
     C124LargeLeveling_PickupAmmo = 3
 
     # 配置组 `GemsFarming`
+    # 可选项：ship, ship_equip
+    GemsFarming_ChangeFlagship = "ship"
     # 可选项：any, langley, bogue, ranger, hermes
     GemsFarming_CommonCV = "any"
-    # 可选项：disabled, ship
+    # 可选项：disabled, ship, ship_equip
     GemsFarming_ChangeVanguard = "ship"
     # 可选项：any, favourite, aulick_or_foote, cassin_or_downes, z20_or_z21
     GemsFarming_CommonDD = "any"
     GemsFarming_CommissionLimit = True
+
+    # 配置组 `EquipmentCode`
+    EquipmentCode_ExportToConfig = True
+    EquipmentCode_Config = None
 
     # 配置组 `EventGeneral`
     EventGeneral_PtLimit = 0

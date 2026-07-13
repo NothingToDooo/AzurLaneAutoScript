@@ -64,6 +64,12 @@ DOCK_SELECTED = Button(
     button=(582, 662, 647, 685),
     file="./assets/cn/retire/DOCK_SELECTED.png",
 )
+DOCK_UNMOUNT = Button(
+    area=(161, 141, 225, 216),
+    color=(111, 111, 112),
+    button=(161, 141, 225, 216),
+    file="./assets/cn/retire/DOCK_UNMOUNT.png",
+)
 EMPTY_ENHANCE_SLOT_PLUS = Button(
     area=(737, 402, 773, 437),
     color=(46, 46, 46),

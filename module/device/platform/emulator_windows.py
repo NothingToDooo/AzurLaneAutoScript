@@ -1,4 +1,5 @@
 import re
+import winreg
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -30,30 +31,14 @@ class Emulator(EmulatorBase):
     @classmethod
     def path_to_type(cls, path: str) -> str:
         emulator_path = Path(path)
-        exe = emulator_path.name.lower()
-        if exe in ["mumuplayer.exe", "mumunxmain.exe"]:
+        if emulator_path.name.casefold() == "mumunxmain.exe":
             return cls.MuMuPlayer12
 
         return ""
 
     @staticmethod
-    def multi_to_single(exe: str) -> Iterator[str]:
-        """将多开管理器路径转为单实例可执行文件路径。"""
-        if "MuMuMultiPlayer.exe" in exe:
-            yield exe.replace("MuMuMultiPlayer.exe", "MuMuPlayer.exe")
-        elif "MuMuManager.exe" in exe:
-            yield exe.replace("MuMuManager.exe", "MuMuPlayer.exe")
-        else:
-            yield exe
-
-    @staticmethod
     def single_to_console(exe: str) -> str:
-        if "MuMuPlayer.exe" in exe:
-            return exe.replace("MuMuPlayer.exe", "MuMuManager.exe")
-        # MuMuPlayer12 5.0
-        if "MuMuNxMain.exe" in exe:
-            return exe.replace("MuMuNxMain.exe", "MuMuManager.exe")
-        return exe
+        return Path(exe).with_name("MuMuManager.exe").as_posix()
 
     @staticmethod
     def vbox_file_to_serial(file: str) -> str:
@@ -86,6 +71,7 @@ class Emulator(EmulatorBase):
         if "MuMuPlayerGlobal" in name:
             return
 
+        seen: set[tuple[str, str, str]] = set()
         for file in iter_folder(folder, ext=".nemu"):
             serial = Emulator.vbox_file_to_serial(file)
             instance = EmulatorInstance(
@@ -93,13 +79,17 @@ class Emulator(EmulatorBase):
                 name=name,
                 path=self.path,
             )
-            if is_mumu12_serial(serial):
-                yield instance
-                continue
-            instance_id = instance.mumu_player_12_id
-            if instance_id is not None:
+            if not is_mumu12_serial(serial):
+                instance_id = instance.mumu_player_12_id
+                if instance_id is None:
+                    continue
                 instance.serial = self._mumu12_default_serial(instance_id)
-                yield instance
+
+            key = (instance.serial, instance.name, instance.path)
+            if key in seen:
+                continue
+            seen.add(key)
+            yield instance
 
     @staticmethod
     def _mumu12_default_serial(instance_id: int) -> str:
@@ -121,14 +111,17 @@ class Emulator(EmulatorBase):
 
 
 class EmulatorManager(EmulatorManagerBase):
+    def __init__(self, configured_emulator_path: str = "") -> None:
+        self.configured_emulator_path = configured_emulator_path
+
     def iter_configured_emulator(self) -> Iterator[str]:
-        """仅用于调试或测试时显式注入的 MuMu 路径。"""
-        path = getattr(self, "configured_emulator_path", "")
+        """产生配置中存在的 MuMu12 可执行文件路径。"""
+        path = self.configured_emulator_path
         if not path:
             return
-        for file in Emulator.multi_to_single(path.replace("\\", "/")):
-            if Emulator.is_emulator(file) and Path(file).exists():
-                yield file
+        file = path.replace("\\", "/")
+        if Emulator.is_emulator(file) and Path(file).is_file():
+            yield file
 
     @staticmethod
     def iter_running_emulator() -> Iterator[str]:
@@ -146,9 +139,26 @@ class EmulatorManager(EmulatorManagerBase):
             if Emulator.is_emulator(exe):
                 yield exe
 
+    @staticmethod
+    def iter_installed_emulator() -> Iterator[str]:
+        """从 Windows 卸载信息定位已安装的 MuMu12 nx_main。"""
+        key_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\MuMuPlayer"
+        for root in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+            try:
+                with winreg.OpenKey(root, key_path) as key:
+                    install_location, _ = winreg.QueryValueEx(key, "InstallLocation")
+            except OSError:
+                continue
+
+            executable = Path(install_location, "nx_main", "MuMuNxMain.exe")
+            if executable.is_file():
+                yield executable.as_posix()
+
     @cached_property
     def all_emulators(self) -> list[Emulator]:
         exe = set(self.iter_configured_emulator())
+        if not exe:
+            exe.update(self.iter_installed_emulator())
         for file in self.iter_running_emulator() or ():
             if Path(file).exists():
                 exe.add(file)

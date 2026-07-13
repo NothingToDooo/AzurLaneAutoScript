@@ -167,7 +167,7 @@ def _instance(
     *,
     serial: str = "127.0.0.1:16384",
     name: str = "MuMuPlayer-12.0-0",
-    path: str = "C:/MuMu/shell/MuMuPlayer.exe",
+    path: str = "C:/MuMu/nx_main/MuMuNxMain.exe",
     emulator_type: str = "MuMuPlayer12",
     mumu_id: int | None = None,
 ) -> _Instance:
@@ -232,7 +232,7 @@ def test_find_emulator_instance_returns_none_when_serial_missing() -> None:
         instances=[
             _instance(serial="127.0.0.1:16416", name="MuMuPlayer-12.0-1"),
         ],
-        running=["C:/MuMu/shell/MuMuPlayer.exe"],
+        running=["C:/MuMu/nx_main/MuMuNxMain.exe"],
     )
 
     assert runtime.find_emulator_instance("127.0.0.1:16384") is None
@@ -264,13 +264,13 @@ def test_emulator_instance_uses_runtime_discovery_without_config_cache() -> None
 
 
 def test_find_emulator_instance_falls_back_to_single_running_path() -> None:
-    expected = _instance(serial="127.0.0.1:16384", name="ArkNights", path="C:/B/MuMuPlayer.exe")
+    expected = _instance(serial="127.0.0.1:16384", name="ArkNights", path="C:/B/MuMuNxMain.exe")
     runtime = _make_runtime(
         instances=[
-            _instance(serial="127.0.0.1:16384", name="Default", path="C:/A/MuMuPlayer.exe"),
+            _instance(serial="127.0.0.1:16384", name="Default", path="C:/A/MuMuNxMain.exe"),
             expected,
         ],
-        running=["C:/B/MuMuPlayer.exe"],
+        running=["C:/B/MuMuNxMain.exe"],
     )
 
     assert runtime.find_emulator_instance("127.0.0.1:16384") is expected

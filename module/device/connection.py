@@ -53,7 +53,7 @@ class Connection(MumuTcpConnection):
         self.release_resource()
         self.adb_client.server_kill()
         del_cached_property(self, "adb_client")
-        _ = self.adb_client
+        self.adb_start_server()
 
     def adb_reconnect(self) -> None:
         if len(self.list_device()) == 0:
