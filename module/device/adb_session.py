@@ -143,14 +143,28 @@ class AdbSession(ConnectionAttr):
     def adb_start_server(self) -> int:
         command = [self.adb_binary, "-P", str(self.adb_server_port), "start-server"]
         logger.info(f"Start ADB server: {command}")
-        completed = subprocess.run(  # noqa: S603
-            command,
-            capture_output=True,
-            check=True,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-            text=True,
-            timeout=10,
-        )
+        try:
+            completed = subprocess.run(  # noqa: S603
+                command,
+                capture_output=True,
+                check=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+                text=True,
+                timeout=10,
+            )
+        except subprocess.CalledProcessError as error:
+            stdout = (error.stdout or "").strip()
+            stderr = (error.stderr or "").strip()
+            for output in (stdout, stderr):
+                if output:
+                    logger.error(output)
+
+            message = f"ADB start-server failed with exit code {error.returncode}"
+            reason = stderr or stdout
+            if reason:
+                message = f"{message}: {reason}"
+            raise OSError(message) from error
+
         for output in (completed.stdout.strip(), completed.stderr.strip()):
             if output:
                 logger.info(output)

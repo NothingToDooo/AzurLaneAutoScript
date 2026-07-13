@@ -294,6 +294,10 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
             return HARD_VANGUARD_BUTTONS[self.fleet_to_attack_slot][0]
         return equipment_assets.FLEET_ENTER
 
+    def _is_fleet_slot_empty(self, button: Button) -> bool:
+        """普通模式按钮是舰船入口，只有困难模式按钮可用于识别空槽。"""
+        return self.is_hard_mode and self.appear(button, offset=(20, 20))
+
     def _change_equipment(self, button: Button, detail_button: Button, *, take_on: bool) -> None:
         if self.is_hard_mode:
             self.ship_info_enter(button, long_click=True, skip_first_screenshot=False)
@@ -318,7 +322,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         button = self.fleet_backline_1_button
         equipment_taken_off = False
 
-        if self.change_flagship_equip and not self.appear(button, offset=(20, 20)):
+        if self.change_flagship_equip and not self._is_fleet_slot_empty(button):
             logger.hr("Unmount flagship equipments", level=2)
             self._change_equipment(
                 button,
@@ -330,7 +334,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         logger.hr("Change flagship", level=2)
         success = self.flagship_change_execute()
 
-        if equipment_taken_off and not self.appear(button, offset=(20, 20)):
+        if equipment_taken_off and not self._is_fleet_slot_empty(button):
             logger.hr("Mount flagship equipments", level=2)
             self._change_equipment(
                 button,
@@ -347,7 +351,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         button = self.fleet_vanguard_1_button
         equipment_taken_off = False
 
-        if self.change_vanguard_equip and not self.appear(button, offset=(20, 20)):
+        if self.change_vanguard_equip and not self._is_fleet_slot_empty(button):
             logger.hr("Unmount vanguard equipments", level=2)
             self._change_equipment(button, equipment_assets.FLEET_DETAIL_ENTER, take_on=False)
             equipment_taken_off = True
@@ -355,7 +359,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         logger.hr("Change vanguard", level=2)
         success = self.vanguard_change_execute()
 
-        if equipment_taken_off and not self.appear(button, offset=(20, 20)):
+        if equipment_taken_off and not self._is_fleet_slot_empty(button):
             logger.hr("Mount vanguard equipments", level=2)
             self._change_equipment(button, equipment_assets.FLEET_DETAIL_ENTER, take_on=True)
         return success

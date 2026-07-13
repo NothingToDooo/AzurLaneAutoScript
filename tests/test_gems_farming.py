@@ -262,6 +262,23 @@ def test_gems_emotion_tracks_only_attacking_fleet_and_requests_change() -> None:
     assert emotion.config.records == [{"Emotion_Fleet1Value": 100}]
 
 
+def test_gems_emotion_uses_fleet1_as_logical_ledger_for_second_attack_slot() -> None:
+    emotion = object.__new__(GemsEmotion)
+    emotion.config = _EmotionConfig()
+    attack_ledger = _FleetEmotion(recovered=datetime.now())
+    physical_fleet_2_record = _FleetEmotion(recovered=datetime.now())
+    emotion.fleet_1 = attack_ledger
+    emotion.fleet_2 = physical_fleet_2_record
+    emotion.fleets = [attack_ledger, physical_fleet_2_record]
+    emotion.total_reduced = 0
+
+    emotion.reduce(fleet_index=2)
+
+    assert attack_ledger.current == 98
+    assert physical_fleet_2_record.current == 100
+    assert emotion.config.records == [{"Emotion_Fleet1Value": 98}]
+
+
 class _HardCampaign(CampaignBase):
     preparation_calls: int
 
@@ -444,13 +461,23 @@ def test_flagship_change_wraps_ship_replacement_with_equipment_code() -> None:
 
 
 @pytest.mark.parametrize("position", ["flagship", "vanguard"])
-def test_empty_slot_does_not_mount_equipment_without_take_off(position: str) -> None:
-    runner = _EquipmentChangeRunner(appear_results=[True, False])
+def test_hard_empty_slot_does_not_mount_equipment_without_take_off(position: str) -> None:
+    runner = _EquipmentChangeRunner(appear_results=[True, False], mode="hard")
 
     change = runner.flagship_change if position == "flagship" else runner.vanguard_change
     assert change() is True
     assert runner.operations == ["goto", "change_ship"]
     assert runner.appear_results == [False]
+
+
+@pytest.mark.parametrize("position", ["flagship", "vanguard"])
+def test_normal_mode_treats_ship_entry_template_as_occupied(position: str) -> None:
+    runner = _EquipmentChangeRunner(appear_results=[True, True])
+
+    change = runner.flagship_change if position == "flagship" else runner.vanguard_change
+    assert change() is True
+    assert runner.operations == ["goto", "take_off", "change_ship", "take_on"]
+    assert runner.appear_results == [True, True]
 
 
 @pytest.mark.parametrize(

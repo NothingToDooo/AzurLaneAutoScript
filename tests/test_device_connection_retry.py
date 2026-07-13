@@ -34,6 +34,13 @@ class _Connection:
         self.calls.append("detect_package")
 
 
+class _FailingStartConnection(_Connection):
+    def adb_start_server(self) -> int:
+        self.calls.append("adb_start_server")
+        message = "ADB start-server failed with exit code 1: cannot bind listener"
+        raise OSError(message)
+
+
 def _patch_retry_runtime(monkeypatch: pytest.MonkeyPatch) -> _Logger:
     logger = _Logger()
     monkeypatch.setattr(adb_session_module, "logger", logger)
@@ -127,3 +134,27 @@ def test_connection_retry_keeps_os_error_as_plain_retry(monkeypatch: pytest.Monk
     assert result == "ok"
     assert logger.errors == ["pipe"]
     assert device.calls == ["run", "run"]
+
+
+def test_connection_retry_converges_when_adb_server_start_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    logger = _patch_retry_runtime(monkeypatch)
+    device = _FailingStartConnection()
+
+    @adb_session_module.retry
+    def always_refused(target: _Connection) -> None:
+        target.calls.append("run")
+        message = "adb server is stopped"
+        raise ConnectionRefusedError(message)
+
+    with pytest.raises(RequestHumanTakeover):
+        always_refused(device)
+
+    assert "adb_start_server" in device.calls
+    assert logger.errors == [
+        "adb server is stopped",
+        "ADB start-server failed with exit code 1: cannot bind listener",
+        "adb server is stopped",
+        "ADB start-server failed with exit code 1: cannot bind listener",
+        "adb server is stopped",
+    ]
+    assert logger.criticals == ["Retry always_refused() failed"]

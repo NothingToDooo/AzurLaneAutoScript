@@ -1,12 +1,22 @@
 import subprocess
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+
+import pytest
 
 from module.device import adb_session as adb_session_module
 from module.device.adb_session import AdbSession
 
-if TYPE_CHECKING:
-    import pytest
+
+class _Logger:
+    def __init__(self) -> None:
+        self.infos: list[str] = []
+        self.errors: list[str] = []
+
+    def info(self, message: object) -> None:
+        self.infos.append(str(message))
+
+    def error(self, message: object) -> None:
+        self.errors.append(str(message))
 
 
 def test_adb_start_server_launches_configured_binary_on_isolated_port(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -47,3 +57,33 @@ def test_adb_start_server_launches_configured_binary_on_isolated_port(monkeypatc
     ]
     assert events == ["run", "server_version"]
     assert version == 41
+
+
+def test_adb_start_server_translates_process_failure_and_logs_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    adb_binary = "C:/Alas/bin/adb/adb.exe"
+    command = [adb_binary, "-P", "65037", "start-server"]
+    process_error = subprocess.CalledProcessError(
+        returncode=1,
+        cmd=command,
+        output="daemon stdout\n",
+        stderr="cannot bind listener\n",
+    )
+    logger = _Logger()
+    monkeypatch.setenv("ANDROID_ADB_SERVER_PORT", "65037")
+
+    def fail_to_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        raise process_error
+
+    monkeypatch.setattr(adb_session_module.subprocess, "run", fail_to_run)
+    monkeypatch.setattr(adb_session_module, "logger", logger)
+    session = object.__new__(AdbSession)
+    vars(session).update(
+        adb_binary=adb_binary,
+        adb_client=SimpleNamespace(server_version=lambda: 0),
+    )
+
+    with pytest.raises(OSError, match=r"ADB start-server failed with exit code 1: cannot bind listener") as raised:
+        session.adb_start_server()
+
+    assert raised.value.__cause__ is process_error
+    assert logger.errors == ["daemon stdout", "cannot bind listener"]
