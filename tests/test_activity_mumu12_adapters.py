@@ -67,6 +67,7 @@ from module.raid.profile import (
 from module.raid.result import RaidAttemptStatus, RaidExecutionResult
 
 if TYPE_CHECKING:
+    from module.config.config_generated import ConfigOverrides
     from module.interaction import CancellationSignal
 
 
@@ -103,9 +104,11 @@ def runtime(monkeypatch: pytest.MonkeyPatch) -> tuple[AzurLaneConfig, Device]:
         _config: AzurLaneConfig,
         _device: Device,
         _task_name: str,
+        overlay: ConfigOverrides,
         cancellation: CancellationSignal,
     ) -> Device:
         cancellation.raise_if_requested()
+        _config.apply_runtime_overlay(**overlay)
         return device
 
     monkeypatch.setattr(adapters, "_activate", activate)
@@ -232,6 +235,46 @@ def test_event_story_resolves_client_profile_and_executes_bounded_units(
     assert runner.calls == ["goto", "story", "goto"]
     assert constructed_profiles == [expected_profile]
     assert config.Campaign_Event == content_id
+
+
+def test_event_story_activation_applies_typed_overlay_after_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    content_id = "event_20260625_cn"
+    config = AzurLaneConfig.from_snapshot("event-story-activation", {})
+    device = object.__new__(Device)
+    runner = _EventStoryRunner()
+    activated: list[tuple[str, str, bool, bool]] = []
+
+    def build_runner(
+        activated_config: AzurLaneConfig,
+        *,
+        profile: EventStoryClientProfile,
+        device: Device,
+    ) -> _EventStoryRunner:
+        del profile, device
+        activated.append(
+            (
+                activated_config.task.command,
+                activated_config.Campaign_Event,
+                activated_config.EventStory_SkipBattle,
+                activated_config.STORY_ALLOW_SKIP,
+            )
+        )
+        return runner
+
+    monkeypatch.setattr(adapters, "EventStory", build_runner)
+
+    adapters.Mumu12EventStoryWorkflow(config, device, _Clock()).execute(
+        ActivitySpec.event_story(
+            activity=_ACTIVITY_CATALOG.resolve_event_story(content_id),
+            skip_battle=True,
+        ),
+        AbortToken(),
+        PreemptionRequest(),
+    )
+
+    assert activated == [("EventStory", content_id, True, True)]
 
 
 def test_unavailable_event_story_returns_before_constructing_a_client(

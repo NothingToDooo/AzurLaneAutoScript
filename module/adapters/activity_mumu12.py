@@ -63,6 +63,7 @@ from module.ui.page import page_campaign_menu, page_hospital
 
 if TYPE_CHECKING:
     from module.application import PreemptionRequest
+    from module.config.config_generated import ConfigOverrides
     from module.interaction import CancellationSignal
 
 
@@ -97,6 +98,7 @@ def _activate(
     config: AzurLaneConfig,
     device: Device,
     task_name: str,
+    overlay: ConfigOverrides,
     cancellation: CancellationSignal,
 ) -> Device:
     cancellation.raise_if_requested()
@@ -104,6 +106,7 @@ def _activate(
     task = name_to_function(task_name)
     config.task = task
     config.bind(task)
+    config.apply_runtime_overlay(**overlay)
     device.config = config
     return cast("Device", CancellationAwareMumu12Device(device, cancellation))
 
@@ -181,8 +184,14 @@ class _Mumu12ActivityAdapter:
         self._clock = selected_clock
         self._delay_sampler = delay_sampler
 
-    def _device_for(self, task_name: str, cancellation: CancellationSignal) -> Device:
-        return _activate(self._config, self._device, task_name, cancellation)
+    def _device_for(
+        self,
+        task_name: str,
+        cancellation: CancellationSignal,
+        overlay: ConfigOverrides | None = None,
+    ) -> Device:
+        selected_overlay: ConfigOverrides = {} if overlay is None else overlay
+        return _activate(self._config, self._device, task_name, selected_overlay, cancellation)
 
     def _now(self) -> datetime:
         return _observed_at(self._clock)
@@ -357,15 +366,18 @@ class Mumu12EventStoryWorkflow(_Mumu12ActivityAdapter, ActivityWorkflow):
             message = "available event story definition requires a profile id"
             raise ValueError(message)
         profile = EVENT_STORY_CLIENT_PROFILES.resolve(profile_id)
-        self._config.apply_runtime_overlay(
-            Campaign_Event=spec.activity.content_id.value,
-            EventStory_SkipBattle=spec.skip_battle,
-            STORY_ALLOW_SKIP=True,
-        )
         runner = EventStory(
             self._config,
             profile=profile,
-            device=self._device_for("EventStory", cancellation),
+            device=self._device_for(
+                "EventStory",
+                cancellation,
+                {
+                    "Campaign_Event": spec.activity.content_id.value,
+                    "EventStory_SkipBattle": spec.skip_battle,
+                    "STORY_ALLOW_SKIP": True,
+                },
+            ),
         )
         cancellation.raise_if_requested()
         if not runner.device.app_is_running():

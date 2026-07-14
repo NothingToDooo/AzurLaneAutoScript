@@ -13,7 +13,7 @@ from module.adapters.opsi_live import (
     OpsiWorldScheduleSource,
 )
 from module.base.timer import Timer
-from module.config.config import AzurLaneConfig
+from module.config.config import AzurLaneConfig, name_to_function
 from module.config.utils import (
     get_nearest_weekday_date,
     get_os_next_reset,
@@ -61,6 +61,7 @@ from module.os_handler.action_point import ActionPointLimit
 from module.os_handler.assets import OS_MONTHBOSS_HARD, OS_MONTHBOSS_NORMAL
 from module.os_shop.assets import OS_SHOP_CHECK
 from module.shop.shop_voucher import VoucherShop
+from module.task_registry import command_to_config_name
 from module.ui.page import page_reward
 
 if TYPE_CHECKING:
@@ -848,6 +849,9 @@ class _Mumu12OpsiExecutor(OpsiUiStepExecutor):
     ) -> LiveOpsiStep:
         cancellation.raise_if_requested()
         self._config.replace_runtime_overlay()
+        task = name_to_function(command_to_config_name(spec.task_id.value))
+        self._config.task = task
+        self._config.bind(task)
         self._config.merge(OSConfig())
         apply_world_task_spec(self._config, spec, progress)
         checked_device = cast("Device", CancellationAwareMumu12Device(self._device, cancellation))

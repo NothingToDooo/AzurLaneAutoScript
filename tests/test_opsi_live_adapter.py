@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, cast, override
 
 import pytest
 
+import module.adapters.opsi_mumu12 as opsi_adapters
 from module.adapters.opsi_live import LiveOperationSirenWorkflow, LiveOpsiStep, OpsiLiveClock
 from module.adapters.opsi_mumu12 import (
     CancellationAwareMumu12Device,
@@ -11,6 +12,9 @@ from module.adapters.opsi_mumu12 import (
     apply_world_task_spec,
 )
 from module.application import AbortRequested, AbortToken, PreemptionRequest, TaskId
+from module.config.config import AzurLaneConfig
+from module.config.deep import deep_set
+from module.device.device import Device
 from module.gameplay.opsi import (
     WORLD_TASK_DEFINITIONS,
     AbyssalSettings,
@@ -43,7 +47,6 @@ from module.gameplay.opsi_progress import WorldProgress, WorldZoneCursor
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from module.config.config import AzurLaneConfig
     from module.gameplay.opsi import WorldTaskSettings
     from module.interaction import CancellationSignal
     from module.os.globe_zone import Zone
@@ -225,6 +228,48 @@ def test_live_workflow_checks_cancellation_before_entering_driver() -> None:
         workflow.execute(_spec(WorldOperation.EXPLORE), None, abort, PreemptionRequest())
 
     assert driver.calls == []
+
+
+def test_mumu12_executor_binds_each_task_before_schedule_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = AzurLaneConfig.from_snapshot("opsi-task-binding", {}, task="OpsiDaily")
+    deep_set(config.data, "OpsiDaily.Scheduler.ServerUpdate", "13:00")
+    deep_set(config.data, "OpsiExplore.Scheduler.ServerUpdate", "01:00")
+    config.bind(config.task)
+    device = object.__new__(Device)
+
+    class _Session:
+        def __init__(self, _config: AzurLaneConfig, _device: Device) -> None:
+            pass
+
+        @staticmethod
+        def prepare_live_step() -> None:
+            pass
+
+        @staticmethod
+        def execute_live_step(spec: WorldTaskSpec) -> LiveOpsiStep:
+            return LiveOpsiStep(spec.operation, WorldTaskStatus.EMPTY)
+
+    monkeypatch.setattr(opsi_adapters, "Mumu12OperationSirenSession", _Session)
+    workflow = opsi_adapters.build_mumu12_operation_siren_workflow(config, device)
+
+    explore = workflow.execute(
+        _spec(WorldOperation.EXPLORE),
+        None,
+        AbortToken(),
+        PreemptionRequest(),
+    )
+    daily = workflow.execute(
+        _spec(WorldOperation.DAILY),
+        None,
+        AbortToken(),
+        PreemptionRequest(),
+    )
+
+    assert explore.schedule.next_server_update_at.hour == 1
+    assert daily.schedule.next_server_update_at.hour == 13
+    assert config.task.command == "OpsiDaily"
 
 
 class _IoTarget:
