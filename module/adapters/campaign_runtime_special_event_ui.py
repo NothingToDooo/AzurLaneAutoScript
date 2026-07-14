@@ -68,7 +68,7 @@ class _SpecialEventUiHost(Protocol):
 
     def is_in_stage_page(self) -> bool: ...
 
-    def _get_stage_name(self, image: ImageArray) -> object: ...
+    def try_update_stage_entrances(self, image: ImageArray) -> bool: ...
 
     def interval_clear(self, button: object) -> object: ...
 
@@ -248,14 +248,10 @@ class Event20240815UiExecutor(RuntimeExecutorInstance):
             else:
                 host.device.screenshot()
             if host.is_in_stage_page():
-                try:
-                    # 旧 OCR 引擎只暴露此解析入口；私有访问被收敛在 production adapter 内。
-                    host._get_stage_name(host.device.image)  # noqa: SLF001
-                except IndexError, CampaignNameError:
-                    if self._handle_story_entrance(runtime):
-                        continue
-                else:
+                if host.try_update_stage_entrances(host.device.image):
                     return True
+                if self._handle_story_entrance(runtime):
+                    continue
             if host.handle_story_skip():
                 host.interval_clear(GET_ITEMS_1)
                 self._entrance_timer.clear()

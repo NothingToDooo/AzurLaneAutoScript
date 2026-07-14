@@ -70,7 +70,10 @@ class _EventRuntime:
         self.device = _Device()
         self.story_visible = False
         self.page_visible = False
+        self.stage_page_visible = False
         self.story_entrance: Button | None = None
+        self.stage_ocr_results: list[bool] = []
+        self.stage_ocr_images: list[object] = []
 
     def runtime_super(
         self,
@@ -101,14 +104,12 @@ class _EventRuntime:
         del kwargs
         return self.story_entrance
 
-    @staticmethod
-    def is_in_stage_page() -> bool:
-        return False
+    def is_in_stage_page(self) -> bool:
+        return self.stage_page_visible
 
-    @staticmethod
-    def _get_stage_name(image: object) -> object:
-        del image
-        return None
+    def try_update_stage_entrances(self, image: object) -> bool:
+        self.stage_ocr_images.append(image)
+        return self.stage_ocr_results.pop(0)
 
     @staticmethod
     def interval_clear(button: object) -> object:
@@ -178,6 +179,45 @@ def test_event_20240815_exp_guard_and_story_entrance_detection() -> None:
 
     assert entrance is runtime.story_entrance
     assert blocked is False
+
+
+def test_event_20240815_story_entrance_falls_back_after_stage_ocr_failure() -> None:
+    manager = _manager(
+        "event_20240815_cn/campaign_base/campaign_base",
+        RuntimeExecutorKind.EVENT_UI,
+        {
+            "operations": [
+                "ensure_no_stage_entrance",
+                "get_story_entrance",
+                "handle_campaign_ui_additional",
+                "handle_exp_info",
+                "handle_get_chapter_additional",
+                "handle_in_stage",
+                "handle_story_entrance",
+            ],
+            "exp_info_blocked_page": "event",
+            "state": ["entrance_timer"],
+        },
+    )
+    runtime = _EventRuntime(manager)
+    runtime.stage_page_visible = True
+    runtime.stage_ocr_results = [False, True]
+    runtime.story_entrance = Button(
+        area=(100, 300, 140, 340),
+        color=(0, 0, 0),
+        button=(100, 300, 140, 340),
+        name="STORY",
+    )
+
+    result = manager.event_ui.invoke(
+        RuntimeOperation.ENSURE_NO_STAGE_ENTRANCE,
+        runtime,
+        lambda: False,
+    )
+
+    assert result is True
+    assert runtime.device.clicks == [runtime.story_entrance]
+    assert runtime.stage_ocr_images == [runtime.device.image, runtime.device.image]
 
 
 class _Config:
