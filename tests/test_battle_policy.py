@@ -4,18 +4,28 @@ from typing import cast
 import pytest
 
 from module.content.battle_policy import (
+    AllConditions,
+    AnyCondition,
+    BattleFlag,
     BattleIntent,
     BattlePlan,
     BattlePolicy,
     BattlePolicyName,
     BossStrategy,
+    CellAccessibleCondition,
     ClearBoss,
     ClearBossRoadblock,
+    ClearChosenEnemy,
     ClearFilteredEnemy,
+    ClearSelectedEnemy,
     ClearSiren,
     DefaultBattle,
+    FlagCondition,
+    GuardedBattleStep,
+    NotCondition,
     StagePolicy,
 )
+from module.content.cell import CellId
 from module.content.errors import ContentValidationError
 
 
@@ -103,6 +113,55 @@ def test_non_atomic_boss_search_requires_an_explicit_roadblock_step() -> None:
     )
 
     assert policy.to_plan().intents == policy.steps
+
+
+def test_stage_policy_exposes_its_boss_contract() -> None:
+    regular = StagePolicy((DefaultBattle(),))
+    guarded_boss = StagePolicy(
+        (
+            GuardedBattleStep(
+                FlagCondition(BattleFlag.CLEAR_MODE, value=True),
+                ClearBoss(BossStrategy.FLEET_BOSS),
+            ),
+        )
+    )
+
+    assert regular.clears_boss is False
+    assert guarded_boss.clears_boss is True
+
+
+def test_stage_policy_owns_all_direct_and_guarded_cell_references() -> None:
+    chosen = CellId(0, 0)
+    first_candidate = CellId(1, 0)
+    second_candidate = CellId(2, 0)
+    accessible = CellId(3, 0)
+    nested_accessible = CellId(4, 0)
+    policy = StagePolicy(
+        (
+            ClearChosenEnemy(chosen),
+            ClearSelectedEnemy((first_candidate, second_candidate)),
+            GuardedBattleStep(
+                AllConditions(
+                    (
+                        CellAccessibleCondition(accessible),
+                        NotCondition(
+                            AnyCondition(
+                                (
+                                    CellAccessibleCondition(nested_accessible),
+                                    FlagCondition(BattleFlag.CLEAR_MODE, value=False),
+                                )
+                            )
+                        ),
+                    )
+                ),
+                DefaultBattle(),
+            ),
+        )
+    )
+
+    assert policy.referenced_cells == frozenset(
+        {chosen, first_candidate, second_candidate, accessible, nested_accessible}
+    )
 
 
 def test_boss_roadblock_rejects_direct_fleet_strategies() -> None:

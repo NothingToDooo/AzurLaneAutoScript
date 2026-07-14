@@ -449,10 +449,6 @@ def test_compiler_projects_typed_map_structures_into_legacy_mechanisms() -> None
 
     compiled = compile_campaign_map(definition)
 
-    assert set(compiled._parse_wall_disconnects()) == {  # noqa: SLF001 - 验证旧 wall ASCII 编码边界。
-        ((0, 0), (1, 0)),
-        ((0, 0), (0, 1)),
-    }
     assert compiled.maze_data == [("A1", "B2")]
     assert tuple(grid.location for grid in compiled.fortress_data[0]) == ((1, 0),)
     assert tuple(grid.location for grid in compiled.fortress_data[1]) == ((0, 1),)

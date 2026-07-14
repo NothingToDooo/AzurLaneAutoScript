@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, Protocol, assert_never, cast
 
 from module.base.decorator import del_cached_property
@@ -87,6 +88,42 @@ _PRIORITY_ENEMIES = (
     ((2,), ("Enemy", "CarrierInvertedOrthant")),
     ((3,), ("Enemy", "CarrierInvertedOrthant")),
 )
+
+
+@dataclass(frozen=True, slots=True)
+class _BattlePrimitiveOutcome:
+    applied: bool
+    target: program_model.ProgramBattleTarget = program_model.ProgramBattleTarget.ENEMY
+    advances_wave: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class _NoBattleTarget:
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class _MechanicActionContext:
+    settled_target: program_model.ProgramBattleTarget
+    resolved_grid: GridInfo | None = None
+
+
+type _BattleHandlerOutcome = _BattlePrimitiveOutcome | _NoBattleTarget
+type _FleetMechanicAction = (
+    BreakSirenCaught
+    | PushFleetForward
+    | ProtectFleet
+    | RescueFleet
+    | StepFleetOn
+    | MoveFleet
+    | MoveFleetToBestCandidate
+    | SwitchFleet
+    | EnsureFleet
+    | EnsureFleetAt
+    | FleetClearTarget
+)
+type _PickupMechanicAction = PickupAmmo | PickupMapItem
+type _MapInteractionMechanicAction = ClearAllMystery | ClearChosenMystery | ClearMechanism | ClearMapItems | AirStrike
 
 
 class BattleProgramMumu12AdapterError(RuntimeError):
@@ -295,62 +332,115 @@ class Mumu12BattleProgramPort:
                 )
             raise
 
-    def execute_mechanic(  # noqa: C901, PLR0911, PLR0912 - 封闭 union 必须在端口边界穷举。
+    def execute_mechanic(
         self,
         action: program_model.ProgramMechanicAction,
         cancellation: CancellationSignal,
     ) -> MechanicActionOutcome:
         cancellation.raise_if_requested()
-        if isinstance(action, BreakSirenCaught):
-            return self._break_siren_caught(action, cancellation)
         before = self._runtime.battle_count
+        # 运行时原语可能在抛出终止异常前清空网格标记，结算事实必须使用调用前快照。
+        context = self._mechanic_action_context(action)
         try:
-            if isinstance(action, RoadblockAction):
-                return self._roadblock(action, cancellation)
-            if isinstance(action, PushFleetForward):
-                return self._push_forward(action, cancellation)
-            if isinstance(action, ProtectFleet):
-                return self._protect(action, cancellation)
-            if isinstance(action, RescueFleet):
-                return self._rescue(action, cancellation)
-            if isinstance(action, StepFleetOn):
-                return self._step_on(action, cancellation)
-            if isinstance(action, MoveFleet | MoveFleetToBestCandidate):
-                return self._move_fleet(action, cancellation)
-            if isinstance(action, SwitchFleet):
-                return self._switch_fleet(action, cancellation)
-            if isinstance(action, EnsureFleet):
-                return self._ensure_fleet(action, cancellation)
-            if isinstance(action, EnsureFleetAt):
-                return self._ensure_fleet_at(action, cancellation)
-            if isinstance(action, FleetClearTarget):
-                return self._fleet_clear_target(action, cancellation)
-            if isinstance(action, PickupAmmo):
-                return self._pickup_ammo(action, cancellation)
-            if isinstance(action, PickupMapItem):
-                return self._pickup_map_item(action, cancellation)
-            if isinstance(action, ClearAllMystery):
-                return self._clear_all_mystery(action, cancellation)
-            if isinstance(action, ClearChosenMystery):
-                return self._clear_chosen_mystery(action, cancellation)
-            if isinstance(action, ClearMechanism):
-                return self._clear_mechanism(action, cancellation)
-            if isinstance(action, ClearMapItems):
-                return self._clear_map_items(action, cancellation)
-            if isinstance(action, AirStrike):
-                return self._air_strike(action, cancellation)
-            if isinstance(action, MoveEnemy):
-                return self._move_enemy(action, cancellation)
-            if isinstance(action, MechanicProcedure):
-                return self._procedure(action, cancellation)
-            assert_never(action)
+            return self._dispatch_mechanic_action(action, context, cancellation)
         except Exception:
             delta = self._runtime.battle_count - before
             if delta == 1:
-                return MechanicSettled(self._mechanic_action_target(action))
+                return MechanicSettled(context.settled_target)
             if delta != 0:
                 return MechanicFailed(f"mechanic action changed battle_count by {delta}, expected zero or one")
             raise
+
+    def _dispatch_mechanic_action(
+        self,
+        action: program_model.ProgramMechanicAction,
+        context: _MechanicActionContext,
+        cancellation: CancellationSignal,
+    ) -> MechanicActionOutcome:
+        if isinstance(action, RoadblockAction):
+            return self._roadblock(action, cancellation)
+        if isinstance(
+            action,
+            BreakSirenCaught
+            | PushFleetForward
+            | ProtectFleet
+            | RescueFleet
+            | StepFleetOn
+            | MoveFleet
+            | MoveFleetToBestCandidate
+            | SwitchFleet
+            | EnsureFleet
+            | EnsureFleetAt
+            | FleetClearTarget,
+        ):
+            return self._dispatch_fleet_mechanic_action(action, context, cancellation)
+        if isinstance(action, PickupAmmo | PickupMapItem):
+            return self._dispatch_pickup_mechanic_action(action, cancellation)
+        if isinstance(action, ClearAllMystery | ClearChosenMystery | ClearMechanism | ClearMapItems | AirStrike):
+            return self._dispatch_map_interaction_action(action, cancellation)
+        if isinstance(action, MoveEnemy):
+            return self._move_enemy(action, cancellation)
+        if isinstance(action, MechanicProcedure):
+            return self._procedure(action, cancellation)
+        assert_never(action)
+
+    def _dispatch_fleet_mechanic_action(  # noqa: C901 - 封闭的舰队机制联合类型必须在单一边界穷举。
+        self,
+        action: _FleetMechanicAction,
+        context: _MechanicActionContext,
+        cancellation: CancellationSignal,
+    ) -> MechanicActionOutcome:
+        if isinstance(action, BreakSirenCaught):
+            outcome = self._break_siren_caught(action, cancellation)
+        elif isinstance(action, PushFleetForward):
+            outcome = self._push_forward(action, cancellation)
+        elif isinstance(action, ProtectFleet):
+            outcome = self._protect(action, cancellation)
+        elif isinstance(action, RescueFleet):
+            outcome = self._rescue(action, cancellation)
+        elif isinstance(action, StepFleetOn):
+            outcome = self._step_on(action, cancellation)
+        elif isinstance(action, MoveFleet | MoveFleetToBestCandidate):
+            outcome = self._move_fleet(action, context, cancellation)
+        elif isinstance(action, SwitchFleet):
+            outcome = self._switch_fleet(action, cancellation)
+        elif isinstance(action, EnsureFleet):
+            outcome = self._ensure_fleet(action, cancellation)
+        elif isinstance(action, EnsureFleetAt):
+            outcome = self._ensure_fleet_at(action, cancellation)
+        elif isinstance(action, FleetClearTarget):
+            outcome = self._fleet_clear_target(action, context, cancellation)
+        else:
+            assert_never(action)
+        return outcome
+
+    def _dispatch_pickup_mechanic_action(
+        self,
+        action: _PickupMechanicAction,
+        cancellation: CancellationSignal,
+    ) -> MechanicActionOutcome:
+        if isinstance(action, PickupAmmo):
+            return self._pickup_ammo(action, cancellation)
+        if isinstance(action, PickupMapItem):
+            return self._pickup_map_item(action, cancellation)
+        assert_never(action)
+
+    def _dispatch_map_interaction_action(
+        self,
+        action: _MapInteractionMechanicAction,
+        cancellation: CancellationSignal,
+    ) -> MechanicActionOutcome:
+        if isinstance(action, ClearAllMystery):
+            return self._clear_all_mystery(action, cancellation)
+        if isinstance(action, ClearChosenMystery):
+            return self._clear_chosen_mystery(action, cancellation)
+        if isinstance(action, ClearMechanism):
+            return self._clear_mechanism(action, cancellation)
+        if isinstance(action, ClearMapItems):
+            return self._clear_map_items(action, cancellation)
+        if isinstance(action, AirStrike):
+            return self._air_strike(action, cancellation)
+        assert_never(action)
 
     def execute_preset_route(  # noqa: C901 - 固定路线的重试与事实闭合必须同处一个状态机。
         self,
@@ -465,113 +555,200 @@ class Mumu12BattleProgramPort:
             for x, weight in enumerate(row):
                 self._runtime.map[(x, y)].weight = weight
 
-    def _execute_unguarded_battle(  # noqa: C901, PLR0912, PLR0915 - 固定 battle union 的显式分派。
+    def _execute_unguarded_battle(
         self,
         action: UnguardedBattleStep,
         cancellation: CancellationSignal,
     ) -> BattleActionOutcome:
-        runtime = self._runtime
-        before = runtime.battle_count
-        target = program_model.ProgramBattleTarget.ENEMY
+        before = self._runtime.battle_count
+        outcome = self._dispatch_battle_action(action, cancellation)
+        if isinstance(outcome, _NoBattleTarget):
+            return program_model.ProgramNoTarget()
+        return self._battle_fact(
+            before,
+            applied=outcome.applied,
+            target=outcome.target,
+            advances_wave=outcome.advances_wave,
+        )
+
+    def _dispatch_battle_action(  # noqa: C901 - 封闭 union 在单一边界穷举，新增成员会触发静态检查。
+        self,
+        action: UnguardedBattleStep,
+        cancellation: CancellationSignal,
+    ) -> _BattleHandlerOutcome:
         if isinstance(action, ClearSiren):
-            if action.include_hidden_candidates:
-                self.mark_all_siren_candidates(cancellation)
-            cancellation.raise_if_requested()
-            applied = bool(runtime.clear_siren(genre=action.genres))
-            target = program_model.ProgramBattleTarget.SIREN
+            outcome = self._handle_clear_siren(action, cancellation)
         elif isinstance(action, ClearFilteredEnemy):
-            enemy_filter = action.enemy_filter or runtime.definition.enemy_filter
-            cancellation.raise_if_requested()
-            applied = bool(runtime.clear_filter_enemy(enemy_filter, preserve=action.preserve))
+            outcome = self._handle_clear_filtered_enemy(action, cancellation)
         elif isinstance(action, ClearEnemy):
-            cancellation.raise_if_requested()
-            applied = bool(
-                runtime.clear_enemy(
+            outcome = self._handle_clear_enemy(action, cancellation)
+        elif isinstance(action, ClearAnyEnemy):
+            outcome = self._handle_clear_any_enemy(action, cancellation)
+        elif isinstance(action, ClearChosenEnemy):
+            outcome = self._handle_clear_chosen_enemy(action, cancellation)
+        elif isinstance(action, ClearSelectedEnemy):
+            outcome = self._handle_clear_selected_enemy(action, cancellation)
+        elif isinstance(action, ClearPriorityEnemy):
+            outcome = self._handle_clear_priority_enemy(action, cancellation)
+        elif isinstance(action, DefaultBattle):
+            outcome = self._handle_default_battle(cancellation)
+        elif isinstance(action, ClearBossRoadblock):
+            outcome = self._handle_clear_boss_roadblock(action, cancellation)
+        elif isinstance(action, ClearBoss):
+            outcome = self._handle_clear_boss(action, cancellation)
+        else:
+            assert_never(action)
+        return outcome
+
+    def _handle_clear_siren(
+        self,
+        action: ClearSiren,
+        cancellation: CancellationSignal,
+    ) -> _BattlePrimitiveOutcome:
+        if action.include_hidden_candidates:
+            self.mark_all_siren_candidates(cancellation)
+        cancellation.raise_if_requested()
+        return _BattlePrimitiveOutcome(
+            applied=bool(self._runtime.clear_siren(genre=action.genres)),
+            target=program_model.ProgramBattleTarget.SIREN,
+        )
+
+    def _handle_clear_filtered_enemy(
+        self,
+        action: ClearFilteredEnemy,
+        cancellation: CancellationSignal,
+    ) -> _BattlePrimitiveOutcome:
+        enemy_filter = action.enemy_filter or self._runtime.definition.enemy_filter
+        cancellation.raise_if_requested()
+        return _BattlePrimitiveOutcome(
+            applied=bool(self._runtime.clear_filter_enemy(enemy_filter, preserve=action.preserve)),
+        )
+
+    def _handle_clear_enemy(
+        self,
+        action: ClearEnemy,
+        cancellation: CancellationSignal,
+    ) -> _BattlePrimitiveOutcome:
+        cancellation.raise_if_requested()
+        return _BattlePrimitiveOutcome(
+            applied=bool(
+                self._runtime.clear_enemy(
                     scale=action.scales,
                     genre=action.genres,
                     sort=action.sort,
                     strongest=action.strongest,
                 )
-            )
-        elif isinstance(action, ClearAnyEnemy):
-            cancellation.raise_if_requested()
-            applied = bool(
-                runtime.clear_any_enemy(
+            ),
+        )
+
+    def _handle_clear_any_enemy(
+        self,
+        action: ClearAnyEnemy,
+        cancellation: CancellationSignal,
+    ) -> _BattlePrimitiveOutcome:
+        cancellation.raise_if_requested()
+        return _BattlePrimitiveOutcome(
+            applied=bool(
+                self._runtime.clear_any_enemy(
                     genre=action.genres,
                     sort=action.sort,
                     strongest=action.strongest,
                 )
-            )
-        elif isinstance(action, ClearChosenEnemy):
-            grid = self._grid(action.target)
-            if not grid.is_accessible:
-                return program_model.ProgramNoTarget()
-            target = self._target_from_expectation(action.expected)
-            cancellation.raise_if_requested()
-            applied = bool(runtime.clear_chosen_enemy(grid, expected=self._target_expected(action.expected)))
-        elif isinstance(action, ClearSelectedEnemy):
-            grid = next(
-                (
-                    self._grid(cell)
-                    for cell in action.candidates
-                    if self._candidate_is_clearable(
-                        self._grid(cell),
-                        action.excluded_genres,
-                        action.expected,
-                    )
-                ),
-                None,
-            )
-            if grid is None:
-                return program_model.ProgramNoTarget()
-            target = self._target_from_expectation(action.expected)
-            cancellation.raise_if_requested()
-            applied = bool(runtime.clear_chosen_enemy(grid, expected=self._target_expected(action.expected)))
-        elif isinstance(action, ClearPriorityEnemy):
-            applied = self._clear_priority_enemy(action, cancellation)
-        elif isinstance(action, DefaultBattle):
-            grid = self._default_target()
-            if grid is None:
-                return program_model.ProgramNoTarget()
-            target = self._target_for_grid(grid)
-            cancellation.raise_if_requested()
-            applied = bool(runtime.clear_chosen_enemy(grid, expected=self._expected_for_grid(grid)))
-        elif isinstance(action, ClearBossRoadblock):
-            return self._clear_boss_roadblock(action, cancellation)
-        elif isinstance(action, ClearBoss):
-            bosses = runtime.map.select(is_boss=True, is_accessible=True).sort("weight", "cost")
-            if not bosses:
-                return program_model.ProgramNoTarget()
-            target = program_model.ProgramBattleTarget.BOSS
-            cancellation.raise_if_requested()
-            if action.strategy in (BossStrategy.FLEET_BOSS, BossStrategy.BRUTE_FORCE):
-                executor = runtime.fleet_boss
-            elif action.strategy is BossStrategy.FLEET_1:
-                executor = runtime.fleet_1
-            elif action.strategy is BossStrategy.MAP_SEARCH:
-                executor = runtime
-            else:
-                assert_never(action.strategy)
-            applied = bool(executor.clear_chosen_enemy(bosses[0], expected="boss"))
-        else:
-            assert_never(action)
-        return self._battle_fact(before, applied=applied, target=target)
+            ),
+        )
 
-    def _clear_boss_roadblock(
+    def _handle_clear_chosen_enemy(
+        self,
+        action: ClearChosenEnemy,
+        cancellation: CancellationSignal,
+    ) -> _BattleHandlerOutcome:
+        grid = self._grid(action.target)
+        if not grid.is_accessible:
+            return _NoBattleTarget()
+        cancellation.raise_if_requested()
+        return _BattlePrimitiveOutcome(
+            applied=bool(
+                self._runtime.clear_chosen_enemy(
+                    grid,
+                    expected=self._target_expected(action.expected),
+                )
+            ),
+            target=self._target_from_expectation(action.expected),
+        )
+
+    def _handle_clear_selected_enemy(
+        self,
+        action: ClearSelectedEnemy,
+        cancellation: CancellationSignal,
+    ) -> _BattleHandlerOutcome:
+        grid = next(
+            (
+                self._grid(cell)
+                for cell in action.candidates
+                if self._candidate_is_clearable(
+                    self._grid(cell),
+                    action.excluded_genres,
+                    action.expected,
+                )
+            ),
+            None,
+        )
+        if grid is None:
+            return _NoBattleTarget()
+        cancellation.raise_if_requested()
+        return _BattlePrimitiveOutcome(
+            applied=bool(
+                self._runtime.clear_chosen_enemy(
+                    grid,
+                    expected=self._target_expected(action.expected),
+                )
+            ),
+            target=self._target_from_expectation(action.expected),
+        )
+
+    def _handle_clear_priority_enemy(
+        self,
+        action: ClearPriorityEnemy,
+        cancellation: CancellationSignal,
+    ) -> _BattlePrimitiveOutcome:
+        return _BattlePrimitiveOutcome(
+            applied=self._clear_priority_enemy(action, cancellation),
+        )
+
+    def _handle_default_battle(
+        self,
+        cancellation: CancellationSignal,
+    ) -> _BattleHandlerOutcome:
+        grid = self._default_target()
+        if grid is None:
+            return _NoBattleTarget()
+        target = self._target_for_grid(grid)
+        expected = self._expected_for_grid(grid)
+        cancellation.raise_if_requested()
+        return _BattlePrimitiveOutcome(
+            applied=bool(
+                self._runtime.clear_chosen_enemy(
+                    grid,
+                    expected=expected,
+                )
+            ),
+            target=target,
+        )
+
+    def _handle_clear_boss_roadblock(
         self,
         action: ClearBossRoadblock,
         cancellation: CancellationSignal,
-    ) -> BattleActionOutcome:
+    ) -> _BattleHandlerOutcome:
         runtime = self._runtime
         boss = runtime.map.select(is_boss=True)
         if not boss:
-            return program_model.ProgramNoTarget()
+            return _NoBattleTarget()
         cancellation.raise_if_requested()
         roadblocks = runtime.brute_find_roadblocks(boss[0], fleet=runtime.fleet_boss_index)
         grids = roadblocks.select(is_enemy=True, is_accessible=True).sort("weight", "cost")
         if not grids:
-            return program_model.ProgramNoTarget()
-        before = runtime.battle_count
+            return _NoBattleTarget()
         cancellation.raise_if_requested()
         if action.strategy is BossStrategy.MAP_SEARCH:
             applied = bool(runtime.fleet_1.clear_chosen_enemy(grids[0]))
@@ -580,11 +757,33 @@ class Mumu12BattleProgramPort:
         else:
             message = f"unsupported boss roadblock strategy: {action.strategy.value}"
             raise BattleProgramMumu12AdapterError(message)
-        return self._battle_fact(
-            before,
+        return _BattlePrimitiveOutcome(
             applied=applied,
             target=program_model.ProgramBattleTarget.ENEMY,
             advances_wave=False,
+        )
+
+    def _handle_clear_boss(
+        self,
+        action: ClearBoss,
+        cancellation: CancellationSignal,
+    ) -> _BattleHandlerOutcome:
+        runtime = self._runtime
+        bosses = runtime.map.select(is_boss=True, is_accessible=True).sort("weight", "cost")
+        if not bosses:
+            return _NoBattleTarget()
+        cancellation.raise_if_requested()
+        if action.strategy in (BossStrategy.FLEET_BOSS, BossStrategy.BRUTE_FORCE):
+            executor = runtime.fleet_boss
+        elif action.strategy is BossStrategy.FLEET_1:
+            executor = runtime.fleet_1
+        elif action.strategy is BossStrategy.MAP_SEARCH:
+            executor = runtime
+        else:
+            assert_never(action.strategy)
+        return _BattlePrimitiveOutcome(
+            applied=bool(executor.clear_chosen_enemy(bosses[0], expected="boss")),
+            target=program_model.ProgramBattleTarget.BOSS,
         )
 
     def _roadblock(
@@ -706,15 +905,18 @@ class Mumu12BattleProgramPort:
     def _move_fleet(
         self,
         action: MoveFleet | MoveFleetToBestCandidate,
+        context: _MechanicActionContext,
         cancellation: CancellationSignal,
     ) -> MechanicActionOutcome:
-        grid = (
-            self._grid(action.destination) if isinstance(action, MoveFleet) else self._best_fleet_move_candidate(action)
-        )
+        grid = context.resolved_grid
+        if grid is None:
+            message = "move fleet mechanic has no resolved target grid"
+            raise AssertionError(message)
         return self._move_fleet_to_grid(
             fleet=action.fleet,
             expected=action.expected,
             grid=grid,
+            target=context.settled_target,
             cancellation=cancellation,
         )
 
@@ -724,6 +926,7 @@ class Mumu12BattleProgramPort:
         fleet: FleetRole,
         expected: EncounterExpectation,
         grid: GridInfo,
+        target: program_model.ProgramBattleTarget,
         cancellation: CancellationSignal,
     ) -> MechanicActionOutcome:
         executor = self._fleet_runtime(fleet, cancellation)
@@ -735,7 +938,7 @@ class Mumu12BattleProgramPort:
         return self._mechanic_fact(
             before,
             applied=moved,
-            target=self._target_for_grid(grid),
+            target=target,
             operation="move fleet",
         )
 
@@ -783,11 +986,15 @@ class Mumu12BattleProgramPort:
     def _fleet_clear_target(
         self,
         action: FleetClearTarget,
+        context: _MechanicActionContext,
         cancellation: CancellationSignal,
     ) -> MechanicActionOutcome:
         executor = self._fleet_runtime(action.fleet, cancellation)
         before = self._runtime.battle_count
-        grid = self._grid(action.target)
+        grid = context.resolved_grid
+        if grid is None:
+            message = "fleet clear target mechanic has no resolved target grid"
+            raise AssertionError(message)
         if not grid.is_accessible:
             return MechanicNotApplied()
         cancellation.raise_if_requested()
@@ -795,7 +1002,7 @@ class Mumu12BattleProgramPort:
         return self._mechanic_fact(
             before,
             applied=applied,
-            target=self._target_from_encounter(action.expected, grid),
+            target=context.settled_target,
             operation="fleet clear target",
         )
 
@@ -1254,19 +1461,22 @@ class Mumu12BattleProgramPort:
             return self._target_for_grid(grid) if grid is not None else program_model.ProgramBattleTarget.ENEMY
         return program_model.ProgramBattleTarget.ENEMY
 
-    def _mechanic_action_target(
+    def _mechanic_action_context(
         self,
         action: program_model.ProgramMechanicAction,
-    ) -> program_model.ProgramBattleTarget:
+    ) -> _MechanicActionContext:
         if isinstance(action, BreakSirenCaught | ProtectFleet):
-            return program_model.ProgramBattleTarget.SIREN
+            return _MechanicActionContext(program_model.ProgramBattleTarget.SIREN)
         if isinstance(action, FleetClearTarget):
-            return self._target_from_encounter(action.expected, self._grid(action.target))
+            grid = self._grid(action.target)
+            return _MechanicActionContext(self._target_from_encounter(action.expected, grid), grid)
         if isinstance(action, MoveFleet):
-            return self._target_from_encounter(action.expected, self._grid(action.destination))
+            grid = self._grid(action.destination)
+            return _MechanicActionContext(self._target_from_encounter(action.expected, grid), grid)
         if isinstance(action, MoveFleetToBestCandidate):
-            return self._target_from_encounter(action.expected, self._best_fleet_move_candidate(action))
-        return program_model.ProgramBattleTarget.ENEMY
+            grid = self._best_fleet_move_candidate(action)
+            return _MechanicActionContext(self._target_from_encounter(action.expected, grid), grid)
+        return _MechanicActionContext(program_model.ProgramBattleTarget.ENEMY)
 
     @staticmethod
     def _candidate_is_clearable(

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Literal
+from typing import Literal, assert_never
 
 from module.content.cell import CellId
 from module.content.errors import ContentValidationError
@@ -309,6 +309,44 @@ type BattleStep = UnguardedBattleStep | GuardedBattleStep
 type BattleIntent = BattleStep
 
 
+def _condition_referenced_cells(condition: BattleCondition) -> frozenset[CellId]:
+    if isinstance(condition, FlagCondition):
+        return frozenset()
+    if isinstance(condition, CellAccessibleCondition):
+        return frozenset({condition.cell})
+    if isinstance(condition, AllConditions | AnyCondition):
+        return frozenset(cell for nested in condition.conditions for cell in _condition_referenced_cells(nested))
+    if isinstance(condition, NotCondition):
+        return _condition_referenced_cells(condition.condition)
+    assert_never(condition)
+
+
+def _unguarded_step_referenced_cells(step: UnguardedBattleStep) -> frozenset[CellId]:
+    if isinstance(step, ClearChosenEnemy):
+        return frozenset({step.target})
+    if isinstance(step, ClearSelectedEnemy):
+        return frozenset(step.candidates)
+    if isinstance(
+        step,
+        ClearSiren
+        | ClearFilteredEnemy
+        | ClearEnemy
+        | ClearAnyEnemy
+        | ClearPriorityEnemy
+        | DefaultBattle
+        | ClearBossRoadblock
+        | ClearBoss,
+    ):
+        return frozenset()
+    assert_never(step)
+
+
+def _step_referenced_cells(step: BattleStep) -> frozenset[CellId]:
+    if isinstance(step, GuardedBattleStep):
+        return _condition_referenced_cells(step.condition) | _unguarded_step_referenced_cells(step.step)
+    return _unguarded_step_referenced_cells(step)
+
+
 def is_battle_step(value: object) -> bool:
     return isinstance(value, (*_STEP_TYPES, GuardedBattleStep))
 
@@ -340,6 +378,16 @@ class StagePolicy:
         steps = _validated_steps(self.steps)
         self._validate_boss_steps(steps)
         object.__setattr__(self, "steps", steps)
+
+    @property
+    def clears_boss(self) -> bool:
+        last_step = self.steps[-1]
+        unguarded = last_step.step if isinstance(last_step, GuardedBattleStep) else last_step
+        return isinstance(unguarded, ClearBoss)
+
+    @property
+    def referenced_cells(self) -> frozenset[CellId]:
+        return frozenset(cell for step in self.steps for cell in _step_referenced_cells(step))
 
     @staticmethod
     def _validate_boss_steps(steps: tuple[BattleStep, ...]) -> None:

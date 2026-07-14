@@ -920,13 +920,16 @@ def _battle_step(  # noqa: C901, PLR0911, PLR0912 - 封闭 battle step tag 解�
             _battle_condition(item["condition"], path, f"{location}.condition", shape),
             guarded_step,
         )
-    strategy = _boss_strategy(item["strategy"], path, f"{location}.strategy")
-    try:
-        if tag == "clear_boss_roadblock":
-            return ClearBossRoadblock(strategy=strategy)
-        return ClearBoss(strategy=strategy)
-    except ContentValidationError as error:
-        raise _fail(path, location, str(error)) from error
+    if tag in {"clear_boss_roadblock", "clear_boss"}:
+        strategy = _boss_strategy(item["strategy"], path, f"{location}.strategy")
+        try:
+            if tag == "clear_boss_roadblock":
+                return ClearBossRoadblock(strategy=strategy)
+            if tag == "clear_boss":
+                return ClearBoss(strategy=strategy)
+        except ContentValidationError as error:
+            raise _fail(path, location, str(error)) from error
+    raise _fail(path, f"{location}.tag", f"unknown tag: {tag!r}")
 
 
 def _battle_policies(

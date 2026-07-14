@@ -269,10 +269,14 @@ def _step(  # noqa: C901, PLR0911, PLR0912 - 封闭 tag 解码必须穷举。
             _condition(item["condition"], f"{location}.condition"),
             guarded_step,
         )
-    strategy = _strategy(item["strategy"], f"{location}.strategy")
-    if tag == "clear_boss_roadblock":
-        return ClearBossRoadblock(strategy)
-    return ClearBoss(strategy)
+    if tag in {"clear_boss_roadblock", "clear_boss"}:
+        strategy = _strategy(item["strategy"], f"{location}.strategy")
+        if tag == "clear_boss_roadblock":
+            return ClearBossRoadblock(strategy)
+        if tag == "clear_boss":
+            return ClearBoss(strategy)
+    message = f"{location}.tag contains an unknown tag: {tag!r}"
+    raise ContentValidationError(message)
 
 
 def _free_mapping(value: object, location: str) -> Mapping[str, object]:
@@ -476,7 +480,10 @@ def _program_condition(  # noqa: C901, PLR0911, PLR0912 - 封闭 condition tag �
             for index, raw_condition in enumerate(_sequence(item["conditions"], f"{location}.conditions"))
         )
         return AllProgramConditions(conditions) if tag == "all" else AnyProgramCondition(conditions)
-    return NotProgramCondition(_program_condition(item["condition"], f"{location}.condition"))
+    if tag == "not":
+        return NotProgramCondition(_program_condition(item["condition"], f"{location}.condition"))
+    message = f"{location}.tag contains an unknown program condition: {tag!r}"
+    raise ContentValidationError(message)
 
 
 def _signed_integer(value: object, location: str) -> int:

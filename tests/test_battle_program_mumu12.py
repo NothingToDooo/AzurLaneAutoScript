@@ -447,10 +447,11 @@ def _grid(  # noqa: PLR0913 - 测试网格显式暴露互斥识别事实。
     boss: bool = False,
     mystery: bool = False,
     land: bool = False,
+    accessible: bool = True,
 ) -> GridInfo:
     grid = GridInfo()
     grid.location = (cell.x, cell.y)
-    grid.cost = cell.x + 1
+    grid.cost = cell.x + 1 if accessible else 9999
     grid.cost_1 = grid.cost
     grid.cost_2 = grid.cost
     grid.weight = cell.x + 1
@@ -538,47 +539,82 @@ def test_stage_single_fleet_state_overrides_the_generic_fleet_count() -> None:
 
 
 @pytest.mark.parametrize(
-    ("action", "grids", "expected"),
+    ("action", "grids", "expected", "expected_events"),
     [
         (
             ClearSiren(),
             [_grid(A1, siren=True)],
             program_model.ProgramBattleSettled(program_model.ProgramBattleTarget.SIREN),
+            [("clear_siren", {"genre": ()})],
         ),
         (
             ClearFilteredEnemy(0),
             [_grid(A1, enemy=True)],
             program_model.ProgramBattleSettled(program_model.ProgramBattleTarget.ENEMY),
+            [("clear_filter_enemy", "1L > 2L", 0)],
         ),
         (
             ClearEnemy(scales=(2,)),
             [_grid(A1, enemy=True)],
             program_model.ProgramBattleSettled(program_model.ProgramBattleTarget.ENEMY),
+            [
+                (
+                    "clear_enemy",
+                    {
+                        "scale": (2,),
+                        "genre": (),
+                        "sort": (),
+                        "strongest": False,
+                    },
+                )
+            ],
         ),
         (
             ClearAnyEnemy(),
             [_grid(A1, enemy=True)],
             program_model.ProgramBattleSettled(program_model.ProgramBattleTarget.ENEMY),
+            [
+                (
+                    "clear_any_enemy",
+                    {
+                        "genre": (),
+                        "sort": (),
+                        "strongest": False,
+                    },
+                )
+            ],
         ),
         (
             ClearChosenEnemy(A1, TargetExpectation.ENEMY),
             [_grid(A1, enemy=True)],
             program_model.ProgramBattleSettled(program_model.ProgramBattleTarget.ENEMY),
+            [("clear_chosen_enemy", (A1.x, A1.y), "", 1)],
         ),
         (
             ClearSelectedEnemy((A1, B1), expected=TargetExpectation.SIREN),
             [_grid(A1, enemy=True, siren=True), _grid(B1)],
             program_model.ProgramBattleSettled(program_model.ProgramBattleTarget.SIREN),
+            [("clear_chosen_enemy", (A1.x, A1.y), "siren", 1)],
         ),
         (
             ClearPriorityEnemy(),
             [_grid(A1, enemy=True)],
             program_model.ProgramBattleSettled(program_model.ProgramBattleTarget.ENEMY),
+            [
+                (
+                    "clear_enemy",
+                    {
+                        "scale": (2,),
+                        "genre": ("LightInvertedOrthant", "MainInvertedOrthant"),
+                    },
+                )
+            ],
         ),
         (
             DefaultBattle(),
             [_grid(A1, enemy=True)],
             program_model.ProgramBattleSettled(program_model.ProgramBattleTarget.ENEMY),
+            [("clear_chosen_enemy", (A1.x, A1.y), "", 1)],
         ),
         (
             ClearBossRoadblock(BossStrategy.MAP_SEARCH),
@@ -587,11 +623,16 @@ def test_stage_single_fleet_state_overrides_the_generic_fleet_count() -> None:
                 program_model.ProgramBattleTarget.ENEMY,
                 advances_wave=False,
             ),
+            [
+                ("brute_find_roadblocks", 2),
+                ("clear_chosen_enemy", (A1.x, A1.y), "", 1),
+            ],
         ),
         (
             ClearBoss(BossStrategy.BRUTE_FORCE),
             [_grid(A1, boss=True)],
             program_model.ProgramBattleSettled(program_model.ProgramBattleTarget.BOSS),
+            [("clear_chosen_enemy", (A1.x, A1.y), "boss", 2)],
         ),
     ],
 )
@@ -599,11 +640,79 @@ def test_every_battle_action_is_fact_closed(
     action: BattleStep,
     grids: list[GridInfo],
     expected: program_model.ProgramBattleSettled,
+    expected_events: list[object],
 ) -> None:
     runtime = _Runtime(grids)
     result = _port(runtime).execute_battle(action, _cancel())
 
     assert result == expected
+    assert runtime.battle_count == 1
+    assert runtime.events == expected_events
+
+
+def test_hidden_siren_candidates_are_marked_before_the_clear_primitive() -> None:
+    runtime = _Runtime([_grid(A1, siren=True), _grid(B1)])
+
+    result = _port(runtime).execute_battle(
+        ClearSiren(include_hidden_candidates=True),
+        _cancel(),
+    )
+
+    assert result == program_model.ProgramBattleSettled(program_model.ProgramBattleTarget.SIREN)
+    assert all(grid.may_siren for grid in runtime.map)
+    assert runtime.events == [("clear_siren", {"genre": ()})]
+
+
+def test_default_battle_keeps_the_selected_target_kind_after_the_primitive_mutates_the_grid() -> None:
+    runtime = _Runtime([_grid(A1, siren=True)])
+
+    result = _port(runtime).execute_battle(DefaultBattle(), _cancel())
+
+    assert result == program_model.ProgramBattleSettled(program_model.ProgramBattleTarget.SIREN)
+    assert runtime.events == [("clear_chosen_enemy", (A1.x, A1.y), "siren", 1)]
+
+
+def test_battle_primitive_success_without_a_count_advance_is_rejected_centrally() -> None:
+    runtime = _Runtime([_grid(A1, enemy=True)])
+    runtime.battle_delta = 0
+
+    result = _port(runtime).execute_battle(ClearEnemy(), _cancel())
+
+    assert result == program_model.ProgramFailed("battle primitive reported success without advancing battle_count")
+    assert runtime.events == [
+        (
+            "clear_enemy",
+            {
+                "scale": (),
+                "genre": (),
+                "sort": (),
+                "strongest": False,
+            },
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    ("action", "grids"),
+    [
+        (ClearChosenEnemy(A1), [_grid(A1, accessible=False)]),
+        (ClearSelectedEnemy((A1,)), [_grid(A1)]),
+        (DefaultBattle(), [_grid(A1)]),
+        (ClearBossRoadblock(BossStrategy.MAP_SEARCH), [_grid(A1)]),
+        (ClearBoss(BossStrategy.BRUTE_FORCE), [_grid(A1, boss=True, accessible=False)]),
+    ],
+)
+def test_battle_handlers_without_a_valid_target_have_no_side_effects(
+    action: BattleStep,
+    grids: list[GridInfo],
+) -> None:
+    runtime = _Runtime(grids)
+
+    result = _port(runtime).execute_battle(action, _cancel())
+
+    assert result == program_model.ProgramNoTarget()
+    assert runtime.battle_count == 0
+    assert runtime.events == []
 
 
 @pytest.mark.parametrize(
@@ -681,10 +790,15 @@ def test_guarded_battle_and_exception_after_settlement_preserve_facts() -> None:
 
 
 @pytest.mark.parametrize(
-    "mode",
-    tuple(RoadblockMode),
+    ("mode", "expected_event"),
+    [
+        (RoadblockMode.CLEAR, "clear_roadblocks"),
+        (RoadblockMode.CLEAR_POTENTIAL, "clear_potential_roadblocks"),
+        (RoadblockMode.CLEAR_FIRST, "clear_first_roadblocks"),
+        (RoadblockMode.CLEAR_FOR_FASTER, "clear_grids_for_faster"),
+    ],
 )
-def test_all_roadblock_modes_are_explicit(mode: RoadblockMode) -> None:
+def test_all_roadblock_modes_are_explicit(mode: RoadblockMode, expected_event: str) -> None:
     runtime = _Runtime([_grid(A1, enemy=True), _grid(B1)])
     action = RoadblockAction(
         0,
@@ -696,9 +810,10 @@ def test_all_roadblock_modes_are_explicit(mode: RoadblockMode) -> None:
     result = _port(runtime).execute_mechanic(action, _cancel())
 
     assert result == MechanicSettled(program_model.ProgramBattleTarget.ENEMY)
+    assert runtime.events == [(expected_event, {"strongest": True})]
 
 
-def test_every_mechanic_action_has_a_fixed_projection() -> None:
+def test_every_fleet_mechanic_action_has_a_fixed_projection() -> None:
     road = RoadGroup((RoadPath((A1,)),))
 
     runtime = _Runtime([_grid(A1, siren=True)])
@@ -706,21 +821,34 @@ def test_every_mechanic_action_has_a_fixed_projection() -> None:
         BreakSirenCaught(0),
         _cancel(),
     ) == MechanicSettled(program_model.ProgramBattleTarget.SIREN)
+    assert runtime.events == ["break_siren_caught"]
 
     runtime = _Runtime()
     assert isinstance(_port(runtime).execute_mechanic(PushFleetForward(0), _cancel()), MechanicApplied)
+    assert runtime.events == ["push_forward"]
+
+    runtime = _Runtime()
     assert isinstance(_port(runtime).execute_mechanic(ProtectFleet(0), _cancel()), MechanicApplied)
+    assert runtime.events == ["protect"]
+
+    runtime = _Runtime()
     assert isinstance(_port(runtime).execute_mechanic(RescueFleet(0, A1), _cancel()), MechanicApplied)
+    assert runtime.events == [("rescue", (A1.x, A1.y))]
+
+    runtime = _Runtime()
     assert isinstance(
         _port(runtime).execute_mechanic(StepFleetOn(0, (C1,), (road,)), _cancel()),
         MechanicApplied,
     )
+    assert runtime.events == ["step_on"]
 
     runtime = _Runtime()
     assert isinstance(
         _port(runtime).execute_mechanic(MoveFleet(0, C1, FleetRole.ACTIVE), _cancel()),
         MechanicApplied,
     )
+    assert runtime.events == [("goto", (C1.x, C1.y), "", 1)]
+
     runtime = _Runtime()
     runtime.map[B1.x, B1.y].weight = 5
     runtime.map[B1.x, B1.y].cost = 2
@@ -738,60 +866,97 @@ def test_every_mechanic_action_has_a_fixed_projection() -> None:
         ),
         MechanicApplied,
     )
-    assert ("goto", (C1.x, C1.y), "", 2) in runtime.events
+    assert runtime.events == [("goto", (C1.x, C1.y), "", 2)]
+
     runtime = _Runtime()
     assert isinstance(
         _port(runtime).execute_mechanic(SwitchFleet(0, FleetRole.FLEET_2), _cancel()),
         MechanicApplied,
     )
+    assert runtime.events == [("switch_to", 2)]
+
     runtime = _Runtime()
     assert isinstance(
         _port(runtime).execute_mechanic(EnsureFleet(0, FleetRole.NON_BOSS), _cancel()),
         MechanicNotApplied,
     )
+    assert runtime.events == [("fleet_ensure", 1)]
+
     runtime = _Runtime()
     assert isinstance(
         _port(runtime).execute_mechanic(EnsureFleetAt(0, A1, FleetRole.FLEET_1), _cancel()),
         MechanicApplied,
     )
+    assert runtime.events == []
 
     runtime = _Runtime([_grid(A1, enemy=True)])
     assert _port(runtime).execute_mechanic(
         FleetClearTarget(0, A1, FleetRole.ACTIVE, EncounterExpectation.ENEMY),
         _cancel(),
     ) == MechanicSettled(program_model.ProgramBattleTarget.ENEMY)
+    assert runtime.events == [("clear_chosen_enemy", (A1.x, A1.y), "", 1)]
+
+
+def test_every_pickup_mechanic_action_has_a_fixed_projection() -> None:
     runtime = _Runtime()
     assert isinstance(_port(runtime).execute_mechanic(PickupAmmo(0), _cancel()), MechanicApplied)
+    assert runtime.events == ["pickup_ammo"]
+
     runtime = _Runtime()
     assert isinstance(
         _port(runtime).execute_mechanic(PickupMapItem(0, MapItemKind.FLARE, C1), _cancel()),
         MechanicApplied,
     )
+    assert runtime.events == [("goto", (C1.x, C1.y), "", 1)]
+    assert runtime.map[C1.x, C1.y].is_flare
 
+
+def test_every_map_interaction_mechanic_action_has_a_fixed_projection() -> None:
     runtime = _Runtime([_grid(A1, mystery=True)])
     assert isinstance(
         _port(runtime).execute_mechanic(ClearAllMystery(0, nearby=False), _cancel()),
         MechanicApplied,
     )
+    assert runtime.events == ["clear_all_mystery"]
+
     runtime = _Runtime([_grid(A1, mystery=True)])
     assert isinstance(
         _port(runtime).execute_mechanic(ClearChosenMystery(0, A1), _cancel()),
         MechanicApplied,
     )
+    assert runtime.events == [("clear_chosen_mystery", (A1.x, A1.y))]
+
     runtime = _Runtime()
     runtime.map[A1.x, A1.y].is_mechanism_trigger = True
     assert isinstance(
         _port(runtime).execute_mechanic(ClearMechanism(0, (A1,)), _cancel()),
         MechanicApplied,
     )
+    event_name, selected = cast("tuple[str, SelectedGrids[GridInfo]]", runtime.events[0])
+    assert event_name == "clear_mechanism"
+    assert selected.location == [(A1.x, A1.y)]
+
     runtime = _Runtime()
     assert isinstance(
         _port(runtime).execute_mechanic(ClearMapItems(0, (C1, D1)), _cancel()),
         MechanicApplied,
     )
+    assert runtime.events == [
+        ("goto", (C1.x, C1.y), "", 1),
+        ("goto", (D1.x, D1.y), "", 1),
+    ]
+
     runtime = _Runtime()
     assert isinstance(_port(runtime).execute_mechanic(AirStrike(0, C1), _cancel()), MechanicApplied)
+    assert runtime.events == [
+        "strategy_open",
+        "air_strike_enter",
+        ("in_sight", (C1.x, C1.y)),
+        ("strategy_close", False),
+    ]
 
+
+def test_standalone_mechanic_actions_have_fixed_projections() -> None:
     runtime = _Runtime([_grid(A1, enemy=True), _grid(B1)])
     assert isinstance(
         _port(runtime).execute_mechanic(MoveEnemy(0, A1, B1), _cancel()),
@@ -799,6 +964,14 @@ def test_every_mechanic_action_has_a_fixed_projection() -> None:
     )
     assert not runtime.map[A1.x, A1.y].is_enemy
     assert runtime.map[B1.x, B1.y].is_enemy
+    assert runtime.events == [
+        ("in_sight", (B1.x, B1.y)),
+        "strategy_open",
+        "mob_move_enter",
+        "view_update",
+        ("strategy_close", False),
+        "find_path_initial",
+    ]
 
     runtime = _Runtime([_grid(A1, enemy=True)])
     result = _port(runtime).execute_mechanic(
@@ -806,6 +979,79 @@ def test_every_mechanic_action_has_a_fixed_projection() -> None:
         _cancel(),
     )
     assert result == MechanicSettled(program_model.ProgramBattleTarget.ENEMY)
+    assert runtime.events == ["clear_bouncing_enemy"]
+
+
+@pytest.mark.parametrize(
+    ("battle_delta", "expected"),
+    [
+        (1, MechanicSettled(program_model.ProgramBattleTarget.ENEMY)),
+        (2, MechanicFailed("mechanic action changed battle_count by 2, expected zero or one")),
+    ],
+)
+def test_mechanic_exception_after_settlement_closes_from_battle_count(
+    battle_delta: int,
+    expected: MechanicSettled | MechanicFailed,
+) -> None:
+    runtime = _Runtime([_grid(A1, enemy=True)])
+    runtime.battle_delta = battle_delta
+    runtime.raise_after_battle = True
+
+    result = _port(runtime).execute_mechanic(
+        FleetClearTarget(0, A1, FleetRole.ACTIVE, EncounterExpectation.ENEMY),
+        _cancel(),
+    )
+
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    ("target", "grid_flags"),
+    [
+        (program_model.ProgramBattleTarget.SIREN, {"siren": True}),
+        (program_model.ProgramBattleTarget.BOSS, {"boss": True}),
+    ],
+)
+@pytest.mark.parametrize("best_candidate", [False, True])
+def test_move_fleet_exception_freezes_any_target_before_the_grid_is_cleared(
+    target: program_model.ProgramBattleTarget,
+    grid_flags: dict[str, bool],
+    *,
+    best_candidate: bool,
+) -> None:
+    runtime = _Runtime([_grid(A1), _grid(B1, **grid_flags)])
+    runtime.raise_after_battle = True
+    action: MoveFleet | MoveFleetToBestCandidate
+    if best_candidate:
+        action = MoveFleetToBestCandidate(
+            0,
+            (B1,),
+            FleetRole.ACTIVE,
+            expected=EncounterExpectation.ANY,
+        )
+    else:
+        action = MoveFleet(
+            0,
+            B1,
+            FleetRole.ACTIVE,
+            expected=EncounterExpectation.ANY,
+        )
+
+    result = _port(runtime).execute_mechanic(action, _cancel())
+
+    assert result == MechanicSettled(target)
+
+
+def test_mechanic_exception_without_settlement_propagates() -> None:
+    runtime = _Runtime([_grid(A1, enemy=True)])
+    runtime.battle_delta = 0
+    runtime.raise_after_battle = True
+
+    with pytest.raises(RuntimeError, match="campaign ended after settlement"):
+        _port(runtime).execute_mechanic(
+            FleetClearTarget(0, A1, FleetRole.ACTIVE, EncounterExpectation.ENEMY),
+            _cancel(),
+        )
 
 
 def test_break_siren_caught_rejects_unconfirmed_success() -> None:

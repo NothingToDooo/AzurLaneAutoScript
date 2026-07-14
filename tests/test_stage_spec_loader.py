@@ -309,6 +309,33 @@ def test_loader_rejects_invalid_stage_contract_at_load_time(
         loader.load(spec)
 
 
+def test_loader_rejects_registered_but_undecoded_battle_step_at_its_tag(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fields = {"tag"}
+    monkeypatch.setitem(
+        stage_loader_module._BATTLE_STEP_FIELDS,  # noqa: SLF001 - 测试扩展表与解码器必须同步。
+        "future_step",
+        fields,
+    )
+    monkeypatch.setitem(
+        stage_loader_module._BATTLE_STEP_REQUIRED_FIELDS,  # noqa: SLF001 - 测试扩展表与解码器必须同步。
+        "future_step",
+        fields,
+    )
+    loader, spec = _write_stage(
+        tmp_path / "events",
+        _minimal_stage(battles="0:\n  steps:\n  - tag: future_step"),
+    )
+
+    with pytest.raises(
+        ContentValidationError,
+        match=r"battles\.0\.steps\[0\]\.tag: unknown tag: 'future_step'",
+    ):
+        loader.load(spec)
+
+
 def test_loader_rejects_duplicate_yaml_keys(tmp_path: Path) -> None:
     body = _minimal_stage().replace("  name: T1", "  name: T1\n  name: OTHER")
     loader, spec = _write_stage(tmp_path / "events", body)
