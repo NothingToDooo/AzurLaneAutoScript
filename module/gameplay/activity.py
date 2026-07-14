@@ -9,6 +9,7 @@ from module.application import (
     Cancelled,
     DailySchedule,
     Deferred,
+    DelayRange,
     DeleteTaskState,
     DisableTask,
     ExecutionMode,
@@ -675,7 +676,7 @@ class EmotionPolicy:
 
 @dataclass(frozen=True, slots=True)
 class EncounterPolicy:
-    failure_retry_delay: timedelta
+    failure_retry_delay: DelayRange
     resource_retry_delay: timedelta
     oil_limit: int = 0
     event_point_limit: int = 0
@@ -684,7 +685,9 @@ class EncounterPolicy:
     emotion: EmotionPolicy | None = None
 
     def __post_init__(self) -> None:
-        _validate_positive_duration(self.failure_retry_delay, field_name="failure_retry_delay")
+        if not isinstance(self.failure_retry_delay, DelayRange):
+            message = "failure_retry_delay must be a DelayRange"
+            raise TypeError(message)
         _validate_positive_duration(self.resource_retry_delay, field_name="resource_retry_delay")
         _validate_non_negative_integer(self.oil_limit, field_name="oil_limit")
         _validate_non_negative_integer(self.event_point_limit, field_name="event_point_limit")

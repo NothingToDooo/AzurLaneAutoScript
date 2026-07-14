@@ -91,7 +91,7 @@ def _daily_settings(decoder: SettingsDecoder) -> DailySettings:
 def _hard_settings(decoder: SettingsDecoder) -> HardSettings:
     return HardSettings(
         schedule=decoder.daily_schedule("schedule"),
-        failure_retry_delay=_duration(decoder, "failure_retry_seconds"),
+        failure_retry_delay=decoder.delay_range("failure_retry_seconds"),
         resource_retry_delay=_duration(decoder, "resource_retry_seconds"),
         stage=decoder.string("stage"),
         fleet=HardFleet(decoder.integer("fleet", minimum=1, maximum=2)),
@@ -101,7 +101,7 @@ def _hard_settings(decoder: SettingsDecoder) -> HardSettings:
 def _exercise_settings(decoder: SettingsDecoder) -> ExerciseSettings:
     return ExerciseSettings(
         schedule=decoder.daily_schedule("schedule"),
-        failure_retry_delay=_duration(decoder, "failure_retry_seconds"),
+        failure_retry_delay=decoder.delay_range("failure_retry_seconds"),
         opponent_refresh_limit=decoder.integer("opponent_refresh_limit", minimum=1),
         opponent_mode=decoder.enum("opponent_mode", ExerciseOpponentMode),
         opponent_trials=decoder.integer("opponent_trials", minimum=1),

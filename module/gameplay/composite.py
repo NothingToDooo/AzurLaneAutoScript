@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Protocol, override
 
 from module.application import (
     DailySchedule,
+    DelayRange,
+    DelaySampler,
     DisableTask,
     RescheduleSelf,
     Retryable,
@@ -13,6 +15,7 @@ from module.application import (
     TaskContext,
     TaskResult,
     UpsertTaskState,
+    runtime_delay_sampler,
 )
 
 if TYPE_CHECKING:
@@ -108,7 +111,7 @@ class DormSettings:
     feed: DormFeedPlan | None
     collect_enabled: bool
     furniture: DormFurniturePlan | None
-    fallback_delay: timedelta
+    fallback_delay: DelayRange
 
     def __post_init__(self) -> None:
         if self.feed is not None and not isinstance(self.feed, DormFeedPlan):
@@ -118,7 +121,9 @@ class DormSettings:
         if self.furniture is not None and not isinstance(self.furniture, DormFurniturePlan):
             message = "furniture must be a DormFurniturePlan or None"
             raise TypeError(message)
-        _validate_positive_duration(self.fallback_delay, field_name="fallback_delay")
+        if not isinstance(self.fallback_delay, DelayRange):
+            message = "fallback_delay must be a DelayRange"
+            raise TypeError(message)
 
     @property
     def has_work(self) -> bool:
@@ -164,13 +169,14 @@ class DormWorkflow(Protocol):
 
 
 class DormTask(Task):
-    __slots__ = ("_last_furniture_check_at", "_settings", "_workflow")
+    __slots__ = ("_delay_sampler", "_last_furniture_check_at", "_settings", "_workflow")
 
     def __init__(
         self,
         workflow: DormWorkflow,
         settings: DormSettings,
         *,
+        delay_sampler: DelaySampler = runtime_delay_sampler,
         last_furniture_check_at: datetime | None = None,
     ) -> None:
         if not isinstance(settings, DormSettings):
@@ -178,8 +184,12 @@ class DormTask(Task):
             raise TypeError(message)
         if last_furniture_check_at is not None:
             _validate_aware_datetime(last_furniture_check_at, field_name="last_furniture_check_at")
+        if not isinstance(delay_sampler, DelaySampler):
+            message = "delay_sampler must be a DelaySampler"
+            raise TypeError(message)
         self._workflow = workflow
         self._settings = settings
+        self._delay_sampler = delay_sampler
         self._last_furniture_check_at = last_furniture_check_at
 
     @override
@@ -209,8 +219,9 @@ class DormTask(Task):
             message = "DormReport.furniture_checked must match the requested furniture check"
             raise ValueError(message)
 
-        delay = self._settings.fallback_delay
-        if report.ships_in_dorm is not None:
+        if report.ships_in_dorm is None:
+            delay = self._delay_sampler.sample(self._settings.fallback_delay)
+        else:
             delay = _DORM_SHIP_DELAYS[report.ships_in_dorm - 1]
         due_at = report.observed_at + delay
         state_effects: tuple[UpsertTaskState, ...] = ()
@@ -378,7 +389,7 @@ class GuildOperationPolicy:
 class GuildSettings:
     logistics: GuildLogisticsPolicy | None
     operation: GuildOperationPolicy | None
-    failure_retry_delay: timedelta
+    failure_retry_delay: DelayRange
     schedule: DailySchedule
 
     def __post_init__(self) -> None:
@@ -388,7 +399,9 @@ class GuildSettings:
         if self.operation is not None and not isinstance(self.operation, GuildOperationPolicy):
             message = "operation must be a GuildOperationPolicy or None"
             raise TypeError(message)
-        _validate_positive_duration(self.failure_retry_delay, field_name="failure_retry_delay")
+        if not isinstance(self.failure_retry_delay, DelayRange):
+            message = "failure_retry_delay must be a DelayRange"
+            raise TypeError(message)
         if not isinstance(self.schedule, DailySchedule):
             message = "schedule must be a DailySchedule"
             raise TypeError(message)
@@ -417,14 +430,24 @@ class GuildWorkflow(Protocol):
 
 
 class GuildTask(Task):
-    __slots__ = ("_settings", "_workflow")
+    __slots__ = ("_delay_sampler", "_settings", "_workflow")
 
-    def __init__(self, workflow: GuildWorkflow, settings: GuildSettings) -> None:
+    def __init__(
+        self,
+        workflow: GuildWorkflow,
+        settings: GuildSettings,
+        *,
+        delay_sampler: DelaySampler = runtime_delay_sampler,
+    ) -> None:
         if not isinstance(settings, GuildSettings):
             message = "settings must be GuildSettings"
             raise TypeError(message)
+        if not isinstance(delay_sampler, DelaySampler):
+            message = "delay_sampler must be a DelaySampler"
+            raise TypeError(message)
         self._workflow = workflow
         self._settings = settings
+        self._delay_sampler = delay_sampler
 
     @override
     def run(self, context: TaskContext) -> TaskResult:
@@ -448,7 +471,7 @@ class GuildTask(Task):
             )
 
         retry_at = min(
-            report.observed_at + self._settings.failure_retry_delay,
+            report.observed_at + self._delay_sampler.sample(self._settings.failure_retry_delay),
             next_server_update_at,
         )
         return TaskResult(
@@ -472,7 +495,7 @@ class RewardSettings:
     collect_exp: bool
     collect_daily_mission: bool
     collect_weekly_mission: bool
-    success_delay: timedelta
+    success_delay: DelayRange
 
     def __post_init__(self) -> None:
         _validate_bool(value=self.collect_oil, field_name="collect_oil")
@@ -480,7 +503,9 @@ class RewardSettings:
         _validate_bool(value=self.collect_exp, field_name="collect_exp")
         _validate_bool(value=self.collect_daily_mission, field_name="collect_daily_mission")
         _validate_bool(value=self.collect_weekly_mission, field_name="collect_weekly_mission")
-        _validate_positive_duration(self.success_delay, field_name="success_delay")
+        if not isinstance(self.success_delay, DelayRange):
+            message = "success_delay must be a DelayRange"
+            raise TypeError(message)
 
 
 @dataclass(frozen=True, slots=True)
@@ -496,14 +521,24 @@ class RewardWorkflow(Protocol):
 
 
 class RewardTask(Task):
-    __slots__ = ("_settings", "_workflow")
+    __slots__ = ("_delay_sampler", "_settings", "_workflow")
 
-    def __init__(self, workflow: RewardWorkflow, settings: RewardSettings) -> None:
+    def __init__(
+        self,
+        workflow: RewardWorkflow,
+        settings: RewardSettings,
+        *,
+        delay_sampler: DelaySampler = runtime_delay_sampler,
+    ) -> None:
         if not isinstance(settings, RewardSettings):
             message = "settings must be RewardSettings"
             raise TypeError(message)
+        if not isinstance(delay_sampler, DelaySampler):
+            message = "delay_sampler must be a DelaySampler"
+            raise TypeError(message)
         self._workflow = workflow
         self._settings = settings
+        self._delay_sampler = delay_sampler
 
     @override
     def run(self, context: TaskContext) -> TaskResult:
@@ -515,7 +550,7 @@ class RewardTask(Task):
         context.abort.raise_if_requested()
         return TaskResult(
             outcome=Succeeded(),
-            effects=(RescheduleSelf(report.observed_at + self._settings.success_delay),),
+            effects=(RescheduleSelf(report.observed_at + self._delay_sampler.sample(self._settings.success_delay)),),
         )
 
 

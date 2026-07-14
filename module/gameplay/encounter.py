@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Protocol, override
 from module.application import (
     DailySchedule,
     Deferred,
+    DelayRange,
+    DelaySampler,
     DeleteTaskState,
     RescheduleSelf,
     Retryable,
@@ -17,6 +19,7 @@ from module.application import (
     UpsertTaskState,
     WakePolicy,
     WakeTask,
+    runtime_delay_sampler,
 )
 
 if TYPE_CHECKING:
@@ -219,7 +222,7 @@ class HardFleet(IntEnum):
 @dataclass(frozen=True, slots=True)
 class HardSettings:
     schedule: DailySchedule
-    failure_retry_delay: timedelta
+    failure_retry_delay: DelayRange
     resource_retry_delay: timedelta
     stage: str
     fleet: HardFleet
@@ -228,7 +231,9 @@ class HardSettings:
         if not isinstance(self.schedule, DailySchedule):
             message = "schedule must be a DailySchedule"
             raise TypeError(message)
-        _validate_positive_duration(self.failure_retry_delay, field_name="failure_retry_delay")
+        if not isinstance(self.failure_retry_delay, DelayRange):
+            message = "failure_retry_delay must be a DelayRange"
+            raise TypeError(message)
         _validate_positive_duration(self.resource_retry_delay, field_name="resource_retry_delay")
         if not isinstance(self.stage, str):
             message = "stage must be a string"
@@ -306,14 +311,24 @@ class HardWorkflow(Protocol):
 
 
 class HardTask(Task):
-    __slots__ = ("_settings", "_workflow")
+    __slots__ = ("_delay_sampler", "_settings", "_workflow")
 
-    def __init__(self, workflow: HardWorkflow, settings: HardSettings) -> None:
+    def __init__(
+        self,
+        workflow: HardWorkflow,
+        settings: HardSettings,
+        *,
+        delay_sampler: DelaySampler = runtime_delay_sampler,
+    ) -> None:
         if not isinstance(settings, HardSettings):
             message = "settings must be HardSettings"
             raise TypeError(message)
+        if not isinstance(delay_sampler, DelaySampler):
+            message = "delay_sampler must be a DelaySampler"
+            raise TypeError(message)
         self._workflow = workflow
         self._settings = settings
+        self._delay_sampler = delay_sampler
 
     @override
     def run(self, context: TaskContext) -> TaskResult:
@@ -332,7 +347,9 @@ class HardTask(Task):
         if report.stop_reason is HardStopReason.FAILED:
             return TaskResult(
                 outcome=Retryable(_HARD_WORKFLOW_FAILED),
-                effects=(RescheduleSelf(report.observed_at + self._settings.failure_retry_delay),),
+                effects=(
+                    RescheduleSelf(report.observed_at + self._delay_sampler.sample(self._settings.failure_retry_delay)),
+                ),
             )
         if report.stop_reason is HardStopReason.IN_PROGRESS:
             return TaskResult(
@@ -380,7 +397,7 @@ class ExerciseProgress:
 @dataclass(frozen=True, slots=True)
 class ExerciseSettings:
     schedule: DailySchedule
-    failure_retry_delay: timedelta
+    failure_retry_delay: DelayRange
     opponent_refresh_limit: int
     opponent_mode: ExerciseOpponentMode
     opponent_trials: int
@@ -392,7 +409,9 @@ class ExerciseSettings:
         if not isinstance(self.schedule, DailySchedule):
             message = "schedule must be a DailySchedule"
             raise TypeError(message)
-        _validate_positive_duration(self.failure_retry_delay, field_name="failure_retry_delay")
+        if not isinstance(self.failure_retry_delay, DelayRange):
+            message = "failure_retry_delay must be a DelayRange"
+            raise TypeError(message)
         _validate_positive_count(self.opponent_refresh_limit, field_name="opponent_refresh_limit")
         if not isinstance(self.opponent_mode, ExerciseOpponentMode):
             message = "opponent_mode must be an ExerciseOpponentMode"
@@ -441,19 +460,25 @@ class ExerciseWorkflow(Protocol):
 
 
 class ExerciseTask(Task):
-    __slots__ = ("_progress", "_settings", "_workflow")
+    __slots__ = ("_delay_sampler", "_progress", "_settings", "_workflow")
 
     def __init__(
         self,
         workflow: ExerciseWorkflow,
         settings: ExerciseSettings,
         progress: ExerciseProgress | None = None,
+        *,
+        delay_sampler: DelaySampler = runtime_delay_sampler,
     ) -> None:
         if not isinstance(settings, ExerciseSettings):
             message = "settings must be ExerciseSettings"
             raise TypeError(message)
+        if not isinstance(delay_sampler, DelaySampler):
+            message = "delay_sampler must be a DelaySampler"
+            raise TypeError(message)
         self._workflow = workflow
         self._settings = settings
+        self._delay_sampler = delay_sampler
         self._progress = ExerciseProgress() if progress is None else progress
         if not isinstance(self._progress, ExerciseProgress):
             message = "progress must be an ExerciseProgress"
@@ -508,6 +533,8 @@ class ExerciseTask(Task):
 
         return TaskResult(
             outcome=Retryable(_EXERCISE_WORKFLOW_FAILED),
-            effects=(RescheduleSelf(report.observed_at + self._settings.failure_retry_delay),),
+            effects=(
+                RescheduleSelf(report.observed_at + self._delay_sampler.sample(self._settings.failure_retry_delay)),
+            ),
             state_effects=(progress_effect,),
         )

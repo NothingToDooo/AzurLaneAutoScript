@@ -512,7 +512,7 @@ def _decode_job(
         difficulty=difficulty,
         execution=_execution(decoder.object("execution")),
         schedule=decoder.daily_schedule("schedule"),
-        failure_retry_delay=_duration(decoder, "failure_retry_seconds"),
+        failure_retry_delay=decoder.delay_range("failure_retry_seconds"),
         resource_retry_delay=_duration(
             decoder,
             "resource_retry_seconds",

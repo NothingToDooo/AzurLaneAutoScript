@@ -106,7 +106,7 @@ def _context(command: str, settings: dict[str, FrozenJsonValue]) -> TaskBuildCon
         (
             "commission",
             {
-                "failure_retry_seconds": 600,
+                "failure_retry_seconds": {"lower_seconds": 600, "upper_seconds": 600},
                 "commission_limit_enabled": True,
                 "gems_farming_deferral_seconds": 7200,
                 "selection": _COMMISSION_SELECTION,
@@ -116,7 +116,7 @@ def _context(command: str, settings: dict[str, FrozenJsonValue]) -> TaskBuildCon
         (
             "tactical",
             {
-                "failure_retry_seconds": 600,
+                "failure_retry_seconds": {"lower_seconds": 600, "upper_seconds": 600},
                 "server_update_schedule": _SERVER_UPDATE_SCHEDULE,
                 "tactical_filter": "SameT4 > SameT3 > first",
                 "rapid_training_slot": "do_not_use",
@@ -146,7 +146,10 @@ def test_facility_factories_reject_missing_and_unknown_settings() -> None:
         factories["commission"].build(
             _context(
                 "commission",
-                {"failure_retry_seconds": 600, "commission_limit_enabled": True},
+                {
+                    "failure_retry_seconds": {"lower_seconds": 600, "upper_seconds": 600},
+                    "commission_limit_enabled": True,
+                },
             )
         )
     with pytest.raises(SettingsDocumentError, match="unknown settings"):
@@ -154,7 +157,7 @@ def test_facility_factories_reject_missing_and_unknown_settings() -> None:
             _context(
                 "tactical",
                 {
-                    "failure_retry_seconds": 600,
+                    "failure_retry_seconds": {"lower_seconds": 600, "upper_seconds": 600},
                     "server_update_schedule": _SERVER_UPDATE_SCHEDULE,
                     "tactical_filter": "SameT4 > SameT3 > first",
                     "rapid_training_slot": "do_not_use",

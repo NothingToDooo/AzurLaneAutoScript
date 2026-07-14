@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 import module.adapters.encounter_mumu12 as adapters
-from module.application import AbortToken, DailySchedule
+from module.application import AbortToken, DailySchedule, DelayRange
 from module.config.config import AzurLaneConfig
 from module.device.device import Device
 from module.exception import OilExhausted, ScriptEnd
@@ -47,14 +47,14 @@ _DAILY_SETTINGS = DailySettings(
 )
 _HARD_SETTINGS = HardSettings(
     schedule=_SCHEDULE,
-    failure_retry_delay=timedelta(minutes=30),
+    failure_retry_delay=DelayRange(1_800, 1_800),
     resource_retry_delay=timedelta(hours=3),
     stage="11-4",
     fleet=HardFleet.FLEET_2,
 )
 _EXERCISE_SETTINGS = ExerciseSettings(
     schedule=_SCHEDULE,
-    failure_retry_delay=timedelta(minutes=30),
+    failure_retry_delay=DelayRange(1_800, 1_800),
     opponent_refresh_limit=5,
     opponent_mode=ExerciseOpponentMode.EASIEST_ELSE_EXP,
     opponent_trials=2,

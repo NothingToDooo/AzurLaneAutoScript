@@ -66,7 +66,7 @@ def _research_settings(decoder: SettingsDecoder) -> ResearchSettings:
 def _commission_settings(decoder: SettingsDecoder) -> CommissionSettings:
     selection = decoder.object("selection")
     settings = CommissionSettings(
-        failure_retry_delay=timedelta(seconds=decoder.integer("failure_retry_seconds", minimum=1)),
+        failure_retry_delay=decoder.delay_range("failure_retry_seconds"),
         commission_limit_enabled=decoder.boolean("commission_limit_enabled"),
         selection=CommissionSelectionPolicy(
             preset_filter=selection.enum("preset_filter", CommissionPreset),
@@ -83,7 +83,7 @@ def _tactical_settings(decoder: SettingsDecoder) -> TacticalSettings:
     experience_overflow = decoder.object("experience_overflow")
     student = decoder.object("student")
     settings = TacticalSettings(
-        failure_retry_delay=timedelta(seconds=decoder.integer("failure_retry_seconds", minimum=1)),
+        failure_retry_delay=decoder.delay_range("failure_retry_seconds"),
         server_update_schedule=decoder.daily_schedule("server_update_schedule"),
         tactical_filter=decoder.string("tactical_filter"),
         rapid_training_slot=decoder.enum("rapid_training_slot", TacticalRapidTrainingSlot),

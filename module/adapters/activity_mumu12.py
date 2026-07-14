@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Protocol, cast, override
 
 from module.adapters.mumu12 import CancellationAwareMumu12Device
+from module.application import DelaySampler, runtime_delay_sampler
 from module.coalition.coalition import Coalition
 from module.coalition.profile import (
     COALITION_CLIENT_PROFILES,
@@ -154,13 +155,15 @@ def _recovery_at(value: datetime) -> datetime:
 
 
 class _Mumu12ActivityAdapter:
-    __slots__ = ("_clock", "_config", "_device")
+    __slots__ = ("_clock", "_config", "_delay_sampler", "_device")
 
     def __init__(
         self,
         config: AzurLaneConfig,
         device: Device,
         clock: ActivityLiveClock | None = None,
+        *,
+        delay_sampler: DelaySampler = runtime_delay_sampler,
     ) -> None:
         if not isinstance(config, AzurLaneConfig):
             message = "config must be an AzurLaneConfig"
@@ -170,9 +173,13 @@ class _Mumu12ActivityAdapter:
             raise TypeError(message)
         selected_clock = SystemActivityLiveClock() if clock is None else clock
         _require_clock(selected_clock)
+        if not isinstance(delay_sampler, DelaySampler):
+            message = "delay_sampler must be a DelaySampler"
+            raise TypeError(message)
         self._config = config
         self._device = device
         self._clock = selected_clock
+        self._delay_sampler = delay_sampler
 
     def _device_for(self, task_name: str, cancellation: CancellationSignal) -> Device:
         return _activate(self._config, self._device, task_name, cancellation)
@@ -193,7 +200,7 @@ class _Mumu12ActivityAdapter:
             stop_reason=EncounterStopReason.FAILED,
             observed_at=observed_at,
             runs_completed=runs_completed,
-            resume_at=observed_at + policy.failure_retry_delay,
+            resume_at=observed_at + self._delay_sampler.sample(policy.failure_retry_delay),
         )
 
     def _resource_limited(
@@ -221,7 +228,7 @@ class _Mumu12ActivityAdapter:
         observed_at = self._now()
         resume_at = _recovery_at(recovered_at)
         if resume_at <= observed_at:
-            resume_at = observed_at + policy.failure_retry_delay
+            resume_at = observed_at + self._delay_sampler.sample(policy.failure_retry_delay)
         return EncounterReport(
             command=command,
             stop_reason=EncounterStopReason.RECOVERY_REQUIRED,

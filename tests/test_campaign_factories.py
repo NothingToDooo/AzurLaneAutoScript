@@ -261,7 +261,7 @@ def _valid_settings(command: str) -> dict[str, FrozenJsonValue]:
             "timezone": "Asia/Hong_Kong",
             "triggers": ("04:00",),
         },
-        "failure_retry_seconds": 1_800,
+        "failure_retry_seconds": {"lower_seconds": 1_800, "upper_seconds": 1_800},
         "resource_retry_seconds": 10_800,
         "task_balancer": None,
     }

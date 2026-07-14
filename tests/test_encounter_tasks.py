@@ -8,6 +8,7 @@ from module.application import (
     AbortToken,
     DailySchedule,
     Deferred,
+    DelayRange,
     DeleteTaskState,
     ExecutionMode,
     PreemptionRequest,
@@ -60,6 +61,7 @@ _OBSERVED_AT = datetime(2026, 7, 13, 12, tzinfo=UTC)
 _SERVER_UPDATE_AT = datetime(2026, 7, 14, 4, tzinfo=UTC)
 _SERVER_UPDATE_SCHEDULE = DailySchedule("Asia/Hong_Kong", (time(12),))
 _FAILURE_RETRY = timedelta(minutes=30)
+_FAILURE_RETRY_RANGE = DelayRange(1_800, 1_800)
 _RESOURCE_RETRY = timedelta(hours=3)
 
 
@@ -112,7 +114,7 @@ def _context(
 def _hard_settings() -> HardSettings:
     return HardSettings(
         schedule=_SERVER_UPDATE_SCHEDULE,
-        failure_retry_delay=_FAILURE_RETRY,
+        failure_retry_delay=_FAILURE_RETRY_RANGE,
         resource_retry_delay=_RESOURCE_RETRY,
         stage="11-4",
         fleet=HardFleet.FLEET_1,
@@ -170,7 +172,7 @@ def _exercise_report(
 def _exercise_settings(*, refresh_limit: int = 5) -> ExerciseSettings:
     return ExerciseSettings(
         schedule=_SERVER_UPDATE_SCHEDULE,
-        failure_retry_delay=_FAILURE_RETRY,
+        failure_retry_delay=_FAILURE_RETRY_RANGE,
         opponent_refresh_limit=refresh_limit,
         opponent_mode=ExerciseOpponentMode.MAX_EXP,
         opponent_trials=1,
@@ -491,10 +493,10 @@ def test_encounter_datetimes_must_be_timezone_aware() -> None:
 def test_encounter_settings_and_reports_reject_invalid_values() -> None:
     with pytest.raises(ValueError, match="must not exceed"):
         DailyReport(attempts_available=1, attempts_completed=2)
-    with pytest.raises(ValueError, match="must be positive"):
+    with pytest.raises(TypeError, match="failure_retry_delay must be a DelayRange"):
         HardSettings(
             _SERVER_UPDATE_SCHEDULE,
-            timedelta(0),
+            cast("DelayRange", timedelta(0)),
             _RESOURCE_RETRY,
             "11-4",
             HardFleet.FLEET_1,
@@ -515,11 +517,11 @@ def test_encounter_settings_require_daily_schedules() -> None:
     with pytest.raises(TypeError, match="schedule must be a DailySchedule"):
         DailySettings(invalid, use_daily_skip=True, missions=_DAILY_MISSIONS)
     with pytest.raises(TypeError, match="schedule must be a DailySchedule"):
-        HardSettings(invalid, _FAILURE_RETRY, _RESOURCE_RETRY, "11-4", HardFleet.FLEET_1)
+        HardSettings(invalid, _FAILURE_RETRY_RANGE, _RESOURCE_RETRY, "11-4", HardFleet.FLEET_1)
     with pytest.raises(TypeError, match="schedule must be a DailySchedule"):
         ExerciseSettings(
             invalid,
-            _FAILURE_RETRY,
+            _FAILURE_RETRY_RANGE,
             5,
             ExerciseOpponentMode.MAX_EXP,
             1,

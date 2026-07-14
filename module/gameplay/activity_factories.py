@@ -210,7 +210,7 @@ def _encounter_policy(decoder: SettingsDecoder) -> EncounterPolicy:
         deadline_at = deadline.datetime("at")
         deadline.finish()
     policy = EncounterPolicy(
-        failure_retry_delay=timedelta(seconds=decoder.integer("failure_retry_seconds", minimum=1)),
+        failure_retry_delay=decoder.delay_range("failure_retry_seconds"),
         resource_retry_delay=timedelta(seconds=decoder.integer("resource_retry_seconds", minimum=1)),
         oil_limit=decoder.integer("oil_limit", minimum=0),
         event_point_limit=decoder.integer("event_point_limit", minimum=0),

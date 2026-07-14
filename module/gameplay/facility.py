@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Protocol, cast, override
 from module.application import (
     DailySchedule,
     Deferred,
+    DelayRange,
+    DelaySampler,
     RescheduleSelf,
     RescheduleTask,
     Retryable,
@@ -14,6 +16,7 @@ from module.application import (
     TaskContext,
     TaskId,
     TaskResult,
+    runtime_delay_sampler,
 )
 
 if TYPE_CHECKING:
@@ -197,13 +200,15 @@ class CommissionSelectionPolicy:
 
 @dataclass(frozen=True, slots=True)
 class CommissionSettings:
-    failure_retry_delay: timedelta
+    failure_retry_delay: DelayRange
     commission_limit_enabled: bool
     selection: CommissionSelectionPolicy
     gems_farming_deferral: timedelta = timedelta(hours=2)
 
     def __post_init__(self) -> None:
-        _validate_positive_duration(self.failure_retry_delay, field_name="failure_retry_delay")
+        if not isinstance(self.failure_retry_delay, DelayRange):
+            message = "failure_retry_delay must be a DelayRange"
+            raise TypeError(message)
         if type(self.commission_limit_enabled) is not bool:
             message = "commission_limit_enabled must be a bool"
             raise TypeError(message)
@@ -236,14 +241,24 @@ class CommissionWorkflow(Protocol):
 
 
 class CommissionTask(Task):
-    __slots__ = ("_settings", "_workflow")
+    __slots__ = ("_delay_sampler", "_settings", "_workflow")
 
-    def __init__(self, workflow: CommissionWorkflow, settings: CommissionSettings) -> None:
+    def __init__(
+        self,
+        workflow: CommissionWorkflow,
+        settings: CommissionSettings,
+        *,
+        delay_sampler: DelaySampler = runtime_delay_sampler,
+    ) -> None:
         if not isinstance(settings, CommissionSettings):
             message = "settings must be CommissionSettings"
             raise TypeError(message)
+        if not isinstance(delay_sampler, DelaySampler):
+            message = "delay_sampler must be a DelaySampler"
+            raise TypeError(message)
         self._workflow = workflow
         self._settings = settings
+        self._delay_sampler = delay_sampler
 
     @override
     def run(self, context: TaskContext) -> TaskResult:
@@ -257,7 +272,7 @@ class CommissionTask(Task):
         nearest_finish = min(report.finish_times, default=None)
         if nearest_finish is None:
             outcome = Retryable(_COMMISSION_EMPTY_REASON)
-            self_due_at = report.observed_at + self._settings.failure_retry_delay
+            self_due_at = report.observed_at + self._delay_sampler.sample(self._settings.failure_retry_delay)
         else:
             outcome = Succeeded()
             self_due_at = nearest_finish
@@ -330,7 +345,7 @@ class TacticalStudentPolicy:
 
 @dataclass(frozen=True, slots=True)
 class TacticalSettings:
-    failure_retry_delay: timedelta
+    failure_retry_delay: DelayRange
     server_update_schedule: DailySchedule
     tactical_filter: str
     rapid_training_slot: TacticalRapidTrainingSlot
@@ -338,7 +353,9 @@ class TacticalSettings:
     student: TacticalStudentPolicy
 
     def __post_init__(self) -> None:
-        _validate_positive_duration(self.failure_retry_delay, field_name="failure_retry_delay")
+        if not isinstance(self.failure_retry_delay, DelayRange):
+            message = "failure_retry_delay must be a DelayRange"
+            raise TypeError(message)
         if not isinstance(self.server_update_schedule, DailySchedule):
             message = "server_update_schedule must be a DailySchedule"
             raise TypeError(message)
@@ -370,14 +387,24 @@ class TacticalWorkflow(Protocol):
 
 
 class TacticalTask(Task):
-    __slots__ = ("_settings", "_workflow")
+    __slots__ = ("_delay_sampler", "_settings", "_workflow")
 
-    def __init__(self, workflow: TacticalWorkflow, settings: TacticalSettings) -> None:
+    def __init__(
+        self,
+        workflow: TacticalWorkflow,
+        settings: TacticalSettings,
+        *,
+        delay_sampler: DelaySampler = runtime_delay_sampler,
+    ) -> None:
         if not isinstance(settings, TacticalSettings):
             message = "settings must be TacticalSettings"
             raise TypeError(message)
+        if not isinstance(delay_sampler, DelaySampler):
+            message = "delay_sampler must be a DelaySampler"
+            raise TypeError(message)
         self._workflow = workflow
         self._settings = settings
+        self._delay_sampler = delay_sampler
 
     @override
     def run(self, context: TaskContext) -> TaskResult:
@@ -391,6 +418,8 @@ class TacticalTask(Task):
         if report.finish_at is None:
             return TaskResult(
                 outcome=Retryable(_TACTICAL_EMPTY_REASON),
-                effects=(RescheduleSelf(report.observed_at + self._settings.failure_retry_delay),),
+                effects=(
+                    RescheduleSelf(report.observed_at + self._delay_sampler.sample(self._settings.failure_retry_delay)),
+                ),
             )
         return TaskResult(outcome=Succeeded(), effects=(RescheduleSelf(report.finish_at),))

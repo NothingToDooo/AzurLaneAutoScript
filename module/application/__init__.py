@@ -12,6 +12,7 @@ from module.application.coordinator import (
     StaleRunMetadataError,
 )
 from module.application.daily_schedule import DailySchedule
+from module.application.delay import DelayRange, DelaySampler, runtime_delay_sampler
 from module.application.effects import (
     DisableTask,
     RequestAppRestart,
@@ -43,6 +44,8 @@ __all__ = [
     "Cancelled",
     "DailySchedule",
     "Deferred",
+    "DelayRange",
+    "DelaySampler",
     "DeleteTaskState",
     "DisableTask",
     "ExecutionMode",
@@ -78,4 +81,5 @@ __all__ = [
     "UpsertTaskState",
     "WakePolicy",
     "WakeTask",
+    "runtime_delay_sampler",
 ]

@@ -11,7 +11,7 @@ from module.adapters.facility_live import (
     ResearchQueueEvidence,
     TacticalEvidence,
 )
-from module.application import AbortRequested, AbortToken, DailySchedule
+from module.application import AbortRequested, AbortToken, DailySchedule, DelayRange
 from module.gameplay import (
     CommissionPreset,
     CommissionReport,
@@ -47,7 +47,7 @@ _RESEARCH_SETTINGS = ResearchSettings(
     ),
 )
 _COMMISSION_SETTINGS = CommissionSettings(
-    timedelta(minutes=30),
+    DelayRange(1_800, 1_800),
     commission_limit_enabled=False,
     selection=CommissionSelectionPolicy(
         CommissionPreset.CUBE,
@@ -56,7 +56,7 @@ _COMMISSION_SETTINGS = CommissionSettings(
     ),
 )
 _TACTICAL_SETTINGS = TacticalSettings(
-    timedelta(minutes=20),
+    DelayRange(1_200, 1_200),
     _SCHEDULE,
     "SameT4 > SameT3 > first",
     TacticalRapidTrainingSlot.DISABLED,

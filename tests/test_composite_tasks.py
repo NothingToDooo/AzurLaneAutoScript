@@ -8,6 +8,8 @@ from module.application import (
     AbortRequested,
     AbortToken,
     DailySchedule,
+    DelayRange,
+    DelaySampler,
     DisableTask,
     ExecutionMode,
     PreemptionRequest,
@@ -67,6 +69,7 @@ if TYPE_CHECKING:
 _OBSERVED_AT = datetime(2026, 7, 13, 12, tzinfo=UTC)
 _SERVER_UPDATE_AT = datetime(2026, 7, 14, 4, tzinfo=UTC)
 _DAILY_SCHEDULE = DailySchedule("UTC", (time(4),))
+_FIXED_FAILURE_RETRY = DelayRange(1_800, 1_800)
 
 
 class _Workflow[SettingsT, ReportT]:
@@ -170,7 +173,7 @@ def _dorm_settings(*, enabled: bool = True) -> DormSettings:
         feed=DormFeedPlan("20000 > 10000") if enabled else None,
         collect_enabled=False,
         furniture=None,
-        fallback_delay=timedelta(minutes=45),
+        fallback_delay=DelayRange(2_700, 2_700),
     )
 
 
@@ -197,7 +200,7 @@ def _guild_settings(
     *,
     logistics_enabled: bool = True,
     operation_enabled: bool = True,
-    failure_retry_delay: timedelta = timedelta(minutes=30),
+    failure_retry_delay: DelayRange = _FIXED_FAILURE_RETRY,
     schedule: DailySchedule = _DAILY_SCHEDULE,
 ) -> GuildSettings:
     return GuildSettings(
@@ -227,7 +230,7 @@ def _reward_settings() -> RewardSettings:
         collect_exp=True,
         collect_daily_mission=True,
         collect_weekly_mission=True,
-        success_delay=timedelta(hours=1),
+        success_delay=DelayRange(3_600, 3_600),
     )
 
 
@@ -431,6 +434,27 @@ def test_reward_uses_success_interval_and_emits_no_hidden_task_wakeups() -> None
     )
 
 
+def test_reward_samples_success_interval_for_each_reschedule() -> None:
+    settings = RewardSettings(
+        collect_oil=True,
+        collect_coin=True,
+        collect_exp=True,
+        collect_daily_mission=True,
+        collect_weekly_mission=True,
+        success_delay=DelayRange(lower_seconds=3_600, upper_seconds=7_200),
+    )
+    workflow = _Workflow(RewardReport(_OBSERVED_AT))
+    draws = iter((3_600, 3_600, 7_200, 7_200, 7_200, 7_200))
+    sampler = DelaySampler(randint=lambda _lower, _upper: next(draws))
+    task = RewardTask(workflow, settings, delay_sampler=sampler)
+
+    first = task.run(_context("reward"))
+    second = task.run(_context("reward"))
+
+    assert first.effects == (RescheduleSelf(_OBSERVED_AT + timedelta(seconds=4_800)),)
+    assert second.effects == (RescheduleSelf(_OBSERVED_AT + timedelta(seconds=7_200)),)
+
+
 def test_reward_still_runs_when_every_collection_option_is_disabled() -> None:
     settings = RewardSettings(
         collect_oil=False,
@@ -438,7 +462,7 @@ def test_reward_still_runs_when_every_collection_option_is_disabled() -> None:
         collect_exp=False,
         collect_daily_mission=False,
         collect_weekly_mission=False,
-        success_delay=timedelta(hours=1),
+        success_delay=DelayRange(3_600, 3_600),
     )
     workflow = _Workflow(RewardReport(_OBSERVED_AT))
 
@@ -701,14 +725,14 @@ def test_composite_settings_and_reports_reject_invalid_values() -> None:
             logistics_succeeded=cast("bool", 1),
             operation_succeeded=True,
         )
-    with pytest.raises(ValueError, match="must be positive"):
+    with pytest.raises(TypeError, match="success_delay must be a DelayRange"):
         RewardSettings(
             collect_oil=True,
             collect_coin=True,
             collect_exp=True,
             collect_daily_mission=True,
             collect_weekly_mission=True,
-            success_delay=timedelta(0),
+            success_delay=cast("DelayRange", timedelta(0)),
         )
     with pytest.raises(TypeError, match="changed must be a bool"):
         FreebieCollectionReport(cast("bool", 1), _OBSERVED_AT)

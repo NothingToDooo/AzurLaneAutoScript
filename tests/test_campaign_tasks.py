@@ -10,6 +10,7 @@ from module.application import (
     Blocked,
     DailySchedule,
     Deferred,
+    DelayRange,
     DeleteTaskState,
     DisableTask,
     ExecutionMode,
@@ -114,6 +115,7 @@ _STARTED_AT = datetime(2026, 7, 13, 11, 59, tzinfo=UTC)
 _SERVER_UPDATE_AT = datetime(2026, 7, 13, 20, tzinfo=UTC)
 _DAILY_SCHEDULE = DailySchedule("Asia/Hong_Kong", (time(4),))
 _FAILURE_RETRY = timedelta(minutes=30)
+_FAILURE_RETRY_RANGE = DelayRange(1_800, 1_800)
 _RESOURCE_RETRY = timedelta(minutes=180)
 
 
@@ -264,7 +266,7 @@ def _spec(
         difficulty=CampaignDifficulty.NORMAL,
         execution=_execution(),
         schedule=_DAILY_SCHEDULE,
-        failure_retry_delay=_FAILURE_RETRY,
+        failure_retry_delay=_FAILURE_RETRY_RANGE,
         resource_retry_delay=_RESOURCE_RETRY,
         limits=CampaignLimits() if limits is None else limits,
         task_balancer=task_balancer,
@@ -1434,7 +1436,7 @@ def test_campaign_specs_require_compiled_content_and_valid_specialization() -> N
             difficulty=CampaignDifficulty.NORMAL,
             execution=_execution(),
             schedule=_DAILY_SCHEDULE,
-            failure_retry_delay=_FAILURE_RETRY,
+            failure_retry_delay=_FAILURE_RETRY_RANGE,
             resource_retry_delay=_RESOURCE_RETRY,
         )
     with pytest.raises(ValueError, match="exactly one primary session"):
@@ -1465,7 +1467,7 @@ def test_campaign_specs_require_a_daily_schedule() -> None:
             difficulty=CampaignDifficulty.NORMAL,
             execution=_execution(),
             schedule=cast("DailySchedule", object()),
-            failure_retry_delay=_FAILURE_RETRY,
+            failure_retry_delay=_FAILURE_RETRY_RANGE,
             resource_retry_delay=_RESOURCE_RETRY,
         )
 
@@ -1478,7 +1480,7 @@ def test_campaign_specs_require_typed_execution_settings() -> None:
             difficulty=CampaignDifficulty.NORMAL,
             execution=cast("CampaignExecutionSettings", object()),
             schedule=_DAILY_SCHEDULE,
-            failure_retry_delay=_FAILURE_RETRY,
+            failure_retry_delay=_FAILURE_RETRY_RANGE,
             resource_retry_delay=_RESOURCE_RETRY,
         )
 
@@ -1491,7 +1493,7 @@ def test_campaign_settings_reject_invalid_resource_and_count_values() -> None:
             difficulty=CampaignDifficulty.NORMAL,
             execution=_execution(),
             schedule=_DAILY_SCHEDULE,
-            failure_retry_delay=_FAILURE_RETRY,
+            failure_retry_delay=_FAILURE_RETRY_RANGE,
             resource_retry_delay=timedelta(minutes=119),
         )
     with pytest.raises(ValueError, match="non-negative"):

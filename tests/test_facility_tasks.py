@@ -8,6 +8,7 @@ from module.application import (
     AbortToken,
     DailySchedule,
     Deferred,
+    DelayRange,
     ExecutionMode,
     PreemptionRequest,
     RescheduleSelf,
@@ -48,6 +49,8 @@ if TYPE_CHECKING:
 _OBSERVED_AT = datetime(2026, 7, 13, 12, tzinfo=UTC)
 _SERVER_UPDATE_AT = datetime(2026, 7, 14, 4, tzinfo=UTC)
 _SERVER_UPDATE_SCHEDULE = DailySchedule("Asia/Hong_Kong", (time(12),))
+_COMMISSION_RETRY_DELAY = DelayRange(1_800, 1_800)
+_TACTICAL_RETRY_DELAY = DelayRange(1_200, 1_200)
 _RESEARCH_SELECTION = ResearchSelectionPolicy(
     use_cube=ResearchResourcePolicy.ONLY_HALF_HOUR,
     use_coin=ResearchResourcePolicy.ALWAYS_USE,
@@ -75,11 +78,11 @@ def _research_settings(schedule: DailySchedule = _SERVER_UPDATE_SCHEDULE) -> Res
     return ResearchSettings(schedule, _RESEARCH_SELECTION)
 
 
-def _commission_settings(*, enabled: bool = False, delay: timedelta = timedelta(minutes=30)) -> CommissionSettings:
+def _commission_settings(*, enabled: bool = False, delay: DelayRange = _COMMISSION_RETRY_DELAY) -> CommissionSettings:
     return CommissionSettings(delay, enabled, _COMMISSION_SELECTION)
 
 
-def _tactical_settings(delay: timedelta = timedelta(minutes=20)) -> TacticalSettings:
+def _tactical_settings(delay: DelayRange = _TACTICAL_RETRY_DELAY) -> TacticalSettings:
     return TacticalSettings(
         delay,
         _SERVER_UPDATE_SCHEDULE,
@@ -461,14 +464,18 @@ def test_facility_rejects_invalid_report_and_settings_values() -> None:
         ResearchReport(observed_at=_OBSERVED_AT, available_slots=5, first_finish_at=_OBSERVED_AT)
     with pytest.raises(ValueError, match="non-empty research queue"):
         ResearchReport(observed_at=_OBSERVED_AT, available_slots=0, first_finish_at=None)
-    with pytest.raises(ValueError, match="must be positive"):
-        CommissionSettings(timedelta(0), commission_limit_enabled=False, selection=_COMMISSION_SELECTION)
+    with pytest.raises(TypeError, match="failure_retry_delay must be a DelayRange"):
+        CommissionSettings(
+            cast("DelayRange", timedelta(0)),
+            commission_limit_enabled=False,
+            selection=_COMMISSION_SELECTION,
+        )
     with pytest.raises(TypeError, match="must be a bool"):
-        CommissionSettings(timedelta(minutes=1), cast("bool", 1), _COMMISSION_SELECTION)
+        CommissionSettings(DelayRange(60, 60), cast("bool", 1), _COMMISSION_SELECTION)
     with pytest.raises(ValueError, match="must be non-negative"):
         CommissionReport(_OBSERVED_AT, (), daily_pending=-1, filtered_urgent_pending=0)
-    with pytest.raises(ValueError, match="must be positive"):
-        _tactical_settings(timedelta(0))
+    with pytest.raises(TypeError, match="failure_retry_delay must be a DelayRange"):
+        _tactical_settings(cast("DelayRange", timedelta(0)))
 
 
 def test_facility_datetime_type_errors_are_not_treated_as_naive_datetimes() -> None:

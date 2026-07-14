@@ -17,7 +17,7 @@ from module.adapters.campaign_mumu12 import (
 )
 from module.adapters.campaign_runtime_profile import RuntimeSessionEntryKind, RuntimeSessionOutcome
 from module.adapters.gems_mumu12 import Mumu12GemsRuntimeBehavior
-from module.application import AbortRequested, AbortToken, DailySchedule, SafeUnitCancellation, TaskId
+from module.application import AbortRequested, AbortToken, DailySchedule, DelayRange, SafeUnitCancellation, TaskId
 from module.base.button import Button
 from module.config.config import AzurLaneConfig
 from module.content.battle_policy import BossStrategy, ClearBoss, StagePolicy
@@ -230,7 +230,7 @@ def _job(*, progress: CampaignProgress | None = None) -> CampaignJobSpec:
         difficulty=CampaignDifficulty.NORMAL,
         execution=_execution_settings(),
         schedule=DailySchedule("Asia/Hong_Kong", (time(4),)),
-        failure_retry_delay=timedelta(minutes=30),
+        failure_retry_delay=DelayRange(1_800, 1_800),
         resource_retry_delay=timedelta(minutes=180),
         progress=progress,
     )
@@ -385,7 +385,7 @@ class _FakeSessionSource:
 def _hard_settings(stage: str = "11-4") -> HardSettings:
     return HardSettings(
         DailySchedule("Asia/Hong_Kong", (time(4),)),
-        timedelta(minutes=30),
+        DelayRange(1_800, 1_800),
         timedelta(hours=2),
         stage,
         HardFleet.FLEET_1,

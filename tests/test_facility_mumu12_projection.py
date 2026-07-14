@@ -1,4 +1,4 @@
-from datetime import time, timedelta
+from datetime import time
 from typing import cast
 
 import pytest
@@ -8,7 +8,7 @@ from module.adapters.facility_mumu12 import (
     project_research_settings,
     project_tactical_settings,
 )
-from module.application import DailySchedule
+from module.application import DailySchedule, DelayRange
 from module.gameplay import (
     CommissionPreset,
     CommissionSelectionPolicy,
@@ -50,7 +50,7 @@ def test_research_projection_contains_every_ui_decision_field() -> None:
 
 def test_commission_projection_contains_every_selection_field_but_no_scheduler_control() -> None:
     settings = CommissionSettings(
-        timedelta(minutes=30),
+        DelayRange(1_800, 1_800),
         commission_limit_enabled=True,
         selection=CommissionSelectionPolicy(
             preset_filter=CommissionPreset.CUSTOM,
@@ -71,7 +71,7 @@ def test_commission_projection_contains_every_selection_field_but_no_scheduler_c
 
 def test_tactical_projection_contains_book_overflow_and_student_policy() -> None:
     settings = TacticalSettings(
-        timedelta(minutes=20),
+        DelayRange(1_200, 1_200),
         _SCHEDULE,
         "SameT4 > BlueT3 > first",
         TacticalRapidTrainingSlot.SLOT_2,

@@ -147,7 +147,7 @@ def test_compiler_projects_encounter_facility_composite_and_market_settings() ->
     assert daily_missions["supply_line_disruption"] == {"stage": "second", "fleet": None}
     assert tasks["hard"] == {
         "schedule": {"timezone": "Asia/Shanghai", "triggers": ["00:00"]},
-        "failure_retry_seconds": 1_800,
+        "failure_retry_seconds": {"lower_seconds": 1_800, "upper_seconds": 1_800},
         "resource_retry_seconds": 7_200,
         "stage": "11-4",
         "fleet": 1,
@@ -198,6 +198,49 @@ def test_compiler_projects_encounter_facility_composite_and_market_settings() ->
     )
     assert guild_shop["box_t3"] == "ironblood"
     assert guild_shop["pr3"] == "cheshire"
+
+
+def test_compiler_preserves_scheduler_interval_bounds_in_canonical_seconds() -> None:
+    payload = cast("dict[str, JsonValue]", WebConfigurationCompiler().compile(_template()).payload)
+    tasks = cast("dict[str, JsonValue]", payload["tasks"])
+
+    tactical = cast("dict[str, JsonValue]", tasks["tactical"])
+    reward = cast("dict[str, JsonValue]", tasks["reward"])
+    assert tactical["failure_retry_seconds"] == {
+        "lower_seconds": 7_200,
+        "upper_seconds": 14_400,
+    }
+    assert reward["success_delay_seconds"] == {
+        "lower_seconds": 7_200,
+        "upper_seconds": 14_400,
+    }
+
+
+@pytest.mark.parametrize("interval", [17, "17"])
+def test_compiler_normalizes_single_scheduler_interval_to_equal_bounds(interval: int | str) -> None:
+    document = _template()
+    hard = cast("dict[str, object]", document["Hard"])
+    scheduler = cast("dict[str, object]", hard["Scheduler"])
+    scheduler["FailureInterval"] = interval
+
+    payload = cast("dict[str, JsonValue]", WebConfigurationCompiler().compile(document).payload)
+    tasks = cast("dict[str, JsonValue]", payload["tasks"])
+    hard_settings = cast("dict[str, JsonValue]", tasks["hard"])
+
+    assert hard_settings["failure_retry_seconds"] == {
+        "lower_seconds": 1_020,
+        "upper_seconds": 1_020,
+    }
+
+
+def test_compiler_rejects_reversed_scheduler_interval() -> None:
+    document = _template()
+    tactical = cast("dict[str, object]", document["Tactical"])
+    scheduler = cast("dict[str, object]", tactical["Scheduler"])
+    scheduler["FailureInterval"] = "240-120"
+
+    with pytest.raises(ConfigurationCompileError, match="lower bound must not exceed upper bound"):
+        WebConfigurationCompiler().compile(document)
 
 
 def test_compiler_preserves_disabled_schedule_due_time_as_an_aware_fact() -> None:

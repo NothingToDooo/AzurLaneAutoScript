@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 import module.adapters.composite_mumu12 as adapters
-from module.application import AbortToken, DailySchedule
+from module.application import AbortToken, DailySchedule, DelayRange
 from module.config.config import AzurLaneConfig
 from module.device.device import Device
 from module.gameplay.composite import (
@@ -85,7 +85,7 @@ def test_dorm_maps_typed_flags_and_confirmed_ship_count_to_report(
         feed=DormFeedPlan("20000 > 10000"),
         collect_enabled=False,
         furniture=DormFurniturePlan(FurnitureBuyOption.ALL, timedelta(days=6)),
-        fallback_delay=timedelta(hours=1),
+        fallback_delay=DelayRange(3_600, 3_600),
     )
     request = DormRunRequest(settings, furniture_due=True)
 

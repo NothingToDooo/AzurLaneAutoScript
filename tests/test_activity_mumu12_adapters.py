@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 import module.adapters.activity_mumu12 as adapters
-from module.application import AbortRequested, AbortToken, DailySchedule, PreemptionRequest
+from module.application import AbortRequested, AbortToken, DailySchedule, DelayRange, PreemptionRequest
 from module.coalition.profile import (
     CoalitionClientSession,
     CoalitionPageMode,
@@ -73,7 +73,7 @@ if TYPE_CHECKING:
 _NOW = datetime(2026, 7, 13, 8, tzinfo=UTC)
 _SCHEDULE = DailySchedule("Asia/Hong_Kong", (time(8),))
 _POLICY = EncounterPolicy(
-    failure_retry_delay=timedelta(minutes=5),
+    failure_retry_delay=DelayRange(300, 300),
     resource_retry_delay=timedelta(hours=2),
     oil_limit=1_000,
 )

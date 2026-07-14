@@ -11,6 +11,7 @@ from module.application import (
     Cancelled,
     DailySchedule,
     Deferred,
+    DelayRange,
     DeleteTaskState,
     PreemptionRequest,
     RescheduleSelf,
@@ -85,7 +86,7 @@ _SERVER_UPDATE_SETTINGS: dict[str, FrozenJsonValue] = {
 }
 _RESUME_AT = _OBSERVED_AT + timedelta(minutes=5)
 _POLICY_SETTINGS: dict[str, FrozenJsonValue] = {
-    "failure_retry_seconds": 300,
+    "failure_retry_seconds": {"lower_seconds": 300, "upper_seconds": 300},
     "resource_retry_seconds": 7_200,
     "oil_limit": 1_000,
     "event_point_limit": 0,
@@ -94,7 +95,7 @@ _POLICY_SETTINGS: dict[str, FrozenJsonValue] = {
     "emotion": None,
 }
 _ENCOUNTER_POLICY = EncounterPolicy(
-    failure_retry_delay=timedelta(minutes=5),
+    failure_retry_delay=DelayRange(300, 300),
     resource_retry_delay=timedelta(hours=2),
     oil_limit=1_000,
 )

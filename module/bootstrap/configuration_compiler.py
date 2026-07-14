@@ -169,19 +169,33 @@ def _local_datetime(value: str, timezone: ZoneInfo, *, path: tuple[str, ...]) ->
     return parsed.astimezone(UTC)
 
 
-def _interval_seconds(value: object, *, path: tuple[str, ...], default_minutes: int = 30) -> int:
+def _interval_seconds(
+    value: object,
+    *,
+    path: tuple[str, ...],
+    default_minutes: int = 30,
+) -> dict[str, JsonValue]:
     if type(value) is int:
-        minutes = value
+        lower_minutes = value
+        upper_minutes = value
     elif isinstance(value, str):
         match = re.fullmatch(r"(\d+)(?:-(\d+))?", value.strip())
         if match is None:
             raise _error(path, "must be minutes or a minute range")
-        minutes = int(match.group(1))
+        lower_minutes = int(match.group(1))
+        upper_minutes = int(match.group(2)) if match.group(2) is not None else lower_minutes
     else:
         raise _error(path, "must be minutes or a minute range")
-    if minutes <= 0:
-        minutes = default_minutes
-    return minutes * 60
+    if lower_minutes <= 0:
+        lower_minutes = default_minutes
+    if upper_minutes <= 0:
+        upper_minutes = default_minutes
+    if lower_minutes > upper_minutes:
+        raise _error(path, "lower bound must not exceed upper bound")
+    return {
+        "lower_seconds": lower_minutes * 60,
+        "upper_seconds": upper_minutes * 60,
+    }
 
 
 def _positive_integer_triplet(value: str, *, path: tuple[str, ...]) -> list[JsonValue]:
@@ -243,7 +257,7 @@ class WebConfigurationCompiler:
         }
 
     @staticmethod
-    def _retry_seconds(view: _ConfigView, config_name: str) -> int:
+    def _retry_seconds(view: _ConfigView, config_name: str) -> dict[str, JsonValue]:
         scheduler = view.mapping(config_name, "Scheduler")
         return _interval_seconds(
             scheduler.get("FailureInterval"),
@@ -251,7 +265,7 @@ class WebConfigurationCompiler:
         )
 
     @staticmethod
-    def _success_seconds(view: _ConfigView, config_name: str) -> int:
+    def _success_seconds(view: _ConfigView, config_name: str) -> dict[str, JsonValue]:
         scheduler = view.mapping(config_name, "Scheduler")
         return _interval_seconds(
             scheduler.get("SuccessInterval"),

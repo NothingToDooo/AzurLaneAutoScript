@@ -100,7 +100,7 @@ def _dorm_settings(decoder: SettingsDecoder) -> DormSettings:
         feed=feed,
         collect_enabled=decoder.boolean("collect_enabled"),
         furniture=furniture,
-        fallback_delay=_duration(decoder, "fallback_delay_seconds"),
+        fallback_delay=decoder.delay_range("fallback_delay_seconds"),
     )
 
 
@@ -174,7 +174,7 @@ def _guild_settings(decoder: SettingsDecoder) -> GuildSettings:
     return GuildSettings(
         logistics=logistics,
         operation=operation,
-        failure_retry_delay=_duration(decoder, "failure_retry_seconds"),
+        failure_retry_delay=decoder.delay_range("failure_retry_seconds"),
         schedule=decoder.daily_schedule("schedule"),
     )
 
@@ -186,7 +186,7 @@ def _reward_settings(decoder: SettingsDecoder) -> RewardSettings:
         collect_exp=decoder.boolean("collect_exp"),
         collect_daily_mission=decoder.boolean("collect_daily_mission"),
         collect_weekly_mission=decoder.boolean("collect_weekly_mission"),
-        success_delay=_duration(decoder, "success_delay_seconds"),
+        success_delay=decoder.delay_range("success_delay_seconds"),
     )
 
 

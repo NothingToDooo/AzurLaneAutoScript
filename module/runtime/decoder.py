@@ -6,6 +6,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, cast
 
 from module.application.daily_schedule import DailySchedule
+from module.application.delay import DelayRange
 from module.runtime.errors import SettingsDocumentError
 
 if TYPE_CHECKING:
@@ -185,6 +186,17 @@ class SettingsDecoder:
             return DailySchedule(timezone_name, tuple(triggers))
         except (TypeError, ValueError) as error:
             message = f"{schedule_path} is not a valid daily schedule: {error}"
+            raise SettingsDocumentError(message) from error
+
+    def delay_range(self, name: str) -> DelayRange:
+        delay = self.object(name)
+        lower_seconds = delay.integer("lower_seconds", minimum=1)
+        upper_seconds = delay.integer("upper_seconds", minimum=1)
+        delay.finish()
+        try:
+            return DelayRange(lower_seconds=lower_seconds, upper_seconds=upper_seconds)
+        except ValueError as error:
+            message = f"{self._path}.{name} is not a valid delay range: {error}"
             raise SettingsDocumentError(message) from error
 
     def enum[E: StrEnum](self, name: str, enum_type: type[E]) -> E:

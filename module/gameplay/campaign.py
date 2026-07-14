@@ -9,6 +9,8 @@ from module.application import (
     Blocked,
     DailySchedule,
     Deferred,
+    DelayRange,
+    DelaySampler,
     DeleteTaskState,
     DisableTask,
     ExecutionMode,
@@ -23,6 +25,7 @@ from module.application import (
     UpsertTaskState,
     WakePolicy,
     WakeTask,
+    runtime_delay_sampler,
 )
 from module.content import battle_program as program_model
 from module.content.campaign_session import (
@@ -668,7 +671,7 @@ class CampaignJobSpec:
     difficulty: CampaignDifficulty
     execution: CampaignExecutionSettings
     schedule: DailySchedule
-    failure_retry_delay: timedelta
+    failure_retry_delay: DelayRange
     resource_retry_delay: timedelta
     limits: CampaignLimits = field(default_factory=CampaignLimits)
     task_balancer: TaskBalancerPolicy | None = None
@@ -694,7 +697,7 @@ class CampaignJobSpec:
         if not isinstance(self.schedule, DailySchedule):
             message = "schedule must be DailySchedule"
             raise TypeError(message)
-        _validate_positive_duration(self.failure_retry_delay, field_name="failure_retry_delay")
+        self._validate_failure_retry_delay()
         _validate_positive_duration(self.resource_retry_delay, field_name="resource_retry_delay")
         if not _MIN_RESOURCE_RETRY <= self.resource_retry_delay <= _MAX_RESOURCE_RETRY:
             message = "resource_retry_delay must be between 120 and 240 minutes"
@@ -715,6 +718,11 @@ class CampaignJobSpec:
         object.__setattr__(self, "sessions", sessions)
         object.__setattr__(self, "stage_selections", selections)
         object.__setattr__(self, "transition_sessions", transitions)
+
+    def _validate_failure_retry_delay(self) -> None:
+        if not isinstance(self.failure_retry_delay, DelayRange):
+            message = "failure_retry_delay must be a DelayRange"
+            raise TypeError(message)
 
     def _validated_sessions(self) -> tuple[CampaignSession, ...]:
         sessions = tuple(self.sessions)
@@ -984,14 +992,24 @@ class CampaignWorkflow(Protocol):
 
 
 class CampaignTask(Task):
-    __slots__ = ("_job", "_workflow")
+    __slots__ = ("_delay_sampler", "_job", "_workflow")
 
-    def __init__(self, workflow: CampaignWorkflow, job: CampaignJobSpec) -> None:
+    def __init__(
+        self,
+        workflow: CampaignWorkflow,
+        job: CampaignJobSpec,
+        *,
+        delay_sampler: DelaySampler = runtime_delay_sampler,
+    ) -> None:
         if not isinstance(job, CampaignJobSpec):
             message = "job must be a CampaignJobSpec"
             raise TypeError(message)
+        if not isinstance(delay_sampler, DelaySampler):
+            message = "delay_sampler must be a DelaySampler"
+            raise TypeError(message)
         self._workflow = workflow
         self._job = job
+        self._delay_sampler = delay_sampler
 
     @override
     def run(self, context: TaskContext) -> TaskResult:
@@ -1533,13 +1551,13 @@ class CampaignTask(Task):
     def _failure_result(self, report: CampaignRunReport) -> TaskResult:
         return TaskResult(
             outcome=Retryable("campaign workflow did not complete"),
-            effects=(RescheduleSelf(report.observed_at + self._job.failure_retry_delay),),
+            effects=(RescheduleSelf(report.observed_at + self._delay_sampler.sample(self._job.failure_retry_delay)),),
         )
 
     def _blocked_result(self, report: CampaignRunReport) -> TaskResult:
         return TaskResult(
             outcome=Blocked("campaign workflow is blocked"),
-            effects=(RescheduleSelf(report.observed_at + self._job.failure_retry_delay),),
+            effects=(RescheduleSelf(report.observed_at + self._delay_sampler.sample(self._job.failure_retry_delay)),),
         )
 
     @staticmethod

@@ -11,6 +11,7 @@ from module.application import (
     Cancelled,
     DailySchedule,
     Deferred,
+    DelayRange,
     DeleteTaskState,
     DisableTask,
     ExecutionMode,
@@ -77,7 +78,7 @@ _SERVER_UPDATE_AT = datetime(2026, 7, 14, 0, tzinfo=UTC)
 _SERVER_UPDATE_SCHEDULE = DailySchedule("Asia/Hong_Kong", (time(8),))
 _RESUME_AT = _OBSERVED_AT + timedelta(hours=2)
 _ENCOUNTER_POLICY = EncounterPolicy(
-    failure_retry_delay=timedelta(minutes=5),
+    failure_retry_delay=DelayRange(300, 300),
     resource_retry_delay=timedelta(hours=2),
 )
 _ACTIVITY_CATALOG = ActivityCatalog(load_event_manifests(Path("content/events")))
