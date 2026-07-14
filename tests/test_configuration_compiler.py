@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from module.bootstrap import ConfigurationCompileError, WebConfigurationCompiler
-from module.notify import DisabledNotificationConfig, SmtpNotificationConfig, SmtpTransport
+from module.notify import DisabledNotificationConfig, NotificationConfigError, SmtpNotificationConfig, SmtpTransport
 from module.task_registry import TASK_CATALOG
 
 if TYPE_CHECKING:
@@ -38,7 +38,7 @@ def test_template_compiles_to_exact_runtime_task_and_schedule_coverage() -> None
 
 
 def test_compiler_projects_legacy_notification_key_to_typed_assembly_config() -> None:
-    credential = "smtp-password-must-not-leak"
+    credential = "local-smtp-password"
     document = _template()
     baseline = WebConfigurationCompiler().compile(document)
     alas = cast("dict[str, object]", document["Alas"])
@@ -64,7 +64,7 @@ port: 465
     )
     assert compiled.source_revision == baseline.source_revision
     assert compiled.assembly_revision != baseline.assembly_revision
-    assert credential not in repr(compiled)
+    assert credential in repr(compiled)
     assert credential not in json.dumps(compiled.payload)
 
 
@@ -79,8 +79,8 @@ def test_notification_can_be_compiled_even_when_an_unrelated_task_setting_is_inv
     assert notification == DisabledNotificationConfig()
 
 
-def test_compiler_rejects_invalid_legacy_notification_without_exposing_password() -> None:
-    credential = "invalid-yaml-password-must-not-leak"
+def test_compiler_preserves_invalid_legacy_notification_detail() -> None:
+    credential = "local-smtp-password"
     document = _template()
     alas = cast("dict[str, object]", document["Alas"])
     error = cast("dict[str, object]", alas["Error"])
@@ -89,9 +89,9 @@ def test_compiler_rejects_invalid_legacy_notification_without_exposing_password(
     with pytest.raises(ConfigurationCompileError) as caught:
         WebConfigurationCompiler().compile(document)
 
-    assert str(caught.value) == "$.Alas.Error.OnePushConfig SMTP config must be valid YAML"
-    assert credential not in str(caught.value)
-    assert credential not in repr(caught.value)
+    assert str(caught.value).startswith("$.Alas.Error.OnePushConfig SMTP config must be valid YAML:")
+    assert "receiver: [" in str(caught.value)
+    assert isinstance(caught.value.__cause__, NotificationConfigError)
 
 
 def test_compiled_revision_changes_only_when_the_persisted_runtime_snapshot_changes() -> None:

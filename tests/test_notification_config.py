@@ -24,8 +24,8 @@ def test_legacy_empty_mapping_is_migrated_to_disabled_config() -> None:
     assert parse_notification_config("{}") == DisabledNotificationConfig()
 
 
-def test_smtp_config_is_canonical_and_redacts_password_from_repr() -> None:
-    credential = " password-must-not-leak "
+def test_smtp_config_is_canonical_and_keeps_password_in_repr() -> None:
+    credential = " local-smtp-password "
 
     config = parse_notification_config(
         f"""
@@ -49,7 +49,7 @@ to:
         port=587,
         transport=SmtpTransport.STARTTLS,
     )
-    assert credential not in repr(config)
+    assert credential in repr(config)
     assert not hasattr(config, "__dict__")
 
 
@@ -187,13 +187,13 @@ def test_invalid_notification_config_is_rejected(raw_config: str, match: str) ->
         parse_notification_config(raw_config)
 
 
-def test_invalid_yaml_error_does_not_expose_source_or_password() -> None:
-    credential = "yaml-password-must-not-leak"
+def test_invalid_yaml_error_preserves_parser_detail_and_cause() -> None:
+    credential = "local-smtp-password"
     raw_config = f"provider: smtp\npassword: {credential}\nreceiver: ["
 
     with pytest.raises(NotificationConfigError) as caught:
         parse_notification_config(raw_config)
 
-    assert str(caught.value) == "SMTP config must be valid YAML"
-    assert credential not in str(caught.value)
-    assert credential not in repr(caught.value)
+    assert str(caught.value).startswith("SMTP config must be valid YAML:")
+    assert caught.value.__cause__ is not None
+    assert str(caught.value.__cause__) in str(caught.value)

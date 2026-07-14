@@ -11,12 +11,14 @@ from typing import TYPE_CHECKING, Final
 from module.application import OperatorNotificationKind
 from module.notify.spool_models import (
     NotificationDelivery,
+    NotificationDeliveryFailure,
     NotificationDeliveryRetry,
     NotificationDeliveryState,
     NotificationDeliveryWork,
     NotificationFailureKind,
     NotificationIntent,
     NotificationIntentDraft,
+    NotificationIntentRetry,
     NotificationIntentSource,
     NotificationIntentState,
 )
@@ -27,8 +29,90 @@ if TYPE_CHECKING:
     from types import TracebackType
     from typing import Self
 
-SPOOL_SCHEMA_VERSION: Final = 1
+SPOOL_SCHEMA_VERSION: Final = 2
 _EXPECTED_TABLES: Final = frozenset({"notification_intents", "notification_deliveries"})
+_V1_EXPECTED_COLUMNS: Final = {
+    "notification_intents": (
+        "sequence",
+        "intent_id",
+        "instance_name",
+        "source",
+        "source_id",
+        "kind",
+        "subject",
+        "body",
+        "state",
+        "plan_attempt_count",
+        "next_plan_attempt_at",
+        "last_plan_failure_kind",
+        "plan_claim_token",
+        "plan_claim_until",
+        "created_at",
+        "planned_at",
+        "suppressed_at",
+    ),
+    "notification_deliveries": (
+        "delivery_id",
+        "intent_id",
+        "recipient",
+        "state",
+        "attempt_count",
+        "next_attempt_at",
+        "last_failure_kind",
+        "smtp_status_code",
+        "claim_token",
+        "claim_until",
+        "created_at",
+        "last_attempt_at",
+        "delivered_at",
+        "dead_lettered_at",
+        "suppressed_at",
+    ),
+}
+_EXPECTED_COLUMNS: Final = {
+    "notification_intents": (
+        "sequence",
+        "intent_id",
+        "instance_name",
+        "source",
+        "source_id",
+        "kind",
+        "subject",
+        "body",
+        "state",
+        "plan_attempt_count",
+        "next_plan_attempt_at",
+        "last_plan_failure_kind",
+        "last_plan_error_type",
+        "last_plan_error_message",
+        "plan_claim_token",
+        "plan_claim_until",
+        "created_at",
+        "planned_at",
+        "suppressed_at",
+    ),
+    "notification_deliveries": (
+        "delivery_id",
+        "intent_id",
+        "recipient",
+        "state",
+        "attempt_count",
+        "next_attempt_at",
+        "last_failure_kind",
+        "smtp_status_code",
+        "last_error_type",
+        "last_error_message",
+        "claim_token",
+        "claim_until",
+        "created_at",
+        "last_attempt_at",
+        "delivered_at",
+        "dead_lettered_at",
+        "suppressed_at",
+    ),
+}
+_LEGACY_ERROR_TYPE: Final = "LegacyNotificationError"
+_LEGACY_ERROR_MESSAGE: Final = "(error message unavailable in schema v1)"
 _SCHEMA_STATEMENTS: Final = (
     """
     CREATE TABLE notification_intents (
@@ -53,6 +137,11 @@ _SCHEMA_STATEMENTS: Final = (
                 'configuration', 'network', 'smtp_transient', 'smtp_permanent', 'unknown'
             )
         ),
+        last_plan_error_type TEXT CHECK (
+            last_plan_error_type IS NULL
+            OR (length(last_plan_error_type) > 0 AND last_plan_error_type = trim(last_plan_error_type))
+        ),
+        last_plan_error_message TEXT,
         plan_claim_token TEXT,
         plan_claim_until TEXT,
         created_at TEXT NOT NULL,
@@ -60,6 +149,18 @@ _SCHEMA_STATEMENTS: Final = (
         suppressed_at TEXT,
         CHECK ((plan_claim_token IS NULL) = (plan_claim_until IS NULL)),
         CHECK (state = 'unplanned' OR plan_claim_token IS NULL),
+        CHECK ((last_plan_failure_kind IS NULL) = (last_plan_error_type IS NULL)),
+        CHECK ((last_plan_error_type IS NULL) = (last_plan_error_message IS NULL)),
+        CHECK (
+            (
+                state = 'unplanned'
+                AND (
+                    (plan_attempt_count = 0 AND last_plan_failure_kind IS NULL)
+                    OR (plan_attempt_count > 0 AND last_plan_failure_kind IS NOT NULL)
+                )
+            )
+            OR (state IN ('planned', 'suppressed') AND last_plan_failure_kind IS NULL)
+        ),
         CHECK (
             (state = 'unplanned' AND next_plan_attempt_at IS NOT NULL AND planned_at IS NULL AND suppressed_at IS NULL)
             OR (state = 'planned' AND next_plan_attempt_at IS NULL AND planned_at IS NOT NULL AND suppressed_at IS NULL)
@@ -88,6 +189,11 @@ _SCHEMA_STATEMENTS: Final = (
         smtp_status_code INTEGER CHECK (
             smtp_status_code IS NULL OR smtp_status_code BETWEEN 100 AND 599
         ),
+        last_error_type TEXT CHECK (
+            last_error_type IS NULL
+            OR (length(last_error_type) > 0 AND last_error_type = trim(last_error_type))
+        ),
+        last_error_message TEXT,
         claim_token TEXT,
         claim_until TEXT,
         created_at TEXT NOT NULL,
@@ -97,6 +203,24 @@ _SCHEMA_STATEMENTS: Final = (
         suppressed_at TEXT,
         UNIQUE(intent_id, recipient),
         CHECK ((claim_token IS NULL) = (claim_until IS NULL)),
+        CHECK ((last_failure_kind IS NULL) = (last_error_type IS NULL)),
+        CHECK ((last_error_type IS NULL) = (last_error_message IS NULL)),
+        CHECK (last_failure_kind IS NOT NULL OR smtp_status_code IS NULL),
+        CHECK (
+            (
+                state = 'pending'
+                AND (
+                    (attempt_count = 0 AND last_failure_kind IS NULL)
+                    OR (attempt_count > 0 AND last_failure_kind IS NOT NULL)
+                )
+            )
+            OR (state = 'dead_letter' AND last_failure_kind IS NOT NULL)
+            OR (
+                state IN ('delivered', 'suppressed')
+                AND last_failure_kind IS NULL
+                AND smtp_status_code IS NULL
+            )
+        ),
         CHECK (
             (
                 state = 'pending'
@@ -167,6 +291,8 @@ class _DeliveryCompletion:
     completed_at: str
     failure_kind: NotificationFailureKind | None
     smtp_status_code: int | None
+    error_type: str | None
+    error_message: str | None
 
 
 def _require_identifier(value: str, *, field_name: str) -> None:
@@ -206,6 +332,14 @@ def _optional_text(row: sqlite3.Row, column: str) -> str | None:
     value: object = row[column]
     if value is not None and (not isinstance(value, str) or not value):
         message = f"column {column} must contain non-empty text or NULL"
+        raise NotificationSpoolCorruptionError(message)
+    return value
+
+
+def _optional_raw_text(row: sqlite3.Row, column: str) -> str | None:
+    value: object = row[column]
+    if value is not None and not isinstance(value, str):
+        message = f"column {column} must contain text or NULL"
         raise NotificationSpoolCorruptionError(message)
     return value
 
@@ -470,6 +604,7 @@ class NotificationSpoolStore:
                 UPDATE notification_intents
                 SET state = 'planned', next_plan_attempt_at = NULL,
                     last_plan_failure_kind = NULL,
+                    last_plan_error_type = NULL, last_plan_error_message = NULL,
                     plan_claim_token = NULL, plan_claim_until = NULL, planned_at = ?
                 WHERE intent_id = ? AND state = 'unplanned' AND plan_claim_token = ?
                 """,
@@ -500,6 +635,7 @@ class NotificationSpoolStore:
                 UPDATE notification_intents
                 SET state = 'suppressed', next_plan_attempt_at = NULL,
                     last_plan_failure_kind = NULL,
+                    last_plan_error_type = NULL, last_plan_error_message = NULL,
                     plan_claim_token = NULL, plan_claim_until = NULL, suppressed_at = ?
                 WHERE intent_id = ? AND state = 'unplanned' AND plan_claim_token = ?
                 """,
@@ -515,17 +651,19 @@ class NotificationSpoolStore:
         intent_id: str,
         *,
         claim_token: str,
-        attempted_at: datetime,
-        next_attempt_at: datetime,
-        failure_kind: NotificationFailureKind,
+        retry: NotificationIntentRetry,
     ) -> NotificationIntent:
         _require_identifier(intent_id, field_name="intent_id")
         _require_identifier(claim_token, field_name="claim_token")
-        if not isinstance(failure_kind, NotificationFailureKind):
+        if not isinstance(retry, NotificationIntentRetry):
+            message = "retry must be a NotificationIntentRetry"
+            raise TypeError(message)
+        if not isinstance(retry.failure_kind, NotificationFailureKind):
             message = "failure_kind must be a NotificationFailureKind"
             raise TypeError(message)
-        encoded_attempted_at = _encode_datetime(attempted_at, field_name="attempted_at")
-        encoded_next_attempt_at = _encode_datetime(next_attempt_at, field_name="next_attempt_at")
+        self._validate_failure_error(retry.error_type, retry.error_message)
+        encoded_attempted_at = _encode_datetime(retry.attempted_at, field_name="attempted_at")
+        encoded_next_attempt_at = _encode_datetime(retry.next_attempt_at, field_name="next_attempt_at")
         if encoded_next_attempt_at <= encoded_attempted_at:
             message = "next_attempt_at must be later than attempted_at"
             raise ValueError(message)
@@ -539,10 +677,18 @@ class NotificationSpoolStore:
                 UPDATE notification_intents
                 SET plan_attempt_count = plan_attempt_count + 1,
                     next_plan_attempt_at = ?, last_plan_failure_kind = ?,
+                    last_plan_error_type = ?, last_plan_error_message = ?,
                     plan_claim_token = NULL, plan_claim_until = NULL
                 WHERE intent_id = ? AND state = 'unplanned' AND plan_claim_token = ?
                 """,
-                (encoded_next_attempt_at, failure_kind.value, intent_id, claim_token),
+                (
+                    encoded_next_attempt_at,
+                    retry.failure_kind.value,
+                    retry.error_type,
+                    retry.error_message,
+                    intent_id,
+                    claim_token,
+                ),
             )
             if updated.rowcount != 1:
                 message = f"notification intent {intent_id!r} was not unplanned while deferring"
@@ -618,7 +764,8 @@ class NotificationSpoolStore:
                 """
                 SELECT
                     delivery_id, intent_id, recipient, state, attempt_count, next_attempt_at,
-                    last_failure_kind, smtp_status_code, claim_token, claim_until,
+                    last_failure_kind, smtp_status_code, last_error_type, last_error_message,
+                    claim_token, claim_until,
                     created_at, last_attempt_at, delivered_at, dead_lettered_at, suppressed_at
                 FROM notification_deliveries
                 ORDER BY intent_id, recipient
@@ -630,7 +777,8 @@ class NotificationSpoolStore:
                 """
                 SELECT
                     delivery_id, intent_id, recipient, state, attempt_count, next_attempt_at,
-                    last_failure_kind, smtp_status_code, claim_token, claim_until,
+                    last_failure_kind, smtp_status_code, last_error_type, last_error_message,
+                    claim_token, claim_until,
                     created_at, last_attempt_at, delivered_at, dead_lettered_at, suppressed_at
                 FROM notification_deliveries
                 WHERE intent_id = ?
@@ -709,6 +857,8 @@ class NotificationSpoolStore:
                 completed_at=encoded_delivered_at,
                 failure_kind=None,
                 smtp_status_code=None,
+                error_type=None,
+                error_message=None,
             ),
         )
 
@@ -729,6 +879,7 @@ class NotificationSpoolStore:
                 UPDATE notification_deliveries
                 SET state = 'suppressed', next_attempt_at = NULL,
                     last_failure_kind = NULL, smtp_status_code = NULL,
+                    last_error_type = NULL, last_error_message = NULL,
                     claim_token = NULL, claim_until = NULL, suppressed_at = ?
                 WHERE delivery_id = ? AND state = 'pending' AND claim_token = ?
                 """,
@@ -747,7 +898,12 @@ class NotificationSpoolStore:
         if not isinstance(retry, NotificationDeliveryRetry):
             message = "retry must be a NotificationDeliveryRetry"
             raise TypeError(message)
-        self._validate_delivery_failure(retry.failure_kind, retry.smtp_status_code)
+        self._validate_delivery_failure(
+            retry.failure_kind,
+            retry.smtp_status_code,
+            retry.error_type,
+            retry.error_message,
+        )
         encoded_attempted_at = _encode_datetime(retry.attempted_at, field_name="attempted_at")
         encoded_next_attempt_at = _encode_datetime(retry.next_attempt_at, field_name="next_attempt_at")
         if encoded_next_attempt_at <= encoded_attempted_at:
@@ -761,6 +917,7 @@ class NotificationSpoolStore:
                 UPDATE notification_deliveries
                 SET attempt_count = attempt_count + 1, next_attempt_at = ?,
                     last_failure_kind = ?, smtp_status_code = ?,
+                    last_error_type = ?, last_error_message = ?,
                     claim_token = NULL, claim_until = NULL, last_attempt_at = ?
                 WHERE delivery_id = ? AND state = 'pending' AND claim_token = ?
                 """,
@@ -768,6 +925,8 @@ class NotificationSpoolStore:
                     encoded_next_attempt_at,
                     retry.failure_kind.value,
                     retry.smtp_status_code,
+                    retry.error_type,
+                    retry.error_message,
                     encoded_attempted_at,
                     delivery_id,
                     claim_token,
@@ -781,20 +940,28 @@ class NotificationSpoolStore:
         delivery_id: str,
         *,
         claim_token: str,
-        dead_lettered_at: datetime,
-        failure_kind: NotificationFailureKind,
-        smtp_status_code: int | None,
+        failure: NotificationDeliveryFailure,
     ) -> NotificationDelivery:
-        self._validate_delivery_failure(failure_kind, smtp_status_code)
-        encoded_dead_lettered_at = _encode_datetime(dead_lettered_at, field_name="dead_lettered_at")
+        if not isinstance(failure, NotificationDeliveryFailure):
+            message = "failure must be a NotificationDeliveryFailure"
+            raise TypeError(message)
+        self._validate_delivery_failure(
+            failure.failure_kind,
+            failure.smtp_status_code,
+            failure.error_type,
+            failure.error_message,
+        )
+        encoded_dead_lettered_at = _encode_datetime(failure.attempted_at, field_name="attempted_at")
         return self._complete_delivery(
             delivery_id,
             claim_token=claim_token,
             completion=_DeliveryCompletion(
                 state=NotificationDeliveryState.DEAD_LETTER,
                 completed_at=encoded_dead_lettered_at,
-                failure_kind=failure_kind,
-                smtp_status_code=smtp_status_code,
+                failure_kind=failure.failure_kind,
+                smtp_status_code=failure.smtp_status_code,
+                error_type=failure.error_type,
+                error_message=failure.error_message,
             ),
         )
 
@@ -812,6 +979,7 @@ class NotificationSpoolStore:
                 UPDATE notification_deliveries
                 SET state = ?, attempt_count = attempt_count + 1, next_attempt_at = NULL,
                     last_failure_kind = ?, smtp_status_code = ?,
+                    last_error_type = ?, last_error_message = ?,
                     claim_token = NULL, claim_until = NULL,
                     last_attempt_at = ?, delivered_at = ?
                 WHERE delivery_id = ? AND state = 'pending' AND claim_token = ?
@@ -821,6 +989,7 @@ class NotificationSpoolStore:
                 UPDATE notification_deliveries
                 SET state = ?, attempt_count = attempt_count + 1, next_attempt_at = NULL,
                     last_failure_kind = ?, smtp_status_code = ?,
+                    last_error_type = ?, last_error_message = ?,
                     claim_token = NULL, claim_until = NULL,
                     last_attempt_at = ?, dead_lettered_at = ?
                 WHERE delivery_id = ? AND state = 'pending' AND claim_token = ?
@@ -835,6 +1004,8 @@ class NotificationSpoolStore:
                     completion.state.value,
                     None if completion.failure_kind is None else completion.failure_kind.value,
                     completion.smtp_status_code,
+                    completion.error_type,
+                    completion.error_message,
                     completion.completed_at,
                     completion.completed_at,
                     delivery_id,
@@ -848,6 +1019,8 @@ class NotificationSpoolStore:
     def _validate_delivery_failure(
         failure_kind: NotificationFailureKind,
         smtp_status_code: int | None,
+        error_type: str,
+        error_message: str,
     ) -> None:
         if not isinstance(failure_kind, NotificationFailureKind):
             message = "failure_kind must be a NotificationFailureKind"
@@ -855,6 +1028,14 @@ class NotificationSpoolStore:
         if smtp_status_code is not None and (type(smtp_status_code) is not int or not 100 <= smtp_status_code <= 599):
             message = "smtp_status_code must be from 100 to 599 or None"
             raise ValueError(message)
+        NotificationSpoolStore._validate_failure_error(error_type, error_message)
+
+    @staticmethod
+    def _validate_failure_error(error_type: str, error_message: str) -> None:
+        _require_identifier(error_type, field_name="error_type")
+        if not isinstance(error_message, str):
+            message = "error_message must be a string"
+            raise TypeError(message)
 
     @staticmethod
     def _require_transition(cursor: sqlite3.Cursor, delivery_id: str) -> None:
@@ -871,7 +1052,7 @@ class NotificationSpoolStore:
 
     def _initialize_schema(self) -> None:
         if self.schema_version == SPOOL_SCHEMA_VERSION:
-            self._validate_schema_tables()
+            self._validate_current_schema()
             return
 
         # 多进程首次打开时必须在拿到写锁后重读；后取得锁者会看到 owner
@@ -880,21 +1061,114 @@ class NotificationSpoolStore:
             version = self.schema_version
             tables = self.table_names()
             if version == SPOOL_SCHEMA_VERSION:
-                self._validate_schema_tables(tables)
+                self._validate_current_schema(tables)
                 return
-            if version != 0 or tables:
+            if version == 0 and not tables:
+                self._create_schema()
+            elif version == 1:
+                self._validate_schema_tables(tables)
+                self._validate_schema_columns(_V1_EXPECTED_COLUMNS)
+                self._migrate_v1_to_v2()
+            else:
                 message = f"unsupported notification spool schema version: {version}"
                 raise NotificationSpoolSchemaError(message)
-            for statement in _SCHEMA_STATEMENTS:
-                self._connection.execute(statement)
-            self._validate_schema_tables()
+            self._validate_current_schema()
             self._connection.execute(f"PRAGMA user_version = {SPOOL_SCHEMA_VERSION}")
+
+    def _create_schema(self) -> None:
+        for statement in _SCHEMA_STATEMENTS:
+            self._connection.execute(statement)
+
+    def _migrate_v1_to_v2(self) -> None:
+        """重建 v1 表；历史版本没有原始异常详情，只能写入显式占位审计。"""
+        self._connection.execute("DROP INDEX IF EXISTS notification_intents_due_idx")
+        self._connection.execute("DROP INDEX IF EXISTS notification_deliveries_due_idx")
+        self._connection.execute("ALTER TABLE notification_deliveries RENAME TO notification_deliveries_v1")
+        self._connection.execute("ALTER TABLE notification_intents RENAME TO notification_intents_v1")
+        self._create_schema()
+        self._connection.execute(
+            """
+            INSERT INTO notification_intents(
+                sequence, intent_id, instance_name, source, source_id, kind, subject, body, state,
+                plan_attempt_count, next_plan_attempt_at, last_plan_failure_kind,
+                last_plan_error_type, last_plan_error_message,
+                plan_claim_token, plan_claim_until, created_at, planned_at, suppressed_at
+            )
+            SELECT
+                sequence, intent_id, instance_name, source, source_id, kind, subject, body, state,
+                plan_attempt_count, next_plan_attempt_at,
+                CASE
+                    WHEN state = 'unplanned' AND plan_attempt_count > 0
+                    THEN COALESCE(last_plan_failure_kind, 'unknown')
+                    ELSE NULL
+                END,
+                CASE
+                    WHEN state = 'unplanned' AND plan_attempt_count > 0 THEN ?
+                    ELSE NULL
+                END,
+                CASE
+                    WHEN state = 'unplanned' AND plan_attempt_count > 0 THEN ?
+                    ELSE NULL
+                END,
+                plan_claim_token, plan_claim_until, created_at, planned_at, suppressed_at
+            FROM notification_intents_v1
+            """,
+            (_LEGACY_ERROR_TYPE, _LEGACY_ERROR_MESSAGE),
+        )
+        self._connection.execute(
+            """
+            INSERT INTO notification_deliveries(
+                delivery_id, intent_id, recipient, state, attempt_count, next_attempt_at,
+                last_failure_kind, smtp_status_code, last_error_type, last_error_message,
+                claim_token, claim_until, created_at, last_attempt_at,
+                delivered_at, dead_lettered_at, suppressed_at
+            )
+            SELECT
+                delivery_id, intent_id, recipient, state, attempt_count, next_attempt_at,
+                CASE
+                    WHEN state = 'dead_letter' OR (state = 'pending' AND attempt_count > 0)
+                    THEN COALESCE(last_failure_kind, 'unknown')
+                    ELSE NULL
+                END,
+                CASE
+                    WHEN state = 'dead_letter' OR (state = 'pending' AND attempt_count > 0)
+                    THEN smtp_status_code
+                    ELSE NULL
+                END,
+                CASE
+                    WHEN state = 'dead_letter' OR (state = 'pending' AND attempt_count > 0) THEN ?
+                    ELSE NULL
+                END,
+                CASE
+                    WHEN state = 'dead_letter' OR (state = 'pending' AND attempt_count > 0) THEN ?
+                    ELSE NULL
+                END,
+                claim_token, claim_until, created_at, last_attempt_at,
+                delivered_at, dead_lettered_at, suppressed_at
+            FROM notification_deliveries_v1
+            """,
+            (_LEGACY_ERROR_TYPE, _LEGACY_ERROR_MESSAGE),
+        )
+        self._connection.execute("DROP TABLE notification_deliveries_v1")
+        self._connection.execute("DROP TABLE notification_intents_v1")
+
+    def _validate_current_schema(self, tables: frozenset[str] | None = None) -> None:
+        self._validate_schema_tables(tables)
+        self._validate_schema_columns(_EXPECTED_COLUMNS)
 
     def _validate_schema_tables(self, tables: frozenset[str] | None = None) -> None:
         actual = self.table_names() if tables is None else tables
         if actual != _EXPECTED_TABLES:
             message = "notification spool schema tables do not match the supported version"
             raise NotificationSpoolSchemaError(message)
+
+    def _validate_schema_columns(self, expected_columns: dict[str, tuple[str, ...]]) -> None:
+        for table_name, expected in expected_columns.items():
+            rows = self._connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+            actual = tuple(_required_text(row, "name") for row in rows)
+            if actual != expected:
+                message = f"notification spool table {table_name!r} columns do not match its schema version"
+                raise NotificationSpoolSchemaError(message)
 
     @contextmanager
     def _transaction(self) -> Iterator[None]:
@@ -913,6 +1187,7 @@ class NotificationSpoolStore:
             SELECT
                 sequence, intent_id, instance_name, source, source_id, kind, subject, body, state,
                 plan_attempt_count, next_plan_attempt_at, last_plan_failure_kind,
+                last_plan_error_type, last_plan_error_message,
                 plan_claim_token, plan_claim_until,
                 created_at, planned_at, suppressed_at
             FROM notification_intents
@@ -934,7 +1209,8 @@ class NotificationSpoolStore:
             """
             SELECT
                 delivery_id, intent_id, recipient, state, attempt_count, next_attempt_at,
-                last_failure_kind, smtp_status_code, claim_token, claim_until,
+                last_failure_kind, smtp_status_code, last_error_type, last_error_message,
+                claim_token, claim_until,
                 created_at, last_attempt_at, delivered_at, dead_lettered_at, suppressed_at
             FROM notification_deliveries
             WHERE delivery_id = ?
@@ -951,7 +1227,8 @@ class NotificationSpoolStore:
             """
             SELECT
                 d.delivery_id, d.intent_id, d.recipient, d.state, d.attempt_count, d.next_attempt_at,
-                d.last_failure_kind, d.smtp_status_code, d.claim_token, d.claim_until,
+                d.last_failure_kind, d.smtp_status_code, d.last_error_type, d.last_error_message,
+                d.claim_token, d.claim_until,
                 d.created_at, d.last_attempt_at, d.delivered_at, d.dead_lettered_at, d.suppressed_at,
                 i.instance_name AS work_instance_name,
                 i.subject AS work_subject,
@@ -1016,6 +1293,8 @@ class NotificationSpoolStore:
             plan_attempt_count=_required_integer(row, "plan_attempt_count"),
             next_plan_attempt_at=_decode_optional_datetime(row, "next_plan_attempt_at"),
             last_plan_failure_kind=_decode_optional_failure_kind(row, "last_plan_failure_kind"),
+            last_plan_error_type=_optional_text(row, "last_plan_error_type"),
+            last_plan_error_message=_optional_raw_text(row, "last_plan_error_message"),
             plan_claim_token=_optional_text(row, "plan_claim_token"),
             plan_claim_until=_decode_optional_datetime(row, "plan_claim_until"),
             created_at=_decode_datetime(row, "created_at"),
@@ -1039,6 +1318,8 @@ class NotificationSpoolStore:
             next_attempt_at=_decode_optional_datetime(row, "next_attempt_at"),
             last_failure_kind=_decode_optional_failure_kind(row, "last_failure_kind"),
             smtp_status_code=_optional_integer(row, "smtp_status_code"),
+            last_error_type=_optional_text(row, "last_error_type"),
+            last_error_message=_optional_raw_text(row, "last_error_message"),
             claim_token=_optional_text(row, "claim_token"),
             claim_until=_decode_optional_datetime(row, "claim_until"),
             created_at=_decode_datetime(row, "created_at"),

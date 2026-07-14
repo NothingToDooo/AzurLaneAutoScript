@@ -55,6 +55,15 @@ def _single_line(value: str, *, field_name: str) -> None:
         raise ValueError(message)
 
 
+def _non_empty_text(value: str, *, field_name: str) -> None:
+    if not isinstance(value, str):
+        message = f"{field_name} must be a string"
+        raise TypeError(message)
+    if not value.strip():
+        message = f"{field_name} must contain non-whitespace text"
+        raise ValueError(message)
+
+
 def notification_intent_id(
     *,
     source: NotificationIntentSource,
@@ -91,7 +100,7 @@ class NotificationIntentDraft:
             message = "kind must be an OperatorNotificationKind"
             raise TypeError(message)
         _single_line(self.subject, field_name="subject")
-        _single_line(self.body, field_name="body")
+        _non_empty_text(self.body, field_name="body")
         expected_intent_id = notification_intent_id(
             source=self.source,
             instance_name=self.instance_name,
@@ -116,6 +125,8 @@ class NotificationIntent:
     plan_attempt_count: int
     next_plan_attempt_at: datetime | None
     last_plan_failure_kind: NotificationFailureKind | None
+    last_plan_error_type: str | None
+    last_plan_error_message: str | None
     plan_claim_token: str | None
     plan_claim_until: datetime | None
     created_at: datetime
@@ -133,6 +144,8 @@ class NotificationDelivery:
     next_attempt_at: datetime | None
     last_failure_kind: NotificationFailureKind | None
     smtp_status_code: int | None
+    last_error_type: str | None
+    last_error_message: str | None
     claim_token: str | None
     claim_until: datetime | None
     created_at: datetime
@@ -151,11 +164,31 @@ class NotificationDeliveryWork:
 
 
 @dataclass(frozen=True, slots=True)
+class NotificationIntentRetry:
+    attempted_at: datetime
+    next_attempt_at: datetime
+    failure_kind: NotificationFailureKind
+    error_type: str
+    error_message: str
+
+
+@dataclass(frozen=True, slots=True)
 class NotificationDeliveryRetry:
     attempted_at: datetime
     next_attempt_at: datetime
     failure_kind: NotificationFailureKind
     smtp_status_code: int | None
+    error_type: str
+    error_message: str
+
+
+@dataclass(frozen=True, slots=True)
+class NotificationDeliveryFailure:
+    attempted_at: datetime
+    failure_kind: NotificationFailureKind
+    smtp_status_code: int | None
+    error_type: str
+    error_message: str
 
 
 @dataclass(frozen=True, slots=True)

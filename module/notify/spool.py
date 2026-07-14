@@ -6,16 +6,19 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Protocol, cast
 from uuid import uuid4
 
+from module.logger import logger
 from module.notify.configuration import DisabledNotificationConfig, SmtpNotificationConfig
 from module.notify.notify import SmtpNotificationSender
 from module.notify.spool_models import (
     NotificationDelivery,
+    NotificationDeliveryFailure,
     NotificationDeliveryRetry,
     NotificationDeliveryWork,
     NotificationFailureKind,
     NotificationFlushResult,
     NotificationIntent,
     NotificationIntentDraft,
+    NotificationIntentRetry,
 )
 from module.notify.spool_store import NotificationSpoolStore
 
@@ -73,6 +76,8 @@ class NotificationSpoolPolicy:
 class _DeliveryFailure:
     kind: NotificationFailureKind
     smtp_status_code: int | None
+    error_type: str
+    error_message: str
     permanent: bool
 
 
@@ -124,12 +129,43 @@ def _classify_delivery_failure(error: BaseException, recipient: str) -> _Deliver
     status_code = _smtp_status_code(error, recipient)
     if status_code is not None:
         if 500 <= status_code <= 599:
-            return _DeliveryFailure(NotificationFailureKind.SMTP_PERMANENT, status_code, permanent=True)
+            return _DeliveryFailure(
+                kind=NotificationFailureKind.SMTP_PERMANENT,
+                smtp_status_code=status_code,
+                error_type=type(error).__name__,
+                error_message=str(error),
+                permanent=True,
+            )
         if 400 <= status_code <= 499:
-            return _DeliveryFailure(NotificationFailureKind.SMTP_TRANSIENT, status_code, permanent=False)
+            return _DeliveryFailure(
+                kind=NotificationFailureKind.SMTP_TRANSIENT,
+                smtp_status_code=status_code,
+                error_type=type(error).__name__,
+                error_message=str(error),
+                permanent=False,
+            )
     if isinstance(error, (OSError, TimeoutError, smtplib.SMTPServerDisconnected)):
-        return _DeliveryFailure(NotificationFailureKind.NETWORK, None, permanent=False)
-    return _DeliveryFailure(NotificationFailureKind.UNKNOWN, status_code, permanent=False)
+        return _DeliveryFailure(
+            kind=NotificationFailureKind.NETWORK,
+            smtp_status_code=None,
+            error_type=type(error).__name__,
+            error_message=str(error),
+            permanent=False,
+        )
+    return _DeliveryFailure(
+        kind=NotificationFailureKind.UNKNOWN,
+        smtp_status_code=status_code,
+        error_type=type(error).__name__,
+        error_message=str(error),
+        permanent=False,
+    )
+
+
+def _unsupported_config_error(value: object) -> TypeError:
+    message = (
+        f"config_source must return DisabledNotificationConfig or SmtpNotificationConfig, got {type(value).__name__}"
+    )
+    return TypeError(message)
 
 
 def _require_sender(value: object) -> RecipientNotificationSender:
@@ -258,12 +294,18 @@ class NotificationSpool:
             intent = intents[0]
             try:
                 config = self._config_source(intent.instance_name)
-            except Exception:  # noqa: BLE001 - 配置适配器边界必须归一化任意第三方错误。
+            except Exception as error:  # noqa: BLE001 - 配置适配器边界必须归一化任意第三方错误。
+                logger.exception(
+                    "Failed to load notification config while planning intent %s for instance %s",
+                    intent.intent_id,
+                    intent.instance_name,
+                )
                 self._defer_intent(
                     intent,
                     claim_token=claim_token,
                     now=now,
                     failure_kind=NotificationFailureKind.CONFIGURATION,
+                    error=error,
                 )
                 deferred += 1
                 continue
@@ -272,11 +314,19 @@ class NotificationSpool:
                 suppressed += 1
                 continue
             if not isinstance(config, SmtpNotificationConfig):
+                error = _unsupported_config_error(config)
+                logger.error(
+                    "Invalid notification config while planning intent %s for instance %s: %s",
+                    intent.intent_id,
+                    intent.instance_name,
+                    error,
+                )
                 self._defer_intent(
                     intent,
                     claim_token=claim_token,
                     now=now,
                     failure_kind=NotificationFailureKind.CONFIGURATION,
+                    error=error,
                 )
                 deferred += 1
                 continue
@@ -334,8 +384,19 @@ class NotificationSpool:
     ) -> str:
         try:
             config = self._config_source(work.instance_name)
-        except Exception:  # noqa: BLE001 - 配置错误正文可能包含凭据，只记录安全分类。
-            failure = _DeliveryFailure(NotificationFailureKind.CONFIGURATION, None, permanent=False)
+        except Exception as error:  # noqa: BLE001 - 配置适配器边界必须归一化任意第三方错误。
+            logger.exception(
+                "Failed to load notification config while delivering %s for instance %s",
+                work.delivery.delivery_id,
+                work.instance_name,
+            )
+            failure = _DeliveryFailure(
+                kind=NotificationFailureKind.CONFIGURATION,
+                smtp_status_code=None,
+                error_type=type(error).__name__,
+                error_message=str(error),
+                permanent=False,
+            )
         else:
             if isinstance(config, DisabledNotificationConfig):
                 self._store.mark_suppressed(
@@ -345,7 +406,20 @@ class NotificationSpool:
                 )
                 return "suppressed"
             if not isinstance(config, SmtpNotificationConfig):
-                failure = _DeliveryFailure(NotificationFailureKind.CONFIGURATION, None, permanent=False)
+                error = _unsupported_config_error(config)
+                logger.error(
+                    "Invalid notification config while delivering %s for instance %s: %s",
+                    work.delivery.delivery_id,
+                    work.instance_name,
+                    error,
+                )
+                failure = _DeliveryFailure(
+                    kind=NotificationFailureKind.CONFIGURATION,
+                    smtp_status_code=None,
+                    error_type=type(error).__name__,
+                    error_message=str(error),
+                    permanent=False,
+                )
             else:
                 try:
                     sender = _require_sender(self._sender_factory(config))
@@ -356,6 +430,11 @@ class NotificationSpool:
                         idempotency_key=work.delivery.delivery_id,
                     )
                 except Exception as error:  # noqa: BLE001 - SMTP 适配器边界必须归一化任意第三方错误。
+                    logger.exception(
+                        "Failed to deliver notification %s to %s",
+                        work.delivery.delivery_id,
+                        work.delivery.recipient,
+                    )
                     failure = _classify_delivery_failure(error, work.delivery.recipient)
                 else:
                     self._store.mark_delivered(
@@ -369,9 +448,13 @@ class NotificationSpool:
             self._store.mark_dead_letter(
                 work.delivery.delivery_id,
                 claim_token=claim_token,
-                dead_lettered_at=attempted_at,
-                failure_kind=failure.kind,
-                smtp_status_code=failure.smtp_status_code,
+                failure=NotificationDeliveryFailure(
+                    attempted_at=attempted_at,
+                    failure_kind=failure.kind,
+                    smtp_status_code=failure.smtp_status_code,
+                    error_type=failure.error_type,
+                    error_message=failure.error_message,
+                ),
             )
             return "dead_lettered"
         next_attempt_at = self._next_attempt_at(attempted_at, completed_attempts=completed_attempts)
@@ -383,6 +466,8 @@ class NotificationSpool:
                 next_attempt_at=next_attempt_at,
                 failure_kind=failure.kind,
                 smtp_status_code=failure.smtp_status_code,
+                error_type=failure.error_type,
+                error_message=failure.error_message,
             ),
         )
         return "retried"
@@ -394,14 +479,19 @@ class NotificationSpool:
         claim_token: str,
         now: datetime,
         failure_kind: NotificationFailureKind,
+        error: BaseException,
     ) -> None:
         next_attempt_at = self._next_attempt_at(now, completed_attempts=intent.plan_attempt_count + 1)
         self._store.defer_intent(
             intent.intent_id,
             claim_token=claim_token,
-            attempted_at=now,
-            next_attempt_at=next_attempt_at,
-            failure_kind=failure_kind,
+            retry=NotificationIntentRetry(
+                attempted_at=now,
+                next_attempt_at=next_attempt_at,
+                failure_kind=failure_kind,
+                error_type=type(error).__name__,
+                error_message=str(error),
+            ),
         )
 
     def _next_attempt_at(self, now: datetime, *, completed_attempts: int) -> datetime:

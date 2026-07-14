@@ -34,6 +34,7 @@ class _NotificationEnvelope:
     task_id: TaskId
     resource: str | None = None
     error_type: str | None = None
+    error_message: str | None = None
 
 
 def _required_text(payload: Mapping[str, object], key: str) -> str:
@@ -47,13 +48,44 @@ def _required_text(payload: Mapping[str, object], key: str) -> str:
 def _notification_kind(raw: Mapping[str, object]) -> OperatorNotificationKind:
     try:
         kind = OperatorNotificationKind(_required_text(raw, "kind"))
-    except ValueError:
-        message = "notification payload kind is unsupported"
-        raise NotificationPayloadError(message) from None
+    except ValueError as error:
+        message = f"notification payload kind is unsupported: {error}"
+        raise NotificationPayloadError(message) from error
     if kind is OperatorNotificationKind.PROCESS_FAILED:
         message = "process failure notification cannot originate from an instance outbox"
         raise NotificationPayloadError(message)
     return kind
+
+
+def _schema_version(raw: Mapping[str, object]) -> int:
+    value = raw.get("schema_version")
+    if type(value) is not int or value not in (1, 2):
+        message = "notification payload schema_version must be 1 or 2"
+        raise NotificationPayloadError(message)
+    return value
+
+
+def _expected_fields(kind: OperatorNotificationKind, schema_version: int) -> set[str]:
+    common_fields = {"schema_version", "kind", "run_id", "task_id"}
+    if kind is not OperatorNotificationKind.RUN_FAULTED:
+        if schema_version == 2:
+            message = "notification payload schema_version 2 is only supported for run_faulted"
+            raise NotificationPayloadError(message)
+        return common_fields | {"resource"}
+    fields = common_fields | {"error_type"}
+    if schema_version == 2:
+        fields.add("message")
+    return fields
+
+
+def _error_message(raw: Mapping[str, object], schema_version: int) -> str:
+    if schema_version == 1:
+        return ""
+    value = raw["message"]
+    if not isinstance(value, str):
+        message = "notification payload field message must be text"
+        raise NotificationPayloadError(message)
+    return value
 
 
 def _decode_notification(payload: JsonValue) -> _NotificationEnvelope:
@@ -61,21 +93,15 @@ def _decode_notification(payload: JsonValue) -> _NotificationEnvelope:
         message = "notification payload must be an object with string fields"
         raise NotificationPayloadError(message)
     raw = cast("Mapping[str, object]", payload)
-    if raw.get("schema_version") != 1 or type(raw.get("schema_version")) is not int:
-        message = "notification payload schema_version must be 1"
-        raise NotificationPayloadError(message)
+    schema_version = _schema_version(raw)
     kind = _notification_kind(raw)
     try:
         run_id = RunId(_required_text(raw, "run_id"))
         task_id = TaskId(_required_text(raw, "task_id"))
     except (TypeError, ValueError) as error:
-        raise NotificationPayloadError(str(error)) from None
+        raise NotificationPayloadError(str(error)) from error
 
-    common_fields = {"schema_version", "kind", "run_id", "task_id"}
-    if kind is OperatorNotificationKind.RUN_FAULTED:
-        expected_fields = common_fields | {"error_type"}
-    else:
-        expected_fields = common_fields | {"resource"}
+    expected_fields = _expected_fields(kind, schema_version)
     unexpected = set(raw) - expected_fields
     if unexpected:
         message = f"notification payload contains unexpected fields: {sorted(unexpected)}"
@@ -89,16 +115,19 @@ def _decode_notification(payload: JsonValue) -> _NotificationEnvelope:
         raise NotificationPayloadError(message)
     if kind is OperatorNotificationKind.RUN_FAULTED:
         error_type = _required_text(raw, "error_type")
+        error_message = _error_message(raw, schema_version)
         resource = None
     else:
         resource = _required_text(raw, "resource")
         error_type = None
+        error_message = None
     return _NotificationEnvelope(
         kind=kind,
         run_id=run_id,
         task_id=task_id,
         resource=resource,
         error_type=error_type,
+        error_message=error_message,
     )
 
 
@@ -144,7 +173,10 @@ class LocalOutboxPublisher:
 
         if envelope.kind is OperatorNotificationKind.RUN_FAULTED:
             subject = f"Alas <{self._instance_name}> crashed"
-            body = f"<{self._instance_name}> {envelope.error_type}"
+            error_summary = envelope.error_type
+            if envelope.error_message:
+                error_summary = f"{error_summary}: {envelope.error_message}"
+            body = f"<{self._instance_name}> {error_summary}"
         else:
             reason = {
                 OperatorNotificationKind.CAMPAIGN_RUN_COUNT_LIMIT: "reached run count limit",
@@ -168,14 +200,14 @@ class LocalOutboxPublisher:
                 subject=subject,
                 body=body,
             )
-        except TypeError, ValueError:
-            message = "notification outbox identity is invalid"
-            raise NotificationPayloadError(message) from None
+        except (TypeError, ValueError) as error:
+            message = f"notification outbox identity is invalid: {error}"
+            raise NotificationPayloadError(message) from error
         try:
             self._spool.enqueue_intent(draft)
-        except NotificationIntentConflictError:
-            message = "notification outbox id conflicts with persisted intent"
-            raise NotificationPayloadError(message) from None
+        except NotificationIntentConflictError as error:
+            message = f"notification outbox id conflicts with persisted intent: {error}"
+            raise NotificationPayloadError(message) from error
 
 
 def build_local_outbox_publisher(instance_name: str, spool: NotificationIntentSink) -> LocalOutboxPublisher:

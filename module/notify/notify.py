@@ -90,7 +90,7 @@ class SmtpNotificationSender:
 
 
 def handle_notify(raw_config: str, *, title: str, content: str) -> bool:
-    """发送 SMTP 邮件；配置或网络失败时只记录安全摘要。"""
+    """发送 SMTP 邮件；配置或网络失败时记录完整异常并返回失败。"""
     try:
         config = parse_notification_config(raw_config)
         if isinstance(config, DisabledNotificationConfig):
@@ -99,11 +99,10 @@ def handle_notify(raw_config: str, *, title: str, content: str) -> bool:
         message = _build_message(config, title=title, content=content)
         _send_email(config, message)
     except NotificationConfigError as error:
-        logger.error(f"Failed to load SMTP notify config ({type(error).__name__}), skip sending")
+        logger.exception(error)
         return False
     except Exception as error:  # noqa: BLE001
-        # SMTP 异常可能包含服务端返回内容，只记录类型以避免泄露凭据。
-        logger.error(f"SMTP notify failed ({type(error).__name__})")
+        logger.exception(error)
         return False
 
     logger.info("SMTP notify success")

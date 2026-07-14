@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from email.errors import HeaderParseError
 from email.headerregistry import Address
 from email.utils import getaddresses
@@ -45,7 +45,7 @@ class DisabledNotificationConfig:
 class SmtpNotificationConfig:
     host: str
     user: str
-    password: str = field(repr=False)
+    password: str
     recipients: tuple[str, ...]
     port: int
     transport: SmtpTransport
@@ -111,9 +111,9 @@ def _load_mailboxes(values: Sequence[str], *, field_name: str) -> tuple[str, ...
     for _display_name, mailbox in parsed:
         try:
             addr_spec = Address(addr_spec=mailbox).addr_spec
-        except HeaderParseError, ValueError:
-            message = f"SMTP {field_name} must contain valid mailbox addresses"
-            raise NotificationConfigError(message) from None
+        except (HeaderParseError, ValueError) as error:
+            message = f"SMTP {field_name} must contain valid mailbox addresses: {error}"
+            raise NotificationConfigError(message) from error
         canonical.append(addr_spec)
     return tuple(dict.fromkeys(canonical))
 
@@ -131,9 +131,9 @@ def _load_mapping(raw_config: str) -> dict[str, object]:
         raise TypeError(message)
     try:
         documents = tuple(document for document in yaml.safe_load_all(raw_config) if document is not None)
-    except yaml.YAMLError:
-        message = "SMTP config must be valid YAML"
-        raise NotificationConfigError(message) from None
+    except yaml.YAMLError as error:
+        message = f"SMTP config must be valid YAML: {error}"
+        raise NotificationConfigError(message) from error
     if len(documents) != 1:
         message = "SMTP config must contain exactly one mapping document"
         raise NotificationConfigError(message)
@@ -271,4 +271,4 @@ def parse_notification_config(raw_config: str) -> NotificationConfig:
             transport=_load_transport(config, port),
         )
     except (TypeError, ValueError) as error:
-        raise NotificationConfigError(str(error)) from None
+        raise NotificationConfigError(str(error)) from error

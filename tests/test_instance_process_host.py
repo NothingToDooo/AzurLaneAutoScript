@@ -3,6 +3,7 @@ from typing import cast
 
 import pytest
 
+import module.bootstrap.process_host as process_host_module
 from module.application import (
     AbortToken,
     Cancelled,
@@ -235,7 +236,9 @@ def test_unhandled_process_failure_is_reported_and_the_original_error_is_preserv
     assert reporter.calls == [("alas", "alas", RuntimeError)]
 
 
-def test_failure_reporter_error_never_replaces_the_process_error() -> None:
+def test_failure_reporter_error_is_logged_and_never_replaces_the_process_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class _FailingProvider:
         @staticmethod
         def open(instance_name: str, *, configuration_signal: object | None = None) -> object:
@@ -243,11 +246,17 @@ def test_failure_reporter_error_never_replaces_the_process_error() -> None:
             message = "original process error"
             raise RuntimeError(message)
 
+    logged: list[Exception] = []
+    monkeypatch.setattr(process_host_module.logger, "exception", logged.append)
+
     with pytest.raises(RuntimeError, match="original process error"):
         InstanceProcessHost(
             cast("InstanceRuntimeProvider", _FailingProvider()),
             failure_reporter=_FailureReporter(fail=True),
         ).execute("alas", "alas")
+
+    assert len(logged) == 1
+    assert str(logged[0]) == "reporter failed"
 
 
 def test_faulted_task_result_is_not_reported_twice_by_the_process_host() -> None:
@@ -285,15 +294,21 @@ def test_process_failure_is_enqueued_without_synchronous_notification_maintenanc
     assert resources.close_calls == 1
 
 
-def test_notification_resource_close_failure_never_changes_the_process_result() -> None:
+def test_notification_resource_close_failure_is_logged_without_changing_the_process_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     resources = _NotificationResources(fail_close=True)
     host = InstanceProcessHost(_Provider(_Runtime()), notification_resources=resources)
+    logged: list[Exception] = []
+    monkeypatch.setattr(process_host_module.logger, "exception", logged.append)
 
     exit_ = host.execute("alas", "alas")
     host.close()
 
     assert exit_.kind is InstanceProcessExitKind.FINISHED
     assert resources.close_calls == 1
+    assert len(logged) == 1
+    assert str(logged[0]) == "close failed"
 
 
 def test_process_host_context_closes_notification_resources_once() -> None:

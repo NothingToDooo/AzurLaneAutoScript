@@ -274,7 +274,7 @@ class WebConfigurationCompiler:
         try:
             return parse_notification_config(raw_config)
         except NotificationConfigError as error:
-            raise _error(path, str(error)) from None
+            raise _error(path, str(error)) from error
 
     def _schedule(self, view: _ConfigView, config_name: str) -> dict[str, JsonValue]:
         raw = view.value(config_name, "Scheduler", "ServerUpdate", expected=str)

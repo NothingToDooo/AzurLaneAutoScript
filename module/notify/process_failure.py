@@ -29,12 +29,20 @@ def _identifier(value: str, *, field_name: str) -> str:
     return value
 
 
+def _error_summary(error: Exception) -> str:
+    error_type = type(error).__name__
+    message = str(error)
+    if not message:
+        return error_type
+    return f"{error_type}: {message}"
+
+
 class ProcessFailureSpool(Protocol):
     def enqueue_intent(self, draft: NotificationIntentDraft) -> NotificationIntent: ...
 
 
 class ProcessFailureNotifier:
-    """run 尚未形成时只持久化安全意图；规划与触网由独立 flusher 负责。"""
+    """run 尚未形成时持久化故障意图；规划与触网由独立 flusher 负责。"""
 
     __slots__ = ("_attempt_id_factory", "_spool")
 
@@ -73,6 +81,6 @@ class ProcessFailureNotifier:
                 source_id=source_id,
                 kind=OperatorNotificationKind.PROCESS_FAILED,
                 subject=f"Alas <{instance}> crashed",
-                body=f"<{instance}> {type(error).__name__} while executing `{process_command}`",
+                body=f"<{instance}> {_error_summary(error)} while executing `{process_command}`",
             )
         )

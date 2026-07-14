@@ -74,7 +74,7 @@ def _process_intent_id() -> str:
     )
 
 
-def test_process_failure_notifier_only_persists_safe_no_run_intent(tmp_path: Path) -> None:
+def test_process_failure_notifier_persists_the_original_error_message(tmp_path: Path) -> None:
     clock = _Clock()
     sender = _Sender()
     with NotificationSpoolStore(tmp_path / "notification-spool.sqlite3") as store:
@@ -94,7 +94,7 @@ def test_process_failure_notifier_only_persists_safe_no_run_intent(tmp_path: Pat
         assert intent.source_id == "process-failure:attempt-1"
         assert intent.kind.value == "process_failed"
         assert intent.subject == "Alas <alas> crashed"
-        assert intent.body == "<alas> RuntimeError while executing `alas`"
+        assert intent.body == "<alas> RuntimeError: credential=original-secret while executing `alas`"
         assert intent.state is NotificationIntentState.UNPLANNED
         assert sender.calls == []
 
@@ -102,7 +102,7 @@ def test_process_failure_notifier_only_persists_safe_no_run_intent(tmp_path: Pat
 
     assert delivered.delivered == 1
     assert sender.calls[0][0] == "operator@example.com"
-    assert "original-secret" not in repr(sender.calls)
+    assert sender.calls[0][2] == "<alas> RuntimeError: credential=original-secret while executing `alas`"
 
 
 def test_process_failure_unplanned_intent_survives_config_failure_and_later_flushes(tmp_path: Path) -> None:
@@ -159,3 +159,16 @@ def test_process_failure_spool_failure_is_left_to_the_host_containment_boundary(
         )
 
     assert len(spool.drafts) == 1
+
+
+def test_process_failure_message_with_line_breaks_is_preserved_in_body() -> None:
+    spool = _FailingSpool()
+
+    with pytest.raises(OSError, match="credential=secret"):
+        ProcessFailureNotifier(spool, lambda: "attempt-1").report(
+            "alas",
+            "alas",
+            RuntimeError("first line\nsecond line "),
+        )
+
+    assert spool.drafts[0].body == "<alas> RuntimeError: first line\nsecond line  while executing `alas`"

@@ -151,14 +151,14 @@ class NotificationSpoolPump:
                 max_intents=self._max_intents,
                 max_deliveries=self._max_deliveries,
             )
-        except Exception as error:  # noqa: BLE001 - 后台通知旁路不能终止宿主或泄露底层错误正文。
-            logger.error(f"Notification spool pump failed ({type(error).__name__})")
+        except Exception as error:  # noqa: BLE001 - 后台通知旁路不能终止宿主。
+            logger.exception(error)
         finally:
             if session is not None:
                 try:
                     session.close()
-                except Exception as close_error:  # noqa: BLE001 - 清理失败只记录安全类型，下一轮使用新连接。
-                    logger.error(f"Notification spool pump close failed ({type(close_error).__name__})")
+                except Exception as close_error:  # noqa: BLE001 - 清理失败后下一轮使用新连接。
+                    logger.exception(close_error)
 
     def _start_locked(self) -> None:
         stop_event = threading.Event()

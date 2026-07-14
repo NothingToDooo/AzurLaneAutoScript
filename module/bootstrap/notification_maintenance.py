@@ -20,6 +20,7 @@ def _report_source_failure(instance_name: str, failure: OutboxFailureFact) -> No
         "Notification source outbox routing failed "
         f"instance={instance_name!r} message_id={failure.message_id!r} "
         f"topic={failure.topic!r} error_type={failure.error_type!r} "
+        f"error_message={failure.error_message!r} "
         f"attempt_count={failure.attempt_count} discarded={failure.is_discarded}"
     )
 
@@ -78,13 +79,13 @@ class ProductionNotificationMaintenance:
         try:
             candidates = sorted(self._state_root.glob("*.sqlite3"))
         except OSError as error:
-            logger.error(f"Notification state discovery failed ({type(error).__name__})")
+            logger.exception(error)
             return ()
         for path in candidates:
             try:
                 name = validate_instance_name(path.stem)
-            except TypeError, ValueError:
-                logger.error("Notification state discovery skipped an invalid instance filename")
+            except (TypeError, ValueError) as error:
+                logger.exception(error)
                 continue
             paths.append((name, path))
         return tuple(paths)
@@ -98,7 +99,7 @@ class ProductionNotificationMaintenance:
                     clock=self._clock,
                 ).dispatch_pending()
         except Exception as error:  # noqa: BLE001 - 单实例状态损坏不能阻断其他实例或全局 spool。
-            logger.error(f"Notification source outbox maintenance failed ({type(error).__name__})")
+            logger.exception(error)
             return
         for failure in result.failures:
             _report_source_failure(instance_name, failure)

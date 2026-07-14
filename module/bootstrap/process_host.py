@@ -170,7 +170,7 @@ class InstanceProcessHost:
         try:
             self._notification_resources.close()
         except Exception as close_error:  # noqa: BLE001 - 通知资源清理不能改写进程结果。
-            logger.error(f"Notification spool close failed ({type(close_error).__name__})")
+            logger.exception(close_error)
 
     def execute(
         self,
@@ -250,7 +250,7 @@ class InstanceProcessHost:
         try:
             self._failure_reporter.report(instance_name, command, error)
         except Exception as reporter_error:  # noqa: BLE001 - 旁路 reporter 不能替换原始进程异常。
-            logger.error(f"Process failure reporter failed ({type(reporter_error).__name__})")
+            logger.exception(reporter_error)
 
     def _require_open(self) -> None:
         if self._closed:

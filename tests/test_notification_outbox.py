@@ -45,9 +45,19 @@ class _FailingSpool:
         raise OSError(message)
 
 
-def _payload(kind: str, **extra: JsonValue) -> dict[str, JsonValue]:
+class _CapturingFailingSpool:
+    def __init__(self) -> None:
+        self.drafts: list[NotificationIntentDraft] = []
+
+    def enqueue_intent(self, draft: NotificationIntentDraft) -> NotificationIntent:
+        self.drafts.append(draft)
+        message = "temporary spool I/O failure"
+        raise OSError(message)
+
+
+def _payload(kind: str, *, schema_version: int = 1, **extra: JsonValue) -> dict[str, JsonValue]:
     return {
-        "schema_version": 1,
+        "schema_version": schema_version,
         "kind": kind,
         "run_id": "run-1",
         "task_id": "main",
@@ -74,13 +84,19 @@ def _spool(store: NotificationSpoolStore) -> NotificationSpool:
         ),
         (
             "run_faulted",
-            {"error_type": "RequestHumanTakeover"},
+            {"error_type": "RequestHumanTakeover", "message": "human takeover requested"},
             "Alas <alas> crashed",
-            "<alas> RequestHumanTakeover",
+            "<alas> RequestHumanTakeover: human takeover requested",
+        ),
+        (
+            "run_faulted",
+            {"error_type": "LegacyRuntimeError"},
+            "Alas <alas> crashed",
+            "<alas> LegacyRuntimeError",
         ),
     ],
 )
-def test_local_publisher_persists_fixed_safe_notification_intent(
+def test_local_publisher_persists_notification_intent(
     tmp_path: Path,
     kind: str,
     extra: dict[str, JsonValue],
@@ -99,7 +115,7 @@ def test_local_publisher_persists_fixed_safe_notification_intent(
 
         publisher.publish(
             topic="operator.notification.requested",
-            payload=_payload(kind, **extra),
+            payload=_payload(kind, schema_version=2 if "message" in extra else 1, **extra),
             key="main",
             idempotency_key=source_message_id,
         )
@@ -183,13 +199,13 @@ def test_local_publisher_explicitly_acknowledges_local_runtime_topics(tmp_path: 
         ),
         (
             "operator.notification.requested",
-            _payload("run_faulted", error_type="RuntimeError", message="secret"),
+            _payload("run_faulted", schema_version=2, error_type="RuntimeError"),
             "main",
-            "unexpected fields",
+            "missing fields",
         ),
         (
             "operator.notification.requested",
-            _payload("run_faulted", error_type="RuntimeError"),
+            _payload("run_faulted", schema_version=2, error_type="RuntimeError", message="failed"),
             "another-task",
             "outbox key must match",
         ),
@@ -226,12 +242,49 @@ def test_spool_io_failure_remains_retryable_for_instance_outbox() -> None:
     with pytest.raises(OSError, match="temporary spool I/O failure") as raised:
         LocalOutboxPublisher("alas", _FailingSpool()).publish(
             topic="operator.notification.requested",
-            payload=_payload("run_faulted", error_type="RuntimeError"),
+            payload=_payload(
+                "run_faulted",
+                schema_version=2,
+                error_type="RuntimeError",
+                message="temporary failure",
+            ),
             key="main",
             idempotency_key="message-1",
         )
 
     assert not isinstance(raised.value, PermanentOutboxPublishError)
+
+
+def test_fault_message_with_line_breaks_is_preserved_in_body() -> None:
+    spool = _CapturingFailingSpool()
+
+    with pytest.raises(OSError, match="temporary spool I/O failure"):
+        LocalOutboxPublisher("alas", spool).publish(
+            topic="operator.notification.requested",
+            payload=_payload(
+                "run_faulted",
+                schema_version=2,
+                error_type="RuntimeError",
+                message="first line\nsecond line ",
+            ),
+            key="main",
+            idempotency_key="message-1",
+        )
+
+    assert spool.drafts[0].body == "<alas> RuntimeError: first line\nsecond line "
+
+
+def test_unsupported_notification_kind_preserves_the_decoder_error() -> None:
+    with pytest.raises(NotificationPayloadError) as raised:
+        LocalOutboxPublisher("alas", _FailingSpool()).publish(
+            topic="operator.notification.requested",
+            payload=_payload("unsupported"),
+            key="main",
+            idempotency_key="message-1",
+        )
+
+    assert isinstance(raised.value.__cause__, ValueError)
+    assert str(raised.value.__cause__) in str(raised.value)
 
 
 def test_smtp_sender_uses_one_recipient_and_stable_message_id(

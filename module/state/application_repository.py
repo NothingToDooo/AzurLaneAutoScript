@@ -250,7 +250,9 @@ class SQLiteRunRepository(RunRepository):
                 payload["resource"] = request.resource
             if request.kind is OperatorNotificationKind.RUN_FAULTED:
                 outcome = cast("Faulted", result.outcome)
+                payload["schema_version"] = 2
                 payload["error_type"] = type(outcome.error).__name__
+                payload["message"] = str(outcome.error)
             messages.append(
                 OutboxMessage(
                     message_id=f"{run_id}:{_OPERATOR_NOTIFICATION_TOPIC}:{request.kind.value}",

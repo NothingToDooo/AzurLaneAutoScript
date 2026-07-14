@@ -195,7 +195,7 @@ def test_fault_without_message_still_persists_non_empty_error(tmp_path: Path) ->
         assert persisted.result_payload == {"error_type": "RuntimeError", "message": ""}
 
 
-def test_fault_atomically_enqueues_a_secret_free_operator_notification(tmp_path: Path) -> None:
+def test_fault_atomically_enqueues_the_original_error_message(tmp_path: Path) -> None:
     clock = _FixedClock(_STARTED_AT, _FINISHED_AT)
     with SQLiteStateStore(tmp_path / "instance.sqlite3") as store:
         repository = SQLiteRunRepository(store, {}, clock, lambda: RunId("run-fault-notify"))
@@ -209,13 +209,13 @@ def test_fault_atomically_enqueues_a_secret_free_operator_notification(tmp_path:
         assert notification.message_id == "run-fault-notify:operator.notification.requested:run_faulted"
         assert notification.key == "daily"
         assert notification.payload == {
-            "schema_version": 1,
+            "schema_version": 2,
             "kind": "run_faulted",
             "run_id": "run-fault-notify",
             "task_id": "daily",
             "error_type": "RuntimeError",
+            "message": "credential=secret",
         }
-        assert "secret" not in repr(notification.payload)
 
 
 def test_task_notification_is_persisted_with_the_run_finalization(tmp_path: Path) -> None:

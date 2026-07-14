@@ -1,10 +1,11 @@
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
+import module.bootstrap.notification_maintenance as notification_maintenance_module
 from module.application import OperatorNotificationKind
 from module.bootstrap import ProductionNotificationMaintenance
 from module.notify import DisabledNotificationConfig, NotificationSpool, NotificationSpoolStore
-from module.runtime import OutboxDispatcher, OutboxRetryPolicy
+from module.runtime import OutboxDispatcher, OutboxFailureFact, OutboxRetryPolicy
 from module.state import (
     OutboxMessage,
     RunFinalization,
@@ -16,6 +17,8 @@ from module.state import (
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    import pytest
 
 _NOW = datetime(2026, 7, 14, 9, tzinfo=UTC)
 
@@ -34,6 +37,25 @@ class _UnavailableSpool:
         del topic, payload, key, idempotency_key
         message = "spool is temporarily unavailable"
         raise OSError(message)
+
+
+def test_source_outbox_failure_log_includes_the_original_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    logs: list[str] = []
+    monkeypatch.setattr(notification_maintenance_module.logger, "error", logs.append)
+    failure = OutboxFailureFact(
+        message_id="message-1",
+        topic="operator.notification.requested",
+        error_type="RuntimeError",
+        error_message="SMTP server rejected local credentials",
+        attempt_count=1,
+        available_at=_NOW,
+        discarded_at=None,
+    )
+
+    notification_maintenance_module._report_source_failure("alas", failure)  # noqa: SLF001
+
+    assert len(logs) == 1
+    assert "error_message='SMTP server rejected local credentials'" in logs[0]
 
 
 def _seed_notification(store: SQLiteStateStore, message_id: str) -> None:

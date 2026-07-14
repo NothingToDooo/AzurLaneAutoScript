@@ -2,6 +2,7 @@ import threading
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Self
 
+import module.notify.pump as pump_module
 import module.webui.app as webui_app
 from module.notify import NotificationSpoolPump
 
@@ -13,6 +14,7 @@ if TYPE_CHECKING:
 class _Session:
     flush_calls: list[tuple[str | None, int, int]] = field(default_factory=list)
     close_calls: int = 0
+    close_error: Exception | None = None
     flush_error: Exception | None = None
     flushed: threading.Event | None = None
 
@@ -32,6 +34,8 @@ class _Session:
 
     def close(self) -> None:
         self.close_calls += 1
+        if self.close_error is not None:
+            raise self.close_error
 
     def __enter__(self) -> Self:
         return self
@@ -60,14 +64,29 @@ def test_run_once_uses_a_bounded_fresh_session_and_closes_it() -> None:
     assert [session.close_calls for session in sessions] == [1, 1]
 
 
-def test_one_pump_failure_is_contained_and_the_next_tick_still_runs() -> None:
-    sessions = [_Session(flush_error=RuntimeError("smtp password=secret")), _Session()]
+def test_one_pump_failure_is_logged_and_the_next_tick_still_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    failure = RuntimeError("SMTP connection failed")
+    logged: list[Exception] = []
+    monkeypatch.setattr(pump_module.logger, "exception", logged.append)
+    sessions = [_Session(flush_error=failure), _Session()]
     pump = NotificationSpoolPump(lambda: sessions.pop(0))
 
     pump.run_once()
     pump.run_once()
 
     assert sessions == []
+    assert logged == [failure]
+
+
+def test_session_close_failure_is_logged_and_contained(monkeypatch: pytest.MonkeyPatch) -> None:
+    failure = OSError("notification spool close failed")
+    logged: list[Exception] = []
+    monkeypatch.setattr(pump_module.logger, "exception", logged.append)
+    pump = NotificationSpoolPump(lambda: _Session(close_error=failure))
+
+    pump.run_once()
+
+    assert logged == [failure]
 
 
 def test_background_pump_runs_without_live_instance_processes_and_stops() -> None:
