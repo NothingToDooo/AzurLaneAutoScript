@@ -41,6 +41,23 @@ _TEST_RULES = StageRules(
 )
 
 
+@pytest.mark.parametrize(
+    ("node", "expected"),
+    [("A1", CellId(0, 0)), ("Z9", CellId(25, 8)), ("AA10", CellId(26, 9))],
+)
+def test_cell_id_parses_canonical_grid_nodes(node: str, expected: CellId) -> None:
+    cell = CellId.parse(node)
+
+    assert cell == expected
+    assert cell.node == node
+
+
+@pytest.mark.parametrize("node", ["a1", "A0", " A1", "A1 ", "", 1, True])
+def test_cell_id_rejects_noncanonical_grid_nodes(node: object) -> None:
+    with pytest.raises(ContentValidationError, match="uppercase grid node"):
+        CellId.parse(node)
+
+
 def _definition(
     waves: tuple[SpawnWave, ...],
     policies: dict[int, StagePolicy | BattlePolicy],

@@ -1,7 +1,6 @@
 from collections.abc import Mapping, Sequence
 from typing import cast
 
-from module.base.utils import node2location
 from module.content.battle_policy import (
     AllConditions,
     AnyCondition,
@@ -23,6 +22,7 @@ from module.content.battle_policy import (
     FlagCondition,
     GuardedBattleStep,
     NotCondition,
+    StagePolicy,
     TargetExpectation,
 )
 from module.content.battle_program import (
@@ -131,7 +131,7 @@ def _sequence(value: object, location: str) -> Sequence[object]:
 
 
 def _string(value: object, location: str) -> str:
-    if not isinstance(value, str) or not value:
+    if not isinstance(value, str) or not value.strip():
         message = f"{location} must be a non-empty string"
         raise ContentValidationError(message)
     return value
@@ -155,8 +155,17 @@ def _strings(value: object, location: str) -> tuple[str, ...]:
     return tuple(_string(item, f"{location}[{index}]") for index, item in enumerate(_sequence(value, location)))
 
 
-def _integers(value: object, location: str) -> tuple[int, ...]:
-    return tuple(_integer(item, f"{location}[{index}]") for index, item in enumerate(_sequence(value, location)))
+def _positive_integers(value: object, location: str) -> tuple[int, ...]:
+    return tuple(
+        _positive_integer(item, f"{location}[{index}]") for index, item in enumerate(_sequence(value, location))
+    )
+
+
+def _positive_integer(value: object, location: str) -> int:
+    if type(value) is not int or value <= 0:
+        message = f"{location} must be a positive integer"
+        raise ContentValidationError(message)
+    return value
 
 
 def _step_mapping(value: object, location: str, tag: str) -> Mapping[str, object]:
@@ -207,7 +216,7 @@ def _strategy(value: object, location: str) -> BossStrategy:
         raise ContentValidationError(message) from error
 
 
-def _step(  # noqa: C901, PLR0911, PLR0912 - 封闭 tag 解码必须穷举。
+def decode_battle_step(  # noqa: C901, PLR0911, PLR0912 - 封闭 tag 解码必须穷举。
     value: object,
     location: str,
 ) -> BattleStep:
@@ -234,7 +243,7 @@ def _step(  # noqa: C901, PLR0911, PLR0912 - 封闭 tag 解码必须穷举。
         return ClearFilteredEnemy(_integer(item["preserve"], f"{location}.preserve"), enemy_filter)
     if tag == "clear_enemy":
         return ClearEnemy(
-            scales=_integers(item.get("scales", ()), f"{location}.scales"),
+            scales=_positive_integers(item.get("scales", ()), f"{location}.scales"),
             genres=_strings(item.get("genres", ()), f"{location}.genres"),
             sort=_strings(item.get("sort", ()), f"{location}.sort"),
             strongest=_boolean(item.get("strongest", False), f"{location}.strongest"),
@@ -261,7 +270,7 @@ def _step(  # noqa: C901, PLR0911, PLR0912 - 封闭 tag 解码必须穷举。
     if tag == "default_battle":
         return DefaultBattle()
     if tag == "guarded":
-        guarded_step = _step(item["step"], f"{location}.step")
+        guarded_step = decode_battle_step(item["step"], f"{location}.step")
         if isinstance(guarded_step, GuardedBattleStep):
             message = f"{location}.step must not contain a nested guard"
             raise ContentValidationError(message)
@@ -279,6 +288,29 @@ def _step(  # noqa: C901, PLR0911, PLR0912 - 封闭 tag 解码必须穷举。
     raise ContentValidationError(message)
 
 
+def decode_stage_policy(value: object, location: str) -> StagePolicy:
+    """把单场战斗的内容声明编译为类型化策略。"""
+
+    item = _free_mapping(value, location)
+    fields = set(item)
+    unknown = fields - {"steps"}
+    if unknown:
+        message = f"{location} contains unknown fields: {sorted(unknown)}"
+        raise ContentValidationError(message)
+    if "steps" not in item:
+        message = f"{location} requires field 'steps'"
+        raise ContentValidationError(message)
+    steps = tuple(
+        decode_battle_step(raw_step, f"{location}.steps[{index}]")
+        for index, raw_step in enumerate(_sequence(item["steps"], f"{location}.steps"))
+    )
+    try:
+        return StagePolicy(steps)
+    except ContentValidationError as error:
+        message = f"{location}.steps is invalid: {error}"
+        raise ContentValidationError(message) from error
+
+
 def _free_mapping(value: object, location: str) -> Mapping[str, object]:
     if not isinstance(value, Mapping) or any(not isinstance(key, str) for key in value):
         message = f"{location} must be a mapping with string fields"
@@ -289,11 +321,10 @@ def _free_mapping(value: object, location: str) -> Mapping[str, object]:
 def _cell(value: object, location: str) -> CellId:
     node = _string(value, location)
     try:
-        x, y = node2location(node)
-    except (TypeError, ValueError) as error:
-        message = f"{location} must be a grid node"
+        return CellId.parse(node)
+    except ContentValidationError as error:
+        message = f"{location} {error}"
         raise ContentValidationError(message) from error
-    return CellId(x, y)
 
 
 def _cells(value: object, location: str) -> tuple[CellId, ...]:
@@ -534,7 +565,7 @@ def _program_statement(  # noqa: C901, PLR0911, PLR0912 - 封闭 statement tag �
     tag = _string(raw.get("tag"), f"{location}.tag")
     if tag in {"attempt_battle", "return_battle"}:
         item = _mapping(value, location, {"tag", "action"})
-        action = _step(item["action"], f"{location}.action")
+        action = decode_battle_step(item["action"], f"{location}.action")
         return AttemptBattleAction(action) if tag == "attempt_battle" else ReturnBattleAction(action)
     if tag in {"attempt_mechanic", "perform_mechanic", "return_mechanic"}:
         item = _mapping(value, location, {"tag", "action", "expected_target"})
