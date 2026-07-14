@@ -1,11 +1,25 @@
-from module.campaign.campaign_base import CampaignBase
+from module.campaign.campaign_engine import CampaignEngine
 from module.daemon.daemon_base import DaemonBase
 from module.exception import CampaignEnd
 from module.handler.assets import MAP_AMBUSH_EVADE
 from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION
 
 
-class AzurLaneDaemon(DaemonBase, CampaignBase):
+class AzurLaneDaemon(DaemonBase, CampaignEngine):
+    def advance_once(self) -> bool:
+        """推进一个可中断步骤；公会弹窗关闭后返回已完成。"""
+        self.device.screenshot()
+        handlers = (
+            self.handle_daemon_combat,
+            self.handle_daemon_map_operation,
+            self.handle_daemon_map_preparation,
+            self.handle_daemon_misc,
+        )
+        for handler in handlers:
+            if handler():
+                return False
+        return bool(self.handle_guild_popup_cancel())
+
     def handle_daemon_combat(self) -> bool:
         # 战斗中只保持截图轮询，不插入其他操作。
         if self.is_combat_executing():
@@ -42,25 +56,3 @@ class AzurLaneDaemon(DaemonBase, CampaignBase):
         if self.handle_vote_popup():
             return True
         return bool(self.story_skip())
-
-    def run(self) -> None:
-        while 1:
-            self.device.screenshot()
-
-            if self.handle_daemon_combat():
-                continue
-            if self.handle_daemon_map_operation():
-                continue
-            if self.handle_daemon_map_preparation():
-                continue
-            if self.handle_daemon_misc():
-                continue
-
-            if self.handle_guild_popup_cancel():
-                return
-            # 没有自动结束条件，需要手动停止。
-
-
-if __name__ == "__main__":
-    b = AzurLaneDaemon("alas", task="Daemon")
-    b.run()

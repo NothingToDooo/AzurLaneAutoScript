@@ -118,10 +118,11 @@ class RewardShipyard(ShipyardUI):
 
             count = self._shipyard_get_bp_count(index)
 
-    def shipyard_run(self, series: int, index: int, count: int) -> bool:
+    def shipyard_run(self, series: int, index: int, count: int, *, rarity: ShipyardRarity) -> bool:
         """运行系列 1～4、舰船 1～6 的蓝图使用和购买；发生页面跳转即返回 True。"""
         if count <= 0:
             return False
+        self._shipyard_bp_rarity = rarity
 
         # 船坞页金币标签和数字共同右对齐，OCR 困难，改从主页读取。
         self.ui_ensure(page_main)
@@ -165,11 +166,11 @@ class RewardShipyard(ShipyardUI):
         if self.config.ShipyardDr_LastRun > get_server_last_update("04:00"):
             logger.warning("Task Shipyard DR has already been run today, skip")
         else:
-            self._shipyard_bp_rarity = "DR"
             self.shipyard_run(
                 series=self.config.ShipyardDr_ResearchSeries,
                 index=self.config.ShipyardDr_ShipIndex,
                 count=self.config.ShipyardDr_BuyAmount,
+                rarity="DR",
             )
 
         logger.hr("Shipyard PR", level=1)
@@ -179,11 +180,11 @@ class RewardShipyard(ShipyardUI):
             self.config.task_delay(server_update=True)
             self.config.task_stop()
         else:
-            self._shipyard_bp_rarity = "PR"
             self.shipyard_run(
                 series=self.config.Shipyard_ResearchSeries,
                 index=self.config.Shipyard_ShipIndex,
                 count=self.config.Shipyard_BuyAmount,
+                rarity="PR",
             )
 
         self.config.task_delay(server_update=True)

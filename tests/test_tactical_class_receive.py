@@ -1,6 +1,9 @@
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Unpack, override
+
+import pytest
 
 from module.tactical import tactical_class as tactical_module
 from module.tactical.assets import BOOK_EMPTY_POPUP
@@ -8,10 +11,6 @@ from module.tactical.tactical_class import RewardTacticalClass
 from module.ui.assets import BACK_ARROW, REWARD_CHECK
 
 if TYPE_CHECKING:
-    from datetime import datetime
-
-    import pytest
-
     from module.base.button import Button, MatchOffset
     from module.retire.dock import DockFilterOptions, DockFilterSettings
     from module.ui.page import Page
@@ -206,6 +205,25 @@ def test_tactical_receive_delays_to_tomorrow_when_books_empty(monkeypatch: pytes
 
     assert tactical.device.clicks == [BOOK_EMPTY_POPUP]
     assert tactical.tactical_finish == ["tomorrow"]
+
+
+def test_tactical_receive_uses_typed_empty_finish_without_reading_legacy_schedule(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    finish_at = datetime(2026, 7, 14, 4, tzinfo=UTC)
+    monkeypatch.setattr(tactical_module, "Timer", lambda *_args, **_kwargs: _Timer())
+    monkeypatch.setattr(
+        tactical_module,
+        "get_server_next_update",
+        lambda _server_update: pytest.fail("legacy schedule must not be read"),
+    )
+    tactical = _Tactical()
+    tactical.set_appear(BOOK_EMPTY_POPUP, results=[True])
+    tactical.set_appear(REWARD_CHECK, results=[True])
+
+    assert tactical.tactical_class_receive(empty_finish_at=finish_at) is True
+
+    assert tactical.tactical_finish == [finish_at]
 
 
 def test_tactical_receive_reenters_when_ship_is_preselected(monkeypatch: pytest.MonkeyPatch) -> None:

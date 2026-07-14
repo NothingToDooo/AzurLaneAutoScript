@@ -544,7 +544,12 @@ class RewardTacticalClass(Dock):
                 return "continue"
         return None
 
-    def tactical_class_receive(self, *, skip_first_screenshot: bool = True) -> bool:
+    def tactical_class_receive(
+        self,
+        *,
+        skip_first_screenshot: bool = True,
+        empty_finish_at: datetime | None = None,
+    ) -> bool:
         """从奖励页领取战术奖励并补充教材，最后回到奖励页。"""
         logger.hr("Tactical class receive", level=1)
         context = _TacticalReceiveContext(study_finished=not self.config.AddNewStudent_Enable)
@@ -567,7 +572,12 @@ class RewardTacticalClass(Dock):
 
         if context.book_empty:
             logger.warning("Tactical books empty, delay to tomorrow")
-            self.tactical_finish = [get_server_next_update(self.config.Scheduler_ServerUpdate)]
+            finish_at = (
+                get_server_next_update(self.config.Scheduler_ServerUpdate)
+                if empty_finish_at is None
+                else empty_finish_at
+            )
+            self.tactical_finish = [finish_at]
             logger.info(f"Tactical finish: {self.tactical_finish}")
         return True
 

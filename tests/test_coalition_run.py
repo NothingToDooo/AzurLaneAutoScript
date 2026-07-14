@@ -1,172 +1,81 @@
-from typing import TYPE_CHECKING, override
+from typing import override
 
 import pytest
 
-from module.coalition.coalition import Coalition
-from module.exception import CampaignNameError, ScriptEnd, ScriptError
-
-if TYPE_CHECKING:
-    from module.base.button import MatchOffset
-    from module.coalition.contracts import CoalitionEvent, CoalitionFleetMode, CoalitionPageMode, CoalitionStage
-    from module.ui.page import Page
+from module.coalition.coalition import Coalition, CoalitionExecutionResult
+from module.coalition.profile import COALITION_CLIENT_PROFILES, CoalitionClientSession
+from module.content.activity_catalog import ActivityCatalog
+from module.content.activity_profile import CoalitionFleetMode, CoalitionStageId
+from module.content.manifest import load_default_event_manifests
 
 
-type _Call = tuple[str] | tuple[str, str] | tuple[str, str, str] | tuple[str, str, str, str] | tuple[str, bool, bool]
+def _session(content_id: str, stage_id: str, fleet: CoalitionFleetMode) -> CoalitionClientSession:
+    catalog = ActivityCatalog(load_default_event_manifests())
+    return COALITION_CLIENT_PROFILES.resolve(
+        catalog.resolve_coalition(content_id),
+        CoalitionStageId(stage_id),
+        fleet,
+    )
 
 
 class _Config:
-    def __init__(self) -> None:
-        self.Campaign_Event = "coalition_20230323"
-        self.Coalition_Mode = "tc1"
-        self.Coalition_Fleet = "multi"
-        self.StopCondition_RunCount = 2
-        self.switched = False
-        self.calls: list[tuple[str]] = []
+    def __init__(self, emotion_control: str = "ignore") -> None:
+        self.Emotion_Fleet1Control = emotion_control
+        self.overlays: list[dict[str, object]] = []
 
-    def task_stop(self) -> None:
-        self.calls.append(("task_stop",))
-
-    def task_switched(self) -> bool:
-        self.calls.append(("task_switched",))
-        return self.switched
-
-
-class _Device:
-    def __init__(self, calls: list[_Call]) -> None:
-        self.calls = calls
-
-    def stuck_record_clear(self) -> None:
-        self.calls.append(("stuck_record_clear",))
-
-    def click_record_clear(self) -> None:
-        self.calls.append(("click_record_clear",))
+    def apply_runtime_overlay(self, **values: object) -> None:
+        self.overlays.append(values)
+        for name, value in values.items():
+            setattr(self, name, value)
 
 
 class _Coalition(Coalition):
     config: _Config
-    device: _Device
 
-    def __init__(self) -> None:
-        self.calls: list[_Call] = []
-        self.config = _Config()
-        self.device = _Device(self.calls)
-        self.stop_on_oil = False
-        self.stop_on_pt = False
-        self.event_time_limited = False
-        self.execute_raises = False
-
-    def event_time_limit_triggered(self) -> bool:
-        self.calls.append(("event_time_limit_triggered",))
-        return self.event_time_limited
+    def __init__(self, client: CoalitionClientSession, *, emotion_control: str = "ignore") -> None:
+        self.client = client
+        self.config = _Config(emotion_control)
+        self.calls: list[str] = []
 
     @override
-    def triggered_stop_condition(self, *, oil_check: bool = False, pt_check: bool = False) -> bool:
-        self.calls.append(("triggered_stop_condition", oil_check, pt_check))
-        return (oil_check and self.stop_on_oil) or (pt_check and self.stop_on_pt)
+    def enter_map(self) -> None:
+        self.calls.append("enter_map")
 
     @override
-    def ui_goto(
-        self,
-        destination: Page,
-        *,
-        get_ship: bool = True,
-        offset: MatchOffset | None = (30, 30),
-        skip_first_screenshot: bool = True,
-    ) -> None:
-        del get_ship, offset, skip_first_screenshot
-        self.calls.append(("ui_goto", destination.name))
-
-    @override
-    def ui_goto_coalition(self) -> bool:
-        self.calls.append(("ui_goto_coalition",))
-        return True
-
-    @override
-    def disable_event_on_raid(self) -> bool:
-        self.calls.append(("disable_event_on_raid",))
-        return True
-
-    @override
-    def coalition_ensure_mode(self, event: CoalitionEvent, mode: CoalitionPageMode) -> None:
-        self.calls.append(("coalition_ensure_mode", event, mode))
-
-    @override
-    def coalition_execute_once(
-        self,
-        *,
-        event: CoalitionEvent,
-        stage: CoalitionStage,
-        fleet: CoalitionFleetMode,
-    ) -> None:
-        self.calls.append(("coalition_execute_once", event, stage, fleet))
-        if self.execute_raises:
-            message = "stop"
-            raise ScriptEnd(message)
+    def coalition_combat(self) -> None:
+        self.calls.append("coalition_combat")
 
 
-def test_coalition_run_requires_arguments() -> None:
-    coalition = _Coalition()
-    coalition.config.Campaign_Event = ""
+def test_execute_once_uses_typed_session_and_returns_content_result() -> None:
+    session = _session("coalition_20230323", "tc3", CoalitionFleetMode.MULTI)
+    coalition = _Coalition(session)
 
-    with pytest.raises(ScriptError):
-        coalition.run()
+    result = coalition.coalition_execute_once()
 
-
-def test_coalition_run_rejects_unknown_event() -> None:
-    coalition = _Coalition()
-    coalition.config.Campaign_Event = "coalition_unknown"
-
-    with pytest.raises(ScriptError, match="Unsupported coalition event"):
-        coalition.run()
-
-
-def test_coalition_run_rejects_unknown_stage() -> None:
-    coalition = _Coalition()
-    coalition.config.Coalition_Mode = "unknown"
-
-    with pytest.raises(CampaignNameError, match="unknown"):
-        coalition.run()
+    assert result == CoalitionExecutionResult(session.activity.content_id, CoalitionStageId("tc3"), 3)
+    assert coalition.calls == ["enter_map", "coalition_combat"]
+    assert coalition.config.overlays == [
+        {
+            "Campaign_Name": "coalition_20230323_tc3",
+            "Campaign_UseAutoSearch": False,
+            "Coalition_Fleet": "multi",
+            "Fleet_FleetOrder": "fleet1_all_fleet2_standby",
+        }
+    ]
 
 
-def test_coalition_run_rejects_unknown_fleet_mode() -> None:
-    coalition = _Coalition()
-    coalition.config.Coalition_Fleet = "unknown"
+def test_single_fleet_execution_applies_only_the_runtime_emotion_guard() -> None:
+    session = _session("coalition_20260122", "hard", CoalitionFleetMode.SINGLE)
+    coalition = _Coalition(session, emotion_control="prevent_red_face")
 
-    with pytest.raises(ScriptError, match="Unsupported coalition fleet mode"):
-        coalition.run()
+    coalition.coalition_execute_once()
 
-
-def test_coalition_stage_name_normalizes_frostfall_alias() -> None:
-    assert Coalition.handle_stage_name("coalition_20230323", " T-C3\n") == ("coalition_20230323", "tc3")
+    assert coalition.config.overlays[-1] == {"Emotion_Fleet1Control": "prevent_yellow_face"}
+    assert coalition.config.Emotion_Fleet1Control == "prevent_yellow_face"
 
 
-def test_coalition_run_executes_until_total() -> None:
-    coalition = _Coalition()
+def test_execution_result_rejects_non_positive_battle_count() -> None:
+    session = _session("coalition_20230323", "tc1", CoalitionFleetMode.SINGLE)
 
-    coalition.run(total=1)
-
-    assert coalition.run_count == 1
-    assert coalition.config.StopCondition_RunCount == 1
-    assert ("coalition_execute_once", "coalition_20230323", "tc1", "multi") in coalition.calls
-
-
-def test_coalition_run_stops_without_increment_when_script_ends() -> None:
-    coalition = _Coalition()
-    coalition.execute_raises = True
-
-    coalition.run(total=2)
-
-    assert coalition.run_count == 0
-    assert coalition.config.StopCondition_RunCount == 2
-
-
-def test_coalition_run_checks_oil_before_ui_without_oil_icon() -> None:
-    coalition = _Coalition()
-    coalition.config.Campaign_Event = "coalition_20260122"
-    coalition.config.Coalition_Mode = "easy"
-    coalition.stop_on_oil = True
-
-    coalition.run(total=1)
-
-    assert ("triggered_stop_condition", True, False) in coalition.calls
-    assert not any(call[0] == "coalition_execute_once" for call in coalition.calls)
+    with pytest.raises(ValueError, match="battle_count must be a positive integer"):
+        CoalitionExecutionResult(session.activity.content_id, session.stage.stage_id, 0)

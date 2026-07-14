@@ -44,6 +44,7 @@ class _Timer:
 
 
 class _Config:
+    Campaign_Event = ""
     STORY_OPTION = 1
     STORY_ALLOW_SKIP = True
 
@@ -187,3 +188,13 @@ def test_story_skip_clicks_safe_area_when_skip_disabled() -> None:
 
     assert result is True
     assert handler.device.clicks == [OS_CLICK_SAFE_AREA]
+
+
+@pytest.mark.parametrize("pack_id", ["event_20201012_cn", "event_20260625_cn"])
+def test_handle_story_skip_stops_on_every_threat_safe_map(pack_id: str) -> None:
+    handler = _InfoHandler()
+    handler.config.Campaign_Event = pack_id
+    handler.map_is_threat_safe = True
+
+    assert handler.handle_story_skip() is False
+    assert handler.calls == []

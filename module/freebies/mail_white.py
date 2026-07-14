@@ -51,7 +51,7 @@ class MailWhite(UI):
         )
         return setting
 
-    def _mail_enter(self, *, skip_first_screenshot: bool = True) -> bool:
+    def mail_enter(self, *, skip_first_screenshot: bool = True) -> bool:
         """从白色主页或邮件管理进入批量领取页；无邮件返回 False。"""
         logger.info("Mail enter")
         self.interval_clear([freebies_assets.MAIL_MANAGE])
@@ -84,7 +84,7 @@ class MailWhite(UI):
                 continue
         return False
 
-    def _mail_quit(self, *, skip_first_screenshot: bool = True) -> None:
+    def mail_quit(self, *, skip_first_screenshot: bool = True) -> None:
         """从邮件内任意页面退出到白色主页。"""
         logger.info("Mail quit")
         self.interval_clear(
@@ -128,7 +128,7 @@ class MailWhite(UI):
             return True
         return False
 
-    def _mail_claim_execute(self, *, skip_first_screenshot: bool = True) -> bool:
+    def mail_claim_execute(self, *, skip_first_screenshot: bool = True) -> bool:
         """在批量领取页领取邮件，以信息条是否出现作为成功结果。"""
         self.handle_info_bar()
         self.interval_clear(
@@ -162,7 +162,7 @@ class MailWhite(UI):
         logger.info(f"Mail claim success: {success}")
         return success
 
-    def _mail_delete(self, *, skip_first_screenshot: bool = True) -> bool:
+    def mail_delete(self, *, skip_first_screenshot: bool = True) -> bool:
         """在批量删除页完成删除，结束后仍停留在该页。"""
         self.handle_info_bar()
         self.interval_clear([freebies_assets.MAIL_BATCH_DELETE])
@@ -197,34 +197,34 @@ class MailWhite(UI):
         delete: bool = True,
     ) -> None:
         """从白色主页或邮件管理页按开关领取邮件，并可选删除；完成后返回白色主页。"""
-        if not self._mail_enter():
+        if not self.mail_enter():
             return
 
         if merit:
             logger.hr("Mail merit", level=2)
-            self._mail_enter()
+            self.mail_enter()
             self.mail_select_setting.set(contains=["merit"])
-            self._mail_claim_execute()
+            self.mail_claim_execute()
         if maintenance:
             logger.hr("Mail maintenance", level=2)
-            self._mail_enter()
+            self.mail_enter()
             self.mail_select_setting.set(contains=["coins", "oil"])
-            self._mail_claim_execute()
-            self._mail_enter()
+            self.mail_claim_execute()
+            self.mail_enter()
             self.mail_select_setting.set(contains=["coins", "oil", "gems"])
-            self._mail_claim_execute()
+            self.mail_claim_execute()
         if trade_license:
             logger.hr("Mail trade license", level=2)
-            self._mail_enter()
+            self.mail_enter()
             self.mail_select_setting.set(contains=["coins", "oil", "cube"])
-            self._mail_claim_execute()
+            self.mail_claim_execute()
         if delete:
             logger.hr("Mail delete", level=2)
-            self._mail_enter()
+            self.mail_enter()
             self.mail_select_all_setting.set(contains=["all"])
-            self._mail_delete()
+            self.mail_delete()
 
-        self._mail_quit()
+        self.mail_quit()
 
     def run(self) -> bool:
         merit = self.config.Mail_ClaimMerit

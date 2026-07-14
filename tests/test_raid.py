@@ -1,243 +1,291 @@
-from typing import TYPE_CHECKING
+import re
+from pathlib import Path
+from typing import TYPE_CHECKING, override
 
 import pytest
 
-from module.exception import ScriptEnd, ScriptError
+from module.content import ActivityCatalog, ContentId, RaidDefinition, RaidMode, RaidProfileId
+from module.content.activity_catalog import RaidActivity
+from module.content.errors import ContentValidationError
+from module.content.manifest import load_event_manifests
 from module.ocr.ocr import Digit, DigitCounter
-from module.raid.raid import (
-    HuanChangCounter,
-    HuanChangPtOcr,
-    RaidCounter,
-    RaidMode,
-    pt_ocr,
-    raid_name_shorten,
-    raid_ocr,
+from module.raid import assets as raid_assets
+from module.raid.ocr import HuanChangPointOcr, HuanChangRemainCounter, PaddedRaidCounter
+from module.raid.profile import (
+    CHANGWU_RAID_PROFILE,
+    HUANCHANG_RAID_PROFILE,
+    RAID_CLIENT_PROFILES,
+    RPG_RAID_PROFILE,
+    CounterOcrSpec,
+    DigitOcrSpec,
+    RaidAttemptSource,
+    RaidNavigationStrategy,
+    ResolvedRaidProfile,
+    UnknownRaidProfileError,
 )
+from module.raid.raid import Raid
+from module.raid.result import RaidExecutionResult
 from module.raid.run import RaidRun
-from module.ui.page import Page, page_campaign_menu, page_raid, page_rpg_stage
+from module.ui.page import Page, page_raid, page_rpg_stage
 
 if TYPE_CHECKING:
-    from types import TracebackType
-    from typing import Self
-
-type RaidCall = (
-    tuple[str] | tuple[str, Page] | tuple[str, RaidMode] | tuple[str, bool, bool, bool] | tuple[str, RaidMode, str]
-)
+    from module.combat.combat import CombatEnd
+    from module.raid.profile import RaidRunPlan
 
 
-class _Device:
-    def __init__(self) -> None:
-        self.stuck_clear_count = 0
-        self.click_clear_count = 0
-
-    def stuck_record_clear(self) -> None:
-        self.stuck_clear_count += 1
-
-    def click_record_clear(self) -> None:
-        self.click_clear_count += 1
+def _raid_activities() -> tuple[RaidActivity, ...]:
+    catalog = ActivityCatalog(load_event_manifests(Path("content/events")))
+    raid_ids = sorted(
+        str(pack.pack_id)
+        for pack in load_event_manifests(Path("content/events"))
+        if isinstance(pack.activity, RaidDefinition)
+    )
+    return tuple(catalog.resolve_raid(raid_id) for raid_id in raid_ids)
 
 
-class _MultiSet:
-    def __init__(self, calls: list[tuple[str]]) -> None:
-        self.calls = calls
+def _activity(profile_id: str, *, daily_modes: tuple[RaidMode, ...] = ()) -> RaidActivity:
+    modes = (RaidMode.EASY, RaidMode.NORMAL, RaidMode.HARD, RaidMode.EX)
+    return RaidActivity(
+        ContentId(f"test_{profile_id}"),
+        RaidDefinition(
+            profile_id=RaidProfileId(profile_id),
+            modes=modes,
+            daily_modes=daily_modes,
+            ticket_modes=(),
+        ),
+    )
 
-    def __enter__(self) -> Self:
-        self.calls.append(("multi_set_enter",))
-        return self
 
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        del exc_type, exc, traceback
-        self.calls.append(("multi_set_exit",))
+def test_builtin_profiles_cover_every_raid_manifest_and_validate_before_runtime() -> None:
+    activities = _raid_activities()
+
+    assert len(activities) == 11
+    assert {activity.definition.profile_id for activity in activities} == RAID_CLIENT_PROFILES.profile_ids
+    for activity in activities:
+        resolved = RAID_CLIENT_PROFILES.bind(activity)
+        assert resolved.activity is activity
+        assert {mode.mode for mode in resolved.client.modes} == set(activity.definition.modes)
+
+
+def test_unknown_profile_fails_during_binding() -> None:
+    with pytest.raises(UnknownRaidProfileError, match="unknown raid client profile"):
+        RAID_CLIENT_PROFILES.bind(_activity("unknown"))
+
+
+def test_rpg_attempts_are_explicitly_unmetered_without_fabricated_ocr() -> None:
+    activity = next(
+        activity for activity in _raid_activities() if activity.definition.profile_id == RaidProfileId("rpg")
+    )
+    resolved = RAID_CLIENT_PROFILES.bind(activity)
+
+    assert resolved.client is RPG_RAID_PROFILE
+    assert resolved.client.navigation is RaidNavigationStrategy.RPG_CAROUSEL
+    assert resolved.client.landing_page is page_rpg_stage
+    assert all(mode.attempt_source is RaidAttemptSource.UNMETERED for mode in resolved.client.modes)
+    assert all(mode.remain_ocr is None for mode in resolved.client.modes)
+
+
+def test_daily_or_ticket_capability_requires_metered_ocr() -> None:
+    with pytest.raises(ContentValidationError, match="daily/ticket modes must have remain OCR"):
+        ResolvedRaidProfile(
+            activity=_activity("rpg", daily_modes=(RaidMode.EASY,)),
+            client=RPG_RAID_PROFILE,
+        )
+
+
+def test_ticket_can_only_be_enabled_for_the_selected_ticket_mode() -> None:
+    activity = next(
+        activity for activity in _raid_activities() if activity.definition.profile_id == RaidProfileId("changwu")
+    )
+    resolved = RAID_CLIENT_PROFILES.bind(activity)
+
+    with pytest.raises(ContentValidationError, match="tickets are not supported"):
+        resolved.plan(RaidMode.HARD, use_ticket=True)
+    assert resolved.plan(RaidMode.EX, use_ticket=True).use_ticket is True
+
+
+def test_daily_plan_requires_manifest_daily_capability() -> None:
+    rpg = next(activity for activity in _raid_activities() if activity.definition.profile_id == RaidProfileId("rpg"))
+
+    with pytest.raises(ContentValidationError, match="is not daily content"):
+        RAID_CLIENT_PROFILES.bind(rpg).daily_plan(RaidMode.HARD)
+
+
+def test_profiles_bind_entrance_and_ocr_without_dynamic_asset_lookup() -> None:
+    hard = CHANGWU_RAID_PROFILE.mode(RaidMode.HARD)
+    ex = CHANGWU_RAID_PROFILE.mode(RaidMode.EX)
+
+    assert hard is not None
+    assert hard.entrance is raid_assets.CHANGWU_RAID_HARD
+    assert isinstance(hard.remain_ocr, CounterOcrSpec)
+    assert isinstance(hard.remain_ocr.create(), DigitCounter)
+    assert ex is not None
+    assert ex.entrance is raid_assets.CHANGWU_RAID_EX
+    assert isinstance(ex.remain_ocr, DigitOcrSpec)
+    assert isinstance(ex.remain_ocr.create(), Digit)
+
+
+def test_special_ocr_strategies_are_bound_to_only_their_profiles() -> None:
+    huanchang_hard = HUANCHANG_RAID_PROFILE.mode(RaidMode.HARD)
+
+    assert huanchang_hard is not None
+    assert isinstance(huanchang_hard.remain_ocr, CounterOcrSpec)
+    assert huanchang_hard.remain_ocr.counter_type is HuanChangRemainCounter
+    assert huanchang_hard.remain_ocr.alphabet == "0123456789IDSB"
+    assert HuanChangRemainCounter(raid_assets.HUANCHANG_OCR_REMAIN_HARD).after_process("9") == (9, 0, 15)
+    assert HUANCHANG_RAID_PROFILE.point_ocr is not None
+    assert HUANCHANG_RAID_PROFILE.point_ocr.counter_type is HuanChangPointOcr
+
+    essex = RAID_CLIENT_PROFILES.resolve(RaidProfileId("essex"))
+    essex_easy = essex.mode(RaidMode.EASY)
+    assert essex_easy is not None
+    assert isinstance(essex_easy.remain_ocr, CounterOcrSpec)
+    assert essex_easy.remain_ocr.counter_type is PaddedRaidCounter
+
+
+class _NoIoRaidRun(RaidRun):
+    def __init__(self, profile: ResolvedRaidProfile) -> None:
+        self._raid_profile = profile
+        self._active_plan = None
+
+
+def test_unmetered_attempt_status_does_not_touch_device() -> None:
+    activity = next(
+        activity for activity in _raid_activities() if activity.definition.profile_id == RaidProfileId("rpg")
+    )
+    profile = RAID_CLIENT_PROFILES.bind(activity)
+    runner = _NoIoRaidRun(profile)
+
+    status = runner.get_attempt_status(profile.plan(RaidMode.EX))
+
+    assert status.source is RaidAttemptSource.UNMETERED
+    assert status.remaining is None
+    assert status.exhausted is False
+
+
+class _LandingRaid(Raid):
+    def __init__(self, profile: ResolvedRaidProfile) -> None:
+        self._raid_profile = profile
+        self._active_plan = None
+        self.pages: list[Page] = []
+        self.carousel_seeks = 0
+
+    @override
+    def ui_ensure(self, destination: Page, *, skip_first_screenshot: bool = True) -> bool:
+        del skip_first_screenshot
+        self.pages.append(destination)
+        return True
+
+    @override
+    def _seek_carousel_end(self, *, skip_first_screenshot: bool = True) -> None:
+        del skip_first_screenshot
+        self.carousel_seeks += 1
+
+
+def test_navigation_strategy_is_profile_driven() -> None:
+    activities = _raid_activities()
+    standard = next(activity for activity in activities if activity.definition.profile_id == RaidProfileId("changwu"))
+    rpg = next(activity for activity in activities if activity.definition.profile_id == RaidProfileId("rpg"))
+
+    standard_runner = _LandingRaid(RAID_CLIENT_PROFILES.bind(standard))
+    standard_runner.ensure_landing()
+    assert standard_runner.pages == [page_raid]
+    assert standard_runner.carousel_seeks == 0
+
+    rpg_runner = _LandingRaid(RAID_CLIENT_PROFILES.bind(rpg))
+    rpg_runner.ensure_landing()
+    assert rpg_runner.pages == [page_rpg_stage]
+    assert rpg_runner.carousel_seeks == 1
 
 
 class _Config:
     def __init__(self) -> None:
-        self.Campaign_Event = "raid_20200624"
-        self.Raid_Mode = "hard"
-        self.StopCondition_RunCount = 2
-        self.Scheduler_Enable = True
-        self.task = type("Task", (), {"command": "Raid"})()
-        self.calls = []
-        self.is_task_switched = False
+        self.Submarine_Fleet = 3
+        self.Submarine_Mode = "boss_only"
+        self.overlays: list[dict[str, object]] = []
 
-    def task_stop(self) -> None:
-        self.calls.append(("task_stop",))
-
-    def task_switched(self) -> bool:
-        self.calls.append(("task_switched",))
-        return self.is_task_switched
-
-    def multi_set(self) -> _MultiSet:
-        return _MultiSet(self.calls)
+    def apply_runtime_overlay(self, **values: object) -> None:
+        self.overlays.append(values)
+        for key, value in values.items():
+            setattr(self, key, value)
 
 
-class _RaidRun(RaidRun):
-    config: _Config
-    device: _Device
-
+class _Emotion:
     def __init__(self) -> None:
+        self.checks: list[int] = []
+
+    def check_reduce(self, fleet_index: int) -> None:
+        self.checks.append(fleet_index)
+
+
+class _ExecutionRaid(Raid):
+    config: _Config
+
+    def __init__(self, profile: ResolvedRaidProfile) -> None:
+        self._raid_profile = profile
+        self._active_plan = None
         self.config = _Config()
-        self.device = _Device()
-        self.calls: list[RaidCall] = []
-        self.stop_condition_results = []
-        self.remain_result = 1
-        self.is_rpg = False
-        self.has_oil_icon = False
-        self.raise_script_end = False
+        self._emotion = _Emotion()
+        self.entered: list[RaidRunPlan] = []
+        self.combat_calls = 0
 
     @property
-    def _raid_has_oil_icon(self) -> bool:
-        return self.has_oil_icon
+    def emotion(self) -> _Emotion:
+        return self._emotion
 
-    def event_time_limit_triggered(self) -> bool:
-        self.calls.append(("event_time_limit",))
-        return False
-
-    def ui_ensure(self, destination: Page, *, skip_first_screenshot: bool = True) -> bool:
+    @override
+    def raid_enter(self, plan: RaidRunPlan, *, skip_first_screenshot: bool = True) -> None:
         del skip_first_screenshot
-        self.calls.append(("ui_ensure", destination))
-        return True
+        assert self._active_plan is plan
+        self.entered.append(plan)
 
-    def triggered_stop_condition(
-        self, *, oil_check: bool = False, pt_check: bool = False, coin_check: bool = False
-    ) -> bool:
-        self.calls.append(("stop_condition", oil_check, pt_check, coin_check))
-        if self.stop_condition_results:
-            return self.stop_condition_results.pop(0)
-        return False
-
-    def is_raid_rpg(self) -> bool:
-        self.calls.append(("is_raid_rpg",))
-        return self.is_rpg
-
-    def raid_rpg_swipe(self, *, skip_first_screenshot: bool = True) -> None:
-        del skip_first_screenshot
-        self.calls.append(("raid_rpg_swipe",))
-
-    def disable_event_on_raid(self) -> bool:
-        self.calls.append(("disable_event_on_raid",))
-        return True
-
-    def get_remain(self, mode: RaidMode, *, skip_first_screenshot: bool = True) -> int:
-        del skip_first_screenshot
-        self.calls.append(("get_remain", mode))
-        return self.remain_result
-
-    def raid_execute_once(self, *, mode: RaidMode, raid: str) -> None:
-        self.calls.append(("raid_execute_once", mode, raid))
-        if self.raise_script_end:
-            message = "end"
-            raise ScriptEnd(message)
+    @override
+    def combat(
+        self,
+        *,
+        balance_hp: bool | None = None,
+        emotion_reduce: bool | None = None,
+        submarine_mode: str | None = None,
+        expected_end: CombatEnd | None = None,
+        fleet_index: int = 1,
+    ) -> None:
+        del balance_hp, emotion_reduce, submarine_mode, expected_end, fleet_index
+        assert self._active_plan is not None
+        self.combat_calls += 1
 
 
-def test_raid_name_shorten_returns_asset_prefix() -> None:
-    assert raid_name_shorten("raid_20200624") == "ESSEX"
-    assert raid_name_shorten("raid_20260212") == "CHANGWU"
+def test_atomic_ex_execution_returns_fact_and_restores_submarine_overlay() -> None:
+    activity = next(
+        activity for activity in _raid_activities() if activity.definition.profile_id == RaidProfileId("changwu")
+    )
+    profile = RAID_CLIENT_PROFILES.bind(activity)
+    plan = profile.plan(RaidMode.EX, use_ticket=True)
+    runner = _ExecutionRaid(profile)
+
+    result = runner.execute_once(plan)
+
+    assert result == RaidExecutionResult(mode=RaidMode.EX, runs_completed=1)
+    assert runner.entered == [plan]
+    assert runner.combat_calls == 1
+    assert runner.emotion.checks == [1]
+    assert runner.config.Submarine_Fleet == 3
+    assert runner.config.Submarine_Mode == "boss_only"
+    assert runner.config.overlays[-1] == {"Submarine_Fleet": 3, "Submarine_Mode": "boss_only"}
 
 
-def test_raid_name_shorten_rejects_unknown_raid() -> None:
-    with pytest.raises(ScriptError):
-        raid_name_shorten("raid_unknown")
+@pytest.mark.parametrize("filename", ["profile.py", "raid.py", "run.py", "result.py"])
+def test_raid_domain_has_no_dated_dispatch_or_scheduler_mutation(filename: str) -> None:
+    source = (Path("module/raid") / filename).read_text(encoding="utf-8")
 
-
-def test_raid_ocr_uses_configured_counter_class() -> None:
-    assert isinstance(raid_ocr("raid_20200624", "easy"), RaidCounter)
-    assert isinstance(raid_ocr("raid_20230118", "normal"), DigitCounter)
-    assert isinstance(raid_ocr("raid_20230118", "ex"), Digit)
-
-
-def test_raid_ocr_rejects_ex_without_single_value_counter() -> None:
-    with pytest.raises(ScriptError, match="mode=ex"):
-        raid_ocr("raid_20200624", "ex")
-
-
-def test_huanchang_counter_preserves_vertical_counter_shape() -> None:
-    counter = raid_ocr("raid_20240130", "hard")
-
-    assert isinstance(counter, HuanChangCounter)
-    assert counter.alphabet == "0123456789IDSB"
-    assert counter.after_process("9") == (9, 0, 15)
-
-
-def test_pt_ocr_uses_configured_counter_class() -> None:
-    assert isinstance(pt_ocr("raid_20220630"), Digit)
-    assert isinstance(pt_ocr("raid_20240130"), HuanChangPtOcr)
-
-
-def test_raid_run_requires_name_and_mode() -> None:
-    raid = _RaidRun()
-    raid.config.Campaign_Event = ""
-
-    with pytest.raises(ScriptError, match="arguments unfilled"):
-        raid.run()
-
-
-def test_raid_run_rejects_unknown_mode() -> None:
-    raid = _RaidRun()
-    raid.config.Raid_Mode = "nightmare"
-
-    with pytest.raises(ScriptError, match="Invalid RaidRun mode"):
-        raid.run()
-
-
-def test_raid_run_executes_once_and_updates_count() -> None:
-    raid = _RaidRun()
-    raid.config.is_task_switched = True
-
-    raid.run(total=1)
-
-    assert raid.run_count == 1
-    assert raid.config.StopCondition_RunCount == 1
-    assert ("ui_ensure", page_campaign_menu) in raid.calls
-    assert ("ui_ensure", page_raid) in raid.calls
-    assert ("raid_execute_once", "hard", "raid_20200624") in raid.calls
-    assert raid.config.calls == [("task_switched",), ("task_stop",)]
-
-
-def test_raid_run_skips_campaign_menu_when_oil_icon_exists() -> None:
-    raid = _RaidRun()
-    raid.has_oil_icon = True
-
-    raid.run(total=1)
-
-    assert ("ui_ensure", page_campaign_menu) not in raid.calls
-    assert ("ui_ensure", page_raid) in raid.calls
-
-
-def test_raid_run_uses_rpg_stage_entry() -> None:
-    raid = _RaidRun()
-    raid.is_rpg = True
-
-    raid.run(total=1)
-
-    assert ("ui_ensure", page_rpg_stage) in raid.calls
-    assert ("raid_rpg_swipe",) in raid.calls
-
-
-def test_raid_run_stops_ex_without_ticket() -> None:
-    raid = _RaidRun()
-    raid.config.Raid_Mode = "ex"
-    raid.remain_result = 0
-
-    raid.run()
-
-    assert ("get_remain", "ex") in raid.calls
-    assert not [call for call in raid.calls if call[0] == "raid_execute_once"]
-    assert raid.config.StopCondition_RunCount == 0
-    assert raid.config.Scheduler_Enable is False
-    assert raid.config.calls == [("multi_set_enter",), ("multi_set_exit",)]
-
-
-def test_raid_run_breaks_on_script_end_without_counting_run() -> None:
-    raid = _RaidRun()
-    raid.raise_script_end = True
-
-    raid.run()
-
-    assert raid.run_count == 0
-    assert raid.config.StopCondition_RunCount == 2
+    assert re.search(r"raid_[0-9]{8}", source) is None
+    for forbidden in (
+        "task_delay(",
+        "task_stop(",
+        "cross_set(",
+        "Scheduler_Enable",
+        "Campaign_Event",
+        "RAID_NAME_PREFIX",
+        "getattr(",
+        "is_raid_rpg",
+    ):
+        assert forbidden not in source
