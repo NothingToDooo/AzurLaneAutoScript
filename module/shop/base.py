@@ -140,6 +140,11 @@ class ShopBase(UI):
     def shop_currency(self) -> int:
         return self._currency
 
+    @property
+    def current_currency(self) -> int:
+        """返回最近一次成功识别并缓存的商店货币数。"""
+        return self._currency
+
     @staticmethod
     def shop_has_loaded(_items: list[Item]) -> bool:
         """变体加载检查钩子；用于等待默认商品和价格被真实数据替换。"""

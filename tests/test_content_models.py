@@ -10,11 +10,11 @@ from module.content import (
     ContentId,
     EventPack,
     EventRelease,
+    StageProgressionRule,
     StageRef,
     StageSpec,
     ValidationIssue,
 )
-from module.content.campaign_policy import apply_pack_policy
 from module.content.errors import ContentValidationError
 
 
@@ -34,18 +34,6 @@ def _event_pack_with_invalid_member(field: str, value: object) -> EventPack:
     if field == "releases":
         return EventPack(pack_id=ContentId("event_pack"), releases=cast("tuple[EventRelease, ...]", value))
     return EventPack(pack_id=ContentId("event_pack"), policy=cast("CampaignPolicy", value))
-
-
-class _MapAchievementConfig:
-    def __init__(self, value: str) -> None:
-        self.StopCondition_MapAchievement = value
-        self.overrides: list[str] = []
-
-    def override(self, **kwargs: object) -> None:
-        value = kwargs.get("StopCondition_MapAchievement")
-        if isinstance(value, str):
-            self.StopCondition_MapAchievement = value
-            self.overrides.append(value)
 
 
 @pytest.mark.parametrize("value", ["", " ", "\t\n"])
@@ -123,19 +111,45 @@ def test_campaign_policy_rejects_duplicate_keys_and_empty_loops() -> None:
         CampaignPolicy(loops=(("t", ()),))
 
 
-def test_stage_spec_carries_reference_source_assets_and_optional_strategy() -> None:
+def test_campaign_policy_rejects_invalid_or_duplicate_progression_rules() -> None:
+    with pytest.raises(TypeError, match="StageProgressionRule"):
+        CampaignPolicy(progressions=cast("tuple[StageProgressionRule, ...]", (object(),)))
+    with pytest.raises(ContentValidationError, match="unique stages"):
+        CampaignPolicy(
+            progressions=(
+                StageProgressionRule("t1", "t2"),
+                StageProgressionRule("t1", "t3"),
+            )
+        )
+
+
+def test_campaign_policy_returns_only_the_declared_immediate_successor() -> None:
+    policy = CampaignPolicy(
+        progressions=(
+            StageProgressionRule("t1", "t2"),
+            StageProgressionRule("t2", "t3"),
+            StageProgressionRule("t3", None),
+            StageProgressionRule("sp1", "sp2"),
+        )
+    )
+
+    assert policy.next_stage("t1") == "t2"
+    assert policy.next_stage("t2") == "t3"
+    assert policy.next_stage("t3") is None
+    assert policy.next_stage("missing") is None
+
+
+def test_stage_spec_carries_reference_source_and_assets() -> None:
     asset = AssetRef(asset_id=ContentId("map"), path=Path("stages/t1.yaml"))
     stage = StageSpec(
         ref=StageRef(pack_id="event_20260625_cn", stage_id="t1"),
         source="campaign.event_20260625_cn.t1",
         assets=(asset,),
-        strategy="campaign.event_20260625_cn.strategy:CampaignStrategy",
     )
 
     assert stage.ref.stage_id == "t1"
     assert stage.source == "campaign.event_20260625_cn.t1"
     assert stage.assets == (asset,)
-    assert stage.strategy == "campaign.event_20260625_cn.strategy:CampaignStrategy"
 
 
 def test_asset_ref_requires_content_id() -> None:
@@ -191,23 +205,6 @@ def test_campaign_policy_rejects_ambiguous_or_multistep_map_achievement_fallback
 ) -> None:
     with pytest.raises(ContentValidationError, match="map_achievement_fallbacks"):
         CampaignPolicy(map_achievement_fallbacks=fallbacks)
-
-
-def test_apply_pack_policy_is_stable_after_one_fallback() -> None:
-    policy = CampaignPolicy(map_achievement_fallbacks=(("threat_safe", "map_3_stars"),))
-    config = _MapAchievementConfig("threat_safe")
-
-    apply_pack_policy("event_pack", policy, config)
-    apply_pack_policy("event_pack", policy, config)
-
-    assert config.StopCondition_MapAchievement == "map_3_stars"
-    assert config.overrides == ["map_3_stars"]
-
-
-@pytest.mark.parametrize("strategy", ["", " ", "\t\n"])
-def test_stage_spec_rejects_empty_strategy(strategy: str) -> None:
-    with pytest.raises(ContentValidationError, match="strategy"):
-        StageSpec(StageRef("event_pack", "t1"), "stages/t1.yaml", strategy=strategy)
 
 
 def test_content_models_are_frozen_and_slotted() -> None:

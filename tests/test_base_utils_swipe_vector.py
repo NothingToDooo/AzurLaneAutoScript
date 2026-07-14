@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from module.base.utils import SwipePathOptions, random_rectangle_vector_opted

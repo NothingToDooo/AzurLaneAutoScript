@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20250724_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: alchemist
 releases:
 - opened_on: '2025-07-24'
   name_cn: 优米雅的炼金工房
@@ -9,6 +12,40 @@ releases:
 - opened_on: '2025-08-07'
   name_cn: null
   order: 2250
+stages:
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_1a037b6a6aa92087
+- id: t1
+  source: stages/t1.yaml
+  runtime_profile: profile_c83973081c6fa9ac
+- id: t2
+  source: stages/t2.yaml
+  runtime_profile: profile_c83973081c6fa9ac
+- id: t3
+  source: stages/t3.yaml
+  runtime_profile: profile_c83973081c6fa9ac
+- id: t4
+  source: stages/t4.yaml
+  runtime_profile: profile_c83973081c6fa9ac
+- id: t5
+  source: stages/t5.yaml
+  runtime_profile: profile_afdd01af6234ff0d
+- id: ts1
+  source: stages/ts1.yaml
+  runtime_profile: profile_bb12b0b7d96167de
+- id: ts2
+  source: stages/ts2.yaml
+  runtime_profile: profile_bb12b0b7d96167de
+- id: ts3
+  source: stages/ts3.yaml
+  runtime_profile: profile_bb12b0b7d96167de
+- id: ts4
+  source: stages/ts4.yaml
+  runtime_profile: profile_bb12b0b7d96167de
+- id: ts5
+  source: stages/ts5.yaml
+  runtime_profile: profile_d70f505533aeb6d8
 policy:
   aliases:
     a1: t1
@@ -36,3 +73,14 @@ policy:
   - ts3
   - ts4
   - ts5
+  progressions:
+    t1: t2
+    t2: t3
+    t3: t4
+    t4: t5
+    t5: null
+    ts1: ts2
+    ts2: ts3
+    ts3: ts4
+    ts4: ts5
+    ts5: null

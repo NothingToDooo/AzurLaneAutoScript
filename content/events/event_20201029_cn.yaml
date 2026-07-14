@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20201029_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2020-10-29'
   name_cn: 激唱的UNIVERSE
@@ -9,3 +12,29 @@ releases:
 - opened_on: '2022-07-14'
   name_cn: null
   order: 1040
+stages:
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_fb586b8e42dcea32
+- id: sp1
+  source: stages/sp1.yaml
+  runtime_profile: profile_fb586b8e42dcea32
+- id: sp2
+  source: stages/sp2.yaml
+  runtime_profile: profile_fb586b8e42dcea32
+- id: sp3
+  source: stages/sp3.yaml
+  runtime_profile: profile_fb586b8e42dcea32
+- id: sp4
+  source: stages/sp4.yaml
+  runtime_profile: profile_fb586b8e42dcea32
+- id: sp5
+  source: stages/sp5.yaml
+  runtime_profile: profile_135711cab689197a
+policy:
+  progressions:
+    sp1: sp2
+    sp2: sp3
+    sp3: sp4
+    sp4: sp5
+    sp5: null

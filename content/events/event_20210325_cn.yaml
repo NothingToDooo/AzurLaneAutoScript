@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20210325_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2021-03-25'
   name_cn: 复刻箱庭疗法
@@ -9,6 +12,67 @@ releases:
 - opened_on: '2022-11-17'
   name_cn: null
   order: 1160
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_b8b009a4cae99715
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_b8b009a4cae99715
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_b8b009a4cae99715
+- id: as1
+  source: stages/as1.yaml
+  runtime_profile: profile_02e998f51c601d9a
+- id: as2
+  source: stages/as2.yaml
+  runtime_profile: profile_02e998f51c601d9a
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_abf13fef021739b2
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_abf13fef021739b2
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_abf13fef021739b2
+- id: bs1
+  source: stages/bs1.yaml
+  runtime_profile: profile_abf13fef021739b2
+- id: bs2
+  source: stages/bs2.yaml
+  runtime_profile: profile_abf13fef021739b2
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_f7774af6ccd5f488
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_f7774af6ccd5f488
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_f7774af6ccd5f488
+- id: cs1
+  source: stages/cs1.yaml
+  runtime_profile: profile_6fa5c01b536ae41a
+- id: cs2
+  source: stages/cs2.yaml
+  runtime_profile: profile_6fa5c01b536ae41a
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_abf13fef021739b2
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_abf13fef021739b2
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_abf13fef021739b2
+- id: ds1
+  source: stages/ds1.yaml
+  runtime_profile: profile_abf13fef021739b2
+- id: ds2
+  source: stages/ds2.yaml
+  runtime_profile: profile_abf13fef021739b2
 policy:
   aliases:
     ht1: c1
@@ -23,3 +87,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

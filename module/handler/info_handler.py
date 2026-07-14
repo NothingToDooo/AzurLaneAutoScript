@@ -457,10 +457,7 @@ class InfoHandler(ModuleBase):
         self.interval_clear(handler_assets.STORY_LETTERS_ONLY)
 
     def handle_story_skip(self) -> bool:
-        # 复刻活动在 clear mode 下仍可能有剧情。
-        # clear mode 通常没有剧情，但 B3/D3 在威胁安全前仍有剧情。
-        # 威胁安全后不再有剧情。
-        if self.map_is_threat_safe and self.config.Campaign_Event != "event_20201012_cn":
+        if self.map_is_threat_safe:
             return False
 
         return self.story_skip()

@@ -1,16 +1,11 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from module.base.decorator import cached_property
 from module.base.timer import Timer
-from module.campaign.campaign_base import CampaignBase
-from module.campaign.run import CampaignMode, CampaignRun
-from module.combat.assets import BATTLE_PREPARATION
 from module.combat.emotion import Emotion, FleetEmotion
 from module.equipment import assets as equipment_assets
 from module.equipment.fleet_equipment import FleetEquipment
-from module.exception import CampaignEnd, HardNotSatisfied, RequestHumanTakeover, ScriptError
-from module.handler.assets import AUTO_SEARCH_MAP_OPTION_OFF
+from module.exception import CampaignEnd, RequestHumanTakeover, ScriptError
 from module.logger import logger
 from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION
 from module.retire.assets import (
@@ -29,7 +24,6 @@ from module.retire.assets import (
 )
 from module.retire.dock import Dock
 from module.retire.scanner import ShipScanner
-from module.ui.assets import BACK_ARROW
 from module.ui.page import page_fleet
 
 if TYPE_CHECKING:
@@ -37,14 +31,13 @@ if TYPE_CHECKING:
 
     from module.base.button import Button
     from module.base.template import Template
+    from module.campaign.campaign_engine import CampaignEngine
     from module.retire.scanner import Ship
 
 SIM_VALUE = 0.92
-EMOTION_WITHDRAW_MESSAGE = "Emotion withdraw"
 EMOTION_CONTROL_MESSAGE = "Emotion control"
 INVALID_GEMS_FARMING_COMMON_DD_MESSAGE = "Invalid GemsFarming_CommonDD"
 INVALID_COMMON_DD_SETTING_TEMPLATE = "Invalid CommonDD setting: {common_dd}"
-GEMS_FARMING_CAMPAIGN_MODULE_MISSING_MESSAGE = "Gems farming campaign module is not loaded"
 UNCACHED_SHIP_SCAN_MESSAGE = "Uncached ship scan must return ships"
 UNREADABLE_SHIP_ATTRIBUTE_MESSAGE = "Ship scan returned an unreadable {attribute}"
 EQUIPMENT_CODE_CHANGE_FAILED_MESSAGE = "GemsFarming equipment code change failed"
@@ -57,100 +50,6 @@ HARD_VANGUARD_BUTTONS = {
     1: (equipment_assets.FLEET_1_VANGUARD_1, equipment_assets.FLEET_1_VANGUARD_3),
     2: (equipment_assets.FLEET_2_VANGUARD_1, equipment_assets.FLEET_2_VANGUARD_3),
 }
-
-
-class GemsCampaignOverride(CampaignBase):
-    gems_farming: GemsFarming
-
-    def bind_gems_farming(self, runner: GemsFarming) -> None:
-        self.gems_farming = runner
-
-    @cached_property
-    def emotion(self) -> GemsEmotion:
-        return GemsEmotion(config=self.config)
-
-    def fleet_preparation(self) -> bool:
-        try:
-            return super().fleet_preparation()
-        except HardNotSatisfied:
-            pass
-
-        prepared = self.gems_farming.hard_fleet_prepare()
-        if prepared:
-            try:
-                return super().fleet_preparation()
-            except HardNotSatisfied:
-                logger.warning("Hard fleet still not satisfied after GemsFarming preparation")
-        else:
-            logger.warning("No ship available for GemsFarming hard fleet preparation")
-
-        self.gems_farming.config.task_delay(minute=30)
-        self.gems_farming.config.task_stop()
-        return False
-
-    def handle_combat_low_emotion(self) -> bool:
-        """启用前排更换时，低心情会撤出战斗并更换旗舰和前排。"""
-        if self.config.GemsFarming_ChangeVanguard == "disabled":
-            return self._handle_low_emotion_ignore()
-
-        if not self.handle_popup_cancel("IGNORE_LOW_EMOTION"):
-            return False
-
-        self.config.GEMS_EMOTION_TRIGGERED = True
-        logger.hr("EMOTION WITHDRAW")
-        self._withdraw_for_low_emotion()
-        raise CampaignEnd(EMOTION_WITHDRAW_MESSAGE)
-
-    def _handle_low_emotion_ignore(self) -> bool:
-        result = self.handle_popup_confirm("IGNORE_LOW_EMOTION")
-        if result:
-            # 避免点击 AUTO_SEARCH_MAP_OPTION_OFF。
-            self.interval_reset(AUTO_SEARCH_MAP_OPTION_OFF)
-        return result
-
-    def _withdraw_for_low_emotion(self) -> None:
-        while 1:
-            self.device.screenshot()
-            handled, finished = self._low_emotion_withdraw_step()
-            if finished:
-                break
-            if handled:
-                continue
-
-    def _low_emotion_withdraw_step(self) -> tuple[bool, bool]:
-        if self._low_emotion_skip_dialogs():
-            return True, False
-        if self._low_emotion_leave_battle_preparation():
-            return True, False
-        if self.handle_auto_search_exit():
-            return True, False
-        return self._low_emotion_finish_withdraw()
-
-    def _low_emotion_skip_dialogs(self) -> bool:
-        return self.handle_story_skip() or self.handle_popup_cancel("IGNORE_LOW_EMOTION")
-
-    def _low_emotion_leave_battle_preparation(self) -> bool:
-        if not self.appear(BATTLE_PREPARATION, offset=(20, 20), interval=2):
-            return False
-
-        self.device.click(BACK_ARROW)
-        return True
-
-    def _low_emotion_finish_withdraw(self) -> tuple[bool, bool]:
-        if self.is_in_stage():
-            return True, True
-        if self.is_in_map():
-            self.withdraw()
-            return True, True
-        if self._low_emotion_at_preparation():
-            self.enter_map_cancel()
-            return True, True
-        return False, False
-
-    def _low_emotion_at_preparation(self) -> bool:
-        return self.appear(FLEET_PREPARATION, offset=(20, 50), interval=2) or self.appear(
-            MAP_PREPARATION, offset=(20, 20), interval=2
-        )
 
 
 class GemsEmotion(Emotion):
@@ -170,17 +69,23 @@ class GemsEmotion(Emotion):
         logger.attr("Emotion fleet_attack", self.fleet.value)
 
     def check_reduce(self, battle: int) -> None:
-        if not self.is_calculate:
+        if not self.replacement_required(battle):
             return
+        self.config.GEMS_EMOTION_TRIGGERED = True
+        raise CampaignEnd(EMOTION_CONTROL_MESSAGE)
+
+    def replacement_required(self, battle: int, *, now: datetime | None = None) -> bool:
+        """返回整图预计消耗是否要求换船，不修改跨 turn 的业务状态。"""
+        if not self.is_calculate:
+            return False
 
         expected_reduce = battle * self.reduce_per_battle_before_entering
         logger.info(f"Expect emotion reduce: {expected_reduce}")
         self.update()
         self.record()
         self.show()
-        if self.fleet.get_recovered(expected_reduce) > datetime.now():
-            self.config.GEMS_EMOTION_TRIGGERED = True
-            raise CampaignEnd(EMOTION_CONTROL_MESSAGE)
+        current = datetime.now() if now is None else now
+        return self.fleet.get_recovered(expected_reduce) > current
 
     def wait(self, fleet_index: int) -> None:
         del fleet_index
@@ -200,25 +105,11 @@ class GemsEmotion(Emotion):
         self.show()
 
 
-class GemsFarming(CampaignRun, FleetEquipment, Dock):
-    @staticmethod
-    def _campaign_with_gems_override(campaign_class: type[CampaignBase]) -> type[GemsCampaignOverride]:
-        return type("GemsCampaign", (GemsCampaignOverride, campaign_class), {})
+class GemsFleetReplacement(FleetEquipment, Dock):
+    """只负责 GemsFarming 的舰队更换 UI，不拥有地图装载或任务循环。"""
 
-    def load_campaign(self, name: str, folder: str = "campaign_main") -> bool:
-        loaded = super().load_campaign(name, folder=folder)
-
-        loaded_stage = self.loaded_stage
-        if loaded_stage is None:
-            raise ScriptError(GEMS_FARMING_CAMPAIGN_MODULE_MISSING_MESSAGE)
-        campaign_class = self._campaign_with_gems_override(loaded_stage.campaign_class)
-        campaign = campaign_class(device=self.campaign.device, config=self.campaign.config)
-        campaign.bind_gems_farming(self)
-        self.campaign = campaign
-        if not self.change_vanguard:
-            self.campaign.config.override(Emotion_Mode="ignore")
-        self.campaign.config.override(EnemyPriority_EnemyScaleBalanceWeight="S1_enemy_first")
-        return loaded
+    campaign: CampaignEngine
+    _new_fleet_emotion: int
 
     @property
     def change_flagship_equip(self) -> bool:
@@ -256,7 +147,7 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         if self.appear(FLEET_PREPARATION, offset=(20, 50)):
             return
 
-        self.campaign.ensure_campaign_ui(name=self.stage, mode="hard")
+        self.campaign.ensure_campaign_ui(name=self.config.Campaign_Name, mode="hard")
         self.campaign.ENTRANCE.area = self.campaign.ENTRANCE.button
         campaign_timer = Timer(5)
         map_timer = Timer(5)
@@ -659,74 +550,3 @@ class GemsFarming(CampaignRun, FleetEquipment, Dock):
         if change_results:
             self.campaign.config.set_record(Emotion_Fleet1Value=self._new_fleet_emotion)
         return bool(change_results) and all(change_results)
-
-    _trigger_lv32 = False
-    _trigger_emotion = False
-    _new_fleet_emotion: int
-
-    def triggered_stop_condition(self, *, oil_check: bool = True) -> bool:
-        # 等级上限为 32。
-        if self.campaign.config.LV32_TRIGGERED:
-            self._trigger_lv32 = True
-            logger.hr("TRIGGERED LV32 LIMIT")
-            return True
-
-        if self.campaign.config.GEMS_EMOTION_TRIGGERED:
-            self._trigger_emotion = True
-            logger.hr("TRIGGERED EMOTION LIMIT")
-            return True
-
-        return super().triggered_stop_condition(oil_check=oil_check)
-
-    def run(
-        self,
-        name: str,
-        folder: str = "campaign_main",
-        mode: CampaignMode = "normal",
-        total: int = 0,
-    ) -> None:
-        """运行指定地图文件；mode 接受 normal 或 hard。"""
-        self.config.override(STOP_IF_REACH_LV32=True)
-
-        while 1:
-            self._trigger_lv32 = False
-            self._trigger_emotion = False
-            is_limit = self.config.StopCondition_RunCount
-
-            try:
-                super().run(name=name, folder=folder, mode=mode, total=total)
-            except CampaignEnd as e:
-                if str(e) in {EMOTION_WITHDRAW_MESSAGE, EMOTION_CONTROL_MESSAGE}:
-                    self._trigger_emotion = True
-                else:
-                    raise
-
-            if self._trigger_lv32 or self._trigger_emotion:
-                self._new_fleet_emotion = 150
-                success = self.flagship_change()
-                if self.change_vanguard:
-                    success = success and self.vanguard_change()
-                self.campaign.config.set_record(Emotion_Fleet1Value=self._new_fleet_emotion)
-
-                if is_limit and self.config.StopCondition_RunCount <= 0:
-                    logger.hr("Triggered stop condition: Run count")
-                    self.config.StopCondition_RunCount = 0
-                    self.config.Scheduler_Enable = False
-                    self._notify_campaign_finished("reached run count limit")
-                    break
-
-                self._trigger_lv32 = False
-                self._trigger_emotion = False
-                self.campaign.config.LV32_TRIGGERED = False
-                self.campaign.config.GEMS_EMOTION_TRIGGERED = False
-
-                if self.config.task_switched():
-                    self.campaign.ensure_auto_search_exit()
-                    self.config.task_stop()
-                elif not success:
-                    self.campaign.ensure_auto_search_exit()
-                    self.config.task_delay(minute=30)
-                    self.config.task_stop()
-
-                continue
-            break

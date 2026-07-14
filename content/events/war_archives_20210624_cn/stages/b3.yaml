@@ -1,0 +1,110 @@
+schema_version: 4
+map:
+  name: B3
+  shape: H7
+  camera_data:
+  - D2
+  - D5
+  - E2
+  - E5
+  camera_data_spawn_point:
+  - D2
+  - D5
+  map_data: 'ME -- MS -- ME -- ++ --
+
+    -- Me ++ MS -- Me ME ME
+
+    SP -- ME -- Me ++ ++ ++
+
+    -- -- -- __ -- MB MB MB
+
+    SP -- Me -- -- ++ ++ ++
+
+    -- ++ ++ -- ME -- ME ME
+
+    Me ++ ++ ME ME MS -- --'
+  weight_data: '50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 2
+    siren: 2
+  - battle: 1
+    enemy: 1
+  - battle: 2
+    enemy: 2
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 2
+  - battle: 5
+    enemy: 1
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: true
+  MAP_HAS_FLEET_STEP: true
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: true
+  MAP_SIREN_TEMPLATE:
+  - DD
+  - CL
+  - CA
+  MAP_HAS_SIREN: true
+  STAR_REQUIRE_1: 1
+  STAR_REQUIRE_2: 2
+  STAR_REQUIRE_3: 3
+  MAP_SWIPE_MULTIPLY:
+  - 1.002
+  - 1.021
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 0.969
+  - 0.987
+enemy_filter: 1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M
+battles:
+  0:
+    steps:
+    - genres: []
+      tag: clear_siren
+    - tag: default_battle
+  5:
+    steps:
+    - strategy: fleet_boss
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns:
+    - 2
+    - 3
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs: []
+boss_approaches: []
+hard_mode: null

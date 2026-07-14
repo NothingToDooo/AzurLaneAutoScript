@@ -1,0 +1,171 @@
+schema_version: 4
+map:
+  name: 11-1
+  shape: H6
+  camera_data:
+  - D3
+  - E4
+  camera_data_spawn_point:
+  - D4
+  map_data: '-- -- ME -- ME -- -- MB
+
+    MB ME __ ME -- ++ ++ --
+
+    ++ Me -- ++ ME MB ++ ME
+
+    -- -- ++ ++ __ ME ME --
+
+    SP -- -- -- Me ME -- ++
+
+    ++ SP -- -- ++ -- MB ++'
+  weight_data: '90 90 90 90 90 90 90 90
+
+    90 90 90 90 90 90 90 90
+
+    90 90 90 90 90 90 90 90
+
+    90 90 90 90 90 90 90 90
+
+    90 90 90 90 90 90 90 90
+
+    90 90 90 90 90 90 90 90'
+  spawn_data:
+  - battle: 0
+    enemy: 2
+  - battle: 1
+    enemy: 2
+  - battle: 2
+    enemy: 1
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 1
+  - battle: 5
+  - battle: 6
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: false
+  MAP_HAS_AMBUSH: true
+  MAP_HAS_MYSTERY: true
+  STAR_REQUIRE_1: 1
+  STAR_REQUIRE_2: 2
+  STAR_REQUIRE_3: 3
+  MAP_SWIPE_MULTIPLY:
+  - 1.064
+  - 1.084
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.029
+  - 1.048
+enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - tag: default_battle
+  6:
+    steps:
+    - tag: clear_boss
+      strategy: fleet_boss
+mechanics:
+  roadblocks:
+  - battle: 0
+    roads:
+    - paths:
+      - - B2
+      - - B3
+      - - E5
+      - - F4
+      - - G4
+      - - H3
+    selection: default
+    tag: clear
+  - battle: 0
+    roads:
+    - paths:
+      - - B2
+      - - B3
+      - - E5
+      - - F4
+      - - G4
+      - - H3
+    selection: default
+    tag: clear_potential
+  - battle: 6
+    roads:
+    - paths:
+      - - B2
+      - - B3
+      - - E5
+      - - F4
+      - - G4
+      - - H3
+    selection: default
+    tag: clear
+  fleet_coordination: []
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns: []
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures:
+  - battle: 6
+    operations:
+    - check_accessibility
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs:
+- activation_modes:
+  - normal
+  battle: 0
+  statements:
+  - action:
+      category: roadblocks
+      index: 0
+    expected_target: enemy
+    tag: attempt_mechanic
+  - action:
+      category: roadblocks
+      index: 1
+    expected_target: enemy
+    tag: attempt_mechanic
+  - action:
+      tag: default_battle
+    tag: return_battle
+- activation_modes:
+  - normal
+  battle: 6
+  statements:
+  - condition:
+      conditions:
+      - presence: boss
+        tag: map_presence
+      - condition:
+          fleet: fleet_boss
+          tag: boss_accessible
+        tag: not
+      tag: all
+    tag: branch
+    when_false: []
+    when_true:
+    - action:
+        category: roadblocks
+        index: 2
+      expected_target: enemy
+      tag: attempt_mechanic
+  - action:
+      strategy: fleet_boss
+      tag: clear_boss
+    tag: return_battle
+boss_approaches: []
+hard_mode: null

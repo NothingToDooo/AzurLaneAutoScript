@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20231123_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2023-11-23'
   name_cn: 苍闪忍法帖
@@ -9,6 +12,40 @@ releases:
 - opened_on: '2023-11-30'
   name_cn: null
   order: 1570
+stages:
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_cbf728ed3c44ba59
+- id: t1
+  source: stages/t1.yaml
+  runtime_profile: profile_cbf728ed3c44ba59
+- id: t2
+  source: stages/t2.yaml
+  runtime_profile: profile_cbf728ed3c44ba59
+- id: t3
+  source: stages/t3.yaml
+  runtime_profile: profile_cbf728ed3c44ba59
+- id: t4
+  source: stages/t4.yaml
+  runtime_profile: profile_cbf728ed3c44ba59
+- id: t5
+  source: stages/t5.yaml
+  runtime_profile: profile_cbf728ed3c44ba59
+- id: tsk1
+  source: stages/tsk1.yaml
+  runtime_profile: profile_7c64bf3a91e04d9c
+- id: tsk2
+  source: stages/tsk2.yaml
+  runtime_profile: profile_7c64bf3a91e04d9c
+- id: tsk3
+  source: stages/tsk3.yaml
+  runtime_profile: profile_7c64bf3a91e04d9c
+- id: tsk4
+  source: stages/tsk4.yaml
+  runtime_profile: profile_7c64bf3a91e04d9c
+- id: tsk5
+  source: stages/tsk5.yaml
+  runtime_profile: profile_7c64bf3a91e04d9c
 policy:
   aliases:
     a1: t1
@@ -16,3 +53,14 @@ policy:
     a3: t3
     b1: t4
     b2: t5
+  progressions:
+    t1: t2
+    t2: t3
+    t3: t4
+    t4: t5
+    t5: null
+    tsk1: tsk2
+    tsk2: tsk3
+    tsk3: tsk4
+    tsk4: tsk5
+    tsk5: null

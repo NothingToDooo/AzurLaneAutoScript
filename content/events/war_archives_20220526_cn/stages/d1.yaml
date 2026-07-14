@@ -1,0 +1,110 @@
+schema_version: 4
+map:
+  name: D1
+  shape: I7
+  camera_data:
+  - D2
+  - D5
+  - F2
+  - F5
+  camera_data_spawn_point:
+  - F5
+  - D5
+  map_data: '++ ++ -- Me Me ME -- ME --
+
+    ++ ++ Me MS __ MS -- -- ME
+
+    -- ME -- -- -- ++ ++ -- --
+
+    ME -- ++ SP MB SP ++ -- ME
+
+    -- -- ++ ++ -- -- -- ME --
+
+    ME -- -- MS __ MS Me ++ ++
+
+    -- ME -- ME Me Me -- ++ ++'
+  weight_data: '50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 2
+    siren: 2
+  - battle: 1
+    enemy: 1
+  - battle: 2
+    enemy: 2
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 2
+  - battle: 5
+    enemy: 1
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: true
+  MAP_HAS_FLEET_STEP: true
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: false
+  MAP_SIREN_TEMPLATE:
+  - DD
+  - CL
+  - CAred
+  MAP_HAS_SIREN: true
+  STAR_REQUIRE_1: 1
+  STAR_REQUIRE_2: 2
+  STAR_REQUIRE_3: 3
+  MAP_SWIPE_MULTIPLY:
+  - 1.228
+  - 1.251
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.188
+  - 1.21
+enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - tag: clear_siren
+    - preserve: 0
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  5:
+    steps:
+    - strategy: fleet_boss
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns:
+    - 2
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs: []
+boss_approaches: []
+hard_mode: null

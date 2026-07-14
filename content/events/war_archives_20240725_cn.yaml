@@ -1,11 +1,32 @@
 schema_version: 1
 id: war_archives_20240725_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: interlude_of_illusions
 releases:
 - opened_on: '2026-06-18'
   name_cn: 幻梦间奏曲
   order: 480
+stages:
+- id: ht1
+  source: stages/ht1.yaml
+  runtime_profile: profile_3531fadb34515d5b
+- id: ht2
+  source: stages/ht2.yaml
+  runtime_profile: profile_3531fadb34515d5b
+- id: ht3
+  source: stages/ht3.yaml
+  runtime_profile: profile_3531fadb34515d5b
+- id: t1
+  source: stages/t1.yaml
+  runtime_profile: profile_3531fadb34515d5b
+- id: t2
+  source: stages/t2.yaml
+  runtime_profile: profile_3531fadb34515d5b
+- id: t3
+  source: stages/t3.yaml
+  runtime_profile: profile_3531fadb34515d5b
 policy:
   aliases:
     a1: t1
@@ -17,3 +38,10 @@ policy:
     sp1: t1
     sp2: t2
     sp3: t3
+  progressions:
+    ht1: ht2
+    ht2: ht3
+    ht3: null
+    t1: t2
+    t2: t3
+    t3: null

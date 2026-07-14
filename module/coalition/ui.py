@@ -1,10 +1,16 @@
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Literal, override
 
 from module.base.timer import Timer
 from module.coalition import assets as coalition_assets
+from module.coalition.profile import (
+    CoalitionClientSession,
+    CoalitionModeDriver,
+    CoalitionPageMode,
+)
 from module.combat.assets import BATTLE_PREPARATION
 from module.combat.combat import Combat
-from module.exception import CampaignNameError, RequestHumanTakeover, ScriptError
+from module.content.activity_profile import CoalitionFleetMode, CoalitionFleetRule
+from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
 from module.ui.assets import BACK_ARROW
 from module.ui.page import page_coalition
@@ -13,336 +19,155 @@ from module.ui.switch import Switch
 if TYPE_CHECKING:
     from module.base.base import ModuleBase
     from module.base.button import Button
-    from module.coalition.contracts import (
-        CoalitionEvent,
-        CoalitionFleetMode,
-        CoalitionPageMode,
-        CoalitionPageState,
-        CoalitionStage,
-    )
+
+type CoalitionPageState = Literal["story", "battle", "unknown"]
 
 
-class NeoncitySwitch(Switch):
+class RedTextModeSwitch(Switch):
     @override
     def get(self, main: ModuleBase) -> CoalitionPageState:
-        # 红字表示当前模式。
-        for data in self.state_list:
-            if main.image_color_count(data["check_button"], color=(123, 41, 41), threshold=221, count=100):
-                state = data["state"]
-                if state == "story":
+        for switch_state in self.state_list:
+            if main.image_color_count(
+                switch_state["check_button"],
+                color=(123, 41, 41),
+                threshold=221,
+                count=100,
+            ):
+                state = switch_state["state"]
+                if state == CoalitionPageMode.STORY:
                     return "story"
-                if state == "battle":
+                if state == CoalitionPageMode.BATTLE:
                     return "battle"
-                message = f"Neoncity switch received an invalid state: {state}"
+                message = f"red-text coalition mode switch received an invalid state: {state}"
                 raise ScriptError(message)
-
         return "unknown"
 
 
 class CoalitionUI(Combat):
+    client: CoalitionClientSession
+
     def in_coalition(self) -> bool:
         return self.ui_page_appear(page_coalition, offset=(20, 20))
 
-    def in_coalition_20251120_difficulty_selection(self) -> bool:
-        return self.appear(coalition_assets.DAL_DIFFICULTY_EXIT, offset=(20, 20))
+    def in_difficulty_selection(self) -> bool:
+        difficulty_exit = self.client.profile.preparation.difficulty_exit
+        return difficulty_exit is not None and self.appear(difficulty_exit, offset=(20, 20))
 
-    def coalition_ensure_mode(self, event: CoalitionEvent, mode: CoalitionPageMode) -> None:
-        """在联合作战页按活动切换 story 或 battle；2025-11-20 活动没有模式开关。"""
-        if event == "coalition_20230323":
-            mode_switch = Switch("CoalitionMode", offset=(20, 20))
-            mode_switch.add_state("story", coalition_assets.FROSTFALL_MODE_STORY)
-            mode_switch.add_state("battle", coalition_assets.FROSTFALL_MODE_BATTLE)
-        elif event == "coalition_20240627":
-            mode_switch = Switch("CoalitionMode", offset=(20, 20))
-            mode_switch.add_state("story", coalition_assets.ACADEMY_MODE_BATTLE)
-            mode_switch.add_state("battle", coalition_assets.ACADEMY_MODE_STORY)
-        elif event == "coalition_20250626":
-            mode_switch = NeoncitySwitch("CoalitionMode", offset=(20, 20))
-            mode_switch.add_state("story", coalition_assets.NEONCITY_MODE_STORY)
-            mode_switch.add_state("battle", coalition_assets.NEONCITY_MODE_BATTLE)
-        elif event == "coalition_20251120":
-            logger.info("Coalition event coalition_20251120 has no mode switch")
+    def ui_goto_coalition(self) -> bool:
+        if self.ui_get_current_page() == page_coalition:
+            logger.info("Already at page_coalition")
+            return True
+        self.ui_goto(page_coalition)
+        return True
+
+    def coalition_ensure_mode(self, mode: CoalitionPageMode) -> None:
+        if not isinstance(mode, CoalitionPageMode):
+            message = "mode must be a CoalitionPageMode"
+            raise TypeError(message)
+        profile = self.client.profile
+        if profile.mode_driver is CoalitionModeDriver.NONE:
+            logger.info(f"Coalition profile {profile.profile_id.value} has no mode switch")
             return
-        elif event == "coalition_20260122":
-            mode_switch = Switch("CoalitionMode", offset=(20, 20))
-            mode_switch.add_state("story", coalition_assets.FASHION_MODE_STORY)
-            mode_switch.add_state("battle", coalition_assets.FASHION_MODE_BATTLE)
-        else:
-            logger.error(f"MODE_SWITCH is not defined in event {event}")
-            raise ScriptError
 
-        if mode == "story":
-            mode_switch.set("story", main=self)
-        elif mode == "battle":
-            mode_switch.set("battle", main=self)
+        assets = profile.mode_switch
+        if assets is None:
+            message = "coalition profile mode switch assets are missing"
+            raise ValueError(message)
+        switch_type = RedTextModeSwitch if profile.mode_driver is CoalitionModeDriver.RED_TEXT else Switch
+        mode_switch = switch_type("CoalitionMode", offset=(20, 20))
+        mode_switch.add_state(CoalitionPageMode.STORY.value, assets.story)
+        mode_switch.add_state(CoalitionPageMode.BATTLE.value, assets.battle)
+        mode_switch.set(mode.value, main=self)
 
-    def coalition_set_fleet(self, event: CoalitionEvent, mode: CoalitionFleetMode) -> bool:
-        """在舰队准备页切换 single 或 multi，并返回是否点击切换。"""
-        fleet_switch = Switch("FleetMode", is_selector=True, offset=0)  # 颜色匹配不使用 offset。
-        if event == "coalition_20230323":
-            fleet_switch.add_state("single", coalition_assets.FROSTFALL_SWITCH_SINGLE)
-            fleet_switch.add_state("multi", coalition_assets.FROSTFALL_SWITCH_MULTI)
-        elif event == "coalition_20240627":
-            fleet_switch.add_state("single", coalition_assets.ACADEMY_SWITCH_SINGLE)
-            fleet_switch.add_state("multi", coalition_assets.ACADEMY_SWITCH_MULTI)
-        elif event == "coalition_20250626":
-            fleet_switch.add_state("single", coalition_assets.NEONCITY_SWITCH_SINGLE)
-            fleet_switch.add_state("multi", coalition_assets.NEONCITY_SWITCH_MULTI)
-        elif event == "coalition_20251120":
-            fleet_switch.add_state("single", coalition_assets.DAL_SWITCH_SINGLE)
-            fleet_switch.add_state("multi", coalition_assets.DAL_SWITCH_MULTI)
-        elif event == "coalition_20260122":
-            fleet_switch.add_state("single", coalition_assets.FASHION_SWITCH_SINGLE)
-            fleet_switch.add_state("multi", coalition_assets.FASHION_SWITCH_MULTI)
-        else:
-            logger.error(f"FLEET_SWITCH is not defined in event {event}")
-            raise ScriptError
-
-        if fleet_switch.get(main=self) == mode:
+    def coalition_set_fleet(self) -> bool:
+        desired = self.client.fleet
+        assets = self.client.profile.fleet_switch
+        fleet_switch = Switch("FleetMode", is_selector=True, offset=0)
+        fleet_switch.add_state(CoalitionFleetMode.SINGLE.value, assets.single)
+        fleet_switch.add_state(CoalitionFleetMode.MULTI.value, assets.multi)
+        if fleet_switch.get(main=self) == desired.value:
             return False
-        if mode == "single":
-            fleet_switch.set("single", main=self)
-            return True
-        if mode == "multi":
-            fleet_switch.set("multi", main=self)
-            return True
-        message = f"Unsupported coalition fleet mode: {mode}"
-        raise ScriptError(message)
+        fleet_switch.set(desired.value, main=self)
+        return True
 
-    @staticmethod
-    def coalition_get_entrance(event: CoalitionEvent, stage: CoalitionStage) -> Button:
-        """按活动和关卡返回入口按钮；组合不受支持时抛出 CampaignNameError。"""
-        dic = {
-            ("coalition_20230323", "tc1"): coalition_assets.FROSTFALL_TC1,
-            ("coalition_20230323", "tc2"): coalition_assets.FROSTFALL_TC2,
-            ("coalition_20230323", "tc3"): coalition_assets.FROSTFALL_TC3,
-            ("coalition_20230323", "sp"): coalition_assets.FROSTFALL_SP,
-            ("coalition_20230323", "ex"): coalition_assets.FROSTFALL_EX,
-            ("coalition_20240627", "easy"): coalition_assets.ACADEMY_EASY,
-            ("coalition_20240627", "normal"): coalition_assets.ACADEMY_NORMAL,
-            ("coalition_20240627", "hard"): coalition_assets.ACADEMY_HARD,
-            ("coalition_20240627", "sp"): coalition_assets.ACADEMY_SP,
-            ("coalition_20240627", "ex"): coalition_assets.ACADEMY_EX,
-            ("coalition_20250626", "easy"): coalition_assets.NEONCITY_EASY,
-            ("coalition_20250626", "normal"): coalition_assets.NEONCITY_NORMAL,
-            ("coalition_20250626", "hard"): coalition_assets.NEONCITY_HARD,
-            ("coalition_20250626", "sp"): coalition_assets.NEONCITY_SP,
-            ("coalition_20250626", "ex"): coalition_assets.NEONCITY_EX,
-            ("coalition_20251120", "area1-normal"): coalition_assets.DAL_AREA1,
-            ("coalition_20251120", "area2-normal"): coalition_assets.DAL_AREA2,
-            ("coalition_20251120", "area3-normal"): coalition_assets.DAL_AREA3,
-            ("coalition_20251120", "area4-normal"): coalition_assets.DAL_AREA4,
-            ("coalition_20251120", "area5-normal"): coalition_assets.DAL_AREA5,
-            ("coalition_20251120", "area6-normal"): coalition_assets.DAL_AREA6,
-            ("coalition_20251120", "area1-hard"): coalition_assets.DAL_AREA1,
-            ("coalition_20251120", "area2-hard"): coalition_assets.DAL_AREA2,
-            ("coalition_20251120", "area3-hard"): coalition_assets.DAL_AREA3,
-            ("coalition_20251120", "area4-hard"): coalition_assets.DAL_AREA4,
-            ("coalition_20251120", "area5-hard"): coalition_assets.DAL_AREA5,
-            ("coalition_20251120", "area6-hard"): coalition_assets.DAL_AREA6,
-            ("coalition_20260122", "easy"): coalition_assets.FASHION_EASY,
-            ("coalition_20260122", "normal"): coalition_assets.FASHION_NORMAL,
-            ("coalition_20260122", "hard"): coalition_assets.FASHION_HARD,
-            ("coalition_20260122", "sp"): coalition_assets.FASHION_SP,
-            ("coalition_20260122", "ex"): coalition_assets.FASHION_EX,
-        }
-        try:
-            return dic[(event, stage)]
-        except KeyError as e:
-            logger.error(e)
-            raise CampaignNameError from e
-
-    @staticmethod
-    def coalition_20251120_get_entrance_difficulty(event: CoalitionEvent, stage: CoalitionStage) -> Button:
-        """返回 2025-11-20 活动关卡的难度按钮；组合不受支持时抛出 CampaignNameError。"""
-        dic = {
-            ("coalition_20251120", "area1-normal"): coalition_assets.DAL_NORMAL,
-            ("coalition_20251120", "area2-normal"): coalition_assets.DAL_NORMAL,
-            ("coalition_20251120", "area3-normal"): coalition_assets.DAL_NORMAL,
-            ("coalition_20251120", "area4-normal"): coalition_assets.DAL_NORMAL,
-            ("coalition_20251120", "area5-normal"): coalition_assets.DAL_NORMAL,
-            ("coalition_20251120", "area6-normal"): coalition_assets.DAL_NORMAL,
-            ("coalition_20251120", "area1-hard"): coalition_assets.DAL_HARD,
-            ("coalition_20251120", "area2-hard"): coalition_assets.DAL_HARD,
-            ("coalition_20251120", "area3-hard"): coalition_assets.DAL_HARD,
-            ("coalition_20251120", "area4-hard"): coalition_assets.DAL_HARD,
-            ("coalition_20251120", "area5-hard"): coalition_assets.DAL_HARD,
-            ("coalition_20251120", "area6-hard"): coalition_assets.DAL_HARD,
-        }
-        try:
-            return dic[(event, stage)]
-        except KeyError as e:
-            logger.error(e)
-            raise CampaignNameError from e
-
-    @staticmethod
-    def coalition_get_battles(event: CoalitionEvent, stage: CoalitionStage) -> int:
-        """返回活动关卡的战斗次数；组合不受支持时抛出 CampaignNameError。"""
-        dic = {
-            ("coalition_20230323", "tc1"): 1,
-            ("coalition_20230323", "tc2"): 2,
-            ("coalition_20230323", "tc3"): 3,
-            ("coalition_20230323", "sp"): 1,
-            ("coalition_20230323", "ex"): 1,
-            ("coalition_20240627", "easy"): 1,
-            ("coalition_20240627", "normal"): 2,
-            ("coalition_20240627", "hard"): 3,
-            ("coalition_20240627", "sp"): 4,
-            ("coalition_20240627", "ex"): 5,
-            ("coalition_20250626", "easy"): 1,
-            ("coalition_20250626", "normal"): 2,
-            ("coalition_20250626", "hard"): 3,
-            ("coalition_20250626", "sp"): 4,
-            ("coalition_20250626", "ex"): 5,
-            ("coalition_20251120", "area1-normal"): 2,
-            ("coalition_20251120", "area2-normal"): 3,
-            ("coalition_20251120", "area3-normal"): 3,
-            ("coalition_20251120", "area4-normal"): 3,
-            ("coalition_20251120", "area5-normal"): 3,
-            ("coalition_20251120", "area6-normal"): 4,
-            ("coalition_20251120", "area1-hard"): 2,
-            ("coalition_20251120", "area2-hard"): 3,
-            ("coalition_20251120", "area3-hard"): 3,
-            ("coalition_20251120", "area4-hard"): 3,
-            ("coalition_20251120", "area5-hard"): 3,
-            ("coalition_20251120", "area6-hard"): 4,
-            ("coalition_20260122", "easy"): 1,
-            ("coalition_20260122", "normal"): 2,
-            ("coalition_20260122", "hard"): 3,
-            ("coalition_20260122", "sp"): 4,
-            ("coalition_20260122", "ex"): 5,
-        }
-        try:
-            return dic[(event, stage)]
-        except KeyError as e:
-            logger.error(e)
-            raise CampaignNameError from e
-
-    @staticmethod
-    def coalition_get_fleet_preparation(event: CoalitionEvent) -> Button:
-        """返回活动专用舰队准备按钮；活动不受支持时抛出 ScriptError。"""
-        if event == "coalition_20230323":
-            return coalition_assets.FROSTFALL_FLEET_PREPARATION
-        if event == "coalition_20240627":
-            return coalition_assets.ACEDEMY_FLEET_PREPARATION
-        if event == "coalition_20250626":
-            return coalition_assets.NEONCITY_FLEET_PREPARATION
-        if event == "coalition_20251120":
-            return coalition_assets.DAL_FLEET_PREPARATION
-        if event == "coalition_20260122":
-            # FASHION 复用 NEONCITY，只整体偏移 (-12, -12)。
-            return coalition_assets.NEONCITY_FLEET_PREPARATION
-        logger.error(f"FLEET_PREPARATION is not defined in event {event}")
-        raise ScriptError
-
-    def handle_fleet_preparation(self, event: CoalitionEvent, stage: CoalitionStage, mode: CoalitionFleetMode) -> bool:
-        """在舰队准备页按 single 或 multi 切换并返回是否点击。
-
-        固定舰队关卡直接返回 False；编队不完整时抛出 RequestHumanTakeover。
-        """
-        # TC1 和 SP 没有舰队切换。
-        if event == "coalition_20230323" and stage in ["tc1", "sp"]:
-            return False
-        # easy 是单舰队，SP 和 EX 必须使用多舰队。
-        if event in [
-            "coalition_20240627",
-            "coalition_20250626",
-            "coalition_20260122",
-        ] and stage in ["easy", "sp", "ex"]:
+    def handle_fleet_preparation(self) -> bool:
+        """按内容声明切换舰队；固定舰队关卡不显示切换控件。"""
+        if self.client.stage.fleet_rule is not CoalitionFleetRule.SELECTABLE:
             return False
 
-        clicked = self.coalition_set_fleet(event, mode)
-
+        clicked = self.coalition_set_fleet()
         if self.appear(coalition_assets.FLEET_NOT_PREPARED, offset=(20, 20)):
             logger.critical("FLEET_NOT_PREPARED")
-            logger.critical("Please prepare you fleets before running coalition battles")
+            logger.critical("Please prepare your fleets before running coalition battles")
             raise RequestHumanTakeover
         if self.appear(coalition_assets.EMPTY_FLAGSHIP, offset=(20, 20)):
-            logger.critical("EMPTY_FLAGSHIP, Please prepare you fleets before running coalition battles")
+            logger.critical("EMPTY_FLAGSHIP, please prepare your fleets before running coalition battles")
             raise RequestHumanTakeover
         if self.appear(coalition_assets.EMPTY_VANGUARD, offset=(20, 20)):
-            logger.critical("EMPTY_VANGUARD, Please prepare you fleets before running coalition battles")
+            logger.critical("EMPTY_VANGUARD, please prepare your fleets before running coalition battles")
             raise RequestHumanTakeover
-
         return clicked
 
-    def coalition_map_exit(self, *, event: CoalitionEvent) -> None:
-        """从战斗或活动舰队准备页返回联合作战页；误到主页时也结束。"""
+    def coalition_map_exit(self) -> None:
+        """从战斗或舰队准备页返回联合作战页；误到主页时也结束。"""
         logger.info("Coalition map exit")
-        fleet_preparation = self.coalition_get_fleet_preparation(event)
+        preparation = self.client.profile.preparation
         for _ in self.loop():
-            if self.in_coalition():
+            if self.in_coalition() or self.is_in_main():
                 break
-            if self.is_in_main():
-                break
-
             if self.appear(BATTLE_PREPARATION, offset=(20, 20), interval=3):
                 logger.info(f"{BATTLE_PREPARATION} -> {BACK_ARROW}")
                 self.device.click(BACK_ARROW)
                 continue
-            if self.appear(fleet_preparation, offset=(20, 20), interval=3):
-                logger.info(f"{fleet_preparation} -> {coalition_assets.NEONCITY_PREPARATION_EXIT}")
-                self.device.click(coalition_assets.NEONCITY_PREPARATION_EXIT)
+            if self.appear(preparation.enter, offset=(20, 20), interval=3):
+                logger.info(f"{preparation.enter} -> {preparation.exit}")
+                self.device.click(preparation.exit)
                 continue
-            if self.appear_then_click(coalition_assets.DAL_DIFFICULTY_EXIT, offset=(20, 20), interval=3):
-                logger.info(f"{coalition_assets.DAL_DIFFICULTY_EXIT} -> {coalition_assets.DAL_DIFFICULTY_EXIT}")
+            if preparation.difficulty_exit is not None and self.appear_then_click(
+                preparation.difficulty_exit,
+                offset=(20, 20),
+                interval=3,
+            ):
                 continue
 
     @staticmethod
-    def _coalition_difficulty_button(event: CoalitionEvent, stage: CoalitionStage) -> Button | None:
-        if event != "coalition_20251120":
-            return None
-        return CoalitionUI.coalition_20251120_get_entrance_difficulty(event, stage)
-
-    @staticmethod
-    def _check_coalition_enter_clicks(
-        button: Button,
-        button_difficulty: Button | None,
-        campaign_click: int,
-        campaign_difficulty_click: int,
-        fleet_click: int,
+    def _check_enter_clicks(
+        entrance: Button,
+        difficulty: Button | None,
+        entrance_clicks: int,
+        difficulty_clicks: int,
+        fleet_clicks: int,
     ) -> None:
-        if campaign_click > 5:
-            logger.critical(f"Failed to enter {button}, too many click on {button}")
-            logger.critical("Possible reason #1: You haven't cleared previous stage to unlock the stage.")
+        if entrance_clicks > 5:
+            logger.critical(f"Failed to enter {entrance}, too many clicks on {entrance}")
+            logger.critical("Possible reason: the previous stage has not been cleared")
             raise RequestHumanTakeover
-        if campaign_difficulty_click > 5:
-            logger.critical(f"Failed to enter {button_difficulty}, too many click on {button_difficulty}")
-            logger.critical("Possible reason #1: The difficulty asset is not correct.")
+        if difficulty_clicks > 5:
+            logger.critical(f"Failed to enter {difficulty}, too many clicks on {difficulty}")
+            logger.critical("Possible reason: the difficulty asset is not correct")
             raise RequestHumanTakeover
-        if fleet_click <= 5:
+        if fleet_clicks <= 5:
             return
-        logger.critical(f"Failed to enter {button}, too many click on FLEET_PREPARATION")
-        logger.critical("Possible reason #1: Your fleets haven't satisfied the stat restrictions of this stage.")
-        logger.critical(
-            "Possible reason #2: "
-            "This stage can only be farmed once a day, "
-            "but it's the second time that you are entering"
-        )
+        logger.critical(f"Failed to enter {entrance}, too many clicks on FLEET_PREPARATION")
+        logger.critical("Possible reason: the fleets do not satisfy this stage's restrictions")
+        logger.critical("Possible reason: this daily stage has already been completed")
         raise RequestHumanTakeover
 
-    def _click_coalition_stage(self, button: Button, campaign_timer: Timer) -> bool:
-        if not campaign_timer.reached() or not self.in_coalition():
+    def _click_stage(self, entrance: Button, timer: Timer) -> bool:
+        if not timer.reached() or not self.in_coalition():
             return False
-        self.device.click(button)
-        campaign_timer.reset()
+        self.device.click(entrance)
+        timer.reset()
         return True
 
-    def _click_coalition_difficulty(
-        self,
-        event: CoalitionEvent,
-        button_difficulty: Button | None,
-        campaign_difficulty_timer: Timer,
-    ) -> bool:
-        if event != "coalition_20251120" or not button_difficulty:
+    def _click_difficulty(self, difficulty: Button | None, timer: Timer) -> bool:
+        if difficulty is None or not timer.reached() or not self.in_difficulty_selection():
             return False
-        if not campaign_difficulty_timer.reached() or not self.in_coalition_20251120_difficulty_selection():
-            return False
-        self.device.click(button_difficulty)
-        campaign_difficulty_timer.reset()
+        self.device.click(difficulty)
+        timer.reset()
         return True
 
-    def _handle_coalition_enter_interrupts(self, campaign_timer: Timer) -> bool:
+    def _handle_enter_interrupts(self, campaign_timer: Timer) -> bool:
         if self.handle_auto_search_continue():
             campaign_timer.reset()
             return True
@@ -357,45 +182,43 @@ class CoalitionUI(Combat):
             return True
         return self.handle_combat_automation_confirm() or self.handle_popup_confirm("COALITION")
 
-    def enter_map(self, event: CoalitionEvent, stage: CoalitionStage, mode: CoalitionFleetMode) -> None:
-        """从联合作战页进入指定活动关卡，按 single 或 multi 编队，结束于战斗准备页。
-
-        连续点击失败或编队不满足限制时抛出 RequestHumanTakeover。
-        """
-        button = self.coalition_get_entrance(event, stage)
-        button_difficulty = self._coalition_difficulty_button(event, stage)
-        fleet_preparation = self.coalition_get_fleet_preparation(event)
-        campaign_timer = Timer(5)
-        campaign_difficulty_timer = Timer(5)
+    def enter_map(self) -> None:
+        """从联合作战页进入已解析的关卡，结束于战斗准备页。"""
+        stage_assets = self.client.profile.stage_assets(self.client.stage.stage_id)
+        entrance = stage_assets.entrance
+        difficulty = stage_assets.difficulty
+        preparation = self.client.profile.preparation.enter
+        entrance_timer = Timer(5)
+        difficulty_timer = Timer(5)
         fleet_timer = Timer(5)
-        campaign_click = 0
-        campaign_difficulty_click = 0
-        fleet_click = 0
+        entrance_clicks = 0
+        difficulty_clicks = 0
+        fleet_clicks = 0
 
         for _ in self.loop():
-            self._check_coalition_enter_clicks(
-                button, button_difficulty, campaign_click, campaign_difficulty_click, fleet_click
+            self._check_enter_clicks(
+                entrance,
+                difficulty,
+                entrance_clicks,
+                difficulty_clicks,
+                fleet_clicks,
             )
-
             if self.appear(BATTLE_PREPARATION, offset=(20, 20)):
                 break
-
             if self.handle_guild_popup_cancel():
                 continue
-
-            if self._click_coalition_stage(button, campaign_timer):
-                campaign_click += 1
+            if self._click_stage(entrance, entrance_timer):
+                entrance_clicks += 1
                 continue
-            if self._click_coalition_difficulty(event, button_difficulty, campaign_difficulty_timer):
-                campaign_difficulty_click += 1
+            if self._click_difficulty(difficulty, difficulty_timer):
+                difficulty_clicks += 1
                 continue
-            if fleet_timer.reached() and self.appear(fleet_preparation, offset=(20, 50)):
-                self.handle_fleet_preparation(event, stage, mode)
-                self.device.click(fleet_preparation)
+            if fleet_timer.reached() and self.appear(preparation, offset=(20, 50)):
+                self.handle_fleet_preparation()
+                self.device.click(preparation)
                 fleet_timer.reset()
-                campaign_timer.reset()
-                fleet_click += 1
+                entrance_timer.reset()
+                fleet_clicks += 1
                 continue
-
-            if self._handle_coalition_enter_interrupts(campaign_timer):
+            if self._handle_enter_interrupts(entrance_timer):
                 continue

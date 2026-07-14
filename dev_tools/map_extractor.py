@@ -10,7 +10,6 @@ import yaml
 import module.logger
 from dev_tools.utils import LuaLoader, require_lua_int, require_lua_str, require_lua_table
 from module.base.utils import location2node
-from module.content.errors import ContentValidationError
 from module.map.utils import camera_2d, camera_spawn_point, get_map_active_area
 
 if TYPE_CHECKING:
@@ -24,9 +23,9 @@ if TYPE_CHECKING:
 type GridLocation = tuple[int, int]
 type SpawnField = Literal["enemy", "siren", "mystery"]
 type SpawnRule = dict[str, int]
-type StageScalar = str | int | bool
+type StageScalar = str | int | bool | None
 type StageValue = StageScalar | Sequence[StageValue] | Mapping[str, StageValue] | Mapping[int, StageValue]
-type BattleDocument = dict[int, dict[str, str | int]]
+type BattleDocument = dict[int, StageValue]
 
 # 导入 module.logger 会切换到项目根目录。
 _ = module.logger
@@ -36,8 +35,6 @@ FOLDER = "./content/events/event_20260417_cn/stages"
 KEYWORD = "2020001"
 SELECT = True
 OVERWRITE = True
-IS_WAR_ARCHIVES = False
-STRATEGY: str | None = None
 ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
 
 
@@ -68,33 +65,6 @@ def _represent_literal(dumper: _StageDumper, value: _LiteralString) -> ScalarNod
 
 
 _StageDumper.add_representer(_LiteralString, _represent_literal)
-
-
-def _validate_strategy_reference(strategy: str | None, *, pack_id: str | None = None) -> None:
-    if strategy is None:
-        return
-    module_name, separator, export_name = strategy.partition(":")
-    if (
-        separator != ":"
-        or not module_name.startswith("campaign.")
-        or any(not part.isidentifier() for part in module_name.split("."))
-        or not export_name.isidentifier()
-    ):
-        message = "strategy must be a campaign.<pack_id>.<module>:<class> reference"
-        raise ContentValidationError(message)
-    if pack_id is not None and not module_name.startswith(f"campaign.{pack_id}."):
-        message = f"output pack {pack_id} requires strategy inside campaign.{pack_id}"
-        raise ContentValidationError(message)
-
-
-def _validate_output_strategy(path: FilePath, strategy: str | None) -> None:
-    output_root = Path(path)
-    if strategy is None:
-        return
-    if output_root.name != "stages" or not output_root.parent.name:
-        message = "strategy output path must be <pack_id>/stages"
-        raise ContentValidationError(message)
-    _validate_strategy_reference(strategy, pack_id=output_root.parent.name)
 
 
 def _active_area(map_data: Mapping[GridLocation, str]) -> tuple[int, int, int, int]:
@@ -635,31 +605,11 @@ class MapData:
                 extracted_data.append(require_lua_table(effect[1], context=f"map event {event_id} enemy wave"))
         return extracted_data
 
-    def map_file_name(self) -> str:
+    def stage_file_name(self) -> str:
         name = self.chapter_name.replace("-", "_").lower()
         if name[0].isdigit():
             name = f"campaign_{name}"
-        return name + ".py"
-
-    @staticmethod
-    def _get_base_import(*, has_modified_campaign_base: bool) -> str:
-        if IS_WAR_ARCHIVES:
-            return "from ..campaign_war_archives.campaign_base import CampaignBase"
-        if has_modified_campaign_base:
-            return "from .campaign_base import CampaignBase"
-        return "from module.campaign.campaign_base import CampaignBase"
-
-    def _get_import_lines(self, *, has_modified_campaign_base: bool) -> list[str]:
-        lines = [
-            self._get_base_import(has_modified_campaign_base=has_modified_campaign_base),
-            "from module.map.map_base import CampaignMap",
-        ]
-        if self.chapter_name[-1].isdigit():
-            chap, stage = self.chapter_name[:-1], self.chapter_name[-1]
-            if stage != "1":
-                lines.append(f"from .{chap.lower()}1 import Config as ConfigBase")
-        lines.append("")
-        return lines
+        return name + ".yaml"
 
     def _get_map_data_rows(self) -> list[str]:
         return [
@@ -674,132 +624,6 @@ class MapData:
         return [
             "    " + " ".join(map_data_loop[(x, y)] for x in range(self.shape[0] + 1)) for y in range(self.shape[1] + 1)
         ]
-
-    def _get_flatten_lines(self) -> list[str]:
-        return [
-            *(
-                ", ".join(location2node((x, y)) for x in range(self.shape[0] + 1)) + ", \\"
-                for y in range(self.shape[1] + 1)
-            ),
-            "    = MAP.flatten()",
-            "",
-            "",
-        ]
-
-    def _get_map_lines(self) -> list[str]:
-        lines = [
-            f"MAP = CampaignMap('{self.chapter_name}')",
-            f"MAP.shape = '{location2node(self.shape)}'",
-        ]
-        camera_data = camera_2d(_active_area(self.map_data), sight=(-3, -1, 3, 2))
-        lines.append(f"MAP.camera_data = {[location2node(loca) for loca in camera_data]}")
-        camera_sp = camera_spawn_point(camera_data, sp_list=[k for k, v in self.map_data.items() if v == "SP"])
-        lines.append(f"MAP.camera_data_spawn_point = {[location2node(loca) for loca in camera_sp]}")
-        if self.MAP_HAS_PORTAL:
-            lines.append(f"MAP.portal_data = {self.portal}")
-        lines.append('MAP.map_data = """')
-        lines.extend(self._get_map_data_rows())
-        lines.append('"""')
-        if self.map_data_loop is not None:
-            lines.append('MAP.map_data_loop = """')
-            lines.extend(self._get_map_data_loop_rows())
-            lines.append('"""')
-        lines.append('MAP.weight_data = """')
-        lines.extend("    " + " ".join(["50"] * (self.shape[0] + 1)) for _y in range(self.shape[1] + 1))
-        lines.append('"""')
-        if self.MAP_HAS_LAND_BASED:
-            lines.append(f"MAP.land_based_data = {self.land_based}")
-        lines.append("MAP.spawn_data = [")
-        lines.extend("    " + str(battle) + "," for battle in self.spawn_data)
-        lines.append("]")
-        if self.spawn_data_loop is not None:
-            lines.append("MAP.spawn_data_loop = [")
-            lines.extend("    " + str(battle) + "," for battle in self.spawn_data_loop)
-            lines.append("]")
-        lines.extend(self._get_flatten_lines())
-        return lines
-
-    def _get_config_class_line(self) -> str:
-        if self.chapter_name[-1].isdigit():
-            _chap, stage = self.chapter_name[:-1], self.chapter_name[-1]
-            if stage != "1":
-                return "class Config(ConfigBase):"
-        return "class Config:"
-
-    def _get_config_lines(self) -> list[str]:
-        lines = [
-            self._get_config_class_line(),
-            "    # ===== Start of generated config =====",
-        ]
-        if self.MAP_SIREN_TEMPLATE:
-            lines.extend(
-                (
-                    f"    MAP_SIREN_TEMPLATE = {self.MAP_SIREN_TEMPLATE}",
-                    f"    MOVABLE_ENEMY_TURN = {tuple(self.MOVABLE_ENEMY_TURN)}",
-                    "    MAP_HAS_SIREN = True",
-                    f"    MAP_HAS_MOVABLE_ENEMY = {self.MAP_HAS_MOVABLE_ENEMY}",
-                )
-            )
-        lines.extend(
-            (
-                f"    MAP_HAS_MAP_STORY = {self.MAP_HAS_MAP_STORY}",
-                f"    MAP_HAS_FLEET_STEP = {self.MAP_HAS_FLEET_STEP}",
-                f"    MAP_HAS_AMBUSH = {self.MAP_HAS_AMBUSH}",
-                f"    MAP_HAS_MYSTERY = {self.MAP_HAS_MYSTERY}",
-            )
-        )
-        if self.MAP_HAS_PORTAL:
-            lines.append(f"    MAP_HAS_PORTAL = {self.MAP_HAS_PORTAL}")
-        if self.MAP_HAS_LAND_BASED:
-            lines.append(f"    MAP_HAS_LAND_BASED = {self.MAP_HAS_LAND_BASED}")
-        lines.extend(f"    STAR_REQUIRE_{n} = 0" for n in range(1, 4) if getattr(self, f"STAR_REQUIRE_{n}") != n)
-        lines.extend(("    # ===== End of generated config =====", "", ""))
-        return lines
-
-    def _get_clear_enemy_battle_lines(self, battle_name: str, preserve: int) -> list[str]:
-        lines = [f"    def {battle_name}(self) -> bool:"]
-        if self.MAP_SIREN_TEMPLATE:
-            lines.extend(("        if self.clear_siren():", "            return True"))
-        lines.extend(
-            (
-                f"        if self.clear_filter_enemy(self.ENEMY_FILTER, preserve={preserve}):",
-                "            return True",
-                "",
-                "        return self.battle_default()",
-                "",
-            )
-        )
-        return lines
-
-    def _get_campaign_lines(self) -> list[str]:
-        battle = require_lua_int(self.data["boss_refresh"], context=f"map {self.chapter_name} boss refresh")
-        preserve = battle - 5 if battle >= 5 else 0
-        lines = [
-            "class Campaign(CampaignBase):",
-            "    MAP = MAP",
-            f"    ENEMY_FILTER = '{ENEMY_FILTER}'",
-            "",
-            *self._get_clear_enemy_battle_lines("battle_0", preserve=preserve),
-        ]
-        if battle >= 6:
-            lines.extend(self._get_clear_enemy_battle_lines("battle_5", preserve=0))
-        lines.append(f"    def battle_{battle}(self) -> bool:")
-        if battle >= 5:
-            lines.append("        return self.fleet_boss.clear_boss()")
-        else:
-            lines.append("        return self.clear_boss()")
-        return lines
-
-    def get_file_lines(self, *, has_modified_campaign_base: bool) -> list[str]:
-        return [
-            *self._get_import_lines(has_modified_campaign_base=has_modified_campaign_base),
-            *self._get_map_lines(),
-            *self._get_config_lines(),
-            *self._get_campaign_lines(),
-        ]
-
-    def stage_file_name(self) -> str:
-        return Path(self.map_file_name()).with_suffix(".yaml").name
 
     def _stage_map_document(self) -> dict[str, StageValue]:
         camera_data = camera_2d(_active_area(self.map_data), sight=(-3, -1, 3, 2))
@@ -832,9 +656,7 @@ class MapData:
         document: dict[str, StageValue] = {}
         if self.MAP_SIREN_TEMPLATE:
             document["MAP_SIREN_TEMPLATE"] = list(self.MAP_SIREN_TEMPLATE)
-            document["MOVABLE_ENEMY_TURN"] = sorted(self.MOVABLE_ENEMY_TURN)
             document["MAP_HAS_SIREN"] = True
-            document["MAP_HAS_MOVABLE_ENEMY"] = self.MAP_HAS_MOVABLE_ENEMY
         document["MAP_HAS_MAP_STORY"] = self.MAP_HAS_MAP_STORY
         document["MAP_HAS_FLEET_STEP"] = self.MAP_HAS_FLEET_STEP
         document["MAP_HAS_AMBUSH"] = self.MAP_HAS_AMBUSH
@@ -849,39 +671,84 @@ class MapData:
                 document[f"STAR_REQUIRE_{number}"] = 0
         return document
 
-    def _stage_battle_document(self, *, strategy: str | None = None) -> BattleDocument:
-        boss_battle = require_lua_int(self.data["boss_refresh"], context=f"map {self.chapter_name} boss refresh")
-        if boss_battle < 5:
-            if strategy is None:
-                message = (
-                    f"boss_refresh={boss_battle} requires an explicit pack-local strategy reference; "
-                    "add the same reference to the event manifest"
-                )
-                raise ContentValidationError(message)
-            if boss_battle == 0:
-                return {}
+    def _stage_battle_document(self) -> BattleDocument:
+        declared_boss = require_lua_int(self.data["boss_refresh"], context=f"map {self.chapter_name} boss refresh")
+        boss_battles = tuple(item["battle"] for item in self.spawn_data if item.get("boss") == 1)
+        if not boss_battles:
+            return {}
+        if len(boss_battles) != 1 or boss_battles[0] != declared_boss:
+            message = f"map {self.chapter_name} boss refresh does not match spawn data"
+            raise ValueError(message)
+        boss_battle = boss_battles[0]
         preserve = boss_battle - 5 if boss_battle >= 5 else 0
-        clear_policy = "siren_then_filtered_enemy" if self.MAP_SIREN_TEMPLATE else "filtered_enemy_then_default"
-        battles: BattleDocument = {0: {"policy": clear_policy, "preserve": preserve}}
+        clear_steps: list[StageValue] = []
+        if self.MAP_SIREN_TEMPLATE:
+            clear_steps.append({"tag": "clear_siren"})
+        clear_steps.extend(
+            (
+                {"tag": "clear_filtered_enemy", "preserve": preserve},
+                {"tag": "default_battle"},
+            )
+        )
+        battles: BattleDocument = {}
+        if boss_battle > 0:
+            battles[0] = {"steps": clear_steps}
         if boss_battle >= 6:
-            battles[5] = {"policy": clear_policy, "preserve": 0}
-        if boss_battle >= 5:
-            battles[boss_battle] = {"policy": "fleet_boss"}
+            battle_five_steps: list[StageValue] = []
+            if self.MAP_SIREN_TEMPLATE:
+                battle_five_steps.append({"tag": "clear_siren"})
+            battle_five_steps.extend(
+                (
+                    {"tag": "clear_filtered_enemy", "preserve": 0},
+                    {"tag": "default_battle"},
+                )
+            )
+            battles[5] = {"steps": battle_five_steps}
+        battles[boss_battle] = {"steps": [{"tag": "clear_boss", "strategy": "fleet_boss"}]}
         return battles
 
-    def stage_document(self, *, strategy: str | None = None) -> dict[str, StageValue]:
-        _validate_strategy_reference(strategy)
+    def _stage_mechanics_document(self) -> dict[str, StageValue]:
         return {
-            "schema_version": 1,
+            "roadblocks": [],
+            "fleet_coordination": [],
+            "pickups": [],
+            "map_interactions": [],
+            "map_mutations": [],
+            "moving_enemies": {
+                "turns": sorted(self.MOVABLE_ENEMY_TURN) if self.MAP_HAS_MOVABLE_ENEMY else [],
+                "wait_until_clear": False,
+                "initial_enemy_cells": [],
+                "initial_siren_cells": [],
+            },
+            "enemy_movement": [],
+            "procedures": [],
+            "preset_routes": [],
+            "fixed_target_sequences": [],
+            "map_structures": {
+                "walls": [],
+                "maze_groups": [],
+                "fortress_enemy_cells": [],
+                "fortress_block_cells": [],
+                "bouncing_enemy_routes": [],
+            },
+        }
+
+    def stage_document(self) -> dict[str, StageValue]:
+        return {
+            "schema_version": 4,
             "map": self._stage_map_document(),
             "config": self._stage_config_document(),
             "enemy_filter": ENEMY_FILTER,
-            "battles": self._stage_battle_document(strategy=strategy),
+            "battles": self._stage_battle_document(),
+            "mechanics": self._stage_mechanics_document(),
+            "programs": [],
+            "boss_approaches": [],
+            "hard_mode": None,
         }
 
-    def render_stage_yaml(self, *, strategy: str | None = None) -> str:
+    def render_stage_yaml(self) -> str:
         return yaml.dump(
-            self.stage_document(strategy=strategy),
+            self.stage_document(),
             Dumper=_StageDumper,
             allow_unicode=True,
             sort_keys=False,
@@ -892,13 +759,11 @@ class MapData:
         self,
         path: FilePath,
         *,
-        strategy: str | None = None,
         overwrite: bool = False,
         check: bool = False,
     ) -> bool:
-        _validate_output_strategy(path, strategy)
         file = Path(path) / self.stage_file_name()
-        content = self.render_stage_yaml(strategy=strategy)
+        content = self.render_stage_yaml()
         if check:
             return file.is_file() and file.read_text(encoding="utf-8") == content
         if file.exists() and not overwrite:
@@ -907,25 +772,6 @@ class MapData:
         file.parent.mkdir(parents=True, exist_ok=True)
         print(f"Extract: {file}")
         file.write_text(content, encoding="utf-8", newline="\n")
-        return True
-
-    def write(self, path: FilePath) -> bool:
-        file = Path(path) / self.map_file_name()
-        has_modified_campaign_base = Path(path, "campaign_base.py").exists()
-        if has_modified_campaign_base:
-            print("Using existing campaign_base.py")
-        if Path(file).exists():
-            if OVERWRITE:
-                print(f"Delete file: {file}")
-                Path(file).unlink()
-            else:
-                print(f"File exists: {file}")
-                return False
-        print(f"Extract: {file}")
-        with file.open("w") as f:
-            f.writelines(
-                f"{text}\n" for text in self.get_file_lines(has_modified_campaign_base=has_modified_campaign_base)
-            )
         return True
 
 
@@ -1025,8 +871,7 @@ class ChapterTemplate:
         return self._select_maps(maps, select=select)
 
     @staticmethod
-    def extract(maps: Sequence[MapData], folder: FilePath, *, strategy: str | None = None) -> None:
-        _validate_output_strategy(folder, strategy)
+    def extract(maps: Sequence[MapData], folder: FilePath) -> None:
         print("<<< CONFIRM >>>")
         print("Please confirm selected the correct maps before extracting.\nInput any key and press ENTER to continue")
         input()
@@ -1034,7 +879,7 @@ class ChapterTemplate:
         if not Path(folder).exists():
             Path(folder).mkdir()
         for data in maps:
-            data.write_stage(folder, strategy=strategy, overwrite=OVERWRITE)
+            data.write_stage(folder, overwrite=OVERWRITE)
 
 
 """
@@ -1043,12 +888,10 @@ class ChapterTemplate:
 先克隆 https://github.com/AzurLaneTools/AzurLaneLuaScripts 获取解密后的 Lua 脚本。
 Arguments:
     FILE:            Lua 脚本仓库路径
-    FOLDER:          保存目录，例如 './campaign/test'
+    FOLDER:          保存目录，例如 './content/events/event_future_cn/stages'
     KEYWORD:         地图名称关键词，例如 '短兵相接'；也可以是地图 ID，例如 702
     SELECT:          是否选择同活动的全部地图
     OVERWRITE:       是否覆盖已有文件
-    IS_WAR_ARCHIVES: 是否按作战档案用法适配
-    STRATEGY:        Boss 在第 5 战前出现时，必须填写并同步到活动清单的 pack-local strategy 引用
 """
 
 
@@ -1064,7 +907,6 @@ def main() -> None:
     chapter.extract(
         chapter.get_chapter_by_name(KEYWORD, select=SELECT),
         folder=FOLDER,
-        strategy=STRATEGY,
     )
 
 

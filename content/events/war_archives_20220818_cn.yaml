@@ -1,8 +1,29 @@
 schema_version: 1
 id: war_archives_20220818_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: operation_convergence
 releases:
 - opened_on: '2026-04-09'
   name_cn: 远汇点作战
   order: 450
+stages:
+- id: sp1
+  source: stages/sp1.yaml
+  runtime_profile: profile_7b3b92ac9397a1cd
+- id: sp2
+  source: stages/sp2.yaml
+  runtime_profile: profile_7b3b92ac9397a1cd
+- id: sp3
+  source: stages/sp3.yaml
+  runtime_profile: profile_7b3b92ac9397a1cd
+- id: sp4
+  source: stages/sp4.yaml
+  runtime_profile: profile_7b3b92ac9397a1cd
+policy:
+  progressions:
+    sp1: sp2
+    sp2: sp3
+    sp3: sp4
+    sp4: null

@@ -1,91 +1,57 @@
 import re
-from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from importlib import import_module
+from enum import StrEnum
 from types import MappingProxyType
-from typing import Literal, Protocol
+from typing import TYPE_CHECKING
 
+from module.application import ExecutionMode
 from module.base.naming import camel_to_snake
 
-
-class CampaignConfig(Protocol):
-    Campaign_Name: str
-    Campaign_Event: str
-    Campaign_Mode: str
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
-class TaskRunner(Protocol):
-    @property
-    def config(self) -> CampaignConfig: ...
-
-    @property
-    def device(self) -> object: ...
+class LaunchSurface(StrEnum):
+    SCHEDULER = "scheduler"
+    TOOL = "tool"
 
 
-type TaskArgsFactory = Callable[[TaskRunner], tuple[tuple[object, ...], dict[str, object]]]
-type LaunchMode = Literal["scheduled", "direct", "both"]
+class TaskDomain(StrEnum):
+    CAMPAIGN = "campaign"
+    ENCOUNTER = "encounter"
+    EXERCISE = "exercise"
+    OPSI = "opsi"
+    FACILITY = "facility"
+    MARKET = "market"
+    COMPOSITE_DAILY = "composite_daily"
+    ACTIVITY = "activity"
+    ASSIST = "assist"
+    MAINTENANCE = "maintenance"
 
 
-@dataclass(frozen=True, slots=True)
-class ClassTaskExecutor:
-    module_name: str
-    class_name: str
-    method_name: str = "run"
-    args_factory: TaskArgsFactory | None = None
-    task_name: str | None = None
-
-    def execute(self, runner: TaskRunner) -> None:
-        module = import_module(self.module_name)
-        task_class = getattr(module, self.class_name)
-        init_kwargs = {
-            "config": runner.config,
-            "device": runner.device,
-        }
-        if self.task_name is not None:
-            init_kwargs["task"] = self.task_name
-        task = task_class(**init_kwargs)
-        args, kwargs = self.args_factory(runner) if self.args_factory is not None else ((), {})
-        getattr(task, self.method_name)(*args, **kwargs)
+SCHEDULER_LAUNCHES = frozenset({LaunchSurface.SCHEDULER})
+TOOL_LAUNCHES = frozenset({LaunchSurface.TOOL})
 
 
-@dataclass(frozen=True, slots=True)
-class FunctionTaskExecutor:
-    module_name: str
-    function_name: str
-
-    def execute(self, runner: TaskRunner) -> None:
-        module = import_module(self.module_name)
-        function = getattr(module, self.function_name)
-        function(config=runner.config)
-
-
-@dataclass(frozen=True, slots=True)
-class RunnerMethodExecutor:
-    method_name: str
-
-    def execute(self, runner: TaskRunner) -> None:
-        getattr(runner, self.method_name)()
-
-
-type TaskExecutor = ClassTaskExecutor | FunctionTaskExecutor | RunnerMethodExecutor
-TASK_EXECUTOR_TYPES = (ClassTaskExecutor, FunctionTaskExecutor, RunnerMethodExecutor)
 TASK_COMMAND_PATTERN = re.compile(r"[a-z][a-z0-9]*(?:_[a-z][a-z0-9]*)*", flags=re.ASCII)
 
 
 @dataclass(frozen=True, slots=True)
 class TaskDefinition:
     command: str
-    executor: TaskExecutor
     config_scopes: tuple[str, ...]
     priority: int | None
-    launch_mode: LaunchMode
+    domain: TaskDomain
+    execution_mode: ExecutionMode
+    allowed_launches: frozenset[LaunchSurface]
 
     def __post_init__(self) -> None:
         self._validate_command()
-        self._validate_executor()
         self._validate_config_scopes()
         self._validate_priority()
-        self._validate_launch_mode()
+        self._validate_domain()
+        self._validate_execution_mode()
+        self._validate_allowed_launches()
 
     def _validate_command(self) -> None:
         if not isinstance(self.command, str):
@@ -94,11 +60,6 @@ class TaskDefinition:
         if TASK_COMMAND_PATTERN.fullmatch(self.command) is None:
             message = f"invalid task command: {self.command!r}"
             raise ValueError(message)
-
-    def _validate_executor(self) -> None:
-        if not isinstance(self.executor, TASK_EXECUTOR_TYPES):
-            message = f"invalid task executor: {type(self.executor).__name__}"
-            raise TypeError(message)
 
     def _validate_config_scopes(self) -> None:
         if not isinstance(self.config_scopes, tuple):
@@ -119,25 +80,30 @@ class TaskDefinition:
             message = f"task priority must not be negative: {self.command}"
             raise ValueError(message)
 
-    def _validate_launch_mode(self) -> None:
-        if not isinstance(self.launch_mode, str):
-            message = f"launch mode must be a string: {self.command}"
+    def _validate_domain(self) -> None:
+        if not isinstance(self.domain, TaskDomain):
+            message = f"task domain must be a TaskDomain: {self.command}"
             raise TypeError(message)
-        if self.launch_mode not in {"scheduled", "direct", "both"}:
-            message = f"invalid launch mode for task {self.command}: {self.launch_mode}"
+
+    def _validate_execution_mode(self) -> None:
+        if not isinstance(self.execution_mode, ExecutionMode):
+            message = f"execution mode must be an ExecutionMode: {self.command}"
+            raise TypeError(message)
+
+    def _validate_allowed_launches(self) -> None:
+        if not isinstance(self.allowed_launches, frozenset):
+            message = f"allowed launches must be a frozenset: {self.command}"
+            raise TypeError(message)
+        if not self.allowed_launches:
+            message = f"allowed launches must not be empty: {self.command}"
             raise ValueError(message)
+        if any(not isinstance(surface, LaunchSurface) for surface in self.allowed_launches):
+            message = f"allowed launches must contain only LaunchSurface values: {self.command}"
+            raise TypeError(message)
 
     @property
     def config_name(self) -> str:
         return command_to_config_name(self.command)
-
-    def execute(self, runner: TaskRunner) -> None:
-        self.executor.execute(runner)
-
-
-# 历史调用方只依赖名字和 execute()；别名避免复制另一份目录。
-TaskSpec = TaskDefinition
-FunctionTaskSpec = FunctionTaskExecutor
 
 
 def command_to_config_name(command: str) -> str:
@@ -154,52 +120,22 @@ def config_name_to_command(config_name: str) -> str:
     return camel_to_snake(config_name)
 
 
-def _campaign_args(runner: TaskRunner) -> tuple[tuple[object, ...], dict[str, object]]:
-    config = runner.config
-    return (
-        (),
-        {
-            "name": config.Campaign_Name,
-            "folder": config.Campaign_Event,
-            "mode": config.Campaign_Mode,
-        },
-    )
-
-
-def _class_executor(
-    module_name: str,
-    class_name: str,
-    method_name: str = "run",
-    args_factory: TaskArgsFactory | None = None,
-    task_name: str | None = None,
-) -> ClassTaskExecutor:
-    return ClassTaskExecutor(
-        module_name=module_name,
-        class_name=class_name,
-        method_name=method_name,
-        args_factory=args_factory,
-        task_name=task_name,
-    )
-
-
-def _campaign_executor(module_name: str, class_name: str) -> ClassTaskExecutor:
-    return _class_executor(module_name, class_name, args_factory=_campaign_args)
-
-
-def _task(
+def _task(  # noqa: PLR0913 - 目录项的独立元数据轴必须在定义处显式可见。
     command: str,
-    executor: TaskExecutor,
     *,
+    domain: TaskDomain,
+    execution_mode: ExecutionMode,
     priority: int | None,
     config_scopes: tuple[str, ...] = (),
-    launch_mode: LaunchMode = "scheduled",
+    allowed_launches: frozenset[LaunchSurface] = SCHEDULER_LAUNCHES,
 ) -> TaskDefinition:
     return TaskDefinition(
         command=command,
-        executor=executor,
         config_scopes=config_scopes,
         priority=priority,
-        launch_mode=launch_mode,
+        domain=domain,
+        execution_mode=execution_mode,
+        allowed_launches=allowed_launches,
     )
 
 
@@ -234,235 +170,401 @@ OPSI_SCOPES = ("OpsiGeneral",)
 
 
 TASK_CATALOG: Mapping[str, TaskDefinition] = _build_catalog(
-    _task("restart", RunnerMethodExecutor(method_name="restart"), priority=0),
-    _task("research", _class_executor("module.research.research", "RewardResearch"), priority=4),
-    _task("commission", _class_executor("module.commission.commission", "RewardCommission"), priority=2),
-    _task("tactical", _class_executor("module.tactical.tactical_class", "RewardTacticalClass"), priority=3),
-    _task("dorm", _class_executor("module.dorm.dorm", "RewardDorm"), priority=6),
-    _task("meowfficer", _class_executor("module.meowfficer.meowfficer", "RewardMeowfficer"), priority=7),
-    _task("guild", _class_executor("module.guild.guild_reward", "RewardGuild"), priority=8),
-    _task("reward", _class_executor("module.reward.reward", "Reward"), priority=10),
-    _task("awaken", _class_executor("module.awaken.awaken", "Awaken"), priority=18),
-    _task("shipyard", _class_executor("module.shipyard.shipyard_reward", "RewardShipyard"), priority=13),
-    _task("gacha", _class_executor("module.gacha.gacha_reward", "RewardGacha"), priority=9),
-    _task("freebies", _class_executor("module.freebies.freebies", "Freebies"), priority=14),
-    _task("minigame", _class_executor("module.minigame.minigame", "Minigame"), priority=17),
     _task(
-        "private_quarters", _class_executor("module.private_quarters.private_quarters", "PrivateQuarters"), priority=15
+        "restart",
+        domain=TaskDomain.MAINTENANCE,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=0,
     ),
-    _task("daily", _class_executor("module.daily.daily", "Daily"), priority=27),
-    _task("hard", _class_executor("module.hard.hard", "CampaignHard"), priority=28),
-    _task("exercise", _class_executor("module.exercise.exercise", "Exercise"), priority=5),
-    _task("sos", _class_executor("module.sos.sos", "CampaignSos"), priority=31),
-    _task("raid_daily", _class_executor("module.raid.daily", "RaidDaily"), priority=37, config_scopes=EVENT_SCOPES),
     _task(
-        "event_sp", _class_executor("module.event.campaign_sp", "CampaignSP"), priority=32, config_scopes=EVENT_SCOPES
+        "research",
+        domain=TaskDomain.FACILITY,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=4,
+    ),
+    _task(
+        "commission",
+        domain=TaskDomain.FACILITY,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=2,
+    ),
+    _task(
+        "tactical",
+        domain=TaskDomain.FACILITY,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=3,
+    ),
+    _task(
+        "dorm",
+        domain=TaskDomain.COMPOSITE_DAILY,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=6,
+    ),
+    _task(
+        "meowfficer",
+        domain=TaskDomain.COMPOSITE_DAILY,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=7,
+    ),
+    _task(
+        "guild",
+        domain=TaskDomain.COMPOSITE_DAILY,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=8,
+    ),
+    _task(
+        "reward",
+        domain=TaskDomain.COMPOSITE_DAILY,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=10,
+    ),
+    _task(
+        "awaken",
+        domain=TaskDomain.MARKET,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=18,
+    ),
+    _task(
+        "shipyard",
+        domain=TaskDomain.MARKET,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=13,
+    ),
+    _task(
+        "gacha",
+        domain=TaskDomain.MARKET,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=9,
+    ),
+    _task(
+        "freebies",
+        domain=TaskDomain.COMPOSITE_DAILY,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=14,
+    ),
+    _task(
+        "minigame",
+        domain=TaskDomain.ACTIVITY,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=17,
+    ),
+    _task(
+        "private_quarters",
+        domain=TaskDomain.COMPOSITE_DAILY,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=15,
+    ),
+    _task(
+        "daily",
+        domain=TaskDomain.ENCOUNTER,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=27,
+    ),
+    _task(
+        "hard",
+        domain=TaskDomain.CAMPAIGN,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=28,
+    ),
+    _task(
+        "exercise",
+        domain=TaskDomain.EXERCISE,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=5,
+    ),
+    _task(
+        "raid_daily",
+        domain=TaskDomain.ENCOUNTER,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=36,
+        config_scopes=EVENT_SCOPES,
+    ),
+    _task(
+        "event_sp",
+        domain=TaskDomain.CAMPAIGN,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=31,
+        config_scopes=EVENT_SCOPES,
     ),
     _task(
         "maritime_escort",
-        _class_executor("module.event.maritime_escort", "MaritimeEscort"),
-        priority=40,
+        domain=TaskDomain.ENCOUNTER,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=39,
         config_scopes=EVENT_SCOPES,
     ),
     _task(
         "opsi_ash_assist",
-        _class_executor("module.os_ash.meta", "AshBeaconAssist"),
+        domain=TaskDomain.OPSI,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
         priority=29,
         config_scopes=OPSI_SCOPES,
     ),
     _task(
         "opsi_ash_beacon",
-        _class_executor("module.os_ash.meta", "OpsiAshBeacon"),
+        domain=TaskDomain.OPSI,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
         priority=19,
         config_scopes=OPSI_SCOPES,
     ),
-    _task("raid", _class_executor("module.raid.run", "RaidRun"), priority=43, config_scopes=EVENT_SCOPES),
-    _task("hospital", _class_executor("module.event_hospital.hospital", "Hospital"), priority=44),
     _task(
-        "coalition", _class_executor("module.coalition.coalition", "Coalition"), priority=45, config_scopes=EVENT_SCOPES
+        "raid",
+        domain=TaskDomain.ENCOUNTER,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=42,
+        config_scopes=EVENT_SCOPES,
+    ),
+    _task(
+        "hospital",
+        domain=TaskDomain.ENCOUNTER,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=43,
+    ),
+    _task(
+        "coalition",
+        domain=TaskDomain.ENCOUNTER,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=44,
+        config_scopes=EVENT_SCOPES,
     ),
     _task(
         "coalition_sp",
-        _class_executor("module.coalition.coalition_sp", "CoalitionSP"),
-        priority=38,
+        domain=TaskDomain.ENCOUNTER,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=37,
         config_scopes=EVENT_SCOPES,
     ),
     _task(
         "shop_frequent",
-        _class_executor("module.shop.shop_reward", "RewardShop", method_name="run_frequent"),
+        domain=TaskDomain.MARKET,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
         priority=11,
     ),
-    _task("shop_once", _class_executor("module.shop.shop_reward", "RewardShop", method_name="run_once"), priority=12),
+    _task(
+        "shop_once",
+        domain=TaskDomain.MARKET,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=12,
+    ),
     _task(
         "event_a",
-        _class_executor("module.event.campaign_abcd", "CampaignABCD"),
-        priority=33,
+        domain=TaskDomain.CAMPAIGN,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=32,
         config_scopes=EVENT_SCOPES,
     ),
     _task(
         "event_b",
-        _class_executor("module.event.campaign_abcd", "CampaignABCD"),
-        priority=34,
+        domain=TaskDomain.CAMPAIGN,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=33,
         config_scopes=EVENT_SCOPES,
     ),
     _task(
         "event_c",
-        _class_executor("module.event.campaign_abcd", "CampaignABCD"),
-        priority=35,
+        domain=TaskDomain.CAMPAIGN,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=34,
         config_scopes=EVENT_SCOPES,
     ),
     _task(
         "event_d",
-        _class_executor("module.event.campaign_abcd", "CampaignABCD"),
-        priority=36,
+        domain=TaskDomain.CAMPAIGN,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=35,
         config_scopes=EVENT_SCOPES,
     ),
     _task(
         "opsi_explore",
-        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_explore"),
+        domain=TaskDomain.OPSI,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
         priority=16,
         config_scopes=OPSI_SCOPES,
     ),
     _task(
         "opsi_shop",
-        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_shop"),
+        domain=TaskDomain.OPSI,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
         priority=21,
         config_scopes=OPSI_SCOPES,
     ),
     _task(
         "opsi_voucher",
-        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_voucher"),
+        domain=TaskDomain.OPSI,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
         priority=22,
         config_scopes=OPSI_SCOPES,
     ),
     _task(
         "opsi_daily",
-        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_daily"),
+        domain=TaskDomain.OPSI,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
         priority=20,
         config_scopes=OPSI_SCOPES,
     ),
     _task(
         "opsi_obscure",
-        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_obscure"),
+        domain=TaskDomain.OPSI,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
         priority=25,
         config_scopes=OPSI_SCOPES,
     ),
     _task(
         "opsi_month_boss",
-        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_month_boss"),
+        domain=TaskDomain.OPSI,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
         priority=30,
         config_scopes=OPSI_SCOPES,
     ),
     _task(
         "opsi_abyssal",
-        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_abyssal"),
+        domain=TaskDomain.OPSI,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
         priority=23,
         config_scopes=OPSI_SCOPES,
     ),
     _task(
         "opsi_archive",
-        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_archive"),
+        domain=TaskDomain.OPSI,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
         priority=26,
         config_scopes=OPSI_SCOPES,
     ),
     _task(
         "opsi_stronghold",
-        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_stronghold"),
+        domain=TaskDomain.OPSI,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
         priority=24,
         config_scopes=OPSI_SCOPES,
     ),
     _task(
         "opsi_meowfficer_farming",
-        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_meowfficer_farming"),
-        priority=49,
+        domain=TaskDomain.OPSI,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=48,
         config_scopes=OPSI_SCOPES,
     ),
     _task(
         "opsi_hazard1_leveling",
-        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_hazard1_leveling"),
-        priority=51,
+        domain=TaskDomain.OPSI,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=50,
         config_scopes=OPSI_SCOPES,
     ),
     _task(
         "opsi_cross_month",
-        _class_executor("module.campaign.os_run", "OSCampaignRun", method_name="opsi_cross_month"),
+        domain=TaskDomain.OPSI,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
         priority=1,
         config_scopes=OPSI_SCOPES,
     ),
-    _task("main", _campaign_executor("module.campaign.run", "CampaignRun"), priority=46),
-    _task("main2", _campaign_executor("module.campaign.run", "CampaignRun"), priority=47),
-    _task("main3", _campaign_executor("module.campaign.run", "CampaignRun"), priority=48),
-    _task("event", _campaign_executor("module.campaign.run", "CampaignRun"), priority=41, config_scopes=EVENT_SCOPES),
-    _task("event2", _campaign_executor("module.campaign.run", "CampaignRun"), priority=42, config_scopes=EVENT_SCOPES),
-    _task("c72_mystery_farming", _campaign_executor("module.campaign.run", "CampaignRun"), priority=None),
-    _task("c122_medium_leveling", _campaign_executor("module.campaign.run", "CampaignRun"), priority=None),
-    _task("c124_large_leveling", _campaign_executor("module.campaign.run", "CampaignRun"), priority=None),
-    _task("war_archives", _campaign_executor("module.war_archives.war_archives", "CampaignWarArchives"), priority=39),
+    _task(
+        "main",
+        domain=TaskDomain.CAMPAIGN,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=45,
+    ),
+    _task(
+        "main2",
+        domain=TaskDomain.CAMPAIGN,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=46,
+    ),
+    _task(
+        "main3",
+        domain=TaskDomain.CAMPAIGN,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=47,
+    ),
+    _task(
+        "event",
+        domain=TaskDomain.CAMPAIGN,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=40,
+        config_scopes=EVENT_SCOPES,
+    ),
+    _task(
+        "event2",
+        domain=TaskDomain.CAMPAIGN,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=41,
+        config_scopes=EVENT_SCOPES,
+    ),
+    _task(
+        "war_archives",
+        domain=TaskDomain.CAMPAIGN,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=38,
+    ),
     _task(
         "gems_farming",
-        _campaign_executor("module.campaign.gems_farming", "GemsFarming"),
-        priority=50,
+        domain=TaskDomain.CAMPAIGN,
+        execution_mode=ExecutionMode.SCHEDULED_JOB,
+        priority=49,
         config_scopes=EVENT_SCOPES,
     ),
     _task(
         "daemon",
-        _class_executor("module.daemon.daemon", "AzurLaneDaemon", task_name="Daemon"),
+        domain=TaskDomain.ASSIST,
+        execution_mode=ExecutionMode.ASSIST_SESSION,
         priority=None,
-        launch_mode="direct",
+        allowed_launches=TOOL_LAUNCHES,
     ),
     _task(
         "opsi_daemon",
-        _class_executor("module.daemon.os_daemon", "AzurLaneDaemon", task_name="OpsiDaemon"),
+        domain=TaskDomain.ASSIST,
+        execution_mode=ExecutionMode.ASSIST_SESSION,
         priority=None,
         config_scopes=OPSI_SCOPES,
-        launch_mode="direct",
+        allowed_launches=TOOL_LAUNCHES,
     ),
     _task(
         "event_story",
-        _class_executor("module.eventstory.eventstory", "EventStory", task_name="EventStory"),
+        domain=TaskDomain.ACTIVITY,
+        execution_mode=ExecutionMode.DIRECT_COMMAND,
         priority=None,
         config_scopes=EVENT_SCOPES,
-        launch_mode="direct",
+        allowed_launches=TOOL_LAUNCHES,
     ),
     _task(
         "azur_lane_uncensored",
-        _class_executor("module.daemon.uncensored", "AzurLaneUncensored", task_name="AzurLaneUncensored"),
+        domain=TaskDomain.MAINTENANCE,
+        execution_mode=ExecutionMode.DIRECT_COMMAND,
         priority=None,
-        launch_mode="direct",
+        allowed_launches=TOOL_LAUNCHES,
     ),
     _task(
         "game_manager",
-        _class_executor("module.daemon.game_manager", "GameManager", task_name="GameManager"),
+        domain=TaskDomain.MAINTENANCE,
+        execution_mode=ExecutionMode.DIRECT_COMMAND,
         priority=None,
-        launch_mode="direct",
+        allowed_launches=TOOL_LAUNCHES,
     ),
     _task(
         "benchmark",
-        FunctionTaskExecutor(module_name="module.daemon.benchmark", function_name="run_benchmark"),
+        domain=TaskDomain.MAINTENANCE,
+        execution_mode=ExecutionMode.DIRECT_COMMAND,
         priority=None,
-        launch_mode="direct",
+        allowed_launches=TOOL_LAUNCHES,
     ),
 )
 
-# 兼容旧名字；与 catalog 共用同一只读映射，不维护第二份目录。
-TASK_REGISTRY = TASK_CATALOG
 
-
-def get_task_spec(command: str) -> TaskDefinition | None:
+def get_task_definition(command: str) -> TaskDefinition | None:
     return TASK_CATALOG.get(command)
 
 
 def get_task_by_config_name(config_name: str) -> TaskDefinition | None:
     command = config_name_to_command(config_name)
-    definition = get_task_spec(command)
+    definition = get_task_definition(command)
     if definition is None or definition.config_name != config_name:
         return None
     return definition
 
 
-def get_direct_task_command(config_name: str) -> str | None:
+def get_tool_task_command(config_name: str) -> str | None:
     definition = get_task_by_config_name(config_name)
-    if definition is None or definition.launch_mode not in {"direct", "both"}:
+    if definition is None or LaunchSurface.TOOL not in definition.allowed_launches:
         return None
     return definition.command
 

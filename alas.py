@@ -1,351 +1,77 @@
-import re
+import argparse
+import signal
 import sys
-import time
-from datetime import datetime, timedelta
-from importlib import import_module
+import threading
 from pathlib import Path
-from typing import TYPE_CHECKING, NoReturn, cast
+from typing import TYPE_CHECKING, cast
 
-from module.base.decorator import cached_property, del_cached_property
-from module.base.naming import camel_to_snake
-from module.base.resource import release_resources
-from module.config.config import AzurLaneConfig, TaskEnd
-from module.config.deep import deep_get, deep_set
-from module.exception import (
-    GameBugError,
-    GameNotRunningError,
-    GamePageUnknownError,
-    GameStuckError,
-    GameTooManyClickError,
-    RequestHumanTakeover,
-    ScriptError,
-)
-from module.logger import get_log_file, logger
-from module.notify import handle_notify
-from module.task_registry import get_task_spec
+from module.bootstrap import InstanceProcessExitKind, build_default_instance_process_host
+from module.logger import logger
 
 if TYPE_CHECKING:
-    from module.base.stop_event import StopEvent
-    from module.config.schedule import ScheduleDecision
-    from module.device.device import Device
-    from module.handler.login import LoginHandler
-    from module.ui.ui import UI
+    from collections.abc import Callable, Sequence
+    from types import FrameType
 
 
-def _load_attr(module_name: str, attr_name: str) -> object:
-    """按需加载重模块里的对象。"""
-    module = import_module(module_name)
-    return getattr(module, attr_name)
+EXIT_RESTART_REQUESTED = 75
+EXIT_STOPPED = 130
 
 
-class AzurLaneAutoScript:
-    stop_event: StopEvent | None = None
+class _ProcessStopSignal:
+    __slots__ = ("_event",)
 
-    def __init__(self, config_name: str = "alas") -> None:
-        logger.hr("Start", level=0)
-        self.config_name = config_name
-        self.is_first_task = True
-        self.failure_record = {}
+    def __init__(self) -> None:
+        self._event = threading.Event()
 
-    @cached_property
-    def config(self) -> AzurLaneConfig:
-        try:
-            return AzurLaneConfig(config_name=self.config_name)
-        except RequestHumanTakeover:
-            logger.critical("Request human takeover")
-            sys.exit(1)
+    def request(self, _signum: int, _frame: FrameType | None) -> None:
+        self._event.set()
 
-    @cached_property
-    def device(self) -> Device:
-        try:
-            device_class = cast("type[Device]", _load_attr("module.device.device", "Device"))
-            return device_class(config=self.config)
-        except RequestHumanTakeover:
-            logger.critical("Request human takeover")
-            self._notify_crash("RequestHumanTakeover")
-            sys.exit(1)
+    def is_set(self) -> bool:
+        return self._event.is_set()
 
-    def _notify_safely(self, *, title: str, content: str) -> None:
-        try:
-            handle_notify(self.config.Error_OnePushConfig, title=title, content=content)
-        except Exception:  # noqa: BLE001
-            # 通知是旁路能力，任何实现错误都不能替换原任务结果。
-            logger.error("SMTP notify failed unexpectedly")
 
-    def _notify_crash(self, reason: str) -> None:
-        self._notify_safely(
-            title=f"Alas <{self.config_name}> crashed",
-            content=f"<{self.config_name}> {reason}",
-        )
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run the typed ALAS instance runtime")
+    parser.add_argument("command", nargs="?", default="alas", help="alas or a direct task command")
+    parser.add_argument("--instance", default="alas", help="configuration instance name")
+    parser.add_argument(
+        "--project-root",
+        type=Path,
+        default=Path(__file__).resolve().parent,
+        help="ALAS source-tree root",
+    )
+    return parser
 
-    def _execute_run_command(self, command: str, *, skip_first_screenshot: bool = False) -> None:
-        if not skip_first_screenshot:
-            self.device.screenshot()
-        task_spec = get_task_spec(command)
-        if task_spec is not None:
-            task_spec.execute(self)
-        else:
-            getattr(self, command)()
 
-    def _handle_recoverable_run_error(
-        self,
-        error: GameNotRunningError | GameStuckError | GameTooManyClickError | GameBugError,
-    ) -> bool:
-        if isinstance(error, GameNotRunningError):
-            logger.warning(error)
-            self._save_error_log_safely()
-            self.config.task_call("Restart")
-            return False
-        if isinstance(error, (GameStuckError, GameTooManyClickError)):
-            logger.error(error)
-            self._save_error_log_safely()
-            logger.warning(f"Game stuck, {self.device.package} will be restarted in 10 seconds")
-            logger.warning("If you are playing by hand, please stop Alas")
-            self.config.task_call("Restart")
-            self.device.sleep(10)
-            return False
+def main(argv: Sequence[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    stop = _ProcessStopSignal()
+    previous: dict[signal.Signals, object] = {}
+    supported = tuple(
+        item for item in (signal.SIGINT, getattr(signal, "SIGTERM", None)) if isinstance(item, signal.Signals)
+    )
+    for item in supported:
+        previous[item] = signal.getsignal(item)
+        signal.signal(item, stop.request)
+    try:
+        host = build_default_instance_process_host(args.project_root)
+        exit_ = host.execute(args.instance, args.command, stop_signal=stop)
+    finally:
+        for item, handler in previous.items():
+            signal.signal(
+                item,
+                cast("Callable[[int, FrameType | None], object] | int | None", handler),
+            )
 
-        logger.warning(error)
-        self._save_error_log_safely()
-        logger.warning("An error has occurred in Azur Lane game client, Alas is unable to handle")
-        logger.warning(f"Restarting {self.device.package} to fix it")
-        self.config.task_call("Restart")
-        self.device.sleep(10)
-        return False
-
-    def _exit_on_fatal_run_error(self, error: GamePageUnknownError | ScriptError | RequestHumanTakeover) -> NoReturn:
-        if isinstance(error, GamePageUnknownError):
-            logger.critical("Game page unknown")
-            self._save_error_log_safely()
-        elif isinstance(error, ScriptError):
-            logger.exception(error)
-            logger.critical("This is likely to be a mistake of developers, but sometimes just random issues")
-            self._save_error_log_safely()
-        else:
-            logger.critical("Request human takeover")
-            if "device" in vars(self):
-                self._save_error_log_safely()
-        self._notify_crash(type(error).__name__)
-        sys.exit(1)
-
-    def _exit_on_unexpected_run_error(self, error: Exception) -> NoReturn:
-        # 任务崩溃边界：保存现场并退出，避免调度循环继续运行在未知状态。
-        logger.exception(error)
-        self._save_error_log_safely()
-        self._notify_crash("Exception occurred")
-        sys.exit(1)
-
-    def run(self, command: str, *, skip_first_screenshot: bool = False) -> bool:
-        try:
-            self._execute_run_command(command, skip_first_screenshot=skip_first_screenshot)
-        except TaskEnd:
-            return True
-        except (GameNotRunningError, GameStuckError, GameTooManyClickError, GameBugError) as e:
-            return self._handle_recoverable_run_error(e)
-        except (GamePageUnknownError, ScriptError, RequestHumanTakeover) as e:
-            self._exit_on_fatal_run_error(e)
-        except Exception as e:  # noqa: BLE001
-            self._exit_on_unexpected_run_error(e)
-        else:
-            return True
-
-    def _save_error_log_safely(self) -> None:
-        try:
-            self.save_error_log()
-        except Exception:  # noqa: BLE001
-            logger.exception("Failed to save error diagnostics")
-
-    def save_error_log(self) -> None:
-        """保存最近业务截图、可回放动作与当前日志。"""
-        if self.config.Error_SaveError:
-            error_dir = Path("./log/error")
-            error_dir.mkdir(parents=True, exist_ok=True)
-            folder = error_dir / str(int(time.time() * 1000))
-            logger.warning(f"Saving error: {folder}")
-            folder.mkdir()
-            replay_dump = self.device.replay_recorder.dump(folder)
-            if replay_dump.trace_path is not None:
-                logger.warning("Saved replay trace")
-            elif replay_dump.blockers:
-                logger.warning(
-                    f"Replay trace skipped because of unsupported or unbound actions: {replay_dump.blockers}"
-                )
-            with Path(get_log_file()).open(encoding="utf-8") as f:
-                lines = f.readlines()
-                start = 0
-                for index, raw_line in enumerate(lines):
-                    line = raw_line.strip(" \r\t\n")
-                    if re.match(r"^═{15,}$", line):
-                        start = index
-                lines = lines[start - 2 :]
-            with (folder / "log.txt").open("w", encoding="utf-8") as f:
-                f.writelines(lines)
-
-    def restart(self) -> None:
-        login_handler_class = cast("type[LoginHandler]", _load_attr("module.handler.login", "LoginHandler"))
-        login_handler_class(self.config, device=self.device).app_restart()
-
-    def start(self) -> None:
-        login_handler_class = cast("type[LoginHandler]", _load_attr("module.handler.login", "LoginHandler"))
-        login_handler_class(self.config, device=self.device).app_start()
-
-    def goto_main(self) -> None:
-        login_handler_class = cast("type[LoginHandler]", _load_attr("module.handler.login", "LoginHandler"))
-        ui_class = cast("type[UI]", _load_attr("module.ui.ui", "UI"))
-
-        if self.device.app_is_running():
-            logger.info("App is already running, goto main page")
-            ui_class(self.config, device=self.device).ui_goto_main()
-        else:
-            logger.info("App is not running, start app and goto main page")
-            login_handler_class(self.config, device=self.device).app_start()
-            ui_class(self.config, device=self.device).ui_goto_main()
-
-    def wait_until(self, future: datetime) -> bool:
-        """等待到指定时间；如果配置变化则提前返回。"""
-        future += timedelta(seconds=1)
-        self.config.start_watching()
-        while 1:
-            if datetime.now() > future:
-                return True
-            if self.stop_event is not None and self.stop_event.is_set():
-                logger.info("Update event detected")
-                logger.info(f"[{self.config_name}] exited. Reason: Update")
-                sys.exit(0)
-
-            time.sleep(5)
-
-            if self.config.should_reload():
-                return False
-        return False
-
-    def _release_during_task_wait(self) -> None:
-        release_resources()
-        self.device.release_during_wait()
-
-    def _wait_with_game_closed(self, decision: ScheduleDecision, wake_at: datetime) -> bool:
-        logger.info("Close game during wait")
-        self.device.app_stop()
-        self._release_during_task_wait()
-        if not self.wait_until(wake_at):
-            del_cached_property(self, "config")
-            return False
-        if decision.command != "Restart":
-            self.config.task_call("Restart")
-            del_cached_property(self, "config")
-            return False
-        return True
-
-    def _wait_on_main_page(self, wake_at: datetime) -> bool:
-        logger.info("Goto main page during wait")
-        self.run("goto_main")
-        self._release_during_task_wait()
-        if not self.wait_until(wake_at):
-            del_cached_property(self, "config")
-            return False
-        return True
-
-    def _wait_in_place(self, wake_at: datetime) -> bool:
-        self._release_during_task_wait()
-        if not self.wait_until(wake_at):
-            del_cached_property(self, "config")
-            return False
-        return True
-
-    def _wait_for_next_task(self, decision: ScheduleDecision) -> bool:
-        """等待未到运行时间的任务，返回当前任务是否可以继续执行。"""
-        if decision.state in {"ready", "error"}:
-            return True
-        wake_at = decision.wake_at
-        if decision.state != "waiting" or wake_at is None:
-            message = f"Invalid schedule decision: {decision.state}"
-            raise ScriptError(message)
-
-        logger.info(f"Wait until {wake_at} for task `{decision.command}`")
-        self.is_first_task = False
-        method = self.config.Optimization_WhenTaskQueueEmpty
-        if method == "close_game":
-            return self._wait_with_game_closed(decision, wake_at)
-        if method == "goto_main":
-            return self._wait_on_main_page(wake_at)
-        if method == "stay_there":
-            logger.info("Stay there during wait")
-        else:
-            logger.warning(f"Invalid Optimization_WhenTaskQueueEmpty: {method}, fallback to stay_there")
-        return self._wait_in_place(wake_at)
-
-    def get_next_task(self) -> str:
-        while 1:
-            decision = self.config.get_next_decision()
-            task = self.config.function_from_decision(decision)
-            self.config.task = task
-            self.config.bind(task)
-
-            if self.config.task.command != "Alas":
-                release_resources(next_task=task.command)
-
-            if not self._wait_for_next_task(decision):
-                continue
-            self.config.mark_task_started()
-            break
-
-        return task.command
-
-    def loop(self) -> None:
-        logger.set_file_logger(self.config_name)
-        logger.info(f"Start scheduler loop: {self.config_name}")
-
-        while 1:
-            if self.stop_event is not None and self.stop_event.is_set():
-                logger.info("Update event detected")
-                logger.info(f"Alas [{self.config_name}] exited.")
-                break
-            task = self.get_next_task()
-            # 访问属性会触发设备懒初始化。
-            _ = self.device
-            self.device.config = self.config
-            if self.is_first_task and task == "Restart":
-                logger.info("Skip task `Restart` at scheduler start")
-                self.config.task_delay(server_update=True)
-                del_cached_property(self, "config")
-                continue
-
-            logger.info(f"Scheduler: Start task `{task}`")
-            self.device.stuck_record_clear()
-            self.device.click_record_clear()
-            logger.hr(task, level=0)
-            success = self.run(camel_to_snake(task))
-            logger.info(f"Scheduler: End task `{task}`")
-            self.is_first_task = False
-
-            failed = deep_get(self.failure_record, keys=task, default=0)
-            failed = 0 if success else failed + 1
-            deep_set(self.failure_record, keys=task, value=failed)
-            if failed >= 3:
-                logger.critical(f"Task `{task}` failed 3 or more times.")
-                logger.critical(
-                    "Possible reason #1: You haven't used it correctly. Please read the help text of the options.",
-                )
-                logger.critical(
-                    "Possible reason #2: There is a problem with this task. "
-                    "Please contact developers or try to fix it yourself.",
-                )
-                logger.critical("Request human takeover")
-                self._notify_safely(
-                    title=f"Alas <{self.config_name}> crashed",
-                    content=f"<{self.config_name}> RequestHumanTakeover\nTask `{task}` failed 3 or more times.",
-                )
-                sys.exit(1)
-
-            if success:
-                del_cached_property(self, "config")
-                continue
-            if self.config.Error_HandleError:
-                del_cached_property(self, "config")
-                continue
-            break
+    if exit_.kind is InstanceProcessExitKind.FINISHED:
+        return 0
+    if exit_.kind is InstanceProcessExitKind.RESTART_REQUESTED:
+        return EXIT_RESTART_REQUESTED
+    if exit_.kind is InstanceProcessExitKind.STOPPED:
+        return EXIT_STOPPED
+    logger.error(f"Instance {args.instance!r} failed while executing {args.command!r}")
+    return 1
 
 
 if __name__ == "__main__":
-    alas = AzurLaneAutoScript()
-    alas.loop()
+    sys.exit(main())

@@ -1,11 +1,50 @@
 schema_version: 1
 id: war_archives_20220428_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: rondo_at_rainbows_end
 releases:
 - opened_on: '2025-07-17'
   name_cn: 虹彩的终幕曲
   order: 400
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_885acadc94e1ff54
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_f7da996b77713999
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_f7da996b77713999
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_666408d3376a028e
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_9b572c98bc9bd2c0
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_b44d6ce3aaac6bc6
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_d2b1a4820273afd2
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_74db08125307ea31
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_74db08125307ea31
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_0c2945cd0e2f4ea9
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_9cbb10ebfb3fdd26
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_b44d6ce3aaac6bc6
 policy:
   aliases:
     ht1: c1
@@ -20,3 +59,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

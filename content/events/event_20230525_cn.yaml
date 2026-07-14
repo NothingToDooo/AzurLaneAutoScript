@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20230525_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2023-05-25'
   name_cn: 空相交汇点
@@ -12,6 +15,58 @@ releases:
 - opened_on: '2025-06-19'
   name_cn: 复刻空相交汇点
   order: 2190
+stages:
+- id: ht1
+  source: stages/ht1.yaml
+  runtime_profile: profile_015979dc518ba864
+- id: ht2
+  source: stages/ht2.yaml
+  runtime_profile: profile_015979dc518ba864
+- id: ht3
+  source: stages/ht3.yaml
+  runtime_profile: profile_96b258296fefd1f9
+- id: ht4
+  source: stages/ht4.yaml
+  runtime_profile: profile_015979dc518ba864
+- id: ht5
+  source: stages/ht5.yaml
+  runtime_profile: profile_015979dc518ba864
+- id: ht6
+  source: stages/ht6.yaml
+  runtime_profile: profile_1af168386c89c055
+- id: hts1
+  source: stages/hts1.yaml
+  runtime_profile: profile_015979dc518ba864
+- id: hts2
+  source: stages/hts2.yaml
+  runtime_profile: profile_015979dc518ba864
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_015979dc518ba864
+- id: t1
+  source: stages/t1.yaml
+  runtime_profile: profile_015979dc518ba864
+- id: t2
+  source: stages/t2.yaml
+  runtime_profile: profile_015979dc518ba864
+- id: t3
+  source: stages/t3.yaml
+  runtime_profile: profile_e5cd8b77f76be0e2
+- id: t4
+  source: stages/t4.yaml
+  runtime_profile: profile_015979dc518ba864
+- id: t5
+  source: stages/t5.yaml
+  runtime_profile: profile_015979dc518ba864
+- id: t6
+  source: stages/t6.yaml
+  runtime_profile: profile_96b258296fefd1f9
+- id: ts1
+  source: stages/ts1.yaml
+  runtime_profile: profile_015979dc518ba864
+- id: ts2
+  source: stages/ts2.yaml
+  runtime_profile: profile_015979dc518ba864
 policy:
   aliases:
     a1: t1
@@ -26,3 +81,20 @@ policy:
     d1: ht4
     d2: ht5
     d3: ht6
+  progressions:
+    ht1: ht2
+    ht2: hts1
+    ht3: null
+    ht4: ht5
+    ht5: hts2
+    ht6: null
+    hts1: ht3
+    hts2: ht6
+    t1: t2
+    t2: ts1
+    t3: null
+    t4: t5
+    t5: ts2
+    t6: null
+    ts1: t3
+    ts2: t6

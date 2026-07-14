@@ -4,6 +4,10 @@
 > 日期：2026-07-11
 > 范围：个人版 ALAS，Windows + MuMu + 国区 + WebUI
 
+> 说明：其中 OCR 研究与证据仍有效；“按触碰迁移、保留旧 runtime”的架构路线已被
+> [`architecture.md`](architecture.md) 取代。当前实现以显式 outcome/effect、SQLite 状态、
+> interaction ports、Campaign definition/session 和跨进程设备独占为目标，不再把旧 API 兼容作为约束。
+
 ## 1. 摘要
 
 本项目不再以“维持旧 ALAS 兼容”为主要目标，也不以完整迁移

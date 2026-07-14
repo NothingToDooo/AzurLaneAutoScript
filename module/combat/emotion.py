@@ -164,10 +164,10 @@ class Emotion:
             return 4
         return 2
 
-    def check_reduce(self, battle: int) -> None:
-        """进图前按预计战斗数检查心情；不足时延迟任务并抛出 ScriptEnd。"""
+    def recovery_at(self, battle: int) -> datetime | None:
+        """返回预计战斗所需的恢复时间；已满足或未启用计算时返回 None。"""
         if not self.is_calculate:
-            return
+            return None
 
         method = self.config.Fleet_FleetOrder
 
@@ -195,10 +195,18 @@ class Emotion:
         recovered = max(
             fleet.get_recovered(reduction) for fleet, reduction in zip(self.fleets, reductions, strict=True)
         )
-        if recovered > datetime.now():
-            logger.info("Delay current task to prevent emotion control in the future")
-            self.config.task_delay(target=recovered)
-            raise ScriptEnd(EMOTION_CONTROL_DELAY_MESSAGE)
+        if recovered <= datetime.now():
+            return None
+        return recovered
+
+    def check_reduce(self, battle: int) -> None:
+        """进图前按预计战斗数检查心情；不足时延迟任务并抛出 ScriptEnd。"""
+        recovered = self.recovery_at(battle)
+        if recovered is None:
+            return
+        logger.info("Delay current task to prevent emotion control in the future")
+        self.config.task_delay(target=recovered)
+        raise ScriptEnd(EMOTION_CONTROL_DELAY_MESSAGE)
 
     def wait(self, fleet_index: int) -> None:
         """进入战斗前等待 1 或 2 号舰队恢复到控制阈值。"""

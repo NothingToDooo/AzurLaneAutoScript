@@ -1,7 +1,13 @@
 schema_version: 1
 id: raid_20230629
 kind: raid
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: raid
+  profile: gorizia
+  modes: [easy, normal, hard, ex]
+  daily_modes: [easy, normal, hard, ex]
+  ticket_modes: [ex]
 releases:
 - opened_on: '2023-06-29'
   name_cn: 绿洲往事

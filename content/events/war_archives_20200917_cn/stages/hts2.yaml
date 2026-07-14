@@ -1,0 +1,137 @@
+schema_version: 4
+map:
+  name: HTS2
+  shape: H8
+  camera_data:
+  - D2
+  - D6
+  - E2
+  - E6
+  camera_data_spawn_point:
+  - D6
+  map_data: '++ MM -- -- -- -- -- --
+
+    ++ ++ ++ ++ -- -- -- ++
+
+    -- -- -- -- -- ++ -- ++
+
+    -- -- -- ++ ++ ++ -- ++
+
+    -- ++ -- -- ++ -- -- --
+
+    -- -- ++ -- -- ++ -- ++
+
+    -- -- SP ++ MM ++ -- ++
+
+    MM -- -- ++ ++ ++ -- ++'
+  weight_data: '50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: false
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: true
+  STAR_REQUIRE_1: 0
+  STAR_REQUIRE_2: 0
+  STAR_REQUIRE_3: 0
+  STAGE_ENTRANCE:
+  - blue
+  MAP_HAS_MODE_SWITCH: false
+  MAP_SWIPE_MULTIPLY:
+  - 1.064
+  - 1.084
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.029
+  - 1.048
+  MAP_IS_ONE_TIME_STAGE: true
+  MAP_ENSURE_EDGE_INSIGHT_CORNER: bottom
+enemy_filter: 1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M
+battles:
+  0:
+    steps:
+    - tag: default_battle
+mechanics:
+  roadblocks: []
+  fleet_coordination:
+  - battle: 0
+    destination: A8
+    expected: story
+    fleet: active
+    tag: move
+  - battle: 0
+    destination: E7
+    expected: story
+    fleet: active
+    tag: move
+  - battle: 0
+    destination: B1
+    expected: story
+    fleet: active
+    tag: move
+  - battle: 0
+    destination: G8
+    expected: story
+    fleet: active
+    tag: move
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns: []
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs:
+- activation_modes:
+  - normal
+  battle: 0
+  statements:
+  - action:
+      category: fleet_coordination
+      index: 0
+    expected_target: any
+    tag: perform_mechanic
+  - action:
+      category: fleet_coordination
+      index: 1
+    expected_target: any
+    tag: perform_mechanic
+  - action:
+      category: fleet_coordination
+      index: 2
+    expected_target: any
+    tag: perform_mechanic
+  - action:
+      category: fleet_coordination
+      index: 3
+    expected_target: any
+    tag: perform_mechanic
+  - tag: end_campaign
+boss_approaches: []
+hard_mode: null

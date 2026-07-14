@@ -1,11 +1,50 @@
 schema_version: 1
 id: war_archives_20220224_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: abyssal_refrain
 releases:
 - opened_on: '2025-01-09'
   name_cn: 深度回音
   order: 360
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_58885ed07c208613
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_58885ed07c208613
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_58885ed07c208613
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_5a819ad6a642c22d
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_5a819ad6a642c22d
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_5a819ad6a642c22d
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_58885ed07c208613
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_58885ed07c208613
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_58885ed07c208613
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_233342def48052df
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_233342def48052df
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_233342def48052df
 policy:
   aliases:
     ht1: c1
@@ -20,3 +59,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

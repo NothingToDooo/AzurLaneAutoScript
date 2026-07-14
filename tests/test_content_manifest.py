@@ -11,21 +11,24 @@ import pytest
 
 from module.config import config_updater as config_updater_module
 from module.config.config_updater import ConfigGenerator
-from module.content.campaign_policy import CampaignPolicy
+from module.content.activity_profile import EventStoryDefinition, EventStoryProfileId
+from module.content.campaign_policy import CampaignPolicy, StageProgressionRule
 from module.content.errors import ContentValidationError
 from module.content.manifest import load_event_manifests, render_campaign_readme
 from module.content.models import ContentId, EventPack, EventRelease
+from module.content.war_archives_profile import WarArchivesDefinition, WarArchivesProfileId
 
 EVENTS_PATH = Path("content/events")
 _UNKNOWN_ASSET_FIELD = (
-    "\nstages:\n  - id: t1\n    source: stages/t1.yaml\n    assets:\n"
+    "\nstages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core\n    assets:\n"
     "      - id: map\n        path: assets/t1.yaml\n        unknown: true"
 )
 _DANGLING_ASSET = (
-    "\nstages:\n  - id: t1\n    source: stages/t1.yaml\n    assets:\n      - id: map\n        path: assets/missing.yaml"
+    "\nstages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core\n"
+    "    assets:\n      - id: map\n        path: assets/missing.yaml"
 )
 _DUPLICATE_ASSET = (
-    "\nstages:\n  - id: t1\n    source: stages/t1.yaml\n    assets:\n"
+    "\nstages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core\n    assets:\n"
     "      - id: map\n        path: assets/t1.yaml\n"
     "      - id: map\n        path: assets/t1.yaml"
 )
@@ -58,17 +61,37 @@ def _minimal_manifest(**replacements: str) -> str:
         "schema_version": "1",
         "id": "event_20260625_cn",
         "kind": "event",
-        "ui_profile": "legacy_python",
+        "ui_profile": "campaign_v1",
         "opened_on": '"2026-06-25"',
         "name_cn": "美梦巡演奇妙夜",
         "order": "10",
     }
     values.update(replacements)
+    activity = (
+        {
+            "event": "activity:\n  kind: event_story\n  profile: standard\n",
+            "raid": (
+                "activity:\n  kind: raid\n  profile: demo\n  modes: [easy]\n  daily_modes: [easy]\n  ticket_modes: []\n"
+            ),
+            "coalition": (
+                "activity:\n"
+                "  kind: coalition\n"
+                "  profile: demo\n"
+                "  stages:\n"
+                "  - id: easy\n"
+                "    battles: 1\n"
+                "    fleet: single\n"
+            ),
+        }.get(values["kind"], "")
+        .rstrip()
+        .replace("\n", "\n        ")
+    )
     return f"""
         schema_version: {values["schema_version"]}
         id: {values["id"]}
         kind: {values["kind"]}
         ui_profile: {values["ui_profile"]}
+        {activity}
         releases:
           - opened_on: {values["opened_on"]}
             name_cn: {values["name_cn"]}
@@ -88,13 +111,13 @@ def test_event_models_keep_the_old_constructor_and_expose_immutable_manifest_dat
     pack = EventPack(
         pack_id=ContentId("event_20260625_cn"),
         kind="event",
-        ui_profile="legacy_python",
+        ui_profile="campaign_v1",
         releases=(release,),
         policy=policy,
     )
 
     assert compatible.kind == "event"
-    assert compatible.ui_profile == "legacy_python"
+    assert compatible.ui_profile == "campaign_v1"
     assert compatible.releases == ()
     assert pack.releases == (release,)
     assert pack.policy.aliases == (("vsp", "sp"),)
@@ -115,10 +138,53 @@ def test_load_minimal_manifest(tmp_path: Path) -> None:
 
     assert str(pack.pack_id) == "event_20260625_cn"
     assert pack.kind == "event"
-    assert pack.ui_profile == "legacy_python"
+    assert pack.ui_profile == "campaign_v1"
     assert pack.releases == (EventRelease(date(2026, 6, 25), "美梦巡演奇妙夜", 10),)
     assert pack.stages == ()
     assert pack.policy == CampaignPolicy()
+    assert pack.activity == EventStoryDefinition(EventStoryProfileId("standard"))
+
+
+def test_activity_manifest_is_required_and_nested_fields_are_strict(tmp_path: Path) -> None:
+    root = tmp_path / "content" / "events"
+    valid = inspect.cleandoc(_minimal_manifest())
+    without_activity = valid.replace(
+        "activity:\n  kind: event_story\n  profile: standard\n",
+        "",
+    )
+    _write_manifest(root, "event_20260625_cn.yaml", without_activity)
+
+    with pytest.raises(ContentValidationError, match=r"activity.*required"):
+        load_event_manifests(root)
+
+    with_unknown_field = valid.replace("  profile: standard", "  profile: standard\n  python_asset: legacy")
+    _write_manifest(root, "event_20260625_cn.yaml", with_unknown_field)
+
+    with pytest.raises(ContentValidationError, match=r"unknown fields.*python_asset"):
+        load_event_manifests(root)
+
+
+def test_war_archives_manifest_owns_its_typed_client_profile(tmp_path: Path) -> None:
+    root = tmp_path / "content" / "events"
+    body = _minimal_manifest(id="war_archives_20260625_cn", kind="war_archives")
+    _write_manifest(root, "war_archives_20260625_cn.yaml", body)
+
+    with pytest.raises(ContentValidationError, match=r"war_archives.*required"):
+        load_event_manifests(root)
+
+    body = inspect.cleandoc(body) + "\nwar_archives:\n  profile: future_archive"
+    _write_manifest(root, "war_archives_20260625_cn.yaml", body)
+
+    (pack,) = load_event_manifests(root)
+
+    definition = WarArchivesDefinition(WarArchivesProfileId("future_archive"))
+    assert pack.war_archives == definition
+    assert all(stage.war_archives == definition for stage in pack.stages)
+
+    event_body = inspect.cleandoc(_minimal_manifest()) + "\nwar_archives:\n  profile: future_archive"
+    _write_manifest(root, "event_20260625_cn.yaml", event_body)
+    with pytest.raises(ContentValidationError, match=r"must not be defined"):
+        load_event_manifests(root)
 
 
 def test_manifest_rejects_empty_directory(tmp_path: Path) -> None:
@@ -182,7 +248,10 @@ def test_manifest_rejects_identity_or_profile_mismatches(
         _minimal_manifest() + "\nunknown: true",
         _minimal_manifest().replace("            order: 10", "            order: 10\n            unknown: true"),
         _minimal_manifest() + "\npolicy:\n  unknown: true",
-        _minimal_manifest() + "\nstages:\n  - id: t1\n    source: stages/t1.yaml\n    unknown: true",
+        _minimal_manifest()
+        + "\nstages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core\n    unknown: true",
+        _minimal_manifest() + "\nstages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core\n"
+        "    strategy: campaign.event_test.strategy:Campaign",
         _minimal_manifest() + _UNKNOWN_ASSET_FIELD,
     ],
 )
@@ -232,7 +301,7 @@ def test_manifest_rejects_duplicate_yaml_keys(tmp_path: Path) -> None:
 @pytest.mark.parametrize("unsafe_path", ["../outside.yaml", "C:/outside.yaml", "/outside.yaml"])
 def test_manifest_rejects_unsafe_native_paths(tmp_path: Path, unsafe_path: str) -> None:
     root = tmp_path / "content" / "events"
-    body = _minimal_manifest() + f"\nstages:\n  - id: t1\n    source: {unsafe_path}"
+    body = _minimal_manifest() + f"\nstages:\n  - id: t1\n    source: {unsafe_path}\n    runtime_profile: core"
     _write_manifest(root, "event_20260625_cn.yaml", body)
 
     with pytest.raises(ContentValidationError):
@@ -245,7 +314,7 @@ def test_manifest_rejects_path_like_native_stage_ids(tmp_path: Path, stage_id: s
     pack_root = root / "event_20260625_cn"
     (pack_root / "stages").mkdir(parents=True)
     (pack_root / "stages" / "t1.yaml").write_text("map: t1\n", encoding="utf-8")
-    body = _manifest_with(f"stages:\n  - id: {stage_id}\n    source: stages/t1.yaml")
+    body = _manifest_with(f"stages:\n  - id: {stage_id}\n    source: stages/t1.yaml\n    runtime_profile: core")
     _write_manifest(root, "event_20260625_cn.yaml", body)
 
     with pytest.raises(ContentValidationError, match="safe stage id"):
@@ -268,13 +337,35 @@ def test_manifest_rejects_path_like_policy_targets(tmp_path: Path, target: str) 
 @pytest.mark.parametrize(
     "extra",
     [
-        "stages:\n  - id: T1\n    source: stages/t1.yaml",
-        ("stages:\n  - id: t1\n    source: stages/t1.yaml\npolicy:\n  aliases:\n    SHORTCUT: t1"),
-        ("stages:\n  - id: t1\n    source: stages/t1.yaml\npolicy:\n  loops:\n    DAILY: [t1]"),
-        ("stages:\n  - id: t1\n    source: stages/t1.yaml\npolicy:\n  aliases:\n    shortcut: T1"),
-        ("stages:\n  - id: t1\n    source: stages/t1.yaml\npolicy:\n  loops:\n    daily: [T1]"),
-        ("stages:\n  - id: t1\n    source: stages/t1.yaml\npolicy:\n  force_threat_safe_stages: [T1]"),
-        ("stages:\n  - id: t1\n    source: stages/t1.yaml\npolicy:\n  resource_free_stages: [T1]"),
+        "stages:\n  - id: T1\n    source: stages/t1.yaml\n    runtime_profile: core",
+        (
+            "stages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core\n"
+            "policy:\n  aliases:\n    SHORTCUT: t1"
+        ),
+        (
+            "stages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core\n"
+            "policy:\n  loops:\n    DAILY: [t1]"
+        ),
+        (
+            "stages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core\n"
+            "policy:\n  progressions:\n    T1: null"
+        ),
+        (
+            "stages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core\n"
+            "policy:\n  aliases:\n    shortcut: T1"
+        ),
+        (
+            "stages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core\n"
+            "policy:\n  loops:\n    daily: [T1]"
+        ),
+        (
+            "stages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core\n"
+            "policy:\n  force_threat_safe_stages: [T1]"
+        ),
+        (
+            "stages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core\n"
+            "policy:\n  resource_free_stages: [T1]"
+        ),
     ],
 )
 def test_manifest_rejects_noncanonical_stage_identifiers(tmp_path: Path, extra: str) -> None:
@@ -333,7 +424,7 @@ def test_manifest_rejects_pack_root_junction_outside_events_directory(tmp_path: 
     _create_directory_link(link, outside)
 
     try:
-        body = _manifest_with("stages:\n  - id: t1\n    source: stages/t1.yaml")
+        body = _manifest_with("stages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core")
         _write_manifest(root, "event_20260625_cn.yaml", body)
         with pytest.raises(ContentValidationError, match="pack content directory"):
             load_event_manifests(root)
@@ -341,7 +432,7 @@ def test_manifest_rejects_pack_root_junction_outside_events_directory(tmp_path: 
         link.rmdir()
 
 
-def test_manifest_rejects_legacy_campaign_junction_outside_repository_root(tmp_path: Path) -> None:
+def test_manifest_does_not_resolve_stage_targets_from_legacy_campaign_directory(tmp_path: Path) -> None:
     root = tmp_path / "content" / "events"
     campaign_root = tmp_path / "campaign"
     root.mkdir(parents=True)
@@ -355,7 +446,7 @@ def test_manifest_rejects_legacy_campaign_junction_outside_repository_root(tmp_p
     try:
         body = _manifest_with("policy:\n  aliases:\n    shortcut: a1")
         _write_manifest(root, "event_20260625_cn.yaml", body)
-        with pytest.raises(ContentValidationError, match="legacy campaign directory"):
+        with pytest.raises(ContentValidationError, match="dangling stage targets"):
             load_event_manifests(root)
     finally:
         link.rmdir()
@@ -374,6 +465,7 @@ def test_manifest_loads_native_stage_and_assets_only_from_its_pack_root(tmp_path
         stages:
           - id: t1
             source: stages/t1.yaml
+            runtime_profile: core
             assets:
               - id: map
                 path: assets/t1.yaml
@@ -382,6 +474,8 @@ def test_manifest_loads_native_stage_and_assets_only_from_its_pack_root(tmp_path
             a1: t1
           loops:
             t: [t1]
+          progressions:
+            t1: null
           force_threat_safe_stages: [t1]
           resource_free_stages: [t1]
           map_achievement_fallbacks:
@@ -396,18 +490,20 @@ def test_manifest_loads_native_stage_and_assets_only_from_its_pack_root(tmp_path
     assert pack.stages[0].assets[0].path == Path("assets/t1.yaml")
     assert pack.policy.aliases == (("a1", "t1"),)
     assert pack.policy.loops == (("t", ("t1",)),)
+    assert pack.policy.progressions == (StageProgressionRule("t1", None),)
 
 
 @pytest.mark.parametrize(
     "body",
     [
-        _minimal_manifest() + "\nstages:\n  - id: t1\n    source: stages/missing.yaml",
+        _minimal_manifest() + "\nstages:\n  - id: t1\n    source: stages/missing.yaml\n    runtime_profile: core",
         _minimal_manifest() + _DANGLING_ASSET,
-        _minimal_manifest()
-        + "\nstages:\n  - id: t1\n    source: stages/t1.yaml\n  - id: t1\n    source: stages/t1.yaml",
+        _minimal_manifest() + "\nstages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core\n"
+        "  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core",
         _minimal_manifest() + _DUPLICATE_ASSET,
         _minimal_manifest() + "\npolicy:\n  aliases:\n    a1: missing",
         _minimal_manifest() + "\npolicy:\n  loops:\n    t: [missing]",
+        _minimal_manifest() + "\npolicy:\n  progressions:\n    missing: null",
         _minimal_manifest() + "\npolicy:\n  force_threat_safe_stages: [missing]",
         _minimal_manifest() + "\npolicy:\n  resource_free_stages: [missing]",
     ],
@@ -428,8 +524,9 @@ def test_manifest_rejects_duplicate_or_dangling_stage_references(tmp_path: Path,
 def test_real_manifests_preserve_all_readme_releases_and_profiles() -> None:
     packs = load_event_manifests(EVENTS_PATH)
 
-    assert len(packs) == 132
-    assert sum(len(pack.releases) for pack in packs) == 268
+    assert len(packs) == 134
+    assert sum(len(pack.releases) for pack in packs) == 270
+    assert sum(pack.kind == "campaign" for pack in packs) == 2
     assert sum(pack.kind == "war_archives" for pack in packs) == 48
     assert sum(pack.kind == "event" for pack in packs) == 68
     assert sum(pack.kind == "raid" for pack in packs) == 11
@@ -437,14 +534,12 @@ def test_real_manifests_preserve_all_readme_releases_and_profiles() -> None:
     assert sum(len(pack.releases) > 1 for pack in packs) == 77
 
 
-def test_20260625_manifest_registers_native_stages_and_pack_local_strategy() -> None:
+def test_20260625_manifest_registers_only_declarative_native_stages() -> None:
     packs = load_event_manifests(EVENTS_PATH)
     pack = next(pack for pack in packs if str(pack.pack_id) == "event_20260625_cn")
 
-    assert tuple(stage.ref.stage_id for stage in pack.stages) == ("t1", "t2", "t3", "ht1", "ht2", "ht3", "sp")
-    assert pack.stages[0].strategy == "campaign.event_20260625_cn.strategy:EarlyBossStrategy"
-    assert pack.stages[1].strategy == "campaign.event_20260625_cn.strategy:EarlyBossStrategy"
-    assert all(stage.strategy is None for stage in pack.stages[2:])
+    assert tuple(stage.ref.stage_id for stage in pack.stages) == ("ht1", "ht2", "ht3", "sp", "t1", "t2", "t3")
+    assert all(stage.source == f"stages/{stage.ref.stage_id}.yaml" for stage in pack.stages)
 
 
 def test_readme_renderer_matches_checked_in_output() -> None:
@@ -485,9 +580,10 @@ def test_config_generator_writes_readme_through_atomic_boundary(
 def test_stable_core_contains_no_dated_event_string_literals() -> None:
     pattern = re.compile(r"(?:event|war_archives)_\d{8}_cn")
     paths = [
-        Path("module/campaign/run.py"),
         Path("module/content/campaign_policy.py"),
+        Path("module/content/campaign_session_source.py"),
         Path("module/content/manifest.py"),
+        Path("module/gameplay/campaign_factories.py"),
         Path("module/config/config_updater.py"),
         Path("module/config/config_manual.py"),
     ]

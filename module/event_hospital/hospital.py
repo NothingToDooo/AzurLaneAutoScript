@@ -2,13 +2,11 @@ from typing import TYPE_CHECKING
 
 from module.base.timer import Timer
 from module.base.utils import random_rectangle_vector
-from module.config.config import TaskEnd
 from module.event_hospital import assets as hospital_assets
 from module.event_hospital.clue import HospitalClue
 from module.event_hospital.combat import HospitalCombat
-from module.exception import OilExhausted, ScriptEnd
 from module.logger import logger
-from module.ui.page import page_campaign_menu, page_hospital
+from module.ui.page import page_hospital
 from module.ui.switch import Switch
 
 if TYPE_CHECKING:
@@ -118,28 +116,16 @@ class Hospital(HospitalClue, HospitalCombat):
                 logger.info(f"is_in_daily_reward -> {hospital_assets.HOSIPITAL_CLUE_CHECK}")
                 continue
 
-    def loop_invest(self) -> None:
-        """强制舰队 1 出战并完成当前调查后领取奖励。
-
-        情绪检查可能抛出 ScriptEnd；任务切换会触发 TaskEnd。战斗后侧栏重置，因此单轮退出。
-        """
-        self.config.override(Fleet_FleetOrder="fleet1_all_fleet2_standby")
-        while 1:
-            logger.hr("Loop hospital invest", level=2)
+    def execute_selected_investigation_once(self, *, check_emotion: bool = True) -> bool:
+        """完成当前侧栏任务的一次调查；无可调查项目时返回 False。"""
+        self.config.apply_runtime_overlay(Fleet_FleetOrder="fleet1_all_fleet2_standby")
+        if check_emotion:
             self.emotion.check_reduce(battle=1)
-
-            entered = self.invest_enter()
-            if not entered:
-                break
-            self.hospital_combat()
-
-            if self.config.task_switched():
-                self.config.task_stop()
-
-            break
-
+        if not self.invest_enter():
+            return False
+        self.hospital_combat()
         self.claim_invest_reward()
-        logger.info("Loop hospital invest end")
+        return True
 
     def invest_reward_appear(self) -> bool:
         return self.image_color_count(
@@ -172,35 +158,6 @@ class Hospital(HospitalClue, HospitalCombat):
                 continue
         return False
 
-    def loop_aside(self) -> None:
-        """依次清理地点、角色首屏和角色后续页。"""
-        while 1:
-            logger.hr("Loop hospital aside", level=1)
-            HOSPITAL_TAB.set("LOCATION", main=self)
-            selected = self.select_aside()
-            if not selected:
-                break
-            self.loop_invest()
-
-        while 1:
-            logger.hr("Loop hospital aside", level=1)
-            HOSPITAL_TAB.set("CHARACTER", main=self)
-            selected = self.select_aside()
-            if not selected:
-                break
-            self.loop_invest()
-
-        while 1:
-            logger.hr("Loop hospital aside", level=1)
-            HOSPITAL_TAB.set("CHARACTER", main=self)
-            self.aside_swipe_down()
-            selected = self.select_aside()
-            if not selected:
-                break
-            self.loop_invest()
-
-        logger.info("Loop hospital aside end")
-
     def aside_swipe_down(self, *, skip_first_screenshot: bool = True) -> None:
         logger.info("Aside swipe down")
         swiped = False
@@ -224,35 +181,3 @@ class Hospital(HospitalClue, HospitalCombat):
                 interval.reset()
                 swiped = True
                 continue
-
-    def run(self) -> None:
-        """从任意页面执行医院活动；OilExhausted 延迟重试，ScriptEnd 正常结束，TaskEnd 重新抛出。"""
-        if self.event_time_limit_triggered():
-            self.config.task_stop()
-        self.ui_ensure(page_campaign_menu)
-        if self.is_event_entrance_available():
-            self.ui_goto(page_hospital)
-
-        self.daily_reward_receive()
-
-        self.clue_enter()
-        try:
-            self.loop_aside()
-            self.config.task_delay(server_update=True)
-        except OilExhausted:
-            self.clue_exit()
-            logger.hr("Triggered stop condition: Oil limit")
-            self.config.task_delay(minute=(120, 240))
-        except ScriptEnd as e:
-            logger.hr("Script end")
-            logger.info(str(e))
-            self.clue_exit()
-        except TaskEnd:
-            self.clue_exit()
-            raise
-
-
-if __name__ == "__main__":
-    self = Hospital("alas")
-    self.device.screenshot()
-    self.loop_aside()

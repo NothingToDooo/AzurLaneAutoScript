@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20240912_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2024-09-12'
   name_cn: 唤醒苍红之炎
@@ -9,6 +12,46 @@ releases:
 - opened_on: '2025-04-30'
   name_cn: null
   order: 2160
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_3d7f511a181d56ce
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_3d7f511a181d56ce
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_3d7f511a181d56ce
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_8fcc37070dd41343
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_8fcc37070dd41343
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_8fcc37070dd41343
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_3d7f511a181d56ce
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_3d7f511a181d56ce
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_3d7f511a181d56ce
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_8fcc37070dd41343
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_8fcc37070dd41343
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_8fcc37070dd41343
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_3d7f511a181d56ce
 policy:
   aliases:
     ht1: c1
@@ -26,3 +69,16 @@ policy:
   map_achievement_fallbacks:
     threat_safe: map_3_stars
     threat_safe_without_3_stars: 100_percent_clear
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

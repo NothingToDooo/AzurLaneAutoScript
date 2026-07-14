@@ -1,7 +1,26 @@
 schema_version: 1
 id: coalition_20250626
 kind: coalition
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: coalition
+  profile: neoncity
+  stages:
+  - id: easy
+    battles: 1
+    fleet: single
+  - id: normal
+    battles: 2
+    fleet: selectable
+  - id: hard
+    battles: 3
+    fleet: selectable
+  - id: sp
+    battles: 4
+    fleet: multi
+  - id: ex
+    battles: 5
+    fleet: multi
 releases:
 - opened_on: '2025-06-26'
   name_cn: 迷彩都市的寻踪者

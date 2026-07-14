@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20221124_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2022-11-24'
   name_cn: 炼金术士与秘密遗迹群岛
@@ -15,6 +18,43 @@ releases:
 - opened_on: '2025-08-07'
   name_cn: null
   order: 2260
+stages:
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_784aa473533514b6
+- id: t1
+  source: stages/t1.yaml
+  runtime_profile: profile_784aa473533514b6
+- id: t2
+  source: stages/t2.yaml
+  runtime_profile: profile_784aa473533514b6
+- id: t3
+  source: stages/t3.yaml
+  runtime_profile: profile_784aa473533514b6
+- id: t4
+  source: stages/t4.yaml
+  runtime_profile: profile_784aa473533514b6
+- id: t5
+  source: stages/t5.yaml
+  runtime_profile: profile_784aa473533514b6
+- id: th1
+  source: stages/th1.yaml
+  runtime_profile: profile_6e5fee0dfef597c4
+- id: th2
+  source: stages/th2.yaml
+  runtime_profile: profile_6e5fee0dfef597c4
+- id: th3
+  source: stages/th3.yaml
+  runtime_profile: profile_6e5fee0dfef597c4
+- id: th4
+  source: stages/th4.yaml
+  runtime_profile: profile_6e5fee0dfef597c4
+- id: th5
+  source: stages/th5.yaml
+  runtime_profile: profile_6e5fee0dfef597c4
+- id: ts1
+  source: stages/ts1.yaml
+  runtime_profile: profile_d2e67c3f5be2ce51
 policy:
   aliases:
     a.sp: sp
@@ -47,3 +87,15 @@ policy:
   - th3
   - th4
   - th5
+  progressions:
+    t1: t2
+    t2: t3
+    t3: ts1
+    t4: t5
+    t5: null
+    th1: th2
+    th2: th3
+    th3: th4
+    th4: th5
+    th5: null
+    ts1: t4

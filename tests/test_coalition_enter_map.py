@@ -5,8 +5,12 @@ import pytest
 
 from module.coalition import assets as coalition_assets
 from module.coalition import ui as coalition_ui
+from module.coalition.profile import COALITION_CLIENT_PROFILES, CoalitionClientSession
 from module.coalition.ui import CoalitionUI
 from module.combat.assets import BATTLE_PREPARATION
+from module.content.activity_catalog import ActivityCatalog
+from module.content.activity_profile import CoalitionFleetMode, CoalitionStageId
+from module.content.manifest import load_default_event_manifests
 from module.exception import RequestHumanTakeover
 
 if TYPE_CHECKING:
@@ -15,7 +19,15 @@ if TYPE_CHECKING:
     from module.base.button import Button, MatchOffset
     from module.base.timer import Timer
     from module.base.type_alias import ImageArray
-    from module.coalition.contracts import CoalitionEvent, CoalitionFleetMode, CoalitionStage
+
+
+def _session(content_id: str, stage_id: str, fleet: CoalitionFleetMode) -> CoalitionClientSession:
+    catalog = ActivityCatalog(load_default_event_manifests())
+    return COALITION_CLIENT_PROFILES.resolve(
+        catalog.resolve_coalition(content_id),
+        CoalitionStageId(stage_id),
+        fleet,
+    )
 
 
 class _Timer:
@@ -24,9 +36,7 @@ class _Timer:
         self.reset_count = 0
 
     def reached(self) -> bool:
-        if not self.results:
-            return False
-        return self.results.pop(0)
+        return self.results.pop(0) if self.results else False
 
     def reset(self) -> None:
         self.reset_count += 1
@@ -43,14 +53,15 @@ class _Device:
 class _Coalition(CoalitionUI):
     device: _Device
 
-    def __init__(self) -> None:
+    def __init__(self, client: CoalitionClientSession) -> None:
+        self.client = client
         self.device = _Device()
         self.loop_count = 8
         self.battle_results: list[bool] = []
         self.fleet_results: list[bool] = []
         self.in_coalition_results: list[bool] = []
         self.in_difficulty_results: list[bool] = []
-        self.fleet_preparation_calls: list[tuple[CoalitionEvent, CoalitionStage, CoalitionFleetMode]] = []
+        self.fleet_preparation_calls = 0
         self.guild_results: list[bool] = []
         self.auto_search_results: list[bool] = []
         self.retirement_results: list[bool] = []
@@ -62,9 +73,7 @@ class _Coalition(CoalitionUI):
 
     @staticmethod
     def _next(results: list[bool]) -> bool:
-        if results:
-            return results.pop(0)
-        return False
+        return results.pop(0) if results else False
 
     @override
     def loop(self, *, skip_first: bool = True, timeout: float | Timer | None = None) -> Iterator[ImageArray]:
@@ -84,27 +93,19 @@ class _Coalition(CoalitionUI):
         del offset, interval, similarity, threshold
         if button == BATTLE_PREPARATION:
             return self._next(self.battle_results)
-        if button in {
-            coalition_assets.FROSTFALL_FLEET_PREPARATION,
-            coalition_assets.DAL_FLEET_PREPARATION,
-        }:
+        if button == self.client.profile.preparation.enter:
             return self._next(self.fleet_results)
         return False
 
     def in_coalition(self) -> bool:
         return self._next(self.in_coalition_results)
 
-    def in_coalition_20251120_difficulty_selection(self) -> bool:
+    def in_difficulty_selection(self) -> bool:
         return self._next(self.in_difficulty_results)
 
     @override
-    def handle_fleet_preparation(
-        self,
-        event: CoalitionEvent,
-        stage: CoalitionStage,
-        mode: CoalitionFleetMode,
-    ) -> bool:
-        self.fleet_preparation_calls.append((event, stage, mode))
+    def handle_fleet_preparation(self) -> bool:
+        self.fleet_preparation_calls += 1
         return False
 
     def handle_guild_popup_cancel(self) -> bool:
@@ -145,38 +146,38 @@ def _patch_timers(monkeypatch: pytest.MonkeyPatch, timers: Iterable[_Timer]) -> 
     monkeypatch.setattr(coalition_ui, "Timer", lambda *_args, **_kwargs: timer_queue.pop(0))
 
 
-def test_coalition_enter_map_clicks_stage_then_fleet_preparation(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_enter_map_clicks_stage_then_fleet_preparation(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_timers(monkeypatch, [_Timer([True, False]), _Timer(), _Timer([True])])
-    coalition = _Coalition()
+    coalition = _Coalition(_session("coalition_20230323", "tc3", CoalitionFleetMode.MULTI))
     coalition.battle_results = [False, False, True]
     coalition.in_coalition_results = [True, False]
     coalition.fleet_results = [True]
 
-    coalition.enter_map("coalition_20230323", "tc3", "multi")
+    coalition.enter_map()
 
     assert coalition.device.clicks == [
         coalition_assets.FROSTFALL_TC3,
         coalition_assets.FROSTFALL_FLEET_PREPARATION,
     ]
-    assert coalition.fleet_preparation_calls == [("coalition_20230323", "tc3", "multi")]
+    assert coalition.fleet_preparation_calls == 1
 
 
-def test_coalition_enter_map_clicks_dal_difficulty(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_enter_map_clicks_profile_difficulty(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_timers(monkeypatch, [_Timer([False]), _Timer([True]), _Timer()])
-    coalition = _Coalition()
+    coalition = _Coalition(_session("coalition_20251120", "area1-hard", CoalitionFleetMode.SINGLE))
     coalition.battle_results = [False, True]
     coalition.in_difficulty_results = [True]
 
-    coalition.enter_map("coalition_20251120", "area1-hard", "single")
+    coalition.enter_map()
 
     assert coalition.device.clicks == [coalition_assets.DAL_HARD]
 
 
-def test_coalition_enter_map_raises_after_campaign_click_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_enter_map_raises_after_stage_click_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_timers(monkeypatch, [_Timer([True] * 6), _Timer(), _Timer()])
-    coalition = _Coalition()
+    coalition = _Coalition(_session("coalition_20230323", "tc3", CoalitionFleetMode.MULTI))
     coalition.battle_results = [False] * 7
     coalition.in_coalition_results = [True] * 6
 
     with pytest.raises(RequestHumanTakeover):
-        coalition.enter_map("coalition_20230323", "tc3", "multi")
+        coalition.enter_map()

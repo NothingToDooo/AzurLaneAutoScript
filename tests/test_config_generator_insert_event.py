@@ -7,6 +7,7 @@ from module.config.deep import deep_get
 from module.config.utils import filepath_args, read_file
 from module.content.manifest import load_event_manifests
 from module.content.models import ContentId, EventPack, EventRelease
+from module.content.war_archives_profile import WarArchivesDefinition, WarArchivesProfileId
 
 if TYPE_CHECKING:
     from module.config.deep import MutableDeepData
@@ -36,8 +37,9 @@ def _pack(pack_id: str, kind: str, *releases: EventRelease) -> EventPack:
     return EventPack(
         pack_id=ContentId(pack_id),
         kind=kind,
-        ui_profile="legacy_python",
+        ui_profile="campaign_v1",
         releases=releases,
+        war_archives=(WarArchivesDefinition(WarArchivesProfileId("test")) if kind == "war_archives" else None),
     )
 
 

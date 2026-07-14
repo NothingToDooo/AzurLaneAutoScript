@@ -1,7 +1,13 @@
 schema_version: 1
 id: raid_20240130
 kind: raid
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: raid
+  profile: huanchang
+  modes: [easy, normal, hard, ex]
+  daily_modes: [easy, normal, hard, ex]
+  ticket_modes: [ex]
 releases:
 - opened_on: '2024-01-30'
   name_cn: 寰昌宇定家事忙

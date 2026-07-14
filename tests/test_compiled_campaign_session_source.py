@@ -1,0 +1,268 @@
+from dataclasses import FrozenInstanceError
+from operator import itemgetter
+from typing import TYPE_CHECKING, cast
+
+import pytest
+
+from module.content import (
+    CampaignRunVariant,
+    CompiledCampaignSessionSource,
+    ContentCatalog,
+    ContentValidationError,
+    EventPack,
+    StageRef,
+    StageSpec,
+    UnknownStageError,
+)
+from module.content.manifest import load_default_event_manifests
+from module.content.stage_loader import StageSpecLoader
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
+def _all_native_specs(catalog: ContentCatalog) -> tuple[StageSpec, ...]:
+    return tuple(stage for pack in catalog.packs for stage in pack.stages)
+
+
+def _assign_attribute(target: object, name: str, value: object) -> None:
+    setattr(target, name, value)
+
+
+def _minimal_stage(*, step_tag: str = "clear_boss", extra_config: str = "") -> str:
+    return f"""schema_version: 4
+map:
+  name: T1
+  shape: A1
+  camera_data: [A1]
+  camera_data_spawn_point: [A1]
+  map_data: |-
+    MB
+  weight_data: |-
+    50
+  spawn_data:
+  - battle: 0
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: false
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: false
+{extra_config}enemy_filter: 1L
+battles:
+  0:
+    steps:
+    - tag: {step_tag}
+      strategy: fleet_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+programs: []
+boss_approaches: []
+hard_mode: null
+"""
+
+
+def _source_for_stage(tmp_path: Path, body: str) -> CompiledCampaignSessionSource:
+    content_root = tmp_path / "events"
+    stage_path = content_root / "event_test" / "stages" / "t1.yaml"
+    stage_path.parent.mkdir(parents=True)
+    stage_path.write_text(body, encoding="utf-8", newline="\n")
+    spec = StageSpec(StageRef("event_test", "t1"), "stages/t1.yaml")
+    catalog = ContentCatalog((EventPack("event_test", stages=(spec,)),))
+    return CompiledCampaignSessionSource(catalog, StageSpecLoader(content_root))
+
+
+def test_default_startup_compiles_every_manifest_native_stage_into_both_variants(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    catalog = ContentCatalog(load_default_event_manifests())
+    specs = _all_native_specs(catalog)
+
+    source = CompiledCampaignSessionSource(catalog, StageSpecLoader())
+
+    assert catalog.stages == specs
+    assert specs
+    compiled = {
+        (spec.ref, variant): source.resolve(spec.ref, variant) for spec in specs for variant in CampaignRunVariant
+    }
+    assert len(compiled) == len(specs) * len(CampaignRunVariant)
+    assert all(
+        session.definition.ref == ref and session.variant is variant for (ref, variant), session in compiled.items()
+    )
+
+    def reject_runtime_compile(_loader: StageSpecLoader, _spec: StageSpec) -> None:
+        message = "resolve must only read the startup snapshot"
+        raise AssertionError(message)
+
+    monkeypatch.setattr(StageSpecLoader, "load", reject_runtime_compile)
+    assert all(source.resolve(ref, variant) is session for (ref, variant), session in compiled.items())
+
+
+def test_selected_snapshot_rejects_duplicate_missing_and_invalid_lookups() -> None:
+    catalog = ContentCatalog(load_default_event_manifests())
+    first, second, *_remaining = catalog.stages
+    source = CompiledCampaignSessionSource(catalog, StageSpecLoader(), stage_refs=(first.ref,))
+
+    assert source.resolve(first.ref, CampaignRunVariant.NORMAL).definition.ref == first.ref
+    with pytest.raises(UnknownStageError, match="not compiled"):
+        source.resolve(second.ref, CampaignRunVariant.NORMAL)
+    with pytest.raises(TypeError, match="StageRef"):
+        source.resolve(cast("StageRef", object()), CampaignRunVariant.NORMAL)
+    with pytest.raises(TypeError, match="CampaignRunVariant"):
+        source.resolve(first.ref, cast("CampaignRunVariant", "normal"))
+    with pytest.raises(ContentValidationError, match="duplicate"):
+        CompiledCampaignSessionSource(catalog, StageSpecLoader(), stage_refs=(first.ref, first.ref))
+    with pytest.raises(UnknownStageError, match="missing"):
+        CompiledCampaignSessionSource(
+            catalog,
+            StageSpecLoader(),
+            stage_refs=(StageRef(first.ref.pack_id, "missing"),),
+        )
+
+
+def test_content_source_selects_aliases_and_loop_stages_before_resolving_variants() -> None:
+    catalog = ContentCatalog(load_default_event_manifests())
+    source = CompiledCampaignSessionSource(
+        catalog,
+        StageSpecLoader(),
+        loop_choice=itemgetter(-1),
+    )
+
+    alias = source.select(StageRef("campaign_main", "campaign_1_1"), remaining_runs=0)
+    assert alias.selected_ref == StageRef("campaign_main", "1-1")
+    assert not alias.loop_stage_switch
+    assert source.resolve(alias.selected_ref, CampaignRunVariant.NORMAL).definition.ref == alias.selected_ref
+
+    random_loop = source.select(StageRef("event_20221124_cn", "th"), remaining_runs=0)
+    assert random_loop.selected_ref == StageRef("event_20221124_cn", "th5")
+    assert random_loop.loop_stage_switch
+
+    ordered_loop = source.select(StageRef("event_20221124_cn", "th"), remaining_runs=2)
+    assert ordered_loop.selected_ref == StageRef("event_20221124_cn", "th4")
+    assert ordered_loop.loop_stage_switch
+
+    resumed_loop = source.select(
+        StageRef("event_20221124_cn", "th"),
+        remaining_runs=0,
+        preferred_ref=StageRef("event_20221124_cn", "th2"),
+    )
+    assert resumed_loop.selected_ref == StageRef("event_20221124_cn", "th2")
+    assert resumed_loop.loop_stage_switch
+
+    with pytest.raises(ContentValidationError, match="preferred_ref"):
+        source.select(
+            StageRef("event_20221124_cn", "th"),
+            remaining_runs=0,
+            preferred_ref=StageRef("event_20221124_cn", "a1"),
+        )
+
+
+def test_hard_stage_resolution_prefers_explicit_override_then_main_campaign() -> None:
+    catalog = ContentCatalog(load_default_event_manifests())
+    hard_override = StageRef("campaign_hard", "12-4")
+    ordinary_stage = StageRef("campaign_main", "11-4")
+    source = CompiledCampaignSessionSource(
+        catalog,
+        StageSpecLoader(),
+        stage_refs=(hard_override, ordinary_stage),
+    )
+
+    assert source.resolve_hard_stage_ref("12-4") == hard_override
+    assert source.resolve_hard_stage_ref("11-4") == ordinary_stage
+    assert (
+        source.resolve(
+            source.resolve_hard_stage_ref("12-4"),
+            CampaignRunVariant.LOOP,
+        ).definition.ref
+        == hard_override
+    )
+    assert (
+        source.resolve(
+            source.resolve_hard_stage_ref("11-4"),
+            CampaignRunVariant.LOOP,
+        ).definition.ref
+        == ordinary_stage
+    )
+
+
+def test_content_source_rejects_invalid_loop_selection_and_duplicate_canonical_stage_refs() -> None:
+    catalog = ContentCatalog(load_default_event_manifests())
+    invalid = CompiledCampaignSessionSource(
+        catalog,
+        StageSpecLoader(),
+        loop_choice=lambda _stages: "missing",
+    )
+
+    with pytest.raises(ContentValidationError, match="loop_choice"):
+        invalid.select(StageRef("event_20221124_cn", "th"), remaining_runs=0)
+    with pytest.raises(ValueError, match="remaining_runs"):
+        invalid.select(StageRef("campaign_main", "1-1"), remaining_runs=-1)
+    with pytest.raises(ContentValidationError, match="canonical"):
+        CompiledCampaignSessionSource(
+            catalog,
+            StageSpecLoader(),
+            stage_refs=(
+                StageRef("campaign_main", "1-1"),
+                StageRef("campaign_main", "campaign_1_1"),
+            ),
+        )
+
+
+def test_compiled_source_and_sessions_are_immutable() -> None:
+    catalog = ContentCatalog(load_default_event_manifests())
+    (first, *_remaining) = catalog.stages
+    source = CompiledCampaignSessionSource(catalog, StageSpecLoader(), stage_refs=(first.ref,))
+    session = source.resolve(first.ref, CampaignRunVariant.LOOP)
+
+    with pytest.raises(FrozenInstanceError):
+        _assign_attribute(source, "_sessions", {})
+    with pytest.raises(FrozenInstanceError):
+        _assign_attribute(session, "variant", CampaignRunVariant.NORMAL)
+
+
+@pytest.mark.parametrize(
+    ("body", "message"),
+    [
+        (_minimal_stage(step_tag="unknown"), "unknown tag"),
+        (
+            _minimal_stage(extra_config="  MAP_UNKNOWN_MECHANIC: true\n"),
+            "unknown fields.*MAP_UNKNOWN_MECHANIC",
+        ),
+        (
+            _minimal_stage(
+                extra_config=(
+                    "  MAP_CHAPTER_SWITCH_20241219_SP: true\n"
+                    "  STAGE_ENTRANCE: [half, future]\n"
+                    "  MAP_HAS_MODE_SWITCH: true\n"
+                )
+            ),
+            "unsupported entrance profile",
+        ),
+    ],
+)
+def test_startup_compile_fails_fast_for_unknown_policy_mechanic_or_ui_revision(
+    tmp_path: Path,
+    body: str,
+    message: str,
+) -> None:
+    with pytest.raises(ContentValidationError, match=message):
+        _source_for_stage(tmp_path, body)

@@ -1,5 +1,3 @@
-from typing import Never
-
 from module.combat.assets import EXP_INFO_C, EXP_INFO_D
 from module.daemon.daemon_base import DaemonBase
 from module.exception import CampaignEnd
@@ -20,7 +18,22 @@ class AzurLaneDaemon(DaemonBase, OSFleet, PortHandler):
 
     def prepare_os_daemon_config(self) -> None:
         self.config.merge(OSConfig())
-        self.config.override(HOMO_EDGE_DETECT=False)
+        self.config.apply_runtime_overlay(HOMO_EDGE_DETECT=False)
+
+    def advance_once(self) -> None:
+        """推进一个可中断步骤；没有动作时也返回当前安全点。"""
+        self.device.screenshot()
+        handlers = (
+            self.handle_os_daemon_combat,
+            self.handle_os_daemon_exp_info,
+            self.handle_os_daemon_map_event,
+            self.handle_os_daemon_auto_search_reward,
+            self.handle_os_daemon_port_repair,
+            self.handle_os_daemon_enemy_selection,
+        )
+        for handler in handlers:
+            if handler():
+                return
 
     def handle_os_daemon_combat(self) -> bool:
         # 战斗中只保持截图轮询，不插入其他操作。
@@ -66,28 +79,3 @@ class AzurLaneDaemon(DaemonBase, OSFleet, PortHandler):
 
     def handle_os_daemon_enemy_selection(self) -> bool:
         return bool(self.config.OpsiDaemon_SelectEnemy and self.click_nearest_object())
-
-    def run(self) -> Never:
-        self.prepare_os_daemon_config()
-        while 1:
-            self.device.screenshot()
-
-            if self.handle_os_daemon_combat():
-                continue
-            if self.handle_os_daemon_exp_info():
-                continue
-            if self.handle_os_daemon_map_event():
-                continue
-            if self.handle_os_daemon_auto_search_reward():
-                continue
-
-            self.handle_os_daemon_port_repair()
-            if self.handle_os_daemon_enemy_selection():
-                continue
-
-            # 没有自动结束条件，需要手动停止。
-
-
-if __name__ == "__main__":
-    b = AzurLaneDaemon("alas", task="OpsiDaemon")
-    b.run()

@@ -1,8 +1,25 @@
 schema_version: 1
 id: war_archives_20200507_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: the_way_home_in_the_night
 releases:
 - opened_on: '2023-03-09'
   name_cn: 夜幕下的归途
   order: 230
+stages:
+- id: sp1
+  source: stages/sp1.yaml
+  runtime_profile: profile_e8b9f9cf244a5223
+- id: sp2
+  source: stages/sp2.yaml
+  runtime_profile: profile_e8b9f9cf244a5223
+- id: sp3
+  source: stages/sp3.yaml
+  runtime_profile: profile_e8b9f9cf244a5223
+policy:
+  progressions:
+    sp1: sp2
+    sp2: sp3
+    sp3: null

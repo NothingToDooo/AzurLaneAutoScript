@@ -6,6 +6,7 @@ from module.config.deep import DeepValue, MutableDeepData, deep_get
 from module.config.utils import filepath_i18n, read_file
 from module.content.manifest import load_default_event_manifests
 from module.content.models import ContentId, EventPack, EventRelease
+from module.content.war_archives_profile import WarArchivesDefinition, WarArchivesProfileId
 
 
 def _string_mapping(value: DeepValue | None) -> dict[str, str]:
@@ -26,6 +27,7 @@ def _pack(pack_id: str, kind: str, *releases: tuple[str, str | None, int]) -> Ev
         pack_id=ContentId(pack_id),
         kind=kind,
         releases=tuple(EventRelease(date.fromisoformat(opened), name, order) for opened, name, order in releases),
+        war_archives=(WarArchivesDefinition(WarArchivesProfileId("test")) if kind == "war_archives" else None),
     )
 
 
@@ -107,5 +109,5 @@ def test_real_manifest_i18n_matches_checked_in_chinese_names() -> None:
     checked_in_packs = {pack_id: checked_in[pack_id] for pack_id in generated}
 
     assert generated == checked_in_packs
-    assert len(generated) == 132
+    assert len(generated) == 134
     assert list(generated) == sorted(generated)

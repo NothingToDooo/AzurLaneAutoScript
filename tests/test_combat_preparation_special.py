@@ -1,8 +1,7 @@
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Never, override
+from typing import TYPE_CHECKING, override
 
 import numpy as np
-import pytest
 
 from module.combat.assets import BATTLE_PREPARATION
 from module.event_hospital.combat import HospitalCombat
@@ -14,10 +13,6 @@ if TYPE_CHECKING:
     from module.base.button import Button, MatchOffset
     from module.base.timer import Timer
     from module.base.type_alias import ImageArray
-
-
-class _TaskBalanced(Exception):
-    pass
 
 
 class _Device:
@@ -98,13 +93,10 @@ class _HospitalCombat(_SpecialCombatBase, HospitalCombat):
         super().__init__()
         self.config = SimpleNamespace(
             StopCondition_OilLimit=0,
-            TaskBalancer_Enable=True,
             Hospital_UseRecommendFleet=True,
         )
         self.appear_results = [True, True]
-        self.task_balancer_results = [True, True]
-        self.task_balancer_calls = 0
-        self.handle_task_balancer_count = 0
+        self.oil_checks = 0
         self.fleet_recommend_results: list[bool] = []
         self.interval_clears: list[Button | list[Button] | tuple[Button, ...] | None] = []
 
@@ -125,16 +117,8 @@ class _HospitalCombat(_SpecialCombatBase, HospitalCombat):
     @override
     def get_oil(self, *, skip_first_screenshot: bool = True) -> int:
         del skip_first_screenshot
+        self.oil_checks += 1
         return 1000
-
-    def triggered_task_balancer(self) -> bool:
-        self.task_balancer_calls += 1
-        return self._next(self.task_balancer_results)
-
-    @override
-    def handle_task_balancer(self) -> Never:
-        self.handle_task_balancer_count += 1
-        raise _TaskBalanced
 
     @override
     def handle_fleet_recommend(self, *, recommend: bool = True) -> bool:
@@ -152,23 +136,9 @@ class _HospitalCombat(_SpecialCombatBase, HospitalCombat):
 
 
 class _Raid(_SpecialCombatBase, Raid):
-    config: SimpleNamespace
-
-    def __init__(self, *, has_oil_icon: bool) -> None:
+    def __init__(self) -> None:
         _SpecialCombatBase.__init__(self)
-        self.config = SimpleNamespace(task_stop=self._task_stop)
-        self.has_oil_icon = has_oil_icon
         self.appear_results = [True]
-        self.stop_condition_results: list[bool] = []
-        self.stop_condition_calls: list[dict[str, bool]] = []
-        self.task_stop_count = 0
-
-    @property
-    def _raid_has_oil_icon(self) -> bool:
-        return self.has_oil_icon
-
-    def _task_stop(self) -> None:
-        self.task_stop_count += 1
 
     @override
     def appear(
@@ -188,46 +158,21 @@ class _Raid(_SpecialCombatBase, Raid):
     def handle_raid_ticket_use(self) -> bool:
         return False
 
-    @override
-    def triggered_stop_condition(
-        self,
-        *,
-        oil_check: bool = False,
-        pt_check: bool = False,
-        coin_check: bool = False,
-    ) -> bool:
-        checks = {"oil_check": oil_check, "pt_check": pt_check, "coin_check": coin_check}
-        self.stop_condition_calls.append({name: enabled for name, enabled in checks.items() if enabled})
-        return self._next(self.stop_condition_results)
 
-
-def test_hospital_combat_preparation_checks_task_balancer_once() -> None:
+def test_hospital_combat_preparation_checks_oil_once_without_scheduler_control() -> None:
     combat = _HospitalCombat()
     combat.combat_results = [False, True]
 
-    with pytest.raises(_TaskBalanced):
-        combat.combat_preparation()
+    combat.combat_preparation()
 
-    assert combat.task_balancer_calls == 1
-    assert combat.handle_task_balancer_count == 1
+    assert combat.oil_checks == 1
+    assert not hasattr(combat, "triggered_task_balancer")
 
 
-def test_raid_combat_preparation_checks_stop_condition_once_when_oil_icon_visible() -> None:
-    raid = _Raid(has_oil_icon=True)
-    raid.stop_condition_results = [True]
+def test_raid_combat_preparation_does_not_own_scheduler_stop_conditions() -> None:
+    raid = _Raid()
     raid.combat_results = [True]
 
     raid.combat_preparation()
 
-    assert raid.stop_condition_calls == [{"oil_check": True, "coin_check": True}]
-    assert raid.task_stop_count == 1
-
-
-def test_raid_combat_preparation_skips_stop_condition_without_oil_icon() -> None:
-    raid = _Raid(has_oil_icon=False)
-    raid.combat_results = [True]
-
-    raid.combat_preparation()
-
-    assert raid.stop_condition_calls == []
-    assert raid.task_stop_count == 0
+    assert not hasattr(raid, "triggered_stop_condition")

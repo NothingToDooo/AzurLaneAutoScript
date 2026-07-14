@@ -8,6 +8,26 @@ from module.replay.device import (
     ReplayImageLoadError,
     ReplayIncompleteError,
 )
+from module.replay.session import (
+    ReplayGameSession,
+    ReplaySessionError,
+    ReplaySessionExhaustedError,
+    ReplaySessionImageLoadError,
+    ReplaySessionIncompleteError,
+    ReplaySessionMismatchError,
+)
+from module.replay.session_trace import (
+    ActionStep,
+    AppStartStep,
+    AppStatusStep,
+    AppStopStep,
+    CaptureStep,
+    ReplayStep,
+    ReplayTrace,
+    TraceMetadata,
+    read_session_trace,
+    write_session_trace,
+)
 from module.replay.trace import (
     ClickAction,
     RecordedAction,
@@ -18,6 +38,11 @@ from module.replay.trace import (
 )
 
 __all__ = [
+    "ActionStep",
+    "AppStartStep",
+    "AppStatusStep",
+    "AppStopStep",
+    "CaptureStep",
     "ClickAction",
     "RecordedAction",
     "ReplayActionMismatchError",
@@ -27,9 +52,20 @@ __all__ = [
     "ReplayFrameIncompleteError",
     "ReplayFrameNotActiveError",
     "ReplayFramesExhaustedError",
+    "ReplayGameSession",
     "ReplayImageLoadError",
     "ReplayIncompleteError",
+    "ReplaySessionError",
+    "ReplaySessionExhaustedError",
+    "ReplaySessionImageLoadError",
+    "ReplaySessionIncompleteError",
+    "ReplaySessionMismatchError",
+    "ReplayStep",
+    "ReplayTrace",
     "SwipeAction",
+    "TraceMetadata",
+    "read_session_trace",
     "read_trace",
+    "write_session_trace",
     "write_trace",
 ]

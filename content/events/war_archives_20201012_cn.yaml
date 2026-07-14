@@ -1,8 +1,25 @@
 schema_version: 1
 id: war_archives_20201012_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: sundered_blue
 releases:
 - opened_on: '2024-03-21'
   name_cn: 划破海空之翼
   order: 310
+stages:
+- id: sp1
+  source: stages/sp1.yaml
+  runtime_profile: profile_02440db1df61ea03
+- id: sp2
+  source: stages/sp2.yaml
+  runtime_profile: profile_02440db1df61ea03
+- id: sp3
+  source: stages/sp3.yaml
+  runtime_profile: profile_02440db1df61ea03
+policy:
+  progressions:
+    sp1: sp2
+    sp2: sp3
+    sp3: null

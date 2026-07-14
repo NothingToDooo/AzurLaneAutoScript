@@ -1,0 +1,97 @@
+schema_version: 4
+map:
+  name: 8-1
+  shape: I3
+  camera_data:
+  - D1
+  - F1
+  camera_data_spawn_point:
+  - D1
+  - F1
+  map_data: 'SP -- ++ ++ ME -- ME MB ++
+
+    SP -- ++ ++ ME -- ME -- ME
+
+    -- ME ME -- ME ++ ME ME MB'
+  weight_data: '50 50 50 50 50 50 21 30 50
+
+    50 50 50 50 25 24 20 12 11
+
+    50 45 40 31 30 50 22 10 20'
+  spawn_data:
+  - battle: 0
+    enemy: 3
+  - battle: 1
+    enemy: 2
+  - battle: 2
+    enemy: 1
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 1
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: false
+  MAP_HAS_AMBUSH: true
+  MAP_HAS_MYSTERY: true
+  STAR_REQUIRE_1: 1
+  STAR_REQUIRE_2: 2
+  STAR_REQUIRE_3: 3
+  MAP_SWIPE_MULTIPLY:
+  - 1.127
+  - 1.148
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.09
+  - 1.11
+enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - tag: default_battle
+  4:
+    steps:
+    - strategy: brute_force
+      tag: clear_boss_roadblock
+    - strategy: brute_force
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination:
+  - battle: 0
+    fleet: fleet_2
+    tag: push_forward
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns: []
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs:
+- activation_modes:
+  - normal
+  battle: 0
+  statements:
+  - action:
+      category: fleet_coordination
+      index: 0
+    expected_target: any
+    tag: perform_mechanic
+  - action:
+      tag: default_battle
+    tag: return_battle
+boss_approaches: []
+hard_mode: null

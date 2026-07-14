@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20250520_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2025-05-20'
   name_cn: 高塔上的蔷薇
@@ -9,6 +12,46 @@ releases:
 - opened_on: '2025-06-12'
   name_cn: null
   order: 2180
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_b8beafad0bed4b5f
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_b8beafad0bed4b5f
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_b8beafad0bed4b5f
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_b1f8bd0372567464
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_b1f8bd0372567464
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_e0a64b6f8ca46e0d
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_b8beafad0bed4b5f
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_b8beafad0bed4b5f
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_b8beafad0bed4b5f
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_b1f8bd0372567464
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_b1f8bd0372567464
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_e0a64b6f8ca46e0d
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_754e9e64baabaf3f
 policy:
   aliases:
     ht1: c1
@@ -23,3 +66,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

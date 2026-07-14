@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20210121_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2021-01-21'
   name_cn: 复刻神圣的悲喜剧
@@ -9,6 +12,58 @@ releases:
 - opened_on: '2022-10-21'
   name_cn: null
   order: 1120
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_3de990e4727f74a3
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_df3f9b776af452c7
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_df3f9b776af452c7
+- id: as1
+  source: stages/as1.yaml
+  runtime_profile: profile_b580629827d89c70
+- id: as2
+  source: stages/as2.yaml
+  runtime_profile: profile_b580629827d89c70
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_d34c48a230e1ef84
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_d34c48a230e1ef84
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_d34c48a230e1ef84
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_3de990e4727f74a3
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_df3f9b776af452c7
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_df3f9b776af452c7
+- id: cs1
+  source: stages/cs1.yaml
+  runtime_profile: profile_3de990e4727f74a3
+- id: cs2
+  source: stages/cs2.yaml
+  runtime_profile: profile_3de990e4727f74a3
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_d34c48a230e1ef84
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_d34c48a230e1ef84
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_d34c48a230e1ef84
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_b580629827d89c70
 policy:
   aliases:
     ht1: c1
@@ -23,3 +78,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

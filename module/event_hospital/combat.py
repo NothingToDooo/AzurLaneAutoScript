@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 from module.base.decorator import run_once
 from module.base.timer import Timer
-from module.campaign.campaign_event import CampaignEvent
+from module.campaign.campaign_status import CampaignStatus
 from module.combat.assets import BATTLE_PREPARATION
 from module.combat.combat import Combat
 from module.event_hospital.assets import HOSPITAL_BATTLE_PREPARE
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
-class HospitalCombat(Combat, HospitalUI, CampaignEvent):
+class HospitalCombat(Combat, HospitalUI, CampaignStatus):
     def handle_fleet_recommend(self, *, recommend: bool = True) -> bool:
         fleet_1 = FleetOperator(
             assets=FleetOperatorAssets(
@@ -54,14 +54,12 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
         *,
         auto: str,
         check_oil: Callable[[], object],
-        check_coin: Callable[[], object],
     ) -> bool:
         if not self.appear(BATTLE_PREPARATION, offset=(30, 20)):
             return False
         if self.handle_combat_automation_set(auto=auto == "combat_auto"):
             return True
         check_oil()
-        check_coin()
         return False
 
     def _handle_hospital_preparation_actions(self) -> bool:
@@ -115,16 +113,8 @@ class HospitalCombat(Combat, HospitalUI, CampaignEvent):
                 logger.hr("Triggered oil limit")
                 raise OilExhausted
 
-        @run_once
-        def check_coin() -> bool:
-            if self.config.TaskBalancer_Enable and self.triggered_task_balancer():
-                logger.hr("Triggered stop condition: Coin limit")
-                self.handle_task_balancer()
-                return True
-            return False
-
         for _ in self.loop():
-            if self._handle_hospital_preparation_page(auto=auto, check_oil=check_oil, check_coin=check_coin):
+            if self._handle_hospital_preparation_page(auto=auto, check_oil=check_oil):
                 continue
             if self._handle_hospital_preparation_actions():
                 continue

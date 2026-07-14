@@ -1,17 +1,18 @@
-from __future__ import annotations
-
 import copy
+import json
+from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 from module.config.config import AzurLaneConfig, name_to_function
+from module.config.deep import deep_get
 from module.config.resolved import ConfigIssue
 from module.os.config import OSConfig
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
 
     from module.config.config_generated import ConfigValue
     from module.config.deep import DeepValue
@@ -229,6 +230,50 @@ def test_runtime_overlay_survives_update_and_rebind_without_writing() -> None:
     assert config.modified == {}
 
 
+def test_runtime_overlay_api_never_mutates_persistent_or_scheduler_state() -> None:
+    stored = {
+        "TaskA": {"Campaign": {"Name": "D3"}},
+        "Research": {"Scheduler": {"Enable": False, "NextRun": "2099-01-01 00:00:00"}},
+    }
+    config = _config(copy.deepcopy(stored))
+    config.bind("TaskA")
+    config.modified["Existing.Value"] = "pending"
+    modified = config.modified.copy()
+    overridden = config.overridden.copy()
+
+    config.apply_runtime_overlay(Campaign_Name="SP")
+
+    assert config.Campaign_Name == "SP"
+    assert config.data == stored
+    assert config.modified == modified
+    assert config.overridden == overridden
+
+
+def test_replace_runtime_overlay_removes_fields_from_previous_session() -> None:
+    config = _config({"TaskA": {"Campaign": {"Name": "D3"}}})
+    config.bind("TaskA")
+    config.apply_runtime_overlay(Campaign_Name="SP", STORY_OPTION=2)
+
+    config.replace_runtime_overlay(Campaign_Name="HT")
+
+    assert config.Campaign_Name == "HT"
+    assert config.STORY_OPTION == 0
+    assert _runtime_overlay(config) == {"Campaign_Name": "HT"}
+
+
+def test_runtime_overlay_rejects_unknown_fields_atomically() -> None:
+    config = _config({"TaskA": {"Campaign": {"Name": "D3"}}})
+    config.bind("TaskA")
+    config.apply_runtime_overlay(Campaign_Name="SP")
+    apply_overlay = cast("Callable[..., None]", config.apply_runtime_overlay)
+
+    with pytest.raises(KeyError, match="unknown runtime config field"):
+        apply_overlay(Not_A_Config_Field=True)
+
+    assert config.Campaign_Name == "SP"
+    assert _runtime_overlay(config) == {"Campaign_Name": "SP"}
+
+
 def test_force_override_has_priority_over_same_runtime_overlay_field() -> None:
     config = _config({"TaskA": {"Campaign": {"Name": "D3"}}})
     config.bind("TaskA")
@@ -288,3 +333,26 @@ def test_update_applies_config_override_only_once() -> None:
     config.update()
 
     assert calls == ["override", "bind", "save"]
+
+
+def test_snapshot_config_uses_one_document_and_keeps_mutations_in_memory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = json.loads(Path("config/template.json").read_text(encoding="utf-8"))
+    document["Alas"]["Emulator"]["Serial"] = "snapshot-device"
+
+    def fail_file_access(*_args: object, **_kwargs: object) -> None:
+        message = "snapshot-backed config must not access configuration files"
+        raise AssertionError(message)
+
+    monkeypatch.setattr(AzurLaneConfig, "read_file_with_issues", fail_file_access)
+    monkeypatch.setattr(AzurLaneConfig, "write_file", fail_file_access)
+
+    config = AzurLaneConfig.from_snapshot("snapshot-instance", document)
+    assert config.Emulator_Serial == "snapshot-device"
+
+    config.Emulator_Serial = "runtime-device"
+
+    assert config.Emulator_Serial == "runtime-device"
+    assert deep_get(config.data, keys="Alas.Emulator.Serial") == "runtime-device"
+    assert config.modified == {}

@@ -11,6 +11,7 @@ class ProcessOutcomeStatus(StrEnum):
     FAILED = "failed"
     MANUAL_STOP = "manual_stop"
     KILLED = "killed"
+    RESTART_REQUESTED = "restart_requested"
 
 
 class ProcessOutcomeData(TypedDict):

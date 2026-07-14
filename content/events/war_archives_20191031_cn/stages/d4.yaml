@@ -1,0 +1,122 @@
+schema_version: 4
+map:
+  name: D4
+  shape: I9
+  camera_data:
+  - D2
+  - D6
+  - D7
+  - F2
+  - F6
+  - F7
+  camera_data_spawn_point:
+  - D7
+  map_data: '++ -- -- ME -- -- -- -- Me
+
+    -- ME -- -- -- Me -- -- --
+
+    -- -- -- Me -- ++ ++ Me --
+
+    ME -- Me ++ -- ++ ++ -- --
+
+    -- -- -- -- MB -- -- -- --
+
+    -- ME ++ ++ -- ++ Me -- ME
+
+    -- -- -- ++ -- Me __ -- --
+
+    SP -- -- ME -- -- -- ME --
+
+    SP SP -- -- -- ME -- -- ++'
+  weight_data: '50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 3
+  - battle: 1
+    enemy: 2
+  - battle: 2
+    enemy: 2
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 2
+  - battle: 5
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: false
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: false
+  STAR_REQUIRE_1: 1
+  STAR_REQUIRE_2: 2
+  STAR_REQUIRE_3: 3
+  MAP_SWIPE_MULTIPLY:
+  - 1.101
+  - 1.122
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.065
+  - 1.085
+  HOMO_STORAGE:
+  - - 6
+    - 4
+  - - - 448
+      - 180
+    - - 1051
+      - 180
+    - - 426
+      - 513
+    - - 1100
+      - 513
+  MAP_ENSURE_EDGE_INSIGHT_CORNER: top
+enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - preserve: 0
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  5:
+    steps:
+    - strategy: fleet_boss
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns: []
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs: []
+boss_approaches: []
+hard_mode: null

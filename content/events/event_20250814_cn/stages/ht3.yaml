@@ -1,0 +1,109 @@
+schema_version: 4
+map:
+  name: HT3
+  shape: J6
+  camera_data:
+  - D2
+  - D4
+  - G2
+  - G4
+  camera_data_spawn_point:
+  - D2
+  map_data: '++ ++ ++ -- MB ++ ME -- -- --
+
+    SP -- -- MS -- Me -- ME -- ++
+
+    SP -- -- MS __ -- -- -- ME ++
+
+    ++ -- MS -- -- Me -- -- -- ME
+
+    ++ -- -- -- ME ++ ++ -- ME --
+
+    -- Me ++ Me -- ++ ++ ME -- --'
+  weight_data: '50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 2
+    siren: 2
+  - battle: 1
+    enemy: 1
+  - battle: 2
+    enemy: 2
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 1
+  - battle: 5
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: true
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: false
+  MAP_SIREN_TEMPLATE:
+  - Jiulaimu_Mud
+  - Jiulaimu_Statue
+  - Jiulaimu_Demon
+  MAP_HAS_SIREN: true
+  STAR_REQUIRE_1: 1
+  STAR_REQUIRE_2: 2
+  STAR_REQUIRE_3: 3
+  MAP_CHAPTER_SWITCH_20241219: true
+  STAGE_ENTRANCE:
+  - half
+  - '20240725'
+  MAP_HAS_MODE_SWITCH: true
+  MAP_SWIPE_MULTIPLY:
+  - 1.193
+  - 1.216
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.154
+  - 1.175
+enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - tag: clear_siren
+    - preserve: 0
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  5:
+    steps:
+    - strategy: fleet_boss
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns:
+    - 2
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs: []
+boss_approaches: []
+hard_mode: null

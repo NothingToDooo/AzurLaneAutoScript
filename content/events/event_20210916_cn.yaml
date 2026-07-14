@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20210916_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2021-09-16'
   name_cn: 碧海光粼

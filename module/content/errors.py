@@ -14,9 +14,9 @@ class UnknownStageError(LookupError):
     """内容目录中不存在指定关卡。"""
 
 
-class LegacyStageReferenceError(ContentValidationError):
-    """历史关卡引用不能安全映射到 Python 模块。"""
+class UnknownActivityError(LookupError):
+    """内容目录中不存在指定活动玩法。"""
 
 
-class LegacyStageContractError(TypeError):
-    """历史关卡模块没有满足装载契约。"""
+class ActivityKindError(ContentValidationError):
+    """内容包声明的活动玩法与调用方要求的类型不一致。"""

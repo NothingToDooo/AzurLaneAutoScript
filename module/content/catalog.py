@@ -43,6 +43,10 @@ class ContentCatalog:
     def packs(self) -> tuple[EventPack, ...]:
         return self._packs
 
+    @property
+    def stages(self) -> tuple[StageSpec, ...]:
+        return tuple(self._stages_by_ref.values())
+
     def get_pack(self, pack_id: str) -> EventPack:
         try:
             return self._packs_by_id[pack_id]
@@ -50,13 +54,36 @@ class ContentCatalog:
             message = f"unknown content pack: {pack_id}"
             raise UnknownPackError(message) from None
 
+    def has_stage(self, ref: StageRef) -> bool:
+        if not isinstance(ref, StageRef):
+            message = "ref must be a StageRef"
+            raise TypeError(message)
+        pack = self._packs_by_id.get(ref.pack_id)
+        if pack is None:
+            return False
+        canonical_ref = StageRef(ref.pack_id, pack.policy.resolve_alias(ref.stage_id))
+        return canonical_ref in self._stages_by_ref
+
     def resolve_stage(self, ref: StageRef) -> StageSpec:
         if not isinstance(ref, StageRef):
             message = "ref must be a StageRef"
             raise TypeError(message)
-        self.get_pack(ref.pack_id)
+        pack = self.get_pack(ref.pack_id)
+        canonical_ref = StageRef(ref.pack_id, pack.policy.resolve_alias(ref.stage_id))
         try:
-            return self._stages_by_ref[ref]
+            return self._stages_by_ref[canonical_ref]
         except KeyError:
             message = f"unknown stage: {ref.pack_id}/{ref.stage_id}"
             raise UnknownStageError(message) from None
+
+    def next_ref(self, ref: StageRef) -> StageRef | None:
+        selected = self.resolve_stage(ref)
+        pack = self.get_pack(selected.ref.pack_id)
+        next_stage = pack.policy.next_stage(selected.ref.stage_id)
+        if next_stage is None:
+            return None
+        next_ref = StageRef(selected.ref.pack_id, next_stage)
+        if next_ref not in self._stages_by_ref:
+            message = f"progression target is not registered: {next_ref.pack_id}/{next_ref.stage_id}"
+            raise ContentCatalogError(message)
+        return next_ref

@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20240829_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2024-08-29'
   name_cn: 埋葬于彼岸之花
@@ -9,9 +12,26 @@ releases:
 - opened_on: '2024-10-31'
   name_cn: null
   order: 1960
+stages:
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_839f96c1469777fb
+- id: t1
+  source: stages/t1.yaml
+  runtime_profile: profile_839f96c1469777fb
+- id: t2
+  source: stages/t2.yaml
+  runtime_profile: profile_839f96c1469777fb
+- id: t3
+  source: stages/t3.yaml
+  runtime_profile: profile_839f96c1469777fb
 policy:
   aliases:
     a1: t1
     a2: t2
     a3: t3
     tp: sp
+  progressions:
+    t1: t2
+    t2: t3
+    t3: null

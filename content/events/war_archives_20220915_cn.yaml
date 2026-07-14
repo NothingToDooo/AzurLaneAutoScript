@@ -1,11 +1,50 @@
 schema_version: 1
 id: war_archives_20220915_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: violet_tempest_blooming_lycoris
 releases:
 - opened_on: '2025-11-06'
   name_cn: 紫绛槿岚
   order: 420
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_7743d40b2c359920
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_7743d40b2c359920
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_7743d40b2c359920
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_87c756fecc9547d1
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_87c756fecc9547d1
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_87c756fecc9547d1
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_f1054510bd35c89c
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_f1054510bd35c89c
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_f1054510bd35c89c
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_a2788fe4fa4ea223
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_a2788fe4fa4ea223
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_a2788fe4fa4ea223
 policy:
   aliases:
     ht1: c1
@@ -20,3 +59,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

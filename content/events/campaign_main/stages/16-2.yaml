@@ -1,0 +1,129 @@
+schema_version: 4
+map:
+  name: 16-2
+  shape: J8
+  camera_data:
+  - C2
+  - C6
+  - G2
+  - G6
+  camera_data_spawn_point:
+  - C6
+  map_data: 'MB ++ -- ME -- -- -- -- -- --
+
+    -- Me ME -- ME ++ ME -- -- --
+
+    -- __ -- -- -- -- -- ME ++ ++
+
+    ME -- ME ME ME -- ME -- ++ --
+
+    Me -- -- Me ++ -- Me -- -- --
+
+    ++ ME -- ME ME -- ME ++ ++ --
+
+    -- -- -- -- -- Me -- -- ++ --
+
+    -- SP SP -- ++ ++ ++ -- -- --'
+  weight_data: '50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 3
+  - battle: 1
+    enemy: 2
+  - battle: 2
+    enemy: 2
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 1
+  - battle: 5
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: false
+  MAP_HAS_AMBUSH: true
+  MAP_HAS_MYSTERY: false
+  STAR_REQUIRE_1: 1
+  STAR_REQUIRE_2: 2
+  STAR_REQUIRE_3: 3
+  MAP_SWIPE_MULTIPLY:
+  - 1.093
+  - 1.113
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.057
+  - 1.077
+  MAP_ENSURE_EDGE_INSIGHT_CORNER: bottom-left
+enemy_filter: 1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M
+battles:
+  0:
+    steps:
+    - preserve: 1
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  5:
+    steps:
+    - tag: clear_boss
+      strategy: fleet_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns: []
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures:
+  - battle: 5
+    operations:
+    - check_accessibility
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs:
+- activation_modes:
+  - normal
+  battle: 5
+  statements:
+  - condition:
+      presence: boss
+      tag: map_presence
+    tag: branch
+    when_false: []
+    when_true:
+    - action:
+        strategy: fleet_boss
+        tag: clear_boss
+      tag: return_battle
+  - action:
+      preserve: 0
+      tag: clear_filtered_enemy
+    tag: attempt_battle
+  - action:
+      tag: default_battle
+    tag: return_battle
+boss_approaches: []
+hard_mode: null

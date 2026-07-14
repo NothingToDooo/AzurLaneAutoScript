@@ -1,7 +1,7 @@
 from typing import override
 
 from module.base.timer import Timer
-from module.campaign.campaign_base import CampaignBase
+from module.campaign.campaign_engine import CampaignEngine
 from module.coalition.assets import COALITION_REWARD_CONFIRM
 from module.coalition.ui import CoalitionUI
 from module.exception import CampaignEnd
@@ -9,7 +9,7 @@ from module.logger import logger
 from module.os_ash.assets import BATTLE_STATUS
 
 
-class CoalitionCombat(CoalitionUI, CampaignBase):
+class CoalitionCombat(CoalitionUI, CampaignEngine):
     battle_status_click_interval = 2
 
     def coalition_combat_re_enter(self, *, skip_first_screenshot: bool = True) -> None:
@@ -36,7 +36,7 @@ class CoalitionCombat(CoalitionUI, CampaignBase):
                 # 战斗已结束，停止继续点击 BATTLE_STATUS。
                 status_clicked = False
                 continue
-            # 2025-11-20 联合作战会掉落舰船。
+            # 部分联合作战会在续战阶段掉落舰船。
             if self.handle_get_ship():
                 continue
             if self.handle_battle_status():

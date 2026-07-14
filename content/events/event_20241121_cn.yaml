@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20241121_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2024-11-21'
   name_cn: 危险发明迫近中
@@ -9,6 +12,40 @@ releases:
 - opened_on: '2024-11-28'
   name_cn: null
   order: 2000
+stages:
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_431132b2a6f7606a
+- id: t1
+  source: stages/t1.yaml
+  runtime_profile: profile_431132b2a6f7606a
+- id: t2
+  source: stages/t2.yaml
+  runtime_profile: profile_431132b2a6f7606a
+- id: t3
+  source: stages/t3.yaml
+  runtime_profile: profile_431132b2a6f7606a
+- id: t4
+  source: stages/t4.yaml
+  runtime_profile: profile_1833e780dc81508a
+- id: t5
+  source: stages/t5.yaml
+  runtime_profile: profile_1833e780dc81508a
+- id: ttl1
+  source: stages/ttl1.yaml
+  runtime_profile: profile_431132b2a6f7606a
+- id: ttl2
+  source: stages/ttl2.yaml
+  runtime_profile: profile_431132b2a6f7606a
+- id: ttl3
+  source: stages/ttl3.yaml
+  runtime_profile: profile_431132b2a6f7606a
+- id: ttl4
+  source: stages/ttl4.yaml
+  runtime_profile: profile_431132b2a6f7606a
+- id: ttl5
+  source: stages/ttl5.yaml
+  runtime_profile: profile_431132b2a6f7606a
 policy:
   aliases:
     a1: t1
@@ -16,3 +53,14 @@ policy:
     a3: t3
     b1: t4
     b2: t5
+  progressions:
+    t1: t2
+    t2: t3
+    t3: t4
+    t4: t5
+    t5: null
+    ttl1: ttl2
+    ttl2: ttl3
+    ttl3: ttl4
+    ttl4: ttl5
+    ttl5: null

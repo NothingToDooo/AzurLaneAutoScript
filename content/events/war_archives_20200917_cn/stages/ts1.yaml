@@ -1,0 +1,97 @@
+schema_version: 4
+map:
+  name: TS1
+  shape: H6
+  camera_data:
+  - D2
+  - D4
+  - E2
+  - E4
+  camera_data_spawn_point:
+  - E4
+  map_data: 'MB -- ++ ++ ++ ++ -- --
+
+    -- ME -- -- -- ++ ++ ++
+
+    ++ -- -- -- Me -- -- ++
+
+    ++ ++ ++ ++ -- -- ME --
+
+    -- -- -- -- ++ ++ -- SP
+
+    -- ++ -- -- -- ++ SP --'
+  weight_data: '50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 1
+  - battle: 1
+    enemy: 1
+  - battle: 2
+    enemy: 1
+  - battle: 3
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: true
+  MAP_HAS_FLEET_STEP: false
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: true
+  STAR_REQUIRE_1: 0
+  STAR_REQUIRE_2: 0
+  STAR_REQUIRE_3: 0
+  STAGE_ENTRANCE:
+  - blue
+  MAP_HAS_MODE_SWITCH: false
+  MAP_SWIPE_MULTIPLY:
+  - 1.064
+  - 1.084
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.029
+  - 1.048
+  MAP_IS_ONE_TIME_STAGE: true
+  MAP_ENSURE_EDGE_INSIGHT_CORNER: bottom
+enemy_filter: 1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M
+battles:
+  0:
+    steps:
+    - tag: default_battle
+  3:
+    steps:
+    - strategy: map_search
+      tag: clear_boss_roadblock
+    - strategy: map_search
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns: []
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs: []
+boss_approaches: []
+hard_mode: null

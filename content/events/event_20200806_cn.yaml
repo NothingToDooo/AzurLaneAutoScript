@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20200806_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2020-08-06'
   name_cn: 复刻最重要的宝物
@@ -15,3 +18,18 @@ releases:
 - opened_on: '2023-02-02'
   name_cn: null
   order: 1240
+stages:
+- id: sp1
+  source: stages/sp1.yaml
+  runtime_profile: profile_467968622eea393a
+- id: sp2
+  source: stages/sp2.yaml
+  runtime_profile: profile_467968622eea393a
+- id: sp3
+  source: stages/sp3.yaml
+  runtime_profile: profile_467968622eea393a
+policy:
+  progressions:
+    sp1: sp2
+    sp2: sp3
+    sp3: null

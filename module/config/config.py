@@ -1,11 +1,12 @@
 import copy
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, cast
 
 import pywebio
 
-from module.config.config_generated import GeneratedConfig
+from module.config.config_generated import ConfigOverrides, GeneratedConfig
 from module.config.config_manual import ManualConfig, OutputConfig
 from module.config.config_updater import ConfigUpdater
 from module.config.deep import deep_get, deep_set
@@ -32,7 +33,7 @@ if TYPE_CHECKING:
     from typing import Literal, Never, Self, Unpack
 
     from module.base.stop_event import StopEvent
-    from module.config.config_generated import ConfigOverrides, ConfigValue, RecordUpdates
+    from module.config.config_generated import ConfigValue, RecordUpdates
     from module.config.deep import DeepPath, DeepValue, MutableDeepData, MutableDeepValue
     from module.config.resolved import ConfigIssue
     from module.config.utils import TimeInput
@@ -117,9 +118,11 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         else:
             super().__setattr__(key, value)
 
-    def __init__(self, config_name: str, task: str | None = None) -> None:
+    def _initialize_state(self, config_name: str) -> None:
         logger.attr("Server", self.SERVER)
         self.config_name = config_name
+        # snapshot-backed 实例只在内存中更新，绝不重新读取或写回 WebUI JSON。
+        self._snapshot_backed = False
         # 原始配置树。
         self.data: MutableDeepData = {}
         # 最近一次磁盘配置解析产生的只读诊断。
@@ -140,15 +143,54 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         self.waiting_task: list[Function] = []
         # 兼容保留类属性默认值，实际调度状态始终由当前配置实例持有。
         self.is_hoarding_task = type(self).is_hoarding_task
-        # 当前任务名对应 AzurLaneAutoScript 的入口方法。
+        # 当前任务名对应 typed task registry 的 command。
         self.task: Function
         self.is_template_config = config_name.startswith("template")
+
+    def __init__(self, config_name: str, task: str | None = None) -> None:
+        self._initialize_state(config_name)
 
         if self.is_template_config:
             logger.info("Using template config, which is read only")
             self.auto_update = False
             self.task = name_to_function("template")
         self.init_task(task)
+
+    @classmethod
+    def from_snapshot(
+        cls,
+        config_name: str,
+        document: Mapping[str, object],
+        task: str | None = None,
+    ) -> Self:
+        """从 assembly 已读取的同一配置快照构造隔离的运行期配置。"""
+
+        if not isinstance(document, Mapping):
+            message = "configuration snapshot must be a mapping"
+            raise TypeError(message)
+        if any(not isinstance(key, str) for key in document):
+            message = "configuration snapshot must use string field names"
+            raise TypeError(message)
+
+        instance = cls.__new__(cls)
+        cls._initialize_state(instance, config_name)
+        vars(instance)["_snapshot_backed"] = True
+        raw = cast("MutableDeepData", copy.deepcopy(dict(document)))
+        instance.data, instance.config_issues = instance.config_update_with_issues(
+            raw,
+            is_template=instance.is_template_config,
+        )
+        if instance.is_template_config:
+            logger.info("Using template config, which is read only")
+            instance.auto_update = False
+            instance.task = name_to_function("template")
+            return instance
+
+        task_name = "Alas" if task is None else task
+        function = name_to_function(task_name)
+        instance.bind(function)
+        instance.task = function
+        return instance
 
     def init_task(self, task: str | None = None) -> None:
         if self.is_template_config:
@@ -162,6 +204,11 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         self.save()
 
     def load(self) -> None:
+        if self.__dict__.get("_snapshot_backed", False):
+            for path, value in self.modified.items():
+                deep_set(self.data, keys=path, value=value)
+            return
+
         self.data, self.config_issues = self.read_file_with_issues(self.config_name)
         self.config_override()
 
@@ -225,6 +272,47 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
         instance_state["bound"] = snapshot.bound_paths
         instance_state["resolved"] = snapshot
         instance_state["_published_config_fields"] = set(published)
+
+    @staticmethod
+    def _validate_runtime_overlay_fields(values: dict[str, object]) -> None:
+        allowed = ConfigOverrides.__required_keys__ | ConfigOverrides.__optional_keys__
+        unknown = sorted(set(values) - allowed)
+        if unknown:
+            message = f"unknown runtime config field: {unknown[0]}"
+            raise KeyError(message)
+
+    def _republish_runtime_overlay(self) -> None:
+        snapshot = self.__dict__.get("resolved")
+        if isinstance(snapshot, ResolvedTaskConfig):
+            self._publish_resolved(snapshot)
+            return
+
+        runtime_overlay = copy.deepcopy(self._runtime_overlay_values())
+        runtime_overlay.update(copy.deepcopy(self.__dict__.get("overridden", {})))
+        old_names = set(self.__dict__.get("_published_config_fields", ()))
+        instance_state = self.__dict__
+        for name in old_names - set(runtime_overlay):
+            instance_state.pop(name, None)
+        instance_state.update(runtime_overlay)
+        instance_state["_published_config_fields"] = set(runtime_overlay)
+
+    def replace_runtime_overlay(self, **kwargs: Unpack[ConfigOverrides]) -> None:
+        """用本次 UI 会话的配置投影替换旧投影，不触碰持久配置和调度状态。"""
+
+        values = dict(kwargs)
+        self._validate_runtime_overlay_fields(values)
+        runtime_overlay = self._runtime_overlay_values()
+        runtime_overlay.clear()
+        runtime_overlay.update(copy.deepcopy(cast("dict[str, ConfigValue]", values)))
+        self._republish_runtime_overlay()
+
+    def apply_runtime_overlay(self, **kwargs: Unpack[ConfigOverrides]) -> None:
+        """追加当前 UI 步骤的配置投影，不触碰持久配置和调度状态。"""
+
+        values = dict(kwargs)
+        self._validate_runtime_overlay_fields(values)
+        self._runtime_overlay_values().update(copy.deepcopy(cast("dict[str, ConfigValue]", values)))
+        self._republish_runtime_overlay()
 
     def bind(self, func: Function | str, func_list: Iterable[str] | None = None) -> None:
         """按 General、Alas、任务通用作用域、当前任务、func_list 额外作用域依次绑定。"""
@@ -318,6 +406,10 @@ class AzurLaneConfig(ConfigUpdater, ManualConfig, GeneratedConfig, ConfigWatcher
 
         for path, value in self.modified.items():
             deep_set(self.data, keys=path, value=value)
+
+        if self.__dict__.get("_snapshot_backed", False):
+            self.modified.clear()
+            return True
 
         logger.info(f"Save config {filepath_config(self.config_name)}, {dict_to_kv(self.modified)}")
         # 不要用 self.modified = {}，否则会创建新对象。

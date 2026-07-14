@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20211125_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2021-11-25'
   name_cn: 交汇世界的弧光
@@ -15,6 +18,37 @@ releases:
 - opened_on: '2023-08-03'
   name_cn: null
   order: 1430
+stages:
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_00e8a85b306ebd86
+- id: t1
+  source: stages/t1.yaml
+  runtime_profile: profile_00e8a85b306ebd86
+- id: t2
+  source: stages/t2.yaml
+  runtime_profile: profile_00e8a85b306ebd86
+- id: t3
+  source: stages/t3.yaml
+  runtime_profile: profile_00e8a85b306ebd86
+- id: t4
+  source: stages/t4.yaml
+  runtime_profile: profile_3b4223db97dea157
+- id: tss1
+  source: stages/tss1.yaml
+  runtime_profile: profile_3f4201ecf110f749
+- id: tss2
+  source: stages/tss2.yaml
+  runtime_profile: profile_3f4201ecf110f749
+- id: tss3
+  source: stages/tss3.yaml
+  runtime_profile: profile_3f4201ecf110f749
+- id: tss4
+  source: stages/tss4.yaml
+  runtime_profile: profile_3f4201ecf110f749
+- id: tss5
+  source: stages/tss5.yaml
+  runtime_profile: profile_3f4201ecf110f749
 policy:
   aliases:
     a1: t1
@@ -32,3 +66,13 @@ policy:
   - tss3
   - tss4
   - tss5
+  progressions:
+    t1: t2
+    t2: t3
+    t3: t4
+    t4: null
+    tss1: tss2
+    tss2: tss3
+    tss3: tss4
+    tss4: tss5
+    tss5: null

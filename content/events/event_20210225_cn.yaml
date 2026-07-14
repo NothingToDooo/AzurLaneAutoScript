@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20210225_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2021-02-25'
   name_cn: 破晓冰华
@@ -15,6 +18,46 @@ releases:
 - opened_on: '2024-01-04'
   name_cn: null
   order: 1600
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_c927f9c0a49b72a4
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_c927f9c0a49b72a4
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_c927f9c0a49b72a4
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_191e6139625c2e88
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_191e6139625c2e88
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_191e6139625c2e88
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_94287a25755eb8f0
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_94287a25755eb8f0
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_94287a25755eb8f0
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_c26d9f9d805fd02d
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_c26d9f9d805fd02d
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_c26d9f9d805fd02d
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_faa830cc0349453e
 policy:
   aliases:
     ht1: c1
@@ -29,3 +72,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

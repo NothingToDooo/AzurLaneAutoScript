@@ -1,7 +1,26 @@
 schema_version: 1
 id: coalition_20260122
 kind: coalition
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: coalition
+  profile: fashion
+  stages:
+  - id: easy
+    battles: 1
+    fleet: single
+  - id: normal
+    battles: 2
+    fleet: selectable
+  - id: hard
+    battles: 3
+    fleet: selectable
+  - id: sp
+    battles: 4
+    fleet: multi
+  - id: ex
+    battles: 5
+    fleet: multi
 releases:
 - opened_on: '2026-01-22'
   name_cn: 光影风尚-拍摄进行时

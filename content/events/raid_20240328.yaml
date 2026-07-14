@@ -1,7 +1,13 @@
 schema_version: 1
 id: raid_20240328
 kind: raid
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: raid
+  profile: rpg
+  modes: [easy, normal, hard, ex]
+  daily_modes: []
+  ticket_modes: []
 releases:
 - opened_on: '2024-03-28'
   name_cn: 从零开始的魔王讨伐之旅

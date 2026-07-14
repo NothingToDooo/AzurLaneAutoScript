@@ -1,11 +1,11 @@
-import importlib
-from types import SimpleNamespace
+import subprocess
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
 
 from module.config.utils import filepath_argument, read_file
-from module.task_registry import TASK_REGISTRY, ClassTaskExecutor
+from module.task_registry import TASK_CATALOG
 
 if TYPE_CHECKING:
     from module.config.deep import MutableDeepValue
@@ -51,41 +51,12 @@ def _task_node(task_name: str) -> dict[str, MutableDeepValue]:
     raise KeyError(task_name)
 
 
-@pytest.mark.parametrize("command", sorted(TASK_REGISTRY))
-def test_task_registry_target_exists(command: str) -> None:
-    executor = TASK_REGISTRY[command].executor
-    if not isinstance(executor, ClassTaskExecutor):
-        return
-
-    module = importlib.import_module(executor.module_name)
-    task_class = getattr(module, executor.class_name)
-
-    assert callable(getattr(task_class, executor.method_name))
-
-
 @pytest.mark.parametrize("task_name", sorted(_scheduler_task_names()))
 def test_scheduler_task_name_maps_to_runtime_command(task_name: str) -> None:
     node = _task_node(task_name)
-    assert _deep_string(node["command"]) in TASK_REGISTRY
+    assert _deep_string(node["command"]) in TASK_CATALOG
 
 
-def test_campaign_args_are_resolved_at_runtime() -> None:
-    executor = TASK_REGISTRY["main"].executor
-    assert isinstance(executor, ClassTaskExecutor)
-    runner = SimpleNamespace(
-        config=SimpleNamespace(
-            Campaign_Name="12-4",
-            Campaign_Event="campaign_main",
-            Campaign_Mode="normal",
-        )
-    )
-
-    assert executor.args_factory is not None
-    assert executor.args_factory(runner) == (
-        (),
-        {
-            "name": "12-4",
-            "folder": "campaign_main",
-            "mode": "normal",
-        },
-    )
+def test_catalog_import_does_not_load_production_device_graph() -> None:
+    script = "import sys; import module.task_registry; assert 'module.device.device' not in sys.modules"
+    subprocess.run([sys.executable, "-c", script], check=True)  # noqa: S603

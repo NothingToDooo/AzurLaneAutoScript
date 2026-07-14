@@ -15,7 +15,7 @@ from module.ui.page import page_dormmenu, page_private_quarters
 class PrivateQuarters(PQInteract, PQShop):
     not_supported_ships: ClassVar[tuple[str, ...]] = ("nakhimov",)
 
-    def _pq_get_daily_count(self, retry: int = 3) -> int:
+    def pq_get_daily_count(self, retry: int = 3) -> int:
         """快速设备的首张截图可能模糊或滞后，有限重试后才确认每日次数为 0。"""
         count = self.status_get_daily_count()
         get_timer = Timer(1.5, count=3).start()
@@ -99,7 +99,7 @@ class PrivateQuarters(PQInteract, PQShop):
                 logger.info(f"Target ship:{target_ship} not supported.")
                 return
 
-            count = self._pq_get_daily_count(retry=3)
+            count = self.pq_get_daily_count(retry=3)
             if count == 0:
                 logger.info("Daily intimacy count exhausted, exit subtask")
                 return

@@ -1,0 +1,146 @@
+schema_version: 4
+map:
+  name: B2
+  shape: I9
+  camera_data:
+  - D2
+  - D5
+  - D7
+  - F2
+  - F5
+  - F7
+  camera_data_spawn_point:
+  - F5
+  map_data: '++ ++ Me -- ME -- ++ ++ ++
+
+    ++ ++ -- ME -- -- -- ME --
+
+    Me -- -- -- ME ++ MS -- --
+
+    -- -- -- -- ME -- -- ME ++
+
+    Me -- MS ++ ME -- -- -- ++
+
+    ++ ++ -- -- -- MS -- -- SP
+
+    ME -- __ MS -- -- ++ -- SP
+
+    -- -- -- ++ -- -- -- -- --
+
+    MB MB MB ++ -- Me ++ ++ ++'
+  weight_data: '50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 2
+    siren: 1
+  - battle: 1
+    enemy: 1
+  - battle: 2
+    enemy: 2
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 2
+  - battle: 5
+    enemy: 1
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: true
+  MAP_HAS_FLEET_STEP: true
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: false
+  MAP_SIREN_TEMPLATE:
+  - DD
+  - CL
+  MAP_HAS_SIREN: true
+  STAR_REQUIRE_1: 1
+  STAR_REQUIRE_2: 2
+  STAR_REQUIRE_3: 3
+  MAP_SWIPE_MULTIPLY:
+  - 1.039
+  - 1.059
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.005
+  - 1.024
+  MAP_ENSURE_EDGE_INSIGHT_CORNER: bottom
+enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - condition:
+        flag: clear_mode
+        tag: flag
+        value: true
+      step:
+        genres: []
+        tag: clear_siren
+      tag: guarded
+    - condition:
+        flag: clear_mode
+        tag: flag
+        value: true
+      step:
+        preserve: 0
+        tag: clear_filtered_enemy
+      tag: guarded
+    - condition:
+        condition:
+          flag: clear_mode
+          tag: flag
+          value: true
+        tag: not
+      step:
+        genres: []
+        sort:
+        - cost_2
+        strongest: false
+        tag: clear_any_enemy
+      tag: guarded
+    - tag: default_battle
+  5:
+    steps:
+    - strategy: fleet_boss
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns:
+    - 2
+    normal_turns:
+    - 2
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs: []
+boss_approaches: []
+hard_mode: null

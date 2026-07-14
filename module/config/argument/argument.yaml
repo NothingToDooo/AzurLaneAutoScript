@@ -172,22 +172,6 @@ EnemyPriority:
     option: [ default_mode, S3_enemy_first, S1_enemy_first ]
 C11AffinityFarming:
   RunCount: 32
-C72MysteryFarming:
-  StepOnA3: true
-C122MediumLeveling:
-  LargeEnemyTolerance:
-    value: 1
-    option: [ 0, 1, 2, 10 ]
-C124LargeLeveling:
-  NonLargeEnterTolerance:
-    value: 1
-    option: [ 0, 1, 2 ]
-  NonLargeRetreatTolerance:
-    value: 1
-    option: [ 0, 1, 2, 10 ]
-  PickupAmmo:
-    value: 3
-    option: [ 3, 4, 5 ]
 GemsFarming:
   ChangeFlagship:
     value: ship
@@ -587,11 +571,6 @@ Exercise:
   LowHpConfirmWait: 0.1
   OpponentRefreshValue: 0
   OpponentRefreshRecord: 2020-01-01 00:00:00
-Sos:
-  Chapter:
-    value: 3
-    option: [ 3, 4, 5, 6, 7, 8, 9, 10 ]
-
 # ==================== Opsi ====================
 
 OpsiAshAssist:

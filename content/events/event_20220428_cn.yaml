@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20220428_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2022-04-28'
   name_cn: 虹彩的终幕曲
@@ -15,6 +18,46 @@ releases:
 - opened_on: '2025-11-21'
   name_cn: null
   order: 2380
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_90f20a977e0e24a3
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_b987c4a372a9c173
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_b987c4a372a9c173
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_02ba0ca17c4bbe98
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_c4dad5b0552d9156
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_3aa6d58bd67822b2
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_73e59e107468ae8f
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_b1c9ea8d54472efd
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_b1c9ea8d54472efd
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_29321f33e93357da
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_236c558ef338c5ed
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_3aa6d58bd67822b2
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_3b093db124e433a8
 policy:
   aliases:
     ht1: c1
@@ -29,3 +72,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

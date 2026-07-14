@@ -1,0 +1,250 @@
+schema_version: 4
+map:
+  name: 8-3
+  shape: H6
+  camera_data:
+  - D3
+  - D4
+  - E3
+  - E4
+  camera_data_spawn_point: []
+  map_data: 'MB -- ME ME ME ME -- MB
+
+    -- ME MM ++ ++ __ ME --
+
+    ME ++ ++ SP -- ME -- ME
+
+    ME MA ++ -- SP ++ ME ME
+
+    MM ME __ ME ++ ++ ME --
+
+    MB -- ME ME ME ME -- MB'
+  weight_data: '50 50 40 90 90 30 50 50
+
+    50 50 50 90 90 20 40 50
+
+    40 90 90 10 10 10 20 20
+
+    30 90 90 10 10 90 40 30
+
+    20 20 20 10 90 90 40 50
+
+    50 30 30 80 80 80 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 3
+  - battle: 1
+    enemy: 2
+    mystery: 1
+  - battle: 2
+    enemy: 2
+    mystery: 1
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 1
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: false
+  MAP_HAS_AMBUSH: true
+  MAP_HAS_MYSTERY: true
+  STAR_REQUIRE_1: 1
+  STAR_REQUIRE_2: 2
+  STAR_REQUIRE_3: 3
+  MAP_SWIPE_MULTIPLY:
+  - 1.127
+  - 1.148
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.09
+  - 1.11
+enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - tag: default_battle
+  4:
+    steps:
+    - strategy: brute_force
+      tag: clear_boss_roadblock
+    - strategy: brute_force
+      tag: clear_boss
+mechanics:
+  roadblocks:
+  - battle: 0
+    roads:
+    - paths:
+      - - D5
+      - - B5
+        - C6
+    - paths:
+      - - F3
+      - - F1
+        - G2
+        - H3
+    - paths:
+      - - A4
+      - - A3
+    - paths:
+      - - F1
+      - - E1
+      - - D1
+      - - C1
+    - paths:
+      - - D6
+      - - E6
+      - - F6
+    - paths:
+      - - H3
+        - G4
+      - - G4
+        - H4
+      - - H4
+        - G5
+    selection: default
+    tag: clear
+  - battle: 0
+    roads:
+    - paths:
+      - - D5
+      - - B5
+        - C6
+    - paths:
+      - - F3
+      - - F1
+        - G2
+        - H3
+    - paths:
+      - - A4
+      - - A3
+    - paths:
+      - - F1
+      - - E1
+      - - D1
+      - - C1
+    - paths:
+      - - D6
+      - - E6
+      - - F6
+    - paths:
+      - - H3
+        - G4
+      - - G4
+        - H4
+      - - H4
+        - G5
+    selection: default
+    tag: clear_potential
+  - battle: 0
+    roads:
+    - paths:
+      - - B2
+        - C1
+    selection: default
+    tag: clear
+  - battle: 0
+    roads:
+    - paths:
+      - - D5
+      - - B5
+        - C6
+    - paths:
+      - - F3
+      - - F1
+        - G2
+        - H3
+    - paths:
+      - - A4
+      - - A3
+    - paths:
+      - - F1
+      - - E1
+      - - D1
+      - - C1
+    - paths:
+      - - D6
+      - - E6
+      - - F6
+    - paths:
+      - - H3
+        - G4
+      - - G4
+        - H4
+      - - H4
+        - G5
+    selection: default
+    tag: clear_first
+  fleet_coordination:
+  - battle: 0
+    candidates:
+    - D5
+    - F3
+    fleet: fleet_2
+    roadblocks:
+    - paths:
+      - - D5
+      - - F3
+    tag: step_on
+  pickups: []
+  map_interactions:
+  - battle: 0
+    ignored: []
+    nearby: true
+    tag: clear_all_mystery
+  map_mutations: []
+  moving_enemies:
+    turns: []
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs:
+- activation_modes:
+  - normal
+  battle: 0
+  statements:
+  - action:
+      category: fleet_coordination
+      index: 0
+    expected_target: any
+    tag: attempt_mechanic
+  - action:
+      category: map_interactions
+      index: 0
+    expected_target: null
+    tag: perform_mechanic
+  - action:
+      category: roadblocks
+      index: 0
+    expected_target: enemy
+    tag: attempt_mechanic
+  - action:
+      category: roadblocks
+      index: 1
+    expected_target: enemy
+    tag: attempt_mechanic
+  - action:
+      category: roadblocks
+      index: 2
+    expected_target: enemy
+    tag: attempt_mechanic
+  - action:
+      category: roadblocks
+      index: 3
+    expected_target: enemy
+    tag: attempt_mechanic
+  - action:
+      tag: default_battle
+    tag: return_battle
+boss_approaches: []
+hard_mode: null

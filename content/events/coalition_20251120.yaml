@@ -1,7 +1,47 @@
 schema_version: 1
 id: coalition_20251120
 kind: coalition
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: coalition
+  profile: dal
+  stages:
+  - id: area1-normal
+    battles: 2
+    fleet: selectable
+  - id: area2-normal
+    battles: 3
+    fleet: selectable
+  - id: area3-normal
+    battles: 3
+    fleet: selectable
+  - id: area4-normal
+    battles: 3
+    fleet: selectable
+  - id: area5-normal
+    battles: 3
+    fleet: selectable
+  - id: area6-normal
+    battles: 4
+    fleet: selectable
+  - id: area1-hard
+    battles: 2
+    fleet: selectable
+  - id: area2-hard
+    battles: 3
+    fleet: selectable
+  - id: area3-hard
+    battles: 3
+    fleet: selectable
+  - id: area4-hard
+    battles: 3
+    fleet: selectable
+  - id: area5-hard
+    battles: 3
+    fleet: selectable
+  - id: area6-hard
+    battles: 4
+    fleet: selectable
 releases:
 - opened_on: '2025-11-20'
   name_cn: DATE A LANE

@@ -1,7 +1,13 @@
 schema_version: 1
 id: raid_20250116
 kind: raid
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: raid
+  profile: chienwu
+  modes: [easy, normal, hard, ex]
+  daily_modes: [easy, normal, hard, ex]
+  ticket_modes: [ex]
 releases:
 - opened_on: '2025-01-16'
   name_cn: 华裳巧展喜事长

@@ -154,7 +154,7 @@ class Minigame(UI):
 
     def run(self) -> None:
         """从任意页面进入游戏室并消耗可用代币。"""
-        self._minigame_enter_game_room()
+        self.minigame_enter_game_room()
         self.go_to_main_page()
 
         specific_game_name = "new_year_challenge"
@@ -162,7 +162,8 @@ class Minigame(UI):
         self._spend_minigame_coins(minigame_instance, specific_game_name)
         self.config.task_delay(server_update=True)
 
-    def _minigame_enter_game_room(self) -> None:
+    def minigame_enter_game_room(self) -> None:
+        """从学院进入游戏室。"""
         self.ui_ensure(page_academy)
         # 学院页 -> 游戏室。
         for _ in self.loop():

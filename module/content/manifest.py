@@ -9,7 +9,25 @@ from typing import cast
 import yaml
 from yaml.resolver import BaseResolver
 
-from module.content.campaign_policy import MAP_ACHIEVEMENT_VALUES, CampaignPolicy
+from module.content.activity_profile import (
+    ActivityDefinition,
+    ActivityKind,
+    CoalitionDefinition,
+    CoalitionFleetRule,
+    CoalitionProfileId,
+    CoalitionStageDefinition,
+    CoalitionStageId,
+    EventStoryDefinition,
+    EventStoryProfileId,
+    RaidDefinition,
+    RaidMode,
+    RaidProfileId,
+)
+from module.content.campaign_policy import (
+    MAP_ACHIEVEMENT_VALUES,
+    CampaignPolicy,
+    StageProgressionRule,
+)
 from module.content.errors import ContentValidationError
 from module.content.models import (
     EVENT_KINDS,
@@ -21,20 +39,38 @@ from module.content.models import (
     StageRef,
     StageSpec,
 )
+from module.content.runtime_profile import CampaignRuntimeProfileId
+from module.content.war_archives_profile import WarArchivesDefinition, WarArchivesProfileId
 
 SCHEMA_VERSION = 1
 DEFAULT_EVENT_MANIFEST_PATH = Path(__file__).resolve().parents[2] / "content" / "events"
-_TOP_LEVEL_FIELDS = {"schema_version", "id", "kind", "ui_profile", "releases", "stages", "policy"}
+_TOP_LEVEL_FIELDS = {
+    "schema_version",
+    "id",
+    "kind",
+    "ui_profile",
+    "releases",
+    "stages",
+    "policy",
+    "activity",
+    "war_archives",
+}
 _RELEASE_FIELDS = {"opened_on", "name_cn", "order"}
-_STAGE_FIELDS = {"id", "source", "assets", "strategy"}
+_STAGE_FIELDS = {"id", "source", "assets", "runtime_profile"}
 _ASSET_FIELDS = {"id", "path"}
 _POLICY_FIELDS = {
     "aliases",
+    "progressions",
     "loops",
     "force_threat_safe_stages",
     "resource_free_stages",
     "map_achievement_fallbacks",
 }
+_EVENT_STORY_ACTIVITY_FIELDS = {"kind", "profile"}
+_RAID_ACTIVITY_FIELDS = {"kind", "profile", "modes", "daily_modes", "ticket_modes"}
+_COALITION_ACTIVITY_FIELDS = {"kind", "profile", "stages"}
+_COALITION_ACTIVITY_STAGE_FIELDS = {"id", "battles", "fleet"}
+_WAR_ARCHIVES_FIELDS = {"profile"}
 _CJK_PATTERN = re.compile(r"[\u3000-\u30ff\u3400-\u4dbf\u4e00-\u9fff、！（）]")
 _README_INTRO = (
     "# 活动列表\n\n"
@@ -107,6 +143,12 @@ def _exact_integer(value: object, path: Path, location: str) -> int:
     if type(value) is not int:
         raise _fail(path, location, "must be an integer")
     return value
+
+
+def _nullable_string(value: object, path: Path, location: str) -> str | None:
+    if value is None:
+        return None
+    return _string(value, path, location)
 
 
 def _safe_stage_id(value: object, path: Path, location: str) -> str:
@@ -202,13 +244,19 @@ def _load_assets(raw: object, path: Path, location: str, pack_root: Path) -> tup
     return tuple(assets)
 
 
-def _load_stages(raw: object, path: Path, pack_id: str, pack_root: Path) -> tuple[StageSpec, ...]:
+def _load_stages(
+    raw: object,
+    path: Path,
+    pack_id: str,
+    pack_root: Path,
+    war_archives: WarArchivesDefinition | None,
+) -> tuple[StageSpec, ...]:
     stages = []
     seen: set[str] = set()
     for index, value in enumerate(_sequence(raw, path, "stages")):
         location = f"stages[{index}]"
         item = _mapping(value, path, location, _STAGE_FIELDS)
-        required = {"id", "source"}
+        required = {"id", "runtime_profile", "source"}
         if not required.issubset(item):
             raise _fail(path, location, f"required fields are {sorted(required)}")
         stage_id = _safe_stage_id(item["id"], path, f"{location}.id")
@@ -217,15 +265,19 @@ def _load_stages(raw: object, path: Path, pack_id: str, pack_root: Path) -> tupl
         seen.add(stage_id)
         source = _safe_pack_file(item["source"], path, f"{location}.source", pack_root)
         assets = _load_assets(item.get("assets", ()), path, f"{location}.assets", pack_root)
-        strategy = item.get("strategy")
-        if strategy is not None:
-            strategy = _string(strategy, path, f"{location}.strategy")
         stages.append(
             StageSpec(
                 ref=StageRef(pack_id=pack_id, stage_id=stage_id),
                 source=source,
                 assets=assets,
-                strategy=strategy,
+                runtime_profile_id=CampaignRuntimeProfileId(
+                    _string(
+                        item["runtime_profile"],
+                        path,
+                        f"{location}.runtime_profile",
+                    )
+                ),
+                war_archives=war_archives,
             )
         )
     return tuple(stages)
@@ -251,6 +303,20 @@ def _stage_mapping(raw: object, path: Path, location: str) -> tuple[tuple[str, s
     return tuple(result)
 
 
+def _stage_progression_mapping(
+    raw: object,
+    path: Path,
+    location: str,
+) -> tuple[StageProgressionRule, ...]:
+    data = _free_mapping(raw, path, location)
+    result = []
+    for key, value in data.items():
+        stage = _safe_stage_id(key, path, f"{location}.<key>")
+        next_stage = None if value is None else _safe_stage_id(value, path, f"{location}.{stage}")
+        result.append(StageProgressionRule(stage, next_stage))
+    return tuple(result)
+
+
 def _map_achievement_mapping(raw: object, path: Path, location: str) -> tuple[tuple[str, str], ...]:
     values = _string_mapping(raw, path, location)
     for source, target in values:
@@ -269,6 +335,11 @@ def _stage_list(raw: object, path: Path, location: str) -> tuple[str, ...]:
 def _load_policy(raw: object, path: Path) -> CampaignPolicy:
     data = _mapping(raw, path, "policy", _POLICY_FIELDS)
     aliases = _stage_mapping(data.get("aliases", {}), path, "policy.aliases")
+    progressions = _stage_progression_mapping(
+        data.get("progressions", {}),
+        path,
+        "policy.progressions",
+    )
     loops_raw = _free_mapping(data.get("loops", {}), path, "policy.loops")
     loops = tuple(
         (
@@ -281,6 +352,7 @@ def _load_policy(raw: object, path: Path) -> CampaignPolicy:
         raise _fail(path, "policy.loops", "loop stages must not be empty")
     return CampaignPolicy(
         aliases=aliases,
+        progressions=progressions,
         loops=loops,
         force_threat_safe_stages=_stage_list(
             data.get("force_threat_safe_stages", ()),
@@ -300,6 +372,113 @@ def _load_policy(raw: object, path: Path) -> CampaignPolicy:
     )
 
 
+def _raid_modes(raw: object, path: Path, location: str) -> tuple[RaidMode, ...]:
+    result: list[RaidMode] = []
+    for index, value in enumerate(_sequence(raw, path, location)):
+        mode = _string(value, path, f"{location}[{index}]")
+        try:
+            result.append(RaidMode(mode))
+        except ValueError as error:
+            allowed = sorted(item.value for item in RaidMode)
+            raise _fail(path, f"{location}[{index}]", f"must be one of {allowed}") from error
+    return tuple(result)
+
+
+def _load_coalition_activity_stages(
+    raw: object,
+    path: Path,
+) -> tuple[CoalitionStageDefinition, ...]:
+    result = []
+    for index, value in enumerate(_sequence(raw, path, "activity.stages")):
+        location = f"activity.stages[{index}]"
+        item = _mapping(value, path, location, _COALITION_ACTIVITY_STAGE_FIELDS)
+        if set(item) != _COALITION_ACTIVITY_STAGE_FIELDS:
+            raise _fail(path, location, f"required fields are {sorted(_COALITION_ACTIVITY_STAGE_FIELDS)}")
+        fleet = _string(item["fleet"], path, f"{location}.fleet")
+        try:
+            fleet_rule = CoalitionFleetRule(fleet)
+        except ValueError as error:
+            allowed = sorted(rule.value for rule in CoalitionFleetRule)
+            raise _fail(path, f"{location}.fleet", f"must be one of {allowed}") from error
+        result.append(
+            CoalitionStageDefinition(
+                stage_id=CoalitionStageId(_safe_stage_id(item["id"], path, f"{location}.id")),
+                battle_count=_exact_integer(item["battles"], path, f"{location}.battles"),
+                fleet_rule=fleet_rule,
+            )
+        )
+    return tuple(result)
+
+
+def _load_activity(raw: object, path: Path, pack_kind: str) -> ActivityDefinition:
+    base = _free_mapping(raw, path, "activity")
+    activity_kind = _string(base.get("kind"), path, "activity.kind")
+    expected_kind = {
+        "event": ActivityKind.EVENT_STORY,
+        "raid": ActivityKind.RAID,
+        "coalition": ActivityKind.COALITION,
+    }.get(pack_kind)
+    if expected_kind is None:
+        raise _fail(path, "activity", f"kind {pack_kind!r} must not define an activity")
+    if activity_kind != expected_kind.value:
+        raise _fail(path, "activity.kind", f"must be {expected_kind.value!r} for pack kind {pack_kind!r}")
+
+    try:
+        if expected_kind is ActivityKind.EVENT_STORY:
+            item = _mapping(base, path, "activity", _EVENT_STORY_ACTIVITY_FIELDS)
+            if set(item) != _EVENT_STORY_ACTIVITY_FIELDS:
+                raise _fail(path, "activity", f"required fields are {sorted(_EVENT_STORY_ACTIVITY_FIELDS)}")
+            profile = _nullable_string(item["profile"], path, "activity.profile")
+            return EventStoryDefinition(None if profile is None else EventStoryProfileId(profile))
+        if expected_kind is ActivityKind.RAID:
+            item = _mapping(base, path, "activity", _RAID_ACTIVITY_FIELDS)
+            if set(item) != _RAID_ACTIVITY_FIELDS:
+                raise _fail(path, "activity", f"required fields are {sorted(_RAID_ACTIVITY_FIELDS)}")
+            return RaidDefinition(
+                profile_id=RaidProfileId(_string(item["profile"], path, "activity.profile")),
+                modes=_raid_modes(item["modes"], path, "activity.modes"),
+                daily_modes=_raid_modes(item["daily_modes"], path, "activity.daily_modes"),
+                ticket_modes=_raid_modes(item["ticket_modes"], path, "activity.ticket_modes"),
+            )
+        item = _mapping(base, path, "activity", _COALITION_ACTIVITY_FIELDS)
+        if set(item) != _COALITION_ACTIVITY_FIELDS:
+            raise _fail(path, "activity", f"required fields are {sorted(_COALITION_ACTIVITY_FIELDS)}")
+        return CoalitionDefinition(
+            profile_id=CoalitionProfileId(_string(item["profile"], path, "activity.profile")),
+            stages=_load_coalition_activity_stages(item["stages"], path),
+        )
+    except (TypeError, ValueError) as error:
+        if isinstance(error, ContentValidationError) and str(error).startswith(f"{path}:"):
+            raise
+        raise _fail(path, "activity", str(error)) from error
+
+
+def _load_war_archives(raw: object, path: Path) -> WarArchivesDefinition:
+    item = _mapping(raw, path, "war_archives", _WAR_ARCHIVES_FIELDS)
+    if set(item) != _WAR_ARCHIVES_FIELDS:
+        raise _fail(path, "war_archives", f"required fields are {sorted(_WAR_ARCHIVES_FIELDS)}")
+    try:
+        return WarArchivesDefinition(WarArchivesProfileId(_string(item["profile"], path, "war_archives.profile")))
+    except (TypeError, ValueError) as error:
+        if isinstance(error, ContentValidationError) and str(error).startswith(f"{path}:"):
+            raise
+        raise _fail(path, "war_archives", str(error)) from error
+
+
+def _pack_war_archives(
+    data: Mapping[str, object],
+    path: Path,
+    kind: str,
+) -> WarArchivesDefinition | None:
+    if kind == "war_archives":
+        if "war_archives" not in data:
+            raise _fail(path, "war_archives", "is required for war_archives packs")
+        return _load_war_archives(data["war_archives"], path)
+    if "war_archives" in data:
+        raise _fail(path, "war_archives", f"must not be defined for pack kind {kind!r}")
+    return None
+
+
 def _validate_policy_targets(
     policy: CampaignPolicy,
     stages: tuple[StageSpec, ...],
@@ -307,42 +486,18 @@ def _validate_policy_targets(
     pack_id: str,
     repository_root: Path,
 ) -> None:
-    native_stage_ids = {stage.ref.stage_id for stage in stages}
-    repository_root = repository_root.resolve()
-    campaign_parent = (repository_root / "campaign").resolve()
-    campaign_root = (repository_root / "campaign" / pack_id).resolve()
-    try:
-        campaign_parent_relative = campaign_parent.relative_to(repository_root)
-        campaign_relative = campaign_root.relative_to(campaign_parent)
-    except ValueError:
-        campaign_parent_relative = None
-        campaign_relative = None
-    legacy_root_is_safe = (
-        campaign_parent_relative is not None
-        and campaign_parent_relative.parts == ("campaign",)
-        and campaign_relative is not None
-        and campaign_relative.parts == (pack_id,)
-    )
-
-    def target_exists(target: str) -> bool:
-        if target in native_stage_ids:
-            return True
-        if not legacy_root_is_safe:
-            raise _fail(path, "policy", "legacy campaign directory must stay inside its pack root")
-        legacy_path = (campaign_root / f"{target}.py").resolve()
-        try:
-            legacy_path.relative_to(campaign_root)
-        except ValueError:
-            return False
-        return legacy_path.is_file()
+    del repository_root, pack_id
+    stage_ids = {stage.ref.stage_id for stage in stages}
 
     targets = [target for _, target in policy.aliases]
+    targets.extend(rule.stage for rule in policy.progressions)
+    targets.extend(rule.next_stage for rule in policy.progressions if rule.next_stage is not None)
     targets.extend(stage for _, loop in policy.loops for stage in loop)
     targets.extend(policy.force_threat_safe_stages)
     targets.extend(policy.resource_free_stages)
     for target in targets:
         _safe_stage_id(target, path, "policy target")
-    dangling = sorted({target for target in targets if not target_exists(target)})
+    dangling = sorted(set(targets) - stage_ids)
     if dangling:
         raise _fail(path, "policy", f"dangling stage targets: {dangling}")
 
@@ -367,10 +522,17 @@ def _load_pack(path: Path, repository_root: Path) -> EventPack:
     if ui_profile not in EVENT_UI_PROFILES:
         raise _fail(path, "ui_profile", f"must be one of {EVENT_UI_PROFILES}")
     releases = _load_releases(data["releases"], path)
+    war_archives = _pack_war_archives(data, path, kind)
     pack_root = _resolve_pack_root(path, pack_id)
-    stages = _load_stages(data.get("stages", ()), path, pack_id, pack_root)
+    stages = _load_stages(data.get("stages", ()), path, pack_id, pack_root, war_archives)
     policy = _load_policy(data.get("policy", {}), path)
     _validate_policy_targets(policy, stages, path, pack_id, repository_root)
+    activity_kinds = {"event", "raid", "coalition"}
+    if kind in activity_kinds and "activity" not in data:
+        raise _fail(path, "activity", f"is required for pack kind {kind!r}")
+    if kind not in activity_kinds and "activity" in data:
+        raise _fail(path, "activity", f"must not be defined for pack kind {kind!r}")
+    activity = None if "activity" not in data else _load_activity(data["activity"], path, kind)
     return EventPack(
         pack_id=ContentId(pack_id),
         stages=stages,
@@ -378,6 +540,8 @@ def _load_pack(path: Path, repository_root: Path) -> EventPack:
         ui_profile=ui_profile,
         releases=releases,
         policy=policy,
+        activity=activity,
+        war_archives=war_archives,
     )
 
 
@@ -420,7 +584,12 @@ def _display_width(text: str) -> int:
 
 def render_campaign_readme(packs: Iterable[EventPack]) -> str:
     """从活动清单纯渲染 README，不读取或写入其他文件。"""
-    rows = [(release.order, release, str(pack.pack_id)) for pack in packs for release in pack.releases]
+    rows = [
+        (release.order, release, str(pack.pack_id))
+        for pack in packs
+        if pack.kind != "campaign"
+        for release in pack.releases
+    ]
     rows.sort(key=itemgetter(0))
     data = [("开放日期", "目录", "国服名称")]
     data.extend(

@@ -1,0 +1,270 @@
+schema_version: 4
+map:
+  name: SP
+  shape: I9
+  camera_data:
+  - E3
+  - E5
+  - E7
+  camera_data_spawn_point:
+  - E7
+  map_data: '-- ++ ++ -- -- -- ++ ++ --
+
+    -- ++ ++ -- MB -- ++ ++ --
+
+    -- ++ ++ ++ -- ++ ++ ++ --
+
+    -- -- ME -- -- -- ME -- --
+
+    ++ ME -- -- -- -- -- ME ++
+
+    ++ -- ME -- __ -- ME -- ++
+
+    -- ME -- -- -- -- -- ME --
+
+    -- ++ -- -- -- -- -- ++ --
+
+    -- -- ++ SP -- SP -- -- --'
+  weight_data: '50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 8
+  - battle: 1
+  - battle: 2
+  - battle: 3
+  - battle: 4
+  - battle: 5
+  - battle: 6
+  - battle: 7
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: true
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: false
+  STAR_REQUIRE_1: 0
+  STAR_REQUIRE_2: 0
+  STAR_REQUIRE_3: 0
+  MAP_CHAPTER_SWITCH_20241219: true
+  STAGE_ENTRANCE:
+  - half
+  - '20240725'
+  MAP_HAS_MODE_SWITCH: false
+  MAP_SWIPE_MULTIPLY:
+  - 1.153
+  - 1.175
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.115
+  - 1.136
+  MAP_IS_ONE_TIME_STAGE: true
+enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - tag: default_battle
+  1:
+    steps:
+    - tag: default_battle
+  2:
+    steps:
+    - tag: default_battle
+  3:
+    steps:
+    - tag: default_battle
+  4:
+    steps:
+    - preserve: 2
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  5:
+    steps:
+    - preserve: 0
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  7:
+    steps:
+    - strategy: fleet_boss
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination:
+  - battle: 0
+    fleet: active
+    tag: ensure_at
+    target: D9
+  - battle: 0
+    expected: enemy
+    fleet: active
+    tag: clear_target
+    target: D7
+  - battle: 0
+    expected: enemy
+    fleet: active
+    tag: clear_target
+    target: F7
+  - battle: 1
+    expected: enemy
+    fleet: active
+    tag: clear_target
+    target: F7
+  - battle: 1
+    expected: enemy
+    fleet: active
+    tag: clear_target
+    target: D7
+  - battle: 2
+    expected: enemy
+    fleet: active
+    tag: clear_target
+    target: D7
+  - battle: 2
+    expected: enemy
+    fleet: active
+    tag: clear_target
+    target: F7
+  - battle: 3
+    expected: enemy
+    fleet: active
+    tag: clear_target
+    target: F7
+  - battle: 3
+    expected: enemy
+    fleet: active
+    tag: clear_target
+    target: D7
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns: []
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs:
+- activation_modes:
+  - normal
+  battle: 0
+  statements:
+  - condition:
+      cell: D9
+      fleet: active
+      tag: fleet_at
+    tag: branch
+    when_false: []
+    when_true:
+    - marker: named:route.started-at-d9
+      tag: set_marker
+      value: true
+  - condition:
+      marker: named:route.started-at-d9
+      tag: marker
+      value: true
+    tag: branch
+    when_false:
+    - action:
+        expected: enemy
+        tag: clear_chosen_enemy
+        target: F7
+      tag: attempt_battle
+    when_true:
+    - action:
+        expected: enemy
+        tag: clear_chosen_enemy
+        target: D7
+      tag: attempt_battle
+  - tag: return_continue
+- activation_modes:
+  - normal
+  battle: 1
+  statements:
+  - condition:
+      marker: named:route.started-at-d9
+      tag: marker
+      value: true
+    tag: branch
+    when_false:
+    - action:
+        expected: enemy
+        tag: clear_chosen_enemy
+        target: D7
+      tag: attempt_battle
+    when_true:
+    - action:
+        expected: enemy
+        tag: clear_chosen_enemy
+        target: F7
+      tag: attempt_battle
+  - tag: return_continue
+- activation_modes:
+  - normal
+  battle: 2
+  statements:
+  - condition:
+      marker: named:route.started-at-d9
+      tag: marker
+      value: true
+    tag: branch
+    when_false:
+    - action:
+        expected: enemy
+        tag: clear_chosen_enemy
+        target: F7
+      tag: attempt_battle
+    when_true:
+    - action:
+        expected: enemy
+        tag: clear_chosen_enemy
+        target: D7
+      tag: attempt_battle
+  - tag: return_continue
+- activation_modes:
+  - normal
+  battle: 3
+  statements:
+  - condition:
+      marker: named:route.started-at-d9
+      tag: marker
+      value: true
+    tag: branch
+    when_false:
+    - action:
+        expected: enemy
+        tag: clear_chosen_enemy
+        target: D7
+      tag: attempt_battle
+    when_true:
+    - action:
+        expected: enemy
+        tag: clear_chosen_enemy
+        target: F7
+      tag: attempt_battle
+  - tag: return_continue
+boss_approaches: []
+hard_mode: null

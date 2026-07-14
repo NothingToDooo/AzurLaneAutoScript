@@ -1,11 +1,50 @@
 schema_version: 1
 id: war_archives_20210819_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: microlayer_medley
 releases:
 - opened_on: '2022-11-17'
   name_cn: 微层混合
   order: 210
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_b5665c7976ce7356
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_b5665c7976ce7356
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_b5665c7976ce7356
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_012c1b9164c24c44
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_012c1b9164c24c44
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_012c1b9164c24c44
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_063f9daac8367240
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_063f9daac8367240
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_063f9daac8367240
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_063f9daac8367240
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_063f9daac8367240
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_063f9daac8367240
 policy:
   aliases:
     ht1: c1
@@ -20,3 +59,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

@@ -1,11 +1,62 @@
 schema_version: 1
 id: war_archives_20230525_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: confluence_of_nothingness
 releases:
 - opened_on: '2026-06-12'
   name_cn: 空相交汇点
   order: 470
+stages:
+- id: ht1
+  source: stages/ht1.yaml
+  runtime_profile: profile_0e6df9dc730588a0
+- id: ht2
+  source: stages/ht2.yaml
+  runtime_profile: profile_0e6df9dc730588a0
+- id: ht3
+  source: stages/ht3.yaml
+  runtime_profile: profile_8939032dc45ae194
+- id: ht4
+  source: stages/ht4.yaml
+  runtime_profile: profile_0e6df9dc730588a0
+- id: ht5
+  source: stages/ht5.yaml
+  runtime_profile: profile_0e6df9dc730588a0
+- id: ht6
+  source: stages/ht6.yaml
+  runtime_profile: profile_be4f6b97e977934a
+- id: hts1
+  source: stages/hts1.yaml
+  runtime_profile: profile_0e6df9dc730588a0
+- id: hts2
+  source: stages/hts2.yaml
+  runtime_profile: profile_0e6df9dc730588a0
+- id: t1
+  source: stages/t1.yaml
+  runtime_profile: profile_0e6df9dc730588a0
+- id: t2
+  source: stages/t2.yaml
+  runtime_profile: profile_0e6df9dc730588a0
+- id: t3
+  source: stages/t3.yaml
+  runtime_profile: profile_3f0f91ebc0165a8c
+- id: t4
+  source: stages/t4.yaml
+  runtime_profile: profile_0e6df9dc730588a0
+- id: t5
+  source: stages/t5.yaml
+  runtime_profile: profile_0e6df9dc730588a0
+- id: t6
+  source: stages/t6.yaml
+  runtime_profile: profile_8939032dc45ae194
+- id: ts1
+  source: stages/ts1.yaml
+  runtime_profile: profile_0e6df9dc730588a0
+- id: ts2
+  source: stages/ts2.yaml
+  runtime_profile: profile_0e6df9dc730588a0
 policy:
   aliases:
     a1: t1
@@ -29,3 +80,20 @@ policy:
     sp4: t4
     sp5: t5
     sp6: t6
+  progressions:
+    ht1: ht2
+    ht2: hts1
+    ht3: null
+    ht4: ht5
+    ht5: hts2
+    ht6: null
+    hts1: ht3
+    hts2: ht6
+    t1: t2
+    t2: ts1
+    t3: null
+    t4: t5
+    t5: ts2
+    t6: null
+    ts1: t3
+    ts2: t6
