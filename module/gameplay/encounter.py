@@ -267,11 +267,13 @@ class HardCampaignPort(Protocol):
         cancellation: CancellationSignal,
     ) -> HardBattleOutcome: ...
 
-    def exit(
+    def exit_ui(
         self,
         settings: HardSettings,
         cancellation: CancellationSignal,
     ) -> None: ...
+
+    def release(self) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)

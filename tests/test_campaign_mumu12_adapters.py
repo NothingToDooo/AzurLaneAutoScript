@@ -1,10 +1,12 @@
 from dataclasses import replace
 from datetime import UTC, datetime, time, timedelta
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, cast
 
 import pytest
 
+import module.adapters.encounter_mumu12 as encounter_adapters
 from module.adapters.campaign_mumu12 import (
+    CampaignRuntimeEvidenceError,
     DeclarativeCampaignMapRuntime,
     Mumu12CampaignRuntimeProvider,
     Mumu12HardCampaignPort,
@@ -70,7 +72,7 @@ from module.content.stage_rules import (
     SwipeScale,
 )
 from module.device.device import Device
-from module.exception import ScriptEnd
+from module.exception import OilExhausted, ScriptEnd
 from module.gameplay.campaign import (
     CampaignAutomationSettings,
     CampaignDifficulty,
@@ -102,7 +104,7 @@ from module.gameplay.campaign import (
     SubmarineMode,
 )
 from module.gameplay.campaign_live import CampaignCheckpointUnavailable, CampaignMapAchievementReached
-from module.gameplay.encounter import HardBattleOutcome, HardFleet, HardSettings
+from module.gameplay.encounter import HardBattleOutcome, HardFleet, HardSettings, HardStopReason
 
 if TYPE_CHECKING:
     from module.interaction import CancellationSignal
@@ -340,6 +342,16 @@ class _FakeDeclarativeRuntime(DeclarativeCampaignMapRuntime):
         return True
 
 
+class _FailingHardRuntime(_FakeDeclarativeRuntime):
+    created: ClassVar[list[object]] = []
+    failures: ClassVar[list[BaseException]] = []
+
+    def execute_hard_attempt(self, cancellation: CancellationSignal) -> None:
+        super().execute_hard_attempt(cancellation)
+        if type(self).failures:
+            raise type(self).failures.pop(0)
+
+
 class _FakeSessionSource:
     def __init__(
         self,
@@ -368,6 +380,36 @@ class _FakeSessionSource:
     ) -> CampaignStageSelection:
         del remaining_runs, preferred_ref
         return CampaignStageSelection(ref, ref)
+
+
+def _hard_settings(stage: str = "11-4") -> HardSettings:
+    return HardSettings(
+        DailySchedule("Asia/Hong_Kong", (time(4),)),
+        timedelta(minutes=30),
+        timedelta(hours=2),
+        stage,
+        HardFleet.FLEET_1,
+    )
+
+
+class _HardClock:
+    @staticmethod
+    def now() -> datetime:
+        return datetime(2026, 7, 14, 12, tzinfo=UTC)
+
+
+def _disable_hard_activation(monkeypatch: pytest.MonkeyPatch, device: Device) -> None:
+    def activate(
+        _config: AzurLaneConfig,
+        _device: Device,
+        _task_name: str,
+        _overlay: object,
+        cancellation: CancellationSignal,
+    ) -> Device:
+        cancellation.raise_if_requested()
+        return device
+
+    monkeypatch.setattr(encounter_adapters, "_activate", activate)
 
 
 def test_compiler_materializes_both_variants_and_map_structure() -> None:
@@ -1030,13 +1072,7 @@ def test_hard_port_uses_explicit_override_or_main_map_and_settles_one_attempt(
         runtime_factory=_FakeDeclarativeRuntime,
         remaining_reader=lambda _device: 2,
     )
-    settings = HardSettings(
-        DailySchedule("Asia/Hong_Kong", (time(4),)),
-        timedelta(minutes=30),
-        timedelta(hours=2),
-        stage,
-        HardFleet.FLEET_1,
-    )
+    settings = _hard_settings(stage)
     cancellation = AbortToken()
 
     assert port.remaining_attempts(settings, cancellation) == 2
@@ -1048,8 +1084,193 @@ def test_hard_port_uses_explicit_override_or_main_map_and_settles_one_attempt(
     )
     assert ("ensure_campaign_ui", stage, "hard") in runtime.calls
     assert port.advance_one(settings, cancellation) is HardBattleOutcome.SETTLED
-    port.exit(settings, cancellation)
+    port.exit_ui(settings, cancellation)
+    port.release()
 
     assert "execute_hard_attempt" in runtime.calls
     assert ("ensure_auto_search_exit", True) in runtime.calls
     assert "discard_runtime" in runtime.calls
+
+
+def test_hard_workflow_closes_each_real_runtime_across_three_attempts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _FakeDeclarativeRuntime.created.clear()
+    config = AzurLaneConfig.from_snapshot("hard-workflow", {})
+    device = object.__new__(Device)
+    vars(device)["screenshot"] = lambda: None
+    vars(device)["image"] = object()
+    source = _FakeSessionSource(_definition())
+    remaining = iter((3, 2, 1))
+    port = Mumu12HardCampaignPort(
+        config,
+        device,
+        source,
+        runtime_factory=_FakeDeclarativeRuntime,
+        remaining_reader=lambda _device: next(remaining),
+    )
+    _disable_hard_activation(monkeypatch, device)
+    workflow = encounter_adapters.Mumu12HardWorkflow(config, device, port, _HardClock())
+    settings = _hard_settings()
+
+    reports = tuple(workflow.execute(settings, AbortToken()) for _ in range(3))
+
+    assert tuple(report.stop_reason for report in reports) == (
+        HardStopReason.IN_PROGRESS,
+        HardStopReason.IN_PROGRESS,
+        HardStopReason.COMPLETED,
+    )
+    assert tuple(report.attempts_available for report in reports) == (3, 2, 1)
+    assert len(_FakeDeclarativeRuntime.created) == 3
+    runtimes = tuple(cast("_FakeDeclarativeRuntime", runtime) for runtime in _FakeDeclarativeRuntime.created)
+    for runtime in runtimes:
+        assert "execute_hard_attempt" in runtime.calls
+        assert "discard_runtime" in runtime.calls
+    assert ("ensure_auto_search_exit", True) not in runtimes[0].calls
+    assert ("ensure_auto_search_exit", True) not in runtimes[1].calls
+    assert ("ensure_auto_search_exit", True) in runtimes[2].calls
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected"),
+    [
+        (OilExhausted(), HardStopReason.RESOURCE_LIMIT),
+        (ScriptEnd(), HardStopReason.FAILED),
+    ],
+)
+def test_hard_workflow_releases_real_runtime_before_retry(
+    monkeypatch: pytest.MonkeyPatch,
+    failure: BaseException,
+    expected: HardStopReason,
+) -> None:
+    _FailingHardRuntime.created.clear()
+    _FailingHardRuntime.failures = [failure]
+    config = AzurLaneConfig.from_snapshot("hard-retry", {})
+    device = object.__new__(Device)
+    vars(device)["screenshot"] = lambda: None
+    vars(device)["image"] = object()
+    remaining = iter((2, 1))
+    port = Mumu12HardCampaignPort(
+        config,
+        device,
+        _FakeSessionSource(_definition()),
+        runtime_factory=_FailingHardRuntime,
+        remaining_reader=lambda _device: next(remaining),
+    )
+    _disable_hard_activation(monkeypatch, device)
+    workflow = encounter_adapters.Mumu12HardWorkflow(config, device, port, _HardClock())
+    settings = _hard_settings()
+
+    first = workflow.execute(settings, AbortToken())
+    retried = workflow.execute(settings, AbortToken())
+
+    assert first.stop_reason is expected
+    assert retried.stop_reason is HardStopReason.COMPLETED
+    assert len(_FailingHardRuntime.created) == 2
+    first_runtime = cast("_FailingHardRuntime", _FailingHardRuntime.created[0])
+    retried_runtime = cast("_FailingHardRuntime", _FailingHardRuntime.created[1])
+    assert "discard_runtime" in first_runtime.calls
+    assert "discard_runtime" in retried_runtime.calls
+
+
+def test_hard_workflow_releases_real_runtime_after_cancellation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _FakeDeclarativeRuntime.created.clear()
+    config = AzurLaneConfig.from_snapshot("hard-cancel", {})
+    device = object.__new__(Device)
+    vars(device)["screenshot"] = lambda: None
+    vars(device)["image"] = object()
+    cancelled = AbortToken()
+    remaining = iter((2, 1))
+
+    def read_remaining(_device: Device) -> int:
+        value = next(remaining)
+        if value == 2:
+            cancelled.request("test cancellation")
+        return value
+
+    port = Mumu12HardCampaignPort(
+        config,
+        device,
+        _FakeSessionSource(_definition()),
+        runtime_factory=_FakeDeclarativeRuntime,
+        remaining_reader=read_remaining,
+    )
+    _disable_hard_activation(monkeypatch, device)
+    workflow = encounter_adapters.Mumu12HardWorkflow(config, device, port, _HardClock())
+    settings = _hard_settings()
+
+    with pytest.raises(AbortRequested, match="test cancellation"):
+        workflow.execute(settings, cancelled)
+    retried = workflow.execute(settings, AbortToken())
+
+    assert retried.stop_reason is HardStopReason.COMPLETED
+    assert len(_FakeDeclarativeRuntime.created) == 2
+    cancelled_runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[0])
+    retried_runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[1])
+    assert "execute_hard_attempt" not in cancelled_runtime.calls
+    assert "discard_runtime" in cancelled_runtime.calls
+    assert "discard_runtime" in retried_runtime.calls
+
+
+def test_hard_workflow_releases_real_runtime_after_unexpected_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _FailingHardRuntime.created.clear()
+    _FailingHardRuntime.failures = [RuntimeError("unexpected hard runtime failure")]
+    config = AzurLaneConfig.from_snapshot("hard-error", {})
+    device = object.__new__(Device)
+    vars(device)["screenshot"] = lambda: None
+    vars(device)["image"] = object()
+    remaining = iter((2, 1))
+    port = Mumu12HardCampaignPort(
+        config,
+        device,
+        _FakeSessionSource(_definition()),
+        runtime_factory=_FailingHardRuntime,
+        remaining_reader=lambda _device: next(remaining),
+    )
+    _disable_hard_activation(monkeypatch, device)
+    workflow = encounter_adapters.Mumu12HardWorkflow(config, device, port, _HardClock())
+    settings = _hard_settings()
+
+    with pytest.raises(RuntimeError, match="unexpected hard runtime failure"):
+        workflow.execute(settings, AbortToken())
+    retried = workflow.execute(settings, AbortToken())
+
+    assert retried.stop_reason is HardStopReason.COMPLETED
+    assert len(_FailingHardRuntime.created) == 2
+    failed_runtime = cast("_FailingHardRuntime", _FailingHardRuntime.created[0])
+    retried_runtime = cast("_FailingHardRuntime", _FailingHardRuntime.created[1])
+    assert "discard_runtime" in failed_runtime.calls
+    assert "discard_runtime" in retried_runtime.calls
+
+
+def test_hard_port_stage_mismatch_can_be_released_without_cancellation() -> None:
+    _FakeDeclarativeRuntime.created.clear()
+    config = AzurLaneConfig.from_snapshot("hard-stage-mismatch", {})
+    device = object.__new__(Device)
+    vars(device)["screenshot"] = lambda: None
+    vars(device)["image"] = object()
+    port = Mumu12HardCampaignPort(
+        config,
+        device,
+        _FakeSessionSource(_definition()),
+        runtime_factory=_FakeDeclarativeRuntime,
+        remaining_reader=lambda _device: 1,
+    )
+    first = _hard_settings("11-4")
+    second = _hard_settings("12-4")
+
+    assert port.remaining_attempts(first, AbortToken()) == 1
+    with pytest.raises(CampaignRuntimeEvidenceError, match="does not match the active stage"):
+        port.exit_ui(second, AbortToken())
+    port.release()
+    first_runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[0])
+    assert "discard_runtime" in first_runtime.calls
+
+    assert port.remaining_attempts(second, AbortToken()) == 1
+    port.release()
+    second_runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[1])
+    assert "discard_runtime" in second_runtime.calls

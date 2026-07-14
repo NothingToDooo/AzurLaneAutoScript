@@ -197,13 +197,16 @@ class _HardCampaign:
             raise self.result
         return self.result
 
-    def exit(self, settings: HardSettings, cancellation: CancellationSignal) -> None:
+    def exit_ui(self, settings: HardSettings, cancellation: CancellationSignal) -> None:
         assert settings is _HARD_SETTINGS
         cancellation.raise_if_requested()
-        self.calls.append("exit")
+        self.calls.append("exit_ui")
+
+    def release(self) -> None:
+        self.calls.append("release")
 
 
-def test_hard_advances_one_confirmed_battle_without_exiting_mid_batch(
+def test_hard_advances_one_confirmed_battle_and_releases_without_exiting_mid_batch(
     runtime: tuple[AzurLaneConfig, Device],
 ) -> None:
     config, device = runtime
@@ -217,7 +220,7 @@ def test_hard_advances_one_confirmed_battle_without_exiting_mid_batch(
     assert report.attempts_available == 3
     assert report.attempts_completed == 1
     assert report.stop_reason is HardStopReason.IN_PROGRESS
-    assert campaign.calls == ["remaining", "advance"]
+    assert campaign.calls == ["remaining", "advance", "release"]
 
 
 def test_hard_final_battle_exits_explicitly(runtime: tuple[AzurLaneConfig, Device]) -> None:
@@ -230,7 +233,7 @@ def test_hard_final_battle_exits_explicitly(runtime: tuple[AzurLaneConfig, Devic
     )
 
     assert report.stop_reason is HardStopReason.COMPLETED
-    assert campaign.calls == ["remaining", "advance", "exit"]
+    assert campaign.calls == ["remaining", "advance", "exit_ui", "release"]
 
 
 @pytest.mark.parametrize(
@@ -255,7 +258,20 @@ def test_hard_maps_legacy_stop_semantics_without_reporting_success(
 
     assert report.stop_reason is expected
     assert report.attempts_completed == 0
-    assert campaign.calls == ["remaining", "advance"]
+    assert campaign.calls == ["remaining", "advance", "release"]
+
+
+def test_hard_releases_runtime_after_unexpected_error(runtime: tuple[AzurLaneConfig, Device]) -> None:
+    config, device = runtime
+    campaign = _HardCampaign(remaining=3, result=RuntimeError("unexpected hard failure"))
+
+    with pytest.raises(RuntimeError, match="unexpected hard failure"):
+        adapters.Mumu12HardWorkflow(config, device, campaign, _Clock()).execute(
+            _HARD_SETTINGS,
+            AbortToken(),
+        )
+
+    assert campaign.calls == ["remaining", "advance", "release"]
 
 
 class _Screen:

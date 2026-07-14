@@ -1,15 +1,18 @@
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
 
 from module.adapters import campaign_runtime_hard as hard_runtime
+from module.adapters.campaign_runtime_implementations import load_default_campaign_runtime_executor_registry
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
     RuntimeOperation,
 )
+from module.config.config import AzurLaneConfig
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
     CampaignRuntimeExtensionId,
@@ -19,6 +22,7 @@ from module.content.runtime_profile import (
     RuntimeExecutorKind,
     RuntimeImplementationId,
 )
+from module.content.runtime_profile_catalog import load_default_campaign_runtime_profile_registry
 from module.exception import CampaignEnd
 from module.map.assets import FLEET_PREPARATION, MAP_PREPARATION
 from module.map.map_base import CampaignMap
@@ -62,8 +66,6 @@ class _Map:
 @dataclass(slots=True)
 class _Config:
     FLEET_HARD_EQUIPMENT: object | None
-    ENABLE_EMOTION_REDUCE: bool = True
-    ENABLE_HP_BALANCE: bool = True
     MAP_HAS_AMBUSH: bool = True
 
     def apply_runtime_overlay(self, **kwargs: object) -> None:
@@ -136,8 +138,6 @@ def _options(**overrides: object) -> dict[str, object]:
             "equipment_take_off_when_finished",
         ],
         "expected_end": "in_stage",
-        "enable_hp_balance": False,
-        "enable_emotion_reduce": False,
     }
     options.update(overrides)
     return options
@@ -183,9 +183,28 @@ def test_runtime_created_applies_hard_mode_config_overlay() -> None:
 
     manager.bind(runtime, CampaignMap("hard-runtime-config"))
 
-    assert runtime.config.ENABLE_EMOTION_REDUCE is False
-    assert runtime.config.ENABLE_HP_BALANCE is False
     assert runtime.config.MAP_HAS_AMBUSH is False
+    manager.reset()
+
+
+def test_production_hard_profile_bind_uses_only_allowed_config_overlays() -> None:
+    profile_registry = load_default_campaign_runtime_profile_registry()
+    hard_extension_id = CampaignRuntimeExtensionId("campaign_hard/campaign_hard/campaign")
+    hard_profiles = tuple(
+        profile
+        for profile in profile_registry.profiles.values()
+        if hard_extension_id in {extension.extension_id for extension in profile.extensions}
+    )
+    assert len(hard_profiles) == 1
+    manager = CampaignRuntimeProfileManager(
+        hard_profiles[0],
+        load_default_campaign_runtime_executor_registry(),
+    )
+    config = AzurLaneConfig.from_snapshot("hard-runtime-production-config", {})
+
+    manager.bind(SimpleNamespace(config=config), CampaignMap("hard-runtime-production-config"))
+
+    assert config.MAP_HAS_AMBUSH is False
     manager.reset()
 
 
@@ -271,7 +290,6 @@ def test_equipment_cleanup_reaches_fleet_preparation_through_closed_assets() -> 
     "options",
     [
         _options(operations=["clear_boss"]),
-        _options(enable_hp_balance=True),
         _options(expected_end="no_searching"),
         _options(unexpected=True),
     ],

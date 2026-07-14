@@ -2196,7 +2196,7 @@ class Mumu12HardCampaignPort:
         runtime.execute_hard_attempt(cancellation)
         return HardBattleOutcome.SETTLED
 
-    def exit(
+    def exit_ui(
         self,
         settings: HardSettings,
         cancellation: CancellationSignal,
@@ -2205,9 +2205,19 @@ class Mumu12HardCampaignPort:
         cancellation.raise_if_requested()
         runtime.ensure_auto_search_exit()
         cancellation.raise_if_requested()
-        runtime.discard_runtime()
+
+    def release(self) -> None:
+        """无条件释放当前 turn 的 runtime，不依赖已可能取消的交互信号。"""
+
+        runtime = self._active_runtime
         self._active_runtime = None
         self._active_stage = None
+        if runtime is None:
+            return
+        if runtime.runtime_session_active:
+            runtime.finish_runtime_session(RuntimeSessionOutcome.INTERRUPTED)
+        else:
+            runtime.discard_runtime()
 
 
 def _read_hard_remaining(device: Device) -> int:

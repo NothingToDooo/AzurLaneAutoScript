@@ -6,8 +6,6 @@
           "implementation": "hard_mode/campaign_clear_mode",
           "kind": "hard_mode",
           "options": {
-            "enable_emotion_reduce": false,
-            "enable_hp_balance": false,
             "expected_end": "in_stage",
             "operations": [
               "_expected_end",

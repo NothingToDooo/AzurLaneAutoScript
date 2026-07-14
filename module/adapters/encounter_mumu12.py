@@ -63,7 +63,7 @@ def _observed_at(clock: EncounterLiveClock) -> datetime:
 
 
 def _require_hard_campaign(port: HardCampaignPort) -> None:
-    for method_name in ("remaining_attempts", "advance_one", "exit"):
+    for method_name in ("remaining_attempts", "advance_one", "exit_ui", "release"):
         if isinstance(port, type) or not callable(getattr(port, method_name, None)):
             message = f"hard_campaign must implement {method_name}()"
             raise TypeError(message)
@@ -241,38 +241,41 @@ class Mumu12HardWorkflow:
 
     def execute(self, settings: HardSettings, cancellation: CancellationSignal) -> HardReport:
         _activate(self._config, self._device, "Hard", _hard_overlay(settings), cancellation)
-        cancellation.raise_if_requested()
-        remaining = self._hard_campaign.remaining_attempts(settings, cancellation)
-        if type(remaining) is not int or remaining < 0:
-            message = "HardCampaignPort.remaining_attempts() must return a non-negative integer"
-            raise TypeError(message)
-        if remaining == 0:
-            cancellation.raise_if_requested()
-            self._hard_campaign.exit(settings, cancellation)
-            return HardReport(_observed_at(self._clock), 0, 0, HardStopReason.COMPLETED)
-
         try:
             cancellation.raise_if_requested()
-            result = self._hard_campaign.advance_one(settings, cancellation)
-        except OilExhausted:
-            result = HardBattleOutcome.RESOURCE_LIMIT
-        except ScriptEnd:
-            result = HardBattleOutcome.FAILED
-        if not isinstance(result, HardBattleOutcome):
-            message = "HardCampaignPort.advance_one() must return a HardBattleOutcome"
-            raise TypeError(message)
+            remaining = self._hard_campaign.remaining_attempts(settings, cancellation)
+            if type(remaining) is not int or remaining < 0:
+                message = "HardCampaignPort.remaining_attempts() must return a non-negative integer"
+                raise TypeError(message)
+            if remaining == 0:
+                cancellation.raise_if_requested()
+                self._hard_campaign.exit_ui(settings, cancellation)
+                return HardReport(_observed_at(self._clock), 0, 0, HardStopReason.COMPLETED)
 
-        observed_at = _observed_at(self._clock)
-        if result is HardBattleOutcome.RESOURCE_LIMIT:
-            return HardReport(observed_at, remaining, 0, HardStopReason.RESOURCE_LIMIT)
-        if result is HardBattleOutcome.FAILED:
-            return HardReport(observed_at, remaining, 0, HardStopReason.FAILED)
-        if remaining > 1:
-            return HardReport(observed_at, remaining, 1, HardStopReason.IN_PROGRESS)
+            try:
+                cancellation.raise_if_requested()
+                result = self._hard_campaign.advance_one(settings, cancellation)
+            except OilExhausted:
+                result = HardBattleOutcome.RESOURCE_LIMIT
+            except ScriptEnd:
+                result = HardBattleOutcome.FAILED
+            if not isinstance(result, HardBattleOutcome):
+                message = "HardCampaignPort.advance_one() must return a HardBattleOutcome"
+                raise TypeError(message)
 
-        cancellation.raise_if_requested()
-        self._hard_campaign.exit(settings, cancellation)
-        return HardReport(observed_at, 1, 1, HardStopReason.COMPLETED)
+            observed_at = _observed_at(self._clock)
+            if result is HardBattleOutcome.RESOURCE_LIMIT:
+                return HardReport(observed_at, remaining, 0, HardStopReason.RESOURCE_LIMIT)
+            if result is HardBattleOutcome.FAILED:
+                return HardReport(observed_at, remaining, 0, HardStopReason.FAILED)
+            if remaining > 1:
+                return HardReport(observed_at, remaining, 1, HardStopReason.IN_PROGRESS)
+
+            cancellation.raise_if_requested()
+            self._hard_campaign.exit_ui(settings, cancellation)
+            return HardReport(observed_at, 1, 1, HardStopReason.COMPLETED)
+        finally:
+            self._hard_campaign.release()
 
 
 class _ReportingExercise(Exercise):

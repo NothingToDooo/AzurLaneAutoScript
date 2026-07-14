@@ -33,8 +33,6 @@ _OPERATIONS = frozenset(
 
 
 class _HardConfig(Protocol):
-    ENABLE_EMOTION_REDUCE: bool
-    ENABLE_HP_BALANCE: bool
     FLEET_HARD_EQUIPMENT: object | None
     MAP_HAS_AMBUSH: bool
 
@@ -88,7 +86,7 @@ def _strings(options: Mapping[str, RuntimeTuningValue], name: str) -> tuple[str,
 class CampaignClearModeExecutor(RuntimeExecutorInstance):
     """封装困难关卡的结束语义、Boss 清理和装备回收流程。"""
 
-    __slots__ = ("_enable_emotion_reduce", "_enable_hp_balance", "_expected_end_value")
+    __slots__ = ("_expected_end_value",)
 
     def __init__(self, context: RuntimeExecutorBuildContext) -> None:
         options = context.options(RuntimeExecutorKind.HARD_MODE)
@@ -96,20 +94,10 @@ class CampaignClearModeExecutor(RuntimeExecutorInstance):
         if operations != _OPERATIONS:
             message = f"runtime hard operations mismatch: expected={sorted(_OPERATIONS)}, actual={sorted(operations)}"
             raise CampaignRuntimeProfileError(message)
-        enable_hp_balance = options["enable_hp_balance"]
-        if enable_hp_balance is not False:
-            message = "hard clear mode requires enable_hp_balance=false"
-            raise CampaignRuntimeProfileError(message)
-        enable_emotion_reduce = options["enable_emotion_reduce"]
-        if enable_emotion_reduce is not False:
-            message = "hard clear mode requires enable_emotion_reduce=false"
-            raise CampaignRuntimeProfileError(message)
         expected_end = options["expected_end"]
         if expected_end != "in_stage":
             message = "hard clear mode expected_end must be 'in_stage'"
             raise CampaignRuntimeProfileError(message)
-        self._enable_hp_balance = False
-        self._enable_emotion_reduce = False
         self._expected_end_value = "in_stage"
         super().__init__(
             {RuntimeExecutorKind.HARD_MODE},
@@ -123,13 +111,10 @@ class CampaignClearModeExecutor(RuntimeExecutorInstance):
             },
         )
 
-    def _runtime_created(self, runtime: object) -> None:
+    @staticmethod
+    def _runtime_created(runtime: object) -> None:
         host = _host(runtime)
-        host.config.apply_runtime_overlay(
-            ENABLE_EMOTION_REDUCE=self._enable_emotion_reduce,
-            ENABLE_HP_BALANCE=self._enable_hp_balance,
-            MAP_HAS_AMBUSH=False,
-        )
+        host.config.apply_runtime_overlay(MAP_HAS_AMBUSH=False)
 
     def _expected_end(self, runtime: object, expected: object) -> str:
         del runtime, expected
@@ -210,8 +195,6 @@ def hard_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescripto
                         {
                             "operations",
                             "expected_end",
-                            "enable_hp_balance",
-                            "enable_emotion_reduce",
                         }
                     )
                 )
