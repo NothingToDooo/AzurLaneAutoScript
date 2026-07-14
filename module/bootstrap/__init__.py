@@ -14,6 +14,7 @@ from module.bootstrap.configuration_compiler import (
     ConfigurationDocument,
     WebConfigurationCompiler,
 )
+from module.bootstrap.notification_maintenance import ProductionNotificationMaintenance
 from module.bootstrap.process_host import (
     InstanceProcessExit,
     InstanceProcessExitKind,
@@ -25,6 +26,8 @@ from module.bootstrap.production import (
     Mumu12GameRuntimeBundleSource,
     SystemLoopClock,
     build_default_instance_process_host,
+    build_default_notification_maintenance,
+    build_default_notification_spool,
 )
 from module.bootstrap.revisions import RevisionTree, SourceTreeRevisionSource
 from module.bootstrap.runtime_provider import (
@@ -54,12 +57,15 @@ __all__ = [
     "InstanceRuntimeSession",
     "JsonConfigurationDocumentSource",
     "Mumu12GameRuntimeBundleSource",
+    "ProductionNotificationMaintenance",
     "ProductionRuntimeProvider",
     "RevisionTree",
     "SourceTreeRevisionSource",
     "SystemLoopClock",
     "WebConfigurationCompiler",
     "build_default_instance_process_host",
+    "build_default_notification_maintenance",
+    "build_default_notification_spool",
     "build_game_task_registry",
     "validate_instance_name",
 ]

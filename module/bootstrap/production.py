@@ -25,7 +25,12 @@ from module.bootstrap.assembly_source import (
     InstanceAssemblyLayout,
     JsonConfigurationDocumentSource,
 )
-from module.bootstrap.configuration_compiler import CompiledConfiguration, ConfigurationDocument
+from module.bootstrap.configuration_compiler import (
+    CompiledConfiguration,
+    ConfigurationDocument,
+    WebConfigurationCompiler,
+)
+from module.bootstrap.notification_maintenance import ProductionNotificationMaintenance
 from module.bootstrap.process_host import InstanceProcessHost
 from module.bootstrap.revisions import RevisionTree, SourceTreeRevisionSource
 from module.bootstrap.runtime_provider import ProductionRuntimeProvider
@@ -40,6 +45,12 @@ from module.content.stage_loader import StageSpecLoader
 from module.device.device import Device
 from module.gameplay.activity_factories import ActivityFactoryDependencies
 from module.gameplay.campaign_factories import HardCampaignSessionSource
+from module.notify import (
+    NotificationSpool,
+    NotificationSpoolStore,
+    ProcessFailureNotifier,
+    build_local_outbox_publisher,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -110,6 +121,19 @@ class SystemLoopClock:
                 return
             if wake_signal is None:
                 time.sleep(interval)
+
+
+def _build_notification_spool(
+    root: Path,
+    configuration_source: JsonConfigurationDocumentSource,
+    compiler: WebConfigurationCompiler,
+    clock: SystemLoopClock,
+) -> NotificationSpool:
+    return NotificationSpool(
+        store=NotificationSpoolStore(root / ".alas-runtime" / "notification-spool.sqlite3"),
+        config_source=lambda instance_name: compiler.compile_notification(configuration_source.load(instance_name)),
+        clock=clock,
+    )
 
 
 class Mumu12GameRuntimeBundleSource:
@@ -231,6 +255,40 @@ class Mumu12GameRuntimeBundleSource:
         )
 
 
+def build_default_notification_spool(
+    project_root: Path | None = None,
+    *,
+    clock: SystemLoopClock | None = None,
+) -> NotificationSpool:
+    """为一个进程构造独立连接的全局通知 spool。"""
+    root = _require_project_root(
+        Path(__file__).resolve().parents[2] if project_root is None else project_root,
+    )
+    configuration_source = JsonConfigurationDocumentSource(root / "config", root / "config" / "template.json")
+    compiler = WebConfigurationCompiler()
+    return _build_notification_spool(
+        root,
+        configuration_source,
+        compiler,
+        SystemLoopClock() if clock is None else clock,
+    )
+
+
+def build_default_notification_maintenance(
+    project_root: Path | None = None,
+) -> ProductionNotificationMaintenance:
+    """构造 WebUI 长寿命 pump 每一轮使用的独立维护会话。"""
+    root = _require_project_root(
+        Path(__file__).resolve().parents[2] if project_root is None else project_root,
+    )
+    clock = SystemLoopClock()
+    return ProductionNotificationMaintenance(
+        state_root=root / ".alas-runtime" / "state",
+        spool=build_default_notification_spool(root, clock=clock),
+        clock=clock,
+    )
+
+
 def build_default_instance_process_host(project_root: Path | None = None) -> InstanceProcessHost:
     """构造 WebUI/CLI/scheduler 共用的 production process host。"""
 
@@ -238,12 +296,26 @@ def build_default_instance_process_host(project_root: Path | None = None) -> Ins
         Path(__file__).resolve().parents[2] if project_root is None else project_root,
     )
     runtime_root = root / ".alas-runtime"
+    configuration_source = JsonConfigurationDocumentSource(root / "config", root / "config" / "template.json")
+    compiler = WebConfigurationCompiler()
+    clock = SystemLoopClock()
     source = FilesystemInstanceAssemblySource(
-        JsonConfigurationDocumentSource(root / "config", root / "config" / "template.json"),
+        configuration_source,
         Mumu12GameRuntimeBundleSource(root),
         InstanceAssemblyLayout(
             state_root=runtime_root / "state",
             lease_lock_root=runtime_root / "device-leases",
         ),
+        compiler=compiler,
     )
-    return InstanceProcessHost(ProductionRuntimeProvider(source, SystemLoopClock()))
+    spool = _build_notification_spool(root, configuration_source, compiler, clock)
+    failure_notifier = ProcessFailureNotifier(spool)
+    return InstanceProcessHost(
+        ProductionRuntimeProvider(
+            source,
+            clock,
+            outbox_publisher_factory=lambda instance_name: build_local_outbox_publisher(instance_name, spool),
+        ),
+        failure_reporter=failure_notifier,
+        notification_resources=spool,
+    )

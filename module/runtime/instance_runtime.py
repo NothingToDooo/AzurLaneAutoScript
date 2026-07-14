@@ -8,12 +8,14 @@ from module.application.scheduler import Scheduler
 from module.runtime.configuration_control import RuntimeConfigurationControl
 from module.runtime.configuration_publisher import ConfigurationPublisher
 from module.runtime.factories import TaskFactoryRegistry
-from module.runtime.outbox import OutboxDispatcher, OutboxPublisher
+from module.runtime.outbox import OutboxDelivery, OutboxDispatcher, OutboxDispatchResult, OutboxFailureFact
 from module.runtime.resolver import CatalogTaskResolver
 from module.state import SQLiteRunRepository, SQLiteScheduleSource, SQLiteStateStore
 from module.supervisor import DeviceLeaseRegistry, InstanceAgent, InstanceLoop, InstanceLoopExit, LoopClock
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from module.state import ConfigurationSourceSnapshot, JsonValue, ScheduleMutation, SettingsSnapshot
 
 
@@ -70,7 +72,7 @@ class InstanceRuntime:
         factories: TaskFactoryRegistry,
         clock: LoopClock,
         *,
-        outbox_publisher: OutboxPublisher | None = None,
+        outbox: OutboxDelivery | None = None,
         configuration_control: RuntimeConfigurationControl | None = None,
     ) -> None:
         if not isinstance(config, InstanceRuntimeConfig):
@@ -81,6 +83,9 @@ class InstanceRuntime:
             raise TypeError(message)
         if configuration_control is not None and not isinstance(configuration_control, RuntimeConfigurationControl):
             message = "configuration_control must be a RuntimeConfigurationControl or None"
+            raise TypeError(message)
+        if outbox is not None and not isinstance(outbox, OutboxDelivery):
+            message = "outbox must be an OutboxDelivery or None"
             raise TypeError(message)
         if (
             isinstance(clock, type)
@@ -107,9 +112,23 @@ class InstanceRuntime:
             leases = DeviceLeaseRegistry(config.lease_lock_root)
             outbox_dispatcher = (
                 None
-                if outbox_publisher is None
-                else OutboxDispatcher(store=store, publisher=outbox_publisher, clock=clock)
+                if outbox is None
+                else OutboxDispatcher(
+                    store=store,
+                    publisher=outbox.publisher,
+                    clock=clock,
+                    retry_policy=outbox.retry_policy,
+                )
             )
+            run_completion_hook = _outbox_completion_hook(
+                outbox_dispatcher,
+                None if outbox is None else outbox.failure_reporter,
+            )
+            if outbox is not None and run_completion_hook is not None:
+                _drain_startup_outbox(
+                    run_completion_hook,
+                    max_batches=outbox.retry_policy.startup_max_batches,
+                )
             self._agent = InstanceAgent(
                 scheduler=scheduler,
                 coordinator=coordinator,
@@ -117,7 +136,7 @@ class InstanceRuntime:
                 task_resolver=resolver,
                 device_serial=config.device_serial,
                 lease_owner=config.lease_owner,
-                run_completion_hook=(None if outbox_dispatcher is None else outbox_dispatcher.dispatch_pending),
+                run_completion_hook=run_completion_hook,
             )
             self._loop = InstanceLoop(self._agent, clock, control=configuration_control)
             self._configuration_publisher = ConfigurationPublisher(
@@ -195,3 +214,32 @@ class InstanceRuntime:
         if self._closed:
             message = "instance runtime is closed"
             raise RuntimeError(message)
+
+
+def _outbox_completion_hook(
+    dispatcher: OutboxDispatcher | None,
+    failure_reporter: Callable[[OutboxFailureFact], object] | None,
+) -> Callable[[], OutboxDispatchResult] | None:
+    if dispatcher is None:
+        return None
+    if failure_reporter is None:
+        return dispatcher.dispatch_pending
+
+    def dispatch_and_report() -> OutboxDispatchResult:
+        result = dispatcher.dispatch_pending()
+        for failure in result.failures:
+            failure_reporter(failure)
+        return result
+
+    return dispatch_and_report
+
+
+def _drain_startup_outbox(
+    dispatch: Callable[[], OutboxDispatchResult],
+    *,
+    max_batches: int,
+) -> None:
+    for _ in range(max_batches):
+        result = dispatch()
+        if result.published_count == 0 and result.failure_count == 0:
+            return

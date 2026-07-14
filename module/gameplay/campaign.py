@@ -14,6 +14,8 @@ from module.application import (
     DeleteTaskState,
     DisableTask,
     ExecutionMode,
+    OperatorNotificationKind,
+    OperatorNotificationRequest,
     RequestAppRestart,
     RescheduleSelf,
     Retryable,
@@ -1090,6 +1092,7 @@ class CampaignTask(Task):
             outcome=result.outcome,
             effects=tuple(effect for effect in result.effects if isinstance(effect, RequestAppRestart)),
             state_effects=result.state_effects,
+            notifications=result.notifications,
         )
 
     def _current_progress(self, context: TaskContext) -> tuple[CampaignProgress | None, bool]:
@@ -1437,6 +1440,7 @@ class CampaignTask(Task):
             outcome=retry.outcome,
             effects=retry.effects,
             state_effects=(self._upsert_progress(context, progress),),
+            notifications=retry.notifications,
         )
 
     def _terminal_result(self, context: TaskContext, result: TaskResult) -> TaskResult:
@@ -1444,6 +1448,7 @@ class CampaignTask(Task):
             outcome=result.outcome,
             effects=result.effects,
             state_effects=(self._delete_progress(context),),
+            notifications=result.notifications,
         )
 
     def _result(self, report: CampaignRunReport) -> TaskResult:
@@ -1492,8 +1497,30 @@ class CampaignTask(Task):
             effects=(RescheduleSelf(report.observed_at),),
         )
 
-    def _disable_self_result(self, _report: CampaignRunReport | None) -> TaskResult:
-        return TaskResult(outcome=Succeeded(), effects=(DisableTask(self._job.task_id),))
+    def _disable_self_result(self, report: CampaignRunReport | None) -> TaskResult:
+        reason = CampaignStopReason.RUN_COUNT_LIMIT if report is None else report.stop_reason
+        notification_kind = {
+            CampaignStopReason.RUN_COUNT_LIMIT: OperatorNotificationKind.CAMPAIGN_RUN_COUNT_LIMIT,
+            CampaignStopReason.REACH_LEVEL_LIMIT: OperatorNotificationKind.CAMPAIGN_REACH_LEVEL_LIMIT,
+            CampaignStopReason.NEW_SHIP: OperatorNotificationKind.CAMPAIGN_NEW_SHIP,
+        }.get(reason)
+        notifications: tuple[OperatorNotificationRequest, ...] = ()
+        if notification_kind is not None:
+            stage_ref = report.stage_ref if report is not None else self._notification_stage_ref()
+            resource = None if stage_ref is None else f"{stage_ref.pack_id}/{stage_ref.stage_id}"
+            notifications = (OperatorNotificationRequest(notification_kind, resource=resource),)
+        return TaskResult(
+            outcome=Succeeded(),
+            effects=(DisableTask(self._job.task_id),),
+            notifications=notifications,
+        )
+
+    def _notification_stage_ref(self) -> StageRef | None:
+        if self._job.progress is not None:
+            return self._job.progress.stage_ref
+        if self._job.stage_refs:
+            return self._job.stage_refs[0]
+        return None
 
     def _oil_result(self, report: CampaignRunReport) -> TaskResult:
         return TaskResult(

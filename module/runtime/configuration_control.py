@@ -44,6 +44,19 @@ class RuntimeConfigurationSnapshot:
             raise ValueError(message)
 
 
+def _require_runtime_configuration_snapshot(
+    value: object,
+    *,
+    field_name: str,
+) -> RuntimeConfigurationSnapshot:
+    """在动态 composition 边界验证值，同时保留公开签名的精确类型。"""
+
+    if not isinstance(value, RuntimeConfigurationSnapshot):
+        message = f"{field_name} must be a RuntimeConfigurationSnapshot"
+        raise TypeError(message)
+    return value
+
+
 class RuntimeConfigurationSource(Protocol):
     def load(self) -> RuntimeConfigurationSnapshot: ...
 
@@ -92,9 +105,7 @@ class RuntimeConfigurationControl:
         if isinstance(signal, type) or not all(callable(getattr(signal, method, None)) for method in ("wait", "clear")):
             message = "signal must implement wait() and clear()"
             raise TypeError(message)
-        if not isinstance(initial, RuntimeConfigurationSnapshot):
-            message = "initial must be a RuntimeConfigurationSnapshot"
-            raise TypeError(message)
+        initial = _require_runtime_configuration_snapshot(initial, field_name="initial")
         if not callable(error_reporter):
             message = "error_reporter must be callable"
             raise TypeError(message)
@@ -140,10 +151,10 @@ class RuntimeConfigurationControl:
         return changed
 
     def _load_candidate(self) -> RuntimeConfigurationSnapshot:
-        candidate = self._source.load()
-        if not isinstance(candidate, RuntimeConfigurationSnapshot):
-            message = "RuntimeConfigurationSource.load() must return a RuntimeConfigurationSnapshot"
-            raise TypeError(message)
+        candidate = _require_runtime_configuration_snapshot(
+            self._source.load(),
+            field_name="RuntimeConfigurationSource.load() result",
+        )
         if candidate.device_serial != self._device_serial:
             message = "runtime configuration changed the immutable device serial; restart the instance"
             raise ValueError(message)
@@ -183,7 +194,6 @@ class RuntimeConfigurationControl:
                     self._publisher.publish_update(
                         candidate.payload,
                         candidate.schedules,
-                        current_source.source_schedules,
                         source_revision=candidate.source_revision,
                         expected_revision=expected_revision,
                     )

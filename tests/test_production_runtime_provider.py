@@ -22,7 +22,8 @@ from module.gameplay.facility_factories import FacilityWorkflows
 from module.gameplay.market_factories import MarketWorkflows
 from module.gameplay.opsi_factories import OpsiWorkflows
 from module.maintenance import MaintenanceServices
-from module.runtime import InstanceRuntimeConfig, RuntimeConfigurationSnapshot, TaskFactoryRegistry
+from module.notify import DisabledNotificationConfig
+from module.runtime import InstanceRuntimeConfig, OutboxDelivery, RuntimeConfigurationSnapshot, TaskFactoryRegistry
 
 _ACTIVITY_CATALOG = ActivityCatalog(load_event_manifests(Path("content/events")))
 
@@ -198,6 +199,7 @@ def test_provider_builds_registry_and_runtime_from_one_instance_assembly(
     configuration = CompiledConfiguration(
         payload={"schema_version": 1, "tasks": {}},
         schedules=(),
+        notification=DisabledNotificationConfig(),
         device_serial="127.0.0.1:16384",
         source_revision="sha256:" + "0" * 64,
         assembly_revision="sha256:" + "1" * 64,
@@ -236,6 +238,10 @@ def test_provider_builds_registry_and_runtime_from_one_instance_assembly(
         calls.append(("control", kwargs))
         return control
 
+    def build_outbox(instance_name: str) -> _Publisher:
+        calls.append(("outbox", instance_name))
+        return publisher
+
     monkeypatch.setattr(runtime_provider_module, "build_game_task_registry", build_registry)
     monkeypatch.setattr(runtime_provider_module, "InstanceRuntime", build_runtime)
     monkeypatch.setattr(runtime_provider_module, "RuntimeConfigurationControl", build_control)
@@ -243,7 +249,7 @@ def test_provider_builds_registry_and_runtime_from_one_instance_assembly(
     publisher = _Publisher()
     external_signal = _Signal()
 
-    opened = ProductionRuntimeProvider(source, clock, outbox_publisher=publisher).open(
+    opened = ProductionRuntimeProvider(source, clock, outbox_publisher_factory=build_outbox).open(
         "alas",
         configuration_signal=external_signal,
     )
@@ -268,13 +274,14 @@ def test_provider_builds_registry_and_runtime_from_one_instance_assembly(
         device_serial=configuration.device_serial,
     )
     assert callable(control_arguments["error_reporter"])
-    assert calls[2] == (
-        "runtime",
-        assembly.runtime,
-        registry,
-        clock,
-        {"outbox_publisher": publisher, "configuration_control": control},
-    )
+    assert calls[2] == ("outbox", "alas")
+    assert calls[3][0:4] == ("runtime", assembly.runtime, registry, clock)
+    runtime_arguments = cast("dict[str, object]", calls[3][4])
+    assert runtime_arguments["configuration_control"] is control
+    outbox = runtime_arguments["outbox"]
+    assert isinstance(outbox, OutboxDelivery)
+    assert outbox.publisher is publisher
+    assert callable(outbox.failure_reporter)
 
 
 def test_provider_closes_configuration_control_when_runtime_construction_fails(
@@ -283,6 +290,7 @@ def test_provider_closes_configuration_control_when_runtime_construction_fails(
     configuration = CompiledConfiguration(
         payload={"schema_version": 1, "tasks": {}},
         schedules=(),
+        notification=DisabledNotificationConfig(),
         device_serial="127.0.0.1:16384",
         source_revision="sha256:" + "0" * 64,
         assembly_revision="sha256:" + "1" * 64,
@@ -316,6 +324,51 @@ def test_provider_closes_configuration_control_when_runtime_construction_fails(
     monkeypatch.setattr(runtime_provider_module, "RuntimeConfigurationControl", lambda **_kwargs: control)
 
     with pytest.raises(RuntimeError, match="runtime failed"):
-        ProductionRuntimeProvider(_Source(assembly), _Clock()).open("alas")
+        ProductionRuntimeProvider(
+            _Source(assembly),
+            _Clock(),
+            outbox_publisher_factory=lambda _instance_name: _Publisher(),
+        ).open("alas")
+
+    assert control.closed is True
+
+
+def test_provider_closes_configuration_control_when_outbox_factory_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configuration = CompiledConfiguration(
+        payload={"schema_version": 1, "tasks": {}},
+        schedules=(),
+        notification=DisabledNotificationConfig(),
+        device_serial="127.0.0.1:16384",
+        source_revision="sha256:" + "0" * 64,
+        assembly_revision="sha256:" + "1" * 64,
+    )
+    assembly = InstanceAssembly(
+        runtime=InstanceRuntimeConfig(
+            state_path=Path("state/alas.sqlite3"),
+            lease_lock_root=Path("state/leases"),
+            device_serial=configuration.device_serial,
+            lease_owner="alas-process",
+        ),
+        tasks=_dependencies(),
+        configuration=configuration,
+        content_revision="content:current",
+        client_ui_revision="ui:current",
+    )
+    control = _Control()
+    monkeypatch.setattr(runtime_provider_module, "build_game_task_registry", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(runtime_provider_module, "RuntimeConfigurationControl", lambda **_kwargs: control)
+
+    def fail_outbox(_instance_name: str) -> _Publisher:
+        message = "outbox failed"
+        raise RuntimeError(message)
+
+    with pytest.raises(RuntimeError, match="outbox failed"):
+        ProductionRuntimeProvider(
+            _Source(assembly),
+            _Clock(),
+            outbox_publisher_factory=fail_outbox,
+        ).open("alas")
 
     assert control.closed is True

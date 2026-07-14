@@ -27,11 +27,19 @@ from module.runtime.errors import (
 from module.runtime.factories import TaskBuildContext, TaskFactory, TaskFactoryRegistry
 from module.runtime.instance_runtime import InstanceRuntime, InstanceRuntimeConfig
 from module.runtime.outbox import (
+    DEFAULT_OUTBOX_RETRY_POLICY,
     OutboxClock,
+    OutboxDelivery,
+    OutboxDeliveryError,
     OutboxDispatcher,
+    OutboxDispatchError,
     OutboxDispatchResult,
+    OutboxFailureFact,
+    OutboxLoadError,
     OutboxPublisher,
+    OutboxRetryPolicy,
     OutboxStore,
+    PermanentOutboxPublishError,
 )
 from module.runtime.resolver import CatalogTaskResolver, TaskResolutionSnapshotSource
 from module.runtime.settings import SETTINGS_SCHEMA_VERSION, FrozenJsonValue, FrozenTaskSettings, TaskSettingsDocument
@@ -39,6 +47,7 @@ from module.runtime.task_state import TaskStateDocument, TaskStateEntry
 from module.runtime.typed_factory import TypedTaskFactory
 
 __all__ = [
+    "DEFAULT_OUTBOX_RETRY_POLICY",
     "SETTINGS_SCHEMA_VERSION",
     "CatalogTaskResolver",
     "ConfigurationChangeSignal",
@@ -57,10 +66,17 @@ __all__ = [
     "InvalidTaskFactoryError",
     "MissingSettingsError",
     "OutboxClock",
+    "OutboxDelivery",
+    "OutboxDeliveryError",
+    "OutboxDispatchError",
     "OutboxDispatchResult",
     "OutboxDispatcher",
+    "OutboxFailureFact",
+    "OutboxLoadError",
     "OutboxPublisher",
+    "OutboxRetryPolicy",
     "OutboxStore",
+    "PermanentOutboxPublishError",
     "RuntimeCompositionError",
     "RuntimeConfigurationControl",
     "RuntimeConfigurationSnapshot",

@@ -14,6 +14,7 @@ from module.application.effects import (
 )
 from module.application.identifiers import RunId, TaskId
 from module.application.metadata import RunMetadata
+from module.application.notifications import OperatorNotificationKind, OperatorNotificationRequest
 from module.application.outcomes import Blocked, Cancelled, Deferred, Faulted, Retryable, RunOutcome, Succeeded
 from module.application.state_effects import DeleteTaskState, StateEffect, UpsertTaskState
 
@@ -95,6 +96,7 @@ class TaskResult:
     outcome: RunOutcome
     effects: tuple[ScheduleEffect, ...] = ()
     state_effects: tuple[StateEffect, ...] = ()
+    notifications: tuple[OperatorNotificationRequest, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.outcome, Succeeded | Deferred | Retryable | Blocked | Cancelled | Faulted):
@@ -117,6 +119,21 @@ class TaskResult:
             message = "state_effects must contain only StateEffect values"
             raise TypeError(message)
         _validate_distinct_state_effects(self.state_effects)
+        if not isinstance(self.notifications, tuple):
+            message = "notifications must be a tuple"
+            raise TypeError(message)
+        if any(not isinstance(request, OperatorNotificationRequest) for request in self.notifications):
+            message = "notifications must contain only OperatorNotificationRequest values"
+            raise TypeError(message)
+        kinds = tuple(request.kind for request in self.notifications)
+        if len(kinds) != len(set(kinds)):
+            message = "notifications must contain at most one request per kind"
+            raise ValueError(message)
+        if any(
+            kind in {OperatorNotificationKind.RUN_FAULTED, OperatorNotificationKind.PROCESS_FAILED} for kind in kinds
+        ):
+            message = "fault notifications are derived outside task implementations"
+            raise ValueError(message)
 
 
 class Task(Protocol):

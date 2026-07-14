@@ -13,6 +13,8 @@ from module.application import (
     DisableTask,
     ExecutionMode,
     Faulted,
+    OperatorNotificationKind,
+    OperatorNotificationRequest,
     PreemptionRequest,
     RequestAppRestart,
     RescheduleSelf,
@@ -294,6 +296,62 @@ def test_task_result_rejects_values_outside_the_closed_unions() -> None:
         TaskResult(outcome=Succeeded(), effects=cast("tuple[ScheduleEffect, ...]", (object(),)))
     with pytest.raises(TypeError, match="state_effects must contain only StateEffect values"):
         TaskResult(outcome=Succeeded(), state_effects=cast("tuple[StateEffect, ...]", (object(),)))
+    with pytest.raises(TypeError, match="notifications must contain only OperatorNotificationRequest values"):
+        TaskResult(outcome=Succeeded(), notifications=cast("tuple[OperatorNotificationRequest, ...]", (object(),)))
+
+
+def test_operator_notification_request_is_typed_and_secret_free() -> None:
+    request = OperatorNotificationRequest(
+        OperatorNotificationKind.CAMPAIGN_NEW_SHIP,
+        resource="campaign_main/12-4",
+    )
+
+    assert request.resource == "campaign_main/12-4"
+    with pytest.raises(TypeError, match="kind must be an OperatorNotificationKind"):
+        OperatorNotificationRequest(cast("OperatorNotificationKind", "campaign_new_ship"))
+    with pytest.raises(ValueError, match="resource must be trimmed and non-empty"):
+        OperatorNotificationRequest(OperatorNotificationKind.CAMPAIGN_NEW_SHIP, resource=" ")
+
+
+def test_task_result_validates_notification_requests() -> None:
+    request = OperatorNotificationRequest(
+        OperatorNotificationKind.CAMPAIGN_REACH_LEVEL_LIMIT,
+        resource="campaign_main/12-4",
+    )
+
+    result = TaskResult(outcome=Succeeded(), notifications=(request,))
+
+    assert result.notifications == (request,)
+    with pytest.raises(TypeError, match="notifications must be a tuple"):
+        TaskResult(
+            outcome=Succeeded(),
+            notifications=cast("tuple[OperatorNotificationRequest, ...]", [request]),
+        )
+    with pytest.raises(ValueError, match="at most one request per kind"):
+        TaskResult(outcome=Succeeded(), notifications=(request, request))
+    with pytest.raises(ValueError, match="fault notifications are derived outside task implementations"):
+        TaskResult(
+            outcome=Faulted(RuntimeError("failed")),
+            notifications=(OperatorNotificationRequest(OperatorNotificationKind.RUN_FAULTED),),
+        )
+    with pytest.raises(ValueError, match="fault notifications are derived outside task implementations"):
+        TaskResult(
+            outcome=Succeeded(),
+            notifications=(OperatorNotificationRequest(OperatorNotificationKind.PROCESS_FAILED),),
+        )
+
+
+def test_campaign_notification_requires_a_resource() -> None:
+    with pytest.raises(ValueError, match="campaign notification requires a resource"):
+        OperatorNotificationRequest(OperatorNotificationKind.CAMPAIGN_RUN_COUNT_LIMIT)
+
+
+def test_campaign_notification_resource_must_be_single_line() -> None:
+    with pytest.raises(ValueError, match="single line"):
+        OperatorNotificationRequest(
+            OperatorNotificationKind.CAMPAIGN_NEW_SHIP,
+            "event/stage\nforged",
+        )
 
 
 def test_task_result_rejects_non_tuple_and_duplicate_state_effects() -> None:

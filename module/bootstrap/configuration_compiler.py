@@ -8,6 +8,13 @@ from typing import TypeVar, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from module.config.server import CN_PACKAGE
+from module.notify.configuration import (
+    DisabledNotificationConfig,
+    NotificationConfig,
+    NotificationConfigError,
+    SmtpNotificationConfig,
+    parse_notification_config,
+)
 from module.state import JsonValue, ScheduleMutation
 from module.task_registry import TASK_CATALOG, config_name_to_command
 
@@ -76,6 +83,7 @@ class _ConfigView:
 class CompiledConfiguration:
     payload: JsonValue
     schedules: tuple[ScheduleMutation, ...]
+    notification: NotificationConfig
     device_serial: str
     source_revision: str
     assembly_revision: str
@@ -88,6 +96,9 @@ class CompiledConfiguration:
             not isinstance(schedule, ScheduleMutation) for schedule in self.schedules
         ):
             message = "schedules must be a tuple of ScheduleMutation values"
+            raise TypeError(message)
+        if not isinstance(self.notification, DisabledNotificationConfig | SmtpNotificationConfig):
+            message = "notification must be a NotificationConfig"
             raise TypeError(message)
         if not isinstance(self.device_serial, str) or not self.device_serial.strip():
             message = "device_serial must be a non-empty string"
@@ -224,6 +235,7 @@ class WebConfigurationCompiler:
 
     def compile(self, document: ConfigurationDocument) -> CompiledConfiguration:
         view = _ConfigView(document)
+        notification = self.compile_notification(document)
         tasks: dict[str, JsonValue] = {}
         tasks.update(self._maintenance(view))
         tasks.update(self._facility(view))
@@ -244,10 +256,25 @@ class WebConfigurationCompiler:
         return CompiledConfiguration(
             payload=payload,
             schedules=schedules,
+            notification=notification,
             device_serial=view.value("Alas", "Emulator", "Serial", expected=str),
             source_revision=_source_revision(payload, schedules),
             assembly_revision=_assembly_revision(view),
         )
+
+    def compile_notification(self, document: ConfigurationDocument) -> NotificationConfig:
+        """独立编译进程级通知配置，供完整 runtime 尚未建成时报告失败。"""
+
+        return self._notification(_ConfigView(document))
+
+    @staticmethod
+    def _notification(view: _ConfigView) -> NotificationConfig:
+        path = ("Alas", "Error", "OnePushConfig")
+        raw_config = view.value(*path, expected=str)
+        try:
+            return parse_notification_config(raw_config)
+        except NotificationConfigError as error:
+            raise _error(path, str(error)) from None
 
     def _schedule(self, view: _ConfigView, config_name: str) -> dict[str, JsonValue]:
         raw = view.value(config_name, "Scheduler", "ServerUpdate", expected=str)

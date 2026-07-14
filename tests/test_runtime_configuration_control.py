@@ -16,7 +16,7 @@ from module.runtime import (
     TaskFactoryRegistry,
     TypedTaskFactory,
 )
-from module.state import ScheduleMutation, SQLiteStateStore
+from module.state import ConfigurationPublication, ConfigurationUpdate, ScheduleMutation, SQLiteStateStore
 from module.task_registry import LaunchSurface, TaskDefinition, TaskDomain
 
 if TYPE_CHECKING:
@@ -153,6 +153,23 @@ def test_initial_publish_failure_closes_store(tmp_path: Path, monkeypatch: pytes
         )
 
     assert len(closed_stores) == 1
+
+
+def test_control_rejects_an_untyped_initial_snapshot_before_opening_state(tmp_path: Path) -> None:
+    state_path = tmp_path / "state.sqlite3"
+
+    with pytest.raises(TypeError, match="initial must be a RuntimeConfigurationSnapshot"):
+        RuntimeConfigurationControl(
+            state_path=state_path,
+            factories=_registry(),
+            clock=_Clock(),
+            source=_Source(_snapshot("source:next")),
+            signal=_Signal(),
+            initial=cast("RuntimeConfigurationSnapshot", object()),
+            error_reporter=lambda _error: None,
+        )
+
+    assert not state_path.exists()
 
 
 def test_unrelated_source_update_preserves_runtime_schedule(tmp_path: Path) -> None:
@@ -306,12 +323,15 @@ def test_refresh_retries_instead_of_splicing_old_source_baseline_with_new_settin
             interleaved = True
             with SQLiteStateStore(state_path) as writer:
                 writer.publish_configuration_update(
-                    competing.payload,
-                    competing.schedules,
-                    initial.schedules,
-                    source_revision=competing.source_revision,
-                    expected_revision=1,
-                    updated_at=_NOW + timedelta(minutes=1),
+                    ConfigurationUpdate(
+                        publication=ConfigurationPublication(
+                            payload=competing.payload,
+                            schedules=competing.schedules,
+                            source_revision=competing.source_revision,
+                            expected_revision=1,
+                            updated_at=_NOW + timedelta(minutes=1),
+                        ),
+                    )
                 )
         return snapshot
 

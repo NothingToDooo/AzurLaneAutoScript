@@ -10,6 +10,8 @@ from module.application import (
     DisableTask,
     ExecutionMode,
     Faulted,
+    OperatorNotificationKind,
+    OperatorNotificationRequest,
     RequestAppRestart,
     RescheduleSelf,
     RescheduleTask,
@@ -33,6 +35,7 @@ from module.state.models import (
     RunEvent,
     RunFinalization,
     RunMode,
+    RunStartCommand,
     RunStatus,
     ScheduleMutation,
     TaskStateMutation,
@@ -54,6 +57,7 @@ _EXECUTION_MODE_TO_RUN_MODE: Final = {
 }
 _RUN_FINISHED_TOPIC: Final = "run.finished"
 _APP_RESTART_TOPIC: Final = "app.restart.requested"
+_OPERATOR_NOTIFICATION_TOPIC: Final = "operator.notification.requested"
 
 
 class RunRepositoryClock(Protocol):
@@ -159,13 +163,15 @@ class SQLiteRunRepository(RunRepository):
         started_at = self._clock.now()
         try:
             self._store.start_run(
-                run_id.value,
-                task_id.value,
-                mode=_EXECUTION_MODE_TO_RUN_MODE[mode],
-                settings_revision=metadata.settings_revision,
-                content_revision=metadata.content_revision,
-                client_ui_revision=metadata.client_ui_revision,
-                started_at=started_at,
+                RunStartCommand(
+                    run_id=run_id.value,
+                    task_id=task_id.value,
+                    mode=_EXECUTION_MODE_TO_RUN_MODE[mode],
+                    settings_revision=metadata.settings_revision,
+                    content_revision=metadata.content_revision,
+                    client_ui_revision=metadata.client_ui_revision,
+                    started_at=started_at,
+                )
             )
         except RevisionConflictError as error:
             raise StaleRunMetadataError(
@@ -209,6 +215,7 @@ class SQLiteRunRepository(RunRepository):
                 payload=finished_payload,
             ),
             *self._restart_messages(run.run_id, run.task_id, result.effects),
+            *self._notification_messages(run.run_id, run.task_id, result),
         )
         finalization = RunFinalization(
             status=status,
@@ -221,6 +228,38 @@ class SQLiteRunRepository(RunRepository):
             outbox_messages=outbox_messages,
         )
         self._store.finalize_run(run.run_id, finalization)
+
+    @staticmethod
+    def _notification_messages(run_id: str, task_id: str, result: TaskResult) -> tuple[OutboxMessage, ...]:
+        requests = list(result.notifications)
+        if isinstance(result.outcome, Faulted):
+            requests.insert(0, OperatorNotificationRequest(OperatorNotificationKind.RUN_FAULTED))
+
+        messages: list[OutboxMessage] = []
+        for request in requests:
+            if request.kind is OperatorNotificationKind.PROCESS_FAILED:
+                message = "process-failed notifications cannot originate from a run"
+                raise ValueError(message)
+            payload: dict[str, JsonValue] = {
+                "schema_version": 1,
+                "kind": request.kind.value,
+                "run_id": run_id,
+                "task_id": task_id,
+            }
+            if request.resource is not None:
+                payload["resource"] = request.resource
+            if request.kind is OperatorNotificationKind.RUN_FAULTED:
+                outcome = cast("Faulted", result.outcome)
+                payload["error_type"] = type(outcome.error).__name__
+            messages.append(
+                OutboxMessage(
+                    message_id=f"{run_id}:{_OPERATOR_NOTIFICATION_TOPIC}:{request.kind.value}",
+                    topic=_OPERATOR_NOTIFICATION_TOPIC,
+                    key=task_id,
+                    payload=payload,
+                )
+            )
+        return tuple(messages)
 
     @staticmethod
     def _task_state_mutations(effects: tuple[StateEffect, ...]) -> tuple[TaskStateMutation, ...]:

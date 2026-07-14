@@ -15,7 +15,15 @@ from module.runtime import (
     TaskFactoryRegistry,
     TypedTaskFactory,
 )
-from module.state import JsonValue, RevisionConflictError, ScheduleMutation, SQLiteStateStore
+from module.state import (
+    ConfigurationPublication,
+    ConfigurationUpdate,
+    JsonValue,
+    RevisionConflictError,
+    ScheduleMutation,
+    SettingsSnapshot,
+    SQLiteStateStore,
+)
 from module.task_registry import LaunchSurface, TaskDefinition, TaskDomain
 
 
@@ -63,6 +71,22 @@ class _Clock:
         return _NOW
 
 
+class _WrongSnapshotStore:
+    @staticmethod
+    def _snapshot(command: ConfigurationPublication) -> SettingsSnapshot:
+        return SettingsSnapshot(
+            revision=command.expected_revision + 1,
+            payload={"unexpected": True},
+            updated_at=command.updated_at,
+        )
+
+    def publish_configuration(self, command: ConfigurationPublication) -> SettingsSnapshot:
+        return self._snapshot(command)
+
+    def publish_configuration_update(self, command: ConfigurationUpdate) -> SettingsSnapshot:
+        return self._snapshot(command.publication)
+
+
 def _decode(decoder: SettingsDecoder) -> _Settings:
     return _Settings(enabled=decoder.boolean("enabled"))
 
@@ -97,6 +121,33 @@ def _schedules(*, enabled: bool = True) -> tuple[ScheduleMutation, ...]:
             priority=0,
         ),
     )
+
+
+@pytest.mark.parametrize("update", [False, True])
+def test_publisher_rejects_a_store_snapshot_with_mismatched_content(*, update: bool) -> None:
+    publisher = ConfigurationPublisher(
+        store=cast("ConfigurationWriteStore", _WrongSnapshotStore()),
+        factories=_registry(),
+        clock=_Clock(),
+    )
+
+    def publish() -> SettingsSnapshot:
+        if update:
+            return publisher.publish_update(
+                _payload(),
+                _schedules(),
+                source_revision=_SOURCE_REVISION,
+                expected_revision=0,
+            )
+        return publisher.publish(
+            _payload(),
+            _schedules(),
+            source_revision=_SOURCE_REVISION,
+            expected_revision=0,
+        )
+
+    with pytest.raises(RuntimeError, match="unexpected settings snapshot"):
+        publish()
 
 
 def test_publisher_atomically_publishes_settings_and_schedule_for_runtime(tmp_path: Path) -> None:
@@ -244,7 +295,6 @@ def test_update_publisher_preserves_runtime_schedule_on_cas_conflict(tmp_path: P
         with pytest.raises(RevisionConflictError):
             publisher.publish_update(
                 _payload(enabled=False),
-                _schedules(),
                 _schedules(),
                 source_revision="sha256:" + "1" * 64,
                 expected_revision=0,

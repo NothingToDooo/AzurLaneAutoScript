@@ -4,13 +4,14 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Never, cast
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from types import TracebackType
     from typing import Self
 
+from module.sqlite_wal import configure_sqlite_wal
 from module.state.errors import (
     CorruptStateError,
     OutboxStateError,
@@ -19,15 +20,21 @@ from module.state.errors import (
     SchemaVersionError,
 )
 from module.state.models import (
+    ConfigurationPublication,
     ConfigurationSourceSnapshot,
+    ConfigurationUpdate,
     DeleteTaskStateMutation,
     JsonValue,
+    OutboxClaimRequest,
+    OutboxFailureUpdate,
+    OutboxManualRetry,
     OutboxRecord,
     RunEvent,
     RunEventRecord,
     RunFinalization,
     RunMode,
     RunRecord,
+    RunStartCommand,
     RunStatus,
     ScheduleMutation,
     ScheduleRecord,
@@ -38,10 +45,45 @@ from module.state.models import (
     UpsertTaskStateMutation,
 )
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 _RUN_MUTATIONS_SKIPPED_EVENT = "run.mutations.skipped"
 
 type _EncodedTaskStateMutation = tuple[TaskStateMutation, str | None]
+
+_OUTBOX_SCHEMA_STATEMENT = """
+    CREATE TABLE outbox (
+        sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id TEXT NOT NULL UNIQUE,
+        run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
+        topic TEXT NOT NULL,
+        message_key TEXT,
+        payload TEXT NOT NULL CHECK (json_valid(payload)),
+        created_at TEXT NOT NULL,
+        available_at TEXT NOT NULL,
+        attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+        last_attempt_at TEXT,
+        last_error_type TEXT CHECK (
+            last_error_type IS NULL OR (length(last_error_type) > 0 AND last_error_type = trim(last_error_type))
+        ),
+        claim_token TEXT,
+        claim_until TEXT,
+        published_at TEXT,
+        discarded_at TEXT,
+        CHECK (published_at IS NULL OR discarded_at IS NULL),
+        CHECK ((claim_token IS NULL) = (claim_until IS NULL)),
+        CHECK ((published_at IS NULL AND discarded_at IS NULL) OR claim_token IS NULL),
+        CHECK (
+            (attempt_count = 0 AND last_attempt_at IS NULL AND last_error_type IS NULL)
+            OR (attempt_count > 0 AND last_attempt_at IS NOT NULL)
+        ),
+        CHECK (discarded_at IS NULL OR last_error_type IS NOT NULL)
+    ) STRICT
+"""
+_OUTBOX_READY_INDEX_STATEMENT = """
+    CREATE INDEX outbox_ready
+    ON outbox(available_at, claim_until, sequence)
+    WHERE published_at IS NULL AND discarded_at IS NULL
+"""
 
 _SCHEMA_STATEMENTS = (
     """
@@ -117,17 +159,8 @@ _SCHEMA_STATEMENTS = (
         PRIMARY KEY (run_id, sequence)
     ) STRICT
     """,
-    """
-    CREATE TABLE outbox (
-        message_id TEXT PRIMARY KEY,
-        run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
-        topic TEXT NOT NULL,
-        message_key TEXT,
-        payload TEXT NOT NULL CHECK (json_valid(payload)),
-        created_at TEXT NOT NULL,
-        published_at TEXT
-    ) STRICT
-    """,
+    _OUTBOX_SCHEMA_STATEMENT,
+    _OUTBOX_READY_INDEX_STATEMENT,
 )
 
 _EXPECTED_COLUMNS = {
@@ -155,7 +188,23 @@ _EXPECTED_COLUMNS = {
         "error",
     ),
     "run_events": ("run_id", "sequence", "kind", "payload", "occurred_at"),
-    "outbox": ("message_id", "run_id", "topic", "message_key", "payload", "created_at", "published_at"),
+    "outbox": (
+        "sequence",
+        "message_id",
+        "run_id",
+        "topic",
+        "message_key",
+        "payload",
+        "created_at",
+        "available_at",
+        "attempt_count",
+        "last_attempt_at",
+        "last_error_type",
+        "claim_token",
+        "claim_until",
+        "published_at",
+        "discarded_at",
+    ),
 }
 
 _TABLE_INFO_QUERIES = {
@@ -167,6 +216,7 @@ _TABLE_INFO_QUERIES = {
     "run_events": "PRAGMA table_info(run_events)",
     "outbox": "PRAGMA table_info(outbox)",
 }
+_V3_OUTBOX_COLUMNS = ("message_id", "run_id", "topic", "message_key", "payload", "created_at", "published_at")
 
 
 def _require_non_empty_text(value: str, *, field_name: str) -> None:
@@ -496,38 +546,23 @@ class SQLiteStateStore:
 
     def publish_configuration(
         self,
-        payload: JsonValue,
-        schedules: tuple[ScheduleMutation, ...],
-        *,
-        source_revision: str,
-        expected_revision: int,
-        updated_at: datetime,
+        command: ConfigurationPublication,
     ) -> SettingsSnapshot:
         """以一次 CAS 事务发布完整 settings 与完整 schedule snapshot。"""
-        _require_non_negative_integer(expected_revision, field_name="expected_revision")
-        _require_trimmed_non_empty_text(source_revision, field_name="source_revision")
-        if not isinstance(schedules, tuple):
-            message = "schedules must be a tuple"
+        if not isinstance(command, ConfigurationPublication):
+            message = "command must be a ConfigurationPublication"
             raise TypeError(message)
-        if any(not isinstance(mutation, ScheduleMutation) for mutation in schedules):
-            message = "schedules must contain only ScheduleMutation values"
-            raise TypeError(message)
-        task_ids = tuple(mutation.task_id for mutation in schedules)
-        if len(task_ids) != len(set(task_ids)):
-            message = "schedules must not contain duplicate task_id values"
-            raise ValueError(message)
-
-        encoded_payload = _encode_json(payload)
-        encoded_updated_at = _encode_datetime(updated_at, field_name="updated_at")
-        encoded_source_schedules = _encode_source_schedules(schedules)
+        encoded_payload = _encode_json(command.payload)
+        encoded_updated_at = _encode_datetime(command.updated_at, field_name="updated_at")
+        encoded_source_schedules = _encode_source_schedules(command.schedules)
         with self._transaction():
             snapshot = self._update_settings(
                 encoded_payload=encoded_payload,
                 encoded_updated_at=encoded_updated_at,
-                expected_revision=expected_revision,
+                expected_revision=command.expected_revision,
             )
             self._connection.execute("DELETE FROM schedule")
-            for mutation in schedules:
+            for mutation in command.schedules:
                 self._upsert_schedule(mutation, encoded_updated_at=encoded_updated_at)
             self._connection.execute(
                 """
@@ -540,47 +575,50 @@ class SQLiteStateStore:
                     source_schedules = excluded.source_schedules,
                     updated_at = excluded.updated_at
                 """,
-                (source_revision, snapshot.revision, encoded_source_schedules, encoded_updated_at),
+                (command.source_revision, snapshot.revision, encoded_source_schedules, encoded_updated_at),
             )
             return snapshot
 
-    def publish_configuration_update(  # noqa: PLR0913
-        self,
-        payload: JsonValue,
-        schedules: tuple[ScheduleMutation, ...],
-        previous_source_schedules: tuple[ScheduleMutation, ...],
-        *,
-        source_revision: str,
-        expected_revision: int,
-        updated_at: datetime,
-    ) -> SettingsSnapshot:
+    def publish_configuration_update(self, command: ConfigurationUpdate) -> SettingsSnapshot:
         """发布新 source snapshot，仅把 source 中实际变化的调度字段合并到运行态。"""
-
-        _require_non_negative_integer(expected_revision, field_name="expected_revision")
-        _require_trimmed_non_empty_text(source_revision, field_name="source_revision")
-        for field_name, values in (
-            ("schedules", schedules),
-            ("previous_source_schedules", previous_source_schedules),
-        ):
-            if not isinstance(values, tuple) or any(not isinstance(item, ScheduleMutation) for item in values):
-                message = f"{field_name} must be a tuple of ScheduleMutation values"
-                raise TypeError(message)
-            task_ids = tuple(item.task_id for item in values)
-            if len(task_ids) != len(set(task_ids)):
-                message = f"{field_name} must not contain duplicate task ids"
-                raise ValueError(message)
-
-        encoded_payload = _encode_json(payload)
-        encoded_updated_at = _encode_datetime(updated_at, field_name="updated_at")
-        encoded_source_schedules = _encode_source_schedules(schedules)
-        current_source = {item.task_id: item for item in schedules}
-        previous_source = {item.task_id: item for item in previous_source_schedules}
+        if not isinstance(command, ConfigurationUpdate):
+            message = "command must be a ConfigurationUpdate"
+            raise TypeError(message)
+        publication = command.publication
+        encoded_payload = _encode_json(publication.payload)
+        encoded_updated_at = _encode_datetime(publication.updated_at, field_name="updated_at")
+        encoded_source_schedules = _encode_source_schedules(publication.schedules)
+        current_source = {item.task_id: item for item in publication.schedules}
 
         with self._transaction():
+            current_settings_revision = self._read_settings_revision()
+            if current_settings_revision != publication.expected_revision:
+                raise RevisionConflictError(
+                    expected_revision=publication.expected_revision,
+                    actual_revision=current_settings_revision,
+                )
+            source_row = self._connection.execute(
+                """
+                SELECT source_revision, settings_revision, source_schedules, updated_at
+                FROM configuration_source
+                WHERE singleton = 1
+                """
+            ).fetchone()
+            if source_row is None:
+                message = "configuration update requires a persisted source baseline"
+                raise CorruptStateError(message)
+            persisted_source = self._configuration_source_from_row(source_row)
+            if persisted_source.settings_revision != current_settings_revision:
+                message = (
+                    "configuration source revision does not reference the current settings revision: "
+                    f"source={persisted_source.settings_revision}, settings={current_settings_revision}"
+                )
+                raise CorruptStateError(message)
+            previous_source = {item.task_id: item for item in persisted_source.source_schedules}
             snapshot = self._update_settings(
                 encoded_payload=encoded_payload,
                 encoded_updated_at=encoded_updated_at,
-                expected_revision=expected_revision,
+                expected_revision=publication.expected_revision,
             )
             for removed_task_id in previous_source.keys() - current_source.keys():
                 self._connection.execute("DELETE FROM schedule WHERE task_id = ?", (removed_task_id,))
@@ -625,7 +663,7 @@ class SQLiteStateStore:
                     source_schedules = excluded.source_schedules,
                     updated_at = excluded.updated_at
                 """,
-                (source_revision, snapshot.revision, encoded_source_schedules, encoded_updated_at),
+                (publication.source_revision, snapshot.revision, encoded_source_schedules, encoded_updated_at),
             )
             return snapshot
 
@@ -698,32 +736,17 @@ class SQLiteStateStore:
         ).fetchone()
         return None if row is None else self._task_state_from_row(row)
 
-    def start_run(  # noqa: PLR0913
-        self,
-        run_id: str,
-        task_id: str,
-        *,
-        mode: RunMode,
-        settings_revision: int,
-        content_revision: str,
-        client_ui_revision: str,
-        started_at: datetime,
-    ) -> RunRecord:
-        _require_non_empty_text(run_id, field_name="run_id")
-        _require_non_empty_text(task_id, field_name="task_id")
-        if not isinstance(mode, RunMode):
-            message = "mode must be a RunMode"
+    def start_run(self, command: RunStartCommand) -> RunRecord:
+        if not isinstance(command, RunStartCommand):
+            message = "command must be a RunStartCommand"
             raise TypeError(message)
-        _require_positive_integer(settings_revision, field_name="settings_revision")
-        _require_trimmed_non_empty_text(content_revision, field_name="content_revision")
-        _require_trimmed_non_empty_text(client_ui_revision, field_name="client_ui_revision")
-        encoded_started_at = _encode_datetime(started_at, field_name="started_at")
+        encoded_started_at = _encode_datetime(command.started_at, field_name="started_at")
         try:
             with self._transaction():
                 actual_revision = self._read_settings_revision()
-                if actual_revision is not None and actual_revision != settings_revision:
+                if actual_revision is not None and actual_revision != command.settings_revision:
                     raise RevisionConflictError(
-                        expected_revision=settings_revision,
+                        expected_revision=command.settings_revision,
                         actual_revision=actual_revision,
                     )
                 self._connection.execute(
@@ -741,20 +764,20 @@ class SQLiteStateStore:
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                        run_id,
-                        task_id,
-                        mode.value,
-                        settings_revision,
-                        content_revision,
-                        client_ui_revision,
+                        command.run_id,
+                        command.task_id,
+                        command.mode.value,
+                        command.settings_revision,
+                        command.content_revision,
+                        command.client_ui_revision,
                         RunStatus.RUNNING.value,
                         encoded_started_at,
                     ),
                 )
         except sqlite3.IntegrityError as error:
-            message = f"run already exists: {run_id}"
+            message = f"run already exists: {command.run_id}"
             raise RunStateError(message) from error
-        run = self.get_run(run_id)
+        run = self.get_run(command.run_id)
         if run is None:
             message = "run insert did not produce a row"
             raise CorruptStateError(message)
@@ -956,8 +979,10 @@ class SQLiteStateStore:
             for outbox_message, encoded_payload in encoded_messages:
                 self._connection.execute(
                     """
-                    INSERT INTO outbox(message_id, run_id, topic, message_key, payload, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO outbox(
+                        message_id, run_id, topic, message_key, payload, created_at, available_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         outbox_message.message_id,
@@ -965,6 +990,7 @@ class SQLiteStateStore:
                         outbox_message.topic,
                         outbox_message.key,
                         encoded_payload,
+                        encoded_finished_at,
                         encoded_finished_at,
                     ),
                 )
@@ -999,81 +1025,404 @@ class SQLiteStateStore:
             raise TypeError(message)
         if pending_only:
             query = """
-                SELECT message_id, run_id, topic, message_key, payload, created_at, published_at
+                SELECT
+                    sequence,
+                    message_id,
+                    run_id,
+                    topic,
+                    message_key,
+                    payload,
+                    created_at,
+                    available_at,
+                    attempt_count,
+                    last_attempt_at,
+                    last_error_type,
+                    claim_token,
+                    claim_until,
+                    published_at,
+                    discarded_at
                 FROM outbox
-                WHERE published_at IS NULL
-                ORDER BY created_at, message_id
+                WHERE published_at IS NULL AND discarded_at IS NULL
+                ORDER BY sequence
             """
         else:
             query = """
-                SELECT message_id, run_id, topic, message_key, payload, created_at, published_at
+                SELECT
+                    sequence,
+                    message_id,
+                    run_id,
+                    topic,
+                    message_key,
+                    payload,
+                    created_at,
+                    available_at,
+                    attempt_count,
+                    last_attempt_at,
+                    last_error_type,
+                    claim_token,
+                    claim_until,
+                    published_at,
+                    discarded_at
                 FROM outbox
-                ORDER BY created_at, message_id
+                ORDER BY sequence
             """
         rows = self._connection.execute(query).fetchall()
         return tuple(self._outbox_from_row(row) for row in rows)
 
-    def mark_outbox_published(self, message_id: str, published_at: datetime) -> OutboxRecord:
+    def claim_ready_outbox(self, request: OutboxClaimRequest) -> tuple[OutboxRecord, ...]:
+        if not isinstance(request, OutboxClaimRequest):
+            message = "request must be an OutboxClaimRequest"
+            raise TypeError(message)
+        encoded_claimed_at = _encode_datetime(request.claimed_at, field_name="claimed_at")
+        encoded_claim_until = _encode_datetime(request.claim_until, field_name="claim_until")
+
+        with self._transaction():
+            token_row = self._connection.execute(
+                "SELECT 1 FROM outbox WHERE claim_token = ? LIMIT 1",
+                (request.claim_token,),
+            ).fetchone()
+            if token_row is not None:
+                message = f"outbox claim token is already active: {request.claim_token}"
+                raise OutboxStateError(message)
+
+            cursor = self._connection.execute(
+                """
+                UPDATE outbox
+                SET claim_token = ?, claim_until = ?
+                WHERE sequence IN (
+                    SELECT sequence
+                    FROM outbox
+                    WHERE
+                        published_at IS NULL
+                        AND discarded_at IS NULL
+                        AND available_at <= ?
+                        AND (claim_until IS NULL OR claim_until <= ?)
+                    ORDER BY sequence
+                    LIMIT ?
+                )
+                """,
+                (
+                    request.claim_token,
+                    encoded_claim_until,
+                    encoded_claimed_at,
+                    encoded_claimed_at,
+                    request.limit,
+                ),
+            )
+            if cursor.rowcount == 0:
+                return ()
+
+            if cursor.rowcount > request.limit:
+                message = "outbox claim did not update the selected batch"
+                raise CorruptStateError(message)
+
+            claimed_rows = self._connection.execute(
+                """
+                SELECT
+                    sequence,
+                    message_id,
+                    run_id,
+                    topic,
+                    message_key,
+                    payload,
+                    created_at,
+                    available_at,
+                    attempt_count,
+                    last_attempt_at,
+                    last_error_type,
+                    claim_token,
+                    claim_until,
+                    published_at,
+                    discarded_at
+                FROM outbox
+                WHERE claim_token = ?
+                ORDER BY sequence
+                """,
+                (request.claim_token,),
+            ).fetchall()
+            if len(claimed_rows) != cursor.rowcount:
+                message = "outbox claim could not reload the selected batch"
+                raise CorruptStateError(message)
+            return tuple(self._outbox_from_row(row) for row in claimed_rows)
+
+    def mark_outbox_published(
+        self,
+        message_id: str,
+        published_at: datetime,
+        *,
+        claim_token: str,
+        expected_attempt_count: int,
+    ) -> OutboxRecord:
         _require_non_empty_text(message_id, field_name="message_id")
+        _require_non_empty_text(claim_token, field_name="claim_token")
+        _require_non_negative_integer(expected_attempt_count, field_name="expected_attempt_count")
         encoded_published_at = _encode_datetime(published_at, field_name="published_at")
 
         with self._transaction():
             cursor = self._connection.execute(
                 """
                 UPDATE outbox
-                SET published_at = ?
-                WHERE message_id = ? AND published_at IS NULL
+                SET
+                    attempt_count = attempt_count + 1,
+                    last_attempt_at = ?,
+                    claim_token = NULL,
+                    claim_until = NULL,
+                    published_at = ?
+                WHERE
+                    message_id = ?
+                    AND claim_token = ?
+                    AND attempt_count = ?
+                    AND published_at IS NULL
+                    AND discarded_at IS NULL
                 """,
-                (encoded_published_at, message_id),
+                (
+                    encoded_published_at,
+                    encoded_published_at,
+                    message_id,
+                    claim_token,
+                    expected_attempt_count,
+                ),
+            )
+            if cursor.rowcount != 1:
+                self._raise_outbox_transition_error(
+                    message_id,
+                    claim_token=claim_token,
+                    expected_attempt_count=expected_attempt_count,
+                )
+
+            record = self._read_outbox(message_id)
+            if record is None:
+                message = f"published outbox message disappeared: {message_id}"
+                raise CorruptStateError(message)
+            return record
+
+    def record_outbox_failure(self, update: OutboxFailureUpdate) -> OutboxRecord:
+        if not isinstance(update, OutboxFailureUpdate):
+            message = "update must be an OutboxFailureUpdate"
+            raise TypeError(message)
+        encoded_failed_at = _encode_datetime(update.failed_at, field_name="failed_at")
+        encoded_available_at = (
+            encoded_failed_at
+            if update.available_at is None
+            else _encode_datetime(update.available_at, field_name="available_at")
+        )
+        encoded_discarded_at = encoded_failed_at if update.available_at is None else None
+
+        with self._transaction():
+            cursor = self._connection.execute(
+                """
+                UPDATE outbox
+                SET
+                    attempt_count = attempt_count + 1,
+                    available_at = ?,
+                    last_attempt_at = ?,
+                    last_error_type = ?,
+                    claim_token = NULL,
+                    claim_until = NULL,
+                    discarded_at = ?
+                WHERE
+                    message_id = ?
+                    AND claim_token = ?
+                    AND attempt_count = ?
+                    AND published_at IS NULL
+                    AND discarded_at IS NULL
+                """,
+                (
+                    encoded_available_at,
+                    encoded_failed_at,
+                    update.error_type,
+                    encoded_discarded_at,
+                    update.message_id,
+                    update.claim_token,
+                    update.expected_attempt_count,
+                ),
+            )
+            if cursor.rowcount != 1:
+                self._raise_outbox_transition_error(
+                    update.message_id,
+                    claim_token=update.claim_token,
+                    expected_attempt_count=update.expected_attempt_count,
+                )
+
+            record = self._read_outbox(update.message_id)
+            if record is None:
+                message = f"failed outbox message disappeared: {update.message_id}"
+                raise CorruptStateError(message)
+            return record
+
+    def retry_discarded_outbox(self, request: OutboxManualRetry) -> OutboxRecord:
+        """重新开放 dead-letter；保留既有 attempt_count 与 last_error_type。"""
+        if not isinstance(request, OutboxManualRetry):
+            message = "request must be an OutboxManualRetry"
+            raise TypeError(message)
+        encoded_available_at = _encode_datetime(request.available_at, field_name="available_at")
+
+        with self._transaction():
+            cursor = self._connection.execute(
+                """
+                UPDATE outbox
+                SET
+                    available_at = ?,
+                    claim_token = NULL,
+                    claim_until = NULL,
+                    discarded_at = NULL
+                WHERE message_id = ? AND published_at IS NULL AND discarded_at IS NOT NULL
+                """,
+                (encoded_available_at, request.message_id),
             )
             if cursor.rowcount != 1:
                 row = self._connection.execute(
-                    "SELECT published_at FROM outbox WHERE message_id = ?",
-                    (message_id,),
+                    "SELECT published_at, discarded_at FROM outbox WHERE message_id = ?",
+                    (request.message_id,),
                 ).fetchone()
                 if row is None:
-                    message = f"unknown outbox message: {message_id}"
-                    raise OutboxStateError(message)
-                message = f"outbox message already published: {message_id}"
+                    message = f"unknown outbox message: {request.message_id}"
+                elif _optional_text(row, "published_at") is not None:
+                    message = f"cannot retry published outbox message: {request.message_id}"
+                else:
+                    message = f"outbox message is not discarded: {request.message_id}"
                 raise OutboxStateError(message)
 
-            row = self._connection.execute(
-                """
-                SELECT message_id, run_id, topic, message_key, payload, created_at, published_at
-                FROM outbox
-                WHERE message_id = ?
-                """,
-                (message_id,),
-            ).fetchone()
-            if row is None:
-                message = f"published outbox message disappeared: {message_id}"
+            record = self._read_outbox(request.message_id)
+            if record is None:
+                message = f"retried outbox message disappeared: {request.message_id}"
                 raise CorruptStateError(message)
-            return self._outbox_from_row(row)
+            return record
+
+    def _read_outbox(self, message_id: str) -> OutboxRecord | None:
+        row = self._connection.execute(
+            """
+            SELECT
+                sequence,
+                message_id,
+                run_id,
+                topic,
+                message_key,
+                payload,
+                created_at,
+                available_at,
+                attempt_count,
+                last_attempt_at,
+                last_error_type,
+                claim_token,
+                claim_until,
+                published_at,
+                discarded_at
+            FROM outbox
+            WHERE message_id = ?
+            """,
+            (message_id,),
+        ).fetchone()
+        return None if row is None else self._outbox_from_row(row)
+
+    def _raise_outbox_transition_error(
+        self,
+        message_id: str,
+        *,
+        claim_token: str,
+        expected_attempt_count: int,
+    ) -> Never:
+        row = self._connection.execute(
+            """
+            SELECT attempt_count, claim_token, published_at, discarded_at
+            FROM outbox
+            WHERE message_id = ?
+            """,
+            (message_id,),
+        ).fetchone()
+        if row is None:
+            message = f"unknown outbox message: {message_id}"
+        elif _optional_text(row, "published_at") is not None:
+            message = f"outbox message already published: {message_id}"
+        elif _optional_text(row, "discarded_at") is not None:
+            message = f"outbox message already discarded: {message_id}"
+        elif _optional_text(row, "claim_token") != claim_token:
+            message = f"outbox claim changed: {message_id}"
+        else:
+            actual_attempt_count = _required_integer(row, "attempt_count")
+            message = (
+                f"outbox attempt count changed: {message_id}; "
+                f"expected={expected_attempt_count}, actual={actual_attempt_count}"
+            )
+        raise OutboxStateError(message)
 
     def _configure_connection(self) -> None:
         self._connection.execute("PRAGMA foreign_keys = ON")
-        self._connection.execute("PRAGMA busy_timeout = 5000")
-        row = self._connection.execute("PRAGMA journal_mode = WAL").fetchone()
-        if row is None or _required_text(row, "journal_mode").lower() != "wal":
+        if configure_sqlite_wal(self._connection) != "wal":
             message = "SQLite did not enable WAL journal mode"
             raise CorruptStateError(message)
         self._connection.execute("PRAGMA synchronous = NORMAL")
 
     def _initialize_schema(self) -> None:
-        version = self.schema_version
-        tables = self.table_names()
-        if version == 0:
-            if tables:
-                message = f"unversioned database already contains tables: {sorted(tables)}"
-                raise SchemaVersionError(message)
-            with self._transaction():
+        if self.schema_version == SCHEMA_VERSION:
+            # 稳态只读校验，避免每个 runtime/maintenance opener 都争抢写锁。
+            self._validate_schema()
+            return
+        # schema 判定与变更必须共享同一个写事务：否则并发 opener 会基于过期
+        # user_version 重复迁移，校验失败也可能把半正确的 schema 永久标成新版。
+        with self._transaction():
+            version = self.schema_version
+            tables = self.table_names()
+            if version == 0:
+                if tables:
+                    message = f"unversioned database already contains tables: {sorted(tables)}"
+                    raise SchemaVersionError(message)
                 for statement in _SCHEMA_STATEMENTS:
                     self._connection.execute(statement)
+            elif version == 3:
+                self._migrate_v3_to_v4(tables)
+            elif version != SCHEMA_VERSION:
+                message = f"unsupported schema version: {version}; expected {SCHEMA_VERSION}"
+                raise SchemaVersionError(message)
+
+            self._validate_schema()
+            if version != SCHEMA_VERSION:
+                # 版本号最后写入；此前任何迁移或全表校验失败都会完整回滚。
                 self._connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
-        elif version != SCHEMA_VERSION:
-            message = f"unsupported schema version: {version}; expected {SCHEMA_VERSION}"
+
+    def _migrate_v3_to_v4(self, tables: frozenset[str]) -> None:
+        expected_tables = frozenset(_EXPECTED_COLUMNS)
+        if tables != expected_tables:
+            message = f"schema v3 tables mismatch: expected {sorted(expected_tables)}, actual {sorted(tables)}"
             raise SchemaVersionError(message)
-        self._validate_schema()
+        rows = self._connection.execute("PRAGMA table_info(outbox)").fetchall()
+        actual_columns = tuple(_required_text(row, "name") for row in rows)
+        if actual_columns != _V3_OUTBOX_COLUMNS:
+            message = f"schema v3 outbox columns mismatch: expected {_V3_OUTBOX_COLUMNS}, actual {actual_columns}"
+            raise SchemaVersionError(message)
+
+        if not self._connection.in_transaction:
+            message = "schema migration requires an active write transaction"
+            raise RuntimeError(message)
+        self._connection.execute("ALTER TABLE outbox RENAME TO outbox_v3")
+        self._connection.execute(_OUTBOX_SCHEMA_STATEMENT)
+        self._connection.execute(
+            """
+            INSERT INTO outbox(
+                message_id,
+                run_id,
+                topic,
+                message_key,
+                payload,
+                created_at,
+                available_at,
+                published_at
+            )
+            SELECT
+                message_id,
+                run_id,
+                topic,
+                message_key,
+                payload,
+                created_at,
+                created_at,
+                published_at
+            FROM outbox_v3
+            ORDER BY created_at, message_id
+            """
+        )
+        self._connection.execute("DROP TABLE outbox_v3")
+        self._connection.execute(_OUTBOX_READY_INDEX_STATEMENT)
 
     def _validate_schema(self) -> None:
         actual_tables = self.table_names()
@@ -1356,17 +1705,41 @@ class SQLiteStateStore:
 
     @staticmethod
     def _outbox_from_row(row: sqlite3.Row) -> OutboxRecord:
+        raw_last_attempt_at = _optional_text(row, "last_attempt_at")
+        raw_claim_until = _optional_text(row, "claim_until")
         raw_published_at = _optional_text(row, "published_at")
+        raw_discarded_at = _optional_text(row, "discarded_at")
         return OutboxRecord(
+            sequence=_required_integer(row, "sequence"),
             message_id=_required_text(row, "message_id"),
             run_id=_required_text(row, "run_id"),
             topic=_required_text(row, "topic"),
             payload=_decode_json(_required_text(row, "payload")),
             key=_optional_text(row, "message_key"),
             created_at=_decode_datetime(_required_text(row, "created_at"), field_name="outbox.created_at"),
+            available_at=_decode_datetime(
+                _required_text(row, "available_at"),
+                field_name="outbox.available_at",
+            ),
+            attempt_count=_required_integer(row, "attempt_count"),
+            last_attempt_at=(
+                None
+                if raw_last_attempt_at is None
+                else _decode_datetime(raw_last_attempt_at, field_name="outbox.last_attempt_at")
+            ),
+            last_error_type=_optional_text(row, "last_error_type"),
+            claim_token=_optional_text(row, "claim_token"),
+            claim_until=(
+                None if raw_claim_until is None else _decode_datetime(raw_claim_until, field_name="outbox.claim_until")
+            ),
             published_at=(
                 None
                 if raw_published_at is None
                 else _decode_datetime(raw_published_at, field_name="outbox.published_at")
+            ),
+            discarded_at=(
+                None
+                if raw_discarded_at is None
+                else _decode_datetime(raw_discarded_at, field_name="outbox.discarded_at")
             ),
         )

@@ -86,6 +86,30 @@ class _Provider:
         return self.runtime
 
 
+@dataclass(slots=True)
+class _FailureReporter:
+    calls: list[tuple[str, str, type[Exception]]] = field(default_factory=list)
+    fail: bool = False
+
+    def report(self, instance_name: str, command: str, error: Exception) -> None:
+        self.calls.append((instance_name, command, type(error)))
+        if self.fail:
+            message = "reporter failed"
+            raise RuntimeError(message)
+
+
+@dataclass(slots=True)
+class _NotificationResources:
+    fail_close: bool = False
+    close_calls: int = 0
+
+    def close(self) -> None:
+        self.close_calls += 1
+        if self.fail_close:
+            message = "close failed"
+            raise RuntimeError(message)
+
+
 @pytest.mark.parametrize(
     ("reason", "expected"),
     [
@@ -161,14 +185,24 @@ def test_configuration_signal_is_forwarded_to_runtime_provider() -> None:
 
 
 @pytest.mark.parametrize("command", ["missing", "restart"])
-def test_invalid_direct_command_closes_runtime(command: str) -> None:
+def test_invalid_direct_command_is_rejected_before_runtime_open_and_not_reported(command: str) -> None:
     runtime = _Runtime()
-    host = InstanceProcessHost(_Provider(runtime))
+    provider = _Provider(runtime)
+    reporter = _FailureReporter()
+    resources = _NotificationResources()
+    host = InstanceProcessHost(
+        provider,
+        failure_reporter=reporter,
+        notification_resources=resources,
+    )
 
     with pytest.raises((LookupError, ValueError)):
         host.execute("alas", command)
 
-    assert runtime.close_calls == 1
+    assert provider.opened == []
+    assert runtime.close_calls == 0
+    assert reporter.calls == []
+    assert resources.close_calls == 0
 
 
 def test_invalid_provider_result_fails_before_execution() -> None:
@@ -180,3 +214,96 @@ def test_invalid_provider_result_fails_before_execution() -> None:
 
     with pytest.raises(TypeError, match="InstanceRuntimeSession"):
         InstanceProcessHost(cast("InstanceRuntimeProvider", _InvalidProvider())).execute("alas", "alas")
+
+
+def test_unhandled_process_failure_is_reported_and_the_original_error_is_preserved() -> None:
+    class _FailingProvider:
+        @staticmethod
+        def open(instance_name: str, *, configuration_signal: object | None = None) -> object:
+            del instance_name, configuration_signal
+            message = "bundle initialization failed"
+            raise RuntimeError(message)
+
+    reporter = _FailureReporter()
+
+    with pytest.raises(RuntimeError, match="bundle initialization failed"):
+        InstanceProcessHost(
+            cast("InstanceRuntimeProvider", _FailingProvider()),
+            failure_reporter=reporter,
+        ).execute("alas", "alas")
+
+    assert reporter.calls == [("alas", "alas", RuntimeError)]
+
+
+def test_failure_reporter_error_never_replaces_the_process_error() -> None:
+    class _FailingProvider:
+        @staticmethod
+        def open(instance_name: str, *, configuration_signal: object | None = None) -> object:
+            del instance_name, configuration_signal
+            message = "original process error"
+            raise RuntimeError(message)
+
+    with pytest.raises(RuntimeError, match="original process error"):
+        InstanceProcessHost(
+            cast("InstanceRuntimeProvider", _FailingProvider()),
+            failure_reporter=_FailureReporter(fail=True),
+        ).execute("alas", "alas")
+
+
+def test_faulted_task_result_is_not_reported_twice_by_the_process_host() -> None:
+    reporter = _FailureReporter()
+    runtime = _Runtime(task_result=TaskResult(Faulted(RuntimeError("failed"))))
+
+    exit_ = InstanceProcessHost(_Provider(runtime), failure_reporter=reporter).execute("alas", "benchmark")
+
+    assert exit_.kind is InstanceProcessExitKind.FAILED
+    assert reporter.calls == []
+
+
+def test_process_failure_is_enqueued_without_synchronous_notification_maintenance() -> None:
+    class _FailingProvider:
+        @staticmethod
+        def open(instance_name: str, *, configuration_signal: object | None = None) -> object:
+            del instance_name, configuration_signal
+            message = "bundle initialization failed"
+            raise RuntimeError(message)
+
+    reporter = _FailureReporter()
+    resources = _NotificationResources()
+    host = InstanceProcessHost(
+        cast("InstanceRuntimeProvider", _FailingProvider()),
+        failure_reporter=reporter,
+        notification_resources=resources,
+    )
+
+    with pytest.raises(RuntimeError, match="bundle initialization failed"):
+        host.execute("alas", "alas")
+
+    assert reporter.calls == [("alas", "alas", RuntimeError)]
+    assert resources.close_calls == 0
+    host.close()
+    assert resources.close_calls == 1
+
+
+def test_notification_resource_close_failure_never_changes_the_process_result() -> None:
+    resources = _NotificationResources(fail_close=True)
+    host = InstanceProcessHost(_Provider(_Runtime()), notification_resources=resources)
+
+    exit_ = host.execute("alas", "alas")
+    host.close()
+
+    assert exit_.kind is InstanceProcessExitKind.FINISHED
+    assert resources.close_calls == 1
+
+
+def test_process_host_context_closes_notification_resources_once() -> None:
+    resources = _NotificationResources()
+    host = InstanceProcessHost(_Provider(_Runtime()), notification_resources=resources)
+
+    with host:
+        host.execute("alas", "alas")
+    host.close()
+
+    assert resources.close_calls == 1
+    with pytest.raises(RuntimeError, match="process host is closed"):
+        host.execute("alas", "alas")

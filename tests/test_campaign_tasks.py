@@ -14,6 +14,8 @@ from module.application import (
     DeleteTaskState,
     DisableTask,
     ExecutionMode,
+    OperatorNotificationKind,
+    OperatorNotificationRequest,
     PreemptionRequest,
     RequestAppRestart,
     RescheduleSelf,
@@ -931,6 +933,12 @@ def test_run_count_exhaustion_disables_the_campaign() -> None:
         outcome=Succeeded(),
         effects=(DisableTask(TaskId("main")),),
         state_effects=(_delete_effect(),),
+        notifications=(
+            OperatorNotificationRequest(
+                OperatorNotificationKind.CAMPAIGN_RUN_COUNT_LIMIT,
+                resource="campaign_main/1-1",
+            ),
+        ),
     )
 
 
@@ -962,6 +970,11 @@ def test_permanent_player_stop_conditions_disable_the_campaign(
     result = CampaignTask(_Workflow(_report(reason)), _spec(limits=limits)).run(_context("main"))
 
     assert result.effects == (DisableTask(TaskId("main")),)
+    expected_kind = {
+        CampaignStopReason.REACH_LEVEL_LIMIT: OperatorNotificationKind.CAMPAIGN_REACH_LEVEL_LIMIT,
+        CampaignStopReason.NEW_SHIP: OperatorNotificationKind.CAMPAIGN_NEW_SHIP,
+    }[reason]
+    assert result.notifications == (OperatorNotificationRequest(expected_kind, resource="campaign_main/1-1"),)
 
 
 def test_event_point_limit_disables_event_raid_coalition_and_hospital_but_not_gems_or_maritime() -> None:

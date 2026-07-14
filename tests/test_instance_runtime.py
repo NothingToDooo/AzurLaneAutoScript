@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import MappingProxyType
 from typing import TYPE_CHECKING, override
 
@@ -14,8 +14,24 @@ from module.application import (
     TaskId,
     TaskResult,
 )
-from module.runtime import InstanceRuntime, InstanceRuntimeConfig, TaskBuildContext, TaskFactoryRegistry
-from module.state import RunMode, RunStatus, ScheduleMutation, SQLiteStateStore
+from module.runtime import (
+    InstanceRuntime,
+    InstanceRuntimeConfig,
+    OutboxDelivery,
+    OutboxFailureFact,
+    OutboxRetryPolicy,
+    TaskBuildContext,
+    TaskFactoryRegistry,
+)
+from module.state import (
+    OutboxMessage,
+    RunFinalization,
+    RunMode,
+    RunStartCommand,
+    RunStatus,
+    ScheduleMutation,
+    SQLiteStateStore,
+)
 from module.supervisor import DeviceLeaseRegistry, InstanceLoopExitReason
 from module.task_registry import LaunchSurface, TaskDefinition, TaskDomain
 
@@ -80,12 +96,12 @@ class _Publisher:
         lock_root: Path,
         device_serial: str,
         events: list[str] | None = None,
-        fail: bool = False,
+        failures_remaining: int = 0,
     ) -> None:
         self._leases = DeviceLeaseRegistry(lock_root)
         self._device_serial = device_serial
         self._events = events
-        self._fail = fail
+        self._failures_remaining = failures_remaining
         self.message_ids: list[str] = []
 
     def publish(
@@ -101,15 +117,21 @@ class _Publisher:
         self.message_ids.append(idempotency_key)
         if self._events is not None:
             self._events.append(f"publish:{topic}")
-        if self._fail:
+        if self._failures_remaining > 0:
+            self._failures_remaining -= 1
             message = "broker unavailable"
             raise RuntimeError(message)
 
 
 class _Clock:
-    @staticmethod
-    def now() -> datetime:
-        return _NOW
+    def __init__(self, now: datetime = _NOW) -> None:
+        self.current = now
+
+    def now(self) -> datetime:
+        return self.current
+
+    def advance(self, duration: timedelta) -> None:
+        self.current += duration
 
     @staticmethod
     def sleep(
@@ -151,6 +173,36 @@ def _config(tmp_path: Path) -> InstanceRuntimeConfig:
         device_serial="127.0.0.1:16384",
         lease_owner="instance-a",
     )
+
+
+def _seed_pending_outbox(config: InstanceRuntimeConfig, *message_ids: str) -> None:
+    with SQLiteStateStore(config.state_path) as store:
+        store.start_run(
+            RunStartCommand(
+                run_id="run-startup-backlog",
+                task_id="research",
+                mode=RunMode.DIRECT_COMMAND,
+                settings_revision=1,
+                content_revision="content:old",
+                client_ui_revision="ui:old",
+                started_at=_NOW,
+            )
+        )
+        store.finalize_run(
+            "run-startup-backlog",
+            RunFinalization(
+                status=RunStatus.SUCCEEDED,
+                finished_at=_NOW,
+                outbox_messages=tuple(
+                    OutboxMessage(
+                        message_id=message_id,
+                        topic="test.startup",
+                        payload={"message_id": message_id},
+                    )
+                    for message_id in message_ids
+                ),
+            ),
+        )
 
 
 def test_instance_runtime_composes_state_scheduler_resolver_lease_and_loop(tmp_path: Path) -> None:
@@ -200,7 +252,7 @@ def test_scheduled_runtime_dispatches_each_run_after_releasing_device_lease(tmp_
         config,
         _registry(_FixedTaskFactory(task)),
         _Clock(),
-        outbox_publisher=publisher,
+        outbox=OutboxDelivery(publisher),
     ) as runtime:
         runtime.publish_configuration(
             {"schema_version": 1, "tasks": {"research": {}}},
@@ -225,12 +277,12 @@ def test_scheduled_runtime_dispatches_each_run_after_releasing_device_lease(tmp_
         assert all(record.published_at is not None for record in store.list_outbox())
 
 
-def test_direct_execute_propagates_publish_failure_and_keeps_message_pending(tmp_path: Path) -> None:
+def test_direct_execute_persists_publish_failure_without_replacing_task_result(tmp_path: Path) -> None:
     config = _config(tmp_path)
     publisher = _Publisher(
         lock_root=config.lease_lock_root,
         device_serial=config.device_serial,
-        fail=True,
+        failures_remaining=1,
     )
     registry = _registry(
         _FixedTaskFactory(_DirectTask()),
@@ -239,16 +291,16 @@ def test_direct_execute_propagates_publish_failure_and_keeps_message_pending(tmp
         allowed_launches=frozenset({LaunchSurface.TOOL}),
     )
 
-    with InstanceRuntime(config, registry, _Clock(), outbox_publisher=publisher) as runtime:
+    with InstanceRuntime(config, registry, _Clock(), outbox=OutboxDelivery(publisher)) as runtime:
         runtime.publish_configuration(
             {"schema_version": 1, "tasks": {"research": {}}},
             (),
             source_revision=_SOURCE_REVISION,
             expected_revision=0,
         )
-        with pytest.raises(RuntimeError, match="broker unavailable"):
-            runtime.execute(TaskId("research"), ExecutionMode.DIRECT_COMMAND)
+        result = runtime.execute(TaskId("research"), ExecutionMode.DIRECT_COMMAND)
 
+    assert isinstance(result.outcome, Succeeded)
     assert len(publisher.message_ids) == 1
     with SQLiteStateStore(config.state_path) as store:
         runs = store.list_runs()
@@ -257,20 +309,167 @@ def test_direct_execute_propagates_publish_failure_and_keeps_message_pending(tmp
     assert runs[0].status is RunStatus.SUCCEEDED
     assert len(pending) == 1
     assert pending[0].message_id == publisher.message_ids[0]
+    assert pending[0].attempt_count == 1
+    assert pending[0].last_attempt_at == _NOW
+    assert pending[0].last_error_type == "RuntimeError"
+    assert pending[0].available_at == _NOW + timedelta(minutes=1)
     assert pending[0].published_at is None
+
+
+def test_delivery_failure_can_be_reported_without_replacing_the_task_result(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    publisher = _Publisher(
+        lock_root=config.lease_lock_root,
+        device_serial=config.device_serial,
+        failures_remaining=1,
+    )
+    failures: list[OutboxFailureFact] = []
+    registry = _registry(
+        _FixedTaskFactory(_DirectTask()),
+        execution_mode=ExecutionMode.DIRECT_COMMAND,
+        priority=None,
+        allowed_launches=frozenset({LaunchSurface.TOOL}),
+    )
+
+    with InstanceRuntime(
+        config,
+        registry,
+        _Clock(),
+        outbox=OutboxDelivery(publisher, failures.append),
+    ) as runtime:
+        runtime.publish_configuration(
+            {"schema_version": 1, "tasks": {"research": {}}},
+            (),
+            source_revision=_SOURCE_REVISION,
+            expected_revision=0,
+        )
+        result = runtime.execute(TaskId("research"), ExecutionMode.DIRECT_COMMAND)
+
+    assert isinstance(result.outcome, Succeeded)
+    assert len(failures) == 1
+    assert failures[0].message_id == publisher.message_ids[0]
+    assert failures[0].topic == "run.finished"
+    assert failures[0].error_type == "RuntimeError"
+    assert failures[0].attempt_count == 1
+    assert not failures[0].is_discarded
+    with SQLiteStateStore(config.state_path) as store:
+        assert len(store.list_outbox(pending_only=True)) == 1
+
+
+def test_due_outbox_message_is_retried_after_a_later_run_with_stable_idempotency_key(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    clock = _Clock()
+    publisher = _Publisher(
+        lock_root=config.lease_lock_root,
+        device_serial=config.device_serial,
+        failures_remaining=1,
+    )
+    failures: list[OutboxFailureFact] = []
+    registry = _registry(
+        _FixedTaskFactory(_DirectTask()),
+        execution_mode=ExecutionMode.DIRECT_COMMAND,
+        priority=None,
+        allowed_launches=frozenset({LaunchSurface.TOOL}),
+    )
+    policy = OutboxRetryPolicy(
+        batch_size=8,
+        max_attempts=3,
+        initial_delay=timedelta(minutes=1),
+        maximum_delay=timedelta(minutes=5),
+    )
+
+    with InstanceRuntime(
+        config,
+        registry,
+        clock,
+        outbox=OutboxDelivery(
+            publisher,
+            failure_reporter=failures.append,
+            retry_policy=policy,
+        ),
+    ) as runtime:
+        runtime.publish_configuration(
+            {"schema_version": 1, "tasks": {"research": {}}},
+            (),
+            source_revision=_SOURCE_REVISION,
+            expected_revision=0,
+        )
+        first_result = runtime.execute(TaskId("research"), ExecutionMode.DIRECT_COMMAND)
+        clock.advance(timedelta(minutes=1))
+        second_result = runtime.execute(TaskId("research"), ExecutionMode.DIRECT_COMMAND)
+
+    assert isinstance(first_result.outcome, Succeeded)
+    assert isinstance(second_result.outcome, Succeeded)
+    assert len(failures) == 1
+    assert len(publisher.message_ids) == 3
+    assert publisher.message_ids[0] == publisher.message_ids[1]
+    assert publisher.message_ids[2] != publisher.message_ids[0]
+    with SQLiteStateStore(config.state_path) as store:
+        records = store.list_outbox()
+        assert store.list_outbox(pending_only=True) == ()
+    assert tuple(record.attempt_count for record in records) == (2, 1)
+    assert all(record.published_at == clock.current for record in records)
+
+
+def test_startup_drains_more_than_one_bounded_outbox_batch(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    message_ids = tuple(f"startup-{index}" for index in range(5))
+    _seed_pending_outbox(config, *message_ids)
+    publisher = _Publisher(
+        lock_root=config.lease_lock_root,
+        device_serial=config.device_serial,
+    )
+    policy = OutboxRetryPolicy(batch_size=2, startup_max_batches=4)
+
+    with InstanceRuntime(
+        config,
+        _registry(),
+        _Clock(),
+        outbox=OutboxDelivery(publisher, retry_policy=policy),
+    ):
+        pass
+
+    assert tuple(publisher.message_ids) == message_ids
+    with SQLiteStateStore(config.state_path) as store:
+        assert store.list_outbox(pending_only=True) == ()
+
+
+def test_startup_outbox_drain_stops_at_the_aggregate_batch_cap(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    _seed_pending_outbox(config, "startup-0", "startup-1", "startup-2")
+    publisher = _Publisher(
+        lock_root=config.lease_lock_root,
+        device_serial=config.device_serial,
+    )
+    policy = OutboxRetryPolicy(batch_size=1, startup_max_batches=2)
+
+    with InstanceRuntime(
+        config,
+        _registry(),
+        _Clock(),
+        outbox=OutboxDelivery(publisher, retry_policy=policy),
+    ):
+        pass
+
+    assert publisher.message_ids == ["startup-0", "startup-1"]
+    with SQLiteStateStore(config.state_path) as store:
+        pending = store.list_outbox(pending_only=True)
+    assert tuple(record.message_id for record in pending) == ("startup-2",)
 
 
 def test_instance_runtime_recovers_interrupted_runs_on_startup(tmp_path: Path) -> None:
     config = _config(tmp_path)
     with SQLiteStateStore(config.state_path) as store:
         store.start_run(
-            "run-interrupted",
-            "research",
-            mode=RunMode.SCHEDULED_JOB,
-            settings_revision=1,
-            content_revision="content:old",
-            client_ui_revision="ui:old",
-            started_at=_NOW,
+            RunStartCommand(
+                run_id="run-interrupted",
+                task_id="research",
+                mode=RunMode.SCHEDULED_JOB,
+                settings_revision=1,
+                content_revision="content:old",
+                client_ui_revision="ui:old",
+                started_at=_NOW,
+            )
         )
 
     with InstanceRuntime(config, _registry(), _Clock()) as runtime:
@@ -282,6 +481,34 @@ def test_instance_runtime_recovers_interrupted_runs_on_startup(tmp_path: Path) -
     assert run.status is RunStatus.FAULTED
     assert run.error is not None
     assert "InterruptedRunError" in run.error
+
+
+def test_instance_runtime_dispatches_recovered_run_facts_on_startup(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    with SQLiteStateStore(config.state_path) as store:
+        store.start_run(
+            RunStartCommand(
+                run_id="run-interrupted",
+                task_id="research",
+                mode=RunMode.SCHEDULED_JOB,
+                settings_revision=1,
+                content_revision="content:old",
+                client_ui_revision="ui:old",
+                started_at=_NOW,
+            )
+        )
+    publisher = _Publisher(
+        lock_root=config.lease_lock_root,
+        device_serial=config.device_serial,
+    )
+
+    with InstanceRuntime(config, _registry(), _Clock(), outbox=OutboxDelivery(publisher)):
+        pass
+
+    assert len(publisher.message_ids) == 2
+    assert any("operator.notification.requested:run_faulted" in message_id for message_id in publisher.message_ids)
+    with SQLiteStateStore(config.state_path) as store:
+        assert store.list_outbox(pending_only=True) == ()
 
 
 def test_closed_instance_runtime_rejects_work(tmp_path: Path) -> None:

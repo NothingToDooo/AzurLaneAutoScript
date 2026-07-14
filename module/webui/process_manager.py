@@ -125,16 +125,16 @@ def _execute_process(
             exception_type="LookupError",
             message=message,
         )
-    host = build_default_instance_process_host()
-    if configuration_event is None:
-        exit_ = host.execute(config_name, command, stop_signal=stop_event)
-    else:
-        exit_ = host.execute(
-            config_name,
-            command,
-            stop_signal=stop_event,
-            configuration_signal=configuration_event,
-        )
+    with build_default_instance_process_host() as host:
+        if configuration_event is None:
+            exit_ = host.execute(config_name, command, stop_signal=stop_event)
+        else:
+            exit_ = host.execute(
+                config_name,
+                command,
+                stop_signal=stop_event,
+                configuration_signal=configuration_event,
+            )
     return _host_outcome(exit_, config_name=config_name, command=func)
 
 

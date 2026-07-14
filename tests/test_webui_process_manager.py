@@ -4,7 +4,7 @@ import queue
 from datetime import UTC, datetime
 from multiprocessing.reduction import ForkingPickler
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, Self
 
 import pytest
 from rich.text import Text
@@ -188,6 +188,12 @@ def _install_host(
     error: BaseException | None = None,
 ) -> None:
     class _Host:
+        def __enter__(self) -> Self:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+
         @staticmethod
         def execute(
             instance_name: str,
