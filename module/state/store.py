@@ -45,7 +45,7 @@ from module.state.models import (
     UpsertTaskStateMutation,
 )
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 _RUN_MUTATIONS_SKIPPED_EVENT = "run.mutations.skipped"
 
 type _EncodedTaskStateMutation = tuple[TaskStateMutation, str | None]
@@ -65,6 +65,7 @@ _OUTBOX_SCHEMA_STATEMENT = """
         last_error_type TEXT CHECK (
             last_error_type IS NULL OR (length(last_error_type) > 0 AND last_error_type = trim(last_error_type))
         ),
+        last_error_message TEXT,
         claim_token TEXT,
         claim_until TEXT,
         published_at TEXT,
@@ -73,9 +74,15 @@ _OUTBOX_SCHEMA_STATEMENT = """
         CHECK ((claim_token IS NULL) = (claim_until IS NULL)),
         CHECK ((published_at IS NULL AND discarded_at IS NULL) OR claim_token IS NULL),
         CHECK (
-            (attempt_count = 0 AND last_attempt_at IS NULL AND last_error_type IS NULL)
+            (
+                attempt_count = 0
+                AND last_attempt_at IS NULL
+                AND last_error_type IS NULL
+                AND last_error_message IS NULL
+            )
             OR (attempt_count > 0 AND last_attempt_at IS NOT NULL)
         ),
+        CHECK ((last_error_type IS NULL) = (last_error_message IS NULL)),
         CHECK (discarded_at IS NULL OR last_error_type IS NOT NULL)
     ) STRICT
 """
@@ -200,6 +207,7 @@ _EXPECTED_COLUMNS = {
         "attempt_count",
         "last_attempt_at",
         "last_error_type",
+        "last_error_message",
         "claim_token",
         "claim_until",
         "published_at",
@@ -217,6 +225,23 @@ _TABLE_INFO_QUERIES = {
     "outbox": "PRAGMA table_info(outbox)",
 }
 _V3_OUTBOX_COLUMNS = ("message_id", "run_id", "topic", "message_key", "payload", "created_at", "published_at")
+_V4_OUTBOX_COLUMNS = (
+    "sequence",
+    "message_id",
+    "run_id",
+    "topic",
+    "message_key",
+    "payload",
+    "created_at",
+    "available_at",
+    "attempt_count",
+    "last_attempt_at",
+    "last_error_type",
+    "claim_token",
+    "claim_until",
+    "published_at",
+    "discarded_at",
+)
 
 
 def _require_non_empty_text(value: str, *, field_name: str) -> None:
@@ -1037,6 +1062,7 @@ class SQLiteStateStore:
                     attempt_count,
                     last_attempt_at,
                     last_error_type,
+                    last_error_message,
                     claim_token,
                     claim_until,
                     published_at,
@@ -1059,6 +1085,7 @@ class SQLiteStateStore:
                     attempt_count,
                     last_attempt_at,
                     last_error_type,
+                    last_error_message,
                     claim_token,
                     claim_until,
                     published_at,
@@ -1130,6 +1157,7 @@ class SQLiteStateStore:
                     attempt_count,
                     last_attempt_at,
                     last_error_type,
+                    last_error_message,
                     claim_token,
                     claim_until,
                     published_at,
@@ -1217,6 +1245,7 @@ class SQLiteStateStore:
                     available_at = ?,
                     last_attempt_at = ?,
                     last_error_type = ?,
+                    last_error_message = ?,
                     claim_token = NULL,
                     claim_until = NULL,
                     discarded_at = ?
@@ -1231,6 +1260,7 @@ class SQLiteStateStore:
                     encoded_available_at,
                     encoded_failed_at,
                     update.error_type,
+                    update.error_message,
                     encoded_discarded_at,
                     update.message_id,
                     update.claim_token,
@@ -1251,7 +1281,7 @@ class SQLiteStateStore:
             return record
 
     def retry_discarded_outbox(self, request: OutboxManualRetry) -> OutboxRecord:
-        """重新开放 dead-letter；保留既有 attempt_count 与 last_error_type。"""
+        """重新开放 dead-letter；保留既有 attempt_count 与最后一次错误。"""
         if not isinstance(request, OutboxManualRetry):
             message = "request must be an OutboxManualRetry"
             raise TypeError(message)
@@ -1304,6 +1334,7 @@ class SQLiteStateStore:
                 attempt_count,
                 last_attempt_at,
                 last_error_type,
+                last_error_message,
                 claim_token,
                 claim_until,
                 published_at,
@@ -1370,7 +1401,9 @@ class SQLiteStateStore:
                 for statement in _SCHEMA_STATEMENTS:
                     self._connection.execute(statement)
             elif version == 3:
-                self._migrate_v3_to_v4(tables)
+                self._migrate_v3_to_v5(tables)
+            elif version == 4:
+                self._migrate_v4_to_v5(tables)
             elif version != SCHEMA_VERSION:
                 message = f"unsupported schema version: {version}; expected {SCHEMA_VERSION}"
                 raise SchemaVersionError(message)
@@ -1380,7 +1413,7 @@ class SQLiteStateStore:
                 # 版本号最后写入；此前任何迁移或全表校验失败都会完整回滚。
                 self._connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
-    def _migrate_v3_to_v4(self, tables: frozenset[str]) -> None:
+    def _migrate_v3_to_v5(self, tables: frozenset[str]) -> None:
         expected_tables = frozenset(_EXPECTED_COLUMNS)
         if tables != expected_tables:
             message = f"schema v3 tables mismatch: expected {sorted(expected_tables)}, actual {sorted(tables)}"
@@ -1422,6 +1455,69 @@ class SQLiteStateStore:
             """
         )
         self._connection.execute("DROP TABLE outbox_v3")
+        self._connection.execute(_OUTBOX_READY_INDEX_STATEMENT)
+
+    def _migrate_v4_to_v5(self, tables: frozenset[str]) -> None:
+        expected_tables = frozenset(_EXPECTED_COLUMNS)
+        if tables != expected_tables:
+            message = f"schema v4 tables mismatch: expected {sorted(expected_tables)}, actual {sorted(tables)}"
+            raise SchemaVersionError(message)
+        rows = self._connection.execute("PRAGMA table_info(outbox)").fetchall()
+        actual_columns = tuple(_required_text(row, "name") for row in rows)
+        if actual_columns != _V4_OUTBOX_COLUMNS:
+            message = f"schema v4 outbox columns mismatch: expected {_V4_OUTBOX_COLUMNS}, actual {actual_columns}"
+            raise SchemaVersionError(message)
+
+        if not self._connection.in_transaction:
+            message = "schema migration requires an active write transaction"
+            raise RuntimeError(message)
+        self._connection.execute("ALTER TABLE outbox RENAME TO outbox_v4")
+        self._connection.execute(_OUTBOX_SCHEMA_STATEMENT)
+        self._connection.execute(
+            """
+            INSERT INTO outbox(
+                sequence,
+                message_id,
+                run_id,
+                topic,
+                message_key,
+                payload,
+                created_at,
+                available_at,
+                attempt_count,
+                last_attempt_at,
+                last_error_type,
+                last_error_message,
+                claim_token,
+                claim_until,
+                published_at,
+                discarded_at
+            )
+            SELECT
+                sequence,
+                message_id,
+                run_id,
+                topic,
+                message_key,
+                payload,
+                created_at,
+                available_at,
+                attempt_count,
+                last_attempt_at,
+                last_error_type,
+                CASE
+                    WHEN last_error_type IS NULL THEN NULL
+                    ELSE '(error message unavailable in schema v4)'
+                END,
+                claim_token,
+                claim_until,
+                published_at,
+                discarded_at
+            FROM outbox_v4
+            ORDER BY sequence
+            """
+        )
+        self._connection.execute("DROP TABLE outbox_v4")
         self._connection.execute(_OUTBOX_READY_INDEX_STATEMENT)
 
     def _validate_schema(self) -> None:
@@ -1728,6 +1824,7 @@ class SQLiteStateStore:
                 else _decode_datetime(raw_last_attempt_at, field_name="outbox.last_attempt_at")
             ),
             last_error_type=_optional_text(row, "last_error_type"),
+            last_error_message=_optional_text(row, "last_error_message"),
             claim_token=_optional_text(row, "claim_token"),
             claim_until=(
                 None if raw_claim_until is None else _decode_datetime(raw_claim_until, field_name="outbox.claim_until")

@@ -866,6 +866,7 @@ def test_dead_letter_is_excluded_from_pending_and_manual_retry_preserves_audit(t
                 expected_attempt_count=0,
                 failed_at=_FINISHED_AT,
                 error_type="PermanentPublishError",
+                error_message="publisher rejected local payload",
                 available_at=None,
             )
         )
@@ -880,11 +881,49 @@ def test_dead_letter_is_excluded_from_pending_and_manual_retry_preserves_audit(t
         assert retried.attempt_count == 1
         assert retried.last_attempt_at == _FINISHED_AT
         assert retried.last_error_type == "PermanentPublishError"
+        assert retried.last_error_message == "publisher rejected local payload"
         assert retried.claim_token is None
         assert store.list_outbox(pending_only=True) == (retried,)
 
-        with pytest.raises(OutboxStateError, match="not discarded"):
+        retry_claim = store.claim_ready_outbox(_claim_request(_RECOVERY_WORKER, claimed_at=retry_at, limit=1))[0]
+        published = store.mark_outbox_published(
+            retry_claim.message_id,
+            retry_at,
+            claim_token=_RECOVERY_WORKER,
+            expected_attempt_count=retry_claim.attempt_count,
+        )
+        assert published.last_error_type == "PermanentPublishError"
+        assert published.last_error_message == "publisher rejected local payload"
+
+        with pytest.raises(OutboxStateError, match="published"):
             store.retry_discarded_outbox(OutboxManualRetry(message_id="discarded-message", available_at=retry_at))
+
+
+@pytest.mark.parametrize("error_message", ["", " first line\nsecond line "])
+def test_outbox_failure_message_round_trips_without_normalization(
+    tmp_path: Path,
+    error_message: str,
+) -> None:
+    database_path = tmp_path / "instance.sqlite3"
+    with SQLiteStateStore(database_path) as store:
+        _seed_outbox(store, "failed-message")
+        claimed = store.claim_ready_outbox(_claim_request(_WORKER_A, limit=1))[0]
+        store.record_outbox_failure(
+            OutboxFailureUpdate(
+                message_id=claimed.message_id,
+                claim_token=_WORKER_A,
+                expected_attempt_count=0,
+                failed_at=_FINISHED_AT,
+                error_type="RuntimeError",
+                error_message=error_message,
+                available_at=None,
+            )
+        )
+
+    with SQLiteStateStore(database_path) as reopened:
+        record = reopened.list_outbox()[0]
+
+    assert record.last_error_message == error_message
 
 
 def _downgrade_outbox_to_v3(database_path: Path) -> None:
@@ -921,6 +960,69 @@ def _downgrade_outbox_to_v3(database_path: Path) -> None:
         connection.commit()
 
 
+def _downgrade_outbox_to_v4(database_path: Path) -> None:
+    with closing(sqlite3.connect(database_path)) as connection:
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("DROP INDEX outbox_ready")
+        connection.execute("ALTER TABLE outbox RENAME TO outbox_v5")
+        connection.execute(
+            """
+            CREATE TABLE outbox (
+                sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                message_id TEXT NOT NULL UNIQUE,
+                run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
+                topic TEXT NOT NULL,
+                message_key TEXT,
+                payload TEXT NOT NULL CHECK (json_valid(payload)),
+                created_at TEXT NOT NULL,
+                available_at TEXT NOT NULL,
+                attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+                last_attempt_at TEXT,
+                last_error_type TEXT CHECK (
+                    last_error_type IS NULL
+                    OR (length(last_error_type) > 0 AND last_error_type = trim(last_error_type))
+                ),
+                claim_token TEXT,
+                claim_until TEXT,
+                published_at TEXT,
+                discarded_at TEXT,
+                CHECK (published_at IS NULL OR discarded_at IS NULL),
+                CHECK ((claim_token IS NULL) = (claim_until IS NULL)),
+                CHECK ((published_at IS NULL AND discarded_at IS NULL) OR claim_token IS NULL),
+                CHECK (
+                    (attempt_count = 0 AND last_attempt_at IS NULL AND last_error_type IS NULL)
+                    OR (attempt_count > 0 AND last_attempt_at IS NOT NULL)
+                ),
+                CHECK (discarded_at IS NULL OR last_error_type IS NOT NULL)
+            ) STRICT
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO outbox(
+                sequence, message_id, run_id, topic, message_key, payload, created_at,
+                available_at, attempt_count, last_attempt_at, last_error_type,
+                claim_token, claim_until, published_at, discarded_at
+            )
+            SELECT
+                sequence, message_id, run_id, topic, message_key, payload, created_at,
+                available_at, attempt_count, last_attempt_at, last_error_type,
+                claim_token, claim_until, published_at, discarded_at
+            FROM outbox_v5
+            """
+        )
+        connection.execute("DROP TABLE outbox_v5")
+        connection.execute(
+            """
+            CREATE INDEX outbox_ready
+            ON outbox(available_at, claim_until, sequence)
+            WHERE published_at IS NULL AND discarded_at IS NULL
+            """
+        )
+        connection.execute("PRAGMA user_version = 4")
+        connection.commit()
+
+
 def _open_state_store_concurrently(database_path: Path, *, workers: int = 8) -> tuple[int, ...]:
     barrier = threading.Barrier(workers)
 
@@ -950,18 +1052,49 @@ def test_schema_v3_migration_assigns_deterministic_sequence_and_initial_retry_st
     with SQLiteStateStore(database_path) as migrated:
         records = migrated.list_outbox()
 
-        assert migrated.schema_version == 4
+        assert migrated.schema_version == SCHEMA_VERSION
         assert tuple(record.message_id for record in records) == ("a-first", "m-published", "z-last")
         assert tuple(record.sequence for record in records) == (1, 2, 3)
         assert all(record.available_at == record.created_at for record in records)
         assert all(record.attempt_count == 0 for record in records)
         assert all(record.last_attempt_at is None for record in records)
         assert all(record.last_error_type is None for record in records)
+        assert all(record.last_error_message is None for record in records)
         assert records[1].published_at == _FINISHED_AT
         assert tuple(record.message_id for record in migrated.list_outbox(pending_only=True)) == (
             "a-first",
             "z-last",
         )
+
+
+def test_schema_v4_migration_preserves_failure_audit_with_explicit_legacy_message(tmp_path: Path) -> None:
+    database_path = tmp_path / "instance.sqlite3"
+    with SQLiteStateStore(database_path) as store:
+        _seed_outbox(store, "failed-message")
+        claimed = store.claim_ready_outbox(_claim_request(_WORKER_A, limit=1))[0]
+        store.record_outbox_failure(
+            OutboxFailureUpdate(
+                message_id=claimed.message_id,
+                claim_token=_WORKER_A,
+                expected_attempt_count=0,
+                failed_at=_FINISHED_AT,
+                error_type="RuntimeError",
+                error_message="original message is not representable in v4",
+                available_at=None,
+            )
+        )
+
+    _downgrade_outbox_to_v4(database_path)
+
+    with SQLiteStateStore(database_path) as migrated:
+        version = migrated.schema_version
+        record = migrated.list_outbox()[0]
+
+    assert version == SCHEMA_VERSION
+    assert record.attempt_count == 1
+    assert record.last_error_type == "RuntimeError"
+    assert record.last_error_message == "(error message unavailable in schema v4)"
+    assert record.discarded_at == _FINISHED_AT
 
 
 def test_schema_v3_migration_rolls_back_before_version_bump_when_another_table_is_invalid(tmp_path: Path) -> None:

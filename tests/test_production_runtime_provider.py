@@ -23,7 +23,13 @@ from module.gameplay.market_factories import MarketWorkflows
 from module.gameplay.opsi_factories import OpsiWorkflows
 from module.maintenance import MaintenanceServices
 from module.notify import DisabledNotificationConfig
-from module.runtime import InstanceRuntimeConfig, OutboxDelivery, RuntimeConfigurationSnapshot, TaskFactoryRegistry
+from module.runtime import (
+    InstanceRuntimeConfig,
+    OutboxDelivery,
+    OutboxFailureFact,
+    RuntimeConfigurationSnapshot,
+    TaskFactoryRegistry,
+)
 
 _ACTIVITY_CATALOG = ActivityCatalog(load_event_manifests(Path("content/events")))
 
@@ -57,6 +63,25 @@ if TYPE_CHECKING:
     from module.maintenance.game_manager import LoginFlow
     from module.maintenance.uncensored import UncensoredAssetBuilder, UncensoredAssetInstaller
     from module.runtime import InstanceRuntime
+
+
+def test_outbox_failure_log_includes_the_original_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    logs: list[str] = []
+    monkeypatch.setattr(runtime_provider_module.logger, "error", logs.append)
+    failure = OutboxFailureFact(
+        message_id="message-1",
+        topic="operator.notification.requested",
+        error_type="RuntimeError",
+        error_message="SMTP server rejected local credentials",
+        attempt_count=1,
+        available_at=datetime(2026, 7, 14, tzinfo=UTC),
+        discarded_at=None,
+    )
+
+    runtime_provider_module._report_outbox_failure(failure)  # noqa: SLF001
+
+    assert len(logs) == 1
+    assert "error_message='SMTP server rejected local credentials'" in logs[0]
 
 
 class _Port:

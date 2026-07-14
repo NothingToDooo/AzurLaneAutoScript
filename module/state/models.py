@@ -462,28 +462,6 @@ class RunFinalization:
         object.__setattr__(self, "outbox_messages", outbox_messages)
 
 
-def _validate_outbox_lifecycle(
-    *,
-    attempt_count: int,
-    last_attempt_at: datetime | None,
-    last_error_type: str | None,
-    published_at: datetime | None,
-    discarded_at: datetime | None,
-) -> None:
-    if published_at is not None and discarded_at is not None:
-        message = "outbox record cannot be both published and discarded"
-        raise ValueError(message)
-    if attempt_count == 0 and (last_attempt_at is not None or last_error_type is not None):
-        message = "unattempted outbox record cannot contain attempt metadata"
-        raise ValueError(message)
-    if attempt_count > 0 and last_attempt_at is None:
-        message = "attempted outbox record requires last_attempt_at"
-        raise ValueError(message)
-    if discarded_at is not None and last_error_type is None:
-        message = "discarded outbox record requires last_error_type"
-        raise ValueError(message)
-
-
 @dataclass(frozen=True, slots=True)
 class OutboxRecord:
     sequence: int
@@ -497,6 +475,7 @@ class OutboxRecord:
     attempt_count: int
     last_attempt_at: datetime | None
     last_error_type: str | None
+    last_error_message: str | None
     claim_token: str | None
     claim_until: datetime | None
     published_at: datetime | None
@@ -523,6 +502,9 @@ class OutboxRecord:
                 _require_aware_datetime(value, field_name=field_name)
         if self.last_error_type is not None:
             _require_identifier(self.last_error_type, field_name="last_error_type")
+        if self.last_error_message is not None and not isinstance(self.last_error_message, str):
+            message = "last_error_message must be a string or None"
+            raise TypeError(message)
         if self.claim_token is not None:
             _require_identifier(self.claim_token, field_name="claim_token")
         if (self.claim_token is None) is not (self.claim_until is None):
@@ -531,13 +513,26 @@ class OutboxRecord:
         if (self.published_at is not None or self.discarded_at is not None) and self.claim_token is not None:
             message = "terminal outbox record cannot remain claimed"
             raise ValueError(message)
-        _validate_outbox_lifecycle(
-            attempt_count=self.attempt_count,
-            last_attempt_at=self.last_attempt_at,
-            last_error_type=self.last_error_type,
-            published_at=self.published_at,
-            discarded_at=self.discarded_at,
-        )
+        self._validate_lifecycle()
+
+    def _validate_lifecycle(self) -> None:
+        if self.published_at is not None and self.discarded_at is not None:
+            message = "outbox record cannot be both published and discarded"
+            raise ValueError(message)
+        if (self.last_error_type is None) is not (self.last_error_message is None):
+            message = "last_error_type and last_error_message must both be set or both be None"
+            raise ValueError(message)
+        if self.attempt_count == 0 and (
+            self.last_attempt_at is not None or self.last_error_type is not None or self.last_error_message is not None
+        ):
+            message = "unattempted outbox record cannot contain attempt metadata"
+            raise ValueError(message)
+        if self.attempt_count > 0 and self.last_attempt_at is None:
+            message = "attempted outbox record requires last_attempt_at"
+            raise ValueError(message)
+        if self.discarded_at is not None and self.last_error_type is None:
+            message = "discarded outbox record requires last_error_type"
+            raise ValueError(message)
 
 
 @dataclass(frozen=True, slots=True)
@@ -549,6 +544,7 @@ class OutboxFailureUpdate:
     expected_attempt_count: int
     failed_at: datetime
     error_type: str
+    error_message: str
     available_at: datetime | None
 
     def __post_init__(self) -> None:
@@ -559,6 +555,9 @@ class OutboxFailureUpdate:
             raise ValueError(message)
         _require_aware_datetime(self.failed_at, field_name="failed_at")
         _require_identifier(self.error_type, field_name="error_type")
+        if not isinstance(self.error_message, str):
+            message = "error_message must be a string"
+            raise TypeError(message)
         if self.available_at is not None:
             _require_aware_datetime(self.available_at, field_name="available_at")
             if self.available_at < self.failed_at:
@@ -587,7 +586,7 @@ class OutboxClaimRequest:
 
 @dataclass(frozen=True, slots=True)
 class OutboxManualRetry:
-    """恢复 dead-letter；保留 attempt_count 与 last_error_type 作为审计。"""
+    """恢复 dead-letter；保留 attempt_count 与最后一次错误作为审计。"""
 
     message_id: str
     available_at: datetime

@@ -31,12 +31,13 @@ def _require_revision(value: str, *, field_name: str) -> None:
 
 
 def _report_outbox_failure(failure: OutboxFailureFact) -> None:
-    """只记录稳定标识；底层 SMTP/服务端异常文本可能包含敏感信息。"""
+    """记录 outbox 投递失败事实。"""
 
     logger.error(
         "Outbox delivery failed "
         f"message_id={failure.message_id!r} topic={failure.topic!r} "
-        f"error_type={failure.error_type!r} attempt_count={failure.attempt_count} "
+        f"error_type={failure.error_type!r} error_message={failure.error_message!r} "
+        f"attempt_count={failure.attempt_count} "
         f"discarded={failure.is_discarded}"
     )
 

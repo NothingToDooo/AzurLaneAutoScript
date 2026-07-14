@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Protocol, cast
 from uuid import uuid4
 
+from module.logger import logger
 from module.state import OutboxClaimRequest, OutboxFailureUpdate, OutboxRecord
 
 if TYPE_CHECKING:
@@ -42,18 +43,19 @@ class OutboxClock(Protocol):
 
 
 class OutboxDeliveryError(RuntimeError):
-    """outbox 状态边界的安全异常；异常文本不包含 payload 或底层错误。"""
+    """outbox 状态边界异常，保留底层错误供调用方诊断。"""
 
 
 class OutboxLoadError(OutboxDeliveryError):
-    def __init__(self) -> None:
-        super().__init__("failed to load ready outbox messages")
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+        super().__init__(f"failed to load ready outbox messages: {type(error).__name__}: {error}")
 
 
 class OutboxDispatchError(OutboxDeliveryError):
-    """publish 结果无法可靠写回状态库时抛出的安全异常。"""
+    """publish 结果无法可靠写回状态库时抛出，并保留底层错误。"""
 
-    def __init__(self, message_id: str, topic: str, operation: str) -> None:
+    def __init__(self, message_id: str, topic: str, operation: str, error: Exception) -> None:
         for field_name, value in (("message_id", message_id), ("topic", topic), ("operation", operation)):
             if not isinstance(value, str) or not value:
                 message = f"{field_name} must be a non-empty string"
@@ -61,7 +63,11 @@ class OutboxDispatchError(OutboxDeliveryError):
         self.message_id = message_id
         self.topic = topic
         self.operation = operation
-        super().__init__(f"failed to confirm outbox {operation} for message {message_id!r} and topic {topic!r}")
+        self.error = error
+        super().__init__(
+            f"failed to confirm outbox {operation} for message {message_id!r} and topic {topic!r}: "
+            f"{type(error).__name__}: {error}"
+        )
 
 
 class PermanentOutboxPublishError(RuntimeError):
@@ -122,6 +128,7 @@ class OutboxFailureFact:
     message_id: str
     topic: str
     error_type: str
+    error_message: str
     attempt_count: int
     available_at: datetime
     discarded_at: datetime | None
@@ -135,6 +142,9 @@ class OutboxFailureFact:
             if not isinstance(value, str) or not value or value != value.strip():
                 message = f"{field_name} must be trimmed and non-empty"
                 raise ValueError(message)
+        if not isinstance(self.error_message, str):
+            message = "error_message must be a string"
+            raise TypeError(message)
         if type(self.attempt_count) is not int or self.attempt_count <= 0:
             message = "attempt_count must be a positive integer"
             raise ValueError(message)
@@ -251,6 +261,8 @@ def _validate_published_confirmation(expected: OutboxRecord, confirmed: object, 
         confirmed.message_id,
         confirmed.attempt_count,
         confirmed.last_attempt_at,
+        confirmed.last_error_type,
+        confirmed.last_error_message,
         confirmed.published_at,
         confirmed.discarded_at,
         confirmed.claim_token,
@@ -260,6 +272,8 @@ def _validate_published_confirmation(expected: OutboxRecord, confirmed: object, 
         expected.message_id,
         expected.attempt_count + 1,
         attempted_at,
+        expected.last_error_type,
+        expected.last_error_message,
         attempted_at,
         None,
         None,
@@ -285,6 +299,7 @@ def _validate_failure_confirmation(
         confirmed.attempt_count,
         confirmed.last_attempt_at,
         confirmed.last_error_type,
+        confirmed.last_error_message,
         confirmed.available_at,
         confirmed.published_at,
         confirmed.claim_token,
@@ -295,6 +310,7 @@ def _validate_failure_confirmation(
         expected.attempt_count + 1,
         update.failed_at,
         update.error_type,
+        update.error_message,
         expected_available_at,
         None,
         None,
@@ -342,8 +358,8 @@ class OutboxDispatcher:
         )
         try:
             selected = _validate_ready_records(self._store.claim_ready_outbox(request), request=request)
-        except Exception:  # noqa: BLE001 - 存储协议边界统一转译为不泄密的 load 错误。
-            raise OutboxLoadError from None
+        except Exception as error:
+            raise OutboxLoadError(error) from error
 
         published: list[str] = []
         failures: list[OutboxFailureFact] = []
@@ -356,10 +372,16 @@ class OutboxDispatcher:
                     idempotency_key=record.message_id,
                 )
             except Exception as error:  # noqa: BLE001 - publisher 是外部边界，失败必须持久化并隔离。
+                logger.exception(
+                    "Outbox publisher failed for message %s on topic %s",
+                    record.message_id,
+                    record.topic,
+                )
                 failures.append(
                     self._record_failure(
                         record,
                         error_type=type(error).__name__,
+                        error_message=str(error),
                         is_permanent=isinstance(error, PermanentOutboxPublishError),
                     )
                 )
@@ -379,14 +401,15 @@ class OutboxDispatcher:
                 expected_attempt_count=record.attempt_count,
             )
             _validate_published_confirmation(record, confirmed, attempted_at)
-        except Exception:  # noqa: BLE001 - publish 后任何确认失败都必须转为安全状态错误。
-            raise OutboxDispatchError(record.message_id, record.topic, "publication") from None
+        except Exception as error:
+            raise OutboxDispatchError(record.message_id, record.topic, "publication", error) from error
 
     def _record_failure(
         self,
         record: OutboxRecord,
         *,
         error_type: str,
+        error_message: str,
         is_permanent: bool,
     ) -> OutboxFailureFact:
         failed_at = _aware_now(self._clock)
@@ -397,6 +420,7 @@ class OutboxDispatcher:
             expected_attempt_count=record.attempt_count,
             failed_at=failed_at,
             error_type=error_type,
+            error_message=error_message,
             available_at=(
                 None
                 if is_permanent
@@ -412,12 +436,13 @@ class OutboxDispatcher:
                 self._store.record_outbox_failure(update),
                 update,
             )
-        except Exception:  # noqa: BLE001 - failure 状态未可靠落库时不能继续假装已处理。
-            raise OutboxDispatchError(record.message_id, record.topic, "failure") from None
+        except Exception as error:
+            raise OutboxDispatchError(record.message_id, record.topic, "failure", error) from error
         return OutboxFailureFact(
             message_id=record.message_id,
             topic=record.topic,
             error_type=error_type,
+            error_message=error_message,
             attempt_count=confirmed.attempt_count,
             available_at=confirmed.available_at,
             discarded_at=confirmed.discarded_at,

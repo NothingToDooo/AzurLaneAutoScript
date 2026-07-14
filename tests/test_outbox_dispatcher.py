@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, override
 
 import pytest
 
+import module.runtime.outbox as outbox_module
 from module.runtime import (
     OutboxDispatcher,
     OutboxDispatchError,
@@ -33,6 +34,7 @@ def _record(message_id: str, *, sequence: int, offset: int = 0) -> OutboxRecord:
         attempt_count=0,
         last_attempt_at=None,
         last_error_type=None,
+        last_error_message=None,
         claim_token=None,
         claim_until=None,
         published_at=None,
@@ -93,6 +95,7 @@ class _Store:
             available_at=update.failed_at if is_discarded else update.available_at,
             last_attempt_at=update.failed_at,
             last_error_type=update.error_type,
+            last_error_message=update.error_message,
             claim_token=None,
             claim_until=None,
             discarded_at=update.failed_at if is_discarded else None,
@@ -169,11 +172,46 @@ def test_publish_failure_is_persisted_and_does_not_block_later_messages() -> Non
     assert result.failure_count == 1
     assert result.failures[0].message_id == "poison"
     assert result.failures[0].error_type == "RuntimeError"
+    assert result.failures[0].error_message == "broker password=secret"
     assert result.failures[0].available_at == _NOW + timedelta(minutes=1)
     assert not result.failures[0].is_discarded
     assert [call[3] for call in publisher.calls] == ["first", "poison", "third"]
     assert tuple(record.message_id for record in store.pending()) == ("poison",)
-    assert "secret" not in repr(result.failures[0])
+    assert "secret" in repr(result.failures[0])
+
+
+def test_empty_publish_error_message_is_preserved_exactly() -> None:
+    store = _Store((_record("empty", sequence=1),))
+    publisher = _Publisher({"empty": RuntimeError()})
+
+    failure = OutboxDispatcher(store=store, publisher=publisher, clock=_Clock()).dispatch_pending().failures[0]
+
+    assert failure.error_type == "RuntimeError"
+    assert failure.error_message == ""
+    assert store.records[0].last_error_message == ""
+
+
+def test_publish_failure_logs_the_active_exception(monkeypatch: pytest.MonkeyPatch) -> None:
+    logged: list[tuple[str, tuple[object, ...]]] = []
+    monkeypatch.setattr(
+        outbox_module.logger,
+        "exception",
+        lambda message, *args: logged.append((message, args)),
+    )
+    store = _Store((_record("failed", sequence=1),))
+
+    OutboxDispatcher(
+        store=store,
+        publisher=_Publisher({"failed": RuntimeError("broker unavailable")}),
+        clock=_Clock(),
+    ).dispatch_pending()
+
+    assert logged == [
+        (
+            "Outbox publisher failed for message %s on topic %s",
+            ("failed", "app.restart.requested"),
+        )
+    ]
 
 
 def test_exponential_backoff_becomes_dead_letter_at_max_attempts() -> None:
@@ -211,11 +249,12 @@ def test_permanent_publish_error_is_dead_lettered_on_first_attempt() -> None:
 
     assert failure.attempt_count == 1
     assert failure.error_type == "PermanentOutboxPublishError"
+    assert failure.error_message == "invalid payload with secret"
     assert failure.is_discarded
     assert store.pending() == ()
 
 
-def test_ready_query_failure_is_translated_without_exposing_store_error() -> None:
+def test_ready_query_failure_preserves_store_error_as_message_and_cause() -> None:
     class _FailingStore(_Store):
         @override
         def claim_ready_outbox(self, request: OutboxClaimRequest) -> tuple[OutboxRecord, ...]:
@@ -226,8 +265,9 @@ def test_ready_query_failure_is_translated_without_exposing_store_error() -> Non
     with pytest.raises(OutboxLoadError, match="failed to load ready outbox messages") as raised:
         OutboxDispatcher(store=_FailingStore(()), publisher=_Publisher(), clock=_Clock()).dispatch_pending()
 
-    assert raised.value.__cause__ is None
-    assert "secret" not in str(raised.value)
+    assert isinstance(raised.value.__cause__, RuntimeError)
+    assert raised.value.error is raised.value.__cause__
+    assert "database-password=secret" in str(raised.value)
 
 
 def test_clock_contract_error_is_not_misreported_as_a_store_load_failure() -> None:
@@ -240,7 +280,7 @@ def test_clock_contract_error_is_not_misreported_as_a_store_load_failure() -> No
         OutboxDispatcher(store=_Store(()), publisher=_Publisher(), clock=_NaiveClock()).dispatch_pending()
 
 
-def test_state_confirmation_failure_raises_safe_error_without_cause_text() -> None:
+def test_state_confirmation_failure_preserves_error_message_and_cause() -> None:
     class _FailingStore(_Store):
         @override
         def mark_outbox_published(
@@ -265,9 +305,48 @@ def test_state_confirmation_failure_raises_safe_error_without_cause_text() -> No
             clock=_Clock(),
         ).dispatch_pending()
 
-    assert raised.value.__cause__ is None
+    assert isinstance(raised.value.__cause__, RuntimeError)
+    assert raised.value.error is raised.value.__cause__
     assert raised.value.message_id == "first"
-    assert "secret" not in str(raised.value)
+    assert "database-password=secret" in str(raised.value)
+
+
+def test_failure_persistence_error_preserves_store_cause_and_publisher_context() -> None:
+    publish_error = RuntimeError("broker unavailable")
+    store_error = OSError("state database is read-only")
+
+    class _FailingStore(_Store):
+        @override
+        def record_outbox_failure(self, update: OutboxFailureUpdate) -> OutboxRecord:
+            del update
+            raise store_error
+
+    with pytest.raises(OutboxDispatchError, match="state database is read-only") as raised:
+        OutboxDispatcher(
+            store=_FailingStore((_record("first", sequence=1),)),
+            publisher=_Publisher({"first": publish_error}),
+            clock=_Clock(),
+        ).dispatch_pending()
+
+    assert raised.value.__cause__ is store_error
+    assert store_error.__context__ is publish_error
+
+
+def test_successful_retry_preserves_last_failure_audit() -> None:
+    store = _Store((_record("retry", sequence=1),))
+    publisher = _Publisher({"retry": RuntimeError("broker unavailable")})
+    clock = _Clock()
+    dispatcher = OutboxDispatcher(store=store, publisher=publisher, clock=clock)
+
+    first = dispatcher.dispatch_pending().failures[0]
+    publisher.failures.clear()
+    clock.current = first.available_at
+    second = dispatcher.dispatch_pending()
+
+    assert second.published_message_ids == ("retry",)
+    assert store.records[0].published_at == first.available_at
+    assert store.records[0].last_error_type == "RuntimeError"
+    assert store.records[0].last_error_message == "broker unavailable"
 
 
 def test_retry_policy_bounds_each_claimed_batch() -> None:
