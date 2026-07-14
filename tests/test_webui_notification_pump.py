@@ -102,11 +102,48 @@ def test_background_pump_runs_without_live_instance_processes_and_stops() -> Non
 
     pump.start()
     assert flushed.wait(timeout=2)
-    pump.stop()
+    assert pump.stop() is True
 
     assert not pump.running
     assert len(sessions) == 1
     assert sessions[0].close_calls == 1
+
+
+def test_stop_reports_timeout_until_the_running_tick_finishes() -> None:
+    first_started = threading.Event()
+    release_first = threading.Event()
+    first_finished = threading.Event()
+    sessions: list[_Session] = []
+
+    class _BlockingSession(_Session):
+        def flush(
+            self,
+            *,
+            instance_name: str | None = None,
+            max_intents: int = 32,
+            max_deliveries: int = 4,
+        ) -> object:
+            self.flush_calls.append((instance_name, max_intents, max_deliveries))
+            first_started.set()
+            assert release_first.wait(timeout=2)
+            first_finished.set()
+            return object()
+
+    def build() -> _Session:
+        session = _BlockingSession() if not sessions else _Session()
+        sessions.append(session)
+        return session
+
+    pump = NotificationSpoolPump(build, interval_seconds=60, shutdown_timeout_seconds=0.1)
+    pump.start()
+    assert first_started.wait(timeout=2)
+
+    assert pump.stop() is False
+    assert pump.running
+    release_first.set()
+    assert first_finished.wait(timeout=2)
+    assert pump.stop() is True
+    assert not pump.running
 
 
 def test_start_during_timed_out_stop_restarts_after_the_old_worker_exits() -> None:

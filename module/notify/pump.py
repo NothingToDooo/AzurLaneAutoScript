@@ -125,22 +125,24 @@ class NotificationSpoolPump:
                 return
             self._start_locked()
 
-    def stop(self) -> None:
+    def stop(self) -> bool:
+        """请求有界停止；返回后台 worker 是否已完全退出。"""
         with self._lock:
             self._restart_requested = False
             stop_event = self._stop_event
             thread = self._thread
         if stop_event is None or thread is None:
-            return
+            return True
         stop_event.set()
         thread.join(timeout=self._shutdown_timeout_seconds)
         if thread.is_alive():
             logger.warning("Notification spool pump did not stop before its bounded shutdown deadline")
-            return
+            return False
         with self._lock:
             if self._thread is thread:
                 self._thread = None
                 self._stop_event = None
+        return True
 
     def run_once(self) -> None:
         session: NotificationFlushSession | None = None

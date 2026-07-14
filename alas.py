@@ -61,14 +61,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         signal.signal(item, stop.request)
     try:
         maintenance_factory = partial(build_default_notification_maintenance, args.project_root)
-        with (
-            NotificationSpoolPump(
-                maintenance_factory,
-                instance_name=args.instance,
-            ),
-            build_default_instance_process_host(args.project_root) as host,
-        ):
-            exit_ = host.execute(args.instance, args.command, stop_signal=stop)
+        notification_pump = NotificationSpoolPump(
+            maintenance_factory,
+            instance_name=args.instance,
+        )
+        notification_pump.start()
+        try:
+            with build_default_instance_process_host(args.project_root) as host:
+                exit_ = host.execute(args.instance, args.command, stop_signal=stop)
+        finally:
+            if notification_pump.stop():
+                notification_pump.run_once()
     finally:
         for item, handler in previous.items():
             signal.signal(
