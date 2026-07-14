@@ -41,6 +41,14 @@ class ConfigurationEvent(ConfigurationChangeSignal, Protocol):
     def is_set(self) -> bool: ...
 
 
+@dataclass(frozen=True, slots=True)
+class _ProcessRequest:
+    """可跨 spawn 边界传递的纯业务请求；IPC 资源由调用参数单独承载。"""
+
+    config_name: str
+    command: str
+
+
 @dataclass(slots=True)
 class _ProcessRun:
     command: str
@@ -109,33 +117,32 @@ def _host_outcome(
 
 
 def _execute_process(
-    config_name: str,
-    func: str,
+    request: _ProcessRequest,
     stop_event: StopEvent | None,
     configuration_event: ConfigurationEvent | None = None,
 ) -> ProcessOutcome:
-    command = "alas" if func == "alas" else get_tool_task_command(func)
-    if command is None:
-        message = f"No function matched: {func}"
+    resolved_command = "alas" if request.command == "alas" else get_tool_task_command(request.command)
+    if resolved_command is None:
+        message = f"No function matched: {request.command}"
         logger.critical(message)
         return _new_outcome(
             ProcessOutcomeStatus.FAILED,
-            config_name=config_name,
-            command=func,
+            config_name=request.config_name,
+            command=request.command,
             exception_type="LookupError",
             message=message,
         )
     with build_default_instance_process_host() as host:
         if configuration_event is None:
-            exit_ = host.execute(config_name, command, stop_signal=stop_event)
+            exit_ = host.execute(request.config_name, resolved_command, stop_signal=stop_event)
         else:
             exit_ = host.execute(
-                config_name,
-                command,
+                request.config_name,
+                resolved_command,
                 stop_signal=stop_event,
                 configuration_signal=configuration_event,
             )
-    return _host_outcome(exit_, config_name=config_name, command=func)
+    return _host_outcome(exit_, config_name=request.config_name, command=request.command)
 
 
 def _system_exit_outcome(
@@ -179,6 +186,7 @@ class ProcessManager:
                 return
             self._join_monitor()
             command = "alas" if func is None else func
+            request = _ProcessRequest(self.config_name, command)
             renderable_queue: queue.Queue[RenderableQueueItem] = State.manager.Queue()
             outcome_queue: queue.Queue[ProcessOutcome] = State.manager.Queue()
             self._stop_event = Event() if ev is None else ev
@@ -186,8 +194,7 @@ class ProcessManager:
             process = Process(
                 target=ProcessManager.run_process,
                 args=(
-                    self.config_name,
-                    command,
+                    request,
                     renderable_queue,
                     outcome_queue,
                     self._stop_event,
@@ -361,9 +368,8 @@ class ProcessManager:
         return cls._processes[config_name]
 
     @staticmethod
-    def run_process(  # noqa: PLR0913, PLR0917
-        config_name: str,
-        func: str,
+    def run_process(
+        request: _ProcessRequest,
         renderable_queue: queue.Queue[RenderableQueueItem],
         outcome_queue: queue.Queue[ProcessOutcome],
         stop_event: StopEvent | None = None,
@@ -371,15 +377,15 @@ class ProcessManager:
     ) -> None:
         outcome: ProcessOutcome | None = None
         try:
-            set_file_logger(name=config_name)
+            set_file_logger(name=request.config_name)
             set_func_logger(func=renderable_queue.put)
             remove_fake_pil_module()
-            outcome = _execute_process(config_name, func, stop_event, configuration_event)
+            outcome = _execute_process(request, stop_event, configuration_event)
         except SystemExit as error:
             outcome = _system_exit_outcome(
                 error,
-                config_name=config_name,
-                command=func,
+                config_name=request.config_name,
+                command=request.command,
                 stop_event=stop_event,
             )
             raise
@@ -387,21 +393,31 @@ class ProcessManager:
             logger.exception(error)
             outcome = _new_outcome(
                 ProcessOutcomeStatus.FAILED,
-                config_name=config_name,
-                command=func,
+                config_name=request.config_name,
+                command=request.command,
                 exception_type=type(error).__name__,
                 message=_short_message(error),
             )
+        except BaseExceptionGroup as error:
+            logger.exception(error)
+            outcome = _new_outcome(
+                ProcessOutcomeStatus.FAILED,
+                config_name=request.config_name,
+                command=request.command,
+                exception_type=type(error).__name__,
+                message=_short_message(error),
+            )
+            raise
         finally:
             if outcome is None:
                 outcome = _new_outcome(
                     ProcessOutcomeStatus.FAILED,
-                    config_name=config_name,
-                    command=func,
+                    config_name=request.config_name,
+                    command=request.command,
                     exception_type="ProcessExit",
                     message="Process exited before producing an outcome",
                 )
-            logger.info(f"[{config_name}] exited. Reason: {outcome.status.value}\n")
+            logger.info(f"[{request.config_name}] exited. Reason: {outcome.status.value}\n")
             try:
                 outcome_queue.put(outcome)
             finally:
