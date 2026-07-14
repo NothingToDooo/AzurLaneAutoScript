@@ -97,6 +97,7 @@ class CampaignFactoryDependencies:
 
     def __post_init__(self) -> None:
         _require_method(self.workflow, "execute", field_name="workflow")
+        _require_method(self.workflow, "discard_checkpoint", field_name="workflow")
         _require_method(self.sessions, "resolve", field_name="sessions")
         _require_method(self.sessions, "select", field_name="sessions")
 

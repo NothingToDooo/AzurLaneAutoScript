@@ -547,10 +547,34 @@ def test_execution_settings_compile_to_legacy_campaign_primitives() -> None:
     assert overlay["Fleet_Fleet1Mode"] == "combat_auto"
     assert overlay["Fleet_FleetOrder"] == "fleet1_mob_fleet2_boss"
     assert overlay["Submarine_Mode"] == "boss_only"
-    assert overlay["Emotion_Fleet1Value"] == 119
-    assert overlay["Emotion_Fleet1Record"] == settings.emotion.fleet1.recorded_at.astimezone().replace(tzinfo=None)
+    assert overlay["Emotion_Fleet1Control"] == "prevent_yellow_face"
+    assert overlay["Emotion_Fleet2Recover"] == "dormitory_floor_1"
+    assert (
+        not {
+            "Emotion_Fleet1Value",
+            "Emotion_Fleet1Record",
+            "Emotion_Fleet2Value",
+            "Emotion_Fleet2Record",
+        }
+        & overlay.keys()
+    )
     assert overlay["HpControl_HpBalanceWeight"] == "1000, 800, 600"
     assert overlay["EnemyPriority_EnemyScaleBalanceWeight"] == "S3_enemy_first"
+
+
+def test_campaign_runtime_does_not_reapply_stale_emotion_values_after_recording() -> None:
+    _FakeDeclarativeRuntime.created.clear()
+    config = AzurLaneConfig.from_snapshot("campaign-emotion-ledger", {})
+    device = object.__new__(Device)
+    provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
+    activated = provider.activate(_job(), AbortToken())
+    assert isinstance(activated, CampaignSession)
+
+    config.set_record(Emotion_Fleet1Value=83, Emotion_Fleet2Value=71)
+    recorded_values = (config.Emotion_Fleet1Value, config.Emotion_Fleet2Value)
+    provider.finish(activated, activated.initial_state(), CampaignStopReason.PREEMPTED)
+
+    assert recorded_values == (83, 71)
 
 
 def test_refreshing_gems_cancellation_preserves_the_active_map_emotion_ledger() -> None:
@@ -769,6 +793,50 @@ def test_provider_keeps_one_runtime_across_resumable_turns_then_releases_it() ->
     assert ("finish_runtime_session", RuntimeSessionOutcome.INTERRUPTED) in runtime.calls
     with pytest.raises(RuntimeError, match="not the active"):
         provider.active_runtime(activated, AbortToken())
+
+
+def test_provider_discards_retained_checkpoint_runtime_as_interrupted() -> None:
+    _FakeDeclarativeRuntime.created.clear()
+    config = AzurLaneConfig.from_snapshot("campaign-provider-stale", {})
+    device = object.__new__(Device)
+    provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
+    activated = provider.activate(_job(), AbortToken())
+    assert isinstance(activated, CampaignSession)
+    provider.finish(activated, activated.initial_state(), CampaignStopReason.IN_PROGRESS)
+    stale_runtime = _FakeDeclarativeRuntime.created[-1]
+    fresh_job = _job()
+
+    with pytest.raises(CampaignRuntimeEvidenceError, match="fresh campaign entry cannot replace"):
+        provider.before_entry(
+            fresh_job,
+            fresh_job.sessions[0],
+            fresh_job.sessions[0].initial_state(),
+            AbortToken(),
+        )
+
+    provider.discard_checkpoint()
+    fresh = provider.activate(fresh_job, AbortToken())
+
+    assert isinstance(stale_runtime, _FakeDeclarativeRuntime)
+    assert ("finish_runtime_session", RuntimeSessionOutcome.INTERRUPTED) in stale_runtime.calls
+    assert isinstance(fresh, CampaignSession)
+    assert len(_FakeDeclarativeRuntime.created) == 2
+
+
+def test_provider_discards_prepared_checkpoint_runtime() -> None:
+    _FakeDeclarativeRuntime.created.clear()
+    config = AzurLaneConfig.from_snapshot("campaign-provider-stale-prepared", {})
+    device = object.__new__(Device)
+    provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
+    job = _job()
+    session = job.sessions[0]
+
+    provider.before_entry(job, session, session.initial_state(), AbortToken())
+    prepared_runtime = _FakeDeclarativeRuntime.created[-1]
+    provider.discard_checkpoint()
+
+    assert isinstance(prepared_runtime, _FakeDeclarativeRuntime)
+    assert "discard_runtime" in prepared_runtime.calls
 
 
 def test_in_progress_completed_state_closes_the_finished_map_runtime() -> None:

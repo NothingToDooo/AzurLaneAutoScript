@@ -94,6 +94,8 @@ class CampaignBattleProgramExecutor(Protocol):
 
 
 class CampaignRuntimeLifecycle(Protocol):
+    def discard_checkpoint(self) -> None: ...
+
     def finish(
         self,
         session: CampaignSession,
@@ -501,6 +503,7 @@ class CampaignLiveServices:
             _require_method(self.gems_fleets, "replace", field_name="gems_fleets")
         if self.lifecycle is not None:
             _require_method(self.lifecycle, "finish", field_name="lifecycle")
+            _require_method(self.lifecycle, "discard_checkpoint", field_name="lifecycle")
 
 
 @dataclass(frozen=True, slots=True)
@@ -558,6 +561,11 @@ class LiveCampaignWorkflow(CampaignWorkflow):
         self._programs = selected_services.programs
         self._gems_fleets = selected_services.gems_fleets
         self._lifecycle = selected_services.lifecycle
+
+    @override
+    def discard_checkpoint(self) -> None:
+        if self._lifecycle is not None:
+            self._lifecycle.discard_checkpoint()
 
     @override
     def execute(

@@ -1,6 +1,5 @@
 import re
 from dataclasses import dataclass, replace
-from datetime import datetime
 from functools import partial
 from typing import TYPE_CHECKING, Final, Literal, Unpack, cast
 
@@ -350,18 +349,6 @@ def campaign_stage_overlay(definition: CampaignStageDefinition) -> ConfigOverrid
     return cast("ConfigOverrides", values)
 
 
-def _legacy_emotion_record(value: object) -> object:
-    """旧 Emotion 只接受本地 naive datetime；typed 边界内始终保留 aware 时间。"""
-
-    if not isinstance(value, datetime):
-        message = "campaign emotion record must be a datetime"
-        raise TypeError(message)
-    if value.tzinfo is None or value.utcoffset() is None:
-        message = "campaign emotion record must be timezone-aware"
-        raise ValueError(message)
-    return value.astimezone().replace(tzinfo=None)
-
-
 def campaign_execution_overlay(settings: CampaignExecutionSettings) -> ConfigOverrides:
     """把领域玩法设置显式投影到旧战斗 primitive，不暴露通用 config bag。"""
 
@@ -391,13 +378,9 @@ def campaign_execution_overlay(settings: CampaignExecutionSettings) -> ConfigOve
         "Submarine_AutoSearchMode": submarine.auto_search_mode.value,
         "Submarine_DistanceToBoss": submarine.distance_to_boss.value,
         "Emotion_Mode": emotion.mode.value,
-        "Emotion_Fleet1Value": emotion.fleet1.value,
-        "Emotion_Fleet1Record": _legacy_emotion_record(emotion.fleet1.recorded_at),
         "Emotion_Fleet1Control": emotion.fleet1.control.value,
         "Emotion_Fleet1Recover": emotion.fleet1.recover.value,
         "Emotion_Fleet1Oath": emotion.fleet1.oath,
-        "Emotion_Fleet2Value": emotion.fleet2.value,
-        "Emotion_Fleet2Record": _legacy_emotion_record(emotion.fleet2.recorded_at),
         "Emotion_Fleet2Control": emotion.fleet2.control.value,
         "Emotion_Fleet2Recover": emotion.fleet2.recover.value,
         "Emotion_Fleet2Oath": emotion.fleet2.oath,
@@ -2040,6 +2023,12 @@ class Mumu12CampaignRuntimeProvider:
         ):
             return RuntimeSessionOutcome.COMPLETED
         return RuntimeSessionOutcome.INTERRUPTED
+
+    def discard_checkpoint(self) -> None:
+        """失效 checkpoint 不再拥有任何 prepared 或 active runtime。"""
+
+        self._discard_prepared_runtime()
+        self._release_active_runtime(RuntimeSessionOutcome.INTERRUPTED)
 
     def finish(
         self,

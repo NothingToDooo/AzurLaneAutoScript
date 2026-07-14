@@ -11,7 +11,7 @@ from module.adapters.campaign_live import (
     CommittedCampaignUnit,
     ExistingCampaignMapAdapter,
 )
-from module.application import AbortRequested, AbortToken, DailySchedule, PreemptionRequest, TaskId
+from module.application import AbortRequested, AbortToken, DailySchedule, DelayRange, PreemptionRequest, TaskId
 from module.content.battle_policy import (
     BattleFlag,
     BossStrategy,
@@ -250,7 +250,7 @@ def _job(  # noqa: PLR0913 - 测试构造器需要独立控制各领域维度。
         difficulty=CampaignDifficulty.NORMAL,
         execution=_execution(),
         schedule=_SCHEDULE,
-        failure_retry_delay=timedelta(minutes=30),
+        failure_retry_delay=DelayRange(1_800, 1_800),
         resource_retry_delay=timedelta(minutes=180),
         progress=progress,
         limits=CampaignLimits() if limits is None else limits,
@@ -383,6 +383,10 @@ class _ProgramExecutor:
 class _RuntimeLifecycle:
     def __init__(self) -> None:
         self.calls: list[tuple[CampaignSession, CampaignSessionState, CampaignStopReason]] = []
+        self.discard_calls = 0
+
+    def discard_checkpoint(self) -> None:
+        self.discard_calls += 1
 
     def finish(
         self,
@@ -766,6 +770,20 @@ def test_live_workflow_finishes_runtime_at_the_report_boundary() -> None:
     assert lifecycle.calls == [(session, report.session_state, report.stop_reason)]
 
 
+def test_live_workflow_discards_the_runtime_owned_by_a_stale_checkpoint() -> None:
+    lifecycle = _RuntimeLifecycle()
+    workflow = LiveCampaignWorkflow(
+        _Observer(BattlefieldObservation(battle_index=0, enemy=1)),
+        _Driver(lambda attempt: BattleSucceeded(attempt, BattleTarget.ENEMY)),
+        _Clock(),
+        services=CampaignLiveServices(lifecycle=lifecycle),
+    )
+
+    workflow.discard_checkpoint()
+
+    assert lifecycle.discard_calls == 1
+
+
 def test_live_workflow_retains_program_checkpoint_through_the_same_lifecycle_boundary() -> None:
     session = _program_session()
     lifecycle = _RuntimeLifecycle()
@@ -871,6 +889,20 @@ def test_live_workflow_marks_runtime_failed_when_execution_raises() -> None:
 def test_campaign_live_services_reject_an_invalid_runtime_lifecycle() -> None:
     with pytest.raises(TypeError, match=r"lifecycle must implement finish\(\)"):
         CampaignLiveServices(lifecycle=cast("CampaignRuntimeLifecycle", object()))
+
+
+def test_campaign_live_services_require_checkpoint_discard_lifecycle() -> None:
+    class _FinishOnlyLifecycle:
+        @staticmethod
+        def finish(
+            session: CampaignSession,
+            state: CampaignSessionState,
+            stop_reason: CampaignStopReason,
+        ) -> None:
+            del session, state, stop_reason
+
+    with pytest.raises(TypeError, match=r"lifecycle must implement discard_checkpoint\(\)"):
+        CampaignLiveServices(lifecycle=cast("CampaignRuntimeLifecycle", _FinishOnlyLifecycle()))
 
 
 def test_live_workflow_resumes_the_exact_progress_session() -> None:

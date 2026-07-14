@@ -179,7 +179,11 @@ class _Workflow:
         self._report = report
         self._on_execute = on_execute
         self.calls = 0
+        self.discard_calls = 0
         self.received_job: CampaignJobSpec | None = None
+
+    def discard_checkpoint(self) -> None:
+        self.discard_calls += 1
 
     def execute(
         self,
@@ -700,6 +704,7 @@ def test_stale_campaign_progress_is_deleted_before_external_work(progress: Campa
     result = CampaignTask(workflow, _spec(progress=progress)).run(_context("main"))
 
     assert workflow.calls == 0
+    assert workflow.discard_calls == 1
     assert result == TaskResult(
         outcome=Deferred("stale campaign progress was discarded"),
         effects=(RescheduleSelf(_STARTED_AT),),

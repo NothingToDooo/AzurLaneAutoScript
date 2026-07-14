@@ -982,6 +982,9 @@ class PreemptionSignal(Protocol):
 
 
 class CampaignWorkflow(Protocol):
+    def discard_checkpoint(self) -> None:
+        """释放只属于已失效 checkpoint 的运行时资源。"""
+
     def execute(
         self,
         job: CampaignJobSpec,
@@ -1020,6 +1023,7 @@ class CampaignTask(Task):
 
         progress, stale_progress = self._current_progress(context)
         if stale_progress:
+            self._workflow.discard_checkpoint()
             return self._for_execution_mode(
                 context.mode,
                 TaskResult(

@@ -89,6 +89,10 @@ class _Port:
         del args
 
     @staticmethod
+    def discard_checkpoint() -> None:
+        pass
+
+    @staticmethod
     def collect(*args: object) -> None:
         del args
 

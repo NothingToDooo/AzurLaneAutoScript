@@ -147,6 +147,9 @@ class _Workflow:
         self.calls = 0
         self.last_job: CampaignJobSpec | None = None
 
+    def discard_checkpoint(self) -> None:
+        pass
+
     def execute(
         self,
         job: CampaignJobSpec,
@@ -821,6 +824,18 @@ def test_factory_dependencies_fail_fast_for_missing_ports() -> None:
     with pytest.raises(TypeError, match=r"workflow must implement execute\(\)"):
         CampaignFactoryDependencies(
             cast("CampaignWorkflow", object()),
+            _SessionSource(),
+        )
+
+    class _ExecuteOnlyWorkflow:
+        @staticmethod
+        def execute(*args: object) -> object:
+            del args
+            return object()
+
+    with pytest.raises(TypeError, match=r"workflow must implement discard_checkpoint\(\)"):
+        CampaignFactoryDependencies(
+            cast("CampaignWorkflow", _ExecuteOnlyWorkflow()),
             _SessionSource(),
         )
     with pytest.raises(TypeError, match=r"sessions must implement resolve\(\)"):
