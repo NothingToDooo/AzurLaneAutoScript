@@ -144,6 +144,7 @@ _MAP_FIELDS = {
     "shape",
     "camera_data",
     "camera_data_spawn_point",
+    "map_covered",
     "map_data",
     "map_data_loop",
     "weight_data",
@@ -1473,6 +1474,9 @@ def _build_map_definition(value: object, path: Path) -> MapDefinition:
         ),
         normal=RunVariant(cells=_cell_specs(map_data, weight_data), spawn_waves=spawn_data),
         loop=RunVariant(cells=_cell_specs(loop_map_data, weight_data), spawn_waves=loop_spawn_data),
+        map_covered=(
+            _grid_nodes(data["map_covered"], path, "map.map_covered", max_coordinate) if "map_covered" in data else ()
+        ),
         portals=(
             _portal_data(data["portal_data"], path, "map.portal_data", max_coordinate) if "portal_data" in data else ()
         ),

@@ -176,8 +176,13 @@ class EquipmentCodeHandler(StorageHandler):
         previous = self._current_input_method()
         if previous == FAST_INPUT_IME:
             return previous
-        self.device.adb_shell(["ime", "enable", FAST_INPUT_IME])
-        self.device.adb_shell(["ime", "set", FAST_INPUT_IME])
+        for command in ("enable", "set"):
+            try:
+                self.device.adb_shell_checked(["ime", command, FAST_INPUT_IME])
+            except OSError as error:
+                logger.warning(error)
+                message = f"Unable to {command} FastInputIME"
+                raise ScriptError(message) from error
         return previous
 
     def _restore_input_method(self, previous: str) -> None:

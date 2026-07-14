@@ -31,6 +31,14 @@ S9_PRESET_KEYS = {
     "series_9_blueprint_only_cube",
     "series_9_blueprint_only",
 }
+S8_PRESET_KEYS = {
+    "series_8_305_only_cube",
+    "series_8_305_only",
+    "series_8_blueprint_305_cube",
+    "series_8_blueprint_305",
+    "series_8_blueprint_only_cube",
+    "series_8_blueprint_only",
+}
 S9_SHIPS = ("valparaiso", "maximmelmann", "duncan", "takahashi", "orage")
 S9_D_PROJECT_NUMBERS = {
     "737",
@@ -304,6 +312,16 @@ def test_series_nine_filter_tokens_and_presets_are_valid() -> None:
             assert FILTER_REGEX.fullmatch(selection)
             research_filter.load(selection)
             assert research_filter.apply(projects), f"{key}: {selection}"
+
+
+@pytest.mark.parametrize("preset_key", sorted(S9_PRESET_KEYS | S8_PRESET_KEYS))
+def test_series_eight_rainbow_gear_projects_are_prioritized(preset_key: str) -> None:
+    selections = split_filter(DICT_FILTER_PRESET[preset_key].lower())
+    rainbow_start = selections.index("s8-e-880")
+
+    assert selections[rainbow_start : rainbow_start + 2] == ["s8-e-880", "s8-e-180"]
+    if preset_key in S9_PRESET_KEYS:
+        assert rainbow_start < selections.index("reset")
 
 
 def test_series_nine_config_defaults_and_chinese_labels_are_generated() -> None:

@@ -4,16 +4,33 @@ map:
   shape: K9
   camera_data:
   - D2
-  - D5
+  - D6
   - D7
   - H2
-  - H5
+  - H6
   - H7
   camera_data_spawn_point:
   - H2
   map_covered:
   - A4
   map_data: 'ME -- ++ ++ -- ME ME ME ++ ++ ++
+
+    -- ME ME ME ME ME ME -- SP SP --
+
+    MB -- __ -- -- -- -- -- ME -- --
+
+    MB ME -- Me Me -- Me ++ ++ -- ME
+
+    MM -- Me ME -- Me -- MA ++ -- ME
+
+    ++ ME ME -- ++ -- ME -- ME -- --
+
+    ++ -- ME Me Me ME -- -- -- -- ++
+
+    -- ME -- -- -- __ -- ME ME -- ME
+
+    -- -- ++ MB MB ++ ++ MM ME ME ME'
+  map_data_loop: 'ME -- ++ ++ -- ME ME ME ++ ++ ++
 
     -- ME ME ME ME ME ME -- SP SP --
 
@@ -49,7 +66,7 @@ map:
     50 50 50 50 50 50 50 50 50 40 50'
   spawn_data:
   - battle: 0
-    enemy: 3
+    enemy: 4
   - battle: 1
     enemy: 3
   - battle: 2
@@ -65,19 +82,6 @@ map:
     boss: 1
   spawn_data_loop:
   - battle: 0
-    enemy: 2
-  - battle: 1
-    enemy: 3
-  - battle: 2
-    enemy: 2
-  - battle: 3
-    enemy: 2
-  - battle: 4
-    enemy: 1
-  - battle: 5
-    enemy: 1
-  - battle: 6
-  - battle: 7
     boss: 1
 config:
   MAP_HAS_MAP_STORY: false
@@ -97,9 +101,8 @@ enemy_filter: 1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M
 battles:
   0:
     steps:
-    - tag: clear_filtered_enemy
-      preserve: 0
-    - tag: default_battle
+    - tag: clear_boss
+      strategy: fleet_boss
   3:
     steps:
     - tag: clear_filtered_enemy
@@ -185,133 +188,7 @@ mechanics:
     kind: flare
     tag: map_item
   map_interactions: []
-  map_mutations:
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: F1
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: H1
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: D2
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: E2
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: G2
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: H2
-    attribute: may_enemy
-    value: true
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: D3
-    attribute: may_enemy
-    value: true
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: I3
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: B4
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: E4
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: I6
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: D7
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: E7
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: F7
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: I7
-    attribute: may_enemy
-    value: true
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: B8
-    attribute: may_enemy
-    value: true
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: E8
-    attribute: may_enemy
-    value: true
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: G8
-    attribute: may_enemy
-    value: true
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: K8
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: I9
-    attribute: may_enemy
-    value: false
-  - phase: map_data_init
-    variant: normal
-    battle: null
-    cell: K9
-    attribute: may_enemy
-    value: false
+  map_mutations: []
   moving_enemies:
     turns: []
     normal_turns: []

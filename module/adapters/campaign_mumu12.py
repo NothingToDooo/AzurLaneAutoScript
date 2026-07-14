@@ -238,6 +238,7 @@ def compile_campaign_map(definition: CampaignStageDefinition) -> CampaignMap:
     source = definition.map
     compiled = CampaignMap(source.name)
     compiled.shape = location2node((source.shape.columns - 1, source.shape.rows - 1))
+    compiled.map_covered = [location2node((cell.x, cell.y)) for cell in source.map_covered]
     compiled.map_data = _variant_text(source.normal, "token")
     compiled.map_data_loop = _variant_text(source.loop, "token")
     compiled.weight_data = _variant_text(source.normal, "weight")

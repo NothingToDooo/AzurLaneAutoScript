@@ -116,7 +116,7 @@ def test_every_manifest_stage_resolves_an_explicit_profile() -> None:
     packs = load_event_manifests(ROOT / "content" / "events")
     specs = tuple(stage for pack in packs for stage in pack.stages)
 
-    assert len(specs) == 1202
+    assert len(specs) == 1203
     assert all(spec.runtime_profile_id.value != "" for spec in specs)
     assert all(registry.resolve(spec.runtime_profile_id) for spec in specs)
 

@@ -17,6 +17,7 @@ from module.exception import ScriptError
 class _Device:
     def __init__(self) -> None:
         self.commands: list[tuple[str | int, ...]] = []
+        self.checked_failures: set[tuple[str | int, ...]] = set()
         self.current_ime = "com.sohu.inputmethod/.SogouIME"
 
     def adb_shell(self, command: list[str | int]) -> str:
@@ -28,6 +29,13 @@ class _Device:
         if command[:2] == ["ime", "set"]:
             self.current_ime = str(command[2])
         return "Broadcast completed: result=0"
+
+    def adb_shell_checked(self, command: list[str | int]) -> str:
+        normalized = tuple(command)
+        if normalized in self.checked_failures:
+            message = f"ADB shell command failed: {normalized}"
+            raise OSError(message)
+        return self.adb_shell(command)
 
 
 class _EquipmentCodeHarness(EquipmentCodeHandler):
@@ -172,6 +180,17 @@ def test_fast_input_ime_uses_adb_and_restores_previous_ime() -> None:
     assert ("ime", "enable", FAST_INPUT_IME) in device.commands
     assert ("am", "broadcast", "-a", "ADB_INPUT_TEXT", "--es", "text", "encoded") in device.commands
     assert ("am", "broadcast", "-a", "ADB_EDITOR_CODE", "--ei", "code", 6) in device.commands
+
+
+def test_fast_input_ime_surfaces_checked_shell_failure() -> None:
+    handler = _handler()
+    device = cast("_Device", handler.device)
+    device.checked_failures.add(("ime", "set", FAST_INPUT_IME))
+
+    with pytest.raises(ScriptError, match="Unable to set FastInputIME"):
+        handler.exercise_fast_input()
+
+    assert not any(command[:3] == ("am", "broadcast", "-a") for command in device.commands)
 
 
 def test_equipment_code_shape_validation() -> None:

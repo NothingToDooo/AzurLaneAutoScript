@@ -269,13 +269,13 @@ FLEET_DETAIL_ENTER_FLAGSHIP = Button(
 )
 FLEET_ENTER = Button(
     area=(502, 474, 517, 489),
-    color=(58, 62, 77),
+    color=(165, 193, 232),
     button=(502, 474, 517, 489),
     file="./assets/cn/equipment/FLEET_ENTER.png",
 )
 FLEET_ENTER_FLAGSHIP = Button(
     area=(577, 277, 605, 291),
-    color=(132, 124, 128),
+    color=(219, 196, 174),
     button=(577, 277, 605, 291),
     file="./assets/cn/equipment/FLEET_ENTER_FLAGSHIP.png",
 )

@@ -1,4 +1,4 @@
-from typing import ClassVar, TypeVar
+from typing import ClassVar, TypeVar, cast
 
 import pytest
 
@@ -7,10 +7,17 @@ from module.private_quarters import interact as interact_module
 from module.private_quarters.interact import PQInteract
 
 _T = TypeVar("_T")
+EXPECTED_INTERACT_OFFSET = (-10, 0, 0, 65)
 
 
 def button_key(button: object) -> str:
     return getattr(button, "name", repr(button))
+
+
+def recorded_offset(call: tuple[object, ...]) -> object:
+    kwargs = call[2]
+    assert isinstance(kwargs, dict)
+    return cast("dict[str, object]", kwargs)["offset"]
 
 
 class _Timer:
@@ -61,6 +68,9 @@ class _PrivateQuarters(PQInteract):
     def interact_once(self) -> None:
         self._pq_interact_once()
 
+    def goto_room_exit(self) -> None:
+        self._pq_goto_room_exit()
+
     @staticmethod
     def _next_result(results: list[_T], *, default: _T) -> _T:
         if results:
@@ -79,6 +89,13 @@ class _PrivateQuarters(PQInteract):
 
     def interval_clear(self, button: object, *_args: object, **_kwargs: object) -> None:
         self.calls.append(("interval_clear", button))
+
+    def ui_click(self, *args: object, **kwargs: object) -> None:
+        self.calls.append(("ui_click", args, kwargs))
+
+    def handle_info_bar(self) -> bool:
+        self.calls.append(("handle_info_bar",))
+        return False
 
 
 class _TrackingPrivateQuarters(PQInteract):
@@ -114,6 +131,12 @@ def test_pq_wait_interact_button_clicks_target_until_ready() -> None:
 
     assert pq.device.clicks == [pq_assets.PRIVATE_QUARTERS_ROOM_TARGET_CLICK_AREA]
     assert pq.device.screenshot_count == 1
+    assert getattr(interact_module, "PRIVATE_QUARTERS_INTERACT_OFFSET", None) == EXPECTED_INTERACT_OFFSET
+    offsets = [recorded_offset(call) for call in pq.calls if call[1] == button_key(pq_assets.PRIVATE_QUARTERS_INTERACT)]
+    assert offsets == [
+        EXPECTED_INTERACT_OFFSET,
+        EXPECTED_INTERACT_OFFSET,
+    ]
 
 
 def test_pq_interact_once_enters_and_leaves_confirm() -> None:
@@ -129,6 +152,25 @@ def test_pq_interact_once_enters_and_leaves_confirm() -> None:
         [pq_assets.PRIVATE_QUARTERS_INTERACT_CHECK, pq_assets.PRIVATE_QUARTERS_INTERACT],
     ) in pq.calls
     assert pq_assets.PRIVATE_QUARTERS_ROOM_BACK in pq.device.clicks
+    assert [
+        recorded_offset(call)
+        for call in pq.calls
+        if call[0] in {"appear", "appear_then_click"} and call[1] == button_key(pq_assets.PRIVATE_QUARTERS_INTERACT)
+    ] == [EXPECTED_INTERACT_OFFSET, EXPECTED_INTERACT_OFFSET, EXPECTED_INTERACT_OFFSET]
+
+
+def test_pq_goto_room_exit_uses_shared_interact_offset() -> None:
+    pq = _PrivateQuarters()
+    pq.appear_results[button_key(pq_assets.PRIVATE_QUARTERS_ROOM_CHECK)] = [False]
+    pq.appear_results[button_key(pq_assets.PRIVATE_QUARTERS_INTERACT)] = [True]
+
+    pq.goto_room_exit()
+
+    assert [
+        recorded_offset(call)
+        for call in pq.calls
+        if call[0] == "appear" and call[1] == button_key(pq_assets.PRIVATE_QUARTERS_INTERACT)
+    ] == [EXPECTED_INTERACT_OFFSET]
 
 
 def test_pq_interact_runs_three_rounds_then_exits() -> None:
