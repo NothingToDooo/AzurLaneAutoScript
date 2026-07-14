@@ -299,29 +299,6 @@ def apply_world_task_spec(
     config.apply_runtime_overlay(**overrides)
 
 
-def _step(  # noqa: PLR0913 - 单一构造点保持 UI evidence 到闭合 report 字段的一一映射。
-    operation: WorldOperation,
-    status: WorldTaskStatus,
-    *,
-    completed_units: int = 0,
-    cursor: WorldZoneCursor | WorldMissionCursor | WorldBossCursor | None = None,
-    retry_at: datetime | None = None,
-    retry_after: timedelta | None = None,
-    has_surplus_yellow_coins: bool = False,
-    exploration_in_progress: bool = False,
-) -> LiveOpsiStep:
-    return LiveOpsiStep(
-        operation=operation,
-        status=status,
-        completed_units=completed_units,
-        cursor=cursor,
-        retry_at=retry_at,
-        retry_after=retry_after,
-        has_surplus_yellow_coins=has_surplus_yellow_coins,
-        exploration_in_progress=exploration_in_progress,
-    )
-
-
 class Mumu12OperationSirenSession(OperationSiren):
     _live_cross_settings: CrossMonthSettings | None = None
 
@@ -360,10 +337,10 @@ class Mumu12OperationSirenSession(OperationSiren):
     def _live_explore_step(self) -> LiveOpsiStep:
         order = self._os_explore_order()
         if not order:
-            return _step(WorldOperation.EXPLORE, WorldTaskStatus.COMPLETED)
+            return LiveOpsiStep(WorldOperation.EXPLORE, WorldTaskStatus.COMPLETED)
         zone_id = order[0]
         if self._skip_cleared_os_explore_zone(zone_id):
-            return _step(
+            return LiveOpsiStep(
                 WorldOperation.EXPLORE,
                 WorldTaskStatus.IN_PROGRESS,
                 completed_units=1,
@@ -371,7 +348,7 @@ class Mumu12OperationSirenSession(OperationSiren):
             )
         self._os_explore_failed_zone = []
         self._run_os_explore_zone(zone_id)
-        return _step(
+        return LiveOpsiStep(
             WorldOperation.EXPLORE,
             WorldTaskStatus.IN_PROGRESS,
             completed_units=1,
@@ -412,28 +389,28 @@ class Mumu12OperationSirenSession(OperationSiren):
         if settings.use_tuning_samples:
             self.tuning_sample_use()
         if not settings.do_missions:
-            return _step(WorldOperation.DAILY, WorldTaskStatus.COMPLETED)
+            return LiveOpsiStep(WorldOperation.DAILY, WorldTaskStatus.COMPLETED)
         if self.is_in_opsi_explore():
-            return _step(WorldOperation.DAILY, WorldTaskStatus.EXPLORE_IN_PROGRESS)
+            return LiveOpsiStep(WorldOperation.DAILY, WorldTaskStatus.EXPLORE_IN_PROGRESS)
         accepted_all = self.os_mission_overview_accept()
         self.zone_init()
         mission = self._finish_one_mission(question=True, rescan=None)
         if mission is not None:
-            return _step(
+            return LiveOpsiStep(
                 WorldOperation.DAILY,
                 WorldTaskStatus.IN_PROGRESS,
                 completed_units=1,
                 cursor=mission,
             )
         if accepted_all:
-            return _step(WorldOperation.DAILY, WorldTaskStatus.COMPLETED)
-        return _step(WorldOperation.DAILY, WorldTaskStatus.FAILED, retry_after=_MISSION_RETRY)
+            return LiveOpsiStep(WorldOperation.DAILY, WorldTaskStatus.COMPLETED)
+        return LiveOpsiStep(WorldOperation.DAILY, WorldTaskStatus.FAILED, retry_after=_MISSION_RETRY)
 
     def _live_obscure_step(self, settings: ObscureSettings) -> LiveOpsiStep:
         self.cl1_ap_preserve()
         found = self.storage_get_next_item("OBSCURE", use_logger=self.config.OpsiGeneral_UseLogger)
         if not found:
-            return _step(WorldOperation.OBSCURE, WorldTaskStatus.EMPTY)
+            return LiveOpsiStep(WorldOperation.OBSCURE, WorldTaskStatus.EMPTY)
         self.config.apply_runtime_overlay(OpsiGeneral_DoRandomMapEvent=False, HOMO_EDGE_DETECT=False, STORY_OPTION=0)
         self.zone_init()
         zone_id = self.zone.zone_id
@@ -443,8 +420,8 @@ class Mumu12OperationSirenSession(OperationSiren):
         self.map_exit()
         self.handle_after_auto_search()
         if not settings.force_run:
-            return _step(WorldOperation.OBSCURE, WorldTaskStatus.COMPLETED, completed_units=1)
-        return _step(
+            return LiveOpsiStep(WorldOperation.OBSCURE, WorldTaskStatus.COMPLETED, completed_units=1)
+        return LiveOpsiStep(
             WorldOperation.OBSCURE,
             WorldTaskStatus.IN_PROGRESS,
             completed_units=1,
@@ -456,14 +433,14 @@ class Mumu12OperationSirenSession(OperationSiren):
         with self.config.temporary(STORY_ALLOW_SKIP=False):
             found = self.storage_get_next_item("ABYSSAL", use_logger=self.config.OpsiGeneral_UseLogger)
         if not found:
-            return _step(WorldOperation.ABYSSAL, WorldTaskStatus.EMPTY)
+            return LiveOpsiStep(WorldOperation.ABYSSAL, WorldTaskStatus.EMPTY)
         self.config.apply_runtime_overlay(OpsiGeneral_DoRandomMapEvent=False, HOMO_EDGE_DETECT=False, STORY_OPTION=0)
         self.zone_init()
         zone_id = self.zone.zone_id
         if not self.run_abyssal():
-            return _step(WorldOperation.ABYSSAL, WorldTaskStatus.FAILED)
+            return LiveOpsiStep(WorldOperation.ABYSSAL, WorldTaskStatus.FAILED)
         self.fleet_repair(revert=False)
-        return _step(
+        return LiveOpsiStep(
             WorldOperation.ABYSSAL,
             WorldTaskStatus.IN_PROGRESS,
             completed_units=1,
@@ -472,10 +449,10 @@ class Mumu12OperationSirenSession(OperationSiren):
 
     def _live_archive_step(self) -> LiveOpsiStep:
         if self.is_in_opsi_explore():
-            return _step(WorldOperation.ARCHIVE, WorldTaskStatus.EXPLORE_IN_PROGRESS)
+            return LiveOpsiStep(WorldOperation.ARCHIVE, WorldTaskStatus.EXPLORE_IN_PROGRESS)
         mission = self._finish_one_mission(question=False, rescan=False)
         if mission is not None:
-            return _step(
+            return LiveOpsiStep(
                 WorldOperation.ARCHIVE,
                 WorldTaskStatus.IN_PROGRESS,
                 completed_units=1,
@@ -486,8 +463,8 @@ class Mumu12OperationSirenSession(OperationSiren):
         bought = shop.run_once()
         self._os_voucher_exit()
         if not bought:
-            return _step(WorldOperation.ARCHIVE, WorldTaskStatus.COMPLETED)
-        return _step(
+            return LiveOpsiStep(WorldOperation.ARCHIVE, WorldTaskStatus.COMPLETED)
+        return LiveOpsiStep(
             WorldOperation.ARCHIVE,
             WorldTaskStatus.IN_PROGRESS,
             completed_units=1,
@@ -500,16 +477,16 @@ class Mumu12OperationSirenSession(OperationSiren):
         self.globe_update()
         zone = self.find_siren_stronghold()
         if zone is None:
-            return _step(WorldOperation.STRONGHOLD, WorldTaskStatus.EMPTY)
+            return LiveOpsiStep(WorldOperation.STRONGHOLD, WorldTaskStatus.EMPTY)
         zone_id = zone.zone_id
         self.globe_enter(zone)
         self.zone_init()
         self.os_order_execute(recon_scan=True, submarine_call=False)
         if not self.run_stronghold():
-            return _step(WorldOperation.STRONGHOLD, WorldTaskStatus.FAILED)
+            return LiveOpsiStep(WorldOperation.STRONGHOLD, WorldTaskStatus.FAILED)
         self.fleet_repair(revert=False)
         self.handle_fleet_resolve(revert=False)
-        return _step(
+        return LiveOpsiStep(
             WorldOperation.STRONGHOLD,
             WorldTaskStatus.IN_PROGRESS,
             completed_units=1,
@@ -521,7 +498,7 @@ class Mumu12OperationSirenSession(OperationSiren):
         settings: MonthBossSettings,
     ) -> LiveOpsiStep:
         if self.is_in_opsi_explore():
-            return _step(WorldOperation.MONTH_BOSS, WorldTaskStatus.EXPLORE_IN_PROGRESS)
+            return LiveOpsiStep(WorldOperation.MONTH_BOSS, WorldTaskStatus.EXPLORE_IN_PROGRESS)
         self.os_mission_enter()
         if self.appear(OS_MONTHBOSS_NORMAL, offset=(20, 20)):
             phase = WorldBossPhase.NORMAL
@@ -531,34 +508,34 @@ class Mumu12OperationSirenSession(OperationSiren):
             is_normal = False
         else:
             self.os_mission_quit()
-            return _step(WorldOperation.MONTH_BOSS, WorldTaskStatus.EMPTY)
+            return LiveOpsiStep(WorldOperation.MONTH_BOSS, WorldTaskStatus.EMPTY)
         self.os_mission_quit()
         if not is_normal and settings.mode is MonthBossMode.NORMAL:
-            return _step(WorldOperation.MONTH_BOSS, WorldTaskStatus.COMPLETED)
+            return LiveOpsiStep(WorldOperation.MONTH_BOSS, WorldTaskStatus.COMPLETED)
         if settings.check_adaptability:
             self.os_map_goto_globe(unpin=False)
             adaptability = self.get_adaptability()
             if (np.array(adaptability) < (203, 203, 156)).any():
-                return _step(WorldOperation.MONTH_BOSS, WorldTaskStatus.RESOURCE_LIMIT)
+                return LiveOpsiStep(WorldOperation.MONTH_BOSS, WorldTaskStatus.RESOURCE_LIMIT)
         self.globe_goto(154)
         self.go_month_boss_room(is_normal=is_normal)
         cleared = self.boss_clear(has_fleet_step=True, is_month=True)
         self.fleet_repair(revert=False)
         self.handle_fleet_resolve(revert=False)
         if not cleared:
-            return _step(WorldOperation.MONTH_BOSS, WorldTaskStatus.FAILED)
+            return LiveOpsiStep(WorldOperation.MONTH_BOSS, WorldTaskStatus.FAILED)
         if is_normal and settings.mode is MonthBossMode.NORMAL_HARD:
-            return _step(
+            return LiveOpsiStep(
                 WorldOperation.MONTH_BOSS,
                 WorldTaskStatus.IN_PROGRESS,
                 completed_units=1,
                 cursor=WorldBossCursor(phase),
             )
-        return _step(WorldOperation.MONTH_BOSS, WorldTaskStatus.COMPLETED, completed_units=1)
+        return LiveOpsiStep(WorldOperation.MONTH_BOSS, WorldTaskStatus.COMPLETED, completed_units=1)
 
     def _live_meowfficer_step(self) -> LiveOpsiStep:
         if self.is_in_opsi_explore():
-            return _step(WorldOperation.MEOWFFICER_FARMING, WorldTaskStatus.EXPLORE_IN_PROGRESS)
+            return LiveOpsiStep(WorldOperation.MEOWFFICER_FARMING, WorldTaskStatus.EXPLORE_IN_PROGRESS)
         preserve = min(
             self.get_action_point_limit(),
             self.config.OpsiMeowfficerFarming_ActionPointPreserve,
@@ -576,7 +553,7 @@ class Mumu12OperationSirenSession(OperationSiren):
             )
             cooling = self.nearest_task_cooling_down
             if cooling is not None and get_os_reset_remain() > 0 and isinstance(cooling.next_run, datetime):
-                return _step(
+                return LiveOpsiStep(
                     WorldOperation.MEOWFFICER_FARMING,
                     WorldTaskStatus.COOLDOWN,
                     retry_at=_aware_local(cooling.next_run),
@@ -586,7 +563,7 @@ class Mumu12OperationSirenSession(OperationSiren):
         zone, refresh = self._next_meowfficer_farming_zone()
         zone_id = zone.zone_id
         self._run_meowfficer_farming_zone(zone, refresh=refresh)
-        return _step(
+        return LiveOpsiStep(
             WorldOperation.MEOWFFICER_FARMING,
             WorldTaskStatus.IN_PROGRESS,
             completed_units=1,
@@ -606,7 +583,7 @@ class Mumu12OperationSirenSession(OperationSiren):
         ):
             self.config.OS_ACTION_POINT_PRESERVE = 0
         if self.get_yellow_coins() < self.config.OS_CL1_YELLOW_COINS_PRESERVE:
-            return _step(
+            return LiveOpsiStep(
                 WorldOperation.HAZARD1_LEVELING,
                 WorldTaskStatus.RESOURCE_LIMIT,
                 exploration_in_progress=self.is_in_opsi_explore(),
@@ -615,7 +592,7 @@ class Mumu12OperationSirenSession(OperationSiren):
         keep_current_ap = self.config.OpsiGeneral_BuyActionPointLimit <= 0
         self.action_point_set(cost=70, keep_current_ap=keep_current_ap, check_rest_ap=True)
         if self._action_point_total >= 3000:
-            return _step(
+            return LiveOpsiStep(
                 WorldOperation.HAZARD1_LEVELING,
                 WorldTaskStatus.RESOURCE_LIMIT,
                 exploration_in_progress=self.is_in_opsi_explore(),
@@ -626,7 +603,7 @@ class Mumu12OperationSirenSession(OperationSiren):
         self.fleet_set(self.config.OpsiFleet_Fleet)
         self.run_strategic_search()
         self.handle_after_auto_search()
-        return _step(
+        return LiveOpsiStep(
             WorldOperation.HAZARD1_LEVELING,
             WorldTaskStatus.IN_PROGRESS,
             completed_units=1,
@@ -647,13 +624,13 @@ class Mumu12OperationSirenSession(OperationSiren):
             status = WorldTaskStatus.EMPTY
         self.port_shop_quit()
         self.port_quit()
-        return _step(WorldOperation.SHOP, status, retry_at=_aware_local(retry_at))
+        return LiveOpsiStep(WorldOperation.SHOP, status, retry_at=_aware_local(retry_at))
 
     def _live_voucher_one_shot(self) -> LiveOpsiStep:
         self._os_voucher_enter()
         VoucherShop(self.config, self.device).run()
         self._os_voucher_exit()
-        return _step(WorldOperation.VOUCHER, WorldTaskStatus.COMPLETED)
+        return LiveOpsiStep(WorldOperation.VOUCHER, WorldTaskStatus.COMPLETED)
 
     def _cross_config_int(self, path: str) -> int:
         settings = self._live_cross_settings
@@ -688,7 +665,7 @@ class Mumu12OperationSirenSession(OperationSiren):
             message = f"invalid Operation Siren reset: {next_reset} < {now}"
             raise RuntimeError(message)
         if next_reset - now > _CROSS_MONTH_LEAD:
-            return _step(
+            return LiveOpsiStep(
                 WorldOperation.CROSS_MONTH,
                 WorldTaskStatus.EMPTY,
                 retry_at=_aware_local(next_reset - _CROSS_MONTH_LEAD),
@@ -699,7 +676,7 @@ class Mumu12OperationSirenSession(OperationSiren):
             self._clear_opsi_monthly_items()
             self._run_opsi_meowfficer_farming_after_reset()
         except ActionPointLimit:
-            return _step(WorldOperation.CROSS_MONTH, WorldTaskStatus.COMPLETED)
+            return LiveOpsiStep(WorldOperation.CROSS_MONTH, WorldTaskStatus.COMPLETED)
         message = "cross-month farming returned without reaching its action-point boundary"
         raise RuntimeError(message)
 
@@ -743,16 +720,16 @@ class _AshAssistStepRunner(AshBeaconAssist):
                 remain_times = self.digit_ocr_point_and_check(ash_assets.BEACON_REMAIN, 1)
                 if not remain_times:
                     MetaReward(self.config, self.device).run()
-                    return _step(WorldOperation.ASH_ASSIST, WorldTaskStatus.COMPLETED)
+                    return LiveOpsiStep(WorldOperation.ASH_ASSIST, WorldTaskStatus.COMPLETED)
                 self._ensure_meta_level()
                 self._make_an_attack()
-                return _step(
+                return LiveOpsiStep(
                     WorldOperation.ASH_ASSIST,
                     WorldTaskStatus.IN_PROGRESS,
                     completed_units=1,
                 )
             if timeout.reached():
-                return _step(
+                return LiveOpsiStep(
                     WorldOperation.ASH_ASSIST,
                     WorldTaskStatus.EMPTY,
                     retry_after=_ASH_ASSIST_RETRY,
@@ -776,7 +753,7 @@ class _AshBeaconStepRunner(OpsiAshBeacon):
                 continue
             if state is MetaState.INIT:
                 if not self._begin_meta():
-                    return _step(WorldOperation.ASH_BEACON, WorldTaskStatus.EMPTY)
+                    return LiveOpsiStep(WorldOperation.ASH_BEACON, WorldTaskStatus.EMPTY)
                 continue
             if state is MetaState.COMPLETE:
                 return self._complete_meta_reward_step()
@@ -790,7 +767,7 @@ class _AshBeaconStepRunner(OpsiAshBeacon):
         self._handle_ash_beacon_reward()
         if category != "undefined":
             MetaReward(self.config, self.device).run(category=category)
-        return _step(
+        return LiveOpsiStep(
             WorldOperation.ASH_BEACON,
             WorldTaskStatus.IN_PROGRESS,
             completed_units=1,
@@ -799,14 +776,14 @@ class _AshBeaconStepRunner(OpsiAshBeacon):
     def _attacking_meta_step(self) -> LiveOpsiStep | None:
         is_beacon = self.appear(ash_assets.BEACON_LIST, offset=(20, 20))
         if is_beacon and self.config.OpsiAshBeacon_OneHitMode and self._get_meta_damage() > 0:
-            return _step(
+            return LiveOpsiStep(
                 WorldOperation.ASH_BEACON,
                 WorldTaskStatus.COOLDOWN,
                 retry_after=_ASH_BEACON_ONE_HIT_RETRY,
             )
         is_dossier = self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20))
         if is_dossier and self.appear(ash_assets.META_AUTO_ATTACKING, offset=(20, 20)):
-            return _step(
+            return LiveOpsiStep(
                 WorldOperation.ASH_BEACON,
                 WorldTaskStatus.COOLDOWN,
                 retry_after=_ASH_BEACON_AUTO_RETRY,
@@ -814,13 +791,13 @@ class _AshBeaconStepRunner(OpsiAshBeacon):
         if not self._pre_attack():
             return None
         if is_dossier and self.appear(ash_assets.META_AUTO_ATTACKING, offset=(20, 20)):
-            return _step(
+            return LiveOpsiStep(
                 WorldOperation.ASH_BEACON,
                 WorldTaskStatus.IN_PROGRESS,
                 completed_units=1,
             )
         self._make_an_attack()
-        return _step(
+        return LiveOpsiStep(
             WorldOperation.ASH_BEACON,
             WorldTaskStatus.IN_PROGRESS,
             completed_units=1,
@@ -870,7 +847,7 @@ class _Mumu12OpsiExecutor(OpsiUiStepExecutor):
             surplus = False
             if spec.operation is WorldOperation.MEOWFFICER_FARMING:
                 surplus = runner.get_yellow_coins() > runner.config.OS_CL1_YELLOW_COINS_PRESERVE
-            return _step(
+            return LiveOpsiStep(
                 spec.operation,
                 WorldTaskStatus.ACTION_POINT_LIMIT,
                 has_surplus_yellow_coins=surplus,

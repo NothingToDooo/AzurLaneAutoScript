@@ -402,6 +402,40 @@ def test_live_step_rejects_more_than_one_safe_unit() -> None:
         LiveOpsiStep(WorldOperation.EXPLORE, WorldTaskStatus.IN_PROGRESS, completed_units=2)
 
 
+def test_live_step_requires_one_confirmed_unit_for_in_progress() -> None:
+    with pytest.raises(ValueError, match="exactly one safe unit"):
+        LiveOpsiStep(WorldOperation.EXPLORE, WorldTaskStatus.IN_PROGRESS)
+
+
+def test_live_step_requires_an_aware_absolute_retry_time() -> None:
+    with pytest.raises(ValueError, match="retry_at must be timezone-aware"):
+        LiveOpsiStep(
+            WorldOperation.EXPLORE,
+            WorldTaskStatus.EMPTY,
+            retry_at=datetime(2026, 7, 14),
+        )
+
+
+@pytest.mark.parametrize("retry_after", [timedelta(), timedelta(seconds=-1)])
+def test_live_step_requires_a_positive_relative_retry_time(retry_after: timedelta) -> None:
+    with pytest.raises(ValueError, match="retry_after must be positive"):
+        LiveOpsiStep(
+            WorldOperation.EXPLORE,
+            WorldTaskStatus.EMPTY,
+            retry_after=retry_after,
+        )
+
+
+def test_live_step_accepts_only_one_retry_representation() -> None:
+    with pytest.raises(ValueError, match="retry_at and retry_after are mutually exclusive"):
+        LiveOpsiStep(
+            WorldOperation.EXPLORE,
+            WorldTaskStatus.EMPTY,
+            retry_at=_NOW,
+            retry_after=timedelta(minutes=1),
+        )
+
+
 def test_definition_coverage_matches_live_settings_fixture() -> None:
     assert {definition.operation for definition in WORLD_TASK_DEFINITIONS.values()} == set(WorldOperation)
     assert {_spec(operation).operation for operation in WorldOperation} == set(WorldOperation)
