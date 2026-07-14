@@ -105,6 +105,53 @@ _BALANCER_SETTINGS: dict[str, FrozenJsonValue] = {
     "retry_seconds": 300,
 }
 _ACTIVITY_CATALOG = ActivityCatalog(load_event_manifests(Path("content/events")))
+_VALID_SETTINGS_BY_COMMAND: dict[str, dict[str, FrozenJsonValue]] = {
+    "minigame": {
+        "game": "new_year_challenge",
+        "operation_limit": 10,
+        "schedule": _SERVER_UPDATE_SETTINGS,
+    },
+    "event_story": {"event": "event_20260625_cn", "skip_battle": True},
+    "raid_daily": {
+        "event": "raid_20260212",
+        "stages": ("hard", "normal", "easy", "ex"),
+        "use_ticket": False,
+        "collect_daily_mission": True,
+        "policy": _POLICY_SETTINGS,
+        "schedule": _SERVER_UPDATE_SETTINGS,
+    },
+    "maritime_escort": {"policy": _POLICY_SETTINGS, "schedule": _SERVER_UPDATE_SETTINGS},
+    "raid": {
+        "event": "raid_20260212",
+        "mode": "hard",
+        "use_ticket": False,
+        "policy": _POLICY_SETTINGS,
+        "run_limit": None,
+        "balancer": _BALANCER_SETTINGS,
+    },
+    "hospital": {
+        "use_recommended_fleet": True,
+        "policy": _POLICY_SETTINGS,
+        "schedule": _SERVER_UPDATE_SETTINGS,
+    },
+    "coalition": {
+        "event": "coalition_20260122",
+        "stage": "hard",
+        "fleet": "single",
+        "policy": _POLICY_SETTINGS,
+        "run_limit": None,
+        "balancer": _BALANCER_SETTINGS,
+    },
+    "coalition_sp": {
+        "event": "coalition_20260122",
+        "stage": "sp",
+        "fleet": "multi",
+        "policy": _POLICY_SETTINGS,
+        "schedule": _SERVER_UPDATE_SETTINGS,
+    },
+    "daemon": {"enter_map": True},
+    "opsi_daemon": {"repair_ship": True, "select_enemy": False},
+}
 
 
 def _minigame_state(payload: object, *, schema_version: int = 1) -> TaskStateDocument:
@@ -250,58 +297,8 @@ def _task_context(
     )
 
 
-def _valid_settings(command: str) -> dict[str, FrozenJsonValue]:  # noqa: C901, PLR0911
-    if command == "minigame":
-        return {
-            "game": "new_year_challenge",
-            "operation_limit": 10,
-            "schedule": _SERVER_UPDATE_SETTINGS,
-        }
-    if command == "event_story":
-        return {"event": "event_20260625_cn", "skip_battle": True}
-    if command == "raid_daily":
-        return {
-            "event": "raid_20260212",
-            "stages": ("hard", "normal", "easy", "ex"),
-            "use_ticket": False,
-            "collect_daily_mission": True,
-            "policy": _POLICY_SETTINGS,
-            "schedule": _SERVER_UPDATE_SETTINGS,
-        }
-    if command == "maritime_escort":
-        return {"policy": _POLICY_SETTINGS, "schedule": _SERVER_UPDATE_SETTINGS}
-    if command == "raid":
-        return {
-            "event": "raid_20260212",
-            "mode": "hard",
-            "use_ticket": False,
-            "policy": _POLICY_SETTINGS,
-            "run_limit": None,
-            "balancer": _BALANCER_SETTINGS,
-        }
-    if command == "hospital":
-        return {
-            "use_recommended_fleet": True,
-            "policy": _POLICY_SETTINGS,
-            "schedule": _SERVER_UPDATE_SETTINGS,
-        }
-    if command in {"coalition", "coalition_sp"}:
-        settings: dict[str, FrozenJsonValue] = {
-            "event": "coalition_20260122",
-            "stage": "hard" if command == "coalition" else "sp",
-            "fleet": "single" if command == "coalition" else "multi",
-            "policy": _POLICY_SETTINGS,
-        }
-        if command == "coalition":
-            settings.update({"run_limit": None, "balancer": _BALANCER_SETTINGS})
-        else:
-            settings["schedule"] = _SERVER_UPDATE_SETTINGS
-        return settings
-    if command == "daemon":
-        return {"enter_map": True}
-    if command == "opsi_daemon":
-        return {"repair_ship": True, "select_enemy": False}
-    return {}
+def _valid_settings(command: str) -> dict[str, FrozenJsonValue]:
+    return dict(_VALID_SETTINGS_BY_COMMAND.get(command, {}))
 
 
 @pytest.mark.parametrize(

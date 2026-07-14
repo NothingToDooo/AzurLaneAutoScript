@@ -93,15 +93,22 @@ class _Runtime:
         self.equipment_has_take_on = True
         self.screenshot_count = 0
         self.device = _Device(self)
-        self.goto_calls: list[tuple[object, str]] = []
+        self.goto_calls: list[tuple[object, str, bool | None, bool | None]] = []
         self.appear_calls: list[tuple[object, tuple[int, int]]] = []
         self.potential_boss_calls = 0
         self.equipment_take_off_calls = 0
         self.ui_back_calls: list[tuple[object, object]] = []
         self.retirement_calls = 0
 
-    def _goto(self, location: object, expected: str = "") -> None:
-        self.goto_calls.append((location, expected))
+    def goto(
+        self,
+        location: object,
+        expected: str = "",
+        *,
+        step_optimize: bool | None = None,
+        turning_optimize: bool | None = None,
+    ) -> None:
+        self.goto_calls.append((location, expected, step_optimize, turning_optimize))
 
     def appear(self, button: object, *, offset: tuple[int, int]) -> bool:
         self.appear_calls.append((button, offset))
@@ -220,7 +227,7 @@ def test_clear_boss_combines_candidates_and_chooses_lowest_weight_then_cost() ->
             lambda: False,
         )
 
-    assert runtime.goto_calls == [(possible, "boss")]
+    assert runtime.goto_calls == [(possible, "boss", False, False)]
     assert runtime.potential_boss_calls == 0
 
 

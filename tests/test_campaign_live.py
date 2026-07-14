@@ -1530,7 +1530,7 @@ class _Fleet:
         self.name = name
 
     def clear_chosen_enemy(self, grid: _Grid, expected: str = "") -> object:
-        return self.runtime._clear(self.name, grid, expected)  # noqa: SLF001
+        return self.runtime.clear(self.name, grid, expected)
 
 
 class _Runtime:
@@ -1583,9 +1583,9 @@ class _Runtime:
         return self.roadblocks
 
     def clear_chosen_enemy(self, grid: _Grid, expected: str = "") -> object:
-        return self._clear("map", grid, expected)
+        return self.clear("map", grid, expected)
 
-    def _clear(self, executor: str, grid: _Grid, expected: str) -> object:
+    def clear(self, executor: str, grid: _Grid, expected: str) -> object:
         self.calls.append(("clear", executor, grid.label, expected))
         self.battle_count += self.confirmed_delta
         if self.action_error is not None:

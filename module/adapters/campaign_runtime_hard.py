@@ -56,7 +56,14 @@ class _HardRuntimeHost(Protocol):
     ENTRANCE: object
     equipment_has_take_on: bool
 
-    def _goto(self, location: object, expected: str = "") -> None: ...
+    def goto(
+        self,
+        location: object,
+        expected: str = "",
+        *,
+        step_optimize: bool | None = None,
+        turning_optimize: bool | None = None,
+    ) -> None: ...
 
     def appear(self, button: object, *, offset: tuple[int, int]) -> bool: ...
 
@@ -132,8 +139,8 @@ class CampaignClearModeExecutor(RuntimeExecutorInstance):
             logger.hr("Clear BOSS")
             grids = grids.sort("weight", "cost")
             logger.info(f"Grids: {grids}")
-            # 困难模式的旧扩展契约以 `_goto` 作为唯一移动入口。
-            host._goto(grids[0], expected="boss")  # noqa: SLF001
+            # 困难模式直接点击 Boss 格，不启用路径与转向优化。
+            host.goto(grids[0], expected="boss", step_optimize=False, turning_optimize=False)
             raise CampaignEnd(HARD_BOSS_CLEAR_MESSAGE)
 
         logger.warning("BOSS not detected, trying all boss spawn point.")

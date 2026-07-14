@@ -102,7 +102,15 @@ class RuntimeConfigurationControl:
         store = SQLiteStateStore(state_path)
         self._store = store
         try:
-            self._initialize(factories, clock, source, signal, initial, error_reporter)
+            self._publisher = ConfigurationPublisher(store=store, factories=factories, clock=clock)
+            self._source = source
+            self._signal = signal
+            self._assembly_revision = initial.assembly_revision
+            self._device_serial = initial.device_serial
+            self._error_reporter = error_reporter
+            self._last_error: Exception | None = None
+            self._closed = False
+            self._synchronize(initial)
         except BaseException:
             store.close()
             raise
@@ -130,25 +138,6 @@ class RuntimeConfigurationControl:
             return False
         self._last_error = None
         return changed
-
-    def _initialize(  # noqa: PLR0913, PLR0917
-        self,
-        factories: TaskFactoryRegistry,
-        clock: ConfigurationClock,
-        source: RuntimeConfigurationSource,
-        signal: ConfigurationChangeSignal,
-        initial: RuntimeConfigurationSnapshot,
-        error_reporter: Callable[[Exception], object],
-    ) -> None:
-        self._publisher = ConfigurationPublisher(store=self._store, factories=factories, clock=clock)
-        self._source = source
-        self._signal = signal
-        self._assembly_revision = initial.assembly_revision
-        self._device_serial = initial.device_serial
-        self._error_reporter = error_reporter
-        self._last_error: Exception | None = None
-        self._closed = False
-        self._synchronize(initial)
 
     def _load_candidate(self) -> RuntimeConfigurationSnapshot:
         candidate = self._source.load()

@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, cast, override
 
+import pytest
+
 from module.application import ExecutionMode, Succeeded, Task, TaskContext, TaskResult
 from module.bootstrap.assembly_source import ConfigurationFileSignal
 from module.runtime import (
@@ -10,6 +12,7 @@ from module.runtime import (
     RuntimeConfigurationSnapshot,
     RuntimeRestartRequiredError,
     SettingsDecoder,
+    SettingsDocumentError,
     TaskFactoryRegistry,
     TypedTaskFactory,
 )
@@ -18,8 +21,6 @@ from module.task_registry import LaunchSurface, TaskDefinition, TaskDomain
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    import pytest
 
     from module.state import ConfigurationSourceSnapshot, JsonValue
 
@@ -130,6 +131,28 @@ def _control(
         initial=initial,
         error_reporter=errors.append,
     )
+
+
+def test_initial_publish_failure_closes_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    closed_stores: list[SQLiteStateStore] = []
+    original_close = SQLiteStateStore.close
+
+    def record_close(store: SQLiteStateStore) -> None:
+        closed_stores.append(store)
+        original_close(store)
+
+    monkeypatch.setattr(SQLiteStateStore, "close", record_close)
+
+    with pytest.raises(SettingsDocumentError, match="must be a boolean"):
+        _control(
+            tmp_path / "state.sqlite3",
+            _Source(_snapshot("source:next")),
+            _Signal(),
+            _snapshot("source:invalid", flag=1),
+            [],
+        )
+
+    assert len(closed_stores) == 1
 
 
 def test_unrelated_source_update_preserves_runtime_schedule(tmp_path: Path) -> None:
