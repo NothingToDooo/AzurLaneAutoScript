@@ -78,6 +78,7 @@ class CompiledConfiguration:
     schedules: tuple[ScheduleMutation, ...]
     device_serial: str
     source_revision: str
+    assembly_revision: str
 
     def __post_init__(self) -> None:
         if not isinstance(self.payload, dict):
@@ -91,12 +92,16 @@ class CompiledConfiguration:
         if not isinstance(self.device_serial, str) or not self.device_serial.strip():
             message = "device_serial must be a non-empty string"
             raise ValueError(message)
-        if not isinstance(self.source_revision, str):
-            message = "source_revision must be a string"
-            raise TypeError(message)
-        if re.fullmatch(r"sha256:[0-9a-f]{64}", self.source_revision) is None:
-            message = "source_revision must be a canonical sha256 revision"
-            raise ValueError(message)
+        for field_name, revision in (
+            ("source_revision", self.source_revision),
+            ("assembly_revision", self.assembly_revision),
+        ):
+            if not isinstance(revision, str):
+                message = f"{field_name} must be a string"
+                raise TypeError(message)
+            if re.fullmatch(r"sha256:[0-9a-f]{64}", revision) is None:
+                message = f"{field_name} must be a canonical sha256 revision"
+                raise ValueError(message)
 
 
 def _source_revision(payload: JsonValue, schedules: tuple[ScheduleMutation, ...]) -> str:
@@ -120,6 +125,30 @@ def _source_revision(payload: JsonValue, schedules: tuple[ScheduleMutation, ...]
         separators=(",", ":"),
         sort_keys=True,
     ).encode()
+    return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def _assembly_revision(view: _ConfigView) -> str:
+    """只摘要进程组装时绑定、不能在任务安全点替换的配置平面。"""
+
+    projection = {
+        "Alas": dict(view.mapping("Alas")),
+        "General": dict(view.mapping("General")),
+    }
+    try:
+        encoded = json.dumps(
+            {
+                "format": "alas-instance-assembly-v1",
+                "configuration": projection,
+            },
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode()
+    except (TypeError, ValueError) as error:
+        message = "$.Alas and $.General must contain canonical JSON values"
+        raise ConfigurationCompileError(message) from error
     return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
 
 
@@ -203,6 +232,7 @@ class WebConfigurationCompiler:
             schedules=schedules,
             device_serial=view.value("Alas", "Emulator", "Serial", expected=str),
             source_revision=_source_revision(payload, schedules),
+            assembly_revision=_assembly_revision(view),
         )
 
     def _schedule(self, view: _ConfigView, config_name: str) -> dict[str, JsonValue]:

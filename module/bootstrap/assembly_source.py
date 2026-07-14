@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import timedelta
@@ -13,7 +14,7 @@ from module.bootstrap.configuration_compiler import (
 )
 from module.bootstrap.runtime_provider import InstanceAssembly, InstanceAssemblySource
 from module.bootstrap.task_factories import GameTaskDependencies
-from module.runtime import InstanceRuntimeConfig
+from module.runtime import ConfigurationChangeSignal, InstanceRuntimeConfig
 from module.supervisor import DeviceLeaseRegistry
 
 
@@ -39,6 +40,8 @@ def validate_instance_name(value: str) -> str:
 
 class ConfigurationDocumentSource(Protocol):
     def load(self, instance_name: str) -> ConfigurationDocument: ...
+
+    def watch_paths(self, instance_name: str) -> tuple[Path, ...]: ...
 
 
 class GameRuntimeBundleSource(Protocol):
@@ -145,6 +148,73 @@ class JsonConfigurationDocumentSource:
             raise ConfigurationLoadError(message)
         return cast("ConfigurationDocument", value)
 
+    def watch_paths(self, instance_name: str) -> tuple[Path, ...]:
+        name = validate_instance_name(instance_name)
+        instance_path = self._config_root / f"{name}.json"
+        if name == self._default_instance:
+            return (instance_path, self._template_path)
+        return (instance_path,)
+
+
+class ConfigurationFileSignal:
+    """WebUI 事件即时唤醒，文件指纹轮询仅作外部编辑的兜底。"""
+
+    __slots__ = ("_external", "_fingerprint", "_paths")
+
+    def __init__(
+        self,
+        paths: tuple[Path, ...],
+        external: ConfigurationChangeSignal | None = None,
+    ) -> None:
+        if not isinstance(paths, tuple) or not paths or any(not isinstance(path, Path) for path in paths):
+            message = "paths must be a non-empty tuple of Path values"
+            raise TypeError(message)
+        if external is not None and (
+            isinstance(external, type)
+            or not all(callable(getattr(external, method, None)) for method in ("wait", "clear"))
+        ):
+            message = "external must implement wait() and clear()"
+            raise TypeError(message)
+        self._paths = paths
+        self._external = external
+        self._fingerprint = self._read_fingerprint()
+
+    def wait(self, timeout: float) -> bool:
+        if type(timeout) not in {int, float} or timeout < 0:
+            message = "timeout must be a non-negative number"
+            raise ValueError(message)
+        deadline = time.monotonic() + timeout
+        while True:
+            if self._external is not None and self._external.wait(0):
+                return True
+            if self._read_fingerprint() != self._fingerprint:
+                return True
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            interval = min(remaining, 1.0)
+            if self._external is not None:
+                if self._external.wait(interval):
+                    return True
+            else:
+                time.sleep(interval)
+
+    def clear(self) -> None:
+        if self._external is not None:
+            self._external.clear()
+        self._fingerprint = self._read_fingerprint()
+
+    def _read_fingerprint(self) -> tuple[tuple[str, int | None, int | None], ...]:
+        fingerprint: list[tuple[str, int | None, int | None]] = []
+        for path in self._paths:
+            try:
+                stat = path.stat()
+            except FileNotFoundError:
+                fingerprint.append((str(path), None, None))
+            else:
+                fingerprint.append((str(path), stat.st_mtime_ns, stat.st_size))
+        return tuple(fingerprint)
+
 
 class FilesystemInstanceAssemblySource(InstanceAssemblySource):
     """配置文档、typed runtime bundle 与实例状态路径的唯一组装入口。"""
@@ -168,8 +238,10 @@ class FilesystemInstanceAssemblySource(InstanceAssemblySource):
         compiler: WebConfigurationCompiler | None = None,
         process_id: Callable[[], int] = os.getpid,
     ) -> None:
-        if isinstance(configuration_source, type) or not callable(getattr(configuration_source, "load", None)):
-            message = "configuration_source must implement load()"
+        if isinstance(configuration_source, type) or not all(
+            callable(getattr(configuration_source, method, None)) for method in ("load", "watch_paths")
+        ):
+            message = "configuration_source must implement load() and watch_paths()"
             raise TypeError(message)
         if isinstance(bundle_source, type) or not callable(getattr(bundle_source, "build", None)):
             message = "bundle_source must implement build()"
@@ -226,3 +298,15 @@ class FilesystemInstanceAssemblySource(InstanceAssemblySource):
             content_revision=bundle.content_revision,
             client_ui_revision=bundle.client_ui_revision,
         )
+
+    def load_configuration(self, instance_name: str) -> CompiledConfiguration:
+        name = validate_instance_name(instance_name)
+        return self._compiler.compile(self._configuration_source.load(name))
+
+    def configuration_signal(
+        self,
+        instance_name: str,
+        external: ConfigurationChangeSignal | None = None,
+    ) -> ConfigurationFileSignal:
+        paths = self._configuration_source.watch_paths(validate_instance_name(instance_name))
+        return ConfigurationFileSignal(paths, external)

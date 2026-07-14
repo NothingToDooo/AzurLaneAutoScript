@@ -567,6 +567,7 @@ class AlasGUI(Frame):
         if modified:
             logger.info(f"Save config {filepath_config(config_name)}, {dict_to_kv(modified)}")
             config_updater.write_file(config_name, config)
+            ProcessManager.get_manager(config_name).notify_configuration_changed()
             toast(
                 t("Gui.Toast.ConfigSaved"),
                 duration=1,

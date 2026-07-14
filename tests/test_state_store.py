@@ -217,6 +217,7 @@ def test_configuration_source_tracks_only_the_settings_revision_published_with_i
         assert source.source_revision == _SOURCE_REVISION
         assert source.settings_revision == published.revision
         assert source.updated_at == _STARTED_AT
+        assert source.source_schedules == ()
 
         store.update_settings(
             {"generation": 2},

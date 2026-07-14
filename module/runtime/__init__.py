@@ -1,4 +1,10 @@
 from module.application.daily_schedule import DailySchedule
+from module.runtime.configuration_control import (
+    ConfigurationChangeSignal,
+    RuntimeConfigurationControl,
+    RuntimeConfigurationSnapshot,
+    RuntimeConfigurationSource,
+)
 from module.runtime.configuration_publisher import (
     ConfigurationClock,
     ConfigurationPublisher,
@@ -7,11 +13,13 @@ from module.runtime.configuration_publisher import (
 from module.runtime.decoder import SettingsDecoder
 from module.runtime.errors import (
     ConfigurationDocumentError,
+    ConfigurationPublicationConflictError,
     ExecutionModeMismatchError,
     FactoryCoverageError,
     InvalidTaskFactoryError,
     MissingSettingsError,
     RuntimeCompositionError,
+    RuntimeRestartRequiredError,
     SettingsDocumentError,
     TaskStateDocumentError,
     UnknownTaskError,
@@ -33,8 +41,10 @@ from module.runtime.typed_factory import TypedTaskFactory
 __all__ = [
     "SETTINGS_SCHEMA_VERSION",
     "CatalogTaskResolver",
+    "ConfigurationChangeSignal",
     "ConfigurationClock",
     "ConfigurationDocumentError",
+    "ConfigurationPublicationConflictError",
     "ConfigurationPublisher",
     "ConfigurationWriteStore",
     "DailySchedule",
@@ -52,6 +62,10 @@ __all__ = [
     "OutboxPublisher",
     "OutboxStore",
     "RuntimeCompositionError",
+    "RuntimeConfigurationControl",
+    "RuntimeConfigurationSnapshot",
+    "RuntimeConfigurationSource",
+    "RuntimeRestartRequiredError",
     "SettingsDecoder",
     "SettingsDocumentError",
     "TaskBuildContext",

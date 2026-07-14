@@ -3,6 +3,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+import pytest
+
 import module.bootstrap.runtime_provider as runtime_provider_module
 from module.bootstrap import (
     CompiledConfiguration,
@@ -20,14 +22,11 @@ from module.gameplay.facility_factories import FacilityWorkflows
 from module.gameplay.market_factories import MarketWorkflows
 from module.gameplay.opsi_factories import OpsiWorkflows
 from module.maintenance import MaintenanceServices
-from module.runtime import InstanceRuntimeConfig, TaskFactoryRegistry
-from module.state import ConfigurationSourceSnapshot
+from module.runtime import InstanceRuntimeConfig, RuntimeConfigurationSnapshot, TaskFactoryRegistry
 
 _ACTIVITY_CATALOG = ActivityCatalog(load_event_manifests(Path("content/events")))
 
 if TYPE_CHECKING:
-    import pytest
-
     from module.gameplay.activity import ActivityWorkflow, AssistSessionWorkflow, EncounterWorkflow
     from module.gameplay.campaign import CampaignWorkflow
     from module.gameplay.campaign_factories import CampaignSessionSource
@@ -138,8 +137,8 @@ class _Clock:
         return datetime(2026, 7, 13, tzinfo=UTC)
 
     @staticmethod
-    def sleep(seconds: float, cancellation: object) -> None:
-        del seconds, cancellation
+    def sleep(seconds: float, cancellation: object, wake_signal: object | None = None) -> None:
+        del seconds, cancellation, wake_signal
 
 
 class _Publisher:
@@ -149,46 +148,46 @@ class _Publisher:
 
 
 class _Runtime:
-    def __init__(self, calls: list[tuple[object, ...]], *, source_revision: str | None = None) -> None:
-        self._calls = calls
-        self._source_revision = source_revision
-
-    def read_configuration_source(self) -> ConfigurationSourceSnapshot | None:
-        self._calls.append(("configuration-source",))
-        if self._source_revision is None:
-            return None
-        return ConfigurationSourceSnapshot(
-            source_revision=self._source_revision,
-            settings_revision=1,
-            updated_at=_Clock.now(),
-        )
-
-    def read_settings(self) -> None:
-        self._calls.append(("settings",))
-
-    def publish_configuration(
-        self,
-        payload: object,
-        schedules: object,
-        *,
-        source_revision: str,
-        expected_revision: int,
-    ) -> None:
-        self._calls.append(("publish-configuration", payload, schedules, source_revision, expected_revision))
-
     @staticmethod
     def close() -> None:
         pass
 
 
+class _Signal:
+    @staticmethod
+    def wait(timeout: float) -> bool:
+        del timeout
+        return False
+
+    @staticmethod
+    def clear() -> None:
+        pass
+
+
+class _Control:
+    closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
 @dataclass(slots=True)
 class _Source:
     assembly: InstanceAssembly
-    names: list[str] = field(default_factory=list)
+    events: list[tuple[object, ...]] = field(default_factory=list)
+    signal: _Signal = field(default_factory=_Signal)
 
     def load(self, instance_name: str) -> InstanceAssembly:
-        self.names.append(instance_name)
+        self.events.append(("load", instance_name))
         return self.assembly
+
+    def load_configuration(self, instance_name: str) -> CompiledConfiguration:
+        self.events.append(("load-configuration", instance_name))
+        return self.assembly.configuration
+
+    def configuration_signal(self, instance_name: str, external: object | None = None) -> _Signal:
+        self.events.append(("configuration-signal", instance_name, external))
+        return self.signal
 
 
 def test_provider_builds_registry_and_runtime_from_one_instance_assembly(
@@ -201,6 +200,7 @@ def test_provider_builds_registry_and_runtime_from_one_instance_assembly(
         schedules=(),
         device_serial="127.0.0.1:16384",
         source_revision="sha256:" + "0" * 64,
+        assembly_revision="sha256:" + "1" * 64,
     )
     assembly = InstanceAssembly(
         runtime=InstanceRuntimeConfig(
@@ -216,7 +216,8 @@ def test_provider_builds_registry_and_runtime_from_one_instance_assembly(
     )
     source = _Source(assembly)
     registry = cast("TaskFactoryRegistry", object())
-    runtime = cast("InstanceRuntime", _Runtime(calls))
+    runtime = cast("InstanceRuntime", _Runtime())
+    control = _Control()
 
     def build_registry(
         tasks: GameTaskDependencies,
@@ -231,37 +232,52 @@ def test_provider_builds_registry_and_runtime_from_one_instance_assembly(
         calls.append(("runtime", *args, kwargs))
         return runtime
 
+    def build_control(**kwargs: object) -> _Control:
+        calls.append(("control", kwargs))
+        return control
+
     monkeypatch.setattr(runtime_provider_module, "build_game_task_registry", build_registry)
     monkeypatch.setattr(runtime_provider_module, "InstanceRuntime", build_runtime)
+    monkeypatch.setattr(runtime_provider_module, "RuntimeConfigurationControl", build_control)
     clock = _Clock()
     publisher = _Publisher()
+    external_signal = _Signal()
 
-    opened = ProductionRuntimeProvider(source, clock, outbox_publisher=publisher).open("alas")
+    opened = ProductionRuntimeProvider(source, clock, outbox_publisher=publisher).open(
+        "alas",
+        configuration_signal=external_signal,
+    )
 
     assert opened is runtime
-    assert source.names == ["alas"]
-    assert calls == [
-        ("registry", dependencies, "content:current", "ui:current"),
-        (
-            "runtime",
-            assembly.runtime,
-            registry,
-            clock,
-            {"outbox_publisher": publisher},
-        ),
-        ("configuration-source",),
-        ("settings",),
-        (
-            "publish-configuration",
-            configuration.payload,
-            configuration.schedules,
-            configuration.source_revision,
-            0,
-        ),
+    assert source.events == [
+        ("configuration-signal", "alas", external_signal),
+        ("load", "alas"),
     ]
+    assert calls[0] == ("registry", dependencies, "content:current", "ui:current")
+    assert calls[1][0] == "control"
+    control_arguments = cast("dict[str, object]", calls[1][1])
+    assert control_arguments["state_path"] == assembly.runtime.state_path
+    assert control_arguments["factories"] is registry
+    assert control_arguments["clock"] is clock
+    assert control_arguments["signal"] is source.signal
+    assert control_arguments["initial"] == RuntimeConfigurationSnapshot(
+        payload=configuration.payload,
+        schedules=configuration.schedules,
+        source_revision=configuration.source_revision,
+        assembly_revision=configuration.assembly_revision,
+        device_serial=configuration.device_serial,
+    )
+    assert callable(control_arguments["error_reporter"])
+    assert calls[2] == (
+        "runtime",
+        assembly.runtime,
+        registry,
+        clock,
+        {"outbox_publisher": publisher, "configuration_control": control},
+    )
 
 
-def test_provider_does_not_publish_or_reset_schedule_when_compiled_revision_is_unchanged(
+def test_provider_closes_configuration_control_when_runtime_construction_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     configuration = CompiledConfiguration(
@@ -269,9 +285,8 @@ def test_provider_does_not_publish_or_reset_schedule_when_compiled_revision_is_u
         schedules=(),
         device_serial="127.0.0.1:16384",
         source_revision="sha256:" + "0" * 64,
+        assembly_revision="sha256:" + "1" * 64,
     )
-    calls: list[tuple[object, ...]] = []
-    runtime = _Runtime(calls, source_revision=configuration.source_revision)
     assembly = InstanceAssembly(
         runtime=InstanceRuntimeConfig(
             state_path=Path("state/alas.sqlite3"),
@@ -285,6 +300,7 @@ def test_provider_does_not_publish_or_reset_schedule_when_compiled_revision_is_u
         client_ui_revision="ui:current",
     )
     registry = cast("TaskFactoryRegistry", object())
+    control = _Control()
 
     def build_registry(*args: object, **kwargs: object) -> TaskFactoryRegistry:
         del args, kwargs
@@ -292,12 +308,14 @@ def test_provider_does_not_publish_or_reset_schedule_when_compiled_revision_is_u
 
     def build_runtime(*args: object, **kwargs: object) -> InstanceRuntime:
         del args, kwargs
-        return cast("InstanceRuntime", runtime)
+        message = "runtime failed"
+        raise RuntimeError(message)
 
     monkeypatch.setattr(runtime_provider_module, "build_game_task_registry", build_registry)
     monkeypatch.setattr(runtime_provider_module, "InstanceRuntime", build_runtime)
+    monkeypatch.setattr(runtime_provider_module, "RuntimeConfigurationControl", lambda **_kwargs: control)
 
-    opened = ProductionRuntimeProvider(_Source(assembly), _Clock()).open("alas")
+    with pytest.raises(RuntimeError, match="runtime failed"):
+        ProductionRuntimeProvider(_Source(assembly), _Clock()).open("alas")
 
-    assert opened is runtime
-    assert calls == [("configuration-source",)]
+    assert control.closed is True

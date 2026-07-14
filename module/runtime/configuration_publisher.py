@@ -25,6 +25,17 @@ class ConfigurationWriteStore(Protocol):
         updated_at: datetime,
     ) -> SettingsSnapshot: ...
 
+    def publish_configuration_update(  # noqa: PLR0913
+        self,
+        payload: JsonValue,
+        schedules: tuple[ScheduleMutation, ...],
+        previous_source_schedules: tuple[ScheduleMutation, ...],
+        *,
+        source_revision: str,
+        expected_revision: int,
+        updated_at: datetime,
+    ) -> SettingsSnapshot: ...
+
 
 class ConfigurationPublisher:
     """严格编译完整配置，再以一个 CAS 事务替换 settings 与 schedule。"""
@@ -38,8 +49,11 @@ class ConfigurationPublisher:
         factories: TaskFactoryRegistry,
         clock: ConfigurationClock,
     ) -> None:
-        if isinstance(store, type) or not callable(getattr(store, "publish_configuration", None)):
-            message = "store must implement publish_configuration()"
+        if isinstance(store, type) or not all(
+            callable(getattr(store, method, None))
+            for method in ("publish_configuration", "publish_configuration_update")
+        ):
+            message = "store must implement publish_configuration() and publish_configuration_update()"
             raise TypeError(message)
         if not isinstance(factories, TaskFactoryRegistry):
             message = "factories must be a TaskFactoryRegistry"
@@ -59,15 +73,7 @@ class ConfigurationPublisher:
         source_revision: str,
         expected_revision: int,
     ) -> SettingsSnapshot:
-        if not isinstance(source_revision, str):
-            message = "source_revision must be a string"
-            raise TypeError(message)
-        if not source_revision or source_revision != source_revision.strip():
-            message = "source_revision must be trimmed and non-empty"
-            raise ValueError(message)
-        if type(expected_revision) is not int or expected_revision < 0:
-            message = "expected_revision must be a non-negative integer"
-            raise ValueError(message)
+        self._validate_publication_request(source_revision, expected_revision)
         self._validate_schedules(schedules)
 
         updated_at = self._clock.now()
@@ -102,6 +108,74 @@ class ConfigurationPublisher:
             message = "configuration store returned an unexpected revision"
             raise RuntimeError(message)
         return published
+
+    def publish_update(
+        self,
+        payload: JsonValue,
+        schedules: tuple[ScheduleMutation, ...],
+        previous_source_schedules: tuple[ScheduleMutation, ...],
+        *,
+        source_revision: str,
+        expected_revision: int,
+    ) -> SettingsSnapshot:
+        """完整验证新配置，再以 source 差量合并 schedule 并 CAS 发布。"""
+
+        self._validate_publication_request(source_revision, expected_revision)
+        if not isinstance(previous_source_schedules, tuple) or any(
+            not isinstance(mutation, ScheduleMutation) for mutation in previous_source_schedules
+        ):
+            message = "previous_source_schedules must contain only ScheduleMutation values"
+            raise TypeError(message)
+        if len({mutation.task_id for mutation in previous_source_schedules}) != len(previous_source_schedules):
+            message = "previous_source_schedules must not contain duplicate task ids"
+            raise ValueError(message)
+        self._validate_schedules(schedules)
+
+        updated_at = self._clock.now()
+        candidate = SettingsSnapshot(
+            revision=expected_revision + 1,
+            payload=payload,
+            updated_at=updated_at,
+        )
+        document = TaskSettingsDocument.from_snapshot(
+            candidate,
+            task_ids=self._factories.task_ids,
+        )
+        schedule_by_task = {mutation.task_id: mutation for mutation in schedules}
+        runnable_task_ids = tuple(
+            task_id
+            for task_id in self._factories.task_ids
+            if task_id not in schedule_by_task or schedule_by_task[task_id].enabled
+        )
+        self._factories.validate_settings(document, task_ids=runnable_task_ids)
+
+        published = self._store.publish_configuration_update(
+            payload,
+            schedules,
+            previous_source_schedules,
+            source_revision=source_revision,
+            expected_revision=expected_revision,
+            updated_at=updated_at,
+        )
+        if not isinstance(published, SettingsSnapshot):
+            message = "ConfigurationWriteStore.publish_configuration_update() must return a SettingsSnapshot"
+            raise TypeError(message)
+        if published.revision != candidate.revision:
+            message = "configuration store returned an unexpected revision"
+            raise RuntimeError(message)
+        return published
+
+    @staticmethod
+    def _validate_publication_request(source_revision: str, expected_revision: int) -> None:
+        if not isinstance(source_revision, str):
+            message = "source_revision must be a string"
+            raise TypeError(message)
+        if not source_revision or source_revision != source_revision.strip():
+            message = "source_revision must be trimmed and non-empty"
+            raise ValueError(message)
+        if type(expected_revision) is not int or expected_revision < 0:
+            message = "expected_revision must be a non-negative integer"
+            raise ValueError(message)
 
     def _validate_schedules(self, schedules: tuple[ScheduleMutation, ...]) -> None:
         if not isinstance(schedules, tuple):

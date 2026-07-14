@@ -2,6 +2,14 @@ class RuntimeCompositionError(RuntimeError):
     """运行时组合边界无法构造一致的 Task。"""
 
 
+class RuntimeRestartRequiredError(RuntimeError):
+    """候选配置修改了进程组装期绑定字段，不能在当前 runtime 内发布。"""
+
+
+class ConfigurationPublicationConflictError(RuntimeError):
+    """配置控制面在有限重试内持续遭遇并发发布。"""
+
+
 class ConfigurationDocumentError(RuntimeCompositionError):
     """完整运行配置的 settings 或 schedule 不满足当前严格 schema。"""
 

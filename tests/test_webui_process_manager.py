@@ -54,6 +54,13 @@ class _StopEvent:
     def is_set(self) -> bool:
         return self.set_calls > 0
 
+    def clear(self) -> None:
+        self.set_calls = 0
+
+    def wait(self, timeout: float) -> bool:
+        del timeout
+        return self.is_set()
+
 
 class _Process:
     def __init__(self, *, exits_on_join: bool = False, alive: bool = True, exitcode: int | None = 0) -> None:
@@ -92,6 +99,12 @@ class _StopEventLike(Protocol):
     def is_set(self) -> bool: ...
 
 
+class _ConfigurationEventLike(_StopEventLike, Protocol):
+    def clear(self) -> None: ...
+
+    def wait(self, timeout: float) -> bool: ...
+
+
 def _outcome(status: ProcessOutcomeStatus, *, command: str = "alas") -> ProcessOutcome:
     return ProcessOutcome(
         status=status,
@@ -108,6 +121,7 @@ def _make_run(
     *,
     command: str = "alas",
     outcome: ProcessOutcome | None = None,
+    configuration_event: _ConfigurationEventLike | None = None,
 ) -> SimpleNamespace:
     renderable_queue: queue.Queue[RenderableQueueItem] = queue.Queue()
     outcome_queue: queue.Queue[ProcessOutcome] = queue.Queue()
@@ -118,6 +132,7 @@ def _make_run(
         process=process,
         renderable_queue=renderable_queue,
         outcome_queue=outcome_queue,
+        configuration_event=_StopEvent() if configuration_event is None else configuration_event,
         stop_status=None,
         monitor=None,
     )
@@ -140,12 +155,20 @@ def _run_process(
     func: str,
     *,
     stop_event: _StopEventLike | None = None,
+    configuration_event: _ConfigurationEventLike | None = None,
 ) -> tuple[ProcessOutcome, queue.Queue[RenderableQueueItem], list[tuple[object, ...]]]:
     calls: list[tuple[object, ...]] = []
     renderable_queue: queue.Queue[RenderableQueueItem] = queue.Queue()
     outcome_queue: queue.Queue[ProcessOutcome] = queue.Queue()
     _patch_process_boundary(monkeypatch, calls)
-    ProcessManager.run_process("alas", func, renderable_queue, outcome_queue, stop_event)
+    ProcessManager.run_process(
+        "alas",
+        func,
+        renderable_queue,
+        outcome_queue,
+        stop_event,
+        configuration_event,
+    )
     return outcome_queue.get_nowait(), renderable_queue, calls
 
 
@@ -171,8 +194,9 @@ def _install_host(
             command: str,
             *,
             stop_signal: object | None = None,
+            configuration_signal: object | None = None,
         ) -> InstanceProcessExit:
-            calls.append(("host_execute", instance_name, command, stop_signal))
+            calls.append(("host_execute", instance_name, command, stop_signal, configuration_signal))
             if error is not None:
                 raise error
             assert exit_ is not None
@@ -201,7 +225,7 @@ def test_run_process_runs_alas_loop(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert outcome_queue.get_nowait().status is ProcessOutcomeStatus.FINISHED
     assert renderable_queue.get_nowait() is None
-    assert ("host_execute", "alas", "alas", None) in calls
+    assert ("host_execute", "alas", "alas", None, None) in calls
     assert ("info", "[alas] exited. Reason: finished\n") in calls
 
 
@@ -214,7 +238,25 @@ def test_run_process_reports_stop_event(monkeypatch: pytest.MonkeyPatch) -> None
 
     assert outcome.status is ProcessOutcomeStatus.MANUAL_STOP
     assert renderable_queue.get_nowait() is None
-    assert ("host_execute", "alas", "alas", stop_event) in calls
+    assert ("host_execute", "alas", "alas", stop_event, None) in calls
+
+
+def test_run_process_forwards_configuration_event(monkeypatch: pytest.MonkeyPatch) -> None:
+    stop_event = _StopEvent()
+    configuration_event = _StopEvent()
+    calls: list[tuple[object, ...]] = []
+    _patch_process_boundary(monkeypatch, calls)
+    _install_host(monkeypatch, calls, exit_=_host_exit(InstanceProcessExitKind.FINISHED))
+
+    outcome, _, _ = _run_process(
+        monkeypatch,
+        "alas",
+        stop_event=stop_event,
+        configuration_event=configuration_event,
+    )
+
+    assert outcome.status is ProcessOutcomeStatus.FINISHED
+    assert ("host_execute", "alas", "alas", stop_event, configuration_event) in calls
 
 
 @pytest.mark.parametrize(
@@ -239,7 +281,7 @@ def test_run_process_runs_direct_catalog_task(
     outcome, _, _ = _run_process(monkeypatch, config_name)
 
     assert outcome.status is ProcessOutcomeStatus.FINISHED
-    assert ("host_execute", "alas", command, None) in calls
+    assert ("host_execute", "alas", command, None, None) in calls
 
 
 @pytest.mark.parametrize("func", ["Main", "MissingMod"])
@@ -312,7 +354,7 @@ def test_process_manager_source_has_no_direct_task_allowlist() -> None:
 
 
 def test_start_uses_fresh_queues_for_each_run(monkeypatch: pytest.MonkeyPatch) -> None:
-    created_event = _StopEvent()
+    created_events: list[_StopEvent] = []
     process_args: list[tuple[object, ...]] = []
     monitor_runs: list[object] = []
     warnings: list[str] = []
@@ -347,7 +389,12 @@ def test_start_uses_fresh_queues_for_each_run(monkeypatch: pytest.MonkeyPatch) -
         del manager
         monitor_runs.append(run)
 
-    monkeypatch.setattr(process_manager_module, "Event", lambda: created_event)
+    def create_event() -> _StopEvent:
+        event = _StopEvent()
+        created_events.append(event)
+        return event
+
+    monkeypatch.setattr(process_manager_module, "Event", create_event)
     monkeypatch.setattr(process_manager_module, "Process", _StartedProcess)
     queue_factory = SimpleNamespace(Queue=queue.Queue)
     monkeypatch.setattr(process_manager_module.State, "manager", queue_factory)
@@ -365,7 +412,9 @@ def test_start_uses_fresh_queues_for_each_run(monkeypatch: pytest.MonkeyPatch) -
     assert process_args[1][0:2] == ("alas", "Benchmark")
     assert process_args[0][2] is not process_args[1][2]
     assert process_args[0][3] is not process_args[1][3]
-    assert process_args[0][4] is created_event
+    assert len(created_events) == 4
+    assert process_args[0][4:6] == (created_events[0], created_events[1])
+    assert process_args[1][4:6] == (created_events[2], created_events[3])
     assert len(monitor_runs) == 2
     assert draining_monitor.join_calls == [process_manager_module.MONITOR_JOIN_SECONDS] * 2
     assert warnings == ["Process monitor is still draining its queue"] * 2
@@ -375,11 +424,12 @@ def test_stop_reports_manual_stop_when_process_exits_gracefully() -> None:
     stop_event = _StopEvent()
     process = _Process(exits_on_join=True)
     manager = ProcessManager()
-    _attach_run(manager, process, stop_event=stop_event)
+    run = _attach_run(manager, process, stop_event=stop_event)
 
     manager.stop()
 
     assert stop_event.set_calls == 1
+    assert run.configuration_event.set_calls == 1
     assert process.join_calls == [STOP_GRACE_SECONDS]
     assert process.kill_calls == 0
     assert manager.outcome is not None
@@ -395,6 +445,7 @@ def test_stop_reports_killed_after_grace_timeout() -> None:
     manager.stop()
 
     assert stop_event.set_calls == 1
+    assert run.configuration_event.set_calls == 1
     assert process.join_calls == [STOP_GRACE_SECONDS, KILL_JOIN_SECONDS]
     assert process.kill_calls == 1
     assert run.renderable_queue.empty()
@@ -412,6 +463,16 @@ def test_parent_stop_intent_wins_over_late_child_success() -> None:
 
     assert manager.outcome is not None
     assert manager.outcome.status is ProcessOutcomeStatus.MANUAL_STOP
+
+
+def test_configuration_notification_wakes_only_a_live_run() -> None:
+    process = _Process(alive=True)
+    manager = ProcessManager()
+    run = _attach_run(manager, process)
+
+    manager.notify_configuration_changed()
+
+    assert run.configuration_event.set_calls == 1
 
 
 def test_monitor_drains_tail_logs_and_publishes_outcome() -> None:

@@ -32,7 +32,20 @@ class AgentTicker(Protocol):
 class LoopClock(Protocol):
     def now(self) -> datetime: ...
 
-    def sleep(self, seconds: float, cancellation: CancellationSignal) -> None: ...
+    def sleep(
+        self,
+        seconds: float,
+        cancellation: CancellationSignal,
+        wake_signal: LoopWakeSignal | None = None,
+    ) -> None: ...
+
+
+class LoopWakeSignal(Protocol):
+    def wait(self, timeout: float) -> bool: ...
+
+
+class LoopControl(LoopWakeSignal, Protocol):
+    def refresh_if_changed(self) -> object: ...
 
 
 class InstanceLoopExitReason(StrEnum):
@@ -103,14 +116,18 @@ def _exit_reason_after_run(result: TaskResult, preemption: PreemptionRequest) ->
 class InstanceLoop:
     """串行运行 scheduled jobs；所有进程级控制信号都有明确退出点。"""
 
-    __slots__ = ("_agent", "_clock")
+    __slots__ = ("_agent", "_clock", "_control")
 
-    def __init__(self, agent: AgentTicker, clock: LoopClock) -> None:
+    def __init__(self, agent: AgentTicker, clock: LoopClock, *, control: LoopControl | None = None) -> None:
         _require_method(agent, "tick", field_name="agent")
         _require_method(clock, "now", field_name="clock")
         _require_method(clock, "sleep", field_name="clock")
+        if control is not None:
+            _require_method(control, "wait", field_name="control")
+            _require_method(control, "refresh_if_changed", field_name="control")
         self._agent = agent
         self._clock = clock
+        self._control = control
 
     def run(
         self,
@@ -150,6 +167,8 @@ class InstanceLoop:
     ) -> InstanceTickResult | None:
         try:
             abort.raise_if_requested()
+            if self._control is not None:
+                self._control.refresh_if_changed()
             return self._agent.tick(
                 self._clock.now(),
                 abort=abort,
@@ -161,7 +180,10 @@ class InstanceLoop:
     def _wait_until(self, wake_at: datetime, abort: AbortToken) -> bool:
         seconds = max(0.0, (wake_at - self._clock.now()).total_seconds())
         try:
-            self._clock.sleep(seconds, abort)
+            if self._control is None:
+                self._clock.sleep(seconds, abort)
+            else:
+                self._clock.sleep(seconds, abort, self._control)
         except AbortRequested:
             return False
         return True

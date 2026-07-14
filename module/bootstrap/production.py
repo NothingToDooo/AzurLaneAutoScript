@@ -46,6 +46,7 @@ if TYPE_CHECKING:
 
     from module.content.runtime_profile import CampaignRuntimeProfileRegistry
     from module.interaction import CancellationSignal
+    from module.supervisor import LoopWakeSignal
 
 
 _CONTENT_SUFFIXES = frozenset({".json", ".yaml", ".yml"})
@@ -89,7 +90,11 @@ class SystemLoopClock:
         return datetime.now(tz=UTC)
 
     @staticmethod
-    def sleep(seconds: float, cancellation: CancellationSignal) -> None:
+    def sleep(
+        seconds: float,
+        cancellation: CancellationSignal,
+        wake_signal: LoopWakeSignal | None = None,
+    ) -> None:
         if type(seconds) not in {int, float} or seconds < 0:
             message = "sleep seconds must be a non-negative number"
             raise ValueError(message)
@@ -99,7 +104,12 @@ class SystemLoopClock:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 return
-            time.sleep(min(remaining, 0.25))
+            interval = min(remaining, 0.25)
+            if wake_signal is not None and wake_signal.wait(interval):
+                cancellation.raise_if_requested()
+                return
+            if wake_signal is None:
+                time.sleep(interval)
 
 
 class Mumu12GameRuntimeBundleSource:

@@ -32,6 +32,7 @@ def test_template_compiles_to_exact_runtime_task_and_schedule_coverage() -> None
     ]
     assert compiled.device_serial == "127.0.0.1:16384"
     assert compiled.source_revision.startswith("sha256:")
+    assert compiled.assembly_revision.startswith("sha256:")
 
 
 def test_compiled_revision_changes_only_when_the_persisted_runtime_snapshot_changes() -> None:
@@ -45,6 +46,20 @@ def test_compiled_revision_changes_only_when_the_persisted_runtime_snapshot_chan
 
     assert repeated.source_revision == original.source_revision
     assert changed.source_revision != original.source_revision
+    assert repeated.assembly_revision == original.assembly_revision
+    assert changed.assembly_revision == original.assembly_revision
+
+
+def test_assembly_revision_tracks_only_process_bound_configuration() -> None:
+    document = _template()
+    original = WebConfigurationCompiler().compile(document)
+    alas = cast("dict[str, object]", document["Alas"])
+    optimization = cast("dict[str, object]", alas["Optimization"])
+    optimization["ScreenshotInterval"] = 0.5
+    changed = WebConfigurationCompiler().compile(document)
+
+    assert changed.source_revision == original.source_revision
+    assert changed.assembly_revision != original.assembly_revision
 
 
 def test_compiler_projects_campaign_opsi_and_direct_command_settings() -> None:

@@ -22,6 +22,8 @@ from module.supervisor.instance_loop import (
     InstanceLoopExit,
     InstanceLoopExitReason,
     LoopClock,
+    LoopControl,
+    LoopWakeSignal,
 )
 
 __all__ = [
@@ -38,6 +40,8 @@ __all__ = [
     "InstanceTickResult",
     "InvalidDeviceLeaseError",
     "LoopClock",
+    "LoopControl",
+    "LoopWakeSignal",
     "ReadyTickResult",
     "RunCompletionHook",
     "StaleScheduleSelectionError",

@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from multiprocessing import Event, Process
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Protocol
 
 from rich.console import ConsoleRenderable
 
@@ -12,6 +12,7 @@ from module.application import Faulted
 from module.bootstrap.process_host import InstanceProcessExit, InstanceProcessExitKind
 from module.bootstrap.production import build_default_instance_process_host
 from module.logger import logger, set_file_logger, set_func_logger
+from module.runtime import ConfigurationChangeSignal
 from module.task_registry import get_tool_task_command
 from module.webui.fake_pil_module import remove_fake_pil_module
 from module.webui.process_outcome import ProcessOutcome, ProcessOutcomeStatus
@@ -34,12 +35,19 @@ type Renderable = ConsoleRenderable | str
 type RenderableQueueItem = ConsoleRenderable | None
 
 
+class ConfigurationEvent(ConfigurationChangeSignal, Protocol):
+    def set(self) -> None: ...
+
+    def is_set(self) -> bool: ...
+
+
 @dataclass(slots=True)
 class _ProcessRun:
     command: str
     process: Process
     renderable_queue: queue.Queue[RenderableQueueItem]
     outcome_queue: queue.Queue[ProcessOutcome]
+    configuration_event: ConfigurationEvent
     stop_status: ProcessOutcomeStatus | None = None
     monitor: threading.Thread | None = None
 
@@ -100,7 +108,12 @@ def _host_outcome(
     return _new_outcome(status, config_name=config_name, command=command)
 
 
-def _execute_process(config_name: str, func: str, stop_event: StopEvent | None) -> ProcessOutcome:
+def _execute_process(
+    config_name: str,
+    func: str,
+    stop_event: StopEvent | None,
+    configuration_event: ConfigurationEvent | None = None,
+) -> ProcessOutcome:
     command = "alas" if func == "alas" else get_tool_task_command(func)
     if command is None:
         message = f"No function matched: {func}"
@@ -113,7 +126,15 @@ def _execute_process(config_name: str, func: str, stop_event: StopEvent | None) 
             message=message,
         )
     host = build_default_instance_process_host()
-    exit_ = host.execute(config_name, command, stop_signal=stop_event)
+    if configuration_event is None:
+        exit_ = host.execute(config_name, command, stop_signal=stop_event)
+    else:
+        exit_ = host.execute(
+            config_name,
+            command,
+            stop_signal=stop_event,
+            configuration_signal=configuration_event,
+        )
     return _host_outcome(exit_, config_name=config_name, command=func)
 
 
@@ -161,6 +182,7 @@ class ProcessManager:
             renderable_queue: queue.Queue[RenderableQueueItem] = State.manager.Queue()
             outcome_queue: queue.Queue[ProcessOutcome] = State.manager.Queue()
             self._stop_event = Event() if ev is None else ev
+            configuration_event = Event()
             process = Process(
                 target=ProcessManager.run_process,
                 args=(
@@ -169,6 +191,7 @@ class ProcessManager:
                     renderable_queue,
                     outcome_queue,
                     self._stop_event,
+                    configuration_event,
                 ),
             )
             run = _ProcessRun(
@@ -176,6 +199,7 @@ class ProcessManager:
                 process=process,
                 renderable_queue=renderable_queue,
                 outcome_queue=outcome_queue,
+                configuration_event=configuration_event,
             )
             self._run = run
             with self._outcome_lock:
@@ -213,6 +237,7 @@ class ProcessManager:
         run.stop_status = ProcessOutcomeStatus.MANUAL_STOP
         if self._stop_event is not None:
             self._stop_event.set()
+            run.configuration_event.set()
             process.join(timeout=STOP_GRACE_SECONDS)
 
         if process.is_alive():
@@ -232,6 +257,11 @@ class ProcessManager:
             if run is not None:
                 self._publish_outcome(run, self._read_child_outcome(run, timeout=0))
         logger.info(f"[{self.config_name}] exited")
+
+    def notify_configuration_changed(self) -> None:
+        run = self._run
+        if run is not None and run.process.is_alive():
+            run.configuration_event.set()
 
     def _append_renderable(self, renderable: ConsoleRenderable) -> None:
         self.renderables.append(renderable)
@@ -331,19 +361,20 @@ class ProcessManager:
         return cls._processes[config_name]
 
     @staticmethod
-    def run_process(
+    def run_process(  # noqa: PLR0913, PLR0917
         config_name: str,
         func: str,
         renderable_queue: queue.Queue[RenderableQueueItem],
         outcome_queue: queue.Queue[ProcessOutcome],
         stop_event: StopEvent | None = None,
+        configuration_event: ConfigurationEvent | None = None,
     ) -> None:
         outcome: ProcessOutcome | None = None
         try:
             set_file_logger(name=config_name)
             set_func_logger(func=renderable_queue.put)
             remove_fake_pil_module()
-            outcome = _execute_process(config_name, func, stop_event)
+            outcome = _execute_process(config_name, func, stop_event, configuration_event)
         except SystemExit as error:
             outcome = _system_exit_outcome(
                 error,

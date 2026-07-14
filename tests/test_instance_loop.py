@@ -25,6 +25,7 @@ from module.supervisor import (
 
 if TYPE_CHECKING:
     from module.interaction import CancellationSignal
+    from module.supervisor import LoopWakeSignal
 
 _NOW = datetime(2026, 7, 13, 8, tzinfo=UTC)
 _ITEM = ScheduleItem(task_id=TaskId("research"), enabled=True, due_at=_NOW, priority=4)
@@ -67,7 +68,12 @@ class _Clock:
     def now(self) -> datetime:
         return self.current
 
-    def sleep(self, seconds: float, cancellation: CancellationSignal) -> None:
+    def sleep(
+        self,
+        seconds: float,
+        cancellation: CancellationSignal,
+        wake_signal: LoopWakeSignal | None = None,
+    ) -> None:
         self.sleeps.append(seconds)
         if self.abort_during_sleep:
             if not isinstance(cancellation, AbortToken):
@@ -75,7 +81,22 @@ class _Clock:
                 raise TypeError(message)
             cancellation.request("stop while waiting")
             cancellation.raise_if_requested()
+        if wake_signal is not None and wake_signal.wait(seconds):
+            return
         self.current += timedelta(seconds=seconds)
+
+
+class _Control:
+    def __init__(self) -> None:
+        self.refresh_calls = 0
+        self.waits: list[float] = []
+
+    def refresh_if_changed(self) -> None:
+        self.refresh_calls += 1
+
+    def wait(self, timeout: float) -> bool:
+        self.waits.append(timeout)
+        return True
 
 
 def _ready(result: TaskResult) -> ReadyTickResult:
@@ -93,6 +114,22 @@ def test_loop_waits_runs_serially_and_exits_when_schedule_is_empty() -> None:
     assert result == InstanceLoopExit(InstanceLoopExitReason.EMPTY, 1, success)
     assert clock.sleeps == [300.0]
     assert agent.calls == 3
+
+
+def test_configuration_change_wakes_wait_and_refreshes_only_at_the_next_safe_point() -> None:
+    wake_at = _NOW + timedelta(hours=4)
+    success = TaskResult(Succeeded(), (RescheduleSelf(_NOW + timedelta(hours=1)),))
+    agent = _Agent([WaitingTickResult(_ITEM, wake_at), _ready(success), EmptyTickResult()])
+    clock = _Clock(_NOW)
+    control = _Control()
+
+    result = InstanceLoop(agent, clock, control=control).run()
+
+    assert result == InstanceLoopExit(InstanceLoopExitReason.EMPTY, 1, success)
+    assert clock.current == _NOW
+    assert clock.sleeps == [4 * 60 * 60]
+    assert control.waits == [4 * 60 * 60]
+    assert control.refresh_calls == 3
 
 
 def test_loop_stops_after_first_fault_without_busy_retry() -> None:

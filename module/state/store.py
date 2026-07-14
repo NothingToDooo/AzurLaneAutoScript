@@ -38,7 +38,7 @@ from module.state.models import (
     UpsertTaskStateMutation,
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 _RUN_MUTATIONS_SKIPPED_EVENT = "run.mutations.skipped"
 
 type _EncodedTaskStateMutation = tuple[TaskStateMutation, str | None]
@@ -59,6 +59,7 @@ _SCHEMA_STATEMENTS = (
             length(source_revision) > 0 AND source_revision = trim(source_revision)
         ),
         settings_revision INTEGER NOT NULL CHECK (settings_revision > 0),
+        source_schedules TEXT NOT NULL CHECK (json_valid(source_schedules)),
         updated_at TEXT NOT NULL
     ) STRICT
     """,
@@ -131,7 +132,13 @@ _SCHEMA_STATEMENTS = (
 
 _EXPECTED_COLUMNS = {
     "settings": ("singleton", "revision", "payload", "updated_at"),
-    "configuration_source": ("singleton", "source_revision", "settings_revision", "updated_at"),
+    "configuration_source": (
+        "singleton",
+        "source_revision",
+        "settings_revision",
+        "source_schedules",
+        "updated_at",
+    ),
     "schedule": ("task_id", "enabled", "due_at", "priority", "updated_at"),
     "task_state": ("namespace", "key", "version", "payload", "updated_at"),
     "runs": (
@@ -254,6 +261,71 @@ def _decode_json(raw: str) -> JsonValue:
     return _validated_json(value)
 
 
+def _encode_source_schedules(schedules: tuple[ScheduleMutation, ...]) -> str:
+    if not isinstance(schedules, tuple) or any(not isinstance(item, ScheduleMutation) for item in schedules):
+        message = "source schedules must be a tuple of ScheduleMutation values"
+        raise TypeError(message)
+    payload: JsonValue = [
+        {
+            "task_id": item.task_id,
+            "enabled": item.enabled,
+            "due_at": None
+            if item.due_at is None
+            else _encode_datetime(item.due_at, field_name=f"source_schedules.{item.task_id}.due_at"),
+            "priority": item.priority,
+        }
+        for item in sorted(schedules, key=lambda value: value.task_id)
+    ]
+    return _encode_json(payload)
+
+
+def _decode_source_schedules(raw: str) -> tuple[ScheduleMutation, ...]:
+    payload = _decode_json(raw)
+    if not isinstance(payload, list):
+        message = "configuration source schedules must contain a JSON array"
+        raise CorruptStateError(message)
+
+    schedules: list[ScheduleMutation] = []
+    expected = {"task_id", "enabled", "due_at", "priority"}
+    for index, item in enumerate(payload):
+        if not isinstance(item, dict) or set(item) != expected:
+            message = f"invalid configuration source schedule at index {index}"
+            raise CorruptStateError(message)
+        task_id = item["task_id"]
+        enabled = item["enabled"]
+        raw_due_at = item["due_at"]
+        priority = item["priority"]
+        if not isinstance(task_id, str) or type(enabled) is not bool or type(priority) is not int:
+            message = f"invalid configuration source schedule fields at index {index}"
+            raise CorruptStateError(message)
+        if raw_due_at is not None and not isinstance(raw_due_at, str):
+            message = f"invalid configuration source schedule due_at at index {index}"
+            raise CorruptStateError(message)
+        try:
+            schedules.append(
+                ScheduleMutation(
+                    task_id=task_id,
+                    enabled=enabled,
+                    due_at=None
+                    if raw_due_at is None
+                    else _decode_datetime(
+                        raw_due_at,
+                        field_name=f"configuration_source.source_schedules[{index}].due_at",
+                    ),
+                    priority=priority,
+                )
+            )
+        except (TypeError, ValueError) as error:
+            message = f"invalid configuration source schedule at index {index}: {error}"
+            raise CorruptStateError(message) from error
+
+    task_ids = tuple(item.task_id for item in schedules)
+    if len(task_ids) != len(set(task_ids)):
+        message = "configuration source schedules contain duplicate task ids"
+        raise CorruptStateError(message)
+    return tuple(schedules)
+
+
 def _required_text(row: sqlite3.Row, column: str) -> str:
     value: object = row[column]
     if not isinstance(value, str):
@@ -353,7 +425,7 @@ class SQLiteStateStore:
         with self._read_transaction():
             row = self._connection.execute(
                 """
-                SELECT source_revision, settings_revision, updated_at
+                SELECT source_revision, settings_revision, source_schedules, updated_at
                 FROM configuration_source
                 WHERE singleton = 1
                 """
@@ -447,6 +519,7 @@ class SQLiteStateStore:
 
         encoded_payload = _encode_json(payload)
         encoded_updated_at = _encode_datetime(updated_at, field_name="updated_at")
+        encoded_source_schedules = _encode_source_schedules(schedules)
         with self._transaction():
             snapshot = self._update_settings(
                 encoded_payload=encoded_payload,
@@ -459,14 +532,100 @@ class SQLiteStateStore:
             self._connection.execute(
                 """
                 INSERT INTO configuration_source(
-                    singleton, source_revision, settings_revision, updated_at
-                ) VALUES (1, ?, ?, ?)
+                    singleton, source_revision, settings_revision, source_schedules, updated_at
+                ) VALUES (1, ?, ?, ?, ?)
                 ON CONFLICT(singleton) DO UPDATE SET
                     source_revision = excluded.source_revision,
                     settings_revision = excluded.settings_revision,
+                    source_schedules = excluded.source_schedules,
                     updated_at = excluded.updated_at
                 """,
-                (source_revision, snapshot.revision, encoded_updated_at),
+                (source_revision, snapshot.revision, encoded_source_schedules, encoded_updated_at),
+            )
+            return snapshot
+
+    def publish_configuration_update(  # noqa: PLR0913
+        self,
+        payload: JsonValue,
+        schedules: tuple[ScheduleMutation, ...],
+        previous_source_schedules: tuple[ScheduleMutation, ...],
+        *,
+        source_revision: str,
+        expected_revision: int,
+        updated_at: datetime,
+    ) -> SettingsSnapshot:
+        """发布新 source snapshot，仅把 source 中实际变化的调度字段合并到运行态。"""
+
+        _require_non_negative_integer(expected_revision, field_name="expected_revision")
+        _require_trimmed_non_empty_text(source_revision, field_name="source_revision")
+        for field_name, values in (
+            ("schedules", schedules),
+            ("previous_source_schedules", previous_source_schedules),
+        ):
+            if not isinstance(values, tuple) or any(not isinstance(item, ScheduleMutation) for item in values):
+                message = f"{field_name} must be a tuple of ScheduleMutation values"
+                raise TypeError(message)
+            task_ids = tuple(item.task_id for item in values)
+            if len(task_ids) != len(set(task_ids)):
+                message = f"{field_name} must not contain duplicate task ids"
+                raise ValueError(message)
+
+        encoded_payload = _encode_json(payload)
+        encoded_updated_at = _encode_datetime(updated_at, field_name="updated_at")
+        encoded_source_schedules = _encode_source_schedules(schedules)
+        current_source = {item.task_id: item for item in schedules}
+        previous_source = {item.task_id: item for item in previous_source_schedules}
+
+        with self._transaction():
+            snapshot = self._update_settings(
+                encoded_payload=encoded_payload,
+                encoded_updated_at=encoded_updated_at,
+                expected_revision=expected_revision,
+            )
+            for removed_task_id in previous_source.keys() - current_source.keys():
+                self._connection.execute("DELETE FROM schedule WHERE task_id = ?", (removed_task_id,))
+            for task_id, source_schedule in current_source.items():
+                previous = previous_source.get(task_id)
+                row = self._connection.execute(
+                    "SELECT task_id, enabled, due_at, priority, updated_at FROM schedule WHERE task_id = ?",
+                    (task_id,),
+                ).fetchone()
+                if previous is None or row is None:
+                    self._upsert_schedule(source_schedule, encoded_updated_at=encoded_updated_at)
+                    continue
+
+                runtime_schedule = self._schedule_from_row(row)
+                merged = ScheduleMutation(
+                    task_id=task_id,
+                    enabled=(
+                        source_schedule.enabled
+                        if source_schedule.enabled != previous.enabled
+                        else runtime_schedule.enabled
+                    ),
+                    due_at=(
+                        source_schedule.due_at if source_schedule.due_at != previous.due_at else runtime_schedule.due_at
+                    ),
+                    priority=source_schedule.priority,
+                )
+                if (
+                    merged.enabled != runtime_schedule.enabled
+                    or merged.due_at != runtime_schedule.due_at
+                    or merged.priority != runtime_schedule.priority
+                ):
+                    self._upsert_schedule(merged, encoded_updated_at=encoded_updated_at)
+
+            self._connection.execute(
+                """
+                INSERT INTO configuration_source(
+                    singleton, source_revision, settings_revision, source_schedules, updated_at
+                ) VALUES (1, ?, ?, ?, ?)
+                ON CONFLICT(singleton) DO UPDATE SET
+                    source_revision = excluded.source_revision,
+                    settings_revision = excluded.settings_revision,
+                    source_schedules = excluded.source_schedules,
+                    updated_at = excluded.updated_at
+                """,
+                (source_revision, snapshot.revision, encoded_source_schedules, encoded_updated_at),
             )
             return snapshot
 
@@ -1125,6 +1284,7 @@ class SQLiteStateStore:
                 _required_text(row, "updated_at"),
                 field_name="configuration_source.updated_at",
             ),
+            source_schedules=_decode_source_schedules(_required_text(row, "source_schedules")),
         )
 
     @staticmethod

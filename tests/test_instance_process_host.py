@@ -30,6 +30,17 @@ class _StopSignal:
         return self.requested
 
 
+class _ConfigurationSignal:
+    @staticmethod
+    def wait(timeout: float) -> bool:
+        del timeout
+        return False
+
+    @staticmethod
+    def clear() -> None:
+        pass
+
+
 @dataclass(slots=True)
 class _Runtime:
     loop_exit: InstanceLoopExit = field(
@@ -62,9 +73,16 @@ class _Runtime:
 class _Provider:
     runtime: _Runtime
     opened: list[str] = field(default_factory=list)
+    configuration_signals: list[object | None] = field(default_factory=list)
 
-    def open(self, instance_name: str) -> InstanceRuntimeSession:
+    def open(
+        self,
+        instance_name: str,
+        *,
+        configuration_signal: object | None = None,
+    ) -> InstanceRuntimeSession:
         self.opened.append(instance_name)
+        self.configuration_signals.append(configuration_signal)
         return self.runtime
 
 
@@ -132,6 +150,16 @@ def test_external_stop_signal_is_linked_to_abort_token_before_io() -> None:
     assert runtime.run_aborts[0].reason == "instance process stop requested"
 
 
+def test_configuration_signal_is_forwarded_to_runtime_provider() -> None:
+    runtime = _Runtime()
+    provider = _Provider(runtime)
+    signal = _ConfigurationSignal()
+
+    InstanceProcessHost(provider).execute("alas", "alas", configuration_signal=signal)
+
+    assert provider.configuration_signals == [signal]
+
+
 @pytest.mark.parametrize("command", ["missing", "restart"])
 def test_invalid_direct_command_closes_runtime(command: str) -> None:
     runtime = _Runtime()
@@ -146,8 +174,8 @@ def test_invalid_direct_command_closes_runtime(command: str) -> None:
 def test_invalid_provider_result_fails_before_execution() -> None:
     class _InvalidProvider:
         @staticmethod
-        def open(instance_name: str) -> object:
-            del instance_name
+        def open(instance_name: str, *, configuration_signal: object | None = None) -> object:
+            del instance_name, configuration_signal
             return object()
 
     with pytest.raises(TypeError, match="InstanceRuntimeSession"):

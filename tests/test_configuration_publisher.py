@@ -1,7 +1,7 @@
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, cast, override
 
 import pytest
 
@@ -18,8 +18,25 @@ from module.runtime import (
 from module.state import JsonValue, RevisionConflictError, ScheduleMutation, SQLiteStateStore
 from module.task_registry import LaunchSurface, TaskDefinition, TaskDomain
 
+
+def test_publisher_requires_both_initial_and_update_store_contracts() -> None:
+    class _InitialOnlyStore:
+        @staticmethod
+        def publish_configuration(*args: object, **kwargs: object) -> None:
+            del args, kwargs
+
+    with pytest.raises(TypeError, match="publish_configuration_update"):
+        ConfigurationPublisher(
+            store=cast("ConfigurationWriteStore", _InitialOnlyStore()),
+            factories=_registry(),
+            clock=_Clock(),
+        )
+
+
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from module.runtime import ConfigurationWriteStore
 
 _NOW = datetime(2026, 7, 13, 8, tzinfo=UTC)
 _SOURCE_REVISION = "sha256:" + "0" * 64
@@ -206,6 +223,40 @@ def test_publisher_preserves_store_cas_conflicts_without_replacing_schedule(tmp_
     assert snapshot.payload == _payload()
     assert schedule is not None
     assert schedule.enabled
+
+
+def test_update_publisher_preserves_runtime_schedule_on_cas_conflict(tmp_path: Path) -> None:
+    registry = _registry()
+    runtime_due = _NOW.replace(hour=12)
+    with SQLiteStateStore(tmp_path / "state.sqlite3") as store:
+        publisher = ConfigurationPublisher(store=store, factories=registry, clock=_Clock())
+        publisher.publish(
+            _payload(),
+            _schedules(),
+            source_revision=_SOURCE_REVISION,
+            expected_revision=0,
+        )
+        store.upsert_schedule(
+            ScheduleMutation(task_id="restart", enabled=False, due_at=runtime_due, priority=0),
+            updated_at=_NOW,
+        )
+
+        with pytest.raises(RevisionConflictError):
+            publisher.publish_update(
+                _payload(enabled=False),
+                _schedules(),
+                _schedules(),
+                source_revision="sha256:" + "1" * 64,
+                expected_revision=0,
+            )
+
+        snapshot = store.read_settings()
+        schedule = store.get_schedule("restart")
+    assert snapshot is not None
+    assert snapshot.revision == 1
+    assert schedule is not None
+    assert not schedule.enabled
+    assert schedule.due_at == runtime_due
 
 
 def test_store_rolls_back_settings_when_schedule_replacement_fails(tmp_path: Path) -> None:

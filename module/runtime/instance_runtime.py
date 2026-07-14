@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Self
 
 from module.application import AbortToken, ExecutionMode, PreemptionRequest, RunCoordinator, TaskId, TaskResult
 from module.application.scheduler import Scheduler
+from module.runtime.configuration_control import RuntimeConfigurationControl
 from module.runtime.configuration_publisher import ConfigurationPublisher
 from module.runtime.factories import TaskFactoryRegistry
 from module.runtime.outbox import OutboxDispatcher, OutboxPublisher
@@ -56,6 +57,7 @@ class InstanceRuntime:
     __slots__ = (
         "_agent",
         "_closed",
+        "_configuration_control",
         "_configuration_publisher",
         "_loop",
         "_store",
@@ -69,12 +71,16 @@ class InstanceRuntime:
         clock: LoopClock,
         *,
         outbox_publisher: OutboxPublisher | None = None,
+        configuration_control: RuntimeConfigurationControl | None = None,
     ) -> None:
         if not isinstance(config, InstanceRuntimeConfig):
             message = "config must be an InstanceRuntimeConfig"
             raise TypeError(message)
         if not isinstance(factories, TaskFactoryRegistry):
             message = "factories must be a TaskFactoryRegistry"
+            raise TypeError(message)
+        if configuration_control is not None and not isinstance(configuration_control, RuntimeConfigurationControl):
+            message = "configuration_control must be a RuntimeConfigurationControl or None"
             raise TypeError(message)
         if (
             isinstance(clock, type)
@@ -113,7 +119,7 @@ class InstanceRuntime:
                 lease_owner=config.lease_owner,
                 run_completion_hook=(None if outbox_dispatcher is None else outbox_dispatcher.dispatch_pending),
             )
-            self._loop = InstanceLoop(self._agent, clock)
+            self._loop = InstanceLoop(self._agent, clock, control=configuration_control)
             self._configuration_publisher = ConfigurationPublisher(
                 store=store,
                 factories=factories,
@@ -123,6 +129,7 @@ class InstanceRuntime:
             store.close()
             raise
         self._store = store
+        self._configuration_control = configuration_control
         self._closed = False
 
     def __enter__(self) -> Self:
@@ -135,6 +142,8 @@ class InstanceRuntime:
     def close(self) -> None:
         if self._closed:
             return
+        if self._configuration_control is not None:
+            self._configuration_control.close()
         self._store.close()
         self._closed = True
 

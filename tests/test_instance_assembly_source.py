@@ -21,6 +21,8 @@ from module.supervisor import DeviceLeaseRegistry
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from module.bootstrap import ConfigurationDocumentSource, GameRuntimeBundleSource
+
 
 def _template() -> dict[str, object]:
     return cast(
@@ -73,6 +75,25 @@ class _DocumentSource:
     def load(self, instance_name: str) -> ConfigurationDocument:
         self.names.append(instance_name)
         return self.document
+
+    @staticmethod
+    def watch_paths(instance_name: str) -> tuple[Path, ...]:
+        return (Path(f"{instance_name}.json"),)
+
+
+def test_filesystem_assembly_requires_configuration_watch_contract(tmp_path: Path) -> None:
+    class _LoadOnlySource:
+        @staticmethod
+        def load(instance_name: str) -> ConfigurationDocument:
+            del instance_name
+            return _template()
+
+    with pytest.raises(TypeError, match="watch_paths"):
+        FilesystemInstanceAssemblySource(
+            cast("ConfigurationDocumentSource", _LoadOnlySource()),
+            cast("GameRuntimeBundleSource", object()),
+            InstanceAssemblyLayout(state_root=tmp_path / "state", lease_lock_root=tmp_path / "leases"),
+        )
 
 
 @dataclass(slots=True)

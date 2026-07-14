@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
     from module.interaction import CancellationSignal
     from module.state import JsonValue
+    from module.supervisor import LoopWakeSignal
 
 _NOW = datetime(2026, 7, 13, 8, tzinfo=UTC)
 _SOURCE_REVISION = "sha256:" + "0" * 64
@@ -111,8 +112,12 @@ class _Clock:
         return _NOW
 
     @staticmethod
-    def sleep(seconds: float, cancellation: CancellationSignal) -> None:
-        del seconds
+    def sleep(
+        seconds: float,
+        cancellation: CancellationSignal,
+        wake_signal: LoopWakeSignal | None = None,
+    ) -> None:
+        del seconds, wake_signal
         cancellation.raise_if_requested()
 
 

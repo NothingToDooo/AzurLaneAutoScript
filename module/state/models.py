@@ -79,11 +79,12 @@ class SettingsSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class ConfigurationSourceSnapshot:
-    """编译配置摘要与其实际发布到的 settings revision。"""
+    """编译配置摘要、其实际发布到的 settings revision 与 source schedule 基线。"""
 
     source_revision: str
     settings_revision: int
     updated_at: datetime
+    source_schedules: tuple[ScheduleMutation, ...]
 
     def __post_init__(self) -> None:
         _require_trimmed_non_empty_text(self.source_revision, field_name="source_revision")
@@ -91,6 +92,15 @@ class ConfigurationSourceSnapshot:
             message = "settings_revision must be a positive integer"
             raise ValueError(message)
         _require_aware_datetime(self.updated_at, field_name="updated_at")
+        if not isinstance(self.source_schedules, tuple) or any(
+            not isinstance(schedule, ScheduleMutation) for schedule in self.source_schedules
+        ):
+            message = "source_schedules must be a tuple of ScheduleMutation values"
+            raise TypeError(message)
+        task_ids = tuple(schedule.task_id for schedule in self.source_schedules)
+        if len(task_ids) != len(set(task_ids)):
+            message = "source_schedules must not contain duplicate task ids"
+            raise ValueError(message)
 
 
 @dataclass(frozen=True, slots=True)

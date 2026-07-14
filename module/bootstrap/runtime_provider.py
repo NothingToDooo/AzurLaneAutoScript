@@ -3,8 +3,15 @@ from typing import TYPE_CHECKING, Protocol
 
 from module.bootstrap.configuration_compiler import CompiledConfiguration
 from module.bootstrap.task_factories import GameTaskDependencies, build_game_task_registry
-from module.runtime import InstanceRuntime, InstanceRuntimeConfig, OutboxPublisher
-from module.state import RevisionConflictError
+from module.logger import logger
+from module.runtime import (
+    ConfigurationChangeSignal,
+    InstanceRuntime,
+    InstanceRuntimeConfig,
+    OutboxPublisher,
+    RuntimeConfigurationControl,
+    RuntimeConfigurationSnapshot,
+)
 
 if TYPE_CHECKING:
     from module.supervisor import LoopClock
@@ -47,6 +54,35 @@ class InstanceAssembly:
 class InstanceAssemblySource(Protocol):
     def load(self, instance_name: str) -> InstanceAssembly: ...
 
+    def load_configuration(self, instance_name: str) -> CompiledConfiguration: ...
+
+    def configuration_signal(
+        self,
+        instance_name: str,
+        external: ConfigurationChangeSignal | None = None,
+    ) -> ConfigurationChangeSignal: ...
+
+
+class _BoundRuntimeConfigurationSource:
+    __slots__ = ("_instance_name", "_source")
+
+    def __init__(self, source: InstanceAssemblySource, instance_name: str) -> None:
+        self._source = source
+        self._instance_name = instance_name
+
+    def load(self) -> RuntimeConfigurationSnapshot:
+        return _runtime_configuration(self._source.load_configuration(self._instance_name))
+
+
+def _runtime_configuration(configuration: CompiledConfiguration) -> RuntimeConfigurationSnapshot:
+    return RuntimeConfigurationSnapshot(
+        payload=configuration.payload,
+        schedules=configuration.schedules,
+        source_revision=configuration.source_revision,
+        assembly_revision=configuration.assembly_revision,
+        device_serial=configuration.device_serial,
+    )
+
 
 class ProductionRuntimeProvider:
     """生产 runtime composition root；每个进程只构建一个实例级依赖图。"""
@@ -60,8 +96,10 @@ class ProductionRuntimeProvider:
         *,
         outbox_publisher: OutboxPublisher | None = None,
     ) -> None:
-        if isinstance(source, type) or not callable(getattr(source, "load", None)):
-            message = "source must implement load()"
+        if isinstance(source, type) or not all(
+            callable(getattr(source, method, None)) for method in ("load", "load_configuration", "configuration_signal")
+        ):
+            message = "source must implement load(), load_configuration(), and configuration_signal()"
             raise TypeError(message)
         if isinstance(clock, type) or not all(callable(getattr(clock, method, None)) for method in ("now", "sleep")):
             message = "clock must implement now() and sleep()"
@@ -75,7 +113,13 @@ class ProductionRuntimeProvider:
         self._clock = clock
         self._outbox_publisher = outbox_publisher
 
-    def open(self, instance_name: str) -> InstanceRuntime:
+    def open(
+        self,
+        instance_name: str,
+        *,
+        configuration_signal: ConfigurationChangeSignal | None = None,
+    ) -> InstanceRuntime:
+        signal = self._source.configuration_signal(instance_name, configuration_signal)
         assembly = self._source.load(instance_name)
         if not isinstance(assembly, InstanceAssembly):
             message = "InstanceAssemblySource.load() must return an InstanceAssembly"
@@ -85,35 +129,23 @@ class ProductionRuntimeProvider:
             content_revision=assembly.content_revision,
             client_ui_revision=assembly.client_ui_revision,
         )
-        runtime = InstanceRuntime(
-            assembly.runtime,
-            factories,
-            self._clock,
-            outbox_publisher=self._outbox_publisher,
+        control = RuntimeConfigurationControl(
+            state_path=assembly.runtime.state_path,
+            factories=factories,
+            clock=self._clock,
+            source=_BoundRuntimeConfigurationSource(self._source, instance_name),
+            signal=signal,
+            initial=_runtime_configuration(assembly.configuration),
+            error_reporter=logger.exception,
         )
         try:
-            self._synchronize_configuration(runtime, assembly.configuration)
-        except BaseException:
-            runtime.close()
-            raise
-        return runtime
-
-    @staticmethod
-    def _synchronize_configuration(runtime: InstanceRuntime, configuration: CompiledConfiguration) -> None:
-        current_source = runtime.read_configuration_source()
-        if current_source is not None and current_source.source_revision == configuration.source_revision:
-            return
-
-        settings = runtime.read_settings()
-        expected_revision = 0 if settings is None else settings.revision
-        try:
-            runtime.publish_configuration(
-                configuration.payload,
-                configuration.schedules,
-                source_revision=configuration.source_revision,
-                expected_revision=expected_revision,
+            return InstanceRuntime(
+                assembly.runtime,
+                factories,
+                self._clock,
+                outbox_publisher=self._outbox_publisher,
+                configuration_control=control,
             )
-        except RevisionConflictError:
-            refreshed_source = runtime.read_configuration_source()
-            if refreshed_source is None or refreshed_source.source_revision != configuration.source_revision:
-                raise
+        except BaseException:
+            control.close()
+            raise

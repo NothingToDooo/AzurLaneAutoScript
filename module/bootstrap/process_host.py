@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from module.application import (
     AbortToken,
@@ -14,6 +14,9 @@ from module.application import (
 )
 from module.supervisor import InstanceLoopExit, InstanceLoopExitReason
 from module.task_registry import TASK_CATALOG
+
+if TYPE_CHECKING:
+    from module.runtime import ConfigurationChangeSignal
 
 
 class InstanceProcessExitKind(StrEnum):
@@ -61,7 +64,12 @@ class InstanceRuntimeSession(Protocol):
 
 
 class InstanceRuntimeProvider(Protocol):
-    def open(self, instance_name: str) -> InstanceRuntimeSession: ...
+    def open(
+        self,
+        instance_name: str,
+        *,
+        configuration_signal: ConfigurationChangeSignal | None = None,
+    ) -> InstanceRuntimeSession: ...
 
 
 def _require_identifier(value: str, *, field_name: str) -> None:
@@ -110,6 +118,7 @@ class InstanceProcessHost:
         command: str,
         *,
         stop_signal: ExternalRequestSignal | None = None,
+        configuration_signal: ConfigurationChangeSignal | None = None,
     ) -> InstanceProcessExit:
         _require_identifier(instance_name, field_name="instance_name")
         _require_identifier(command, field_name="command")
@@ -117,7 +126,7 @@ class InstanceProcessHost:
             external_signal=stop_signal,
             external_reason="instance process stop requested",
         )
-        runtime = self._provider.open(instance_name)
+        runtime = self._provider.open(instance_name, configuration_signal=configuration_signal)
         if isinstance(runtime, type) or not all(
             callable(getattr(runtime, method, None)) for method in ("run", "execute", "close")
         ):
