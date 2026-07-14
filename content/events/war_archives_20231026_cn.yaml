@@ -1,11 +1,32 @@
 schema_version: 1
 id: war_archives_20231026_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: tempesta_and_the_fountain_of_youth
 releases:
 - opened_on: '2025-10-16'
   name_cn: 飓风与青春之泉
   order: 410
+stages:
+- id: t1
+  source: stages/t1.yaml
+  runtime_profile: profile_13abb2481d05e1a1
+- id: t2
+  source: stages/t2.yaml
+  runtime_profile: profile_d9be26e664abed75
+- id: t3
+  source: stages/t3.yaml
+  runtime_profile: profile_13abb2481d05e1a1
+- id: t4
+  source: stages/t4.yaml
+  runtime_profile: profile_13abb2481d05e1a1
+- id: t5
+  source: stages/t5.yaml
+  runtime_profile: profile_d9be26e664abed75
+- id: t6
+  source: stages/t6.yaml
+  runtime_profile: profile_bcfd9c0b28ace281
 policy:
   aliases:
     a1: t1
@@ -23,3 +44,10 @@ policy:
     sp4: t4
     sp5: t5
     sp6: t6
+  progressions:
+    t1: t2
+    t2: t3
+    t3: t4
+    t4: t5
+    t5: t6
+    t6: null

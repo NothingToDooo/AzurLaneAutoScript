@@ -1,11 +1,36 @@
 schema_version: 1
 id: event_20200326_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2020-03-26'
   name_cn: 微层混合
   order: 490
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_2b4bd42c4ed05274
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_2b4bd42c4ed05274
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_2b4bd42c4ed05274
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_2b4bd42c4ed05274
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_2b4bd42c4ed05274
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_2b4bd42c4ed05274
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_292ab61881d2305c
 policy:
   aliases:
     ht6: d3
@@ -15,3 +40,11 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    d3: null

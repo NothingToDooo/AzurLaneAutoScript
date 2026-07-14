@@ -1,0 +1,123 @@
+schema_version: 4
+map:
+  name: B1
+  shape: J8
+  camera_data:
+  - D2
+  - D6
+  - G2
+  - G6
+  camera_data_spawn_point:
+  - G2
+  - D2
+  map_data: '-- MS ++ SP MB SP ++ MS ME --
+
+    ME -- -- -- __ -- -- -- -- ME
+
+    Me -- ++ MS -- MS ++ Me -- ++
+
+    ++ -- ++ ++ -- ++ ++ ++ -- ++
+
+    ME -- -- -- -- -- -- -- -- --
+
+    -- Me -- ++ ++ ++ -- ++ ++ --
+
+    ME -- -- ++ -- ME -- ME Me --
+
+    ++ ME -- -- ME -- Me -- -- ME'
+  weight_data: '50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 2
+    siren: 1
+  - battle: 1
+    enemy: 1
+  - battle: 2
+    enemy: 2
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 2
+    boss: 1
+  - battle: 5
+    enemy: 1
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: true
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: true
+  MAP_SIREN_TEMPLATE:
+  - Gloucester
+  - York
+  MAP_HAS_SIREN: true
+  STAR_REQUIRE_1: 1
+  STAR_REQUIRE_2: 2
+  STAR_REQUIRE_3: 3
+  MAP_SWIPE_MULTIPLY:
+  - 1.207
+  - 1.229
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.167
+  - 1.189
+enemy_filter: 1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M
+battles:
+  0:
+    steps:
+    - genres: []
+      tag: clear_siren
+    - tag: default_battle
+  4:
+    steps:
+    - strategy: map_search
+      tag: clear_boss_roadblock
+    - strategy: map_search
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns:
+    - 2
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups:
+    - - D5
+      - I4
+      - J6
+    - - B4
+      - E4
+      - D8
+    - - C2
+      - G2
+      - G6
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs: []
+boss_approaches: []
+hard_mode: null

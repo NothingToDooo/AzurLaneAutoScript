@@ -1,8 +1,29 @@
 schema_version: 1
 id: war_archives_20220324_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: virtual_tower
 releases:
 - opened_on: '2025-03-20'
   name_cn: 虚像构筑之塔
   order: 370
+stages:
+- id: sp1
+  source: stages/sp1.yaml
+  runtime_profile: profile_aa4858488dc3f87e
+- id: sp2
+  source: stages/sp2.yaml
+  runtime_profile: profile_aa4858488dc3f87e
+- id: sp3
+  source: stages/sp3.yaml
+  runtime_profile: profile_aa4858488dc3f87e
+- id: sp4
+  source: stages/sp4.yaml
+  runtime_profile: profile_aa4858488dc3f87e
+policy:
+  progressions:
+    sp1: sp2
+    sp2: sp3
+    sp3: sp4
+    sp4: null

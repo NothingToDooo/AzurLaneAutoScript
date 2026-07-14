@@ -1,11 +1,50 @@
 schema_version: 1
 id: war_archives_20220526_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: pledge_of_the_radiant_court
 releases:
 - opened_on: '2025-04-17'
   name_cn: 泠誓光庭
   order: 380
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_293e44bb4f4a39ce
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_3956532bfdc2a22b
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_b9f8dfa9de6c90b6
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_fa7ccb0d3dd422e9
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_b55d66256028df54
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_5c38e45d714f7ed2
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_e24d1660ca891e98
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_b033d2f38a6e40e1
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_b9f8dfa9de6c90b6
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_f46ee8efd288a124
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_b55d66256028df54
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_5c38e45d714f7ed2
 policy:
   aliases:
     ht1: c1
@@ -20,3 +59,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

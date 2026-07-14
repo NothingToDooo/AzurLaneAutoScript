@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20240725_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2024-07-25'
   name_cn: 幻梦间奏曲
@@ -9,6 +12,28 @@ releases:
 - opened_on: '2025-02-27'
   name_cn: null
   order: 2100
+stages:
+- id: ht1
+  source: stages/ht1.yaml
+  runtime_profile: profile_5a0d5fabd6df603f
+- id: ht2
+  source: stages/ht2.yaml
+  runtime_profile: profile_5a0d5fabd6df603f
+- id: ht3
+  source: stages/ht3.yaml
+  runtime_profile: profile_5a0d5fabd6df603f
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_5a0d5fabd6df603f
+- id: t1
+  source: stages/t1.yaml
+  runtime_profile: profile_5a0d5fabd6df603f
+- id: t2
+  source: stages/t2.yaml
+  runtime_profile: profile_5a0d5fabd6df603f
+- id: t3
+  source: stages/t3.yaml
+  runtime_profile: profile_5a0d5fabd6df603f
 policy:
   aliases:
     a1: t1
@@ -19,3 +44,10 @@ policy:
     c3: ht3
     y.sp: sp
     ysp: sp
+  progressions:
+    ht1: ht2
+    ht2: ht3
+    ht3: null
+    t1: t2
+    t2: t3
+    t3: null

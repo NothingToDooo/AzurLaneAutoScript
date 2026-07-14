@@ -4,15 +4,18 @@ from typing import TYPE_CHECKING, cast, get_type_hints
 import pytest
 
 from module.content import (
+    CampaignPolicy,
     ContentCatalog,
     ContentCatalogError,
     ContentId,
     EventPack,
+    StageProgressionRule,
     StageRef,
     StageSpec,
     UnknownPackError,
     UnknownStageError,
 )
+from module.content.manifest import load_default_event_manifests
 
 if TYPE_CHECKING:
     from typing import Any
@@ -44,6 +47,7 @@ def test_catalog_preserves_explicit_pack_order_and_resolves_stages() -> None:
 
     assert catalog.packs == (first, second)
     assert catalog.get_pack("event_first") is first
+    assert catalog.has_stage(StageRef("event_first", "t1"))
     assert catalog.resolve_stage(StageRef("event_first", "t1")) is first.stages[1]
 
 
@@ -58,11 +62,15 @@ def test_catalog_pack_view_cannot_be_rebound() -> None:
 
 def test_catalog_public_annotations_are_runtime_resolvable() -> None:
     init_hints = get_type_hints(ContentCatalog.__init__)
+    stages_hints = get_type_hints(ContentCatalog.__dict__["stages"].fget)
     get_pack_hints = get_type_hints(ContentCatalog.get_pack)
+    has_stage_hints = get_type_hints(ContentCatalog.has_stage)
     resolve_stage_hints = get_type_hints(ContentCatalog.resolve_stage)
 
     assert init_hints["packs"] == Iterable[EventPack]
+    assert stages_hints["return"] == tuple[StageSpec, ...]
     assert get_pack_hints["return"] is EventPack
+    assert has_stage_hints == {"ref": StageRef, "return": bool}
     assert resolve_stage_hints == {"ref": StageRef, "return": StageSpec}
 
 
@@ -116,3 +124,76 @@ def test_catalog_distinguishes_unknown_stage_from_unknown_pack() -> None:
 
     with pytest.raises(UnknownPackError, match="event_missing"):
         catalog.resolve_stage(StageRef("event_missing", "t1"))
+
+
+def test_catalog_stage_presence_is_alias_aware_and_total_for_unknown_content() -> None:
+    pack = EventPack(
+        pack_id=ContentId("event_known"),
+        stages=(_stage("event_known", "t1"),),
+        policy=CampaignPolicy(aliases=(("first", "t1"),)),
+    )
+    catalog = ContentCatalog((pack,))
+
+    assert catalog.has_stage(StageRef("event_known", "first"))
+    assert not catalog.has_stage(StageRef("event_known", "missing"))
+    assert not catalog.has_stage(StageRef("event_missing", "t1"))
+    with pytest.raises(TypeError, match="StageRef"):
+        catalog.has_stage(cast("Any", object()))
+
+
+def test_default_catalog_resolves_main_campaign_configuration_aliases() -> None:
+    catalog = ContentCatalog(load_default_event_manifests())
+
+    spec = catalog.resolve_stage(StageRef("campaign_main", "campaign_10_1"))
+
+    assert spec.ref == StageRef("campaign_main", "10-1")
+
+
+def test_catalog_resolves_alias_before_selecting_the_next_progression_stage() -> None:
+    pack = EventPack(
+        pack_id=ContentId("event_known"),
+        stages=tuple(_stage("event_known", stage) for stage in ("t1", "t2", "t3")),
+        policy=CampaignPolicy(
+            aliases=(("first", "t1"),),
+            progressions=(
+                StageProgressionRule("t1", "t2"),
+                StageProgressionRule("t2", "t3"),
+                StageProgressionRule("t3", None),
+            ),
+        ),
+    )
+    catalog = ContentCatalog((pack,))
+
+    assert catalog.next_ref(StageRef("event_known", "first")) == StageRef("event_known", "t2")
+    assert catalog.next_ref(StageRef("event_known", "t2")) == StageRef("event_known", "t3")
+    assert catalog.next_ref(StageRef("event_known", "t3")) is None
+
+
+def test_default_catalog_preserves_main_and_event_progression_contracts() -> None:
+    catalog = ContentCatalog(load_default_event_manifests())
+
+    assert catalog.next_ref(StageRef("campaign_main", "campaign_10_1")) == StageRef(
+        "campaign_main",
+        "10-2",
+    )
+    assert catalog.next_ref(StageRef("event_20200917_cn", "t4")) == StageRef(
+        "event_20200917_cn",
+        "ts2",
+    )
+    assert catalog.next_ref(StageRef("event_20200917_cn", "t6")) is None
+    assert catalog.next_ref(StageRef("war_archives_20190911_cn", "a1")) == StageRef(
+        "war_archives_20190911_cn",
+        "a2",
+    )
+    assert catalog.next_ref(StageRef("war_archives_20190911_cn", "as1")) == StageRef(
+        "war_archives_20190911_cn",
+        "a2",
+    )
+    assert catalog.next_ref(StageRef("war_archives_20210325_cn", "bs1")) == StageRef(
+        "war_archives_20210325_cn",
+        "b2",
+    )
+    assert catalog.next_ref(StageRef("war_archives_20211229_cn", "bs1")) == StageRef(
+        "war_archives_20211229_cn",
+        "b3",
+    )

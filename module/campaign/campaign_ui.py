@@ -5,8 +5,8 @@ from module.base.button import Button
 from module.base.timer import Timer
 from module.base.utils import area_offset
 from module.campaign import assets as campaign_assets
-from module.campaign.campaign_event import CampaignEvent
 from module.campaign.campaign_ocr import CampaignOcr
+from module.campaign.event_navigation import EventCampaignNavigation
 from module.exception import CampaignEnd, CampaignNameError, ScriptEnd
 from module.logger import logger
 from module.map.assets import WITHDRAW
@@ -83,7 +83,7 @@ def is_digit_chapter(chapter: str | int) -> bool:
         return False
 
 
-class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
+class CampaignUI(MapOperation, EventCampaignNavigation, CampaignOcr):
     ENTRANCE = Button(area=(), color=(), button=(), name="default_button")
     stage_entrance: dict[str, Button]
 
@@ -139,7 +139,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
     def campaign_ensure_mode(self, mode: str = "normal") -> None:
         """mode 接受 normal、hard 或 ex。"""
         if mode == "hard":
-            self.config.override(Campaign_Mode="hard")
+            self.config.apply_runtime_overlay(Campaign_Mode="hard")
 
         switch_2 = MODE_SWITCH_2.get(main=self)
 
@@ -257,7 +257,7 @@ class CampaignUI(MapOperation, CampaignEvent, CampaignOcr):
 
     def _set_20241219_hard_mode(self, chapter: str, stage: str) -> None:
         if self._campaign_name_is_hard(f"{chapter}{stage}"):
-            self.config.override(Campaign_Mode="hard")
+            self.config.apply_runtime_overlay(Campaign_Mode="hard")
 
     def _campaign_set_chapter_20241219_aside(
         self,

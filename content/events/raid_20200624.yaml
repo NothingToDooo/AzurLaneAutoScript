@@ -1,7 +1,13 @@
 schema_version: 1
 id: raid_20200624
 kind: raid
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: raid
+  profile: essex
+  modes: [easy, normal, hard]
+  daily_modes: [easy, normal, hard]
+  ticket_modes: []
 releases:
 - opened_on: '2020-06-24'
   name_cn: 复刻特别演习埃塞克斯级

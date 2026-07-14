@@ -1,8 +1,33 @@
 schema_version: 1
 id: war_archives_20201029_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: universe_in_unison
 releases:
 - opened_on: '2022-10-13'
   name_cn: 激唱的UNIVERSE
   order: 190
+stages:
+- id: sp1
+  source: stages/sp1.yaml
+  runtime_profile: profile_9d867d668f76644a
+- id: sp2
+  source: stages/sp2.yaml
+  runtime_profile: profile_9d867d668f76644a
+- id: sp3
+  source: stages/sp3.yaml
+  runtime_profile: profile_9d867d668f76644a
+- id: sp4
+  source: stages/sp4.yaml
+  runtime_profile: profile_9d867d668f76644a
+- id: sp5
+  source: stages/sp5.yaml
+  runtime_profile: profile_c7b92ee3366c6f3f
+policy:
+  progressions:
+    sp1: sp2
+    sp2: sp3
+    sp3: sp4
+    sp4: sp5
+    sp5: null

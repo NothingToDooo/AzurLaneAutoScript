@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20240229_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2024-02-29'
   name_cn: 雪境迷踪
@@ -12,6 +15,46 @@ releases:
 - opened_on: '2026-03-12'
   name_cn: 复刻雪境迷踪
   order: 2510
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_46b36895ba33934f
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_46b36895ba33934f
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_46b36895ba33934f
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_66659f6335c73348
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_ffff044bf1e5e44f
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_6ca7d224a4623631
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_46b36895ba33934f
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_46b36895ba33934f
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_46b36895ba33934f
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_66659f6335c73348
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_ffff044bf1e5e44f
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_d03c1a81113ad34d
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_c471021c404053c4
 policy:
   aliases:
     ht1: c1
@@ -26,3 +69,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

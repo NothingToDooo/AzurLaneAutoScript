@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20200603_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2020-06-03'
   name_cn: 峡湾间的反击
@@ -15,3 +18,18 @@ releases:
 - opened_on: '2023-06-15'
   name_cn: null
   order: 1360
+stages:
+- id: sp1
+  source: stages/sp1.yaml
+  runtime_profile: core
+- id: sp2
+  source: stages/sp2.yaml
+  runtime_profile: core
+- id: sp3
+  source: stages/sp3.yaml
+  runtime_profile: core
+policy:
+  progressions:
+    sp1: sp2
+    sp2: sp3
+    sp3: null

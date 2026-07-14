@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20211111_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2021-11-11'
   name_cn: 杰诺瓦的焰火

@@ -2,12 +2,20 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+from module.content.activity_profile import (
+    ActivityDefinition,
+    CoalitionDefinition,
+    EventStoryDefinition,
+    RaidDefinition,
+)
 from module.content.campaign_policy import CampaignPolicy
 from module.content.errors import ContentValidationError
+from module.content.runtime_profile import CampaignRuntimeProfileId
 from module.content.validation import require_non_empty_identifier
+from module.content.war_archives_profile import WarArchivesDefinition
 
-EVENT_KINDS = ("event", "raid", "coalition", "war_archives")
-EVENT_UI_PROFILES = ("legacy_python",)
+EVENT_KINDS = ("event", "raid", "coalition", "war_archives", "campaign")
+EVENT_UI_PROFILES = ("campaign_v1",)
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,7 +56,8 @@ class StageSpec:
     ref: StageRef
     source: str
     assets: tuple[AssetRef, ...] = ()
-    strategy: str | None = None
+    runtime_profile_id: CampaignRuntimeProfileId = field(default_factory=lambda: CampaignRuntimeProfileId("core"))
+    war_archives: WarArchivesDefinition | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.ref, StageRef):
@@ -59,13 +68,12 @@ class StageSpec:
         if any(not isinstance(asset, AssetRef) for asset in assets):
             message = "assets must contain AssetRef instances"
             raise TypeError(message)
-        if self.strategy is not None:
-            if not isinstance(self.strategy, str):
-                message = "strategy must be a string or None"
-                raise TypeError(message)
-            if not self.strategy.strip():
-                message = "strategy must not be empty or whitespace"
-                raise ContentValidationError(message)
+        if not isinstance(self.runtime_profile_id, CampaignRuntimeProfileId):
+            message = "runtime_profile_id must be a CampaignRuntimeProfileId"
+            raise TypeError(message)
+        if self.war_archives is not None and not isinstance(self.war_archives, WarArchivesDefinition):
+            message = "war_archives must be a WarArchivesDefinition or None"
+            raise TypeError(message)
         object.__setattr__(self, "assets", assets)
 
 
@@ -96,9 +104,11 @@ class EventPack:
     pack_id: ContentId | str
     stages: tuple[StageSpec, ...] = ()
     kind: str = "event"
-    ui_profile: str = "legacy_python"
+    ui_profile: str = "campaign_v1"
     releases: tuple[EventRelease, ...] = ()
     policy: CampaignPolicy = field(default_factory=CampaignPolicy)
+    activity: ActivityDefinition | None = None
+    war_archives: WarArchivesDefinition | None = None
 
     def __post_init__(self) -> None:
         pack_id = self.pack_id
@@ -127,6 +137,34 @@ class EventPack:
         if not isinstance(self.policy, CampaignPolicy):
             message = "policy must be a CampaignPolicy"
             raise TypeError(message)
+        self._validate_profiles(stages)
 
         object.__setattr__(self, "stages", stages)
         object.__setattr__(self, "releases", releases)
+
+    def _validate_profiles(self, stages: tuple[StageSpec, ...]) -> None:
+        if self.activity is not None and not isinstance(
+            self.activity,
+            EventStoryDefinition | RaidDefinition | CoalitionDefinition,
+        ):
+            message = "activity must be an ActivityDefinition or None"
+            raise TypeError(message)
+        expected_activity = {
+            "event": EventStoryDefinition,
+            "raid": RaidDefinition,
+            "coalition": CoalitionDefinition,
+        }.get(self.kind)
+        if self.activity is not None and (
+            expected_activity is None or not isinstance(self.activity, expected_activity)
+        ):
+            message = f"kind {self.kind!r} does not accept {type(self.activity).__name__}"
+            raise ContentValidationError(message)
+        if self.war_archives is not None and not isinstance(self.war_archives, WarArchivesDefinition):
+            message = "war_archives must be a WarArchivesDefinition or None"
+            raise TypeError(message)
+        if (self.kind == "war_archives") != (self.war_archives is not None):
+            message = "war_archives definition must exist exactly for war_archives packs"
+            raise ContentValidationError(message)
+        if any(stage.war_archives != self.war_archives for stage in stages):
+            message = "stage war_archives definition must match its pack"
+            raise ContentValidationError(message)

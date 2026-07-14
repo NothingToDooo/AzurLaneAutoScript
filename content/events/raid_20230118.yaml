@@ -1,7 +1,13 @@
 schema_version: 1
 id: raid_20230118
 kind: raid
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: raid
+  profile: kuybyshey
+  modes: [easy, normal, hard, ex]
+  daily_modes: [easy, normal, hard, ex]
+  ticket_modes: [ex]
 releases:
 - opened_on: '2023-01-18'
   name_cn: 冬日的寻路人

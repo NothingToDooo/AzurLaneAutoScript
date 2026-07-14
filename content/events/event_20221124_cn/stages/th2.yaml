@@ -1,0 +1,135 @@
+schema_version: 4
+map:
+  name: TH2
+  shape: I7
+  camera_data:
+  - D2
+  - D5
+  - F2
+  - F5
+  camera_data_spawn_point:
+  - D2
+  - D5
+  map_data: '-- -- ME -- Me -- ++ ++ ++
+
+    -- ME -- ME -- MS ME Me --
+
+    SP -- -- MS -- -- -- -- --
+
+    SP -- ++ ++ -- -- __ -- ME
+
+    -- -- ++ ++ MS -- ++ MB --
+
+    ++ -- -- ME -- -- ++ ++ --
+
+    ME ME -- -- -- ME -- -- ME'
+  weight_data: '50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 3
+    siren: 2
+  - battle: 1
+    enemy: 2
+    siren: 1
+  - battle: 2
+    enemy: 1
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 1
+  - battle: 5
+  - battle: 6
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: true
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: false
+  MAP_SIREN_TEMPLATE:
+  - DDalchemist
+  - CLalchemist
+  MAP_HAS_SIREN: true
+  STAR_REQUIRE_1: 0
+  STAR_REQUIRE_2: 0
+  STAR_REQUIRE_3: 0
+  MAP_SWIPE_MULTIPLY:
+  - 1.103
+  - 1.123
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.066
+  - 1.086
+  MAP_ENSURE_EDGE_INSIGHT_CORNER: bottom
+enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - tag: clear_siren
+    - preserve: 1
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  5:
+    steps:
+    - tag: clear_siren
+    - preserve: 0
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  6:
+    steps:
+    - tag: clear_boss
+      strategy: fleet_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions:
+  - battle: 6
+    cells:
+    - E2
+    - E7
+    tag: clear_map_items
+  map_mutations: []
+  moving_enemies:
+    turns:
+    - 2
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs:
+- activation_modes:
+  - normal
+  battle: 6
+  statements:
+  - action:
+      category: map_interactions
+      index: 0
+    expected_target: null
+    tag: perform_mechanic
+  - action:
+      strategy: fleet_boss
+      tag: clear_boss
+    tag: return_battle
+boss_approaches: []
+hard_mode: null

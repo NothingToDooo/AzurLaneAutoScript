@@ -1,0 +1,202 @@
+schema_version: 4
+map:
+  name: 15-3
+  shape: J8
+  camera_data:
+  - C2
+  - C6
+  - G2
+  - G6
+  camera_data_spawn_point:
+  - G6
+  map_data: 'Me -- ++ ME ME ME -- ME -- ME
+
+    -- ME ++ Me -- Me ME Me ME --
+
+    ME Me ME ME Me -- ++ MB -- ME
+
+    ++ -- -- ME ME Me ++ ++ __ ME
+
+    Me ME -- ++ Me -- ME MS -- Me
+
+    ME ME -- -- ME ME ME -- -- ME
+
+    Me -- __ -- -- ME -- -- ++ ++
+
+    ++ ++ ++ Me -- -- SP SP ++ ++'
+  weight_data: '50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 5
+  - battle: 1
+    enemy: 2
+  - battle: 2
+    enemy: 1
+  - battle: 3
+    enemy: 1
+    siren: 1
+  - battle: 4
+    enemy: 2
+  - battle: 5
+  - battle: 6
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: false
+  MAP_HAS_AMBUSH: true
+  MAP_HAS_MYSTERY: false
+  STAR_REQUIRE_1: 1
+  STAR_REQUIRE_2: 2
+  STAR_REQUIRE_3: 3
+  MAP_SWIPE_MULTIPLY:
+  - 0.993
+  - 1.011
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 0.96
+  - 0.978
+enemy_filter: 1L > 1M > 1E > 2L > 3L > 2M > 2E > 1C > 2C > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - tag: clear_filtered_enemy
+      preserve: 0
+    - tag: default_battle
+  1:
+    steps:
+    - preserve: 1
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  3:
+    steps:
+    - expected: siren
+      tag: clear_chosen_enemy
+      target: H5
+  4:
+    steps:
+    - preserve: 1
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  5:
+    steps:
+    - preserve: 0
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  6:
+    steps:
+    - strategy: fleet_boss
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination:
+  - battle: 0
+    expected: enemy
+    fleet: active
+    tag: clear_target
+    target: A1
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns: []
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement:
+  - battle: 0
+    source: B3
+    target: B4
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs:
+- activation_modes:
+  - normal
+  - clear_all
+  battle: 0
+  statements:
+  - condition:
+      conditions:
+      - flag: clear_all
+        tag: flag
+        value: true
+      - flag: clear_mode
+        tag: flag
+        value: true
+      tag: all
+    tag: branch
+    when_false:
+    - condition:
+        conditions:
+        - condition:
+            flag: clear_mode
+            tag: flag
+            value: true
+          tag: not
+        - flag: map_has_mob_move
+          tag: flag
+          value: true
+        tag: all
+      tag: branch
+      when_false: []
+      when_true:
+      - action:
+          category: enemy_movement
+          index: 0
+        expected_target: null
+        tag: perform_mechanic
+      - condition:
+          cell: A1
+          operator: equal
+          property: accessible
+          tag: cell_property
+          value: true
+        tag: branch
+        when_false: []
+        when_true:
+        - action:
+            expected: enemy
+            tag: clear_chosen_enemy
+            target: A1
+          tag: return_battle
+    - action:
+        preserve: 1
+        tag: clear_filtered_enemy
+      tag: attempt_battle
+    - action:
+        tag: default_battle
+      tag: return_battle
+    when_true:
+    - tag: delegate
+      target: default_mode
+- battle: 3
+  activation_modes:
+  - clear_all
+  statements:
+  - tag: return_battle
+    action:
+      tag: clear_chosen_enemy
+      target: H5
+      expected: siren
+boss_approaches: []
+hard_mode: null

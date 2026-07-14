@@ -1,7 +1,26 @@
 schema_version: 1
 id: coalition_20240627
 kind: coalition
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: coalition
+  profile: academy
+  stages:
+  - id: easy
+    battles: 1
+    fleet: single
+  - id: normal
+    battles: 2
+    fleet: selectable
+  - id: hard
+    battles: 3
+    fleet: selectable
+  - id: sp
+    battles: 4
+    fleet: multi
+  - id: ex
+    battles: 5
+    fleet: multi
 releases:
 - opened_on: '2024-06-27'
   name_cn: 欢迎来到童心学院

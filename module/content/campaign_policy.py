@@ -1,9 +1,6 @@
-import random
 from dataclasses import dataclass
-from typing import Protocol
 
 from module.content.errors import ContentValidationError
-from module.logger import logger
 
 MAP_ACHIEVEMENT_VALUES = (
     "non_stop",
@@ -14,16 +11,20 @@ MAP_ACHIEVEMENT_VALUES = (
 )
 
 
-class PolicyConfig(Protocol):
-    def override(self, **kwargs: object) -> None: ...
+@dataclass(frozen=True, slots=True)
+class StageProgressionRule:
+    """声明一个关卡的直接后继；`None` 表示该规则在当前包内终止。"""
 
+    stage: str
+    next_stage: str | None
 
-class StageLoopConfig(PolicyConfig, Protocol):
-    StopCondition_RunCount: int
-
-
-class StagePolicyConfig(PolicyConfig, Protocol):
-    StopCondition_MapAchievement: str
+    def __post_init__(self) -> None:
+        if not isinstance(self.stage, str) or not self.stage:
+            message = "progression rule stage must be a non-empty string"
+            raise ContentValidationError(message)
+        if self.next_stage is not None and (not isinstance(self.next_stage, str) or not self.next_stage):
+            message = "progression rule next_stage must be a non-empty string or None"
+            raise ContentValidationError(message)
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +32,7 @@ class CampaignPolicy:
     """单个活动包允许声明的有限运行策略。"""
 
     aliases: tuple[tuple[str, str], ...] = ()
+    progressions: tuple[StageProgressionRule, ...] = ()
     loops: tuple[tuple[str, tuple[str, ...]], ...] = ()
     force_threat_safe_stages: tuple[str, ...] = ()
     resource_free_stages: tuple[str, ...] = ()
@@ -40,6 +42,13 @@ class CampaignPolicy:
         aliases = tuple((source, target) for source, target in self.aliases)
         if len({source for source, _ in aliases}) != len(aliases):
             message = "duplicate alias key"
+            raise ContentValidationError(message)
+        progressions = tuple(self.progressions)
+        if any(not isinstance(rule, StageProgressionRule) for rule in progressions):
+            message = "progressions must contain StageProgressionRule values"
+            raise TypeError(message)
+        if len({rule.stage for rule in progressions}) != len(progressions):
+            message = "progression rules must have unique stages"
             raise ContentValidationError(message)
         loops = tuple((alias, tuple(stages)) for alias, stages in self.loops)
         if len({alias for alias, _ in loops}) != len(loops):
@@ -66,6 +75,7 @@ class CampaignPolicy:
             raise ContentValidationError(message)
 
         object.__setattr__(self, "aliases", aliases)
+        object.__setattr__(self, "progressions", progressions)
         object.__setattr__(
             self,
             "loops",
@@ -81,66 +91,5 @@ class CampaignPolicy:
     def loop_stages(self, alias: str) -> tuple[str, ...] | None:
         return dict(self.loops).get(alias)
 
-
-def resolve_stage_loop(
-    stage: str,
-    pack_id: str,
-    policy: CampaignPolicy,
-    config: StageLoopConfig,
-) -> tuple[str, bool]:
-    """按剩余次数选择循环关卡，随机和倒序取模语义保持不变。"""
-    stages = policy.loop_stages(stage)
-    if stages is None:
-        return stage, False
-
-    cycle = len(stages)
-    count = int(config.StopCondition_RunCount)
-    if count == 0:
-        selected = random.choice(stages)
-        logger.info(f"Loop stages in {stage.upper()} of {pack_id}, run random stage: {selected}")
-    else:
-        index = count % cycle
-        index = 0 if index == 0 else cycle - index
-        selected = stages[index]
-        logger.info(
-            f"Loop stages in {stage.upper()} of {pack_id} with remain run_count={count}, run ordered stage: {selected}"
-        )
-
-    logger.info("disable continuous clear")
-    config.override(StopCondition_MapAchievement="non_stop")
-    config.override(StopCondition_StageIncrease=False)
-    return selected, True
-
-
-def apply_stage_policy(
-    stage: str,
-    pack_id: str,
-    policy: CampaignPolicy,
-    config: StagePolicyConfig,
-) -> None:
-    if stage in policy.force_threat_safe_stages and config.StopCondition_MapAchievement != "non_stop":
-        logger.info(f"In {pack_id}/{stage}, MapAchievement is forced to threat_safe")
-        config.override(StopCondition_MapAchievement="threat_safe")
-
-    if stage in policy.resource_free_stages:
-        logger.info(f"Apply resource-free stage policy for {pack_id}/{stage}")
-        config.override(
-            StopCondition_OilLimit=0,
-            StopCondition_MapAchievement="100_percent_clear",
-            StopCondition_StageIncrease=True,
-            Emotion_Mode="ignore",
-            Fleet_Fleet2=0,
-            Submarine_Fleet=0,
-        )
-
-
-def apply_pack_policy(
-    pack_id: str,
-    policy: CampaignPolicy,
-    config: StagePolicyConfig,
-) -> None:
-    fallback = dict(policy.map_achievement_fallbacks).get(config.StopCondition_MapAchievement)
-    if fallback is None:
-        return
-    logger.info(f"In {pack_id}, MapAchievement={config.StopCondition_MapAchievement} fallback to {fallback}")
-    config.override(StopCondition_MapAchievement=fallback)
+    def next_stage(self, stage: str) -> str | None:
+        return {rule.stage: rule.next_stage for rule in self.progressions}.get(stage)

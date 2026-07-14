@@ -1,11 +1,50 @@
 schema_version: 1
 id: war_archives_20180726_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: iris_of_light_and_dark
 releases:
 - opened_on: '2018-07-26'
   name_cn: 光与影的鸢尾之华
   order: 100
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_8ee92377d8137d5d
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_8ee92377d8137d5d
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_8ee92377d8137d5d
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_8ee92377d8137d5d
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_8ee92377d8137d5d
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_8ee92377d8137d5d
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_8ee92377d8137d5d
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_8ee92377d8137d5d
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_8ee92377d8137d5d
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_8ee92377d8137d5d
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_672c7f03fa92030b
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_ded62cfbb11eff42
 policy:
   aliases:
     ht1: c1
@@ -20,3 +59,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

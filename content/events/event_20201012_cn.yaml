@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20201012_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2020-10-12'
   name_cn: 划破海空之翼

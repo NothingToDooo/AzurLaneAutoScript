@@ -1,11 +1,50 @@
 schema_version: 1
 id: war_archives_20210916_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: upon_the_shimmering_blue
 releases:
 - opened_on: '2024-07-18'
   name_cn: 碧海光粼
   order: 330
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_4cf16229518809d4
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_4cf16229518809d4
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_4cf16229518809d4
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_53ebbf510ffd2cc6
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_53ebbf510ffd2cc6
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_53ebbf510ffd2cc6
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_3611e071d1d183ff
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_3611e071d1d183ff
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_3611e071d1d183ff
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_53ebbf510ffd2cc6
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_53ebbf510ffd2cc6
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_53ebbf510ffd2cc6
 policy:
   aliases:
     ht1: c1
@@ -20,3 +59,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

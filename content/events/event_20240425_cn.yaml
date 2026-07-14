@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20240425_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2024-04-25'
   name_cn: 共鸣的PASSION
@@ -9,6 +12,43 @@ releases:
 - opened_on: '2024-08-15'
   name_cn: null
   order: 1880
+stages:
+- id: isp1
+  source: stages/isp1.yaml
+  runtime_profile: profile_0b4f886d900bced3
+- id: isp2
+  source: stages/isp2.yaml
+  runtime_profile: profile_0b4f886d900bced3
+- id: isp3
+  source: stages/isp3.yaml
+  runtime_profile: profile_0b4f886d900bced3
+- id: isp4
+  source: stages/isp4.yaml
+  runtime_profile: profile_0b4f886d900bced3
+- id: isp5
+  source: stages/isp5.yaml
+  runtime_profile: profile_0b4f886d900bced3
+- id: isp6
+  source: stages/isp6.yaml
+  runtime_profile: profile_0b4f886d900bced3
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_bf15f954d2be8a31
+- id: sp1
+  source: stages/sp1.yaml
+  runtime_profile: profile_a289b01226ef3afe
+- id: sp2
+  source: stages/sp2.yaml
+  runtime_profile: profile_a289b01226ef3afe
+- id: sp3
+  source: stages/sp3.yaml
+  runtime_profile: profile_a289b01226ef3afe
+- id: sp4
+  source: stages/sp4.yaml
+  runtime_profile: profile_a289b01226ef3afe
+- id: sp5
+  source: stages/sp5.yaml
+  runtime_profile: profile_a289b01226ef3afe
 policy:
   aliases:
     1sp: isp1
@@ -29,3 +69,15 @@ policy:
     lsp6: isp6
     usp: sp
     μsp: sp
+  progressions:
+    isp1: isp2
+    isp2: isp3
+    isp3: isp4
+    isp4: isp5
+    isp5: isp6
+    isp6: null
+    sp1: sp2
+    sp2: sp3
+    sp3: sp4
+    sp4: sp5
+    sp5: null

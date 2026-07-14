@@ -1,12 +1,12 @@
 import importlib
 import sys
-from types import ModuleType
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Protocol
 
 import pytest
 
 from dev_tools import utils as dev_utils
-from module.campaign.campaign_base import CampaignBase
+from module.content.battle_policy import BossStrategy, ClearBoss
+from module.content.campaign_session import CampaignRunVariant, CampaignSession
 from module.content.errors import ContentValidationError
 from module.content.manifest import load_event_manifests
 from module.content.models import StageRef, StageSpec
@@ -14,6 +14,7 @@ from module.content.stage_loader import StageSpecLoader
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from types import ModuleType
     from typing import Any
 
 
@@ -77,7 +78,7 @@ def test_stage_renderer_is_exact_deterministic_and_uses_finite_policies(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _module, stage = _map_data(monkeypatch)
-    expected = """schema_version: 1
+    expected = """schema_version: 4
 map:
   name: HT2
   shape: B2
@@ -105,10 +106,7 @@ map:
 config:
   MAP_SIREN_TEMPLATE:
   - SirenOne
-  MOVABLE_ENEMY_TURN:
-  - 2
   MAP_HAS_SIREN: true
-  MAP_HAS_MOVABLE_ENEMY: true
   MAP_HAS_MAP_STORY: false
   MAP_HAS_FLEET_STEP: true
   MAP_HAS_AMBUSH: false
@@ -117,13 +115,46 @@ config:
 enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
 battles:
   0:
-    policy: siren_then_filtered_enemy
-    preserve: 1
+    steps:
+    - tag: clear_siren
+    - tag: clear_filtered_enemy
+      preserve: 1
+    - tag: default_battle
   5:
-    policy: siren_then_filtered_enemy
-    preserve: 0
+    steps:
+    - tag: clear_siren
+    - tag: clear_filtered_enemy
+      preserve: 0
+    - tag: default_battle
   6:
-    policy: fleet_boss
+    steps:
+    - tag: clear_boss
+      strategy: fleet_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns:
+    - 2
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs: []
+boss_approaches: []
+hard_mode: null
 """
 
     first = stage.render_stage_yaml()
@@ -131,7 +162,7 @@ battles:
 
     assert first == expected
     assert second == expected
-    assert "strategy" not in stage.stage_document()
+    assert stage.stage_document()["battles"][6] == {"steps": [{"tag": "clear_boss", "strategy": "fleet_boss"}]}
 
 
 def test_stage_renderer_selects_filtered_policy_when_map_has_no_siren(
@@ -142,7 +173,12 @@ def test_stage_renderer_selects_filtered_policy_when_map_has_no_siren(
 
     document = stage.stage_document()
 
-    assert document["battles"][0] == {"policy": "filtered_enemy_then_default", "preserve": 1}
+    assert document["battles"][0] == {
+        "steps": [
+            {"tag": "clear_filtered_enemy", "preserve": 1},
+            {"tag": "default_battle"},
+        ]
+    }
     assert "MAP_HAS_SIREN" not in document["config"]
 
 
@@ -221,11 +257,12 @@ def test_generated_stage_yaml_is_accepted_by_native_loader(
     stage.write_stage(stages_root)
     spec = StageSpec(StageRef("event_future_cn", "ht2"), "stages/ht2.yaml")
 
-    loaded = StageSpecLoader(content_root=events_root, campaign_root=tmp_path / "campaign").load(spec)
+    definition = StageSpecLoader(content_root=events_root).load(spec)
 
-    assert loaded.map.name == "HT2"
-    assert loaded.map.spawn_data[-1] == {"battle": 6, "boss": 1}
-    assert vars(loaded.config_class)["MAP_SIREN_TEMPLATE"] == ("SirenOne",)
+    assert definition.map.name == "HT2"
+    assert definition.map.normal.spawn_waves[-1].battle == 6
+    assert definition.map.normal.spawn_waves[-1].boss == 1
+    assert definition.rules.features.siren_templates == ("SirenOne",)
 
 
 class _EarlyBossStage(Protocol):
@@ -241,7 +278,7 @@ def _make_early_boss(stage: _EarlyBossStage, *, boss_battle: int = 4) -> None:
     stage.spawn_data[-1]["boss"] = 1
 
 
-def test_early_boss_generation_requires_explicit_pack_strategy(
+def test_early_boss_generation_uses_declarative_spawn_and_typed_default(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -249,50 +286,25 @@ def test_early_boss_generation_requires_explicit_pack_strategy(
     _make_early_boss(stage)
     stages_root = tmp_path / "event_early_cn" / "stages"
 
-    with pytest.raises(ContentValidationError, match=r"boss_refresh.*4.*strategy"):
-        stage.stage_document()
-    with pytest.raises(ContentValidationError, match=r"boss_refresh.*4.*strategy"):
-        stage.render_stage_yaml()
-    with pytest.raises(ContentValidationError, match=r"boss_refresh.*4.*strategy"):
-        stage.write_stage(stages_root)
+    document = stage.stage_document()
 
-    assert not (stages_root / "t1.yaml").exists()
+    assert document["battles"] == {
+        0: {
+            "steps": [
+                {"tag": "clear_siren"},
+                {"tag": "clear_filtered_enemy", "preserve": 0},
+                {"tag": "default_battle"},
+            ]
+        },
+        4: {"steps": [{"tag": "clear_boss", "strategy": "fleet_boss"}]},
+    }
+    assert "strategy: fleet_boss" in stage.render_stage_yaml()
+    assert stage.write_stage(stages_root)
+    assert (stages_root / "t1.yaml").is_file()
     assert not (stages_root.parent / "strategy.py").exists()
 
 
-def test_early_boss_after_zero_keeps_only_clear_policy_before_strategy(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _module, stage = _map_data(monkeypatch)
-    _make_early_boss(stage, boss_battle=4)
-
-    document = stage.stage_document(strategy="campaign.event_early_cn.strategy:EarlyBossStrategy")
-
-    assert document["battles"] == {
-        0: {"policy": "siren_then_filtered_enemy", "preserve": 0},
-    }
-
-
-class _EarlyBossStrategy(CampaignBase):
-    def battle_4(self) -> bool:
-        return self.clear_boss()
-
-
-class _BossZeroStrategy(CampaignBase):
-    def battle_0(self) -> bool:
-        return self.clear_boss()
-
-
-class _ClearBossCampaign:
-    def __init__(self) -> None:
-        self.calls: list[str] = []
-
-    def clear_boss(self) -> str:
-        self.calls.append("clear_boss")
-        return "boss"
-
-
-def test_early_boss_generation_uses_manifest_pack_strategy_without_touching_it(
+def test_boss_at_zero_compiles_without_touching_unrelated_legacy_strategy_file(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -314,7 +326,10 @@ def test_early_boss_generation_uses_manifest_pack_strategy_without_touching_it(
         """schema_version: 1
 id: event_early_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2026-01-01'
   name_cn: 早期Boss测试
@@ -322,7 +337,7 @@ releases:
 stages:
 - id: t1
   source: stages/t1.yaml
-  strategy: campaign.event_early_cn.strategy:EarlyBossStrategy
+  runtime_profile: core
 """,
         encoding="utf-8",
         newline="\n",
@@ -330,57 +345,14 @@ stages:
     (pack,) = load_event_manifests(events_root)
     spec = pack.stages[0]
 
-    assert stage.write_stage(stages_root, overwrite=True, strategy=spec.strategy) is True
+    assert stage.write_stage(stages_root, overwrite=True) is True
     assert strategy_path.read_bytes() == strategy_bytes
-    module = ModuleType(f"campaign.{pack_id}.strategy")
-    module.__file__ = str(strategy_path)
-    module.__dict__["EarlyBossStrategy"] = _BossZeroStrategy
-    monkeypatch.setattr("module.content.stage_loader.importlib.import_module", lambda _name: module)
+    definition = StageSpecLoader(content_root=events_root).load(spec)
+    session = CampaignSession(definition, CampaignRunVariant.NORMAL)
 
-    loaded = StageSpecLoader(content_root=events_root, campaign_root=repository_root / "campaign").load(spec)
-    campaign = _ClearBossCampaign()
-
-    assert "\nbattles: {}\n" in stage_path.read_text(encoding="utf-8")
-    assert cast("Any", loaded.campaign_class).battle_0(campaign) == "boss"
-    assert campaign.calls == ["clear_boss"]
+    assert "strategy: fleet_boss" in stage_path.read_text(encoding="utf-8")
+    assert session.battle_plan(0).intents == (ClearBoss(BossStrategy.FLEET_BOSS),)
     assert strategy_path.read_bytes() == strategy_bytes
-
-
-def test_write_rejects_strategy_from_another_pack_without_touching_files(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _module, stage = _map_data(monkeypatch)
-    _make_early_boss(stage)
-    stages_root = tmp_path / "event_early_cn" / "stages"
-    stages_root.parent.mkdir(parents=True)
-    strategy_path = stages_root.parent / "strategy.py"
-    strategy_bytes = b"# current pack strategy\n"
-    strategy_path.write_bytes(strategy_bytes)
-    wrong_strategy = "campaign.event_other_cn.strategy:EarlyBossStrategy"
-
-    assert stage.render_stage_yaml(strategy=wrong_strategy)
-    with pytest.raises(ContentValidationError, match=r"event_early_cn.*strategy|strategy.*event_early_cn"):
-        stage.write_stage(stages_root, strategy=wrong_strategy)
-
-    assert not (stages_root / "t1.yaml").exists()
-    assert strategy_path.read_bytes() == strategy_bytes
-
-
-def test_chapter_extract_rejects_cross_pack_strategy_before_prompt(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    module, stage = _map_data(monkeypatch)
-    _make_early_boss(stage)
-    stages_root = tmp_path / "event_early_cn" / "stages"
-    wrong_strategy = "campaign.event_other_cn.strategy:EarlyBossStrategy"
-    monkeypatch.setattr("builtins.input", lambda: pytest.fail("跨 pack strategy 应在确认提示前失败"))
-
-    with pytest.raises(ContentValidationError, match=r"event_early_cn.*strategy|strategy.*event_early_cn"):
-        module.ChapterTemplate().extract([stage], stages_root, strategy=wrong_strategy)
-
-    assert not stages_root.exists()
 
 
 def test_extractor_unknown_grid_sentinel_is_rejected_by_native_loader(
@@ -395,4 +367,4 @@ def test_extractor_unknown_grid_sentinel_is_rejected_by_native_loader(
     spec = StageSpec(StageRef("event_future_cn", "ht2"), "stages/ht2.yaml")
 
     with pytest.raises(ContentValidationError, match=r"map\.map_data:.*unknown.*\?\?"):
-        StageSpecLoader(content_root=events_root, campaign_root=tmp_path / "campaign").load(spec)
+        StageSpecLoader(content_root=events_root).load(spec)

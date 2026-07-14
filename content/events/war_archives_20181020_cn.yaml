@@ -1,8 +1,25 @@
 schema_version: 1
 id: war_archives_20181020_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: strive_wish_and_strategize
 releases:
 - opened_on: '2017-06-07'
   name_cn: 努力、希望和计划
   order: 10
+stages:
+- id: sp1
+  source: stages/sp1.yaml
+  runtime_profile: profile_e8b9f9cf244a5223
+- id: sp2
+  source: stages/sp2.yaml
+  runtime_profile: profile_e8b9f9cf244a5223
+- id: sp3
+  source: stages/sp3.yaml
+  runtime_profile: profile_e8b9f9cf244a5223
+policy:
+  progressions:
+    sp1: sp2
+    sp2: sp3
+    sp3: null

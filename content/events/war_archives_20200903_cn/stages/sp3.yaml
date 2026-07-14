@@ -1,0 +1,187 @@
+schema_version: 4
+map:
+  name: SP3
+  shape: K7
+  camera_data:
+  - D2
+  - D5
+  - H2
+  - H5
+  camera_data_spawn_point:
+  - D2
+  map_data: 'ME -- -- MS -- ME ME -- ME ME --
+
+    -- -- ++ -- -- -- ++ -- ME ME ME
+
+    SP -- ++ ++ ME -- ++ -- ++ ++ ++
+
+    SP -- ++ ++ ME -- -- -- Me Me MB
+
+    -- -- -- ++ ME ME -- -- ++ ++ ++
+
+    ME ME -- __ -- -- -- -- -- ME --
+
+    ME ME ++ ME ME ME -- ++ -- MS ME'
+  weight_data: '50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 40 30 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 2
+    siren: 2
+  - battle: 1
+    enemy: 2
+  - battle: 2
+    enemy: 1
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 1
+  - battle: 5
+    boss: 1
+  map_data_loop: 'ME -- -- MS -- ME ME -- ME ME --
+
+    -- -- -- -- -- -- ++ -- ME ME ME
+
+    SP -- ++ ++ ME -- -- -- ++ ++ ++
+
+    SP -- ++ ++ ME -- -- -- Me Me MB
+
+    -- -- -- -- ME ME -- -- ++ ++ ++
+
+    ME ME -- __ -- -- -- -- -- ME --
+
+    ME ME ++ ME ME ME -- -- -- MS ME'
+  land_based_data:
+  - - H7
+    - up
+  - - D5
+    - left
+  - - G3
+    - down
+  - - C2
+    - right
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: true
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: true
+  MAP_SIREN_TEMPLATE:
+  - Z18
+  MAP_HAS_SIREN: true
+  MAP_HAS_LAND_BASED: true
+  STAR_REQUIRE_1: 1
+  STAR_REQUIRE_2: 2
+  STAR_REQUIRE_3: 3
+  MAP_SWIPE_MULTIPLY:
+  - 1.064
+  - 1.084
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.029
+  - 1.048
+enemy_filter: 1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M
+battles:
+  0:
+    steps:
+    - tag: clear_siren
+    - tag: default_battle
+  5:
+    steps:
+    - strategy: fleet_boss
+      tag: clear_boss
+mechanics:
+  roadblocks:
+  - battle: 0
+    roads:
+    - paths:
+      - - I4
+      - - J4
+    selection: default
+    tag: clear
+  fleet_coordination:
+  - battle: 0
+    fleet: fleet_2
+    tag: push_forward
+  pickups: []
+  map_interactions:
+  - battle: 0
+    cells: []
+    tag: clear_mechanism
+  map_mutations: []
+  moving_enemies:
+    turns:
+    - 3
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs:
+- activation_modes:
+  - normal
+  battle: 0
+  statements:
+  - condition:
+      condition:
+        flag: movable_enemy
+        tag: flag
+        value: true
+      tag: not
+    tag: branch
+    when_false: []
+    when_true:
+    - action:
+        category: fleet_coordination
+        index: 0
+      expected_target: any
+      tag: perform_mechanic
+  - action:
+      genres: []
+      tag: clear_siren
+    tag: attempt_battle
+  - action:
+      category: map_interactions
+      index: 0
+    expected_target: null
+    tag: perform_mechanic
+  - condition:
+      flag: movable_enemy
+      tag: flag
+      value: true
+    tag: branch
+    when_false: []
+    when_true:
+    - action:
+        category: fleet_coordination
+        index: 0
+      expected_target: any
+      tag: perform_mechanic
+  - action:
+      category: roadblocks
+      index: 0
+    expected_target: enemy
+    tag: attempt_mechanic
+  - action:
+      tag: default_battle
+    tag: return_battle
+boss_approaches: []
+hard_mode: null

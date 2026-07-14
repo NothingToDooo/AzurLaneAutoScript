@@ -1,8 +1,29 @@
 schema_version: 1
 id: war_archives_20200903_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: stars_of_the_shimmering_fjord
 releases:
 - opened_on: '2022-11-17'
   name_cn: 峡湾间的星辰
   order: 200
+stages:
+- id: sp0
+  source: stages/sp0.yaml
+  runtime_profile: profile_e8b9f9cf244a5223
+- id: sp1
+  source: stages/sp1.yaml
+  runtime_profile: profile_e8b9f9cf244a5223
+- id: sp2
+  source: stages/sp2.yaml
+  runtime_profile: profile_e8b9f9cf244a5223
+- id: sp3
+  source: stages/sp3.yaml
+  runtime_profile: profile_e8b9f9cf244a5223
+policy:
+  progressions:
+    sp0: sp1
+    sp1: sp2
+    sp2: sp3
+    sp3: null

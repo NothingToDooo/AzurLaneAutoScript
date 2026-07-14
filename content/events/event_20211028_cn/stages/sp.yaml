@@ -1,0 +1,190 @@
+schema_version: 4
+map:
+  name: SP
+  shape: K9
+  camera_data:
+  - D3
+  - E6
+  camera_data_spawn_point:
+  - D3
+  map_data: '++ ++ -- -- -- -- -- -- -- ++ --
+
+    -- -- ME ME MS MS ME ME -- ++ --
+
+    -- Me -- -- -- -- -- Me -- -- --
+
+    SP -- -- Me ME -- MB ++ ++ ++ --
+
+    -- ME ++ ++ ++ __ MB ++ ++ ++ --
+
+    SP -- -- Me ME -- MB ++ ++ ++ --
+
+    -- Me -- -- -- -- -- Me -- -- --
+
+    -- -- ME ME MS MS ME ME -- ++ --
+
+    ++ -- -- -- -- -- -- -- -- -- --'
+  weight_data: '50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 2
+    siren: 2
+  - battle: 1
+    enemy: 1
+  - battle: 2
+    enemy: 2
+    siren: 1
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 2
+  - battle: 5
+    enemy: 1
+  - battle: 6
+  - battle: 7
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: true
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: false
+  MAP_SIREN_TEMPLATE:
+  - Vauquelin
+  - LaGalissonniere
+  - Algerie
+  MAP_HAS_SIREN: true
+  STAR_REQUIRE_1: 0
+  STAR_REQUIRE_2: 0
+  STAR_REQUIRE_3: 0
+  MAP_SWIPE_MULTIPLY:
+  - 1.064
+  - 1.084
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.029
+  - 1.048
+enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - tag: clear_siren
+    - preserve: 2
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  5:
+    steps:
+    - tag: clear_siren
+    - preserve: 0
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  7:
+    steps:
+    - strategy: fleet_boss
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns:
+    - 2
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls:
+    - - B2
+      - C2
+    - - D2
+      - E2
+    - - H2
+      - I2
+    - - A3
+      - B3
+    - - H3
+      - I3
+    - - H4
+      - I4
+    - - H5
+      - I5
+    - - H6
+      - I6
+    - - A7
+      - B7
+    - - H7
+      - I7
+    - - B8
+      - C8
+    - - D8
+      - E8
+    - - H8
+      - I8
+    - - C1
+      - C2
+    - - D1
+      - D2
+    - - E1
+      - E2
+    - - F1
+      - F2
+    - - G1
+      - G2
+    - - H1
+      - H2
+    - - B2
+      - B3
+    - - E2
+      - E3
+    - - F2
+      - F3
+    - - A3
+      - A4
+    - - A6
+      - A7
+    - - B7
+      - B8
+    - - E7
+      - E8
+    - - F7
+      - F8
+    - - C8
+      - C9
+    - - D8
+      - D9
+    - - E8
+      - E9
+    - - F8
+      - F9
+    - - G8
+      - G9
+    - - H8
+      - H9
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs: []
+boss_approaches: []
+hard_mode: null

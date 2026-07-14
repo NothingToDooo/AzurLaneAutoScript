@@ -1,0 +1,126 @@
+schema_version: 4
+map:
+  name: SP
+  shape: K9
+  camera_data:
+  - F2
+  - F4
+  - F7
+  camera_data_spawn_point:
+  - F2
+  map_data: '-- -- MS ++ -- -- -- ++ MS -- --
+
+    -- -- -- ++ -- __ -- ++ -- -- --
+
+    ++ -- Me ++ SP -- SP ++ Me -- ++
+
+    -- ++ ++ ++ ++ -- ++ ++ ++ ++ --
+
+    -- -- ++ ME -- -- -- ME ++ -- --
+
+    -- -- ++ -- -- MS -- -- ++ -- --
+
+    -- ++ ++ ++ ++ -- ++ ++ ++ ++ --
+
+    ++ -- -- -- ++ -- ++ -- -- -- ++
+
+    -- -- -- -- ++ MB ++ -- -- -- --'
+  weight_data: '50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 2
+    siren: 2
+  - battle: 1
+  - battle: 2
+  - battle: 3
+  - battle: 4
+    enemy: 2
+    siren: 1
+  - battle: 5
+  - battle: 6
+  - battle: 7
+    boss: 1
+  portal_data:
+  - - E1
+    - K1
+  - - K1
+    - E1
+  - - A1
+    - G1
+  - - G1
+    - A1
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: false
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: true
+  MAP_SIREN_TEMPLATE:
+  - CV
+  - BB
+  MAP_HAS_SIREN: true
+  MAP_HAS_PORTAL: true
+  STAR_REQUIRE_1: 0
+  STAR_REQUIRE_2: 0
+  STAR_REQUIRE_3: 0
+  STAGE_ENTRANCE:
+  - blue
+  MAP_HAS_MODE_SWITCH: false
+  MAP_SWIPE_MULTIPLY:
+  - 1.23
+  - 1.253
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.19
+  - 1.212
+  MAP_ENSURE_EDGE_INSIGHT_CORNER: bottom
+enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - genres: []
+      tag: clear_siren
+    - tag: default_battle
+  7:
+    steps:
+    - strategy: fleet_boss
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns: []
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs: []
+boss_approaches: []
+hard_mode: null

@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20251023_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: sp
 releases:
 - opened_on: '2025-10-23'
   name_cn: 飓风与自由群岛
@@ -9,6 +12,28 @@ releases:
 - opened_on: '2025-12-11'
   name_cn: null
   order: 2410
+stages:
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_0b42f64686054d41
+- id: t1
+  source: stages/t1.yaml
+  runtime_profile: profile_1f30e7e2b84859c0
+- id: t2
+  source: stages/t2.yaml
+  runtime_profile: profile_1f30e7e2b84859c0
+- id: t3
+  source: stages/t3.yaml
+  runtime_profile: profile_1f30e7e2b84859c0
+- id: t4
+  source: stages/t4.yaml
+  runtime_profile: profile_1f30e7e2b84859c0
+- id: t5
+  source: stages/t5.yaml
+  runtime_profile: profile_1f30e7e2b84859c0
+- id: t6
+  source: stages/t6.yaml
+  runtime_profile: profile_c9a495d2baa0c11e
 policy:
   aliases:
     a1: t1
@@ -26,3 +51,10 @@ policy:
     sp4: t4
     sp5: t5
     sp6: t6
+  progressions:
+    t1: t2
+    t2: t3
+    t3: t4
+    t4: t5
+    t5: t6
+    t6: null

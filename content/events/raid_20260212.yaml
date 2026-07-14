@@ -1,7 +1,13 @@
 schema_version: 1
 id: raid_20260212
 kind: raid
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: raid
+  profile: changwu
+  modes: [easy, normal, hard, ex]
+  daily_modes: [easy, normal, hard, ex]
+  ticket_modes: [ex]
 releases:
 - opened_on: '2026-02-12'
   name_cn: 春宴怀玉香满庭

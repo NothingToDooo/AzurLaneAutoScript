@@ -1,11 +1,51 @@
 schema_version: 1
 id: event_20200521_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2020-05-21'
   name_cn: 穹顶下的圣咏曲
   order: 520
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_6d2b5024030b7756
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_6d2b5024030b7756
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_6d2b5024030b7756
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_6d2b5024030b7756
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_c4ab27e8510e6d12
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_c4ab27e8510e6d12
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_194533b819d16091
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_194533b819d16091
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_091e6d2a53d9c041
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_091e6d2a53d9c041
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_091e6d2a53d9c041
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_091e6d2a53d9c041
 policy:
   aliases:
     ht1: c1
@@ -20,3 +60,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

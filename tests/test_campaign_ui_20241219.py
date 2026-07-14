@@ -22,7 +22,7 @@ class _Config:
         self.MAP_CHAPTER_SWITCH_20241219_SPEX = chapter_switch_spex
         self.overrides: list[dict[str, str]] = []
 
-    def override(self, **kwargs: str) -> None:
+    def apply_runtime_overlay(self, **kwargs: str) -> None:
         self.overrides.append(kwargs)
 
 

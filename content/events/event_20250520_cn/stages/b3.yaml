@@ -1,0 +1,354 @@
+schema_version: 4
+map:
+  name: B3
+  shape: I10
+  camera_data:
+  - D3
+  - D7
+  - E3
+  - E7
+  camera_data_spawn_point:
+  - E3
+  - D3
+  map_data: '-- -- -- -- -- -- -- -- --
+
+    -- ++ ME ++ ++ ++ ME ++ --
+
+    ++ Me -- ++ ++ ++ -- Me --
+
+    ME -- -- ++ ++ ++ -- -- ++
+
+    -- -- -- SP -- SP -- -- --
+
+    -- ME -- -- __ -- -- ME ++
+
+    ME ++ ME -- MS -- ME ++ ++
+
+    -- ++ -- MS -- MS -- ++ ++
+
+    ++ -- Me -- MB -- Me -- --
+
+    -- -- -- ++ -- ++ -- -- --'
+  weight_data: '50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 20 10 10 10 10 10 50 50
+
+    50 30 20 10 10 10 20 30 50
+
+    50 50 30 20 25 20 30 50 50
+
+    50 50 50 25 25 25 50 50 50
+
+    50 50 50 50 30 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 2
+    siren: 2
+  - battle: 1
+    enemy: 1
+  - battle: 2
+    enemy: 2
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 2
+  - battle: 5
+    enemy: 1
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: true
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: false
+  MAP_SIREN_TEMPLATE: []
+  MAP_HAS_SIREN: true
+  STAR_REQUIRE_1: 1
+  STAR_REQUIRE_2: 2
+  STAR_REQUIRE_3: 3
+  MAP_CHAPTER_SWITCH_20241219: true
+  STAGE_ENTRANCE:
+  - half
+  - '20240725'
+  MAP_HAS_MODE_SWITCH: true
+  MAP_SWIPE_MULTIPLY:
+  - 1.1
+  - 1.121
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.064
+  - 1.084
+  MAP_ENSURE_EDGE_INSIGHT_CORNER: bottom
+enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - tag: clear_siren
+    - preserve: 0
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  5:
+    steps:
+    - strategy: fleet_boss
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination:
+  - tag: protect
+    battle: 0
+    fleet: fleet_2
+  - tag: protect
+    battle: 1
+    fleet: fleet_2
+  - tag: protect
+    battle: 2
+    fleet: fleet_2
+  - tag: protect
+    battle: 3
+    fleet: fleet_2
+  - tag: protect
+    battle: 4
+    fleet: fleet_2
+  - tag: protect
+    battle: 5
+    fleet: fleet_2
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns:
+    - 2
+    normal_turns:
+    - 1
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs:
+- battle: 0
+  activation_modes:
+  - normal
+  - clear_all
+  - poor_map_data
+  statements:
+  - tag: branch
+    condition:
+      tag: any
+      conditions:
+      - tag: all
+        conditions:
+        - tag: flag
+          flag: clear_all
+          value: true
+        - tag: map_presence
+          presence: enemy
+      - tag: all
+        conditions:
+        - tag: flag
+          flag: clear_mode
+          value: false
+        - tag: not
+          condition:
+            tag: map_presence
+            presence: boss
+    when_true:
+    - tag: attempt_mechanic
+      action:
+        category: fleet_coordination
+        index: 0
+      expected_target: any
+    when_false: []
+  - tag: delegate
+    target: default_mode
+- battle: 1
+  activation_modes:
+  - normal
+  - clear_all
+  - poor_map_data
+  statements:
+  - tag: branch
+    condition:
+      tag: any
+      conditions:
+      - tag: all
+        conditions:
+        - tag: flag
+          flag: clear_all
+          value: true
+        - tag: map_presence
+          presence: enemy
+      - tag: all
+        conditions:
+        - tag: flag
+          flag: clear_mode
+          value: false
+        - tag: not
+          condition:
+            tag: map_presence
+            presence: boss
+    when_true:
+    - tag: attempt_mechanic
+      action:
+        category: fleet_coordination
+        index: 1
+      expected_target: any
+    when_false: []
+  - tag: delegate
+    target: default_mode
+- battle: 2
+  activation_modes:
+  - normal
+  - clear_all
+  - poor_map_data
+  statements:
+  - tag: branch
+    condition:
+      tag: any
+      conditions:
+      - tag: all
+        conditions:
+        - tag: flag
+          flag: clear_all
+          value: true
+        - tag: map_presence
+          presence: enemy
+      - tag: all
+        conditions:
+        - tag: flag
+          flag: clear_mode
+          value: false
+        - tag: not
+          condition:
+            tag: map_presence
+            presence: boss
+    when_true:
+    - tag: attempt_mechanic
+      action:
+        category: fleet_coordination
+        index: 2
+      expected_target: any
+    when_false: []
+  - tag: delegate
+    target: default_mode
+- battle: 3
+  activation_modes:
+  - normal
+  - clear_all
+  - poor_map_data
+  statements:
+  - tag: branch
+    condition:
+      tag: any
+      conditions:
+      - tag: all
+        conditions:
+        - tag: flag
+          flag: clear_all
+          value: true
+        - tag: map_presence
+          presence: enemy
+      - tag: all
+        conditions:
+        - tag: flag
+          flag: clear_mode
+          value: false
+        - tag: not
+          condition:
+            tag: map_presence
+            presence: boss
+    when_true:
+    - tag: attempt_mechanic
+      action:
+        category: fleet_coordination
+        index: 3
+      expected_target: any
+    when_false: []
+  - tag: delegate
+    target: default_mode
+- battle: 4
+  activation_modes:
+  - normal
+  - clear_all
+  - poor_map_data
+  statements:
+  - tag: branch
+    condition:
+      tag: any
+      conditions:
+      - tag: all
+        conditions:
+        - tag: flag
+          flag: clear_all
+          value: true
+        - tag: map_presence
+          presence: enemy
+      - tag: all
+        conditions:
+        - tag: flag
+          flag: clear_mode
+          value: false
+        - tag: not
+          condition:
+            tag: map_presence
+            presence: boss
+    when_true:
+    - tag: attempt_mechanic
+      action:
+        category: fleet_coordination
+        index: 4
+      expected_target: any
+    when_false: []
+  - tag: delegate
+    target: default_mode
+- battle: 5
+  activation_modes:
+  - normal
+  - clear_all
+  - poor_map_data
+  statements:
+  - tag: branch
+    condition:
+      tag: any
+      conditions:
+      - tag: all
+        conditions:
+        - tag: flag
+          flag: clear_all
+          value: true
+        - tag: map_presence
+          presence: enemy
+      - tag: all
+        conditions:
+        - tag: flag
+          flag: clear_mode
+          value: false
+        - tag: not
+          condition:
+            tag: map_presence
+            presence: boss
+    when_true:
+    - tag: attempt_mechanic
+      action:
+        category: fleet_coordination
+        index: 5
+      expected_target: any
+    when_false: []
+  - tag: delegate
+    target: default_mode
+boss_approaches: []
+hard_mode: null

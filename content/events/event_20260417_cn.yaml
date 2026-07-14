@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20260417_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2026-04-17'
   name_cn: 假日航线闪耀海滨
@@ -9,6 +12,27 @@ releases:
 - opened_on: '2026-04-17'
   name_cn: null
   order: 2590
+stages:
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_f736ba7d73829835
+- id: sp1
+  source: stages/sp1.yaml
+  runtime_profile: profile_d961e00539d8885e
+- id: sp2
+  source: stages/sp2.yaml
+  runtime_profile: profile_d961e00539d8885e
+- id: sp3
+  source: stages/sp3.yaml
+  runtime_profile: profile_af8af2c396a6ec7a
+- id: sp4
+  source: stages/sp4.yaml
+  runtime_profile: profile_d961e00539d8885e
 policy:
   aliases:
     vsp: sp
+  progressions:
+    sp1: sp2
+    sp2: sp3
+    sp3: sp4
+    sp4: null

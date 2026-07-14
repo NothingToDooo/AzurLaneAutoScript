@@ -1,0 +1,17 @@
+schema_version: 1
+id: campaign_hard
+kind: campaign
+ui_profile: campaign_v1
+releases:
+- opened_on: '2017-05-25'
+  name_cn: 困难战役
+  order: 2
+stages:
+- id: 12-4
+  source: stages/12-4.yaml
+  runtime_profile: profile_e649d3333f65a559
+policy:
+  aliases:
+    campaign_12_4: 12-4
+  progressions:
+    12-4: null

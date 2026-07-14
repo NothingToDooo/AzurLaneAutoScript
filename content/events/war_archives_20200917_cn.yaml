@@ -1,11 +1,62 @@
 schema_version: 1
 id: war_archives_20200917_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: dreamwakers_butterfly
 releases:
 - opened_on: '2024-01-18'
   name_cn: 蝶海梦花
   order: 280
+stages:
+- id: ht1
+  source: stages/ht1.yaml
+  runtime_profile: profile_8ba075e90392a7d8
+- id: ht2
+  source: stages/ht2.yaml
+  runtime_profile: profile_8ba075e90392a7d8
+- id: ht3
+  source: stages/ht3.yaml
+  runtime_profile: profile_8ba075e90392a7d8
+- id: ht4
+  source: stages/ht4.yaml
+  runtime_profile: profile_8ba075e90392a7d8
+- id: ht5
+  source: stages/ht5.yaml
+  runtime_profile: profile_8ba075e90392a7d8
+- id: ht6
+  source: stages/ht6.yaml
+  runtime_profile: profile_8ba075e90392a7d8
+- id: hts1
+  source: stages/hts1.yaml
+  runtime_profile: profile_e6b8bc25b70c83cc
+- id: hts2
+  source: stages/hts2.yaml
+  runtime_profile: profile_e6b8bc25b70c83cc
+- id: t1
+  source: stages/t1.yaml
+  runtime_profile: profile_8ba075e90392a7d8
+- id: t2
+  source: stages/t2.yaml
+  runtime_profile: profile_1dfe5207e77db4b3
+- id: t3
+  source: stages/t3.yaml
+  runtime_profile: profile_1dfe5207e77db4b3
+- id: t4
+  source: stages/t4.yaml
+  runtime_profile: profile_1dfe5207e77db4b3
+- id: t5
+  source: stages/t5.yaml
+  runtime_profile: profile_1dfe5207e77db4b3
+- id: t6
+  source: stages/t6.yaml
+  runtime_profile: profile_8ba075e90392a7d8
+- id: ts1
+  source: stages/ts1.yaml
+  runtime_profile: profile_e6b8bc25b70c83cc
+- id: ts2
+  source: stages/ts2.yaml
+  runtime_profile: profile_e6b8bc25b70c83cc
 policy:
   aliases:
     a1: t1
@@ -20,3 +71,20 @@ policy:
     d1: ht4
     d2: ht5
     d3: ht6
+  progressions:
+    ht1: ht2
+    ht2: ht3
+    ht3: null
+    ht4: hts2
+    ht5: ht6
+    ht6: null
+    hts1: ht1
+    hts2: ht5
+    t1: t2
+    t2: t3
+    t3: t4
+    t4: ts2
+    t5: t6
+    t6: null
+    ts1: t1
+    ts2: t5

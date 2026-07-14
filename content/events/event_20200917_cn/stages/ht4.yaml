@@ -1,0 +1,230 @@
+schema_version: 4
+map:
+  name: HT4
+  shape: K9
+  camera_data:
+  - D2
+  - D5
+  - D7
+  - H2
+  - H5
+  - H7
+  camera_data_spawn_point:
+  - D2
+  - D7
+  map_data: 'Me -- -- ++ Me -- ME -- ME ++ ++
+
+    -- MS -- ++ -- SP -- __ -- MS --
+
+    -- -- Me ++ -- -- -- ME -- -- --
+
+    ME -- ++ ++ ++ ++ ++ ++ ++ -- ME
+
+    -- -- -- ++ -- MB -- ++ -- -- --
+
+    ME -- ++ ++ ++ ++ ++ ++ ++ -- ME
+
+    -- -- -- ME -- -- -- ++ Me -- --
+
+    -- MS -- __ -- SP -- ++ -- MS --
+
+    ++ ++ ME -- ME -- Me ++ -- -- Me'
+  weight_data: '50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 10 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 2
+    siren: 2
+  - battle: 1
+    enemy: 1
+  - battle: 2
+    enemy: 2
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 2
+  - battle: 5
+    enemy: 1
+    boss: 1
+  map_data_loop: 'Me -- -- ++ Me -- ME -- ME ++ ++
+
+    -- MS -- -- -- SP -- __ -- MS --
+
+    -- -- Me ++ -- -- -- ME -- -- --
+
+    ME -- ++ ++ -- ++ -- ++ ++ -- ME
+
+    -- -- -- ++ -- MB -- ++ -- -- --
+
+    ME -- ++ ++ -- ++ -- ++ ++ -- ME
+
+    -- -- -- ME -- -- -- ++ Me -- --
+
+    -- MS -- __ -- SP -- -- -- MS --
+
+    ++ ++ ME -- ME -- Me ++ -- -- Me'
+  portal_data:
+  - - I5
+    - C5
+  - - C5
+    - I5
+  - - E5
+    - E3
+  - - E3
+    - E5
+  - - G5
+    - G7
+  - - G7
+    - G5
+config:
+  MAP_HAS_MAP_STORY: true
+  MAP_HAS_FLEET_STEP: true
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: true
+  MAP_SIREN_TEMPLATE:
+  - BB
+  - SS
+  MAP_HAS_SIREN: true
+  MAP_HAS_PORTAL: true
+  STAR_REQUIRE_1: 1
+  STAR_REQUIRE_2: 2
+  STAR_REQUIRE_3: 3
+  STAGE_ENTRANCE:
+  - blue
+  MAP_HAS_MODE_SWITCH: false
+  MAP_SWIPE_MULTIPLY:
+  - 1.23
+  - 1.253
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.19
+  - 1.212
+  MAP_ENSURE_EDGE_INSIGHT_CORNER: bottom
+enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - tag: clear_siren
+    - tag: default_battle
+  2:
+    steps:
+    - genres: []
+      tag: clear_siren
+    - condition:
+        flag: clear_mode
+        tag: flag
+        value: true
+      step:
+        genres: []
+        scales:
+        - 2
+        sort: []
+        strongest: false
+        tag: clear_enemy
+      tag: guarded
+    - condition:
+        flag: clear_mode
+        tag: flag
+        value: true
+      step:
+        genres: []
+        scales:
+        - 1
+        sort: []
+        strongest: false
+        tag: clear_enemy
+      tag: guarded
+    - tag: default_battle
+  5:
+    steps:
+    - strategy: fleet_boss
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination:
+  - battle: 0
+    fleet: fleet_2
+    tag: push_forward
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns:
+    - 2
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs:
+- activation_modes:
+  - normal
+  battle: 0
+  statements:
+  - condition:
+      flag: movable_enemy
+      tag: flag
+      value: true
+    tag: branch
+    when_false: []
+    when_true:
+    - action:
+        category: fleet_coordination
+        index: 0
+      expected_target: any
+      tag: perform_mechanic
+  - action:
+      genres: []
+      tag: clear_siren
+    tag: attempt_battle
+  - condition:
+      flag: clear_mode
+      tag: flag
+      value: true
+    tag: branch
+    when_false: []
+    when_true:
+    - action:
+        genres: []
+        scales:
+        - 2
+        sort: []
+        strongest: false
+        tag: clear_enemy
+      tag: attempt_battle
+    - action:
+        genres: []
+        scales:
+        - 1
+        sort: []
+        strongest: false
+        tag: clear_enemy
+      tag: attempt_battle
+  - action:
+      tag: default_battle
+    tag: return_battle
+boss_approaches: []
+hard_mode: null

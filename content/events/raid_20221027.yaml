@@ -1,7 +1,13 @@
 schema_version: 1
 id: raid_20221027
 kind: raid
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: raid
+  profile: albion
+  modes: [easy, normal, hard]
+  daily_modes: [easy, normal, hard]
+  ticket_modes: []
 releases:
 - opened_on: '2022-10-27'
   name_cn: 战斗！皇家女仆队3rd

@@ -1,0 +1,130 @@
+schema_version: 4
+map:
+  name: SP
+  shape: I8
+  camera_data:
+  - D4
+  - F4
+  camera_data_spawn_point:
+  - F4
+  map_data: '-- -- ++ ++ -- ++ ++ -- --
+
+    -- -- ++ ++ MB ++ ++ -- --
+
+    -- -- ME MS -- MS ME -- --
+
+    ++ ME -- -- MS -- -- ME ++
+
+    ++ ME -- -- __ -- -- ME ++
+
+    -- -- ME SP -- SP ME -- --
+
+    -- -- ++ ++ ++ ++ ++ -- --
+
+    -- -- ++ ++ -- ++ ++ -- --'
+  weight_data: '50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50
+
+    50 50 50 10 10 10 50 50 50
+
+    50 50 50 10 10 10 50 50 50
+
+    50 50 50 10 10 10 50 50 50
+
+    50 50 50 50 50 10 50 50 50
+
+    50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 8
+    siren: 3
+  - battle: 1
+  - battle: 2
+  - battle: 3
+  - battle: 4
+  - battle: 5
+  - battle: 6
+  - battle: 7
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: true
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: false
+  MAP_SIREN_TEMPLATE:
+  - BlackDragonBoss01
+  - BlackDragonBoss02
+  MAP_HAS_SIREN: true
+  STAR_REQUIRE_1: 0
+  STAR_REQUIRE_2: 0
+  STAR_REQUIRE_3: 0
+  MAP_CHAPTER_SWITCH_20241219: true
+  STAGE_ENTRANCE:
+  - half
+  - '20240725'
+  MAP_HAS_MODE_SWITCH: false
+  MAP_SWIPE_MULTIPLY:
+  - 1.096
+  - 1.117
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.06
+  - 1.08
+  MAP_IS_ONE_TIME_STAGE: true
+enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - tag: clear_siren
+    - preserve: 2
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  5:
+    steps:
+    - tag: clear_siren
+    - preserve: 0
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  7:
+    steps:
+    - strategy: fleet_boss
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns:
+    - 2
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells:
+    - B4
+    - B5
+    - C3
+    - C6
+    - G3
+    - G6
+    - H4
+    - H5
+    initial_siren_cells:
+    - D3
+    - E4
+    - F3
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs: []
+boss_approaches: []
+hard_mode: null

@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20231221_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2023-12-21'
   name_cn: 星海逐光
@@ -12,6 +15,46 @@ releases:
 - opened_on: '2026-01-15'
   name_cn: 复刻星海逐光
   order: 2440
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_5782e511ce4e789a
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_a46a49f9d481f978
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_1b04d1f82f658ed6
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_dfa917b5d995d508
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_dfa917b5d995d508
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_c190abb5749c174d
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_5782e511ce4e789a
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_a46a49f9d481f978
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_1b04d1f82f658ed6
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_dfa917b5d995d508
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_dfa917b5d995d508
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_c190abb5749c174d
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_c190abb5749c174d
 policy:
   aliases:
     ht1: c1
@@ -26,3 +69,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

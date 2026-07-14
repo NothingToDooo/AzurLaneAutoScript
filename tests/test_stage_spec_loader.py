@@ -1,265 +1,75 @@
 import inspect
 import textwrap
-from pathlib import Path
-from types import ModuleType
+from dataclasses import FrozenInstanceError
+from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from module.campaign.campaign_base import CampaignBase
+from module.content import CampaignStageDefinition, CellId, GridShape, LandBasedDirection, LandBasedSpec, PortalSpec
+from module.content import stage_loader as stage_loader_module
+from module.content.battle_policy import (
+    BossStrategy,
+    ClearBoss,
+    ClearBossRoadblock,
+    ClearFilteredEnemy,
+    ClearSiren,
+    DefaultBattle,
+)
+from module.content.campaign_session import CampaignRunVariant, CampaignSession
 from module.content.errors import ContentValidationError
-from module.content.legacy_stage import LegacyStageModuleAdapter
+from module.content.manifest import load_default_event_manifests
 from module.content.models import StageRef, StageSpec
+from module.content.stage_definition import SpawnWave
 from module.content.stage_loader import StageSpecLoader, load_default_stage
+from module.content.stage_rules import (
+    ChapterSwitch,
+    EdgeInsightCorner,
+    OneTimeCompletion,
+    RepeatableCompletion,
+    StageEntrance,
+    StageEntrancePosition,
+    StageEntranceRevision,
+)
 
 if TYPE_CHECKING:
-    from typing import Any
+    from pathlib import Path
 
 PACK_ID = "event_20260625_cn"
-ENEMY_FILTER = "1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C"
+NATIVE_STAGE_EXPECTATIONS = {
+    "t1": (GridShape(9, 7), 5, frozenset({4}), frozenset({0, 4})),
+    "t2": (GridShape(9, 7), 5, frozenset({4}), frozenset({0, 4})),
+    "t3": (GridShape(9, 8), 6, frozenset({5}), frozenset({0, 5})),
+    "ht1": (GridShape(9, 7), 6, frozenset({5}), frozenset({0, 5})),
+    "ht2": (GridShape(9, 7), 7, frozenset({6}), frozenset({0, 5, 6})),
+    "ht3": (GridShape(9, 8), 7, frozenset({6}), frozenset({0, 5, 6})),
+    "sp": (GridShape(7, 10), 8, frozenset({7}), frozenset({0, 5, 7})),
+}
 
 
-class _BossFleet:
-    def __init__(self, calls: list[object], result: object) -> None:
-        self.calls = calls
-        self.result = result
-
-    def clear_boss(self) -> object:
-        self.calls.append("fleet_boss.clear_boss")
-        return self.result
+def _native_stage_spec(stage_id: str) -> StageSpec:
+    pack = next(pack for pack in load_default_event_manifests() if str(pack.pack_id) == PACK_ID)
+    return next(spec for spec in pack.stages if spec.ref.stage_id == stage_id)
 
 
-class _BattleCampaign:
-    ENEMY_FILTER = ENEMY_FILTER
-
-    def __init__(
-        self,
-        *,
-        siren_result: object = False,
-        enemy_result: object = False,
-        boss_result: object = False,
-    ) -> None:
-        self.calls: list[object] = []
-        self.default_result = object()
-        self.siren_result = siren_result
-        self.enemy_result = enemy_result
-        self.boss_result = boss_result
-        self.fleet_boss = _BossFleet(self.calls, boss_result)
-
-    def clear_siren(self) -> object:
-        self.calls.append("clear_siren")
-        return self.siren_result
-
-    def clear_filter_enemy(self, enemy_filter: str, *, preserve: int) -> object:
-        self.calls.append(("clear_filter_enemy", enemy_filter, preserve))
-        return self.enemy_result
-
-    def battle_default(self) -> object:
-        self.calls.append("battle_default")
-        return self.default_result
-
-    def clear_boss(self) -> object:
-        self.calls.append("clear_boss")
-        return self.boss_result
+def _assign_attribute(target: object, name: str, value: object) -> None:
+    setattr(target, name, value)
 
 
-def _normalized_rows(value: str) -> tuple[str, ...]:
-    return tuple(line.strip() for line in value.splitlines() if line.strip())
-
-
-def _config_values(config_class: type[object]) -> dict[str, object]:
-    return {name: value for name, value in vars(config_class).items() if name.isupper()}
-
-
-def _call_battle(campaign_class: type[CampaignBase], battle: int, campaign: _BattleCampaign) -> object:
-    method = getattr(campaign_class, f"battle_{battle}")
-    return method(cast("Any", campaign))
-
-
-@pytest.mark.parametrize("stage_id", ["t1", "t2", "t3", "ht1", "ht2", "ht3", "sp"])
-def test_default_loader_resolves_every_20260625_native_stage(stage_id: str) -> None:
-    loaded = load_default_stage(StageRef(PACK_ID, stage_id))
-
-    assert loaded.map.name == stage_id.upper()
-    assert loaded.config_class.__name__ == "Config"
-    assert loaded.campaign_class.__name__ == "Campaign"
-    assert loaded.campaign_class.MAP is loaded.map
-    assert cast("Any", loaded.campaign_class).ENEMY_FILTER == ENEMY_FILTER
-
-
-def test_t1_stage_matches_the_pre_migration_map_and_complete_config_snapshot() -> None:
-    loaded = load_default_stage(StageRef(PACK_ID, "t1"))
-
-    assert loaded.map.shape == (8, 6)
-    assert [str(grid) for grid in loaded.map.camera_data] == ["F2", "F5"]
-    assert [str(grid) for grid in loaded.map.camera_data_spawn_point] == ["D5"]
-    assert _normalized_rows(loaded.map.map_data)[0] == "-- -- ME -- ME -- -- ++ MB"
-    assert loaded.map.spawn_data == [
-        {"battle": 0, "enemy": 2, "siren": 1},
-        {"battle": 1, "enemy": 2},
-        {"battle": 2, "enemy": 1},
-        {"battle": 3, "enemy": 1},
-        {"battle": 4, "boss": 1},
-    ]
-    assert _config_values(loaded.config_class) == {
-        "MAP_SIREN_TEMPLATE": ("MeowfficerBust_Hobbies",),
-        "MOVABLE_ENEMY_TURN": (2,),
-        "MAP_HAS_SIREN": True,
-        "MAP_HAS_MOVABLE_ENEMY": True,
-        "MAP_HAS_MAP_STORY": False,
-        "MAP_HAS_FLEET_STEP": True,
-        "MAP_HAS_AMBUSH": False,
-        "MAP_HAS_MYSTERY": False,
-        "MAP_CHAPTER_SWITCH_20241219_SP": True,
-        "STAGE_ENTRANCE": ("half", "20240725"),
-        "MAP_HAS_MODE_SWITCH": True,
-        "MAP_SWIPE_MULTIPLY": (1.144, 1.165),
-        "MAP_SWIPE_MULTIPLY_MINITOUCH": (1.106, 1.126),
-    }
-
-
-def test_ht3_stage_keeps_inherited_config_and_battle_preserve_counts() -> None:
-    loaded = load_default_stage(StageRef(PACK_ID, "ht3"))
-
-    assert loaded.map.shape == (8, 7)
-    assert loaded.map.spawn_data[-2:] == [{"battle": 5}, {"battle": 6, "boss": 1}]
-    assert _config_values(loaded.config_class) == {
-        "MAP_SIREN_TEMPLATE": ("MeowfficerBust_Studying", "MeowfficerBust_Playtime"),
-        "MOVABLE_ENEMY_TURN": (2,),
-        "MAP_HAS_SIREN": True,
-        "MAP_HAS_MOVABLE_ENEMY": True,
-        "MAP_HAS_MAP_STORY": False,
-        "MAP_HAS_FLEET_STEP": True,
-        "MAP_HAS_AMBUSH": False,
-        "MAP_HAS_MYSTERY": False,
-        "MAP_CHAPTER_SWITCH_20241219_SP": True,
-        "STAGE_ENTRANCE": ("half", "20240725"),
-        "MAP_HAS_MODE_SWITCH": True,
-        "MAP_SWIPE_MULTIPLY": (1.115, 1.136),
-        "MAP_SWIPE_MULTIPLY_MINITOUCH": (1.078, 1.098),
-    }
-
-    campaign = _BattleCampaign(boss_result="boss")
-    assert _call_battle(loaded.campaign_class, 0, campaign) is campaign.default_result
-    assert campaign.calls == [
-        "clear_siren",
-        ("clear_filter_enemy", ENEMY_FILTER, 1),
-        "battle_default",
-    ]
-    campaign = _BattleCampaign()
-    _call_battle(loaded.campaign_class, 5, campaign)
-    assert campaign.calls == [
-        "clear_siren",
-        ("clear_filter_enemy", ENEMY_FILTER, 0),
-        "battle_default",
-    ]
-    campaign = _BattleCampaign(boss_result="boss")
-    assert _call_battle(loaded.campaign_class, 6, campaign) == "boss"
-    assert campaign.calls == ["fleet_boss.clear_boss"]
-
-
-def test_sp_stage_keeps_one_time_homography_and_edge_config() -> None:
-    loaded = load_default_stage(StageRef(PACK_ID, "sp"))
-    config = _config_values(loaded.config_class)
-
-    assert loaded.map.shape == (6, 9)
-    assert config["STAR_REQUIRE_1"] == config["STAR_REQUIRE_2"] == config["STAR_REQUIRE_3"] == 0
-    assert config["MAP_IS_ONE_TIME_STAGE"] is True
-    assert config["HOMO_STORAGE"] == (
-        (8, 6),
-        ((137.405, 104.804), (1046.044, 104.804), (-12.171, 652.093), (1166.717, 652.093)),
-    )
-    assert config["MAP_ENSURE_EDGE_INSIGHT_CORNER"] == "bottom"
-    assert config == {
-        "MAP_SIREN_TEMPLATE": ("MeowfficerBust_Studying", "MeowfficerBust_Playtime"),
-        "MOVABLE_ENEMY_TURN": (2,),
-        "MAP_HAS_SIREN": True,
-        "MAP_HAS_MOVABLE_ENEMY": True,
-        "MAP_HAS_MAP_STORY": False,
-        "MAP_HAS_FLEET_STEP": False,
-        "MAP_HAS_AMBUSH": False,
-        "MAP_HAS_MYSTERY": False,
-        "STAR_REQUIRE_1": 0,
-        "STAR_REQUIRE_2": 0,
-        "STAR_REQUIRE_3": 0,
-        "MAP_IS_ONE_TIME_STAGE": True,
-        "MAP_CHAPTER_SWITCH_20241219_SP": True,
-        "STAGE_ENTRANCE": ("half", "20240725"),
-        "MAP_HAS_MODE_SWITCH": False,
-        "HOMO_STORAGE": (
-            (8, 6),
-            ((137.405, 104.804), (1046.044, 104.804), (-12.171, 652.093), (1166.717, 652.093)),
-        ),
-        "MAP_ENSURE_EDGE_INSIGHT_CORNER": "bottom",
-        "MAP_SWIPE_MULTIPLY": (1.005, 1.024),
-        "MAP_SWIPE_MULTIPLY_MINITOUCH": (0.972, 0.990),
-    }
-
-    campaign = _BattleCampaign()
-    _call_battle(loaded.campaign_class, 0, campaign)
-    assert campaign.calls[1] == ("clear_filter_enemy", ENEMY_FILTER, 2)
-    campaign = _BattleCampaign()
-    _call_battle(loaded.campaign_class, 5, campaign)
-    assert campaign.calls[1] == ("clear_filter_enemy", ENEMY_FILTER, 0)
-    campaign = _BattleCampaign(boss_result="boss")
-    assert _call_battle(loaded.campaign_class, 7, campaign) == "boss"
-
-
-def test_t1_pack_strategy_keeps_clear_boss_instead_of_fleet_boss() -> None:
-    loaded = load_default_stage(StageRef(PACK_ID, "t1"))
-    campaign = _BattleCampaign(boss_result="boss")
-
-    assert _call_battle(loaded.campaign_class, 4, campaign) == "boss"
-    assert campaign.calls == ["clear_boss"]
-
-
-def test_t1_loaded_policy_short_circuits_in_declared_order() -> None:
-    loaded = load_default_stage(StageRef(PACK_ID, "t1"))
-    campaign = _BattleCampaign(siren_result="siren")
-
-    assert _call_battle(loaded.campaign_class, 0, campaign) is True
-    assert campaign.calls == ["clear_siren"]
-
-    campaign = _BattleCampaign(enemy_result="enemy")
-    assert _call_battle(loaded.campaign_class, 0, campaign) is True
-    assert campaign.calls == [
-        "clear_siren",
-        ("clear_filter_enemy", ENEMY_FILTER, 0),
-    ]
-
-
-@pytest.mark.parametrize("stage_id", ["t1", "t2", "t3", "ht1", "ht2", "ht3", "sp"])
-def test_legacy_python_stage_is_only_a_thin_export_of_native_content(stage_id: str) -> None:
-    ref = StageRef(PACK_ID, stage_id)
-    native = load_default_stage(ref)
-
-    compatible = LegacyStageModuleAdapter().load(ref)
-
-    assert compatible.map is native.map
-    assert compatible.config_class is native.config_class
-    assert compatible.campaign_class is native.campaign_class
-    source = Path("campaign") / PACK_ID / f"{stage_id}.py"
-    text = source.read_text(encoding="utf-8")
-    assert "CampaignMap" not in text
-    assert "class Config" not in text
-    assert "class Campaign" not in text
-
-
-def _write_stage(root: Path, body: str, *, strategy: str | None = None) -> tuple[StageSpecLoader, StageSpec]:
-    pack_root = root / PACK_ID
-    stage_path = pack_root / "stages" / "t1.yaml"
+def _write_stage(root: Path, body: str) -> tuple[StageSpecLoader, StageSpec]:
+    stage_path = root / PACK_ID / "stages" / "t1.yaml"
     stage_path.parent.mkdir(parents=True)
     stage_path.write_text(inspect.cleandoc(body) + "\n", encoding="utf-8", newline="\n")
     return (
-        StageSpecLoader(content_root=root, campaign_root=root.parent / "campaign"),
-        StageSpec(StageRef(PACK_ID, "t1"), "stages/t1.yaml", strategy=strategy),
+        StageSpecLoader(content_root=root),
+        StageSpec(StageRef(PACK_ID, "t1"), "stages/t1.yaml"),
     )
 
 
 def _minimal_stage(**replacements: str) -> str:
     body = inspect.cleandoc(
         """
-        schema_version: 1
+        schema_version: 4
         map:
           name: T1
           shape: A1
@@ -273,11 +83,40 @@ def _minimal_stage(**replacements: str) -> str:
           - battle: 0
             boss: 1
         config:
+          MAP_HAS_MAP_STORY: false
+          MAP_HAS_FLEET_STEP: false
           MAP_HAS_AMBUSH: false
+          MAP_HAS_MYSTERY: false
         enemy_filter: 1L
         battles:
           0:
-            policy: fleet_boss
+            steps:
+            - tag: clear_boss
+              strategy: fleet_boss
+        mechanics:
+          roadblocks: []
+          fleet_coordination: []
+          pickups: []
+          map_interactions: []
+          map_mutations: []
+          moving_enemies:
+            turns: []
+            wait_until_clear: false
+            initial_enemy_cells: []
+            initial_siren_cells: []
+          map_structures:
+            walls: []
+            maze_groups: []
+            fortress_enemy_cells: []
+            fortress_block_cells: []
+            bouncing_enemy_routes: []
+          enemy_movement: []
+          procedures: []
+          preset_routes: []
+          fixed_target_sequences: []
+        programs: []
+        boss_approaches: []
+        hard_mode: null
         """
     )
     if "shape" in replacements:
@@ -293,11 +132,151 @@ def _minimal_stage(**replacements: str) -> str:
         body = body.replace("  spawn_data:\n  - battle: 0\n    boss: 1", f"  spawn_data:\n{rendered}")
     if "config" in replacements:
         rendered = textwrap.indent(replacements["config"], "  ")
-        body = body.replace("config:\n  MAP_HAS_AMBUSH: false", f"config:\n{rendered}")
+        body = body.replace(
+            "config:\n"
+            "  MAP_HAS_MAP_STORY: false\n"
+            "  MAP_HAS_FLEET_STEP: false\n"
+            "  MAP_HAS_AMBUSH: false\n"
+            "  MAP_HAS_MYSTERY: false",
+            f"config:\n{rendered}",
+        )
     if "battles" in replacements:
         rendered = textwrap.indent(replacements["battles"], "  ")
-        body = body.replace("battles:\n  0:\n    policy: fleet_boss", f"battles:\n{rendered}")
+        body = body.replace(
+            "battles:\n  0:\n    steps:\n    - tag: clear_boss\n      strategy: fleet_boss",
+            f"battles:\n{rendered}",
+        )
     return body
+
+
+@pytest.mark.parametrize("stage_id", tuple(NATIVE_STAGE_EXPECTATIONS))
+def test_default_loader_returns_typed_definition_for_every_native_stage(stage_id: str) -> None:
+    definition = load_default_stage(StageRef(PACK_ID, stage_id))
+
+    assert isinstance(definition, CampaignStageDefinition)
+    assert definition.ref == StageRef(PACK_ID, stage_id)
+    assert definition.map.name == stage_id.upper()
+    assert not hasattr(definition, "config_class")
+    assert not hasattr(definition, "campaign_class")
+
+
+def test_load_and_load_definition_share_the_same_typed_contract() -> None:
+    loader = StageSpecLoader()
+    spec = _native_stage_spec("t3")
+
+    assert loader.load(spec) == loader.load_definition(spec)
+
+
+@pytest.mark.parametrize(
+    ("stage_id", "shape", "wave_count", "boss_battles", "policy_battles"),
+    [(stage_id, *expected) for stage_id, expected in NATIVE_STAGE_EXPECTATIONS.items()],
+)
+def test_loader_compiles_complete_normal_and_loop_variants(
+    stage_id: str,
+    shape: GridShape,
+    wave_count: int,
+    boss_battles: frozenset[int],
+    policy_battles: frozenset[int],
+) -> None:
+    definition = StageSpecLoader().load(_native_stage_spec(stage_id))
+    map_definition = definition.map
+
+    assert map_definition.shape == shape
+    assert len(map_definition.normal.cells) == shape.cell_count
+    assert map_definition.normal.cells[0].cell_id == CellId(0, 0)
+    assert map_definition.normal.cells[-1].cell_id == shape.last_cell
+    assert all(cell.weight == 50.0 for cell in map_definition.normal.cells)
+    assert len(map_definition.normal.spawn_waves) == wave_count
+    assert tuple(wave.battle for wave in map_definition.normal.spawn_waves) == tuple(range(wave_count))
+    assert map_definition.normal.boss_battles == boss_battles
+    assert map_definition.boss_battles == boss_battles
+    assert set(definition.battle_policies) == policy_battles
+    assert map_definition.loop == map_definition.normal
+
+
+def test_compiled_definition_is_deeply_immutable() -> None:
+    definition = StageSpecLoader().load(_native_stage_spec("t1"))
+
+    assert isinstance(definition.battle_policies, MappingProxyType)
+    assert isinstance(definition.rules.completion, RepeatableCompletion)
+    for target, name, value in (
+        (definition, "enemy_filter", "changed"),
+        (definition.rules.features, "has_ambush", True),
+        (definition.rules.navigation, "has_mode_switch", False),
+        (definition.map, "name", "changed"),
+        (definition.map.normal, "cells", ()),
+        (definition.map.normal.cells[0], "token", "++"),
+        (definition.map.normal.spawn_waves[0], "enemy", 99),
+    ):
+        with pytest.raises(FrozenInstanceError):
+            _assign_attribute(target, name, value)
+    with pytest.raises(TypeError):
+        definition.battle_policies[99] = definition.battle_policies[0]
+
+
+def test_native_loader_has_no_dynamic_or_legacy_materialization_path() -> None:
+    source = inspect.getsource(stage_loader_module)
+    definition = StageSpecLoader().load(_native_stage_spec("t1"))
+
+    assert 'type("Config"' not in source
+    assert 'type("Campaign"' not in source
+    assert "legacy_stage" not in source
+    assert "legacy_battle_policy" not in source
+    assert "CampaignMap" not in source
+    assert not isinstance(definition, type)
+
+
+def test_normal_stage_compiles_config_into_typed_rule_groups() -> None:
+    rules = StageSpecLoader().load(_native_stage_spec("t1")).rules
+
+    assert rules.features.siren_templates == ("MeowfficerBust_Hobbies",)
+    assert rules.features.movable_enemy_turns == (2,)
+    assert rules.features.has_siren
+    assert rules.features.has_movable_enemy
+    assert not rules.features.has_map_story
+    assert rules.features.has_fleet_step
+    assert not rules.features.has_ambush
+    assert not rules.features.has_mystery
+    assert rules.navigation is not None
+    assert rules.navigation.chapter_switch is ChapterSwitch.SP_20241219
+    assert isinstance(rules.navigation.entrance, StageEntrance)
+    assert rules.navigation.entrance.position is StageEntrancePosition.HALF
+    assert rules.navigation.entrance.revision is StageEntranceRevision.EVENT_20240725
+    assert rules.navigation.has_mode_switch
+    assert rules.calibration is not None
+    assert rules.calibration.swipe.horizontal == 1.144
+    assert rules.calibration.swipe.vertical == 1.165
+    assert rules.calibration.homography is None
+
+
+def test_one_time_stage_has_typed_completion_homography_and_edge_insight() -> None:
+    rules = StageSpecLoader().load(_native_stage_spec("sp")).rules
+
+    assert isinstance(rules.completion, OneTimeCompletion)
+    assert rules.completion.star_requirements.first == 0
+    assert rules.completion.star_requirements.second == 0
+    assert rules.completion.star_requirements.third == 0
+    assert rules.calibration is not None
+    assert rules.calibration.homography is not None
+    assert rules.calibration.homography.reference_columns == 8
+    assert rules.calibration.homography.reference_rows == 6
+    assert len(rules.calibration.homography.corners) == 4
+    assert rules.calibration.edge_insight_corner is EdgeInsightCorner.BOTTOM
+
+
+def test_native_session_uses_typed_policies_and_explicit_boss_strategy() -> None:
+    definition = load_default_stage(StageRef(PACK_ID, "t1"))
+    session = CampaignSession(definition, CampaignRunVariant.NORMAL)
+
+    assert session.battle_plan(0).intents == (
+        ClearSiren(),
+        ClearFilteredEnemy(preserve=0),
+        DefaultBattle(),
+    )
+    assert session.battle_plan(4).intents == (
+        ClearBossRoadblock(BossStrategy.MAP_SEARCH),
+        ClearBoss(BossStrategy.MAP_SEARCH),
+    )
 
 
 @pytest.mark.parametrize(
@@ -308,10 +287,14 @@ def _minimal_stage(**replacements: str) -> str:
         ("spawn_data", "- battle: true", "battle"),
         ("spawn_data", "- battle: 0\n  arbitrary: 1", "unknown"),
         ("config", "lowercase: true", "config"),
-        ("config", "DANGEROUS: {call: value}", "scalar or sequence"),
-        ("battles", "1:\n  policy: fleet_boss", "spawn"),
-        ("battles", "0:\n  policy: arbitrary_expression", "unknown battle policy"),
-        ("battles", "0:\n  policy: fleet_boss\n  arbitrary: true", "unknown"),
+        ("config", "DANGEROUS: {call: value}", "unknown"),
+        (
+            "battles",
+            "1:\n  steps:\n  - tag: clear_boss\n    strategy: fleet_boss",
+            "spawn",
+        ),
+        ("battles", "0:\n  steps:\n  - tag: arbitrary_expression", "unknown tag"),
+        ("battles", "0:\n  policy: fleet_boss", "unknown"),
     ],
 )
 def test_loader_rejects_invalid_stage_contract_at_load_time(
@@ -334,201 +317,133 @@ def test_loader_rejects_duplicate_yaml_keys(tmp_path: Path) -> None:
         loader.load(spec)
 
 
+def test_loader_rejects_unknown_mechanic_tags_and_removed_extension_field(tmp_path: Path) -> None:
+    unknown_mechanic = _minimal_stage().replace(
+        "  roadblocks: []",
+        "  roadblocks:\n  - tag: call_python",
+    )
+    loader, spec = _write_stage(tmp_path / "mechanic", unknown_mechanic)
+    with pytest.raises(ContentValidationError, match=r"unknown tag.*call_python"):
+        loader.load(spec)
+
+    stale_extension_field = _minimal_stage().replace(
+        "hard_mode: null",
+        "extensions: []\nhard_mode: null",
+    )
+    loader, spec = _write_stage(tmp_path / "extension", stale_extension_field)
+    with pytest.raises(ContentValidationError, match=r"extensions|unknown"):
+        loader.load(spec)
+
+
+def test_loader_compiles_advanced_mechanics_directly_from_the_stage(tmp_path: Path) -> None:
+    body = _minimal_stage(
+        shape="B1",
+        map_data="-- MB",
+        weight_data="50 50",
+    )
+    body = (
+        body.replace(
+            "  enemy_movement: []",
+            "  enemy_movement:\n  - battle: 0\n    source: A1\n    target: B1",
+        )
+        .replace(
+            "  procedures: []",
+            "  procedures:\n  - battle: 0\n    operations: [check_accessibility]",
+        )
+        .replace(
+            "  preset_routes: []",
+            "  preset_routes:\n"
+            "  - start_column: 0\n"
+            "    battles:\n"
+            "    - battle: 0\n"
+            "      steps:\n"
+            "      - fleet: fleet_1\n"
+            "        delta_x: 1\n"
+            "        delta_y: 0\n"
+            "        clear_enemy: false",
+        )
+        .replace(
+            "  fixed_target_sequences: []",
+            "  fixed_target_sequences:\n  - battles: [0]\n    targets: [B1]\n    fleet: active",
+        )
+    )
+    loader, spec = _write_stage(tmp_path / "advanced", body)
+
+    mechanics = loader.load(spec).mechanics
+
+    assert mechanics.enemy_movement.moves[0].target == CellId(1, 0)
+    assert mechanics.procedures[0].battle == 0
+    assert mechanics.preset_routes[0].battles[0].battle == 0
+    assert mechanics.fixed_target_sequences[0].targets == (CellId(1, 0),)
+
+
+def test_loader_requires_the_exact_unified_mechanics_shape(tmp_path: Path) -> None:
+    body = _minimal_stage().replace("  procedures: []\n", "")
+    loader, spec = _write_stage(tmp_path / "missing-mechanic", body)
+
+    with pytest.raises(ContentValidationError, match=r"mechanics.*required fields"):
+        loader.load(spec)
+
+
 @pytest.mark.parametrize("token", ["--", "++", "SP", "ME", "Me", "me", "MB", "MS", "MM", "MA", "__", "SI"])
 def test_loader_accepts_every_repository_map_token(tmp_path: Path, token: str) -> None:
     loader, spec = _write_stage(tmp_path / "events", _minimal_stage(map_data=token))
 
-    loaded = loader.load(spec)
+    definition = loader.load(spec)
 
-    assert _normalized_rows(loaded.map.map_data) == (token,)
-
-
-def test_loader_rejects_unknown_map_data_token_with_location(tmp_path: Path) -> None:
-    loader, spec = _write_stage(tmp_path / "events", _minimal_stage(map_data="??"))
-
-    with pytest.raises(ContentValidationError, match=r"map\.map_data:.*unknown.*\?\?"):
-        loader.load(spec)
+    assert definition.map.normal.cells[0].token == token
 
 
-def test_loader_rejects_unknown_map_data_loop_token_with_location(tmp_path: Path) -> None:
-    body = _minimal_stage().replace(
-        "  weight_data: |-\n    50",
-        "  map_data_loop: |-\n    ??\n  weight_data: |-\n    50",
-    )
-    loader, spec = _write_stage(tmp_path / "events", body)
-
-    with pytest.raises(ContentValidationError, match=r"map\.map_data_loop:.*unknown.*\?\?"):
-        loader.load(spec)
-
-
-def test_loader_rejects_boss_battle_without_policy_or_pack_strategy(tmp_path: Path) -> None:
-    body = _minimal_stage(
-        spawn_data="""- battle: 0
-- battle: 1
-- battle: 2
-- battle: 3
-- battle: 4
-  boss: 1""",
-        battles="""0:
-  policy: filtered_enemy_then_default
-  preserve: 0""",
-    )
-    loader, spec = _write_stage(tmp_path / "events", body)
-
-    with pytest.raises(ContentValidationError, match=r"battles\.4.*strategy|strategy.*battle_4"):
-        loader.load(spec)
-
-
-def _stage_with_loop_only_boss(*, declare_boss_policy: bool) -> str:
-    battles = """0:
-  policy: filtered_enemy_then_default
-  preserve: 0"""
-    if declare_boss_policy:
-        battles += """
-1:
-  policy: fleet_boss"""
-    body = _minimal_stage(spawn_data="- battle: 0", battles=battles)
-    return body.replace(
-        "config:\n",
-        "  spawn_data_loop:\n  - battle: 0\n  - battle: 1\n    boss: 1\nconfig:\n",
-    )
-
-
-def test_loader_rejects_loop_only_boss_without_handler(tmp_path: Path) -> None:
-    loader, spec = _write_stage(
-        tmp_path / "events",
-        _stage_with_loop_only_boss(declare_boss_policy=False),
-    )
-
-    with pytest.raises(ContentValidationError, match=r"battles\.1.*strategy|strategy.*battle_1"):
-        loader.load(spec)
-
-
-def test_loader_accepts_policy_declared_only_for_loop_boss(tmp_path: Path) -> None:
-    loader, spec = _write_stage(
-        tmp_path / "events",
-        _stage_with_loop_only_boss(declare_boss_policy=True),
-    )
-
-    loaded = loader.load(spec)
-
-    assert loaded.map.spawn_data == [{"battle": 0}]
-    assert loaded.map.spawn_data_loop == [{"battle": 0}, {"battle": 1, "boss": 1}]
-    assert "battle_1" in vars(loaded.campaign_class)
-
-
-class _BossZeroStrategy(CampaignBase):
-    def battle_0(self) -> bool:
-        return self.clear_boss()
-
-
-class _BossOneStrategy(CampaignBase):
-    def battle_1(self) -> bool:
-        return self.clear_boss()
-
-
-def _write_stage_with_strategy(
+@pytest.mark.parametrize(
+    ("field", "body", "message"),
+    [
+        ("map_data", _minimal_stage(map_data="??"), r"map\.map_data:.*unknown.*\?\?"),
+        (
+            "map_data_loop",
+            _minimal_stage().replace(
+                "  weight_data: |-\n    50",
+                "  map_data_loop: |-\n    ??\n  weight_data: |-\n    50",
+            ),
+            r"map\.map_data_loop:.*unknown.*\?\?",
+        ),
+    ],
+)
+def test_loader_rejects_unknown_map_tokens(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    field: str,
     body: str,
-    strategy_class: type[CampaignBase],
-) -> tuple[StageSpecLoader, StageSpec]:
-    reference = f"campaign.{PACK_ID}.strategy:CampaignStrategy"
-    loader, spec = _write_stage(tmp_path / "events", body, strategy=reference)
-    strategy_path = tmp_path / "campaign" / PACK_ID / "strategy.py"
-    strategy_path.parent.mkdir(parents=True)
-    strategy_path.write_text("# test strategy\n", encoding="utf-8", newline="\n")
-    module = ModuleType(f"campaign.{PACK_ID}.strategy")
-    module.__file__ = str(strategy_path)
-    module.__dict__["CampaignStrategy"] = strategy_class
-    monkeypatch.setattr("module.content.stage_loader.importlib.import_module", lambda _name: module)
-    return loader, spec
-
-
-def _boss_zero_filtered_stage() -> str:
-    return _minimal_stage(
-        battles="""0:
-  policy: filtered_enemy_then_default
-  preserve: 0""",
-    )
-
-
-def test_loader_rejects_filtered_policy_for_boss_zero_without_strategy(tmp_path: Path) -> None:
-    loader, spec = _write_stage(tmp_path / "events", _boss_zero_filtered_stage())
-
-    with pytest.raises(ContentValidationError, match=r"battles\.0.*fleet_boss"):
-        loader.load(spec)
-
-
-def test_loader_rejects_policy_and_strategy_for_same_boss_zero(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    message: str,
 ) -> None:
-    loader, spec = _write_stage_with_strategy(
-        tmp_path,
-        monkeypatch,
-        _boss_zero_filtered_stage(),
-        _BossZeroStrategy,
-    )
+    _ = field
+    loader, spec = _write_stage(tmp_path / "events", body)
 
-    with pytest.raises(ContentValidationError, match=r"battles\.0.*strategy.*same|same.*battle_0"):
+    with pytest.raises(ContentValidationError, match=message):
         loader.load(spec)
 
 
-def test_loader_accepts_strategy_only_boss_zero_and_calls_clear_boss(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    loader, spec = _write_stage_with_strategy(
-        tmp_path,
-        monkeypatch,
-        _minimal_stage(battles="{}"),
-        _BossZeroStrategy,
+def test_native_loader_requires_explicit_boss_strategy_and_rejects_non_boss_step(tmp_path: Path) -> None:
+    loader, spec = _write_stage(tmp_path / "implicit", _minimal_stage(battles="{}"))
+
+    with pytest.raises(ContentValidationError, match="explicit stage policy"):
+        loader.load(spec)
+
+    loader, spec = _write_stage(
+        tmp_path / "wrong-policy",
+        _minimal_stage(
+            battles="""0:
+  steps:
+  - tag: clear_filtered_enemy
+    preserve: 0
+  - tag: default_battle""",
+        ),
     )
-
-    loaded = loader.load(spec)
-    campaign = _BattleCampaign(boss_result="boss")
-
-    assert _call_battle(loaded.campaign_class, 0, campaign) == "boss"
-    assert campaign.calls == ["clear_boss"]
-    assert "battle_0" not in vars(loaded.campaign_class)
-
-
-def test_loader_rejects_empty_policies_without_any_strategy_handler(tmp_path: Path) -> None:
-    loader, spec = _write_stage(tmp_path / "events", _minimal_stage(battles="{}"))
-
-    with pytest.raises(ContentValidationError, match=r"battles.*policy.*strategy"):
+    with pytest.raises(ContentValidationError, match=r"boss battle 0 policy must end with ClearBoss"):
         loader.load(spec)
 
 
-def test_loader_rejects_loop_policy_and_strategy_for_same_battle(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    loader, spec = _write_stage_with_strategy(
-        tmp_path,
-        monkeypatch,
-        _stage_with_loop_only_boss(declare_boss_policy=True),
-        _BossOneStrategy,
-    )
-
-    with pytest.raises(ContentValidationError, match=r"battles\.1.*strategy.*same|same.*battle_1"):
-        loader.load(spec)
-
-
-def test_loader_accepts_fleet_boss_policy_without_strategy(tmp_path: Path) -> None:
-    loader, spec = _write_stage(tmp_path / "events", _minimal_stage())
-
-    loaded = loader.load(spec)
-    campaign = _BattleCampaign(boss_result="boss")
-
-    assert _call_battle(loaded.campaign_class, 0, campaign) == "boss"
-    assert campaign.calls == ["fleet_boss.clear_boss"]
-
-
-def test_loader_preserves_loop_portal_and_land_based_map_data(tmp_path: Path) -> None:
+def test_loader_preserves_distinct_loop_portal_and_land_based_data(tmp_path: Path) -> None:
     body = """
-        schema_version: 1
+        schema_version: 4
         map:
           name: T1
           shape: B2
@@ -550,23 +465,60 @@ def test_loader_preserves_loop_portal_and_land_based_map_data(tmp_path: Path) ->
             boss: 1
           spawn_data_loop:
           - battle: 0
+          - battle: 1
             boss: 1
         config:
+          MAP_HAS_MAP_STORY: false
+          MAP_HAS_FLEET_STEP: false
+          MAP_HAS_AMBUSH: false
+          MAP_HAS_MYSTERY: false
           MAP_HAS_PORTAL: true
           MAP_HAS_LAND_BASED: true
         enemy_filter: 1L
         battles:
           0:
-            policy: fleet_boss
+            steps:
+            - tag: clear_boss
+              strategy: fleet_boss
+          1:
+            steps:
+            - tag: clear_boss
+              strategy: fleet_boss
+        mechanics:
+          roadblocks: []
+          fleet_coordination: []
+          pickups: []
+          map_interactions: []
+          map_mutations: []
+          moving_enemies:
+            turns: []
+            wait_until_clear: false
+            initial_enemy_cells: []
+            initial_siren_cells: []
+          map_structures:
+            walls: []
+            maze_groups: []
+            fortress_enemy_cells: []
+            fortress_block_cells: []
+            bouncing_enemy_routes: []
+          enemy_movement: []
+          procedures: []
+          preset_routes: []
+          fixed_target_sequences: []
+        programs: []
+        boss_approaches: []
+        hard_mode: null
     """
     loader, spec = _write_stage(tmp_path / "events", body)
 
-    loaded = loader.load(spec)
+    definition = loader.load(spec)
 
-    assert _normalized_rows(loaded.map.map_data_loop) == ("-- --", "SP MB")
-    assert loaded.map.portal_data == [((0, 0), (1, 1))]
-    assert loaded.map.land_based_data == [("A1", "right")]
-    assert loaded.map.spawn_data_loop == [{"battle": 0, "boss": 1}]
+    assert tuple(cell.token for cell in definition.map.normal.cells) == ("--", "++", "SP", "MB")
+    assert tuple(cell.token for cell in definition.map.loop.cells) == ("--", "--", "SP", "MB")
+    assert definition.map.portals == (PortalSpec(CellId(0, 0), CellId(1, 1)),)
+    assert definition.map.land_based == (LandBasedSpec(CellId(0, 0), LandBasedDirection.RIGHT),)
+    assert definition.map.normal.spawn_waves == (SpawnWave(0, boss=1),)
+    assert definition.map.loop.spawn_waves == (SpawnWave(0), SpawnWave(1, boss=1))
 
 
 def test_loader_rejects_manifest_stage_bound_to_another_map(tmp_path: Path) -> None:
@@ -576,61 +528,8 @@ def test_loader_rejects_manifest_stage_bound_to_another_map(tmp_path: Path) -> N
         loader.load(spec)
 
 
-@pytest.mark.parametrize(
-    "strategy",
-    [
-        "campaign.event_other.strategy:CampaignStrategy",
-        "campaign.event_20260625_cn...strategy:CampaignStrategy",
-        "campaign.event_20260625_cn.strategy:bad-name",
-        "os:path",
-    ],
-)
-def test_loader_rejects_strategy_references_outside_current_pack(
-    tmp_path: Path,
-    strategy: str,
-) -> None:
-    loader, spec = _write_stage(tmp_path / "events", _minimal_stage(), strategy=strategy)
-
-    with pytest.raises(ContentValidationError, match="strategy"):
-        loader.load(spec)
-
-
-def test_loader_rejects_strategy_module_resolved_outside_pack(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    strategy = f"campaign.{PACK_ID}.strategy:CampaignStrategy"
-    loader, spec = _write_stage(tmp_path / "events", _minimal_stage(), strategy=strategy)
-    module = ModuleType(f"campaign.{PACK_ID}.strategy")
-    module.__file__ = str(tmp_path / "outside" / "strategy.py")
-    cast("Any", module).CampaignStrategy = CampaignBase
-    monkeypatch.setattr("module.content.stage_loader.importlib.import_module", lambda _name: module)
-
-    with pytest.raises(ContentValidationError, match=r"inside.*pack|pack.*directory"):
-        loader.load(spec)
-
-
-def test_loader_wraps_missing_strategy_import_with_source_location(tmp_path: Path) -> None:
-    strategy = f"campaign.{PACK_ID}.missing_strategy:CampaignStrategy"
-    loader, spec = _write_stage(tmp_path / "events", _minimal_stage(), strategy=strategy)
-
-    with pytest.raises(ContentValidationError, match=r"t1\.yaml:strategy:.*missing_strategy"):
-        loader.load(spec)
-
-
-def test_loader_rejects_strategy_export_outside_campaign_base(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    strategy = f"campaign.{PACK_ID}.strategy:CampaignStrategy"
-    loader, spec = _write_stage(tmp_path / "events", _minimal_stage(), strategy=strategy)
-    strategy_path = tmp_path / "campaign" / PACK_ID / "strategy.py"
-    strategy_path.parent.mkdir(parents=True)
-    strategy_path.write_text("", encoding="utf-8")
-    module = ModuleType(f"campaign.{PACK_ID}.strategy")
-    module.__file__ = str(strategy_path)
-    cast("Any", module).CampaignStrategy = object
-    monkeypatch.setattr("module.content.stage_loader.importlib.import_module", lambda _name: module)
-
-    with pytest.raises(ContentValidationError, match="CampaignBase"):
-        loader.load(spec)
+def test_loader_rejects_foreign_input_types() -> None:
+    with pytest.raises(TypeError, match="StageSpec"):
+        StageSpecLoader().load(cast("StageSpec", object()))
+    with pytest.raises(TypeError, match="StageRef"):
+        load_default_stage(cast("StageRef", object()))

@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20250424_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2025-04-24'
   name_cn: 扬起郁金之旗
@@ -12,6 +15,28 @@ releases:
 - opened_on: '2026-04-17'
   name_cn: 复刻扬起郁金之旗
   order: 2580
+stages:
+- id: ht1
+  source: stages/ht1.yaml
+  runtime_profile: profile_f142e43985109deb
+- id: ht2
+  source: stages/ht2.yaml
+  runtime_profile: profile_f142e43985109deb
+- id: ht3
+  source: stages/ht3.yaml
+  runtime_profile: profile_c8bb40f286ae0006
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_4bcea2c5b80d0193
+- id: t1
+  source: stages/t1.yaml
+  runtime_profile: profile_f142e43985109deb
+- id: t2
+  source: stages/t2.yaml
+  runtime_profile: profile_f142e43985109deb
+- id: t3
+  source: stages/t3.yaml
+  runtime_profile: profile_c8bb40f286ae0006
 policy:
   aliases:
     a1: t1
@@ -23,3 +48,10 @@ policy:
     sp1: t1
     sp2: t2
     sp3: t3
+  progressions:
+    ht1: ht2
+    ht2: ht3
+    ht3: null
+    t1: t2
+    t2: t3
+    t3: null

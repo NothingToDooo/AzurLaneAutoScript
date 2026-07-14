@@ -1,31 +1,51 @@
-schema_version: 1
+schema_version: 4
 map:
   name: SP
   shape: G10
-  camera_data: [D3, D7, D8]
-  camera_data_spawn_point: [D8]
-  map_data: |-
-    -- -- ++ -- ++ ++ --
+  camera_data:
+  - D3
+  - D7
+  - D8
+  camera_data_spawn_point:
+  - D8
+  map_data: '-- -- ++ -- ++ ++ --
+
     ++ ++ ++ MB ++ ++ ++
+
     ++ ME -- -- -- ME --
+
     -- -- -- ME -- -- ME
+
     ME -- ME ++ ++ -- --
+
     ++ -- -- -- ++ -- ME
+
     ++ -- MS __ MS -- ++
+
     ME -- -- MS -- -- ME
+
     ++ ++ -- -- -- ME --
-    ++ ++ SP -- SP ++ --
-  weight_data: |-
+
+    ++ ++ SP -- SP ++ --'
+  weight_data: '50 50 50 50 50 50 50
+
     50 50 50 50 50 50 50
+
     50 50 50 50 50 50 50
+
     50 50 50 50 50 50 50
+
     50 50 50 50 50 50 50
+
     50 50 50 50 50 50 50
+
     50 50 50 50 50 50 50
+
     50 50 50 50 50 50 50
+
     50 50 50 50 50 50 50
-    50 50 50 50 50 50 50
-    50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50'
   spawn_data:
   - battle: 0
     enemy: 10
@@ -39,10 +59,10 @@ map:
   - battle: 7
     boss: 1
 config:
-  MAP_SIREN_TEMPLATE: [MeowfficerBust_Studying, MeowfficerBust_Playtime]
-  MOVABLE_ENEMY_TURN: [2]
+  MAP_SIREN_TEMPLATE:
+  - MeowfficerBust_Studying
+  - MeowfficerBust_Playtime
   MAP_HAS_SIREN: true
-  MAP_HAS_MOVABLE_ENEMY: true
   MAP_HAS_MAP_STORY: false
   MAP_HAS_FLEET_STEP: false
   MAP_HAS_AMBUSH: false
@@ -52,24 +72,68 @@ config:
   STAR_REQUIRE_3: 0
   MAP_IS_ONE_TIME_STAGE: true
   MAP_CHAPTER_SWITCH_20241219_SP: true
-  STAGE_ENTRANCE: [half, '20240725']
+  STAGE_ENTRANCE:
+  - half
+  - '20240725'
   MAP_HAS_MODE_SWITCH: false
   HOMO_STORAGE:
-  - [8, 6]
-  - - [137.405, 104.804]
-    - [1046.044, 104.804]
-    - [-12.171, 652.093]
-    - [1166.717, 652.093]
+  - - 8
+    - 6
+  - - - 137.405
+      - 104.804
+    - - 1046.044
+      - 104.804
+    - - -12.171
+      - 652.093
+    - - 1166.717
+      - 652.093
   MAP_ENSURE_EDGE_INSIGHT_CORNER: bottom
-  MAP_SWIPE_MULTIPLY: [1.005, 1.024]
-  MAP_SWIPE_MULTIPLY_MINITOUCH: [0.972, 0.990]
+  MAP_SWIPE_MULTIPLY:
+  - 1.005
+  - 1.024
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 0.972
+  - 0.99
 enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
 battles:
   0:
-    policy: siren_then_filtered_enemy
-    preserve: 2
+    steps:
+    - tag: clear_siren
+    - tag: clear_filtered_enemy
+      preserve: 2
+    - tag: default_battle
   5:
-    policy: siren_then_filtered_enemy
-    preserve: 0
+    steps:
+    - tag: clear_siren
+    - tag: clear_filtered_enemy
+      preserve: 0
+    - tag: default_battle
   7:
-    policy: fleet_boss
+    steps:
+    - tag: clear_boss
+      strategy: fleet_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns:
+    - 2
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs: []
+boss_approaches: []
+hard_mode: null

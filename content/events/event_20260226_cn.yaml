@@ -1,11 +1,54 @@
 schema_version: 1
 id: event_20260226_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: null
 releases:
 - opened_on: '2026-02-26'
   name_cn: 春满客栈Online
   order: 2500
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_0502d5ec5ce205ad
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_0502d5ec5ce205ad
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_0502d5ec5ce205ad
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_0502d5ec5ce205ad
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_0502d5ec5ce205ad
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_0502d5ec5ce205ad
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_0502d5ec5ce205ad
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_0502d5ec5ce205ad
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_0502d5ec5ce205ad
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_0502d5ec5ce205ad
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_0502d5ec5ce205ad
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_0502d5ec5ce205ad
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_0502d5ec5ce205ad
 policy:
   aliases:
     ht1: c1
@@ -20,3 +63,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

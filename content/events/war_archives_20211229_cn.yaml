@@ -1,11 +1,56 @@
 schema_version: 1
 id: war_archives_20211229_cn
 kind: war_archives
-ui_profile: legacy_python
+ui_profile: campaign_v1
+war_archives:
+  profile: tower_of_transcendence
 releases:
 - opened_on: '2024-10-17'
   name_cn: 逆转彩虹之塔
   order: 350
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_9ae787029cac7550
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_ee9c147c6acbce50
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_b465a55154efc742
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_9ab03b44a0f71e5d
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_9ab03b44a0f71e5d
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_9ab03b44a0f71e5d
+- id: bs1
+  source: stages/bs1.yaml
+  runtime_profile: profile_8327707cb2e0e9b4
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_ea520ef81a8f901e
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_bdbfcdd12ae7d69b
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_d3208e469a65ec5e
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_e5c4bc252f4689c2
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_e5c4bc252f4689c2
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_e5c4bc252f4689c2
+- id: ds1
+  source: stages/ds1.yaml
+  runtime_profile: profile_c6621189d77ff184
 policy:
   aliases:
     ht1: c1
@@ -20,3 +65,18 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    bs1: b3
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: ds1
+    d3: null
+    ds1: d3

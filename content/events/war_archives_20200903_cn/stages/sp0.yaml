@@ -1,0 +1,118 @@
+schema_version: 4
+map:
+  name: SP0
+  shape: J6
+  camera_data:
+  - D2
+  - D4
+  - G2
+  - G4
+  camera_data_spawn_point:
+  - D2
+  - D4
+  map_data: '-- -- ++ ++ ++ ++ -- -- ++ ++
+
+    -- ++ -- -- -- ++ -- -- -- ++
+
+    SP -- -- -- -- -- ++ -- -- --
+
+    SP -- -- -- -- -- -- -- -- MB
+
+    -- -- -- -- ++ -- -- ++ -- --
+
+    -- -- -- ++ ++ -- ++ ++ ++ --'
+  weight_data: '50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    boss: 1
+  land_based_data:
+  - - D6
+    - up
+  - - H5
+    - up
+  - - F2
+    - down
+  - - C1
+    - down
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: true
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: true
+  MAP_HAS_LAND_BASED: true
+  STAR_REQUIRE_1: 0
+  STAR_REQUIRE_2: 0
+  STAR_REQUIRE_3: 0
+  MAP_SWIPE_MULTIPLY:
+  - 1.064
+  - 1.084
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.029
+  - 1.048
+  MAP_IS_ONE_TIME_STAGE: true
+enemy_filter: 1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M
+battles:
+  0:
+    steps:
+    - tag: clear_boss_roadblock
+      strategy: map_search
+    - tag: clear_boss
+      strategy: map_search
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions:
+  - battle: 0
+    cells:
+    - C6
+    - E2
+    - G5
+    tag: clear_mechanism
+  map_mutations: []
+  moving_enemies:
+    turns: []
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs:
+- activation_modes:
+  - normal
+  battle: 0
+  statements:
+  - action:
+      category: map_interactions
+      index: 0
+    expected_target: null
+    tag: perform_mechanic
+  - action:
+      strategy: map_search
+      tag: clear_boss_roadblock
+    tag: attempt_battle
+  - action:
+      strategy: map_search
+      tag: clear_boss
+    tag: return_battle
+boss_approaches: []
+hard_mode: null

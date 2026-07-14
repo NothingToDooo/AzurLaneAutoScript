@@ -1,28 +1,36 @@
 schema_version: 1
 id: event_20260625_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2026-06-25'
   name_cn: 美梦巡演奇妙夜
   order: 2670
 stages:
-- id: t1
-  source: stages/t1.yaml
-  strategy: campaign.event_20260625_cn.strategy:EarlyBossStrategy
-- id: t2
-  source: stages/t2.yaml
-  strategy: campaign.event_20260625_cn.strategy:EarlyBossStrategy
-- id: t3
-  source: stages/t3.yaml
 - id: ht1
   source: stages/ht1.yaml
+  runtime_profile: core
 - id: ht2
   source: stages/ht2.yaml
+  runtime_profile: core
 - id: ht3
   source: stages/ht3.yaml
+  runtime_profile: core
 - id: sp
   source: stages/sp.yaml
+  runtime_profile: core
+- id: t1
+  source: stages/t1.yaml
+  runtime_profile: core
+- id: t2
+  source: stages/t2.yaml
+  runtime_profile: core
+- id: t3
+  source: stages/t3.yaml
+  runtime_profile: core
 policy:
   aliases:
     a1: t1
@@ -34,3 +42,10 @@ policy:
     sp1: t1
     sp2: t2
     sp3: t3
+  progressions:
+    ht1: ht2
+    ht2: ht3
+    ht3: null
+    t1: t2
+    t2: t3
+    t3: null

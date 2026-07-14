@@ -1,0 +1,192 @@
+schema_version: 4
+map:
+  name: D3
+  shape: J10
+  camera_data:
+  - D2
+  - D6
+  - D8
+  - G2
+  - G6
+  - G8
+  camera_data_spawn_point:
+  - D8
+  - G8
+  map_data: '++ -- -- ME -- -- ME -- -- ++
+
+    -- -- ++ -- MB MB -- ++ -- --
+
+    ++ -- -- ME -- -- ME -- -- ++
+
+    -- ++ ++ ME -- -- ME ++ ++ --
+
+    ++ ++ MS -- __ __ -- MS ++ ++
+
+    ++ ME -- -- ++ ++ -- -- ME ++
+
+    -- ME -- Me ++ ++ Me -- ME --
+
+    ++ ++ -- -- Me Me -- -- ++ ++
+
+    -- ++ MS -- -- -- -- MS ++ --
+
+    -- ++ ++ ++ SP SP ++ ++ ++ --'
+  weight_data: '50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 4
+    siren: 2
+  - battle: 1
+    enemy: 1
+  - battle: 2
+    enemy: 1
+    siren: 1
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 1
+  - battle: 5
+    enemy: 1
+  - battle: 6
+    boss: 1
+  spawn_data_loop:
+  - battle: 0
+    enemy: 2
+    siren: 2
+  - battle: 1
+    enemy: 1
+  - battle: 2
+    enemy: 2
+    siren: 1
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 2
+  - battle: 5
+    enemy: 1
+  - battle: 6
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: true
+  MAP_HAS_FLEET_STEP: true
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: true
+  MAP_SIREN_TEMPLATE:
+  - BBpurple
+  - CVpurple
+  - Intruder
+  MAP_HAS_SIREN: true
+  STAR_REQUIRE_1: 1
+  STAR_REQUIRE_2: 2
+  STAR_REQUIRE_3: 3
+  MAP_SWIPE_MULTIPLY:
+  - 0.946
+  - 0.963
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 0.914
+  - 0.931
+  MAP_ENSURE_EDGE_INSIGHT_CORNER: bottom
+enemy_filter: 1T > 1L > 1E > 1M > 2T > 2L > 2E > 2M > 3T > 3L > 3E > 3M
+battles:
+  0:
+    steps:
+    - tag: clear_siren
+    - tag: default_battle
+  5:
+    steps:
+    - tag: clear_siren
+    - tag: default_battle
+  6:
+    steps:
+    - strategy: fleet_boss
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination:
+  - battle: 0
+    fleet: fleet_2
+    tag: protect
+  - battle: 5
+    fleet: fleet_2
+    tag: protect
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns:
+    - 2
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs:
+- activation_modes:
+  - normal
+  battle: 0
+  statements:
+  - action:
+      category: fleet_coordination
+      index: 0
+    expected_target: any
+    tag: attempt_mechanic
+  - action:
+      genres: []
+      tag: clear_siren
+    tag: attempt_battle
+  - action:
+      include_scale_1: false
+      tag: clear_priority_enemy
+    tag: attempt_battle
+  - action:
+      tag: default_battle
+    tag: return_battle
+- activation_modes:
+  - normal
+  battle: 5
+  statements:
+  - action:
+      category: fleet_coordination
+      index: 1
+    expected_target: any
+    tag: attempt_mechanic
+  - action:
+      genres: []
+      tag: clear_siren
+    tag: attempt_battle
+  - action:
+      include_scale_1: true
+      tag: clear_priority_enemy
+    tag: attempt_battle
+  - action:
+      tag: default_battle
+    tag: return_battle
+boss_approaches: []
+hard_mode: null

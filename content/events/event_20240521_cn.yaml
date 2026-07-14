@@ -1,7 +1,10 @@
 schema_version: 1
 id: event_20240521_cn
 kind: event
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: event_story
+  profile: standard
 releases:
 - opened_on: '2024-05-21'
   name_cn: 绽放于辉光之城
@@ -12,6 +15,46 @@ releases:
 - opened_on: '2026-06-18'
   name_cn: 复刻绽放于辉光之城
   order: 2650
+stages:
+- id: a1
+  source: stages/a1.yaml
+  runtime_profile: profile_f431c5293f754a57
+- id: a2
+  source: stages/a2.yaml
+  runtime_profile: profile_9f18ed819afe567b
+- id: a3
+  source: stages/a3.yaml
+  runtime_profile: profile_9f18ed819afe567b
+- id: b1
+  source: stages/b1.yaml
+  runtime_profile: profile_72498bef23a030f8
+- id: b2
+  source: stages/b2.yaml
+  runtime_profile: profile_b587f8dd600f6d5d
+- id: b3
+  source: stages/b3.yaml
+  runtime_profile: profile_fa5d4594287e9525
+- id: c1
+  source: stages/c1.yaml
+  runtime_profile: profile_69ff6bf2864c2c6a
+- id: c2
+  source: stages/c2.yaml
+  runtime_profile: profile_9f18ed819afe567b
+- id: c3
+  source: stages/c3.yaml
+  runtime_profile: profile_9f18ed819afe567b
+- id: d1
+  source: stages/d1.yaml
+  runtime_profile: profile_72498bef23a030f8
+- id: d2
+  source: stages/d2.yaml
+  runtime_profile: profile_b587f8dd600f6d5d
+- id: d3
+  source: stages/d3.yaml
+  runtime_profile: profile_14ce391def3aab67
+- id: sp
+  source: stages/sp.yaml
+  runtime_profile: profile_c5dca0de9384d53f
 policy:
   aliases:
     ht1: c1
@@ -26,3 +69,16 @@ policy:
     t4: b1
     t5: b2
     t6: b3
+  progressions:
+    a1: a2
+    a2: a3
+    a3: b1
+    b1: b2
+    b2: b3
+    b3: null
+    c1: c2
+    c2: c3
+    c3: null
+    d1: d2
+    d2: d3
+    d3: null

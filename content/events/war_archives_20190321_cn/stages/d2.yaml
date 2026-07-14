@@ -1,0 +1,220 @@
+schema_version: 4
+map:
+  name: D2
+  shape: I7
+  camera_data:
+  - D2
+  - D5
+  - F2
+  - F5
+  camera_data_spawn_point:
+  - D5
+  map_data: '++ -- ME ME ME ME -- -- ++
+
+    MB Me ME ME ++ -- ME -- ++
+
+    MB MB ++ ++ ++ ++ ++ ME --
+
+    ++ ++ ++ ++ -- -- ME Me --
+
+    SP SP -- ++ -- ME Me -- ++
+
+    SP -- -- Me -- -- ++ -- --
+
+    SP SP ++ -- -- -- ++ -- MM'
+  weight_data: '50 10 20 20 10 20 50 50 50
+
+    20 20 30 30 50 50 50 50 50
+
+    10 10 50 50 50 50 50 10 50
+
+    50 50 50 50 50 10 20 10 50
+
+    50 50 50 50 10 30 30 50 50
+
+    50 50 50 20 50 40 50 50 50
+
+    50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 4
+  - battle: 1
+    enemy: 2
+  - battle: 2
+    enemy: 1
+  - battle: 3
+    enemy: 1
+    mystery: 1
+  - battle: 4
+    enemy: 1
+  - battle: 5
+    enemy: 1
+  - battle: 6
+  - battle: 7
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: true
+  MAP_HAS_FLEET_STEP: false
+  MAP_HAS_AMBUSH: true
+  MAP_HAS_MYSTERY: true
+  STAR_REQUIRE_1: 1
+  STAR_REQUIRE_2: 2
+  STAR_REQUIRE_3: 3
+  MAP_SWIPE_MULTIPLY:
+  - 1.064
+  - 1.084
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 1.029
+  - 1.048
+enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - tag: default_battle
+  3:
+    steps:
+    - tag: default_battle
+  7:
+    steps:
+    - strategy: fleet_boss
+      tag: clear_boss
+mechanics:
+  roadblocks:
+  - battle: 0
+    roads:
+    - paths:
+      - - D6
+      - - G4
+        - G5
+      - - H4
+      - - H3
+      - - F1
+      - - D1
+      - - C1
+      - - B2
+    selection: strongest
+    tag: clear
+  - battle: 0
+    roads:
+    - paths:
+      - - D6
+      - - G4
+        - G5
+      - - H4
+      - - H3
+      - - F1
+      - - D1
+      - - C1
+      - - B2
+    selection: strongest
+    tag: clear_potential
+  - battle: 3
+    roads:
+    - paths:
+      - - D6
+      - - G4
+        - G5
+      - - H4
+      - - H3
+      - - F1
+      - - D1
+      - - C1
+      - - B2
+    selection: strongest
+    tag: clear
+  - battle: 3
+    roads:
+    - paths:
+      - - D6
+      - - G4
+        - G5
+      - - H4
+      - - H3
+      - - F1
+      - - D1
+      - - C1
+      - - B2
+    selection: strongest
+    tag: clear_potential
+  fleet_coordination:
+  - battle: 0
+    fleet: fleet_2
+    tag: push_forward
+  - battle: 3
+    fleet: fleet_2
+    tag: push_forward
+  pickups: []
+  map_interactions:
+  - battle: 3
+    ignored: []
+    nearby: true
+    tag: clear_all_mystery
+  map_mutations: []
+  moving_enemies:
+    turns: []
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs:
+- activation_modes:
+  - normal
+  battle: 0
+  statements:
+  - action:
+      category: fleet_coordination
+      index: 0
+    expected_target: any
+    tag: perform_mechanic
+  - action:
+      category: roadblocks
+      index: 0
+    expected_target: enemy
+    tag: attempt_mechanic
+  - action:
+      category: roadblocks
+      index: 1
+    expected_target: enemy
+    tag: attempt_mechanic
+  - action:
+      tag: default_battle
+    tag: return_battle
+- activation_modes:
+  - normal
+  battle: 3
+  statements:
+  - action:
+      category: map_interactions
+      index: 0
+    expected_target: null
+    tag: perform_mechanic
+  - action:
+      category: fleet_coordination
+      index: 1
+    expected_target: any
+    tag: perform_mechanic
+  - action:
+      category: roadblocks
+      index: 2
+    expected_target: enemy
+    tag: attempt_mechanic
+  - action:
+      category: roadblocks
+      index: 3
+    expected_target: enemy
+    tag: attempt_mechanic
+  - action:
+      tag: default_battle
+    tag: return_battle
+boss_approaches: []
+hard_mode: null

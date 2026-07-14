@@ -1,7 +1,13 @@
 schema_version: 1
 id: raid_20210708
 kind: raid
-ui_profile: legacy_python
+ui_profile: campaign_v1
+activity:
+  kind: raid
+  profile: suruga
+  modes: [easy, normal, hard]
+  daily_modes: [easy, normal, hard]
+  ticket_modes: []
 releases:
 - opened_on: '2021-07-08'
   name_cn: 复刻穿越彼方的水线

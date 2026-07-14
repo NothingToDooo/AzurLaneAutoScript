@@ -1,0 +1,145 @@
+schema_version: 4
+map:
+  name: SP
+  shape: M10
+  camera_data:
+  - D5
+  - D8
+  - J5
+  - J8
+  camera_data_spawn_point:
+  - D8
+  - J8
+  map_data: '-- -- -- -- -- -- -- -- -- -- -- -- --
+
+    -- -- -- -- -- ++ ++ -- -- -- -- -- --
+
+    -- ++ ++ ++ -- -- ++ -- -- ++ ++ ++ --
+
+    -- ME ++ ++ ++ ++ ++ ++ ++ ++ ++ Me --
+
+    Me -- Me -- ++ ++ ++ ++ ++ -- Me -- Me
+
+    -- -- -- MS Me -- ++ -- Me MS -- -- --
+
+    -- ME -- -- -- ++ MB ++ -- -- -- ME --
+
+    ME -- ME -- -- MS -- MS -- -- ME -- ME
+
+    -- ME -- -- -- -- __ -- -- -- -- ME --
+
+    -- -- -- SP -- -- -- -- -- SP -- -- --'
+  weight_data: '50 50 50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50 50 50
+
+    50 50 50 50 50 50 50 50 50 50 50 50 50'
+  spawn_data:
+  - battle: 0
+    enemy: 2
+    siren: 2
+  - battle: 1
+    enemy: 1
+  - battle: 2
+    enemy: 2
+    siren: 1
+  - battle: 3
+    enemy: 1
+  - battle: 4
+    enemy: 2
+  - battle: 5
+    enemy: 1
+  - battle: 6
+  - battle: 7
+    boss: 1
+config:
+  MAP_HAS_MAP_STORY: false
+  MAP_HAS_FLEET_STEP: true
+  MAP_HAS_AMBUSH: false
+  MAP_HAS_MYSTERY: false
+  MAP_SIREN_TEMPLATE:
+  - Scharnhorst
+  - Deutschland
+  - Spee
+  - Gneisenau
+  - Tirpitz
+  MAP_HAS_SIREN: true
+  STAR_REQUIRE_1: 0
+  STAR_REQUIRE_2: 0
+  STAR_REQUIRE_3: 0
+  MAP_SWIPE_MULTIPLY:
+  - 0.963
+  - 0.981
+  MAP_SWIPE_MULTIPLY_MINITOUCH:
+  - 0.932
+  - 0.949
+  HOMO_STORAGE:
+  - - 10
+    - 6
+  - - - 172.714
+      - 96.467
+    - - 1291.455
+      - 96.467
+    - - 27.369
+      - 639.803
+    - - 1491.921
+      - 639.803
+  MAP_ENSURE_EDGE_INSIGHT_CORNER: bottom
+enemy_filter: 1L > 1M > 1E > 1C > 2L > 2M > 2E > 2C > 3L > 3M > 3E > 3C
+battles:
+  0:
+    steps:
+    - tag: clear_siren
+    - preserve: 2
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  5:
+    steps:
+    - tag: clear_siren
+    - preserve: 0
+      tag: clear_filtered_enemy
+    - tag: default_battle
+  7:
+    steps:
+    - strategy: fleet_boss
+      tag: clear_boss
+mechanics:
+  roadblocks: []
+  fleet_coordination: []
+  pickups: []
+  map_interactions: []
+  map_mutations: []
+  moving_enemies:
+    turns:
+    - 2
+    normal_turns: []
+    wait_until_clear: false
+    initial_enemy_cells: []
+    initial_siren_cells: []
+  enemy_movement: []
+  procedures: []
+  preset_routes: []
+  fixed_target_sequences: []
+  map_structures:
+    walls: []
+    maze_groups: []
+    fortress_enemy_cells: []
+    fortress_block_cells: []
+    bouncing_enemy_routes: []
+programs: []
+boss_approaches: []
+hard_mode: null
