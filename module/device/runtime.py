@@ -7,6 +7,7 @@ import psutil
 from adbutils.errors import AdbError
 
 from module.base.decorator import run_once
+from module.base.failure import raise_cleanup_errors
 from module.base.timer import Timer
 from module.device.mumu_runtime_base import MumuRuntimeBase
 from module.device.platform.emulator_windows import Emulator, EmulatorInstance, EmulatorManager
@@ -300,20 +301,17 @@ class DeviceRuntime:
 
     def release_serial(self) -> None:
         """按旧 serial 资源依赖顺序释放并失效缓存。"""
-        first_error: Exception | None = None
-        try:
-            self.controller.release()
-        except Exception as error:  # noqa: BLE001
-            first_error = error
-        try:
-            self.capture.release()
-        except Exception as error:  # noqa: BLE001
-            if first_error is None:
-                first_error = error
-        finally:
-            self.mumu_runtime.invalidate_serial()
-        if first_error is not None:
-            raise first_error
+        errors: list[BaseException] = []
+        for cleanup in (
+            self.controller.release,
+            self.capture.release,
+            self.mumu_runtime.invalidate_serial,
+        ):
+            try:
+                cleanup()
+            except BaseException as error:  # noqa: BLE001 - 独立清理步骤失败后仍须继续释放其余资源。
+                errors.append(error)
+        raise_cleanup_errors(errors, message="device serial resource cleanup failed")
 
     def release(self) -> None:
         self.release_serial()

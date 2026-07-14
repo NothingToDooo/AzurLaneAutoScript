@@ -4,6 +4,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Protocol, override
 
 from module.application import AbortRequested
+from module.base.failure import preserve_cleanup_failure
 from module.content import battle_program as program_model
 from module.content.campaign_session import (
     BattleAttempt,
@@ -603,11 +604,11 @@ class LiveCampaignWorkflow(CampaignWorkflow):
             stop_reason = (
                 CampaignStopReason.PREEMPTED if isinstance(error, AbortRequested) else CampaignStopReason.FAILED
             )
-            try:
-                self._finish_session(session, initial_state, stop_reason)
-            # 清理失败只能作为附注；不能把原始取消或执行错误改写成另一种任务结果。
-            except Exception as lifecycle_error:  # noqa: BLE001
-                error.add_note(f"campaign runtime cleanup failed: {lifecycle_error!r}")
+            preserve_cleanup_failure(
+                error,
+                lambda: self._finish_session(session, initial_state, stop_reason),
+                message="campaign execution and lifecycle cleanup both failed",
+            )
             raise
         return self._finish_report(job, report)
 

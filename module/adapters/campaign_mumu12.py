@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass, replace
 from functools import partial
-from typing import TYPE_CHECKING, Final, Literal, Unpack, cast
+from typing import TYPE_CHECKING, Final, Literal, Self, Unpack, cast
 
 from module.adapters.campaign_live import (
     CampaignMapRuntime,
@@ -28,6 +28,7 @@ from module.adapters.gems_mumu12 import (
 from module.adapters.mumu12 import CancellationAwareMumu12Device
 from module.application import SafeUnitCancellation
 from module.base.decorator import cached_property
+from module.base.failure import preserve_cleanup_failure, raise_cleanup_errors
 from module.base.utils import location2node
 from module.campaign.campaign_engine import CampaignEngine
 from module.combat.emotion import Emotion
@@ -87,6 +88,7 @@ from module.war_archives.assets import OCR_DATA_KEY_CAMPAIGN, WAR_ARCHIVES_CAMPA
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from types import TracebackType
 
     from module.base.button import Button
     from module.base.template import Template
@@ -146,6 +148,43 @@ class CampaignRuntimeEvidenceError(RuntimeError):
 class _ActivatedMap:
     session: CampaignSession
     state: CampaignSessionState
+
+
+class _RuntimeActivationOwner:
+    """activation 成功转交前，保证局部 runtime 不会成为 orphan。"""
+
+    __slots__ = ("_cleanup", "_owned")
+
+    def __init__(self, cleanup: Callable[[], None]) -> None:
+        self._cleanup = cleanup
+        self._owned = True
+
+    def __enter__(self) -> Self:
+        return self
+
+    def transfer(self) -> None:
+        """runtime 已发布给 provider 或已完整释放。"""
+
+        self._owned = False
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        error: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> Literal[False]:
+        del exc_type, traceback
+        if not self._owned:
+            return False
+        if error is None:
+            self._cleanup()
+        else:
+            preserve_cleanup_failure(
+                error,
+                self._cleanup,
+                message="campaign activation and runtime cleanup both failed",
+            )
+        return False
 
 
 def _variant_text(variant: RunVariant, attribute: str) -> str:
@@ -1235,8 +1274,12 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             self.map_init(self.MAP)
             self.battle_count = battle_index
             self._apply_map_patches(MapMutationPhase.MAP_INIT)
-        except BaseException:
-            self.finish_runtime_session(RuntimeSessionOutcome.FAILED)
+        except BaseException as error:
+            preserve_cleanup_failure(
+                error,
+                partial(self.finish_runtime_session, RuntimeSessionOutcome.FAILED),
+                message="campaign session initialization and cleanup both failed",
+            )
             raise
 
     def resume_session(self, state: CampaignSessionState) -> None:
@@ -1259,10 +1302,18 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         if not self._runtime_profile_session_active:
             message = "campaign runtime profile session is not active"
             raise CampaignRuntimeProfileError(message)
-        self._runtime_profile.end_session(outcome)
-        self._runtime_profile_session_active = False
-        self._runtime_profile.reset()
         self._runtime_profile_available = False
+        self._runtime_profile_session_active = False
+        errors: list[BaseException] = []
+        for cleanup in (
+            partial(self._runtime_profile.end_session, outcome),
+            self._runtime_profile.reset,
+        ):
+            try:
+                cleanup()
+            except BaseException as error:  # noqa: BLE001 - end 与 reset 是独立的关闭阶段。
+                errors.append(error)
+        raise_cleanup_errors(errors, message="campaign runtime session cleanup failed")
 
     def discard_runtime(self) -> None:
         if self._runtime_profile_session_active:
@@ -1270,8 +1321,8 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             raise CampaignRuntimeProfileError(message)
         if not self._runtime_profile_available:
             return
-        self._runtime_profile.reset()
         self._runtime_profile_available = False
+        self._runtime_profile.reset()
 
     @property
     def runtime_session_active(self) -> bool:
@@ -1403,9 +1454,13 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         )
         try:
             self._execute_hard_attempt_body(cancellation)
-        except BaseException:
+        except BaseException as error:
             if self._runtime_profile_session_active:
-                self.finish_runtime_session(RuntimeSessionOutcome.FAILED)
+                preserve_cleanup_failure(
+                    error,
+                    partial(self.finish_runtime_session, RuntimeSessionOutcome.FAILED),
+                    message="hard campaign attempt and cleanup both failed",
+                )
             raise
         self.finish_runtime_session(RuntimeSessionOutcome.COMPLETED)
 
@@ -1555,7 +1610,15 @@ class Mumu12CampaignRuntimeProvider:
         if not isinstance(runtime, DeclarativeCampaignMapRuntime):
             message = "campaign runtime factory returned an invalid runtime"
             raise TypeError(message)
-        unit_cancellation = self._refresh_runtime_cancellation(job, runtime, cancellation)
+        try:
+            unit_cancellation = self._refresh_runtime_cancellation(job, runtime, cancellation)
+        except BaseException as error:
+            preserve_cleanup_failure(
+                error,
+                runtime.discard_runtime,
+                message="campaign runtime construction and cleanup both failed",
+            )
+            raise
         return runtime, unit_cancellation
 
     def _refresh_runtime_cancellation(
@@ -1795,6 +1858,12 @@ class Mumu12CampaignRuntimeProvider:
         else:
             runtime.discard_runtime()
 
+    def _release_activation_runtime(self, runtime: DeclarativeCampaignMapRuntime) -> None:
+        if runtime is self._active_runtime:
+            self._release_active_runtime(RuntimeSessionOutcome.FAILED)
+        else:
+            self._release_runtime(runtime, RuntimeSessionOutcome.FAILED)
+
     def _activate_checkpoint(
         self,
         session: CampaignSession,
@@ -1811,23 +1880,16 @@ class Mumu12CampaignRuntimeProvider:
             else:
                 runtime.discard_runtime()
             return CampaignCheckpointUnavailable("client is not inside the checkpoint map")
-        try:
-            if runtime.runtime_session_active:
-                runtime.resume_session(progress_state)
-            else:
-                runtime.initialize_session(
-                    progress_state.variant,
-                    progress_state.battle_index,
-                    RuntimeSessionEntryKind.RESUME,
-                    progress_state,
-                )
-            runtime.prepare_battle(progress_state.battle_index)
-        except BaseException:
-            if runtime is self._active_runtime:
-                self._release_active_runtime(RuntimeSessionOutcome.FAILED)
-            else:
-                self._release_runtime(runtime, RuntimeSessionOutcome.FAILED)
-            raise
+        if runtime.runtime_session_active:
+            runtime.resume_session(progress_state)
+        else:
+            runtime.initialize_session(
+                progress_state.variant,
+                progress_state.battle_index,
+                RuntimeSessionEntryKind.RESUME,
+                progress_state,
+            )
+        runtime.prepare_battle(progress_state.battle_index)
         return session
 
     def _activate_fresh(
@@ -1855,37 +1917,32 @@ class Mumu12CampaignRuntimeProvider:
                 ),
                 str(error),
             )
-        except ScriptEnd:
+        except ScriptEnd as stop_error:
             try:
                 reached = runtime.triggered_map_stop()
-            finally:
+            except BaseException as inspection_error:  # noqa: BLE001 - 必须保留 ScriptEnd 与检查失败。
+                message = "campaign map-stop inspection failed"
+                raise BaseExceptionGroup(message, (stop_error, inspection_error)) from None
+            if reached:
                 runtime.discard_runtime()
-            if not reached:
-                raise
-            return CampaignMapAchievementReached(
-                full_clear=bool(runtime.map_is_100_percent_clear),
-                three_stars=bool(runtime.map_is_3_stars),
-                threat_safe=bool(runtime.map_is_threat_safe),
-            )
-        except BaseException:
-            runtime.discard_runtime()
+                return CampaignMapAchievementReached(
+                    full_clear=bool(runtime.map_is_100_percent_clear),
+                    three_stars=bool(runtime.map_is_3_stars),
+                    threat_safe=bool(runtime.map_is_threat_safe),
+                )
             raise
 
-        try:
-            runtime.handle_map_fleet_lock()
-            variant = CampaignRunVariant.LOOP if runtime.map_is_clear_mode else CampaignRunVariant.NORMAL
-            activated = self._entered_session(job, session, variant)
-            state = activated.initial_state()
-            runtime.initialize_session(
-                variant,
-                state.battle_index,
-                RuntimeSessionEntryKind.FRESH,
-                state,
-            )
-            runtime.prepare_battle(state.battle_index)
-        except BaseException:
-            self._release_runtime(runtime, RuntimeSessionOutcome.FAILED)
-            raise
+        runtime.handle_map_fleet_lock()
+        variant = CampaignRunVariant.LOOP if runtime.map_is_clear_mode else CampaignRunVariant.NORMAL
+        activated = self._entered_session(job, session, variant)
+        state = activated.initial_state()
+        runtime.initialize_session(
+            variant,
+            state.battle_index,
+            RuntimeSessionEntryKind.FRESH,
+            state,
+        )
+        runtime.prepare_battle(state.battle_index)
         return _ActivatedMap(activated, state)
 
     @staticmethod
@@ -1915,38 +1972,42 @@ class Mumu12CampaignRuntimeProvider:
             runtime, unit_cancellation = self._take_active_runtime(job, session, cancellation)
         if runtime is None:
             runtime, unit_cancellation = self._new_runtime(job, session, cancellation)
-        if unit_cancellation is None:
-            message = "campaign runtime is missing its safe-unit cancellation gate"
-            raise CampaignRuntimeEvidenceError(message)
-        if progress is not None and not prepared_at_boundary:
-            result = self._activate_checkpoint(
-                session,
-                runtime,
-                progress.session_state,
-                cancellation,
-            )
-            if isinstance(result, CampaignCheckpointUnavailable):
-                return result
-            activated = result
-        else:
-            fresh = self._activate_fresh(
-                job,
-                session,
-                runtime,
-                unit_cancellation,
-                prepared=prepared,
-            )
-            if not isinstance(fresh, _ActivatedMap):
-                return fresh
-            activated = fresh.session
+        with _RuntimeActivationOwner(partial(self._release_activation_runtime, runtime)) as owner:
+            if unit_cancellation is None:
+                message = "campaign runtime is missing its safe-unit cancellation gate"
+                raise CampaignRuntimeEvidenceError(message)
+            if progress is not None and not prepared_at_boundary:
+                result = self._activate_checkpoint(
+                    session,
+                    runtime,
+                    progress.session_state,
+                    cancellation,
+                )
+                if isinstance(result, CampaignCheckpointUnavailable):
+                    owner.transfer()
+                    return result
+                activated = result
+            else:
+                fresh = self._activate_fresh(
+                    job,
+                    session,
+                    runtime,
+                    unit_cancellation,
+                    prepared=prepared,
+                )
+                if not isinstance(fresh, _ActivatedMap):
+                    owner.transfer()
+                    return fresh
+                activated = fresh.session
 
-        self._config.apply_runtime_overlay(
-            Campaign_UseAutoSearch=job.execution.automation.use_auto_search,
-        )
-        self._active_runtime = runtime
-        self._active_session = activated
-        self._active_unit_cancellation = unit_cancellation
-        return activated
+            self._config.apply_runtime_overlay(
+                Campaign_UseAutoSearch=job.execution.automation.use_auto_search,
+            )
+            self._active_runtime = runtime
+            self._active_session = activated
+            self._active_unit_cancellation = unit_cancellation
+            owner.transfer()
+            return activated
 
     def active_runtime(
         self,
@@ -2028,8 +2089,7 @@ class Mumu12CampaignRuntimeProvider:
     def discard_checkpoint(self) -> None:
         """失效 checkpoint 不再拥有任何 prepared 或 active runtime。"""
 
-        self._discard_prepared_runtime()
-        self._release_active_runtime(RuntimeSessionOutcome.INTERRUPTED)
+        self._release_owned_runtimes(RuntimeSessionOutcome.INTERRUPTED)
 
     def finish(
         self,
@@ -2062,8 +2122,19 @@ class Mumu12CampaignRuntimeProvider:
             return
 
         outcome = self._runtime_outcome(state, stop_reason)
-        self._discard_prepared_runtime()
-        self._release_active_runtime(outcome)
+        self._release_owned_runtimes(outcome)
+
+    def _release_owned_runtimes(self, outcome: RuntimeSessionOutcome) -> None:
+        errors: list[BaseException] = []
+        for cleanup in (
+            self._discard_prepared_runtime,
+            partial(self._release_active_runtime, outcome),
+        ):
+            try:
+                cleanup()
+            except BaseException as error:  # noqa: BLE001 - 两个 owner 必须独立释放。
+                errors.append(error)
+        raise_cleanup_errors(errors, message="campaign runtime ownership cleanup failed")
 
 
 class Mumu12HardCampaignPort:
@@ -2153,8 +2224,12 @@ class Mumu12HardCampaignPort:
         runtime.device = cast("Device", CancellationAwareMumu12Device(self._device, cancellation))
         try:
             remaining = self._read_remaining_attempts(runtime, settings, cancellation)
-        except BaseException:
-            runtime.discard_runtime()
+        except BaseException as error:
+            preserve_cleanup_failure(
+                error,
+                runtime.discard_runtime,
+                message="hard campaign attempt discovery and cleanup both failed",
+            )
             raise
         self._active_runtime = runtime
         self._active_stage = stage

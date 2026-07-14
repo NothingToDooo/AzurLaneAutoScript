@@ -1,6 +1,6 @@
 from dataclasses import replace
 from datetime import UTC, datetime, time, timedelta
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, Unpack, cast, override
 
 import pytest
 
@@ -15,7 +15,11 @@ from module.adapters.campaign_mumu12 import (
     compile_campaign_map,
     compose_campaign_attempt_definition,
 )
-from module.adapters.campaign_runtime_profile import RuntimeSessionEntryKind, RuntimeSessionOutcome
+from module.adapters.campaign_runtime_profile import (
+    CampaignRuntimeProfileError,
+    RuntimeSessionEntryKind,
+    RuntimeSessionOutcome,
+)
 from module.adapters.gems_mumu12 import Mumu12GemsRuntimeBehavior
 from module.application import AbortRequested, AbortToken, DailySchedule, DelayRange, SafeUnitCancellation, TaskId
 from module.base.button import Button
@@ -107,6 +111,7 @@ from module.gameplay.campaign_live import CampaignCheckpointUnavailable, Campaig
 from module.gameplay.encounter import HardBattleOutcome, HardFleet, HardSettings, HardStopReason
 
 if TYPE_CHECKING:
+    from module.config.config_generated import ConfigOverrides
     from module.interaction import CancellationSignal
 
 
@@ -700,6 +705,139 @@ def test_runtime_rejects_invalid_battle_index_before_mutating_map() -> None:
         runtime.prepare_battle(-1)
 
 
+def test_runtime_is_poisoned_before_session_cleanup_can_fail() -> None:
+    cleanup_error = RuntimeError("session cleanup failed")
+    calls: list[object] = []
+
+    class _EndFailingProfile:
+        @staticmethod
+        def end_session(outcome: RuntimeSessionOutcome) -> None:
+            calls.append(("end_session", outcome))
+            raise cleanup_error
+
+        @staticmethod
+        def reset() -> None:
+            calls.append("reset")
+
+    runtime = object.__new__(DeclarativeCampaignMapRuntime)
+    vars(runtime).update(
+        _runtime_profile=_EndFailingProfile(),
+        _runtime_profile_available=True,
+        _runtime_profile_session_active=True,
+    )
+
+    with pytest.raises(RuntimeError) as raised:
+        runtime.finish_runtime_session(RuntimeSessionOutcome.FAILED)
+
+    assert raised.value is cleanup_error
+    assert runtime._runtime_profile_available is False  # noqa: SLF001 - 验证失败后的所有权状态。
+    assert runtime._runtime_profile_session_active is False  # noqa: SLF001 - 失败后不能再报告 active。
+    assert calls == [("end_session", RuntimeSessionOutcome.FAILED), "reset"]
+    with pytest.raises(CampaignRuntimeProfileError, match="already been released"):
+        runtime.initialize_session(
+            CampaignRunVariant.NORMAL,
+            0,
+            RuntimeSessionEntryKind.FRESH,
+        )
+
+
+def test_new_runtime_refresh_failure_cleans_the_factory_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    refresh_error = RuntimeError("runtime cancellation refresh failed")
+    cleanup_error = OSError("runtime discard failed")
+
+    class _RefreshCleanupFailingRuntime(_FakeDeclarativeRuntime):
+        created: ClassVar[list[object]] = []
+
+        @override
+        def discard_runtime(self) -> None:
+            self._runtime_released = True
+            self.calls.append("discard_runtime")
+            raise cleanup_error
+
+    def fail_refresh(
+        provider: Mumu12CampaignRuntimeProvider,
+        job: CampaignJobSpec,
+        runtime: DeclarativeCampaignMapRuntime,
+        cancellation: CancellationSignal,
+    ) -> SafeUnitCancellation:
+        del provider, job, runtime, cancellation
+        raise refresh_error
+
+    monkeypatch.setattr(Mumu12CampaignRuntimeProvider, "_refresh_runtime_cancellation", fail_refresh)
+    provider = Mumu12CampaignRuntimeProvider(
+        AzurLaneConfig.from_snapshot("campaign-refresh-cleanup-failure", {}),
+        object.__new__(Device),
+        runtime_factory=_RefreshCleanupFailingRuntime,
+    )
+
+    with pytest.raises(ExceptionGroup) as raised:
+        provider.activate(_job(), AbortToken())
+
+    assert raised.value.exceptions == (refresh_error, cleanup_error)
+    runtime = cast("_RefreshCleanupFailingRuntime", _RefreshCleanupFailingRuntime.created[0])
+    assert runtime.calls[-1] == "discard_runtime"
+
+
+def test_fresh_activation_guard_cleans_runtime_when_entry_setup_fails() -> None:
+    setup_error = RuntimeError("campaign UI setup failed")
+    cleanup_error = OSError("runtime discard failed")
+
+    class _SetupCleanupFailingRuntime(_FakeDeclarativeRuntime):
+        created: ClassVar[list[object]] = []
+
+        @override
+        def ensure_campaign_ui(self, name: str, mode: str = "normal", **kwargs: object) -> bool:
+            del name, mode, kwargs
+            raise setup_error
+
+        @override
+        def discard_runtime(self) -> None:
+            self._runtime_released = True
+            self.calls.append("discard_runtime")
+            raise cleanup_error
+
+    provider = Mumu12CampaignRuntimeProvider(
+        AzurLaneConfig.from_snapshot("campaign-entry-setup-cleanup-failure", {}),
+        object.__new__(Device),
+        runtime_factory=_SetupCleanupFailingRuntime,
+    )
+
+    with pytest.raises(ExceptionGroup) as raised:
+        provider.activate(_job(), AbortToken())
+
+    assert raised.value.exceptions == (setup_error, cleanup_error)
+
+
+def test_activation_guard_releases_initialized_runtime_when_final_overlay_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    overlay_error = RuntimeError("final runtime overlay failed")
+    config = AzurLaneConfig.from_snapshot("campaign-final-overlay-failure", {})
+    original_apply_runtime_overlay = config.apply_runtime_overlay
+
+    def fail_final_overlay(**kwargs: Unpack[ConfigOverrides]) -> None:
+        if kwargs == {"Campaign_UseAutoSearch": True}:
+            raise overlay_error
+        original_apply_runtime_overlay(**kwargs)
+
+    monkeypatch.setattr(config, "apply_runtime_overlay", fail_final_overlay)
+    provider = Mumu12CampaignRuntimeProvider(
+        config,
+        object.__new__(Device),
+        runtime_factory=_FakeDeclarativeRuntime,
+    )
+
+    with pytest.raises(RuntimeError) as raised:
+        provider.activate(_job(), AbortToken())
+
+    assert raised.value is overlay_error
+    runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[-1])
+    assert ("finish_runtime_session", RuntimeSessionOutcome.FAILED) in runtime.calls
+    assert provider._active_runtime is None  # noqa: SLF001 - overlay 失败前不能发布 owner。
+
+
 def test_provider_enters_once_and_exposes_only_the_exact_activated_variant() -> None:
     _FakeDeclarativeRuntime.created.clear()
     _FakeDeclarativeRuntime.client_in_map = True
@@ -793,6 +931,51 @@ def test_provider_keeps_one_runtime_across_resumable_turns_then_releases_it() ->
         provider.active_runtime(activated, AbortToken())
 
 
+def test_checkpoint_probe_failure_releases_the_retained_runtime() -> None:
+    screenshot_error = RuntimeError("checkpoint screenshot failed")
+    cleanup_error = OSError("runtime finish failed")
+
+    class _CheckpointCleanupFailingRuntime(_FakeDeclarativeRuntime):
+        created: ClassVar[list[object]] = []
+
+        @override
+        def finish_runtime_session(self, outcome: RuntimeSessionOutcome) -> None:
+            self._runtime_session_active = False
+            self._runtime_released = True
+            self.calls.append(("finish_runtime_session", outcome))
+            raise cleanup_error
+
+    def fail_screenshot() -> None:
+        raise screenshot_error
+
+    config = AzurLaneConfig.from_snapshot("campaign-checkpoint-probe-failure", {})
+    device = object.__new__(Device)
+    vars(device)["screenshot"] = fail_screenshot
+    provider = Mumu12CampaignRuntimeProvider(
+        config,
+        device,
+        runtime_factory=_CheckpointCleanupFailingRuntime,
+    )
+    activated = provider.activate(_job(), AbortToken())
+    assert isinstance(activated, CampaignSession)
+    state = activated.initial_state()
+    provider.finish(activated, state, CampaignStopReason.IN_PROGRESS)
+    progress = CampaignProgress(
+        stage_ref=activated.definition.ref,
+        variant=activated.variant,
+        session_state=state,
+        runs_completed=0,
+        settings_revision=1,
+        content_revision="content-current",
+    )
+
+    with pytest.raises(ExceptionGroup) as raised:
+        provider.activate(_job(progress=progress), AbortToken())
+
+    assert raised.value.exceptions == (screenshot_error, cleanup_error)
+    assert provider._active_runtime is None  # noqa: SLF001 - probe 失败后 active owner 必须清空。
+
+
 def test_provider_discards_retained_checkpoint_runtime_as_interrupted() -> None:
     _FakeDeclarativeRuntime.created.clear()
     config = AzurLaneConfig.from_snapshot("campaign-provider-stale", {})
@@ -835,6 +1018,47 @@ def test_provider_discards_prepared_checkpoint_runtime() -> None:
 
     assert isinstance(prepared_runtime, _FakeDeclarativeRuntime)
     assert "discard_runtime" in prepared_runtime.calls
+
+
+def test_provider_attempts_prepared_and_active_cleanup_after_each_failure() -> None:
+    calls: list[str] = []
+    prepared_error = RuntimeError("prepared cleanup failed")
+    active_error = OSError("active cleanup failed")
+
+    class _ResetFailingProfile:
+        def __init__(self, label: str, error: BaseException) -> None:
+            self._label = label
+            self._error = error
+
+        def reset(self) -> None:
+            calls.append(self._label)
+            raise self._error
+
+    def failing_runtime(label: str, error: BaseException) -> DeclarativeCampaignMapRuntime:
+        runtime = object.__new__(DeclarativeCampaignMapRuntime)
+        vars(runtime).update(
+            _runtime_profile=_ResetFailingProfile(label, error),
+            _runtime_profile_available=True,
+            _runtime_profile_session_active=False,
+        )
+        return runtime
+
+    prepared_runtime = failing_runtime("prepared", prepared_error)
+    active_runtime = failing_runtime("active", active_error)
+    config = AzurLaneConfig.from_snapshot("campaign-provider-cleanup-failure", {})
+    provider = Mumu12CampaignRuntimeProvider(config, object.__new__(Device))
+    provider._prepared_runtime = prepared_runtime  # noqa: SLF001 - 构造双 owner 失败状态。
+    provider._active_runtime = active_runtime  # noqa: SLF001 - 构造双 owner 失败状态。
+
+    with pytest.raises(ExceptionGroup) as raised:
+        provider.discard_checkpoint()
+
+    assert raised.value.exceptions == (prepared_error, active_error)
+    assert calls == ["prepared", "active"]
+    assert provider._prepared_runtime is None  # noqa: SLF001 - 验证失败后 owner 已释放。
+    assert provider._active_runtime is None  # noqa: SLF001 - 验证失败后 owner 已释放。
+    assert prepared_runtime._runtime_profile_available is False  # noqa: SLF001 - 验证 prepared owner 已失效。
+    assert active_runtime._runtime_profile_available is False  # noqa: SLF001 - 验证 active owner 已失效。
 
 
 def test_in_progress_completed_state_closes_the_finished_map_runtime() -> None:
@@ -963,6 +1187,68 @@ def test_provider_returns_typed_map_achievement_evidence_from_entry_stop() -> No
     assert isinstance(runtime, _FakeDeclarativeRuntime)
     assert "handle_map_fleet_lock" not in runtime.calls
     assert not any(call[0] == "initialize_session" for call in runtime.calls if isinstance(call, tuple))
+
+
+def test_provider_preserves_rejected_map_stop_and_discard_failure() -> None:
+    cleanup_error = OSError("runtime discard failed")
+
+    class _RejectedStopRuntime(_FakeDeclarativeRuntime):
+        created: ClassVar[list[object]] = []
+        trigger_map_stop = True
+
+        @override
+        def triggered_map_stop(self) -> bool:
+            return False
+
+        def discard_runtime(self) -> None:
+            self.calls.append("discard_runtime")
+            raise cleanup_error
+
+    provider = Mumu12CampaignRuntimeProvider(
+        AzurLaneConfig.from_snapshot("campaign-map-stop-cleanup-failure", {}),
+        object.__new__(Device),
+        runtime_factory=_RejectedStopRuntime,
+    )
+
+    with pytest.raises(ExceptionGroup) as raised:
+        provider.activate(_job(), AbortToken())
+
+    stop_error, observed_cleanup_error = raised.value.exceptions
+    assert isinstance(stop_error, ScriptEnd)
+    assert observed_cleanup_error is cleanup_error
+
+
+def test_provider_preserves_map_stop_inspection_and_discard_failures() -> None:
+    inspection_error = RuntimeError("map-stop inspection failed")
+    cleanup_error = OSError("runtime discard failed")
+
+    class _InspectionFailingStopRuntime(_FakeDeclarativeRuntime):
+        created: ClassVar[list[object]] = []
+        trigger_map_stop = True
+
+        @override
+        def triggered_map_stop(self) -> bool:
+            raise inspection_error
+
+        def discard_runtime(self) -> None:
+            self.calls.append("discard_runtime")
+            raise cleanup_error
+
+    provider = Mumu12CampaignRuntimeProvider(
+        AzurLaneConfig.from_snapshot("campaign-map-stop-inspection-failure", {}),
+        object.__new__(Device),
+        runtime_factory=_InspectionFailingStopRuntime,
+    )
+
+    with pytest.raises(ExceptionGroup) as raised:
+        provider.activate(_job(), AbortToken())
+
+    handling_error, observed_cleanup_error = raised.value.exceptions
+    assert isinstance(handling_error, ExceptionGroup)
+    stop_error, observed_inspection_error = handling_error.exceptions
+    assert isinstance(stop_error, ScriptEnd)
+    assert observed_inspection_error is inspection_error
+    assert observed_cleanup_error is cleanup_error
 
 
 def test_resource_free_selection_projects_exact_completion_runtime_policy() -> None:
@@ -1311,6 +1597,40 @@ def test_hard_workflow_releases_real_runtime_after_unexpected_error(
     retried_runtime = cast("_FailingHardRuntime", _FailingHardRuntime.created[1])
     assert "discard_runtime" in failed_runtime.calls
     assert "discard_runtime" in retried_runtime.calls
+
+
+def test_hard_port_preserves_attempt_discovery_and_cleanup_failures() -> None:
+    discovery_error = RuntimeError("attempt discovery failed")
+    cleanup_error = OSError("runtime cleanup failed")
+
+    class _CleanupFailingRuntime(_FakeDeclarativeRuntime):
+        created: ClassVar[list[object]] = []
+
+        def discard_runtime(self) -> None:
+            self.calls.append("discard_runtime")
+            raise cleanup_error
+
+    def fail_remaining(_device: Device) -> int:
+        raise discovery_error
+
+    config = AzurLaneConfig.from_snapshot("hard-cleanup-failure", {})
+    device = object.__new__(Device)
+    vars(device)["screenshot"] = lambda: None
+    vars(device)["image"] = object()
+    port = Mumu12HardCampaignPort(
+        config,
+        device,
+        _FakeSessionSource(_definition()),
+        runtime_factory=_CleanupFailingRuntime,
+        remaining_reader=fail_remaining,
+    )
+
+    with pytest.raises(BaseExceptionGroup) as raised:
+        port.remaining_attempts(_hard_settings(), AbortToken())
+
+    assert raised.value.exceptions == (discovery_error, cleanup_error)
+    runtime = cast("_CleanupFailingRuntime", _CleanupFailingRuntime.created[0])
+    assert runtime.calls[-1] == "discard_runtime"
 
 
 def test_hard_port_stage_mismatch_can_be_released_without_cancellation() -> None:

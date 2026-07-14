@@ -886,6 +886,39 @@ def test_live_workflow_marks_runtime_failed_when_execution_raises() -> None:
     assert lifecycle.calls == [(session, session.initial_state(), CampaignStopReason.FAILED)]
 
 
+def test_live_workflow_preserves_execution_and_lifecycle_cleanup_failures() -> None:
+    session = _session()
+    execution_error = RuntimeError("observation failed")
+    cleanup_error = OSError("runtime cleanup failed")
+
+    class _FailingLifecycle(_RuntimeLifecycle):
+        def finish(
+            self,
+            session: CampaignSession,
+            state: CampaignSessionState,
+            stop_reason: CampaignStopReason,
+        ) -> None:
+            super().finish(session, state, stop_reason)
+            raise cleanup_error
+
+    def fail_observation() -> None:
+        raise execution_error
+
+    lifecycle = _FailingLifecycle()
+    workflow = LiveCampaignWorkflow(
+        _Observer(BattlefieldObservation(battle_index=0, enemy=1), fail_observation),
+        _Driver(lambda attempt: BattleSucceeded(attempt, BattleTarget.ENEMY)),
+        _Clock(),
+        services=CampaignLiveServices(lifecycle=lifecycle),
+    )
+
+    with pytest.raises(BaseExceptionGroup) as raised:
+        workflow.execute(_job(session), AbortToken(), PreemptionRequest())
+
+    assert raised.value.exceptions == (execution_error, cleanup_error)
+    assert lifecycle.calls == [(session, session.initial_state(), CampaignStopReason.FAILED)]
+
+
 def test_campaign_live_services_reject_an_invalid_runtime_lifecycle() -> None:
     with pytest.raises(TypeError, match=r"lifecycle must implement finish\(\)"):
         CampaignLiveServices(lifecycle=cast("CampaignRuntimeLifecycle", object()))
