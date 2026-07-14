@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Protocol, cast
 
 from module.campaign.assets import SWITCH_20241219_COMBAT, SWITCH_20241219_STORY

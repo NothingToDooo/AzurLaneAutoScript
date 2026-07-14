@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, ClassVar, override
 
 from module.base.utils import color_similarity_2d

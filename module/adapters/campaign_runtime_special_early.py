@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Protocol, cast
 
 from module.campaign.assets import EVENT_20221124_ENTRANCE, EVENT_20221124_PT_ICON

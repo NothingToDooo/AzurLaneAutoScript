@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from calendar import day_name
 from datetime import UTC, datetime
 from types import MappingProxyType

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from .campaign_runtime_event_ui import event_ui_runtime_executor_descriptors
 from .campaign_runtime_grid_registry import grid_runtime_executor_descriptors
 from .campaign_runtime_hard import hard_runtime_executor_descriptors

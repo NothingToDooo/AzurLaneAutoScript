@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Literal, Protocol, assert_never, cast
 
 from module.base.decorator import del_cached_property
