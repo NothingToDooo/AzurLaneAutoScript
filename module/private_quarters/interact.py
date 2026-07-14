@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Final
 
 from module.base.timer import Timer
 from module.base.utils import random_rectangle_vector
@@ -10,6 +10,8 @@ from module.ui.ui import UI
 
 if TYPE_CHECKING:
     from module.base.button import Button
+
+PRIVATE_QUARTERS_INTERACT_OFFSET: Final = (-10, 0, 0, 65)
 
 
 class PQInteract(UI):
@@ -157,7 +159,7 @@ class PQInteract(UI):
     def _pq_goto_room_exit(self) -> None:
         """退出房间；少数情况下仍在对话，需先推进完毕。"""
         if not self.appear(pq_assets.PRIVATE_QUARTERS_ROOM_CHECK, offset=(20, 20)) and not self.appear(
-            pq_assets.PRIVATE_QUARTERS_INTERACT, offset=(0, 60)
+            pq_assets.PRIVATE_QUARTERS_INTERACT, offset=PRIVATE_QUARTERS_INTERACT_OFFSET
         ):
             self._pq_handle_dialogue()
 
@@ -172,7 +174,7 @@ class PQInteract(UI):
         self.handle_info_bar()
 
     def pq_interact(self) -> None:
-        """执行三轮互动；检查按钮时用 60px 纵向偏移兼容不同亲密度布局。"""
+        """执行三轮互动；检查按钮时限制左上角和底边偏移以兼容不同亲密度布局。"""
         logger.hr("Interact Start", level=2)
         self._pq_wait_interact_button()
 
@@ -192,7 +194,7 @@ class PQInteract(UI):
             else:
                 self.device.screenshot()
 
-            if self.appear(pq_assets.PRIVATE_QUARTERS_INTERACT, offset=(0, 60)):
+            if self.appear(pq_assets.PRIVATE_QUARTERS_INTERACT, offset=PRIVATE_QUARTERS_INTERACT_OFFSET):
                 break
 
             if click_timer.reached():
@@ -215,7 +217,11 @@ class PQInteract(UI):
             if self.appear(pq_assets.PRIVATE_QUARTERS_INTERACT_CHECK, offset=(20, 20)):
                 break
 
-            if self.appear_then_click(pq_assets.PRIVATE_QUARTERS_INTERACT, offset=(0, 60), interval=1):
+            if self.appear_then_click(
+                pq_assets.PRIVATE_QUARTERS_INTERACT,
+                offset=PRIVATE_QUARTERS_INTERACT_OFFSET,
+                interval=1,
+            ):
                 continue
 
     def _pq_leave_interact_confirm(self) -> None:
@@ -226,7 +232,7 @@ class PQInteract(UI):
             else:
                 self.device.screenshot()
 
-            if self.appear(pq_assets.PRIVATE_QUARTERS_INTERACT, offset=(0, 60)):
+            if self.appear(pq_assets.PRIVATE_QUARTERS_INTERACT, offset=PRIVATE_QUARTERS_INTERACT_OFFSET):
                 break
 
             if self.appear(pq_assets.PRIVATE_QUARTERS_INTERACT_CHECK, offset=(20, 20), interval=1):

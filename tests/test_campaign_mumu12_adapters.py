@@ -129,6 +129,7 @@ def _definition() -> CampaignStageDefinition:
             camera_data_spawn_point=(CellId(1, 0),),
             normal=_variant(("SP", "ME", "--", "MB")),
             loop=_variant(("SP", "--", "ME", "MB")),
+            map_covered=(CellId(0, 1),),
             portals=(PortalSpec(CellId(0, 1), CellId(1, 0)),),
             land_based=(LandBasedSpec(CellId(1, 1), LandBasedDirection.LEFT),),
         ),
@@ -422,6 +423,7 @@ def test_compiler_materializes_both_variants_and_map_structure() -> None:
     assert compiled.weight_data == "1.0 2.0\n3.0 4.0"
     assert [str(grid) for grid in compiled.camera_data] == ["A1", "B2"]
     assert [str(grid) for grid in compiled.camera_data_spawn_point] == ["B1"]
+    assert [str(grid) for grid in compiled.manual_map_covered] == ["A2"]
     assert compiled.portal_data == [((0, 1), (1, 0))]
     assert compiled.land_based_data == [("B2", "left")]
     assert compiled.spawn_data == [{"battle": 0, "enemy": 1}, {"battle": 1, "boss": 1}]

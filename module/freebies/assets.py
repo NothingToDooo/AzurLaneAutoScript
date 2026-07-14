@@ -100,9 +100,9 @@ MAIL_WHITE_EMPTY = Button(
     file="./assets/cn/freebies/MAIL_WHITE_EMPTY.png",
 )
 OCR_DATA_KEY = Button(
-    area=(132, 42, 233, 70),
-    color=(74, 75, 86),
-    button=(132, 42, 233, 70),
+    area=(133, 39, 250, 72),
+    color=(82, 80, 91),
+    button=(133, 39, 250, 72),
     file="./assets/cn/freebies/OCR_DATA_KEY.png",
 )
 PURCHASE_POPUP = Button(

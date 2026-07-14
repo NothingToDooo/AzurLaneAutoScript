@@ -229,6 +229,27 @@ class AdbSession(ConnectionAttr):
             return result
         return remove_shell_warning(self.adb.shell(cmd, stream=stream, timeout=timeout, rstrip=rstrip))
 
+    def adb_shell_checked(
+        self,
+        cmd: AdbCommand,
+        *,
+        timeout: float | None = 10,
+        rstrip: bool = True,
+    ) -> str:
+        """执行 shell 命令，并在 Android 返回非零退出码时立即失败。"""
+        command = cmd if isinstance(cmd, str) else list(map(str, cmd))
+        result = self.adb.shell2(command, timeout=timeout, rstrip=rstrip)
+        output = remove_shell_warning(result.output)
+        if rstrip:
+            output = output.rstrip()
+        if result.returncode:
+            reason = (result.stderr or result.stdout or output).strip()
+            message = f"ADB shell command failed with exit code {result.returncode}: {result.command}"
+            if reason:
+                message = f"{message}: {reason}"
+            raise OSError(message)
+        return output
+
     def adb_getprop(self, name: str) -> str:
         return self.adb_shell(["getprop", name]).strip()
 

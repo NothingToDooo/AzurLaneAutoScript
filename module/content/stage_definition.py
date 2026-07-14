@@ -177,6 +177,7 @@ class MapDefinition:
     camera_data_spawn_point: tuple[CellId, ...]
     normal: RunVariant
     loop: RunVariant
+    map_covered: tuple[CellId, ...] = ()
     portals: tuple[PortalSpec, ...] = ()
     land_based: tuple[LandBasedSpec, ...] = ()
 
@@ -184,14 +185,16 @@ class MapDefinition:
         self._validate_root_types()
         camera_data = tuple(self.camera_data)
         camera_spawn = tuple(self.camera_data_spawn_point)
+        map_covered = tuple(self.map_covered)
         portals = tuple(self.portals)
         land_based = tuple(self.land_based)
-        self._validate_collection_types(camera_data, camera_spawn, portals, land_based)
+        self._validate_collection_types(camera_data, camera_spawn, map_covered, portals, land_based)
         self._validate_variants()
-        self._validate_referenced_cells(camera_data, camera_spawn, portals, land_based)
+        self._validate_referenced_cells(camera_data, camera_spawn, map_covered, portals, land_based)
 
         object.__setattr__(self, "camera_data", camera_data)
         object.__setattr__(self, "camera_data_spawn_point", camera_spawn)
+        object.__setattr__(self, "map_covered", map_covered)
         object.__setattr__(self, "portals", portals)
         object.__setattr__(self, "land_based", land_based)
 
@@ -210,11 +213,15 @@ class MapDefinition:
     def _validate_collection_types(
         camera_data: tuple[CellId, ...],
         camera_spawn: tuple[CellId, ...],
+        map_covered: tuple[CellId, ...],
         portals: tuple[PortalSpec, ...],
         land_based: tuple[LandBasedSpec, ...],
     ) -> None:
         if any(not isinstance(cell, CellId) for cell in (*camera_data, *camera_spawn)):
             message = "camera data must contain CellId values"
+            raise TypeError(message)
+        if any(not isinstance(cell, CellId) for cell in map_covered):
+            message = "map_covered must contain CellId values"
             raise TypeError(message)
         if any(not isinstance(portal, PortalSpec) for portal in portals):
             message = "portals must contain PortalSpec values"
@@ -237,10 +244,11 @@ class MapDefinition:
         self,
         camera_data: tuple[CellId, ...],
         camera_spawn: tuple[CellId, ...],
+        map_covered: tuple[CellId, ...],
         portals: tuple[PortalSpec, ...],
         land_based: tuple[LandBasedSpec, ...],
     ) -> None:
-        referenced_cells = [*camera_data, *camera_spawn]
+        referenced_cells = [*camera_data, *camera_spawn, *map_covered]
         referenced_cells.extend(endpoint for portal in portals for endpoint in (portal.source, portal.target))
         referenced_cells.extend(unit.cell_id for unit in land_based)
         if any(not self.shape.contains(cell) for cell in referenced_cells):

@@ -65,6 +65,12 @@ def test_dock_filter_options_override_existing_options() -> None:
 def test_dock_filter_uses_current_cn_layout() -> None:
     dock = object.__new__(Dock)
     setting = dock.dock_filter
+    phantom_keys = {
+        ("index", "not_available"),
+        ("faction", "not_available"),
+        ("rarity", "not_available"),
+        ("extra", "not_available"),
+    }
 
     assert setting.settings[("sort", "rarity")].area[:2] == (218, 36)
     assert setting.settings[("index", "all")].area[:2] == (218, 109)
@@ -72,6 +78,7 @@ def test_dock_filter_uses_current_cn_layout() -> None:
     assert ("faction", "pedreria") in setting.settings
     assert setting.settings[("rarity", "all")].area[:2] == (218, 427)
     assert setting.settings[("extra", "no_limit")].area[:2] == (218, 499)
+    assert setting.settings.keys().isdisjoint(phantom_keys)
 
 
 def test_dock_filter_enter_uses_expanded_confirm_offset() -> None:

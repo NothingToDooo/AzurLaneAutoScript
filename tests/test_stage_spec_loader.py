@@ -449,6 +449,7 @@ def test_loader_preserves_distinct_loop_portal_and_land_based_data(tmp_path: Pat
           shape: B2
           camera_data: [A1]
           camera_data_spawn_point: [B2]
+          map_covered: [B1]
           portal_data: [[A1, B2]]
           map_data: |-
             -- ++
@@ -515,6 +516,7 @@ def test_loader_preserves_distinct_loop_portal_and_land_based_data(tmp_path: Pat
 
     assert tuple(cell.token for cell in definition.map.normal.cells) == ("--", "++", "SP", "MB")
     assert tuple(cell.token for cell in definition.map.loop.cells) == ("--", "--", "SP", "MB")
+    assert definition.map.map_covered == (CellId(1, 0),)
     assert definition.map.portals == (PortalSpec(CellId(0, 0), CellId(1, 1)),)
     assert definition.map.land_based == (LandBasedSpec(CellId(0, 0), LandBasedDirection.RIGHT),)
     assert definition.map.normal.spawn_waves == (SpawnWave(0, boss=1),)
