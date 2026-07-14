@@ -374,8 +374,8 @@
       "ServerUpdate": "00:00"
     },
     "Campaign": {
-      "Name": "D3",
-      "Event": "campaign_main",
+      "Name": "t3",
+      "Event": "event_20260625_cn",
       "Mode": "normal",
       "UseClearMode": true,
       "UseFleetLock": true,
@@ -527,7 +527,7 @@
     },
     "Campaign": {
       "Name": "dynamic",
-      "Event": "campaign_main",
+      "Event": "raid_20260212",
       "Mode": "normal",
       "UseClearMode": true,
       "UseFleetLock": true,
@@ -608,7 +608,7 @@
     },
     "Campaign": {
       "Name": "dynamic",
-      "Event": "campaign_main",
+      "Event": "coalition_20260122",
       "Mode": "normal",
       "UseClearMode": true,
       "UseFleetLock": true,
@@ -617,7 +617,7 @@
       "AmbushEvade": true
     },
     "Coalition": {
-      "Mode": "tc3",
+      "Mode": "hard",
       "Fleet": "single"
     },
     "StopCondition": {
@@ -1135,7 +1135,7 @@
     },
     "Campaign": {
       "Name": "dynamic",
-      "Event": "campaign_main",
+      "Event": "raid_20260212",
       "Mode": "normal",
       "UseClearMode": true,
       "UseFleetLock": true,
@@ -1179,7 +1179,7 @@
     },
     "Campaign": {
       "Name": "sp",
-      "Event": "campaign_main",
+      "Event": "coalition_20260122",
       "Mode": "normal",
       "UseClearMode": true,
       "UseFleetLock": true,
@@ -1189,7 +1189,7 @@
     },
     "Coalition": {
       "Mode": "sp",
-      "Fleet": "single"
+      "Fleet": "multi"
     },
     "StopCondition": {
       "OilLimit": 1000,

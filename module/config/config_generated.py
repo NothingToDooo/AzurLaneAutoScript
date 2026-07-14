@@ -207,11 +207,6 @@ class ConfigOverrides(TypedDict, total=False):
     HpControl_LowHpRetreatThreshold: float
     EnemyPriority_EnemyScaleBalanceWeight: str
     C11AffinityFarming_RunCount: int
-    C72MysteryFarming_StepOnA3: bool
-    C122MediumLeveling_LargeEnemyTolerance: int
-    C124LargeLeveling_NonLargeEnterTolerance: int
-    C124LargeLeveling_NonLargeRetreatTolerance: int
-    C124LargeLeveling_PickupAmmo: int
     GemsFarming_ChangeFlagship: str
     GemsFarming_CommonCV: str
     GemsFarming_ChangeVanguard: str
@@ -361,7 +356,6 @@ class ConfigOverrides(TypedDict, total=False):
     Exercise_LowHpConfirmWait: float
     Exercise_OpponentRefreshValue: int
     Exercise_OpponentRefreshRecord: datetime.datetime
-    Sos_Chapter: int
     OpsiAshAssist_Tier: int
     OpsiGeneral_UseLogger: bool
     OpsiGeneral_BuyActionPointLimit: int
@@ -548,21 +542,6 @@ class GeneratedConfig:
 
     # 配置组 `C11AffinityFarming`
     C11AffinityFarming_RunCount = 32
-
-    # 配置组 `C72MysteryFarming`
-    C72MysteryFarming_StepOnA3 = True
-
-    # 配置组 `C122MediumLeveling`
-    # 可选项：0, 1, 2, 10
-    C122MediumLeveling_LargeEnemyTolerance = 1
-
-    # 配置组 `C124LargeLeveling`
-    # 可选项：0, 1, 2
-    C124LargeLeveling_NonLargeEnterTolerance = 1
-    # 可选项：0, 1, 2, 10
-    C124LargeLeveling_NonLargeRetreatTolerance = 1
-    # 可选项：3, 4, 5
-    C124LargeLeveling_PickupAmmo = 3
 
     # 配置组 `GemsFarming`
     # 可选项：ship, ship_equip
@@ -899,10 +878,6 @@ class GeneratedConfig:
     Exercise_LowHpConfirmWait = 0.1
     Exercise_OpponentRefreshValue = 0
     Exercise_OpponentRefreshRecord = datetime.datetime(2020, 1, 1, 0, 0)
-
-    # 配置组 `Sos`
-    # 可选项：3, 4, 5, 6, 7, 8, 9, 10
-    Sos_Chapter = 3
 
     # 配置组 `OpsiAshAssist`
     OpsiAshAssist_Tier = 15

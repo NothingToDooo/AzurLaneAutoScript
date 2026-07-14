@@ -457,7 +457,8 @@
     "Event": {
       "name": "活动名称",
       "help": "自动选择至最新的活动",
-      "campaign_main": "主线图",
+      "campaign_main": "主线战役",
+      "campaign_hard": "困难战役",
       "coalition_20230323": "极地风暴",
       "coalition_20240627": "欢迎来到童心学院",
       "coalition_20250626": "迷彩都市的寻踪者",
@@ -898,58 +899,6 @@
     "RunCount": {
       "name": "运行次数",
       "help": ""
-    }
-  },
-  "C72MysteryFarming": {
-    "_info": {
-      "name": "7-2 三站拣垃圾",
-      "help": "打三战，拣完问号后撤退"
-    },
-    "StepOnA3": {
-      "name": "用二队踩 A3",
-      "help": "能有效避免 A2 的问号点被堵住"
-    }
-  },
-  "C122MediumLeveling": {
-    "_info": {
-      "name": "12-2 中型练级",
-      "help": "用强度低的队伍在 12-2 练级，打完非三星敌人后撤退\n通过降低队伍强度提高 经验/油耗 的比例"
-    },
-    "LargeEnemyTolerance": {
-      "name": "最多打 X 战三星敌人",
-      "help": "",
-      "0": "0",
-      "1": "1",
-      "2": "2",
-      "10": "10"
-    }
-  },
-  "C124LargeLeveling": {
-    "_info": {
-      "name": "12-4 大型练级",
-      "help": "用强度高的队伍在 12-4 练级，打完三星敌人后撤退\n通过多打三星敌人提高 经验/油耗 的比例"
-    },
-    "NonLargeEnterTolerance": {
-      "name": "进图后 X 战无三星敌人，撤退",
-      "help": "",
-      "0": "0",
-      "1": "1",
-      "2": "2"
-    },
-    "NonLargeRetreatTolerance": {
-      "name": "最多打 X 战非三星敌人",
-      "help": "",
-      "0": "0",
-      "1": "1",
-      "2": "2",
-      "10": "10"
-    },
-    "PickupAmmo": {
-      "name": "X 战后拣弹药",
-      "help": "",
-      "3": "3",
-      "4": "4",
-      "5": "5"
     }
   },
   "GemsFarming": {
@@ -2077,24 +2026,6 @@
     "OpponentRefreshRecord": {
       "name": "演习对手刷新记录时间",
       "help": ""
-    }
-  },
-  "Sos": {
-    "_info": {
-      "name": "潜艇图",
-      "help": ""
-    },
-    "Chapter": {
-      "name": "潜艇图出击章节",
-      "help": "",
-      "3": "3",
-      "4": "4",
-      "5": "5",
-      "6": "6",
-      "7": "7",
-      "8": "8",
-      "9": "9",
-      "10": "10"
     }
   },
   "OpsiAshAssist": {

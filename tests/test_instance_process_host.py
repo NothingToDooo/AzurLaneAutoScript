@@ -1,0 +1,154 @@
+from dataclasses import dataclass, field
+from typing import cast
+
+import pytest
+
+from module.application import (
+    AbortToken,
+    Cancelled,
+    ExecutionMode,
+    Faulted,
+    RequestAppRestart,
+    Succeeded,
+    TaskId,
+    TaskResult,
+)
+from module.bootstrap import (
+    InstanceProcessExitKind,
+    InstanceProcessHost,
+    InstanceRuntimeProvider,
+    InstanceRuntimeSession,
+)
+from module.supervisor import InstanceLoopExit, InstanceLoopExitReason
+
+
+class _StopSignal:
+    def __init__(self, *, requested: bool = False) -> None:
+        self.requested = requested
+
+    def is_set(self) -> bool:
+        return self.requested
+
+
+@dataclass(slots=True)
+class _Runtime:
+    loop_exit: InstanceLoopExit = field(
+        default_factory=lambda: InstanceLoopExit(InstanceLoopExitReason.EMPTY, 0),
+    )
+    task_result: TaskResult = field(default_factory=lambda: TaskResult(Succeeded()))
+    run_aborts: list[AbortToken] = field(default_factory=list)
+    execute_calls: list[tuple[TaskId, ExecutionMode, AbortToken]] = field(default_factory=list)
+    close_calls: int = 0
+
+    def run(self, *, abort: AbortToken | None = None) -> InstanceLoopExit:
+        self.run_aborts.append(cast("AbortToken", abort))
+        return self.loop_exit
+
+    def execute(
+        self,
+        task_id: TaskId,
+        mode: ExecutionMode,
+        *,
+        abort: AbortToken | None = None,
+    ) -> TaskResult:
+        self.execute_calls.append((task_id, mode, cast("AbortToken", abort)))
+        return self.task_result
+
+    def close(self) -> None:
+        self.close_calls += 1
+
+
+@dataclass(slots=True)
+class _Provider:
+    runtime: _Runtime
+    opened: list[str] = field(default_factory=list)
+
+    def open(self, instance_name: str) -> InstanceRuntimeSession:
+        self.opened.append(instance_name)
+        return self.runtime
+
+
+@pytest.mark.parametrize(
+    ("reason", "expected"),
+    [
+        (InstanceLoopExitReason.EMPTY, InstanceProcessExitKind.FINISHED),
+        (InstanceLoopExitReason.CANCELLED, InstanceProcessExitKind.STOPPED),
+        (InstanceLoopExitReason.PREEMPTED, InstanceProcessExitKind.STOPPED),
+        (InstanceLoopExitReason.RESTART_REQUESTED, InstanceProcessExitKind.RESTART_REQUESTED),
+        (InstanceLoopExitReason.FAULTED, InstanceProcessExitKind.FAILED),
+    ],
+)
+def test_scheduler_command_uses_one_runtime_and_maps_loop_exit(
+    reason: InstanceLoopExitReason,
+    expected: InstanceProcessExitKind,
+) -> None:
+    runtime = _Runtime(loop_exit=InstanceLoopExit(reason, 0))
+    provider = _Provider(runtime)
+
+    exit_ = InstanceProcessHost(provider).execute("alas", "alas")
+
+    assert exit_.kind is expected
+    assert exit_.loop_exit is runtime.loop_exit
+    assert exit_.task_result is None
+    assert provider.opened == ["alas"]
+    assert len(runtime.run_aborts) == 1
+    assert runtime.close_calls == 1
+
+
+@pytest.mark.parametrize(
+    ("result", "expected"),
+    [
+        (TaskResult(Succeeded()), InstanceProcessExitKind.FINISHED),
+        (TaskResult(Cancelled("stopped")), InstanceProcessExitKind.STOPPED),
+        (TaskResult(Faulted(RuntimeError("failed"))), InstanceProcessExitKind.FAILED),
+        (
+            TaskResult(Succeeded(), effects=(RequestAppRestart("client update"),)),
+            InstanceProcessExitKind.RESTART_REQUESTED,
+        ),
+    ],
+)
+def test_direct_command_uses_catalog_execution_mode_and_maps_result(
+    result: TaskResult,
+    expected: InstanceProcessExitKind,
+) -> None:
+    runtime = _Runtime(task_result=result)
+
+    exit_ = InstanceProcessHost(_Provider(runtime)).execute("alas", "benchmark")
+
+    assert exit_.kind is expected
+    assert exit_.task_result is result
+    assert runtime.execute_calls[0][0] == TaskId("benchmark")
+    assert runtime.execute_calls[0][1] is ExecutionMode.DIRECT_COMMAND
+    assert runtime.close_calls == 1
+
+
+def test_external_stop_signal_is_linked_to_abort_token_before_io() -> None:
+    runtime = _Runtime()
+    stop = _StopSignal(requested=True)
+
+    InstanceProcessHost(_Provider(runtime)).execute("alas", "alas", stop_signal=stop)
+
+    assert runtime.run_aborts[0].is_requested
+    assert runtime.run_aborts[0].reason == "instance process stop requested"
+
+
+@pytest.mark.parametrize("command", ["missing", "restart"])
+def test_invalid_direct_command_closes_runtime(command: str) -> None:
+    runtime = _Runtime()
+    host = InstanceProcessHost(_Provider(runtime))
+
+    with pytest.raises((LookupError, ValueError)):
+        host.execute("alas", command)
+
+    assert runtime.close_calls == 1
+
+
+def test_invalid_provider_result_fails_before_execution() -> None:
+    class _InvalidProvider:
+        @staticmethod
+        def open(instance_name: str) -> object:
+            del instance_name
+            return object()
+
+    with pytest.raises(TypeError, match="InstanceRuntimeSession"):
+        InstanceProcessHost(cast("InstanceRuntimeProvider", _InvalidProvider())).execute("alas", "alas")

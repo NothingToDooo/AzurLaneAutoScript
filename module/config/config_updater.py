@@ -27,7 +27,7 @@ from module.config.utils import (
 from module.content.manifest import load_default_event_manifests, render_campaign_readme
 from module.content.models import EventPack, EventRelease
 from module.logger import logger
-from module.task_registry import TASK_CATALOG, command_to_config_name, get_task_spec
+from module.task_registry import TASK_CATALOG, LaunchSurface, command_to_config_name, get_task_definition
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
@@ -262,7 +262,7 @@ class ConfigGenerator:
         command = node_data.get("command")
         if command is None:
             return None, groups
-        if not isinstance(command, str) or get_task_spec(command) is None:
+        if not isinstance(command, str) or get_task_definition(command) is None:
             message = f"unknown task command: {command}"
             raise ValueError(message)
         if command_to_config_name(command) != task:
@@ -284,19 +284,19 @@ class ConfigGenerator:
                 raise ValueError(message)
             return
 
-        definition = get_task_spec(command)
+        definition = get_task_definition(command)
         if definition is None:
             message = f"unknown task command: {command}"
             raise ValueError(message)
         is_scheduled = "Scheduler" in groups
         if is_scheduled:
-            if is_tool or definition.launch_mode not in {"scheduled", "both"}:
-                message = f"task launch mode does not allow Scheduler: {task}"
+            if is_tool or LaunchSurface.SCHEDULER not in definition.allowed_launches:
+                message = f"task allowed launches do not include Scheduler: {task}"
                 raise ValueError(message)
             return
         if is_tool:
-            if definition.launch_mode not in {"direct", "both"}:
-                message = f"task launch mode does not allow tool page: {task}"
+            if LaunchSurface.TOOL not in definition.allowed_launches:
+                message = f"task allowed launches do not include tool page: {task}"
                 raise ValueError(message)
             return
         message = f"executable task must be scheduled or tool: {task}"
