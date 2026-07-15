@@ -484,6 +484,78 @@ def test_registry_contracts_fail_before_runtime_binding(
         CampaignRuntimeProfileManager(profile, registry)
 
 
+@pytest.mark.parametrize(
+    ("key", "value", "match"),
+    [
+        (RuntimeTuningKey.FLEET_2, 1.0, "fleet_2 must be an integer"),
+        (
+            RuntimeTuningKey.MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD,
+            "bright",
+            "map_air_raid_overlay_transparency_threshold must be a number",
+        ),
+        (
+            RuntimeTuningKey.BOSS_APPEAR_REFOCUS_PRESET,
+            (1,),
+            "boss_appear_refocus_preset must contain two integers",
+        ),
+        (
+            RuntimeTuningKey.MAP_CLEAR_PERCENTAGE_MULTIPLIER,
+            True,
+            "map_clear_percentage_multiplier must be a number",
+        ),
+        (
+            RuntimeTuningKey.COMBAT_DISABLE_STUCK_DETECTION_BATTLE,
+            1.0,
+            "combat_disable_stuck_detection_battle must be an integer",
+        ),
+    ],
+)
+def test_invalid_tuning_projection_fails_during_manager_construction(
+    key: RuntimeTuningKey,
+    value: object,
+    match: str,
+) -> None:
+    profile = CampaignRuntimeProfile(
+        CampaignRuntimeProfileId("invalid_tuning"),
+        tunings=(RuntimeTuning(key, value),),
+    )
+
+    with pytest.raises(CampaignRuntimeProfileError, match=match):
+        CampaignRuntimeProfileManager(profile, CampaignRuntimeExecutorRegistry(()))
+
+
+@pytest.mark.parametrize(
+    ("kind", "match"),
+    [
+        (RuntimeExecutorKind.MAP_GRID_RECOGNITION, "more than one effective map grid executor"),
+        (RuntimeExecutorKind.CAMERA_GRID_RECOGNITION, "more than one effective camera grid executor"),
+    ],
+)
+def test_effective_grid_executor_conflict_fails_during_manager_construction(
+    kind: RuntimeExecutorKind,
+    match: str,
+) -> None:
+    def factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
+        del context
+        if kind is RuntimeExecutorKind.MAP_GRID_RECOGNITION:
+            return RuntimeExecutorInstance({kind}, map_grid_class=_MapGrid)
+        return RuntimeExecutorInstance({kind}, camera_grid_class=_CameraGrid)
+
+    profile = _profile(
+        _extension("first", _binding("first", kind)),
+        _extension("second", _binding("second", kind)),
+    )
+    registry = CampaignRuntimeExecutorRegistry(
+        (
+            _descriptor("first", {kind: RuntimeExecutorOptionsSchema()}, factory),
+            _descriptor("second", {kind: RuntimeExecutorOptionsSchema()}, factory),
+        )
+    )
+
+    with pytest.raises(CampaignRuntimeProfileError, match=match):
+        CampaignRuntimeProfileManager(profile, registry)
+
+
 def test_tuning_projection_is_exhaustive_and_does_not_leak_between_runtimes() -> None:
     values: dict[RuntimeTuningKey, object] = dict.fromkeys(RuntimeTuningKey, 1)
     values[RuntimeTuningKey.CAMPAIGN_MODE] = "normal"

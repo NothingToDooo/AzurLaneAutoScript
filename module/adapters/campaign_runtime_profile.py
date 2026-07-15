@@ -726,6 +726,7 @@ class CampaignRuntimeProfileManager:
         self._direct_config_tunings = MappingProxyType(direct)
         self._runtime_attribute_tunings = MappingProxyType(runtime_attributes)
         self._behavior_tunings = MappingProxyType(behavior)
+        self._validate_projection_contracts()
 
     @staticmethod
     def _build_instances(
@@ -754,6 +755,17 @@ class CampaignRuntimeProfileManager:
                 instances.append(instance)
                 facets.extend(_SessionFacet(binding, instance) for binding in bindings)
         return tuple(instances), tuple(facets)
+
+    def _validate_projection_contracts(self) -> None:
+        for key, value in self._direct_config_tunings.items():
+            _integer_tuning(value, key)
+        for key, value in self._runtime_attribute_tunings.items():
+            _number_tuning(value, key)
+        _ = self.boss_appear_refocus_preset
+        _ = self.map_clear_percentage_multiplier
+        _ = self.combat_disable_stuck_detection_battle
+        _ = self.map_grid_class
+        _ = self.camera_grid_class
 
     @property
     def profile(self) -> CampaignRuntimeProfile:
