@@ -15,10 +15,8 @@ from module.application import (
     DeleteTaskState,
     DisableTask,
     ExecutionMode,
-    PreemptionRequest,
     RescheduleSelf,
     Retryable,
-    RunId,
     RunMetadata,
     Succeeded,
     TaskContext,
@@ -28,7 +26,8 @@ from module.application import (
     WakePolicy,
     WakeTask,
 )
-from module.content import ActivityCatalog, CoalitionStageId
+from module.content.activity_catalog import ActivityCatalog
+from module.content.activity_profile import CoalitionStageId
 from module.content.manifest import load_event_manifests
 from module.gameplay.activity import (
     GAMEPLAY_COMMAND_PROFILES,
@@ -137,17 +136,14 @@ class _ActivityWorkflow:
         self._report = report
         self._on_execute = on_execute
         self.specs: list[ActivitySpec] = []
-        self.preemptions: list[PreemptionRequest] = []
 
     def execute(
         self,
         spec: ActivitySpec,
         cancellation: CancellationSignal,
-        preemption: PreemptionRequest,
     ) -> ActivityReport:
         cancellation.raise_if_requested()
         self.specs.append(spec)
-        self.preemptions.append(preemption)
         if self._on_execute is not None:
             self._on_execute()
         return cast("ActivityReport", self._report)
@@ -202,18 +198,15 @@ def _context(
     *,
     mode: ExecutionMode | None = None,
     abort: AbortToken | None = None,
-    preemption: PreemptionRequest | None = None,
 ) -> TaskContext:
     if mode is None:
         mode = GAMEPLAY_COMMAND_PROFILES[command].execution_mode
     return TaskContext(
         task_id=TaskId(command),
-        run_id=RunId(f"run-{command}"),
         started_at=_RUN_STARTED_AT,
         mode=mode,
-        metadata=RunMetadata(settings_revision=1, content_revision="content-1", client_ui_revision="ui-1"),
+        metadata=RunMetadata(settings_revision=1, content_revision="content-1"),
         abort=AbortToken() if abort is None else abort,
-        preemption=PreemptionRequest() if preemption is None else preemption,
     )
 
 
@@ -294,10 +287,6 @@ def _encounter_report(
 
 def _request_abort(abort: AbortToken, reason: str) -> None:
     abort.request(reason)
-
-
-def _request_preemption(preemption: PreemptionRequest, reason: str) -> None:
-    preemption.request(reason)
 
 
 def _request_abort_on_second_step(abort: AbortToken, call: int) -> None:
@@ -476,37 +465,19 @@ def test_activity_abort_before_entry_prevents_external_work() -> None:
     assert workflow.specs == []
 
 
-def test_activity_preemption_before_entry_prevents_external_work() -> None:
-    preemption = PreemptionRequest()
-    preemption.request("higher-priority task needs the device")
-    workflow = _ActivityWorkflow(
-        ActivityReport(ActivityCommand.MINIGAME, ActivityDisposition.COMPLETED, _OBSERVED_AT, 0)
-    )
-
-    result = ActivityTask(workflow, ActivitySpec.minigame(schedule=_SERVER_UPDATE_SCHEDULE)).run(
-        _context("minigame", preemption=preemption)
-    )
-
-    assert workflow.specs == []
-    assert result == TaskResult(outcome=Cancelled("higher-priority task needs the device"))
-
-
-def test_activity_preemption_during_work_is_honored_at_the_returned_safe_point() -> None:
-    preemption = PreemptionRequest()
+def test_activity_abort_during_work_is_honored_at_the_returned_safe_point() -> None:
+    abort = AbortToken()
     workflow = _ActivityWorkflow(
         ActivityReport(ActivityCommand.MINIGAME, ActivityDisposition.COMPLETED, _OBSERVED_AT, 1),
-        on_execute=lambda: _request_preemption(preemption, "yield after the current operation"),
+        on_execute=lambda: _request_abort(abort, "stop after the current operation"),
     )
 
-    result = ActivityTask(workflow, ActivitySpec.minigame(schedule=_SERVER_UPDATE_SCHEDULE)).run(
-        _context("minigame", preemption=preemption)
-    )
+    with pytest.raises(AbortRequested, match="stop after the current operation"):
+        ActivityTask(workflow, ActivitySpec.minigame(schedule=_SERVER_UPDATE_SCHEDULE)).run(
+            _context("minigame", abort=abort)
+        )
 
-    assert workflow.preemptions == [preemption]
-    assert result == TaskResult(
-        outcome=Cancelled("yield after the current operation"),
-        state_effects=(_progress_effect(1),),
-    )
+    assert len(workflow.specs) == 1
 
 
 def test_activity_rejects_cross_command_and_in_progress_at_the_operation_limit() -> None:
@@ -784,16 +755,16 @@ def test_opsi_daemon_honors_abort_only_after_the_current_safe_point() -> None:
     assert result == TaskResult(outcome=Cancelled("operator stop"))
 
 
-def test_assist_preemption_before_the_first_step_has_no_external_side_effect() -> None:
-    preemption = PreemptionRequest()
-    preemption.request("scheduled task needs the device")
+def test_assist_abort_before_the_first_step_has_no_external_side_effect() -> None:
+    abort = AbortToken()
+    abort.request("operator stop")
     spec = AssistSessionSpec(AssistSessionCommand.DAEMON, DaemonOptions(enter_map=False))
     workflow = _AssistWorkflow([AssistSessionReport(AssistSessionCommand.DAEMON, AssistSessionState.CONTINUE)])
 
-    result = AssistSessionTask(workflow, spec).run(_context("daemon", preemption=preemption))
+    result = AssistSessionTask(workflow, spec).run(_context("daemon", abort=abort))
 
     assert workflow.specs == []
-    assert result == TaskResult(outcome=Cancelled("scheduled task needs the device"))
+    assert result == TaskResult(outcome=Cancelled("operator stop"))
 
 
 def test_assist_sessions_reject_invalid_options_and_reports() -> None:

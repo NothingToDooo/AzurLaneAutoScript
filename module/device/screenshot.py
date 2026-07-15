@@ -6,10 +6,10 @@ from PIL import Image
 
 from module.base.decorator import cached_property
 from module.base.timer import Timer
-from module.base.utils import get_color, image_size, limit_in, save_image
+from module.base.utils import get_color, image_size, save_image
+from module.diagnostics import ScreenshotHistory
 from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
-from module.replay.recorder import ReplayRecorder
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -46,8 +46,7 @@ class Screenshot:
                 break
             continue
 
-        if self.config.Error_SaveError:
-            self.replay_recorder.record_frame(self.image)
+        self.error_screenshots.record(self.image)
 
         return self.image
 
@@ -76,15 +75,8 @@ class Screenshot:
         return image
 
     @cached_property
-    def replay_recorder(self) -> ReplayRecorder:
-        try:
-            length = int(self.config.Error_ScreenshotLength)
-        except (TypeError, ValueError) as e:
-            logger.error(f"Error_ScreenshotLength={self.config.Error_ScreenshotLength} is not an integer")
-            raise RequestHumanTakeover from e
-        # 限制在 1~300。
-        length = max(1, min(length, 300))
-        return ReplayRecorder(max_frames=length)
+    def error_screenshots(self) -> ScreenshotHistory:
+        return ScreenshotHistory(max_frames=self.config.Error_ScreenshotLength)
 
     def screenshot_interval_clear(self) -> None:
         self._screenshot_interval.clear()
@@ -92,19 +84,9 @@ class Screenshot:
     def screenshot_interval_set(self, interval: float | Literal["combat"] | None = None) -> None:
         """interval 为截图间隔秒数；None 读取默认配置，'combat' 读取战斗配置。"""
         if interval is None:
-            origin = self.config.Optimization_ScreenshotInterval
-            checked_interval = float(limit_in(origin, 0.1, 0.3))
-            if checked_interval != origin:
-                logger.warning(f"Optimization.ScreenshotInterval {origin} is revised to {checked_interval}")
-                self.config.Optimization_ScreenshotInterval = checked_interval
-            # 当前个人版固定使用 nemu_ipc 截图，可以使用更低的默认截图间隔。
-            interval_value = float(limit_in(origin, 0.1, 0.2))
+            interval_value = self.config.Optimization_ScreenshotInterval
         elif interval == "combat":
-            origin = self.config.Optimization_CombatScreenshotInterval
-            interval_value = float(limit_in(origin, 0.3, 1.0))
-            if interval_value != origin:
-                logger.warning(f"Optimization.CombatScreenshotInterval {origin} is revised to {interval_value}")
-                self.config.Optimization_CombatScreenshotInterval = interval_value
+            interval_value = self.config.Optimization_CombatScreenshotInterval
         elif isinstance(interval, (int, float)):
             interval_value = float(interval)
         else:

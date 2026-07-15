@@ -10,9 +10,8 @@ if TYPE_CHECKING:
 class DaemonBase(ModuleBase):
     def __init__(
         self,
-        config: AzurLaneConfig | str,
-        device: Device | str | None = None,
-        task: str | None = None,
+        config: AzurLaneConfig,
+        device: Device,
     ) -> None:
-        super().__init__(config, device=device, task=task)
+        super().__init__(config, device=device)
         self.device.disable_stuck_detection()

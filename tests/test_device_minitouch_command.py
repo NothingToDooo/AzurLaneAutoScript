@@ -1,4 +1,4 @@
-from module.device.method.minitouch import Command, CommandBuilder
+from module.device.minitouch_service import Command, CommandBuilder
 
 
 class _Device:

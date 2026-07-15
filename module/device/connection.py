@@ -15,7 +15,7 @@ __all__ = ["AdbDeviceWithStatus", "Connection", "retry"]
 class Connection(MumuTcpConnection):
     _runtime: DeviceRuntime
 
-    def __init__(self, config: AzurLaneConfig | str) -> None:
+    def __init__(self, config: AzurLaneConfig) -> None:
         super().__init__(config)
         self.detect_device()
 

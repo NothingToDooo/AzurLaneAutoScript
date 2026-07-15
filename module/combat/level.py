@@ -18,13 +18,12 @@ if TYPE_CHECKING:
 class Level(ModuleBase):
     def __init__(
         self,
-        config: AzurLaneConfig | str,
-        device: Device | str | None = None,
-        task: str | None = None,
+        config: AzurLaneConfig,
+        device: Device,
     ) -> None:
         self._lv = [-1] * 6
         self._lv_before_battle = [-1] * 6
-        super().__init__(config=config, device=device, task=task)
+        super().__init__(config=config, device=device)
 
     @property
     def lv(self) -> list[int]:

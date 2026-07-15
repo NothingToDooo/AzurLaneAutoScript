@@ -208,12 +208,11 @@ class RewardTacticalClass(Dock):
 
     def __init__(
         self,
-        config: AzurLaneConfig | str,
-        device: Device | str | None = None,
-        task: str | None = None,
+        config: AzurLaneConfig,
+        device: Device,
     ) -> None:
         self.tactical_finish: list[datetime | str] = []
-        super().__init__(config, device, task)
+        super().__init__(config, device)
 
     def _tactical_books_get(self, *, skip_first_screenshot: bool = True) -> SelectedGrids[Book] | Literal[False]:
         """在教材选择页等待教材稳定；最多检测 15 次，持续加载时抛出 ScriptError。"""
@@ -705,15 +704,3 @@ class RewardTacticalClass(Dock):
                 return skill_button
 
         return None
-
-    def run(self) -> None:
-        """从任意页面执行战术教室，结束于战术页。"""
-        self.ui_ensure(page_reward)
-
-        self.tactical_class_receive()
-
-        if self.tactical_finish:
-            self.config.task_delay(target=self.tactical_finish)
-        else:
-            logger.info("No tactical running")
-            self.config.task_delay(success=False)

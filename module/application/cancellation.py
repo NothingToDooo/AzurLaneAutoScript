@@ -127,29 +127,3 @@ class SafeUnitCancellation:
             if self._committed:
                 return
             self._source.raise_if_requested()
-
-
-class PreemptionRequest:
-    __slots__ = ("_signal",)
-
-    def __init__(
-        self,
-        *,
-        external_signal: ExternalRequestSignal | None = None,
-        external_reason: str | None = "external preemption requested",
-    ) -> None:
-        self._signal = _OneShotSignal(
-            external_signal=external_signal,
-            external_reason=external_reason,
-        )
-
-    @property
-    def is_requested(self) -> bool:
-        return self._signal.is_requested
-
-    @property
-    def reason(self) -> str | None:
-        return self._signal.reason
-
-    def request(self, reason: str | None = None) -> bool:
-        return self._signal.request(reason)

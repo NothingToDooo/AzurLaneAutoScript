@@ -169,12 +169,11 @@ class OSFleet(OSCamera, Combat, Fleet, OSAsh):
 
     def __init__(
         self,
-        config: AzurLaneConfig | str,
-        device: Device | str | None = None,
-        task: str | None = None,
+        config: AzurLaneConfig,
+        device: Device,
     ) -> None:
         self.need_repair: list[bool] = [False] * 6
-        super().__init__(config, device=device, task=task)
+        super().__init__(config, device=device)
 
     def hp_get(self) -> list[float]:
         """计算当前血量，并识别舰船阵亡后需要维修的扳手标记。"""

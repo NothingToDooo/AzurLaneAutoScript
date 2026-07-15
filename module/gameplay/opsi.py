@@ -6,11 +6,12 @@ from typing import TYPE_CHECKING, Final, Protocol, override
 
 from module.application import (
     Deferred,
+    DelayTask,
     DisableTask,
-    PreemptionRequest,
     RescheduleSelf,
     RescheduleTask,
     Retryable,
+    ScheduleEffect,
     StateEffect,
     Succeeded,
     Task,
@@ -45,8 +46,6 @@ _ACTION_POINTS_EXHAUSTED = "operation siren action points are exhausted"
 _COOLDOWN_ACTIVE = "operation siren task is cooling down"
 _EXPLORATION_ACTIVE = "operation siren exploration is still active"
 _NO_WORK = "operation siren task has no work"
-_PREEMPTED = "operation siren task yielded at a safe point"
-_PREEMPTED_BEFORE_START = "operation siren task was preempted before execution"
 _RESOURCE_LIMIT = "operation siren resources are insufficient"
 _SAFE_UNIT_COMPLETED = "operation siren completed one safe unit"
 _STALE_PROGRESS = "operation siren progress belongs to a stale revision or reset cycle"
@@ -150,7 +149,6 @@ class WorldTaskStatus(StrEnum):
     RESOURCE_LIMIT = "resource_limit"
     COOLDOWN = "cooldown"
     EXPLORE_IN_PROGRESS = "explore_in_progress"
-    PREEMPTED = "preempted"
     FAILED = "failed"
     DISABLED = "disabled"
 
@@ -517,6 +515,29 @@ class WorldSchedule:
         _validate_aware_datetime(self.next_archive_refresh_at, field_name="next_archive_refresh_at")
 
 
+@dataclass(frozen=True, slots=True)
+class WorldScheduleDelay:
+    """把一组任务的既有 due time 推迟到至少 due_at。"""
+
+    due_at: datetime
+    task_ids: tuple[TaskId, ...]
+
+    def __post_init__(self) -> None:
+        _validate_aware_datetime(self.due_at, field_name="due_at")
+        if not isinstance(self.task_ids, tuple):
+            message = "task_ids must be a tuple"
+            raise TypeError(message)
+        if not self.task_ids:
+            message = "task_ids must not be empty"
+            raise ValueError(message)
+        if any(not isinstance(task_id, TaskId) for task_id in self.task_ids):
+            message = "task_ids must contain TaskId values"
+            raise TypeError(message)
+        if len(set(self.task_ids)) != len(self.task_ids):
+            message = "task_ids must be unique"
+            raise ValueError(message)
+
+
 def _validate_schedule_after_observation(observed_at: datetime, schedule: WorldSchedule) -> None:
     for field_name, value in (
         ("next_server_update_at", schedule.next_server_update_at),
@@ -556,6 +577,33 @@ def _validate_affected_task_ids(
         raise ValueError(message)
 
 
+def _validate_schedule_delays(
+    observed_at: datetime,
+    schedule_delays: tuple[WorldScheduleDelay, ...],
+) -> None:
+    if not isinstance(schedule_delays, tuple):
+        message = "schedule_delays must be a tuple"
+        raise TypeError(message)
+    if any(not isinstance(delay, WorldScheduleDelay) for delay in schedule_delays):
+        message = "schedule_delays must contain WorldScheduleDelay values"
+        raise TypeError(message)
+    if any(delay.due_at <= observed_at for delay in schedule_delays):
+        message = "schedule delay due_at must be after observed_at"
+        raise ValueError(message)
+
+
+def _validate_wake_task_ids(wake_task_ids: tuple[TaskId, ...]) -> None:
+    if not isinstance(wake_task_ids, tuple):
+        message = "wake_task_ids must be a tuple"
+        raise TypeError(message)
+    if any(not isinstance(task_id, TaskId) for task_id in wake_task_ids):
+        message = "wake_task_ids must contain TaskId values"
+        raise TypeError(message)
+    if len(set(wake_task_ids)) != len(wake_task_ids):
+        message = "wake_task_ids must be unique"
+        raise ValueError(message)
+
+
 @dataclass(frozen=True, slots=True)
 class WorldTaskReport:
     observed_at: datetime
@@ -564,6 +612,8 @@ class WorldTaskReport:
     completed_units: int = 0
     retry_at: datetime | None = None
     affected_task_ids: tuple[TaskId, ...] = ()
+    schedule_delays: tuple[WorldScheduleDelay, ...] = ()
+    wake_task_ids: tuple[TaskId, ...] = ()
     has_surplus_yellow_coins: bool = False
     exploration_in_progress: bool = False
     cursor: WorldProgressCursor | None = None
@@ -594,6 +644,8 @@ class WorldTaskReport:
             message = "cooldown report requires retry_at"
             raise ValueError(message)
         _validate_affected_task_ids(self.affected_task_ids, status=self.status)
+        _validate_schedule_delays(self.observed_at, self.schedule_delays)
+        _validate_wake_task_ids(self.wake_task_ids)
         _validate_bool(value=self.has_surplus_yellow_coins, field_name="has_surplus_yellow_coins")
         _validate_bool(value=self.exploration_in_progress, field_name="exploration_in_progress")
         if self.cursor is not None and not isinstance(
@@ -602,11 +654,8 @@ class WorldTaskReport:
         ):
             message = "cursor must be a WorldProgressCursor or None"
             raise TypeError(message)
-        if self.cursor is not None and self.status not in {
-            WorldTaskStatus.IN_PROGRESS,
-            WorldTaskStatus.PREEMPTED,
-        }:
-            message = "cursor is only valid for in-progress or preempted reports"
+        if self.cursor is not None and self.status is not WorldTaskStatus.IN_PROGRESS:
+            message = "cursor is only valid for in-progress reports"
             raise ValueError(message)
 
     @property
@@ -620,7 +669,6 @@ class OperationSirenWorkflow(Protocol):
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
         cancellation: CancellationSignal,
-        preemption: PreemptionRequest,
     ) -> WorldTaskReport: ...
 
 
@@ -835,19 +883,86 @@ class OperationSirenTask(Task):
         stale = self._stale_progress_result(context)
         if stale is not None:
             return stale
-        if context.preemption.is_requested:
-            return self._preempted_before_start(context)
 
-        report = self._workflow.execute(self._spec, self._progress, context.abort, context.preemption)
+        report = self._workflow.execute(self._spec, self._progress, context.abort)
         if not isinstance(report, WorldTaskReport):
             message = "OperationSirenWorkflow.execute() must return a WorldTaskReport"
             raise TypeError(message)
         context.abort.raise_if_requested()
-        if report.status is WorldTaskStatus.PREEMPTED and not context.preemption.is_requested:
-            message = "preempted report requires an active preemption request"
-            raise ValueError(message)
         self._validate_report_checkpoint(report)
-        return self._resolve(report, context)
+        return self._merge_schedule_intents(self._resolve(report, context), report)
+
+    def _merge_schedule_intents(self, result: TaskResult, report: WorldTaskReport) -> TaskResult:
+        effects: list[ScheduleEffect] = list(result.effects)
+        delayed_until: dict[TaskId, datetime] = {}
+        for delay in report.schedule_delays:
+            for task_id in delay.task_ids:
+                delayed_until[task_id] = max(delayed_until.get(task_id, delay.due_at), delay.due_at)
+        for task_id, due_at in delayed_until.items():
+            self._merge_delay(effects, task_id=task_id, due_at=due_at)
+        for task_id in report.wake_task_ids:
+            self._merge_wake(effects, task_id=task_id, due_at=report.observed_at)
+        return TaskResult(
+            outcome=result.outcome,
+            effects=tuple(effects),
+            state_effects=result.state_effects,
+            notifications=result.notifications,
+        )
+
+    def _merge_delay(self, effects: list[ScheduleEffect], *, task_id: TaskId, due_at: datetime) -> None:
+        if task_id == self._spec.task_id:
+            self._merge_self_delay(effects, task_id=task_id, due_at=due_at)
+            return
+
+        for index, effect in enumerate(effects):
+            if not isinstance(effect, RescheduleTask | DelayTask | WakeTask | DisableTask):
+                continue
+            if effect.task_id != task_id:
+                continue
+            if isinstance(effect, DisableTask):
+                return
+            merged_due_at = max(effect.due_at, due_at)
+            if isinstance(effect, RescheduleTask):
+                effects[index] = RescheduleTask(task_id, merged_due_at)
+            elif isinstance(effect, DelayTask):
+                effects[index] = DelayTask(task_id, merged_due_at)
+            else:
+                effects[index] = WakeTask(task_id, merged_due_at, effect.enable_policy)
+            return
+        effects.append(DelayTask(task_id, due_at))
+
+    @staticmethod
+    def _merge_self_delay(effects: list[ScheduleEffect], *, task_id: TaskId, due_at: datetime) -> None:
+        for index, effect in enumerate(effects):
+            if isinstance(effect, DisableTask) and effect.task_id == task_id:
+                return
+            if isinstance(effect, RescheduleSelf):
+                effects[index] = RescheduleSelf(max(effect.due_at, due_at))
+                return
+        message = "current OpSi task delay requires a self schedule effect"
+        raise AssertionError(message)
+
+    def _merge_wake(self, effects: list[ScheduleEffect], *, task_id: TaskId, due_at: datetime) -> None:
+        if task_id == self._spec.task_id:
+            for index, effect in enumerate(effects):
+                if isinstance(effect, DisableTask) and effect.task_id == task_id:
+                    return
+                if isinstance(effect, RescheduleSelf):
+                    effects[index] = RescheduleSelf(due_at)
+                    return
+            message = "current OpSi task wake requires a self schedule effect"
+            raise AssertionError(message)
+
+        for index, effect in enumerate(effects):
+            if not isinstance(effect, RescheduleTask | DelayTask | WakeTask | DisableTask):
+                continue
+            if effect.task_id != task_id:
+                continue
+            if isinstance(effect, DisableTask):
+                return
+            effects[index] = WakeTask(task_id, due_at, WakePolicy.FORCE_ENABLE)
+            return
+        effects.append(WakeTask(task_id, due_at, WakePolicy.FORCE_ENABLE))
 
     def _stale_progress_result(self, context: TaskContext) -> TaskResult | None:
         progress = self._progress
@@ -867,23 +982,10 @@ class OperationSirenTask(Task):
             state_effects=(delete_world_progress(self._spec.operation),),
         )
 
-    def _preempted_before_start(self, context: TaskContext) -> TaskResult:
-        state_effects = () if self._progress is None else (upsert_world_progress(self._progress),)
-        return TaskResult(
-            outcome=Deferred(_PREEMPTED_BEFORE_START),
-            effects=(RescheduleSelf(context.started_at),),
-            state_effects=state_effects,
-        )
-
     def _validate_report_checkpoint(self, report: WorldTaskReport) -> None:
         if self._spec.checkpoint_mode is WorldCheckpointMode.ONE_SHOT:
             if report.status is WorldTaskStatus.IN_PROGRESS:
                 message = f"one-shot operation cannot report in-progress: {self._spec.operation.value}"
-                raise ValueError(message)
-            if report.status is WorldTaskStatus.PREEMPTED and (
-                report.completed_units != 0 or report.cursor is not None
-            ):
-                message = "one-shot preemption must not report resumable progress"
                 raise ValueError(message)
             return
 
@@ -895,9 +997,7 @@ class OperationSirenTask(Task):
             if not isinstance(report.cursor, expected_cursor):
                 message = f"{self._spec.operation.value} report requires a {expected_cursor.__name__}"
                 raise TypeError(message)
-        completed_safe_unit = report.status is WorldTaskStatus.IN_PROGRESS or (
-            report.status is WorldTaskStatus.PREEMPTED and report.completed_units == 1
-        )
+        completed_safe_unit = report.status is WorldTaskStatus.IN_PROGRESS
         if completed_safe_unit and expected_cursor is not None and report.cursor is None:
             message = f"{self._spec.operation.value} safe unit requires a {expected_cursor.__name__}"
             raise ValueError(message)
@@ -905,8 +1005,8 @@ class OperationSirenTask(Task):
     def _resolve(self, report: WorldTaskReport, context: TaskContext) -> TaskResult:
         if report.status is WorldTaskStatus.IN_PROGRESS:
             return self._resolve_in_progress(report, context)
-        if report.status in {WorldTaskStatus.DISABLED, WorldTaskStatus.PREEMPTED}:
-            return self._resolve_terminal_state(report, context)
+        if report.status is WorldTaskStatus.DISABLED:
+            return self._resolve_disabled()
         if report.status not in {WorldTaskStatus.COMPLETED, WorldTaskStatus.EMPTY}:
             return self._resolve_waiting_state(report)
         return self._resolve_settled_state(report)
@@ -922,22 +1022,11 @@ class OperationSirenTask(Task):
             state_effects=(upsert_world_progress(progress),),
         )
 
-    def _resolve_terminal_state(self, report: WorldTaskReport, context: TaskContext) -> TaskResult:
-        if report.status is WorldTaskStatus.DISABLED:
-            return TaskResult(
-                outcome=Succeeded(),
-                effects=(DisableTask(self._spec.task_id),),
-                state_effects=self._settled_state_effects(),
-            )
-        progress = self._next_progress(report, context)
-        if self._spec.checkpoint_mode is WorldCheckpointMode.BOUNDED and progress is None:
-            message = "bounded preemption must expose a resumable safe point"
-            raise ValueError(message)
-        state_effects = () if progress is None else (upsert_world_progress(progress),)
+    def _resolve_disabled(self) -> TaskResult:
         return TaskResult(
-            outcome=Deferred(_PREEMPTED),
-            effects=(RescheduleSelf(report.observed_at),),
-            state_effects=state_effects,
+            outcome=Succeeded(),
+            effects=(DisableTask(self._spec.task_id),),
+            state_effects=self._settled_state_effects(),
         )
 
     def _next_progress(self, report: WorldTaskReport, context: TaskContext) -> WorldProgress | None:

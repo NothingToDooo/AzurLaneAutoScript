@@ -349,22 +349,3 @@ class Awaken(Dock):
             raise ScriptError(message)
 
         return result
-
-    def run(self) -> None:
-        favourite = self.config.Awaken_Favourite
-        if self.config.Awaken_LevelCap == "level125":
-            result = self.awaken_run(use_array=True, favourite=favourite)
-            if result != "timeout":
-                self.awaken_run(favourite=favourite)
-        elif self.config.Awaken_LevelCap == "level120":
-            self.awaken_run(favourite=favourite)
-        else:
-            message = UNKNOWN_AWAKEN_LEVEL_CAP_TEMPLATE.format(level_cap=self.config.Awaken_LevelCap)
-            raise ScriptError(message)
-
-        logger.hr("Awaken run exit", level=1)
-        if favourite:
-            self.dock_favourite_set(wait_loading=False)
-        self.dock_filter_set(wait_loading=False)
-
-        self.config.task_delay(server_update=True)

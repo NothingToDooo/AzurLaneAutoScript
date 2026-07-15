@@ -1,22 +1,31 @@
+import copy
 import hashlib
 import json
+import math
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TypeVar, cast
+from itertools import pairwise
+from pathlib import Path
+from typing import TYPE_CHECKING, TypeVar, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from module.config.json_codec import StrictJsonDecodeError, decode_json
 from module.config.server import CN_PACKAGE
+from module.device.mumu import MUMU12_SERIAL_EXAMPLE, is_mumu12_serial
 from module.notify.configuration import (
     DisabledNotificationConfig,
     NotificationConfig,
     NotificationConfigError,
     SmtpNotificationConfig,
-    parse_notification_config,
+    build_notification_config,
 )
-from module.state import JsonValue, ScheduleMutation
 from module.task_registry import TASK_CATALOG, config_name_to_command
+
+if TYPE_CHECKING:
+    from module.config.deep import DeepValue, MutableDeepData, MutableDeepValue
+    from module.runtime.settings import JsonValue
 
 
 class ConfigurationCompileError(ValueError):
@@ -27,10 +36,173 @@ type ConfigurationDocument = Mapping[str, object]
 
 _ValueT = TypeVar("_ValueT", bool, int, float, str)
 _SENTINEL_DATE = datetime(2020, 1, 1)
+_DEFAULT_SCHEMA_PATH = Path(__file__).resolve().parents[1] / "config" / "argument" / "args.json"
 
 
 def _error(path: tuple[str, ...], message: str) -> ConfigurationCompileError:
-    return ConfigurationCompileError(f"$.{'.'.join(path)} {message}")
+    location = "$" if not path else f"$.{'.'.join(path)}"
+    return ConfigurationCompileError(f"{location} {message}")
+
+
+def _schema_mapping(value: object, *, path: tuple[str, ...]) -> Mapping[str, object]:
+    if not isinstance(value, Mapping):
+        raise _error(path, "must be an object")
+    if any(not isinstance(key, str) for key in value):
+        raise _error(path, "must use string field names")
+    return cast("Mapping[str, object]", value)
+
+
+def _require_exact_fields(
+    value: Mapping[str, object],
+    expected: Mapping[str, object],
+    *,
+    path: tuple[str, ...],
+) -> None:
+    unknown = sorted(set(value) - set(expected))
+    if unknown:
+        raise _error((*path, unknown[0]), "is not part of the current configuration schema")
+    missing = sorted(set(expected) - set(value))
+    if missing:
+        raise _error((*path, missing[0]), "is required by the current configuration schema")
+
+
+def _matches_option(value: object, option: object) -> bool:
+    return type(value) is type(option) and value == option
+
+
+def _is_finite_number(value: object) -> bool:
+    if type(value) not in {int, float}:
+        return False
+    return math.isfinite(cast("int | float", value))
+
+
+class CurrentConfigurationSchema:
+    """校验并解析唯一受支持的当前 alas.json 结构。"""
+
+    __slots__ = ("_definition",)
+
+    def __init__(self, definition_path: Path = _DEFAULT_SCHEMA_PATH) -> None:
+        if not isinstance(definition_path, Path):
+            message = "definition_path must be a Path"
+            raise TypeError(message)
+        try:
+            decoded = decode_json(definition_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, StrictJsonDecodeError) as error:
+            message = f"failed to load current configuration schema {definition_path}: {error}"
+            raise RuntimeError(message) from error
+        self._definition = _schema_mapping(decoded, path=())
+
+    def validate(self, document: ConfigurationDocument) -> None:
+        self.parse(document)
+
+    def parse(self, document: ConfigurationDocument) -> MutableDeepData:
+        root = _schema_mapping(document, path=())
+        _require_exact_fields(root, self._definition, path=())
+        parsed: MutableDeepData = {}
+        for task_name, raw_groups in self._definition.items():
+            task_path = (task_name,)
+            groups = _schema_mapping(raw_groups, path=task_path)
+            task = _schema_mapping(root[task_name], path=task_path)
+            _require_exact_fields(task, groups, path=task_path)
+            parsed_groups: MutableDeepData = {}
+            for group_name, raw_fields in groups.items():
+                group_path = (*task_path, group_name)
+                fields = _schema_mapping(raw_fields, path=group_path)
+                group = _schema_mapping(task[group_name], path=group_path)
+                _require_exact_fields(group, fields, path=group_path)
+                parsed_fields: MutableDeepData = {}
+                for field_name, raw_descriptor in fields.items():
+                    field_path = (*group_path, field_name)
+                    descriptor = _schema_mapping(raw_descriptor, path=field_path)
+                    parsed_fields[field_name] = self._parse_field(
+                        group[field_name],
+                        descriptor,
+                        path=field_path,
+                    )
+                parsed_groups[group_name] = parsed_fields
+            parsed[task_name] = parsed_groups
+        return parsed
+
+    @staticmethod
+    def _parse_field(
+        value: object,
+        descriptor: Mapping[str, object],
+        *,
+        path: tuple[str, ...],
+    ) -> MutableDeepValue:
+        if "value" not in descriptor:
+            raise _error(path, "has no current default definition")
+        default_value = descriptor["value"]
+        CurrentConfigurationSchema._validate_raw_type(value, default_value, path=path)
+        options = descriptor.get("option")
+        if options is not None:
+            if not isinstance(options, list):
+                raise _error(path, "has an invalid internal option definition")
+            if not any(_matches_option(value, option) for option in options):
+                raise _error(path, f"must be one of {options!r}")
+        parsed = CurrentConfigurationSchema._parse_typed_value(value, descriptor, path=path)
+        default = CurrentConfigurationSchema._parse_typed_value(default_value, descriptor, path=path)
+        CurrentConfigurationSchema._validate_parsed_type(parsed, default, path=path)
+        return cast("MutableDeepValue", parsed)
+
+    @staticmethod
+    def _parse_typed_value(
+        value: object,
+        descriptor: Mapping[str, object],
+        *,
+        path: tuple[str, ...],
+    ) -> DeepValue:
+        # JSON 已携带 bool/数字类型；只有 schema 明确声明的 datetime 需要转换。
+        if type(descriptor.get("value")) is float and type(value) is int:
+            return float(value)
+        if descriptor.get("type") != "datetime":
+            return cast("DeepValue", value)
+        if not isinstance(value, str):
+            raise _error(path, "must be an ISO datetime")
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError as error:
+            raise _error(path, "must be an ISO datetime") from error
+
+    @staticmethod
+    def _validate_raw_type(value: object, default: object, *, path: tuple[str, ...]) -> None:
+        if default is None:
+            if value is not None and not isinstance(value, str):
+                raise _error(path, "must be text or null")
+            return
+        if type(default) is float:
+            if not _is_finite_number(value):
+                raise _error(path, "must be a finite number")
+            return
+        if isinstance(default, Mapping):
+            if not isinstance(value, Mapping):
+                raise _error(path, "must be an object")
+            if any(not isinstance(key, str) for key in value):
+                raise _error(path, "must use string field names")
+            return
+        if type(value) is not type(default):
+            raise _error(path, f"must be a {type(default).__name__}")
+
+    @staticmethod
+    def _validate_parsed_type(value: DeepValue, default: DeepValue, *, path: tuple[str, ...]) -> None:
+        if default is None:
+            if value is not None and not isinstance(value, str):
+                raise _error(path, "must be text or null")
+            return
+        if type(default) is float:
+            if not _is_finite_number(value):
+                raise _error(path, "must be a finite number")
+            return
+        if isinstance(default, Mapping):
+            if not isinstance(value, Mapping):
+                raise _error(path, "must be an object")
+            if any(not isinstance(key, str) for key in value):
+                raise _error(path, "must use string field names")
+            return
+        if type(value) is not type(default):
+            if isinstance(default, datetime):
+                raise _error(path, "must be an ISO datetime")
+            raise _error(path, f"must be a {type(default).__name__}")
 
 
 class _ConfigView:
@@ -71,7 +243,9 @@ class _ConfigView:
         elif expected is int:
             valid = type(value) is int
         elif expected is float:
-            valid = type(value) is float
+            if not _is_finite_number(value):
+                raise _error(path, "must be a float")
+            return cast("_ValueT", float(cast("int | float", value)))
         else:
             valid = isinstance(value, expected)
         if not valid:
@@ -79,57 +253,56 @@ class _ConfigView:
         return cast("_ValueT", value)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, init=False)
 class CompiledConfiguration:
-    payload: JsonValue
-    schedules: tuple[ScheduleMutation, ...]
+    _payload: JsonValue = field(repr=False)
     notification: NotificationConfig
     device_serial: str
     source_revision: str
-    assembly_revision: str
 
-    def __post_init__(self) -> None:
-        if not isinstance(self.payload, dict):
+    def __init__(
+        self,
+        *,
+        payload: JsonValue,
+        notification: NotificationConfig,
+        device_serial: str,
+        source_revision: str,
+    ) -> None:
+        if not isinstance(payload, dict):
             message = "payload must be an object"
             raise TypeError(message)
-        if not isinstance(self.schedules, tuple) or any(
-            not isinstance(schedule, ScheduleMutation) for schedule in self.schedules
-        ):
-            message = "schedules must be a tuple of ScheduleMutation values"
-            raise TypeError(message)
-        if not isinstance(self.notification, DisabledNotificationConfig | SmtpNotificationConfig):
+        if not isinstance(notification, DisabledNotificationConfig | SmtpNotificationConfig):
             message = "notification must be a NotificationConfig"
             raise TypeError(message)
-        if not isinstance(self.device_serial, str) or not self.device_serial.strip():
+        if not isinstance(device_serial, str) or not device_serial.strip():
             message = "device_serial must be a non-empty string"
             raise ValueError(message)
-        for field_name, revision in (
-            ("source_revision", self.source_revision),
-            ("assembly_revision", self.assembly_revision),
-        ):
-            if not isinstance(revision, str):
-                message = f"{field_name} must be a string"
-                raise TypeError(message)
-            if re.fullmatch(r"sha256:[0-9a-f]{64}", revision) is None:
-                message = f"{field_name} must be a canonical sha256 revision"
-                raise ValueError(message)
+        if not isinstance(source_revision, str):
+            message = "source_revision must be a string"
+            raise TypeError(message)
+        if re.fullmatch(r"sha256:[0-9a-f]{64}", source_revision) is None:
+            message = "source_revision must be a canonical sha256 revision"
+            raise ValueError(message)
+        if source_revision != _source_revision(payload):
+            message = "source_revision must match payload"
+            raise ValueError(message)
+        object.__setattr__(self, "_payload", copy.deepcopy(payload))
+        object.__setattr__(self, "notification", notification)
+        object.__setattr__(self, "device_serial", device_serial)
+        object.__setattr__(self, "source_revision", source_revision)
+
+    @property
+    def payload(self) -> JsonValue:
+        """返回独立副本，避免外部修改破坏 payload 与 revision 的绑定。"""
+
+        return copy.deepcopy(self._payload)
 
 
-def _source_revision(payload: JsonValue, schedules: tuple[ScheduleMutation, ...]) -> str:
-    canonical_schedules = [
-        {
-            "task_id": schedule.task_id,
-            "enabled": schedule.enabled,
-            "due_at": None if schedule.due_at is None else schedule.due_at.astimezone(UTC).isoformat(),
-            "priority": schedule.priority,
-        }
-        for schedule in sorted(schedules, key=lambda item: item.task_id)
-    ]
+def _source_revision(payload: JsonValue) -> str:
     encoded = json.dumps(
         {
             "format": "alas-runtime-configuration-v1",
             "payload": payload,
-            "schedules": canonical_schedules,
         },
         allow_nan=False,
         ensure_ascii=False,
@@ -139,34 +312,12 @@ def _source_revision(payload: JsonValue, schedules: tuple[ScheduleMutation, ...]
     return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
 
 
-def _assembly_revision(view: _ConfigView) -> str:
-    """只摘要进程组装时绑定、不能在任务安全点替换的配置平面。"""
-
-    projection = {
-        "Alas": dict(view.mapping("Alas")),
-        "General": dict(view.mapping("General")),
-    }
-    try:
-        encoded = json.dumps(
-            {
-                "format": "alas-instance-assembly-v1",
-                "configuration": projection,
-            },
-            allow_nan=False,
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode()
-    except (TypeError, ValueError) as error:
-        message = "$.Alas and $.General must contain canonical JSON values"
-        raise ConfigurationCompileError(message) from error
-    return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
-
-
 def _split_triggers(value: str, *, path: tuple[str, ...]) -> list[JsonValue]:
     triggers = [part.strip() for part in value.split(",")]
     if not triggers or any(re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", trigger) is None for trigger in triggers):
         raise _error(path, "must be a comma-separated HH:MM list")
+    if any(left >= right for left, right in pairwise(triggers)):
+        raise _error(path, "must be strictly increasing without duplicates")
     return [cast("JsonValue", trigger) for trigger in triggers]
 
 
@@ -184,7 +335,6 @@ def _interval_seconds(
     value: object,
     *,
     path: tuple[str, ...],
-    default_minutes: int = 30,
 ) -> dict[str, JsonValue]:
     if type(value) is int:
         lower_minutes = value
@@ -197,10 +347,8 @@ def _interval_seconds(
         upper_minutes = int(match.group(2)) if match.group(2) is not None else lower_minutes
     else:
         raise _error(path, "must be minutes or a minute range")
-    if lower_minutes <= 0:
-        lower_minutes = default_minutes
-    if upper_minutes <= 0:
-        upper_minutes = default_minutes
+    if lower_minutes <= 0 or upper_minutes <= 0:
+        raise _error(path, "must be positive")
     if lower_minutes > upper_minutes:
         raise _error(path, "lower bound must not exceed upper bound")
     return {
@@ -219,7 +367,7 @@ def _positive_integer_triplet(value: str, *, path: tuple[str, ...]) -> list[Json
 class WebConfigurationCompiler:
     """把 WebUI 文档严格投影为当前 runtime schema；旧字段不会越过此边界。"""
 
-    __slots__ = ("_timezone", "_timezone_name")
+    __slots__ = ("_schema", "_timezone", "_timezone_name")
 
     def __init__(self, *, timezone_name: str = "Asia/Shanghai") -> None:
         if not isinstance(timezone_name, str) or not timezone_name or timezone_name != timezone_name.strip():
@@ -230,12 +378,24 @@ class WebConfigurationCompiler:
         except ZoneInfoNotFoundError as error:
             message = f"unknown IANA timezone: {timezone_name}"
             raise ValueError(message) from error
+        self._schema = CurrentConfigurationSchema()
         self._timezone = timezone
         self._timezone_name = timezone_name
 
     def compile(self, document: ConfigurationDocument) -> CompiledConfiguration:
+        compiled, _runtime_document = self.compile_runtime_document(document)
+        return compiled
+
+    def compile_runtime_document(
+        self,
+        document: ConfigurationDocument,
+    ) -> tuple[CompiledConfiguration, MutableDeepData]:
+        """一次校验同时产出 typed settings 与旧游戏驱动需要的解析文档。"""
+
+        runtime_document = self._schema.parse(document)
         view = _ConfigView(document)
-        notification = self.compile_notification(document)
+        notification = self._notification(view)
+        device_serial = self._validate_device_settings(view)
         tasks: dict[str, JsonValue] = {}
         tasks.update(self._maintenance(view))
         tasks.update(self._facility(view))
@@ -252,27 +412,67 @@ class WebConfigurationCompiler:
             message = f"compiled task coverage mismatch: missing={missing}, unknown={unknown}"
             raise ConfigurationCompileError(message)
         payload: JsonValue = {"schema_version": 1, "tasks": tasks}
-        schedules = self._schedules(view)
-        return CompiledConfiguration(
-            payload=payload,
-            schedules=schedules,
-            notification=notification,
-            device_serial=view.value("Alas", "Emulator", "Serial", expected=str),
-            source_revision=_source_revision(payload, schedules),
-            assembly_revision=_assembly_revision(view),
+        return (
+            CompiledConfiguration(
+                payload=payload,
+                notification=notification,
+                device_serial=device_serial,
+                source_revision=_source_revision(payload),
+            ),
+            runtime_document,
         )
 
-    def compile_notification(self, document: ConfigurationDocument) -> NotificationConfig:
-        """独立编译进程级通知配置，供完整 runtime 尚未建成时报告失败。"""
+    def parse_runtime_document(self, document: ConfigurationDocument) -> MutableDeepData:
+        """完整校验后，把 JSON 字段解析为旧 UI driver 需要的运行时类型。"""
 
-        return self._notification(_ConfigView(document))
+        _compiled, runtime_document = self.compile_runtime_document(document)
+        return runtime_document
+
+    @staticmethod
+    def _validate_device_settings(view: _ConfigView) -> str:
+        serial_path = ("Alas", "Emulator", "Serial")
+        serial = view.value(*serial_path, expected=str)
+        if not is_mumu12_serial(serial):
+            raise _error(serial_path, f'must be a MuMu12 TCP serial such as "{MUMU12_SERIAL_EXAMPLE}"')
+
+        screenshot_length_path = ("Alas", "Error", "ScreenshotLength")
+        screenshot_length = view.value(*screenshot_length_path, expected=int)
+        if not 1 <= screenshot_length <= 300:
+            raise _error(screenshot_length_path, "must be between 1 and 300")
+
+        for field_name, lower, upper in (
+            ("ScreenshotInterval", 0.1, 0.3),
+            ("CombatScreenshotInterval", 0.3, 1.0),
+        ):
+            path = ("Alas", "Optimization", field_name)
+            interval = view.value(*path, expected=float)
+            if not lower <= interval <= upper:
+                raise _error(path, f"must be between {lower} and {upper} seconds")
+        return serial
 
     @staticmethod
     def _notification(view: _ConfigView) -> NotificationConfig:
-        path = ("Alas", "Error", "OnePushConfig")
-        raw_config = view.value(*path, expected=str)
+        path = ("Alas", "Error")
+        fields = view.mapping(*path)
+
+        def text(name: str) -> str:
+            value = fields.get(name)
+            if value is None:
+                return ""
+            if not isinstance(value, str):
+                raise _error((*path, name), "must be text or null")
+            return value
+
         try:
-            return parse_notification_config(raw_config)
+            return build_notification_config(
+                enabled=view.value(*path, "SmtpEnabled", expected=bool),
+                host=text("SmtpHost"),
+                port=view.value(*path, "SmtpPort", expected=int),
+                transport=view.value(*path, "SmtpTransport", expected=str),
+                user=text("SmtpUser"),
+                password=text("SmtpPassword"),
+                recipients=text("SmtpRecipients"),
+            )
         except NotificationConfigError as error:
             raise _error(path, str(error)) from error
 
@@ -298,28 +498,6 @@ class WebConfigurationCompiler:
             scheduler.get("SuccessInterval"),
             path=(config_name, "Scheduler", "SuccessInterval"),
         )
-
-    def _schedules(self, view: _ConfigView) -> tuple[ScheduleMutation, ...]:
-        schedules: list[ScheduleMutation] = []
-        for task_id, definition in TASK_CATALOG.items():
-            if definition.priority is None:
-                continue
-            config_name = definition.config_name
-            enabled = view.value(config_name, "Scheduler", "Enable", expected=bool)
-            next_run = view.value(config_name, "Scheduler", "NextRun", expected=str)
-            schedules.append(
-                ScheduleMutation(
-                    task_id=task_id,
-                    enabled=enabled,
-                    due_at=_local_datetime(
-                        next_run,
-                        self._timezone,
-                        path=(config_name, "Scheduler", "NextRun"),
-                    ),
-                    priority=definition.priority,
-                )
-            )
-        return tuple(schedules)
 
     def _maintenance(self, view: _ConfigView) -> dict[str, JsonValue]:
         return {
@@ -1032,7 +1210,6 @@ class WebConfigurationCompiler:
                     "common_carrier": view.value("GemsFarming", "GemsFarming", "CommonCV", expected=str),
                     "vanguard_change": view.value("GemsFarming", "GemsFarming", "ChangeVanguard", expected=str),
                     "common_destroyer": view.value("GemsFarming", "GemsFarming", "CommonDD", expected=str),
-                    "equipment_code_config": view.value("GemsFarming", "EquipmentCode", "Config", expected=str),
                     "replacement_retry_seconds": 1_800,
                 }
             tasks[command] = task

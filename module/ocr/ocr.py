@@ -14,7 +14,6 @@ from module.base.decorator import cached_property
 from module.base.type_alias import Area, Color, ImageArray, NumericArray, Scalar
 from module.base.utils import _cv_scalar, crop, extract_letters, float2str, rgb2luma
 from module.logger import logger
-from module.ocr.metrics import OCR_METRICS
 from module.ocr.models import OCR_MODEL
 from module.ocr.result import RawOcrResult, RecognitionFailureReason, RecognitionResult
 
@@ -183,11 +182,6 @@ class Ocr[OcrValueT = str]:
         start_time = time.perf_counter()
         raw_results = engine.atomic_ocr_for_single_lines_raw(processed_images, self.alphabet)
         latency_seconds = time.perf_counter() - start_time
-        OCR_METRICS.observe(
-            self._profile,
-            latency_seconds=latency_seconds,
-            processed_widths=[int(image.shape[1]) for image in processed_images],
-        )
         items = tuple(
             _OcrInference(
                 raw_image=raw_image,

@@ -1,9 +1,13 @@
 from dataclasses import replace
 
 from module.adapters.campaign_mumu12 import compile_campaign_map
-from module.content import CampaignRunVariant, CellId, CompiledCampaignSessionSource, ContentCatalog, StageRef
+from module.content.campaign_session import CampaignRunVariant
+from module.content.campaign_session_source import CompiledCampaignSessionSource
+from module.content.catalog import ContentCatalog
 from module.content.manifest import load_default_event_manifests
 from module.content.mechanic_rules import MapMutationRules
+from module.content.models import StageRef
+from module.content.stage_definition import CellId
 from module.content.stage_loader import StageSpecLoader, load_default_stage
 
 _NORMAL_MAP_DATA = """ME -- ++ ++ -- ME ME ME ++ ++ ++
@@ -33,7 +37,6 @@ def test_campaign_hard_14_4_resolves_to_its_complete_declarative_override() -> N
     source = CompiledCampaignSessionSource(
         catalog,
         StageSpecLoader(),
-        stage_refs=(hard_ref,),
     )
 
     assert source.resolve_hard_stage_ref("14-4") == hard_ref

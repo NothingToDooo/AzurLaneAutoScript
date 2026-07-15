@@ -13,8 +13,9 @@ from module.device.runtime import DeviceRuntime
 from module.exception import RequestHumanTakeover
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from module.config.config import AzurLaneConfig
-    from module.device.contracts import ControllerService
 
 
 class _Closeable:
@@ -33,18 +34,6 @@ class _NemuIpc:
 
     def disconnect(self) -> None:
         self.disconnected_at.append(self.connection.serial)
-
-
-class _MinitouchInitThread:
-    def __init__(self, connection: Device, controller: ControllerService, builder: object) -> None:
-        self.connection = connection
-        self.controller = controller
-        self.builder = builder
-        self.joined_at: list[str] = []
-
-    def join(self) -> None:
-        self.joined_at.append(self.connection.serial)
-        self.controller.__dict__["_minitouch_builder"] = self.builder
 
 
 def _make_attr(serial: str) -> ConnectionAttr:
@@ -67,11 +56,29 @@ def test_connection_attr_publishes_selected_adb_binary_to_adbutils(
 ) -> None:
     monkeypatch.delenv("ADBUTILS_ADB_PATH", raising=False)
 
-    config = cast("AzurLaneConfig", SimpleNamespace(Emulator_Serial="127.0.0.1:16384"))
+    config = cast(
+        "AzurLaneConfig",
+        SimpleNamespace(
+            Emulator_Serial="127.0.0.1:16384",
+            Emulator_AdbExecutable="./.venv/Lib/site-packages/adbutils/binaries/adb.exe",
+        ),
+    )
     connection = ConnectionAttr(config)
 
     assert os.environ["ADBUTILS_ADB_PATH"] == connection.adb_binary
     assert adb_path() == connection.adb_binary
+
+
+def test_connection_attr_uses_adb_executable_from_alas_config(tmp_path: Path) -> None:
+    executable = tmp_path / "adb.exe"
+    executable.write_bytes(b"")
+    connection = object.__new__(ConnectionAttr)
+    connection.config = cast(
+        "AzurLaneConfig",
+        SimpleNamespace(Emulator_AdbExecutable=executable.as_posix()),
+    )
+
+    assert connection.adb_binary == str(executable.resolve())
 
 
 @dataclass(frozen=True)
@@ -139,7 +146,7 @@ def test_bind_serial_same_serial_has_no_side_effects() -> None:
     state = _prime_serial_bound_state(connection)
     before = connection.__dict__.copy()
 
-    changed = connection.bind_serial(serial, persist=True)
+    changed = connection.bind_serial(serial)
 
     assert changed is False
     assert connection.__dict__ == before
@@ -147,16 +154,6 @@ def test_bind_serial_same_serial_has_no_side_effects() -> None:
     assert state.stream.closed_at == []
     assert state.nemu_ipc.disconnected_at == []
     assert state.forward_removals == []
-
-
-def test_bind_serial_persists_explicit_change() -> None:
-    connection = _make_connection("127.0.0.1:16384")
-
-    changed = connection.bind_serial("127.0.0.1:16385", persist=True)
-
-    assert changed is True
-    assert connection.serial == "127.0.0.1:16385"
-    assert connection.config.Emulator_Serial == "127.0.0.1:16385"
 
 
 def test_bind_serial_recomputes_each_layer_from_new_serial(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -201,18 +198,6 @@ def test_bind_serial_recomputes_each_layer_from_new_serial(monkeypatch: pytest.M
     assert family_checks == [old_serial, new_serial]
 
 
-def test_serial_check_revises_through_persistent_rebinding() -> None:
-    old_serial = "16384"
-    connection = _make_connection(old_serial)
-    state = _prime_serial_bound_state(connection)
-
-    connection.serial_check()
-
-    assert connection.serial == "127.0.0.1:16384"
-    assert connection.config.Emulator_Serial == "127.0.0.1:16384"
-    _assert_serial_bound_state_released(connection, state, old_serial=old_serial)
-
-
 def test_bind_serial_repeated_release_is_safe() -> None:
     old_serial = "127.0.0.1:16384"
     connection = _make_connection(old_serial)
@@ -225,43 +210,12 @@ def test_bind_serial_repeated_release_is_safe() -> None:
     _assert_serial_bound_state_released(connection, state, old_serial=old_serial)
 
 
-def test_bind_serial_joins_old_minitouch_initialization_before_releasing_builder() -> None:
-    old_serial = "127.0.0.1:16384"
-    connection = _make_connection(old_serial)
-    state = _prime_serial_bound_state(connection)
-    connection.controller.__dict__.pop("_minitouch_builder")
-    old_builder = object()
-    init_thread = _MinitouchInitThread(connection, connection.controller, old_builder)
-    vars(connection.controller)["_minitouch_init_thread"] = init_thread
-
-    connection.bind_serial("127.0.0.1:16385")
-
-    assert init_thread.joined_at == [old_serial]
-    assert vars(connection.controller)["_minitouch_init_thread"] is None
-    assert "_minitouch_builder" not in connection.controller.__dict__
-    _assert_serial_bound_state_released(connection, state, old_serial=old_serial)
-
-
-@pytest.mark.parametrize(
-    ("serial", "expected"),
-    [
-        ("16384", "127.0.0.1:16384"),
-        ("127.0.0.1.16384", "127.0.0.1:16384"),
-        ("MuMu模拟器12127.0.0.1:16384", "127.0.0.1:16384"),
-    ],
-)
-def test_serial_check_revises_common_mumu12_serial_typos(serial: str, expected: str) -> None:
-    attr = _make_attr(serial)
-
-    attr.serial_check()
-
-    assert attr.serial == expected
-    assert attr.config.Emulator_Serial == expected
-
-
 @pytest.mark.parametrize(
     "serial",
     [
+        "16384",
+        "127.0.0.1.16384",
+        "MuMu模拟器12127.0.0.1:16384",
         "auto",
         "emulator-5554",
         "127.0.0.1:5555",

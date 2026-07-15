@@ -12,9 +12,7 @@ from module.application import (
     DeleteTaskState,
     DisableTask,
     ExecutionMode,
-    PreemptionRequest,
     RescheduleSelf,
-    RunId,
     RunMetadata,
     Succeeded,
     TaskContext,
@@ -46,7 +44,6 @@ from module.gameplay.campaign import (
     CampaignStopReason,
     CampaignTask,
     CampaignWorkflow,
-    PreemptionSignal,
 )
 from module.gameplay.campaign_factories import (
     CampaignFactoryDependencies,
@@ -154,10 +151,8 @@ class _Workflow:
         self,
         job: CampaignJobSpec,
         cancellation: CancellationSignal,
-        preemption: PreemptionSignal,
     ) -> CampaignRunReport:
         cancellation.raise_if_requested()
-        assert not preemption.is_requested
         self.calls += 1
         self.last_job = job
         session = job.sessions[0]
@@ -278,7 +273,6 @@ def _valid_settings(command: str) -> dict[str, FrozenJsonValue]:
             "common_carrier": "langley",
             "vanguard_change": "ship_equip",
             "common_destroyer": "z20_or_z21",
-            "equipment_code_config": "DD: null\nlangley: null",
             "replacement_retry_seconds": 1_800,
         }
     return settings
@@ -301,12 +295,10 @@ def _context(
 def _task_context(command: str) -> TaskContext:
     return TaskContext(
         task_id=TaskId(command),
-        run_id=RunId(f"run-{command}"),
         started_at=_OBSERVED_AT,
         mode=ExecutionMode.SCHEDULED_JOB,
-        metadata=RunMetadata(settings_revision=3, content_revision="content-1", client_ui_revision="ui-1"),
+        metadata=RunMetadata(settings_revision=3, content_revision="content-1"),
         abort=AbortToken(),
-        preemption=PreemptionRequest(),
     )
 
 

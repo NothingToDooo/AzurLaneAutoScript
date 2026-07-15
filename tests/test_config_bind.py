@@ -1,14 +1,13 @@
 import copy
-import json
-from pathlib import Path
+from datetime import datetime
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 import pytest
 
 from module.config.config import AzurLaneConfig, name_to_function
-from module.config.deep import deep_get
-from module.config.resolved import ConfigIssue
+from module.config.deep import deep_get, deep_set
+from module.config.utils import filepath_config, read_file
 from module.os.config import OSConfig
 
 if TYPE_CHECKING:
@@ -47,6 +46,16 @@ def _config(
 
 def _runtime_overlay(config: _TestConfig) -> dict[str, ConfigValue]:
     return config.runtime_overlay()
+
+
+def test_generic_personal_config_view_cannot_write_alas_json() -> None:
+    config = AzurLaneConfig.__new__(AzurLaneConfig)
+    config._initialize_state("alas")  # noqa: SLF001 - 直接验证 personal config 的 writer 边界。
+    config.modified["Alas.Scheduler.Command"] = "Benchmark"
+
+    assert not config.auto_update
+    with pytest.raises(RuntimeError, match=r"cannot write the personal alas\.json"):
+        config.save()
 
 
 def test_task_bind_chain_adds_event_defaults_in_existing_order() -> None:
@@ -216,9 +225,7 @@ def test_runtime_overlay_survives_update_and_rebind_without_writing() -> None:
     config.merge(SimpleNamespace(Campaign_Name="SP"))
     config.config_name = "alas"
     config.task = name_to_function("TaskA")
-    issue = ConfigIssue(path="TaskA.Campaign.Name", raw="12-4", resolved="D3", reason="migration")
-    vars(config)["read_file_with_issues"] = lambda _name: (copy.deepcopy(stored), (issue,))
-    vars(config)["config_override"] = lambda: None
+    vars(config)["load"] = lambda: vars(config).__setitem__("data", copy.deepcopy(stored))
     vars(config)["write_file"] = lambda *_args, **_kwargs: pytest.fail("runtime overlay must not write config")
 
     config.update()
@@ -226,7 +233,6 @@ def test_runtime_overlay_survives_update_and_rebind_without_writing() -> None:
 
     assert config.Campaign_Name == "SP"
     assert config.resolved.fields["Campaign_Name"].value == "D3"
-    assert config.config_issues == (issue,)
     assert config.modified == {}
 
 
@@ -320,39 +326,32 @@ def test_cleared_runtime_overlay_does_not_leave_stale_facade_fields() -> None:
     assert config.MAP_HAS_SIREN is False
 
 
-def test_update_applies_config_override_only_once() -> None:
+def test_update_loads_binds_and_saves_once() -> None:
     config = _config({})
     config.config_name = "alas"
     config.task = name_to_function("Alas")
     calls: list[str] = []
-    vars(config)["read_file_with_issues"] = lambda _name: ({}, ())
-    vars(config)["config_override"] = lambda: calls.append("override")
+    vars(config)["load"] = lambda: calls.append("load")
     vars(config)["bind"] = lambda _task: calls.append("bind")
     vars(config)["save"] = lambda: calls.append("save")
 
     config.update()
 
-    assert calls == ["override", "bind", "save"]
+    assert calls == ["load", "bind", "save"]
 
 
-def test_snapshot_config_uses_one_document_and_keeps_mutations_in_memory(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    document = json.loads(Path("config/template.json").read_text(encoding="utf-8"))
-    document["Alas"]["Emulator"]["Serial"] = "snapshot-device"
+def test_load_preserves_disabled_tasks_and_future_schedule(monkeypatch: pytest.MonkeyPatch) -> None:
+    stored = read_file(filepath_config("template"))
+    for task in ("Commission", "Research", "Reward"):
+        deep_set(stored, keys=f"{task}.Scheduler.Enable", value=False)
+        deep_set(stored, keys=f"{task}.Scheduler.NextRun", value="2099-01-01 00:00:00")
+    config = _config({})
+    config.config_name = "alas"
+    monkeypatch.setattr("module.config.config.read_config_file", lambda _name: copy.deepcopy(stored))
 
-    def fail_file_access(*_args: object, **_kwargs: object) -> None:
-        message = "snapshot-backed config must not access configuration files"
-        raise AssertionError(message)
+    config.load()
 
-    monkeypatch.setattr(AzurLaneConfig, "read_file_with_issues", fail_file_access)
-    monkeypatch.setattr(AzurLaneConfig, "write_file", fail_file_access)
-
-    config = AzurLaneConfig.from_snapshot("snapshot-instance", document)
-    assert config.Emulator_Serial == "snapshot-device"
-
-    config.Emulator_Serial = "runtime-device"
-
-    assert config.Emulator_Serial == "runtime-device"
-    assert deep_get(config.data, keys="Alas.Emulator.Serial") == "runtime-device"
+    for task in ("Commission", "Research", "Reward"):
+        assert deep_get(config.data, keys=f"{task}.Scheduler.Enable") is False
+        assert deep_get(config.data, keys=f"{task}.Scheduler.NextRun") == datetime(2099, 1, 1)
     assert config.modified == {}

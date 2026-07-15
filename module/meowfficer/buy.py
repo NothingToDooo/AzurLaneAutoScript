@@ -53,18 +53,17 @@ def _calculate_meow_buy_count(bought: int, total: int, coins: int, buy_amount: i
 class MeowfficerBuy(MeowfficerBase):
     def meow_get_buy_count(self, buy_amount: int, overflow_th: int) -> int:
         """在指挥喵主页 OCR 剩余次数和金币，返回本次购买的 0～15 箱。"""
-        failure_store = OCR_FAILURE_STORE if self.config.Error_SaveError else None
         for _ in self.loop(timeout=2):
             counter_result = MEOWFFICER.recognize(
                 self.device.image,
                 expected_total=BUY_MAX,
-                failure_store=failure_store,
+                failure_store=OCR_FAILURE_STORE,
             )
             if not counter_result.valid or counter_result.value is None:
                 continue
             remain, bought, total = counter_result.value
 
-            coins_result = MEOWFFICER_COINS.recognize(self.device.image, failure_store=failure_store)
+            coins_result = MEOWFFICER_COINS.recognize(self.device.image, failure_store=OCR_FAILURE_STORE)
             if isinstance(coins_result, list):
                 message = "MEOWFFICER_COINS 必须使用单个 OCR 区域"
                 raise ScriptError(message)

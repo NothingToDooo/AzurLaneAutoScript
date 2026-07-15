@@ -27,13 +27,12 @@ class HPBalancer(ModuleBase):
 
     def __init__(
         self,
-        config: AzurLaneConfig | str,
-        device: Device | str | None = None,
-        task: str | None = None,
+        config: AzurLaneConfig,
+        device: Device,
     ) -> None:
         self._hp: dict[int, list[float]] = {}
         self._hp_has_ship: dict[int, list[bool]] = {}
-        super().__init__(config=config, device=device, task=task)
+        super().__init__(config=config, device=device)
 
     @property
     def hp(self) -> list[float]:

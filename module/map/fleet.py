@@ -148,13 +148,12 @@ class Fleet(Camera, AmbushHandler):
 
     def __init__(
         self,
-        config: AzurLaneConfig | str,
-        device: Device | str | None = None,
-        task: str | None = None,
+        config: AzurLaneConfig,
+        device: Device,
     ) -> None:
         self.round = 0
         self.enemy_round: dict[int, int] = {}
-        super().__init__(config=config, device=device, task=task)
+        super().__init__(config=config, device=device)
 
     def round_next(self) -> bool:
         """舰队到达后推进地图行动轮次。"""

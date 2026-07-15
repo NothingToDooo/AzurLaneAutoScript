@@ -4,10 +4,11 @@ from typing import TYPE_CHECKING, override
 
 import pytest
 
-from module.content import ActivityCatalog, ContentId, RaidDefinition, RaidMode, RaidProfileId
-from module.content.activity_catalog import RaidActivity
+from module.content.activity_catalog import ActivityCatalog, RaidActivity
+from module.content.activity_profile import RaidDefinition, RaidMode, RaidProfileId
 from module.content.errors import ContentValidationError
 from module.content.manifest import load_event_manifests
+from module.content.models import ContentId
 from module.ocr.ocr import Digit, DigitCounter
 from module.raid import assets as raid_assets
 from module.raid.ocr import HuanChangPointOcr, HuanChangRemainCounter, PaddedRaidCounter
@@ -267,7 +268,7 @@ def test_atomic_ex_execution_returns_fact_and_restores_submarine_overlay() -> No
     assert result == RaidExecutionResult(mode=RaidMode.EX, runs_completed=1)
     assert runner.entered == [plan]
     assert runner.combat_calls == 1
-    assert runner.emotion.checks == [1]
+    assert runner.emotion.checks == []
     assert runner.config.Submarine_Fleet == 3
     assert runner.config.Submarine_Mode == "boss_only"
     assert runner.config.overlays[-1] == {"Submarine_Fleet": 3, "Submarine_Mode": "boss_only"}

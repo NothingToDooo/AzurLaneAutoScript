@@ -54,7 +54,6 @@ if TYPE_CHECKING:
 
 _MIN_RESOURCE_RETRY = timedelta(minutes=120)
 _MAX_RESOURCE_RETRY = timedelta(minutes=240)
-_PREEMPTED_REASON = "campaign yielded at a safe point"
 _RESTART_REASON = "campaign detected the emotion calculation bug"
 _IN_PROGRESS_REASON = "campaign battle batch is still in progress"
 _STALE_PROGRESS_REASON = "stale campaign progress was discarded"
@@ -583,7 +582,6 @@ class GemsFarmingPolicy:
     common_carrier: GemsCommonCarrier
     vanguard_change: GemsVanguardChange
     common_destroyer: GemsCommonDestroyer
-    equipment_code_config: str
     replacement_retry_delay: timedelta = timedelta(minutes=30)
 
     def __post_init__(self) -> None:
@@ -601,9 +599,6 @@ class GemsFarmingPolicy:
             raise TypeError(message)
         if not isinstance(self.common_destroyer, GemsCommonDestroyer):
             message = "common_destroyer must be a GemsCommonDestroyer"
-            raise TypeError(message)
-        if not isinstance(self.equipment_code_config, str) or not self.equipment_code_config.strip():
-            message = "equipment_code_config must be a non-empty string"
             raise TypeError(message)
         _validate_positive_duration(self.replacement_retry_delay, field_name="replacement_retry_delay")
 
@@ -903,7 +898,7 @@ class CampaignStopReason(StrEnum):
     GEMS_EMOTION_REPLACEMENT_FAILED = "gems_emotion_replacement_failed"
     GEMS_HARD_PREPARATION_FAILED = "gems_hard_preparation_failed"
     CHECKPOINT_UNAVAILABLE = "checkpoint_unavailable"
-    PREEMPTED = "preempted"
+    CANCELLED = "cancelled"  # AbortRequested 的 runtime 清理语义，不作为正常 workflow report。
     FAILED = "failed"
     BLOCKED = "blocked"
 
@@ -975,14 +970,6 @@ def _validate_report_transition(
         _invalid("stage-increase reports must contain exactly one next_stage_ref")
 
 
-class PreemptionSignal(Protocol):
-    @property
-    def is_requested(self) -> bool: ...
-
-    @property
-    def reason(self) -> str | None: ...
-
-
 class CampaignWorkflow(Protocol):
     def discard_checkpoint(self) -> None:
         """释放只属于已失效 checkpoint 的运行时资源。"""
@@ -991,7 +978,6 @@ class CampaignWorkflow(Protocol):
         self,
         job: CampaignJobSpec,
         cancellation: CancellationSignal,
-        preemption: PreemptionSignal,
     ) -> CampaignRunReport:
         """最多确认一个 battle，并在 pending 已清空的安全点返回。"""
 
@@ -1034,16 +1020,6 @@ class CampaignTask(Task):
                     state_effects=(self._delete_progress(context),),
                 ),
             )
-        if context.preemption.is_requested:
-            state_effects = () if progress is None else (self._upsert_progress(context, progress),)
-            return self._for_execution_mode(
-                context.mode,
-                TaskResult(
-                    outcome=Deferred(_PREEMPTED_REASON),
-                    effects=(RescheduleSelf(context.started_at),),
-                    state_effects=state_effects,
-                ),
-            )
         if not self._job.sessions:
             return self._for_execution_mode(
                 context.mode,
@@ -1055,7 +1031,7 @@ class CampaignTask(Task):
                 self._terminal_result(context, self._disable_self_result(None)),
             )
 
-        report = self._workflow.execute(self._job, context.abort, context.preemption)
+        report = self._workflow.execute(self._job, context.abort)
         if not isinstance(report, CampaignRunReport):
             message = "CampaignWorkflow.execute() must return a CampaignRunReport"
             raise TypeError(message)
@@ -1063,16 +1039,12 @@ class CampaignTask(Task):
         if report.stop_reason in (
             CampaignStopReason.IN_PROGRESS,
             CampaignStopReason.PROGRAM_CONTINUE,
-            CampaignStopReason.PREEMPTED,
             CampaignStopReason.GEMS_EVENT_FALLBACK,
             CampaignStopReason.GEMS_FLEET_REPLACED,
             CampaignStopReason.STAGE_INCREASE,
         ):
             checkpoint = self._progress_after_report(context, report, progress)
-            reason = report.stop_reason
-            if context.preemption.is_requested:
-                reason = CampaignStopReason.PREEMPTED
-            result = self._checkpoint_result(context, report, checkpoint, reason)
+            result = self._checkpoint_result(context, report, checkpoint, report.stop_reason)
         elif report.stop_reason in (
             CampaignStopReason.GEMS_LEVEL_REPLACEMENT_FAILED,
             CampaignStopReason.GEMS_EMOTION_REPLACEMENT_FAILED,
@@ -1141,11 +1113,6 @@ class CampaignTask(Task):
             switched_to_gems_fallback=switched_to_gems_fallback,
         )
         self._validate_report_units(report, units, pending_replacement)
-        if report.stop_reason is CampaignStopReason.PREEMPTED and report.session_state.status not in (
-            CampaignSessionStatus.ACTIVE,
-            CampaignSessionStatus.COMPLETED,
-        ):
-            _invalid("preempted campaign report must contain a resumable session state")
         if (
             report.session_state.status is CampaignSessionStatus.FAILED
             and report.stop_reason is not CampaignStopReason.FAILED
@@ -1411,9 +1378,7 @@ class CampaignTask(Task):
         progress: CampaignProgress,
         reason: CampaignStopReason,
     ) -> TaskResult:
-        if reason is CampaignStopReason.PREEMPTED:
-            message = _PREEMPTED_REASON
-        elif reason is CampaignStopReason.GEMS_EVENT_FALLBACK:
+        if reason is CampaignStopReason.GEMS_EVENT_FALLBACK:
             message = "gems farming switched to its configured fallback stage"
         elif reason is CampaignStopReason.STAGE_INCREASE:
             message = "campaign advanced to the next stage"
@@ -1470,12 +1435,10 @@ class CampaignTask(Task):
             CampaignStopReason.ONE_TIME_STAGE: self._completion_result,
             CampaignStopReason.LOOP_STAGE_SWITCH: self._completion_result,
             CampaignStopReason.MAP_ACHIEVEMENT: self._disable_self_result,
-            CampaignStopReason.GEMS_EVENT_FALLBACK: self._preempted_result,
             CampaignStopReason.GEMS_LEVEL_REPLACEMENT_FAILED: self._gems_replacement_result,
             CampaignStopReason.GEMS_EMOTION_REPLACEMENT_FAILED: self._gems_replacement_result,
             CampaignStopReason.GEMS_HARD_PREPARATION_FAILED: self._gems_replacement_result,
             CampaignStopReason.CHECKPOINT_UNAVAILABLE: self._checkpoint_unavailable_result,
-            CampaignStopReason.PREEMPTED: self._preempted_result,
             CampaignStopReason.FAILED: self._failure_result,
             CampaignStopReason.BLOCKED: self._blocked_result,
         }
@@ -1507,8 +1470,9 @@ class CampaignTask(Task):
         notifications: tuple[OperatorNotificationRequest, ...] = ()
         if notification_kind is not None:
             stage_ref = report.stage_ref if report is not None else self._notification_stage_ref()
-            resource = None if stage_ref is None else f"{stage_ref.pack_id}/{stage_ref.stage_id}"
-            notifications = (OperatorNotificationRequest(notification_kind, resource=resource),)
+            if stage_ref is not None:
+                resource = f"{stage_ref.pack_id}/{stage_ref.stage_id}"
+                notifications = (OperatorNotificationRequest(notification_kind, resource=resource),)
         return TaskResult(
             outcome=Succeeded(),
             effects=(DisableTask(self._job.task_id),),
@@ -1570,13 +1534,6 @@ class CampaignTask(Task):
         return TaskResult(
             outcome=Retryable("gems farming fleet replacement failed"),
             effects=(RescheduleSelf(report.observed_at + policy.replacement_retry_delay),),
-        )
-
-    @staticmethod
-    def _preempted_result(report: CampaignRunReport) -> TaskResult:
-        return TaskResult(
-            outcome=Deferred(_PREEMPTED_REASON),
-            effects=(RescheduleSelf(report.observed_at),),
         )
 
     def _failure_result(self, report: CampaignRunReport) -> TaskResult:

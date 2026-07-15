@@ -114,14 +114,13 @@ class ActionPointLimit(Exception):
 class ActionPointHandler(UI, MapEventHandler):
     def __init__(
         self,
-        config: AzurLaneConfig | str,
-        device: Device | str | None = None,
-        task: str | None = None,
+        config: AzurLaneConfig,
+        device: Device,
     ) -> None:
         self._action_point_box: list[int] = [0, 0, 0, 0]
         self._action_point_current: int = 0
         self._action_point_total: int = 0
-        super().__init__(config, device=device, task=task)
+        super().__init__(config, device=device)
 
     def _is_in_action_point(self) -> bool:
         return self.appear(os_assets.ACTION_POINT_USE, offset=(20, 20))

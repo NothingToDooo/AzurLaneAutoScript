@@ -94,6 +94,43 @@ class SchedulerSelection:
             raise ValueError(message)
 
 
+def order_schedule_items(
+    items: Iterable[ScheduleItem],
+    *,
+    now: datetime,
+) -> tuple[tuple[ScheduleItem, ...], tuple[ScheduleItem, ...]]:
+    """按运行时 scheduler 的规则返回已到期和等待中的任务。"""
+    _validate_aware_datetime(now, field_name="now")
+    active: list[tuple[ScheduleItem, datetime]] = []
+    for item in items:
+        if not isinstance(item, ScheduleItem):
+            message = "items must contain ScheduleItem instances"
+            raise TypeError(message)
+        if not item.enabled:
+            continue
+        due_at = item.due_at
+        if due_at is None:
+            message = f"enabled schedule must have due_at: {item.task_id.value}"
+            raise ValueError(message)
+        active.append((item, due_at))
+
+    ready = tuple(
+        item
+        for item, due_at in sorted(
+            (pair for pair in active if pair[1] <= now),
+            key=lambda pair: (pair[0].priority, pair[1], pair[0].task_id.value),
+        )
+    )
+    waiting = tuple(
+        item
+        for item, due_at in sorted(
+            (pair for pair in active if pair[1] > now),
+            key=lambda pair: (pair[1], pair[0].priority, pair[0].task_id.value),
+        )
+    )
+    return ready, waiting
+
+
 class SchedulePlanner:
     @staticmethod
     def select(
@@ -104,32 +141,16 @@ class SchedulePlanner:
     ) -> SchedulerSelection:
         _validate_aware_datetime(now, field_name="now")
         _validate_hoard_window(hoard_window)
-
-        active: list[tuple[ScheduleItem, datetime]] = []
-        for item in items:
-            if not isinstance(item, ScheduleItem):
-                message = "items must contain ScheduleItem instances"
-                raise TypeError(message)
-            if not item.enabled:
-                continue
+        ready, waiting = order_schedule_items(items, now=now)
+        if ready:
+            item = ready[0]
+            return SchedulerSelection(decision=SchedulerDecision.READY, item=item, wake_at=None)
+        if waiting:
+            item = waiting[0]
             due_at = item.due_at
             if due_at is None:
                 message = f"enabled schedule must have due_at: {item.task_id.value}"
                 raise ValueError(message)
-            active.append((item, due_at))
-
-        ready = tuple(pair for pair in active if pair[1] <= now)
-        if ready:
-            item, _due_at = min(
-                ready,
-                key=lambda pair: (pair[0].priority, pair[1], pair[0].task_id.value),
-            )
-            return SchedulerSelection(decision=SchedulerDecision.READY, item=item, wake_at=None)
-        if active:
-            item, due_at = min(
-                active,
-                key=lambda pair: (pair[1], pair[0].priority, pair[0].task_id.value),
-            )
             return SchedulerSelection(
                 decision=SchedulerDecision.WAITING,
                 item=item,

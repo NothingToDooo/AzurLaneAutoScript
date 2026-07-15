@@ -634,33 +634,3 @@ class RewardCommission(UI, InfoHandler):
 
         logger.critical("Failed to handle oil maxed after 3 trial")
         raise RequestHumanTakeover
-
-    def run(self) -> None:
-        """从任意页面领取并启动委托，结束于委托页。"""
-        self.ui_ensure(page_reward)
-        self.commission_receive()
-
-        # 在“启航庆典”委托获得舰船时会出现信息条。
-        # 这是游戏 bug：信息条会反复显示获得舰船，直到点击 get_ship。
-        self.handle_info_bar()
-        self.commission_start()
-
-        total = self.daily.add_by_eq(self.urgent)
-        future_finish = sorted([f for f in total.get("finish_time") if f is not None])
-        logger.info(f"Commission finish: {[str(f) for f in future_finish]}")
-        if future_finish:
-            self.config.task_delay(target=future_finish)
-        else:
-            logger.info("No commission running")
-            self.config.task_delay(success=False)
-
-        if self.config.cross_get(keys="GemsFarming.GemsFarming.CommissionLimit", default=False):
-            daily = self.daily.select(category_str="daily", status="pending").count
-            filtered_urgent = self.comm_choose.intersect_by_eq(self.urgent.select(status="pending")).count
-            logger.info(f"Daily commission: {daily}, filtered_urgent: {filtered_urgent}")
-            if daily > 0 and filtered_urgent >= 1:
-                logger.info("Having daily commissions to do, delay task `GemsFarming`")
-                self.config.task_delay(minute=120, target=future_finish or None, task="GemsFarming")
-            elif filtered_urgent >= 4:
-                logger.info("Having too many urgent commissions, delay task `GemsFarming`")
-                self.config.task_delay(minute=120, target=future_finish or None, task="GemsFarming")

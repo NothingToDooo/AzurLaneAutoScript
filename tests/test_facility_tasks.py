@@ -10,18 +10,16 @@ from module.application import (
     Deferred,
     DelayRange,
     ExecutionMode,
-    PreemptionRequest,
     RescheduleSelf,
     RescheduleTask,
     Retryable,
-    RunId,
     RunMetadata,
     Succeeded,
     TaskContext,
     TaskId,
     TaskResult,
 )
-from module.gameplay import (
+from module.gameplay.facility import (
     CommissionPreset,
     CommissionReport,
     CommissionSelectionPolicy,
@@ -164,12 +162,10 @@ def _context(
 ) -> TaskContext:
     return TaskContext(
         task_id=TaskId(task_id),
-        run_id=RunId(f"run-{task_id}"),
         started_at=started_at,
         mode=ExecutionMode.SCHEDULED_JOB,
-        metadata=RunMetadata(settings_revision=1, content_revision="content-1", client_ui_revision="ui-1"),
+        metadata=RunMetadata(settings_revision=1, content_revision="content-1"),
         abort=AbortToken() if abort is None else abort,
-        preemption=PreemptionRequest(),
     )
 
 

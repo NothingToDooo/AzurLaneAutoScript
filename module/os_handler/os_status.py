@@ -1,16 +1,44 @@
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING
 
 from module.base.timer import Timer
+from module.config.deep import DeepValue, deep_get
 from module.config.utils import get_server_next_update
 from module.logger import logger
-from module.map.map_grids import SelectedGrids
 from module.ocr.ocr import Digit
 from module.os_shop.assets import OS_SHOP_CHECK, OS_SHOP_PURPLE_COINS, SHOP_PURPLE_COINS, SHOP_YELLOW_COINS
 from module.ui.ui import UI
 
-if TYPE_CHECKING:
-    from module.config.config import Function
+_COOLDOWN_TASKS = ("OpsiObscure", "OpsiAbyssal", "OpsiStronghold", "OpsiDaily")
+
+
+@dataclass(frozen=True, slots=True)
+class OpsiCooldown:
+    command: str
+    ready_at: datetime
+
+
+def nearest_opsi_cooldown(
+    data: DeepValue,
+    *,
+    now: datetime,
+    server_update: datetime,
+) -> OpsiCooldown | None:
+    """返回未来一小时内最先到期、且不等于日服重置点的大世界任务。"""
+    deadline = now + timedelta(minutes=60)
+    candidates: list[OpsiCooldown] = []
+    for command in _COOLDOWN_TASKS:
+        enabled = deep_get(data, keys=f"{command}.Scheduler.Enable", default=False)
+        ready_at = deep_get(data, keys=f"{command}.Scheduler.NextRun")
+        if (
+            enabled is True
+            and isinstance(ready_at, datetime)
+            and ready_at != server_update
+            and now <= ready_at <= deadline
+        ):
+            candidates.append(OpsiCooldown(command=command, ready_at=ready_at))
+    return min(candidates, key=lambda item: item.ready_at, default=None)
+
 
 OCR_SHOP_YELLOW_COINS = Digit(SHOP_YELLOW_COINS, letter=(239, 239, 239), threshold=160, name="OCR_SHOP_YELLOW_COINS")
 OCR_SHOP_PURPLE_COINS = Digit(SHOP_PURPLE_COINS, letter=(255, 255, 255), name="OCR_SHOP_PURPLE_COINS")
@@ -34,29 +62,12 @@ class OSStatus(UI):
         return self.config.is_task_enabled("OpsiHazard1Leveling")
 
     @property
-    def nearest_task_cooling_down(self) -> Function | None:
-        """返回一小时内即将结束冷却的最近大世界任务。"""
-        now = datetime.now()
-        update = get_server_next_update("00:00")
-        cd_tasks = [
-            "OpsiObscure",
-            "OpsiAbyssal",
-            "OpsiStronghold",
-            "OpsiDaily",
-        ]
-
-        def func(task: Function) -> bool:
-            next_run = task.next_run
-            return (
-                task.command in cd_tasks
-                and task.enable
-                and isinstance(next_run, datetime)
-                and next_run != update
-                and next_run - now <= timedelta(minutes=60)
-            )
-
-        tasks = SelectedGrids(self.config.pending_task + self.config.waiting_task).filter(func).sort("next_run")
-        return tasks.first_or_none()
+    def nearest_task_cooldown(self) -> OpsiCooldown | None:
+        return nearest_opsi_cooldown(
+            self.config.data,
+            now=datetime.now(),
+            server_update=get_server_next_update("00:00"),
+        )
 
     def get_yellow_coins(self) -> int:
         yellow_coins = 0

@@ -284,8 +284,3 @@ class RewardGacha(GachaUI, Retirement):
                 result = True
 
         return result
-
-    def run(self) -> None:
-        """从任意页面执行建造任务，结束于建造页。"""
-        self.gacha_run()
-        self.config.task_delay(server_update=True)

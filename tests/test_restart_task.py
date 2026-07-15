@@ -8,9 +8,7 @@ from module.application import (
     AbortToken,
     DailySchedule,
     ExecutionMode,
-    PreemptionRequest,
     RescheduleSelf,
-    RunId,
     RunMetadata,
     Succeeded,
     TaskContext,
@@ -63,12 +61,10 @@ class _Login:
 def _context(abort: AbortToken | None = None) -> TaskContext:
     return TaskContext(
         task_id=TaskId("restart"),
-        run_id=RunId("run-restart"),
         started_at=datetime(2026, 7, 13, 4, tzinfo=UTC),
         mode=ExecutionMode.SCHEDULED_JOB,
-        metadata=RunMetadata(settings_revision=1, content_revision="content-1", client_ui_revision="ui-1"),
+        metadata=RunMetadata(settings_revision=1, content_revision="content-1"),
         abort=AbortToken() if abort is None else abort,
-        preemption=PreemptionRequest(),
     )
 
 

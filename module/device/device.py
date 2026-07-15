@@ -27,7 +27,6 @@ if TYPE_CHECKING:
     from module.device.contracts import AppControllerService, CaptureService, ControllerService, MumuRuntimeService
     from module.device.control import ButtonTarget
     from module.device.platform.emulator_base import EmulatorInstanceBase, EmulatorManagerBase
-    from module.replay.trace import RecordedAction
 
 
 def show_function_call() -> None:
@@ -54,7 +53,7 @@ def show_function_call() -> None:
 class Device(Screenshot, Control, Connection):
     stuck_long_wait_list: ClassVar[tuple[str, ...]] = ("BATTLE_STATUS_S", "PAUSE", "LOGIN_CHECK")
 
-    def __init__(self, config: AzurLaneConfig | str) -> None:
+    def __init__(self, config: AzurLaneConfig) -> None:
         self.detect_record: set[str] = set()
         self.click_record: collections.deque[str] = collections.deque(maxlen=15)
         self.stuck_detection_enabled = True
@@ -81,10 +80,6 @@ class Device(Screenshot, Control, Connection):
 
         self.method_check()
         self.screenshot_interval_set()
-
-        # 提前初始化 minitouch，避免第一次点击时才启动服务。
-        if self.config.is_actual_task:
-            self.early_minitouch_init()
 
     @property
     def runtime(self) -> DeviceRuntime:
@@ -236,14 +231,6 @@ class Device(Screenshot, Control, Connection):
         self.stuck_record_clear()
         self.click_record_add(button)
         self.click_record_check()
-
-    def replay_record_action(self, action: RecordedAction) -> None:
-        if self.config.Error_SaveError:
-            self.replay_recorder.record_action(action)
-
-    def replay_mark_unsupported_action(self, action: str) -> None:
-        if self.config.Error_SaveError:
-            self.replay_recorder.mark_unsupported_action(action)
 
     def click_record_add(self, button: ButtonTarget | str) -> None:
         self.click_record.append(str(button))

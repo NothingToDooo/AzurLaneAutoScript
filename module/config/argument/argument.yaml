@@ -27,22 +27,34 @@ Emulator:
   MuMuPath:
     value: C:/Program Files/Netease/MuMu Player 12/nx_main/MuMuNxMain.exe
     type: textarea
+  AdbExecutable:
+    value: ./.venv/Lib/site-packages/adbutils/binaries/adb.exe
+    type: textarea
 Error:
   HandleError: true
-  SaveError: true
-  # 保留旧字段名以无损读取现有配置，运行时只支持 SMTP。
-  OnePushConfig:
+  SmtpEnabled: false
+  SmtpHost:
+    value: ''
+    valuetype: str
+  SmtpPort: 465
+  SmtpTransport:
+    value: implicit_tls
+    option: [ implicit_tls, starttls ]
+  SmtpUser:
+    value: ''
+    valuetype: str
+  SmtpPassword:
     type: textarea
-    mode: yaml
-    value: 'provider: null'
+    value: ''
+    valuetype: str
+  SmtpRecipients:
+    type: textarea
+    value: ''
+    valuetype: str
   ScreenshotLength: 12
 Optimization:
   ScreenshotInterval: 0.3
   CombatScreenshotInterval: 1.0
-  TaskHoardingDuration: 0
-  WhenTaskQueueEmpty:
-    value: goto_main
-    option: [ stay_there, goto_main, close_game ]
 Retirement:
   RetireMode:
     value: one_click_retire
@@ -222,8 +234,8 @@ MaritimeEscort:
   Enable: true
 Coalition:
   Mode:
-    value: tc3
-    option: [ tc1, tc2, tc3, sp, ex ]
+    value: hard
+    option: [ easy, normal, hard, sp, ex ]
   Fleet:
     value: single
     option: [ single, multi ]

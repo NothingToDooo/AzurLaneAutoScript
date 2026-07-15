@@ -7,8 +7,6 @@ import pytest
 from module.application import (
     AbortToken,
     ExecutionMode,
-    PreemptionRequest,
-    RunId,
     RunMetadata,
     TaskContext,
     TaskId,
@@ -250,10 +248,8 @@ class _Workflow:
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
         cancellation: CancellationSignal,
-        preemption: PreemptionRequest,
     ) -> WorldTaskReport:
         cancellation.raise_if_requested()
-        assert not preemption.is_requested
         self.received_spec = spec
         self.received_progress = progress
         retry_at = _SHOP_RETRY_AT if spec.operation is WorldOperation.SHOP else None
@@ -310,12 +306,10 @@ def _progress_state(
 def _run_context(command: str) -> TaskContext:
     return TaskContext(
         task_id=TaskId(command),
-        run_id=RunId(f"run-{command}"),
         started_at=datetime(2026, 7, 13, tzinfo=UTC),
         mode=ExecutionMode.SCHEDULED_JOB,
-        metadata=RunMetadata(settings_revision=7, content_revision="content-1", client_ui_revision="ui-1"),
+        metadata=RunMetadata(settings_revision=7, content_revision="content-1"),
         abort=AbortToken(),
-        preemption=PreemptionRequest(),
     )
 
 

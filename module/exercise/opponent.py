@@ -78,13 +78,12 @@ class Opponent:
 class OpponentChoose(UI):
     def __init__(
         self,
-        config: AzurLaneConfig | str,
-        device: Device | str | None = None,
-        task: str | None = None,
+        config: AzurLaneConfig,
+        device: Device,
     ) -> None:
         self.main_image: ImageArray | None = None
         self.opponents: list[Opponent] = []
-        super().__init__(config=config, device=device, task=task)
+        super().__init__(config=config, device=device)
 
     def _opponent_fleet_check_all(self) -> None:
         self.opponents = []

@@ -28,12 +28,11 @@ MEOWFFICER_BOX_COUNT = Digit(
 class MeowfficerTrain(MeowfficerCollect, MeowfficerEnhance):
     def __init__(
         self,
-        config: AzurLaneConfig | str,
-        device: Device | str | None = None,
-        task: str | None = None,
+        config: AzurLaneConfig,
+        device: Device,
     ) -> None:
         self._box_count: list[int] = [0, 0, 0]
-        super().__init__(config, device, task)
+        super().__init__(config, device)
 
     def _meow_queue_enter(self, *, skip_first_screenshot: bool = True) -> bool:
         """进入猫箱排队页，最多尝试三次。"""

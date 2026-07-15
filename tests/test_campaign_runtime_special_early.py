@@ -191,16 +191,6 @@ def test_t4_observation_only_waits_for_a_fortress_camera_move(
     assert runtime.device.sleeps == expected_sleeps
 
 
-def test_ryza_executor_builds_once_for_both_facets() -> None:
-    manager = _ryza_manager()
-
-    assert manager.executor_instance_count == 1
-    assert {binding.kind for binding in manager.executor_bindings} == {
-        RuntimeExecutorKind.EVENT_UI,
-        RuntimeExecutorKind.MAP_MECHANIC,
-    }
-
-
 def test_ryza_event_ui_recognizes_the_existing_event_page() -> None:
     manager = _ryza_manager()
     runtime = _Runtime(manager)

@@ -1,20 +1,23 @@
-"""验证已提交的 campaign runtime profile 与生产执行器契约。"""
+"""显式验证全部 Campaign 内容与生产运行时契约。"""
 
 import argparse
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from module.adapters.campaign_profiles import validate_mumu12_campaign_runtime_profiles
+from module.content.campaign_session_source import CompiledCampaignSessionSource
+from module.content.catalog import ContentCatalog
 from module.content.manifest import load_event_manifests
 from module.content.runtime_profile_catalog import (
     compile_campaign_runtime_profile_registry,
 )
+from module.content.stage_loader import StageSpecLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-def check_campaign_runtime_profiles(root: Path) -> None:
+def validate_campaign_content(root: Path) -> None:
     """从当前事实源验证每个 stage、profile 和 production executor。"""
 
     if not isinstance(root, Path):
@@ -25,9 +28,14 @@ def check_campaign_runtime_profiles(root: Path) -> None:
         message = f"legacy campaign Python source still exists: {legacy_sources[0].relative_to(root)}"
         raise ValueError(message)
 
+    content_root = root / "content" / "events"
+    catalog = ContentCatalog(load_event_manifests(content_root))
     registry = compile_campaign_runtime_profile_registry(root / "content" / "campaign-runtime-profiles.json")
-    stages = tuple(stage for pack in load_event_manifests(root / "content" / "events") for stage in pack.stages)
-    validate_mumu12_campaign_runtime_profiles(stages, registry)
+    validate_mumu12_campaign_runtime_profiles(catalog.stages, registry)
+    CompiledCampaignSessionSource(
+        catalog,
+        StageSpecLoader(content_root, runtime_profile_registry=registry),
+    ).validate_all()
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -42,7 +50,7 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Iterable[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    check_campaign_runtime_profiles(args.root.resolve())
+    validate_campaign_content(args.root.resolve())
     return 0
 
 

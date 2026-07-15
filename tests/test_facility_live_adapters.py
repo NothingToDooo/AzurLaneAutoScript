@@ -12,7 +12,7 @@ from module.adapters.facility_live import (
     TacticalEvidence,
 )
 from module.application import AbortRequested, AbortToken, DailySchedule, DelayRange
-from module.gameplay import (
+from module.gameplay.facility import (
     CommissionPreset,
     CommissionReport,
     CommissionSelectionPolicy,

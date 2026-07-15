@@ -9,21 +9,19 @@ from module.application import (
     Blocked,
     Cancelled,
     Deferred,
+    DelayTask,
     DeleteTaskState,
     DisableTask,
     ExecutionMode,
     Faulted,
     OperatorNotificationKind,
     OperatorNotificationRequest,
-    PreemptionRequest,
     RequestAppRestart,
     RescheduleSelf,
     RescheduleTask,
     Retryable,
-    RunId,
     RunMetadata,
     RunOutcome,
-    RunStart,
     ScheduleEffect,
     StateEffect,
     Succeeded,
@@ -44,31 +42,23 @@ def _metadata(
     *,
     settings_revision: int = 1,
     content_revision: str = "content-v1",
-    client_ui_revision: str = "ui-v1",
 ) -> RunMetadata:
     return RunMetadata(
         settings_revision=settings_revision,
         content_revision=content_revision,
-        client_ui_revision=client_ui_revision,
     )
 
 
-@pytest.mark.parametrize("identifier_type", [TaskId, RunId])
 @pytest.mark.parametrize("value", ["", " ", "task id", " task", "task\t"])
-def test_identifiers_reject_empty_or_whitespace(
-    identifier_type: type[TaskId | RunId],
-    value: str,
-) -> None:
+def test_task_id_rejects_empty_or_whitespace(value: str) -> None:
     with pytest.raises(ValueError, match="must not be empty or contain whitespace"):
-        identifier_type(value)
+        TaskId(value)
 
 
-def test_identifiers_are_opaque_hashable_values() -> None:
+def test_task_id_is_an_opaque_hashable_value() -> None:
     task_id = TaskId("opsi_explore")
-    run_id = RunId("run-019d")
 
     assert str(task_id) == "opsi_explore"
-    assert str(run_id) == "run-019d"
     assert {task_id, TaskId("opsi_explore")} == {task_id}
 
 
@@ -81,11 +71,10 @@ def test_execution_modes_are_closed_and_explicit() -> None:
 
 
 def test_run_metadata_is_a_hashable_value() -> None:
-    metadata = _metadata(settings_revision=4, content_revision="event-20260713", client_ui_revision="cn-ui-v3")
+    metadata = _metadata(settings_revision=4, content_revision="event-20260713")
     equal_metadata = _metadata(
         settings_revision=4,
         content_revision="event-20260713",
-        client_ui_revision="cn-ui-v3",
     )
 
     assert {metadata, equal_metadata} == {metadata}
@@ -103,30 +92,21 @@ def test_run_metadata_requires_a_positive_integer_settings_revision() -> None:
 def test_run_metadata_rejects_empty_or_untrimmed_revision_strings(revision: str) -> None:
     with pytest.raises(ValueError, match="content_revision must not be empty or contain surrounding whitespace"):
         _metadata(content_revision=revision)
-    with pytest.raises(ValueError, match="client_ui_revision must not be empty or contain surrounding whitespace"):
-        _metadata(client_ui_revision=revision)
 
 
 def test_run_metadata_requires_revision_strings() -> None:
     with pytest.raises(TypeError, match="content_revision must be a string"):
         _metadata(content_revision=cast("str", 1))
-    with pytest.raises(TypeError, match="client_ui_revision must be a string"):
-        _metadata(client_ui_revision=cast("str", 1))
 
 
-def test_abort_and_preemption_are_independent_one_shot_signals() -> None:
+def test_abort_is_a_one_shot_signal() -> None:
     abort = AbortToken()
-    preemption = PreemptionRequest()
-
-    assert preemption.request("commission became due")
-    assert preemption.is_requested
     assert not abort.is_requested
     abort.raise_if_requested()
 
     assert abort.request("manual stop")
     assert not abort.request("later stop reason")
     assert abort.reason == "manual stop"
-    assert preemption.reason == "commission became due"
 
     with pytest.raises(AbortRequested, match="manual stop") as raised:
         abort.raise_if_requested()
@@ -141,26 +121,16 @@ class _ExternalSignal:
         return self.requested
 
 
-@pytest.mark.parametrize(
-    ("signal_type", "expected_reason"),
-    [
-        (AbortToken, "parent process stopped"),
-        (PreemptionRequest, "higher-priority task became ready"),
-    ],
-)
-def test_control_signals_can_link_to_an_external_process_signal(
-    signal_type: type[AbortToken | PreemptionRequest],
-    expected_reason: str,
-) -> None:
+def test_abort_can_link_to_an_external_process_signal() -> None:
     external = _ExternalSignal()
-    signal = signal_type(external_signal=external, external_reason=expected_reason)
+    abort = AbortToken(external_signal=external, external_reason="parent process stopped")
 
-    assert not signal.is_requested
+    assert not abort.is_requested
     external.requested = True
 
-    assert signal.is_requested
-    assert signal.reason == expected_reason
-    assert not signal.request("a later local reason")
+    assert abort.is_requested
+    assert abort.reason == "parent process stopped"
+    assert not abort.request("a later local reason")
 
 
 def test_linked_abort_checks_the_external_signal_before_io() -> None:
@@ -194,6 +164,7 @@ def test_schedule_effects_use_aware_time_and_explicit_wake_policy() -> None:
 
     assert RescheduleSelf(due_at).due_at == due_at
     assert RescheduleTask(task_id, due_at).task_id == task_id
+    assert DelayTask(task_id, due_at).task_id == task_id
     assert WakeTask(task_id, due_at, WakePolicy.FORCE_ENABLE).enable_policy is WakePolicy.FORCE_ENABLE
     assert WakeTask(task_id, due_at, WakePolicy.RESPECT_DISABLED).enable_policy is WakePolicy.RESPECT_DISABLED
     assert DisableTask(task_id).task_id == task_id
@@ -308,7 +279,10 @@ def test_operator_notification_request_is_typed_and_secret_free() -> None:
 
     assert request.resource == "campaign_main/12-4"
     with pytest.raises(TypeError, match="kind must be an OperatorNotificationKind"):
-        OperatorNotificationRequest(cast("OperatorNotificationKind", "campaign_new_ship"))
+        OperatorNotificationRequest(
+            cast("OperatorNotificationKind", "campaign_new_ship"),
+            resource="campaign_main/12-4",
+        )
     with pytest.raises(ValueError, match="resource must be trimmed and non-empty"):
         OperatorNotificationRequest(OperatorNotificationKind.CAMPAIGN_NEW_SHIP, resource=" ")
 
@@ -329,21 +303,14 @@ def test_task_result_validates_notification_requests() -> None:
         )
     with pytest.raises(ValueError, match="at most one request per kind"):
         TaskResult(outcome=Succeeded(), notifications=(request, request))
-    with pytest.raises(ValueError, match="fault notifications are derived outside task implementations"):
-        TaskResult(
-            outcome=Faulted(RuntimeError("failed")),
-            notifications=(OperatorNotificationRequest(OperatorNotificationKind.RUN_FAULTED),),
-        )
-    with pytest.raises(ValueError, match="fault notifications are derived outside task implementations"):
-        TaskResult(
-            outcome=Succeeded(),
-            notifications=(OperatorNotificationRequest(OperatorNotificationKind.PROCESS_FAILED),),
-        )
 
 
 def test_campaign_notification_requires_a_resource() -> None:
-    with pytest.raises(ValueError, match="campaign notification requires a resource"):
-        OperatorNotificationRequest(OperatorNotificationKind.CAMPAIGN_RUN_COUNT_LIMIT)
+    with pytest.raises(TypeError, match="resource must be a string"):
+        OperatorNotificationRequest(
+            OperatorNotificationKind.CAMPAIGN_RUN_COUNT_LIMIT,
+            cast("str", None),
+        )
 
 
 def test_campaign_notification_resource_must_be_single_line() -> None:
@@ -430,6 +397,10 @@ def test_task_result_rejects_multiple_restart_effects() -> None:
             DisableTask(TaskId("reward")),
         ),
         (
+            DelayTask(TaskId("reward"), datetime(2026, 7, 14, 4, tzinfo=UTC)),
+            RescheduleTask(TaskId("reward"), datetime(2026, 7, 14, 5, tzinfo=UTC)),
+        ),
+        (
             WakeTask(
                 TaskId("reward"),
                 datetime(2026, 7, 14, 4, tzinfo=UTC),
@@ -438,7 +409,15 @@ def test_task_result_rejects_multiple_restart_effects() -> None:
             RescheduleTask(TaskId("reward"), datetime(2026, 7, 14, 5, tzinfo=UTC)),
         ),
     ],
-    ids=["wake-wake", "disable-disable", "wake-disable", "disable-wake", "reschedule-disable", "wake-reschedule"],
+    ids=[
+        "wake-wake",
+        "disable-disable",
+        "wake-disable",
+        "disable-wake",
+        "reschedule-disable",
+        "delay-reschedule",
+        "wake-reschedule",
+    ],
 )
 def test_task_result_rejects_multiple_operations_for_the_same_task(
     effects: tuple[ScheduleEffect, ...],
@@ -464,12 +443,10 @@ def test_task_result_preserves_distinct_effect_order() -> None:
     assert result.effects is effects
 
 
-class _PreemptibleTask(Task):
+class _CancellableTask(Task):
     @override
     def run(self, context: TaskContext) -> TaskResult:
         context.abort.raise_if_requested()
-        if context.preemption.is_requested:
-            return TaskResult(outcome=Cancelled(context.preemption.reason or "preempted"))
         return TaskResult(outcome=Succeeded())
 
 
@@ -477,41 +454,41 @@ def _run_task(task: Task, context: TaskContext) -> TaskResult:
     return task.run(context)
 
 
-def test_task_context_exposes_only_run_identity_and_control_signals() -> None:
-    preemption = PreemptionRequest()
+def test_task_context_exposes_task_identity_and_abort_token() -> None:
+    abort = AbortToken()
     context = TaskContext(
         task_id=TaskId("main"),
-        run_id=RunId("run-1"),
         started_at=datetime(2026, 7, 13, tzinfo=UTC),
         mode=ExecutionMode.SCHEDULED_JOB,
         metadata=_metadata(),
-        abort=AbortToken(),
-        preemption=preemption,
+        abort=abort,
     )
 
-    assert isinstance(_run_task(_PreemptibleTask(), context).outcome, Succeeded)
+    assert isinstance(_run_task(_CancellableTask(), context).outcome, Succeeded)
+    assert context.abort is abort
 
-    preemption.request("higher priority task")
-    result = _run_task(_PreemptibleTask(), context)
-    assert result == TaskResult(outcome=Cancelled("higher priority task"))
-
-
-def test_run_start_is_the_single_aware_started_at_fact() -> None:
-    started_at = datetime(2026, 7, 13, tzinfo=UTC)
-
-    assert RunStart(RunId("run-1"), started_at) == RunStart(RunId("run-1"), started_at)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        RunStart(RunId("run-1"), datetime(2026, 7, 13))
+    abort.request("manual stop")
+    with pytest.raises(AbortRequested, match="manual stop"):
+        _run_task(_CancellableTask(), context)
 
 
 def test_task_context_rejects_untyped_identity_values() -> None:
     with pytest.raises(TypeError, match="task_id must be a TaskId"):
         TaskContext(
             task_id=cast("TaskId", "main"),
-            run_id=RunId("run-1"),
             started_at=datetime(2026, 7, 13, tzinfo=UTC),
             mode=ExecutionMode.SCHEDULED_JOB,
             metadata=_metadata(),
             abort=AbortToken(),
-            preemption=PreemptionRequest(),
+        )
+
+
+def test_task_context_requires_aware_started_at() -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        TaskContext(
+            task_id=TaskId("main"),
+            started_at=datetime(2026, 7, 13),
+            mode=ExecutionMode.SCHEDULED_JOB,
+            metadata=_metadata(),
+            abort=AbortToken(),
         )

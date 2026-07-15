@@ -43,7 +43,6 @@ def build_game_task_registry(
     dependencies: GameTaskDependencies,
     *,
     content_revision: str,
-    client_ui_revision: str,
 ) -> TaskFactoryRegistry:
     """唯一的游戏 Task composition root；领域 factory 必须精确覆盖 catalog。"""
     if not isinstance(dependencies, GameTaskDependencies):
@@ -61,5 +60,4 @@ def build_game_task_registry(
             build_activity_factories(dependencies.activity),
         ),
         content_revision=content_revision,
-        client_ui_revision=client_ui_revision,
     )

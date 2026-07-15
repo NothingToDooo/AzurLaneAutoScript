@@ -11,7 +11,7 @@ from module.adapters.campaign_live import (
     CommittedCampaignUnit,
     ExistingCampaignMapAdapter,
 )
-from module.application import AbortRequested, AbortToken, DailySchedule, DelayRange, PreemptionRequest, TaskId
+from module.application import AbortRequested, AbortToken, DailySchedule, DelayRange, TaskId
 from module.content.battle_policy import (
     BattleFlag,
     BossStrategy,
@@ -449,7 +449,6 @@ def test_live_workflow_checkpoints_a_battle_free_program_action_and_markers() ->
     report = _program_workflow(programs, observer, driver).execute(
         _job(session),
         AbortToken(),
-        PreemptionRequest(),
     )
 
     assert report.stop_reason is CampaignStopReason.PROGRAM_CONTINUE
@@ -489,7 +488,7 @@ def test_live_workflow_delegates_to_the_current_modes_default_program_once() -> 
         programs,
         _Observer(BattlefieldObservation(0, enemy=1)),
         _Driver(NoBattleTarget),
-    ).execute(_job(session), AbortToken(), PreemptionRequest())
+    ).execute(_job(session), AbortToken())
 
     assert report.stop_reason is CampaignStopReason.IN_PROGRESS
     assert report.session_state.battle_index == 1
@@ -519,7 +518,7 @@ def test_live_workflow_rejects_recursive_default_mode_delegation() -> None:
             programs,
             _Observer(BattlefieldObservation(0, enemy=1)),
             _Driver(NoBattleTarget),
-        ).execute(_job(session), AbortToken(), PreemptionRequest())
+        ).execute(_job(session), AbortToken())
 
 
 def test_live_workflow_delegates_to_the_stage_policy_without_losing_program_facts() -> None:
@@ -540,7 +539,6 @@ def test_live_workflow_delegates_to_the_stage_policy_without_losing_program_fact
     report = _program_workflow(programs, observer, driver).execute(
         _job(session),
         AbortToken(),
-        PreemptionRequest(),
     )
 
     assert report.stop_reason is CampaignStopReason.IN_PROGRESS
@@ -570,7 +568,6 @@ def test_live_workflow_turns_verified_map_completion_into_a_terminal_achievement
             limits=CampaignLimits(map_achievement=CampaignMapAchievement.FULL_CLEAR),
         ),
         AbortToken(),
-        PreemptionRequest(),
     )
 
     assert report.stop_reason is CampaignStopReason.MAP_ACHIEVEMENT
@@ -609,7 +606,7 @@ def test_live_workflow_advances_only_to_the_content_declared_next_stage() -> Non
         services=CampaignLiveServices(activator=activator),
     )
 
-    report = workflow.execute(job, AbortToken(), PreemptionRequest())
+    report = workflow.execute(job, AbortToken())
 
     assert report.stop_reason is CampaignStopReason.STAGE_INCREASE
     assert report.next_stage_ref == target.definition.ref
@@ -635,7 +632,6 @@ def test_live_workflow_rejects_unmet_map_achievement_evidence() -> None:
                 limits=CampaignLimits(map_achievement=CampaignMapAchievement.THREAT_SAFE),
             ),
             AbortToken(),
-            PreemptionRequest(),
         )
 
 
@@ -654,7 +650,7 @@ def test_live_workflow_reduces_a_program_battle_and_advances_the_static_wave() -
         programs,
         _Observer(BattlefieldObservation(0, enemy=1)),
         _Driver(NoBattleTarget),
-    ).execute(_job(session), AbortToken(), PreemptionRequest())
+    ).execute(_job(session), AbortToken())
 
     assert report.stop_reason is CampaignStopReason.IN_PROGRESS
     assert report.session_state.battle_index == 1
@@ -675,7 +671,7 @@ def test_live_workflow_keeps_a_dynamic_boss_roadblock_on_the_current_wave() -> N
         programs,
         _Observer(BattlefieldObservation(0, boss=1)),
         _Driver(NoBattleTarget),
-    ).execute(_job(session), AbortToken(), PreemptionRequest())
+    ).execute(_job(session), AbortToken())
 
     assert report.stop_reason is CampaignStopReason.IN_PROGRESS
     assert report.session_state.battle_index == 0
@@ -701,7 +697,7 @@ def test_live_workflow_closes_terminal_program_results(
         programs,
         _Observer(BattlefieldObservation(0, enemy=1)),
         _Driver(NoBattleTarget),
-    ).execute(_job(session), AbortToken(), PreemptionRequest())
+    ).execute(_job(session), AbortToken())
 
     assert report.stop_reason is expected_reason
     assert report.session_state.status is expected_status
@@ -715,7 +711,6 @@ def test_live_workflow_observes_issues_confirms_and_reduces_one_battle() -> None
     report = _workflow(observer, driver).execute(
         _job(session),
         AbortToken(),
-        PreemptionRequest(),
     )
 
     assert report.stop_reason is CampaignStopReason.IN_PROGRESS
@@ -734,7 +729,7 @@ def test_live_workflow_reduces_no_target_without_faking_a_battle() -> None:
     observer = _Observer(BattlefieldObservation(battle_index=0, enemy=1, siren=1))
     driver = _Driver(NoBattleTarget)
 
-    report = _workflow(observer, driver).execute(_job(session), AbortToken(), PreemptionRequest())
+    report = _workflow(observer, driver).execute(_job(session), AbortToken())
 
     assert report.stop_reason is CampaignStopReason.IN_PROGRESS
     assert report.session_state.status is CampaignSessionStatus.ACTIVE
@@ -748,7 +743,7 @@ def test_live_workflow_reduces_confirmed_failure() -> None:
     observer = _Observer(BattlefieldObservation(battle_index=0, enemy=1))
     driver = _Driver(lambda attempt: BattleFailed(attempt, "combat confirmation failed"))
 
-    report = _workflow(observer, driver).execute(_job(session), AbortToken(), PreemptionRequest())
+    report = _workflow(observer, driver).execute(_job(session), AbortToken())
 
     assert report.stop_reason is CampaignStopReason.FAILED
     assert report.session_state.status is CampaignSessionStatus.FAILED
@@ -765,7 +760,7 @@ def test_live_workflow_finishes_runtime_at_the_report_boundary() -> None:
         services=CampaignLiveServices(lifecycle=lifecycle),
     )
 
-    report = workflow.execute(_job(session), AbortToken(), PreemptionRequest())
+    report = workflow.execute(_job(session), AbortToken())
 
     assert lifecycle.calls == [(session, report.session_state, report.stop_reason)]
 
@@ -795,46 +790,10 @@ def test_live_workflow_retains_program_checkpoint_through_the_same_lifecycle_bou
         services=CampaignLiveServices(programs=programs, lifecycle=lifecycle),
     )
 
-    report = workflow.execute(_job(session), AbortToken(), PreemptionRequest())
+    report = workflow.execute(_job(session), AbortToken())
 
     assert report.stop_reason is CampaignStopReason.PROGRAM_CONTINUE
     assert lifecycle.calls == [(session, report.session_state, CampaignStopReason.PROGRAM_CONTINUE)]
-
-
-def test_live_workflow_preempts_before_observation_at_original_safe_point() -> None:
-    session = _session()
-    observer = _Observer(BattlefieldObservation(battle_index=0, enemy=1))
-    driver = _Driver(lambda attempt: BattleSucceeded(attempt, BattleTarget.ENEMY))
-    preemption = PreemptionRequest()
-    preemption.request("higher priority task")
-
-    report = _workflow(observer, driver).execute(_job(session), AbortToken(), preemption)
-
-    assert report.stop_reason is CampaignStopReason.PREEMPTED
-    assert report.session_state == session.initial_state()
-    assert observer.calls == []
-    assert driver.calls == []
-
-
-def test_live_workflow_preempts_after_observation_without_persisting_pending() -> None:
-    session = _session()
-    preemption = PreemptionRequest()
-
-    def request_preemption() -> None:
-        preemption.request("higher priority task")
-
-    observer = _Observer(
-        BattlefieldObservation(battle_index=0, enemy=1),
-        request_preemption,
-    )
-    driver = _Driver(lambda attempt: BattleSucceeded(attempt, BattleTarget.ENEMY))
-
-    report = _workflow(observer, driver).execute(_job(session), AbortToken(), preemption)
-
-    assert report.stop_reason is CampaignStopReason.PREEMPTED
-    assert report.session_state == session.initial_state()
-    assert report.session_state.pending is None
-    assert driver.calls == []
 
 
 def test_live_workflow_checks_cancellation_before_intent_io() -> None:
@@ -859,10 +818,10 @@ def test_live_workflow_checks_cancellation_before_intent_io() -> None:
     )
 
     with pytest.raises(AbortRequested, match="stop before action"):
-        workflow.execute(_job(session), cancellation, PreemptionRequest())
+        workflow.execute(_job(session), cancellation)
 
     assert driver.calls == []
-    assert lifecycle.calls == [(session, session.initial_state(), CampaignStopReason.PREEMPTED)]
+    assert lifecycle.calls == [(session, session.initial_state(), CampaignStopReason.CANCELLED)]
 
 
 def test_live_workflow_marks_runtime_failed_when_execution_raises() -> None:
@@ -881,7 +840,7 @@ def test_live_workflow_marks_runtime_failed_when_execution_raises() -> None:
     )
 
     with pytest.raises(RuntimeError, match="observation failed"):
-        workflow.execute(_job(session), AbortToken(), PreemptionRequest())
+        workflow.execute(_job(session), AbortToken())
 
     assert lifecycle.calls == [(session, session.initial_state(), CampaignStopReason.FAILED)]
 
@@ -913,7 +872,7 @@ def test_live_workflow_preserves_execution_and_lifecycle_cleanup_failures() -> N
     )
 
     with pytest.raises(BaseExceptionGroup) as raised:
-        workflow.execute(_job(session), AbortToken(), PreemptionRequest())
+        workflow.execute(_job(session), AbortToken())
 
     assert raised.value.exceptions == (execution_error, cleanup_error)
     assert lifecycle.calls == [(session, session.initial_state(), CampaignStopReason.FAILED)]
@@ -955,7 +914,6 @@ def test_live_workflow_resumes_the_exact_progress_session() -> None:
     report = _workflow(observer, driver).execute(
         _job(second, task_id="event_a", sessions=(first, second), progress=progress),
         AbortToken(),
-        PreemptionRequest(),
     )
 
     assert observer.calls[0][0] == second
@@ -981,7 +939,7 @@ def test_live_workflow_reports_a_physically_unavailable_checkpoint_without_io() 
         services=CampaignLiveServices(activator=_UnavailableActivator()),
     )
 
-    report = workflow.execute(_job(session, progress=progress), AbortToken(), PreemptionRequest())
+    report = workflow.execute(_job(session, progress=progress), AbortToken())
 
     assert report.stop_reason is CampaignStopReason.CHECKPOINT_UNAVAILABLE
     assert report.session_state == progress.session_state
@@ -1170,7 +1128,7 @@ def test_live_workflow_stops_before_entry_without_observer_or_driver_io() -> Non
         services=CampaignLiveServices(guards=guards),
     )
 
-    report = workflow.execute(_job(session), AbortToken(), PreemptionRequest())
+    report = workflow.execute(_job(session), AbortToken())
 
     assert report.stop_reason is CampaignStopReason.OIL_LIMIT
     assert observer.calls == []
@@ -1215,7 +1173,6 @@ def test_gems_event_guard_switches_to_typed_fallback_without_entering_map() -> N
             GemsCommonCarrier.ANY,
             GemsVanguardChange.SHIP,
             GemsCommonDestroyer.ANY,
-            "DD: null",
         ),
     )
     observer = _Observer(BattlefieldObservation(battle_index=0, enemy=1))
@@ -1233,7 +1190,6 @@ def test_gems_event_guard_switches_to_typed_fallback_without_entering_map() -> N
     ).execute(
         job,
         AbortToken(),
-        PreemptionRequest(),
     )
 
     assert report.stop_reason is CampaignStopReason.GEMS_EVENT_FALLBACK
@@ -1255,7 +1211,6 @@ def test_gems_replacement_trigger_is_explicit_in_guard_decision() -> None:
             GemsCommonCarrier.ANY,
             GemsVanguardChange.SHIP,
             GemsCommonDestroyer.ANY,
-            "DD: null",
         ),
     )
     completed = _completed(primary)
@@ -1298,7 +1253,6 @@ def test_gems_workflow_replaces_fleet_and_checkpoints_completed_map(
             GemsCommonCarrier.ANY,
             GemsVanguardChange.SHIP,
             GemsCommonDestroyer.ANY,
-            "DD: null",
         ),
     )
     fleets = _GemsFleetExecutor(GemsFleetReplacementCompleted())
@@ -1312,7 +1266,7 @@ def test_gems_workflow_replaces_fleet_and_checkpoints_completed_map(
         ),
     )
 
-    report = workflow.execute(job, AbortToken(), PreemptionRequest())
+    report = workflow.execute(job, AbortToken())
 
     assert report.stop_reason is CampaignStopReason.IN_PROGRESS
     assert report.session_state.status is CampaignSessionStatus.COMPLETED
@@ -1331,7 +1285,6 @@ def test_gems_workflow_reports_real_replacement_failure() -> None:
             GemsCommonCarrier.ANY,
             GemsVanguardChange.DISABLED,
             GemsCommonDestroyer.ANY,
-            "DD: null",
         ),
     )
     fleets = _GemsFleetExecutor(GemsFleetReplacementFailed("no eligible carrier"))
@@ -1345,7 +1298,7 @@ def test_gems_workflow_reports_real_replacement_failure() -> None:
         ),
     )
 
-    report = workflow.execute(job, AbortToken(), PreemptionRequest())
+    report = workflow.execute(job, AbortToken())
 
     assert report.stop_reason is CampaignStopReason.GEMS_LEVEL_REPLACEMENT_FAILED
 
@@ -1362,7 +1315,6 @@ def test_gems_pre_entry_emotion_replacement_never_enters_the_map() -> None:
             GemsCommonCarrier.ANY,
             GemsVanguardChange.SHIP,
             GemsCommonDestroyer.ANY,
-            "DD: null",
         ),
     )
     observer = _Observer(BattlefieldObservation(0, enemy=1))
@@ -1380,7 +1332,7 @@ def test_gems_pre_entry_emotion_replacement_never_enters_the_map() -> None:
             ),
             gems_fleets=fleets,
         ),
-    ).execute(job, AbortToken(), PreemptionRequest())
+    ).execute(job, AbortToken())
 
     assert report.stop_reason is CampaignStopReason.GEMS_FLEET_REPLACED
     assert report.gems_replacement == GemsFleetReplacementRequest(
@@ -1416,7 +1368,6 @@ def test_pending_gems_replacement_is_consumed_before_any_map_io() -> None:
             GemsCommonCarrier.ANY,
             GemsVanguardChange.SHIP,
             GemsCommonDestroyer.ANY,
-            "DD: null",
         ),
     )
     observer = _Observer(BattlefieldObservation(0, enemy=1))
@@ -1429,7 +1380,7 @@ def test_pending_gems_replacement_is_consumed_before_any_map_io() -> None:
             guards=_GuardSource(),
             gems_fleets=fleets,
         ),
-    ).execute(job, AbortToken(), PreemptionRequest())
+    ).execute(job, AbortToken())
 
     assert report.stop_reason is CampaignStopReason.GEMS_FLEET_REPLACED
     assert report.gems_replacement == pending
@@ -1448,7 +1399,6 @@ def test_gems_low_emotion_interruption_resets_the_withdrawn_map() -> None:
             GemsCommonCarrier.ANY,
             GemsVanguardChange.SHIP,
             GemsCommonDestroyer.ANY,
-            "DD: null",
         ),
     )
     fleets = _GemsFleetExecutor(GemsFleetReplacementCompleted())
@@ -1457,7 +1407,7 @@ def test_gems_low_emotion_interruption_resets_the_withdrawn_map() -> None:
         _Driver(lambda attempt: BattleInterrupted(attempt, BattleInterruptionReason.GEMS_LOW_EMOTION)),
         _Clock(),
         services=CampaignLiveServices(guards=_GuardSource(), gems_fleets=fleets),
-    ).execute(job, AbortToken(), PreemptionRequest())
+    ).execute(job, AbortToken())
 
     assert report.stop_reason is CampaignStopReason.GEMS_FLEET_REPLACED
     assert report.session_state == primary.initial_state()
@@ -1481,7 +1431,6 @@ def test_gems_final_run_attempts_replacement_before_run_count_stop() -> None:
             GemsCommonCarrier.ANY,
             GemsVanguardChange.SHIP,
             GemsCommonDestroyer.ANY,
-            "DD: null",
         ),
     )
     fleets = _GemsFleetExecutor(GemsFleetReplacementFailed("no eligible carrier"))
@@ -1493,7 +1442,7 @@ def test_gems_final_run_attempts_replacement_before_run_count_stop() -> None:
             guards=_GuardSource(after=CampaignGuardEvidence(CampaignGuardPhase.POST_BATTLE, gems_level_limit=True)),
             gems_fleets=fleets,
         ),
-    ).execute(job, AbortToken(), PreemptionRequest())
+    ).execute(job, AbortToken())
 
     assert report.stop_reason is CampaignStopReason.RUN_COUNT_LIMIT
     assert report.runs_completed == 1
@@ -1516,7 +1465,6 @@ def test_hard_gems_preparation_failure_becomes_a_persistable_request() -> None:
             GemsCommonCarrier.ANY,
             GemsVanguardChange.SHIP,
             GemsCommonDestroyer.ANY,
-            "DD: null",
         ),
     )
     report = LiveCampaignWorkflow(
@@ -1526,7 +1474,7 @@ def test_hard_gems_preparation_failure_becomes_a_persistable_request() -> None:
         services=CampaignLiveServices(
             activator=_GemsFailureActivator(CampaignGemsReplacementFailed(request, "no hard fleet candidate"))
         ),
-    ).execute(job, AbortToken(), PreemptionRequest())
+    ).execute(job, AbortToken())
 
     assert report.stop_reason is CampaignStopReason.GEMS_HARD_PREPARATION_FAILED
     assert report.gems_replacement == request

@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from module.bootstrap import GameTaskDependencies, build_game_task_registry
-from module.content import ActivityCatalog
+from module.bootstrap.task_factories import GameTaskDependencies, build_game_task_registry
+from module.content.activity_catalog import ActivityCatalog
 from module.content.manifest import load_event_manifests
 from module.gameplay.activity_factories import ActivityFactoryDependencies, ActivityWorkflows
 from module.gameplay.campaign_factories import CampaignFactoryDependencies
@@ -181,7 +181,6 @@ def test_game_registry_has_exactly_one_factory_for_every_catalog_task() -> None:
     registry = build_game_task_registry(
         _dependencies(),
         content_revision="content:current",
-        client_ui_revision="ui:current",
     )
 
     assert registry.task_ids == tuple(TASK_CATALOG)

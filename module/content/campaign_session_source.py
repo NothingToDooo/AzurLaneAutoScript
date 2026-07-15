@@ -1,12 +1,10 @@
-from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from secrets import choice
-from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from module.content.campaign_session import CampaignRunVariant, CampaignSession
 from module.content.catalog import ContentCatalog
-from module.content.errors import ContentValidationError, UnknownStageError
+from module.content.errors import ContentValidationError
 from module.content.models import StageRef, StageSpec
 from module.content.stage_definition import CampaignStageDefinition
 from module.content.stage_loader import StageSpecLoader
@@ -75,18 +73,22 @@ class CampaignStageSelection:
         )
 
 
-@dataclass(frozen=True, slots=True, init=False)
 class CompiledCampaignSessionSource:
+    """按需编译关卡，并在当前进程内复用 definition 与 session。"""
+
+    __slots__ = ("_catalog", "_definitions", "_loader", "_loop_choice", "_sessions")
+
     _catalog: ContentCatalog
+    _loader: StageSpecLoader
     _loop_choice: Callable[[tuple[str, ...]], str]
-    _sessions: Mapping[CampaignSessionKey, CampaignSession]
+    _definitions: dict[StageRef, CampaignStageDefinition]
+    _sessions: dict[CampaignSessionKey, CampaignSession]
 
     def __init__(
         self,
         catalog: ContentCatalog,
         loader: StageSpecLoader,
         *,
-        stage_refs: Iterable[StageRef] | None = None,
         loop_choice: Callable[[tuple[str, ...]], str] = choice,
     ) -> None:
         if not isinstance(catalog, ContentCatalog):
@@ -99,44 +101,30 @@ class CompiledCampaignSessionSource:
             message = "loop_choice must be callable"
             raise TypeError(message)
 
-        specs = catalog.stages if stage_refs is None else self._select_specs(catalog, stage_refs)
-        sessions: dict[CampaignSessionKey, CampaignSession] = {}
-        for spec in specs:
-            definition = loader.load(spec)
-            self._validate_definition(spec, definition)
-            for variant in CampaignRunVariant:
-                key = (spec.ref, variant)
-                if key in sessions:
-                    message = (
-                        f"duplicate compiled campaign session: {spec.ref.pack_id}/{spec.ref.stage_id} [{variant.value}]"
-                    )
-                    raise ContentValidationError(message)
-                sessions[key] = CampaignSession(definition, variant)
-        object.__setattr__(self, "_catalog", catalog)
-        object.__setattr__(self, "_loop_choice", loop_choice)
-        object.__setattr__(self, "_sessions", MappingProxyType(sessions))
+        self._catalog = catalog
+        self._loader = loader
+        self._loop_choice = loop_choice
+        self._definitions = {}
+        self._sessions = {}
 
     @property
     def session_count(self) -> int:
         return len(self._sessions)
 
-    @staticmethod
-    def _select_specs(catalog: ContentCatalog, stage_refs: Iterable[StageRef]) -> tuple[StageSpec, ...]:
-        if not isinstance(stage_refs, Iterable):
-            message = "stage_refs must be iterable"
-            raise TypeError(message)
-        refs = tuple(stage_refs)
-        if any(not isinstance(ref, StageRef) for ref in refs):
-            message = "stage_refs must contain StageRef instances"
-            raise TypeError(message)
-        if len(set(refs)) != len(refs):
-            message = "stage_refs must not contain duplicates"
-            raise ContentValidationError(message)
-        specs = tuple(catalog.resolve_stage(ref) for ref in refs)
-        if len({spec.ref for spec in specs}) != len(specs):
-            message = "stage_refs must not resolve to duplicate canonical stages"
-            raise ContentValidationError(message)
-        return specs
+    def validate_all(self) -> None:
+        """显式编译全部关卡；生产运行不调用此入口。"""
+
+        for spec in self._catalog.stages:
+            self._definition(spec)
+
+    def _definition(self, spec: StageSpec) -> CampaignStageDefinition:
+        cached = self._definitions.get(spec.ref)
+        if cached is not None:
+            return cached
+        definition = self._loader.load(spec)
+        self._validate_definition(spec, definition)
+        self._definitions[spec.ref] = definition
+        return definition
 
     @staticmethod
     def _validate_definition(spec: StageSpec, definition: CampaignStageDefinition) -> None:
@@ -160,12 +148,14 @@ class CompiledCampaignSessionSource:
         if not isinstance(variant, CampaignRunVariant):
             message = "variant must be a CampaignRunVariant"
             raise TypeError(message)
-        canonical_ref = self._catalog.resolve_stage(ref).ref
-        try:
-            return self._sessions[(canonical_ref, variant)]
-        except KeyError:
-            message = f"campaign session was not compiled: {ref.pack_id}/{ref.stage_id} [{variant.value}]"
-            raise UnknownStageError(message) from None
+        spec = self._catalog.resolve_stage(ref)
+        key = (spec.ref, variant)
+        cached = self._sessions.get(key)
+        if cached is not None:
+            return cached
+        session = CampaignSession(self._definition(spec), variant)
+        self._sessions[key] = session
+        return session
 
     def resolve_hard_stage_ref(self, stage_id: str) -> StageRef:
         """困难图有显式内容定义时使用 override，否则使用同名主线图。"""

@@ -4,12 +4,11 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from module.gameplay import (
+from module.gameplay.facility import (
     CommissionReport,
     CommissionSettings,
     CommissionTask,
     CommissionWorkflow,
-    FacilityWorkflows,
     ResearchReport,
     ResearchSettings,
     ResearchTask,
@@ -18,8 +17,8 @@ from module.gameplay import (
     TacticalSettings,
     TacticalTask,
     TacticalWorkflow,
-    build_facility_factories,
 )
+from module.gameplay.facility_factories import FacilityWorkflows, build_facility_factories
 from module.runtime import FrozenJsonValue, SettingsDocumentError, TaskBuildContext, TaskStateDocument
 from module.task_registry import TASK_CATALOG
 

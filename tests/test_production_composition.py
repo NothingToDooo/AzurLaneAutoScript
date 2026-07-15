@@ -5,24 +5,37 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import pytest
+import yaml
+from config_factory import in_memory_config
 
-from module.application import AbortRequested, AbortToken
-from module.bootstrap import (
-    GameRuntimeBundle,
-    InstanceProcessHost,
+import module.bootstrap.production as production_module
+import module.config.config as config_module
+import module.state.config_repository as state_repository_module
+from module.application import AbortRequested, AbortToken, ExecutionMode, RunMetadata, Succeeded, TaskId, TaskResult
+from module.application.state_effects import UpsertTaskState
+from module.bootstrap.assembly_source import ConfigurationLoadError, GameRuntimeBundle, JsonConfigurationDocumentSource
+from module.bootstrap.configuration_compiler import ConfigurationCompileError, WebConfigurationCompiler
+from module.bootstrap.production import (
     Mumu12GameRuntimeBundleSource,
+    PersonalRuntimeConfig,
     SystemLoopClock,
-    WebConfigurationCompiler,
-    build_default_instance_process_host,
-    build_game_task_registry,
+    ensure_personal_configuration,
+    validate_personal_configuration,
 )
+from module.bootstrap.task_factories import build_game_task_registry
 from module.device.device import Device
-from module.runtime import ConfigurationPublisher, TaskSettingsDocument
-from module.state import SettingsSnapshot, SQLiteStateStore
+from module.equipment.equipment_code import EquipmentCodeHandler
+from module.runtime.settings import TaskSettingsDocument
+from module.state.config_repository import ConfigStateError, ConfigStateRepository
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from module.config.config import AzurLaneConfig
-    from module.content import CampaignRunVariant, CampaignSession, CampaignStageSelection, StageRef
+    from module.config.config_generated import ConfigValue
+    from module.content.campaign_session import CampaignRunVariant, CampaignSession
+    from module.content.campaign_session_source import CampaignStageSelection
+    from module.content.models import StageRef
 
 
 class _Sessions:
@@ -58,12 +71,6 @@ class _Revision:
         return self.value
 
 
-class _Clock:
-    @staticmethod
-    def now() -> datetime:
-        return datetime(2026, 7, 13, tzinfo=UTC)
-
-
 def _template() -> dict[str, object]:
     return cast(
         "dict[str, object]",
@@ -71,49 +78,83 @@ def _template() -> dict[str, object]:
     )
 
 
-def _template_with_resolvable_campaign_placeholders() -> dict[str, object]:
-    document = _template()
-    for task_name in ("Event2", "EventSp"):
-        task = cast("dict[str, object]", document[task_name])
-        campaign = cast("dict[str, object]", task["Campaign"])
-        campaign["Event"] = "campaign_main"
-        campaign["Name"] = "1-1"
-    for task_name in ("EventA", "EventB", "EventC", "EventD"):
-        task = cast("dict[str, object]", document[task_name])
-        campaign = cast("dict[str, object]", task["Campaign"])
-        campaign["Event"] = "campaign_main"
-        daily = cast("dict[str, object]", task["EventDaily"])
-        daily["StageFilter"] = "1-1"
-    archive = cast("dict[str, object]", document["WarArchives"])
-    archive_campaign = cast("dict[str, object]", archive["Campaign"])
-    archive_campaign["Name"] = "t3"
-    return document
+def _runtime_repository(path: Path, document: dict[str, object]) -> ConfigStateRepository:
+    return ConfigStateRepository(
+        SystemLoopClock(),
+        config_path=path,
+        initial_document=document,
+        initial_runtime_document=WebConfigurationCompiler().parse_runtime_document(document),
+    )
 
 
-def test_bundle_source_builds_every_domain_from_one_bound_snapshot_and_device() -> None:
-    document = _template()
-    compiled = WebConfigurationCompiler().compile(document)
+def _personal_config_factory(
+    document: dict[str, object],
+) -> tuple[Callable[[ConfigStateRepository], AzurLaneConfig], list[AzurLaneConfig]]:
     created: list[AzurLaneConfig] = []
 
-    def device_factory(config: AzurLaneConfig) -> Device:
+    def load(_repository: ConfigStateRepository) -> AzurLaneConfig:
+        config = in_memory_config("alas", document)
         created.append(config)
-        return object.__new__(Device)
+        return config
 
-    source = Mumu12GameRuntimeBundleSource(
+    return load, created
+
+
+def _test_device(config: AzurLaneConfig) -> Device:
+    device = object.__new__(Device)
+    device.config = config
+    return device
+
+
+def test_equipment_codes_accumulate_through_one_owner_in_the_same_process(tmp_path: Path) -> None:
+    document = _template()
+    path = tmp_path / "alas.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    config = PersonalRuntimeConfig(_runtime_repository(path, document))
+    config.init_task("GemsFarming")
+    handler = object.__new__(EquipmentCodeHandler)
+    handler.config = config
+
+    handler.set_code("DD", "code-dd")
+    handler.set_code("CV", "code-cv")
+
+    live_codes = yaml.safe_load(config.EquipmentCode_Config)
+    stored = cast("dict[str, object]", json.loads(path.read_text(encoding="utf-8")))
+    gems = cast("dict[str, object]", stored["GemsFarming"])
+    equipment = cast("dict[str, object]", gems["EquipmentCode"])
+    stored_codes = yaml.safe_load(cast("str", equipment["Config"]))
+    assert live_codes["DD"] == "code-dd"
+    assert live_codes["CV"] == "code-cv"
+    assert stored_codes == live_codes
+
+
+def _source(
+    *,
+    config_factory: Callable[[ConfigStateRepository], AzurLaneConfig],
+    device_factory: Callable[[AzurLaneConfig], Device] = _test_device,
+) -> Mumu12GameRuntimeBundleSource:
+    return Mumu12GameRuntimeBundleSource(
         Path(),
+        config_factory=config_factory,
         device_factory=device_factory,
         sessions_factory=lambda _root, _catalog, _profiles: _Sessions(),
         content_revision=_Revision("content-test"),
-        client_ui_revision=_Revision("client-test"),
     )
 
-    bundle = source.build("snapshot-test", document, compiled)
+
+def test_bundle_source_builds_every_domain_from_personal_configuration() -> None:
+    document = _template()
+    config_factory, configs = _personal_config_factory(document)
+
+    compiled, bundle, _repository = _source(config_factory=config_factory).build(
+        document,
+        clock=SystemLoopClock(),
+    )
 
     assert isinstance(bundle, GameRuntimeBundle)
     assert bundle.content_revision == "content-test"
-    assert bundle.client_ui_revision == "client-test"
-    assert created[0].config_name == "snapshot-test"
-    assert created[0].Emulator_Serial == compiled.device_serial
+    assert configs[0].config_name == "alas"
+    assert configs[0].Emulator_Serial == compiled.device_serial
     assert {field.name for field in fields(bundle.tasks)} == {
         "maintenance",
         "facility",
@@ -126,108 +167,55 @@ def test_bundle_source_builds_every_domain_from_one_bound_snapshot_and_device() 
     }
 
 
-def test_activity_profile_validation_precedes_device_construction(monkeypatch: pytest.MonkeyPatch) -> None:
-    document = _template()
-    compiled = WebConfigurationCompiler().compile(document)
-    created: list[AzurLaneConfig] = []
-
-    def reject_profiles(_catalog: object) -> None:
-        message = "invalid activity profile"
-        raise ValueError(message)
-
-    monkeypatch.setattr(
-        "module.bootstrap.production.validate_mumu12_activity_profiles",
-        reject_profiles,
-    )
-    source = Mumu12GameRuntimeBundleSource(
-        Path(),
-        device_factory=lambda config: created.append(config) or object.__new__(Device),
-        content_revision=_Revision("content-test"),
-        client_ui_revision=_Revision("client-test"),
-    )
-
-    with pytest.raises(ValueError, match="invalid activity profile"):
-        source.build("snapshot-test", document, compiled)
-
-    assert created == []
-
-
-def test_war_archives_profile_validation_precedes_device_construction(
+@pytest.mark.parametrize(
+    ("validator_name", "message"),
+    [
+        ("validate_mumu12_activity_profiles", "invalid activity profile"),
+        ("validate_mumu12_war_archives_profiles", "invalid war archives profile"),
+        ("validate_mumu12_campaign_runtime_profiles", "invalid campaign profile"),
+    ],
+)
+def test_content_validation_precedes_device_construction(
     monkeypatch: pytest.MonkeyPatch,
+    validator_name: str,
+    message: str,
 ) -> None:
     document = _template()
-    compiled = WebConfigurationCompiler().compile(document)
+    config_factory, _configs = _personal_config_factory(document)
     created: list[AzurLaneConfig] = []
 
-    def reject_profiles(_catalog: object) -> None:
-        message = "invalid war archives profile"
+    def reject_profiles(*_args: object) -> None:
         raise ValueError(message)
 
-    monkeypatch.setattr(
-        "module.bootstrap.production.validate_mumu12_war_archives_profiles",
-        reject_profiles,
-    )
-    source = Mumu12GameRuntimeBundleSource(
-        Path(),
-        device_factory=lambda config: created.append(config) or object.__new__(Device),
-        content_revision=_Revision("content-test"),
-        client_ui_revision=_Revision("client-test"),
-    )
+    monkeypatch.setattr(production_module, validator_name, reject_profiles)
 
-    with pytest.raises(ValueError, match="invalid war archives profile"):
-        source.build("snapshot-test", document, compiled)
+    with pytest.raises(ValueError, match=message):
+        _source(
+            config_factory=config_factory,
+            device_factory=lambda config: created.append(config) or _test_device(config),
+        ).build(document, clock=SystemLoopClock())
 
     assert created == []
 
 
-def test_campaign_profile_validation_precedes_device_construction(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_complete_configuration_builds_all_57_tasks() -> None:
     document = _template()
-    compiled = WebConfigurationCompiler().compile(document)
-    created: list[AzurLaneConfig] = []
-
-    def reject_profiles(_stages: object, _profiles: object) -> None:
-        message = "invalid campaign profile"
-        raise ValueError(message)
-
-    monkeypatch.setattr(
-        "module.bootstrap.production.validate_mumu12_campaign_runtime_profiles",
-        reject_profiles,
-    )
+    config_factory, _configs = _personal_config_factory(document)
     source = Mumu12GameRuntimeBundleSource(
         Path(),
-        device_factory=lambda config: created.append(config) or object.__new__(Device),
+        config_factory=config_factory,
+        device_factory=_test_device,
         content_revision=_Revision("content-test"),
-        client_ui_revision=_Revision("client-test"),
     )
-
-    with pytest.raises(ValueError, match="invalid campaign profile"):
-        source.build("snapshot-test", document, compiled)
-
-    assert created == []
-
-
-def test_complete_resolvable_configuration_builds_all_real_tasks_against_one_content_snapshot() -> None:
-    document = _template_with_resolvable_campaign_placeholders()
-    compiled = WebConfigurationCompiler().compile(document)
-    source = Mumu12GameRuntimeBundleSource(
-        Path(),
-        device_factory=lambda _config: object.__new__(Device),
-        content_revision=_Revision("content-test"),
-        client_ui_revision=_Revision("client-test"),
-    )
-
-    bundle = source.build("snapshot-test", document, compiled)
+    compiled, bundle, _repository = source.build(document, clock=SystemLoopClock())
     registry = build_game_task_registry(
         bundle.tasks,
         content_revision=bundle.content_revision,
-        client_ui_revision=bundle.client_ui_revision,
     )
-    settings = TaskSettingsDocument.from_snapshot(
-        SettingsSnapshot(
-            revision=1,
-            payload=compiled.payload,
-            updated_at=datetime(2026, 7, 13, tzinfo=UTC),
-        ),
+    settings = TaskSettingsDocument.from_payload(
+        compiled.payload,
+        revision=1,
+        updated_at=datetime(2026, 7, 13, tzinfo=UTC),
         task_ids=registry.task_ids,
     )
 
@@ -235,32 +223,197 @@ def test_complete_resolvable_configuration_builds_all_real_tasks_against_one_con
     assert len(registry.task_ids) == 57
 
 
-def test_default_template_can_be_published_with_disabled_placeholder_campaigns(tmp_path: Path) -> None:
+def test_personal_configuration_validation_reuses_task_factory_contracts_without_connecting_device(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     document = _template()
-    compiled = WebConfigurationCompiler().compile(document)
-    source = Mumu12GameRuntimeBundleSource(
-        Path(),
-        device_factory=lambda _config: object.__new__(Device),
-        content_revision=_Revision("content-test"),
-        client_ui_revision=_Revision("client-test"),
-    )
-    bundle = source.build("snapshot-test", document, compiled)
-    registry = build_game_task_registry(
-        bundle.tasks,
-        content_revision=bundle.content_revision,
-        client_ui_revision=bundle.client_ui_revision,
+    tactical = cast("dict[str, object]", document["Tactical"])
+    student = cast("dict[str, object]", tactical["AddNewStudent"])
+    student["MinLevel"] = 0
+
+    def reject_device_init(_self: Device, _config: AzurLaneConfig) -> None:
+        message = "configuration validation must not initialize a device"
+        raise AssertionError(message)
+
+    monkeypatch.setattr(Device, "__init__", reject_device_init)
+    monkeypatch.setattr(
+        production_module,
+        "atomic_write",
+        lambda *_args, **_kwargs: pytest.fail("configuration validation must not write files"),
     )
 
-    with SQLiteStateStore(tmp_path / "state.sqlite3") as store:
-        published = ConfigurationPublisher(store=store, factories=registry, clock=_Clock()).publish(
-            compiled.payload,
-            compiled.schedules,
-            source_revision=compiled.source_revision,
-            expected_revision=0,
+    with pytest.raises(ConfigurationCompileError, match=r"tasks\.tactical\.student\.minimum_level must be at least 1"):
+        validate_personal_configuration(document, project_root=Path())
+
+
+def test_personal_configuration_validation_wraps_unknown_content_reference() -> None:
+    document = _template()
+    event = cast("dict[str, object]", document["Event"])
+    campaign = cast("dict[str, object]", event["Campaign"])
+    campaign["Name"] = "missing-stage"
+
+    with pytest.raises(ConfigurationCompileError, match=r"compiled task settings are invalid:.*missing-stage"):
+        validate_personal_configuration(document, project_root=Path())
+
+
+def test_json_configuration_source_reads_only_its_bound_path(tmp_path: Path) -> None:
+    path = tmp_path / "alas.json"
+    path.write_text('{"version": 1}', encoding="utf-8")
+    source = JsonConfigurationDocumentSource(path)
+
+    assert source.load() == {"version": 1}
+
+    path.write_text('{"version": 1, "version": 2}', encoding="utf-8")
+    with pytest.raises(ConfigurationLoadError, match="duplicate configuration field: version"):
+        source.load()
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_json_configuration_source_rejects_non_finite_numbers(
+    constant: str,
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "alas.json"
+    path.write_text(f'{{"value": {constant}}}', encoding="utf-8")
+    source = JsonConfigurationDocumentSource(path)
+
+    with pytest.raises(ConfigurationLoadError, match="non-finite JSON number"):
+        source.load()
+
+
+def test_personal_runtime_config_reads_only_its_bound_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "alas.json"
+    original = Path("config/template.json").read_bytes()
+    path.write_bytes(original)
+    document = _template()
+
+    def reject_read(*_args: object, **_kwargs: object) -> None:
+        message = "generic config reader must not run"
+        raise AssertionError(message)
+
+    monkeypatch.setattr(config_module, "read_config_file", reject_read)
+
+    config = PersonalRuntimeConfig(_runtime_repository(path, document))
+
+    assert config.Emulator_Serial == "127.0.0.1:16384"
+    assert path.read_bytes() == original
+
+
+def test_personal_runtime_config_rejects_invalid_option_without_rewriting(tmp_path: Path) -> None:
+    document = _template()
+    path = tmp_path / "alas.json"
+    path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+    original = path.read_bytes()
+    config = PersonalRuntimeConfig(_runtime_repository(path, document))
+    config.modified["Research.Research.UseCube"] = "removed-option"
+
+    with pytest.raises(ConfigStateError, match=r"Research\.Research\.UseCube must be one of"):
+        config.save()
+
+    assert path.read_bytes() == original
+
+
+def test_personal_runtime_config_saves_datetime_with_current_json_format(tmp_path: Path) -> None:
+    path = tmp_path / "alas.json"
+    path.write_bytes(Path("config/template.json").read_bytes())
+    document = _template()
+    config = PersonalRuntimeConfig(_runtime_repository(path, document))
+    next_run = datetime(2026, 7, 16, 9, 30, 45)
+    config.modified["Restart.Scheduler.NextRun"] = next_run
+
+    assert config.save() is True
+
+    stored = cast("dict[str, object]", json.loads(path.read_text(encoding="utf-8")))
+    restart = cast("dict[str, object]", stored["Restart"])
+    scheduler = cast("dict[str, object]", restart["Scheduler"])
+    assert scheduler["NextRun"] == "2026-07-16 09:30:45"
+
+
+def test_personal_runtime_config_refreshes_shared_owner_before_binding_next_task(tmp_path: Path) -> None:
+    path = tmp_path / "alas.json"
+    path.write_bytes(Path("config/template.json").read_bytes())
+    document = _template()
+    repository = _runtime_repository(path, document)
+    config = PersonalRuntimeConfig(repository)
+
+    repository.apply_runtime_updates({"Research.Scheduler.Enable": False})
+    config.bind("Research")
+
+    assert config.Scheduler_Enable is False
+
+
+def test_personal_runtime_config_save_preserves_state_committed_after_its_last_snapshot(tmp_path: Path) -> None:
+    path = tmp_path / "alas.json"
+    path.write_bytes(Path("config/template.json").read_bytes())
+    document = _template()
+    repository = _runtime_repository(path, document)
+    config = PersonalRuntimeConfig(repository)
+
+    repository.begin_run(
+        TaskId("main"),
+        ExecutionMode.SCHEDULED_JOB,
+        RunMetadata(settings_revision=1, content_revision="content-test"),
+    )
+    repository.finalize_run(
+        TaskResult(
+            outcome=Succeeded(),
+            state_effects=(UpsertTaskState("main", "progress", 1, {"wave": 3}),),
         )
+    )
+    config.modified["Research.Research.UseCube"] = "always_use"
+    assert config.save() is True
 
-    assert published.revision == 1
-    assert len(registry.task_ids) == 57
+    stored = cast("dict[str, object]", json.loads(path.read_text(encoding="utf-8")))
+    main = cast("dict[str, object]", stored["Main"])
+    storage_group = cast("dict[str, object]", main["Storage"])
+    storage = cast("dict[str, object]", storage_group["Storage"])
+    research = cast("dict[str, object]", stored["Research"])
+    research_settings = cast("dict[str, object]", research["Research"])
+    assert cast("dict[str, object]", storage["progress"])["payload"] == {"wave": 3}
+    assert research_settings["UseCube"] == "always_use"
+
+
+def test_personal_runtime_config_rejects_unknown_object_without_rewriting(tmp_path: Path) -> None:
+    path = tmp_path / "alas.json"
+    path.write_bytes(Path("config/template.json").read_bytes())
+    original = path.read_bytes()
+    document = _template()
+    config = PersonalRuntimeConfig(_runtime_repository(path, document))
+    invalid_value = cast("ConfigValue", object())
+    config.modified["Restart.Scheduler.NextRun"] = invalid_value
+
+    with pytest.raises(ConfigStateError, match="cannot be persisted as JSON"):
+        config.save()
+
+    assert path.read_bytes() == original
+    assert config.modified == {"Restart.Scheduler.NextRun": invalid_value}
+
+
+def test_multi_set_restores_auto_update_after_shared_owner_write_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "alas.json"
+    path.write_bytes(Path("config/template.json").read_bytes())
+    document = _template()
+    config = PersonalRuntimeConfig(_runtime_repository(path, document))
+    config.bind("Main")
+
+    def fail_write(_target: Path, _content: str) -> None:
+        message = "disk full"
+        raise OSError(message)
+
+    monkeypatch.setattr(state_repository_module, "atomic_write", fail_write)
+
+    with pytest.raises(OSError, match="disk full"):
+        config.set_record(Emotion_Fleet1Value=100)
+
+    assert config.auto_update is True
+    assert config.modified["Main.Emotion.Fleet1Value"] == 100
+    assert isinstance(config.modified["Main.Emotion.Fleet1Record"], datetime)
 
 
 def test_system_loop_clock_wait_is_cancellation_aware() -> None:
@@ -271,13 +424,16 @@ def test_system_loop_clock_wait_is_cancellation_aware() -> None:
         SystemLoopClock.sleep(30, abort)
 
 
-def test_default_process_host_can_be_constructed_without_opening_a_device(tmp_path: Path) -> None:
+def test_personal_configuration_is_created_once_from_template(tmp_path: Path) -> None:
     (tmp_path / "config").mkdir()
-    (tmp_path / "config" / "template.json").write_text("{}", encoding="utf-8")
     (tmp_path / "content" / "events").mkdir(parents=True)
     (tmp_path / "module").mkdir()
+    template = tmp_path / "config" / "template.json"
+    template.write_text('{"version": 1}', encoding="utf-8")
 
-    with build_default_instance_process_host(tmp_path) as host:
-        assert isinstance(host, InstanceProcessHost)
+    path = ensure_personal_configuration(tmp_path)
+    template.write_text('{"version": 2}', encoding="utf-8")
+    same_path = ensure_personal_configuration(tmp_path)
 
-    assert (tmp_path / ".alas-runtime" / "notification-spool.sqlite3").is_file()
+    assert same_path == path
+    assert path.read_text(encoding="utf-8") == '{"version": 1}'

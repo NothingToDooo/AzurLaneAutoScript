@@ -53,13 +53,7 @@ class _Device:
 
 
 class _Config:
-    def __init__(self) -> None:
-        self.task_switched_results: list[bool] = []
-
-    def task_switched(self) -> bool:
-        if self.task_switched_results:
-            return self.task_switched_results.pop(0)
-        return False
+    pass
 
 
 class _AutoSearchMap(OSMap):
@@ -124,9 +118,6 @@ class _AutoSearchMap(OSMap):
     def on_auto_search_battle_count_add(self) -> None:
         self.calls.append(("on_auto_search_battle_count_add",))
 
-    def interrupt_auto_search(self) -> None:
-        self.calls.append(("interrupt_auto_search",))
-
     def auto_search_combat(self) -> bool:
         self.calls.append(("auto_search_combat",))
         return self._next_result(self.auto_search_combat_results, default=False)
@@ -182,19 +173,6 @@ def test_os_auto_search_daemon_disables_search_after_fleet_needs_repair() -> Non
     assert result == 0
     assert ("handle_os_auto_search_map_option", True) in runner.calls
     assert ("handle_os_auto_search_map_option", False) in runner.calls
-
-
-def test_os_auto_search_daemon_interrupts_when_strategic_task_switched() -> None:
-    runner = _AutoSearchMap()
-    runner.appear_results[button_key(map_module.AUTO_SEARCH_OS_MAP_OPTION_OFF)] = [True]
-    runner.combat_appear_results = [True]
-    runner.auto_search_combat_results = [True]
-    runner.config.task_switched_results = [True]
-
-    result = runner.os_auto_search_daemon(strategic=True)
-
-    assert result == 1
-    assert runner.calls.index(("interrupt_auto_search",)) < runner.calls.index(("auto_search_combat",))
 
 
 def test_os_auto_search_daemon_marks_ash_popup_after_retirement_interrupt() -> None:

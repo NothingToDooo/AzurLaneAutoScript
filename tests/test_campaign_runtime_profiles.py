@@ -14,7 +14,6 @@ from module.content.runtime_profile import (
     CampaignRuntimeExtensionId,
     CampaignRuntimeProfile,
     CampaignRuntimeProfileId,
-    RuntimeCapabilityKind,
     RuntimeExecutorBinding,
     RuntimeExecutorKind,
     RuntimeImplementationId,
@@ -43,7 +42,6 @@ def _binding(
 def test_executor_binding_is_typed_and_deeply_immutable() -> None:
     binding = _binding(RuntimeExecutorKind.MAP_GRID_RECOGNITION)
 
-    assert binding.kind.capability is RuntimeCapabilityKind.GRID_RECOGNITION
     assert binding.options["cells"] == ("A1", "B2")
     mutable_options = cast("dict[str, object]", binding.options)
     with pytest.raises(TypeError):
@@ -99,6 +97,21 @@ def test_catalog_rejects_unknown_executor_kind(tmp_path: Path) -> None:
         compile_campaign_runtime_profile_registry(path)
 
 
+@pytest.mark.parametrize(
+    ("content", "message"),
+    [
+        ('{"schema_version": 1, "schema_version": 1}', "duplicate JSON key: schema_version"),
+        ('{"schema_version": NaN}', "non-finite JSON number: NaN"),
+    ],
+)
+def test_catalog_uses_strict_json_decoding(content: str, message: str, tmp_path: Path) -> None:
+    path = tmp_path / "profiles.json"
+    path.write_text(content, encoding="utf-8")
+
+    with pytest.raises(ContentValidationError, match=message):
+        compile_campaign_runtime_profile_registry(path)
+
+
 def test_checked_in_registry_is_exactly_owned_by_manifest_stages() -> None:
     registry = load_default_campaign_runtime_profile_registry()
     stages = tuple(stage for pack in load_event_manifests(ROOT / "content" / "events") for stage in pack.stages)
@@ -128,7 +141,6 @@ def test_compiled_session_carries_the_resolved_runtime_profile() -> None:
     source = CompiledCampaignSessionSource(
         catalog,
         StageSpecLoader(),
-        stage_refs=(spec.ref,),
     )
 
     session = source.resolve(spec.ref, CampaignRunVariant.NORMAL)

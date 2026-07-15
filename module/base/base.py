@@ -1,7 +1,3 @@
-import threading
-import time
-from concurrent.futures import ThreadPoolExecutor
-from importlib import import_module
 from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
 import cv2
@@ -13,17 +9,16 @@ from module.base.decorator import cached_property
 from module.base.timer import Timer
 from module.base.utils import area_offset, color_similarity_2d, crop, get_color, image_size, load_image
 from module.combat.emotion import Emotion
-from module.config.config import AzurLaneConfig
-from module.device.device import Device
 from module.logger import logger
 from module.map_detection.utils import fit_points
-from module.webui.setting import cached_class_property
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from module.base.button import MatchOffset
     from module.base.type_alias import Area, Color, ImageArray
+    from module.config.config import AzurLaneConfig
+    from module.device.device import Device
 
 
 @runtime_checkable
@@ -41,72 +36,19 @@ class ModuleBase:
     config: AzurLaneConfig
     device: Device
 
-    EARLY_OCR_IMPORT = False
-
     def __init__(
         self,
-        config: AzurLaneConfig | str,
-        device: Device | str | None = None,
-        task: str | None = None,
+        config: AzurLaneConfig,
+        device: Device,
     ) -> None:
-        """config 可传配置对象或配置名；device 可复用对象、按序列号新建，或省略后新建。
-
-        task 仅供开发时绑定；未指定时使用默认配置。
-        """
-        if isinstance(config, str):
-            self.config = AzurLaneConfig(config, task=task)
-        else:
-            self.config = config
-            if task is not None:
-                self.config.init_task(task)
-
-        if device is None:
-            self.device = Device(config=self.config)
-        elif isinstance(device, str):
-            self.config.override(Emulator_Serial=device)
-            self.device = Device(config=self.config)
-        else:
-            self.device = device
+        self.config = config
+        self.device = device
 
         self.interval_timer: dict[str, Timer] = {}
-        self.early_ocr_import()
 
     @cached_property
     def emotion(self) -> Emotion:
         return Emotion(config=self.config)
-
-    def early_ocr_import(self) -> None:
-        """截图是 I/O 密集，OCR 导入是 CPU 密集；后台导入可缩短启动等待。"""
-        if ModuleBase.EARLY_OCR_IMPORT:
-            return
-        if not self.config.is_actual_task:
-            logger.info("No actual task bound, skip early_ocr_import")
-            return
-        if self.config.task.command in ["Daemon", "OpsiDaemon"]:
-            logger.info("No ocr in daemon task, skip early_ocr_import")
-            return
-
-        def do_ocr_import() -> None:
-            while 1:
-                if self.device.has_cached_image:
-                    break
-                time.sleep(0.01)
-
-            logger.info("early_ocr_import start")
-            al_ocr_class = import_module("module.ocr.al_ocr").AlOcr
-            _ = al_ocr_class
-            logger.info("early_ocr_import finish")
-
-        logger.info("early_ocr_import call")
-        thread = threading.Thread(target=do_ocr_import, daemon=True)
-        thread.start()
-        ModuleBase.EARLY_OCR_IMPORT = True
-
-    @cached_class_property
-    def worker(cls) -> ThreadPoolExecutor:
-        """共享单线程后台池，提交的任务不得阻塞主流程。"""
-        logger.hr("Creating worker")
-        return ThreadPoolExecutor(1)
 
     def loop(self, *, skip_first: bool = True, timeout: float | Timer | None = None) -> Iterator[ImageArray]:
         """循环产出最新截图；skip_first 可复用已有截图，timeout 可传秒数或 Timer。"""

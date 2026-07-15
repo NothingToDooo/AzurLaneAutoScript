@@ -435,7 +435,6 @@ def _gems_policy(
         common_carrier=settings.enum("common_carrier", GemsCommonCarrier),
         vanguard_change=settings.enum("vanguard_change", GemsVanguardChange),
         common_destroyer=settings.enum("common_destroyer", GemsCommonDestroyer),
-        equipment_code_config=settings.string("equipment_code_config"),
         replacement_retry_delay=_duration(settings, "replacement_retry_seconds"),
     )
     settings.finish()

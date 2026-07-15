@@ -1,9 +1,14 @@
-import json
 from collections.abc import Mapping, Sequence
 from functools import lru_cache
 from pathlib import Path
 from typing import cast
 
+from module.config.json_codec import (
+    DuplicateJsonFieldError,
+    NonFiniteJsonNumberError,
+    StrictJsonDecodeError,
+    decode_json,
+)
 from module.content.errors import ContentValidationError
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
@@ -25,16 +30,6 @@ _EXTENSION_FIELDS = {"id", "executors"}
 _EXECUTOR_FIELDS = {"kind", "implementation", "options"}
 _PROFILE_FIELDS = {"id", "extensions", "tunings"}
 _TUNING_FIELDS = {"key", "value"}
-
-
-def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
-    result: dict[str, object] = {}
-    for key, value in pairs:
-        if key in result:
-            message = f"duplicate JSON key: {key}"
-            raise ContentValidationError(message)
-        result[key] = value
-    return result
 
 
 def _mapping(value: object, location: str, fields: set[str]) -> Mapping[str, object]:
@@ -99,8 +94,14 @@ def compile_campaign_runtime_profile_registry(
         message = "runtime profile registry path must be a Path"
         raise TypeError(message)
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
-    except (OSError, json.JSONDecodeError) as error:
+        raw = decode_json(path.read_text(encoding="utf-8"))
+    except DuplicateJsonFieldError as error:
+        message = f"duplicate JSON key: {error.field}"
+        raise ContentValidationError(message) from error
+    except NonFiniteJsonNumberError as error:
+        message = f"runtime profile registry contains a non-finite JSON number: {error.constant}"
+        raise ContentValidationError(message) from error
+    except (OSError, UnicodeError, StrictJsonDecodeError) as error:
         message = f"failed to load runtime profile registry {path}: {error}"
         raise ContentValidationError(message) from error
     root = _mapping(raw, "$", _ROOT_FIELDS)

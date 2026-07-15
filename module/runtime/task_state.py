@@ -1,12 +1,11 @@
 import math
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
 from module.runtime.errors import TaskStateDocumentError
-from module.state.models import TaskStateRecord
 
 if TYPE_CHECKING:
     from module.runtime.settings import FrozenJsonValue
@@ -110,35 +109,6 @@ class TaskStateDocument:
     @classmethod
     def empty(cls, namespace: str) -> TaskStateDocument:
         return cls(namespace=namespace, entries=MappingProxyType({}))
-
-    @classmethod
-    def from_records(
-        cls,
-        namespace: str,
-        records: Iterable[TaskStateRecord],
-    ) -> TaskStateDocument:
-        _validate_identifier(namespace, field_name="namespace")
-        if isinstance(records, TaskStateRecord):
-            message = "records must be an iterable of TaskStateRecord values"
-            raise TypeError(message)
-
-        entries: dict[str, TaskStateEntry] = {}
-        for record in records:
-            if not isinstance(record, TaskStateRecord):
-                message = "records must contain TaskStateRecord values"
-                raise TypeError(message)
-            if record.namespace != namespace:
-                message = f"task state namespace must be {namespace!r}, got {record.namespace!r}"
-                raise TaskStateDocumentError(message)
-            if record.key in entries:
-                message = f"duplicate task state key: {record.key}"
-                raise TaskStateDocumentError(message)
-            entries[record.key] = TaskStateEntry(
-                schema_version=record.version,
-                payload=cast("FrozenJsonValue", record.payload),
-                updated_at=record.updated_at,
-            )
-        return cls(namespace=namespace, entries=entries)
 
     def get(self, key: str) -> TaskStateEntry | None:
         _validate_identifier(key, field_name="key")

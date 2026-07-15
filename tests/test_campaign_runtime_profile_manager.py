@@ -266,7 +266,6 @@ def test_one_implementation_builds_once_and_shares_multiple_facets() -> None:
 
     manager = CampaignRuntimeProfileManager(profile, registry)
 
-    assert manager.executor_instance_count == 1
     assert len(builds) == 1
     assert {binding.kind for binding in builds[0].bindings} == {
         RuntimeExecutorKind.MAP_MECHANIC,
@@ -510,7 +509,6 @@ def test_tuning_projection_is_exhaustive_and_does_not_leak_between_runtimes() ->
     manager.apply_runtime_tunings(runtime)
 
     assert len(config.overlays) == 1
-    assert len(config.overlays[0]) == len(manager.config_overlay) + 2
     assert config.overlays[0]["Fleet_Fleet2"] == 1
     assert config.fleet_boss == 1
     assert config.overlays[0]["Submarine_Fleet"] == 1
@@ -522,7 +520,6 @@ def test_tuning_projection_is_exhaustive_and_does_not_leak_between_runtimes() ->
     assert manager.boss_appear_refocus_preset == (-3, 0)
     assert manager.map_clear_percentage_multiplier == 0.5
     assert manager.combat_disable_stuck_detection_battle == 1
-    assert other.config_overlay == {}
     assert other.boss_appear_refocus_preset is None
     assert other.map_clear_percentage_multiplier == 1.0
 

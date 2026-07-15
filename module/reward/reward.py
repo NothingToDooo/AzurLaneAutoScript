@@ -7,7 +7,7 @@ from module.combat import assets as combat_assets
 from module.logger import logger
 from module.reward import assets as reward_assets
 from module.ui.navbar import Navbar, NavbarColorRule, NavbarTarget, NavbarVisualRules
-from module.ui.page import page_main, page_mission, page_reward
+from module.ui.page import page_mission
 from module.ui.ui import UI
 from module.ui_white.assets import MISSION_NOTICE_WHITE
 
@@ -238,13 +238,3 @@ class Reward(UI):
     def reward_side_navbar_ensure(self, *, upper: int | None = None, bottom: int | None = None) -> bool:
         """按上方 1～6 或下方逆序 1～6 选择侧栏；不等待目标页面加载。"""
         return self._reward_side_navbar.set(self, NavbarTarget(upper=upper, bottom=bottom))
-
-    def run(self) -> None:
-        """从任意页面领取资源和任务奖励，结束于主页或任务页。"""
-        self.ui_ensure(page_reward)
-        self.reward_receive(
-            oil=self.config.Reward_CollectOil, coin=self.config.Reward_CollectCoin, exp=self.config.Reward_CollectExp
-        )
-        self.ui_goto(page_main)
-        self.reward_mission(daily=self.config.Reward_CollectMission, weekly=self.config.Reward_CollectWeeklyMission)
-        self.config.task_delay(success=True)

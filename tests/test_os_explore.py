@@ -1,9 +1,5 @@
-from datetime import datetime
-from typing import TYPE_CHECKING, Literal, Never, Self, override
+from typing import TYPE_CHECKING, override
 
-import pytest
-
-import module.os.tasks.explore as explore_module
 from module.exception import ScriptError
 from module.os.globe_zone import Zone
 from module.os.map_data import DIC_OS_MAP
@@ -11,19 +7,10 @@ from module.os.tasks.explore import OpsiExplore
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from types import TracebackType
 
     from module.os.globe_operation import ZoneType
     from module.os.globe_zone import ZoneName
     from module.os.map import RescanMode
-
-_NEXT_RUN = datetime(2026, 2, 1, 0, 0)
-_OLD_RUN = datetime(2026, 1, 1, 0, 0)
-_NEXT_RESET = datetime(2026, 3, 1, 0, 0)
-
-
-class _TaskStopped(Exception):
-    pass
 
 
 class _Config:
@@ -33,46 +20,6 @@ class _Config:
         self.OpsiExplore_SpecialRadar = True
         self.OpsiFleet_Fleet = 1
         self.OpsiFleet_Submarine = False
-        self.Scheduler_NextRun = _NEXT_RUN
-        self.calls = []
-
-    def multi_set(self) -> _Config:
-        return self
-
-    def __enter__(self) -> Self:
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> Literal[False]:
-        del exc_type, exc, traceback
-        return False
-
-    def cross_get(self, keys: str, default: datetime | None = None) -> datetime:
-        self.calls.append(("cross_get", keys, default))
-        return _OLD_RUN
-
-    def cross_set(self, keys: str, value: datetime) -> None:
-        self.calls.append(("cross_set", keys, value))
-
-    def task_delay(self, *, target: datetime) -> None:
-        self.calls.append(("task_delay", target))
-
-    def task_call(self, task: str, *, force_call: bool = False) -> bool:
-        self.calls.append(("task_call", task, force_call))
-        return True
-
-    def task_stop(self, message: str = "") -> Never:
-        del message
-        self.calls.append(("task_stop", None))
-        raise _TaskStopped
-
-    def check_task_switch(self, message: str = "") -> None:
-        del message
-        self.calls.append(("check_task_switch", None))
 
 
 class _Explore(OpsiExplore):
@@ -92,8 +39,11 @@ class _Explore(OpsiExplore):
     def explore_order(self) -> list[int]:
         return self._os_explore_order()
 
-    def run_explore(self) -> None:
-        return self._os_explore()
+    def skip_cleared_zone(self, zone: int) -> bool:
+        return self._skip_cleared_os_explore_zone(zone)
+
+    def run_zone(self, zone: int) -> None:
+        self._run_os_explore_zone(zone)
 
     @override
     def name_to_zone(self, name: ZoneName) -> Zone:
@@ -128,8 +78,9 @@ class _Explore(OpsiExplore):
         return True
 
     @override
-    def os_order_execute(self, *, recon_scan: bool = True, submarine_call: bool = True) -> None:
+    def os_order_execute(self, *, recon_scan: bool = True, submarine_call: bool = True) -> tuple[bool, bool]:
         self.calls.append(("os_order_execute", {"recon_scan": recon_scan, "submarine_call": submarine_call}))
+        return recon_scan, submarine_call
 
     @override
     def run_auto_search(
@@ -163,17 +114,15 @@ def test_os_explore_invalid_last_zone_restarts_from_beginning() -> None:
     assert explore.explore_order() == [1, 2]
 
 
-def test_os_explore_skips_safe_zone_runs_next_and_finishes(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(explore_module, "get_os_next_reset", lambda: _NEXT_RESET)
+def test_os_explore_skips_safe_zone_and_runs_one_dangerous_zone() -> None:
     explore = _Explore(globe_results={1: False, 2: True}, combat_results=[0])
 
-    with pytest.raises(_TaskStopped):
-        explore.run_explore()
+    assert explore.skip_cleared_zone(1)
+    assert not explore.skip_cleared_zone(2)
+    explore.run_zone(2)
 
     assert ("globe_goto", 1, True) in explore.calls
     assert ("globe_goto", 2, True) in explore.calls
     assert ("os_order_execute", {"recon_scan": False, "submarine_call": False}) in explore.calls
     assert explore.failed_zones == [2]
-    assert explore.config.OpsiExplore_LastZone == 0
-    assert ("task_delay", _NEXT_RESET) in explore.config.calls
-    assert ("task_stop", None) in explore.config.calls
+    assert explore.config.OpsiExplore_LastZone == 2

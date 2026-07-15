@@ -4,13 +4,9 @@ from email.message import EmailMessage
 from hashlib import sha256
 from typing import Final
 
-from module.logger import logger
 from module.notify.configuration import (
-    DisabledNotificationConfig,
-    NotificationConfigError,
     SmtpNotificationConfig,
     SmtpTransport,
-    parse_notification_config,
 )
 
 SMTP_TIMEOUT_SECONDS: Final = 15
@@ -68,7 +64,7 @@ def _send_email(config: SmtpNotificationConfig, message: EmailMessage) -> None:
 
 
 class SmtpNotificationSender:
-    """严格 SMTP sender；投递异常交给 outbox 决定是否重试。"""
+    """严格 SMTP sender；投递异常由同步调用边界决定是否重试。"""
 
     __slots__ = ("_config",)
 
@@ -87,23 +83,3 @@ class SmtpNotificationSender:
             recipient=recipient,
         )
         _send_email(self._config, message)
-
-
-def handle_notify(raw_config: str, *, title: str, content: str) -> bool:
-    """发送 SMTP 邮件；配置或网络失败时记录完整异常并返回失败。"""
-    try:
-        config = parse_notification_config(raw_config)
-        if isinstance(config, DisabledNotificationConfig):
-            logger.info("No SMTP provider configured, skip sending")
-            return False
-        message = _build_message(config, title=title, content=content)
-        _send_email(config, message)
-    except NotificationConfigError as error:
-        logger.exception(error)
-        return False
-    except Exception as error:  # noqa: BLE001
-        logger.exception(error)
-        return False
-
-    logger.info("SMTP notify success")
-    return True

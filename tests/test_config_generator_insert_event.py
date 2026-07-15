@@ -2,6 +2,8 @@ from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
+import pytest
+
 from module.config.config_updater import ConfigGenerator
 from module.config.deep import deep_get
 from module.config.utils import filepath_args, read_file
@@ -29,6 +31,24 @@ class _Generator(ConfigGenerator):
         return self._event_packs
 
 
+class _OptionsGenerator(_Generator):
+    @override
+    def _set_latest_event_defaults(self, packs: tuple[EventPack, ...], options: list[str]) -> None:
+        del packs, options
+
+    @override
+    def _set_latest_raid_defaults(self, packs: tuple[EventPack, ...], options: list[str]) -> None:
+        del packs, options
+
+    @override
+    def _set_latest_coalition_defaults(self, packs: tuple[EventPack, ...], options: list[str]) -> None:
+        del packs, options
+
+    @override
+    def _set_latest_archive_defaults(self, packs: tuple[EventPack, ...], options: list[str]) -> None:
+        del packs, options
+
+
 def _release(opened_on: str, order: int, name_cn: str | None = "活动") -> EventRelease:
     return EventRelease(date.fromisoformat(opened_on), name_cn, order)
 
@@ -44,7 +64,7 @@ def _pack(pack_id: str, kind: str, *releases: EventRelease) -> EventPack:
 
 
 def _generator(packs: list[EventPack]) -> _Generator:
-    return _Generator(packs)
+    return _OptionsGenerator(packs)
 
 
 def _option_names(generator: ConfigGenerator, task: str) -> list[str]:
@@ -53,6 +73,34 @@ def _option_names(generator: ConfigGenerator, task: str) -> list[str]:
 
 def _bold_option_names(generator: ConfigGenerator, task: str) -> list[str]:
     return deep_get(generator.args, keys=f"{task}.Campaign.Event.option_bold", default=[])
+
+
+def test_insert_event_rejects_an_empty_manifest_catalog() -> None:
+    with pytest.raises(ValueError, match="current event manifest"):
+        _Generator([]).insert_event()
+
+
+def test_current_activity_defaults_require_stage_and_activity_definitions() -> None:
+    event = _pack("event_current", "event", _release("2026-01-01", 10))
+    raid = _pack("raid_current", "raid", _release("2026-01-01", 20))
+    coalition = _pack("coalition_current", "coalition", _release("2026-01-01", 30))
+    archive = _pack("war_archives_current", "war_archives", _release("2026-01-01", 40))
+    generator = _Generator([])
+
+    with pytest.raises(ValueError, match="event pack has no default stage"):
+        generator._set_latest_event_defaults(  # noqa: SLF001 - 验证 manifest 默认值边界。
+            (event,), ["event_current"]
+        )
+    with pytest.raises(ValueError, match="raid pack has no activity definition"):
+        generator._set_latest_raid_defaults((raid,), ["raid_current"])  # noqa: SLF001 - 验证 activity 边界。
+    with pytest.raises(ValueError, match="coalition pack has no activity definition"):
+        generator._set_latest_coalition_defaults(  # noqa: SLF001 - 验证 activity 边界。
+            (coalition,), ["coalition_current"]
+        )
+    with pytest.raises(ValueError, match="war archive pack has no default stage"):
+        generator._set_latest_archive_defaults(  # noqa: SLF001 - 验证 manifest 默认值边界。
+            (archive,), ["war_archives_current"]
+        )
 
 
 def test_insert_event_adds_latest_regular_event_to_event_and_gems_tasks() -> None:
@@ -66,7 +114,7 @@ def test_insert_event_adds_latest_regular_event_to_event_and_gems_tasks() -> Non
     generator.insert_event()
 
     assert _option_names(generator, "Event") == ["event_latest"]
-    assert _option_names(generator, "GemsFarming") == ["event_latest"]
+    assert _option_names(generator, "GemsFarming") == ["campaign_main", "event_latest"]
     assert _bold_option_names(generator, "Event") == ["event_latest"]
 
 

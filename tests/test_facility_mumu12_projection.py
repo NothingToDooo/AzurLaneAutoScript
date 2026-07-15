@@ -9,7 +9,7 @@ from module.adapters.facility_mumu12 import (
     project_tactical_settings,
 )
 from module.application import DailySchedule, DelayRange
-from module.gameplay import (
+from module.gameplay.facility import (
     CommissionPreset,
     CommissionSelectionPolicy,
     CommissionSettings,

@@ -3,30 +3,29 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from config_factory import in_memory_config
 
 import module.adapters.activity_mumu12 as adapters
-from module.application import AbortRequested, AbortToken, DailySchedule, DelayRange, PreemptionRequest
+from module.application import AbortRequested, AbortToken, DailySchedule, DelayRange
 from module.coalition.profile import (
     CoalitionClientSession,
     CoalitionPageMode,
     UnknownCoalitionProfileError,
 )
 from module.config.config import AzurLaneConfig
-from module.content import (
-    ActivityCatalog,
-    CoalitionActivity,
+from module.content.activity_catalog import ActivityCatalog, CoalitionActivity, RaidActivity
+from module.content.activity_profile import (
     CoalitionDefinition,
     CoalitionFleetRule,
     CoalitionProfileId,
     CoalitionStageDefinition,
     CoalitionStageId,
-    ContentId,
-    RaidActivity,
     RaidDefinition,
     RaidProfileId,
 )
 from module.content.errors import ContentValidationError
 from module.content.manifest import load_event_manifests
+from module.content.models import ContentId
 from module.device.device import Device
 from module.eventstory.profile import (
     ALCHEMIST_EVENT_STORY_PROFILE,
@@ -164,7 +163,6 @@ def test_minigame_executes_exactly_one_typed_operation(
     report = adapters.Mumu12MinigameWorkflow(config, device, _Clock()).execute(
         ActivitySpec.minigame(schedule=_SCHEDULE, operation_limit=3),
         AbortToken(),
-        PreemptionRequest(),
     )
 
     assert report == ActivityReport(ActivityCommand.MINIGAME, ActivityDisposition.IN_PROGRESS, _NOW, 1)
@@ -228,7 +226,6 @@ def test_event_story_resolves_client_profile_and_executes_bounded_units(
             skip_battle=True,
         ),
         AbortToken(),
-        PreemptionRequest(),
     )
 
     assert report == ActivityReport(ActivityCommand.EVENT_STORY, ActivityDisposition.COMPLETED, _NOW, 0)
@@ -241,7 +238,7 @@ def test_event_story_activation_applies_typed_overlay_after_binding(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     content_id = "event_20260625_cn"
-    config = AzurLaneConfig.from_snapshot("event-story-activation", {})
+    config = in_memory_config("event-story-activation", {})
     device = object.__new__(Device)
     runner = _EventStoryRunner()
     activated: list[tuple[str, str, bool, bool]] = []
@@ -271,7 +268,6 @@ def test_event_story_activation_applies_typed_overlay_after_binding(
             skip_battle=True,
         ),
         AbortToken(),
-        PreemptionRequest(),
     )
 
     assert activated == [("EventStory", content_id, True, True)]
@@ -297,7 +293,6 @@ def test_unavailable_event_story_returns_before_constructing_a_client(
             skip_battle=True,
         ),
         AbortToken(),
-        PreemptionRequest(),
     )
 
     assert report == ActivityReport(ActivityCommand.EVENT_STORY, ActivityDisposition.UNAVAILABLE, _NOW, 0)
@@ -324,8 +319,8 @@ class _RaidRunner:
             RaidAttemptStatus(plan.mode, RaidAttemptSource.METERED, remaining=1),
         )
 
-    def execute_once(self, plan: RaidRunPlan, *, check_emotion: bool = True) -> RaidExecutionResult:
-        self.calls.append(("execute", plan, check_emotion))
+    def execute_once(self, plan: RaidRunPlan) -> RaidExecutionResult:
+        self.calls.append(("execute", plan))
         return RaidExecutionResult(plan.mode, runs_completed=1)
 
 
@@ -385,7 +380,6 @@ def test_raid_one_safe_unit_preserves_cumulative_run_limit(
     assert isinstance(plan, RaidRunPlan)
     assert plan.mode is RaidMode.HARD
     assert plan.use_ticket is False
-    assert execute[2] is False
     assert len(profiles) == 1
     assert profiles[0] is plan.profile
     assert config.Campaign_Event == "raid_20260212"
@@ -573,7 +567,6 @@ def test_raid_daily_scans_order_but_executes_only_one_battle(
     execute_calls = [call for call in runner.calls if isinstance(call, tuple) and call[0] == "execute"]
     assert len(execute_calls) == 1
     assert execute_calls[0][1] is status_plans[1]
-    assert execute_calls[0][2] is False
     assert reward_calls == [(True, False)]
 
 
@@ -671,8 +664,8 @@ class _HospitalRunner:
         self.calls.append("select")
         return True
 
-    def execute_selected_investigation_once(self, *, check_emotion: bool) -> bool:
-        self.calls.append(("execute", check_emotion))
+    def execute_selected_investigation_once(self) -> bool:
+        self.calls.append(("execute",))
         return True
 
 
@@ -702,7 +695,7 @@ def test_hospital_executes_one_selected_investigation(
     assert report.stop_reason is EncounterStopReason.IN_PROGRESS
     assert report.runs_completed == 1
     assert runner.calls.count("select") == 1
-    assert ("execute", False) in runner.calls
+    assert ("execute",) in runner.calls
 
 
 class _CoalitionDevice:
@@ -954,7 +947,6 @@ def test_activity_builder_covers_all_ten_workflows_and_cancel_before_io(
         workflows.minigame.execute(
             ActivitySpec.minigame(schedule=_SCHEDULE),
             cancelled,
-            PreemptionRequest(),
         )
 
 

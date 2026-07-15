@@ -3,6 +3,7 @@ from datetime import UTC, datetime, time, timedelta
 from typing import TYPE_CHECKING, ClassVar, Unpack, cast, override
 
 import pytest
+from config_factory import in_memory_config
 
 import module.adapters.encounter_mumu12 as encounter_adapters
 from module.adapters.campaign_mumu12 import (
@@ -23,7 +24,6 @@ from module.adapters.campaign_runtime_profile import (
 from module.adapters.gems_mumu12 import Mumu12GemsRuntimeBehavior
 from module.application import AbortRequested, AbortToken, DailySchedule, DelayRange, SafeUnitCancellation, TaskId
 from module.base.button import Button
-from module.config.config import AzurLaneConfig
 from module.content.battle_policy import BossStrategy, ClearBoss, StagePolicy
 from module.content.campaign_session import (
     CampaignRunVariant,
@@ -111,6 +111,7 @@ from module.gameplay.campaign_live import CampaignCheckpointUnavailable, Campaig
 from module.gameplay.encounter import HardBattleOutcome, HardFleet, HardSettings, HardStopReason
 
 if TYPE_CHECKING:
+    from module.config.config import AzurLaneConfig
     from module.config.config_generated import ConfigOverrides
     from module.interaction import CancellationSignal
 
@@ -567,7 +568,7 @@ def test_execution_settings_compile_to_legacy_campaign_primitives() -> None:
 
 def test_campaign_runtime_does_not_reapply_stale_emotion_values_after_recording() -> None:
     _FakeDeclarativeRuntime.created.clear()
-    config = AzurLaneConfig.from_snapshot("campaign-emotion-ledger", {})
+    config = in_memory_config("campaign-emotion-ledger", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
     activated = provider.activate(_job(), AbortToken())
@@ -575,13 +576,13 @@ def test_campaign_runtime_does_not_reapply_stale_emotion_values_after_recording(
 
     config.set_record(Emotion_Fleet1Value=83, Emotion_Fleet2Value=71)
     recorded_values = (config.Emotion_Fleet1Value, config.Emotion_Fleet2Value)
-    provider.finish(activated, activated.initial_state(), CampaignStopReason.PREEMPTED)
+    provider.finish(activated, activated.initial_state(), CampaignStopReason.CANCELLED)
 
     assert recorded_values == (83, 71)
 
 
 def test_refreshing_gems_cancellation_preserves_the_active_map_emotion_ledger() -> None:
-    config = AzurLaneConfig.from_snapshot("campaign-gems-ledger", {})
+    config = in_memory_config("campaign-gems-ledger", {})
     fallback = CampaignSession(
         replace(_definition(), ref=StageRef("campaign_main", "2-4")),
         CampaignRunVariant.NORMAL,
@@ -592,7 +593,6 @@ def test_refreshing_gems_cancellation_preserves_the_active_map_emotion_ledger() 
         GemsCommonCarrier.ANY,
         GemsVanguardChange.SHIP,
         GemsCommonDestroyer.ANY,
-        "CV: []",
     )
     runtime = object.__new__(DeclarativeCampaignMapRuntime)
     runtime.config = config
@@ -767,7 +767,7 @@ def test_new_runtime_refresh_failure_cleans_the_factory_result(
 
     monkeypatch.setattr(Mumu12CampaignRuntimeProvider, "_refresh_runtime_cancellation", fail_refresh)
     provider = Mumu12CampaignRuntimeProvider(
-        AzurLaneConfig.from_snapshot("campaign-refresh-cleanup-failure", {}),
+        in_memory_config("campaign-refresh-cleanup-failure", {}),
         object.__new__(Device),
         runtime_factory=_RefreshCleanupFailingRuntime,
     )
@@ -799,7 +799,7 @@ def test_fresh_activation_guard_cleans_runtime_when_entry_setup_fails() -> None:
             raise cleanup_error
 
     provider = Mumu12CampaignRuntimeProvider(
-        AzurLaneConfig.from_snapshot("campaign-entry-setup-cleanup-failure", {}),
+        in_memory_config("campaign-entry-setup-cleanup-failure", {}),
         object.__new__(Device),
         runtime_factory=_SetupCleanupFailingRuntime,
     )
@@ -814,7 +814,7 @@ def test_activation_guard_releases_initialized_runtime_when_final_overlay_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     overlay_error = RuntimeError("final runtime overlay failed")
-    config = AzurLaneConfig.from_snapshot("campaign-final-overlay-failure", {})
+    config = in_memory_config("campaign-final-overlay-failure", {})
     original_apply_runtime_overlay = config.apply_runtime_overlay
 
     def fail_final_overlay(**kwargs: Unpack[ConfigOverrides]) -> None:
@@ -841,7 +841,7 @@ def test_activation_guard_releases_initialized_runtime_when_final_overlay_fails(
 def test_provider_enters_once_and_exposes_only_the_exact_activated_variant() -> None:
     _FakeDeclarativeRuntime.created.clear()
     _FakeDeclarativeRuntime.client_in_map = True
-    config = AzurLaneConfig.from_snapshot("campaign-provider", {})
+    config = in_memory_config("campaign-provider", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
 
@@ -879,7 +879,7 @@ def test_hard_attempt_overlay_is_immutable_and_idempotent() -> None:
 
 def test_provider_composes_hard_runtime_profile_for_a_main_stage() -> None:
     _FakeDeclarativeRuntime.created.clear()
-    config = AzurLaneConfig.from_snapshot("campaign-provider-hard", {})
+    config = in_memory_config("campaign-provider-hard", {})
     device = object.__new__(Device)
     job = replace(_job(), difficulty=CampaignDifficulty.HARD)
     provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
@@ -893,13 +893,13 @@ def test_provider_composes_hard_runtime_profile_for_a_main_stage() -> None:
         "campaign_hard/campaign_hard/campaign"
     ]
     assert job.sessions[0].definition.runtime_profile.extensions == ()
-    provider.finish(activated, activated.initial_state(), CampaignStopReason.PREEMPTED)
+    provider.finish(activated, activated.initial_state(), CampaignStopReason.CANCELLED)
 
 
 def test_provider_keeps_one_runtime_across_resumable_turns_then_releases_it() -> None:
     _FakeDeclarativeRuntime.created.clear()
     _FakeDeclarativeRuntime.client_in_map = True
-    config = AzurLaneConfig.from_snapshot("campaign-provider-resume", {})
+    config = in_memory_config("campaign-provider-resume", {})
     device = object.__new__(Device)
     vars(device)["screenshot"] = lambda: None
     provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
@@ -924,7 +924,7 @@ def test_provider_keeps_one_runtime_across_resumable_turns_then_releases_it() ->
     assert isinstance(runtime, _FakeDeclarativeRuntime)
     assert runtime.calls.count(("resume_session", state)) == 2
 
-    provider.finish(activated, state, CampaignStopReason.PREEMPTED)
+    provider.finish(activated, state, CampaignStopReason.CANCELLED)
 
     assert ("finish_runtime_session", RuntimeSessionOutcome.INTERRUPTED) in runtime.calls
     with pytest.raises(RuntimeError, match="not the active"):
@@ -948,7 +948,7 @@ def test_checkpoint_probe_failure_releases_the_retained_runtime() -> None:
     def fail_screenshot() -> None:
         raise screenshot_error
 
-    config = AzurLaneConfig.from_snapshot("campaign-checkpoint-probe-failure", {})
+    config = in_memory_config("campaign-checkpoint-probe-failure", {})
     device = object.__new__(Device)
     vars(device)["screenshot"] = fail_screenshot
     provider = Mumu12CampaignRuntimeProvider(
@@ -978,7 +978,7 @@ def test_checkpoint_probe_failure_releases_the_retained_runtime() -> None:
 
 def test_provider_discards_retained_checkpoint_runtime_as_interrupted() -> None:
     _FakeDeclarativeRuntime.created.clear()
-    config = AzurLaneConfig.from_snapshot("campaign-provider-stale", {})
+    config = in_memory_config("campaign-provider-stale", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
     activated = provider.activate(_job(), AbortToken())
@@ -1006,7 +1006,7 @@ def test_provider_discards_retained_checkpoint_runtime_as_interrupted() -> None:
 
 def test_provider_discards_prepared_checkpoint_runtime() -> None:
     _FakeDeclarativeRuntime.created.clear()
-    config = AzurLaneConfig.from_snapshot("campaign-provider-stale-prepared", {})
+    config = in_memory_config("campaign-provider-stale-prepared", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
     job = _job()
@@ -1045,7 +1045,7 @@ def test_provider_attempts_prepared_and_active_cleanup_after_each_failure() -> N
 
     prepared_runtime = failing_runtime("prepared", prepared_error)
     active_runtime = failing_runtime("active", active_error)
-    config = AzurLaneConfig.from_snapshot("campaign-provider-cleanup-failure", {})
+    config = in_memory_config("campaign-provider-cleanup-failure", {})
     provider = Mumu12CampaignRuntimeProvider(config, object.__new__(Device))
     provider._prepared_runtime = prepared_runtime  # noqa: SLF001 - 构造双 owner 失败状态。
     provider._active_runtime = active_runtime  # noqa: SLF001 - 构造双 owner 失败状态。
@@ -1063,7 +1063,7 @@ def test_provider_attempts_prepared_and_active_cleanup_after_each_failure() -> N
 
 def test_in_progress_completed_state_closes_the_finished_map_runtime() -> None:
     _FakeDeclarativeRuntime.created.clear()
-    config = AzurLaneConfig.from_snapshot("campaign-provider-completed-map", {})
+    config = in_memory_config("campaign-provider-completed-map", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
     activated = provider.activate(_job(), AbortToken())
@@ -1084,7 +1084,7 @@ def test_in_progress_completed_state_closes_the_finished_map_runtime() -> None:
 
 def test_completed_map_remains_completed_when_post_map_fleet_replacement_fails() -> None:
     _FakeDeclarativeRuntime.created.clear()
-    config = AzurLaneConfig.from_snapshot("campaign-provider-post-map-gems-failure", {})
+    config = in_memory_config("campaign-provider-post-map-gems-failure", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
     activated = provider.activate(_job(), AbortToken())
@@ -1105,7 +1105,7 @@ def test_completed_map_remains_completed_when_post_map_fleet_replacement_fails()
 
 def test_active_map_fleet_replacement_failure_marks_runtime_failed() -> None:
     _FakeDeclarativeRuntime.created.clear()
-    config = AzurLaneConfig.from_snapshot("campaign-provider-pre-map-gems-failure", {})
+    config = in_memory_config("campaign-provider-pre-map-gems-failure", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
     activated = provider.activate(_job(), AbortToken())
@@ -1124,7 +1124,7 @@ def test_active_map_fleet_replacement_failure_marks_runtime_failed() -> None:
 
 def test_provider_reports_failed_domain_state_to_runtime_lifecycle() -> None:
     _FakeDeclarativeRuntime.created.clear()
-    config = AzurLaneConfig.from_snapshot("campaign-provider-failed", {})
+    config = in_memory_config("campaign-provider-failed", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
     activated = provider.activate(_job(), AbortToken())
@@ -1144,7 +1144,7 @@ def test_provider_reports_failed_domain_state_to_runtime_lifecycle() -> None:
 
 def test_provider_commits_program_io_as_one_non_interruptible_safe_unit() -> None:
     _FakeDeclarativeRuntime.created.clear()
-    config = AzurLaneConfig.from_snapshot("campaign-provider", {})
+    config = in_memory_config("campaign-provider", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
     cancellation = AbortToken()
@@ -1166,7 +1166,7 @@ def test_provider_returns_typed_map_achievement_evidence_from_entry_stop() -> No
     _FakeDeclarativeRuntime.full_clear = True
     _FakeDeclarativeRuntime.three_stars = False
     _FakeDeclarativeRuntime.threat_safe = True
-    config = AzurLaneConfig.from_snapshot("campaign-provider", {})
+    config = in_memory_config("campaign-provider", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
 
@@ -1205,7 +1205,7 @@ def test_provider_preserves_rejected_map_stop_and_discard_failure() -> None:
             raise cleanup_error
 
     provider = Mumu12CampaignRuntimeProvider(
-        AzurLaneConfig.from_snapshot("campaign-map-stop-cleanup-failure", {}),
+        in_memory_config("campaign-map-stop-cleanup-failure", {}),
         object.__new__(Device),
         runtime_factory=_RejectedStopRuntime,
     )
@@ -1235,7 +1235,7 @@ def test_provider_preserves_map_stop_inspection_and_discard_failures() -> None:
             raise cleanup_error
 
     provider = Mumu12CampaignRuntimeProvider(
-        AzurLaneConfig.from_snapshot("campaign-map-stop-inspection-failure", {}),
+        in_memory_config("campaign-map-stop-inspection-failure", {}),
         object.__new__(Device),
         runtime_factory=_InspectionFailingStopRuntime,
     )
@@ -1253,7 +1253,7 @@ def test_provider_preserves_map_stop_inspection_and_discard_failures() -> None:
 
 def test_resource_free_selection_projects_exact_completion_runtime_policy() -> None:
     _FakeDeclarativeRuntime.created.clear()
-    config = AzurLaneConfig.from_snapshot("campaign-provider", {})
+    config = in_memory_config("campaign-provider", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
     base = _job()
@@ -1280,12 +1280,15 @@ def test_resource_free_selection_projects_exact_completion_runtime_policy() -> N
         (GemsVanguardChange.DISABLED, "ignore"),
     ],
 )
-def test_gems_policy_projects_exact_runtime_configuration(
+def test_gems_policy_projects_runtime_configuration_without_overwriting_live_equipment_codes(
     vanguard_change: GemsVanguardChange,
     expected_emotion_mode: str,
 ) -> None:
     _FakeDeclarativeRuntime.created.clear()
-    config = AzurLaneConfig.from_snapshot("campaign-provider", {})
+    config = in_memory_config(
+        "campaign-provider",
+        {"GemsFarming": {"EquipmentCode": {"Config": "DD: live-code"}}},
+    )
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
     base = _job()
@@ -1303,7 +1306,6 @@ def test_gems_policy_projects_exact_runtime_configuration(
             GemsCommonCarrier.RANGER,
             vanguard_change,
             GemsCommonDestroyer.CASSIN_OR_DOWNES,
-            "CV: [slot-1, slot-2]",
         ),
     )
     session = job.sessions[0]
@@ -1314,7 +1316,7 @@ def test_gems_policy_projects_exact_runtime_configuration(
     assert config.GemsFarming_CommonCV == "ranger"
     assert config.GemsFarming_ChangeVanguard == vanguard_change.value
     assert config.GemsFarming_CommonDD == "cassin_or_downes"
-    assert config.EquipmentCode_Config == "CV: [slot-1, slot-2]"
+    assert config.EquipmentCode_Config == "DD: live-code"
     assert config.EnemyPriority_EnemyScaleBalanceWeight == "S1_enemy_first"
     assert config.Emotion_Mode == expected_emotion_mode
     assert config.STOP_IF_REACH_LV32 is True
@@ -1323,7 +1325,7 @@ def test_gems_policy_projects_exact_runtime_configuration(
 def test_provider_reuses_pre_entry_evidence_runtime_for_activation() -> None:
     _FakeDeclarativeRuntime.created.clear()
     _FakeDeclarativeRuntime.client_in_map = True
-    config = AzurLaneConfig.from_snapshot("campaign-provider", {})
+    config = in_memory_config("campaign-provider", {})
     device = object.__new__(Device)
     provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
     job = _job()
@@ -1343,7 +1345,7 @@ def test_provider_reuses_pre_entry_evidence_runtime_for_activation() -> None:
 def test_provider_restarts_an_initial_checkpoint_after_evidence_proves_a_map_boundary() -> None:
     _FakeDeclarativeRuntime.created.clear()
     _FakeDeclarativeRuntime.client_in_map = False
-    config = AzurLaneConfig.from_snapshot("campaign-provider", {})
+    config = in_memory_config("campaign-provider", {})
     device = object.__new__(Device)
     vars(device)["screenshot"] = lambda: None
     base_job = _job()
@@ -1377,7 +1379,7 @@ def test_provider_restarts_an_initial_checkpoint_after_evidence_proves_a_map_bou
 def test_provider_rejects_a_checkpoint_when_the_client_left_its_map() -> None:
     _FakeDeclarativeRuntime.created.clear()
     _FakeDeclarativeRuntime.client_in_map = False
-    config = AzurLaneConfig.from_snapshot("campaign-provider", {})
+    config = in_memory_config("campaign-provider", {})
     device = object.__new__(Device)
     vars(device)["screenshot"] = lambda: None
     job = _job()
@@ -1412,7 +1414,7 @@ def test_hard_port_uses_explicit_override_or_main_map_and_settles_one_attempt(
     expected_ref: StageRef,
 ) -> None:
     _FakeDeclarativeRuntime.created.clear()
-    config = AzurLaneConfig.from_snapshot("hard-port", {})
+    config = in_memory_config("hard-port", {})
     device = object.__new__(Device)
     vars(device)["screenshot"] = lambda: None
     vars(device)["image"] = object()
@@ -1448,7 +1450,7 @@ def test_hard_workflow_closes_each_real_runtime_across_three_attempts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _FakeDeclarativeRuntime.created.clear()
-    config = AzurLaneConfig.from_snapshot("hard-workflow", {})
+    config = in_memory_config("hard-workflow", {})
     device = object.__new__(Device)
     vars(device)["screenshot"] = lambda: None
     vars(device)["image"] = object()
@@ -1497,7 +1499,7 @@ def test_hard_workflow_releases_real_runtime_before_retry(
 ) -> None:
     _FailingHardRuntime.created.clear()
     _FailingHardRuntime.failures = [failure]
-    config = AzurLaneConfig.from_snapshot("hard-retry", {})
+    config = in_memory_config("hard-retry", {})
     device = object.__new__(Device)
     vars(device)["screenshot"] = lambda: None
     vars(device)["image"] = object()
@@ -1529,7 +1531,7 @@ def test_hard_workflow_releases_real_runtime_after_cancellation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _FakeDeclarativeRuntime.created.clear()
-    config = AzurLaneConfig.from_snapshot("hard-cancel", {})
+    config = in_memory_config("hard-cancel", {})
     device = object.__new__(Device)
     vars(device)["screenshot"] = lambda: None
     vars(device)["image"] = object()
@@ -1571,7 +1573,7 @@ def test_hard_workflow_releases_real_runtime_after_unexpected_error(
 ) -> None:
     _FailingHardRuntime.created.clear()
     _FailingHardRuntime.failures = [RuntimeError("unexpected hard runtime failure")]
-    config = AzurLaneConfig.from_snapshot("hard-error", {})
+    config = in_memory_config("hard-error", {})
     device = object.__new__(Device)
     vars(device)["screenshot"] = lambda: None
     vars(device)["image"] = object()
@@ -1613,7 +1615,7 @@ def test_hard_port_preserves_attempt_discovery_and_cleanup_failures() -> None:
     def fail_remaining(_device: Device) -> int:
         raise discovery_error
 
-    config = AzurLaneConfig.from_snapshot("hard-cleanup-failure", {})
+    config = in_memory_config("hard-cleanup-failure", {})
     device = object.__new__(Device)
     vars(device)["screenshot"] = lambda: None
     vars(device)["image"] = object()
@@ -1635,7 +1637,7 @@ def test_hard_port_preserves_attempt_discovery_and_cleanup_failures() -> None:
 
 def test_hard_port_stage_mismatch_can_be_released_without_cancellation() -> None:
     _FakeDeclarativeRuntime.created.clear()
-    config = AzurLaneConfig.from_snapshot("hard-stage-mismatch", {})
+    config = in_memory_config("hard-stage-mismatch", {})
     device = object.__new__(Device)
     vars(device)["screenshot"] = lambda: None
     vars(device)["image"] = object()

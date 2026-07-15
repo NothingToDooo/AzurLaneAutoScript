@@ -12,12 +12,8 @@ from module.config.config_manual import ManualConfig
 from module.config.config_updater import ConfigGenerator
 from module.config.utils import LANGUAGES, filepath_args, filepath_i18n, read_file, write_file
 from module.task_registry import (
-    SCHEDULER_LAUNCHES,
     TASK_CATALOG,
-    TOOL_LAUNCHES,
-    LaunchSurface,
     TaskDefinition,
-    TaskDomain,
     command_to_config_name,
     get_task_definition,
     get_tool_task_command,
@@ -81,7 +77,7 @@ EXPECTED_SCOPES = {
     "opsi_daemon": ("OpsiGeneral",),
 }
 
-TOOL_LAUNCH_COMMANDS = {
+NON_SCHEDULED_COMMANDS = {
     "daemon",
     "opsi_daemon",
     "event_story",
@@ -152,59 +148,8 @@ EXPECTED_CATALOG_COMMANDS = {
     "war_archives",
 }
 
-EXPECTED_DOMAIN_COMMANDS = {
-    TaskDomain.CAMPAIGN: {
-        "main",
-        "main2",
-        "main3",
-        "event",
-        "event2",
-        "war_archives",
-        "gems_farming",
-        "hard",
-        "event_sp",
-        "event_a",
-        "event_b",
-        "event_c",
-        "event_d",
-    },
-    TaskDomain.ENCOUNTER: {
-        "daily",
-        "raid",
-        "raid_daily",
-        "coalition",
-        "coalition_sp",
-        "maritime_escort",
-        "hospital",
-    },
-    TaskDomain.EXERCISE: {"exercise"},
-    TaskDomain.OPSI: {
-        "opsi_ash_assist",
-        "opsi_ash_beacon",
-        "opsi_explore",
-        "opsi_shop",
-        "opsi_voucher",
-        "opsi_daily",
-        "opsi_obscure",
-        "opsi_month_boss",
-        "opsi_abyssal",
-        "opsi_archive",
-        "opsi_stronghold",
-        "opsi_meowfficer_farming",
-        "opsi_hazard1_leveling",
-        "opsi_cross_month",
-    },
-    TaskDomain.FACILITY: {"research", "commission", "tactical"},
-    TaskDomain.MARKET: {"shop_frequent", "shop_once", "shipyard", "gacha", "awaken"},
-    TaskDomain.COMPOSITE_DAILY: {"dorm", "meowfficer", "guild", "reward", "freebies", "private_quarters"},
-    TaskDomain.ACTIVITY: {"minigame", "event_story"},
-    TaskDomain.ASSIST: {"daemon", "opsi_daemon"},
-    TaskDomain.MAINTENANCE: {"restart", "azur_lane_uncensored", "game_manager", "benchmark"},
-}
-
 EXPECTED_EXECUTION_COMMANDS = {
-    ExecutionMode.SCHEDULED_JOB: EXPECTED_CATALOG_COMMANDS
-    - {"daemon", "opsi_daemon", "event_story", "azur_lane_uncensored", "game_manager", "benchmark"},
+    ExecutionMode.SCHEDULED_JOB: EXPECTED_CATALOG_COMMANDS - NON_SCHEDULED_COMMANDS,
     ExecutionMode.ASSIST_SESSION: {"daemon", "opsi_daemon"},
     ExecutionMode.DIRECT_COMMAND: {"event_story", "azur_lane_uncensored", "game_manager", "benchmark"},
 }
@@ -296,7 +241,7 @@ def _task_group(nodes: dict, *, page: str = "setting") -> dict:
     }
 
 
-def test_task_definition_is_frozen_slotted_and_compatibility_is_derived() -> None:
+def test_task_definition_is_frozen_slotted_catalog_metadata() -> None:
     definition = TASK_CATALOG["main"]
 
     assert isinstance(definition, TaskDefinition)
@@ -329,9 +274,7 @@ def test_task_definition_rejects_non_ascii_snake_case_commands(command: str) -> 
             command=command,
             config_scopes=(),
             priority=0,
-            domain=TaskDomain.MAINTENANCE,
             execution_mode=ExecutionMode.SCHEDULED_JOB,
-            allowed_launches=SCHEDULER_LAUNCHES,
         )
 
 
@@ -345,9 +288,7 @@ def test_task_definition_rejects_invalid_config_scopes(config_scopes: object) ->
             command="main",
             config_scopes=cast("tuple[str, ...]", config_scopes),
             priority=0,
-            domain=TaskDomain.CAMPAIGN,
             execution_mode=ExecutionMode.SCHEDULED_JOB,
-            allowed_launches=SCHEDULER_LAUNCHES,
         )
 
 
@@ -361,21 +302,7 @@ def test_task_definition_rejects_invalid_priority(priority: object, error: type[
             command="main",
             config_scopes=(),
             priority=cast("int | None", priority),
-            domain=TaskDomain.CAMPAIGN,
             execution_mode=ExecutionMode.SCHEDULED_JOB,
-            allowed_launches=SCHEDULER_LAUNCHES,
-        )
-
-
-def test_task_definition_rejects_untyped_domain() -> None:
-    with pytest.raises(TypeError, match="task domain"):
-        TaskDefinition(
-            command="main",
-            config_scopes=(),
-            priority=0,
-            domain=cast("TaskDomain", "campaign"),
-            execution_mode=ExecutionMode.SCHEDULED_JOB,
-            allowed_launches=SCHEDULER_LAUNCHES,
         )
 
 
@@ -385,29 +312,30 @@ def test_task_definition_rejects_untyped_execution_mode() -> None:
             command="main",
             config_scopes=(),
             priority=0,
-            domain=TaskDomain.CAMPAIGN,
             execution_mode=cast("ExecutionMode", "scheduled_job"),
-            allowed_launches=SCHEDULER_LAUNCHES,
         )
 
 
 @pytest.mark.parametrize(
-    ("allowed_launches", "error"),
+    ("mode", "priority", "error", "message"),
     [
-        ({LaunchSurface.SCHEDULER}, TypeError),
-        (frozenset(), ValueError),
-        (frozenset({"scheduler"}), TypeError),
+        (ExecutionMode.SCHEDULED_JOB, None, TypeError, "scheduled task priority"),
+        (ExecutionMode.ASSIST_SESSION, 0, ValueError, "non-scheduled task priority"),
+        (ExecutionMode.DIRECT_COMMAND, 0, ValueError, "non-scheduled task priority"),
     ],
 )
-def test_task_definition_rejects_invalid_allowed_launches(allowed_launches: object, error: type[Exception]) -> None:
-    with pytest.raises(error, match="allowed launches"):
+def test_task_definition_rejects_priority_that_conflicts_with_execution_mode(
+    mode: ExecutionMode,
+    priority: int | None,
+    error: type[Exception],
+    message: str,
+) -> None:
+    with pytest.raises(error, match=message):
         TaskDefinition(
             command="main",
             config_scopes=(),
-            priority=0,
-            domain=TaskDomain.CAMPAIGN,
-            execution_mode=ExecutionMode.SCHEDULED_JOB,
-            allowed_launches=cast("frozenset[LaunchSurface]", allowed_launches),
+            priority=priority,
+            execution_mode=mode,
         )
 
 
@@ -428,41 +356,22 @@ def test_task_yaml_commands_are_unique_catalog_entries_with_matching_modes() -> 
         assert command in TASK_CATALOG
         assert command_to_config_name(command) == task_name
         command_nodes[command] = (task_group, task_name, groups)
-        allowed_launches = TASK_CATALOG[command].allowed_launches
+        execution_mode = TASK_CATALOG[command].execution_mode
         if "Scheduler" in groups:
-            assert LaunchSurface.SCHEDULER in allowed_launches
+            assert execution_mode is ExecutionMode.SCHEDULED_JOB
         else:
             assert task_group == "Tool"
-            assert LaunchSurface.TOOL in allowed_launches
+            assert execution_mode is not ExecutionMode.SCHEDULED_JOB
 
     assert scope_nodes == SCOPE_ONLY_NODES
     assert set(TASK_CATALOG) - set(command_nodes) == INTERNAL_SCHEDULED_COMMANDS
     assert set(command_nodes) - set(TASK_CATALOG) == set()
 
 
-def test_task_catalog_scopes_and_allowed_launches_are_complete() -> None:
+def test_task_catalog_scopes_are_complete() -> None:
     assert {
         command: definition.config_scopes for command, definition in TASK_CATALOG.items() if definition.config_scopes
     } == EXPECTED_SCOPES
-    assert {
-        command for command, definition in TASK_CATALOG.items() if definition.allowed_launches == TOOL_LAUNCHES
-    } == TOOL_LAUNCH_COMMANDS
-    assert all(
-        definition.allowed_launches == SCHEDULER_LAUNCHES
-        for command, definition in TASK_CATALOG.items()
-        if command not in TOOL_LAUNCH_COMMANDS
-    )
-
-
-def test_task_catalog_domains_are_exact_and_complete() -> None:
-    classified_commands = [command for commands in EXPECTED_DOMAIN_COMMANDS.values() for command in commands]
-
-    assert set(EXPECTED_DOMAIN_COMMANDS) == set(TaskDomain)
-    assert set(classified_commands) == EXPECTED_CATALOG_COMMANDS
-    assert len(classified_commands) == len(set(classified_commands))
-    assert {command: definition.domain for command, definition in TASK_CATALOG.items()} == {
-        command: domain for domain, commands in EXPECTED_DOMAIN_COMMANDS.items() for command in commands
-    }
 
 
 def test_task_catalog_execution_modes_are_exact_and_complete() -> None:
@@ -476,12 +385,19 @@ def test_task_catalog_execution_modes_are_exact_and_complete() -> None:
     }
 
 
-def test_launch_surface_and_execution_mode_are_orthogonal() -> None:
-    assert TASK_CATALOG["daemon"].allowed_launches == TASK_CATALOG["benchmark"].allowed_launches == TOOL_LAUNCHES
+def test_execution_mode_is_the_only_launch_rule_and_determines_priority_shape() -> None:
     assert TASK_CATALOG["daemon"].execution_mode is ExecutionMode.ASSIST_SESSION
     assert TASK_CATALOG["benchmark"].execution_mode is ExecutionMode.DIRECT_COMMAND
     assert TASK_CATALOG["restart"].execution_mode is ExecutionMode.SCHEDULED_JOB
-    assert all(isinstance(definition.allowed_launches, frozenset) for definition in TASK_CATALOG.values())
+    assert {
+        command
+        for command, definition in TASK_CATALOG.items()
+        if definition.execution_mode is not ExecutionMode.SCHEDULED_JOB
+    } == NON_SCHEDULED_COMMANDS
+    assert all(
+        (definition.priority is not None) is (definition.execution_mode is ExecutionMode.SCHEDULED_JOB)
+        for definition in TASK_CATALOG.values()
+    )
 
 
 @pytest.mark.parametrize(
@@ -537,9 +453,9 @@ def test_config_generator_rejects_unknown_and_duplicate_commands() -> None:
         (
             {"Benchmark": {"command": "benchmark", "groups": ["Scheduler"]}},
             "setting",
-            "allowed launches",
+            "execution mode",
         ),
-        ({"Main": {"command": "main", "groups": []}}, "tool", "allowed launches"),
+        ({"Main": {"command": "main", "groups": []}}, "tool", "execution mode"),
         (
             {"Main": {"command": "main", "groups": ["Campaign"]}},
             "setting",
@@ -617,8 +533,8 @@ def test_priority_matches_legacy_filter_first_match_order() -> None:
 def test_only_tool_commands_resolve_for_webui_launch() -> None:
     assert {
         command_to_config_name(command): get_tool_task_command(command_to_config_name(command))
-        for command in TOOL_LAUNCH_COMMANDS
-    } == {command_to_config_name(command): command for command in TOOL_LAUNCH_COMMANDS}
+        for command in NON_SCHEDULED_COMMANDS
+    } == {command_to_config_name(command): command for command in NON_SCHEDULED_COMMANDS}
     assert get_tool_task_command("Main") is None
     assert get_tool_task_command("Missing") is None
 

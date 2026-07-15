@@ -6,7 +6,6 @@ from module.base.button import Button
 from module.base.timer import Timer
 from module.combat.assets import BATTLE_PREPARATION
 from module.logger import logger
-from module.meta_reward.meta_reward import MetaReward
 from module.ocr.ocr import Digit, DigitCounter
 from module.os_ash import assets as ash_assets
 from module.os_ash.ash import AshCombat
@@ -94,57 +93,17 @@ class Meta(UI, MapEventHandler):
 class OpsiAshBeacon(Meta):
     def __init__(
         self,
-        config: AzurLaneConfig | str,
-        device: Device | str | None = None,
-        task: str | None = None,
+        config: AzurLaneConfig,
+        device: Device,
     ) -> None:
-        self._meta_receive: list[MetaCategory] = []
         self._meta_category: MetaCategory = "undefined"
-        super().__init__(config, device=device, task=task)
-
-    def _handle_attacking_meta_state(self) -> None:
-        if not self._pre_attack():
-            return
-        if self._satisfy_attack_condition():
-            self._make_an_attack()
+        super().__init__(config, device=device)
 
     def _set_completed_meta_category(self) -> None:
         if self.appear(ash_assets.BEACON_LIST, offset=(20, 20)):
             self._meta_category = "beacon"
         elif self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20)):
             self._meta_category = "dossier"
-
-    def _handle_completed_meta_state(self) -> None:
-        self._set_completed_meta_category()
-        self._handle_ash_beacon_reward()
-        if self._meta_category not in self._meta_receive:
-            self._meta_receive.append(self._meta_category)
-        self.config.check_task_switch()
-
-    def _attack_meta(self, *, skip_first_screenshot: bool = True) -> None:
-        """处理 META 攻击事件，页面保持在 META。"""
-        while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                self.device.screenshot()
-
-            if self.handle_map_event():
-                continue
-            state = self._get_state()
-            logger.info("Meta state:" + state.name)
-            if state == MetaState.UNDEFINED:
-                continue
-            if state == MetaState.INIT:
-                if not self._begin_meta():
-                    break
-                continue
-            if state == MetaState.ATTACKING:
-                self._handle_attacking_meta_state()
-                continue
-            if state == MetaState.COMPLETE:
-                self._handle_completed_meta_state()
-                continue
 
     def _make_an_attack(self) -> None:
         """从 ASH_START 发起 META 战斗，结束于 META、ASH_START 或奖励页。"""
@@ -189,29 +148,6 @@ class OpsiAshBeacon(Meta):
                 continue
             if self.appear(ash_assets.META_ENTRANCE, offset=(20, 300), interval=2):
                 continue
-
-    def _satisfy_attack_condition(self) -> bool:
-        """
-        检查当前 META 是否可以攻击。
-
-        信标：
-            启用 OneHitMode 且已经攻击过时，不允许继续攻击。
-        档案：
-            启用自动攻击且正在自动攻击时，不允许手动攻击。
-        """
-        if self.appear(ash_assets.BEACON_LIST, offset=(20, 20)) and self.config.OpsiAshBeacon_OneHitMode:
-            damage = self._get_meta_damage()
-            if damage > 0:
-                logger.info("Enable OneHitMode and meta damage is " + str(damage) + ", check after 30 minutes")
-                self.config.task_delay(minute=30)
-                self.config.task_stop()
-        if self.appear(ash_assets.DOSSIER_LIST, offset=(20, 20)) and self.appear(
-            ash_assets.META_AUTO_ATTACKING, offset=(20, 20)
-        ):
-            logger.info("This meta is auto attacking, check after 15 minutes")
-            self.config.task_delay(minute=15)
-            self.config.task_stop()
-        return True
 
     def _get_meta_damage(self) -> int:
         self._ensure_meta_inner_page_damage()
@@ -443,50 +379,8 @@ class OpsiAshBeacon(Meta):
                 continue
         return False
 
-    def _begin_beacon(self) -> None:
-        logger.hr("Meta Beacon Attack")
-        self._ensure_meta_page()
-        self._attack_meta()
-
-    def run(self) -> None:
-        self.ui_ensure(page_reward)
-        self._begin_beacon()
-
-        with self.config.multi_set():
-            for meta in self._meta_receive:
-                MetaReward(self.config, self.device).run(category=meta)
-            self._meta_receive = []
-            self.config.task_delay(server_update=True)
-
 
 class AshBeaconAssist(Meta):
-    def _attack_meta_assist(self, *, skip_first_screenshot: bool = True) -> bool:
-        timeout = Timer(3, count=9).start()
-        appeared = False
-        while 1:
-            if skip_first_screenshot:
-                skip_first_screenshot = False
-            else:
-                self.device.screenshot()
-
-            if not appeared and timeout.reached():
-                logger.info("No meta beacon found, delay task OpsiAshAssist")
-                break
-
-            if self.handle_map_event():
-                continue
-            if self.appear(ash_assets.ASH_START, offset=(20, 20)):
-                appeared = True
-                remain_times = self.digit_ocr_point_and_check(ash_assets.BEACON_REMAIN, 1)
-                if remain_times:
-                    self._ensure_meta_level()
-                    self._make_an_attack()
-                else:
-                    logger.info("No enough assist times, complete")
-                    break
-
-        return appeared
-
     def _make_an_attack(self) -> None:
         """在 META 支援页完成一次支援战斗，结束后仍在支援页。"""
         logger.hr("Begin meta assist combat", level=2)
@@ -563,17 +457,3 @@ class AshBeaconAssist(Meta):
                 logger.info("In meta page dossier")
                 continue
         return False
-
-    def _begin_meta_assist(self) -> bool:
-        logger.hr("Meta Beacon Assist")
-        self._ensure_meta_assist_page()
-        return self._attack_meta_assist(skip_first_screenshot=False)
-
-    def run(self) -> None:
-        self.ui_ensure(page_reward)
-
-        if self._begin_meta_assist():
-            MetaReward(self.config, self.device).run()
-            self.config.task_delay(server_update=True)
-        else:
-            self.config.task_delay(minute=(10, 20))

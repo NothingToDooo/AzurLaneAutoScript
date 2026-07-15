@@ -31,7 +31,6 @@ from module.gameplay.campaign import (
     GemsFleetReplacementBoundary,
     GemsFleetReplacementRequest,
     GemsFleetReplacementTrigger,
-    PreemptionSignal,
 )
 from module.gameplay.campaign_battle_program import (
     default_mode_battle_program,
@@ -508,19 +507,13 @@ class CampaignLiveServices:
 
 
 @dataclass(frozen=True, slots=True)
-class _CampaignExecutionSignals:
-    cancellation: CancellationSignal
-    preemption: PreemptionSignal
-
-
-@dataclass(frozen=True, slots=True)
 class _CampaignProgramRun:
     job: CampaignJobSpec
     session: CampaignSession
     state: CampaignSessionState
     program: BattleProgram
     mode: program_model.BattleProgramMode
-    signals: _CampaignExecutionSignals
+    cancellation: CancellationSignal
     is_default_mode: bool = False
 
 
@@ -573,7 +566,6 @@ class LiveCampaignWorkflow(CampaignWorkflow):
         self,
         job: CampaignJobSpec,
         cancellation: CancellationSignal,
-        preemption: PreemptionSignal,
     ) -> CampaignRunReport:
         if not isinstance(job, CampaignJobSpec):
             message = "live campaign workflow requires a CampaignJobSpec"
@@ -581,28 +573,24 @@ class LiveCampaignWorkflow(CampaignWorkflow):
         cancellation.raise_if_requested()
         session, initial_state = self._current_session(job)
         try:
-            if preemption.is_requested:
-                report = self._report(session, initial_state, CampaignStopReason.PREEMPTED)
+            pre_entry = self._pre_entry_guard(job, session, initial_state, cancellation)
+            if pre_entry is not None:
+                report = pre_entry
             else:
-                pre_entry = self._pre_entry_guard(job, session, initial_state, cancellation)
-                if pre_entry is not None:
-                    report = pre_entry
+                activation = self._activate(job, session, initial_state, cancellation)
+                if isinstance(activation, CampaignRunReport):
+                    report = activation
                 else:
-                    activation = self._activate(job, session, initial_state, cancellation, preemption)
-                    if isinstance(activation, CampaignRunReport):
-                        report = activation
-                    else:
-                        session, initial_state = activation
-                        report = self._execute_battle(
-                            job,
-                            session,
-                            initial_state,
-                            cancellation,
-                            preemption,
-                        )
+                    session, initial_state = activation
+                    report = self._execute_battle(
+                        job,
+                        session,
+                        initial_state,
+                        cancellation,
+                    )
         except BaseException as error:
             stop_reason = (
-                CampaignStopReason.PREEMPTED if isinstance(error, AbortRequested) else CampaignStopReason.FAILED
+                CampaignStopReason.CANCELLED if isinstance(error, AbortRequested) else CampaignStopReason.FAILED
             )
             preserve_cleanup_failure(
                 error,
@@ -637,14 +625,11 @@ class LiveCampaignWorkflow(CampaignWorkflow):
         session: CampaignSession,
         initial_state: CampaignSessionState,
         cancellation: CancellationSignal,
-        preemption: PreemptionSignal,
     ) -> CampaignRunReport:
 
         stage_program = session.definition.battle_programs.get(initial_state.battle_index)
         programs = self._programs
         if programs is not None:
-            if preemption.is_requested:
-                return self._report(session, initial_state, CampaignStopReason.PREEMPTED)
             cancellation.raise_if_requested()
             mode = programs.mode(session, initial_state, cancellation)
             if not isinstance(mode, program_model.BattleProgramMode):
@@ -664,7 +649,7 @@ class LiveCampaignWorkflow(CampaignWorkflow):
                         initial_state,
                         program,
                         mode,
-                        _CampaignExecutionSignals(cancellation, preemption),
+                        cancellation,
                     )
                 )
         elif stage_program is not None:
@@ -676,7 +661,6 @@ class LiveCampaignWorkflow(CampaignWorkflow):
             session,
             initial_state,
             cancellation,
-            preemption,
         )
 
     def _execute_standard_battle(
@@ -685,7 +669,6 @@ class LiveCampaignWorkflow(CampaignWorkflow):
         session: CampaignSession,
         initial_state: CampaignSessionState,
         cancellation: CancellationSignal,
-        preemption: PreemptionSignal,
     ) -> CampaignRunReport:
 
         # observe 是第一个外部 I/O；取消只在 I/O 前中断，已确认动作之后必须先完成 reduce。
@@ -694,8 +677,6 @@ class LiveCampaignWorkflow(CampaignWorkflow):
         if not isinstance(observation, BattlefieldObservation):
             message = "CampaignBattlefieldObserver.observe() must return a BattlefieldObservation"
             raise TypeError(message)
-        if preemption.is_requested:
-            return self._report(session, initial_state, CampaignStopReason.PREEMPTED)
 
         decision = (
             session.decide_auto_search(initial_state, observation)
@@ -704,9 +685,6 @@ class LiveCampaignWorkflow(CampaignWorkflow):
         )
         if decision.command is None:
             return self._report(session, decision.state, CampaignStopReason.BLOCKED)
-        if preemption.is_requested:
-            # decision.state 含 pending；未发出动作时仍返回原安全点。
-            return self._report(session, initial_state, CampaignStopReason.PREEMPTED)
 
         cancellation.raise_if_requested()
         outcome = self._driver.issue_and_confirm(session, decision.command, cancellation)
@@ -740,14 +718,12 @@ class LiveCampaignWorkflow(CampaignWorkflow):
         if self._programs is None:
             message = "campaign stage requires a BattleProgram executor"
             raise ValueError(message)
-        if run.signals.preemption.is_requested:
-            return self._report(run.session, run.state, CampaignStopReason.PREEMPTED)
-        run.signals.cancellation.raise_if_requested()
+        run.cancellation.raise_if_requested()
         execution = self._programs.execute(
             run.program,
             run.session,
             run.state,
-            run.signals.cancellation,
+            run.cancellation,
         )
         if not isinstance(execution, BattleProgramExecution):
             message = "CampaignBattleProgramExecutor.execute() must return a BattleProgramExecution"
@@ -788,8 +764,7 @@ class LiveCampaignWorkflow(CampaignWorkflow):
             run.job,
             run.session,
             reduced,
-            run.signals.cancellation,
-            run.signals.preemption,
+            run.cancellation,
         )
 
     def _program_result_report(
@@ -813,7 +788,7 @@ class LiveCampaignWorkflow(CampaignWorkflow):
                 run.job,
                 run.session,
                 reduced,
-                run.signals.cancellation,
+                run.cancellation,
             )
             return self._report(
                 run.session,
@@ -1016,7 +991,6 @@ class LiveCampaignWorkflow(CampaignWorkflow):
         session: CampaignSession,
         state: CampaignSessionState,
         cancellation: CancellationSignal,
-        preemption: PreemptionSignal,
     ) -> tuple[CampaignSession, CampaignSessionState] | CampaignRunReport:
         if self._activator is None:
             return session, state
@@ -1056,10 +1030,7 @@ class LiveCampaignWorkflow(CampaignWorkflow):
                 next_stage_ref=completion.next_stage_ref,
             )
         if not isinstance(activated, CampaignCheckpointUnavailable):
-            selected = self._activated_session(job, activated)
-            if preemption.is_requested:
-                return self._report(*selected, CampaignStopReason.PREEMPTED)
-            return selected
+            return self._activated_session(job, activated)
         if job.progress is None:
             message = "fresh campaign activation cannot report an unavailable checkpoint"
             raise ValueError(message)

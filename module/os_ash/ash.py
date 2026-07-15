@@ -136,8 +136,4 @@ class OSAsh(UI, MapEventHandler):
 
     def handle_ash_beacon_attack(self) -> bool:
         """在区域地图处理信标攻击；结束后仍在区域地图，返回是否发起攻击。"""
-        if self.ash_collect_status() >= 100 and self._support_call_ash_beacon_task():
-            self.config.task_call(task="OpsiAshBeacon")
-            return True
-
-        return False
+        return self.ash_collect_status() >= 100 and self._support_call_ash_beacon_task()

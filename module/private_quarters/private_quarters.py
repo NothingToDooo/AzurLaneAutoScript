@@ -9,7 +9,7 @@ from module.private_quarters.assets import (
 )
 from module.private_quarters.interact import PQInteract
 from module.private_quarters.shop import PQShop
-from module.ui.page import page_dormmenu, page_private_quarters
+from module.ui.page import page_private_quarters
 
 
 class PrivateQuarters(PQInteract, PQShop):
@@ -105,12 +105,3 @@ class PrivateQuarters(PQInteract, PQShop):
                 return
 
             self.pq_execute_interact(target_ship)
-
-    def run(self) -> None:
-        """从任意页面执行私宅任务，结束于可能带 info_bar 的主页。"""
-        self.ui_ensure(page_dormmenu)
-        self.ui_goto(page_private_quarters, get_ship=False)
-        self.handle_info_bar()
-        self.pq_run()
-
-        self.config.task_delay(server_update=True)

@@ -1,20 +1,18 @@
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from module.runtime.errors import SettingsDocumentError
-from module.state import SettingsSnapshot
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from datetime import datetime
-
-    from module.state import JsonValue
 
 SETTINGS_SCHEMA_VERSION = 1
 
+type JsonValue = bool | int | float | str | list[JsonValue] | dict[str, JsonValue] | None
 type FrozenJsonValue = bool | int | float | str | tuple[FrozenJsonValue, ...] | Mapping[str, FrozenJsonValue] | None
 type FrozenTaskSettings = Mapping[str, FrozenJsonValue]
 
@@ -54,6 +52,33 @@ def _expected_task_ids(task_ids: Iterable[str]) -> frozenset[str]:
     return frozenset(values)
 
 
+def _raw_tasks(payload: JsonValue, *, expected: frozenset[str]) -> dict[str, JsonValue]:
+    if not isinstance(payload, dict):
+        message = "settings payload must be an object"
+        raise SettingsDocumentError(message)
+    allowed_fields = {"schema_version", "tasks"}
+    if set(payload) != allowed_fields:
+        missing = sorted(allowed_fields - set(payload))
+        unknown = sorted(set(payload) - allowed_fields)
+        message = f"settings payload fields mismatch: missing={missing}, unknown={unknown}"
+        raise SettingsDocumentError(message)
+    if type(payload["schema_version"]) is not int or payload["schema_version"] != SETTINGS_SCHEMA_VERSION:
+        message = f"settings schema_version must be {SETTINGS_SCHEMA_VERSION}"
+        raise SettingsDocumentError(message)
+
+    raw_tasks = payload["tasks"]
+    if not isinstance(raw_tasks, dict):
+        message = "settings tasks must be an object"
+        raise SettingsDocumentError(message)
+    actual = set(raw_tasks)
+    if actual != expected:
+        missing = sorted(expected - actual)
+        unknown = sorted(actual - expected)
+        message = f"settings task coverage mismatch: missing={missing}, unknown={unknown}"
+        raise SettingsDocumentError(message)
+    return raw_tasks
+
+
 @dataclass(frozen=True, slots=True)
 class TaskSettingsDocument:
     """一次 settings revision 的深度只读、按 TaskId 完整解析结果。"""
@@ -63,40 +88,26 @@ class TaskSettingsDocument:
     tasks: Mapping[str, FrozenTaskSettings]
 
     @classmethod
-    def from_snapshot(
+    def from_payload(
         cls,
-        snapshot: SettingsSnapshot,
+        payload: JsonValue,
         *,
+        revision: int,
+        updated_at: datetime,
         task_ids: Iterable[str],
     ) -> TaskSettingsDocument:
-        if not isinstance(snapshot, SettingsSnapshot):
-            message = "snapshot must be a SettingsSnapshot"
+        """直接解析当前配置，不创建数据库 snapshot。"""
+        if type(revision) is not int or revision <= 0:
+            message = "revision must be a positive integer"
+            raise ValueError(message)
+        if not isinstance(updated_at, datetime):
+            message = "updated_at must be a datetime"
             raise TypeError(message)
+        if updated_at.utcoffset() is None:
+            message = "updated_at must be timezone-aware"
+            raise ValueError(message)
         expected = _expected_task_ids(task_ids)
-        payload = snapshot.payload
-        if not isinstance(payload, dict):
-            message = "settings payload must be an object"
-            raise SettingsDocumentError(message)
-        allowed_fields = {"schema_version", "tasks"}
-        if set(payload) != allowed_fields:
-            missing = sorted(allowed_fields - set(payload))
-            unknown = sorted(set(payload) - allowed_fields)
-            message = f"settings payload fields mismatch: missing={missing}, unknown={unknown}"
-            raise SettingsDocumentError(message)
-        if type(payload["schema_version"]) is not int or payload["schema_version"] != SETTINGS_SCHEMA_VERSION:
-            message = f"settings schema_version must be {SETTINGS_SCHEMA_VERSION}"
-            raise SettingsDocumentError(message)
-
-        raw_tasks = payload["tasks"]
-        if not isinstance(raw_tasks, dict):
-            message = "settings tasks must be an object"
-            raise SettingsDocumentError(message)
-        actual = set(raw_tasks)
-        if actual != expected:
-            missing = sorted(expected - actual)
-            unknown = sorted(actual - expected)
-            message = f"settings task coverage mismatch: missing={missing}, unknown={unknown}"
-            raise SettingsDocumentError(message)
+        raw_tasks = _raw_tasks(payload, expected=expected)
 
         frozen: dict[str, FrozenTaskSettings] = {}
         for task_id, raw_settings in raw_tasks.items():
@@ -108,8 +119,8 @@ class TaskSettingsDocument:
             )
 
         return cls(
-            revision=snapshot.revision,
-            updated_at=snapshot.updated_at,
+            revision=revision,
+            updated_at=updated_at,
             tasks=MappingProxyType(frozen),
         )
 

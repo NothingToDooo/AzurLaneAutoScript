@@ -2,17 +2,11 @@ import argparse
 import signal
 import sys
 import threading
-from functools import partial
-from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from module.bootstrap import (
-    InstanceProcessExitKind,
-    build_default_instance_process_host,
-    build_default_notification_maintenance,
-)
+from module.bootstrap.production import run_default_command
 from module.logger import logger
-from module.notify import NotificationSpoolPump
+from module.runtime.runner import CommandStatus
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -37,15 +31,8 @@ class _ProcessStopSignal:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run the typed ALAS instance runtime")
-    parser.add_argument("command", nargs="?", default="alas", help="alas or a direct task command")
-    parser.add_argument("--instance", default="alas", help="configuration instance name")
-    parser.add_argument(
-        "--project-root",
-        type=Path,
-        default=Path(__file__).resolve().parent,
-        help="ALAS source-tree root",
-    )
+    parser = argparse.ArgumentParser(description="Run the personal ALAS runtime")
+    parser.add_argument("command", nargs="?", default="alas", help="alas or one task command")
     return parser
 
 
@@ -60,18 +47,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         previous[item] = signal.getsignal(item)
         signal.signal(item, stop.request)
     try:
-        maintenance_factory = partial(build_default_notification_maintenance, args.project_root)
-        notification_pump = NotificationSpoolPump(
-            maintenance_factory,
-            instance_name=args.instance,
+        outcome = run_default_command(
+            args.command,
+            stop_signal=stop,
         )
-        notification_pump.start()
-        try:
-            with build_default_instance_process_host(args.project_root) as host:
-                exit_ = host.execute(args.instance, args.command, stop_signal=stop)
-        finally:
-            if notification_pump.stop():
-                notification_pump.run_once()
     finally:
         for item, handler in previous.items():
             signal.signal(
@@ -79,13 +58,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 cast("Callable[[int, FrameType | None], object] | int | None", handler),
             )
 
-    if exit_.kind is InstanceProcessExitKind.FINISHED:
+    if outcome.status is CommandStatus.FINISHED:
         return 0
-    if exit_.kind is InstanceProcessExitKind.RESTART_REQUESTED:
+    if outcome.status is CommandStatus.RESTART_REQUESTED:
         return EXIT_RESTART_REQUESTED
-    if exit_.kind is InstanceProcessExitKind.STOPPED:
+    if outcome.status is CommandStatus.STOPPED:
         return EXIT_STOPPED
-    logger.error(f"Instance {args.instance!r} failed while executing {args.command!r}")
+    logger.error(f"Command {args.command!r} failed: {outcome.message or outcome.status.value}")
+    if outcome.error_bundle is not None:
+        logger.error(f"Error bundle: {outcome.error_bundle}")
     return 1
 
 

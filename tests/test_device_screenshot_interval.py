@@ -23,19 +23,10 @@ class _ScreenshotContext:
         return self._screenshot_interval.limit
 
 
-def test_default_screenshot_interval_uses_nemu_ipc_limit() -> None:
+def test_default_screenshot_interval_uses_compiled_value_directly() -> None:
     context = _ScreenshotContext(0.3)
 
     context.screenshot_interval_set()
 
     assert context.config.Optimization_ScreenshotInterval == 0.3
-    assert context.interval_limit == 0.2
-
-
-def test_default_screenshot_interval_revises_config_and_keeps_runtime_cap() -> None:
-    context = _ScreenshotContext(0.5)
-
-    context.screenshot_interval_set()
-
-    assert context.config.Optimization_ScreenshotInterval == 0.3
-    assert context.interval_limit == 0.2
+    assert context.interval_limit == 0.3

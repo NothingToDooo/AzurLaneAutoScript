@@ -3,8 +3,9 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Protocol
 
-from module.application.cancellation import AbortToken, PreemptionRequest
+from module.application.cancellation import AbortToken
 from module.application.effects import (
+    DelayTask,
     DisableTask,
     RequestAppRestart,
     RescheduleSelf,
@@ -12,9 +13,9 @@ from module.application.effects import (
     ScheduleEffect,
     WakeTask,
 )
-from module.application.identifiers import RunId, TaskId
+from module.application.identifiers import TaskId
 from module.application.metadata import RunMetadata
-from module.application.notifications import OperatorNotificationKind, OperatorNotificationRequest
+from module.application.notifications import OperatorNotificationRequest
 from module.application.outcomes import Blocked, Cancelled, Deferred, Faulted, Retryable, RunOutcome, Succeeded
 from module.application.state_effects import DeleteTaskState, StateEffect, UpsertTaskState
 
@@ -45,7 +46,7 @@ def _validate_distinct_effects(effects: tuple[ScheduleEffect, ...]) -> None:
             has_restart = True
             continue
 
-        if isinstance(effect, RescheduleTask | WakeTask | DisableTask):
+        if isinstance(effect, RescheduleTask | DelayTask | WakeTask | DisableTask):
             if effect.task_id in task_operations:
                 message = "effects must contain at most one target-task schedule operation per task_id"
                 raise ValueError(message)
@@ -65,22 +66,18 @@ def _validate_distinct_state_effects(state_effects: tuple[StateEffect, ...]) -> 
 @dataclass(frozen=True, slots=True)
 class TaskContext:
     task_id: TaskId
-    run_id: RunId
     started_at: datetime
     mode: ExecutionMode
     metadata: RunMetadata
     abort: AbortToken
-    preemption: PreemptionRequest
 
     def __post_init__(self) -> None:
         expected = (
             ("task_id", self.task_id, TaskId),
-            ("run_id", self.run_id, RunId),
             ("started_at", self.started_at, datetime),
             ("mode", self.mode, ExecutionMode),
             ("metadata", self.metadata, RunMetadata),
             ("abort", self.abort, AbortToken),
-            ("preemption", self.preemption, PreemptionRequest),
         )
         for name, value, expected_type in expected:
             if not isinstance(value, expected_type):
@@ -106,7 +103,10 @@ class TaskResult:
             message = "effects must be a tuple"
             raise TypeError(message)
         if any(
-            not isinstance(effect, RescheduleSelf | RescheduleTask | WakeTask | DisableTask | RequestAppRestart)
+            not isinstance(
+                effect,
+                RescheduleSelf | RescheduleTask | DelayTask | WakeTask | DisableTask | RequestAppRestart,
+            )
             for effect in self.effects
         ):
             message = "effects must contain only ScheduleEffect values"
@@ -128,11 +128,6 @@ class TaskResult:
         kinds = tuple(request.kind for request in self.notifications)
         if len(kinds) != len(set(kinds)):
             message = "notifications must contain at most one request per kind"
-            raise ValueError(message)
-        if any(
-            kind in {OperatorNotificationKind.RUN_FAULTED, OperatorNotificationKind.PROCESS_FAILED} for kind in kinds
-        ):
-            message = "fault notifications are derived outside task implementations"
             raise ValueError(message)
 
 

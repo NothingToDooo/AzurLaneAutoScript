@@ -15,8 +15,6 @@ from module.logger import emit_renderables, logger
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
-    from module.config.config import AzurLaneConfig
-
 type BenchmarkResult = float | str
 type BenchmarkRecord = tuple[str, BenchmarkResult]
 type SpeedLevel = tuple[float, str, str]
@@ -178,13 +176,3 @@ class Benchmark(DaemonBase, CampaignUI):
         logger.attr("TestScene", self.config.Benchmark_TestScene)
         screenshot, click = self.get_test_methods()
         self.benchmark(screenshot, click)
-
-
-def run_benchmark(config: AzurLaneConfig | str) -> bool:
-    try:
-        Benchmark(config, task="Benchmark").run()
-    except RequestHumanTakeover:
-        logger.critical("Request human takeover")
-        return False
-    else:
-        return True

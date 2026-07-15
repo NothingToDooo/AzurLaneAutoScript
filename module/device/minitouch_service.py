@@ -1,5 +1,4 @@
 import socket
-import threading
 import time
 from dataclasses import dataclass
 from functools import wraps
@@ -8,7 +7,7 @@ from typing import TYPE_CHECKING, Protocol
 import numpy as np
 from adbutils.errors import AdbError
 
-from module.base.decorator import cached_property, del_cached_property, has_cached_property
+from module.base.decorator import cached_property, del_cached_property
 from module.base.failure import raise_cleanup_errors
 from module.base.runtime_random import runtime_random
 from module.base.timer import Timer
@@ -334,7 +333,7 @@ def retry[TargetT: _MinitouchRecoveryTarget, **P, ResultT](
 
 
 class MinitouchController:
-    """持有 minitouch 连接、转发、线程与命令构建器。"""
+    """持有 minitouch 连接、转发和命令构建器。"""
 
     def __init__(self, session: MinitouchSession) -> None:
         self.session = session
@@ -344,10 +343,6 @@ class MinitouchController:
         self._minitouch_stream: AdbConnection | None = None
         self.max_x = 1280
         self.max_y = 720
-        self._minitouch_init_thread: threading.Thread | None = None
-        self._minitouch_lifecycle_lock = threading.RLock()
-        self._minitouch_thread_lock = threading.RLock()
-        self._minitouch_releasing = False
 
     @property
     def config(self) -> MinitouchConfig:
@@ -360,40 +355,23 @@ class MinitouchController:
     def release(self) -> None:
         """在旧 serial 仍有效时按依赖顺序释放控制资源。"""
         errors: list[BaseException] = []
-        current_thread = threading.current_thread()
-        with self._minitouch_thread_lock:
-            self._minitouch_releasing = True
-            init_thread = self._minitouch_init_thread
-        if init_thread is not None and init_thread is not current_thread:
-            try:
-                init_thread.join()
-            except BaseException as error:  # noqa: BLE001 - join 失败后仍须释放 socket 与端口转发。
-                errors.append(error)
         try:
-            with self._minitouch_lifecycle_lock:
-                with self._minitouch_thread_lock:
-                    if self._minitouch_init_thread is init_thread or init_thread is current_thread:
-                        self._minitouch_init_thread = None
-                try:
-                    self._close_minitouch_client()
-                except BaseException as error:  # noqa: BLE001 - client 失败后仍须释放转发与 stream。
-                    errors.append(error)
-                if self._minitouch_port:
-                    try:
-                        self.session.adb_forward_remove(f"tcp:{self._minitouch_port}")
-                    except BaseException as error:  # noqa: BLE001 - 转发失败后仍须清空本地状态。
-                        errors.append(error)
-                    finally:
-                        self._minitouch_port = 0
-                try:
-                    self._close_minitouch_stream()
-                except BaseException as error:  # noqa: BLE001 - stream 失败后仍须失效其余本地状态。
-                    errors.append(error)
-                self._minitouch_pid = ""
-                del_cached_property(self, "_minitouch_builder")
-        finally:
-            with self._minitouch_thread_lock:
-                self._minitouch_releasing = False
+            self._close_minitouch_client()
+        except BaseException as error:  # noqa: BLE001 - client 失败后仍须释放转发与 stream。
+            errors.append(error)
+        if self._minitouch_port:
+            try:
+                self.session.adb_forward_remove(f"tcp:{self._minitouch_port}")
+            except BaseException as error:  # noqa: BLE001 - 转发失败后仍须清空本地状态。
+                errors.append(error)
+            finally:
+                self._minitouch_port = 0
+        try:
+            self._close_minitouch_stream()
+        except BaseException as error:  # noqa: BLE001 - stream 失败后仍须失效其余本地状态。
+            errors.append(error)
+        self._minitouch_pid = ""
+        del_cached_property(self, "_minitouch_builder")
         raise_cleanup_errors(errors, message="minitouch resource cleanup failed")
 
     def release_resource(self) -> None:
@@ -477,55 +455,7 @@ class MinitouchController:
 
     @property
     def minitouch_builder(self) -> CommandBuilder:
-        current_thread = threading.current_thread()
-        with self._minitouch_thread_lock:
-            init_thread = self._minitouch_init_thread
-        if init_thread is not None and init_thread is not current_thread:
-            init_thread.join()
-        with self._minitouch_lifecycle_lock:
-            with self._minitouch_thread_lock:
-                if self._minitouch_init_thread is init_thread:
-                    self._minitouch_init_thread = None
-                if self._minitouch_releasing:
-                    message = "minitouch is being released"
-                    raise RuntimeError(message)
-            return self._minitouch_builder
-
-    def early_minitouch_init(self) -> None:
-        """截图阶段异步预热 minitouch，使首次点击快约 0.05 秒。"""
-        with self._minitouch_thread_lock:
-            if (
-                self._minitouch_releasing
-                or has_cached_property(self, "_minitouch_builder")
-                or self._minitouch_init_thread is not None
-            ):
-                return
-
-            def early_minitouch_init_func() -> None:
-                current_thread = threading.current_thread()
-                try:
-                    # 覆盖 cached_property 写入；release 要么先阻止启动，要么等完整发布后再清理。
-                    with self._minitouch_lifecycle_lock:
-                        with self._minitouch_thread_lock:
-                            if self._minitouch_releasing:
-                                return
-                        _ = self._minitouch_builder
-                finally:
-                    with self._minitouch_thread_lock:
-                        if self._minitouch_init_thread is current_thread:
-                            self._minitouch_init_thread = None
-
-            thread = threading.Thread(target=early_minitouch_init_func, daemon=True)
-            self._minitouch_init_thread = thread
-            try:
-                # pointer 发布与 start 在同一个临界区，release 永远看不到未启动线程。
-                thread.start()
-            except BaseException:
-                self._minitouch_init_thread = None
-                raise
-
-    def early_init(self) -> None:
-        self.early_minitouch_init()
+        return self._minitouch_builder
 
     def minitouch_init(self) -> None:
         logger.hr("MiniTouch init")
