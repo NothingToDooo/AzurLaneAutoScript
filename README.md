@@ -1,31 +1,16 @@
 # AzurLaneAutoScript Personal
 
-这是一个只给自己使用的 AzurLaneAutoScript 分支。
+这是只给自己使用的 AzurLaneAutoScript 分支：Windows、国服、一个 MuMu 12 模拟器、一个执行进程。
 
-当前分支的目标不是继续兼容上游的多人、多平台、多区服、多分发场景，而是把项目收敛成一个清楚、好维护、能直接运行的个人版本：
-
-- 只保留国区。
-- 只保留 Windows。
-- 只保留 MuMu。
-- 设备截图固定 `nemu_ipc`。
-- 设备控制固定 `minitouch`。
-- WebUI 只监听本机，作为主要入口。
-- 保留 SMTP 邮件通知；旧配置键 `OnePushConfig` 仅用于兼容已有配置。
-- `GemsFarming` 保留困难模式、装备码、潜艇和独立心情控制。
-- Python 固定 3.14.6。
-- 依赖和运行环境由 `uv` 管理。
-- 项目直接运行，不做打包、安装器、自更新或通用分发。
+这个版本保留全部现有玩法和 WebUI，也保留 CLI 调试入口；不保留多实例、多平台、多区服、打包分发、自更新或旧配置兼容代码。截图固定使用 `nemu_ipc`，控制固定使用 `minitouch`。
 
 ## 运行
 
-先同步依赖：
+依赖与 Python 环境由 `uv` 管理：
 
 ```powershell
 uv sync
 ```
-
-从旧版本迁移时，将原 `config/alas.json` 复制到当前仓库。配置加载会保留 SMTP 与
-`GemsFarming` 增强字段，并把旧 `EmulatorInfo.path` 迁移到 MuMu 专用路径。
 
 启动 WebUI：
 
@@ -33,28 +18,41 @@ uv sync
 uv run python gui.py
 ```
 
-直接运行调度器：
+需要打开 WebUI 后立即启动调度器时，使用无参数开关 `uv run python gui.py --run`。
+
+直接启动调度器：
 
 ```powershell
 uv run python alas.py
 ```
 
-## 开发检查
+首次运行会从 `config/template.json` 创建唯一的 `config/alas.json`。之后 WebUI、CLI、模拟器与 ADB 路径、调度状态和任务 checkpoint 都使用这一个文件。该分支只接受当前配置 schema；重复 JSON 字段、`NaN`/`Infinity`、未知字段、无效范围和失效的活动引用都会直接报错，不做旧配置迁移。
 
-常用检查命令：
+WebUI 保存和导入前会用当前内容定义离线构造全部 57 个任务进行校验，但不会连接或启动模拟器。跨字段修改如果暂时不完整，会保留在当前 WebUI 会话中，等后续字段组成合法候选后再一次写入。
+
+CLI 也可以运行一个明确命令来复现问题，例如：
 
 ```powershell
-uv run ruff check .
-uv run ty check
-uv run pytest
+uv run python alas.py benchmark
+uv run python alas.py event_story
 ```
 
-## 配置生成
+异常会在 `log/error/` 生成包含 traceback、最近 2000 行日志和最近游戏截图的 error bundle。SMTP 通知使用 `alas.json` 中的显式 `Smtp*` 字段，不使用 OnePush 配置。
 
-修改 `module/config/argument/*.yaml` 后，在仓库根目录运行：
+## 游戏更新
+
+活动、关卡和客户端行为的维护入口见 [架构说明](docs/architecture.md)。修改 manifest 或配置参数后运行：
 
 ```powershell
 uv run python -m module.config.config_updater
+uv run python -m dev_tools.campaign_runtime_profile_validator
 ```
 
-这个分支会继续小步清理旧结构。清理优先级是：先删已经不可达的分发、语言、资源和设备后端，再把仍然有运行职责的代码迁到更合适的位置。
+## 开发检查
+
+```powershell
+uv run pytest
+uv run ruff check . --no-cache
+uv run ruff format --check .
+uv run ty check
+```

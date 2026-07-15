@@ -1,258 +1,146 @@
-# ALAS 目标架构
+# ALAS 个人版架构
 
-本文定义本仓库重构完成时必须成立的边界。它不是旧实现说明，也不承诺旧类、旧配置 schema 或旧扩展点兼容。
+本文只描述当前实现。这个分支面向一台 Windows 电脑、一个 MuMu 12 模拟器和国服客户端，不保留多实例、多设备、多平台或旧配置兼容路径。
 
-## 设计目标
+## 目标与边界
 
-- 保留游戏仍存在的全部玩法；已经从游戏删除的 SOS 不属于迁移范围。
-- 游戏更新时，优先新增内容定义、识别 profile 或窄领域策略，而不是继续扩大公共基类。
-- 一次设备会话只有一个写入者；调度任务、辅助会话和直接命令不能并发操作同一模拟器。
-- 游戏操作循环保持同步、单线程。并发只存在于进程监督、事件订阅等外围，不进入点击决策链。
-- 任何正常结束、等待、重试、阻塞、取消和故障都有显式结果，不再以异常或配置文件副作用表达正常控制流。
+- 保留游戏仍存在的全部玩法；已经从游戏删除的 SOS 不保留。
+- 同一时刻只有一个执行者操作模拟器，截图、识别、点击和状态提交均为同步串行流程。
+- WebUI 是日常入口；CLI 保留，用于直接运行、复现和调试。
+- 游戏更新优先修改内容定义或窄领域适配，不扩展通用框架。
+- 正常结束、等待、重试、阻塞、取消和故障都返回显式结果。
+- 只维护当前 schema。配置或内容不符合当前契约时立即报错，不做静默迁移。
 
-## 依赖方向
-
-```text
-WebUI / Supervisor
-        ↓ IPC
-InstanceAgent
-        ↓
-application ─────→ state
-     ↓                ↑
-domain use cases ─────┘
-     ↓
-interaction ports
-     ↓
-MuMu12 / Replay adapters
-
-content definitions ─→ typed catalogs ─→ domain policies
-client UI profiles ──────────────→ recognizers / action drivers
-```
-
-约束：
-
-- `application` 只认识任务身份、运行模式、取消/抢占、结果和效果。
-- task catalog 只保存身份和启动元数据；implementation resolver 从同一个不可变 snapshot 一次产出
-  `TaskResolution(task, metadata)`，不能让任务设置与 run revision 分两次读取。
-- 领域模块不直接改 scheduler、全局配置或 WebUI 状态。
-- `interaction` 的原始截图无业务副作用；全局弹窗处理发生在显式 `poll(scope)` 层。
-- `state` 保存事实和原子事务，不决定业务策略。
-- adapter 可以依赖端口和第三方库；端口不能反向依赖 adapter。
-
-## 三种运行语义
-
-- `SCHEDULED_JOB`：有限、可重调度的任务，包括 Campaign、设施、商店和大世界 farming。
-- `ASSIST_SESSION`：与玩家操作共存、只能显式取消的 daemon。
-- `DIRECT_COMMAND`：用户主动执行的一次性工具。
-
-允许从 WebUI 的哪个入口启动是另一条轴，由 `LaunchSurface` 表达，不能用它推导运行生命周期。
-
-## 任务结果和效果
-
-任务统一返回 `TaskResult(outcome, effects)`。
-
-终态闭合为：
-
-- `Succeeded`
-- `Deferred`
-- `Retryable`
-- `Blocked`
-- `Cancelled`
-- `Faulted`
-
-跨任务或调度副作用闭合为：
-
-- `RescheduleSelf`
-- `RescheduleTask`，只调整既有目标任务的 due time 并保持 enabled 状态
-- `WakeTask`，并显式选择尊重禁用或强制启用
-- `DisableTask`
-- `RequestAppRestart`
-
-用户立即停止由 `AbortToken` 表达；调度器请求在安全点切换由 `PreemptionRequest` 表达。两者不能合并。
-
-## 状态事实
-
-每个实例使用一个 SQLite/WAL 数据库，并分离：
-
-- `settings`：带 revision 的用户意图快照
-- `configuration_source`：编译后配置摘要及其实际发布到的 settings revision
-- `schedule`：enabled、due time、priority
-- `task_state`：领域 checkpoint
-- `runs`：运行身份、版本信息和终态
-- `run_events`：有序运行事实
-- `outbox`：与 run 终态同事务提交的外发事件
-
-一次 run 的终态、调度变化、领域事件和 outbox 必须原子提交。游戏点击无法回滚，因此不可逆动作采用：
+## 运行路径
 
 ```text
-observe → record intent → issue action → observe confirmation → checkpoint
+WebUI ──→ singleton ProcessManager ──→ child process ─┐
+                                                     ├─→ run_default_command
+CLI ─────────────────────────────────────────────────┘
+                                                           │
+                                                           ├─ load config/alas.json
+                                                           ├─ compile settings + parsed driver document + SMTP
+                                                           ├─ load manifests and validate profiles
+                                                           ├─ create one in-process config owner
+                                                           ├─ build one MuMu Device and 57 task factories
+                                                           └─ RuntimeRunner
+                                                                  │
+                                                                  ├─ scheduler loop: command = alas
+                                                                  └─ one task: explicit CLI/WebUI command
+                                                                         │
+                                                                         └─ RunCoordinator
+                                                                                │
+                                                                                ├─ TaskResult
+                                                                                └─ ConfigStateRepository
+                                                                                       └─ atomic write alas.json
 ```
 
-实例启动时只在编译摘要变化后以 CAS 原子替换 `settings + schedule + configuration_source`；摘要未变化时，
-必须保留运行中已经推进的 due time，禁止用磁盘 JSON 的旧 `NextRun` 覆盖 SQLite 事实。
+WebUI 使用子进程是为了能够可靠停止游戏任务并持续显示日志，不代表允许多个模拟器执行者。`ProcessManager` 是进程内 singleton；保存或导入配置前先停止唯一子进程。CLI 直接调用同一个 production composition root，不维护第二套运行逻辑。
 
-每次 run 必须记录 settings revision、content revision 和 client UI revision，保证故障与 Replay 可以还原当时环境。
+## 唯一配置与状态
 
-`RescheduleTask` 与 `WakeTask` 不能混用：前者用于 OpSi 等批量延后但不改变用户启用意图的场景，后者表示真正唤醒任务。
+唯一事实源是 `config/alas.json`。首次运行时，如果该文件不存在，就从 `config/template.json` 复制一次；之后只读取和写入 `alas.json`。
 
-## 设备交互
+同一个文件保存三类事实：
 
-`Frame` 拥有只读像素、单调递增 id、monotonic 时间和带时区 wall time。业务代码不得依赖可被下一次截图覆盖的 `device.image`。
+- 模拟器、ADB 路径、用户配置和任务开关；
+- `Scheduler.Enable`、`Scheduler.NextRun` 等调度状态；
+- `Storage.Storage` 中的领域 checkpoint。
 
-动作是闭合类型：`Click`、`LongPress`、`Swipe`。每个动作保存语义目标、最终坐标和产生决策的 frame id。Live MuMu12 与 Replay 实现同一组端口：
+子进程启动时只读取一次文件，并由同一次编译得到 typed settings 和 legacy driver 需要的 parsed document。`ConfigStateRepository` 随后成为该子进程内唯一的文档 owner，同时持有 raw 与 parsed 快照：scheduler、checkpoint 和 legacy `AzurLaneConfig` 都经它读取或提交，不在调度循环中反复读盘，也不会由两个 writer 用 stale snapshot 相互覆盖。每次修改先完整编译候选，再一次原子写入，写失败时内存快照和磁盘都保持原状。
 
-- `FrameSource`
-- `ActionSink`
-- `AppLifecycle`
-- `Clock`
+typed settings 在子进程启动时固定；WebUI 修改配置会先离线校验候选，再停止唯一子进程并写入，下一次启动使用新 revision。个人版没有 SQLite、WAL、CAS、lease、outbox、配置发布器或热重载协议，也不支持运行中从外部编辑文件。
 
-## 领域边界
+任务内部学习或推进的字段仍通过同一个 owner 提交，并在下一次 legacy config bind 时读取最新值，不能再投影回 frozen policy。需要影响当前进程调度的变化必须作为 workflow report 的显式事实返回；例如装备码连续导出保留最新表，指挥喵训练自动关闭后立即停止周期检查。
 
-共享 runtime 契约不意味着共享业务状态机。稳定领域至少包括：
+配置 JSON 拒绝重复字段、非有限数字、未知或缺失字段、隐式字符串数值转换和无效 MuMu/截图参数。编译结果的 payload 对调用方只返回独立快照，摘要不会因外部 mutation 失真。
 
-- Grid Campaign
-- 非网格 Encounter
-- Exercise
-- Operation Siren World
-- Commission / Research / Tactical 等独立设施
-- Market 与 DockCapacityRecovery
-- 复合日常 use case
-- 活动专用不可变 client profile 与窄策略
+本地 `Scheduler.NextRun` 按 `Asia/Shanghai` 解释，运行时统一转换为带时区的 UTC 时间。checkpoint 保存 schema version、JSON payload 和 UTC 更新时间。任务只能修改自己的 checkpoint namespace。
 
-Raid、Coalition 只与 Campaign 共享战斗能力，不共享地图 session；Operation Siren 是持久世界，不是大号 Campaign。
+## 任务与结果
 
-## 活动内容与客户端 profile
+`TASK_CATALOG` 是 57 个命令的唯一目录。每个任务只声明：
 
-活动不再由日期分支、动态资源名或 Campaign 子类表达。`EventPack.activity` 是严格的
-`EventStoryDefinition | RaidDefinition | CoalitionDefinition | None`；`ActivityCatalog` 从与
-`ContentCatalog` 相同的不可变 manifest snapshot 一次建立，并只对外暴露带 `ContentId` 的
-`EventStoryActivity`、`RaidActivity`、`CoalitionActivity` 与不可变 activity 序列。
+- command；
+- config scopes；
+- scheduler priority；
+- `ExecutionMode`。
 
-所有权分配如下：
+运行模式只有：
 
-| 层 | 拥有的事实 | 不应拥有 |
-| --- | --- | --- |
-| manifest definition | EventStory 是否可用；Raid 的 modes、daily modes、ticket modes；Coalition 的 stage、battle count、fleet rule | 模板、ROI、OCR 参数、日期特判 |
-| immutable client profile | 页面、入口、结束检查点、识别参数与封闭的导航/OCR/弹窗策略 | 可玩 mode、战斗次数、调度和任意回调 |
-| domain/workflow | 构造已验证 plan/session，执行有界安全单元，返回 typed result/report | scheduler 写入、跨任务唤醒或禁用 |
-| application/coordinator | 把 report 转换为 `TaskResult` 与调度 effect | 客户端识别和点击细节 |
+- `SCHEDULED_JOB`：由 `alas` 调度循环选择的有限任务；
+- `ASSIST_SESSION`：需要用户明确停止的辅助会话；
+- `DIRECT_COMMAND`：一次性工具。
 
-client profile 必须是 `frozen` 值对象，策略必须是闭合枚举或窄类型。EventStory 只组合 landing page、
-special-entry probe 和 popup handler；Raid 只组合 landing/navigation、每 mode 入口与次数识别；
-Coalition 只组合 mode driver、entry strategy、PT OCR、oil 读取位置与 stage assets。新活动优先只新增
-manifest 并绑定已有 profile；客户端布局真正出现新切面时，才增加一个 profile 或一个窄策略，
-不能以活动日期继续扩大公共 runner。
+任务统一返回 `TaskResult`。outcome 包括 `Succeeded`、`Deferred`、`Retryable`、`Blocked`、`Cancelled` 和 `Faulted`；调度 effect 包括重新调度、唤醒、禁用任务和请求重启；checkpoint 通过独立 state effect 写入。`RunCoordinator` 负责闭合一次执行，业务任务不直接操作 WebUI 或运行进程。
 
-War Archives 不是 Activity runner，但遵守相同的内容/客户端分层：每个 archive manifest 在 pack 层声明
-semantic `war_archives.profile`，不可变 client registry 只负责把该语义 profile 绑定到入口模板。profile 随
-`StageSpec → CampaignStageDefinition` 投影到运行时；导航不得再用 `Campaign_Event`、日期 ID 或全局字典查资产。
-manifest 引用集合与 client registry 必须 exact closure，unknown 与 unused profile 都在启动期失败。
+checkpoint 只记录 `settings_revision` 和 `content_revision`。配置或内容发生变化时，依赖旧 revision 的 Campaign、活动或大世界进度会失效并按当前事实重新开始；没有无人使用的 client UI revision 轴。
 
-production bootstrap 必须遵守以下顺序：
+## 玩法与内容
 
-```text
-load manifests
-  → ContentCatalog
-  → validate every War Archives/client-profile binding
-  → ActivityCatalog + validate every activity/client-profile binding
-  → compile and validate every Campaign runtime profile/executor contract
-  → build campaign session source
-  → construct Device
-  → build workflows
+玩法实现按真实业务边界拆分，包括 Campaign、非网格遭遇、演习、大世界、设施、商店、复合日常和活动。共享的是小型 typed contract，不共享大而全的任务基类。
+
+活动和关卡的机器事实位于：
+
+- `content/events/*.yaml`：活动包、关卡索引、别名、进度和活动定义；
+- `content/events/stages/*.yaml`：完整关卡定义；
+- `content/campaign-runtime-profiles.json`：客户端行为和 runtime implementation 组合；
+- `module/content`：严格解析、catalog、policy 和不可变 definition；
+- `module/adapters`：MuMu 12 客户端实现与少量无法数据化的窄策略。
+
+production 启动时读取全部 manifest，并在创建 `Device` 前验证活动、作战档案和 runtime profile 引用闭合。关卡 definition 与 session 按第一次实际访问惰性编译并在当前进程缓存，避免每次启动预编译全部 1203 个关卡。
+
+WebUI 保存和导入也会走同一内容目录及 57 个真实 settings decoder/factory 做离线校验。校验使用明确的只读 config 和无连接 Device seam，不创建 ADB client、不启动模拟器、不执行 workflow，也不写文件。自动保存遇到 pack/stage 等跨字段中间态时保留 pending changes，后续字段补齐后再形成一个原子候选。
+
+开发阶段可以显式验证全部内容：
+
+```powershell
+uv run python -m dev_tools.campaign_runtime_profile_validator
 ```
 
-profile 校验遍历 `ActivityCatalog.activities`，不只校验当前选中的活动。未知 profile、Raid content/client mode
-不一致、daily/ticket mode 缺少次数识别、Coalition content/client stage 不一致，都必须在
-`Device` 构造和任何 I/O 之前失败。单次命令中的原始 content/mode/stage/fleet 值在 factory 边界转为
-typed options，Raid plan 与 Coalition client session 在 `_device_for` 激活设备前再验证选择约束。
+该命令编译所有关卡并校验 production runtime contract；它不启动模拟器。
 
-Raid、Coalition 与 Maritime Escort 的原子执行分别返回 `RaidExecutionResult`、`CoalitionExecutionResult`
-和 `MaritimeEscortExecutionResult`；活动
-workflow 统一向上返回 `ActivityReport`、`EncounterReport` 或 `AssistSessionReport`。正常停止、资源不足、
-次数耗尽、活动不可用和恢复等待都是 typed fact；activity domain/adapter 不调用 scheduler 变更 API，
-只有 application/coordinator 能把这些事实解释为调度 effect。
+## 游戏更新的扩展顺序
 
-## Campaign 内容与策略
+新增或更新活动时，按下面的最短路径处理：
 
-关卡编译为不可变 `CampaignStageDefinition`，静态地图定义、运行状态、观测证据和推断知识分别保存。
+1. 修改对应 manifest 和 stage YAML。
+2. 优先复用现有 activity/client/runtime profile。
+3. 只有出现新的页面结构、识别方式或地图机制时，才新增一个不可变 profile 或窄 implementation。
+4. manifest 改变任务选项后，运行配置生成器。
+5. 运行全部内容验证和测试。
 
-```text
-Frame
-  → MapObservation
-  → Reconciler
-  → CampaignSnapshot
-  → StagePolicy
-  → typed Intent
-  → IntentExecutor
-  → DomainEvent
-  → Reducer
+```powershell
+uv run python -m module.config.config_updater
+uv run python -m dev_tools.campaign_runtime_profile_validator
+uv run pytest
 ```
 
-Campaign 的调度边界是一个已确认的 battle 安全单元，而不是整个地图循环。`CampaignProgress` 同时保存
-`StageRef`、run variant、完整 `CampaignSessionState`、累计地图完成数以及 settings/content revision；
-`pending` action 只能存在于进程内的 decide/execute/reduce 期间，run 边界必须为空。继续执行或安全点抢占时，
-checkpoint 与立即重调度原子提交；真正终止时删除 checkpoint。Stage、variant 或 revision 已变化的 checkpoint
-先删除并立即重调度，不允许带入新的 workflow。
+禁止通过日期分支、动态 import、`battle_N` 反射、任意脚本 DSL 或旧 schema fallback 添加玩法。未知字段、未知引用、未使用 profile 和未注册 implementation 都应在验证阶段失败。
 
-`LiveCampaignWorkflow` 已把一次真实执行固定为 `observe → decide → issue_and_confirm → reduce`，并通过
-`CampaignBattlefieldObserver`、`CampaignBattleIntentDriver` 两个窄端口连接客户端。现有 Campaign Map adapter
-只执行原子 typed intent，以 `battle_count` 恰好增加一次作为成功证据；Boss 路障与 Boss 本体分别结算，禁止调用
-会在内部清路障、猜刷新点或连续执行的 compound `clear_boss/brute_clear_boss`。动作确认后即使收到迟到取消，也必须
-先完成 reduce 并提交 pending-free checkpoint。
+配置生成器把 manifest 中的当前 event、raid、coalition 和 war archive 投影为默认值与选项；缺少当前包、默认关卡或活动定义时立即失败。生成器不会保留手写日期补丁，`CoalitionSp` 等内容相关选项也由所选 manifest 的真实能力收窄。
 
-每个 manifest stage 都严格加载 schema v4 YAML，并一次编译为不可变 `CampaignStageDefinition`。它组合而不继承以下正交内容：
+## 故障诊断
 
-1. `MapDefinition` / `RunVariant`：普通、周回的地图和刷新事实。
-2. `StageRules` / `StageMechanicRules`：导航、观测、移动敌人、墙、迷宫、要塞等规则。
-3. `StagePolicy`：普通 battle 的闭合目标选择策略。
-4. `BattleProgram`：少数复合 battle 的有界 typed action 程序。
-5. `BossApproachPlan`：只在 generic Boss 分支生效的候选格排序与进场动作。
-6. `CampaignRuntimeProfile`：识别、导航、活动 UI、地图机制和 engine extension 的显式实现绑定与 tuning。
+设备始终保留一个有界的最近截图队列。任务或 composition 发生异常时，在 `log/error/` 写入一个独立目录：
 
-`BattleProgram` 不是任意脚本语言：没有循环、动态 import、字符串方法调用或隐式异常分支，只允许闭合 statement/condition/action
-代数。每个 program 必须声明 `NORMAL`、`CLEAR_ALL`、`POOR_MAP_DATA` 中的激活模式；未覆盖的模式回到同一套 generic
-mode policy。需要复用 generic 行为时只能通过 typed `DelegateBattle` 委托。地图内一次性事实使用 `ProgramMarker` 持久化，
-不能继续增加以具体关卡命名的 boolean flag。
+- `error.json`：命令、任务、异常类型、消息和完整 traceback；
+- `log.txt`：当前日志最后 2000 行；
+- `screenshots/`：异常前最近的游戏截图。
 
-`Mumu12CampaignRuntimeProvider` 是地图 runtime 的 composition boundary：从 stage definition、attempt settings 和 runtime profile
-创建一个 runtime，并由 activation、guard、observer、program executor 共用。`LiveCampaignWorkflow` 在唯一报告出口调用 lifecycle：
-`IN_PROGRESS/PROGRAM_CONTINUE + ACTIVE` 保留同一 runtime 供下一 turn 恢复；地图完成、停止、阻塞、失败、取消或异常则以明确
-outcome 释放。Hard mode 通过不可变 attempt overlay 组合，不修改基础 definition，也不另走 legacy Campaign class。
+CLI 返回稳定退出码并打印 error bundle 路径；WebUI 通过结构化 `CommandOutcome` 区分完成、停止、重启请求、故障和强制终止，不解析日志文字猜结果。
 
-普通和周回地图在加载时编译成完整 `RunVariant`，运行中不修改同一份静态地图。关卡拥有自己的 policy、mechanics 和
-program；复用发生在闭合类型与组合子层，而不是把单关行为拆到全局匿名引用表。只有真正跨关卡、依赖客户端实现且无法数据化的
-能力，才能进入带稳定 id、显式 executor kind 和 options 的窄 runtime registry。不得用动态 stage import、`battle_N` 反射、
-legacy Stage fallback、通用 uppercase config bag 或伪造 outcome 绕过边界。
+OCR 识别失败另外按 profile 保存最新 raw、processed 和 metadata 样本。该存储是有界覆盖，不维护指标数据库、去重索引或后台清理进程。
 
-runtime 契约由 production bootstrap 调用的纯 validator 负责，`dev_tools/campaign_runtime_profile_validator.py`
-只是同一 validator 的命令行门面。它只读取当前 manifest、runtime profile registry 和 production executor registry，
-在 `Device` 构造前校验每个 stage 引用已声明且有使用者的 profile、
-每个声明的 extension 都有 profile 引用且不存在未知或未使用 extension，以及每个 executor kind/options
-与已注册 production descriptor 闭合；
-旧 Campaign Python 源码存在时直接失败。它不从历史 coverage 生成 runtime profile，也不依赖固定 profile/extension 数量。
+## 通知
 
-一次性 migration inventory、固定数量账本和 legacy source parser 已在迁移验收后删除，避免未来新增关卡时维护
-第二份历史事实。manifest + 当前严格、自包含的 YAML 与 runtime profile registry 共同构成唯一内容源；
-动态闭包验证只检查当前 stage/profile/extension/executor 关系，不锁死数量。SOS 已从游戏删除，因此不进入内容包或兼容层。
+通知只保留显式 SMTP 字段。发送发生在任务结果边界，每个收件人最多尝试两次；失败写日志，但不改变已经确定的任务结果。没有 OnePush YAML、spool、outbox、pump 或后台重试服务。
 
-## 游戏更新的两个版本轴
+## 完成约束
 
-- `ContentRevision`：地图、spawn、敌人、奖励和活动规则。
-- `ClientUiRevision`：页面结构、ROI、模板、OCR 和导航。
-
-运行时只支持一个当前内部 schema 和一个当前客户端 UI revision。历史玩法先迁移到当前 schema，再保留为 content pack、窄策略和 Replay；不保留多版本 runtime 解析分支。
-
-## 完成标准
-
-- catalog 中全部当前命令都通过 coordinator 和 state transaction 运行。
-- 每个仍存在的玩法均有明确 domain、definition/profile/policy，并有语义模拟或 Replay 验收。
-- 所有 native content 在启动前严格编译；未知字段、引用、mechanic 或 UI revision 立即失败。
-- `ActivityCatalog` 中全部 activity 的 manifest/profile 关系在 `Device` 构造前通过；单次选择在设备 I/O 前编译为 typed plan/session。
-- 全部 War Archives profile 与 Campaign runtime executor/options 契约在 `Device` 构造前 exact closure。
-- activity domain 的正常终止只通过 typed result/report 上报，不存在 scheduler 写入或日期特判。
-- manual stop 在下一次 I/O 前停止产生新输入；preemption 只在领域安全点生效。
-- WebUI 不直接写运行中状态，不创建第二个进程争抢同一设备。
-- 设备独占必须是跨进程 OS lease；仅有进程内 mutex 不满足要求，进程崩溃后 lease 必须自动释放。
-- 截图层不点击、不处理委托、不修改调度。
-- 删除 `TaskEnd`、`task_delay/task_call/task_stop` 业务控制流、`battle_N` 反射、动态 `Campaign` 类型、legacy stage fallback 和通用 uppercase config bag。
-- 全量 pytest、Ruff、ty、内容编译、语义模拟与 Replay 套件通过。
+- 57 个任务全部有 factory，当前所有玩法测试通过。
+- 调度器和直接命令共用同一个 runner、coordinator、repository 和错误处理边界。
+- WebUI 不允许第二个游戏进程，也不在运行中改配置。
+- production 只有 MuMu 12、`nemu_ipc` 截图和 `minitouch` 控制路径。
+- 当前内容可全量编译，所有 profile/implementation 引用闭合。
+- 全量 pytest、Ruff、ty、内容 validator 和 CLI smoke test 通过。
