@@ -1,34 +1,20 @@
 import inspect
-import multiprocessing
 from importlib.metadata import version
+from typing import TYPE_CHECKING
 
-import pytest
+import pywebio.io_ctrl as upstream_io_ctrl
 import pywebio.pin as upstream_pin
+import pywebio.session as upstream_session
 from pywebio.input import input as upstream_input
 from pywebio.output import OutputPosition
 
+if TYPE_CHECKING:
+    import pytest
+
 VERIFIED_PYWEBIO_VERSION = "1.8.4"
-_CONTRACT_PROCESS_TIMEOUT_SECONDS = 30
 
 
-def _assert_private_pin_output_behavior() -> None:
-    private_pin_output = vars(upstream_pin)["_pin_output"]
-    single_input_return = upstream_input(
-        name="contract_input",
-        label="",
-        value="value",
-        data_contract="preserved",
-    )
-    output = private_pin_output(single_input_return, "contract-scope", OutputPosition.BOTTOM)
-
-    assert output.spec["type"] == "pin"
-    assert output.spec["input"]["name"] == "contract_input"
-    assert output.spec["input"]["data_contract"] == "preserved"
-    assert output.spec["scope"] == "#pywebio-scope-contract-scope"
-    assert output.spec["position"] == OutputPosition.BOTTOM
-
-
-def test_pywebio_private_pin_output_contract() -> None:
+def test_pywebio_private_pin_output_contract(monkeypatch: pytest.MonkeyPatch) -> None:
     assert version("pywebio") == VERIFIED_PYWEBIO_VERSION
 
     public_helpers = {
@@ -54,12 +40,24 @@ def test_pywebio_private_pin_output_contract() -> None:
         "position",
     )
 
-    # PyWebIO 会为脱离 server 的 input() 注册进程级 script session；隔离运行避免污染其他 WebUI 测试。
-    process = multiprocessing.get_context("spawn").Process(target=_assert_private_pin_output_behavior)
-    process.start()
-    process.join(_CONTRACT_PROCESS_TIMEOUT_SECONDS)
-    if process.is_alive():
-        process.kill()
-        process.join()
-        pytest.fail("PyWebIO private contract process did not exit")
-    assert process.exitcode == 0
+    # 只验证输入与 pin 的数据契约，不让 PyWebIO 为测试启动 Script Mode。
+    monkeypatch.setattr(
+        upstream_session,
+        "get_session_implement",
+        lambda: upstream_session.ThreadBasedSession,
+    )
+    monkeypatch.setattr(upstream_io_ctrl, "get_current_session", object)
+
+    single_input_return = upstream_input(
+        name="contract_input",
+        label="",
+        value="value",
+        data_contract="preserved",
+    )
+    spec = private_pin_output(single_input_return, "contract-scope", OutputPosition.BOTTOM).embed_data()
+
+    assert spec["type"] == "pin"
+    assert spec["input"]["name"] == "contract_input"
+    assert spec["input"]["data_contract"] == "preserved"
+    assert spec["scope"] == "#pywebio-scope-contract-scope"
+    assert spec["position"] == OutputPosition.BOTTOM
