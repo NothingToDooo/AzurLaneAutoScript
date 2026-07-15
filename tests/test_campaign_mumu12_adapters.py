@@ -575,10 +575,9 @@ def test_campaign_runtime_does_not_reapply_stale_emotion_values_after_recording(
     assert isinstance(activated, CampaignSession)
 
     config.set_record(Emotion_Fleet1Value=83, Emotion_Fleet2Value=71)
-    recorded_values = (config.Emotion_Fleet1Value, config.Emotion_Fleet2Value)
     provider.finish(activated, activated.initial_state(), CampaignStopReason.CANCELLED)
 
-    assert recorded_values == (83, 71)
+    assert (config.Emotion_Fleet1Value, config.Emotion_Fleet2Value) == (83, 71)
 
 
 def test_refreshing_gems_cancellation_preserves_the_active_map_emotion_ledger() -> None:

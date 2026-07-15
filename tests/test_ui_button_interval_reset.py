@@ -55,18 +55,19 @@ def test_ui_button_interval_reset_single_targets(button: Button, expected: list[
 @pytest.mark.parametrize(
     ("button", "expected"),
     [
-        (ui_assets.MAIN_GOTO_REWARD, [GET_SHIP, GET_SHIP]),
-        (ui_assets.MAIN_GOTO_CAMPAIGN, [GET_SHIP, GET_SHIP, ui_assets.RAID_CHECK]),
-        (ui_white_assets.MAIN_GOTO_REWARD_WHITE, [GET_SHIP]),
-        (ui_white_assets.MAIN_GOTO_CAMPAIGN_WHITE, [GET_SHIP, ui_assets.RAID_CHECK]),
+        (ui_assets.MAIN_GOTO_REWARD, {GET_SHIP}),
+        (ui_assets.MAIN_GOTO_CAMPAIGN, {GET_SHIP, ui_assets.RAID_CHECK}),
+        (ui_white_assets.MAIN_GOTO_REWARD_WHITE, {GET_SHIP}),
+        (ui_white_assets.MAIN_GOTO_CAMPAIGN_WHITE, {GET_SHIP, ui_assets.RAID_CHECK}),
     ],
 )
-def test_ui_button_interval_reset_keeps_legacy_duplicate_resets(button: Button, expected: list[Button]) -> None:
+def test_ui_button_interval_reset_resets_all_related_targets(button: Button, expected: set[Button]) -> None:
     ui = _FakeUI()
 
     UI.ui_button_interval_reset(ui, button)
 
-    assert ui.reset_buttons == expected
+    assert set(ui.reset_buttons) == expected
+    assert ui.interval_timer == {}
 
 
 def test_ui_button_interval_reset_covers_page_main_links() -> None:

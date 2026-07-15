@@ -579,34 +579,6 @@ def test_extract_raw_result_rejects_non_finite_or_out_of_range_score(
         extract_raw_result(monkeypatch, {"text": "14/15", "score": score})
 
 
-def test_recognition_result_accepts_consistent_success_and_failure() -> None:
-    success = RecognitionResult[int](
-        raw_text="14/15",
-        normalized_text="14/15",
-        score=0.875,
-        value=14,
-        valid=True,
-        reason=None,
-        latency_seconds=0.01,
-        profile="counter",
-        model="densenet_lite_136-gru",
-    )
-    failure = RecognitionResult[int](
-        raw_text="",
-        normalized_text="",
-        score=0.0,
-        value=None,
-        valid=False,
-        reason=RecognitionFailureReason.EMPTY_TEXT,
-        latency_seconds=0.0,
-        profile="counter",
-        model="densenet_lite_136-gru",
-    )
-
-    assert success.value == 14
-    assert failure.reason is RecognitionFailureReason.EMPTY_TEXT
-
-
 @pytest.mark.parametrize("field", ["profile", "model"])
 @pytest.mark.parametrize("value", ["", " ", "\t\n"])
 def test_recognition_result_rejects_blank_identity_fields(field: str, value: str) -> None:

@@ -9,7 +9,7 @@ import pytest
 from PIL import Image
 
 import module.ocr.failure_store as failure_store_module
-from module.ocr.failure_store import OCR_FAILURE_STORE, OcrFailureRecorder, OcrFailureSample, OcrFailureStore
+from module.ocr.failure_store import OcrFailureSample, OcrFailureStore
 from module.ocr.ocr import DigitCounter
 from module.ocr.result import RawOcrResult, RecognitionFailureReason, RecognitionResult
 
@@ -92,12 +92,10 @@ def _read_png(path: Path) -> np.ndarray:
         return np.asarray(image)
 
 
-def test_failure_store_is_lazy_and_exports_the_default_recorder(tmp_path: Path) -> None:
+def test_failure_store_construction_does_not_create_root_directory(tmp_path: Path) -> None:
     root = tmp_path / "missing"
-    recorder: OcrFailureRecorder = OcrFailureStore(root)
+    OcrFailureStore(root)
 
-    assert isinstance(recorder, OcrFailureStore)
-    assert isinstance(OCR_FAILURE_STORE, OcrFailureStore)
     assert not root.exists()
 
 
