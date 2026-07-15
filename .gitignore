@@ -21,7 +21,7 @@ config/reloadalas
 test.py
 test/
 .codegraph/
-.alas/
+AzurLaneAutoScript/
 # Created by .ignore support plugin (hsz.mobi)
 
 ### JetBrains template
