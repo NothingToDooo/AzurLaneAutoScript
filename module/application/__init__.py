@@ -1,6 +1,7 @@
 from module.application.cancellation import (
     AbortRequested,
     AbortToken,
+    CancellationSource,
     ExternalRequestSignal,
     SafeUnitCancellation,
 )
@@ -41,6 +42,7 @@ __all__ = [
     "AbortRequested",
     "AbortToken",
     "Blocked",
+    "CancellationSource",
     "Cancelled",
     "DailySchedule",
     "Deferred",

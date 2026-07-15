@@ -38,9 +38,9 @@ from module.gameplay.campaign_battle_program import (
 )
 
 if TYPE_CHECKING:
+    from module.application import CancellationSource
     from module.content.battle_program import BattleProgram
     from module.content.models import StageRef
-    from module.interaction import CancellationSignal
 
 
 def _require_method(value: object, method_name: str, *, field_name: str) -> None:
@@ -63,7 +63,7 @@ class CampaignBattlefieldObserver(Protocol):
         self,
         session: CampaignSession,
         state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattlefieldObservation: ...
 
 
@@ -72,7 +72,7 @@ class CampaignBattleIntentDriver(Protocol):
         self,
         session: CampaignSession,
         attempt: BattleAttempt,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleOutcome: ...
 
 
@@ -81,7 +81,7 @@ class CampaignBattleProgramExecutor(Protocol):
         self,
         session: CampaignSession,
         state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> program_model.BattleProgramMode: ...
 
     def execute(
@@ -89,7 +89,7 @@ class CampaignBattleProgramExecutor(Protocol):
         program: BattleProgram,
         session: CampaignSession,
         state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleProgramExecution: ...
 
 
@@ -201,7 +201,7 @@ class CampaignGuardEvidenceSource(Protocol):
         job: CampaignJobSpec,
         session: CampaignSession,
         state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignGuardEvidence:
         """在尚未消耗本局资源时采集 UI/OCR 事实。"""
 
@@ -238,7 +238,7 @@ class GemsFleetReplacementExecutor(Protocol):
         job: CampaignJobSpec,
         session: CampaignSession,
         trigger: GemsFleetReplacementTrigger,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> GemsFleetReplacementResult: ...
 
 
@@ -465,7 +465,7 @@ class CampaignSessionActivator(Protocol):
     def activate(
         self,
         job: CampaignJobSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> (
         CampaignSession | CampaignCheckpointUnavailable | CampaignMapAchievementReached | CampaignGemsReplacementFailed
     ):
@@ -513,7 +513,7 @@ class _CampaignProgramRun:
     state: CampaignSessionState
     program: BattleProgram
     mode: program_model.BattleProgramMode
-    cancellation: CancellationSignal
+    cancellation: CancellationSource
     is_default_mode: bool = False
 
 
@@ -565,7 +565,7 @@ class LiveCampaignWorkflow(CampaignWorkflow):
     def execute(
         self,
         job: CampaignJobSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignRunReport:
         if not isinstance(job, CampaignJobSpec):
             message = "live campaign workflow requires a CampaignJobSpec"
@@ -624,7 +624,7 @@ class LiveCampaignWorkflow(CampaignWorkflow):
         job: CampaignJobSpec,
         session: CampaignSession,
         initial_state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignRunReport:
 
         stage_program = session.definition.battle_programs.get(initial_state.battle_index)
@@ -668,7 +668,7 @@ class LiveCampaignWorkflow(CampaignWorkflow):
         job: CampaignJobSpec,
         session: CampaignSession,
         initial_state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignRunReport:
 
         # observe 是第一个外部 I/O；取消只在 I/O 前中断，已确认动作之后必须先完成 reduce。
@@ -804,7 +804,7 @@ class LiveCampaignWorkflow(CampaignWorkflow):
         session: CampaignSession,
         attempt: BattleAttempt,
         outcome: BattleInterrupted,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignRunReport:
         if outcome.attempt != attempt:
             message = "battle interruption does not match the issued attempt"
@@ -831,7 +831,7 @@ class LiveCampaignWorkflow(CampaignWorkflow):
         job: CampaignJobSpec,
         session: CampaignSession,
         state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> tuple[CampaignStopReason, GemsFleetReplacementRequest | None]:
         guard_decision, _observed_at = self._post_battle_guard(job, session, state)
         trigger = guard_decision.gems_replacement
@@ -881,7 +881,7 @@ class LiveCampaignWorkflow(CampaignWorkflow):
         job: CampaignJobSpec,
         session: CampaignSession,
         state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignRunReport | None:
         if state != session.initial_state():
             return None
@@ -926,7 +926,7 @@ class LiveCampaignWorkflow(CampaignWorkflow):
         session: CampaignSession,
         state: CampaignSessionState,
         request: GemsFleetReplacementRequest,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignRunReport:
         if self._gems_fleets is None:
             message = "gems-farming campaign requires a fleet replacement executor"
@@ -990,7 +990,7 @@ class LiveCampaignWorkflow(CampaignWorkflow):
         job: CampaignJobSpec,
         session: CampaignSession,
         state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> tuple[CampaignSession, CampaignSessionState] | CampaignRunReport:
         if self._activator is None:
             return session, state

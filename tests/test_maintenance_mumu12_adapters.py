@@ -5,7 +5,6 @@ import pytest
 from module.adapters.maintenance_mumu12 import LocalUncensoredAssetBuilder, Mumu12DeviceAppLifecycle
 from module.application import AbortRequested, AbortToken
 from module.device.device import Device
-from module.interaction import AppStatus
 from module.maintenance import UncensoredPayload
 
 if TYPE_CHECKING:
@@ -15,19 +14,12 @@ if TYPE_CHECKING:
 class _AppController:
     def __init__(self) -> None:
         self.calls: list[str] = []
-        self.running = False
-
-    def is_running(self) -> bool:
-        self.calls.append("status")
-        return self.running
 
     def start(self) -> None:
         self.calls.append("start")
-        self.running = True
 
     def stop(self) -> None:
         self.calls.append("stop")
-        self.running = False
 
 
 class _Device(Device):
@@ -79,12 +71,10 @@ def test_device_lifecycle_uses_the_real_app_service_and_clears_local_records() -
     device = _Device(app)
     lifecycle = Mumu12DeviceAppLifecycle(device)
 
-    assert lifecycle.status(AbortToken()) is AppStatus.STOPPED
     lifecycle.start(AbortToken())
-    assert lifecycle.status(AbortToken()) is AppStatus.RUNNING
     lifecycle.stop(AbortToken())
 
-    assert app.calls == ["status", "start", "status", "stop"]
+    assert app.calls == ["start", "stop"]
     assert device.local_calls == ["stuck-clear", "click-clear", "stuck-clear", "click-clear"]
 
 

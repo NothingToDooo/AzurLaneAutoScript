@@ -70,7 +70,7 @@ from module.task_registry import TASK_CATALOG
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _OBSERVED_AT = datetime(2026, 7, 13, 8, tzinfo=UTC)
@@ -183,7 +183,7 @@ class _ActivityWorkflow:
     def execute(
         self,
         spec: ActivitySpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> ActivityReport:
         cancellation.raise_if_requested()
         self.specs.append(spec)
@@ -199,7 +199,7 @@ class _EncounterWorkflow:
     def __init__(self) -> None:
         self.specs: list[EncounterSpec] = []
 
-    def execute(self, spec: EncounterSpec, cancellation: CancellationSignal) -> EncounterReport:
+    def execute(self, spec: EncounterSpec, cancellation: CancellationSource) -> EncounterReport:
         cancellation.raise_if_requested()
         self.specs.append(spec)
         if spec.command in {EncounterCommand.RAID, EncounterCommand.COALITION}:
@@ -232,7 +232,7 @@ class _AssistWorkflow:
     def advance_to_safe_point(
         self,
         spec: AssistSessionSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> AssistSessionReport:
         cancellation.raise_if_requested()
         self.specs.append(spec)

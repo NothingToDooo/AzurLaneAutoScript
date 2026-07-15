@@ -8,7 +8,7 @@ from module.gameplay.battle_program import BattleProgramExecution, BattleProgram
 if TYPE_CHECKING:
     from module.adapters.campaign_live import CampaignRuntimeUnitSource
     from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 class Mumu12CampaignBattleProgramExecutor:
@@ -29,7 +29,7 @@ class Mumu12CampaignBattleProgramExecutor:
         program: BattleProgram,
         session: CampaignSession,
         state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleProgramExecution:
         if not isinstance(program, BattleProgram):
             message = "MuMu12 campaign program executor requires a BattleProgram"
@@ -64,7 +64,7 @@ class Mumu12CampaignBattleProgramExecutor:
         self,
         session: CampaignSession,
         state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleProgramMode:
         if not isinstance(session, CampaignSession):
             message = "MuMu12 campaign program mode requires a CampaignSession"

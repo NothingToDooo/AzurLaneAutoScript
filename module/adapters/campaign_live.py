@@ -52,8 +52,8 @@ from module.gameplay.campaign_live import (
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator
 
+    from module.application import CancellationSource
     from module.content.cell import CellId
-    from module.interaction import CancellationSignal
 
 
 _ENEMY_FILTER_PATTERN = re.compile(r"^(.*?)$")
@@ -123,7 +123,7 @@ class CampaignMapRuntime(CampaignFleetRuntime, Protocol):
     def execute_auto_search_battle(
         self,
         battle_index: int,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleTarget: ...
 
     def brute_find_roadblocks(
@@ -137,7 +137,7 @@ class CampaignMapRuntimeSource(Protocol):
     def active_runtime(
         self,
         session: CampaignSession,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignMapRuntime:
         """返回已进入 session 对应地图、且在本次 workflow turn 内稳定的 runtime。"""
 
@@ -145,14 +145,14 @@ class CampaignMapRuntimeSource(Protocol):
 @dataclass(frozen=True, slots=True)
 class CommittedCampaignUnit:
     runtime: CampaignMapRuntime
-    cancellation: CancellationSignal
+    cancellation: CancellationSource
 
 
 class CampaignSafeUnitSource(Protocol):
     def commit_active_unit(
         self,
         session: CampaignSession,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CommittedCampaignUnit:
         """提交当前安全单元，之后把新取消请求延迟到 checkpoint 闭合。"""
 
@@ -212,7 +212,7 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
         self,
         session: CampaignSession,
         state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattlefieldObservation:
         session.validate_state(state)
         runtime = self._runtime(session, cancellation)
@@ -232,7 +232,7 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
         self,
         session: CampaignSession,
         attempt: BattleAttempt,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleOutcome:
         runtime = self._runtime(session, cancellation)
         intent = self._eligible_intent(runtime, attempt.intent)
@@ -268,7 +268,7 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
         runtime: CampaignMapRuntime,
         attempt: BattleAttempt,
         intent: AutoSearchBattle | ClearSiren,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleOutcome:
         if isinstance(intent, AutoSearchBattle):
             return self._issue_auto_search(runtime, attempt, cancellation)
@@ -332,7 +332,7 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
         runtime: CampaignMapRuntime,
         attempt: BattleAttempt,
         intent: ClearChosenEnemy | ClearSelectedEnemy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleOutcome:
         if isinstance(intent, ClearChosenEnemy):
             target = self._cell(runtime, intent.target)
@@ -480,7 +480,7 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
     def _issue_auto_search(
         runtime: CampaignMapRuntime,
         attempt: BattleAttempt,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleOutcome:
         cancellation.raise_if_requested()
         try:
@@ -495,7 +495,7 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
     def _runtime(
         self,
         session: CampaignSession,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignMapRuntime:
         cancellation.raise_if_requested()
         runtime = self._runtimes.active_runtime(session, cancellation)
@@ -547,7 +547,7 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
         runtime: CampaignMapRuntime,
         attempt: BattleAttempt,
         strategy: BossStrategy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleOutcome:
         if strategy not in (BossStrategy.MAP_SEARCH, BossStrategy.BRUTE_FORCE):
             message = f"unsupported boss roadblock strategy: {strategy.value}"
@@ -578,7 +578,7 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
         runtime: CampaignMapRuntime,
         attempt: BattleAttempt,
         strategy: BossStrategy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleOutcome:
         cancellation.raise_if_requested()
         if strategy in (BossStrategy.FLEET_BOSS, BossStrategy.BRUTE_FORCE):
@@ -598,7 +598,7 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
         runtime: CampaignMapRuntime,
         attempt: BattleAttempt,
         selected: _SelectedBattle,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleOutcome:
         if selected.target is None:
             return NoBattleTarget(attempt)

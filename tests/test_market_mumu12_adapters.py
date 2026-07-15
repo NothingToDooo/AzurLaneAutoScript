@@ -33,7 +33,7 @@ from module.gameplay.market import (
 )
 
 if TYPE_CHECKING:
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _SCHEDULE = DailySchedule("Asia/Hong_Kong", (time(12),))
@@ -49,7 +49,7 @@ def runtime(monkeypatch: pytest.MonkeyPatch) -> tuple[AzurLaneConfig, Device]:
         _device: Device,
         _task_name: str,
         overlay: dict[str, object],
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> Device:
         cancellation.raise_if_requested()
         vars(config).update(overlay)

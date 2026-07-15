@@ -52,7 +52,7 @@ from module.gameplay.market import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _NEXT_SERVER_UPDATE_AT = datetime(2026, 7, 14, 4, tzinfo=UTC)
@@ -76,7 +76,7 @@ class _Workflow[T]:
         self.execute_calls = 0
         self.received_settings: list[object] = []
 
-    def execute(self, settings: object, cancellation: CancellationSignal) -> T:
+    def execute(self, settings: object, cancellation: CancellationSource) -> T:
         cancellation.raise_if_requested()
         self.execute_calls += 1
         self.received_settings.append(settings)

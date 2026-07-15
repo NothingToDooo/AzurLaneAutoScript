@@ -14,9 +14,9 @@ from module.content.mechanic_rules import EncounterExpectation, FleetRole, Picku
 if TYPE_CHECKING:
     from collections.abc import Collection
 
+    from module.application import CancellationSource
     from module.content.battle_policy import BattleStep
     from module.content.cell import CellId
-    from module.interaction.ports import CancellationSignal
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,81 +63,81 @@ class BattleProgramPort(Protocol):
     def read_metric(
         self,
         metric: program_model.ProgramMetric,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> int: ...
 
     def read_cell_property(
         self,
         cell: CellId,
         cell_property: program_model.CellProperty,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> program_model.CellPropertyValue: ...
 
     def is_fleet_at(
         self,
         cell: CellId,
         fleet: FleetRole,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool: ...
 
     def has_map_presence(
         self,
         presence: program_model.MapPresence,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool: ...
 
-    def is_boss_at(self, cell: CellId, cancellation: CancellationSignal) -> bool: ...
+    def is_boss_at(self, cell: CellId, cancellation: CancellationSource) -> bool: ...
 
     def is_boss_accessible(
         self,
         fleet: FleetRole,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool: ...
 
     def is_cell_accessible_for_fleet(
         self,
         cell: CellId,
         fleet: FleetRole,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool: ...
 
     def has_candidate_enemy(
         self,
         candidates: tuple[CellId, ...],
         excluded_genres: tuple[str, ...],
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool: ...
 
     def execute_battle(
         self,
         action: BattleStep,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleActionOutcome: ...
 
     def execute_mechanic(
         self,
         action: program_model.ProgramMechanicAction,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome: ...
 
     def execute_preset_route(
         self,
         action: program_model.ExecutePresetRoute,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome: ...
 
     def execute_fixed_target(
         self,
         action: program_model.ExecuteFixedTarget,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome: ...
 
-    def mark_all_siren_candidates(self, cancellation: CancellationSignal) -> None: ...
+    def mark_all_siren_candidates(self, cancellation: CancellationSource) -> None: ...
 
     def set_map_weights(
         self,
         rows: tuple[tuple[int, ...], ...],
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> None: ...
 
 
@@ -272,7 +272,7 @@ class BattleProgramInterpreter:
         program: program_model.BattleProgram,
         port: BattleProgramPort,
         persisted_program_flags: Collection[program_model.ProgramFlag],
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
         persisted_program_markers: Collection[program_model.ProgramMarker] = (),
     ) -> BattleProgramExecution:
         if not isinstance(program, program_model.BattleProgram):
@@ -308,7 +308,7 @@ class BattleProgramInterpreter:
         self,
         statements: tuple[program_model.ProgramStatement, ...],
         port: BattleProgramPort,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
         state: _ExecutionState,
         *,
         branch_depth: int,
@@ -337,7 +337,7 @@ class BattleProgramInterpreter:
         self,
         statement: program_model.ProgramStatement,
         port: BattleProgramPort,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
         state: _ExecutionState,
         *,
         branch_depth: int,
@@ -385,7 +385,7 @@ class BattleProgramInterpreter:
         self,
         statement: program_model.AttemptBattleAction | program_model.ReturnBattleAction,
         port: BattleProgramPort,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleActionOutcome | None:
         outcome = self._execute_battle(port, statement.action, cancellation)
         if isinstance(outcome, program_model.ProgramBattleSettled) and isinstance(
@@ -408,7 +408,7 @@ class BattleProgramInterpreter:
             | program_model.ReturnMechanicAction
         ),
         port: BattleProgramPort,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
         state: _ExecutionState,
     ) -> program_model.CompleteBattleProgramResult | None:
         outcome = self._execute_mechanic_with_state(
@@ -460,7 +460,7 @@ class BattleProgramInterpreter:
         self,
         statement: program_model.MechanicActionBranch | program_model.ProgramBranch,
         port: BattleProgramPort,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
         state: _ExecutionState,
         *,
         branch_depth: int,
@@ -498,7 +498,7 @@ class BattleProgramInterpreter:
         self,
         statement: program_model.AttemptPresetRoute | program_model.AttemptFixedTarget,
         port: BattleProgramPort,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> program_model.CompleteBattleProgramResult | None:
         if isinstance(statement, program_model.AttemptPresetRoute):
             outcome = self._execute_preset_route(port, statement.action, cancellation)
@@ -519,7 +519,7 @@ class BattleProgramInterpreter:
             | program_model.SetMapWeights
         ),
         port: BattleProgramPort,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
         state: _ExecutionState,
     ) -> program_model.ProgramFailed | None:
         if isinstance(statement, program_model.SetProgramFlag):
@@ -588,7 +588,7 @@ class BattleProgramInterpreter:
         self,
         condition: program_model.ProgramCondition,
         port: BattleProgramPort,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
         state: _ExecutionState,
         *,
         condition_depth: int,
@@ -628,7 +628,7 @@ class BattleProgramInterpreter:
         self,
         condition: program_model.MetricCondition | program_model.CellPropertyCondition,
         port: BattleProgramPort,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool | program_model.ProgramFailed:
         if isinstance(condition, program_model.MetricCondition):
             cancellation.raise_if_requested()
@@ -668,7 +668,7 @@ class BattleProgramInterpreter:
             | program_model.CandidateEnemyCondition
         ),
         port: BattleProgramPort,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool | program_model.ProgramFailed:
         cancellation.raise_if_requested()
         if isinstance(condition, program_model.FleetAtCondition):
@@ -703,7 +703,7 @@ class BattleProgramInterpreter:
             program_model.AllProgramConditions | program_model.AnyProgramCondition | program_model.NotProgramCondition
         ),
         port: BattleProgramPort,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
         state: _ExecutionState,
         *,
         condition_depth: int,
@@ -847,7 +847,7 @@ class BattleProgramInterpreter:
     def _execute_battle(
         port: BattleProgramPort,
         action: BattleStep,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleActionOutcome:
         cancellation.raise_if_requested()
         outcome = port.execute_battle(action, cancellation)
@@ -866,7 +866,7 @@ class BattleProgramInterpreter:
     def _execute_mechanic(
         port: BattleProgramPort,
         action: program_model.ProgramMechanicAction,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         cancellation.raise_if_requested()
         outcome = port.execute_mechanic(action, cancellation)
@@ -876,7 +876,7 @@ class BattleProgramInterpreter:
         self,
         port: BattleProgramPort,
         action: program_model.ProgramMechanicAction,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
         state: _ExecutionState,
     ) -> MechanicActionOutcome:
         marker = self._map_item_marker(action) if isinstance(action, PickupMapItem) else None
@@ -895,7 +895,7 @@ class BattleProgramInterpreter:
     def _execute_preset_route(
         port: BattleProgramPort,
         action: program_model.ExecutePresetRoute,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         cancellation.raise_if_requested()
         outcome = port.execute_preset_route(action, cancellation)
@@ -905,7 +905,7 @@ class BattleProgramInterpreter:
     def _execute_fixed_target(
         port: BattleProgramPort,
         action: program_model.ExecuteFixedTarget,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         cancellation.raise_if_requested()
         outcome = port.execute_fixed_target(action, cancellation)

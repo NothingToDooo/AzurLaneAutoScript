@@ -43,8 +43,8 @@ from module.shop.shop_reward import RewardShop
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from module.application import CancellationSource
     from module.config.config_generated import ConfigOverrides
-    from module.interaction import CancellationSignal
 
 
 def _activate(
@@ -52,7 +52,7 @@ def _activate(
     device: Device,
     task_name: str,
     overlay: ConfigOverrides,
-    cancellation: CancellationSignal,
+    cancellation: CancellationSource,
 ) -> Device:
     cancellation.raise_if_requested()
     config.replace_runtime_overlay()
@@ -170,7 +170,7 @@ class _Mumu12MarketAdapter:
     def _device_for(
         self,
         task_name: str,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
         overlay: ConfigOverrides | None = None,
     ) -> Device:
         selected_overlay: ConfigOverrides = {} if overlay is None else overlay
@@ -181,7 +181,7 @@ class Mumu12AwakenWorkflow(_Mumu12MarketAdapter, AwakenWorkflow):
     __slots__ = ()
 
     @override
-    def execute(self, settings: AwakenSettings, cancellation: CancellationSignal) -> AwakenReport:
+    def execute(self, settings: AwakenSettings, cancellation: CancellationSource) -> AwakenReport:
         if not isinstance(settings, AwakenSettings):
             message = "settings must be AwakenSettings"
             raise TypeError(message)
@@ -215,7 +215,7 @@ class Mumu12ShipyardWorkflow(_Mumu12MarketAdapter, ShipyardWorkflow):
     __slots__ = ()
 
     @override
-    def execute(self, settings: ShipyardSettings, cancellation: CancellationSignal) -> ShipyardReport:
+    def execute(self, settings: ShipyardSettings, cancellation: CancellationSource) -> ShipyardReport:
         if not isinstance(settings, ShipyardSettings):
             message = "settings must be ShipyardSettings"
             raise TypeError(message)
@@ -248,7 +248,7 @@ class Mumu12GachaWorkflow(_Mumu12MarketAdapter, GachaWorkflow):
     __slots__ = ()
 
     @override
-    def execute(self, settings: GachaSettings, cancellation: CancellationSignal) -> GachaReport:
+    def execute(self, settings: GachaSettings, cancellation: CancellationSource) -> GachaReport:
         if not isinstance(settings, GachaSettings):
             message = "settings must be GachaSettings"
             raise TypeError(message)
@@ -271,7 +271,7 @@ class _Mumu12ShopWorkflow(_Mumu12MarketAdapter):
         *,
         navigation: str,
         tab: str,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> None:
         cancellation.raise_if_requested()
         runner.device.click_record_clear()
@@ -281,7 +281,7 @@ class _Mumu12ShopWorkflow(_Mumu12MarketAdapter):
         runner.shop_tab_250814.set(tab, main=runner)
 
     @staticmethod
-    def _general(shop: GeneralShop250814, *, refresh: bool, cancellation: CancellationSignal) -> None:
+    def _general(shop: GeneralShop250814, *, refresh: bool, cancellation: CancellationSource) -> None:
         if not shop.shop_filter:
             return
         for _ in range(2):
@@ -296,7 +296,7 @@ class _Mumu12ShopWorkflow(_Mumu12MarketAdapter):
             return
 
     @staticmethod
-    def _merit(shop: MeritShop250814, *, refresh: bool, cancellation: CancellationSignal) -> None:
+    def _merit(shop: MeritShop250814, *, refresh: bool, cancellation: CancellationSource) -> None:
         if not shop.shop_filter:
             return
         for _ in range(2):
@@ -311,7 +311,7 @@ class _Mumu12ShopWorkflow(_Mumu12MarketAdapter):
             return
 
     @staticmethod
-    def _guild(shop: GuildShop250814, *, refresh: bool, cancellation: CancellationSignal) -> None:
+    def _guild(shop: GuildShop250814, *, refresh: bool, cancellation: CancellationSource) -> None:
         if not shop.shop_filter:
             return
         for _ in range(2):
@@ -326,14 +326,14 @@ class _Mumu12ShopWorkflow(_Mumu12MarketAdapter):
             return
 
     @staticmethod
-    def _core(shop: CoreShop250814, cancellation: CancellationSignal) -> None:
+    def _core(shop: CoreShop250814, cancellation: CancellationSource) -> None:
         if not shop.shop_filter:
             return
         cancellation.raise_if_requested()
         shop.shop_buy()
 
     @staticmethod
-    def _medal(shop: MedalShop2V250814, cancellation: CancellationSignal) -> None:
+    def _medal(shop: MedalShop2V250814, cancellation: CancellationSource) -> None:
         if not shop.shop_filter:
             return
         cancellation.raise_if_requested()
@@ -362,7 +362,7 @@ class Mumu12ShopFrequentWorkflow(_Mumu12ShopWorkflow, ShopFrequentWorkflow):
     def execute(
         self,
         settings: ShopFrequentSettings,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> ShopFrequentReport:
         if not isinstance(settings, ShopFrequentSettings):
             message = "settings must be ShopFrequentSettings"
@@ -389,7 +389,7 @@ class Mumu12ShopOnceWorkflow(_Mumu12ShopWorkflow, ShopOnceWorkflow):
     __slots__ = ()
 
     @override
-    def execute(self, settings: ShopOnceSettings, cancellation: CancellationSignal) -> ShopOnceReport:
+    def execute(self, settings: ShopOnceSettings, cancellation: CancellationSource) -> ShopOnceReport:
         if not isinstance(settings, ShopOnceSettings):
             message = "settings must be ShopOnceSettings"
             raise TypeError(message)

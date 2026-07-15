@@ -30,7 +30,7 @@ from module.content.activity_profile import CoalitionFleetMode, CoalitionStageId
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _ACTIVITY_UNAVAILABLE = "activity is unavailable"
@@ -315,7 +315,7 @@ class ActivityWorkflow(Protocol):
     def execute(
         self,
         spec: ActivitySpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> ActivityReport:
         """在一次操作完成后的安全点返回。"""
 
@@ -992,7 +992,7 @@ class EncounterReport:
 
 
 class EncounterWorkflow(Protocol):
-    def execute(self, spec: EncounterSpec, cancellation: CancellationSignal) -> EncounterReport: ...
+    def execute(self, spec: EncounterSpec, cancellation: CancellationSource) -> EncounterReport: ...
 
 
 class EncounterTask(Task):
@@ -1311,7 +1311,7 @@ class AssistSessionWorkflow(Protocol):
     def advance_to_safe_point(
         self,
         spec: AssistSessionSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> AssistSessionReport: ...
 
 

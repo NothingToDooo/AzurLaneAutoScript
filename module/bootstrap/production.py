@@ -69,9 +69,8 @@ from module.task_registry import TASK_CATALOG, get_task_definition
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-    from module.application import ExternalRequestSignal
+    from module.application import CancellationSource, ExternalRequestSignal
     from module.content.runtime_profile import CampaignRuntimeProfileRegistry
-    from module.interaction import CancellationSignal
 
 
 _CONTENT_SUFFIXES = frozenset({".json", ".yaml", ".yml"})
@@ -325,7 +324,7 @@ class SystemLoopClock:
     @staticmethod
     def sleep(
         seconds: float,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> None:
         if type(seconds) not in {int, float} or seconds < 0:
             message = "sleep seconds must be a non-negative number"

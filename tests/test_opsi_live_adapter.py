@@ -47,9 +47,9 @@ from module.gameplay.opsi_progress import WorldProgress, WorldZoneCursor
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from module.application import CancellationSource
     from module.config.config import AzurLaneConfig
     from module.gameplay.opsi import WorldTaskSettings
-    from module.interaction import CancellationSignal
     from module.os.globe_zone import Zone
 
 
@@ -153,7 +153,7 @@ class _ScheduleSource:
 
 
 class _Driver:
-    calls: list[tuple[WorldTaskSpec, WorldProgress | None, CancellationSignal]]
+    calls: list[tuple[WorldTaskSpec, WorldProgress | None, CancellationSource]]
 
     def __init__(self, step: LiveOpsiStep) -> None:
         self.step = step
@@ -163,7 +163,7 @@ class _Driver:
         self,
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> LiveOpsiStep:
         self.calls.append((spec, progress, cancellation))
         return self.step

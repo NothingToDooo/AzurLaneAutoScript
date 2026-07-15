@@ -28,7 +28,7 @@ from module.gameplay.composite import (
 )
 
 if TYPE_CHECKING:
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _NOW = datetime(2026, 7, 13, 12, tzinfo=UTC)
@@ -51,7 +51,7 @@ def runtime(monkeypatch: pytest.MonkeyPatch) -> tuple[AzurLaneConfig, Device]:
         _device: Device,
         _task_name: str,
         overlay: dict[str, object],
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> Device:
         cancellation.raise_if_requested()
         vars(config).update(overlay)

@@ -33,7 +33,7 @@ from module.gameplay.battle_program import (
 from module.gameplay.campaign_battle_program import default_mode_battle_program
 
 if TYPE_CHECKING:
-    from module.interaction.ports import CancellationSignal
+    from module.application import CancellationSource
 
 CELL_A = CellId(0, 0)
 CELL_B = CellId(1, 0)
@@ -83,7 +83,7 @@ class StubBattleProgramPort:
     def read_metric(
         self,
         metric: program_model.ProgramMetric,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> int:
         self._record("read_metric", metric, cancellation)
         return cast("int", self.metrics[metric])
@@ -92,7 +92,7 @@ class StubBattleProgramPort:
         self,
         cell: CellId,
         cell_property: program_model.CellProperty,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> program_model.CellPropertyValue:
         self._record("read_cell_property", cell, cell_property, cancellation)
         return cast("program_model.CellPropertyValue", self.cell_properties[(cell, cell_property)])
@@ -101,24 +101,24 @@ class StubBattleProgramPort:
         self,
         cell: CellId,
         fleet: FleetRole,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool:
         return self._boolean("is_fleet_at", cell, fleet, cancellation)
 
     def has_map_presence(
         self,
         presence: program_model.MapPresence,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool:
         return self._boolean("has_map_presence", presence, cancellation)
 
-    def is_boss_at(self, cell: CellId, cancellation: CancellationSignal) -> bool:
+    def is_boss_at(self, cell: CellId, cancellation: CancellationSource) -> bool:
         return self._boolean("is_boss_at", cell, cancellation)
 
     def is_boss_accessible(
         self,
         fleet: FleetRole,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool:
         return self._boolean("is_boss_accessible", fleet, cancellation)
 
@@ -126,7 +126,7 @@ class StubBattleProgramPort:
         self,
         cell: CellId,
         fleet: FleetRole,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool:
         return self._boolean("is_cell_accessible_for_fleet", cell, fleet, cancellation)
 
@@ -134,7 +134,7 @@ class StubBattleProgramPort:
         self,
         candidates: tuple[CellId, ...],
         excluded_genres: tuple[str, ...],
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool:
         return self._boolean(
             "has_candidate_enemy",
@@ -146,7 +146,7 @@ class StubBattleProgramPort:
     def execute_battle(
         self,
         action: BattleStep,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleActionOutcome:
         self._record("execute_battle", action, cancellation)
         return cast("BattleActionOutcome", self.battle_outcomes.pop(0))
@@ -154,31 +154,31 @@ class StubBattleProgramPort:
     def execute_mechanic(
         self,
         action: program_model.ProgramMechanicAction,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         return self._mechanic("execute_mechanic", action, cancellation)
 
     def execute_preset_route(
         self,
         action: program_model.ExecutePresetRoute,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         return self._mechanic("execute_preset_route", action, cancellation)
 
     def execute_fixed_target(
         self,
         action: program_model.ExecuteFixedTarget,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         return self._mechanic("execute_fixed_target", action, cancellation)
 
-    def mark_all_siren_candidates(self, cancellation: CancellationSignal) -> None:
+    def mark_all_siren_candidates(self, cancellation: CancellationSource) -> None:
         self._record("mark_all_siren_candidates", cancellation)
 
     def set_map_weights(
         self,
         rows: tuple[tuple[int, ...], ...],
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> None:
         self._record("set_map_weights", rows, cancellation)
 

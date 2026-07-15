@@ -16,8 +16,8 @@ from module.runtime import FrozenJsonValue, SettingsDocumentError, TaskBuildCont
 from module.task_registry import TASK_CATALOG
 
 if TYPE_CHECKING:
+    from module.application import CancellationSource
     from module.gameplay.facility import CommissionWorkflow, ResearchWorkflow, TacticalWorkflow
-    from module.interaction import CancellationSignal
 
 _NOW = datetime(2026, 7, 13, 8, tzinfo=UTC)
 _SERVER_UPDATE_SCHEDULE: dict[str, FrozenJsonValue] = {
@@ -51,7 +51,7 @@ class _RecordingWorkflow[SettingsT, ReportT]:
         self._report = report
         self.settings: SettingsT | None = None
 
-    def execute(self, settings: SettingsT, cancellation: CancellationSignal) -> ReportT:
+    def execute(self, settings: SettingsT, cancellation: CancellationSource) -> ReportT:
         cancellation.raise_if_requested()
         self.settings = settings
         return self._report

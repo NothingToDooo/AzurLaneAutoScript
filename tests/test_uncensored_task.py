@@ -7,6 +7,7 @@ import pytest
 from module.application import (
     AbortRequested,
     AbortToken,
+    CancellationSource,
     ExecutionMode,
     RunMetadata,
     Succeeded,
@@ -14,7 +15,6 @@ from module.application import (
     TaskId,
     TaskResult,
 )
-from module.interaction import AppStatus, CancellationSignal
 from module.maintenance import UncensoredPayload, UncensoredSettings, UncensoredTask
 
 if TYPE_CHECKING:
@@ -33,7 +33,7 @@ class _Assets:
         self._payload = payload
         self._after_build = after_build
 
-    def build(self, cancellation: CancellationSignal) -> UncensoredPayload:
+    def build(self, cancellation: CancellationSource) -> UncensoredPayload:
         cancellation.raise_if_requested()
         self._calls.append("build")
         if self._after_build is not None:
@@ -51,7 +51,7 @@ class _Installer:
         self,
         payload: UncensoredPayload,
         package_name: str,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> None:
         cancellation.raise_if_requested()
         self._calls.append("install")
@@ -64,16 +64,11 @@ class _App:
     def __init__(self, calls: list[str]) -> None:
         self._calls = calls
 
-    @staticmethod
-    def status(cancellation: CancellationSignal) -> AppStatus:
-        cancellation.raise_if_requested()
-        return AppStatus.STOPPED
-
-    def start(self, cancellation: CancellationSignal) -> None:
+    def start(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self._calls.append("start")
 
-    def stop(self, cancellation: CancellationSignal) -> None:
+    def stop(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self._calls.append("stop")
 
@@ -82,7 +77,7 @@ class _Login:
     def __init__(self, calls: list[str]) -> None:
         self._calls = calls
 
-    def ensure_logged_in(self, cancellation: CancellationSignal) -> None:
+    def ensure_logged_in(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self._calls.append("login")
 

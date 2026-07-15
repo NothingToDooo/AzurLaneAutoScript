@@ -70,8 +70,8 @@ from module.ui.page import page_reward
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
+    from module.application import CancellationSource
     from module.config.config_generated import ConfigOverrides
-    from module.interaction import CancellationSignal
     from module.os.map import RescanMode
 
 
@@ -135,7 +135,7 @@ class OpsiUiStepExecutor(Protocol):
         self,
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> LiveOpsiStep: ...
 
 
@@ -153,7 +153,7 @@ class Mumu12OperationSirenStepDriver(OpsiLiveStepDriver):
         self,
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> LiveOpsiStep:
         return self._executor.execute(spec, progress, cancellation)
 
@@ -921,7 +921,7 @@ class _Mumu12OpsiExecutor(OpsiUiStepExecutor):
         self,
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> LiveOpsiStep:
         cancellation.raise_if_requested()
         self._config.replace_runtime_overlay()

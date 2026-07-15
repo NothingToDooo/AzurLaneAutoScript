@@ -25,7 +25,7 @@ from module.gameplay.encounter import (
 )
 
 if TYPE_CHECKING:
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _NOW = datetime(2026, 7, 13, 12, tzinfo=UTC)
@@ -79,7 +79,7 @@ def runtime(monkeypatch: pytest.MonkeyPatch) -> tuple[AzurLaneConfig, Device]:
         _device: Device,
         _task_name: str,
         _overlay: object,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> Device:
         cancellation.raise_if_requested()
         return device
@@ -185,13 +185,13 @@ class _HardCampaign:
         self.release_error = release_error
         self.calls: list[str] = []
 
-    def remaining_attempts(self, settings: HardSettings, cancellation: CancellationSignal) -> int:
+    def remaining_attempts(self, settings: HardSettings, cancellation: CancellationSource) -> int:
         assert settings is _HARD_SETTINGS
         cancellation.raise_if_requested()
         self.calls.append("remaining")
         return self.remaining
 
-    def advance_one(self, settings: HardSettings, cancellation: CancellationSignal) -> HardBattleOutcome:
+    def advance_one(self, settings: HardSettings, cancellation: CancellationSource) -> HardBattleOutcome:
         assert settings is _HARD_SETTINGS
         cancellation.raise_if_requested()
         self.calls.append("advance")
@@ -199,7 +199,7 @@ class _HardCampaign:
             raise self.result
         return self.result
 
-    def exit_ui(self, settings: HardSettings, cancellation: CancellationSignal) -> None:
+    def exit_ui(self, settings: HardSettings, cancellation: CancellationSource) -> None:
         assert settings is _HARD_SETTINGS
         cancellation.raise_if_requested()
         self.calls.append("exit_ui")
@@ -340,7 +340,7 @@ def test_exercise_advances_one_settlement_from_typed_checkpoint(
         _device: Device,
         _task_name: str,
         _overlay: object,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> Device:
         cancellation.raise_if_requested()
         return cast("Device", screen)

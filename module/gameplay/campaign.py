@@ -49,7 +49,7 @@ from module.gameplay.battle_program import BattleProgramExecution, BattleProgram
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _MIN_RESOURCE_RETRY = timedelta(minutes=120)
@@ -977,7 +977,7 @@ class CampaignWorkflow(Protocol):
     def execute(
         self,
         job: CampaignJobSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignRunReport:
         """最多确认一个 battle，并在 pending 已清空的安全点返回。"""
 

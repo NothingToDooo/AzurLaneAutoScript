@@ -106,7 +106,7 @@ from module.gameplay.campaign import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _OBSERVED_AT = datetime(2026, 7, 13, 12, tzinfo=UTC)
@@ -187,7 +187,7 @@ class _Workflow:
     def execute(
         self,
         job: CampaignJobSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignRunReport:
         cancellation.raise_if_requested()
         self.calls += 1

@@ -62,8 +62,8 @@ from module.ui.assets import CAMPAIGN_MENU_NO_EVENT
 from module.ui.page import page_campaign_menu, page_hospital
 
 if TYPE_CHECKING:
+    from module.application import CancellationSource
     from module.config.config_generated import ConfigOverrides
-    from module.interaction import CancellationSignal
 
 
 class ActivityLiveClock(Protocol):
@@ -98,7 +98,7 @@ def _activate(
     device: Device,
     task_name: str,
     overlay: ConfigOverrides,
-    cancellation: CancellationSignal,
+    cancellation: CancellationSource,
 ) -> Device:
     cancellation.raise_if_requested()
     config.replace_runtime_overlay()
@@ -186,7 +186,7 @@ class _Mumu12ActivityAdapter:
     def _device_for(
         self,
         task_name: str,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
         overlay: ConfigOverrides | None = None,
     ) -> Device:
         selected_overlay: ConfigOverrides = {} if overlay is None else overlay
@@ -259,7 +259,7 @@ class _Mumu12ActivityAdapter:
     @staticmethod
     def _event_available(
         runner: RaidRun | Coalition | Hospital,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool:
         cancellation.raise_if_requested()
         runner.ui_ensure(page_campaign_menu)
@@ -270,7 +270,7 @@ class _Mumu12ActivityAdapter:
     def _oil_limited(
         runner: RaidRun | Coalition,
         policy: EncounterPolicy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool:
         cancellation.raise_if_requested()
         oil = runner.get_oil()
@@ -280,7 +280,7 @@ class _Mumu12ActivityAdapter:
     def _points_limited(
         runner: RaidRun | Coalition | Hospital,
         policy: EncounterPolicy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool:
         if policy.event_point_limit <= 0:
             return False
@@ -292,7 +292,7 @@ class _Mumu12ActivityAdapter:
     def _balancer_limited(
         runner: RaidRun | Coalition,
         policy: EncounterBalancerPolicy | None,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool:
         if policy is None:
             return False
@@ -308,7 +308,7 @@ class Mumu12MinigameWorkflow(_Mumu12ActivityAdapter, ActivityWorkflow):
     def execute(
         self,
         spec: ActivitySpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> ActivityReport:
         if spec.command is not ActivityCommand.MINIGAME:
             message = "minigame workflow requires a minigame spec"
@@ -350,7 +350,7 @@ class Mumu12EventStoryWorkflow(_Mumu12ActivityAdapter, ActivityWorkflow):
     def execute(
         self,
         spec: ActivitySpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> ActivityReport:
         if spec.command is not ActivityCommand.EVENT_STORY or spec.activity is None or spec.skip_battle is None:
             message = "event story workflow requires an event_story spec"
@@ -407,7 +407,7 @@ class Mumu12RaidDailyWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
     __slots__ = ()
 
     @override
-    def execute(self, spec: EncounterSpec, cancellation: CancellationSignal) -> EncounterReport:
+    def execute(self, spec: EncounterSpec, cancellation: CancellationSource) -> EncounterReport:
         if spec.command is not EncounterCommand.RAID_DAILY or not isinstance(spec.options, RaidDailyOptions):
             message = "raid daily workflow requires a raid_daily spec"
             raise ValueError(message)
@@ -437,7 +437,7 @@ class Mumu12RaidDailyWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
         runner: RaidRun,
         spec: EncounterSpec,
         options: RaidDailyOptions,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> EncounterReport | None:
         policy = options.policy
         terminal = self._event_terminal(spec.command, policy)
@@ -464,7 +464,7 @@ class Mumu12RaidDailyWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
         plans: tuple[RaidRunPlan, ...],
         spec: EncounterSpec,
         options: RaidDailyOptions,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> EncounterReport:
         standard_plans = tuple(plan for plan in plans if plan.mode is not RaidMode.EX)
         for plan in standard_plans:
@@ -495,7 +495,7 @@ class Mumu12RaidDailyWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
         plan: RaidRunPlan,
         spec: EncounterSpec,
         options: RaidDailyOptions,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> EncounterReport:
         recovered_at = runner.emotion.recovery_at(1)
         if recovered_at is not None:
@@ -514,7 +514,7 @@ class Mumu12MaritimeEscortWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
     __slots__ = ()
 
     @override
-    def execute(self, spec: EncounterSpec, cancellation: CancellationSignal) -> EncounterReport:
+    def execute(self, spec: EncounterSpec, cancellation: CancellationSource) -> EncounterReport:
         if spec.command is not EncounterCommand.MARITIME_ESCORT or not isinstance(spec.options, MaritimeEscortOptions):
             message = "maritime escort workflow requires a maritime_escort spec"
             raise ValueError(message)
@@ -560,7 +560,7 @@ class Mumu12RaidWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
     __slots__ = ()
 
     @override
-    def execute(self, spec: EncounterSpec, cancellation: CancellationSignal) -> EncounterReport:
+    def execute(self, spec: EncounterSpec, cancellation: CancellationSource) -> EncounterReport:
         if spec.command is not EncounterCommand.RAID or not isinstance(spec.options, RaidOptions):
             message = "raid workflow requires a raid spec"
             raise ValueError(message)
@@ -583,7 +583,7 @@ class Mumu12RaidWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
         plan: RaidRunPlan,
         spec: EncounterSpec,
         options: RaidOptions,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> EncounterReport | None:
         policy = options.policy
         terminal = self._event_terminal(spec.command, policy)
@@ -611,7 +611,7 @@ class Mumu12RaidWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
         plan: RaidRunPlan,
         spec: EncounterSpec,
         options: RaidOptions,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> EncounterReport | None:
         if self._points_limited(runner, options.policy, cancellation):
             return EncounterReport(spec.command, EncounterStopReason.EVENT_LIMIT, self._now(), 0)
@@ -627,7 +627,7 @@ class Mumu12RaidWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
         plan: RaidRunPlan,
         spec: EncounterSpec,
         options: RaidOptions,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> EncounterReport:
         policy = options.policy
         recovered_at = runner.emotion.recovery_at(1)
@@ -662,7 +662,7 @@ class Mumu12HospitalWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
     __slots__ = ()
 
     @override
-    def execute(self, spec: EncounterSpec, cancellation: CancellationSignal) -> EncounterReport:
+    def execute(self, spec: EncounterSpec, cancellation: CancellationSource) -> EncounterReport:
         if spec.command is not EncounterCommand.HOSPITAL or not isinstance(spec.options, HospitalOptions):
             message = "hospital workflow requires a hospital spec"
             raise ValueError(message)
@@ -678,7 +678,7 @@ class Mumu12HospitalWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
         runner: Hospital,
         spec: EncounterSpec,
         options: HospitalOptions,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> EncounterReport | None:
         policy = options.policy
         terminal = self._event_terminal(spec.command, policy)
@@ -707,7 +707,7 @@ class Mumu12HospitalWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
         runner: Hospital,
         spec: EncounterSpec,
         options: HospitalOptions,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> EncounterReport:
         for tab, swipe in (("LOCATION", False), ("CHARACTER", False), ("CHARACTER", True)):
             cancellation.raise_if_requested()
@@ -728,7 +728,7 @@ class Mumu12HospitalWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
         runner: Hospital,
         spec: EncounterSpec,
         policy: EncounterPolicy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> EncounterReport:
         recovered_at = runner.emotion.recovery_at(1)
         if recovered_at is not None:
@@ -761,7 +761,7 @@ class Mumu12CoalitionWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
         self._command = command
 
     @override
-    def execute(self, spec: EncounterSpec, cancellation: CancellationSignal) -> EncounterReport:
+    def execute(self, spec: EncounterSpec, cancellation: CancellationSource) -> EncounterReport:
         if spec.command is not self._command or not isinstance(spec.options, CoalitionOptions):
             message = f"coalition workflow requires a {self._command.value} spec"
             raise ValueError(message)
@@ -788,7 +788,7 @@ class Mumu12CoalitionWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
         client: CoalitionClientSession,
         spec: EncounterSpec,
         options: CoalitionOptions,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> EncounterReport | None:
         policy = options.policy
         terminal = self._event_terminal(spec.command, policy)
@@ -820,7 +820,7 @@ class Mumu12CoalitionWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
         runner: Coalition,
         client: CoalitionClientSession,
         spec: EncounterSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> EncounterReport | None:
         if not self._event_available(runner, cancellation):
             return EncounterReport(spec.command, EncounterStopReason.EVENT_UNAVAILABLE, self._now(), 0)
@@ -837,7 +837,7 @@ class Mumu12CoalitionWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
         runner: Coalition,
         client: CoalitionClientSession,
         spec: EncounterSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> EncounterReport | None:
         options = spec.options
         if not isinstance(options, CoalitionOptions):
@@ -857,7 +857,7 @@ class Mumu12CoalitionWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
         client: CoalitionClientSession,
         spec: EncounterSpec,
         options: CoalitionOptions,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> EncounterReport:
         policy = options.policy
         recovered_at = runner.emotion.recovery_at(client.stage.battle_count)
@@ -897,7 +897,7 @@ class Mumu12DaemonWorkflow(_Mumu12ActivityAdapter, AssistSessionWorkflow):
     def advance_to_safe_point(
         self,
         spec: AssistSessionSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> AssistSessionReport:
         if spec.command is not AssistSessionCommand.DAEMON or not isinstance(spec.options, DaemonOptions):
             message = "daemon workflow requires a daemon spec"
@@ -917,7 +917,7 @@ class Mumu12OpsiDaemonWorkflow(_Mumu12ActivityAdapter, AssistSessionWorkflow):
     def advance_to_safe_point(
         self,
         spec: AssistSessionSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> AssistSessionReport:
         if spec.command is not AssistSessionCommand.OPSI_DAEMON or not isinstance(spec.options, OpsiDaemonOptions):
             message = "opsi daemon workflow requires an opsi_daemon spec"

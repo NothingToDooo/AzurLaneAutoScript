@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Protocol, override
 from module.application import Blocked, Succeeded, Task, TaskContext, TaskResult
 
 if TYPE_CHECKING:
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 def _validate_non_empty_text(value: str, *, field_name: str) -> None:
@@ -150,15 +150,15 @@ type BenchmarkPreparation = BenchmarkReady | BenchmarkUnavailable
 
 
 class BenchmarkEnvironment(Protocol):
-    def prepare(self, safe_stage: str, cancellation: CancellationSignal) -> BenchmarkPreparation: ...
+    def prepare(self, safe_stage: str, cancellation: CancellationSource) -> BenchmarkPreparation: ...
 
 
 class BenchmarkEngine(Protocol):
-    def measure(self, scene: BenchmarkScene, cancellation: CancellationSignal) -> BenchmarkReport: ...
+    def measure(self, scene: BenchmarkScene, cancellation: CancellationSource) -> BenchmarkReport: ...
 
 
 class BenchmarkPresenter(Protocol):
-    def present(self, report: BenchmarkReport, cancellation: CancellationSignal) -> None: ...
+    def present(self, report: BenchmarkReport, cancellation: CancellationSource) -> None: ...
 
 
 class BenchmarkTask(Task):

@@ -56,7 +56,7 @@ from module.task_registry import TASK_CATALOG
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _OBSERVED_AT = datetime(2026, 7, 13, 12, tzinfo=UTC)
@@ -246,7 +246,7 @@ class _Workflow:
         self,
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> WorldTaskReport:
         cancellation.raise_if_requested()
         self.received_spec = spec

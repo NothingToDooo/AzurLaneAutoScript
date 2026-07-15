@@ -9,7 +9,6 @@ from module.daemon.benchmark import Benchmark, BenchmarkResult
 from module.device.device import Device
 from module.exception import RequestHumanTakeover
 from module.handler.login import LoginHandler
-from module.interaction import AppStatus
 from module.logger import logger
 from module.maintenance import (
     BenchmarkCategory,
@@ -27,7 +26,7 @@ from module.maintenance import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _LOCALIZATION_TEXT = "Localization = true\nLocalization_skin = true\n"
@@ -38,7 +37,7 @@ def _activate(
     config: AzurLaneConfig,
     device: Device,
     task_name: str,
-    cancellation: CancellationSignal,
+    cancellation: CancellationSource,
 ) -> Device:
     cancellation.raise_if_requested()
     task = name_to_function(task_name)
@@ -57,17 +56,13 @@ class Mumu12DeviceAppLifecycle:
             raise TypeError(message)
         self._device = device
 
-    def status(self, cancellation: CancellationSignal) -> AppStatus:
-        cancellation.raise_if_requested()
-        return AppStatus.RUNNING if self._device.app_controller.is_running() else AppStatus.STOPPED
-
-    def start(self, cancellation: CancellationSignal) -> None:
+    def start(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self._device.app_controller.start()
         self._device.stuck_record_clear()
         self._device.click_record_clear()
 
-    def stop(self, cancellation: CancellationSignal) -> None:
+    def stop(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self._device.app_controller.stop()
         self._device.stuck_record_clear()
@@ -87,7 +82,7 @@ class Mumu12LoginFlow:
         self._config = config
         self._device = device
 
-    def ensure_logged_in(self, cancellation: CancellationSignal) -> None:
+    def ensure_logged_in(self, cancellation: CancellationSource) -> None:
         device = _activate(self._config, self._device, "Alas", cancellation)
         LoginHandler(self._config, device=device).handle_app_login()
 
@@ -101,7 +96,7 @@ class LocalUncensoredAssetBuilder:
             raise TypeError(message)
         self._output = (toolkit_root.resolve() / "files").resolve()
 
-    def build(self, cancellation: CancellationSignal) -> UncensoredPayload:
+    def build(self, cancellation: CancellationSource) -> UncensoredPayload:
         cancellation.raise_if_requested()
         if self._output.exists():
             shutil.rmtree(self._output)
@@ -129,7 +124,7 @@ class Mumu12UncensoredAssetInstaller:
         self,
         payload: UncensoredPayload,
         package_name: str,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> None:
         if not isinstance(payload, UncensoredPayload):
             message = "payload must be an UncensoredPayload"
@@ -153,7 +148,7 @@ class Mumu12BenchmarkAdapter:
         self._device = device
         self._runner: Benchmark | None = None
 
-    def prepare(self, safe_stage: str, cancellation: CancellationSignal) -> BenchmarkPreparation:
+    def prepare(self, safe_stage: str, cancellation: CancellationSource) -> BenchmarkPreparation:
         device = _activate(self._config, self._device, "Benchmark", cancellation)
         runner = Benchmark(self._config, device=device)
         try:
@@ -165,7 +160,7 @@ class Mumu12BenchmarkAdapter:
         self._runner = runner
         return BenchmarkReady()
 
-    def measure(self, scene: BenchmarkScene, cancellation: CancellationSignal) -> BenchmarkReport:
+    def measure(self, scene: BenchmarkScene, cancellation: CancellationSource) -> BenchmarkReport:
         runner = self._prepared_runner()
         measurements: list[BenchmarkMeasurement] = []
         if BenchmarkCategory.SCREENSHOT in scene.categories:
@@ -202,7 +197,7 @@ class Mumu12BenchmarkAdapter:
         category: BenchmarkCategory,
         method: str,
         operation: Callable[[], object],
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BenchmarkMeasurement:
         cancellation.raise_if_requested()
         result = runner.benchmark_test(operation)
@@ -210,7 +205,7 @@ class Mumu12BenchmarkAdapter:
             return BenchmarkMeasurement(category, method, average_seconds=float(result))
         return BenchmarkMeasurement(category, method, failure_reason=str(result))
 
-    def present(self, report: BenchmarkReport, cancellation: CancellationSignal) -> None:
+    def present(self, report: BenchmarkReport, cancellation: CancellationSource) -> None:
         runner = self._prepared_runner()
         for category in BenchmarkCategory:
             rows = tuple(

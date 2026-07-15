@@ -19,7 +19,7 @@ from module.application import (
 )
 
 if TYPE_CHECKING:
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _GUILD_INCOMPLETE_REASON = "guild logistics or operation did not complete"
@@ -165,7 +165,7 @@ class DormReport:
 
 
 class DormWorkflow(Protocol):
-    def execute(self, request: DormRunRequest, cancellation: CancellationSignal) -> DormReport: ...
+    def execute(self, request: DormRunRequest, cancellation: CancellationSource) -> DormReport: ...
 
 
 class DormTask(Task):
@@ -317,7 +317,7 @@ class MeowfficerReport:
 
 
 class MeowfficerWorkflow(Protocol):
-    def execute(self, settings: MeowfficerSettings, cancellation: CancellationSignal) -> MeowfficerReport: ...
+    def execute(self, settings: MeowfficerSettings, cancellation: CancellationSource) -> MeowfficerReport: ...
 
 
 class MeowfficerTask(Task):
@@ -434,7 +434,7 @@ class GuildReport:
 
 
 class GuildWorkflow(Protocol):
-    def execute(self, settings: GuildSettings, cancellation: CancellationSignal) -> GuildReport: ...
+    def execute(self, settings: GuildSettings, cancellation: CancellationSource) -> GuildReport: ...
 
 
 class GuildTask(Task):
@@ -525,7 +525,7 @@ class RewardReport:
 
 
 class RewardWorkflow(Protocol):
-    def execute(self, settings: RewardSettings, cancellation: CancellationSignal) -> RewardReport: ...
+    def execute(self, settings: RewardSettings, cancellation: CancellationSource) -> RewardReport: ...
 
 
 class RewardTask(Task):
@@ -638,14 +638,14 @@ class FreebieCollectionReport:
 
 
 class FreebieCollectionWorkflow(Protocol):
-    def collect(self, cancellation: CancellationSignal) -> FreebieCollectionReport: ...
+    def collect(self, cancellation: CancellationSource) -> FreebieCollectionReport: ...
 
 
 class DataKeyWorkflow(Protocol):
     def collect(
         self,
         plan: DataKeyPlan,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> FreebieCollectionReport: ...
 
 
@@ -653,7 +653,7 @@ class MailCollectionWorkflow(Protocol):
     def collect(
         self,
         policy: MailCollectionPolicy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> FreebieCollectionReport: ...
 
 
@@ -661,7 +661,7 @@ class SupplyPackWorkflow(Protocol):
     def collect(
         self,
         plan: SupplyPackPlan,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> FreebieCollectionReport: ...
 
 
@@ -789,7 +789,7 @@ class PrivateQuartersWorkflow(Protocol):
     def execute(
         self,
         settings: PrivateQuartersSettings,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> PrivateQuartersReport: ...
 
 

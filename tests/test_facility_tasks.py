@@ -41,7 +41,7 @@ from module.gameplay.facility import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _OBSERVED_AT = datetime(2026, 7, 13, 12, tzinfo=UTC)
@@ -103,7 +103,7 @@ class _ResearchWorkflow:
         self.execute_calls = 0
         self.settings: ResearchSettings | None = None
 
-    def execute(self, settings: ResearchSettings, cancellation: CancellationSignal) -> ResearchReport:
+    def execute(self, settings: ResearchSettings, cancellation: CancellationSource) -> ResearchReport:
         cancellation.raise_if_requested()
         self.settings = settings
         self.execute_calls += 1
@@ -124,7 +124,7 @@ class _CommissionWorkflow:
         self.execute_calls = 0
         self.settings: CommissionSettings | None = None
 
-    def execute(self, settings: CommissionSettings, cancellation: CancellationSignal) -> CommissionReport:
+    def execute(self, settings: CommissionSettings, cancellation: CancellationSource) -> CommissionReport:
         cancellation.raise_if_requested()
         self.settings = settings
         self.execute_calls += 1
@@ -145,7 +145,7 @@ class _TacticalWorkflow:
         self.execute_calls = 0
         self.settings: TacticalSettings | None = None
 
-    def execute(self, settings: TacticalSettings, cancellation: CancellationSignal) -> TacticalReport:
+    def execute(self, settings: TacticalSettings, cancellation: CancellationSource) -> TacticalReport:
         cancellation.raise_if_requested()
         self.settings = settings
         self.execute_calls += 1

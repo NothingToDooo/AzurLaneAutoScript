@@ -6,6 +6,7 @@ import pytest
 from module.application import (
     AbortRequested,
     AbortToken,
+    CancellationSource,
     DailySchedule,
     ExecutionMode,
     RescheduleSelf,
@@ -15,7 +16,6 @@ from module.application import (
     TaskId,
     TaskResult,
 )
-from module.interaction import AppStatus, CancellationSignal
 from module.maintenance import RestartSettings, RestartTask
 
 if TYPE_CHECKING:
@@ -30,16 +30,11 @@ class _App:
         self._calls = calls
         self._on_stop = on_stop
 
-    @staticmethod
-    def status(cancellation: CancellationSignal) -> AppStatus:
-        cancellation.raise_if_requested()
-        return AppStatus.STOPPED
-
-    def start(self, cancellation: CancellationSignal) -> None:
+    def start(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self._calls.append("start")
 
-    def stop(self, cancellation: CancellationSignal) -> None:
+    def stop(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self._calls.append("stop")
         if self._on_stop is not None:
@@ -51,7 +46,7 @@ class _Login:
         self._calls = calls
         self._error = error
 
-    def ensure_logged_in(self, cancellation: CancellationSignal) -> None:
+    def ensure_logged_in(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self._calls.append("login")
         if self._error is not None:

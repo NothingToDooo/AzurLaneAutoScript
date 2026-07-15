@@ -39,7 +39,7 @@ from module.gameplay.opsi_progress import (
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _ACTION_POINTS_EXHAUSTED = "operation siren action points are exhausted"
@@ -668,7 +668,7 @@ class OperationSirenWorkflow(Protocol):
         self,
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> WorldTaskReport: ...
 
 

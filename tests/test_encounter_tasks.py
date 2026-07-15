@@ -52,7 +52,7 @@ from module.gameplay.encounter import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _OBSERVED_AT = datetime(2026, 7, 13, 12, tzinfo=UTC)
@@ -70,21 +70,21 @@ class _Workflow[ReportT]:
         self.execute_calls = 0
 
     @overload
-    def execute(self, settings: DailySettings, cancellation: CancellationSignal) -> ReportT: ...
+    def execute(self, settings: DailySettings, cancellation: CancellationSource) -> ReportT: ...
 
     @overload
-    def execute(self, settings: HardSettings, cancellation: CancellationSignal) -> ReportT: ...
+    def execute(self, settings: HardSettings, cancellation: CancellationSource) -> ReportT: ...
 
     @overload
     def execute(
         self,
         settings: ExerciseSettings,
         progress: ExerciseProgress,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> ReportT: ...
 
     def execute(self, *args: object) -> ReportT:
-        cancellation = cast("CancellationSignal", args[-1])
+        cancellation = cast("CancellationSource", args[-1])
         cancellation.raise_if_requested()
         self.execute_calls += 1
         if self._on_execute is not None:

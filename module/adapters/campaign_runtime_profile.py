@@ -22,7 +22,7 @@ from module.map_detection.grid import Grid
 from module.map_detection.grid_info import GridInfo
 
 if TYPE_CHECKING:
-    from module.application import CancellationSource as CancellationSignal
+    from module.application import CancellationSource
     from module.config.config_generated import ConfigOverrides
 
 
@@ -950,15 +950,15 @@ class CampaignRuntimeProfileManager:
             RuntimeTuningKey.COMBAT_DISABLE_STUCK_DETECTION_BATTLE,
         )
 
-    def map_has_mob_move(self, cancellation: CancellationSignal) -> bool:
+    def map_has_mob_move(self, cancellation: CancellationSource) -> bool:
         cancellation.raise_if_requested()
         return self._shared_state.map_has_mob_move
 
-    def use_support_fleet(self, cancellation: CancellationSignal) -> bool:
+    def use_support_fleet(self, cancellation: CancellationSource) -> bool:
         cancellation.raise_if_requested()
         return self._shared_state.use_support_fleet
 
-    def use_single_fleet_override(self, cancellation: CancellationSignal) -> bool | None:
+    def use_single_fleet_override(self, cancellation: CancellationSource) -> bool | None:
         cancellation.raise_if_requested()
         return self._shared_state.use_single_fleet_override
 

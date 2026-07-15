@@ -74,7 +74,7 @@ from module.gameplay.opsi_progress import WorldBossPhase, WorldMissionEvidenceKi
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _OBSERVED_AT = datetime(2026, 7, 13, 12, tzinfo=UTC)
@@ -173,13 +173,13 @@ class _Workflow:
         self.calls = 0
         self.received_spec: WorldTaskSpec | None = None
         self.received_progress: WorldProgress | None = None
-        self.received_cancellation: CancellationSignal | None = None
+        self.received_cancellation: CancellationSource | None = None
 
     def execute(
         self,
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> WorldTaskReport:
         cancellation.raise_if_requested()
         self.calls += 1
