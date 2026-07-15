@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import TYPE_CHECKING, override
 
 import pytest
@@ -6,7 +5,7 @@ import pytest
 from module.content.activity_catalog import ActivityCatalog, RaidActivity
 from module.content.activity_profile import RaidDefinition, RaidMode, RaidProfileId
 from module.content.errors import ContentValidationError
-from module.content.manifest import load_event_manifests
+from module.content.manifest import load_default_event_manifests
 from module.content.models import ContentId
 from module.ocr.ocr import Digit, DigitCounter
 from module.raid import assets as raid_assets
@@ -35,7 +34,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture(scope="module")
 def raid_activities() -> tuple[RaidActivity, ...]:
-    manifests = load_event_manifests(Path("content/events"))
+    manifests = load_default_event_manifests()
     catalog = ActivityCatalog(manifests)
     raid_ids = sorted(str(pack.pack_id) for pack in manifests if isinstance(pack.activity, RaidDefinition))
     return tuple(catalog.resolve_raid(raid_id) for raid_id in raid_ids)

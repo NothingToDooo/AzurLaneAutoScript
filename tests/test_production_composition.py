@@ -34,6 +34,7 @@ from module.bootstrap.production import (
     validate_personal_configuration,
 )
 from module.bootstrap.task_factories import build_game_task_registry
+from module.content.manifest import load_default_event_manifests
 from module.device.device import Device
 from module.diagnostics import ScreenshotHistory
 from module.equipment.equipment_code import EquipmentCodeHandler
@@ -48,7 +49,7 @@ if TYPE_CHECKING:
     from module.config.config_generated import ConfigValue
     from module.content.campaign_session import CampaignRunVariant, CampaignSession
     from module.content.campaign_session_source import CampaignStageSelection
-    from module.content.models import StageRef
+    from module.content.models import EventPack, StageRef
 
 
 class _Sessions:
@@ -119,6 +120,25 @@ def _test_device(config: AzurLaneConfig) -> Device:
     return device
 
 
+@pytest.fixture(scope="module")
+def production_default_event_packs() -> tuple[EventPack, ...]:
+    """默认 manifests 不可变，同一模块只需解析和校验一次。"""
+    return load_default_event_manifests()
+
+
+def _reuse_production_default_event_packs(
+    monkeypatch: pytest.MonkeyPatch,
+    packs: tuple[EventPack, ...],
+) -> None:
+    expected_root = Path("content/events").resolve()
+
+    def load(path: Path) -> tuple[EventPack, ...]:
+        assert path.resolve() == expected_root
+        return packs
+
+    monkeypatch.setattr(production_module, "load_event_manifests", load)
+
+
 def test_equipment_codes_accumulate_through_one_owner_in_the_same_process(tmp_path: Path) -> None:
     document = _template()
     path = tmp_path / "alas.json"
@@ -155,7 +175,11 @@ def _source(
     )
 
 
-def test_bundle_source_builds_every_domain_from_personal_configuration() -> None:
+def test_bundle_source_builds_every_domain_from_personal_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+    production_default_event_packs: tuple[EventPack, ...],
+) -> None:
+    _reuse_production_default_event_packs(monkeypatch, production_default_event_packs)
     document = _template()
     config_factory, configs = _personal_config_factory(document)
 
@@ -190,9 +214,11 @@ def test_bundle_source_builds_every_domain_from_personal_configuration() -> None
 )
 def test_content_validation_precedes_device_construction(
     monkeypatch: pytest.MonkeyPatch,
+    production_default_event_packs: tuple[EventPack, ...],
     validator_name: str,
     message: str,
 ) -> None:
+    _reuse_production_default_event_packs(monkeypatch, production_default_event_packs)
     document = _template()
     config_factory, _configs = _personal_config_factory(document)
     created: list[AzurLaneConfig] = []
@@ -211,7 +237,11 @@ def test_content_validation_precedes_device_construction(
     assert created == []
 
 
-def test_complete_configuration_builds_all_57_tasks() -> None:
+def test_complete_configuration_builds_all_57_tasks(
+    monkeypatch: pytest.MonkeyPatch,
+    production_default_event_packs: tuple[EventPack, ...],
+) -> None:
+    _reuse_production_default_event_packs(monkeypatch, production_default_event_packs)
     document = _template()
     config_factory, _configs = _personal_config_factory(document)
     source = Mumu12GameRuntimeBundleSource(
@@ -311,7 +341,9 @@ def test_fault_observer_saves_diagnostics_and_sends_all_production_notifications
 
 def test_personal_configuration_validation_reuses_task_factory_contracts_without_connecting_device(
     monkeypatch: pytest.MonkeyPatch,
+    production_default_event_packs: tuple[EventPack, ...],
 ) -> None:
+    _reuse_production_default_event_packs(monkeypatch, production_default_event_packs)
     document = _template()
     tactical = cast("dict[str, object]", document["Tactical"])
     student = cast("dict[str, object]", tactical["AddNewStudent"])
@@ -332,7 +364,11 @@ def test_personal_configuration_validation_reuses_task_factory_contracts_without
         validate_personal_configuration(document, project_root=Path())
 
 
-def test_personal_configuration_validation_wraps_unknown_content_reference() -> None:
+def test_personal_configuration_validation_wraps_unknown_content_reference(
+    monkeypatch: pytest.MonkeyPatch,
+    production_default_event_packs: tuple[EventPack, ...],
+) -> None:
+    _reuse_production_default_event_packs(monkeypatch, production_default_event_packs)
     document = _template()
     event = cast("dict[str, object]", document["Event"])
     campaign = cast("dict[str, object]", event["Campaign"])

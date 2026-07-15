@@ -11,7 +11,7 @@ from module.adapters.campaign_runtime_implementations import (
 )
 from module.adapters.campaign_runtime_profile import CampaignRuntimeProfileManager
 from module.content.errors import ContentValidationError
-from module.content.manifest import load_event_manifests
+from module.content.manifest import load_default_event_manifests
 from module.content.models import StageRef, StageSpec
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
@@ -39,7 +39,7 @@ PROFILE_PATH = ROOT / "content" / "campaign-runtime-profiles.json"
 
 @pytest.fixture(scope="module")
 def packs_by_id() -> Mapping[str, EventPack]:
-    return MappingProxyType({str(pack.pack_id): pack for pack in load_event_manifests(ROOT / "content" / "events")})
+    return MappingProxyType({str(pack.pack_id): pack for pack in load_default_event_manifests()})
 
 
 @pytest.fixture(scope="module")
