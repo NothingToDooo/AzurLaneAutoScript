@@ -26,12 +26,13 @@ class _Receive6thContext(RewardResearch):
         self,
         *,
         status: list[ResearchStatus],
+        status_after_wait: list[ResearchStatus] | None = None,
         finished: bool = False,
         receive_result: bool = True,
         queue_slot: int = 1,
     ) -> None:
         self.device = _Device()
-        self.status = status
+        self.statuses = [status] if status_after_wait is None else [status, status_after_wait]
         self.finished = finished
         self.receive_result = receive_result
         self.queue_slot = queue_slot
@@ -41,7 +42,7 @@ class _Receive6thContext(RewardResearch):
     def get_research_status(self, image: ImageArray) -> list[ResearchStatus]:
         assert image is self.device.image
         self.calls.append(("status", None))
-        return self.status
+        return self.statuses.pop(0) if len(self.statuses) > 1 else self.statuses[0]
 
     def research_has_finished(self) -> bool:
         self.calls.append(("finished", None))
@@ -88,7 +89,8 @@ def test_receive_6th_research_returns_false_when_finished_reward_cannot_be_recei
 
 def test_receive_6th_research_does_not_start_running_project_when_queue_is_full() -> None:
     context = _Receive6thContext(
-        status=["detail", "running", "detail", "detail", "detail"],
+        status=["detail", "detail", "detail", "detail", "detail"],
+        status_after_wait=["detail", "running", "detail", "detail", "detail"],
         queue_slot=0,
     )
 
