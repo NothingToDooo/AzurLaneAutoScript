@@ -31,8 +31,6 @@ from module.content.campaign_policy import (
 from module.content.errors import ContentValidationError
 from module.content.models import (
     EVENT_KINDS,
-    EVENT_UI_PROFILES,
-    AssetRef,
     ContentId,
     EventPack,
     EventRelease,
@@ -48,7 +46,6 @@ _TOP_LEVEL_FIELDS = {
     "schema_version",
     "id",
     "kind",
-    "ui_profile",
     "releases",
     "stages",
     "policy",
@@ -56,8 +53,7 @@ _TOP_LEVEL_FIELDS = {
     "war_archives",
 }
 _RELEASE_FIELDS = {"opened_on", "name_cn", "order"}
-_STAGE_FIELDS = {"id", "source", "assets", "runtime_profile"}
-_ASSET_FIELDS = {"id", "path"}
+_STAGE_FIELDS = {"id", "source", "runtime_profile"}
 _POLICY_FIELDS = {
     "aliases",
     "progressions",
@@ -227,23 +223,6 @@ def _safe_pack_file(raw: object, path: Path, location: str, pack_root: Path) -> 
     return relative.as_posix()
 
 
-def _load_assets(raw: object, path: Path, location: str, pack_root: Path) -> tuple[AssetRef, ...]:
-    assets = []
-    seen: set[str] = set()
-    for index, value in enumerate(_sequence(raw, path, location)):
-        item_location = f"{location}[{index}]"
-        item = _mapping(value, path, item_location, _ASSET_FIELDS)
-        if set(item) != _ASSET_FIELDS:
-            raise _fail(path, item_location, f"required fields are {sorted(_ASSET_FIELDS)}")
-        asset_id = _string(item["id"], path, f"{item_location}.id")
-        if asset_id in seen:
-            raise _fail(path, f"{item_location}.id", f"duplicate asset id: {asset_id}")
-        seen.add(asset_id)
-        asset_path = _safe_pack_file(item["path"], path, f"{item_location}.path", pack_root)
-        assets.append(AssetRef(asset_id=ContentId(asset_id), path=Path(asset_path)))
-    return tuple(assets)
-
-
 def _load_stages(
     raw: object,
     path: Path,
@@ -264,12 +243,10 @@ def _load_stages(
             raise _fail(path, f"{location}.id", f"duplicate stage id: {stage_id}")
         seen.add(stage_id)
         source = _safe_pack_file(item["source"], path, f"{location}.source", pack_root)
-        assets = _load_assets(item.get("assets", ()), path, f"{location}.assets", pack_root)
         stages.append(
             StageSpec(
                 ref=StageRef(pack_id=pack_id, stage_id=stage_id),
                 source=source,
-                assets=assets,
                 runtime_profile_id=CampaignRuntimeProfileId(
                     _string(
                         item["runtime_profile"],
@@ -504,7 +481,7 @@ def _validate_policy_targets(
 
 def _load_pack(path: Path, repository_root: Path) -> EventPack:
     data = _load_yaml(path)
-    required = {"schema_version", "id", "kind", "ui_profile", "releases"}
+    required = {"schema_version", "id", "kind", "releases"}
     if not required.issubset(data):
         raise _fail(path, "$", f"required fields are {sorted(required)}")
     version = _exact_integer(data["schema_version"], path, "schema_version")
@@ -518,9 +495,6 @@ def _load_pack(path: Path, repository_root: Path) -> EventPack:
         raise _fail(path, "kind", f"must be one of {EVENT_KINDS}")
     if not pack_id.startswith(f"{kind}_"):
         raise _fail(path, "kind", "must match the pack id prefix")
-    ui_profile = _string(data["ui_profile"], path, "ui_profile")
-    if ui_profile not in EVENT_UI_PROFILES:
-        raise _fail(path, "ui_profile", f"must be one of {EVENT_UI_PROFILES}")
     releases = _load_releases(data["releases"], path)
     war_archives = _pack_war_archives(data, path, kind)
     pack_root = _resolve_pack_root(path, pack_id)
@@ -537,7 +511,6 @@ def _load_pack(path: Path, repository_root: Path) -> EventPack:
         pack_id=ContentId(pack_id),
         stages=stages,
         kind=kind,
-        ui_profile=ui_profile,
         releases=releases,
         policy=policy,
         activity=activity,

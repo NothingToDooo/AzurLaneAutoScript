@@ -1,7 +1,6 @@
 schema_version: 1
 id: war_archives_20180726_cn
 kind: war_archives
-ui_profile: campaign_v1
 war_archives:
   profile: iris_of_light_and_dark
 releases:

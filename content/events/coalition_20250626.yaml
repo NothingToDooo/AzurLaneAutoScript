@@ -1,7 +1,6 @@
 schema_version: 1
 id: coalition_20250626
 kind: coalition
-ui_profile: campaign_v1
 activity:
   kind: coalition
   profile: neoncity

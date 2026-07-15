@@ -4,7 +4,7 @@ from collections.abc import Set as AbstractSet
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, cast
 
 import yaml
 from yaml.resolver import BaseResolver
@@ -1323,10 +1323,6 @@ def _stage_path(spec: StageSpec, content_root: Path) -> tuple[Path, Path]:
     if not path.is_file():
         raise _fail(path, "source", "file does not exist")
     return path, pack_root
-
-
-class StageLoader(Protocol):
-    def load(self, spec: StageSpec) -> CampaignStageDefinition: ...
 
 
 class StageSpecLoader:

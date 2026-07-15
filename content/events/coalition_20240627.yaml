@@ -1,7 +1,6 @@
 schema_version: 1
 id: coalition_20240627
 kind: coalition
-ui_profile: campaign_v1
 activity:
   kind: coalition
   profile: academy

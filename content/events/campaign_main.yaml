@@ -1,7 +1,6 @@
 schema_version: 1
 id: campaign_main
 kind: campaign
-ui_profile: campaign_v1
 releases:
 - opened_on: '2017-05-25'
   name_cn: 主线战役
