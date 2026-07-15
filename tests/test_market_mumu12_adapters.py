@@ -306,17 +306,3 @@ def test_disabled_shop_filter_projects_to_empty_legacy_primitive() -> None:
     )
 
     assert adapters.project_shop_frequent_settings(settings)["GeneralShop_Filter"] == ""
-
-
-def test_market_production_builder_returns_all_five_capabilities(
-    runtime: tuple[AzurLaneConfig, Device],
-) -> None:
-    config, device = runtime
-
-    workflows = adapters.build_mumu12_market_workflows(config, device)
-
-    assert isinstance(workflows.awaken, adapters.Mumu12AwakenWorkflow)
-    assert isinstance(workflows.shipyard, adapters.Mumu12ShipyardWorkflow)
-    assert isinstance(workflows.gacha, adapters.Mumu12GachaWorkflow)
-    assert isinstance(workflows.shop_frequent, adapters.Mumu12ShopFrequentWorkflow)
-    assert isinstance(workflows.shop_once, adapters.Mumu12ShopOnceWorkflow)

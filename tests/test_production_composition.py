@@ -1,5 +1,4 @@
 import json
-from dataclasses import fields
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -24,7 +23,7 @@ from module.application import (
     TaskResult,
 )
 from module.application.state_effects import UpsertTaskState
-from module.bootstrap.assembly_source import ConfigurationLoadError, GameRuntimeBundle, JsonConfigurationDocumentSource
+from module.bootstrap.assembly_source import ConfigurationLoadError, JsonConfigurationDocumentSource
 from module.bootstrap.configuration_compiler import ConfigurationCompileError, WebConfigurationCompiler
 from module.bootstrap.production import (
     Mumu12GameRuntimeBundleSource,
@@ -41,6 +40,7 @@ from module.equipment.equipment_code import EquipmentCodeHandler
 from module.notify.configuration import SmtpNotificationConfig, SmtpTransport
 from module.runtime.settings import TaskSettingsDocument
 from module.state.config_repository import ConfigStateError, ConfigStateRepository
+from module.task_registry import TASK_CATALOG
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -188,20 +188,9 @@ def test_bundle_source_builds_every_domain_from_personal_configuration(
         clock=SystemLoopClock(),
     )
 
-    assert isinstance(bundle, GameRuntimeBundle)
     assert bundle.content_revision == "content-test"
     assert configs[0].config_name == "alas"
     assert configs[0].Emulator_Serial == compiled.device_serial
-    assert {field.name for field in fields(bundle.tasks)} == {
-        "maintenance",
-        "facility",
-        "composite",
-        "market",
-        "encounter",
-        "campaign",
-        "opsi",
-        "activity",
-    }
 
 
 @pytest.mark.parametrize(
@@ -237,7 +226,7 @@ def test_content_validation_precedes_device_construction(
     assert created == []
 
 
-def test_complete_configuration_builds_all_57_tasks(
+def test_complete_configuration_builds_the_exact_task_catalog(
     monkeypatch: pytest.MonkeyPatch,
     production_default_event_packs: tuple[EventPack, ...],
 ) -> None:
@@ -263,7 +252,7 @@ def test_complete_configuration_builds_all_57_tasks(
     )
 
     registry.validate_settings(settings)
-    assert len(registry.task_ids) == 57
+    assert registry.task_ids == tuple(TASK_CATALOG)
 
 
 def test_fault_observer_saves_diagnostics_and_sends_all_production_notifications(

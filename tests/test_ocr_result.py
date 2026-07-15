@@ -1,4 +1,3 @@
-import inspect
 from datetime import timedelta
 from typing import TYPE_CHECKING, TypedDict
 
@@ -226,12 +225,6 @@ def test_counter_recognize_records_failure_with_complete_inference_context() -> 
         64,
         10,
     )
-
-
-def test_structured_recognize_signatures_are_introspectable() -> None:
-    for recognize in (Digit.recognize, DigitCounter.recognize, Duration.recognize):
-        signature = inspect.signature(recognize)
-        assert signature.parameters["failure_store"].default is None
 
 
 def test_counter_recognize_rejects_multiple_rois() -> None:

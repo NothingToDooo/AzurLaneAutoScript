@@ -362,11 +362,11 @@ def test_exercise_advances_one_settlement_from_typed_checkpoint(
     assert runner.calls[-1] == ("advance", _EXERCISE_SETTINGS, 1)
 
 
-def test_production_builder_requires_and_exposes_the_hard_campaign_port(
+def test_production_builder_executes_hard_with_the_injected_campaign_port(
     runtime: tuple[AzurLaneConfig, Device],
 ) -> None:
     config, device = runtime
-    campaign = _HardCampaign(remaining=0)
+    campaign = _HardCampaign(remaining=3)
 
     workflows = adapters.build_mumu12_encounter_workflows(
         config,
@@ -375,6 +375,9 @@ def test_production_builder_requires_and_exposes_the_hard_campaign_port(
         clock=_Clock(),
     )
 
-    assert isinstance(workflows.daily, adapters.Mumu12DailyWorkflow)
-    assert isinstance(workflows.hard, adapters.Mumu12HardWorkflow)
-    assert isinstance(workflows.exercise, adapters.Mumu12ExerciseWorkflow)
+    report = workflows.hard.execute(_HARD_SETTINGS, AbortToken())
+
+    assert report.attempts_available == 3
+    assert report.attempts_completed == 1
+    assert report.stop_reason is HardStopReason.IN_PROGRESS
+    assert campaign.calls == ["remaining", "advance", "release"]

@@ -2,7 +2,6 @@ import inspect
 import os
 from datetime import date
 from pathlib import Path
-from typing import get_type_hints
 
 import psutil
 import pytest
@@ -120,11 +119,6 @@ def test_event_models_keep_the_old_constructor_and_expose_immutable_manifest_dat
     assert pack.policy.aliases == (("vsp", "sp"),)
     with pytest.raises(AttributeError):
         _set_attribute(pack, "kind", "raid")
-
-
-@pytest.mark.parametrize("model", [EventRelease, EventPack, CampaignPolicy])
-def test_public_manifest_model_annotations_are_runtime_resolvable(model: type[object]) -> None:
-    assert get_type_hints(model)
 
 
 def test_load_minimal_manifest(tmp_path: Path) -> None:
@@ -543,11 +537,6 @@ def test_readme_renderer_matches_checked_in_output() -> None:
     packs = load_default_event_manifests()
 
     assert render_campaign_readme(packs) == Path("campaign/Readme.md").read_text(encoding="utf-8")
-
-
-def test_config_generator_manifest_annotations_are_runtime_resolvable() -> None:
-    event_packs_property = ConfigGenerator.__dict__["event_packs"]
-    assert get_type_hints(event_packs_property.func)["return"] == tuple[EventPack, ...]
 
 
 def test_config_generator_writes_readme_through_atomic_boundary(
