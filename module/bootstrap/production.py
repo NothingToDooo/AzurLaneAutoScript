@@ -476,13 +476,12 @@ def run_default_command(
     root = _require_project_root(
         Path(__file__).resolve().parents[2] if project_root is None else project_root,
     )
-    config_path = ensure_personal_configuration(root)
-    configuration_source = JsonConfigurationDocumentSource(config_path)
     screenshots: ScreenshotHistory | None = None
     notification: NotificationConfig = DisabledNotificationConfig()
     try:
-        document = configuration_source.load()
         _validate_command(command)
+        config_path = ensure_personal_configuration(root)
+        document = JsonConfigurationDocumentSource(config_path).load()
         clock = SystemLoopClock()
         compiled, bundle, repository = Mumu12GameRuntimeBundleSource(root).build(document, clock=clock)
         notification = compiled.notification
@@ -515,23 +514,6 @@ def run_default_command(
             external_reason="personal runtime stop requested",
         )
         return runner.run(command, abort=abort)
-    except SystemExit as error:
-        if error.code in {None, 0}:
-            return CommandOutcome(
-                command=command,
-                status=CommandStatus.FINISHED,
-                finished_at=datetime.now(tz=UTC),
-            )
-        logger.exception(error)
-        bundle_path = _save_error_bundle(
-            root=root,
-            command=command,
-            task_id=None,
-            error=error,
-            screenshots=screenshots,
-        )
-        _notify(notification, title="Alas process failed", content=f"{type(error).__name__}: {error}")
-        return _failed_outcome(command, error, bundle=bundle_path)
     except Exception as error:  # noqa: BLE001 - 唯一进程边界必须返回可序列化结果。
         logger.exception(error)
         bundle_path = _save_error_bundle(

@@ -6,12 +6,15 @@ import pytest
 from module.application import (
     AbortRequested,
     AbortToken,
+    Blocked,
     Cancelled,
+    Deferred,
     DisableTask,
     ExecutionMode,
     Faulted,
     RequestAppRestart,
     RescheduleSelf,
+    Retryable,
     RunMetadata,
     ScheduleItem,
     Succeeded,
@@ -223,6 +226,90 @@ def test_direct_command_maps_terminal_result(result: TaskResult, status: Command
     assert outcome.status is status
     if status is CommandStatus.FAILED:
         assert (outcome.exception_type, outcome.message) == ("RuntimeError", "boom")
+
+
+@pytest.mark.parametrize(
+    ("result", "reason"),
+    [
+        (TaskResult(Blocked("not available")), "not available"),
+        (TaskResult(Deferred("try later")), "try later"),
+        (TaskResult(Retryable("temporary failure")), "temporary failure"),
+    ],
+)
+def test_direct_command_rejects_incomplete_result(result: TaskResult, reason: str) -> None:
+    runner = _runner(
+        (_definition("benchmark", ExecutionMode.DIRECT_COMMAND, None),),
+        (_Task(result),),
+        _Repository(),
+        _Clock(),
+    )
+
+    outcome = runner.run("benchmark")
+
+    assert outcome.status is CommandStatus.FAILED
+    assert outcome.message == reason
+
+
+def test_scheduler_continues_after_an_expected_incomplete_result() -> None:
+    task_id = TaskId("benchmark")
+    repository = _Repository(
+        (
+            ScheduleItem(
+                task_id=task_id,
+                enabled=True,
+                due_at=NOW,
+                priority=0,
+            ),
+        )
+    )
+    runner = _runner(
+        (_definition(task_id.value, ExecutionMode.SCHEDULED_JOB, 0),),
+        (_Task(TaskResult(Deferred("try later"), effects=(DisableTask(task_id),))),),
+        repository,
+        _Clock(),
+    )
+
+    outcome = runner.run("alas")
+
+    assert outcome.status is CommandStatus.FINISHED
+    assert outcome.runs_completed == 1
+    assert repository.items[task_id].enabled is False
+
+
+def test_persistence_failure_keeps_task_context_for_diagnostics() -> None:
+    class _FailingRepository(_Repository):
+        def finalize_run(self, result: TaskResult) -> None:
+            del result
+            self.active_task = None
+            message = "disk full"
+            raise OSError(message)
+
+    observed: list[tuple[TaskId, TaskResult]] = []
+
+    def observe(task_id: TaskId, result: TaskResult) -> str:
+        observed.append((task_id, result))
+        return "log/error/benchmark"
+
+    task = _Task(TaskResult(Succeeded()))
+    runner = _runner(
+        (_definition("benchmark", ExecutionMode.DIRECT_COMMAND, None),),
+        (task,),
+        _FailingRepository(),
+        _Clock(),
+        observer=observe,
+    )
+
+    outcome = runner.run("benchmark")
+
+    assert len(task.contexts) == 1
+    assert observed[0][0] == TaskId("benchmark")
+    assert isinstance(observed[0][1].outcome, Faulted)
+    assert outcome.status is CommandStatus.FAILED
+    assert outcome.last_task == "benchmark"
+    assert outcome.runs_completed == 1
+    assert outcome.exception_type == "OSError"
+    assert outcome.message == "disk full"
+    assert outcome.error_bundle == "log/error/benchmark"
 
 
 def test_result_observer_can_attach_error_bundle() -> None:

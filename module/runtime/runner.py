@@ -7,10 +7,13 @@ from typing import Protocol, cast
 from module.application import (
     AbortRequested,
     AbortToken,
+    Blocked,
     Cancelled,
+    Deferred,
     ExecutionMode,
     Faulted,
     RequestAppRestart,
+    Retryable,
     RunCoordinator,
     RunMetadata,
     RunRepository,
@@ -89,6 +92,13 @@ def _require_clock(clock: object) -> RunnerClock:
         message = "clock must implement now() and sleep()"
         raise TypeError(message)
     return cast("RunnerClock", clock)
+
+
+def _require_task_state(value: object) -> TaskStateDocument:
+    if not isinstance(value, TaskStateDocument):
+        message = "RuntimeRepository.task_state() must return a TaskStateDocument"
+        raise TypeError(message)
+    return value
 
 
 def _result_status(result: TaskResult) -> CommandStatus | None:
@@ -228,21 +238,21 @@ class RuntimeRunner:
         mode: ExecutionMode,
         abort: AbortToken,
     ) -> tuple[TaskResult, str | None]:
-        task_state = self._repository.task_state(task_id)
-        if not isinstance(task_state, TaskStateDocument):
-            message = "RuntimeRepository.task_state() must return a TaskStateDocument"
-            raise TypeError(message)
-        task = self._factories.build(task_id.value, self._settings, task_state)
-        result = self._coordinator.execute(
-            task_id,
-            mode,
-            RunMetadata(
-                settings_revision=self._settings.revision_for(task_id.value),
-                content_revision=self._factories.content_revision_for(task_id.value),
-            ),
-            task,
-            abort=abort,
-        )
+        try:
+            task_state = _require_task_state(self._repository.task_state(task_id))
+            task = self._factories.build(task_id.value, self._settings, task_state)
+            result = self._coordinator.execute(
+                task_id,
+                mode,
+                RunMetadata(
+                    settings_revision=self._settings.revision_for(task_id.value),
+                    content_revision=self._factories.content_revision_for(task_id.value),
+                ),
+                task,
+                abort=abort,
+            )
+        except Exception as error:  # noqa: BLE001 - task 边界必须保留 task id 并生成诊断。
+            result = TaskResult(Faulted(error))
         bundle = None if self._observer is None else self._observer(task_id, result)
         if bundle is not None and not isinstance(bundle, str):
             message = "result observer must return a string or None"
@@ -265,6 +275,9 @@ class RuntimeRunner:
             exception_type = type(result.outcome.error).__name__
             message = str(result.outcome.error)
         elif isinstance(result.outcome, Cancelled):
+            message = result.outcome.reason
+        elif isinstance(result.outcome, Blocked | Deferred | Retryable):
+            status = CommandStatus.FAILED
             message = result.outcome.reason
         return CommandOutcome(
             command=command,
