@@ -26,7 +26,6 @@ from module.content.activity_catalog import ActivityCatalog
 from module.content.activity_profile import CoalitionStageId
 from module.content.manifest import load_event_manifests
 from module.gameplay.activity import (
-    GAMEPLAY_COMMAND_PROFILES,
     ActivityDisposition,
     ActivityReport,
     ActivitySpec,
@@ -284,7 +283,7 @@ def _task_context(
     return TaskContext(
         task_id=TaskId(command),
         started_at=datetime(2026, 7, 13, tzinfo=UTC),
-        mode=GAMEPLAY_COMMAND_PROFILES[command].execution_mode,
+        mode=TASK_CATALOG[command].execution_mode,
         metadata=RunMetadata(settings_revision=3, content_revision="content-1"),
         abort=AbortToken() if abort is None else abort,
     )

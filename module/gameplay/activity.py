@@ -12,7 +12,6 @@ from module.application import (
     DelayRange,
     DeleteTaskState,
     DisableTask,
-    ExecutionMode,
     RescheduleSelf,
     Retryable,
     Succeeded,
@@ -26,6 +25,7 @@ from module.application import (
 )
 from module.content.activity_catalog import CoalitionActivity, EventStoryActivity, RaidActivity
 from module.content.activity_profile import CoalitionFleetMode, CoalitionStageId, RaidMode
+from module.task_registry import TASK_CATALOG
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -108,49 +108,13 @@ def _require_method(value: object, method_name: str, *, field_name: str) -> None
         raise TypeError(message)
 
 
-class GameplayTaskFamily(StrEnum):
-    ACTIVITY = "activity"
-    ENCOUNTER = "encounter"
-    ASSIST_SESSION = "assist_session"
-
-
-@dataclass(frozen=True, slots=True)
-class GameplayCommandProfile:
-    family: GameplayTaskFamily
-    execution_mode: ExecutionMode
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.family, GameplayTaskFamily):
-            message = "family must be a GameplayTaskFamily"
-            raise TypeError(message)
-        if not isinstance(self.execution_mode, ExecutionMode):
-            message = "execution_mode must be an ExecutionMode"
-            raise TypeError(message)
-
-
-GAMEPLAY_COMMAND_PROFILES: Mapping[str, GameplayCommandProfile] = MappingProxyType(
-    {
-        "minigame": GameplayCommandProfile(GameplayTaskFamily.ACTIVITY, ExecutionMode.SCHEDULED_JOB),
-        "event_story": GameplayCommandProfile(GameplayTaskFamily.ACTIVITY, ExecutionMode.DIRECT_COMMAND),
-        "raid_daily": GameplayCommandProfile(GameplayTaskFamily.ENCOUNTER, ExecutionMode.SCHEDULED_JOB),
-        "maritime_escort": GameplayCommandProfile(GameplayTaskFamily.ENCOUNTER, ExecutionMode.SCHEDULED_JOB),
-        "raid": GameplayCommandProfile(GameplayTaskFamily.ENCOUNTER, ExecutionMode.SCHEDULED_JOB),
-        "hospital": GameplayCommandProfile(GameplayTaskFamily.ENCOUNTER, ExecutionMode.SCHEDULED_JOB),
-        "coalition": GameplayCommandProfile(GameplayTaskFamily.ENCOUNTER, ExecutionMode.SCHEDULED_JOB),
-        "coalition_sp": GameplayCommandProfile(GameplayTaskFamily.ENCOUNTER, ExecutionMode.SCHEDULED_JOB),
-        "daemon": GameplayCommandProfile(GameplayTaskFamily.ASSIST_SESSION, ExecutionMode.ASSIST_SESSION),
-        "opsi_daemon": GameplayCommandProfile(GameplayTaskFamily.ASSIST_SESSION, ExecutionMode.ASSIST_SESSION),
-    }
-)
-
-
 def _validate_context(context: TaskContext, command: str) -> None:
-    profile = GAMEPLAY_COMMAND_PROFILES[command]
+    expected_mode = TASK_CATALOG[command].execution_mode
     if context.task_id != TaskId(command):
         message = f"task context id must be {command!r}"
         raise ValueError(message)
-    if context.mode is not profile.execution_mode:
-        message = f"task {command!r} requires {profile.execution_mode.value} execution mode"
+    if context.mode is not expected_mode:
+        message = f"task {command!r} requires {expected_mode.value} execution mode"
         raise ValueError(message)
 
 
