@@ -1,12 +1,12 @@
 import abc
 from collections import deque
-from functools import partial, wraps
+from functools import partial
 from itertools import count
 from threading import Lock, Thread
 from typing import TYPE_CHECKING, NoReturn, Protocol
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable
     from types import TracebackType
     from typing import Self
 
@@ -255,36 +255,9 @@ class WorkerPool:
         worker.worker_lock.release()
         return job
 
-    def run_on_thread[**P, ResultT](self, func: Callable[P, ResultT]) -> Callable[P, Job[ResultT]]:
-        """将函数包装为线程调用，每次调用返回 Job。"""
-
-        @wraps(func)
-        def thread_wrapper(*args: P.args, **kwargs: P.kwargs) -> Job[ResultT]:
-            return self.start_thread_soon(func, *args, **kwargs)
-
-        return thread_wrapper
-
     def wait_jobs(self) -> WaitJobsWrapper:
         """上下文退出时等待其中所有 Job。"""
         return WaitJobsWrapper(self)
-
-    def gather_jobs[ResultT](self) -> GatherJobsWrapper[ResultT]:
-        """上下文退出时等待所有 Job，并把结果收集到 results。"""
-        return GatherJobsWrapper(self)
-
-    def thread_map[ArgT, ResultT](self, func: Callable[[ArgT], ResultT], iterables: Iterable[ArgT]) -> list[ResultT]:
-        jobs = [self.start_thread_soon(func, arg) for arg in iterables]
-        return [job.get() for job in jobs]
-
-    def thread_starmap[*ArgsT, ResultT](
-        self, func: Callable[[*ArgsT], ResultT], iterables: Iterable[tuple[*ArgsT]]
-    ) -> list[ResultT]:
-        jobs = [self.start_thread_soon(func, *arg) for arg in iterables]
-        return [job.get() for job in jobs]
-
-    def thread_funcmap[ResultT](self, func_iterables: Iterable[Callable[[], ResultT]]) -> list[ResultT]:
-        jobs = [self.start_thread_soon(func) for func in func_iterables]
-        return [job.get() for job in jobs]
 
 
 class WaitJobsWrapper:
@@ -312,37 +285,6 @@ class WaitJobsWrapper:
     def start_thread_soon[**P, ResultT](
         self, func: Callable[P, ResultT], *args: P.args, **kwargs: P.kwargs
     ) -> Job[ResultT]:
-        job = self.pool.start_thread_soon(func, *args, **kwargs)
-        self.jobs.append(job)
-        return job
-
-
-class GatherJobsWrapper[ResultT]:
-    def __init__(self, pool: WorkerPool) -> None:
-        self.pool = pool
-        self.jobs: list[Job[ResultT]] = []
-        self.results: list[ResultT] = []
-
-    def get(self) -> None:
-        for job in self.jobs:
-            result = job.get()
-            self.results.append(result)
-        self.jobs.clear()
-
-    def __enter__(self) -> Self:
-        self.jobs.clear()
-        self.results.clear()
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        self.get()
-
-    def start_thread_soon[**P](self, func: Callable[P, ResultT], *args: P.args, **kwargs: P.kwargs) -> Job[ResultT]:
         job = self.pool.start_thread_soon(func, *args, **kwargs)
         self.jobs.append(job)
         return job

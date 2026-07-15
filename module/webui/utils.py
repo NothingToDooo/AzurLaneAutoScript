@@ -22,15 +22,7 @@ from module.logger import logger
 from module.webui.setting import State
 
 if TYPE_CHECKING:
-    from queue import Queue
-
     from pywebio.session.base import Session
-
-RE_DATETIME = (
-    r"\d{4}\-(0\d|1[0-2])\-([0-2]\d|[3][0-1]) "
-    r"([0-1]\d|[2][0-3]):([0-5]\d):([0-5]\d)"
-)
-
 
 TRACEBACK_CODE_FORMAT = """\
 <code class="rich-traceback">
@@ -89,14 +81,6 @@ LIGHT_TERMINAL_THEME = TerminalTheme(
         (165, 165, 165),  # White
     ],
 )
-
-
-class QueueHandler:
-    def __init__(self, q: Queue[str]) -> None:
-        self.queue = q
-
-    def write(self, s: str) -> None:
-        self.queue.put(s)
 
 
 type TaskGenerator = Generator[None, TaskHandler | None]
@@ -182,20 +166,9 @@ class TaskHandler:
                 self._remove_task(task)
             self.pending_remove_tasks = []
 
-    def remove_current_task(self) -> None:
-        if self._task is not None:
-            self.remove_task(self._task, nowait=True)
-
     def set_current_task_delay(self, delay: float) -> None:
         if self._task is not None:
             self._task.delay = delay
-
-    def get_task(self, name: str) -> Task | None:
-        with self._lock:
-            for task in self.tasks:
-                if task.name == name:
-                    return task
-            return None
 
     def loop(self) -> None:
         """在独立线程中运行后台任务调度循环。"""
@@ -370,7 +343,6 @@ class Icon:
     SETTING = _read(filepath_icon("setting"))
     RUN = _read(filepath_icon("run"))
     DEVELOP = _read(filepath_icon("develop"))
-    ADD = _read(filepath_icon("add"))
 
 
 def _parse_typed_pin_value(val: MutableDeepValue, valuetype: str) -> MutableDeepValue:
@@ -442,14 +414,6 @@ def re_fullmatch(pattern: str, string: str) -> bool:
         else:
             return True
     return re.fullmatch(pattern=pattern, string=string) is not None
-
-
-def get_next_time(t: datetime.time) -> int:
-    now = datetime.datetime.now(tz=datetime.UTC).astimezone().time()
-    second = (t.hour - now.hour) * 3600 + (t.minute - now.minute) * 60 + (t.second - now.second)
-    if second < 0:
-        second += 86400
-    return second
 
 
 def on_task_exception(self: Session) -> None:
