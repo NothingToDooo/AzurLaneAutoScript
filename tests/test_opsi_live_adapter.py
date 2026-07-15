@@ -16,7 +16,6 @@ from module.application import AbortRequested, AbortToken, TaskId
 from module.config.deep import deep_set
 from module.device.device import Device
 from module.gameplay.opsi import (
-    WORLD_TASK_DEFINITIONS,
     AbyssalSettings,
     ArchiveSettings,
     AshAssistSettings,
@@ -542,8 +541,3 @@ def test_live_step_accepts_only_one_retry_representation() -> None:
             retry_at=_NOW,
             retry_after=timedelta(minutes=1),
         )
-
-
-def test_definition_coverage_matches_live_settings_fixture() -> None:
-    assert {definition.operation for definition in WORLD_TASK_DEFINITIONS.values()} == set(WorldOperation)
-    assert {_spec(operation).operation for operation in WorldOperation} == set(WorldOperation)

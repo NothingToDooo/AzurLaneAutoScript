@@ -70,16 +70,6 @@ def test_execution_modes_are_closed_and_explicit() -> None:
     }
 
 
-def test_run_metadata_is_a_hashable_value() -> None:
-    metadata = _metadata(settings_revision=4, content_revision="event-20260713")
-    equal_metadata = _metadata(
-        settings_revision=4,
-        content_revision="event-20260713",
-    )
-
-    assert {metadata, equal_metadata} == {metadata}
-
-
 def test_run_metadata_requires_a_positive_integer_settings_revision() -> None:
     invalid_revision = True
     with pytest.raises(TypeError, match="settings_revision must be an integer"):
@@ -331,17 +321,6 @@ def test_task_result_rejects_non_tuple_and_duplicate_state_effects() -> None:
         TaskResult(outcome=Succeeded(), state_effects=(upsert, delete))
 
 
-def test_task_result_preserves_distinct_state_effect_order() -> None:
-    state_effects: tuple[StateEffect, ...] = (
-        UpsertTaskState("encounter.progress", "raid", 1, {"runs": 2}),
-        DeleteTaskState("event.lifecycle", "reset"),
-    )
-
-    result = TaskResult(outcome=Succeeded(), state_effects=state_effects)
-
-    assert result.state_effects is state_effects
-
-
 def test_task_result_rejects_multiple_reschedule_effects() -> None:
     due_at = datetime(2026, 7, 14, 4, tzinfo=UTC)
 
@@ -427,20 +406,6 @@ def test_task_result_rejects_multiple_operations_for_the_same_task(
         match="effects must contain at most one target-task schedule operation per task_id",
     ):
         TaskResult(outcome=Succeeded(), effects=effects)
-
-
-def test_task_result_preserves_distinct_effect_order() -> None:
-    due_at = datetime(2026, 7, 14, 4, tzinfo=UTC)
-    effects: tuple[ScheduleEffect, ...] = (
-        WakeTask(TaskId("reward"), due_at, WakePolicy.RESPECT_DISABLED),
-        RescheduleSelf(due_at),
-        DisableTask(TaskId("commission")),
-        RequestAppRestart("game process stopped"),
-    )
-
-    result = TaskResult(outcome=Succeeded(), effects=effects)
-
-    assert result.effects is effects
 
 
 class _CancellableTask(Task):

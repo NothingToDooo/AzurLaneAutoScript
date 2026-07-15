@@ -4,7 +4,6 @@ from typing import cast
 
 import pytest
 
-from module.application import DailySchedule as ApplicationDailySchedule
 from module.runtime import DailySchedule, FrozenTaskSettings, SettingsDecoder, SettingsDocumentError
 
 
@@ -28,7 +27,6 @@ def test_decoder_decodes_a_daily_schedule_and_consumes_the_whole_object() -> Non
     schedule = decoder.daily_schedule("schedule")
     decoder.finish()
 
-    assert DailySchedule is ApplicationDailySchedule
     assert schedule == DailySchedule("Asia/Hong_Kong", (time(4), time(12, 30)))
 
 

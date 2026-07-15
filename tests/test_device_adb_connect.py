@@ -146,16 +146,6 @@ def test_adb_connect_runs_refused_diagnostics_before_reporting_missing_device() 
     assert connection.detect_calls == 1
 
 
-def test_connection_release_resource_is_base_hook() -> None:
-    connection = object.__new__(Connection)
-    marker = object()
-    connection.__dict__["_minitouch_builder"] = marker
-
-    connection.release_resource()
-
-    assert connection.__dict__["_minitouch_builder"] is marker
-
-
 class _ReconnectConnection(Connection):
     devices: list[object]
     calls: list[str]

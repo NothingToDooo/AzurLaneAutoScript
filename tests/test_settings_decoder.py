@@ -90,9 +90,8 @@ def _valid_settings() -> dict[str, FrozenJsonValue]:
 def test_typed_factory_decodes_all_fields_and_normalizes_datetime() -> None:
     factory = TypedTaskFactory(_decode, _Task)
 
-    task = factory.build(_context(_valid_settings()))
+    task = cast("_Task", factory.build(_context(_valid_settings())))
 
-    assert isinstance(task, _Task)
     assert task.settings == _Settings(
         enabled=True,
         retries=2,

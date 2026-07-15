@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 
 from module.content.activity_catalog import ActivityCatalog, CoalitionActivity, EventStoryActivity, RaidActivity
@@ -9,12 +7,12 @@ from module.content.activity_profile import (
     RaidMode,
 )
 from module.content.errors import ActivityKindError, UnknownActivityError
-from module.content.manifest import load_event_manifests
+from module.content.manifest import load_default_event_manifests
 
 
 @pytest.fixture(scope="module")
 def catalog() -> ActivityCatalog:
-    return ActivityCatalog(load_event_manifests(Path("content/events")))
+    return ActivityCatalog(load_default_event_manifests())
 
 
 def test_catalog_resolves_typed_activity_definitions(catalog: ActivityCatalog) -> None:

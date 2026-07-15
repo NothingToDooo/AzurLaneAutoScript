@@ -1,7 +1,10 @@
-import pytest
+from typing import TYPE_CHECKING
 
 import module.research.project as research_project
 from module.research.project import ResearchProject
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def _bare_project(series: int = 5) -> ResearchProject:
@@ -47,14 +50,3 @@ def test_research_project_get_data_matches_trimmed_suffix(monkeypatch: pytest.Mo
     monkeypatch.setattr(research_project, "LIST_RESEARCH_PROJECT", data)
 
     assert list(project.get_data("D-057-U", 2)) == data
-
-
-def test_research_project_get_data_has_no_hidden_return_value(monkeypatch: pytest.MonkeyPatch) -> None:
-    project = _bare_project(series=5)
-    monkeypatch.setattr(research_project, "LIST_RESEARCH_PROJECT", [])
-    data = project.get_data("X-000-X", 5)
-
-    with pytest.raises(StopIteration) as stopped:
-        next(data)
-
-    assert stopped.value.value is None

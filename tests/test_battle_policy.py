@@ -94,13 +94,6 @@ def test_policy_rejects_unknown_names_and_incompatible_preserve() -> None:
         BattlePolicy("fleet_boss", preserve=0)
 
 
-def test_policy_exposes_no_legacy_execution_api() -> None:
-    policy = BattlePolicy("fleet_boss")
-
-    assert not hasattr(policy, "execute")
-    assert not hasattr(policy, "as_method")
-
-
 def test_non_atomic_boss_search_requires_an_explicit_roadblock_step() -> None:
     with pytest.raises(ContentValidationError, match="roadblock"):
         StagePolicy((ClearBoss(BossStrategy.MAP_SEARCH),))

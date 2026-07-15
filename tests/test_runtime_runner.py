@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from module.application import (
+    AbortRequested,
     AbortToken,
     Cancelled,
     DisableTask,
@@ -158,13 +159,20 @@ def test_direct_command_runs_once() -> None:
     assert task.contexts[0].mode is ExecutionMode.DIRECT_COMMAND
 
 
-def test_scheduler_waits_runs_due_task_and_finishes_when_disabled() -> None:
+def test_scheduler_runs_all_due_tasks_then_finishes_when_empty() -> None:
     due_at = NOW + timedelta(minutes=5)
-    task = _Task(TaskResult(Succeeded(), effects=(DisableTask(TaskId("reward")),)))
+    reward_task = _Task(TaskResult(Succeeded(), effects=(DisableTask(TaskId("reward")),)))
+    tactical_task = _Task(TaskResult(Succeeded(), effects=(DisableTask(TaskId("tactical")),)))
     repository = _Repository(
         (
             ScheduleItem(
                 task_id=TaskId("reward"),
+                enabled=True,
+                due_at=due_at,
+                priority=1,
+            ),
+            ScheduleItem(
+                task_id=TaskId("tactical"),
                 enabled=True,
                 due_at=due_at,
                 priority=0,
@@ -173,8 +181,11 @@ def test_scheduler_waits_runs_due_task_and_finishes_when_disabled() -> None:
     )
     clock = _Clock()
     runner = _runner(
-        (_definition("reward", ExecutionMode.SCHEDULED_JOB, 0),),
-        (task,),
+        (
+            _definition("reward", ExecutionMode.SCHEDULED_JOB, 1),
+            _definition("tactical", ExecutionMode.SCHEDULED_JOB, 0),
+        ),
+        (reward_task, tactical_task),
         repository,
         clock,
     )
@@ -182,7 +193,12 @@ def test_scheduler_waits_runs_due_task_and_finishes_when_disabled() -> None:
     outcome = runner.run("alas")
 
     assert outcome.status is CommandStatus.FINISHED
-    assert outcome.runs_completed == 1
+    assert outcome.runs_completed == 2
+    assert outcome.last_task == "reward"
+    assert [task_id for task_id, _result in repository.results] == [
+        TaskId("tactical"),
+        TaskId("reward"),
+    ]
     assert clock.sleeps == [330.0]
 
 
@@ -240,6 +256,42 @@ def test_abort_before_scheduler_tick_returns_stopped() -> None:
 
     assert outcome.status is CommandStatus.STOPPED
     assert outcome.runs_completed == 0
+
+
+def test_abort_during_scheduler_sleep_returns_stopped() -> None:
+    class _AbortingClock(_Clock):
+        def sleep(self, seconds: float, cancellation: AbortToken) -> None:
+            del cancellation
+            self.sleeps.append(seconds)
+            raise AbortRequested
+
+    due_at = NOW + timedelta(minutes=5)
+    task = _Task(TaskResult(Succeeded(), effects=(DisableTask(TaskId("reward")),)))
+    repository = _Repository(
+        (
+            ScheduleItem(
+                task_id=TaskId("reward"),
+                enabled=True,
+                due_at=due_at,
+                priority=0,
+            ),
+        )
+    )
+    clock = _AbortingClock()
+    runner = _runner(
+        (_definition("reward", ExecutionMode.SCHEDULED_JOB, 0),),
+        (task,),
+        repository,
+        clock,
+    )
+
+    outcome = runner.run("alas")
+
+    assert outcome.status is CommandStatus.STOPPED
+    assert outcome.runs_completed == 0
+    assert outcome.last_task is None
+    assert clock.sleeps == [330.0]
+    assert task.contexts == []
 
 
 def test_scheduled_task_can_be_launched_once_for_debugging() -> None:

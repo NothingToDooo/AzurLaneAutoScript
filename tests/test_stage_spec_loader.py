@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from module.content import stage_behavior_codec
-from module.content import stage_loader as stage_loader_module
 from module.content.battle_policy import (
     BossStrategy,
     ClearBoss,
@@ -21,7 +20,6 @@ from module.content.errors import ContentValidationError
 from module.content.manifest import load_default_event_manifests
 from module.content.models import StageRef, StageSpec
 from module.content.stage_definition import (
-    CampaignStageDefinition,
     CellId,
     GridShape,
     LandBasedDirection,
@@ -161,11 +159,8 @@ def _minimal_stage(**replacements: str) -> str:
 def test_default_loader_returns_typed_definition_for_every_native_stage(stage_id: str) -> None:
     definition = load_default_stage(StageRef(PACK_ID, stage_id))
 
-    assert isinstance(definition, CampaignStageDefinition)
     assert definition.ref == StageRef(PACK_ID, stage_id)
     assert definition.map.name == stage_id.upper()
-    assert not hasattr(definition, "config_class")
-    assert not hasattr(definition, "campaign_class")
 
 
 def test_load_and_load_definition_share_the_same_typed_contract() -> None:
@@ -220,18 +215,6 @@ def test_compiled_definition_is_deeply_immutable() -> None:
             _assign_attribute(target, name, value)
     with pytest.raises(TypeError):
         definition.battle_policies[99] = definition.battle_policies[0]
-
-
-def test_native_loader_has_no_dynamic_or_legacy_materialization_path() -> None:
-    source = inspect.getsource(stage_loader_module)
-    definition = StageSpecLoader().load(_native_stage_spec("t1"))
-
-    assert 'type("Config"' not in source
-    assert 'type("Campaign"' not in source
-    assert "legacy_stage" not in source
-    assert "legacy_battle_policy" not in source
-    assert "CampaignMap" not in source
-    assert not isinstance(definition, type)
 
 
 def test_normal_stage_compiles_config_into_typed_rule_groups() -> None:

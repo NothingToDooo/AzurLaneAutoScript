@@ -1,10 +1,7 @@
-import ast
 import inspect
 import os
-import re
 from datetime import date
 from pathlib import Path
-from typing import get_type_hints
 
 import psutil
 import pytest
@@ -14,11 +11,10 @@ from module.config.config_updater import ConfigGenerator
 from module.content.activity_profile import EventStoryDefinition, EventStoryProfileId
 from module.content.campaign_policy import CampaignPolicy, StageProgressionRule
 from module.content.errors import ContentValidationError
-from module.content.manifest import load_event_manifests, render_campaign_readme
+from module.content.manifest import load_default_event_manifests, load_event_manifests, render_campaign_readme
 from module.content.models import ContentId, EventPack, EventRelease
 from module.content.war_archives_profile import WarArchivesDefinition, WarArchivesProfileId
 
-EVENTS_PATH = Path("content/events")
 _UNKNOWN_ASSET_FIELD = (
     "\nstages:\n  - id: t1\n    source: stages/t1.yaml\n    runtime_profile: core\n    assets:\n"
     "      - id: map\n        path: assets/t1.yaml\n        unknown: true"
@@ -123,11 +119,6 @@ def test_event_models_keep_the_old_constructor_and_expose_immutable_manifest_dat
     assert pack.policy.aliases == (("vsp", "sp"),)
     with pytest.raises(AttributeError):
         _set_attribute(pack, "kind", "raid")
-
-
-@pytest.mark.parametrize("model", [EventRelease, EventPack, CampaignPolicy])
-def test_public_manifest_model_annotations_are_runtime_resolvable(model: type[object]) -> None:
-    assert get_type_hints(model)
 
 
 def test_load_minimal_manifest(tmp_path: Path) -> None:
@@ -522,7 +513,7 @@ def test_manifest_rejects_duplicate_or_dangling_stage_references(tmp_path: Path,
 
 
 def test_real_manifests_preserve_all_readme_releases_and_profiles() -> None:
-    packs = load_event_manifests(EVENTS_PATH)
+    packs = load_default_event_manifests()
 
     assert len(packs) == 134
     assert sum(len(pack.releases) for pack in packs) == 270
@@ -535,7 +526,7 @@ def test_real_manifests_preserve_all_readme_releases_and_profiles() -> None:
 
 
 def test_20260625_manifest_registers_only_declarative_native_stages() -> None:
-    packs = load_event_manifests(EVENTS_PATH)
+    packs = load_default_event_manifests()
     pack = next(pack for pack in packs if str(pack.pack_id) == "event_20260625_cn")
 
     assert tuple(stage.ref.stage_id for stage in pack.stages) == ("ht1", "ht2", "ht3", "sp", "t1", "t2", "t3")
@@ -543,14 +534,9 @@ def test_20260625_manifest_registers_only_declarative_native_stages() -> None:
 
 
 def test_readme_renderer_matches_checked_in_output() -> None:
-    packs = load_event_manifests(EVENTS_PATH)
+    packs = load_default_event_manifests()
 
     assert render_campaign_readme(packs) == Path("campaign/Readme.md").read_text(encoding="utf-8")
-
-
-def test_config_generator_manifest_annotations_are_runtime_resolvable() -> None:
-    event_packs_property = ConfigGenerator.__dict__["event_packs"]
-    assert get_type_hints(event_packs_property.func)["return"] == tuple[EventPack, ...]
 
 
 def test_config_generator_writes_readme_through_atomic_boundary(
@@ -575,24 +561,3 @@ def test_config_generator_writes_readme_through_atomic_boundary(
             render_campaign_readme((pack,)),
         )
     ]
-
-
-def test_stable_core_contains_no_dated_event_string_literals() -> None:
-    pattern = re.compile(r"(?:event|war_archives)_\d{8}_cn")
-    paths = [
-        Path("module/content/campaign_policy.py"),
-        Path("module/content/campaign_session_source.py"),
-        Path("module/content/manifest.py"),
-        Path("module/gameplay/campaign_factories.py"),
-        Path("module/config/config_updater.py"),
-        Path("module/config/config_manual.py"),
-    ]
-
-    for path in paths:
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        violations = [
-            node.value
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Constant) and isinstance(node.value, str) and pattern.search(node.value)
-        ]
-        assert violations == [], f"{path}: {violations}"

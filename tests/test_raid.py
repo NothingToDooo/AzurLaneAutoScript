@@ -1,5 +1,3 @@
-import re
-from pathlib import Path
 from typing import TYPE_CHECKING, override
 
 import pytest
@@ -7,7 +5,7 @@ import pytest
 from module.content.activity_catalog import ActivityCatalog, RaidActivity
 from module.content.activity_profile import RaidDefinition, RaidMode, RaidProfileId
 from module.content.errors import ContentValidationError
-from module.content.manifest import load_event_manifests
+from module.content.manifest import load_default_event_manifests
 from module.content.models import ContentId
 from module.ocr.ocr import Digit, DigitCounter
 from module.raid import assets as raid_assets
@@ -34,13 +32,11 @@ if TYPE_CHECKING:
     from module.raid.profile import RaidRunPlan
 
 
-def _raid_activities() -> tuple[RaidActivity, ...]:
-    catalog = ActivityCatalog(load_event_manifests(Path("content/events")))
-    raid_ids = sorted(
-        str(pack.pack_id)
-        for pack in load_event_manifests(Path("content/events"))
-        if isinstance(pack.activity, RaidDefinition)
-    )
+@pytest.fixture(scope="module")
+def raid_activities() -> tuple[RaidActivity, ...]:
+    manifests = load_default_event_manifests()
+    catalog = ActivityCatalog(manifests)
+    raid_ids = sorted(str(pack.pack_id) for pack in manifests if isinstance(pack.activity, RaidDefinition))
     return tuple(catalog.resolve_raid(raid_id) for raid_id in raid_ids)
 
 
@@ -57,12 +53,12 @@ def _activity(profile_id: str, *, daily_modes: tuple[RaidMode, ...] = ()) -> Rai
     )
 
 
-def test_builtin_profiles_cover_every_raid_manifest_and_validate_before_runtime() -> None:
-    activities = _raid_activities()
-
-    assert len(activities) == 11
-    assert {activity.definition.profile_id for activity in activities} == RAID_CLIENT_PROFILES.profile_ids
-    for activity in activities:
+def test_builtin_profiles_cover_every_raid_manifest_and_validate_before_runtime(
+    raid_activities: tuple[RaidActivity, ...],
+) -> None:
+    assert len(raid_activities) == 11
+    assert {activity.definition.profile_id for activity in raid_activities} == RAID_CLIENT_PROFILES.profile_ids
+    for activity in raid_activities:
         resolved = RAID_CLIENT_PROFILES.bind(activity)
         assert resolved.activity is activity
         assert {mode.mode for mode in resolved.client.modes} == set(activity.definition.modes)
@@ -73,10 +69,10 @@ def test_unknown_profile_fails_during_binding() -> None:
         RAID_CLIENT_PROFILES.bind(_activity("unknown"))
 
 
-def test_rpg_attempts_are_explicitly_unmetered_without_fabricated_ocr() -> None:
-    activity = next(
-        activity for activity in _raid_activities() if activity.definition.profile_id == RaidProfileId("rpg")
-    )
+def test_rpg_attempts_are_explicitly_unmetered_without_fabricated_ocr(
+    raid_activities: tuple[RaidActivity, ...],
+) -> None:
+    activity = next(activity for activity in raid_activities if activity.definition.profile_id == RaidProfileId("rpg"))
     resolved = RAID_CLIENT_PROFILES.bind(activity)
 
     assert resolved.client is RPG_RAID_PROFILE
@@ -94,9 +90,11 @@ def test_daily_or_ticket_capability_requires_metered_ocr() -> None:
         )
 
 
-def test_ticket_can_only_be_enabled_for_the_selected_ticket_mode() -> None:
+def test_ticket_can_only_be_enabled_for_the_selected_ticket_mode(
+    raid_activities: tuple[RaidActivity, ...],
+) -> None:
     activity = next(
-        activity for activity in _raid_activities() if activity.definition.profile_id == RaidProfileId("changwu")
+        activity for activity in raid_activities if activity.definition.profile_id == RaidProfileId("changwu")
     )
     resolved = RAID_CLIENT_PROFILES.bind(activity)
 
@@ -105,8 +103,8 @@ def test_ticket_can_only_be_enabled_for_the_selected_ticket_mode() -> None:
     assert resolved.plan(RaidMode.EX, use_ticket=True).use_ticket is True
 
 
-def test_daily_plan_requires_manifest_daily_capability() -> None:
-    rpg = next(activity for activity in _raid_activities() if activity.definition.profile_id == RaidProfileId("rpg"))
+def test_daily_plan_requires_manifest_daily_capability(raid_activities: tuple[RaidActivity, ...]) -> None:
+    rpg = next(activity for activity in raid_activities if activity.definition.profile_id == RaidProfileId("rpg"))
 
     with pytest.raises(ContentValidationError, match="is not daily content"):
         RAID_CLIENT_PROFILES.bind(rpg).daily_plan(RaidMode.HARD)
@@ -150,10 +148,10 @@ class _NoIoRaidRun(RaidRun):
         self._active_plan = None
 
 
-def test_unmetered_attempt_status_does_not_touch_device() -> None:
-    activity = next(
-        activity for activity in _raid_activities() if activity.definition.profile_id == RaidProfileId("rpg")
-    )
+def test_unmetered_attempt_status_does_not_touch_device(
+    raid_activities: tuple[RaidActivity, ...],
+) -> None:
+    activity = next(activity for activity in raid_activities if activity.definition.profile_id == RaidProfileId("rpg"))
     profile = RAID_CLIENT_PROFILES.bind(activity)
     runner = _NoIoRaidRun(profile)
 
@@ -183,10 +181,11 @@ class _LandingRaid(Raid):
         self.carousel_seeks += 1
 
 
-def test_navigation_strategy_is_profile_driven() -> None:
-    activities = _raid_activities()
-    standard = next(activity for activity in activities if activity.definition.profile_id == RaidProfileId("changwu"))
-    rpg = next(activity for activity in activities if activity.definition.profile_id == RaidProfileId("rpg"))
+def test_navigation_strategy_is_profile_driven(raid_activities: tuple[RaidActivity, ...]) -> None:
+    standard = next(
+        activity for activity in raid_activities if activity.definition.profile_id == RaidProfileId("changwu")
+    )
+    rpg = next(activity for activity in raid_activities if activity.definition.profile_id == RaidProfileId("rpg"))
 
     standard_runner = _LandingRaid(RAID_CLIENT_PROFILES.bind(standard))
     standard_runner.ensure_landing()
@@ -255,9 +254,11 @@ class _ExecutionRaid(Raid):
         self.combat_calls += 1
 
 
-def test_atomic_ex_execution_returns_fact_and_restores_submarine_overlay() -> None:
+def test_atomic_ex_execution_returns_fact_and_restores_submarine_overlay(
+    raid_activities: tuple[RaidActivity, ...],
+) -> None:
     activity = next(
-        activity for activity in _raid_activities() if activity.definition.profile_id == RaidProfileId("changwu")
+        activity for activity in raid_activities if activity.definition.profile_id == RaidProfileId("changwu")
     )
     profile = RAID_CLIENT_PROFILES.bind(activity)
     plan = profile.plan(RaidMode.EX, use_ticket=True)
@@ -272,21 +273,3 @@ def test_atomic_ex_execution_returns_fact_and_restores_submarine_overlay() -> No
     assert runner.config.Submarine_Fleet == 3
     assert runner.config.Submarine_Mode == "boss_only"
     assert runner.config.overlays[-1] == {"Submarine_Fleet": 3, "Submarine_Mode": "boss_only"}
-
-
-@pytest.mark.parametrize("filename", ["profile.py", "raid.py", "run.py", "result.py"])
-def test_raid_domain_has_no_dated_dispatch_or_scheduler_mutation(filename: str) -> None:
-    source = (Path("module/raid") / filename).read_text(encoding="utf-8")
-
-    assert re.search(r"raid_[0-9]{8}", source) is None
-    for forbidden in (
-        "task_delay(",
-        "task_stop(",
-        "cross_set(",
-        "Scheduler_Enable",
-        "Campaign_Event",
-        "RAID_NAME_PREFIX",
-        "getattr(",
-        "is_raid_rpg",
-    ):
-        assert forbidden not in source

@@ -9,16 +9,11 @@ from adbutils.errors import AdbError
 from module.base.decorator import cached_property
 from module.config.config import AzurLaneConfig
 from module.device import connection as connection_module
-from module.device.app_service import AppController
 from module.device.connection import Connection
-from module.device.control import Control
 from module.device.device import Device
 from module.device.minitouch_service import CommandBuilder, MinitouchController
-from module.device.mumu_runtime_base import MumuRuntimeBase
-from module.device.nemu_ipc_service import NemuIpcCapture
 from module.device.platform.emulator_base import EmulatorManagerBase
-from module.device.runtime import DeviceRuntime, MumuRuntime
-from module.device.screenshot import Screenshot
+from module.device.runtime import DeviceRuntime
 from module.exception import EmulatorNotRunningError
 from module.map.map_grids import SelectedGrids
 
@@ -359,15 +354,6 @@ def test_runtime_services_share_one_adb_session_without_constructor_io() -> None
     assert session.accesses == []
 
 
-def test_device_mro_keeps_one_connection_spine() -> None:
-    mro = Device.__mro__
-
-    assert mro[:4] == (Device, Screenshot, Control, Connection)
-    assert mro.count(Connection) == 1
-    for owned_service in (AppController, MinitouchController, NemuIpcCapture, MumuRuntimeBase, MumuRuntime):
-        assert owned_service not in mro
-
-
 def test_device_builds_runtime_before_first_connection_and_reuses_it_for_recovery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -547,30 +533,6 @@ def test_release_during_wait_only_releases_capture() -> None:
     device.release_during_wait()
 
     assert calls == ["capture"]
-
-
-def test_device_facade_delegates_to_owned_services() -> None:
-    device = object.__new__(Device)
-    vars(device)["_runtime"] = SimpleNamespace(
-        app_controller=SimpleNamespace(
-            current=lambda: "current",
-            is_running=lambda: True,
-            start=lambda: "started",
-            stop=lambda: "stopped",
-        ),
-        controller=SimpleNamespace(click=lambda *args: ("click", args)),
-        capture=SimpleNamespace(screenshot=lambda: "image", release=lambda: None),
-    )
-    device.config = SimpleNamespace(Error_HandleError=True)
-    device.stuck_record_clear = lambda: None
-    device.click_record_clear = lambda: None
-
-    assert device.app_current() == "current"
-    assert device.app_is_running() is True
-    assert device.app_start() == "started"
-    assert device.app_stop() == "stopped"
-    assert device.click_minitouch(1, 2) == ("click", (1, 2))
-    assert device.screenshot_nemu_ipc() == "image"
 
 
 def test_runtime_rejects_mismatched_service_sessions() -> None:

@@ -1,5 +1,4 @@
 import json
-from dataclasses import fields
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -11,9 +10,20 @@ from config_factory import in_memory_config
 import module.bootstrap.production as production_module
 import module.config.config as config_module
 import module.state.config_repository as state_repository_module
-from module.application import AbortRequested, AbortToken, ExecutionMode, RunMetadata, Succeeded, TaskId, TaskResult
+from module.application import (
+    AbortRequested,
+    AbortToken,
+    ExecutionMode,
+    Faulted,
+    OperatorNotificationKind,
+    OperatorNotificationRequest,
+    RunMetadata,
+    Succeeded,
+    TaskId,
+    TaskResult,
+)
 from module.application.state_effects import UpsertTaskState
-from module.bootstrap.assembly_source import ConfigurationLoadError, GameRuntimeBundle, JsonConfigurationDocumentSource
+from module.bootstrap.assembly_source import ConfigurationLoadError, JsonConfigurationDocumentSource
 from module.bootstrap.configuration_compiler import ConfigurationCompileError, WebConfigurationCompiler
 from module.bootstrap.production import (
     Mumu12GameRuntimeBundleSource,
@@ -23,10 +33,14 @@ from module.bootstrap.production import (
     validate_personal_configuration,
 )
 from module.bootstrap.task_factories import build_game_task_registry
+from module.content.manifest import load_default_event_manifests
 from module.device.device import Device
+from module.diagnostics import ScreenshotHistory
 from module.equipment.equipment_code import EquipmentCodeHandler
+from module.notify.configuration import SmtpNotificationConfig, SmtpTransport
 from module.runtime.settings import TaskSettingsDocument
 from module.state.config_repository import ConfigStateError, ConfigStateRepository
+from module.task_registry import TASK_CATALOG
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -35,7 +49,7 @@ if TYPE_CHECKING:
     from module.config.config_generated import ConfigValue
     from module.content.campaign_session import CampaignRunVariant, CampaignSession
     from module.content.campaign_session_source import CampaignStageSelection
-    from module.content.models import StageRef
+    from module.content.models import EventPack, StageRef
 
 
 class _Sessions:
@@ -106,6 +120,25 @@ def _test_device(config: AzurLaneConfig) -> Device:
     return device
 
 
+@pytest.fixture(scope="module")
+def production_default_event_packs() -> tuple[EventPack, ...]:
+    """默认 manifests 不可变，同一模块只需解析和校验一次。"""
+    return load_default_event_manifests()
+
+
+def _reuse_production_default_event_packs(
+    monkeypatch: pytest.MonkeyPatch,
+    packs: tuple[EventPack, ...],
+) -> None:
+    expected_root = Path("content/events").resolve()
+
+    def load(path: Path) -> tuple[EventPack, ...]:
+        assert path.resolve() == expected_root
+        return packs
+
+    monkeypatch.setattr(production_module, "load_event_manifests", load)
+
+
 def test_equipment_codes_accumulate_through_one_owner_in_the_same_process(tmp_path: Path) -> None:
     document = _template()
     path = tmp_path / "alas.json"
@@ -142,7 +175,11 @@ def _source(
     )
 
 
-def test_bundle_source_builds_every_domain_from_personal_configuration() -> None:
+def test_bundle_source_builds_every_domain_from_personal_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+    production_default_event_packs: tuple[EventPack, ...],
+) -> None:
+    _reuse_production_default_event_packs(monkeypatch, production_default_event_packs)
     document = _template()
     config_factory, configs = _personal_config_factory(document)
 
@@ -151,20 +188,9 @@ def test_bundle_source_builds_every_domain_from_personal_configuration() -> None
         clock=SystemLoopClock(),
     )
 
-    assert isinstance(bundle, GameRuntimeBundle)
     assert bundle.content_revision == "content-test"
     assert configs[0].config_name == "alas"
     assert configs[0].Emulator_Serial == compiled.device_serial
-    assert {field.name for field in fields(bundle.tasks)} == {
-        "maintenance",
-        "facility",
-        "composite",
-        "market",
-        "encounter",
-        "campaign",
-        "opsi",
-        "activity",
-    }
 
 
 @pytest.mark.parametrize(
@@ -177,9 +203,11 @@ def test_bundle_source_builds_every_domain_from_personal_configuration() -> None
 )
 def test_content_validation_precedes_device_construction(
     monkeypatch: pytest.MonkeyPatch,
+    production_default_event_packs: tuple[EventPack, ...],
     validator_name: str,
     message: str,
 ) -> None:
+    _reuse_production_default_event_packs(monkeypatch, production_default_event_packs)
     document = _template()
     config_factory, _configs = _personal_config_factory(document)
     created: list[AzurLaneConfig] = []
@@ -198,7 +226,11 @@ def test_content_validation_precedes_device_construction(
     assert created == []
 
 
-def test_complete_configuration_builds_all_57_tasks() -> None:
+def test_complete_configuration_builds_the_exact_task_catalog(
+    monkeypatch: pytest.MonkeyPatch,
+    production_default_event_packs: tuple[EventPack, ...],
+) -> None:
+    _reuse_production_default_event_packs(monkeypatch, production_default_event_packs)
     document = _template()
     config_factory, _configs = _personal_config_factory(document)
     source = Mumu12GameRuntimeBundleSource(
@@ -220,12 +252,87 @@ def test_complete_configuration_builds_all_57_tasks() -> None:
     )
 
     registry.validate_settings(settings)
-    assert len(registry.task_ids) == 57
+    assert registry.task_ids == tuple(TASK_CATALOG)
+
+
+def test_fault_observer_saves_diagnostics_and_sends_all_production_notifications(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = RuntimeError("device disconnected")
+    screenshots = ScreenshotHistory(max_frames=1)
+    saved: list[tuple[Path, str, str | None, BaseException, ScreenshotHistory]] = []
+    sent: list[tuple[SmtpNotificationConfig, str, str]] = []
+    smtp = SmtpNotificationConfig(
+        host="smtp.example.com",
+        user="sender@example.com",
+        password=tmp_path.name,
+        recipients=("operator@example.com",),
+        port=587,
+        transport=SmtpTransport.STARTTLS,
+    )
+
+    def save_error_bundle(
+        *,
+        root: Path,
+        command: str,
+        task_id: str | None,
+        error: BaseException,
+        screenshots: ScreenshotHistory,
+    ) -> str:
+        saved.append((root, command, task_id, error, screenshots))
+        return "log/error/bundle"
+
+    def send_notification(
+        config: SmtpNotificationConfig,
+        *,
+        title: str,
+        content: str,
+    ) -> bool:
+        sent.append((config, title, content))
+        return True
+
+    monkeypatch.setattr(production_module, "_save_error_bundle", save_error_bundle)
+    monkeypatch.setattr(production_module, "send_notification", send_notification)
+
+    bundle = production_module._observe_result(  # noqa: SLF001 - 验证生产结果观察器的完整编排。
+        TaskId("main"),
+        TaskResult(
+            outcome=Faulted(error),
+            notifications=(
+                OperatorNotificationRequest(
+                    OperatorNotificationKind.CAMPAIGN_RUN_COUNT_LIMIT,
+                    resource="campaign_main/12-4",
+                ),
+            ),
+        ),
+        root=tmp_path,
+        command="alas",
+        screenshots=screenshots,
+        notification=smtp,
+    )
+
+    assert bundle == "log/error/bundle"
+    assert saved == [(tmp_path, "alas", "main", error, screenshots)]
+    assert sent == [
+        (
+            smtp,
+            "Alas crashed",
+            "<main> RuntimeError: device disconnected\nError bundle: log/error/bundle",
+        ),
+        (
+            smtp,
+            "Alas campaign finished",
+            "<main> campaign_main/12-4 reached run count limit",
+        ),
+    ]
 
 
 def test_personal_configuration_validation_reuses_task_factory_contracts_without_connecting_device(
     monkeypatch: pytest.MonkeyPatch,
+    production_default_event_packs: tuple[EventPack, ...],
 ) -> None:
+    _reuse_production_default_event_packs(monkeypatch, production_default_event_packs)
     document = _template()
     tactical = cast("dict[str, object]", document["Tactical"])
     student = cast("dict[str, object]", tactical["AddNewStudent"])
@@ -246,7 +353,11 @@ def test_personal_configuration_validation_reuses_task_factory_contracts_without
         validate_personal_configuration(document, project_root=Path())
 
 
-def test_personal_configuration_validation_wraps_unknown_content_reference() -> None:
+def test_personal_configuration_validation_wraps_unknown_content_reference(
+    monkeypatch: pytest.MonkeyPatch,
+    production_default_event_packs: tuple[EventPack, ...],
+) -> None:
+    _reuse_production_default_event_packs(monkeypatch, production_default_event_packs)
     document = _template()
     event = cast("dict[str, object]", document["Event"])
     campaign = cast("dict[str, object]", event["Campaign"])

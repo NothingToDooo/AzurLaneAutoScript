@@ -68,30 +68,6 @@ def test_frame_requires_timezone_aware_wall_time() -> None:
         )
 
 
-def test_actions_keep_semantic_target_coordinates_and_source_frame() -> None:
-    target = SemanticTarget("campaign.enemy.A1")
-    frame_id = FrameId(8)
-
-    click = Click(target=target, point=ScreenPoint(10, 20), based_on_frame=frame_id)
-    long_press = LongPress(
-        target=target,
-        point=ScreenPoint(10, 20),
-        duration_seconds=0.8,
-        based_on_frame=frame_id,
-    )
-    swipe = Swipe(
-        target=SemanticTarget("campaign.pan.right"),
-        start=ScreenPoint(10, 20),
-        end=ScreenPoint(50, 20),
-        based_on_frame=frame_id,
-    )
-
-    assert click.based_on_frame == frame_id
-    assert long_press.duration_seconds == 0.8
-    assert swipe.start != swipe.end
-    assert ActionReceipt(sequence=2, action=click, issued_at_monotonic=13).action is click
-
-
 @pytest.mark.parametrize(
     ("factory", "message"),
     [

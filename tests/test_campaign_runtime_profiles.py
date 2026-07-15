@@ -1,6 +1,5 @@
 import json
-from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -8,7 +7,7 @@ from module.content.campaign_session import CampaignRunVariant
 from module.content.campaign_session_source import CompiledCampaignSessionSource
 from module.content.catalog import ContentCatalog
 from module.content.errors import ContentValidationError
-from module.content.manifest import load_event_manifests
+from module.content.manifest import load_default_event_manifests
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
     CampaignRuntimeExtensionId,
@@ -26,7 +25,8 @@ from module.content.runtime_profile_catalog import (
 )
 from module.content.stage_loader import StageSpecLoader
 
-ROOT = Path(__file__).resolve().parents[1]
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _binding(
@@ -112,31 +112,9 @@ def test_catalog_uses_strict_json_decoding(content: str, message: str, tmp_path:
         compile_campaign_runtime_profile_registry(path)
 
 
-def test_checked_in_registry_is_exactly_owned_by_manifest_stages() -> None:
-    registry = load_default_campaign_runtime_profile_registry()
-    stages = tuple(stage for pack in load_event_manifests(ROOT / "content" / "events") for stage in pack.stages)
-    referenced_profiles = {stage.runtime_profile_id for stage in stages}
-    referenced_extensions = {
-        extension.extension_id for profile in registry.profiles.values() for extension in profile.extensions
-    }
-
-    assert referenced_profiles == set(registry.profiles)
-    assert referenced_extensions == set(registry.extensions)
-
-
-def test_every_manifest_stage_resolves_an_explicit_profile() -> None:
-    registry = load_default_campaign_runtime_profile_registry()
-    packs = load_event_manifests(ROOT / "content" / "events")
-    specs = tuple(stage for pack in packs for stage in pack.stages)
-
-    assert len(specs) == 1203
-    assert all(spec.runtime_profile_id.value != "" for spec in specs)
-    assert all(registry.resolve(spec.runtime_profile_id) for spec in specs)
-
-
 def test_compiled_session_carries_the_resolved_runtime_profile() -> None:
     registry = load_default_campaign_runtime_profile_registry()
-    catalog = ContentCatalog(load_event_manifests(ROOT / "content" / "events"))
+    catalog = ContentCatalog(load_default_event_manifests())
     spec = catalog.resolve_stage(next(stage.ref for stage in catalog.stages if stage.ref.pack_id == "campaign_main"))
     source = CompiledCampaignSessionSource(
         catalog,

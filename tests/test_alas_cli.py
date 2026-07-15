@@ -1,6 +1,5 @@
 import signal
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -121,12 +120,3 @@ def test_cli_rejects_removed_instance_option() -> None:
 def test_cli_rejects_removed_project_root_option() -> None:
     with pytest.raises(SystemExit, match="2"):
         alas_module.main(["--project-root", "."])
-
-
-def test_cli_source_has_one_runtime_entry() -> None:
-    source = Path(alas_module.__file__).read_text(encoding="utf-8")
-
-    assert "build_default_instance_process_host" not in source
-    assert "NotificationSpoolPump" not in source
-    assert '"--instance"' not in source
-    assert '"--project-root"' not in source

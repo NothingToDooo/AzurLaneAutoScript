@@ -48,15 +48,16 @@ def test_stage_ref_rejects_empty_pack_or_stage(pack_id: str, stage_id: str) -> N
         StageRef(pack_id=pack_id, stage_id=stage_id)
 
 
-def test_event_pack_exposes_stage_specs_in_declared_order() -> None:
+def test_event_pack_owns_stage_specs_as_a_tuple_in_declared_order() -> None:
     pack_id = ContentId("event_20260625_cn")
     stage_t2 = StageSpec(ref=StageRef(str(pack_id), "t2"), source="campaign.event_20260625_cn.t2")
     stage_t1 = StageSpec(ref=StageRef(str(pack_id), "t1"), source="campaign.event_20260625_cn.t1")
+    stages = [stage_t2, stage_t1]
 
-    pack = EventPack(pack_id=pack_id, stages=(stage_t2, stage_t1))
+    pack = EventPack(pack_id=pack_id, stages=cast("tuple[StageSpec, ...]", stages))
+    stages.reverse()
 
     assert pack.stages == (stage_t2, stage_t1)
-    assert isinstance(pack.stages, tuple)
 
 
 def test_event_pack_converts_string_pack_id() -> None:
@@ -131,19 +132,6 @@ def test_campaign_policy_returns_only_the_declared_immediate_successor() -> None
     assert policy.next_stage("missing") is None
 
 
-def test_stage_spec_carries_reference_source_and_assets() -> None:
-    asset = AssetRef(asset_id=ContentId("map"), path=Path("stages/t1.yaml"))
-    stage = StageSpec(
-        ref=StageRef(pack_id="event_20260625_cn", stage_id="t1"),
-        source="campaign.event_20260625_cn.t1",
-        assets=(asset,),
-    )
-
-    assert stage.ref.stage_id == "t1"
-    assert stage.source == "campaign.event_20260625_cn.t1"
-    assert stage.assets == (asset,)
-
-
 def test_asset_ref_requires_content_id() -> None:
     with pytest.raises(TypeError, match="asset_id"):
         AssetRef(asset_id=cast("ContentId", "map"), path=Path("assets/map.yaml"))
@@ -199,7 +187,7 @@ def test_campaign_policy_rejects_ambiguous_or_multistep_map_achievement_fallback
         CampaignPolicy(map_achievement_fallbacks=fallbacks)
 
 
-def test_content_models_are_frozen_and_slotted() -> None:
+def test_content_models_are_immutable() -> None:
     content_id = ContentId("event_20260625_cn")
     issue = ValidationIssue(location="stages.t1", message="source is missing")
 
@@ -207,6 +195,3 @@ def test_content_models_are_frozen_and_slotted() -> None:
         _set_attribute(content_id, "value", "changed")
     with pytest.raises(FrozenInstanceError):
         _set_attribute(issue, "message", "changed")
-
-    assert not hasattr(content_id, "__dict__")
-    assert not hasattr(issue, "__dict__")

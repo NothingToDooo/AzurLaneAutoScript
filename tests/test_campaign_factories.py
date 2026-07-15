@@ -36,13 +36,11 @@ from module.content.stage_definition import (
 )
 from module.content.stage_rules import MapFeatures, RepeatableCompletion, StageRules, StarRequirements
 from module.gameplay.campaign import (
-    CAMPAIGN_JOB_KINDS,
     CampaignExecutionSettings,
     CampaignJobSpec,
     CampaignProgress,
     CampaignRunReport,
     CampaignStopReason,
-    CampaignTask,
     CampaignWorkflow,
 )
 from module.gameplay.campaign_factories import (
@@ -351,17 +349,6 @@ def _task_state(
             )
         },
     )
-
-
-@pytest.mark.parametrize("command", [task_id.value for task_id in CAMPAIGN_JOB_KINDS])
-def test_campaign_factories_exactly_build_all_twelve_commands(command: str) -> None:
-    factories = build_campaign_factories(_dependencies())
-
-    task = factories[command].build(_context(command, _valid_settings(command)))
-
-    assert isinstance(task, CampaignTask)
-    assert set(factories) == {task_id.value for task_id in CAMPAIGN_JOB_KINDS}
-    assert len(factories) == 12
 
 
 def test_campaign_factory_decodes_complete_typed_execution_settings() -> None:

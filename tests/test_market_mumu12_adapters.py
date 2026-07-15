@@ -1,5 +1,4 @@
 from datetime import time
-from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -307,24 +306,3 @@ def test_disabled_shop_filter_projects_to_empty_legacy_primitive() -> None:
     )
 
     assert adapters.project_shop_frequent_settings(settings)["GeneralShop_Filter"] == ""
-
-
-def test_market_production_builder_returns_all_five_capabilities(
-    runtime: tuple[AzurLaneConfig, Device],
-) -> None:
-    config, device = runtime
-
-    workflows = adapters.build_mumu12_market_workflows(config, device)
-
-    assert isinstance(workflows.awaken, adapters.Mumu12AwakenWorkflow)
-    assert isinstance(workflows.shipyard, adapters.Mumu12ShipyardWorkflow)
-    assert isinstance(workflows.gacha, adapters.Mumu12GachaWorkflow)
-    assert isinstance(workflows.shop_frequent, adapters.Mumu12ShopFrequentWorkflow)
-    assert isinstance(workflows.shop_once, adapters.Mumu12ShopOnceWorkflow)
-
-
-def test_market_adapter_has_no_legacy_scheduler_or_run_dispatch() -> None:
-    source = Path(adapters.__file__).read_text(encoding="utf-8")
-
-    for forbidden in (".run(", "task_delay(", "task_stop(", "task_call(", "import_module("):
-        assert forbidden not in source

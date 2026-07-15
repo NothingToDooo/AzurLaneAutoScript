@@ -1,13 +1,41 @@
+from datetime import UTC, datetime, time, timedelta
 from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from module.gameplay.composite import DormTask, FreebiesTask, GuildTask, MeowfficerTask, PrivateQuartersTask, RewardTask
+from module.application import (
+    AbortToken,
+    DailySchedule,
+    DelayRange,
+    ExecutionMode,
+    RunMetadata,
+    TaskContext,
+    TaskId,
+)
+from module.gameplay.composite import (
+    DormFeedPlan,
+    DormFurniturePlan,
+    DormReport,
+    DormRunRequest,
+    DormSettings,
+    FurnitureBuyOption,
+)
 from module.gameplay.composite_factories import CompositeWorkflows, build_composite_factories
-from module.gameplay.encounter import DailyTask, ExerciseTask, HardTask
+from module.gameplay.encounter import (
+    ExerciseOpponentMode,
+    ExerciseProgress,
+    ExerciseReport,
+    ExerciseSettings,
+    ExerciseStrategy,
+)
 from module.gameplay.encounter_factories import EncounterWorkflows, build_encounter_factories
-from module.gameplay.market import AwakenTask, GachaTask, ShipyardTask, ShopFrequentTask, ShopOnceTask
+from module.gameplay.market import (
+    GachaPlan,
+    GachaPool,
+    GachaReport,
+    GachaSettings,
+)
 from module.gameplay.market_factories import MarketWorkflows, build_market_factories
 from module.runtime import FrozenJsonValue, SettingsDocumentError, TaskBuildContext, TaskFactory, TaskStateDocument
 from module.task_registry import TASK_CATALOG
@@ -34,35 +62,41 @@ if TYPE_CHECKING:
         ShopFrequentWorkflow,
         ShopOnceWorkflow,
     )
+    from module.interaction import CancellationSignal
 
-_SERVER_UPDATE = "2026-07-14T00:00:00+08:00"
+_OBSERVED_AT = datetime(2026, 7, 15, 1, tzinfo=UTC)
 _DAILY_SCHEDULE: dict[str, FrozenJsonValue] = {
     "timezone": "Asia/Hong_Kong",
     "triggers": ("08:00",),
 }
+_DAILY_SCHEDULE_VALUE = DailySchedule("Asia/Hong_Kong", (time(8),))
+_SERVER_UPDATE = "2026-07-14T00:00:00+08:00"
 _SERVER_UPDATE_SCHEDULE: dict[str, FrozenJsonValue] = {
     "timezone": "Asia/Hong_Kong",
     "triggers": ("12:00",),
 }
+_SERVER_UPDATE_SCHEDULE_VALUE = DailySchedule("Asia/Hong_Kong", (time(12),))
 
 
-class _Port:
-    def __init__(self) -> None:
-        self.calls = 0
+class _RecordingPort[ReportT]:
+    def __init__(self, report: ReportT) -> None:
+        self._report = report
+        self.received: list[tuple[object, ...]] = []
 
-    def execute(self, *args: object) -> object:
-        self.calls += 1
-        return args
+    def execute(self, *args: object) -> ReportT:
+        cancellation = cast("CancellationSignal", args[-1])
+        cancellation.raise_if_requested()
+        self.received.append(args[:-1])
+        return self._report
 
-    def collect(self, *args: object) -> object:
-        self.calls += 1
-        return args
+    def collect(self, *args: object) -> ReportT:
+        return self.execute(*args)
 
 
-def _composite_factories() -> Mapping[str, TaskFactory]:
-    port = _Port()
+def _composite_factories(dorm: _RecordingPort[DormReport] | None = None) -> Mapping[str, TaskFactory]:
+    port = _RecordingPort(object())
     workflows = CompositeWorkflows(
-        dorm=cast("DormWorkflow", port),
+        dorm=cast("DormWorkflow", port if dorm is None else dorm),
         meowfficer=cast("MeowfficerWorkflow", port),
         guild=cast("GuildWorkflow", port),
         reward=cast("RewardWorkflow", port),
@@ -75,24 +109,24 @@ def _composite_factories() -> Mapping[str, TaskFactory]:
     return build_composite_factories(workflows)
 
 
-def _market_factories() -> Mapping[str, TaskFactory]:
-    port = _Port()
+def _market_factories(gacha: _RecordingPort[GachaReport] | None = None) -> Mapping[str, TaskFactory]:
+    port = _RecordingPort(object())
     workflows = MarketWorkflows(
         awaken=cast("AwakenWorkflow", port),
         shipyard=cast("ShipyardWorkflow", port),
-        gacha=cast("GachaWorkflow", port),
+        gacha=cast("GachaWorkflow", port if gacha is None else gacha),
         shop_frequent=cast("ShopFrequentWorkflow", port),
         shop_once=cast("ShopOnceWorkflow", port),
     )
     return build_market_factories(workflows)
 
 
-def _encounter_factories() -> Mapping[str, TaskFactory]:
-    port = _Port()
+def _encounter_factories(exercise: _RecordingPort[ExerciseReport] | None = None) -> Mapping[str, TaskFactory]:
+    port = _RecordingPort(object())
     workflows = EncounterWorkflows(
         daily=cast("DailyWorkflow", port),
         hard=cast("HardWorkflow", port),
-        exercise=cast("ExerciseWorkflow", port),
+        exercise=cast("ExerciseWorkflow", port if exercise is None else exercise),
     )
     return build_encounter_factories(workflows)
 
@@ -106,240 +140,100 @@ def _context(command: str, settings: dict[str, FrozenJsonValue]) -> TaskBuildCon
     )
 
 
-@pytest.mark.parametrize(
-    ("command", "settings", "task_type"),
-    [
-        (
+def _task_context(command: str) -> TaskContext:
+    return TaskContext(
+        task_id=TaskId(command),
+        started_at=_OBSERVED_AT,
+        mode=ExecutionMode.SCHEDULED_JOB,
+        metadata=RunMetadata(settings_revision=2, content_revision="content-1"),
+        abort=AbortToken(),
+    )
+
+
+def test_composite_factory_passes_decoded_dorm_request_to_workflow() -> None:
+    workflow = _RecordingPort(DormReport(_OBSERVED_AT, ships_in_dorm=2, furniture_checked=True))
+    task = _composite_factories(workflow)["dorm"].build(
+        _context(
             "dorm",
             {
-                "feed": {"filter": "20000 > 10000"},
-                "collect_enabled": True,
-                "furniture": None,
-                "fallback_delay_seconds": {"lower_seconds": 600, "upper_seconds": 600},
+                "feed": {"filter": "Oil < 12000"},
+                "collect_enabled": False,
+                "furniture": {"buy_option": "all", "check_interval_seconds": 5_400},
+                "fallback_delay_seconds": {"lower_seconds": 601, "upper_seconds": 899},
             },
-            DormTask,
-        ),
-        (
-            "meowfficer",
-            {
-                "buy_amount": 1,
-                "overflow_coin_threshold": None,
-                "fort_chore_enabled": False,
-                "training": {"mode": "seamlessly", "check_delay_seconds": 9000},
-                "schedule": _DAILY_SCHEDULE,
-            },
-            MeowfficerTask,
-        ),
-        (
-            "guild",
-            {
-                "logistics": {
-                    "select_new_mission": False,
-                    "exchange_filter": "Coin > Oil",
-                },
-                "operation": {
-                    "select_new_operation": False,
-                    "new_operation_max_date": 15,
-                    "join_threshold": 1.0,
-                    "attack_boss": True,
-                    "boss_fleet_recommend": False,
-                },
-                "failure_retry_seconds": {"lower_seconds": 600, "upper_seconds": 600},
-                "schedule": _DAILY_SCHEDULE,
-            },
-            GuildTask,
-        ),
-        (
-            "reward",
-            {
-                "collect_oil": True,
-                "collect_coin": True,
-                "collect_exp": True,
-                "collect_daily_mission": True,
-                "collect_weekly_mission": True,
-                "success_delay_seconds": {"lower_seconds": 600, "upper_seconds": 600},
-            },
-            RewardTask,
-        ),
-        (
-            "freebies",
-            {
-                "collect_battle_pass": True,
-                "data_key": {"force_collect": False},
-                "mail": {
-                    "claim_merit": True,
-                    "claim_maintenance": False,
-                    "claim_trade_license": False,
-                    "delete_collected": True,
-                },
-                "supply_pack": {"collect": True, "day_of_week": 0},
-                "schedule": _DAILY_SCHEDULE,
-            },
-            FreebiesTask,
-        ),
-        (
-            "private_quarters",
-            {
-                "buy_roses": True,
-                "buy_cake": False,
-                "target_ship": None,
-                "schedule": _DAILY_SCHEDULE,
-            },
-            PrivateQuartersTask,
-        ),
-    ],
-)
-def test_composite_factories_build_all_tasks(
-    command: str,
-    settings: dict[str, FrozenJsonValue],
-    task_type: type[object],
-) -> None:
-    assert isinstance(_composite_factories()[command].build(_context(command, settings)), task_type)
+        )
+    )
+
+    task.run(_task_context("dorm"))
+
+    settings = DormSettings(
+        feed=DormFeedPlan("Oil < 12000"),
+        collect_enabled=False,
+        furniture=DormFurniturePlan(FurnitureBuyOption.ALL, timedelta(seconds=5_400)),
+        fallback_delay=DelayRange(601, 899),
+    )
+    assert workflow.received == [(DormRunRequest(settings, furniture_due=True),)]
 
 
-@pytest.mark.parametrize(
-    ("command", "settings", "task_type"),
-    [
-        (
-            "awaken",
-            {
-                "plan": {"level_cap": "level120", "favourite_only": False},
-                "schedule": _DAILY_SCHEDULE,
-            },
-            AwakenTask,
-        ),
-        (
-            "shipyard",
-            {
-                "plan": {
-                    "pr": {"research_series": 1, "ship_index": 0, "buy_amount": 1},
-                    "dr": {"research_series": 1, "ship_index": 0, "buy_amount": 0},
-                },
-                "schedule": _DAILY_SCHEDULE,
-            },
-            ShipyardTask,
-        ),
-        (
+def test_market_factory_passes_decoded_gacha_settings_to_workflow() -> None:
+    workflow = _RecordingPort(GachaReport(submitted=True))
+    task = _market_factories(workflow)["gacha"].build(
+        _context(
             "gacha",
             {
-                "plan": {"pool": "light", "amount": 1, "use_ticket": True, "use_drill": False},
+                "plan": {"pool": "event", "amount": 8, "use_ticket": False, "use_drill": True},
                 "schedule": _DAILY_SCHEDULE,
             },
-            GachaTask,
-        ),
+        )
+    )
+
+    task.run(_task_context("gacha"))
+
+    assert workflow.received == [
         (
-            "shop_frequent",
-            {
-                "plan": {
-                    "filter": "Cube",
-                    "refresh": False,
-                    "use_gems": False,
-                    "consume_coins": False,
-                    "buy_skin_box": False,
-                },
-                "schedule": _DAILY_SCHEDULE,
-            },
-            ShopFrequentTask,
-        ),
-        (
-            "shop_once",
-            {
-                "plan": {
-                    "merit": {"filter": "Cube", "refresh": False},
-                    "guild": {
-                        "filter": "PlateT4",
-                        "refresh": True,
-                        "box_t3": "ironblood",
-                        "box_t4": "ironblood",
-                        "book_t2": "red",
-                        "book_t3": "red",
-                        "retrofit_t2": "cl",
-                        "retrofit_t3": "cl",
-                        "plate_t2": "general",
-                        "plate_t3": "general",
-                        "plate_t4": "gun",
-                        "pr1": "neptune",
-                        "pr2": "seattle",
-                        "pr3": "cheshire",
-                    },
-                    "core": {"filter": "Array"},
-                    "medal": {
-                        "filter": "DR > PR",
-                        "retrofit_t1": "cl",
-                        "retrofit_t2": "cl",
-                        "retrofit_t3": "cl",
-                        "plate_t1": "general",
-                        "plate_t2": "general",
-                        "plate_t3": "general",
-                    },
-                },
-                "schedule": _DAILY_SCHEDULE,
-            },
-            ShopOnceTask,
-        ),
-    ],
-)
-def test_market_factories_build_all_tasks(
-    command: str,
-    settings: dict[str, FrozenJsonValue],
-    task_type: type[object],
-) -> None:
-    assert isinstance(_market_factories()[command].build(_context(command, settings)), task_type)
+            GachaSettings(
+                GachaPlan(GachaPool.EVENT, amount=8, use_ticket=False, use_drill=True),
+                _DAILY_SCHEDULE_VALUE,
+            ),
+        )
+    ]
 
 
-@pytest.mark.parametrize(
-    ("command", "settings", "task_type"),
-    [
-        (
-            "daily",
-            {
-                "schedule": _SERVER_UPDATE_SCHEDULE,
-                "use_daily_skip": True,
-                "missions": {
-                    "escort": {"stage": "first", "fleet": 1},
-                    "advance": {"stage": "first", "fleet": 1},
-                    "fierce_assault": {"stage": "first", "fleet": 1},
-                    "tactical_training": {"stage": "second", "fleet": 1},
-                    "supply_line_disruption": {"stage": "second", "fleet": None},
-                    "module_development": {"stage": "first", "fleet": 1},
-                    "emergency_module_development": {"stage": "first", "fleet": 1},
-                },
-            },
-            DailyTask,
-        ),
-        (
-            "hard",
-            {
-                "schedule": _SERVER_UPDATE_SCHEDULE,
-                "failure_retry_seconds": {"lower_seconds": 600, "upper_seconds": 600},
-                "resource_retry_seconds": 1800,
-                "stage": "11-4",
-                "fleet": 1,
-            },
-            HardTask,
-        ),
-        (
+def test_encounter_factory_passes_decoded_exercise_settings_and_progress_to_workflow() -> None:
+    workflow = _RecordingPort(ExerciseReport(_OBSERVED_AT, 0, 0, 1, 3))
+    task = _encounter_factories(workflow)["exercise"].build(
+        _context(
             "exercise",
             {
                 "schedule": _SERVER_UPDATE_SCHEDULE,
-                "failure_retry_seconds": {"lower_seconds": 600, "upper_seconds": 600},
-                "opponent_refresh_limit": 5,
-                "opponent_mode": "max_exp",
-                "opponent_trials": 1,
-                "strategy": "aggressive",
-                "low_hp_threshold": 0.4,
-                "low_hp_confirm_wait_seconds": 0.1,
+                "failure_retry_seconds": {"lower_seconds": 401, "upper_seconds": 997},
+                "opponent_refresh_limit": 9,
+                "opponent_mode": "easiest_else_exp",
+                "opponent_trials": 4,
+                "strategy": "sun18",
+                "low_hp_threshold": 0.27,
+                "low_hp_confirm_wait_seconds": 1.75,
             },
-            ExerciseTask,
-        ),
-    ],
-)
-def test_encounter_factories_build_all_tasks(
-    command: str,
-    settings: dict[str, FrozenJsonValue],
-    task_type: type[object],
-) -> None:
-    assert isinstance(_encounter_factories()[command].build(_context(command, settings)), task_type)
+        )
+    )
+
+    task.run(_task_context("exercise"))
+
+    assert workflow.received == [
+        (
+            ExerciseSettings(
+                schedule=_SERVER_UPDATE_SCHEDULE_VALUE,
+                failure_retry_delay=DelayRange(401, 997),
+                opponent_refresh_limit=9,
+                opponent_mode=ExerciseOpponentMode.EASIEST_ELSE_EXP,
+                opponent_trials=4,
+                strategy=ExerciseStrategy.SUN_18,
+                low_hp_threshold=0.27,
+                low_hp_confirm_wait_seconds=1.75,
+            ),
+            ExerciseProgress(),
+        )
+    ]
 
 
 def test_encounter_factories_reject_legacy_absolute_deadlines() -> None:
@@ -354,5 +248,6 @@ def test_nested_factory_settings_reject_unknown_fields() -> None:
         "plan": {"level_cap": "level120", "favourite_only": False, "obsolete": True},
         "schedule": _DAILY_SCHEDULE,
     }
+
     with pytest.raises(SettingsDocumentError, match="unknown settings"):
         _market_factories()["awaken"].build(_context("awaken", settings))

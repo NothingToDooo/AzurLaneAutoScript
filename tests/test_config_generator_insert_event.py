@@ -1,5 +1,4 @@
 from datetime import date
-from pathlib import Path
 from typing import TYPE_CHECKING, override
 
 import pytest
@@ -7,7 +6,7 @@ import pytest
 from module.config.config_updater import ConfigGenerator
 from module.config.deep import deep_get
 from module.config.utils import filepath_args, read_file
-from module.content.manifest import load_event_manifests
+from module.content.manifest import load_default_event_manifests
 from module.content.models import ContentId, EventPack, EventRelease
 from module.content.war_archives_profile import WarArchivesDefinition, WarArchivesProfileId
 
@@ -207,7 +206,7 @@ def test_insert_event_replaces_stale_campaign_main_and_duplicate_options() -> No
 
 
 def test_real_manifest_options_match_checked_in_args() -> None:
-    generator = _generator(list(load_event_manifests(Path("content/events"))))
+    generator = _generator(list(load_default_event_manifests()))
     generator.insert_event()
     expected = read_file(filepath_args())
 

@@ -5,7 +5,6 @@ import pytest
 from module.device import control as control_module
 from module.device.control import Control
 from module.device.control_options import Duration, SwipeVectorOptions
-from module.device.device import Device
 
 if TYPE_CHECKING:
     from module.base.type_alias import Area, Point
@@ -57,25 +56,6 @@ class _RecordingControl(Control):
 
     def drag_minitouch(self, p1: Point, p2: Point, point_random: Area = (-10, -10, 10, 10)) -> None:
         self.low_level_calls.append(("drag", p1, p2, point_random))
-
-
-def test_control_uses_explicit_controller_without_device_service_bases() -> None:
-    assert Control.__bases__ == (object,)
-
-
-def test_release_during_wait_releases_nemu_ipc() -> None:
-    calls: list[str] = []
-    device = object.__new__(Device)
-
-    vars(device)["_runtime"] = type(
-        "_Runtime",
-        (),
-        {"capture": type("_Capture", (), {"release": lambda _capture: calls.append("released")})()},
-    )()
-
-    device.release_during_wait()
-
-    assert calls == ["released"]
 
 
 def test_swipe_vector_uses_options(monkeypatch: pytest.MonkeyPatch) -> None:

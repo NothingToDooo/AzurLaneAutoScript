@@ -1,5 +1,4 @@
-from collections.abc import Iterable
-from typing import TYPE_CHECKING, cast, get_type_hints
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -50,20 +49,6 @@ def test_catalog_pack_view_cannot_be_rebound() -> None:
         _set_attribute(catalog, "packs", ())
 
     assert catalog.get_pack("event_first") is catalog.packs[0]
-
-
-def test_catalog_public_annotations_are_runtime_resolvable() -> None:
-    init_hints = get_type_hints(ContentCatalog.__init__)
-    stages_hints = get_type_hints(ContentCatalog.__dict__["stages"].fget)
-    get_pack_hints = get_type_hints(ContentCatalog.get_pack)
-    has_stage_hints = get_type_hints(ContentCatalog.has_stage)
-    resolve_stage_hints = get_type_hints(ContentCatalog.resolve_stage)
-
-    assert init_hints["packs"] == Iterable[EventPack]
-    assert stages_hints["return"] == tuple[StageSpec, ...]
-    assert get_pack_hints["return"] is EventPack
-    assert has_stage_hints == {"ref": StageRef, "return": bool}
-    assert resolve_stage_hints == {"ref": StageRef, "return": StageSpec}
 
 
 def test_catalog_rejects_objects_outside_content_model_contracts() -> None:

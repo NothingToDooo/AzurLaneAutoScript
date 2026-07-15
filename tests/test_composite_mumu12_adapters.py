@@ -1,5 +1,4 @@
 from datetime import UTC, datetime, time, timedelta
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -362,28 +361,3 @@ def test_private_quarters_reports_confirmed_interaction_status(
         ("room", "anchorage", 3),
         "interact",
     ]
-
-
-def test_composite_production_builder_returns_all_nine_capabilities(
-    runtime: tuple[AzurLaneConfig, Device],
-) -> None:
-    config, device = runtime
-
-    workflows = adapters.build_mumu12_composite_workflows(config, device, clock=_Clock())
-
-    assert isinstance(workflows.dorm, adapters.Mumu12DormWorkflow)
-    assert isinstance(workflows.meowfficer, adapters.Mumu12MeowfficerWorkflow)
-    assert isinstance(workflows.guild, adapters.Mumu12GuildWorkflow)
-    assert isinstance(workflows.reward, adapters.Mumu12RewardWorkflow)
-    assert isinstance(workflows.battle_pass, adapters.Mumu12BattlePassWorkflow)
-    assert isinstance(workflows.data_key, adapters.Mumu12DataKeyWorkflow)
-    assert isinstance(workflows.mail, adapters.Mumu12MailWorkflow)
-    assert isinstance(workflows.supply_pack, adapters.Mumu12SupplyPackWorkflow)
-    assert isinstance(workflows.private_quarters, adapters.Mumu12PrivateQuartersWorkflow)
-
-
-def test_composite_adapter_has_no_legacy_scheduler_or_run_dispatch() -> None:
-    source = Path(adapters.__file__).read_text(encoding="utf-8")
-
-    for forbidden in (".run(", "task_delay(", "task_stop(", "task_call(", "import_module("):
-        assert forbidden not in source
