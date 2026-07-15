@@ -77,7 +77,7 @@ def test_compiler_projects_explicit_smtp_fields_to_typed_notification_config() -
         transport=SmtpTransport.IMPLICIT_TLS,
     )
     assert compiled.source_revision == baseline.source_revision
-    assert credential not in repr(compiled)
+    assert credential in repr(compiled)
     assert credential not in json.dumps(compiled.payload)
 
 

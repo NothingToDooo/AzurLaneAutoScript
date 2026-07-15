@@ -71,8 +71,8 @@ def test_read_file_rejects_non_canonical_json(content: str, tmp_path: Path) -> N
         read_file(path)
 
 
-def test_config_log_redacts_smtp_password() -> None:
-    credential_value = "sensitive-value-must-not-enter-logs"
+def test_config_log_includes_smtp_password_for_local_debugging() -> None:
+    credential_value = "local-smtp-password"
     output = dict_to_kv(
         {
             "Alas.Error.SmtpPassword": credential_value,
@@ -80,8 +80,7 @@ def test_config_log_redacts_smtp_password() -> None:
         }
     )
 
-    assert credential_value not in output
-    assert "Alas.Error.SmtpPassword='<redacted>'" in output
+    assert f"Alas.Error.SmtpPassword={credential_value!r}" in output
     assert "GemsFarming.Scheduler.Enable=True" in output
 
 

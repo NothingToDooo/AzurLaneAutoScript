@@ -17,7 +17,7 @@ def _config(*recipients: str) -> SmtpNotificationConfig:
 
 
 def test_direct_notification_sends_each_recipient_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[tuple[str, str, str, str]] = []
+    calls: list[tuple[str, str, str]] = []
 
     def capture(
         _sender: SmtpNotificationSender,
@@ -25,9 +25,8 @@ def test_direct_notification_sends_each_recipient_once(monkeypatch: pytest.Monke
         recipient: str,
         title: str,
         content: str,
-        idempotency_key: str,
     ) -> None:
-        calls.append((recipient, title, content, idempotency_key))
+        calls.append((recipient, title, content))
 
     monkeypatch.setattr(SmtpNotificationSender, "send", capture)
 
@@ -38,40 +37,36 @@ def test_direct_notification_sends_each_recipient_once(monkeypatch: pytest.Monke
     )
 
     assert result is True
-    assert [(recipient, title, content) for recipient, title, content, _key in calls] == [
+    assert calls == [
         ("one@example.com", "Alas completed", "Task completed"),
         ("two@example.com", "Alas completed", "Task completed"),
     ]
-    assert calls[0][3] != calls[1][3]
 
 
-def test_direct_notification_retries_once_with_the_same_idempotency_key(
+def test_direct_notification_does_not_retry_a_failed_recipient(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    keys: list[str] = []
+    attempts: list[str] = []
 
-    def fail_once(
+    def fail(
         _sender: SmtpNotificationSender,
         *,
         recipient: str,
         title: str,
         content: str,
-        idempotency_key: str,
     ) -> None:
-        del recipient, title, content
-        keys.append(idempotency_key)
-        if len(keys) == 1:
-            message = "temporary SMTP failure"
-            raise OSError(message)
+        del title, content
+        attempts.append(recipient)
+        message = "SMTP failure"
+        raise OSError(message)
 
-    monkeypatch.setattr(SmtpNotificationSender, "send", fail_once)
+    monkeypatch.setattr(SmtpNotificationSender, "send", fail)
 
-    assert send_notification(_config("one@example.com"), title="Title", content="Body") is True
-    assert len(keys) == 2
-    assert keys[0] == keys[1]
+    assert send_notification(_config("one@example.com"), title="Title", content="Body") is False
+    assert attempts == ["one@example.com"]
 
 
-def test_direct_notification_returns_false_after_retry_and_continues_other_recipients(
+def test_direct_notification_returns_false_and_continues_other_recipients(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     attempts: list[str] = []
@@ -82,9 +77,8 @@ def test_direct_notification_returns_false_after_retry_and_continues_other_recip
         recipient: str,
         title: str,
         content: str,
-        idempotency_key: str,
     ) -> None:
-        del title, content, idempotency_key
+        del title, content
         attempts.append(recipient)
         if recipient == "broken@example.com":
             message = "permanent SMTP failure"
@@ -99,7 +93,7 @@ def test_direct_notification_returns_false_after_retry_and_continues_other_recip
     )
 
     assert result is False
-    assert attempts == ["broken@example.com", "broken@example.com", "working@example.com"]
+    assert attempts == ["broken@example.com", "working@example.com"]
 
 
 @pytest.mark.parametrize(
