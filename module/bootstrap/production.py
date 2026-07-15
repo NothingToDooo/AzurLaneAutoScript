@@ -64,7 +64,7 @@ from module.runtime.errors import RuntimeCompositionError
 from module.runtime.runner import CommandOutcome, CommandStatus, RuntimeRunner
 from module.runtime.settings import TaskSettingsDocument
 from module.state.config_repository import ConfigRepositoryClock, ConfigStateRepository
-from module.task_registry import get_task_definition
+from module.task_registry import TASK_CATALOG, get_task_definition
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -136,15 +136,6 @@ class PersonalRuntimeConfig(AzurLaneConfig):
         return True
 
 
-def _settings_revision(source_revision: str) -> int:
-    """把配置摘要稳定映射为 checkpoint 可比较的正整数。"""
-    prefix = "sha256:"
-    if not source_revision.startswith(prefix):
-        message = "source_revision must be a sha256 revision"
-        raise ValueError(message)
-    return int(source_revision.removeprefix(prefix)[:15], 16) + 1
-
-
 class _ConfigurationValidationConfig(PersonalRuntimeConfig):
     """只读候选配置；若 composition 尝试写盘则立即失败。"""
 
@@ -182,11 +173,10 @@ def validate_personal_configuration(
         ).build(document, clock=SystemLoopClock())
         registry = build_game_task_registry(
             bundle.tasks,
-            content_revision=bundle.content_revision,
+            content_revisions=dict.fromkeys(TASK_CATALOG, bundle.content_revision),
         )
         settings = TaskSettingsDocument.from_payload(
             compiled.payload,
-            revision=_settings_revision(compiled.source_revision),
             updated_at=datetime.now(tz=UTC),
             task_ids=registry.task_ids,
         )
@@ -499,11 +489,10 @@ def run_default_command(
         screenshots = bundle.screenshots
         registry = build_game_task_registry(
             bundle.tasks,
-            content_revision=bundle.content_revision,
+            content_revisions=dict.fromkeys(TASK_CATALOG, bundle.content_revision),
         )
         settings = TaskSettingsDocument.from_payload(
             compiled.payload,
-            revision=_settings_revision(compiled.source_revision),
             updated_at=datetime.now(tz=UTC),
             task_ids=registry.task_ids,
         )

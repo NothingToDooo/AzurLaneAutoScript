@@ -80,7 +80,6 @@ def _payload(*, tasks: JsonValue | None = None) -> JsonValue:
 def _document(*, payload: JsonValue | None = None) -> TaskSettingsDocument:
     return TaskSettingsDocument.from_payload(
         _payload() if payload is None else payload,
-        revision=7,
         updated_at=_NOW,
         task_ids=("restart", "benchmark"),
     )
@@ -90,7 +89,7 @@ def _registry(*, restart_factory: _Factory | None = None) -> TaskFactoryRegistry
     return TaskFactoryRegistry(
         catalog=_catalog(),
         factories={"restart": restart_factory or _Factory(), "benchmark": _Factory()},
-        content_revision="content-sha256:abc",
+        content_revisions={"restart": "content-restart", "benchmark": "content-benchmark"},
     )
 
 
@@ -107,7 +106,8 @@ def test_registry_builds_from_one_settings_revision_and_current_task_state() -> 
     assert len(factory.contexts) == 1
     context = factory.contexts[0]
     assert context.definition.command == "restart"
-    assert context.settings_revision == 7
+    assert context.settings_revision == _document().revision_for("restart")
+    assert context.content_revision == "content-restart"
     nested = cast("dict[str, FrozenJsonValue]", context.settings["nested"])
     assert nested["values"] == (1, 2)
     assert context.task_state.get("checkpoint") == task_state.get("checkpoint")
@@ -187,13 +187,22 @@ def test_settings_document_rejects_schema_drift(payload: JsonValue, match: str) 
         _document(payload=payload)
 
 
-def test_settings_document_rejects_invalid_revision_and_timestamp() -> None:
-    with pytest.raises(ValueError, match="positive integer"):
-        TaskSettingsDocument.from_payload(_payload(), revision=0, updated_at=_NOW, task_ids=_catalog())
+def test_settings_document_revisions_change_only_with_their_task_payload() -> None:
+    baseline = _document()
+    payload = cast("dict[str, JsonValue]", _payload())
+    tasks = cast("dict[str, JsonValue]", payload["tasks"])
+    benchmark = cast("dict[str, JsonValue]", tasks["benchmark"])
+    benchmark["scenes"] = ["screenshot"]
+    changed = _document(payload=payload)
+
+    assert changed.revision_for("restart") == baseline.revision_for("restart")
+    assert changed.revision_for("benchmark") != baseline.revision_for("benchmark")
+
+
+def test_settings_document_rejects_invalid_timestamp() -> None:
     with pytest.raises(ValueError, match="timezone-aware"):
         TaskSettingsDocument.from_payload(
             _payload(),
-            revision=1,
             updated_at=datetime(2026, 7, 13),
             task_ids=_catalog(),
         )
@@ -204,13 +213,20 @@ def test_registry_requires_exact_factory_coverage_and_coherent_catalog_keys() ->
         TaskFactoryRegistry(
             catalog=_catalog(),
             factories={"restart": _Factory()},
-            content_revision="content:1",
+            content_revisions={"restart": "content:1", "benchmark": "content:1"},
         )
     with pytest.raises(FactoryCoverageError, match="keys must match"):
         TaskFactoryRegistry(
             catalog={"renamed": _definition("restart", ExecutionMode.SCHEDULED_JOB, priority=0)},
             factories={"renamed": _Factory()},
-            content_revision="content:1",
+            content_revisions={"renamed": "content:1"},
+        )
+
+    with pytest.raises(FactoryCoverageError, match="content revision coverage mismatch"):
+        TaskFactoryRegistry(
+            catalog=_catalog(),
+            factories={"restart": _Factory(), "benchmark": _Factory()},
+            content_revisions={"restart": "content:1"},
         )
 
 
@@ -225,7 +241,7 @@ def test_registry_rejects_unknown_task_and_invalid_factory_result() -> None:
             "restart": cast("TaskFactory", _InvalidFactory()),
             "benchmark": registry.factory("benchmark"),
         },
-        content_revision="content-sha256:abc",
+        content_revisions={"restart": "content-restart", "benchmark": "content-benchmark"},
     )
     with pytest.raises(InvalidTaskFactoryError, match="must return a Task"):
         invalid_registry.build("restart", _document(), TaskStateDocument.empty("restart"))

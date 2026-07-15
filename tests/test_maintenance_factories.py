@@ -92,6 +92,7 @@ def _context(command: str, settings: dict[str, FrozenJsonValue]) -> TaskBuildCon
     return TaskBuildContext(
         definition=TASK_CATALOG[command],
         settings_revision=5,
+        content_revision="content-1",
         settings=MappingProxyType(settings),
         task_state=TaskStateDocument.empty(command),
     )

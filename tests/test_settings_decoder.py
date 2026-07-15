@@ -53,7 +53,13 @@ def _context(settings: dict[str, FrozenJsonValue]) -> TaskBuildContext:
         priority=0,
         execution_mode=ExecutionMode.SCHEDULED_JOB,
     )
-    return TaskBuildContext(definition, 3, MappingProxyType(settings), TaskStateDocument.empty("restart"))
+    return TaskBuildContext(
+        definition=definition,
+        settings_revision=3,
+        content_revision="content-1",
+        settings=MappingProxyType(settings),
+        task_state=TaskStateDocument.empty("restart"),
+    )
 
 
 def _decode(decoder: SettingsDecoder) -> _Settings:

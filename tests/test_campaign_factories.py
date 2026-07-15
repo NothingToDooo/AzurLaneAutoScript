@@ -280,13 +280,15 @@ def _context(
     command: str,
     settings: dict[str, FrozenJsonValue],
     *,
+    content_revision: str = "content-1",
     task_state: TaskStateDocument | None = None,
 ) -> TaskBuildContext:
     return TaskBuildContext(
-        TASK_CATALOG[command],
-        3,
-        MappingProxyType(settings),
-        TaskStateDocument.empty(command) if task_state is None else task_state,
+        definition=TASK_CATALOG[command],
+        settings_revision=3,
+        content_revision=content_revision,
+        settings=MappingProxyType(settings),
+        task_state=TaskStateDocument.empty(command) if task_state is None else task_state,
     )
 
 
@@ -741,6 +743,30 @@ def test_factory_keeps_the_selected_loop_stage_while_resuming_the_same_settings_
     requested = StageRef("event_20221124_cn", "th")
     assert source.selection_calls == [(requested, 0, resumed_ref)]
     assert cast("CampaignJobSpec", workflow.last_job).stage_refs == (resumed_ref,)
+
+
+def test_factory_does_not_resolve_a_stale_stage_from_an_old_content_revision() -> None:
+    source = _SelectingSource()
+    workflow = _Workflow()
+    settings = _valid_settings("main")
+    settings["pack_id"] = "event_20221124_cn"
+    settings["stage_ids"] = ("th",)
+    payload = _progress_payload()
+    payload["content_revision"] = "content-old"
+    payload["stage_ref"] = {"pack_id": "event_20221124_cn", "stage_id": "removed"}
+
+    task = build_campaign_factories(_dependencies(workflow=workflow, sessions=source))["main"].build(
+        _context("main", settings, task_state=_task_state("main", payload))
+    )
+    result = task.run(_task_context("main"))
+
+    assert source.selection_calls == [(StageRef("event_20221124_cn", "th"), 0, None)]
+    assert workflow.calls == 0
+    assert result == TaskResult(
+        outcome=Deferred("stale campaign progress was discarded"),
+        effects=(RescheduleSelf(_OBSERVED_AT),),
+        state_effects=(DeleteTaskState("main", "progress"),),
+    )
 
 
 @pytest.mark.parametrize("seconds", [7_199, 14_401])

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from module.gameplay.activity_factories import ActivityFactoryDependencies, build_activity_factories
 from module.gameplay.campaign_factories import CampaignFactoryDependencies, build_campaign_factories
@@ -9,6 +10,9 @@ from module.gameplay.market_factories import MarketWorkflows, build_market_facto
 from module.gameplay.opsi_factories import OpsiWorkflows, build_opsi_factories
 from module.maintenance import MaintenanceServices, build_maintenance_factories
 from module.runtime import TaskFactoryRegistry, compose_task_factories
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,7 +46,7 @@ class GameTaskDependencies:
 def build_game_task_registry(
     dependencies: GameTaskDependencies,
     *,
-    content_revision: str,
+    content_revisions: Mapping[str, str],
 ) -> TaskFactoryRegistry:
     """唯一的游戏 Task composition root；领域 factory 必须精确覆盖 catalog。"""
     if not isinstance(dependencies, GameTaskDependencies):
@@ -59,5 +63,5 @@ def build_game_task_registry(
             build_opsi_factories(dependencies.opsi),
             build_activity_factories(dependencies.activity),
         ),
-        content_revision=content_revision,
+        content_revisions=content_revisions,
     )

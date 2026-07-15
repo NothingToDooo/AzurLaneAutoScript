@@ -21,6 +21,7 @@ class TaskFactory(Protocol):
 class TaskBuildContext:
     definition: TaskDefinition
     settings_revision: int
+    content_revision: str
     settings: FrozenTaskSettings
     task_state: TaskStateDocument
 
@@ -31,6 +32,7 @@ class TaskBuildContext:
         if type(self.settings_revision) is not int or self.settings_revision <= 0:
             message = "settings_revision must be a positive integer"
             raise ValueError(message)
+        _validate_revision(self.content_revision, field_name="content_revision")
         if not isinstance(self.settings, Mapping):
             message = "settings must be a mapping"
             raise TypeError(message)
@@ -51,17 +53,39 @@ def _validate_revision(value: str, *, field_name: str) -> None:
         raise ValueError(message)
 
 
-class TaskFactoryRegistry:
-    """绑定同一内容 revision，并精确覆盖 catalog 的不可变 factory 集。"""
+def _validated_content_revisions(
+    content_revisions: Mapping[str, str],
+    *,
+    catalog: Mapping[str, TaskDefinition],
+) -> dict[str, str]:
+    if not isinstance(content_revisions, Mapping):
+        message = "content_revisions must be a mapping"
+        raise TypeError(message)
+    revision_copy = dict(content_revisions)
+    if any(not isinstance(key, str) for key in revision_copy):
+        message = "content_revisions must use task id strings"
+        raise TypeError(message)
+    if set(revision_copy) != set(catalog):
+        missing = sorted(set(catalog) - set(revision_copy))
+        unknown = sorted(set(revision_copy) - set(catalog))
+        message = f"content revision coverage mismatch: missing={missing}, unknown={unknown}"
+        raise FactoryCoverageError(message)
+    for task_id, revision in revision_copy.items():
+        _validate_revision(revision, field_name=f"content_revisions[{task_id!r}]")
+    return revision_copy
 
-    __slots__ = ("_catalog", "_factories", "content_revision")
+
+class TaskFactoryRegistry:
+    """绑定各 task 内容 revision，并精确覆盖 catalog 的不可变 factory 集。"""
+
+    __slots__ = ("_catalog", "_content_revisions", "_factories")
 
     def __init__(
         self,
         *,
         catalog: Mapping[str, TaskDefinition],
         factories: Mapping[str, TaskFactory],
-        content_revision: str,
+        content_revisions: Mapping[str, str],
     ) -> None:
         if not isinstance(catalog, Mapping):
             message = "catalog must be a mapping"
@@ -69,7 +93,6 @@ class TaskFactoryRegistry:
         if not isinstance(factories, Mapping):
             message = "factories must be a mapping"
             raise TypeError(message)
-        _validate_revision(content_revision, field_name="content_revision")
 
         catalog_copy = dict(catalog)
         if any(
@@ -97,9 +120,11 @@ class TaskFactoryRegistry:
             message = f"factory coverage mismatch: missing={missing}, unknown={unknown}"
             raise FactoryCoverageError(message)
 
+        revision_copy = _validated_content_revisions(content_revisions, catalog=catalog_copy)
+
         self._catalog = MappingProxyType(catalog_copy)
         self._factories = MappingProxyType(factory_copy)
-        self.content_revision = content_revision
+        self._content_revisions = MappingProxyType(revision_copy)
 
     @property
     def task_ids(self) -> tuple[str, ...]:
@@ -123,6 +148,13 @@ class TaskFactoryRegistry:
             message = f"unknown task: {task_id}"
             raise UnknownTaskError(message) from None
 
+    def content_revision_for(self, task_id: str) -> str:
+        try:
+            return self._content_revisions[task_id]
+        except KeyError:
+            message = f"unknown task: {task_id}"
+            raise UnknownTaskError(message) from None
+
     def build(
         self,
         task_id: str,
@@ -141,7 +173,8 @@ class TaskFactoryRegistry:
         definition = self.definition(task_id)
         context = TaskBuildContext(
             definition=definition,
-            settings_revision=document.revision,
+            settings_revision=document.revision_for(task_id),
+            content_revision=self.content_revision_for(task_id),
             settings=document.for_task(task_id),
             task_state=task_state,
         )

@@ -269,6 +269,7 @@ def _build_context(
     return TaskBuildContext(
         definition=TASK_CATALOG[command],
         settings_revision=7,
+        content_revision="content-1",
         settings=MappingProxyType(settings),
         task_state=TaskStateDocument.empty(command) if task_state is None else task_state,
     )

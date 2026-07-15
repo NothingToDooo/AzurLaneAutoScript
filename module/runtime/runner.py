@@ -108,7 +108,6 @@ class RuntimeRunner:
         "_clock",
         "_coordinator",
         "_factories",
-        "_metadata",
         "_observer",
         "_repository",
         "_scheduler",
@@ -151,10 +150,6 @@ class RuntimeRunner:
         self._observer = observer
         self._coordinator = RunCoordinator(repository)
         self._scheduler = Scheduler(repository, hoard_window=hoard_window)
-        self._metadata = RunMetadata(
-            settings_revision=settings.revision,
-            content_revision=factories.content_revision,
-        )
 
     def run(self, command: str, *, abort: AbortToken | None = None) -> CommandOutcome:
         if not isinstance(command, str) or not command or command != command.strip():
@@ -241,7 +236,10 @@ class RuntimeRunner:
         result = self._coordinator.execute(
             task_id,
             mode,
-            self._metadata,
+            RunMetadata(
+                settings_revision=self._settings.revision_for(task_id.value),
+                content_revision=self._factories.content_revision_for(task_id.value),
+            ),
             task,
             abort=abort,
         )

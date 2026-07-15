@@ -242,11 +242,10 @@ def test_complete_configuration_builds_the_exact_task_catalog(
     compiled, bundle, _repository = source.build(document, clock=SystemLoopClock())
     registry = build_game_task_registry(
         bundle.tasks,
-        content_revision=bundle.content_revision,
+        content_revisions=dict.fromkeys(TASK_CATALOG, bundle.content_revision),
     )
     settings = TaskSettingsDocument.from_payload(
         compiled.payload,
-        revision=1,
         updated_at=datetime(2026, 7, 13, tzinfo=UTC),
         task_ids=registry.task_ids,
     )

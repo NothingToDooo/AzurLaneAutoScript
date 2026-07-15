@@ -8,7 +8,7 @@ from module.task_registry import TASK_CATALOG, TaskDefinition
 def compose_task_factories(
     groups: Iterable[Mapping[str, TaskFactory]],
     *,
-    content_revision: str,
+    content_revisions: Mapping[str, str],
     catalog: Mapping[str, TaskDefinition] = TASK_CATALOG,
 ) -> TaskFactoryRegistry:
     """合并互斥领域 factory group，并由 registry 强制验证 catalog 精确覆盖。"""
@@ -29,5 +29,5 @@ def compose_task_factories(
     return TaskFactoryRegistry(
         catalog=catalog,
         factories=merged,
-        content_revision=content_revision,
+        content_revisions=content_revisions,
     )

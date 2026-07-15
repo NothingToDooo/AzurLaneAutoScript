@@ -125,11 +125,10 @@ def _runner(
     registry = TaskFactoryRegistry(
         catalog=catalog,
         factories={definition.command: _Factory(task) for definition, task in zip(definitions, tasks, strict=True)},
-        content_revision="content-test",
+        content_revisions={definition.command: f"content-{definition.command}" for definition in definitions},
     )
     settings = TaskSettingsDocument.from_payload(
         {"schema_version": 1, "tasks": {definition.command: {} for definition in definitions}},
-        revision=1,
         updated_at=NOW,
         task_ids=catalog,
     )
@@ -157,6 +156,7 @@ def test_direct_command_runs_once() -> None:
     assert outcome.runs_completed == 1
     assert len(task.contexts) == 1
     assert task.contexts[0].mode is ExecutionMode.DIRECT_COMMAND
+    assert task.contexts[0].metadata.content_revision == "content-benchmark"
 
 
 def test_scheduler_runs_all_due_tasks_then_finishes_when_empty() -> None:

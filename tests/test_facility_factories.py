@@ -70,10 +70,11 @@ def _workflows(
 
 def _context(command: str, settings: dict[str, FrozenJsonValue]) -> TaskBuildContext:
     return TaskBuildContext(
-        TASK_CATALOG[command],
-        2,
-        MappingProxyType(settings),
-        TaskStateDocument.empty(command),
+        definition=TASK_CATALOG[command],
+        settings_revision=2,
+        content_revision="content-1",
+        settings=MappingProxyType(settings),
+        task_state=TaskStateDocument.empty(command),
     )
 
 
