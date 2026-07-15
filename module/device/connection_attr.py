@@ -1,9 +1,9 @@
 import os
-import sys
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+import adbutils
 from adbutils import AdbClient, AdbDevice
 
 from module.base.decorator import del_cached_property
@@ -97,12 +97,14 @@ class ConnectionAttr:
 
     @cached_property
     def adb_binary(self) -> str:
-        configured = Path(self.config.Emulator_AdbExecutable.replace("\\", "/"))
-        if configured.exists():
-            return str(configured.resolve())
+        configured = self.config.Emulator_AdbExecutable.strip()
+        if configured:
+            configured_path = Path(configured.replace("\\", "/"))
+            if configured_path.is_file():
+                return str(configured_path.resolve())
 
-        bundled = (Path(sys.executable) / "../Lib/site-packages/adbutils/binaries/adb.exe").resolve()
-        if bundled.exists():
+        bundled = Path(adbutils.__file__).resolve().parent / "binaries" / "adb.exe"
+        if bundled.is_file():
             return bundled.as_posix()
 
         return "adb"

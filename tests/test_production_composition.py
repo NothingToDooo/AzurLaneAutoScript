@@ -302,6 +302,37 @@ def test_personal_runtime_config_reads_only_its_bound_file(
     assert path.read_bytes() == original
 
 
+def test_personal_runtime_temporary_bound_field_never_persists(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    document = _template()
+    main = cast("dict[str, object]", document["Main"])
+    campaign = cast("dict[str, object]", main["Campaign"])
+    campaign["UseAutoSearch"] = False
+    path = tmp_path / "alas.json"
+    path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+    config = PersonalRuntimeConfig(_runtime_repository(path, document))
+    config.init_task("Main")
+    original = path.read_bytes()
+
+    assert config.bound["Campaign_UseAutoSearch"] == "Main.Campaign.UseAutoSearch"
+    monkeypatch.setattr(
+        state_repository_module,
+        "atomic_write",
+        lambda *_args: pytest.fail("temporary overlay must not write alas.json"),
+    )
+
+    with config.temporary(Campaign_UseAutoSearch=True):
+        assert config.Campaign_UseAutoSearch is True
+        assert config.modified == {}
+        assert path.read_bytes() == original
+
+    assert config.Campaign_UseAutoSearch is False
+    assert config.modified == {}
+    assert path.read_bytes() == original
+
+
 def test_personal_runtime_config_rejects_invalid_option_without_rewriting(tmp_path: Path) -> None:
     document = _template()
     path = tmp_path / "alas.json"

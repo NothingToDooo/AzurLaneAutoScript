@@ -255,6 +255,36 @@ def test_runtime_overlay_api_never_mutates_persistent_or_scheduler_state() -> No
     assert config.overridden == overridden
 
 
+def test_temporary_overlay_restores_existing_value_through_nested_contexts() -> None:
+    stored = {"TaskA": {"Campaign": {"Name": "D3"}}}
+    config = _config(copy.deepcopy(stored))
+    config.bind("TaskA")
+    config.apply_runtime_overlay(Campaign_Name="SP", STORY_OPTION=2)
+    original_overlay = copy.deepcopy(_runtime_overlay(config))
+    update_calls: list[str] = []
+    config.auto_update = True
+    vars(config)["update"] = lambda: update_calls.append("update")
+
+    with config.temporary(Campaign_Name="HT", STORY_ALLOW_SKIP=False):
+        assert config.Campaign_Name == "HT"
+        assert _runtime_overlay(config) == {
+            "Campaign_Name": "HT",
+            "STORY_OPTION": 2,
+            "STORY_ALLOW_SKIP": False,
+        }
+
+        with config.temporary(Campaign_Name="EX"):
+            assert config.Campaign_Name == "EX"
+
+        assert config.Campaign_Name == "HT"
+
+    assert config.Campaign_Name == "SP"
+    assert _runtime_overlay(config) == original_overlay
+    assert config.data == stored
+    assert config.modified == {}
+    assert update_calls == []
+
+
 def test_replace_runtime_overlay_removes_fields_from_previous_session() -> None:
     config = _config({"TaskA": {"Campaign": {"Name": "D3"}}})
     config.bind("TaskA")

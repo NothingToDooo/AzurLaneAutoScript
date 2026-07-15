@@ -19,7 +19,7 @@ from module.logger import logger
 from module.task_registry import get_task_by_config_name
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
     from types import TracebackType
     from typing import Self, Unpack
 
@@ -381,10 +381,22 @@ class AzurLaneConfig(ManualConfig, GeneratedConfig):
         self._fleet_boss = value
 
     def temporary(self, **kwargs: Unpack[ConfigOverrides]) -> ConfigBackup:
-        """临时覆盖属性并返回可手动 recover 或作为上下文使用的 ConfigBackup。"""
-        backup = ConfigBackup(config=self)
-        backup.cover(**kwargs)
-        return backup
+        """通过运行期投影临时覆盖属性，不触碰持久配置。"""
+        values = dict(kwargs)
+        self._validate_runtime_overlay_fields(values)
+        runtime_overlay = self._runtime_overlay_values()
+        overlay_backup = {key: copy.deepcopy(runtime_overlay[key]) for key in values if key in runtime_overlay}
+        missing_overlay_fields = set(values) - set(overlay_backup)
+        self.apply_runtime_overlay(**kwargs)
+
+        def recover() -> None:
+            current_overlay = self._runtime_overlay_values()
+            for key in missing_overlay_fields:
+                current_overlay.pop(key, None)
+            current_overlay.update(copy.deepcopy(overlay_backup))
+            self._republish_runtime_overlay()
+
+        return ConfigBackup(recover)
 
 
 vars(pywebio.output)["Output"] = OutputConfig
@@ -392,20 +404,15 @@ vars(pywebio.pin)["Output"] = OutputConfig
 
 
 class ConfigBackup:
-    def __init__(self, config: AzurLaneConfig) -> None:
-        self.config = config
-        self.backup: dict[str, ConfigValue] = {}
-        self.kwargs: dict[str, ConfigValue] = {}
-
-    def cover(self, **kwargs: Unpack[ConfigOverrides]) -> None:
-        self.kwargs = cast("dict[str, ConfigValue]", kwargs)
-        for key, value in kwargs.items():
-            self.backup[key] = cast("ConfigValue", getattr(self.config, key))
-            setattr(self.config, key, value)
+    def __init__(self, recover: Callable[[], None]) -> None:
+        self._recover: Callable[[], None] | None = recover
 
     def recover(self) -> None:
-        for key, value in self.backup.items():
-            setattr(self.config, key, value)
+        recover = self._recover
+        if recover is None:
+            return
+        recover()
+        self._recover = None
 
     def __enter__(self) -> Self:
         return self

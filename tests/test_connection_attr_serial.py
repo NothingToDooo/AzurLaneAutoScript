@@ -1,8 +1,10 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
+import adbutils
 import pytest
 from adbutils import adb_path
 
@@ -13,8 +15,6 @@ from module.device.runtime import DeviceRuntime
 from module.exception import RequestHumanTakeover
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from module.config.config import AzurLaneConfig
 
 
@@ -79,6 +79,23 @@ def test_connection_attr_uses_adb_executable_from_alas_config(tmp_path: Path) ->
     )
 
     assert connection.adb_binary == str(executable.resolve())
+
+
+def test_connection_attr_uses_bundled_adb_for_blank_or_directory_path(
+    tmp_path: Path,
+) -> None:
+    assert adbutils.__file__ is not None
+    bundled = Path(adbutils.__file__).resolve().parent / "binaries" / "adb.exe"
+    assert bundled.is_file()
+
+    for configured in ("", tmp_path.as_posix()):
+        connection = object.__new__(ConnectionAttr)
+        connection.config = cast(
+            "AzurLaneConfig",
+            SimpleNamespace(Emulator_AdbExecutable=configured),
+        )
+
+        assert connection.adb_binary == bundled.as_posix()
 
 
 @dataclass(frozen=True)
