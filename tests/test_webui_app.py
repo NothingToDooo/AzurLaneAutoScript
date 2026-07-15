@@ -1,5 +1,4 @@
 import json
-import queue
 from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -13,6 +12,8 @@ from module.webui.app import AlasGUI, import_personal_configuration
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from module.webui.utils import WebIOTaskHandler
 
 
 def _template() -> dict[str, object]:
@@ -34,7 +35,6 @@ def _record_validation(
 def test_config_listeners_are_bound_once_per_session(monkeypatch: pytest.MonkeyPatch) -> None:
     gui = AlasGUI.__new__(AlasGUI)
     gui.ALAS_ARGS = {}
-    gui.modified_config_queue = queue.Queue()
     gui._config_listeners_initialized = False  # noqa: SLF001 - 验证 session 监听初始化边界。
     bindings: list[tuple[str, object]] = []
 
@@ -55,36 +55,28 @@ def test_config_listeners_are_bound_once_per_session(monkeypatch: pytest.MonkeyP
     assert [name for name, _onchange in bindings] == ["Task_Group_Field"]
 
 
-def test_failed_autosave_keeps_pending_fields_for_the_next_candidate() -> None:
+def test_failed_synchronous_save_keeps_pending_fields_for_the_next_candidate() -> None:
     gui = AlasGUI.__new__(AlasGUI)
     gui.alive = True
-    first = {"name": "Event.Campaign.Event", "value": "event-next"}
-    second = {"name": "Event.Campaign.Name", "value": "d3"}
-
-    class _Queue:
-        def __init__(self) -> None:
-            self.responses: list[object] = [first, queue.Empty(), second, queue.Empty()]
-
-        def get(self, *, timeout: int) -> object:
-            del timeout
-            response = self.responses.pop(0)
-            if isinstance(response, queue.Empty):
-                raise response
-            return response
+    gui._pending_config = {}  # noqa: SLF001 - 验证跨字段候选在失败后继续累积。
+    gui._saving_config = False  # noqa: SLF001 - 验证同步保存状态机。
 
     attempts: list[dict[str, object]] = []
 
     def save(modified: dict[str, object]) -> bool:
         attempts.append(dict(modified))
-        if len(attempts) == 2:
-            gui.alive = False
-            return True
-        return False
+        return len(attempts) == 2
 
-    gui.modified_config_queue = cast("queue.Queue[webui_app.ConfigChange]", _Queue())
     vars(gui)["_save_config"] = save
 
-    gui._alas_thread_update_config()  # noqa: SLF001 - 验证跨字段候选在失败后继续累积。
+    gui.save_config_change(
+        "Event.Campaign.Event",
+        "event-next",
+    )
+    gui.save_config_change(
+        "Event.Campaign.Name",
+        "d3",
+    )
 
     assert attempts == [
         {"Event.Campaign.Event": "event-next"},
@@ -93,6 +85,77 @@ def test_failed_autosave_keeps_pending_fields_for_the_next_candidate() -> None:
             "Event.Campaign.Name": "d3",
         },
     ]
+    assert gui._pending_config == {}  # noqa: SLF001 - 成功后不得遗留旧候选。
+
+
+def test_config_change_saves_synchronously_without_a_background_worker() -> None:
+    gui = AlasGUI.__new__(AlasGUI)
+    gui.alive = True
+    gui._pending_config = {}  # noqa: SLF001 - 验证同步保存状态机。
+    gui._saving_config = False  # noqa: SLF001 - 验证同步保存状态机。
+    saved: list[dict[str, object]] = []
+
+    def save(modified: dict[str, object]) -> bool:
+        saved.append(dict(modified))
+        return True
+
+    vars(gui)["_save_config"] = save
+
+    gui.save_config_change("Alas.Optimization.ScreenshotInterval", 0.2)
+
+    assert saved == [{"Alas.Optimization.ScreenshotInterval": 0.2}]
+    assert gui._pending_config == {}  # noqa: SLF001 - 回调返回前已经完成保存。
+    assert not hasattr(gui, "modified_config_queue")
+
+
+def test_config_change_after_session_stop_does_not_write() -> None:
+    gui = AlasGUI.__new__(AlasGUI)
+    gui.alive = True
+    gui._pending_config = {}  # noqa: SLF001 - 验证 session 停止边界。
+    gui._saving_config = False  # noqa: SLF001 - 验证 session 停止边界。
+    attempts: list[dict[str, object]] = []
+
+    class _TaskHandler:
+        stopped = False
+
+        def stop(self) -> None:
+            self.stopped = True
+
+    handler = _TaskHandler()
+    gui.task_handler = cast("WebIOTaskHandler", handler)
+    vars(gui)["_save_config"] = lambda modified: attempts.append(dict(modified)) or False
+
+    gui.save_config_change("Event.Campaign.Event", "event-next")
+    gui.stop()
+    gui.save_config_change("Event.Campaign.Name", "d3")
+
+    assert handler.stopped is True
+    assert attempts == [{"Event.Campaign.Event": "event-next"}]
+    assert gui._pending_config == {"Event.Campaign.Event": "event-next"}  # noqa: SLF001
+
+
+def test_reentrant_config_change_is_saved_after_the_active_candidate() -> None:
+    gui = AlasGUI.__new__(AlasGUI)
+    gui.alive = True
+    gui._pending_config = {}  # noqa: SLF001 - 验证同步保存防重入。
+    gui._saving_config = False  # noqa: SLF001 - 验证同步保存防重入。
+    attempts: list[dict[str, object]] = []
+
+    def save(modified: dict[str, object]) -> bool:
+        attempts.append(dict(modified))
+        if len(attempts) == 1:
+            gui.save_config_change("Event.Campaign.Name", "d3")
+        return True
+
+    vars(gui)["_save_config"] = save
+
+    gui.save_config_change("Event.Campaign.Event", "event-next")
+
+    assert attempts == [
+        {"Event.Campaign.Event": "event-next"},
+        {"Event.Campaign.Name": "d3"},
+    ]
+    assert gui._pending_config == {}  # noqa: SLF001 - 重入变化也必须在返回前完成。
 
 
 def test_webui_field_save_validates_full_current_schema_before_writing(

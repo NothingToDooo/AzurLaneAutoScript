@@ -1,7 +1,5 @@
 import argparse
 import json
-import queue
-import threading
 import time
 from datetime import datetime
 from functools import partial
@@ -27,7 +25,7 @@ from pywebio.output import (
     use_scope,
 )
 from pywebio.pin import pin, pin_on_change
-from pywebio.session import download, go_app, info, local, register_thread, run_js, set_env
+from pywebio.session import download, go_app, info, local, run_js, set_env
 
 from module.application.scheduler import ScheduleItem, order_schedule_items
 from module.base.atomic import atomic_failure_cleanup, atomic_write
@@ -90,11 +88,6 @@ class MenuDefinition(TypedDict):
     tasks: list[str]
 
 
-class ConfigChange(TypedDict):
-    name: str
-    value: MutableDeepValue
-
-
 def _read_menu() -> dict[str, MenuDefinition]:
     raw_menu = read_file(filepath_args("menu"))
     menu: dict[str, MenuDefinition] = {}
@@ -129,7 +122,8 @@ class AlasGUI(Frame):
 
     def __init__(self) -> None:
         super().__init__()
-        self.modified_config_queue: queue.Queue[ConfigChange] = queue.Queue()
+        self._pending_config: dict[str, MutableDeepValue] = {}
+        self._saving_config = False
         self._config_listeners_initialized = False
         self.alas_name = ""
         self.alas_config = AzurLaneConfig("template")
@@ -441,30 +435,29 @@ class AlasGUI(Frame):
         if self._config_listeners_initialized:
             return
 
-        def put_queue(path: str, value: MutableDeepValue) -> None:
-            self.modified_config_queue.put({"name": path, "value": value})
-
         for path in get_alas_config_listen_path(self.ALAS_ARGS):
-            pin_on_change(name="_".join(path), onchange=partial(put_queue, ".".join(path)))
+            pin_on_change(name="_".join(path), onchange=partial(self.save_config_change, ".".join(path)))
         self._config_listeners_initialized = True
         logger.info("Init config listeners done.")
 
-    def _alas_thread_update_config(self) -> None:
-        modified = {}
-        while self.alive:
-            try:
-                d = self.modified_config_queue.get(timeout=10)
-            except queue.Empty:
-                continue
-            modified[d["name"]] = d["value"]
-            while True:
-                try:
-                    d = self.modified_config_queue.get(timeout=1)
-                    modified[d["name"]] = d["value"]
-                except queue.Empty:
-                    if self._save_config(modified):
-                        modified.clear()
-                    break
+    def save_config_change(self, path: str, value: MutableDeepValue) -> None:
+        if not self.alive:
+            return
+        self._pending_config[path] = value
+        if self._saving_config:
+            return
+
+        self._saving_config = True
+        try:
+            while self.alive and self._pending_config:
+                modified = dict(self._pending_config)
+                if not self._save_config(modified):
+                    return
+                for name, saved_value in modified.items():
+                    if name in self._pending_config and self._pending_config[name] == saved_value:
+                        del self._pending_config[name]
+        finally:
+            self._saving_config = False
 
     def _save_config(
         self,
@@ -791,10 +784,6 @@ class AlasGUI(Frame):
         self.show()
 
         self._init_config_listeners()
-
-        save_config_thread = threading.Thread(target=self._alas_thread_update_config)
-        register_thread(save_config_thread)
-        save_config_thread.start()
 
         visibility_state_switch = Switch(
             status={
