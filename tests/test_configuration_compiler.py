@@ -197,6 +197,34 @@ def test_campaign_revision_tracks_emotion_policy_updates(field_name: str, value:
     assert changed.task_revisions["main"] != original.task_revisions["main"]
 
 
+def test_opsi_explore_revision_ignores_runtime_last_zone() -> None:
+    document = _template()
+    original = WebConfigurationCompiler().compile(document)
+    explore = cast("dict[str, object]", document["OpsiExplore"])
+    settings = cast("dict[str, object]", explore["OpsiExplore"])
+    settings["LastZone"] = 44
+
+    changed = WebConfigurationCompiler().compile(document)
+
+    assert changed.tasks["opsi_explore"] == original.tasks["opsi_explore"]
+    assert changed.task_revisions["opsi_explore"] == original.task_revisions["opsi_explore"]
+    changed_explore = cast("dict[str, object]", changed.runtime_document["OpsiExplore"])
+    changed_settings = cast("dict[str, object]", changed_explore["OpsiExplore"])
+    assert changed_settings["LastZone"] == 44
+
+
+def test_opsi_explore_revision_tracks_user_policy() -> None:
+    document = _template()
+    original = WebConfigurationCompiler().compile(document)
+    explore = cast("dict[str, object]", document["OpsiExplore"])
+    settings = cast("dict[str, object]", explore["OpsiExplore"])
+    settings["SpecialRadar"] = True
+
+    changed = WebConfigurationCompiler().compile(document)
+
+    assert changed.task_revisions["opsi_explore"] != original.task_revisions["opsi_explore"]
+
+
 def test_compiled_settings_are_deeply_read_only_and_detached_from_source() -> None:
     document = _template()
     compiled = WebConfigurationCompiler().compile(document)

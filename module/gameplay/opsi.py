@@ -241,14 +241,12 @@ class ExploreSettings:
     fleet: FleetSettings
     special_radar: bool
     force_run: bool
-    last_zone: int
 
     def __post_init__(self) -> None:
         _validate_settings_member(self.general, WorldGeneralSettings, field_name="general")
         _validate_settings_member(self.fleet, FleetSettings, field_name="fleet")
         _validate_bool(value=self.special_radar, field_name="special_radar")
         _validate_bool(value=self.force_run, field_name="force_run")
-        _validate_int(self.last_zone, field_name="last_zone", minimum=0)
 
 
 @dataclass(frozen=True, slots=True)

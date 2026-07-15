@@ -121,13 +121,12 @@ _CASES: tuple[tuple[str, dict[str, FrozenJsonValue], WorldTaskSettings], ...] = 
     ),
     (
         "opsi_explore",
-        _settings(fleet=_FLEET_JSON, special_radar=True, force_run=False, last_zone=44),
+        _settings(fleet=_FLEET_JSON, special_radar=True, force_run=False),
         ExploreSettings(
             general=_GENERAL,
             fleet=_FLEET,
             special_radar=True,
             force_run=False,
-            last_zone=44,
         ),
     ),
     (

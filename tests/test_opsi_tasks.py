@@ -114,7 +114,6 @@ _SETTINGS_BY_TASK: dict[str, WorldTaskSettings] = {
         fleet=_FLEET,
         special_radar=False,
         force_run=False,
-        last_zone=0,
     ),
     "opsi_shop": ShopSettings(_GENERAL, OpsiShopPreset.MAX_BENEFIT_META, "ActionPoint > PurpleCoins"),
     "opsi_voucher": VoucherSettings(_GENERAL, "LoggerAbyssal > LoggerObscure > Book > Coin > Fragment"),

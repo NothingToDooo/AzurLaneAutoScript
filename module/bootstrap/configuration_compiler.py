@@ -1233,7 +1233,6 @@ class WebConfigurationCompiler:
                 "fleet": self._fleet(view, "OpsiExplore"),
                 "special_radar": view.value("OpsiExplore", "OpsiExplore", "SpecialRadar", expected=bool),
                 "force_run": view.value("OpsiExplore", "OpsiExplore", "ForceRun", expected=bool),
-                "last_zone": view.value("OpsiExplore", "OpsiExplore", "LastZone", expected=int),
             },
             "opsi_shop": {
                 "general": general(),

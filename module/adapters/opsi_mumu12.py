@@ -200,15 +200,14 @@ def _(settings: AshBeaconSettings, _progress: WorldProgress | None) -> dict[str,
 
 @_specific_settings_overrides.register
 def _(settings: ExploreSettings, progress: WorldProgress | None) -> dict[str, object]:
-    last_zone = settings.last_zone
-    if progress is not None and isinstance(progress.cursor, WorldZoneCursor):
-        last_zone = progress.cursor.zone_id
-    return {
+    values: dict[str, object] = {
         **_fleet_overrides(settings.fleet.fleet_index, use_submarine=settings.fleet.use_submarine),
         "OpsiExplore_SpecialRadar": settings.special_radar,
         "OpsiExplore_ForceRun": settings.force_run,
-        "OpsiExplore_LastZone": last_zone,
     }
+    if progress is not None and isinstance(progress.cursor, WorldZoneCursor):
+        values["OpsiExplore_LastZone"] = progress.cursor.zone_id
+    return values
 
 
 @_specific_settings_overrides.register
