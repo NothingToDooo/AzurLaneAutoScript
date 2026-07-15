@@ -24,7 +24,7 @@ from module.application import (
 )
 from module.runtime.factories import TaskBuildContext, TaskFactoryRegistry
 from module.runtime.runner import CommandStatus, ResultObserver, RuntimeRunner
-from module.runtime.settings import TaskSettingsDocument
+from module.runtime.settings import freeze_task_settings
 from module.runtime.task_state import TaskStateDocument
 from module.task_registry import TaskDefinition
 
@@ -130,14 +130,14 @@ def _runner(
         factories={definition.command: _Factory(task) for definition, task in zip(definitions, tasks, strict=True)},
         content_revisions={definition.command: f"content-{definition.command}" for definition in definitions},
     )
-    settings = TaskSettingsDocument.from_payload(
-        {"schema_version": 1, "tasks": {definition.command: {} for definition in definitions}},
-        updated_at=NOW,
+    settings, settings_revisions = freeze_task_settings(
+        {definition.command: {} for definition in definitions},
         task_ids=catalog,
     )
     return RuntimeRunner(
         factories=registry,
         settings=settings,
+        settings_revisions=settings_revisions,
         repository=repository,
         clock=clock,
         observer=observer,

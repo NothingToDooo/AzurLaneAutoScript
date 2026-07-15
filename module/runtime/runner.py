@@ -1,8 +1,9 @@
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-from typing import Protocol, cast
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Protocol, cast
 
 from module.application import (
     AbortRequested,
@@ -24,8 +25,10 @@ from module.application import (
     TaskResult,
 )
 from module.runtime.factories import TaskFactoryRegistry
-from module.runtime.settings import TaskSettingsDocument
 from module.runtime.task_state import TaskStateDocument
+
+if TYPE_CHECKING:
+    from module.runtime.settings import FrozenTaskSettings
 
 
 class CommandStatus(StrEnum):
@@ -122,13 +125,15 @@ class RuntimeRunner:
         "_repository",
         "_scheduler",
         "_settings",
+        "_settings_revisions",
     )
 
-    def __init__(  # noqa: PLR0913 - runner 的五个依赖在唯一 composition root 显式组装。
+    def __init__(  # noqa: PLR0913 - runner 依赖在唯一 composition root 显式组装。
         self,
         *,
         factories: TaskFactoryRegistry,
-        settings: TaskSettingsDocument,
+        settings: Mapping[str, FrozenTaskSettings],
+        settings_revisions: Mapping[str, int],
         repository: RuntimeRepository,
         clock: RunnerClock,
         hoard_window: timedelta = timedelta(seconds=30),
@@ -137,8 +142,11 @@ class RuntimeRunner:
         if not isinstance(factories, TaskFactoryRegistry):
             message = "factories must be a TaskFactoryRegistry"
             raise TypeError(message)
-        if not isinstance(settings, TaskSettingsDocument):
-            message = "settings must be a TaskSettingsDocument"
+        if not isinstance(settings, Mapping):
+            message = "settings must be a mapping"
+            raise TypeError(message)
+        if not isinstance(settings_revisions, Mapping):
+            message = "settings_revisions must be a mapping"
             raise TypeError(message)
         if isinstance(repository, type) or not all(
             callable(getattr(repository, method, None))
@@ -152,9 +160,9 @@ class RuntimeRunner:
         if observer is not None and not callable(observer):
             message = "observer must be callable or None"
             raise TypeError(message)
-        factories.validate_settings(settings)
         self._factories = factories
-        self._settings = settings
+        self._settings = MappingProxyType(dict(settings))
+        self._settings_revisions = MappingProxyType(dict(settings_revisions))
         self._repository = repository
         self._clock = _require_clock(clock)
         self._observer = observer
@@ -240,13 +248,20 @@ class RuntimeRunner:
     ) -> tuple[TaskResult, str | None]:
         try:
             task_state = _require_task_state(self._repository.task_state(task_id))
-            task = self._factories.build(task_id.value, self._settings, task_state)
+            task_id_value = task_id.value
+            settings_revision = self._settings_revisions[task_id_value]
+            task = self._factories.build(
+                task_id_value,
+                self._settings[task_id_value],
+                settings_revision,
+                task_state,
+            )
             result = self._coordinator.execute(
                 task_id,
                 mode,
                 RunMetadata(
-                    settings_revision=self._settings.revision_for(task_id.value),
-                    content_revision=self._factories.content_revision_for(task_id.value),
+                    settings_revision=settings_revision,
+                    content_revision=self._factories.content_revision_for(task_id_value),
                 ),
                 task,
                 abort=abort,

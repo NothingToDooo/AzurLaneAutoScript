@@ -1,6 +1,4 @@
 import copy
-import hashlib
-import json
 import math
 import re
 from collections.abc import Mapping
@@ -21,11 +19,11 @@ from module.notify.configuration import (
     SmtpNotificationConfig,
     build_notification_config,
 )
+from module.runtime.settings import FrozenTaskSettings, JsonValue, freeze_task_settings
 from module.task_registry import TASK_CATALOG, config_name_to_command
 
 if TYPE_CHECKING:
     from module.config.deep import DeepValue, MutableDeepData, MutableDeepValue
-    from module.runtime.settings import JsonValue
 
 
 class ConfigurationCompileError(ValueError):
@@ -265,21 +263,22 @@ class _ConfigView:
 
 @dataclass(frozen=True, slots=True, init=False)
 class CompiledConfiguration:
-    _payload: JsonValue = field(repr=False)
+    _runtime_document: MutableDeepData = field(repr=False)
+    _tasks: Mapping[str, FrozenTaskSettings] = field(repr=False)
+    _task_revisions: Mapping[str, int] = field(repr=False)
     notification: NotificationConfig
     device_serial: str
-    source_revision: str
 
     def __init__(
         self,
         *,
-        payload: JsonValue,
+        runtime_document: MutableDeepData,
+        tasks: Mapping[str, JsonValue],
         notification: NotificationConfig,
         device_serial: str,
-        source_revision: str,
     ) -> None:
-        if not isinstance(payload, dict):
-            message = "payload must be an object"
+        if not isinstance(runtime_document, dict):
+            message = "runtime_document must be a parsed configuration object"
             raise TypeError(message)
         if not isinstance(notification, DisabledNotificationConfig | SmtpNotificationConfig):
             message = "notification must be a NotificationConfig"
@@ -287,39 +286,26 @@ class CompiledConfiguration:
         if not isinstance(device_serial, str) or not device_serial.strip():
             message = "device_serial must be a non-empty string"
             raise ValueError(message)
-        if not isinstance(source_revision, str):
-            message = "source_revision must be a string"
-            raise TypeError(message)
-        if re.fullmatch(r"sha256:[0-9a-f]{64}", source_revision) is None:
-            message = "source_revision must be a canonical sha256 revision"
-            raise ValueError(message)
-        if source_revision != _source_revision(payload):
-            message = "source_revision must match payload"
-            raise ValueError(message)
-        object.__setattr__(self, "_payload", copy.deepcopy(payload))
+        frozen_tasks, task_revisions = freeze_task_settings(tasks, task_ids=TASK_CATALOG)
+        object.__setattr__(self, "_runtime_document", copy.deepcopy(runtime_document))
+        object.__setattr__(self, "_tasks", frozen_tasks)
+        object.__setattr__(self, "_task_revisions", task_revisions)
         object.__setattr__(self, "notification", notification)
         object.__setattr__(self, "device_serial", device_serial)
-        object.__setattr__(self, "source_revision", source_revision)
 
     @property
-    def payload(self) -> JsonValue:
-        """返回独立副本，避免外部修改破坏 payload 与 revision 的绑定。"""
+    def runtime_document(self) -> MutableDeepData:
+        """返回 legacy driver 使用的独立解析快照。"""
 
-        return copy.deepcopy(self._payload)
+        return copy.deepcopy(self._runtime_document)
 
+    @property
+    def tasks(self) -> Mapping[str, FrozenTaskSettings]:
+        return self._tasks
 
-def _source_revision(payload: JsonValue) -> str:
-    encoded = json.dumps(
-        {
-            "format": "alas-runtime-configuration-v1",
-            "payload": payload,
-        },
-        allow_nan=False,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode()
-    return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+    @property
+    def task_revisions(self) -> Mapping[str, int]:
+        return self._task_revisions
 
 
 def _split_triggers(value: str, *, path: tuple[str, ...]) -> list[JsonValue]:
@@ -393,13 +379,6 @@ class WebConfigurationCompiler:
         self._timezone_name = timezone_name
 
     def compile(self, document: ConfigurationDocument) -> CompiledConfiguration:
-        compiled, _runtime_document = self.compile_runtime_document(document)
-        return compiled
-
-    def compile_runtime_document(
-        self,
-        document: ConfigurationDocument,
-    ) -> tuple[CompiledConfiguration, MutableDeepData]:
         """一次校验同时产出 typed settings 与旧游戏驱动需要的解析文档。"""
 
         runtime_document = self._schema.parse(document)
@@ -421,22 +400,17 @@ class WebConfigurationCompiler:
             unknown = sorted(set(tasks) - expected)
             message = f"compiled task coverage mismatch: missing={missing}, unknown={unknown}"
             raise ConfigurationCompileError(message)
-        payload: JsonValue = {"schema_version": 1, "tasks": tasks}
-        return (
-            CompiledConfiguration(
-                payload=payload,
-                notification=notification,
-                device_serial=device_serial,
-                source_revision=_source_revision(payload),
-            ),
-            runtime_document,
+        return CompiledConfiguration(
+            runtime_document=runtime_document,
+            tasks=tasks,
+            notification=notification,
+            device_serial=device_serial,
         )
 
     def parse_runtime_document(self, document: ConfigurationDocument) -> MutableDeepData:
         """完整校验后，把 JSON 字段解析为旧 UI driver 需要的运行时类型。"""
 
-        _compiled, runtime_document = self.compile_runtime_document(document)
-        return runtime_document
+        return self.compile(document).runtime_document
 
     @staticmethod
     def _validate_device_settings(view: _ConfigView) -> str:
