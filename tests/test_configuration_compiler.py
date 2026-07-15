@@ -284,19 +284,35 @@ def test_compiler_preserves_scheduler_interval_bounds_in_canonical_seconds() -> 
     }
 
 
-def test_compiler_normalizes_single_scheduler_interval_to_equal_bounds() -> None:
+def test_compiler_accepts_single_interval_for_range_default() -> None:
+    document = _template()
+    tactical = cast("dict[str, object]", document["Tactical"])
+    scheduler = cast("dict[str, object]", tactical["Scheduler"])
+    scheduler["FailureInterval"] = 120
+
+    payload = cast("dict[str, JsonValue]", WebConfigurationCompiler().compile(document).payload)
+    tasks = cast("dict[str, JsonValue]", payload["tasks"])
+    tactical_settings = cast("dict[str, JsonValue]", tasks["tactical"])
+
+    assert tactical_settings["failure_retry_seconds"] == {
+        "lower_seconds": 7_200,
+        "upper_seconds": 7_200,
+    }
+
+
+def test_compiler_accepts_range_for_integer_interval_default() -> None:
     document = _template()
     hard = cast("dict[str, object]", document["Hard"])
     scheduler = cast("dict[str, object]", hard["Scheduler"])
-    scheduler["FailureInterval"] = 17
+    scheduler["FailureInterval"] = "120-240"
 
     payload = cast("dict[str, JsonValue]", WebConfigurationCompiler().compile(document).payload)
     tasks = cast("dict[str, JsonValue]", payload["tasks"])
     hard_settings = cast("dict[str, JsonValue]", tasks["hard"])
 
     assert hard_settings["failure_retry_seconds"] == {
-        "lower_seconds": 1_020,
-        "upper_seconds": 1_020,
+        "lower_seconds": 7_200,
+        "upper_seconds": 14_400,
     }
 
 

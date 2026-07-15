@@ -123,6 +123,44 @@ def test_webui_field_save_does_not_replace_empty_value_with_default(
         )
 
 
+def test_webui_field_save_accepts_scheduler_number_and_range(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gui = AlasGUI.__new__(AlasGUI)
+    gui.ALAS_ARGS = read_file(filepath_args())
+    vars(gui)["pin_remove_invalid_mark"] = lambda _paths: None
+    vars(gui)["pin_set_invalid_mark"] = lambda _paths: None
+    document = _template()
+    written: list[dict[str, object]] = []
+
+    class _Manager:
+        alive = False
+
+    monkeypatch.setattr(webui_app, "toast", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(webui_app, "read_config_file", lambda _name: deepcopy(document))
+    monkeypatch.setattr(webui_app.ProcessManager, "instance", _Manager)
+    monkeypatch.setattr(
+        webui_app,
+        "write_config_file",
+        lambda _name, saved: written.append(cast("dict[str, object]", saved)),
+    )
+
+    gui._save_config_unchecked(  # noqa: SLF001 - 验证 interval 的 int | range 持久化契约。
+        {
+            "Commission.Scheduler.SuccessInterval": "30",
+            "Hard.Scheduler.FailureInterval": "15-30",
+        }
+    )
+
+    assert len(written) == 1
+    commission = cast("dict[str, object]", written[0]["Commission"])
+    commission_scheduler = cast("dict[str, object]", commission["Scheduler"])
+    hard = cast("dict[str, object]", written[0]["Hard"])
+    hard_scheduler = cast("dict[str, object]", hard["Scheduler"])
+    assert commission_scheduler["SuccessInterval"] == 30
+    assert hard_scheduler["FailureInterval"] == "15-30"
+
+
 def test_webui_field_save_preserves_state_written_during_process_stop(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

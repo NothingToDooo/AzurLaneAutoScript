@@ -37,6 +37,7 @@ type ConfigurationDocument = Mapping[str, object]
 _ValueT = TypeVar("_ValueT", bool, int, float, str)
 _SENTINEL_DATE = datetime(2020, 1, 1)
 _DEFAULT_SCHEMA_PATH = Path(__file__).resolve().parents[1] / "config" / "argument" / "args.json"
+_SCHEDULER_INTERVAL_FIELDS = frozenset({"SuccessInterval", "FailureInterval"})
 
 
 def _error(path: tuple[str, ...], message: str) -> ConfigurationCompileError:
@@ -74,6 +75,17 @@ def _is_finite_number(value: object) -> bool:
     if type(value) not in {int, float}:
         return False
     return math.isfinite(cast("int | float", value))
+
+
+def _is_scheduler_interval_value(value: object, *, path: tuple[str, ...]) -> bool:
+    if len(path) != 3 or path[1] != "Scheduler" or path[2] not in _SCHEDULER_INTERVAL_FIELDS:
+        return False
+    if type(value) is int:
+        return True
+    if not isinstance(value, str):
+        return False
+    lower, separator, upper = value.strip().partition("-")
+    return separator == "-" and lower.isascii() and lower.isdecimal() and upper.isascii() and upper.isdecimal()
 
 
 class CurrentConfigurationSchema:
@@ -166,6 +178,8 @@ class CurrentConfigurationSchema:
 
     @staticmethod
     def _validate_raw_type(value: object, default: object, *, path: tuple[str, ...]) -> None:
+        if _is_scheduler_interval_value(value, path=path):
+            return
         if default is None:
             if value is not None and not isinstance(value, str):
                 raise _error(path, "must be text or null")
@@ -175,16 +189,15 @@ class CurrentConfigurationSchema:
                 raise _error(path, "must be a finite number")
             return
         if isinstance(default, Mapping):
-            if not isinstance(value, Mapping):
-                raise _error(path, "must be an object")
-            if any(not isinstance(key, str) for key in value):
-                raise _error(path, "must use string field names")
+            _schema_mapping(value, path=path)
             return
         if type(value) is not type(default):
             raise _error(path, f"must be a {type(default).__name__}")
 
     @staticmethod
     def _validate_parsed_type(value: DeepValue, default: DeepValue, *, path: tuple[str, ...]) -> None:
+        if _is_scheduler_interval_value(value, path=path):
+            return
         if default is None:
             if value is not None and not isinstance(value, str):
                 raise _error(path, "must be text or null")
@@ -194,10 +207,7 @@ class CurrentConfigurationSchema:
                 raise _error(path, "must be a finite number")
             return
         if isinstance(default, Mapping):
-            if not isinstance(value, Mapping):
-                raise _error(path, "must be an object")
-            if any(not isinstance(key, str) for key in value):
-                raise _error(path, "must use string field names")
+            _schema_mapping(value, path=path)
             return
         if type(value) is not type(default):
             if isinstance(default, datetime):
