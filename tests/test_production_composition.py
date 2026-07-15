@@ -271,5 +271,13 @@ def test_system_loop_clock_wait_is_cancellation_aware() -> None:
         SystemLoopClock.sleep(30, abort)
 
 
-def test_default_process_host_can_be_constructed_without_opening_a_device() -> None:
-    assert isinstance(build_default_instance_process_host(Path()), InstanceProcessHost)
+def test_default_process_host_can_be_constructed_without_opening_a_device(tmp_path: Path) -> None:
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "template.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "content" / "events").mkdir(parents=True)
+    (tmp_path / "module").mkdir()
+
+    with build_default_instance_process_host(tmp_path) as host:
+        assert isinstance(host, InstanceProcessHost)
+
+    assert (tmp_path / ".alas-runtime" / "notification-spool.sqlite3").is_file()

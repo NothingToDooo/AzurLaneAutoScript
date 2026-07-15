@@ -3,6 +3,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Protocol, cast, override
 
 from module.adapters.mumu12 import CancellationAwareMumu12Device
+from module.base.failure import cleanup_scope
 from module.config.config import AzurLaneConfig, name_to_function
 from module.daily.daily import OCR_REMAIN, Daily
 from module.device.device import Device
@@ -241,7 +242,10 @@ class Mumu12HardWorkflow:
 
     def execute(self, settings: HardSettings, cancellation: CancellationSignal) -> HardReport:
         _activate(self._config, self._device, "Hard", _hard_overlay(settings), cancellation)
-        try:
+        with cleanup_scope(
+            self._hard_campaign.release,
+            message="hard campaign execution and runtime cleanup both failed",
+        ):
             cancellation.raise_if_requested()
             remaining = self._hard_campaign.remaining_attempts(settings, cancellation)
             if type(remaining) is not int or remaining < 0:
@@ -274,8 +278,6 @@ class Mumu12HardWorkflow:
             cancellation.raise_if_requested()
             self._hard_campaign.exit_ui(settings, cancellation)
             return HardReport(observed_at, 1, 1, HardStopReason.COMPLETED)
-        finally:
-            self._hard_campaign.release()
 
 
 class _ReportingExercise(Exercise):

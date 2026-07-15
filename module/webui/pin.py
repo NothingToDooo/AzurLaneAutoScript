@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 from pywebio.input import checkbox, select, textarea
 from pywebio.input import input as pywebio_input
 from pywebio.output import OutputPosition
+
+# PyWebIO 1.8.4 的公开 put_* 不接受自定义 HTML 属性；tests/test_webui_pin_contract.py 锁定了私有契约。
 from pywebio.pin import _pin_output, check_dom_name_value  # noqa: PLC2701
 
 if TYPE_CHECKING:

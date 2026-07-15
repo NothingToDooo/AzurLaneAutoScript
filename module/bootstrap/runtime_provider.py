@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 
 from module.bootstrap.configuration_compiler import CompiledConfiguration
 from module.bootstrap.task_factories import GameTaskDependencies, build_game_task_registry
@@ -8,12 +8,16 @@ from module.runtime import (
     ConfigurationChangeSignal,
     InstanceRuntime,
     InstanceRuntimeConfig,
+    OutboxDelivery,
+    OutboxFailureFact,
     OutboxPublisher,
     RuntimeConfigurationControl,
     RuntimeConfigurationSnapshot,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from module.supervisor import LoopClock
 
 
@@ -24,6 +28,25 @@ def _require_revision(value: str, *, field_name: str) -> None:
     if not value or value != value.strip():
         message = f"{field_name} must be trimmed and non-empty"
         raise ValueError(message)
+
+
+def _report_outbox_failure(failure: OutboxFailureFact) -> None:
+    """记录 outbox 投递失败事实。"""
+
+    logger.error(
+        "Outbox delivery failed "
+        f"message_id={failure.message_id!r} topic={failure.topic!r} "
+        f"error_type={failure.error_type!r} error_message={failure.error_message!r} "
+        f"attempt_count={failure.attempt_count} "
+        f"discarded={failure.is_discarded}"
+    )
+
+
+def _require_outbox_publisher(value: object) -> OutboxPublisher:
+    if isinstance(value, type) or not callable(getattr(value, "publish", None)):
+        message = "outbox_publisher_factory must return an OutboxPublisher"
+        raise TypeError(message)
+    return cast("OutboxPublisher", value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,14 +110,14 @@ def _runtime_configuration(configuration: CompiledConfiguration) -> RuntimeConfi
 class ProductionRuntimeProvider:
     """生产 runtime composition root；每个进程只构建一个实例级依赖图。"""
 
-    __slots__ = ("_clock", "_outbox_publisher", "_source")
+    __slots__ = ("_clock", "_outbox_publisher_factory", "_source")
 
     def __init__(
         self,
         source: InstanceAssemblySource,
         clock: LoopClock,
         *,
-        outbox_publisher: OutboxPublisher | None = None,
+        outbox_publisher_factory: Callable[[str], OutboxPublisher],
     ) -> None:
         if isinstance(source, type) or not all(
             callable(getattr(source, method, None)) for method in ("load", "load_configuration", "configuration_signal")
@@ -104,14 +127,12 @@ class ProductionRuntimeProvider:
         if isinstance(clock, type) or not all(callable(getattr(clock, method, None)) for method in ("now", "sleep")):
             message = "clock must implement now() and sleep()"
             raise TypeError(message)
-        if outbox_publisher is not None and (
-            isinstance(outbox_publisher, type) or not callable(getattr(outbox_publisher, "publish", None))
-        ):
-            message = "outbox_publisher must implement publish()"
+        if not callable(outbox_publisher_factory):
+            message = "outbox_publisher_factory must be callable"
             raise TypeError(message)
         self._source = source
         self._clock = clock
-        self._outbox_publisher = outbox_publisher
+        self._outbox_publisher_factory = outbox_publisher_factory
 
     def open(
         self,
@@ -139,11 +160,12 @@ class ProductionRuntimeProvider:
             error_reporter=logger.exception,
         )
         try:
+            outbox_publisher = _require_outbox_publisher(self._outbox_publisher_factory(instance_name))
             return InstanceRuntime(
                 assembly.runtime,
                 factories,
                 self._clock,
-                outbox_publisher=self._outbox_publisher,
+                outbox=OutboxDelivery(outbox_publisher, _report_outbox_failure),
                 configuration_control=control,
             )
         except BaseException:

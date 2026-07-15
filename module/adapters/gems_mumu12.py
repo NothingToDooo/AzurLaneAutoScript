@@ -1,11 +1,17 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 from module.adapters.campaign_live import CampaignActionInterrupted
 from module.application import SafeUnitCancellation
 from module.campaign.campaign_engine import CampaignEngine
-from module.campaign.gems_farming import GemsEmotion, GemsFleetReplacement
+from module.campaign.gems_farming import (
+    GemsEmotion,
+    GemsFleetReplacement,
+    GemsShipReplacementDisposition,
+    GemsShipReplacementFactSink,
+    GemsShipReplacementResult,
+)
 from module.combat.assets import BATTLE_PREPARATION
 from module.config.config import AzurLaneConfig
 from module.content.campaign_session import BattleInterruptionReason
@@ -34,13 +40,15 @@ class GemsFleetReplacementBridge(Protocol):
     config: AzurLaneConfig
     device: Device
     campaign: CampaignEngine
-    _new_fleet_emotion: int
 
-    def flagship_change(self) -> bool: ...
+    def flagship_change(self, fact_sink: GemsShipReplacementFactSink) -> GemsShipReplacementResult: ...
 
-    def vanguard_change(self) -> bool: ...
+    def vanguard_change(self, fact_sink: GemsShipReplacementFactSink) -> GemsShipReplacementResult: ...
 
-    def hard_fleet_prepare(self) -> bool: ...
+    def hard_fleet_prepare(
+        self,
+        fact_sink: GemsShipReplacementFactSink,
+    ) -> Iterator[GemsShipReplacementResult]: ...
 
 
 class GemsReplacementUnitSource(Protocol):
@@ -108,8 +116,8 @@ class Mumu12GemsRuntimeBehavior:
         cancellation.raise_if_requested()
         cancellation.commit()
         runner = self._runner_factory(runtime.config, runtime.device)
-        _BoundGemsFleetReplacement.bind(runner, runtime, self.policy, cancellation)
-        if runner.hard_fleet_prepare():
+        bound = _BoundGemsFleetReplacement.bind(runner, runtime, self.policy, cancellation)
+        if bound.prepare_hard_fleet(cancellation):
             return True
         raise GemsHardPreparationFailed(_HARD_PREPARATION_NO_REPLACEMENT)
 
@@ -142,6 +150,7 @@ class Mumu12GemsRuntimeBehavior:
 class _BoundGemsFleetReplacement:
     runner: GemsFleetReplacementBridge
     runtime: CampaignEngine
+    minimum_emotion: int
 
     @classmethod
     def bind(
@@ -160,30 +169,140 @@ class _BoundGemsFleetReplacement:
             EquipmentCode_Config=policy.equipment_code_config,
         )
         runner.campaign = runtime
-        runner._new_fleet_emotion = policy.emotion_after_replacement  # noqa: SLF001 - 固定桥接旧 primitive 状态。
-        return cls(runner, runtime)
+        return cls(runner, runtime, policy.emotion_after_replacement)
 
-    def replace_flagship(self, cancellation: CancellationSignal) -> bool:
-        cancellation.raise_if_requested()
-        result = self.runner.flagship_change()
-        if type(result) is not bool:
-            message = "gems fleet replacement flagship_change() must return bool"
+    @staticmethod
+    def _validated_result(
+        result: object,
+        *,
+        operation: str,
+    ) -> GemsShipReplacementResult:
+        if not isinstance(result, GemsShipReplacementResult):
+            message = f"gems fleet replacement {operation}() must return GemsShipReplacementResult"
             raise TypeError(message)
         return result
 
-    def replace_vanguard(self, cancellation: CancellationSignal) -> bool:
-        cancellation.raise_if_requested()
-        result = self.runner.vanguard_change()
-        if type(result) is not bool:
-            message = "gems fleet replacement vanguard_change() must return bool"
-            raise TypeError(message)
+    def _merge_result(
+        self,
+        result: object,
+        *,
+        operation: str,
+    ) -> GemsShipReplacementResult:
+        result = self._validated_result(result, operation=operation)
+        selected_emotion = result.selected_emotion
+        if selected_emotion is None:
+            self.minimum_emotion = 0
+        else:
+            self.minimum_emotion = min(self.minimum_emotion, selected_emotion)
         return result
 
-    def record_emotion(self, cancellation: CancellationSignal) -> None:
-        cancellation.raise_if_requested()
+    def _record_replacement_result(
+        self,
+        result: object,
+        *,
+        operation: str,
+    ) -> GemsShipReplacementResult:
+        merged = self._merge_result(result, operation=operation)
+        # UI 换舰已经生效；必须先记录事实，取消只能阻止下一次操作。
         self.runtime.config.set_record(
-            Emotion_Fleet1Value=self.runner._new_fleet_emotion,  # noqa: SLF001 - 固定桥接旧 primitive 状态。
+            Emotion_Fleet1Value=self.minimum_emotion,
         )
+        return merged
+
+    def _match_reported_fact(
+        self,
+        returned: object,
+        reported: GemsShipReplacementResult | None,
+        *,
+        operation: str,
+    ) -> GemsShipReplacementResult:
+        validated = self._validated_result(returned, operation=operation)
+        if reported is None:
+            # bridge 违约也不能让已经返回的真实换舰事实丢失。
+            self._record_replacement_result(validated, operation=operation)
+            message = f"gems fleet replacement {operation}() did not report its completion fact"
+            raise TypeError(message)
+        if reported != validated:
+            message = f"gems fleet replacement {operation}() returned a different completion fact"
+            raise ValueError(message)
+        return validated
+
+    def _replace_one(
+        self,
+        operation: Callable[[GemsShipReplacementFactSink], object],
+        *,
+        operation_name: str,
+        cancellation: CancellationSignal,
+    ) -> GemsShipReplacementResult:
+        cancellation.raise_if_requested()
+        pending_fact: GemsShipReplacementResult | None = None
+        callback_violation: TypeError | None = None
+
+        def persist_fact(result: GemsShipReplacementResult) -> None:
+            nonlocal callback_violation, pending_fact
+            if pending_fact is not None:
+                callback_violation = TypeError(
+                    f"gems fleet replacement {operation_name}() reported more than one completion fact"
+                )
+                raise callback_violation
+            pending_fact = self._record_replacement_result(result, operation=operation_name)
+
+        returned = operation(persist_fact)
+        if callback_violation is not None:
+            raise callback_violation
+        return self._match_reported_fact(returned, pending_fact, operation=operation_name)
+
+    def replace_flagship(self, cancellation: CancellationSignal) -> GemsShipReplacementResult:
+        return self._replace_one(
+            self.runner.flagship_change,
+            operation_name="flagship_change",
+            cancellation=cancellation,
+        )
+
+    def replace_vanguard(self, cancellation: CancellationSignal) -> GemsShipReplacementResult:
+        return self._replace_one(
+            self.runner.vanguard_change,
+            operation_name="vanguard_change",
+            cancellation=cancellation,
+        )
+
+    def prepare_hard_fleet(self, cancellation: CancellationSignal) -> bool:
+        cancellation.raise_if_requested()
+        self.runtime.emotion.update()
+        self.minimum_emotion = min(self.minimum_emotion, self.runtime.emotion.fleet_1.current)
+        pending_fact: GemsShipReplacementResult | None = None
+        callback_violation: TypeError | None = None
+
+        def persist_fact(result: GemsShipReplacementResult) -> None:
+            nonlocal callback_violation, pending_fact
+            if pending_fact is not None:
+                callback_violation = TypeError(
+                    "gems fleet replacement hard_fleet_prepare() reported multiple facts before one result"
+                )
+                raise callback_violation
+            pending_fact = self._record_replacement_result(result, operation="hard_fleet_prepare")
+
+        results = self.runner.hard_fleet_prepare(persist_fact)
+        if not isinstance(results, Iterator):
+            message = "gems fleet replacement hard_fleet_prepare() must return an iterator"
+            raise TypeError(message)
+        has_result = False
+        all_satisfied = True
+        for result in results:
+            has_result = True
+            if callback_violation is not None:
+                raise callback_violation
+            returned = self._match_reported_fact(result, pending_fact, operation="hard_fleet_prepare")
+            pending_fact = None
+            if returned.disposition is not GemsShipReplacementDisposition.POLICY_SATISFIED:
+                all_satisfied = False
+            cancellation.raise_if_requested()
+        if callback_violation is not None:
+            raise callback_violation
+        if pending_fact is not None:
+            message = "gems fleet replacement hard_fleet_prepare() reported a fact without yielding its result"
+            raise TypeError(message)
+        return has_result and all_satisfied
 
 
 def _default_runner_factory(config: AzurLaneConfig, device: Device) -> GemsFleetReplacementBridge:
@@ -244,20 +363,22 @@ class Mumu12GemsFleetReplacementExecutor:
         bound = _BoundGemsFleetReplacement.bind(runner, runtime, policy, unit_cancellation)
 
         if trigger is GemsFleetReplacementTrigger.HARD_PREPARATION:
-            if not runner.hard_fleet_prepare():
+            if not bound.prepare_hard_fleet(unit_cancellation):
                 return GemsFleetReplacementFailed("hard fleet preparation failed")
             runtime.config.LV32_TRIGGERED = False
             runtime.config.GEMS_EMOTION_TRIGGERED = False
             return GemsFleetReplacementCompleted()
 
-        if not bound.replace_flagship(unit_cancellation):
-            bound.record_emotion(unit_cancellation)
+        flagship_result = bound.replace_flagship(unit_cancellation)
+        if flagship_result.disposition is not GemsShipReplacementDisposition.POLICY_SATISFIED:
+            unit_cancellation.raise_if_requested()
             return GemsFleetReplacementFailed("flagship replacement failed")
-        if policy.changes_vanguard and not bound.replace_vanguard(unit_cancellation):
-            bound.record_emotion(unit_cancellation)
-            return GemsFleetReplacementFailed("vanguard replacement failed")
+        if policy.changes_vanguard:
+            vanguard_result = bound.replace_vanguard(unit_cancellation)
+            if vanguard_result.disposition is not GemsShipReplacementDisposition.POLICY_SATISFIED:
+                unit_cancellation.raise_if_requested()
+                return GemsFleetReplacementFailed("vanguard replacement failed")
 
-        bound.record_emotion(unit_cancellation)
         unit_cancellation.raise_if_requested()
         runtime.config.LV32_TRIGGERED = False
         runtime.config.GEMS_EMOTION_TRIGGERED = False

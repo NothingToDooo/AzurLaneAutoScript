@@ -4,7 +4,7 @@ import queue
 from datetime import UTC, datetime
 from multiprocessing.reduction import ForkingPickler
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, Self
 
 import pytest
 from rich.text import Text
@@ -19,6 +19,8 @@ from module.webui.process_manager import (
     RenderableQueueItem,
 )
 from module.webui.process_outcome import ProcessOutcome, ProcessOutcomeStatus
+
+_ProcessRequest = process_manager_module._ProcessRequest  # noqa: SLF001 - 验证私有 IPC 请求边界。
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -116,6 +118,10 @@ def _outcome(status: ProcessOutcomeStatus, *, command: str = "alas") -> ProcessO
     )
 
 
+def _request(command: str, *, config_name: str = "alas") -> _ProcessRequest:
+    return _ProcessRequest(config_name, command)
+
+
 def _make_run(
     process: _ProcessLike,
     *,
@@ -162,8 +168,7 @@ def _run_process(
     outcome_queue: queue.Queue[ProcessOutcome] = queue.Queue()
     _patch_process_boundary(monkeypatch, calls)
     ProcessManager.run_process(
-        "alas",
-        func,
+        _request(func),
         renderable_queue,
         outcome_queue,
         stop_event,
@@ -188,6 +193,12 @@ def _install_host(
     error: BaseException | None = None,
 ) -> None:
     class _Host:
+        def __enter__(self) -> Self:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+
         @staticmethod
         def execute(
             instance_name: str,
@@ -214,6 +225,14 @@ def test_process_outcome_is_serializable_and_json_ready() -> None:
     assert hash(outcome)
 
 
+def test_process_request_is_forking_picklable() -> None:
+    request = _request("Benchmark")
+
+    restored = ForkingPickler.loads(ForkingPickler.dumps(request))
+
+    assert restored == request
+
+
 def test_run_process_runs_alas_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[object, ...]] = []
     _patch_process_boundary(monkeypatch, calls)
@@ -221,7 +240,11 @@ def test_run_process_runs_alas_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     renderable_queue: queue.Queue[RenderableQueueItem] = queue.Queue()
     outcome_queue: queue.Queue[ProcessOutcome] = queue.Queue()
 
-    ProcessManager.run_process("alas", "alas", renderable_queue, outcome_queue)
+    ProcessManager.run_process(
+        _request("alas"),
+        renderable_queue,
+        outcome_queue,
+    )
 
     assert outcome_queue.get_nowait().status is ProcessOutcomeStatus.FINISHED
     assert renderable_queue.get_nowait() is None
@@ -329,11 +352,43 @@ def test_run_process_queues_outcome_before_reraising_system_exit(monkeypatch: py
     outcome_queue: queue.Queue[ProcessOutcome] = queue.Queue()
 
     with pytest.raises(SystemExit, match="7"):
-        ProcessManager.run_process("alas", "alas", renderable_queue, outcome_queue)
+        ProcessManager.run_process(
+            _request("alas"),
+            renderable_queue,
+            outcome_queue,
+        )
 
     outcome = outcome_queue.get_nowait()
     assert outcome.status is ProcessOutcomeStatus.FAILED
     assert outcome.exception_type == "SystemExit"
+    assert renderable_queue.get_nowait() is None
+
+
+def test_run_process_reports_base_exception_group_before_reraising(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[object, ...]] = []
+    error = BaseExceptionGroup(
+        "exit and cleanup both failed",
+        (SystemExit(7), OSError("cleanup failed")),
+    )
+    _patch_process_boundary(monkeypatch, calls)
+    _install_host(monkeypatch, calls, error=error)
+    renderable_queue: queue.Queue[RenderableQueueItem] = queue.Queue()
+    outcome_queue: queue.Queue[ProcessOutcome] = queue.Queue()
+
+    with pytest.raises(BaseExceptionGroup) as raised:
+        ProcessManager.run_process(
+            _request("alas"),
+            renderable_queue,
+            outcome_queue,
+        )
+
+    assert raised.value is error
+    outcome = outcome_queue.get_nowait()
+    assert outcome.status is ProcessOutcomeStatus.FAILED
+    assert outcome.exception_type == "BaseExceptionGroup"
+    assert outcome.message == "exit and cleanup both failed (2 sub-exceptions)"
     assert renderable_queue.get_nowait() is None
 
 
@@ -355,6 +410,7 @@ def test_process_manager_source_has_no_direct_task_allowlist() -> None:
 
 def test_start_uses_fresh_queues_for_each_run(monkeypatch: pytest.MonkeyPatch) -> None:
     created_events: list[_StopEvent] = []
+    process_targets: list[Callable[..., None]] = []
     process_args: list[tuple[object, ...]] = []
     monitor_runs: list[object] = []
     warnings: list[str] = []
@@ -374,7 +430,7 @@ def test_start_uses_fresh_queues_for_each_run(monkeypatch: pytest.MonkeyPatch) -
         exitcode = 0
 
         def __init__(self, target: Callable[..., None], args: tuple[object, ...]) -> None:
-            del target
+            process_targets.append(target)
             process_args.append(args)
 
         @staticmethod
@@ -408,13 +464,14 @@ def test_start_uses_fresh_queues_for_each_run(monkeypatch: pytest.MonkeyPatch) -
     manager.start("Benchmark")
 
     assert len(process_args) == 2
-    assert process_args[0][0:2] == ("alas", "alas")
-    assert process_args[1][0:2] == ("alas", "Benchmark")
+    assert process_targets == [ProcessManager.run_process, ProcessManager.run_process]
+    assert process_args[0][0] == _request("alas")
+    assert process_args[1][0] == _request("Benchmark")
+    assert process_args[0][1] is not process_args[1][1]
     assert process_args[0][2] is not process_args[1][2]
-    assert process_args[0][3] is not process_args[1][3]
     assert len(created_events) == 4
-    assert process_args[0][4:6] == (created_events[0], created_events[1])
-    assert process_args[1][4:6] == (created_events[2], created_events[3])
+    assert process_args[0][3:5] == (created_events[0], created_events[1])
+    assert process_args[1][3:5] == (created_events[2], created_events[3])
     assert len(monitor_runs) == 2
     assert draining_monitor.join_calls == [process_manager_module.MONITOR_JOIN_SECONDS] * 2
     assert warnings == ["Process monitor is still draining its queue"] * 2

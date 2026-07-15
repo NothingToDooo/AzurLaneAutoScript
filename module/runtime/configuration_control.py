@@ -44,6 +44,19 @@ class RuntimeConfigurationSnapshot:
             raise ValueError(message)
 
 
+def _require_runtime_configuration_snapshot(
+    value: object,
+    *,
+    field_name: str,
+) -> RuntimeConfigurationSnapshot:
+    """在动态 composition 边界验证值，同时保留公开签名的精确类型。"""
+
+    if not isinstance(value, RuntimeConfigurationSnapshot):
+        message = f"{field_name} must be a RuntimeConfigurationSnapshot"
+        raise TypeError(message)
+    return value
+
+
 class RuntimeConfigurationSource(Protocol):
     def load(self) -> RuntimeConfigurationSnapshot: ...
 
@@ -92,9 +105,7 @@ class RuntimeConfigurationControl:
         if isinstance(signal, type) or not all(callable(getattr(signal, method, None)) for method in ("wait", "clear")):
             message = "signal must implement wait() and clear()"
             raise TypeError(message)
-        if not isinstance(initial, RuntimeConfigurationSnapshot):
-            message = "initial must be a RuntimeConfigurationSnapshot"
-            raise TypeError(message)
+        initial = _require_runtime_configuration_snapshot(initial, field_name="initial")
         if not callable(error_reporter):
             message = "error_reporter must be callable"
             raise TypeError(message)
@@ -102,7 +113,15 @@ class RuntimeConfigurationControl:
         store = SQLiteStateStore(state_path)
         self._store = store
         try:
-            self._initialize(factories, clock, source, signal, initial, error_reporter)
+            self._publisher = ConfigurationPublisher(store=store, factories=factories, clock=clock)
+            self._source = source
+            self._signal = signal
+            self._assembly_revision = initial.assembly_revision
+            self._device_serial = initial.device_serial
+            self._error_reporter = error_reporter
+            self._last_error: Exception | None = None
+            self._closed = False
+            self._synchronize(initial)
         except BaseException:
             store.close()
             raise
@@ -131,30 +150,11 @@ class RuntimeConfigurationControl:
         self._last_error = None
         return changed
 
-    def _initialize(  # noqa: PLR0913, PLR0917
-        self,
-        factories: TaskFactoryRegistry,
-        clock: ConfigurationClock,
-        source: RuntimeConfigurationSource,
-        signal: ConfigurationChangeSignal,
-        initial: RuntimeConfigurationSnapshot,
-        error_reporter: Callable[[Exception], object],
-    ) -> None:
-        self._publisher = ConfigurationPublisher(store=self._store, factories=factories, clock=clock)
-        self._source = source
-        self._signal = signal
-        self._assembly_revision = initial.assembly_revision
-        self._device_serial = initial.device_serial
-        self._error_reporter = error_reporter
-        self._last_error: Exception | None = None
-        self._closed = False
-        self._synchronize(initial)
-
     def _load_candidate(self) -> RuntimeConfigurationSnapshot:
-        candidate = self._source.load()
-        if not isinstance(candidate, RuntimeConfigurationSnapshot):
-            message = "RuntimeConfigurationSource.load() must return a RuntimeConfigurationSnapshot"
-            raise TypeError(message)
+        candidate = _require_runtime_configuration_snapshot(
+            self._source.load(),
+            field_name="RuntimeConfigurationSource.load() result",
+        )
         if candidate.device_serial != self._device_serial:
             message = "runtime configuration changed the immutable device serial; restart the instance"
             raise ValueError(message)
@@ -194,7 +194,6 @@ class RuntimeConfigurationControl:
                     self._publisher.publish_update(
                         candidate.payload,
                         candidate.schedules,
-                        current_source.source_schedules,
                         source_revision=candidate.source_revision,
                         expected_revision=expected_revision,
                     )

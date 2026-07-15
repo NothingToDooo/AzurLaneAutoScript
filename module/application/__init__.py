@@ -24,6 +24,7 @@ from module.application.effects import (
 )
 from module.application.identifiers import RunId, TaskId
 from module.application.metadata import RunMetadata
+from module.application.notifications import OperatorNotificationKind, OperatorNotificationRequest
 from module.application.outcomes import Blocked, Cancelled, Deferred, Faulted, Retryable, RunOutcome, Succeeded
 from module.application.run_start import RunStart
 from module.application.scheduler import (
@@ -51,6 +52,8 @@ __all__ = [
     "ExecutionMode",
     "ExternalRequestSignal",
     "Faulted",
+    "OperatorNotificationKind",
+    "OperatorNotificationRequest",
     "PreemptionRequest",
     "RequestAppRestart",
     "RescheduleSelf",

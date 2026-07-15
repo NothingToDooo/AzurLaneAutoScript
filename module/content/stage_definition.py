@@ -4,18 +4,7 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from module.content.battle_policy import (
-    AllConditions,
-    AnyCondition,
-    BattlePolicy,
-    CellAccessibleCondition,
-    ClearBoss,
-    ClearChosenEnemy,
-    ClearSelectedEnemy,
-    GuardedBattleStep,
-    NotCondition,
-    StagePolicy,
-)
+from module.content.battle_policy import BattlePolicy, StagePolicy
 from module.content.battle_program import BattleProgram, BossApproachPlan
 from module.content.cell import CellId
 from module.content.errors import ContentValidationError
@@ -312,7 +301,14 @@ class CampaignStageDefinition:
             message = "runtime_profile must be a CampaignRuntimeProfile"
             raise TypeError(message)
 
-    def _validated_policies(self) -> dict[int, StagePolicy]:  # noqa: C901 - 封闭策略约束需整体校验。
+    def _validated_policies(self) -> dict[int, StagePolicy]:
+        policies = self._normalized_policies()
+        self._validate_policy_battle_references(policies)
+        self._validate_policy_boss_constraints(policies)
+        self._validate_policy_cell_references(policies)
+        return policies
+
+    def _normalized_policies(self) -> dict[int, StagePolicy]:
         policies = {
             battle: policy.to_stage_policy() if isinstance(policy, BattlePolicy) else policy
             for battle, policy in self.battle_policies.items()
@@ -323,63 +319,30 @@ class CampaignStageDefinition:
         if any(not isinstance(policy, StagePolicy) for policy in policies.values()):
             message = "battle_policies must contain StagePolicy values"
             raise TypeError(message)
+        return policies
+
+    def _validate_policy_battle_references(self, policies: dict[int, StagePolicy]) -> None:
         if not set(policies) <= self.map.battles:
             message = "battle policies must reference declared spawn battles"
             raise ContentValidationError(message)
         if not self.map.boss_battles <= set(policies):
             message = "boss spawn battles require an explicit stage policy"
             raise ContentValidationError(message)
+
+    def _validate_policy_boss_constraints(self, policies: dict[int, StagePolicy]) -> None:
         for battle in self.map.boss_battles:
-            last_step = policies[battle].steps[-1]
-            if isinstance(last_step, GuardedBattleStep):
-                last_step = last_step.step
-            if not isinstance(last_step, ClearBoss):
+            if not policies[battle].clears_boss:
                 message = f"boss battle {battle} policy must end with ClearBoss"
                 raise ContentValidationError(message)
         non_boss_policies = set(policies) - self.map.boss_battles
-        if any(
-            any(
-                isinstance(step.step if isinstance(step, GuardedBattleStep) else step, ClearBoss)
-                for step in policies[battle].steps
-            )
-            for battle in non_boss_policies
-        ):
+        if any(policies[battle].clears_boss for battle in non_boss_policies):
             message = "ClearBoss steps may only appear on boss spawn battles"
             raise ContentValidationError(message)
-        referenced_cells = {
-            cell
-            for policy in policies.values()
-            for raw_step in policy.steps
-            for step in (raw_step.step if isinstance(raw_step, GuardedBattleStep) else raw_step,)
-            for cell in (
-                (step.target,)
-                if isinstance(step, ClearChosenEnemy)
-                else step.candidates
-                if isinstance(step, ClearSelectedEnemy)
-                else ()
-            )
-        }
 
-        def condition_cells(condition: object) -> set[CellId]:
-            if isinstance(condition, CellAccessibleCondition):
-                return {condition.cell}
-            if isinstance(condition, AllConditions | AnyCondition):
-                return {cell for nested in condition.conditions for cell in condition_cells(nested)}
-            if isinstance(condition, NotCondition):
-                return condition_cells(condition.condition)
-            return set()
-
-        referenced_cells.update(
-            cell
-            for policy in policies.values()
-            for raw_step in policy.steps
-            if isinstance(raw_step, GuardedBattleStep)
-            for cell in condition_cells(raw_step.condition)
-        )
-        if any(not self.map.shape.contains(cell) for cell in referenced_cells):
+    def _validate_policy_cell_references(self, policies: dict[int, StagePolicy]) -> None:
+        if any(not self.map.shape.contains(cell) for policy in policies.values() for cell in policy.referenced_cells):
             message = "battle policies reference a cell outside the map shape"
             raise ContentValidationError(message)
-        return policies
 
     def _validate_mechanics(self) -> None:
         if not isinstance(self.mechanics, StageMechanicRules):

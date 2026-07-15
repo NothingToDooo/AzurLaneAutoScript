@@ -16,6 +16,7 @@ from module.bootstrap import (
     JsonConfigurationDocumentSource,
     validate_instance_name,
 )
+from module.notify import DisabledNotificationConfig
 from module.supervisor import DeviceLeaseRegistry
 
 if TYPE_CHECKING:
@@ -156,6 +157,7 @@ def test_filesystem_assembly_compiles_once_and_owns_instance_state_paths(tmp_pat
     assert assembly.runtime.lease_lock_root == lease_root
     assert assembly.runtime.lease_owner == "港区一号:pid-1234"
     assert assembly.runtime.device_serial == assembly.configuration.device_serial
+    assert assembly.configuration.notification == DisabledNotificationConfig()
     assert state_root.is_dir()
     assert lease_root.is_dir()
 

@@ -2,11 +2,17 @@ import argparse
 import signal
 import sys
 import threading
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from module.bootstrap import InstanceProcessExitKind, build_default_instance_process_host
+from module.bootstrap import (
+    InstanceProcessExitKind,
+    build_default_instance_process_host,
+    build_default_notification_maintenance,
+)
 from module.logger import logger
+from module.notify import NotificationSpoolPump
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -54,8 +60,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         previous[item] = signal.getsignal(item)
         signal.signal(item, stop.request)
     try:
-        host = build_default_instance_process_host(args.project_root)
-        exit_ = host.execute(args.instance, args.command, stop_signal=stop)
+        maintenance_factory = partial(build_default_notification_maintenance, args.project_root)
+        notification_pump = NotificationSpoolPump(
+            maintenance_factory,
+            instance_name=args.instance,
+        )
+        notification_pump.start()
+        try:
+            with build_default_instance_process_host(args.project_root) as host:
+                exit_ = host.execute(args.instance, args.command, stop_signal=stop)
+        finally:
+            if notification_pump.stop():
+                notification_pump.run_once()
     finally:
         for item, handler in previous.items():
             signal.signal(

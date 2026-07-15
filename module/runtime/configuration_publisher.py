@@ -3,7 +3,13 @@ from typing import TYPE_CHECKING, Protocol
 from module.runtime.errors import ConfigurationDocumentError
 from module.runtime.factories import TaskFactoryRegistry
 from module.runtime.settings import TaskSettingsDocument
-from module.state import JsonValue, ScheduleMutation, SettingsSnapshot
+from module.state import (
+    ConfigurationPublication,
+    ConfigurationUpdate,
+    JsonValue,
+    ScheduleMutation,
+    SettingsSnapshot,
+)
 from module.task_registry import LaunchSurface
 
 if TYPE_CHECKING:
@@ -17,24 +23,10 @@ class ConfigurationClock(Protocol):
 class ConfigurationWriteStore(Protocol):
     def publish_configuration(
         self,
-        payload: JsonValue,
-        schedules: tuple[ScheduleMutation, ...],
-        *,
-        source_revision: str,
-        expected_revision: int,
-        updated_at: datetime,
+        command: ConfigurationPublication,
     ) -> SettingsSnapshot: ...
 
-    def publish_configuration_update(  # noqa: PLR0913
-        self,
-        payload: JsonValue,
-        schedules: tuple[ScheduleMutation, ...],
-        previous_source_schedules: tuple[ScheduleMutation, ...],
-        *,
-        source_revision: str,
-        expected_revision: int,
-        updated_at: datetime,
-    ) -> SettingsSnapshot: ...
+    def publish_configuration_update(self, command: ConfigurationUpdate) -> SettingsSnapshot: ...
 
 
 class ConfigurationPublisher:
@@ -95,17 +87,19 @@ class ConfigurationPublisher:
         self._factories.validate_settings(document, task_ids=runnable_task_ids)
 
         published = self._store.publish_configuration(
-            payload,
-            schedules,
-            source_revision=source_revision,
-            expected_revision=expected_revision,
-            updated_at=updated_at,
+            ConfigurationPublication(
+                payload=payload,
+                schedules=schedules,
+                source_revision=source_revision,
+                expected_revision=expected_revision,
+                updated_at=updated_at,
+            )
         )
         if not isinstance(published, SettingsSnapshot):
             message = "ConfigurationWriteStore.publish_configuration() must return a SettingsSnapshot"
             raise TypeError(message)
-        if published.revision != candidate.revision:
-            message = "configuration store returned an unexpected revision"
+        if published != candidate:
+            message = "configuration store returned an unexpected settings snapshot"
             raise RuntimeError(message)
         return published
 
@@ -113,7 +107,6 @@ class ConfigurationPublisher:
         self,
         payload: JsonValue,
         schedules: tuple[ScheduleMutation, ...],
-        previous_source_schedules: tuple[ScheduleMutation, ...],
         *,
         source_revision: str,
         expected_revision: int,
@@ -121,14 +114,6 @@ class ConfigurationPublisher:
         """完整验证新配置，再以 source 差量合并 schedule 并 CAS 发布。"""
 
         self._validate_publication_request(source_revision, expected_revision)
-        if not isinstance(previous_source_schedules, tuple) or any(
-            not isinstance(mutation, ScheduleMutation) for mutation in previous_source_schedules
-        ):
-            message = "previous_source_schedules must contain only ScheduleMutation values"
-            raise TypeError(message)
-        if len({mutation.task_id for mutation in previous_source_schedules}) != len(previous_source_schedules):
-            message = "previous_source_schedules must not contain duplicate task ids"
-            raise ValueError(message)
         self._validate_schedules(schedules)
 
         updated_at = self._clock.now()
@@ -150,18 +135,21 @@ class ConfigurationPublisher:
         self._factories.validate_settings(document, task_ids=runnable_task_ids)
 
         published = self._store.publish_configuration_update(
-            payload,
-            schedules,
-            previous_source_schedules,
-            source_revision=source_revision,
-            expected_revision=expected_revision,
-            updated_at=updated_at,
+            ConfigurationUpdate(
+                publication=ConfigurationPublication(
+                    payload=payload,
+                    schedules=schedules,
+                    source_revision=source_revision,
+                    expected_revision=expected_revision,
+                    updated_at=updated_at,
+                ),
+            )
         )
         if not isinstance(published, SettingsSnapshot):
             message = "ConfigurationWriteStore.publish_configuration_update() must return a SettingsSnapshot"
             raise TypeError(message)
-        if published.revision != candidate.revision:
-            message = "configuration store returned an unexpected revision"
+        if published != candidate:
+            message = "configuration store returned an unexpected settings snapshot"
             raise RuntimeError(message)
         return published
 

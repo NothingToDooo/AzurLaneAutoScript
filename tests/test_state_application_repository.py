@@ -12,6 +12,8 @@ from module.application import (
     DisableTask,
     ExecutionMode,
     Faulted,
+    OperatorNotificationKind,
+    OperatorNotificationRequest,
     RequestAppRestart,
     RescheduleSelf,
     RescheduleTask,
@@ -169,12 +171,13 @@ def test_finalize_run_maps_every_outcome_and_emits_finished_fact(
         assert events[0].occurred_at == _FINISHED_AT
 
         outbox = store.list_outbox()
-        assert len(outbox) == 1
-        assert outbox[0].message_id == "run-outcome:run.finished"
-        assert outbox[0].topic == "run.finished"
-        assert outbox[0].key == "daily"
-        assert outbox[0].payload == expected_finished_payload
-        assert outbox[0].created_at == _FINISHED_AT
+        expected_outbox_count = 2 if isinstance(outcome, Faulted) else 1
+        assert len(outbox) == expected_outbox_count
+        finished_message = next(message for message in outbox if message.topic == "run.finished")
+        assert finished_message.message_id == "run-outcome:run.finished"
+        assert finished_message.key == "daily"
+        assert finished_message.payload == expected_finished_payload
+        assert finished_message.created_at == _FINISHED_AT
         assert clock.calls == 2
 
 
@@ -190,6 +193,63 @@ def test_fault_without_message_still_persists_non_empty_error(tmp_path: Path) ->
         assert persisted is not None
         assert persisted.error == "RuntimeError"
         assert persisted.result_payload == {"error_type": "RuntimeError", "message": ""}
+
+
+def test_fault_atomically_enqueues_the_original_error_message(tmp_path: Path) -> None:
+    clock = _FixedClock(_STARTED_AT, _FINISHED_AT)
+    with SQLiteStateStore(tmp_path / "instance.sqlite3") as store:
+        repository = SQLiteRunRepository(store, {}, clock, lambda: RunId("run-fault-notify"))
+        run_id = repository.begin_run(TaskId("daily"), ExecutionMode.SCHEDULED_JOB, _metadata()).run_id
+
+        repository.finalize_run(run_id, TaskResult(outcome=Faulted(RuntimeError("credential=secret"))))
+
+        notification = next(
+            message for message in store.list_outbox() if message.topic == "operator.notification.requested"
+        )
+        assert notification.message_id == "run-fault-notify:operator.notification.requested:run_faulted"
+        assert notification.key == "daily"
+        assert notification.payload == {
+            "schema_version": 2,
+            "kind": "run_faulted",
+            "run_id": "run-fault-notify",
+            "task_id": "daily",
+            "error_type": "RuntimeError",
+            "message": "credential=secret",
+        }
+
+
+def test_task_notification_is_persisted_with_the_run_finalization(tmp_path: Path) -> None:
+    clock = _FixedClock(_STARTED_AT, _FINISHED_AT)
+    with SQLiteStateStore(tmp_path / "instance.sqlite3") as store:
+        repository = SQLiteRunRepository(store, {}, clock, lambda: RunId("run-campaign-notify"))
+        run_id = repository.begin_run(TaskId("main"), ExecutionMode.SCHEDULED_JOB, _metadata()).run_id
+
+        repository.finalize_run(
+            run_id,
+            TaskResult(
+                outcome=Succeeded(),
+                notifications=(
+                    OperatorNotificationRequest(
+                        OperatorNotificationKind.CAMPAIGN_RUN_COUNT_LIMIT,
+                        resource="campaign_main/12-4",
+                    ),
+                ),
+            ),
+        )
+
+        notification = next(
+            message for message in store.list_outbox() if message.topic == "operator.notification.requested"
+        )
+        assert notification.message_id == (
+            "run-campaign-notify:operator.notification.requested:campaign_run_count_limit"
+        )
+        assert notification.payload == {
+            "schema_version": 1,
+            "kind": "campaign_run_count_limit",
+            "run_id": "run-campaign-notify",
+            "task_id": "main",
+            "resource": "campaign_main/12-4",
+        }
 
 
 def test_finalize_translates_schedule_effects_and_restart_outbox(tmp_path: Path) -> None:
@@ -275,7 +335,7 @@ def test_finalize_translates_schedule_effects_and_restart_outbox(tmp_path: Path)
         assert all(record.updated_at == _FINISHED_AT for record in store.list_schedules())
 
         outbox = store.list_outbox()
-        assert tuple(message.topic for message in outbox) == ("app.restart.requested", "run.finished")
+        assert tuple(message.topic for message in outbox) == ("run.finished", "app.restart.requested")
         restart = next(message for message in outbox if message.topic == "app.restart.requested")
         assert restart.message_id == "run-effects:app.restart.requested"
         assert restart.payload == {"run_id": "run-effects", "reason": "recover emulator"}
@@ -416,7 +476,10 @@ def test_recover_interrupted_runs_finalizes_every_running_run_with_audit_facts(t
             "run.finished",
             "run.finished",
         )
-        assert tuple(message.key for message in store.list_outbox()) == ("main", "daily")
+        outbox = store.list_outbox()
+        assert tuple(message.topic for message in outbox).count("run.finished") == 2
+        assert tuple(message.topic for message in outbox).count("operator.notification.requested") == 2
+        assert {message.key for message in outbox} == {"main", "daily"}
 
 
 def test_recover_interrupted_runs_rejects_an_empty_reason(tmp_path: Path) -> None:

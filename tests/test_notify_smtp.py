@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import ANY, MagicMock, call
 
 import module.notify.notify as notify_module
-from module.notify import handle_notify
+from module.notify import NotificationConfigError, handle_notify
 
 if TYPE_CHECKING:
     import pytest
@@ -82,7 +82,7 @@ password: secret-value
         call("smtp.example.com", 0, timeout=notify_module.SMTP_TIMEOUT_SECONDS),
     ]
     smtp_ssl.assert_not_called()
-    client.starttls.assert_not_called()
+    assert client.starttls.call_count == 2
 
 
 def test_omitted_port_with_ssl_uses_ssl_default_sentinel(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -166,7 +166,7 @@ port: 587
     client.send_message.assert_not_called()
 
 
-def test_nonstandard_port_with_ssl_false_uses_plain_smtp(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_nonstandard_port_with_ssl_false_upgrades_to_tls_before_login(monkeypatch: pytest.MonkeyPatch) -> None:
     context, client = _smtp_context()
     smtp = MagicMock(return_value=context)
     smtp_ssl = MagicMock()
@@ -192,8 +192,8 @@ to:
     assert sent
     smtp.assert_called_once_with("smtp.example.com", 2525, timeout=notify_module.SMTP_TIMEOUT_SECONDS)
     smtp_ssl.assert_not_called()
-    client.starttls.assert_not_called()
-    assert [method_call[0] for method_call in client.method_calls] == ["login", "send_message"]
+    assert [method_call[0] for method_call in client.method_calls] == ["starttls", "login", "send_message"]
+    client.starttls.assert_called_once_with(context=ANY)
     message = client.send_message.call_args.args[0]
     assert message["To"] == "first@example.com, second@example.com"
 
@@ -280,12 +280,12 @@ starttls: true
 
 
 def test_explicit_ssl_and_starttls_are_rejected_without_connecting(monkeypatch: pytest.MonkeyPatch) -> None:
-    errors: list[str] = []
+    errors: list[Exception] = []
     smtp = MagicMock()
     smtp_ssl = MagicMock()
     monkeypatch.setattr(notify_module.smtplib, "SMTP", smtp)
     monkeypatch.setattr(notify_module.smtplib, "SMTP_SSL", smtp_ssl)
-    monkeypatch.setattr(notify_module.logger, "error", errors.append)
+    monkeypatch.setattr(notify_module.logger, "exception", errors.append)
 
     sent = handle_notify(
         """
@@ -304,16 +304,44 @@ starttls: true
     assert not sent
     smtp.assert_not_called()
     smtp_ssl.assert_not_called()
-    assert errors == ["Failed to load SMTP notify config (_EmailConfigError), skip sending"]
+    assert len(errors) == 1
+    assert isinstance(errors[0], NotificationConfigError)
+    assert str(errors[0]) == "SMTP ssl and starttls cannot both be true"
 
 
-def test_smtp_failure_does_not_log_password_or_raise(monkeypatch: pytest.MonkeyPatch) -> None:
-    credential = "password-must-not-leak"
+def test_explicitly_disabling_starttls_is_rejected_before_connecting(monkeypatch: pytest.MonkeyPatch) -> None:
+    smtp = MagicMock()
+    smtp_ssl = MagicMock()
+    monkeypatch.setattr(notify_module.smtplib, "SMTP", smtp)
+    monkeypatch.setattr(notify_module.smtplib, "SMTP_SSL", smtp_ssl)
+
+    sent = handle_notify(
+        """
+provider: smtp
+host: smtp.example.com
+user: sender@example.com
+password: secret-value
+port: 2525
+ssl: false
+starttls: false
+""",
+        title="Ignored",
+        content="Ignored",
+    )
+
+    assert not sent
+    smtp.assert_not_called()
+    smtp_ssl.assert_not_called()
+
+
+def test_smtp_failure_logs_the_original_exception_and_returns_false(monkeypatch: pytest.MonkeyPatch) -> None:
+    credential = "smtp authentication failed for local account"
+    failure = RuntimeError(credential)
     context, client = _smtp_context()
-    client.login.side_effect = RuntimeError(credential)
-    errors: list[str] = []
+    client.login.side_effect = failure
+    errors: list[Exception] = []
     monkeypatch.setattr(notify_module.smtplib, "SMTP_SSL", MagicMock(return_value=context))
-    monkeypatch.setattr(notify_module.logger, "error", errors.append)
+    monkeypatch.setattr(notify_module.logger, "exception", errors.append)
 
     sent = handle_notify(
         f"""
@@ -328,18 +356,18 @@ port: 465
     )
 
     assert not sent
-    assert errors == ["SMTP notify failed (RuntimeError)"]
-    assert credential not in "".join(errors)
+    assert errors == [failure]
+    assert str(errors[0]) == credential
 
 
-def test_invalid_yaml_does_not_log_password_or_connect(monkeypatch: pytest.MonkeyPatch) -> None:
-    credential = "yaml-password-must-not-leak"
-    errors: list[str] = []
+def test_invalid_yaml_logs_the_detailed_config_error_without_connecting(monkeypatch: pytest.MonkeyPatch) -> None:
+    credential = "local-smtp-password"
+    errors: list[Exception] = []
     smtp = MagicMock()
     smtp_ssl = MagicMock()
     monkeypatch.setattr(notify_module.smtplib, "SMTP", smtp)
     monkeypatch.setattr(notify_module.smtplib, "SMTP_SSL", smtp_ssl)
-    monkeypatch.setattr(notify_module.logger, "error", errors.append)
+    monkeypatch.setattr(notify_module.logger, "exception", errors.append)
 
     sent = handle_notify(
         f"""
@@ -355,21 +383,25 @@ receiver: [
     smtp.assert_not_called()
     smtp_ssl.assert_not_called()
     assert len(errors) == 1
-    assert credential not in errors[0]
+    assert isinstance(errors[0], NotificationConfigError)
+    assert "SMTP config must be valid YAML:" in str(errors[0])
+    assert errors[0].__cause__ is not None
 
 
 def test_non_smtp_provider_is_rejected_without_connecting(monkeypatch: pytest.MonkeyPatch) -> None:
-    errors: list[str] = []
+    errors: list[Exception] = []
     smtp = MagicMock()
     smtp_ssl = MagicMock()
     monkeypatch.setattr(notify_module.smtplib, "SMTP", smtp)
     monkeypatch.setattr(notify_module.smtplib, "SMTP_SSL", smtp_ssl)
-    monkeypatch.setattr(notify_module.logger, "error", errors.append)
+    monkeypatch.setattr(notify_module.logger, "exception", errors.append)
 
     assert not handle_notify("provider: discord", title="Ignored", content="Ignored")
     smtp.assert_not_called()
     smtp_ssl.assert_not_called()
-    assert errors == ["Failed to load SMTP notify config (_EmailConfigError), skip sending"]
+    assert len(errors) == 1
+    assert isinstance(errors[0], NotificationConfigError)
+    assert str(errors[0]) == "only the SMTP notification provider is supported"
 
 
 def test_null_provider_keeps_notification_disabled(monkeypatch: pytest.MonkeyPatch) -> None:

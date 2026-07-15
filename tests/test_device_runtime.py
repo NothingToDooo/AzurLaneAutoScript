@@ -25,7 +25,7 @@ from module.exception import EmulatorNotRunningError
 from module.map.map_grids import SelectedGrids
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
 
     from adbutils import AdbConnection
 
@@ -187,9 +187,16 @@ class _DeviceSessionDouble:
 
 
 class _MumuRuntimeDouble:
-    def __init__(self, session: _DeviceSessionDouble, calls: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        session: _DeviceSessionDouble,
+        calls: list[str] | None = None,
+        *,
+        invalidate_error: BaseException | None = None,
+    ) -> None:
         self.session = session
         self._calls = [] if calls is None else calls
+        self._invalidate_error = invalidate_error
         self._emulator_manager = EmulatorManagerBase()
         self._emulator_instance: EmulatorInstanceBase | None = None
         self._lifecycle_result = True
@@ -237,12 +244,21 @@ class _MumuRuntimeDouble:
 
     def invalidate_serial(self) -> None:
         self._calls.append("mumu")
+        if self._invalidate_error is not None:
+            raise self._invalidate_error
 
 
 class _CaptureServiceDouble:
-    def __init__(self, mumu_runtime: _MumuRuntimeDouble, calls: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        mumu_runtime: _MumuRuntimeDouble,
+        calls: list[str] | None = None,
+        *,
+        release_error: BaseException | None = None,
+    ) -> None:
         self.mumu_runtime = mumu_runtime
         self._calls = [] if calls is None else calls
+        self._release_error = release_error
         self._image = np.zeros((1, 1, 3), dtype=np.uint8)
 
     def screenshot(self) -> ImageArray:
@@ -250,6 +266,8 @@ class _CaptureServiceDouble:
 
     def release(self) -> None:
         self._calls.append("capture")
+        if self._release_error is not None:
+            raise self._release_error
 
 
 class _ControllerServiceDouble:
@@ -262,7 +280,7 @@ class _ControllerServiceDouble:
         session: _DeviceSessionDouble,
         calls: list[str] | None = None,
         *,
-        release_error: Exception | None = None,
+        release_error: BaseException | None = None,
     ) -> None:
         self.session = session
         self._calls = [] if calls is None else calls
@@ -440,6 +458,31 @@ def test_runtime_finishes_capture_and_mumu_cleanup_after_controller_error() -> N
     assert calls == ["controller", "capture", "mumu"]
 
 
+def test_runtime_preserves_every_serial_cleanup_failure_in_order() -> None:
+    class _InvalidationSignal(BaseException):
+        pass
+
+    calls: list[str] = []
+    session = _DeviceSessionDouble()
+    controller_error = OSError("controller cleanup failed")
+    capture_error = RuntimeError("capture cleanup failed")
+    invalidation_error = _InvalidationSignal("serial invalidation failed")
+    mumu_runtime = _MumuRuntimeDouble(session, calls, invalidate_error=invalidation_error)
+    runtime = DeviceRuntime(
+        adb_session=session,
+        mumu_runtime=mumu_runtime,
+        capture=_CaptureServiceDouble(mumu_runtime, calls, release_error=capture_error),
+        controller=_ControllerServiceDouble(session, calls, release_error=controller_error),
+        app_controller=_AppControllerServiceDouble(session),
+    )
+
+    with pytest.raises(BaseExceptionGroup) as raised:
+        runtime.release_serial()
+
+    assert raised.value.exceptions == (controller_error, capture_error, invalidation_error)
+    assert calls == ["controller", "capture", "mumu"]
+
+
 def test_minitouch_release_clears_state_when_forward_removal_fails() -> None:
     closed: list[str] = []
     session = _DeviceSessionDouble(forward_remove_error=OSError("remove failed"))
@@ -464,6 +507,49 @@ def test_minitouch_release_clears_state_when_forward_removal_fails() -> None:
     controller.release()
 
 
+def test_minitouch_release_preserves_every_failure_and_clears_local_state() -> None:
+    class _StreamCloseSignal(BaseException):
+        pass
+
+    join_error = RuntimeError("join failed")
+    client_error = RuntimeError("client close failed")
+    forward_error = OSError("forward removal failed")
+    stream_error = _StreamCloseSignal("stream close interrupted")
+
+    class _FailingJoinThread:
+        @staticmethod
+        def join() -> None:
+            raise join_error
+
+    def fail_client_close() -> None:
+        raise client_error
+
+    def fail_stream_close() -> None:
+        raise stream_error
+
+    session = _DeviceSessionDouble(forward_remove_error=forward_error)
+    controller = MinitouchController(session)
+    vars(controller).update(
+        _minitouch_init_thread=_FailingJoinThread(),
+        _minitouch_port=23456,
+        _minitouch_client=SimpleNamespace(close=fail_client_close),
+        _minitouch_stream=SimpleNamespace(close=fail_stream_close),
+        _minitouch_pid="4312",
+        _minitouch_builder=object(),
+    )
+
+    with pytest.raises(BaseExceptionGroup) as raised:
+        controller.release()
+
+    assert raised.value.exceptions == (join_error, client_error, forward_error, stream_error)
+    assert vars(controller)["_minitouch_init_thread"] is None
+    assert vars(controller)["_minitouch_port"] == 0
+    assert vars(controller)["_minitouch_client"] is None
+    assert vars(controller)["_minitouch_stream"] is None
+    assert vars(controller)["_minitouch_pid"] == ""
+    assert "_minitouch_builder" not in controller.__dict__
+
+
 def test_minitouch_release_does_not_join_current_initialization_thread() -> None:
     controller = MinitouchController(_DeviceSessionDouble())
     vars(controller)["_minitouch_init_thread"] = threading.current_thread()
@@ -471,6 +557,122 @@ def test_minitouch_release_does_not_join_current_initialization_thread() -> None
     controller.release()
 
     assert vars(controller)["_minitouch_init_thread"] is None
+
+
+def test_repeated_early_minitouch_init_reuses_worker_and_release_clears_its_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    init_started = threading.Event()
+    allow_init = threading.Event()
+    release_started = threading.Event()
+    release_finished = threading.Event()
+    init_calls: list[str] = []
+    closed: list[str] = []
+
+    def blocking_init(controller: MinitouchController) -> None:
+        init_calls.append("init")
+        init_started.set()
+        if not allow_init.wait(timeout=2):
+            message = "test did not release minitouch initialization"
+            raise RuntimeError(message)
+        vars(controller).update(
+            _minitouch_port=23456,
+            _minitouch_client=SimpleNamespace(close=lambda: closed.append("client")),
+            _minitouch_stream=SimpleNamespace(close=lambda: closed.append("stream")),
+            _minitouch_pid="4312",
+        )
+
+    monkeypatch.setattr(MinitouchController, "minitouch_init", blocking_init)
+    controller = MinitouchController(_DeviceSessionDouble())
+    controller.early_minitouch_init()
+    assert init_started.wait(timeout=2)
+    first_worker = vars(controller)["_minitouch_init_thread"]
+
+    controller.early_minitouch_init()
+
+    assert vars(controller)["_minitouch_init_thread"] is first_worker
+    assert init_calls == ["init"]
+
+    def release() -> None:
+        release_started.set()
+        controller.release()
+        release_finished.set()
+
+    release_thread = threading.Thread(target=release)
+    release_thread.start()
+    assert release_started.wait(timeout=2)
+    assert not release_finished.wait(timeout=0.05)
+    allow_init.set()
+    release_thread.join(timeout=2)
+
+    assert not release_thread.is_alive()
+    assert release_finished.is_set()
+    assert closed == ["client", "stream"]
+    assert vars(controller)["_minitouch_port"] == 0
+    assert vars(controller)["_minitouch_client"] is None
+    assert vars(controller)["_minitouch_stream"] is None
+    assert vars(controller)["_minitouch_pid"] == ""
+    assert "_minitouch_builder" not in controller.__dict__
+
+
+def test_release_cannot_observe_early_worker_before_thread_start(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_thread_type = threading.Thread
+    start_entered = threading.Event()
+    allow_start = threading.Event()
+    release_entered = threading.Event()
+    release_finished = threading.Event()
+    joined_before_start: list[bool] = []
+
+    class _StartBarrierThread:
+        def __init__(self, *, target: Callable[[], None], daemon: bool) -> None:
+            self._target = target
+            self._daemon = daemon
+            self._thread: threading.Thread | None = None
+
+        def start(self) -> None:
+            start_entered.set()
+            if not allow_start.wait(timeout=2):
+                message = "test did not release thread start"
+                raise RuntimeError(message)
+            self._thread = real_thread_type(target=self._target, daemon=self._daemon)
+            self._thread.start()
+
+        def join(self) -> None:
+            thread = self._thread
+            if thread is None:
+                joined_before_start.append(True)
+                return
+            thread.join()
+
+    monkeypatch.setattr(MinitouchController, "minitouch_init", lambda _controller: None)
+    monkeypatch.setattr(threading, "Thread", _StartBarrierThread)
+    controller = MinitouchController(_DeviceSessionDouble())
+    early_thread = real_thread_type(target=controller.early_minitouch_init)
+    early_thread.start()
+    assert start_entered.wait(timeout=2)
+
+    def release() -> None:
+        release_entered.set()
+        controller.release()
+        release_finished.set()
+
+    release_thread = real_thread_type(target=release)
+    release_thread.start()
+    assert release_entered.wait(timeout=2)
+    assert not release_finished.wait(timeout=0.05)
+    allow_start.set()
+    early_thread.join(timeout=2)
+    release_thread.join(timeout=2)
+
+    assert not early_thread.is_alive()
+    assert not release_thread.is_alive()
+    assert joined_before_start == []
+    assert "_minitouch_builder" not in controller.__dict__
+    assert vars(controller)["_minitouch_port"] == 0
+    assert vars(controller)["_minitouch_client"] is None
+    assert vars(controller)["_minitouch_stream"] is None
 
 
 def test_release_during_wait_only_releases_capture() -> None:

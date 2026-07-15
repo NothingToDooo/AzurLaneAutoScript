@@ -242,6 +242,26 @@ def test_abort_requested_becomes_a_finalized_cancelled_result(
     assert repository.finalize_calls == [(RunId("run-1"), result)]
 
 
+def test_abort_with_cleanup_failure_is_faulted_instead_of_cleanly_cancelled() -> None:
+    events: list[str] = []
+    repository = _RecordingRepository(events)
+    abort_error = AbortRequested("manual stop")
+    cleanup_error = OSError("runtime cleanup failed")
+    error = ExceptionGroup("abort and cleanup both failed", (abort_error, cleanup_error))
+
+    result = RunCoordinator(repository).execute(
+        TaskId("main"),
+        ExecutionMode.SCHEDULED_JOB,
+        _metadata(),
+        _RaisingTask(error, events),
+    )
+
+    assert isinstance(result.outcome, Faulted)
+    assert result.outcome.error is error
+    assert result.outcome.error.exceptions == (abort_error, cleanup_error)
+    assert repository.finalize_calls == [(RunId("run-1"), result)]
+
+
 def test_abort_requested_before_start_never_calls_the_task() -> None:
     events: list[str] = []
     repository = _RecordingRepository(events)

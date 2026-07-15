@@ -178,9 +178,12 @@ class _HardCampaign:
         self,
         remaining: int,
         result: HardBattleOutcome | BaseException = HardBattleOutcome.SETTLED,
+        *,
+        release_error: BaseException | None = None,
     ) -> None:
         self.remaining = remaining
         self.result = result
+        self.release_error = release_error
         self.calls: list[str] = []
 
     def remaining_attempts(self, settings: HardSettings, cancellation: CancellationSignal) -> int:
@@ -204,6 +207,8 @@ class _HardCampaign:
 
     def release(self) -> None:
         self.calls.append("release")
+        if self.release_error is not None:
+            raise self.release_error
 
 
 def test_hard_advances_one_confirmed_battle_and_releases_without_exiting_mid_batch(
@@ -271,6 +276,26 @@ def test_hard_releases_runtime_after_unexpected_error(runtime: tuple[AzurLaneCon
             AbortToken(),
         )
 
+    assert campaign.calls == ["remaining", "advance", "release"]
+
+
+def test_hard_preserves_execution_and_release_failures(runtime: tuple[AzurLaneConfig, Device]) -> None:
+    config, device = runtime
+    execution_error = RuntimeError("unexpected hard failure")
+    release_error = OSError("runtime release failed")
+    campaign = _HardCampaign(
+        remaining=3,
+        result=execution_error,
+        release_error=release_error,
+    )
+
+    with pytest.raises(BaseExceptionGroup) as raised:
+        adapters.Mumu12HardWorkflow(config, device, campaign, _Clock()).execute(
+            _HARD_SETTINGS,
+            AbortToken(),
+        )
+
+    assert raised.value.exceptions == (execution_error, release_error)
     assert campaign.calls == ["remaining", "advance", "release"]
 
 

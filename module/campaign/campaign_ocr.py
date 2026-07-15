@@ -297,6 +297,14 @@ class CampaignOcr(ModuleBase):
         logger.attr("Chapter", self.campaign_chapter)
         logger.attr("Stage", ", ".join(self.stage_entrance.keys()))
 
+    def try_update_stage_entrances(self, image: ImageArray) -> bool:
+        """尝试从截图更新章节和关卡入口；预期的识别失败返回 False。"""
+        try:
+            self._get_stage_name(image)
+        except IndexError, CampaignNameError:
+            return False
+        return True
+
     def handle_get_chapter_additional(self) -> bool:
         if self.appear(WITHDRAW, offset=(30, 30)):
             logger.warning("get_chapter_index: WITHDRAW appears")
@@ -314,11 +322,8 @@ class CampaignOcr(ModuleBase):
             if timeout.reached():
                 raise CampaignNameError
             image = self.device.image
-            try:
-                self._get_stage_name(image)
+            if self.try_update_stage_entrances(image):
                 break
-            except IndexError, CampaignNameError:
-                pass
 
             if self.handle_get_chapter_additional():
                 continue

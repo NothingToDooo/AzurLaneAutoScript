@@ -33,6 +33,7 @@ from pywebio.pin import pin, pin_on_change
 from pywebio.session import download, go_app, info, local, register_thread, run_js, set_env
 
 from module.base.atomic import atomic_failure_cleanup
+from module.bootstrap.production import build_default_notification_maintenance
 from module.config.config import AzurLaneConfig, Function
 from module.config.deep import DeepValue, MutableDeepData, MutableDeepValue, deep_get, deep_iter, deep_set
 from module.config.resolved import resolve_task_config
@@ -45,6 +46,7 @@ from module.config.utils import (
     read_file,
 )
 from module.logger import logger
+from module.notify import NotificationSpoolPump
 from module.webui import lang
 from module.webui.app_manage_utils import (
     format_export_config_filename,
@@ -93,6 +95,7 @@ if TYPE_CHECKING:
 
 
 task_handler = TaskHandler()
+_notification_spool_pump = NotificationSpoolPump(build_default_notification_maintenance)
 
 
 class MenuDefinition(TypedDict):
@@ -1052,6 +1055,7 @@ def debug() -> None:
 def startup() -> None:
     State.init()
     lang.reload()
+    _notification_spool_pump.start()
     task_handler.start()
 
 
@@ -1059,6 +1063,8 @@ def clearup() -> None:
     """必须在 uvicorn 重新加载 app 前执行。"""
     logger.info("Start clearup")
     ProcessManager.stop_all()
+    if _notification_spool_pump.stop():
+        _notification_spool_pump.run_once()
     State.clearup()
     task_handler.stop()
     logger.info("Alas closed.")

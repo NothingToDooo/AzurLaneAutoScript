@@ -1,5 +1,4 @@
 import math
-import re
 from collections.abc import Mapping, Sequence
 from collections.abc import Set as AbstractSet
 from enum import StrEnum
@@ -10,29 +9,7 @@ from typing import TYPE_CHECKING, Protocol, cast
 import yaml
 from yaml.resolver import BaseResolver
 
-from module.base.utils import node2location
-from module.content.battle_policy import (
-    AllConditions,
-    AnyCondition,
-    BattleFlag,
-    BossStrategy,
-    CellAccessibleCondition,
-    ClearAnyEnemy,
-    ClearBoss,
-    ClearBossRoadblock,
-    ClearChosenEnemy,
-    ClearEnemy,
-    ClearFilteredEnemy,
-    ClearPriorityEnemy,
-    ClearSelectedEnemy,
-    ClearSiren,
-    DefaultBattle,
-    FlagCondition,
-    GuardedBattleStep,
-    NotCondition,
-    StagePolicy,
-    TargetExpectation,
-)
+from module.content.battle_policy import BossStrategy
 from module.content.battle_program import BattleProgram, BattleProgramMode, BossApproachPlan
 from module.content.catalog import ContentCatalog
 from module.content.errors import ContentValidationError
@@ -90,6 +67,7 @@ from module.content.stage_behavior_codec import (
     decode_fixed_target_sequences,
     decode_mechanic_procedures,
     decode_preset_route_variants,
+    decode_stage_policy,
 )
 from module.content.stage_definition import (
     MAP_CELL_TOKENS,
@@ -124,7 +102,7 @@ from module.content.stage_rules import (
 )
 
 if TYPE_CHECKING:
-    from module.content.battle_policy import BattleCondition
+    from module.content.battle_policy import StagePolicy
 
 SCHEMA_VERSION = 4
 
@@ -163,40 +141,6 @@ _REQUIRED_MAP_FIELDS = {
     "spawn_data",
 }
 _SPAWN_FIELDS = {"battle", "enemy", "siren", "mystery", "boss"}
-_BATTLE_FIELDS = {"steps"}
-_BATTLE_STEP_FIELDS = {
-    "clear_siren": {"tag", "genres", "include_hidden_candidates"},
-    "clear_filtered_enemy": {"tag", "preserve", "enemy_filter"},
-    "clear_enemy": {"tag", "scales", "genres", "sort", "strongest"},
-    "clear_any_enemy": {"tag", "genres", "sort", "strongest"},
-    "clear_chosen_enemy": {"tag", "target", "expected"},
-    "clear_selected_enemy": {"tag", "candidates", "excluded_genres", "expected"},
-    "clear_priority_enemy": {"tag", "include_scale_1"},
-    "default_battle": {"tag"},
-    "clear_boss_roadblock": {"tag", "strategy"},
-    "clear_boss": {"tag", "strategy"},
-    "guarded": {"tag", "condition", "step"},
-}
-_BATTLE_STEP_REQUIRED_FIELDS = {
-    "clear_siren": {"tag"},
-    "clear_filtered_enemy": {"tag", "preserve"},
-    "clear_enemy": {"tag"},
-    "clear_any_enemy": {"tag"},
-    "clear_chosen_enemy": {"tag", "target", "expected"},
-    "clear_selected_enemy": {"tag", "candidates", "excluded_genres", "expected"},
-    "clear_priority_enemy": {"tag", "include_scale_1"},
-    "default_battle": {"tag"},
-    "clear_boss_roadblock": {"tag", "strategy"},
-    "clear_boss": {"tag", "strategy"},
-    "guarded": {"tag", "condition", "step"},
-}
-_BATTLE_CONDITION_FIELDS = {
-    "flag": {"tag", "flag", "value"},
-    "cell_accessible": {"tag", "cell"},
-    "all": {"tag", "conditions"},
-    "any": {"tag", "conditions"},
-    "not": {"tag", "condition"},
-}
 _MECHANIC_FIELDS = {
     "roadblocks",
     "fleet_coordination",
@@ -288,7 +232,6 @@ _STAGE_RULE_FIELDS = (
     | _ONE_TIME_RULE_FIELDS
     | _OPTIONAL_CALIBRATION_FIELDS
 )
-_GRID_NODE = re.compile(r"^[A-Z]+[1-9][0-9]*$")
 
 
 class _StrictLoader(yaml.SafeLoader):
@@ -374,12 +317,13 @@ def _load_yaml(path: Path) -> Mapping[str, object]:
 
 def _grid_node(value: object, path: Path, location: str, shape: tuple[int, int]) -> CellId:
     node = _string(value, path, location)
-    if _GRID_NODE.fullmatch(node) is None:
-        raise _fail(path, location, "must be a valid uppercase grid node")
-    coordinate = node2location(node)
-    if coordinate[0] > shape[0] or coordinate[1] > shape[1]:
+    try:
+        cell = CellId.parse(node)
+    except ContentValidationError as error:
+        raise _fail(path, location, str(error)) from error
+    if cell.x > shape[0] or cell.y > shape[1]:
         raise _fail(path, location, f"grid node {node} is outside shape")
-    return CellId(*coordinate)
+    return cell
 
 
 def _grid_nodes(value: object, path: Path, location: str, shape: tuple[int, int]) -> tuple[CellId, ...]:
@@ -801,139 +745,10 @@ def _boss_strategy(value: object, path: Path, location: str) -> BossStrategy:
         raise _fail(path, location, f"unknown boss strategy: {raw!r}") from error
 
 
-def _battle_condition(
-    value: object,
-    path: Path,
-    location: str,
-    shape: tuple[int, int],
-) -> BattleCondition:
-    raw = _mapping(value, path, location)
-    if "tag" not in raw:
-        raise _fail(path, location, "battle condition requires a tag")
-    tag = _string(raw["tag"], path, f"{location}.tag")
-    fields = _BATTLE_CONDITION_FIELDS.get(tag)
-    if fields is None:
-        raise _fail(path, f"{location}.tag", f"unknown battle condition: {tag!r}")
-    item = _fields_mapping(value, path, location, fields)
-    if set(item) != fields:
-        raise _fail(path, location, f"required condition fields are {sorted(fields)}")
-    if tag == "flag":
-        return FlagCondition(
-            _enum_value(BattleFlag, item["flag"], path, f"{location}.flag"),
-            _boolean(item["value"], path, f"{location}.value"),
-        )
-    if tag == "cell_accessible":
-        return CellAccessibleCondition(_grid_node(item["cell"], path, f"{location}.cell", shape))
-    if tag in {"all", "any"}:
-        conditions = tuple(
-            _battle_condition(
-                raw_condition,
-                path,
-                f"{location}.conditions[{index}]",
-                shape,
-            )
-            for index, raw_condition in enumerate(_sequence(item["conditions"], path, f"{location}.conditions"))
-        )
-        return AllConditions(conditions) if tag == "all" else AnyCondition(conditions)
-    return NotCondition(_battle_condition(item["condition"], path, f"{location}.condition", shape))
-
-
-def _battle_step(  # noqa: C901, PLR0911, PLR0912 - 封闭 battle step tag 解码必须穷举。
-    value: object,
-    path: Path,
-    location: str,
-    shape: tuple[int, int],
-) -> (
-    ClearSiren
-    | ClearFilteredEnemy
-    | ClearEnemy
-    | ClearAnyEnemy
-    | ClearChosenEnemy
-    | ClearSelectedEnemy
-    | ClearPriorityEnemy
-    | DefaultBattle
-    | ClearBossRoadblock
-    | ClearBoss
-    | GuardedBattleStep
-):
-    raw = _mapping(value, path, location)
-    if "tag" not in raw:
-        raise _fail(path, location, "required field is tag")
-    tag = _string(raw["tag"], path, f"{location}.tag")
-    allowed = _BATTLE_STEP_FIELDS.get(tag)
-    if allowed is None:
-        raise _fail(path, f"{location}.tag", f"unknown tag: {tag!r}")
-    item = _fields_mapping(value, path, location, allowed)
-    required = _BATTLE_STEP_REQUIRED_FIELDS[tag]
-    if not required <= set(item):
-        raise _fail(path, location, f"required fields for {tag!r} are {sorted(required)}")
-    if tag == "clear_siren":
-        return ClearSiren(
-            _string_tuple(item.get("genres", ()), path, f"{location}.genres"),
-            _boolean(
-                item.get("include_hidden_candidates", False),
-                path,
-                f"{location}.include_hidden_candidates",
-            ),
-        )
-    if tag == "clear_filtered_enemy":
-        preserve = _exact_integer(item["preserve"], path, f"{location}.preserve")
-        raw_filter = item.get("enemy_filter")
-        enemy_filter = None if raw_filter is None else _string(raw_filter, path, f"{location}.enemy_filter")
-        return ClearFilteredEnemy(preserve=preserve, enemy_filter=enemy_filter)
-    if tag == "clear_enemy":
-        return ClearEnemy(
-            scales=tuple(
-                _exact_integer(raw_scale, path, f"{location}.scales[{index}]", minimum=1)
-                for index, raw_scale in enumerate(_sequence(item.get("scales", ()), path, f"{location}.scales"))
-            ),
-            genres=_string_tuple(item.get("genres", ()), path, f"{location}.genres"),
-            sort=_string_tuple(item.get("sort", ()), path, f"{location}.sort"),
-            strongest=_boolean(item.get("strongest", False), path, f"{location}.strongest"),
-        )
-    if tag == "clear_any_enemy":
-        return ClearAnyEnemy(
-            genres=_string_tuple(item.get("genres", ()), path, f"{location}.genres"),
-            sort=_string_tuple(item.get("sort", ()), path, f"{location}.sort"),
-            strongest=_boolean(item.get("strongest", False), path, f"{location}.strongest"),
-        )
-    if tag == "clear_chosen_enemy":
-        return ClearChosenEnemy(
-            _grid_node(item["target"], path, f"{location}.target", shape),
-            _enum_value(TargetExpectation, item["expected"], path, f"{location}.expected"),
-        )
-    if tag == "clear_selected_enemy":
-        return ClearSelectedEnemy(
-            _grid_nodes(item["candidates"], path, f"{location}.candidates", shape),
-            _string_tuple(item["excluded_genres"], path, f"{location}.excluded_genres"),
-            _enum_value(TargetExpectation, item["expected"], path, f"{location}.expected"),
-        )
-    if tag == "clear_priority_enemy":
-        return ClearPriorityEnemy(_boolean(item["include_scale_1"], path, f"{location}.include_scale_1"))
-    if tag == "default_battle":
-        return DefaultBattle()
-    if tag == "guarded":
-        guarded_step = _battle_step(item["step"], path, f"{location}.step", shape)
-        if isinstance(guarded_step, GuardedBattleStep):
-            raise _fail(path, f"{location}.step", "must not contain a nested guard")
-        return GuardedBattleStep(
-            _battle_condition(item["condition"], path, f"{location}.condition", shape),
-            guarded_step,
-        )
-    strategy = _boss_strategy(item["strategy"], path, f"{location}.strategy")
-    try:
-        if tag == "clear_boss_roadblock":
-            return ClearBossRoadblock(strategy=strategy)
-        return ClearBoss(strategy=strategy)
-    except ContentValidationError as error:
-        raise _fail(path, location, str(error)) from error
-
-
 def _battle_policies(
     value: object,
     path: Path,
     spawn_battles: AbstractSet[int],
-    shape: tuple[int, int],
 ) -> dict[int, StagePolicy]:
     mapping = _mapping(value, path, "battles")
     result: dict[int, StagePolicy] = {}
@@ -941,18 +756,11 @@ def _battle_policies(
         battle = _exact_integer(raw_battle, path, "battles.<key>")
         if battle not in spawn_battles:
             raise _fail(path, f"battles.{battle}", "battle is not declared in map spawn_data")
-        item = _fields_mapping(raw_policy, path, f"battles.{battle}", _BATTLE_FIELDS)
-        if set(item) != _BATTLE_FIELDS:
-            raise _fail(path, f"battles.{battle}", "required field is steps")
-        raw_steps = _sequence(item["steps"], path, f"battles.{battle}.steps")
-        steps = tuple(
-            _battle_step(raw_step, path, f"battles.{battle}.steps[{index}]", shape)
-            for index, raw_step in enumerate(raw_steps)
-        )
         try:
-            result[battle] = StagePolicy(steps)
+            result[battle] = decode_stage_policy(raw_policy, f"battles.{battle}")
         except ContentValidationError as error:
-            raise _fail(path, f"battles.{battle}.steps", str(error)) from error
+            message = f"{path}:{error}"
+            raise ContentValidationError(message) from error
     return result
 
 
@@ -1443,9 +1251,11 @@ def _build_map_definition(value: object, path: Path) -> MapDefinition:
         raise _fail(path, "map", f"missing required fields: {sorted(missing)}")
     name = _string(data["name"], path, "map.name")
     shape_name = _string(data["shape"], path, "map.shape")
-    if _GRID_NODE.fullmatch(shape_name) is None:
-        raise _fail(path, "map.shape", "must be a valid uppercase shape")
-    max_coordinate = node2location(shape_name)
+    try:
+        max_cell = CellId.parse(shape_name)
+    except ContentValidationError as error:
+        raise _fail(path, "map.shape", "must be a valid uppercase shape") from error
+    max_coordinate = (max_cell.x, max_cell.y)
     shape = GridShape(columns=max_coordinate[0] + 1, rows=max_coordinate[1] + 1)
     map_data = _map_data_text(data["map_data"], path, "map.map_data", max_coordinate)
     weight_data = _weight_text(data["weight_data"], path, "map.weight_data", max_coordinate)
@@ -1565,7 +1375,6 @@ class StageSpecLoader:
             data["battles"],
             path,
             map_definition.battles,
-            (map_definition.shape.columns - 1, map_definition.shape.rows - 1),
         )
         try:
             return CampaignStageDefinition(

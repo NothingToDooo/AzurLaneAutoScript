@@ -127,6 +127,77 @@ class ScheduleMutation:
             raise ValueError(message)
 
 
+def _validate_schedule_mutations(
+    schedules: tuple[ScheduleMutation, ...],
+    *,
+    field_name: str,
+) -> None:
+    if not isinstance(schedules, tuple) or any(not isinstance(schedule, ScheduleMutation) for schedule in schedules):
+        message = f"{field_name} must be a tuple of ScheduleMutation values"
+        raise TypeError(message)
+    task_ids = tuple(schedule.task_id for schedule in schedules)
+    if len(task_ids) != len(set(task_ids)):
+        message = f"{field_name} must not contain duplicate task ids"
+        raise ValueError(message)
+
+
+@dataclass(frozen=True, slots=True)
+class ConfigurationPublication:
+    """状态层一次完整配置 CAS 写入所需的不可变命令。"""
+
+    payload: JsonValue
+    schedules: tuple[ScheduleMutation, ...]
+    source_revision: str
+    expected_revision: int
+    updated_at: datetime
+
+    def __post_init__(self) -> None:
+        _validate_schedule_mutations(self.schedules, field_name="schedules")
+        _require_trimmed_non_empty_text(self.source_revision, field_name="source_revision")
+        if type(self.expected_revision) is not int or self.expected_revision < 0:
+            message = "expected_revision must be a non-negative integer"
+            raise ValueError(message)
+        _require_aware_datetime(self.updated_at, field_name="updated_at")
+
+
+@dataclass(frozen=True, slots=True)
+class ConfigurationUpdate:
+    """配置热更新命令；三方合并基线由状态库在写事务内读取。"""
+
+    publication: ConfigurationPublication
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.publication, ConfigurationPublication):
+            message = "publication must be a ConfigurationPublication"
+            raise TypeError(message)
+
+
+@dataclass(frozen=True, slots=True)
+class RunStartCommand:
+    """创建 RUNNING run 的完整来源事实。"""
+
+    run_id: str
+    task_id: str
+    mode: RunMode
+    settings_revision: int
+    content_revision: str
+    client_ui_revision: str
+    started_at: datetime
+
+    def __post_init__(self) -> None:
+        _require_identifier(self.run_id, field_name="run_id")
+        _require_identifier(self.task_id, field_name="task_id")
+        if not isinstance(self.mode, RunMode):
+            message = "mode must be a RunMode"
+            raise TypeError(message)
+        if type(self.settings_revision) is not int or self.settings_revision <= 0:
+            message = "settings_revision must be a positive integer"
+            raise ValueError(message)
+        _require_trimmed_non_empty_text(self.content_revision, field_name="content_revision")
+        _require_trimmed_non_empty_text(self.client_ui_revision, field_name="client_ui_revision")
+        _require_aware_datetime(self.started_at, field_name="started_at")
+
+
 @dataclass(frozen=True, slots=True)
 class ScheduleRecord:
     task_id: str
@@ -393,17 +464,133 @@ class RunFinalization:
 
 @dataclass(frozen=True, slots=True)
 class OutboxRecord:
+    sequence: int
     message_id: str
     run_id: str
     topic: str
     payload: JsonValue
     key: str | None
     created_at: datetime
+    available_at: datetime
+    attempt_count: int
+    last_attempt_at: datetime | None
+    last_error_type: str | None
+    last_error_message: str | None
+    claim_token: str | None
+    claim_until: datetime | None
     published_at: datetime | None
+    discarded_at: datetime | None
 
     def __post_init__(self) -> None:
+        if type(self.sequence) is not int or self.sequence <= 0:
+            message = "sequence must be a positive integer"
+            raise ValueError(message)
         OutboxMessage(message_id=self.message_id, topic=self.topic, payload=self.payload, key=self.key)
         _require_non_empty_text(self.run_id, field_name="run_id")
         _require_aware_datetime(self.created_at, field_name="created_at")
-        if self.published_at is not None:
-            _require_aware_datetime(self.published_at, field_name="published_at")
+        _require_aware_datetime(self.available_at, field_name="available_at")
+        if type(self.attempt_count) is not int or self.attempt_count < 0:
+            message = "attempt_count must be a non-negative integer"
+            raise ValueError(message)
+        for field_name, value in (
+            ("last_attempt_at", self.last_attempt_at),
+            ("claim_until", self.claim_until),
+            ("published_at", self.published_at),
+            ("discarded_at", self.discarded_at),
+        ):
+            if value is not None:
+                _require_aware_datetime(value, field_name=field_name)
+        if self.last_error_type is not None:
+            _require_identifier(self.last_error_type, field_name="last_error_type")
+        if self.last_error_message is not None and not isinstance(self.last_error_message, str):
+            message = "last_error_message must be a string or None"
+            raise TypeError(message)
+        if self.claim_token is not None:
+            _require_identifier(self.claim_token, field_name="claim_token")
+        if (self.claim_token is None) is not (self.claim_until is None):
+            message = "claim_token and claim_until must both be set or both be None"
+            raise ValueError(message)
+        if (self.published_at is not None or self.discarded_at is not None) and self.claim_token is not None:
+            message = "terminal outbox record cannot remain claimed"
+            raise ValueError(message)
+        self._validate_lifecycle()
+
+    def _validate_lifecycle(self) -> None:
+        if self.published_at is not None and self.discarded_at is not None:
+            message = "outbox record cannot be both published and discarded"
+            raise ValueError(message)
+        if (self.last_error_type is None) is not (self.last_error_message is None):
+            message = "last_error_type and last_error_message must both be set or both be None"
+            raise ValueError(message)
+        if self.attempt_count == 0 and (
+            self.last_attempt_at is not None or self.last_error_type is not None or self.last_error_message is not None
+        ):
+            message = "unattempted outbox record cannot contain attempt metadata"
+            raise ValueError(message)
+        if self.attempt_count > 0 and self.last_attempt_at is None:
+            message = "attempted outbox record requires last_attempt_at"
+            raise ValueError(message)
+        if self.discarded_at is not None and self.last_error_type is None:
+            message = "discarded outbox record requires last_error_type"
+            raise ValueError(message)
+
+
+@dataclass(frozen=True, slots=True)
+class OutboxFailureUpdate:
+    """以乐观 attempt_count 确认一次失败，并选择退避或 dead-letter。"""
+
+    message_id: str
+    claim_token: str
+    expected_attempt_count: int
+    failed_at: datetime
+    error_type: str
+    error_message: str
+    available_at: datetime | None
+
+    def __post_init__(self) -> None:
+        _require_non_empty_text(self.message_id, field_name="message_id")
+        _require_identifier(self.claim_token, field_name="claim_token")
+        if type(self.expected_attempt_count) is not int or self.expected_attempt_count < 0:
+            message = "expected_attempt_count must be a non-negative integer"
+            raise ValueError(message)
+        _require_aware_datetime(self.failed_at, field_name="failed_at")
+        _require_identifier(self.error_type, field_name="error_type")
+        if not isinstance(self.error_message, str):
+            message = "error_message must be a string"
+            raise TypeError(message)
+        if self.available_at is not None:
+            _require_aware_datetime(self.available_at, field_name="available_at")
+            if self.available_at < self.failed_at:
+                message = "available_at must not be earlier than failed_at"
+                raise ValueError(message)
+
+
+@dataclass(frozen=True, slots=True)
+class OutboxClaimRequest:
+    claim_token: str
+    claimed_at: datetime
+    claim_until: datetime
+    limit: int
+
+    def __post_init__(self) -> None:
+        _require_identifier(self.claim_token, field_name="claim_token")
+        _require_aware_datetime(self.claimed_at, field_name="claimed_at")
+        _require_aware_datetime(self.claim_until, field_name="claim_until")
+        if self.claim_until <= self.claimed_at:
+            message = "claim_until must be later than claimed_at"
+            raise ValueError(message)
+        if type(self.limit) is not int or self.limit <= 0:
+            message = "limit must be a positive integer"
+            raise ValueError(message)
+
+
+@dataclass(frozen=True, slots=True)
+class OutboxManualRetry:
+    """恢复 dead-letter；保留 attempt_count 与最后一次错误作为审计。"""
+
+    message_id: str
+    available_at: datetime
+
+    def __post_init__(self) -> None:
+        _require_non_empty_text(self.message_id, field_name="message_id")
+        _require_aware_datetime(self.available_at, field_name="available_at")

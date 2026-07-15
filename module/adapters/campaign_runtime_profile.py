@@ -4,6 +4,7 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Protocol, cast
 
+from module.base.failure import raise_cleanup_errors
 from module.config.config import AzurLaneConfig
 from module.content.campaign_session import CampaignRunVariant
 from module.content.errors import ContentValidationError
@@ -893,20 +894,32 @@ class CampaignRuntimeProfileManager:
         if not isinstance(outcome, RuntimeSessionOutcome):
             message = "runtime profile end_session requires RuntimeSessionOutcome"
             raise TypeError(message)
-        for instance in reversed(self._instances):
-            instance.end_session(outcome)
+        # manager 先放弃 active ownership，避免任一 executor 失败后留下可复用的半关闭会话。
         self._active_context = None
+        errors: list[BaseException] = []
+        for instance in reversed(self._instances):
+            try:
+                instance.end_session(outcome)
+            except BaseException as error:  # noqa: BLE001 - 各 executor 必须独立结束。
+                errors.append(error)
+        raise_cleanup_errors(errors, message="runtime profile session cleanup failed")
 
     def reset(self) -> None:
         if self._active_context is not None:
             message = "runtime profile manager cannot reset an active session"
             raise CampaignRuntimeProfileError(message)
-        for instance in reversed(self._instances):
-            instance.reset()
-        self._reset_shared_state()
+        # ownership 状态先失效；executor reset 即使失败也不能让 manager 再次参与执行。
         self._runtime = None
         self._compiled_map = None
         self._frames.clear()
+        errors: list[BaseException] = []
+        for instance in reversed(self._instances):
+            try:
+                instance.reset()
+            except BaseException as error:  # noqa: BLE001 - 各 executor 必须独立重置。
+                errors.append(error)
+        self._reset_shared_state()
+        raise_cleanup_errors(errors, message="runtime profile reset failed")
 
     def apply_runtime_tunings(self, runtime: RuntimeProfileHost) -> None:
         for key, value in self._runtime_attribute_tunings.items():

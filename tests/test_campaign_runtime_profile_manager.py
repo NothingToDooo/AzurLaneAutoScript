@@ -152,6 +152,29 @@ class _LifecycleExecutor(RuntimeExecutorInstance):
         self.trace.append("reset")
 
 
+class _CleanupFailingLifecycleExecutor(_LifecycleExecutor):
+    def __init__(
+        self,
+        trace: list[object],
+        *,
+        end_error: BaseException,
+        reset_error: BaseException,
+    ) -> None:
+        super().__init__(frozenset({RuntimeExecutorKind.MAP_MECHANIC}), trace)
+        self._end_error = end_error
+        self._reset_error = reset_error
+
+    @override
+    def end_session(self, outcome: RuntimeSessionOutcome) -> None:
+        super().end_session(outcome)
+        raise self._end_error
+
+    @override
+    def reset(self) -> None:
+        super().reset()
+        raise self._reset_error
+
+
 class _DependentStateExecutor(RuntimeExecutorInstance):
     def __init__(self) -> None:
         super().__init__(
@@ -606,3 +629,68 @@ def test_lifecycle_distinguishes_fresh_and_resume_and_resets_session_state() -> 
         ("begin", RuntimeSessionEntryKind.RESUME, 3),
     ]
     assert other.use_support_fleet(AbortToken())
+
+
+def test_lifecycle_attempts_every_executor_cleanup_and_poison_manager() -> None:
+    first_trace: list[object] = []
+    second_trace: list[object] = []
+    first_end_error = RuntimeError("first end failed")
+    second_end_error = OSError("second end failed")
+    first_reset_error = RuntimeError("first reset failed")
+    second_reset_error = OSError("second reset failed")
+
+    def first_factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
+        del context
+        return _CleanupFailingLifecycleExecutor(
+            first_trace,
+            end_error=first_end_error,
+            reset_error=first_reset_error,
+        )
+
+    def second_factory(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
+        del context
+        return _CleanupFailingLifecycleExecutor(
+            second_trace,
+            end_error=second_end_error,
+            reset_error=second_reset_error,
+        )
+
+    schema = {RuntimeExecutorKind.MAP_MECHANIC: RuntimeExecutorOptionsSchema()}
+    manager = CampaignRuntimeProfileManager(
+        _profile(
+            _extension("first", _binding("first", RuntimeExecutorKind.MAP_MECHANIC)),
+            _extension("second", _binding("second", RuntimeExecutorKind.MAP_MECHANIC)),
+        ),
+        CampaignRuntimeExecutorRegistry(
+            (
+                _descriptor("first", schema, first_factory),
+                _descriptor("second", schema, second_factory),
+            )
+        ),
+    )
+    manager.bind(_Runtime(), CampaignMap("cleanup-failure"))
+    context = RuntimeSessionContext(
+        CampaignRunVariant.NORMAL,
+        0,
+        RuntimeSessionEntryKind.FRESH,
+    )
+    manager.begin_session(context)
+
+    with pytest.raises(ExceptionGroup) as end_raised:
+        manager.end_session(RuntimeSessionOutcome.FAILED)
+
+    assert end_raised.value.exceptions == (second_end_error, first_end_error)
+
+    with pytest.raises(ExceptionGroup) as reset_raised:
+        manager.reset()
+
+    assert reset_raised.value.exceptions == (second_reset_error, first_reset_error)
+    assert first_trace == [
+        "bind",
+        ("begin", RuntimeSessionEntryKind.FRESH, 0),
+        ("end", RuntimeSessionOutcome.FAILED),
+        "reset",
+    ]
+    assert second_trace == first_trace
+    with pytest.raises(CampaignRuntimeProfileError, match="must be bound"):
+        manager.begin_session(context)

@@ -6,7 +6,15 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from module.content import CampaignStageDefinition, CellId, GridShape, LandBasedDirection, LandBasedSpec, PortalSpec
+from module.content import (
+    CampaignStageDefinition,
+    CellId,
+    GridShape,
+    LandBasedDirection,
+    LandBasedSpec,
+    PortalSpec,
+    stage_behavior_codec,
+)
 from module.content import stage_loader as stage_loader_module
 from module.content.battle_policy import (
     BossStrategy,
@@ -306,6 +314,49 @@ def test_loader_rejects_invalid_stage_contract_at_load_time(
     loader, spec = _write_stage(tmp_path / "events", _minimal_stage(**{replacement: value}))
 
     with pytest.raises(ContentValidationError, match=message):
+        loader.load(spec)
+
+
+def test_loader_rejects_registered_but_undecoded_battle_step_at_its_tag(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(
+        stage_behavior_codec._STEP_FIELDS,  # noqa: SLF001 - 测试验证 schema 与唯一解码入口必须同步。
+        "future_step",
+        ({"tag"}, set()),
+    )
+    loader, spec = _write_stage(
+        tmp_path / "events",
+        _minimal_stage(battles="0:\n  steps:\n  - tag: future_step"),
+    )
+
+    with pytest.raises(
+        ContentValidationError,
+        match=r"battles\.0\.steps\[0\]\.tag contains an unknown tag: 'future_step'",
+    ):
+        loader.load(spec)
+
+
+def test_loader_rejects_policy_cells_outside_the_map_after_decoding(tmp_path: Path) -> None:
+    loader, spec = _write_stage(
+        tmp_path / "events",
+        _minimal_stage(
+            battles="""0:
+  steps:
+  - tag: clear_selected_enemy
+    candidates: [B1]
+    excluded_genres: []
+    expected: enemy
+  - tag: clear_boss
+    strategy: fleet_boss""",
+        ),
+    )
+
+    with pytest.raises(
+        ContentValidationError,
+        match=r"t1\.yaml:\$: battle policies reference a cell outside the map shape",
+    ):
         loader.load(spec)
 
 

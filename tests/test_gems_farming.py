@@ -5,7 +5,13 @@ from typing import TYPE_CHECKING, cast, override
 import pytest
 
 from module.campaign import gems_farming as gems_module
-from module.campaign.gems_farming import GemsEmotion, GemsFleetReplacement
+from module.campaign.gems_farming import (
+    GemsEmotion,
+    GemsFleetReplacement,
+    GemsShipReplacementDisposition,
+    GemsShipReplacementFactSink,
+    GemsShipReplacementResult,
+)
 from module.exception import CampaignEnd
 from module.retire.scanner import Ship
 
@@ -87,11 +93,9 @@ class _HardFleetPrepareResultRunner(GemsFleetReplacement):
     def __init__(
         self,
         *,
-        flagship_result: bool,
-        vanguard_result: bool,
+        flagship_result: GemsShipReplacementResult,
+        vanguard_result: GemsShipReplacementResult,
         current_emotion: int = 100,
-        flagship_emotion: int | None = None,
-        vanguard_emotion: int | None = None,
     ) -> None:
         self.records: list[dict[str, int]] = []
 
@@ -119,8 +123,6 @@ class _HardFleetPrepareResultRunner(GemsFleetReplacement):
         )
         self.flagship_result = flagship_result
         self.vanguard_result = vanguard_result
-        self.flagship_emotion = flagship_emotion
-        self.vanguard_emotion = vanguard_emotion
         self.change_calls: list[str] = []
 
     @override
@@ -128,34 +130,49 @@ class _HardFleetPrepareResultRunner(GemsFleetReplacement):
         return True
 
     @override
-    def flagship_change(self) -> bool:
+    def flagship_change(self, fact_sink: GemsShipReplacementFactSink) -> GemsShipReplacementResult:
         self.change_calls.append("flagship")
-        if self.flagship_emotion is not None:
-            ship = Ship(button=cast("Button", object()), level=1, emotion=self.flagship_emotion)
-            self._record_new_ship_emotion(ship)
+        fact_sink(self.flagship_result)
         return self.flagship_result
 
     @override
-    def vanguard_change(self) -> bool:
+    def vanguard_change(self, fact_sink: GemsShipReplacementFactSink) -> GemsShipReplacementResult:
         self.change_calls.append("vanguard")
-        if self.vanguard_emotion is not None:
-            ship = Ship(button=cast("Button", object()), level=100, emotion=self.vanguard_emotion)
-            self._record_new_ship_emotion(ship)
+        fact_sink(self.vanguard_result)
         return self.vanguard_result
+
+
+def _replacement_result(
+    disposition: GemsShipReplacementDisposition,
+    emotion: int | None,
+) -> GemsShipReplacementResult:
+    return GemsShipReplacementResult(disposition, emotion)
 
 
 @pytest.mark.parametrize(
     ("flagship_result", "vanguard_result", "expected"),
     [
-        (True, True, True),
-        (False, True, False),
-        (True, False, False),
+        (
+            _replacement_result(GemsShipReplacementDisposition.POLICY_SATISFIED, 120),
+            _replacement_result(GemsShipReplacementDisposition.POLICY_SATISFIED, 110),
+            True,
+        ),
+        (
+            _replacement_result(GemsShipReplacementDisposition.FALLBACK_USED, 80),
+            _replacement_result(GemsShipReplacementDisposition.POLICY_SATISFIED, 110),
+            False,
+        ),
+        (
+            _replacement_result(GemsShipReplacementDisposition.POLICY_SATISFIED, 120),
+            _replacement_result(GemsShipReplacementDisposition.NO_CANDIDATE, None),
+            False,
+        ),
     ],
 )
-def test_hard_fleet_prepare_requires_every_replacement_to_succeed(
+def test_hard_fleet_prepare_returns_every_typed_replacement(
     *,
-    flagship_result: bool,
-    vanguard_result: bool,
+    flagship_result: GemsShipReplacementResult,
+    vanguard_result: GemsShipReplacementResult,
     expected: bool,
 ) -> None:
     runner = _HardFleetPrepareResultRunner(
@@ -163,35 +180,42 @@ def test_hard_fleet_prepare_requires_every_replacement_to_succeed(
         vanguard_result=vanguard_result,
     )
 
-    assert runner.hard_fleet_prepare() is expected
+    facts: list[GemsShipReplacementResult] = []
+    results = tuple(runner.hard_fleet_prepare(facts.append))
+
+    assert results == (flagship_result, vanguard_result)
+    assert facts == list(results)
+    assert all(result.disposition is GemsShipReplacementDisposition.POLICY_SATISFIED for result in results) is expected
     assert runner.change_calls == ["flagship", "vanguard"]
 
 
-def test_hard_fleet_prepare_records_lowest_current_and_replacement_emotion() -> None:
+def test_hard_fleet_prepare_leaves_emotion_persistence_to_its_adapter() -> None:
     runner = _HardFleetPrepareResultRunner(
-        flagship_result=True,
-        vanguard_result=True,
+        flagship_result=_replacement_result(GemsShipReplacementDisposition.POLICY_SATISFIED, 120),
+        vanguard_result=_replacement_result(GemsShipReplacementDisposition.POLICY_SATISFIED, 30),
         current_emotion=80,
-        flagship_emotion=120,
-        vanguard_emotion=30,
     )
 
-    assert runner.hard_fleet_prepare() is True
-    assert runner.records == [{"Emotion_Fleet1Value": 30}]
+    assert tuple(runner.hard_fleet_prepare(lambda _result: None)) == (
+        _replacement_result(GemsShipReplacementDisposition.POLICY_SATISFIED, 120),
+        _replacement_result(GemsShipReplacementDisposition.POLICY_SATISFIED, 30),
+    )
+    assert runner.records == []
 
 
 @pytest.mark.parametrize("current_emotion", [0, 80])
-def test_hard_fleet_prepare_keeps_zero_as_lowest_emotion(current_emotion: int) -> None:
+def test_hard_fleet_prepare_returns_zero_emotion_without_persisting_it(current_emotion: int) -> None:
     runner = _HardFleetPrepareResultRunner(
-        flagship_result=False,
-        vanguard_result=True,
+        flagship_result=_replacement_result(GemsShipReplacementDisposition.FALLBACK_USED, 0),
+        vanguard_result=_replacement_result(GemsShipReplacementDisposition.POLICY_SATISFIED, 120),
         current_emotion=current_emotion,
-        flagship_emotion=0,
-        vanguard_emotion=120,
     )
 
-    assert runner.hard_fleet_prepare() is False
-    assert runner.records == [{"Emotion_Fleet1Value": 0}]
+    assert tuple(runner.hard_fleet_prepare(lambda _result: None)) == (
+        _replacement_result(GemsShipReplacementDisposition.FALLBACK_USED, 0),
+        _replacement_result(GemsShipReplacementDisposition.POLICY_SATISFIED, 120),
+    )
+    assert runner.records == []
 
 
 class _EquipmentChangeRunner(GemsFleetReplacement):
@@ -199,8 +223,9 @@ class _EquipmentChangeRunner(GemsFleetReplacement):
         self,
         *,
         appear_results: list[bool] | None = None,
-        change_result: bool = True,
+        change_result: GemsShipReplacementResult | None = None,
         mode: str = "normal",
+        take_on_error: RuntimeError | None = None,
     ) -> None:
         self.config = cast(
             "AzurLaneConfig",
@@ -215,7 +240,11 @@ class _EquipmentChangeRunner(GemsFleetReplacement):
         )
         self.operations: list[str] = []
         self.appear_results = list(appear_results or [])
-        self.change_result = change_result
+        self.change_result = change_result or _replacement_result(
+            GemsShipReplacementDisposition.POLICY_SATISFIED,
+            100,
+        )
+        self.take_on_error = take_on_error
 
     def _goto_fleet(self) -> None:
         self.operations.append("goto")
@@ -228,29 +257,38 @@ class _EquipmentChangeRunner(GemsFleetReplacement):
 
     def _change_equipment(self, *_args: object, take_on: bool, **_kwargs: object) -> None:
         self.operations.append("take_on" if take_on else "take_off")
+        if take_on and self.take_on_error is not None:
+            raise self.take_on_error
 
-    def flagship_change_execute(self) -> bool:
+    def flagship_change_execute(self) -> GemsShipReplacementResult:
         self.operations.append("change_ship")
         return self.change_result
 
-    def vanguard_change_execute(self) -> bool:
+    def vanguard_change_execute(self) -> GemsShipReplacementResult:
         self.operations.append("change_ship")
         return self.change_result
 
 
 def test_flagship_change_wraps_ship_replacement_with_equipment_code() -> None:
     runner = _EquipmentChangeRunner()
+    facts: list[GemsShipReplacementResult] = []
 
-    assert runner.flagship_change() is True
+    assert runner.flagship_change(facts.append) == _replacement_result(
+        GemsShipReplacementDisposition.POLICY_SATISFIED,
+        100,
+    )
+    assert facts == [_replacement_result(GemsShipReplacementDisposition.POLICY_SATISFIED, 100)]
     assert runner.operations == ["goto", "take_off", "change_ship", "take_on"]
 
 
 @pytest.mark.parametrize("position", ["flagship", "vanguard"])
 def test_hard_empty_slot_does_not_mount_equipment_without_take_off(position: str) -> None:
     runner = _EquipmentChangeRunner(appear_results=[True, False], mode="hard")
+    facts: list[GemsShipReplacementResult] = []
 
     change = runner.flagship_change if position == "flagship" else runner.vanguard_change
-    assert change() is True
+    assert change(facts.append).disposition is GemsShipReplacementDisposition.POLICY_SATISFIED
+    assert len(facts) == 1
     assert runner.operations == ["goto", "change_ship"]
     assert runner.appear_results == [False]
 
@@ -258,9 +296,11 @@ def test_hard_empty_slot_does_not_mount_equipment_without_take_off(position: str
 @pytest.mark.parametrize("position", ["flagship", "vanguard"])
 def test_normal_mode_treats_ship_entry_template_as_occupied(position: str) -> None:
     runner = _EquipmentChangeRunner(appear_results=[True, True])
+    facts: list[GemsShipReplacementResult] = []
 
     change = runner.flagship_change if position == "flagship" else runner.vanguard_change
-    assert change() is True
+    assert change(facts.append).disposition is GemsShipReplacementDisposition.POLICY_SATISFIED
+    assert len(facts) == 1
     assert runner.operations == ["goto", "take_off", "change_ship", "take_on"]
     assert runner.appear_results == [True, True]
 
@@ -282,13 +322,63 @@ def test_hard_mode_mounts_equipment_only_when_replacement_occupies_slot(
 ) -> None:
     runner = _EquipmentChangeRunner(
         appear_results=[False, slot_is_empty],
-        change_result=False,
+        change_result=_replacement_result(GemsShipReplacementDisposition.FALLBACK_USED, 20),
         mode="hard",
     )
+    facts: list[GemsShipReplacementResult] = []
 
     change = runner.flagship_change if position == "flagship" else runner.vanguard_change
-    assert change() is False
+    assert change(facts.append).disposition is GemsShipReplacementDisposition.FALLBACK_USED
+    assert len(facts) == 1
     assert runner.operations == expected_operations
+
+
+@pytest.mark.parametrize("position", ["flagship", "vanguard"])
+def test_replacement_fact_is_delivered_before_take_on_failure(position: str) -> None:
+    take_on_error = RuntimeError("equipment restoration failed")
+    runner = _EquipmentChangeRunner(take_on_error=take_on_error)
+    facts: list[GemsShipReplacementResult] = []
+    change = runner.flagship_change if position == "flagship" else runner.vanguard_change
+
+    with pytest.raises(RuntimeError) as raised:
+        change(facts.append)
+
+    assert raised.value is take_on_error
+    assert facts == [_replacement_result(GemsShipReplacementDisposition.POLICY_SATISFIED, 100)]
+    assert runner.operations == ["goto", "take_off", "change_ship", "take_on"]
+
+
+@pytest.mark.parametrize("position", ["flagship", "vanguard"])
+def test_fact_sink_failure_still_restores_equipment_and_preserves_original_error(position: str) -> None:
+    fact_error = RuntimeError("fact persistence failed")
+    runner = _EquipmentChangeRunner()
+    change = runner.flagship_change if position == "flagship" else runner.vanguard_change
+
+    def fail_fact(_result: GemsShipReplacementResult) -> None:
+        raise fact_error
+
+    with pytest.raises(RuntimeError) as raised:
+        change(fail_fact)
+
+    assert raised.value is fact_error
+    assert runner.operations == ["goto", "take_off", "change_ship", "take_on"]
+
+
+@pytest.mark.parametrize("position", ["flagship", "vanguard"])
+def test_fact_and_equipment_restoration_failures_are_both_preserved(position: str) -> None:
+    fact_error = RuntimeError("fact persistence failed")
+    take_on_error = RuntimeError("equipment restoration failed")
+    runner = _EquipmentChangeRunner(take_on_error=take_on_error)
+    change = runner.flagship_change if position == "flagship" else runner.vanguard_change
+
+    def fail_fact(_result: GemsShipReplacementResult) -> None:
+        raise fact_error
+
+    with pytest.raises(BaseExceptionGroup) as raised:
+        change(fail_fact)
+
+    assert raised.value.exceptions == (fact_error, take_on_error)
+    assert runner.operations == ["goto", "take_off", "change_ship", "take_on"]
 
 
 class _CvSearchRunner(GemsFleetReplacement):
@@ -329,8 +419,8 @@ def test_cv_search_starts_at_low_levels_before_reversing_specific_fallback() -> 
     assert runner.sort_orders == [False, True]
 
 
-class _FlagshipSelectionRunner(GemsFleetReplacement):
-    def __init__(self, *, mode: str) -> None:
+class _ShipSelectionRunner(GemsFleetReplacement):
+    def __init__(self, *, mode: str, find_results: list[list[Ship]] | None = None) -> None:
         self.config = cast(
             "AzurLaneConfig",
             SimpleNamespace(
@@ -343,13 +433,13 @@ class _FlagshipSelectionRunner(GemsFleetReplacement):
             SimpleNamespace(map_battle_count=0, emotion=SimpleNamespace(reduce_per_battle=2)),
         )
         self.low_ready_button = cast("Button", object())
-        self.candidates = [
+        candidates = [
             Ship(button=cast("Button", object()), level=1, emotion=20),
             Ship(button=self.low_ready_button, level=1, emotion=100),
             Ship(button=cast("Button", object()), level=31, emotion=150),
         ]
+        self.find_results = [candidates] if find_results is None else find_results
         self.selected_button: Button | None = None
-        self._new_fleet_emotion = 150
 
     @override
     def ship_info_enter(self, *_args: object, **_kwargs: object) -> None:
@@ -357,7 +447,11 @@ class _FlagshipSelectionRunner(GemsFleetReplacement):
 
     def get_common_rarity_cv(self, *, max_level: int = 31, min_emotion: int = 0) -> list[Ship]:
         del max_level, min_emotion
-        return self.candidates
+        return self.find_results.pop(0)
+
+    def get_common_rarity_dd(self, *, min_emotion: int = 0) -> list[Ship]:
+        del min_emotion
+        return self.find_results.pop(0)
 
     def _ship_change_confirm(self, button: Button, *, check_button: Button) -> None:
         del check_button
@@ -371,10 +465,50 @@ class _FlagshipSelectionRunner(GemsFleetReplacement):
     def _enter_hard_dock(self, button: Button) -> None:
         del button
 
+    def _dock_reset(self) -> None:
+        pass
+
+    @override
+    def ui_back(
+        self,
+        check_button: object,
+        appear_button: object | None = None,
+        offset: object | None = (30, 30),
+        retry_wait: float = 10,
+        *,
+        skip_first_screenshot: bool = False,
+    ) -> None:
+        del check_button, appear_button, offset, retry_wait, skip_first_screenshot
+
 
 @pytest.mark.parametrize("mode", ["normal", "hard"])
 def test_flagship_change_prefers_low_level_then_high_emotion(mode: str) -> None:
-    runner = _FlagshipSelectionRunner(mode=mode)
+    runner = _ShipSelectionRunner(mode=mode)
 
-    assert runner.flagship_change_execute() is True
+    assert runner.flagship_change_execute() == _replacement_result(
+        GemsShipReplacementDisposition.POLICY_SATISFIED,
+        100,
+    )
     assert runner.selected_button is runner.low_ready_button
+
+
+@pytest.mark.parametrize("position", ["flagship", "vanguard"])
+def test_hard_ship_change_reports_fallback_ship_and_emotion(position: str) -> None:
+    fallback = Ship(button=cast("Button", object()), level=80, emotion=17)
+    runner = _ShipSelectionRunner(mode="hard", find_results=[[], [fallback]])
+    execute = runner.flagship_change_execute if position == "flagship" else runner.vanguard_change_execute
+
+    result = execute()
+
+    assert result == _replacement_result(GemsShipReplacementDisposition.FALLBACK_USED, 17)
+    assert runner.selected_button is fallback.button
+
+
+@pytest.mark.parametrize("position", ["flagship", "vanguard"])
+def test_hard_ship_change_reports_no_candidate_without_fake_emotion(position: str) -> None:
+    runner = _ShipSelectionRunner(mode="hard", find_results=[[], []])
+    execute = runner.flagship_change_execute if position == "flagship" else runner.vanguard_change_execute
+
+    result = execute()
+
+    assert result == _replacement_result(GemsShipReplacementDisposition.NO_CANDIDATE, None)

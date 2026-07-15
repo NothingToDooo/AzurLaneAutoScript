@@ -886,6 +886,39 @@ def test_live_workflow_marks_runtime_failed_when_execution_raises() -> None:
     assert lifecycle.calls == [(session, session.initial_state(), CampaignStopReason.FAILED)]
 
 
+def test_live_workflow_preserves_execution_and_lifecycle_cleanup_failures() -> None:
+    session = _session()
+    execution_error = RuntimeError("observation failed")
+    cleanup_error = OSError("runtime cleanup failed")
+
+    class _FailingLifecycle(_RuntimeLifecycle):
+        def finish(
+            self,
+            session: CampaignSession,
+            state: CampaignSessionState,
+            stop_reason: CampaignStopReason,
+        ) -> None:
+            super().finish(session, state, stop_reason)
+            raise cleanup_error
+
+    def fail_observation() -> None:
+        raise execution_error
+
+    lifecycle = _FailingLifecycle()
+    workflow = LiveCampaignWorkflow(
+        _Observer(BattlefieldObservation(battle_index=0, enemy=1), fail_observation),
+        _Driver(lambda attempt: BattleSucceeded(attempt, BattleTarget.ENEMY)),
+        _Clock(),
+        services=CampaignLiveServices(lifecycle=lifecycle),
+    )
+
+    with pytest.raises(BaseExceptionGroup) as raised:
+        workflow.execute(_job(session), AbortToken(), PreemptionRequest())
+
+    assert raised.value.exceptions == (execution_error, cleanup_error)
+    assert lifecycle.calls == [(session, session.initial_state(), CampaignStopReason.FAILED)]
+
+
 def test_campaign_live_services_reject_an_invalid_runtime_lifecycle() -> None:
     with pytest.raises(TypeError, match=r"lifecycle must implement finish\(\)"):
         CampaignLiveServices(lifecycle=cast("CampaignRuntimeLifecycle", object()))
@@ -1530,7 +1563,7 @@ class _Fleet:
         self.name = name
 
     def clear_chosen_enemy(self, grid: _Grid, expected: str = "") -> object:
-        return self.runtime._clear(self.name, grid, expected)  # noqa: SLF001
+        return self.runtime.clear(self.name, grid, expected)
 
 
 class _Runtime:
@@ -1583,9 +1616,9 @@ class _Runtime:
         return self.roadblocks
 
     def clear_chosen_enemy(self, grid: _Grid, expected: str = "") -> object:
-        return self._clear("map", grid, expected)
+        return self.clear("map", grid, expected)
 
-    def _clear(self, executor: str, grid: _Grid, expected: str) -> object:
+    def clear(self, executor: str, grid: _Grid, expected: str) -> object:
         self.calls.append(("clear", executor, grid.label, expected))
         self.battle_count += self.confirmed_delta
         if self.action_error is not None:

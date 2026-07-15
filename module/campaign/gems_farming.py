@@ -1,5 +1,7 @@
+from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING
+from enum import StrEnum
+from typing import TYPE_CHECKING, Protocol
 
 from module.base.timer import Timer
 from module.combat.emotion import Emotion, FleetEmotion
@@ -27,7 +29,7 @@ from module.retire.scanner import ShipScanner
 from module.ui.page import page_fleet
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Iterator, Sequence
 
     from module.base.button import Button
     from module.base.template import Template
@@ -50,6 +52,65 @@ HARD_VANGUARD_BUTTONS = {
     1: (equipment_assets.FLEET_1_VANGUARD_1, equipment_assets.FLEET_1_VANGUARD_3),
     2: (equipment_assets.FLEET_2_VANGUARD_1, equipment_assets.FLEET_2_VANGUARD_3),
 }
+
+
+class GemsShipReplacementDisposition(StrEnum):
+    POLICY_SATISFIED = "policy_satisfied"
+    FALLBACK_USED = "fallback_used"
+    NO_CANDIDATE = "no_candidate"
+
+
+@dataclass(frozen=True, slots=True)
+class GemsShipReplacementResult:
+    disposition: GemsShipReplacementDisposition
+    selected_emotion: int | None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.disposition, GemsShipReplacementDisposition):
+            message = "gems ship replacement disposition must be a GemsShipReplacementDisposition"
+            raise TypeError(message)
+        if self.disposition is GemsShipReplacementDisposition.NO_CANDIDATE:
+            if self.selected_emotion is not None:
+                message = "gems ship replacement without a candidate cannot have selected emotion"
+                raise ValueError(message)
+            return
+        if type(self.selected_emotion) is not int:
+            message = "gems ship replacement must include selected emotion"
+            raise TypeError(message)
+        if not 0 <= self.selected_emotion <= 150:
+            message = "gems ship replacement selected emotion must be between 0 and 150"
+            raise ValueError(message)
+
+
+class GemsShipReplacementFactSink(Protocol):
+    """在换舰已生效、后续装备回装尚未开始时接收持久化事实。"""
+
+    def __call__(self, result: GemsShipReplacementResult, /) -> None: ...
+
+
+def _require_replacement_fact_sink(value: object) -> None:
+    if isinstance(value, type) or not callable(value):
+        message = "replacement fact sink must be callable"
+        raise TypeError(message)
+
+
+def _deliver_replacement_fact(
+    result: GemsShipReplacementResult,
+    fact_sink: GemsShipReplacementFactSink,
+    restore_equipment: Callable[[], None],
+) -> None:
+    """先交付事实再清理；双重失败时保留两个独立根因。"""
+
+    try:
+        fact_sink(result)
+    except BaseException as fact_error:
+        try:
+            restore_equipment()
+        except BaseException as restore_error:  # noqa: BLE001 - 必须把 cleanup 与原始持久化失败一起保留。
+            message = "gems replacement fact persistence and equipment restoration both failed"
+            raise BaseExceptionGroup(message, (fact_error, restore_error)) from None
+        raise
+    restore_equipment()
 
 
 class GemsEmotion(Emotion):
@@ -109,7 +170,6 @@ class GemsFleetReplacement(FleetEquipment, Dock):
     """只负责 GemsFarming 的舰队更换 UI，不拥有地图装载或任务循环。"""
 
     campaign: CampaignEngine
-    _new_fleet_emotion: int
 
     @property
     def change_flagship_equip(self) -> bool:
@@ -205,8 +265,9 @@ class GemsFleetReplacement(FleetEquipment, Dock):
         else:
             self.fleet_back()
 
-    def flagship_change(self) -> bool:
+    def flagship_change(self, fact_sink: GemsShipReplacementFactSink) -> GemsShipReplacementResult:
         """更换旗舰，并按配置用装备码转移装备。"""
+        _require_replacement_fact_sink(fact_sink)
         logger.hr("Change flagship", level=1)
         logger.attr("ChangeFlagship", self.config.GemsFarming_ChangeFlagship)
         self._goto_fleet()
@@ -223,19 +284,24 @@ class GemsFleetReplacement(FleetEquipment, Dock):
             equipment_taken_off = True
 
         logger.hr("Change flagship", level=2)
-        success = self.flagship_change_execute()
+        result = self.flagship_change_execute()
 
-        if equipment_taken_off and not self._is_fleet_slot_empty(button):
-            logger.hr("Mount flagship equipments", level=2)
-            self._change_equipment(
-                button,
-                equipment_assets.FLEET_DETAIL_ENTER_FLAGSHIP,
-                take_on=True,
-            )
-        return success
+        def restore_equipment() -> None:
+            if equipment_taken_off and not self._is_fleet_slot_empty(button):
+                logger.hr("Mount flagship equipments", level=2)
+                self._change_equipment(
+                    button,
+                    equipment_assets.FLEET_DETAIL_ENTER_FLAGSHIP,
+                    take_on=True,
+                )
 
-    def vanguard_change(self) -> bool:
+        # 换舰确认已经改变真实舰队；先交付事实，回装失败也不能丢失心情账本。
+        _deliver_replacement_fact(result, fact_sink, restore_equipment)
+        return result
+
+    def vanguard_change(self, fact_sink: GemsShipReplacementFactSink) -> GemsShipReplacementResult:
         """更换前排，并按配置用装备码转移装备。"""
+        _require_replacement_fact_sink(fact_sink)
         logger.hr("Change vanguard", level=1)
         logger.attr("ChangeVanguard", self.config.GemsFarming_ChangeVanguard)
         self._goto_fleet()
@@ -248,12 +314,16 @@ class GemsFleetReplacement(FleetEquipment, Dock):
             equipment_taken_off = True
 
         logger.hr("Change vanguard", level=2)
-        success = self.vanguard_change_execute()
+        result = self.vanguard_change_execute()
 
-        if equipment_taken_off and not self._is_fleet_slot_empty(button):
-            logger.hr("Mount vanguard equipments", level=2)
-            self._change_equipment(button, equipment_assets.FLEET_DETAIL_ENTER, take_on=True)
-        return success
+        def restore_equipment() -> None:
+            if equipment_taken_off and not self._is_fleet_slot_empty(button):
+                logger.hr("Mount vanguard equipments", level=2)
+                self._change_equipment(button, equipment_assets.FLEET_DETAIL_ENTER, take_on=True)
+
+        # 与旗舰相同，事实交付点必须早于可能失败的装备回装。
+        _deliver_replacement_fact(result, fact_sink, restore_equipment)
+        return result
 
     def _dock_reset(self) -> None:
         self.dock_favourite_set(enable=False, wait_loading=False)
@@ -389,9 +459,13 @@ class GemsFleetReplacement(FleetEquipment, Dock):
             raise TypeError(message)
         return value
 
-    def _record_new_ship_emotion(self, ship: Ship) -> None:
+    def _ship_replacement_result(
+        self,
+        ship: Ship,
+        disposition: GemsShipReplacementDisposition,
+    ) -> GemsShipReplacementResult:
         emotion = self._ship_attribute(ship, "emotion")
-        self._new_fleet_emotion = min(emotion, self._new_fleet_emotion)
+        return GemsShipReplacementResult(disposition, emotion)
 
     def _select_low_level_cv(self, candidates: Sequence[Ship]) -> Ship:
         """优先选择低等级航母；同等级时选择心情更高的舰船。"""
@@ -403,7 +477,7 @@ class GemsFleetReplacement(FleetEquipment, Dock):
             ),
         )
 
-    def _normal_flagship_change_execute(self) -> bool:
+    def _normal_flagship_change_execute(self) -> GemsShipReplacementResult:
         self.ship_info_enter(
             equipment_assets.FLEET_ENTER_FLAGSHIP,
             check_button=DOCK_CHECK,
@@ -413,16 +487,15 @@ class GemsFleetReplacement(FleetEquipment, Dock):
         candidates = self.get_common_rarity_cv(min_emotion=self.min_emotion)
         if candidates:
             ship = self._select_low_level_cv(candidates)
-            self._record_new_ship_emotion(ship)
+            result = self._ship_replacement_result(ship, GemsShipReplacementDisposition.POLICY_SATISFIED)
             self._ship_change_confirm(ship.button, check_button=page_fleet.check_button)
             logger.info("Change flagship success")
-            return True
+            return result
 
         logger.info("Change flagship failed, no CV in common rarity")
-        self._new_fleet_emotion = 0
         self._dock_reset()
         self.ui_back(check_button=page_fleet.check_button)
-        return False
+        return GemsShipReplacementResult(GemsShipReplacementDisposition.NO_CANDIDATE, None)
 
     def _hard_unmount(self, button: Button, *, ship_name: str) -> None:
         if self.appear(button, offset=(20, 20)):
@@ -451,7 +524,7 @@ class GemsFleetReplacement(FleetEquipment, Dock):
             skip_first_screenshot=False,
         )
 
-    def _hard_flagship_change_execute(self) -> bool:
+    def _hard_flagship_change_execute(self) -> GemsShipReplacementResult:
         unmount_button, mount_button = HARD_BACKLINE_BUTTONS[self.fleet_to_attack_slot]
         self._hard_unmount(unmount_button, ship_name="flagship")
         self._enter_hard_dock(mount_button)
@@ -459,31 +532,30 @@ class GemsFleetReplacement(FleetEquipment, Dock):
         candidates = self.get_common_rarity_cv(max_level=31, min_emotion=self.min_emotion)
         if candidates:
             ship = self._select_low_level_cv(candidates)
-            self._record_new_ship_emotion(ship)
+            result = self._ship_replacement_result(ship, GemsShipReplacementDisposition.POLICY_SATISFIED)
             self._ship_change_confirm(ship.button, check_button=FLEET_PREPARATION)
             logger.info("Change flagship success")
-            return True
+            return result
 
         logger.info("Change flagship failed, try using leveled or exhausted CVs")
         candidates = self.get_common_rarity_cv(max_level=100)
         if candidates:
             ship = self._select_low_level_cv(candidates)
-            self._record_new_ship_emotion(ship)
+            result = self._ship_replacement_result(ship, GemsShipReplacementDisposition.FALLBACK_USED)
             self._ship_change_confirm(ship.button, check_button=FLEET_PREPARATION)
-            return False
+            return result
 
         logger.info("Change flagship failed, no CV was found")
-        self._new_fleet_emotion = 0
         self._dock_reset()
         self.ui_back(check_button=FLEET_PREPARATION)
-        return False
+        return GemsShipReplacementResult(GemsShipReplacementDisposition.NO_CANDIDATE, None)
 
-    def flagship_change_execute(self) -> bool:
+    def flagship_change_execute(self) -> GemsShipReplacementResult:
         if self.is_hard_mode:
             return self._hard_flagship_change_execute()
         return self._normal_flagship_change_execute()
 
-    def _normal_vanguard_change_execute(self) -> bool:
+    def _normal_vanguard_change_execute(self) -> GemsShipReplacementResult:
         self.ship_info_enter(
             equipment_assets.FLEET_ENTER,
             check_button=DOCK_CHECK,
@@ -493,18 +565,17 @@ class GemsFleetReplacement(FleetEquipment, Dock):
         candidates = self.get_common_rarity_dd(min_emotion=self.min_emotion)
         if candidates:
             ship = max(candidates, key=lambda candidate: self._ship_attribute(candidate, "emotion"))
-            self._record_new_ship_emotion(ship)
+            result = self._ship_replacement_result(ship, GemsShipReplacementDisposition.POLICY_SATISFIED)
             self._ship_change_confirm(ship.button, check_button=page_fleet.check_button)
             logger.info("Change vanguard success")
-            return True
+            return result
 
         logger.info("Change vanguard failed, no DD in common rarity")
-        self._new_fleet_emotion = 0
         self._dock_reset()
         self.ui_back(check_button=page_fleet.check_button)
-        return False
+        return GemsShipReplacementResult(GemsShipReplacementDisposition.NO_CANDIDATE, None)
 
-    def _hard_vanguard_change_execute(self) -> bool:
+    def _hard_vanguard_change_execute(self) -> GemsShipReplacementResult:
         unmount_button, mount_button = HARD_VANGUARD_BUTTONS[self.fleet_to_attack_slot]
         self._hard_unmount(unmount_button, ship_name="vanguard")
         self._enter_hard_dock(mount_button)
@@ -512,41 +583,38 @@ class GemsFleetReplacement(FleetEquipment, Dock):
         candidates = self.get_common_rarity_dd(min_emotion=self.min_emotion)
         if candidates:
             ship = max(candidates, key=lambda candidate: self._ship_attribute(candidate, "emotion"))
-            self._record_new_ship_emotion(ship)
+            result = self._ship_replacement_result(ship, GemsShipReplacementDisposition.POLICY_SATISFIED)
             self._ship_change_confirm(ship.button, check_button=FLEET_PREPARATION)
             logger.info("Change vanguard success")
-            return True
+            return result
 
         logger.info("Change vanguard failed, try using exhausted DDs")
         candidates = self.get_common_rarity_dd()
         if candidates:
             ship = max(candidates, key=lambda candidate: self._ship_attribute(candidate, "emotion"))
-            self._record_new_ship_emotion(ship)
+            result = self._ship_replacement_result(ship, GemsShipReplacementDisposition.FALLBACK_USED)
             self._ship_change_confirm(ship.button, check_button=FLEET_PREPARATION)
-            return False
+            return result
 
         logger.info("Change vanguard failed, no DD was found")
-        self._new_fleet_emotion = 0
         self._dock_reset()
         self.ui_back(check_button=FLEET_PREPARATION)
-        return False
+        return GemsShipReplacementResult(GemsShipReplacementDisposition.NO_CANDIDATE, None)
 
-    def vanguard_change_execute(self) -> bool:
+    def vanguard_change_execute(self) -> GemsShipReplacementResult:
         if self.is_hard_mode:
             return self._hard_vanguard_change_execute()
         return self._normal_vanguard_change_execute()
 
-    def hard_fleet_prepare(self) -> bool:
-        """困难模式退役后补齐空位；所有替换都有效时才允许重试进图。"""
-        self.campaign.emotion.update()
-        self._new_fleet_emotion = self.campaign.emotion.fleet_1.current
-        change_results: list[bool] = []
+    def hard_fleet_prepare(
+        self,
+        fact_sink: GemsShipReplacementFactSink,
+    ) -> Iterator[GemsShipReplacementResult]:
+        """补齐困难模式空位，并逐项返回已经完成的换舰结果。"""
+        _require_replacement_fact_sink(fact_sink)
         if self.appear(self.fleet_backline_1_button, offset=(20, 20)):
             logger.info("Backline is empty, change flagship")
-            change_results.append(self.flagship_change())
+            yield self.flagship_change(fact_sink)
         if self.appear(self.fleet_vanguard_1_button, offset=(20, 20)):
             logger.info("Vanguard is empty, change vanguard")
-            change_results.append(self.vanguard_change())
-        if change_results:
-            self.campaign.config.set_record(Emotion_Fleet1Value=self._new_fleet_emotion)
-        return bool(change_results) and all(change_results)
+            yield self.vanguard_change(fact_sink)
