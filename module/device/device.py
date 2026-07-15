@@ -1,5 +1,6 @@
 import collections
 import traceback
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
@@ -22,6 +23,8 @@ from module.handler.assets import GET_MISSION
 from module.logger import logger
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from module.base.type_alias import ImageArray
     from module.config.config import AzurLaneConfig
     from module.device.contracts import AppControllerService, CaptureService, ControllerService, MumuRuntimeService
@@ -276,10 +279,19 @@ class Device(Screenshot, Control, Connection):
             raise GameTooManyClickError(message)
         return False
 
-    def disable_stuck_detection(self) -> None:
-        """禁用卡死检测及其处理，用于半自动流程和调试。"""
-        logger.info("Disable stuck detection")
-        self.stuck_detection_enabled = False
+    @contextmanager
+    def suspend_stuck_detection(self) -> Iterator[None]:
+        """在当前操作内暂停卡死检测，结束后恢复原状态。"""
+        was_enabled = self.stuck_detection_enabled
+        if was_enabled:
+            logger.info("Disable stuck detection")
+            self.stuck_detection_enabled = False
+        try:
+            yield
+        finally:
+            self.stuck_detection_enabled = was_enabled
+            if was_enabled:
+                logger.info("Enable stuck detection")
 
     def app_start(self) -> None:
         if not self.config.Error_HandleError:

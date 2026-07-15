@@ -4,6 +4,7 @@ import pytest
 
 from module.config.server import CN_ACTIVITY, CN_PACKAGE
 from module.device.app_service import AppController
+from module.exception import RequestHumanTakeover
 
 if TYPE_CHECKING:
     from module.device.contracts import RetrySession
@@ -64,6 +65,13 @@ def test_app_start_falls_back_to_monkey_then_forced_activity() -> None:
         ("monkey", CN_PACKAGE, None, True),
         ("am", CN_PACKAGE, CN_ACTIVITY, False),
     ]
+
+
+def test_app_start_raises_when_every_strategy_fails() -> None:
+    app = _AppControl(am_results=[False, False], monkey_result=False)
+
+    with pytest.raises(RequestHumanTakeover, match="Unable to start app after all strategies failed"):
+        app.app_start()
 
 
 def test_current_reads_both_adb_sources_before_finding_the_focused_package() -> None:

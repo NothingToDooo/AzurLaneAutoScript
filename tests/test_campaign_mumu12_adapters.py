@@ -1,10 +1,13 @@
+from contextlib import contextmanager
 from dataclasses import replace
 from datetime import UTC, datetime, time, timedelta
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, ClassVar, Unpack, cast, override
 
 import pytest
 from config_factory import in_memory_config
 
+import module.adapters.campaign_mumu12 as campaign_adapters
 import module.adapters.encounter_mumu12 as encounter_adapters
 from module.adapters.campaign_mumu12 import (
     CampaignRuntimeEvidenceError,
@@ -111,6 +114,8 @@ from module.gameplay.campaign_live import CampaignCheckpointUnavailable, Campaig
 from module.gameplay.encounter import HardBattleOutcome, HardFleet, HardSettings, HardStopReason
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from module.config.config import AzurLaneConfig
     from module.config.config_generated import ConfigOverrides
     from module.interaction import CancellationSignal
@@ -123,6 +128,38 @@ def _variant(tokens: tuple[str, ...]) -> RunVariant:
         ),
         spawn_waves=(SpawnWave(0, enemy=1), SpawnWave(1, boss=1)),
     )
+
+
+def test_combat_stuck_detection_pause_is_scoped(monkeypatch: pytest.MonkeyPatch) -> None:
+    events: list[str] = []
+
+    @contextmanager
+    def suspend_stuck_detection() -> Iterator[None]:
+        events.append("disable")
+        try:
+            yield
+        finally:
+            events.append("enable")
+
+    runtime = cast(
+        "DeclarativeCampaignMapRuntime",
+        SimpleNamespace(
+            _runtime_profile=SimpleNamespace(combat_disable_stuck_detection_battle=4),
+            battle_count=4,
+            device=SimpleNamespace(suspend_stuck_detection=suspend_stuck_detection),
+            map_is_clear_mode=False,
+        ),
+    )
+
+    def combat_status(_runtime: object, expected_end: object = None) -> None:
+        assert expected_end is None
+        events.append("combat")
+
+    monkeypatch.setattr(campaign_adapters.CampaignEngine, "combat_status", combat_status)
+
+    DeclarativeCampaignMapRuntime.combat_status(runtime)
+
+    assert events == ["disable", "combat", "enable"]
 
 
 def _definition() -> CampaignStageDefinition:

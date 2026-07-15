@@ -73,3 +73,24 @@ def test_benchmark_keeps_first_result_when_costs_tie(monkeypatch: pytest.MonkeyP
 
     assert benchmark.benchmark(screenshot=("nemu_ipc", "nemu_ipc")) == ("nemu_ipc", "minitouch")
     assert "Fixed screenshot method: nemu_ipc (first)" in messages
+
+
+def test_benchmark_restores_stuck_detection_after_measurement() -> None:
+    events: list[str] = []
+
+    class _DetectionScope:
+        def __enter__(self) -> None:
+            events.append("disable")
+
+        def __exit__(self, *_args: object) -> None:
+            events.append("enable")
+
+    benchmark = object.__new__(Benchmark)
+    benchmark.TEST_TOTAL = 1
+    benchmark.TEST_BEST = 1
+    benchmark.device = SimpleNamespace(suspend_stuck_detection=_DetectionScope)
+
+    result = benchmark.benchmark_test(lambda: events.append("measure"))
+
+    assert isinstance(result, float)
+    assert events == ["disable", "measure", "enable"]

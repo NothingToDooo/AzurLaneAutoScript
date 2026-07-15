@@ -8,7 +8,6 @@ from rich.text import Text
 from module.base.utils import float2str as float2str_
 from module.base.utils import random_rectangle_point
 from module.campaign.campaign_ui import CampaignUI
-from module.daemon.daemon_base import DaemonBase
 from module.exception import RequestHumanTakeover
 from module.logger import emit_renderables, logger
 
@@ -57,7 +56,7 @@ def _evaluate_speed(
     return Text(label, style=style)
 
 
-class Benchmark(DaemonBase, CampaignUI):
+class Benchmark(CampaignUI):
     TEST_TOTAL = 15
     TEST_BEST = int(TEST_TOTAL * 0.8)
 
@@ -67,19 +66,20 @@ class Benchmark(DaemonBase, CampaignUI):
         logger.info(f"Testing function: {function_name}")
         record = []
 
-        for n in range(1, self.TEST_TOTAL + 1):
-            start = time.perf_counter()
+        with self.device.suspend_stuck_detection():
+            for n in range(1, self.TEST_TOTAL + 1):
+                start = time.perf_counter()
 
-            try:
-                func(*args, **kwargs)
-            except RequestHumanTakeover:
-                logger.critical("RequestHumanTakeover")
-                logger.warning(f"Benchmark tests failed on func: {function_name}")
-                return "Failed"
+                try:
+                    func(*args, **kwargs)
+                except RequestHumanTakeover:
+                    logger.critical("RequestHumanTakeover")
+                    logger.warning(f"Benchmark tests failed on func: {function_name}")
+                    return "Failed"
 
-            cost = time.perf_counter() - start
-            logger.attr(f"{str(n).rjust(2, '0')}/{self.TEST_TOTAL}", f"{float2str(cost)}")
-            record.append(cost)
+                cost = time.perf_counter() - start
+                logger.attr(f"{str(n).rjust(2, '0')}/{self.TEST_TOTAL}", f"{float2str(cost)}")
+                record.append(cost)
 
         logger.info("Benchmark tests done")
         average = float(np.mean(np.sort(record)[: self.TEST_BEST]))

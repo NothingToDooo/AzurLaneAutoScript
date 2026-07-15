@@ -1,12 +1,9 @@
 import abc
-import ctypes
 from collections import deque
 from functools import partial, wraps
 from itertools import count
 from threading import Lock, Thread
 from typing import TYPE_CHECKING, NoReturn, Protocol
-
-from module.logger import logger
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -77,21 +74,13 @@ def capture[**P, ResultT](sync_fn: Callable[P, ResultT], *args: P.args, **kwargs
     """将 sync_fn 的返回值或任意 BaseException 封装为 Outcome。"""
     try:
         return Value(sync_fn(*args, **kwargs))
-    # 线程池 outcome 边界：需要把 _JobKill、KeyboardInterrupt 等跨线程异常传回调用方。
+    # 线程池 outcome 边界：需要把 KeyboardInterrupt 等跨线程异常传回调用方。
     except BaseException as exc:  # noqa: BLE001
         exc = remove_tb_frames(exc, 1)
         return Error(exc)
 
 
-class JobError(Exception):
-    pass
-
-
 class JobTimeout(Exception):
-    pass
-
-
-class _JobKill(Exception):
     pass
 
 
@@ -108,12 +97,11 @@ class Job[ResultT]:
 
     def __init__(self, worker: WorkerThread, func: Callable[[], ResultT]) -> None:
         # Having attribute "worker" means job is ongoing
-        # Not having attribute "worker" means job is finished or killed
+        # Not having attribute "worker" means job is finished
         self.worker: WorkerThread | None = worker
         self.func = func
 
         self.queue: deque[Outcome[ResultT]] = deque()
-        self.put_lock = Lock()
         self.notify_get = Lock()
         self.notify_get.acquire()
 
@@ -129,24 +117,12 @@ class Job[ResultT]:
         item = self.queue.popleft()
         return item.unwrap()
 
-    def get_or_kill(self, timeout: float) -> ResultT:
-        """timeout 秒内未完成则终止线程并抛出 JobTimeout。
-
-        线程池已满时，JobTimeout 可能无法立即抛出。
-        """
+    def get_or_timeout(self, timeout: float) -> ResultT:
+        """timeout 秒内未完成则抛出 JobTimeout，底层调用继续占用原 worker。"""
         if self.notify_get.acquire(timeout=timeout):
             item = self.queue.popleft()
             return item.unwrap()
-        self._kill()
         raise JobTimeout
-
-    def _kill(self) -> None:
-        with self.put_lock:
-            worker = self.worker
-            if worker is None:
-                return
-            worker.kill()
-            self.worker = None
 
     def run(self, worker: WorkerThread) -> None:
         result = capture(self.func)
@@ -155,12 +131,9 @@ class Job[ResultT]:
         worker.thread_pool.idle_workers[worker] = None
         worker.thread_pool.release_full_lock()
 
-        if isinstance(result, Error) and isinstance(result.error, _JobKill):
-            return
-        with self.put_lock:
-            self.queue.append(result)
-            self.worker = None
-            self.notify_get.release()
+        self.queue.append(result)
+        self.worker = None
+        self.notify_get.release()
 
 
 name_counter = count()
@@ -218,29 +191,6 @@ class WorkerThread:
                     del self.thread_pool.all_workers[self]
                     self.thread_pool.release_full_lock()
                     return
-
-    def kill(self) -> bool:
-        """用异步异常终止阻塞线程，调用时必须持有 job.put_lock。
-
-        返回异常是否成功注入。
-        """
-        ident = self.thread.ident
-        if ident is None:
-            logger.error(f"Failed to kill thread {ident} from job {self.job}")
-            return False
-        thread_id = ctypes.c_long(ident)
-        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, ctypes.py_object(_JobKill))
-        if res <= 1:
-            self.thread_pool.all_workers.pop(self, None)
-            self.thread_pool.release_full_lock()
-            return True
-        try:
-            job = self.job
-        except AttributeError:
-            job = None
-        logger.error(f"Failed to kill thread {self.thread.ident} from job {job}")
-        ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0)
-        return False
 
 
 class WorkerPool:

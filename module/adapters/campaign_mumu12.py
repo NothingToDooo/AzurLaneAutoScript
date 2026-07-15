@@ -765,7 +765,9 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     def combat_status(self, expected_end: CombatEnd | None = None) -> None:
         threshold = self._runtime_profile.combat_disable_stuck_detection_battle
         if threshold is not None and not self.map_is_clear_mode and self.battle_count >= threshold:
-            self.device.disable_stuck_detection()
+            with self.device.suspend_stuck_detection():
+                CampaignEngine.combat_status(self, expected_end=expected_end)
+            return
         CampaignEngine.combat_status(self, expected_end=expected_end)
 
     def ensure_no_stage_entrance(self, *, skip_first_screenshot: bool = True) -> bool:
