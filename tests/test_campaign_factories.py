@@ -217,15 +217,11 @@ def _valid_settings(command: str) -> dict[str, FrozenJsonValue]:
             "emotion": {
                 "mode": "calculate",
                 "fleet1": {
-                    "value": 119,
-                    "recorded_at": _OBSERVED_AT.isoformat(),
                     "control": "prevent_green_face",
                     "recover": "not_in_dormitory",
                     "oath": False,
                 },
                 "fleet2": {
-                    "value": 120,
-                    "recorded_at": _OBSERVED_AT.isoformat(),
                     "control": "keep_exp_bonus",
                     "recover": "dormitory_floor_1",
                     "oath": True,
@@ -366,7 +362,7 @@ def test_campaign_factory_decodes_complete_typed_execution_settings() -> None:
     assert execution.automation.use_auto_search
     assert execution.fleets.fleet2_mode.value == "combat_manual"
     assert execution.submarine.mode.value == "boss_only"
-    assert execution.emotion.fleet2.recorded_at == _OBSERVED_AT
+    assert execution.emotion.fleet2.control.value == "keep_exp_bonus"
     assert execution.hp_control.hp_balance_weight == (1_000, 900, 800)
     assert execution.enemy_priority.scale_balance_weight.value == "S3_enemy_first"
 

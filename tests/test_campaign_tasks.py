@@ -120,8 +120,6 @@ _RESOURCE_RETRY = timedelta(minutes=180)
 
 def _execution() -> CampaignExecutionSettings:
     fleet_emotion = CampaignFleetEmotionSettings(
-        value=119,
-        recorded_at=_OBSERVED_AT,
         control=EmotionControl.PREVENT_GREEN_FACE,
         recover=EmotionRecoverLocation.NOT_IN_DORMITORY,
         oath=False,
@@ -1415,8 +1413,6 @@ def test_campaign_datetimes_must_be_timezone_aware() -> None:
         )
     with pytest.raises(ValueError, match="timezone-aware"):
         CampaignLimits(event_deadline_at=naive)
-    with pytest.raises(ValueError, match="timezone-aware"):
-        replace(_execution().emotion.fleet1, recorded_at=naive)
 
 
 def test_campaign_specs_require_a_daily_schedule() -> None:

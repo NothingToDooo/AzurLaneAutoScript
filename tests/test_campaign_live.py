@@ -136,8 +136,6 @@ _DEFAULT_STAGE_REF = StageRef("campaign_main", "1-1")
 
 def _execution() -> CampaignExecutionSettings:
     fleet_emotion = CampaignFleetEmotionSettings(
-        value=119,
-        recorded_at=_NOW,
         control=EmotionControl.PREVENT_GREEN_FACE,
         recover=EmotionRecoverLocation.NOT_IN_DORMITORY,
         oath=False,

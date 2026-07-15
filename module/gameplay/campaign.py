@@ -375,15 +375,11 @@ class CampaignSubmarineSettings:
 
 @dataclass(frozen=True, slots=True)
 class CampaignFleetEmotionSettings:
-    value: int
-    recorded_at: datetime
     control: EmotionControl
     recover: EmotionRecoverLocation
     oath: bool
 
     def __post_init__(self) -> None:
-        _validate_int_range(self.value, field_name="value", minimum=0, maximum=150)
-        _validate_aware_datetime(self.recorded_at, field_name="recorded_at")
         if not isinstance(self.control, EmotionControl):
             message = "control must be an EmotionControl"
             raise TypeError(message)

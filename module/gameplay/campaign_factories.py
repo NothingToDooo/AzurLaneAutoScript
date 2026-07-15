@@ -267,8 +267,6 @@ def _submarine(decoder: SettingsDecoder) -> CampaignSubmarineSettings:
 
 def _fleet_emotion(decoder: SettingsDecoder) -> CampaignFleetEmotionSettings:
     settings = CampaignFleetEmotionSettings(
-        value=decoder.integer("value", minimum=0, maximum=150),
-        recorded_at=decoder.datetime("recorded_at"),
         control=decoder.enum("control", EmotionControl),
         recover=decoder.enum("recover", EmotionRecoverLocation),
         oath=decoder.boolean("oath"),

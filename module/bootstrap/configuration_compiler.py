@@ -1018,18 +1018,11 @@ class WebConfigurationCompiler:
             "coin_limit": view.value("EventGeneral", "TaskBalancer", "CoinLimit", expected=int),
         }
 
-    def _campaign_execution(self, view: _ConfigView, name: str) -> dict[str, JsonValue]:
+    @staticmethod
+    def _campaign_execution(view: _ConfigView, name: str) -> dict[str, JsonValue]:
         def fleet_emotion(index: int) -> dict[str, JsonValue]:
             prefix = f"Fleet{index}"
-            record_path = (name, "Emotion", f"{prefix}Record")
-            recorded_at = _local_datetime(
-                view.value(*record_path, expected=str),
-                self._timezone,
-                path=record_path,
-            )
             return {
-                "value": view.value(name, "Emotion", f"{prefix}Value", expected=int),
-                "recorded_at": recorded_at.isoformat(),
                 "control": view.value(name, "Emotion", f"{prefix}Control", expected=str),
                 "recover": view.value(name, "Emotion", f"{prefix}Recover", expected=str),
                 "oath": view.value(name, "Emotion", f"{prefix}Oath", expected=bool),

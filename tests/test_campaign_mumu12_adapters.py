@@ -221,8 +221,6 @@ def _definition() -> CampaignStageDefinition:
 
 def _execution_settings() -> CampaignExecutionSettings:
     fleet_emotion = CampaignFleetEmotionSettings(
-        value=119,
-        recorded_at=datetime(2026, 7, 13, 8, 30, tzinfo=UTC),
         control=EmotionControl.PREVENT_YELLOW_FACE,
         recover=EmotionRecoverLocation.DORMITORY_FLOOR_1,
         oath=True,
@@ -250,7 +248,7 @@ def _execution_settings() -> CampaignExecutionSettings:
             SubmarineAutoSearchMode.AUTO_CALL,
             SubmarineDistanceToBoss.ONE_GRID_TO_BOSS,
         ),
-        emotion=CampaignEmotionSettings(EmotionMode.CALCULATE, fleet_emotion, replace(fleet_emotion, value=101)),
+        emotion=CampaignEmotionSettings(EmotionMode.CALCULATE, fleet_emotion, fleet_emotion),
         hp_control=CampaignHpControlSettings(
             use_hp_balance=True,
             use_emergency_repair=True,

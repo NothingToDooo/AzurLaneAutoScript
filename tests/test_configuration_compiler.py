@@ -149,6 +149,54 @@ def test_compiled_task_revision_changes_only_for_the_changed_task() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("Fleet1Value", 73),
+        ("Fleet1Record", "2026-07-15 12:34:56"),
+        ("Fleet2Value", 91),
+        ("Fleet2Record", "2026-07-15 12:34:56"),
+    ],
+)
+def test_campaign_revision_ignores_runtime_emotion_ledger_updates(field_name: str, value: object) -> None:
+    document = _template()
+    original = WebConfigurationCompiler().compile(document)
+    main = cast("dict[str, object]", document["Main"])
+    emotion = cast("dict[str, object]", main["Emotion"])
+    emotion[field_name] = value
+
+    changed = WebConfigurationCompiler().compile(document)
+
+    assert changed.tasks["main"] == original.tasks["main"]
+    assert changed.task_revisions["main"] == original.task_revisions["main"]
+    changed_main = cast("dict[str, object]", changed.runtime_document["Main"])
+    changed_emotion = cast("dict[str, object]", changed_main["Emotion"])
+    if isinstance(value, str):
+        assert str(changed_emotion[field_name]) == value
+    else:
+        assert changed_emotion[field_name] == value
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("Fleet1Control", "prevent_yellow_face"),
+        ("Fleet1Recover", "dormitory_floor_1"),
+        ("Fleet1Oath", True),
+    ],
+)
+def test_campaign_revision_tracks_emotion_policy_updates(field_name: str, value: object) -> None:
+    document = _template()
+    original = WebConfigurationCompiler().compile(document)
+    main = cast("dict[str, object]", document["Main"])
+    emotion = cast("dict[str, object]", main["Emotion"])
+    emotion[field_name] = value
+
+    changed = WebConfigurationCompiler().compile(document)
+
+    assert changed.task_revisions["main"] != original.task_revisions["main"]
+
+
 def test_compiled_settings_are_deeply_read_only_and_detached_from_source() -> None:
     document = _template()
     compiled = WebConfigurationCompiler().compile(document)
@@ -197,8 +245,6 @@ def test_compiler_projects_campaign_opsi_and_direct_command_settings() -> None:
     emotion = cast("dict[str, JsonValue]", execution["emotion"])
     assert emotion["mode"] == "calculate"
     assert emotion["fleet1"] == {
-        "value": 119,
-        "recorded_at": "2019-12-31T16:00:00+00:00",
         "control": "prevent_green_face",
         "recover": "not_in_dormitory",
         "oath": False,
