@@ -134,7 +134,7 @@ OCR 识别失败另外按 profile 保存最新 raw、processed 和 metadata 样�
 
 ## 通知
 
-通知只保留显式 SMTP 字段。发送发生在任务结果边界，每个收件人最多尝试两次；失败写日志，但不改变已经确定的任务结果。没有 OnePush YAML、spool、outbox、pump 或后台重试服务。
+通知只保留显式 SMTP 字段。发送发生在任务结果边界，每个收件人只尝试一次；失败写日志，但不改变已经确定的任务结果。没有 OnePush YAML、spool、outbox、pump 或后台重试服务。
 
 ## 完成约束
 
