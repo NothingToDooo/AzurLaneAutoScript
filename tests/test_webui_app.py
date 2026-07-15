@@ -1,6 +1,7 @@
 import json
 from copy import deepcopy
 from pathlib import Path
+from threading import Event, RLock, Thread
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -59,6 +60,7 @@ def test_failed_synchronous_save_keeps_pending_fields_for_the_next_candidate() -
     gui = AlasGUI.__new__(AlasGUI)
     gui.alive = True
     gui._pending_config = {}  # noqa: SLF001 - 验证跨字段候选在失败后继续累积。
+    gui._config_save_lock = RLock()  # noqa: SLF001 - 绕过完整 UI 构造，仅初始化保存边界。
     gui._saving_config = False  # noqa: SLF001 - 验证同步保存状态机。
 
     attempts: list[dict[str, object]] = []
@@ -92,6 +94,7 @@ def test_config_change_saves_synchronously_without_a_background_worker() -> None
     gui = AlasGUI.__new__(AlasGUI)
     gui.alive = True
     gui._pending_config = {}  # noqa: SLF001 - 验证同步保存状态机。
+    gui._config_save_lock = RLock()  # noqa: SLF001 - 绕过完整 UI 构造，仅初始化保存边界。
     gui._saving_config = False  # noqa: SLF001 - 验证同步保存状态机。
     saved: list[dict[str, object]] = []
 
@@ -108,10 +111,40 @@ def test_config_change_saves_synchronously_without_a_background_worker() -> None
     assert not hasattr(gui, "modified_config_queue")
 
 
+def test_config_change_waits_for_the_session_save_lock() -> None:
+    gui = AlasGUI.__new__(AlasGUI)
+    gui.alive = True
+    gui._pending_config = {}  # noqa: SLF001 - 验证跨线程保存边界。
+    gui._config_save_lock = RLock()  # noqa: SLF001 - 绕过完整 UI 构造，仅初始化保存边界。
+    gui._saving_config = False  # noqa: SLF001 - 验证同步保存状态机。
+    worker_started = Event()
+    save_entered = Event()
+
+    def save(_modified: dict[str, object]) -> bool:
+        save_entered.set()
+        return True
+
+    def change_config() -> None:
+        worker_started.set()
+        gui.save_config_change("Alas.Optimization.ScreenshotInterval", 0.2)
+
+    vars(gui)["_save_config"] = save
+    with gui._config_save_lock:  # noqa: SLF001 - 主线程占有锁时，回调线程不得进入保存。
+        worker = Thread(target=change_config)
+        worker.start()
+        assert worker_started.wait(timeout=1)
+        assert not save_entered.wait(timeout=0.1)
+
+    assert save_entered.wait(timeout=1)
+    worker.join(timeout=1)
+    assert not worker.is_alive()
+
+
 def test_config_change_after_session_stop_does_not_write() -> None:
     gui = AlasGUI.__new__(AlasGUI)
     gui.alive = True
     gui._pending_config = {}  # noqa: SLF001 - 验证 session 停止边界。
+    gui._config_save_lock = RLock()  # noqa: SLF001 - 绕过完整 UI 构造，仅初始化保存边界。
     gui._saving_config = False  # noqa: SLF001 - 验证 session 停止边界。
     attempts: list[dict[str, object]] = []
 
@@ -138,6 +171,7 @@ def test_reentrant_config_change_is_saved_after_the_active_candidate() -> None:
     gui = AlasGUI.__new__(AlasGUI)
     gui.alive = True
     gui._pending_config = {}  # noqa: SLF001 - 验证同步保存防重入。
+    gui._config_save_lock = RLock()  # noqa: SLF001 - 绕过完整 UI 构造，仅初始化保存边界。
     gui._saving_config = False  # noqa: SLF001 - 验证同步保存防重入。
     attempts: list[dict[str, object]] = []
 
@@ -230,7 +264,8 @@ def test_webui_field_save_accepts_scheduler_number_and_range(
     )
 
     assert len(written) == 1
-    assert validated == written
+    assert len(validated) == 2
+    assert validated[-1] == written[0]
     commission = cast("dict[str, object]", written[0]["Commission"])
     commission_scheduler = cast("dict[str, object]", commission["Scheduler"])
     hard = cast("dict[str, object]", written[0]["Hard"])
@@ -290,6 +325,43 @@ def test_webui_field_save_preserves_state_written_during_process_stop(
     saved_main = cast("dict[str, object]", saved["Main"])
     assert cast("dict[str, object]", saved_main["Scheduler"])["NextRun"] == "2026-07-16 01:02:03"
     assert cast("dict[str, object]", saved_main["Storage"])["Storage"] == {"progress": {"wave": 4}}
+
+
+def test_webui_field_save_reloads_after_a_concurrent_process_exit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gui = AlasGUI.__new__(AlasGUI)
+    gui.ALAS_ARGS = read_file(filepath_args())
+    vars(gui)["pin_remove_invalid_mark"] = lambda _paths: None
+    vars(gui)["pin_set_invalid_mark"] = lambda _paths: None
+    before_exit = _template()
+    after_exit = deepcopy(before_exit)
+    main = cast("dict[str, object]", after_exit["Main"])
+    scheduler = cast("dict[str, object]", main["Scheduler"])
+    scheduler["NextRun"] = "2026-07-16 02:03:04"
+    reads = iter([before_exit, after_exit])
+    written: list[dict[str, object]] = []
+
+    class _Manager:
+        alive = False
+
+    monkeypatch.setattr(webui_app, "toast", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(webui_app, "read_config_file", lambda _name: deepcopy(next(reads)))
+    monkeypatch.setattr(webui_app, "validate_personal_configuration", lambda _candidate: None)
+    monkeypatch.setattr(webui_app.ProcessManager, "instance", _Manager)
+    monkeypatch.setattr(
+        webui_app,
+        "write_config_file",
+        lambda _name, document: written.append(cast("dict[str, object]", document)),
+    )
+
+    gui._save_config_unchecked(  # noqa: SLF001 - 已退出进程的最终运行状态也必须从磁盘重读。
+        {"Alas.Optimization.ScreenshotInterval": 0.2}
+    )
+
+    assert len(written) == 1
+    saved_main = cast("dict[str, object]", written[0]["Main"])
+    assert cast("dict[str, object]", saved_main["Scheduler"])["NextRun"] == "2026-07-16 02:03:04"
 
 
 def test_webui_field_save_revalidates_gameplay_fields_written_during_stop(

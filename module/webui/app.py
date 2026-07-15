@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 from functools import partial
 from pathlib import Path
+from threading import RLock
 from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
@@ -120,6 +121,7 @@ class AlasGUI(Frame):
     def __init__(self) -> None:
         super().__init__()
         self._pending_config: dict[str, MutableDeepValue] = {}
+        self._config_save_lock = RLock()
         self._saving_config = False
         self._config_listeners_initialized = False
         self.alas_name = ""
@@ -438,6 +440,11 @@ class AlasGUI(Frame):
         logger.info("Init config listeners done.")
 
     def save_config_change(self, path: str, value: MutableDeepValue) -> None:
+        # PyWebIO 的按钮回调仍可能从独立线程进入；同一 session 的配置写入必须串行。
+        with self._config_save_lock:
+            self._save_config_change_serialized(path, value)
+
+    def _save_config_change_serialized(self, path: str, value: MutableDeepValue) -> None:
         if not self.alive:
             return
         self._pending_config[path] = value
@@ -502,14 +509,14 @@ class AlasGUI(Frame):
             return candidate
 
         if updates:
-            # 先校验输入，停机后再从磁盘重建一次，避免覆盖任务退出时写入的运行状态。
-            config = build_candidate()
+            # 先校验输入，避免无效设置导致正在运行的任务被停止。
+            build_candidate()
             manager = ProcessManager.instance()
             if manager.alive:
                 logger.info("Stop alas before writing configuration")
                 manager.stop()
-                # 退出过程也可能推进玩法字段，最终组合必须再次通过全部 factory 和内容校验。
-                config = build_candidate()
+            # 无论本轮是否主动停机都重新读盘；任务可能刚在并行退出并写入 Scheduler/Storage。
+            config = build_candidate()
             logger.info(f"Save config {filepath_config('alas')}, {dict_to_kv(updates)}")
             write_config_file("alas", config)
             toast(
