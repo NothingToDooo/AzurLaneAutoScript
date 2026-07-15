@@ -1,28 +1,22 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from module.application import AbortToken, DelayRange, ExecutionMode, RunMetadata, TaskContext, TaskId
 from module.gameplay.facility import (
+    CommissionPreset,
     CommissionReport,
+    CommissionSelectionPolicy,
     CommissionSettings,
-    CommissionTask,
-    CommissionWorkflow,
-    ResearchReport,
-    ResearchSettings,
-    ResearchTask,
-    ResearchWorkflow,
-    TacticalReport,
-    TacticalSettings,
-    TacticalTask,
-    TacticalWorkflow,
 )
 from module.gameplay.facility_factories import FacilityWorkflows, build_facility_factories
 from module.runtime import FrozenJsonValue, SettingsDocumentError, TaskBuildContext, TaskStateDocument
 from module.task_registry import TASK_CATALOG
 
 if TYPE_CHECKING:
+    from module.gameplay.facility import CommissionWorkflow, ResearchWorkflow, TacticalWorkflow
     from module.interaction import CancellationSignal
 
 _NOW = datetime(2026, 7, 13, 8, tzinfo=UTC)
@@ -38,11 +32,6 @@ _RESEARCH_SELECTION: dict[str, FrozenJsonValue] = {
     "preset_filter": "series_9_blueprint_only",
     "custom_filter": "Q > G > shortest",
 }
-_COMMISSION_SELECTION: dict[str, FrozenJsonValue] = {
-    "preset_filter": "cube",
-    "custom_filter": "DailyEvent > Gem-4 > shortest",
-    "do_major_commission": False,
-}
 _TACTICAL_OVERFLOW: dict[str, FrozenJsonValue] = {
     "enabled": True,
     "t1_allow": 200,
@@ -57,32 +46,26 @@ _TACTICAL_STUDENT: dict[str, FrozenJsonValue] = {
 }
 
 
-class _ResearchWorkflow:
-    @staticmethod
-    def execute(settings: ResearchSettings, cancellation: CancellationSignal) -> ResearchReport:
-        assert isinstance(settings, ResearchSettings)
+class _RecordingWorkflow[SettingsT, ReportT]:
+    def __init__(self, report: ReportT) -> None:
+        self._report = report
+        self.settings: SettingsT | None = None
+
+    def execute(self, settings: SettingsT, cancellation: CancellationSignal) -> ReportT:
         cancellation.raise_if_requested()
-        return ResearchReport(observed_at=_NOW, available_slots=5, first_finish_at=None)
+        self.settings = settings
+        return self._report
 
 
-class _CommissionWorkflow:
-    @staticmethod
-    def execute(settings: CommissionSettings, cancellation: CancellationSignal) -> CommissionReport:
-        assert isinstance(settings, CommissionSettings)
-        cancellation.raise_if_requested()
-        return CommissionReport(_NOW, (), 0, 0)
-
-
-class _TacticalWorkflow:
-    @staticmethod
-    def execute(settings: TacticalSettings, cancellation: CancellationSignal) -> TacticalReport:
-        assert isinstance(settings, TacticalSettings)
-        cancellation.raise_if_requested()
-        return TacticalReport(_NOW, None)
-
-
-def _workflows() -> FacilityWorkflows:
-    return FacilityWorkflows(_ResearchWorkflow(), _CommissionWorkflow(), _TacticalWorkflow())
+def _workflows(
+    commission: _RecordingWorkflow[CommissionSettings, CommissionReport] | None = None,
+) -> FacilityWorkflows:
+    port = _RecordingWorkflow(object())
+    return FacilityWorkflows(
+        research=cast("ResearchWorkflow", port),
+        commission=cast("CommissionWorkflow", port if commission is None else commission),
+        tactical=cast("TacticalWorkflow", port),
+    )
 
 
 def _context(command: str, settings: dict[str, FrozenJsonValue]) -> TaskBuildContext:
@@ -94,49 +77,46 @@ def _context(command: str, settings: dict[str, FrozenJsonValue]) -> TaskBuildCon
     )
 
 
-@pytest.mark.parametrize(
-    ("command", "settings", "task_type"),
-    [
-        (
-            "research",
-            {"schedule": _SERVER_UPDATE_SCHEDULE, "selection": _RESEARCH_SELECTION},
-            ResearchTask,
-        ),
-        (
+def _task_context(command: str) -> TaskContext:
+    return TaskContext(
+        task_id=TaskId(command),
+        started_at=_NOW,
+        mode=ExecutionMode.SCHEDULED_JOB,
+        metadata=RunMetadata(settings_revision=2, content_revision="content-1"),
+        abort=AbortToken(),
+    )
+
+
+def test_commission_factory_passes_decoded_settings_to_workflow() -> None:
+    workflow = _RecordingWorkflow[CommissionSettings, CommissionReport](CommissionReport(_NOW, (), 0, 0))
+    task = build_facility_factories(_workflows(workflow))["commission"].build(
+        _context(
             "commission",
             {
-                "failure_retry_seconds": {"lower_seconds": 600, "upper_seconds": 600},
+                "failure_retry_seconds": {"lower_seconds": 347, "upper_seconds": 911},
                 "commission_limit_enabled": True,
-                "gems_farming_deferral_seconds": 7200,
-                "selection": _COMMISSION_SELECTION,
+                "gems_farming_deferral_seconds": 5_432,
+                "selection": {
+                    "preset_filter": "oil",
+                    "custom_filter": "Gem-8 > Oil-10 > shortest",
+                    "do_major_commission": True,
+                },
             },
-            CommissionTask,
-        ),
-        (
-            "tactical",
-            {
-                "failure_retry_seconds": {"lower_seconds": 600, "upper_seconds": 600},
-                "server_update_schedule": _SERVER_UPDATE_SCHEDULE,
-                "tactical_filter": "SameT4 > SameT3 > first",
-                "rapid_training_slot": "do_not_use",
-                "experience_overflow": _TACTICAL_OVERFLOW,
-                "student": _TACTICAL_STUDENT,
-            },
-            TacticalTask,
-        ),
-    ],
-)
-def test_facility_factories_decode_strict_settings(
-    command: str,
-    settings: dict[str, FrozenJsonValue],
-    task_type: type[object],
-) -> None:
-    factories = build_facility_factories(_workflows())
+        )
+    )
 
-    task = factories[command].build(_context(command, settings))
+    task.run(_task_context("commission"))
 
-    assert isinstance(task, task_type)
-    assert set(factories) == {"research", "commission", "tactical"}
+    assert workflow.settings == CommissionSettings(
+        failure_retry_delay=DelayRange(347, 911),
+        commission_limit_enabled=True,
+        selection=CommissionSelectionPolicy(
+            preset_filter=CommissionPreset.OIL,
+            custom_filter="Gem-8 > Oil-10 > shortest",
+            do_major_commission=True,
+        ),
+        gems_farming_deferral=timedelta(seconds=5_432),
+    )
 
 
 def test_facility_factories_reject_missing_and_unknown_settings() -> None:
@@ -172,9 +152,10 @@ def test_facility_factories_reject_missing_and_unknown_settings() -> None:
 
 
 def test_facility_workflows_fail_fast_for_missing_execute_port() -> None:
+    port = _RecordingWorkflow(object())
     with pytest.raises(TypeError, match=r"research must implement execute\(\)"):
         FacilityWorkflows(
             research=cast("ResearchWorkflow", object()),
-            commission=cast("CommissionWorkflow", _CommissionWorkflow()),
-            tactical=cast("TacticalWorkflow", _TacticalWorkflow()),
+            commission=cast("CommissionWorkflow", port),
+            tactical=cast("TacticalWorkflow", port),
         )

@@ -1,9 +1,14 @@
 import sys
 from ipaddress import IPv4Address
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 import gui
+import module.webui.app as webui_app
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def test_main_uses_local_webui_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -31,16 +36,39 @@ def test_main_uses_local_webui_defaults(monkeypatch: pytest.MonkeyPatch) -> None
     ]
 
 
-def test_main_accepts_flag_only_auto_run(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[str] = []
+def test_main_forwards_auto_run_to_the_deferred_webui_factory(monkeypatch: pytest.MonkeyPatch) -> None:
+    starts: list[str] = []
+
+    class _Manager:
+        @staticmethod
+        def start_default() -> None:
+            starts.append("alas")
+
+    def build_asgi_app(**kwargs: object) -> object:
+        callbacks = kwargs["on_startup"]
+        assert isinstance(callbacks, list)
+        candidate = callbacks[1]
+        assert callable(candidate)
+        auto_start = cast("Callable[[], None]", candidate)
+        auto_start()
+        return object()
+
+    def run(app: str, **kwargs: object) -> None:
+        assert app == "module.webui.app:app"
+        assert kwargs["factory"] is True
+        webui_app.app()
 
     monkeypatch.setattr(sys, "argv", ["gui.py", "--run"])
     monkeypatch.setattr(gui, "prepare_pywebio_imports", lambda: None)
-    monkeypatch.setattr(gui.uvicorn, "run", lambda app, **_kwargs: calls.append(app))
+    monkeypatch.setattr(gui.uvicorn, "run", run)
+    monkeypatch.setattr(webui_app.AlasGUI, "set_theme", lambda: None)
+    monkeypatch.setattr(webui_app, "atomic_failure_cleanup", lambda _path: None)
+    monkeypatch.setattr(webui_app, "asgi_app", build_asgi_app)
+    monkeypatch.setattr(webui_app.ProcessManager, "instance", _Manager)
 
     gui.main()
 
-    assert calls == ["module.webui.app:app"]
+    assert starts == ["alas"]
 
 
 @pytest.mark.parametrize(

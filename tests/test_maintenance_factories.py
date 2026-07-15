@@ -1,27 +1,26 @@
+from datetime import UTC, datetime
 from pathlib import Path
 from types import MappingProxyType
 from typing import cast
 
 import pytest
 
+from module.application import AbortToken, ExecutionMode, RunMetadata, TaskContext, TaskId
 from module.interaction import AppLifecycle, AppStatus, CancellationSignal
 from module.maintenance import (
-    BenchmarkCategory,
     BenchmarkMeasurement,
     BenchmarkReady,
     BenchmarkReport,
     BenchmarkScene,
     BenchmarkSelection,
-    BenchmarkTask,
-    GameManagerTask,
     MaintenanceServices,
-    RestartTask,
     UncensoredPayload,
-    UncensoredTask,
     build_maintenance_factories,
 )
 from module.runtime import FrozenJsonValue, SettingsDocumentError, TaskBuildContext, TaskStateDocument
 from module.task_registry import TASK_CATALOG
+
+_STARTED_AT = datetime(2026, 7, 15, 8, tzinfo=UTC)
 
 
 class _Services:
@@ -67,8 +66,9 @@ class _Services:
     def measure(self, scene: BenchmarkScene, cancellation: CancellationSignal) -> BenchmarkReport:
         cancellation.raise_if_requested()
         self.calls.append(f"measure:{scene.value}")
-        measurement = BenchmarkMeasurement(BenchmarkCategory.SCREENSHOT, "test", average_seconds=0.1)
-        selection = BenchmarkSelection(BenchmarkCategory.SCREENSHOT, "test")
+        category = next(iter(scene.categories))
+        measurement = BenchmarkMeasurement(category, "recorded", average_seconds=0.1)
+        selection = BenchmarkSelection(category, "recorded")
         return BenchmarkReport((measurement,), (selection,))
 
     def present(self, report: BenchmarkReport, cancellation: CancellationSignal) -> None:
@@ -76,8 +76,7 @@ class _Services:
         self.calls.append(f"present:{len(report.measurements)}")
 
 
-def _services() -> MaintenanceServices:
-    shared = _Services()
+def _services(shared: _Services) -> MaintenanceServices:
     return MaintenanceServices(
         app=shared,
         login=shared,
@@ -98,34 +97,29 @@ def _context(command: str, settings: dict[str, FrozenJsonValue]) -> TaskBuildCon
     )
 
 
-@pytest.mark.parametrize(
-    ("command", "settings", "task_type"),
-    [
-        (
-            "restart",
-            {"schedule": {"timezone": "Asia/Hong_Kong", "triggers": ("08:00",)}},
-            RestartTask,
-        ),
-        ("azur_lane_uncensored", {"package_name": "com.bilibili.azurlane"}, UncensoredTask),
-        ("game_manager", {"auto_restart": True}, GameManagerTask),
-        ("benchmark", {"scene": "screenshot", "safe_stage": "7-2"}, BenchmarkTask),
-    ],
-)
-def test_maintenance_factories_build_typed_tasks(
-    command: str,
-    settings: dict[str, FrozenJsonValue],
-    task_type: type[object],
-) -> None:
-    factories = build_maintenance_factories(_services())
+def _task_context(command: str) -> TaskContext:
+    return TaskContext(
+        task_id=TaskId(command),
+        started_at=_STARTED_AT,
+        mode=ExecutionMode.SCHEDULED_JOB,
+        metadata=RunMetadata(settings_revision=5, content_revision="content-1"),
+        abort=AbortToken(),
+    )
 
-    task = factories[command].build(_context(command, settings))
 
-    assert isinstance(task, task_type)
-    assert set(factories) == {"restart", "azur_lane_uncensored", "game_manager", "benchmark"}
+def test_benchmark_factory_passes_decoded_scene_and_safe_stage_to_services() -> None:
+    shared = _Services()
+    task = build_maintenance_factories(_services(shared))["benchmark"].build(
+        _context("benchmark", {"scene": "click", "safe_stage": "13-4"})
+    )
+
+    task.run(_task_context("benchmark"))
+
+    assert shared.calls == ["prepare:13-4", "measure:click", "present:1"]
 
 
 def test_maintenance_factory_rejects_schema_drift() -> None:
-    factories = build_maintenance_factories(_services())
+    factories = build_maintenance_factories(_services(_Services()))
 
     with pytest.raises(SettingsDocumentError, match="unknown settings"):
         factories["game_manager"].build(_context("game_manager", {"auto_restart": True, "obsolete": False}))

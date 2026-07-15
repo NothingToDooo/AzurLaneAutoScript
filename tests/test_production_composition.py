@@ -11,7 +11,18 @@ from config_factory import in_memory_config
 import module.bootstrap.production as production_module
 import module.config.config as config_module
 import module.state.config_repository as state_repository_module
-from module.application import AbortRequested, AbortToken, ExecutionMode, RunMetadata, Succeeded, TaskId, TaskResult
+from module.application import (
+    AbortRequested,
+    AbortToken,
+    ExecutionMode,
+    Faulted,
+    OperatorNotificationKind,
+    OperatorNotificationRequest,
+    RunMetadata,
+    Succeeded,
+    TaskId,
+    TaskResult,
+)
 from module.application.state_effects import UpsertTaskState
 from module.bootstrap.assembly_source import ConfigurationLoadError, GameRuntimeBundle, JsonConfigurationDocumentSource
 from module.bootstrap.configuration_compiler import ConfigurationCompileError, WebConfigurationCompiler
@@ -24,7 +35,9 @@ from module.bootstrap.production import (
 )
 from module.bootstrap.task_factories import build_game_task_registry
 from module.device.device import Device
+from module.diagnostics import ScreenshotHistory
 from module.equipment.equipment_code import EquipmentCodeHandler
+from module.notify.configuration import SmtpNotificationConfig, SmtpTransport
 from module.runtime.settings import TaskSettingsDocument
 from module.state.config_repository import ConfigStateError, ConfigStateRepository
 
@@ -221,6 +234,79 @@ def test_complete_configuration_builds_all_57_tasks() -> None:
 
     registry.validate_settings(settings)
     assert len(registry.task_ids) == 57
+
+
+def test_fault_observer_saves_diagnostics_and_sends_all_production_notifications(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = RuntimeError("device disconnected")
+    screenshots = ScreenshotHistory(max_frames=1)
+    saved: list[tuple[Path, str, str | None, BaseException, ScreenshotHistory]] = []
+    sent: list[tuple[SmtpNotificationConfig, str, str]] = []
+    smtp = SmtpNotificationConfig(
+        host="smtp.example.com",
+        user="sender@example.com",
+        password=tmp_path.name,
+        recipients=("operator@example.com",),
+        port=587,
+        transport=SmtpTransport.STARTTLS,
+    )
+
+    def save_error_bundle(
+        *,
+        root: Path,
+        command: str,
+        task_id: str | None,
+        error: BaseException,
+        screenshots: ScreenshotHistory,
+    ) -> str:
+        saved.append((root, command, task_id, error, screenshots))
+        return "log/error/bundle"
+
+    def send_notification(
+        config: SmtpNotificationConfig,
+        *,
+        title: str,
+        content: str,
+    ) -> bool:
+        sent.append((config, title, content))
+        return True
+
+    monkeypatch.setattr(production_module, "_save_error_bundle", save_error_bundle)
+    monkeypatch.setattr(production_module, "send_notification", send_notification)
+
+    bundle = production_module._observe_result(  # noqa: SLF001 - 验证生产结果观察器的完整编排。
+        TaskId("main"),
+        TaskResult(
+            outcome=Faulted(error),
+            notifications=(
+                OperatorNotificationRequest(
+                    OperatorNotificationKind.CAMPAIGN_RUN_COUNT_LIMIT,
+                    resource="campaign_main/12-4",
+                ),
+            ),
+        ),
+        root=tmp_path,
+        command="alas",
+        screenshots=screenshots,
+        notification=smtp,
+    )
+
+    assert bundle == "log/error/bundle"
+    assert saved == [(tmp_path, "alas", "main", error, screenshots)]
+    assert sent == [
+        (
+            smtp,
+            "Alas crashed",
+            "<main> RuntimeError: device disconnected\nError bundle: log/error/bundle",
+        ),
+        (
+            smtp,
+            "Alas campaign finished",
+            "<main> campaign_main/12-4 reached run count limit",
+        ),
+    ]
 
 
 def test_personal_configuration_validation_reuses_task_factory_contracts_without_connecting_device(

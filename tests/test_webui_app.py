@@ -249,10 +249,14 @@ def test_webui_import_validates_then_replaces_personal_configuration(tmp_path: P
     calls: list[str] = []
     document = _template()
 
+    def stop_before_replace() -> None:
+        assert destination.read_text(encoding="utf-8") == "old"
+        calls.append("stop")
+
     import_personal_configuration(
         json.dumps(document, ensure_ascii=False).encode(),
         destination,
-        before_replace=lambda: calls.append("stop"),
+        before_replace=stop_before_replace,
     )
 
     assert json.loads(destination.read_text(encoding="utf-8")) == document

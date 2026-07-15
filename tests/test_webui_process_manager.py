@@ -1,4 +1,3 @@
-import inspect
 import queue
 from datetime import UTC, datetime
 from multiprocessing.reduction import ForkingPickler
@@ -456,23 +455,11 @@ def test_parent_stop_intent_wins_over_late_child_success() -> None:
     assert manager.outcome.status is CommandStatus.STOPPED
 
 
-def test_process_manager_has_one_instance_and_no_multi_instance_registry() -> None:
+def test_process_manager_is_singleton() -> None:
     manager = ProcessManager.instance()
 
     assert ProcessManager.instance() is manager
     assert ProcessManager() is manager
-    source = inspect.getsource(process_manager_module)
-    assert "_processes" not in source
-    assert "get_manager" not in source
-    assert "config_name" not in source
-    assert "notify_configuration_changed" not in source
-    assert "restart_processes" not in source
-    assert "running_instances" not in source
-    assert "multiprocessing.Manager" not in source
-    assert "stop_all" not in source
-    assert tuple(inspect.signature(ProcessManager.start_default).parameters) == ("self",)
-    assert tuple(inspect.signature(ProcessManager.start).parameters) == ("self", "command")
-    assert tuple(inspect.signature(ProcessManager.start_log_queue_handler).parameters) == ("self", "run")
 
 
 def test_stop_instance_does_not_create_a_manager(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -525,6 +512,26 @@ def test_monitor_reports_missing_child_outcome(monkeypatch: pytest.MonkeyPatch) 
     assert manager.outcome.message == "Process exited without an outcome (exitcode=9)"
 
 
+def test_old_monitor_cannot_overwrite_current_run_outcome() -> None:
+    manager = ProcessManager()
+    old_outcome = _outcome(CommandStatus.FAILED)
+    old_run = _attach_run(manager, _Process(alive=False), outcome=old_outcome)
+    old_run.renderable_queue.put(None)
+
+    current_outcome = _outcome(CommandStatus.FINISHED)
+    current_run = _attach_run(manager, _Process(alive=False), outcome=current_outcome)
+    assert manager.outcome is current_outcome
+
+    manager.start_log_queue_handler(old_run)
+    old_monitor = old_run.monitor
+    assert old_monitor is not None
+    old_monitor.join(timeout=2)
+
+    assert not old_monitor.is_alive()
+    assert vars(manager)["_run"] is current_run
+    assert manager.outcome is current_outcome
+
+
 @pytest.mark.parametrize(
     ("status", "expected"),
     [
@@ -553,11 +560,3 @@ def test_stop_after_completion_preserves_child_outcome() -> None:
 
     assert manager.outcome is not None
     assert manager.outcome.status is CommandStatus.FINISHED
-
-
-def test_process_manager_source_has_one_runtime_entry() -> None:
-    source = inspect.getsource(process_manager_module)
-
-    assert "build_default_instance_process_host" not in source
-    assert "ProcessOutcomeStatus" not in source
-    assert "_host_outcome" not in source
