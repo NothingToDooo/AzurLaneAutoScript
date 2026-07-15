@@ -5,29 +5,28 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from module.application import ExecutionMode
 from module.base.atomic import atomic_write
 from module.base.decorator import cached_property
 from module.base.timer import timer
 from module.config.config_manual import ManualConfig
+from module.config.configuration_file import write_config_file
 from module.config.deep import deep_default, deep_exist, deep_get, deep_iter, deep_set
-from module.config.resolved import ConfigIssue, ConfigIssueReason
 from module.config.utils import (
     LANGUAGES,
     data_to_type,
     filepath_args,
     filepath_argument,
     filepath_code,
-    filepath_config,
     filepath_i18n,
-    parse_value,
     path_to_arg,
     read_file,
     write_file,
 )
+from module.content.activity_profile import CoalitionDefinition, CoalitionFleetRule, RaidDefinition, RaidMode
 from module.content.manifest import load_default_event_manifests, render_campaign_readme
 from module.content.models import EventPack, EventRelease
-from module.logger import logger
-from module.task_registry import TASK_CATALOG, LaunchSurface, command_to_config_name, get_task_definition
+from module.task_registry import TASK_CATALOG, command_to_config_name, get_task_definition
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
@@ -69,6 +68,13 @@ HOSPITAL = ["Hospital"]
 CONFIG_SCOPE_TASKS = frozenset(
     {"Alas", "General"} | {scope for definition in TASK_CATALOG.values() for scope in definition.config_scopes}
 )
+INTERVAL_ARGUMENTS = frozenset({"SuccessInterval", "FailureInterval"})
+OVERRIDE_METADATA_FIELDS = frozenset(
+    {"display", "mode", "option", "option_bold", "type", "validate", "value", "valuetype"}
+)
+WIDGET_TYPES = frozenset({"checkbox", "datetime", "input", "lock", "select", "state", "storage", "textarea"})
+DISPLAY_MODES = frozenset({"disabled", "display", "hide"})
+PIN_VALUE_TYPES = frozenset({"bool", "float", "ignore", "int", "str"})
 
 
 def _generated_comment(text: str, prefix: str = "") -> list[str]:
@@ -167,6 +173,28 @@ def _generated_value(name: str, value: MutableDeepValue) -> list[str]:
     if isinstance(value, list):
         return [f"{GENERATED_INDENT}{name}: ClassVar[{_generated_type(value)}] = {value!r}"]
     return [f"{GENERATED_INDENT}{name} = {value!r}"]
+
+
+def _parse_descriptor_value(
+    path: list[str],
+    descriptor: dict[str, MutableDeepValue],
+) -> MutableDeepValue:
+    """按参数描述符解析生成值，只转换显式声明的 datetime。"""
+
+    if "value" not in descriptor:
+        message = f"argument descriptor has no value: {'.'.join(path)}"
+        raise ValueError(message)
+    value = descriptor["value"]
+    if value is None or descriptor.get("type") != "datetime" or isinstance(value, datetime):
+        return value
+    if not isinstance(value, str):
+        message = f"datetime argument value must be text: {'.'.join(path)}"
+        raise TypeError(message)
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError as error:
+        message = f"invalid datetime argument value at {'.'.join(path)}: {value!r}"
+        raise ValueError(message) from error
 
 
 class ConfigGenerator:
@@ -290,13 +318,13 @@ class ConfigGenerator:
             raise ValueError(message)
         is_scheduled = "Scheduler" in groups
         if is_scheduled:
-            if is_tool or LaunchSurface.SCHEDULER not in definition.allowed_launches:
-                message = f"task allowed launches do not include Scheduler: {task}"
+            if is_tool or definition.execution_mode is not ExecutionMode.SCHEDULED_JOB:
+                message = f"task execution mode does not allow Scheduler: {task}"
                 raise ValueError(message)
             return
         if is_tool:
-            if LaunchSurface.TOOL not in definition.allowed_launches:
-                message = f"task allowed launches do not include tool page: {task}"
+            if definition.execution_mode is ExecutionMode.SCHEDULED_JOB:
+                message = f"task execution mode does not allow tool page: {task}"
                 raise ValueError(message)
             return
         message = f"executable task must be scheduled or tool: {task}"
@@ -344,57 +372,156 @@ class ConfigGenerator:
         return data
 
     @staticmethod
-    def _argument_value(argument: DeepValue) -> DeepValue:
-        if isinstance(argument, dict):
-            mapping = cast("dict[str, DeepValue]", argument)
-            return mapping.get("value", None)
+    def _argument_descriptor(data: MutableDeepData, path: list[str]) -> dict[str, MutableDeepValue]:
+        if not deep_exist(data, path):
+            message = f"argument path does not exist: {'.'.join(path)}"
+            raise KeyError(message)
+        raw_argument = deep_get(data, keys=path)
+        if not isinstance(raw_argument, dict):
+            message = f"argument descriptor must be a mapping: {'.'.join(path)}"
+            raise TypeError(message)
+        argument = cast("dict[str, MutableDeepValue]", raw_argument)
+        if "value" not in argument:
+            message = f"argument descriptor has no value: {'.'.join(path)}"
+            raise ValueError(message)
         return argument
 
     @staticmethod
-    def _override_validation_value(argument: DeepValue, override: DeepValue) -> DeepValue:
-        if isinstance(override, dict):
-            # 字典覆盖通常用于改元数据，沿用旧语义，只用原参数值做合法性校验。
-            return ConfigGenerator._argument_value(argument)
-        return override
+    def _is_interval_argument(path: list[str]) -> bool:
+        return len(path) == 3 and path[1] == "Scheduler" and path[2] in INTERVAL_ARGUMENTS
 
-    @staticmethod
-    def _has_incompatible_override_type(path: list[str], old_value: DeepValue, value: DeepValue) -> bool:
-        return (
-            type(value) is not type(old_value)
-            and old_value is not None
-            and path[2] not in ["SuccessInterval", "FailureInterval"]
-        )
+    @classmethod
+    def _validate_value_type(cls, path: list[str], expected: DeepValue, value: DeepValue) -> None:
+        if cls._is_interval_argument(path):
+            if type(value) is int:
+                if value < 0:
+                    message = f"scheduler interval must be non-negative: {'.'.join(path)}"
+                    raise ValueError(message)
+                return
+            if isinstance(value, str):
+                start, separator, end = value.partition("-")
+                if (
+                    separator != "-"
+                    or not start.isascii()
+                    or not start.isdecimal()
+                    or not end.isascii()
+                    or not end.isdecimal()
+                    or int(start) > int(end)
+                ):
+                    message = f"scheduler interval range is invalid at {'.'.join(path)}: {value!r}"
+                    raise ValueError(message)
+                return
+            message = f"scheduler interval must be an int or minute range: {'.'.join(path)}"
+            raise TypeError(message)
 
-    @staticmethod
-    def _has_invalid_override_option(argument: DeepValue, value: DeepValue) -> bool:
-        if not isinstance(argument, dict):
-            return False
-        options = argument.get("option")
-        return isinstance(options, list) and value not in cast("list[DeepValue]", options)
-
-    def _can_apply_override(self, data: MutableDeepData, path: list[str], value: DeepValue) -> bool:
-        # 检查参数是否存在。
-        old = deep_get(data, keys=path, default=None)
-        if old is None:
-            logger.warning(f"`{'.'.join(path)}` is not a existing argument")
-            return False
-
-        old_value = self._argument_value(old)
-        value = self._override_validation_value(old, value)
-        if self._has_incompatible_override_type(path, old_value, value):
-            logger.warning(
-                f"`{value}` ({type(value)}) and `{'.'.join(path)}` ({type(old_value)}) are in different types"
+        if type(value) is not type(expected):
+            message = (
+                f"argument value type mismatch at {'.'.join(path)}: "
+                f"expected {type(expected).__name__}, got {type(value).__name__}"
             )
-            return False
-        if self._has_invalid_override_option(old, value):
-            logger.warning(f"`{value}` is not an option of argument `{'.'.join(path)}`")
-            return False
-        return True
+            raise TypeError(message)
+
+    @classmethod
+    def _validate_options(
+        cls,
+        path: list[str],
+        expected: DeepValue,
+        raw_options: DeepValue,
+        *,
+        field: str,
+    ) -> list[DeepValue]:
+        if not isinstance(raw_options, list):
+            message = f"override metadata {field} must be a list: {'.'.join(path)}"
+            raise TypeError(message)
+        options = cast("list[DeepValue]", raw_options)
+        for option in options:
+            cls._validate_value_type(path, expected, option)
+        return options
+
+    @classmethod
+    def _validate_argument_value(
+        cls,
+        path: list[str],
+        argument: dict[str, MutableDeepValue],
+        value: DeepValue,
+    ) -> None:
+        expected = argument["value"]
+        cls._validate_value_type(path, expected, value)
+        raw_options = argument.get("option")
+        if raw_options is None:
+            return
+        options = cls._validate_options(path, expected, raw_options, field="option")
+        if value not in options:
+            message = f"argument value is not an option at {'.'.join(path)}: {value!r}"
+            raise ValueError(message)
+
+    @staticmethod
+    def _validate_string_metadata(path: list[str], field: str, value: DeepValue) -> str:
+        if not isinstance(value, str) or not value:
+            message = f"override metadata {field} must be non-empty text: {'.'.join(path)}"
+            raise TypeError(message)
+        return value
+
+    @classmethod
+    def _validate_override_scalar_metadata(
+        cls,
+        path: list[str],
+        override: dict[str, MutableDeepValue],
+    ) -> None:
+        for field in ("mode", "validate"):
+            if field in override:
+                cls._validate_string_metadata(path, field, override[field])
+        enumerated = (("type", WIDGET_TYPES), ("display", DISPLAY_MODES), ("valuetype", PIN_VALUE_TYPES))
+        for field, allowed in enumerated:
+            if field not in override:
+                continue
+            value = cls._validate_string_metadata(path, field, override[field])
+            if value not in allowed:
+                message = f"unsupported override metadata {field} at {'.'.join(path)}: {value!r}"
+                raise ValueError(message)
+
+    @classmethod
+    def _validate_override_value_and_options(
+        cls,
+        path: list[str],
+        argument: dict[str, MutableDeepValue],
+        override: dict[str, MutableDeepValue],
+    ) -> None:
+        expected = argument["value"]
+        value = override.get("value", expected)
+        cls._validate_value_type(path, expected, value)
+        raw_options = override.get("option", argument.get("option"))
+        options: list[DeepValue] | None = None
+        if raw_options is not None:
+            options = cls._validate_options(path, expected, raw_options, field="option")
+            if value not in options:
+                message = f"override value is not an option at {'.'.join(path)}: {value!r}"
+                raise ValueError(message)
+        if "option_bold" in override:
+            bold_options = cls._validate_options(path, expected, override["option_bold"], field="option_bold")
+            if options is None or any(option not in options for option in bold_options):
+                message = f"override option_bold must be contained in option: {'.'.join(path)}"
+                raise ValueError(message)
+
+    @classmethod
+    def _validate_dict_override(
+        cls,
+        path: list[str],
+        argument: dict[str, MutableDeepValue],
+        override: dict[str, MutableDeepValue],
+    ) -> None:
+        unknown = set(override) - OVERRIDE_METADATA_FIELDS
+        if unknown:
+            message = f"unsupported override metadata at {'.'.join(path)}: {sorted(unknown)}"
+            raise ValueError(message)
+        cls._validate_override_scalar_metadata(path, override)
+        cls._validate_override_value_and_options(path, argument, override)
 
     def _apply_default_values(self, data: MutableDeepData) -> None:
         for path, value in deep_iter(self.default, depth=3):
-            if self._can_apply_override(data, path, value):
-                deep_set(data, keys=[*path, "value"], value=cast("MutableDeepValue", value))
+            argument = self._argument_descriptor(data, path)
+            self._validate_argument_value(path, argument, value)
+            deep_set(data, keys=[*path, "value"], value=cast("MutableDeepValue", value))
 
     @staticmethod
     def _normalized_override(value: dict[str, MutableDeepValue]) -> dict[str, MutableDeepValue]:
@@ -417,8 +544,12 @@ class ConfigGenerator:
 
     def _apply_override_values(self, data: MutableDeepData) -> None:
         for path, value in deep_iter(self.override, depth=3):
-            if self._can_apply_override(data, path, value):
-                self._apply_override_value(data, path, value)
+            argument = self._argument_descriptor(data, path)
+            if isinstance(value, dict):
+                self._validate_dict_override(path, argument, cast("dict[str, MutableDeepValue]", value))
+            else:
+                self._validate_argument_value(path, argument, value)
+            self._apply_override_value(data, path, value)
 
     def _hide_task_commands(self, data: MutableDeepData) -> None:
         for task, _groups in self._iter_task_argument_groups():
@@ -443,7 +574,7 @@ class ConfigGenerator:
                 message = f"Invalid argument definition at {'.'.join(path)}"
                 raise TypeError(message)
             data = cast("dict[str, MutableDeepValue]", raw_data)
-            parsed = cast("MutableDeepValue", parse_value(data["value"], data=data))
+            parsed = _parse_descriptor_value(path, data)
             arguments.append((path, data, parsed))
         return arguments
 
@@ -645,12 +776,200 @@ class ConfigGenerator:
                     value=cast("MutableDeepValue", options.copy()),
                 )
 
+    def _set_event_value(self, tasks: list[str], options: list[str]) -> None:
+        if not options:
+            message = f"current activity manifest options are empty: {', '.join(tasks)}"
+            raise ValueError(message)
+        for task in tasks:
+            deep_set(self.args, keys=f"{task}.Campaign.Event.value", value=options[0])
+
+    @classmethod
+    def _latest_pack(cls, packs: tuple[EventPack, ...], kind: str) -> EventPack | None:
+        options = cls._latest_named_options(packs, kind)
+        if not options:
+            return None
+        selected = options[0]
+        return next(pack for pack in packs if str(pack.pack_id) == selected)
+
+    @staticmethod
+    def _event_default_stage(pack: EventPack) -> str | None:
+        terminals = [rule.stage for rule in pack.policy.progressions if rule.next_stage is None]
+        if terminals:
+            return terminals[-1]
+        if pack.stages:
+            return pack.stages[-1].ref.stage_id
+        return None
+
+    @staticmethod
+    def _event_progression_chains(pack: EventPack) -> list[list[str]]:
+        rules = pack.policy.progressions
+        if not rules:
+            return []
+        next_by_stage = {rule.stage: rule.next_stage for rule in rules}
+        referenced = {rule.next_stage for rule in rules if rule.next_stage is not None}
+        roots = [rule.stage for rule in rules if rule.stage not in referenced]
+        chains: list[list[str]] = []
+        for root in roots:
+            chain = [root]
+            while (next_stage := next_by_stage.get(chain[-1])) is not None:
+                if next_stage in chain:
+                    message = f"event progression cycle in {pack.pack_id}: {next_stage}"
+                    raise ValueError(message)
+                chain.append(next_stage)
+            chains.append(chain)
+        return chains
+
+    def _set_latest_event_defaults(self, packs: tuple[EventPack, ...], options: list[str]) -> None:
+        if not options:
+            message = "current event manifest with a named release is required"
+            raise ValueError(message)
+        self._set_event_value(EVENTS, options)
+        pack = self._latest_pack(packs, "event")
+        if pack is None:
+            message = "current event pack is required"
+            raise ValueError(message)
+        stage = self._event_default_stage(pack)
+        if stage is None:
+            message = f"current event pack has no default stage: {pack.pack_id}"
+            raise ValueError(message)
+
+        for task in EVENTS:
+            deep_set(self.args, keys=f"{task}.Campaign.Name.value", value=stage)
+
+        chains = self._event_progression_chains(pack)
+        primary_chain = chains[-1] if chains else [stage]
+        alternate_chain = chains[0] if chains else primary_chain
+        deep_set(self.args, keys="Event2.Campaign.Name.value", value=alternate_chain[-1])
+
+        stage_ids = {item.ref.stage_id for item in pack.stages}
+        if "sp" in stage_ids:
+            deep_set(self.args, keys="EventSp.Campaign.Name.value", value="sp")
+        for task, chain in (
+            ("EventA", primary_chain),
+            ("EventB", primary_chain),
+            ("EventC", alternate_chain),
+            ("EventD", alternate_chain),
+        ):
+            deep_set(self.args, keys=f"{task}.EventDaily.StageFilter.value", value=" > ".join(chain))
+
+    def _set_latest_archive_defaults(self, packs: tuple[EventPack, ...], options: list[str]) -> None:
+        if not options:
+            message = "current war archive manifest with a named release is required"
+            raise ValueError(message)
+        self._set_event_value(WAR_ARCHIVES, options)
+        selected = options[0]
+        pack = next((pack for pack in packs if str(pack.pack_id) == selected), None)
+        if pack is None:
+            message = f"current war archive pack is missing: {selected}"
+            raise ValueError(message)
+        stage = self._event_default_stage(pack)
+        if stage is None:
+            message = f"current war archive pack has no default stage: {pack.pack_id}"
+            raise ValueError(message)
+        deep_set(self.args, keys="WarArchives.Campaign.Name.value", value=stage)
+
+    def _set_latest_raid_defaults(self, packs: tuple[EventPack, ...], options: list[str]) -> None:
+        if not options:
+            message = "current raid manifest with a named release is required"
+            raise ValueError(message)
+        self._set_event_value(RAIDS, options)
+        pack = self._latest_pack(packs, "raid")
+        if pack is None:
+            message = "current raid pack is required"
+            raise ValueError(message)
+        definition = pack.activity
+        if definition is None:
+            message = f"current raid pack has no activity definition: {pack.pack_id}"
+            raise ValueError(message)
+        if not isinstance(definition, RaidDefinition):
+            message = f"latest raid pack has no raid definition: {pack.pack_id}"
+            raise TypeError(message)
+
+        modes = [mode.value for mode in definition.modes]
+        preferred = RaidMode.HARD if RaidMode.HARD in definition.modes else definition.modes[-1]
+        deep_set(self.args, keys="Raid.Raid.Mode.option", value=cast("MutableDeepValue", modes))
+        deep_set(self.args, keys="Raid.Raid.Mode.value", value=preferred.value)
+
+        daily_modes = [mode.value for mode in definition.daily_modes]
+        if not daily_modes:
+            message = f"current raid pack has no daily mode: {pack.pack_id}"
+            raise ValueError(message)
+        daily_filter = [mode for mode in ("hard", "normal", "easy") if mode in daily_modes]
+        if not daily_filter:
+            daily_filter = [mode for mode in daily_modes if mode != "ex"] or daily_modes
+        deep_set(self.args, keys="RaidDaily.RaidDaily.StageFilter.value", value=" > ".join(daily_filter))
+
+    @staticmethod
+    def _coalition_fleet_value(rule: CoalitionFleetRule) -> str:
+        return "multi" if rule is CoalitionFleetRule.MULTI else "single"
+
+    def _set_latest_coalition_defaults(self, packs: tuple[EventPack, ...], options: list[str]) -> None:
+        if not options:
+            message = "current coalition manifest with a named release is required"
+            raise ValueError(message)
+        self._set_event_value(COALITIONS, options)
+        pack = self._latest_pack(packs, "coalition")
+        if pack is None:
+            message = "current coalition pack is required"
+            raise ValueError(message)
+        definition = pack.activity
+        if definition is None:
+            message = f"current coalition pack has no activity definition: {pack.pack_id}"
+            raise ValueError(message)
+        if not isinstance(definition, CoalitionDefinition):
+            message = f"latest coalition pack has no coalition definition: {pack.pack_id}"
+            raise TypeError(message)
+
+        stages = list(definition.stages)
+        primary_options = [stage.stage_id.value for stage in stages if stage.stage_id.value != "sp"]
+        primary_candidates = [stage for stage in stages if stage.stage_id.value not in {"sp", "ex"}]
+        primary = primary_candidates[-1] if primary_candidates else stages[0]
+        deep_set(
+            self.args,
+            keys="Coalition.Coalition.Mode.option",
+            value=cast("MutableDeepValue", primary_options),
+        )
+        deep_set(self.args, keys="Coalition.Coalition.Mode.value", value=primary.stage_id.value)
+        deep_set(
+            self.args,
+            keys="Coalition.Coalition.Fleet.value",
+            value=self._coalition_fleet_value(primary.fleet_rule),
+        )
+
+        special = next((stage for stage in stages if stage.stage_id.value == "sp"), None)
+        if special is None:
+            special = next(
+                (stage for stage in reversed(stages) if stage.fleet_rule is CoalitionFleetRule.MULTI),
+                stages[-1],
+            )
+        deep_set(
+            self.args,
+            keys="CoalitionSp.Coalition.Mode.option",
+            value=cast("MutableDeepValue", [special.stage_id.value]),
+        )
+        deep_set(self.args, keys="CoalitionSp.Coalition.Mode.value", value=special.stage_id.value)
+        deep_set(
+            self.args,
+            keys="CoalitionSp.Coalition.Fleet.value",
+            value=self._coalition_fleet_value(special.fleet_rule),
+        )
+
     def insert_event(self) -> None:
+        """把最新活动 manifest 投影到 UI 参数和首次运行默认值。"""
         packs = tuple(self.event_packs)
-        self._set_event_options(EVENTS + GEMS_FARMINGS, self._latest_named_options(packs, "event"), bold=True)
-        self._set_event_options(RAIDS, self._latest_named_options(packs, "raid"), bold=True)
-        self._set_event_options(COALITIONS, self._latest_named_options(packs, "coalition"), bold=True)
-        self._set_event_options(WAR_ARCHIVES, self._war_archive_options(packs), bold=False)
+        event_options = self._latest_named_options(packs, "event")
+        raid_options = self._latest_named_options(packs, "raid")
+        coalition_options = self._latest_named_options(packs, "coalition")
+        archive_options = self._war_archive_options(packs)
+        self._set_event_options(EVENTS, event_options, bold=True)
+        self._set_event_options(GEMS_FARMINGS, ["campaign_main", *event_options], bold=False)
+        self._set_event_options(RAIDS, raid_options, bold=True)
+        self._set_event_options(COALITIONS, coalition_options, bold=True)
+        self._set_event_options(WAR_ARCHIVES, archive_options, bold=False)
+        self._set_latest_event_defaults(packs, event_options)
+        self._set_latest_raid_defaults(packs, raid_options)
+        self._set_latest_coalition_defaults(packs, coalition_options)
+        self._set_latest_archive_defaults(packs, archive_options)
 
     @staticmethod
     def write_campaign_readme(packs: tuple[EventPack, ...]) -> None:
@@ -670,259 +989,24 @@ class ConfigGenerator:
             self.generate_i18n(lang)
 
 
-class ConfigUpdater:
-    _args_path = filepath_args()
+def build_template() -> MutableDeepData:
+    """只根据当前参数定义生成 template，不读取或迁移用户配置。"""
 
-    @cached_property
-    def args(self) -> MutableDeepData:
-        return read_file(self._args_path)
-
-    @staticmethod
-    def _should_reset_config_value(
-        value: DeepValue,
-        data: dict[str, MutableDeepValue],
-        *,
-        is_template: bool,
-    ) -> bool:
-        typ = data["type"]
-        display = data.get("display")
-        return (
-            is_template
-            or value is None
-            or value == ""
-            or typ in ["lock", "state"]
-            or (display == "hide" and typ != "stored")
-        )
-
-    @staticmethod
-    def _record_issue(
-        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]],
-        *,
-        path: str,
-        raw: DeepValue,
-        resolved: DeepValue,
-        reason: ConfigIssueReason,
-    ) -> None:
-        if raw == resolved or path in pending:
-            return
-        pending[path] = cast("MutableDeepValue", deepcopy(raw)), reason
-
-    @staticmethod
-    def _has_invalid_config_option(value: DeepValue, data: dict[str, MutableDeepValue]) -> bool:
-        options = data.get("option")
-        return isinstance(options, list) and value not in cast("list[DeepValue]", options)
-
-    def _rebuild_config_from_args(
-        self,
-        old: MutableDeepData,
-        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]],
-        *,
-        is_template: bool,
-    ) -> MutableDeepData:
-        new: MutableDeepData = {}
-        for keys, raw_data in deep_iter(self.args, depth=3):
-            if not isinstance(raw_data, dict):
-                message = f"Invalid generated argument at {'.'.join(keys)}"
-                raise TypeError(message)
-            data = cast("dict[str, MutableDeepValue]", raw_data)
-            path = ".".join(keys)
-            exists = deep_exist(old, keys)
-            value = deep_get(old, keys=keys, default=data["value"])
-            if self._should_reset_config_value(value, data, is_template=is_template):
-                if exists and not is_template:
-                    reason: ConfigIssueReason = (
-                        "hidden_reset"
-                        if data.get("display") == "hide" and data["type"] != "stored"
-                        else "default_fallback"
-                    )
-                    self._record_issue(
-                        pending,
-                        path=path,
-                        raw=value,
-                        resolved=data["value"],
-                        reason=reason,
-                    )
-                value = data["value"]
-            elif self._has_invalid_config_option(value, data):
-                self._record_issue(
-                    pending,
-                    path=path,
-                    raw=value,
-                    resolved=data["value"],
-                    reason="invalid_option",
-                )
-            parsed = cast("MutableDeepValue", parse_value(value, data=data))
-            deep_set(new, keys=keys, value=parsed)
-        return new
-
-    def _migrate_opsi_hazard_leveling_enable(
-        self,
-        old: MutableDeepData,
-        new: MutableDeepData,
-        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]],
-    ) -> None:
-        source_path = "OpsiHazard1Leveling.Scheduler.Enable"
-        if not deep_get(new, keys=source_path):
-            return
-        target_path = "OpsiMeowfficerFarming.Scheduler.Enable"
-        raw = deep_get(new, keys=target_path, default=False)
-        deep_set(new, keys=target_path, value=True)
-        if deep_exist(old, source_path):
-            self._record_issue(pending, path=target_path, raw=raw, resolved=True, reason="migration")
-
-    def _migrate_mumu_executable_path(
-        self,
-        old: MutableDeepData,
-        new: MutableDeepData,
-        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]],
-    ) -> None:
-        """把旧通用模拟器路径迁移到个人版 MuMu 可执行文件路径。"""
-        source_path = "Alas.EmulatorInfo.path"
-        target_path = "Alas.Emulator.MuMuPath"
-        source = deep_get(old, keys=source_path, default=None)
-        if not isinstance(source, str) or not source.strip():
-            return
-        raw = deep_get(old, keys=target_path, default=None)
-        if isinstance(raw, str) and raw.strip():
-            return
-        deep_set(new, keys=target_path, value=source)
-        self._record_issue(pending, path=target_path, raw=raw, resolved=source, reason="migration")
-
-    def _refresh_latest_campaign_event(
-        self,
-        old: MutableDeepData,
-        new: MutableDeepData,
-        tasks: Iterable[str],
-        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]],
-    ) -> None:
-        for task in tasks:
-            path = f"{task}.Campaign.Event"
-            options = deep_get(self.args, keys=f"{path}.option", default=[])
-            raw = deep_get(new, keys=path, default="campaign_main")
-            if options and raw not in options:
-                resolved = options[0]
-                deep_set(new, keys=path, value=resolved)
-                if deep_exist(old, path):
-                    self._record_issue(pending, path=path, raw=raw, resolved=resolved, reason="migration")
-
-    def _keep_war_archives_away_from_campaign_main(
-        self,
-        old: MutableDeepData,
-        new: MutableDeepData,
-        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]],
-    ) -> None:
-        for task in WAR_ARCHIVES:
-            path = f"{task}.Campaign.Event"
-            options = deep_get(self.args, keys=f"{path}.option", default=[])
-            raw = deep_get(new, keys=path, default="campaign_main")
-            if options and raw == "campaign_main":
-                resolved = options[0]
-                deep_set(new, keys=path, value=resolved)
-                if deep_exist(old, path):
-                    self._record_issue(pending, path=path, raw=raw, resolved=resolved, reason="migration")
-
-    def _replace_default_campaign_stage(
-        self,
-        old: MutableDeepData,
-        new: MutableDeepData,
-        tasks: Iterable[str],
-        stage: str,
-        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]],
-    ) -> None:
-        for task in tasks:
-            path = f"{task}.Campaign.Name"
-            raw = deep_get(new, keys=path, default="12-4")
-            if raw in ["7-2", "12-4"]:
-                deep_set(new, keys=path, value=stage)
-                if deep_exist(old, path):
-                    self._record_issue(pending, path=path, raw=raw, resolved=stage, reason="migration")
-
-    @staticmethod
-    def _finalize_issues(
-        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]],
-        resolved: MutableDeepData,
-    ) -> tuple[ConfigIssue, ...]:
-        return tuple(
-            ConfigIssue(
-                path=path,
-                raw=deepcopy(raw),
-                resolved=cast("MutableDeepValue", deepcopy(deep_get(resolved, keys=path))),
-                reason=reason,
-            )
-            for path, (raw, reason) in pending.items()
-        )
-
-    def config_update_with_issues(
-        self,
-        old: MutableDeepData,
-        *,
-        is_template: bool = False,
-    ) -> tuple[MutableDeepData, tuple[ConfigIssue, ...]]:
-        """迁移配置并返回只读诊断；配置结果与 ``config_update()`` 完全相同。"""
-        pending: dict[str, tuple[MutableDeepValue, ConfigIssueReason]] = {}
-        new = self._rebuild_config_from_args(old, pending, is_template=is_template)
-        if not is_template:
-            self._migrate_mumu_executable_path(old, new, pending)
-        self._migrate_opsi_hazard_leveling_enable(old, new, pending)
-
-        # 更新到最新活动。
-        if not is_template:
-            self._refresh_latest_campaign_event(old, new, EVENTS + RAIDS + COALITIONS + GEMS_FARMINGS, pending)
-        # 作战档案不允许使用 campaign_main。
-        self._keep_war_archives_away_from_campaign_main(old, new, pending)
-
-        # 活动任务不允许默认关卡 12-4。
-        self._replace_default_campaign_stage(old, new, EVENTS + WAR_ARCHIVES, "D3", pending)
-        self._replace_default_campaign_stage(old, new, COALITIONS, "area1-normal", pending)
-
-        resolved = self._override(new)
-        return resolved, self._finalize_issues(pending, resolved)
-
-    def config_update(self, old: MutableDeepData, *, is_template: bool = False) -> MutableDeepData:
-        updated, _issues = self.config_update_with_issues(old, is_template=is_template)
-        return updated
-
-    @staticmethod
-    def _override(data: MutableDeepData) -> MutableDeepData:
-        return data
-
-    @staticmethod
-    def save_callback(key: str, _value: MutableDeepValue) -> Iterable[tuple[str, MutableDeepValue]]:
-        """配置值保存回调；Emotion 的 `*Value` 变化时产出对应 `*Record` 路径和当前时间。"""
-        if "Emotion" in key and "Value" in key:
-            keys = key.split(".")
-            keys[-1] = keys[-1].replace("Value", "Record")
-            yield ".".join(keys), datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    def read_file(self, config_name: str, *, is_template: bool = False) -> MutableDeepData:
-        """读取并迁移 `./config/{config_name}.json`，只返回结果而不立即写回。"""
-        data, _issues = self.read_file_with_issues(config_name, is_template=is_template)
-        return data
-
-    def read_file_with_issues(
-        self,
-        config_name: str,
-        *,
-        is_template: bool = False,
-    ) -> tuple[MutableDeepData, tuple[ConfigIssue, ...]]:
-        """读取并迁移配置，同时返回本次解析产生的诊断。"""
-        old = read_file(filepath_config(config_name))
-        return self.config_update_with_issues(old, is_template=is_template)
-
-    @staticmethod
-    def write_file(config_name: str, data: MutableDeepData) -> None:
-        write_file(filepath_config(config_name), data)
-
-    @timer
-    def update_file(self, config_name: str, *, is_template: bool = False) -> MutableDeepData:
-        data = self.read_file(config_name, is_template=is_template)
-        self.write_file(config_name, data)
-        return data
+    args = read_file(filepath_args())
+    template: MutableDeepData = {}
+    for keys, raw_data in deep_iter(args, depth=3):
+        if not isinstance(raw_data, dict):
+            message = f"Invalid generated argument at {'.'.join(keys)}"
+            raise TypeError(message)
+        data = cast("dict[str, MutableDeepValue]", raw_data)
+        parsed = _parse_descriptor_value(keys, data)
+        deep_set(template, keys=keys, value=parsed)
+    return template
 
 
 def main() -> None:
     ConfigGenerator().generate()
-    ConfigUpdater().update_file("template", is_template=True)
+    write_config_file("template", build_template())
 
 
 if __name__ == "__main__":

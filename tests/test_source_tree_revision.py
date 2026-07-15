@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from module.bootstrap import RevisionTree, SourceTreeRevisionSource
+from module.bootstrap.revisions import RevisionTree, SourceTreeRevisionSource
 
 if TYPE_CHECKING:
     from pathlib import Path

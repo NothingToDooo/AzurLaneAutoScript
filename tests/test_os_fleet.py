@@ -170,8 +170,9 @@ class _Fleet(OSFleet):
         self.calls.append(("parse_fleet_filter",))
         return self.fleet_filter_results
 
-    def os_order_execute(self, *_args: object, **kwargs: object) -> None:
+    def os_order_execute(self, *_args: object, **kwargs: object) -> tuple[bool, bool]:
         self.calls.append(("os_order_execute", kwargs))
+        return bool(kwargs.get("recon_scan", True)), bool(kwargs.get("submarine_call", True))
 
     @override
     def fleet_set(self, index: int | None = None, *, skip_first_screenshot: bool = True) -> bool:

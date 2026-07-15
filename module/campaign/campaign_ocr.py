@@ -58,12 +58,11 @@ class CampaignOcr(ModuleBase):
 
     def __init__(
         self,
-        config: AzurLaneConfig | str,
-        device: Device | str | None = None,
-        task: str | None = None,
+        config: AzurLaneConfig,
+        device: Device,
     ) -> None:
         self.stage_entrance = {}
-        super().__init__(config=config, device=device, task=task)
+        super().__init__(config=config, device=device)
 
     @staticmethod
     def campaign_get_chapter_index(name: str | int) -> int:

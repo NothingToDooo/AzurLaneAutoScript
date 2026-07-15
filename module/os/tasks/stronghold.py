@@ -4,35 +4,6 @@ from module.os.map import OSMap
 
 
 class OpsiStronghold(OSMap):
-    def clear_stronghold(self) -> None:
-        """在全球地图查找并清理要塞，然后维修舰队。
-
-        行动力不足时抛出 ActionPointLimit；没有要塞时抛出 TaskEnd；舰队耗尽仍未清理时抛出 RequestHumanTakeover。
-        """
-        logger.hr("OS clear stronghold", level=1)
-        self.cl1_ap_preserve()
-
-        self.os_map_goto_globe()
-        self.globe_update()
-        zone = self.find_siren_stronghold()
-        if zone is None:
-            # 没有要塞时推迟到次日运行。
-            self.config.task_delay(server_update=True)
-            self.config.task_stop()
-
-        self.globe_enter(zone)
-        self.zone_init()
-        self.os_order_execute(recon_scan=True, submarine_call=False)
-        self.run_stronghold()
-
-        self.fleet_repair(revert=False)
-        self.handle_fleet_resolve(revert=False)
-
-    def os_stronghold(self) -> None:
-        while True:
-            self.clear_stronghold()
-            self.config.check_task_switch()
-
     def run_stronghold_one_fleet(self, fleet: BossFleet) -> bool:
         """使用指定舰队清理一次要塞，并返回是否全部完成。"""
         self.config.override(OpsiGeneral_DoRandomMapEvent=False, HOMO_EDGE_DETECT=False, STORY_OPTION=0)

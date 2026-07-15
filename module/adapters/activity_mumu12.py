@@ -62,7 +62,6 @@ from module.ui.assets import CAMPAIGN_MENU_NO_EVENT
 from module.ui.page import page_campaign_menu, page_hospital
 
 if TYPE_CHECKING:
-    from module.application import PreemptionRequest
     from module.config.config_generated import ConfigOverrides
     from module.interaction import CancellationSignal
 
@@ -310,7 +309,6 @@ class Mumu12MinigameWorkflow(_Mumu12ActivityAdapter, ActivityWorkflow):
         self,
         spec: ActivitySpec,
         cancellation: CancellationSignal,
-        preemption: PreemptionRequest,
     ) -> ActivityReport:
         if spec.command is not ActivityCommand.MINIGAME:
             message = "minigame workflow requires a minigame spec"
@@ -328,7 +326,7 @@ class Mumu12MinigameWorkflow(_Mumu12ActivityAdapter, ActivityWorkflow):
                 cancellation.raise_if_requested()
                 coin_count = runner.get_coin_amount(skip_first_screenshot=False)
 
-        if preemption.is_requested or coin_count <= 0 or spec.remaining_operations == 0:
+        if coin_count <= 0 or spec.remaining_operations == 0:
             return ActivityReport(ActivityCommand.MINIGAME, ActivityDisposition.COMPLETED, self._now(), 0)
         if spec.minigame_kind is not MinigameKind.NEW_YEAR_CHALLENGE:
             message = f"unsupported minigame: {spec.minigame_kind}"
@@ -353,7 +351,6 @@ class Mumu12EventStoryWorkflow(_Mumu12ActivityAdapter, ActivityWorkflow):
         self,
         spec: ActivitySpec,
         cancellation: CancellationSignal,
-        preemption: PreemptionRequest,
     ) -> ActivityReport:
         if spec.command is not ActivityCommand.EVENT_STORY or spec.activity is None or spec.skip_battle is None:
             message = "event story workflow requires an event_story spec"
@@ -385,8 +382,6 @@ class Mumu12EventStoryWorkflow(_Mumu12ActivityAdapter, ActivityWorkflow):
             runner.app_start()
 
         for _ in range(100):
-            if preemption.is_requested:
-                return ActivityReport(ActivityCommand.EVENT_STORY, ActivityDisposition.COMPLETED, self._now(), 0)
             cancellation.raise_if_requested()
             state = runner.ui_goto_event_story()
             if state == "finish":
@@ -507,7 +502,7 @@ class Mumu12RaidDailyWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
             return self._recovery_required(spec.command, options.policy, recovered_at)
         cancellation.raise_if_requested()
         try:
-            runner.execute_once(plan, check_emotion=False)
+            runner.execute_once(plan)
         except OilExhausted:
             return self._resource_limited(spec.command, options.policy)
         except ScriptEnd:
@@ -640,7 +635,7 @@ class Mumu12RaidWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
             return self._recovery_required(spec.command, policy, recovered_at)
         cancellation.raise_if_requested()
         try:
-            runner.execute_once(plan, check_emotion=False)
+            runner.execute_once(plan)
         except OilExhausted:
             return self._resource_limited(spec.command, policy)
         except ScriptEnd:
@@ -740,7 +735,7 @@ class Mumu12HospitalWorkflow(_Mumu12ActivityAdapter, EncounterWorkflow):
             return self._recovery_required(spec.command, policy, recovered_at)
         try:
             cancellation.raise_if_requested()
-            executed = runner.execute_selected_investigation_once(check_emotion=False)
+            executed = runner.execute_selected_investigation_once()
         except OilExhausted:
             return self._resource_limited(spec.command, policy)
         except ScriptEnd:

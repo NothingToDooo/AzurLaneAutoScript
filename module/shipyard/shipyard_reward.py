@@ -2,7 +2,6 @@ from datetime import datetime
 from typing import Literal
 
 from module.base.timer import Timer
-from module.config.utils import get_server_last_update
 from module.exception import ScriptError
 from module.logger import logger
 from module.shipyard.ui import ShipyardUI
@@ -154,37 +153,3 @@ class RewardShipyard(ShipyardUI):
         self._shipyard_buy(count=count)
 
         return True
-
-    def run(self) -> None:
-        """从任意页面执行船坞蓝图任务，结束于船坞页。"""
-        if self.config.Shipyard_BuyAmount <= 0 and self.config.ShipyardDr_BuyAmount <= 0:
-            self.config.Scheduler_Enable = False
-            self.config.task_stop()
-
-        logger.hr("Shipyard DR", level=1)
-        logger.attr("ShipyardDr_LastRun", self.config.ShipyardDr_LastRun)
-        if self.config.ShipyardDr_LastRun > get_server_last_update("04:00"):
-            logger.warning("Task Shipyard DR has already been run today, skip")
-        else:
-            self.shipyard_run(
-                series=self.config.ShipyardDr_ResearchSeries,
-                index=self.config.ShipyardDr_ShipIndex,
-                count=self.config.ShipyardDr_BuyAmount,
-                rarity="DR",
-            )
-
-        logger.hr("Shipyard PR", level=1)
-        logger.attr("Shipyard_LastRun", self.config.Shipyard_LastRun)
-        if self.config.Shipyard_LastRun > get_server_last_update("04:00"):
-            logger.warning("Task Shipyard PR has already been run today, stop")
-            self.config.task_delay(server_update=True)
-            self.config.task_stop()
-        else:
-            self.shipyard_run(
-                series=self.config.Shipyard_ResearchSeries,
-                index=self.config.Shipyard_ShipIndex,
-                count=self.config.Shipyard_BuyAmount,
-                rarity="PR",
-            )
-
-        self.config.task_delay(server_update=True)

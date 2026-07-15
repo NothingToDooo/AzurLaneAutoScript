@@ -31,11 +31,24 @@ def test_main_uses_local_webui_defaults(monkeypatch: pytest.MonkeyPatch) -> None
     ]
 
 
+def test_main_accepts_flag_only_auto_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    monkeypatch.setattr(sys, "argv", ["gui.py", "--run"])
+    monkeypatch.setattr(gui, "prepare_pywebio_imports", lambda: None)
+    monkeypatch.setattr(gui.uvicorn, "run", lambda app, **_kwargs: calls.append(app))
+
+    gui.main()
+
+    assert calls == ["module.webui.app:app"]
+
+
 @pytest.mark.parametrize(
     "options",
     [
         ["--ssl-key", "key.pem"],
         ["--host", str(IPv4Address(0))],
+        ["--run", "alas"],
     ],
 )
 def test_main_rejects_removed_remote_options(

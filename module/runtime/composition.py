@@ -9,7 +9,6 @@ def compose_task_factories(
     groups: Iterable[Mapping[str, TaskFactory]],
     *,
     content_revision: str,
-    client_ui_revision: str,
     catalog: Mapping[str, TaskDefinition] = TASK_CATALOG,
 ) -> TaskFactoryRegistry:
     """合并互斥领域 factory group，并由 registry 强制验证 catalog 精确覆盖。"""
@@ -31,5 +30,4 @@ def compose_task_factories(
         catalog=catalog,
         factories=merged,
         content_revision=content_revision,
-        client_ui_revision=client_ui_revision,
     )

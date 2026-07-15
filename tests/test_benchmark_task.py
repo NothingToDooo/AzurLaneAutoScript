@@ -8,8 +8,6 @@ from module.application import (
     AbortToken,
     Blocked,
     ExecutionMode,
-    PreemptionRequest,
-    RunId,
     RunMetadata,
     Succeeded,
     TaskContext,
@@ -93,12 +91,10 @@ class _Presenter:
 def _context(abort: AbortToken | None = None) -> TaskContext:
     return TaskContext(
         task_id=TaskId("benchmark"),
-        run_id=RunId("run-benchmark"),
         started_at=datetime(2026, 7, 13, tzinfo=UTC),
         mode=ExecutionMode.DIRECT_COMMAND,
-        metadata=RunMetadata(settings_revision=1, content_revision="content-1", client_ui_revision="ui-1"),
+        metadata=RunMetadata(settings_revision=1, content_revision="content-1"),
         abort=AbortToken() if abort is None else abort,
-        preemption=PreemptionRequest(),
     )
 
 

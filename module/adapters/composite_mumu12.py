@@ -240,14 +240,16 @@ class Mumu12MeowfficerWorkflow(_Mumu12CompositeAdapter, MeowfficerWorkflow):
         if not isinstance(settings, MeowfficerSettings):
             message = "settings must be MeowfficerSettings"
             raise TypeError(message)
-        runner = RewardMeowfficer(
-            self._config,
-            device=self._device_for(
-                "Meowfficer",
-                cancellation,
-                _overlay(project_meowfficer_settings(settings)),
-            ),
+        device = self._device_for(
+            "Meowfficer",
+            cancellation,
+            _overlay(project_meowfficer_settings(settings)),
         )
+        training = settings.training if self._config.MeowfficerTrain_Enable else None
+        if not settings.has_non_training_work and training is None:
+            return MeowfficerReport(observed_at=self._now(), training_active=False)
+
+        runner = RewardMeowfficer(self._config, device=device)
 
         cancellation.raise_if_requested()
         runner.ui_ensure(page_meowfficer)
@@ -268,7 +270,6 @@ class Mumu12MeowfficerWorkflow(_Mumu12CompositeAdapter, MeowfficerWorkflow):
             cancellation.raise_if_requested()
             runner.meow_fort()
 
-        training = settings.training
         if training is not None:
             cancellation.raise_if_requested()
             runner.meow_train()
@@ -276,7 +277,10 @@ class Mumu12MeowfficerWorkflow(_Mumu12CompositeAdapter, MeowfficerWorkflow):
                 cancellation.raise_if_requested()
                 runner.meow_enhance()
 
-        return MeowfficerReport(observed_at=self._now())
+        return MeowfficerReport(
+            observed_at=self._now(),
+            training_active=training is not None and self._config.MeowfficerTrain_Enable,
+        )
 
 
 class Mumu12GuildWorkflow(_Mumu12CompositeAdapter, GuildWorkflow):

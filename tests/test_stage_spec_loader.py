@@ -6,15 +6,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from module.content import (
-    CampaignStageDefinition,
-    CellId,
-    GridShape,
-    LandBasedDirection,
-    LandBasedSpec,
-    PortalSpec,
-    stage_behavior_codec,
-)
+from module.content import stage_behavior_codec
 from module.content import stage_loader as stage_loader_module
 from module.content.battle_policy import (
     BossStrategy,
@@ -28,7 +20,15 @@ from module.content.campaign_session import CampaignRunVariant, CampaignSession
 from module.content.errors import ContentValidationError
 from module.content.manifest import load_default_event_manifests
 from module.content.models import StageRef, StageSpec
-from module.content.stage_definition import SpawnWave
+from module.content.stage_definition import (
+    CampaignStageDefinition,
+    CellId,
+    GridShape,
+    LandBasedDirection,
+    LandBasedSpec,
+    PortalSpec,
+    SpawnWave,
+)
 from module.content.stage_loader import StageSpecLoader, load_default_stage
 from module.content.stage_rules import (
     ChapterSwitch,

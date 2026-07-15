@@ -6,7 +6,6 @@ from module.device.mumu import (
     is_mumu12_serial,
     mumu12_serial_to_id,
     mumu12_shifted_serials,
-    revise_mumu12_serial,
 )
 
 
@@ -41,20 +40,6 @@ def test_mumu12_serial_rejects_non_mumu12(serial: str) -> None:
     assert MuMuSerial.parse(serial) is None
     assert mumu12_serial_to_id(serial) is None
     assert not is_mumu12_serial(serial)
-
-
-@pytest.mark.parametrize(
-    ("serial", "expected"),
-    [
-        ("16384", "127.0.0.1:16384"),
-        ("127.0.0.1.16384", "127.0.0.1:16384"),
-        ("5555,16384", "127.0.0.1:16384"),
-        ("MuMu模拟器12127.0.0.1:16384", "127.0.0.1:16384"),
-        ("auto127.0.0.1:16384", "127.0.0.1:16384"),
-    ],
-)
-def test_revise_mumu12_serial_handles_common_typos(serial: str, expected: str) -> None:
-    assert revise_mumu12_serial(serial) == expected
 
 
 def test_mumu12_shifted_serials_uses_neighbor_ports() -> None:

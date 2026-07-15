@@ -1,13 +1,7 @@
-from dataclasses import dataclass
-from datetime import datetime
 from typing import TYPE_CHECKING, override
 
-import pytest
-
-from module.config.config import TaskEnd
 from module.map.map_grids import SelectedGrids
 from module.os.globe_zone import Zone
-from module.os.tasks import meowfficer_farming
 from module.os.tasks.meowfficer_farming import OpsiMeowfficerFarming
 
 if TYPE_CHECKING:
@@ -17,10 +11,6 @@ if TYPE_CHECKING:
     from module.os.globe_zone import ZoneName
     from module.os.map import RescanMode
     from module.os_handler.action_point import ActionPointZone, ActionPointZoneType
-
-
-class _Task:
-    command = "OpsiMeowfficerFarming"
 
 
 class _Config:
@@ -34,36 +24,12 @@ class _Config:
         self.OpsiAshBeacon_EnsureFullyCollected = True
         self.OS_CL1_YELLOW_COINS_PRESERVE = 100
         self.OS_ACTION_POINT_PRESERVE = None
-        self.task = _Task()
-        self.overrides: list[dict[str, object]] = []
-        self.delays: list[dict[str, object]] = []
         self.calls: list[tuple[object, ...]] = []
         self.ash_enabled = False
-
-    def override(self, **kwargs: object) -> None:
-        self.overrides.append(kwargs)
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-    def task_delay(self, **kwargs: object) -> None:
-        self.delays.append(kwargs)
-
-    def task_stop(self) -> None:
-        self.calls.append(("task_stop",))
-        raise TaskEnd
 
     def is_task_enabled(self, task: str) -> bool:
         self.calls.append(("is_task_enabled", task))
         return self.ash_enabled
-
-    def check_task_switch(self, message: str = "") -> None:
-        self.calls.append(("check_task_switch", message))
-        raise TaskEnd
-
-
-@dataclass
-class _Cooldown:
-    next_run: datetime
 
 
 def _zone(zone_id: int) -> Zone:
@@ -89,7 +55,6 @@ class _MeowfficerFarming(OpsiMeowfficerFarming):
         self.calls: list[tuple[object, ...]] = []
         self.cl1_enabled = False
         self.ash_fully_collected = True
-        self.cooling_down = None
         self.action_point_limit = 500
         self.yellow_coins = 0
         self.in_opsi_explore = False
@@ -108,10 +73,6 @@ class _MeowfficerFarming(OpsiMeowfficerFarming):
     @property
     def _ash_fully_collected(self) -> bool:
         return self.ash_fully_collected
-
-    @property
-    def nearest_task_cooling_down(self) -> _Cooldown | None:
-        return self.cooling_down
 
     def get_action_point_limit(self) -> int:
         self.calls.append(("get_action_point_limit",))
@@ -175,8 +136,9 @@ class _MeowfficerFarming(OpsiMeowfficerFarming):
         self.calls.append(("fleet_set", index))
         return True
 
-    def os_order_execute(self, *_args: object, **kwargs: object) -> None:
+    def os_order_execute(self, *_args: object, **kwargs: object) -> tuple[bool, bool]:
         self.calls.append(("os_order_execute", kwargs))
+        return bool(kwargs.get("recon_scan", True)), bool(kwargs.get("submarine_call", True))
 
     @override
     def run_auto_search(
@@ -195,18 +157,21 @@ class _MeowfficerFarming(OpsiMeowfficerFarming):
         self.calls.append(("handle_after_auto_search",))
         return False
 
+    def run_one_zone(self, *, preserve: int = 200) -> None:
+        self._apply_meowfficer_action_point_preserve(preserve)
+        self._check_meowfficer_action_points()
+        zone, refresh = self._next_meowfficer_farming_zone()
+        self._run_meowfficer_farming_zone(zone, refresh=refresh)
+
 
 def test_os_meowfficer_farming_runs_configured_target_zone() -> None:
     runner = _MeowfficerFarming()
     runner.config.OpsiMeowfficerFarming_TargetZone = 135
 
-    with pytest.raises(TaskEnd):
-        runner.os_meowfficer_farming()
+    runner.run_one_zone()
 
     assert runner.config.OS_ACTION_POINT_PRESERVE == 200
     assert runner.calls == [
-        ("get_action_point_limit",),
-        ("is_in_opsi_explore",),
         ("action_point_set", {"cost": 0, "keep_current_ap": True, "check_rest_ap": True}),
         ("name_to_zone", 135),
         ("globe_goto", 135, {"refresh": True}),
@@ -215,10 +180,7 @@ def test_os_meowfficer_farming_runs_configured_target_zone() -> None:
         ("run_auto_search",),
         ("handle_after_auto_search",),
     ]
-    assert runner.config.calls == [
-        ("is_task_enabled", "OpsiAshBeacon"),
-        ("check_task_switch", ""),
-    ]
+    assert runner.config.calls == [("is_task_enabled", "OpsiAshBeacon")]
 
 
 def test_os_meowfficer_farming_uses_auto_selected_zone() -> None:
@@ -226,43 +188,8 @@ def test_os_meowfficer_farming_uses_auto_selected_zone() -> None:
     runner.config.ash_enabled = True
     runner.ash_fully_collected = False
 
-    with pytest.raises(TaskEnd):
-        runner.os_meowfficer_farming()
+    runner.run_one_zone()
 
     assert runner.config.OS_ACTION_POINT_PRESERVE == 0
     assert ("zone_select", 3) in runner.calls
     assert ("globe_goto", 44, {}) in runner.calls
-
-
-def test_os_meowfficer_farming_delays_when_opsi_explore_is_running() -> None:
-    runner = _MeowfficerFarming()
-    runner.in_opsi_explore = True
-
-    with pytest.raises(TaskEnd):
-        runner.os_meowfficer_farming()
-
-    assert runner.config.delays == [{"server_update": True}]
-    assert runner.config.calls == [("task_stop",)]
-    assert ("action_point_set", {"cost": 0, "keep_current_ap": True, "check_rest_ap": True}) not in runner.calls
-
-
-def test_os_meowfficer_farming_delays_after_cl1_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
-    cooldown = _Cooldown(next_run=datetime(2026, 1, 1, 1, 0, 0))
-    runner = _MeowfficerFarming()
-    runner.cl1_enabled = True
-    runner.action_point_limit = 2000
-    runner.cooling_down = cooldown
-    monkeypatch.setattr(meowfficer_farming, "get_os_reset_remain", lambda: 1)
-
-    with pytest.raises(TaskEnd):
-        runner.os_meowfficer_farming()
-
-    assert runner.config.OpsiMeowfficerFarming_ActionPointPreserve == 1000
-    assert runner.config.delays == [{"target": cooldown.next_run}]
-    assert runner.config.overrides == [
-        {
-            "OpsiGeneral_DoRandomMapEvent": True,
-            "OpsiGeneral_AkashiShopFilter": "ActionPoint",
-            "OpsiFleet_Submarine": False,
-        }
-    ]

@@ -23,18 +23,17 @@ if TYPE_CHECKING:
 class Raid(MapOperation, RaidCombat, CampaignStatus):
     def __init__(
         self,
-        config: AzurLaneConfig | str,
+        config: AzurLaneConfig,
         *,
         profile: ResolvedRaidProfile,
-        device: Device | str | None = None,
-        task: str | None = None,
+        device: Device,
     ) -> None:
         if not isinstance(profile, ResolvedRaidProfile):
             message = "profile must be a ResolvedRaidProfile"
             raise TypeError(message)
         self._raid_profile = profile
         self._active_plan: RaidRunPlan | None = None
-        super().__init__(config, device=device, task=task)
+        super().__init__(config, device=device)
 
     @property
     def raid_profile(self) -> ResolvedRaidProfile:
@@ -154,8 +153,6 @@ class Raid(MapOperation, RaidCombat, CampaignStatus):
     def execute_once(
         self,
         plan: RaidRunPlan,
-        *,
-        check_emotion: bool = True,
     ) -> RaidExecutionResult:
         """执行一次原子共斗；EX 临时启用每战潜艇并在结束后恢复。"""
         self._require_plan(plan)
@@ -175,8 +172,6 @@ class Raid(MapOperation, RaidCombat, CampaignStatus):
         previous_plan = self._active_plan
         self._active_plan = plan
         try:
-            if check_emotion:
-                self.emotion.check_reduce(1)
             self.raid_enter(plan)
             self.combat(balance_hp=False, expected_end=self.raid_expected_end)
         finally:

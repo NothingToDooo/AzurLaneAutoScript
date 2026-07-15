@@ -4,7 +4,10 @@ import sys
 
 import pytest
 
+from module.device.app_service import AppController
 from module.device.connection import Connection
+from module.device.minitouch_service import MinitouchController
+from module.device.nemu_ipc_service import NemuIpcCapture
 
 
 def test_device_method_utils_imports() -> None:
@@ -19,12 +22,8 @@ def test_device_connection_imports() -> None:
     assert hasattr(module, "Connection")
 
 
-def test_legacy_device_services_do_not_inherit_connection() -> None:
-    classes = (
-        importlib.import_module("module.device.app_control").AppControl,
-        importlib.import_module("module.device.method.minitouch").Minitouch,
-        importlib.import_module("module.device.method.nemu_ipc").NemuIpc,
-    )
+def test_owned_device_services_do_not_inherit_connection() -> None:
+    classes = (AppController, MinitouchController, NemuIpcCapture)
 
     assert all(Connection not in cls.__mro__ for cls in classes)
 
@@ -34,8 +33,9 @@ def test_legacy_device_services_do_not_inherit_connection() -> None:
     [
         "import module.device.services",
         "import module.device.runtime",
-        "import module.device.method.minitouch",
-        "import module.device.method.nemu_ipc",
+        "import module.device.app_service",
+        "import module.device.minitouch_service",
+        "import module.device.nemu_ipc_service",
         "import module.device.device",
     ],
 )

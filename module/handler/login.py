@@ -173,13 +173,6 @@ class LoginHandler(UI):
         self.device.app_start()
         self.handle_app_login()
 
-    def app_restart(self) -> None:
-        logger.hr("App restart")
-        self.device.app_stop()
-        self.device.app_start()
-        self.handle_app_login()
-        self.config.task_delay(server_update=True)
-
     def ensure_no_unfinished_campaign(self) -> None:
         """退出未完成战役；页面进出均为 page_main。"""
 

@@ -30,13 +30,11 @@ from module.content.activity_profile import CoalitionFleetMode, CoalitionStageId
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from module.application import PreemptionRequest
     from module.interaction import CancellationSignal
 
 
 _ACTIVITY_UNAVAILABLE = "activity is unavailable"
 _ACTIVITY_IN_PROGRESS = "activity batch is still in progress"
-_ACTIVITY_PREEMPTED = "activity preempted"
 _STALE_ACTIVITY_PROGRESS = "stale activity progress was discarded"
 MINIGAME_PROGRESS_KEY = "progress"
 MINIGAME_PROGRESS_SCHEMA_VERSION = 1
@@ -51,7 +49,6 @@ _RECOVERY_REQUIRED = "encounter recovery is required"
 _WORKFLOW_FAILED = "encounter workflow did not complete"
 _BALANCER_SWITCH = "encounter yielded to the configured balancing task"
 _ASSIST_ABORTED = "assist session aborted"
-_ASSIST_PREEMPTED = "assist session preempted"
 
 
 def _validate_aware_datetime(value: datetime, *, field_name: str) -> None:
@@ -319,7 +316,6 @@ class ActivityWorkflow(Protocol):
         self,
         spec: ActivitySpec,
         cancellation: CancellationSignal,
-        preemption: PreemptionRequest,
     ) -> ActivityReport:
         """在一次操作完成后的安全点返回。"""
 
@@ -342,9 +338,6 @@ class ActivityTask(Task):
         context.abort.raise_if_requested()
         execution_spec, stale_progress = self._execution_spec(context)
         stale_effects = (self._delete_progress(context),) if stale_progress else ()
-        preempted = self._preempted_at_safe_point(context, state_effects=stale_effects)
-        if preempted is not None:
-            return preempted
         if stale_progress:
             return TaskResult(
                 outcome=Deferred(_STALE_ACTIVITY_PROGRESS),
@@ -355,17 +348,13 @@ class ActivityTask(Task):
         if limit_reached is not None:
             return limit_reached
 
-        report = self._workflow.execute(execution_spec, context.abort, context.preemption)
+        report = self._workflow.execute(execution_spec, context.abort)
         if not isinstance(report, ActivityReport):
             message = "ActivityWorkflow.execute() must return an ActivityReport"
             raise TypeError(message)
         context.abort.raise_if_requested()
         self._validate_report(context, execution_spec, report)
         progress = self._progress_after_report(context, execution_spec, report)
-        progress_effects = () if progress is None else (self._upsert_progress(context, progress),)
-        preempted = self._preempted_at_safe_point(context, state_effects=progress_effects)
-        if preempted is not None:
-            return preempted
         return self._result_from_report(context, execution_spec, report, progress)
 
     def _execution_spec(self, context: TaskContext) -> tuple[ActivitySpec, bool]:
@@ -473,19 +462,6 @@ class ActivityTask(Task):
             outcome=outcome,
             effects=(RescheduleSelf(spec.schedule.next_after(report.observed_at)),),
             state_effects=(self._delete_progress(context),),
-        )
-
-    @staticmethod
-    def _preempted_at_safe_point(
-        context: TaskContext,
-        *,
-        state_effects: tuple[UpsertTaskState | DeleteTaskState, ...] = (),
-    ) -> TaskResult | None:
-        if not context.preemption.is_requested:
-            return None
-        return TaskResult(
-            outcome=Cancelled(context.preemption.reason or _ACTIVITY_PREEMPTED),
-            state_effects=state_effects,
         )
 
     @staticmethod
@@ -1381,6 +1357,4 @@ class AssistSessionTask(Task):
     def _cancelled_at_safe_point(context: TaskContext) -> TaskResult | None:
         if context.abort.is_requested:
             return TaskResult(outcome=Cancelled(context.abort.reason or _ASSIST_ABORTED))
-        if context.preemption.is_requested:
-            return TaskResult(outcome=Cancelled(context.preemption.reason or _ASSIST_PREEMPTED))
         return None

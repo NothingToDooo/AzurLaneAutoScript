@@ -19,14 +19,3 @@ class TaskId:
 
     def __str__(self) -> str:
         return self.value
-
-
-@dataclass(frozen=True, slots=True)
-class RunId:
-    value: str
-
-    def __post_init__(self) -> None:
-        _validate_identifier(self.value, kind="run id")
-
-    def __str__(self) -> str:
-        return self.value

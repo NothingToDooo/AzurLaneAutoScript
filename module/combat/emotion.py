@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Literal
 
 from module.base.decorator import cached_property
 from module.base.utils import random_normal_distribution_int
-from module.exception import RequestHumanTakeover, ScriptEnd, ScriptError
+from module.exception import RequestHumanTakeover, ScriptError
 from module.logger import logger
 
 if TYPE_CHECKING:
@@ -28,7 +28,6 @@ DIC_RECOVER_MAX = {
 }
 OATH_RECOVER = 10
 UNKNOWN_FLEET_ORDER_TEMPLATE = "Unknown fleet order: {method}"
-EMOTION_CONTROL_DELAY_MESSAGE = "Emotion control"
 
 
 class FleetEmotion:
@@ -198,15 +197,6 @@ class Emotion:
         if recovered <= datetime.now():
             return None
         return recovered
-
-    def check_reduce(self, battle: int) -> None:
-        """进图前按预计战斗数检查心情；不足时延迟任务并抛出 ScriptEnd。"""
-        recovered = self.recovery_at(battle)
-        if recovered is None:
-            return
-        logger.info("Delay current task to prevent emotion control in the future")
-        self.config.task_delay(target=recovered)
-        raise ScriptEnd(EMOTION_CONTROL_DELAY_MESSAGE)
 
     def wait(self, fleet_index: int) -> None:
         """进入战斗前等待 1 或 2 号舰队恢复到控制阈值。"""

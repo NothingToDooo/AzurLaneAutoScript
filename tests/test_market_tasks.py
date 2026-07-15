@@ -9,9 +9,7 @@ from module.application import (
     DailySchedule,
     DisableTask,
     ExecutionMode,
-    PreemptionRequest,
     RescheduleSelf,
-    RunId,
     RunMetadata,
     Succeeded,
     Task,
@@ -90,12 +88,10 @@ class _Workflow[T]:
 def _context(task_id: str, abort: AbortToken | None = None) -> TaskContext:
     return TaskContext(
         task_id=TaskId(task_id),
-        run_id=RunId(f"run-{task_id}"),
         started_at=datetime(2026, 7, 13, 4, tzinfo=UTC),
         mode=ExecutionMode.SCHEDULED_JOB,
-        metadata=RunMetadata(settings_revision=1, content_revision="content-1", client_ui_revision="ui-1"),
+        metadata=RunMetadata(settings_revision=1, content_revision="content-1"),
         abort=AbortToken() if abort is None else abort,
-        preemption=PreemptionRequest(),
     )
 
 

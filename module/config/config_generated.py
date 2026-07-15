@@ -141,14 +141,18 @@ class ConfigOverrides(TypedDict, total=False):
     Scheduler_ServerUpdate: str
     Emulator_Serial: str
     Emulator_MuMuPath: str
+    Emulator_AdbExecutable: str
     Error_HandleError: bool
-    Error_SaveError: bool
-    Error_OnePushConfig: str
+    Error_SmtpEnabled: bool
+    Error_SmtpHost: str
+    Error_SmtpPort: int
+    Error_SmtpTransport: str
+    Error_SmtpUser: str
+    Error_SmtpPassword: str
+    Error_SmtpRecipients: str
     Error_ScreenshotLength: int
     Optimization_ScreenshotInterval: float
     Optimization_CombatScreenshotInterval: float
-    Optimization_TaskHoardingDuration: int
-    Optimization_WhenTaskQueueEmpty: str
     Retirement_RetireMode: str
     OneClickRetire_KeepLimitBreak: str
     Enhance_ShipToEnhance: str
@@ -213,7 +217,7 @@ class ConfigOverrides(TypedDict, total=False):
     GemsFarming_CommonDD: str
     GemsFarming_CommissionLimit: bool
     EquipmentCode_ExportToConfig: bool
-    EquipmentCode_Config: str | None
+    EquipmentCode_Config: str
     EventGeneral_PtLimit: int
     EventGeneral_TimeLimit: datetime.datetime
     TaskBalancer_Enable: bool
@@ -421,19 +425,23 @@ class GeneratedConfig:
     # 配置组 `Emulator`
     Emulator_Serial = "127.0.0.1:16384"
     Emulator_MuMuPath = "C:/Program Files/Netease/MuMu Player 12/nx_main/MuMuNxMain.exe"
+    Emulator_AdbExecutable = "./.venv/Lib/site-packages/adbutils/binaries/adb.exe"
 
     # 配置组 `Error`
     Error_HandleError = True
-    Error_SaveError = True
-    Error_OnePushConfig = "provider: null"
+    Error_SmtpEnabled = False
+    Error_SmtpHost = ""
+    Error_SmtpPort = 465
+    # 可选项：implicit_tls, starttls
+    Error_SmtpTransport = "implicit_tls"
+    Error_SmtpUser = ""
+    Error_SmtpPassword = ""
+    Error_SmtpRecipients = ""
     Error_ScreenshotLength = 12
 
     # 配置组 `Optimization`
     Optimization_ScreenshotInterval = 0.3
     Optimization_CombatScreenshotInterval = 1.0
-    Optimization_TaskHoardingDuration = 0
-    # 可选项：stay_there, goto_main, close_game
-    Optimization_WhenTaskQueueEmpty = "goto_main"
 
     # 配置组 `Retirement`
     # 可选项：one_click_retire, enhance, old_retire
@@ -556,7 +564,7 @@ class GeneratedConfig:
 
     # 配置组 `EquipmentCode`
     EquipmentCode_ExportToConfig = True
-    EquipmentCode_Config = None
+    EquipmentCode_Config = ""
 
     # 配置组 `EventGeneral`
     EventGeneral_PtLimit = 0
@@ -587,8 +595,8 @@ class GeneratedConfig:
     MaritimeEscort_Enable = True
 
     # 配置组 `Coalition`
-    # 可选项：tc1, tc2, tc3, sp, ex
-    Coalition_Mode = "tc3"
+    # 可选项：easy, normal, hard, sp, ex
+    Coalition_Mode = "hard"
     # 可选项：single, multi
     Coalition_Fleet = "single"
 

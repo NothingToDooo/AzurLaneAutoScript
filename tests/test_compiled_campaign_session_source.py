@@ -4,25 +4,18 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from module.content import (
-    CampaignRunVariant,
-    CompiledCampaignSessionSource,
-    ContentCatalog,
-    ContentValidationError,
-    EventPack,
-    StageRef,
-    StageSpec,
-    UnknownStageError,
-)
+from module.content.campaign_session import CampaignRunVariant
+from module.content.campaign_session_source import CompiledCampaignSessionSource
+from module.content.catalog import ContentCatalog
+from module.content.errors import ContentValidationError, UnknownStageError
 from module.content.manifest import load_default_event_manifests
+from module.content.models import EventPack, StageRef, StageSpec
 from module.content.stage_loader import StageSpecLoader
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-
-def _all_native_specs(catalog: ContentCatalog) -> tuple[StageSpec, ...]:
-    return tuple(stage for pack in catalog.packs for stage in pack.stages)
+    from module.content.stage_definition import CampaignStageDefinition
 
 
 def _assign_attribute(target: object, name: str, value: object) -> None:
@@ -91,52 +84,48 @@ def _source_for_stage(tmp_path: Path, body: str) -> CompiledCampaignSessionSourc
     return CompiledCampaignSessionSource(catalog, StageSpecLoader(content_root))
 
 
-def test_default_startup_compiles_every_manifest_native_stage_into_both_variants(
+def test_resolve_compiles_only_the_requested_stage_and_caches_each_variant(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     catalog = ContentCatalog(load_default_event_manifests())
-    specs = _all_native_specs(catalog)
+    first, second, *_remaining = catalog.stages
+    original_load = StageSpecLoader.load
+    loaded: list[StageRef] = []
+
+    def tracked_load(loader: StageSpecLoader, spec: StageSpec) -> CampaignStageDefinition:
+        loaded.append(spec.ref)
+        return original_load(loader, spec)
+
+    monkeypatch.setattr(StageSpecLoader, "load", tracked_load)
 
     source = CompiledCampaignSessionSource(catalog, StageSpecLoader())
 
-    assert catalog.stages == specs
-    assert specs
-    compiled = {
-        (spec.ref, variant): source.resolve(spec.ref, variant) for spec in specs for variant in CampaignRunVariant
-    }
-    assert len(compiled) == len(specs) * len(CampaignRunVariant)
-    assert all(
-        session.definition.ref == ref and session.variant is variant for (ref, variant), session in compiled.items()
-    )
-
-    def reject_runtime_compile(_loader: StageSpecLoader, _spec: StageSpec) -> None:
-        message = "resolve must only read the startup snapshot"
-        raise AssertionError(message)
-
-    monkeypatch.setattr(StageSpecLoader, "load", reject_runtime_compile)
-    assert all(source.resolve(ref, variant) is session for (ref, variant), session in compiled.items())
+    assert loaded == []
+    assert source.session_count == 0
+    normal = source.resolve(first.ref, CampaignRunVariant.NORMAL)
+    assert loaded == [first.ref]
+    assert source.session_count == 1
+    assert source.resolve(first.ref, CampaignRunVariant.NORMAL) is normal
+    loop = source.resolve(first.ref, CampaignRunVariant.LOOP)
+    assert loaded == [first.ref]
+    assert source.session_count == 2
+    assert source.resolve(first.ref, CampaignRunVariant.LOOP) is loop
+    assert second.ref not in loaded
 
 
-def test_selected_snapshot_rejects_duplicate_missing_and_invalid_lookups() -> None:
+def test_source_rejects_missing_and_invalid_lookups() -> None:
     catalog = ContentCatalog(load_default_event_manifests())
     first, second, *_remaining = catalog.stages
-    source = CompiledCampaignSessionSource(catalog, StageSpecLoader(), stage_refs=(first.ref,))
+    source = CompiledCampaignSessionSource(catalog, StageSpecLoader())
 
     assert source.resolve(first.ref, CampaignRunVariant.NORMAL).definition.ref == first.ref
-    with pytest.raises(UnknownStageError, match="not compiled"):
-        source.resolve(second.ref, CampaignRunVariant.NORMAL)
+    assert source.resolve(second.ref, CampaignRunVariant.NORMAL).definition.ref == second.ref
+    with pytest.raises(UnknownStageError, match="missing"):
+        source.resolve(StageRef(first.ref.pack_id, "missing"), CampaignRunVariant.NORMAL)
     with pytest.raises(TypeError, match="StageRef"):
         source.resolve(cast("StageRef", object()), CampaignRunVariant.NORMAL)
     with pytest.raises(TypeError, match="CampaignRunVariant"):
         source.resolve(first.ref, cast("CampaignRunVariant", "normal"))
-    with pytest.raises(ContentValidationError, match="duplicate"):
-        CompiledCampaignSessionSource(catalog, StageSpecLoader(), stage_refs=(first.ref, first.ref))
-    with pytest.raises(UnknownStageError, match="missing"):
-        CompiledCampaignSessionSource(
-            catalog,
-            StageSpecLoader(),
-            stage_refs=(StageRef(first.ref.pack_id, "missing"),),
-        )
 
 
 def test_content_source_selects_aliases_and_loop_stages_before_resolving_variants() -> None:
@@ -183,7 +172,6 @@ def test_hard_stage_resolution_prefers_explicit_override_then_main_campaign() ->
     source = CompiledCampaignSessionSource(
         catalog,
         StageSpecLoader(),
-        stage_refs=(hard_override, ordinary_stage),
     )
 
     assert source.resolve_hard_stage_ref("12-4") == hard_override
@@ -204,7 +192,7 @@ def test_hard_stage_resolution_prefers_explicit_override_then_main_campaign() ->
     )
 
 
-def test_content_source_rejects_invalid_loop_selection_and_duplicate_canonical_stage_refs() -> None:
+def test_content_source_rejects_invalid_loop_selection() -> None:
     catalog = ContentCatalog(load_default_event_manifests())
     invalid = CompiledCampaignSessionSource(
         catalog,
@@ -216,25 +204,14 @@ def test_content_source_rejects_invalid_loop_selection_and_duplicate_canonical_s
         invalid.select(StageRef("event_20221124_cn", "th"), remaining_runs=0)
     with pytest.raises(ValueError, match="remaining_runs"):
         invalid.select(StageRef("campaign_main", "1-1"), remaining_runs=-1)
-    with pytest.raises(ContentValidationError, match="canonical"):
-        CompiledCampaignSessionSource(
-            catalog,
-            StageSpecLoader(),
-            stage_refs=(
-                StageRef("campaign_main", "1-1"),
-                StageRef("campaign_main", "campaign_1_1"),
-            ),
-        )
 
 
-def test_compiled_source_and_sessions_are_immutable() -> None:
+def test_cached_sessions_remain_immutable() -> None:
     catalog = ContentCatalog(load_default_event_manifests())
     (first, *_remaining) = catalog.stages
-    source = CompiledCampaignSessionSource(catalog, StageSpecLoader(), stage_refs=(first.ref,))
+    source = CompiledCampaignSessionSource(catalog, StageSpecLoader())
     session = source.resolve(first.ref, CampaignRunVariant.LOOP)
 
-    with pytest.raises(FrozenInstanceError):
-        _assign_attribute(source, "_sessions", {})
     with pytest.raises(FrozenInstanceError):
         _assign_attribute(session, "variant", CampaignRunVariant.NORMAL)
 
@@ -259,10 +236,12 @@ def test_compiled_source_and_sessions_are_immutable() -> None:
         ),
     ],
 )
-def test_startup_compile_fails_fast_for_unknown_policy_mechanic_or_ui_revision(
+def test_explicit_full_validation_fails_for_unknown_policy_mechanic_or_ui_revision(
     tmp_path: Path,
     body: str,
     message: str,
 ) -> None:
+    source = _source_for_stage(tmp_path, body)
+    assert source.session_count == 0
     with pytest.raises(ContentValidationError, match=message):
-        _source_for_stage(tmp_path, body)
+        source.validate_all()

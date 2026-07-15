@@ -1,35 +1,25 @@
+from datetime import datetime
 from typing import Final, Protocol
 
-from module.application.cancellation import AbortRequested, AbortToken, PreemptionRequest
-from module.application.effects import DisableTask, RescheduleSelf, RescheduleTask, WakeTask
-from module.application.identifiers import RunId, TaskId
+from module.application.cancellation import AbortRequested, AbortToken
+from module.application.effects import DelayTask, DisableTask, RescheduleSelf, RescheduleTask, WakeTask
+from module.application.identifiers import TaskId
 from module.application.metadata import RunMetadata
-from module.application.outcomes import Cancelled, Deferred, Faulted
-from module.application.run_start import RunStart
+from module.application.outcomes import Cancelled, Faulted
 from module.application.state_effects import DeleteTaskState, UpsertTaskState
 from module.application.task import ExecutionMode, Task, TaskContext, TaskResult
 
 _DEFAULT_ABORT_REASON: Final = "abort requested"
-_DEFAULT_PREEMPTION_REASON: Final = "preemption requested before task start"
 
 
 class ScheduledTaskDidNotAdvanceError(RuntimeError):
     """scheduled task 正常返回但没有推进或禁用自己的 schedule。"""
 
 
-class StaleRunMetadataError(RuntimeError):
-    """任务解析完成后 settings revision 已改变，run 不应以旧意图启动。"""
-
-    def __init__(self, *, expected_revision: int, actual_revision: int | None) -> None:
-        self.expected_revision = expected_revision
-        self.actual_revision = actual_revision
-        super().__init__(f"run metadata revision is stale: expected {expected_revision}, actual {actual_revision}")
-
-
 class RunRepository(Protocol):
-    def begin_run(self, task_id: TaskId, mode: ExecutionMode, metadata: RunMetadata) -> RunStart: ...
+    def begin_run(self, task_id: TaskId, mode: ExecutionMode, metadata: RunMetadata) -> datetime: ...
 
-    def finalize_run(self, run_id: RunId, result: TaskResult) -> None: ...
+    def finalize_run(self, result: TaskResult) -> None: ...
 
 
 def _validate_execute_arguments(
@@ -52,16 +42,9 @@ def _validate_execute_arguments(
         raise TypeError(message)
 
 
-def _validate_control_signals(
-    *,
-    abort: AbortToken | None,
-    preemption: PreemptionRequest | None,
-) -> None:
+def _validate_abort(abort: AbortToken | None) -> None:
     if abort is not None and not isinstance(abort, AbortToken):
         message = "abort must be an AbortToken or None"
-        raise TypeError(message)
-    if preemption is not None and not isinstance(preemption, PreemptionRequest):
-        message = "preemption must be a PreemptionRequest or None"
         raise TypeError(message)
 
 
@@ -76,7 +59,7 @@ def _validate_scheduled_result(task_id: TaskId, mode: ExecutionMode, result: Tas
     indirect_self_effects = tuple(
         effect
         for effect in result.effects
-        if isinstance(effect, RescheduleTask | WakeTask) and effect.task_id == task_id
+        if isinstance(effect, RescheduleTask | DelayTask | WakeTask) and effect.task_id == task_id
     )
     if indirect_self_effects:
         message = f"task {task_id.value!r} must use RescheduleSelf or DisableTask for its own schedule"
@@ -116,7 +99,7 @@ class RunCoordinator:
     def __init__(self, repository: RunRepository) -> None:
         self.repository = repository
 
-    def execute(  # noqa: PLR0913
+    def execute(
         self,
         task_id: TaskId,
         mode: ExecutionMode,
@@ -124,38 +107,28 @@ class RunCoordinator:
         task: Task,
         *,
         abort: AbortToken | None = None,
-        preemption: PreemptionRequest | None = None,
     ) -> TaskResult:
         _validate_execute_arguments(task_id, mode, metadata, task)
-        _validate_control_signals(abort=abort, preemption=preemption)
+        _validate_abort(abort)
 
-        start = self.repository.begin_run(task_id, mode, metadata)
-        if not isinstance(start, RunStart):
-            message = "begin_run() must return a RunStart"
+        started_at = self.repository.begin_run(task_id, mode, metadata)
+        if not isinstance(started_at, datetime):
+            message = "begin_run() must return a datetime"
             raise TypeError(message)
+        if started_at.tzinfo is None or started_at.utcoffset() is None:
+            message = "begin_run() must return a timezone-aware datetime"
+            raise ValueError(message)
 
         context = TaskContext(
             task_id=task_id,
-            run_id=start.run_id,
-            started_at=start.started_at,
+            started_at=started_at,
             mode=mode,
             metadata=metadata,
             abort=AbortToken() if abort is None else abort,
-            preemption=PreemptionRequest() if preemption is None else preemption,
         )
         try:
             context.abort.raise_if_requested()
-            if context.preemption.is_requested:
-                reason = context.preemption.reason or _DEFAULT_PREEMPTION_REASON
-                if mode is ExecutionMode.SCHEDULED_JOB:
-                    result = TaskResult(
-                        outcome=Deferred(reason),
-                        effects=(RescheduleSelf(start.started_at),),
-                    )
-                else:
-                    result = TaskResult(outcome=Cancelled(reason))
-            else:
-                result = _require_task_result(task.run(context))
+            result = _require_task_result(task.run(context))
             _validate_scheduled_result(task_id, mode, result)
             _validate_state_effects(task_id, result)
         except AbortRequested as error:
@@ -163,5 +136,5 @@ class RunCoordinator:
         except Exception as error:  # noqa: BLE001
             result = TaskResult(outcome=Faulted(error))
 
-        self.repository.finalize_run(start.run_id, result)
+        self.repository.finalize_run(result)
         return result

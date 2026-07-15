@@ -759,14 +759,6 @@ class CampaignRuntimeProfileManager:
     def profile(self) -> CampaignRuntimeProfile:
         return self._profile
 
-    @property
-    def executor_bindings(self) -> tuple[RuntimeExecutorBinding, ...]:
-        return tuple(facet.binding for facet in self._facets)
-
-    @property
-    def executor_instance_count(self) -> int:
-        return len(self._instances)
-
     def facet(self, kind: RuntimeExecutorKind) -> RuntimeFacetComposite:
         if not isinstance(kind, RuntimeExecutorKind):
             message = "runtime facet requires a RuntimeExecutorKind"
@@ -800,10 +792,6 @@ class CampaignRuntimeProfileManager:
     @property
     def engine(self) -> RuntimeFacetComposite:
         return self.facet(RuntimeExecutorKind.ENGINE_EXTENSION)
-
-    @property
-    def config_overlay(self) -> Mapping[str, object]:
-        return self._standard_config_tunings
 
     def apply_config(self, config: AzurLaneConfig) -> None:
         if not isinstance(config, AzurLaneConfig):

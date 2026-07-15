@@ -7,18 +7,15 @@ from module.application import (
     AbortRequested,
     AbortToken,
     Cancelled,
-    Deferred,
+    DelayTask,
     DisableTask,
     ExecutionMode,
     Faulted,
-    PreemptionRequest,
     RescheduleSelf,
     RescheduleTask,
     RunCoordinator,
-    RunId,
     RunMetadata,
     RunRepository,
-    RunStart,
     ScheduledTaskDidNotAdvanceError,
     Succeeded,
     Task,
@@ -35,7 +32,6 @@ def _metadata() -> RunMetadata:
     return RunMetadata(
         settings_revision=8,
         content_revision="content-20260713",
-        client_ui_revision="cn-ui-v3",
     )
 
 
@@ -44,29 +40,29 @@ class _RecordingRepository(RunRepository):
         self,
         events: list[str],
         *,
-        run_start: RunStart | None = None,
+        started_at: datetime | None = None,
         begin_error: Exception | None = None,
         finalize_error: Exception | None = None,
     ) -> None:
         self.events = events
-        self.run_start = RunStart(RunId("run-1"), datetime(2026, 7, 13, tzinfo=UTC)) if run_start is None else run_start
+        self.started_at = datetime(2026, 7, 13, tzinfo=UTC) if started_at is None else started_at
         self.begin_error = begin_error
         self.finalize_error = finalize_error
         self.begin_calls: list[tuple[TaskId, ExecutionMode, RunMetadata]] = []
-        self.finalize_calls: list[tuple[RunId, TaskResult]] = []
+        self.finalize_calls: list[TaskResult] = []
 
     @override
-    def begin_run(self, task_id: TaskId, mode: ExecutionMode, metadata: RunMetadata) -> RunStart:
+    def begin_run(self, task_id: TaskId, mode: ExecutionMode, metadata: RunMetadata) -> datetime:
         self.events.append("begin")
         self.begin_calls.append((task_id, mode, metadata))
         if self.begin_error is not None:
             raise self.begin_error
-        return self.run_start
+        return self.started_at
 
     @override
-    def finalize_run(self, run_id: RunId, result: TaskResult) -> None:
+    def finalize_run(self, result: TaskResult) -> None:
         self.events.append("finalize")
-        self.finalize_calls.append((run_id, result))
+        self.finalize_calls.append(result)
         if self.finalize_error is not None:
             raise self.finalize_error
 
@@ -129,7 +125,7 @@ def test_execute_begins_runs_and_finalizes_in_order() -> None:
     assert result is expected
     assert events == ["begin", "task", "finalize"]
     assert repository.begin_calls == [(task_id, ExecutionMode.SCHEDULED_JOB, metadata)]
-    assert repository.finalize_calls == [(RunId("run-1"), expected)]
+    assert repository.finalize_calls == [expected]
     assert task.contexts[0].metadata is metadata
     assert task.contexts[0].started_at == datetime(2026, 7, 13, tzinfo=UTC)
 
@@ -147,7 +143,7 @@ def test_scheduled_success_without_self_schedule_becomes_faulted() -> None:
 
     assert isinstance(result.outcome, Faulted)
     assert isinstance(result.outcome.error, ScheduledTaskDidNotAdvanceError)
-    assert repository.finalize_calls == [(RunId("run-1"), result)]
+    assert repository.finalize_calls == [result]
 
 
 def test_scheduled_task_must_have_exactly_one_self_advancement() -> None:
@@ -171,17 +167,18 @@ def test_scheduled_task_must_have_exactly_one_self_advancement() -> None:
 
     assert isinstance(result.outcome, Faulted)
     assert isinstance(result.outcome.error, ScheduledTaskDidNotAdvanceError)
-    assert repository.finalize_calls == [(RunId("run-1"), result)]
+    assert repository.finalize_calls == [result]
 
 
 @pytest.mark.parametrize(
     "effect",
     [
         RescheduleTask(TaskId("research"), datetime(2026, 7, 14, tzinfo=UTC)),
+        DelayTask(TaskId("research"), datetime(2026, 7, 14, tzinfo=UTC)),
         WakeTask(TaskId("research"), datetime(2026, 7, 14, tzinfo=UTC), WakePolicy.FORCE_ENABLE),
     ],
 )
-def test_task_cannot_target_its_own_schedule_indirectly(effect: RescheduleTask | WakeTask) -> None:
+def test_task_cannot_target_its_own_schedule_indirectly(effect: RescheduleTask | DelayTask | WakeTask) -> None:
     events: list[str] = []
     repository = _RecordingRepository(events)
 
@@ -239,7 +236,7 @@ def test_abort_requested_becomes_a_finalized_cancelled_result(
     )
 
     assert result == TaskResult(outcome=Cancelled(expected_reason))
-    assert repository.finalize_calls == [(RunId("run-1"), result)]
+    assert repository.finalize_calls == [result]
 
 
 def test_abort_with_cleanup_failure_is_faulted_instead_of_cleanly_cancelled() -> None:
@@ -259,7 +256,7 @@ def test_abort_with_cleanup_failure_is_faulted_instead_of_cleanly_cancelled() ->
     assert isinstance(result.outcome, Faulted)
     assert result.outcome.error is error
     assert result.outcome.error.exceptions == (abort_error, cleanup_error)
-    assert repository.finalize_calls == [(RunId("run-1"), result)]
+    assert repository.finalize_calls == [result]
 
 
 def test_abort_requested_before_start_never_calls_the_task() -> None:
@@ -282,50 +279,6 @@ def test_abort_requested_before_start_never_calls_the_task() -> None:
     assert events == ["begin", "finalize"]
 
 
-def test_preemption_before_scheduled_start_is_recorded_and_rescheduled_without_calling_task() -> None:
-    events: list[str] = []
-    started_at = datetime(2026, 7, 13, 3, tzinfo=UTC)
-    repository = _RecordingRepository(events, run_start=RunStart(RunId("run-preempt"), started_at))
-    task = _ReturningTask(TaskResult(Succeeded()), events)
-    preemption = PreemptionRequest()
-    preemption.request("higher priority task")
-
-    result = RunCoordinator(repository).execute(
-        TaskId("research"),
-        ExecutionMode.SCHEDULED_JOB,
-        _metadata(),
-        task,
-        preemption=preemption,
-    )
-
-    assert result == TaskResult(
-        Deferred("higher priority task"),
-        effects=(RescheduleSelf(started_at),),
-    )
-    assert task.contexts == []
-    assert events == ["begin", "finalize"]
-
-
-@pytest.mark.parametrize("mode", [ExecutionMode.ASSIST_SESSION, ExecutionMode.DIRECT_COMMAND])
-def test_preemption_before_non_scheduled_start_cancels_without_calling_task(mode: ExecutionMode) -> None:
-    events: list[str] = []
-    repository = _RecordingRepository(events)
-    task = _ReturningTask(TaskResult(Succeeded()), events)
-    preemption = PreemptionRequest()
-    preemption.request()
-
-    result = RunCoordinator(repository).execute(
-        TaskId("event_story"),
-        mode,
-        _metadata(),
-        task,
-        preemption=preemption,
-    )
-
-    assert result == TaskResult(Cancelled("preemption requested before task start"))
-    assert task.contexts == []
-
-
 def test_ordinary_exception_becomes_faulted_with_the_original_error() -> None:
     events: list[str] = []
     repository = _RecordingRepository(events)
@@ -340,7 +293,7 @@ def test_ordinary_exception_becomes_faulted_with_the_original_error() -> None:
 
     assert isinstance(result.outcome, Faulted)
     assert result.outcome.error is error
-    assert repository.finalize_calls == [(RunId("run-1"), result)]
+    assert repository.finalize_calls == [result]
 
 
 def test_base_exception_propagates_without_finalizing() -> None:
@@ -375,12 +328,24 @@ def test_begin_failure_does_not_run_or_finalize() -> None:
     assert repository.finalize_calls == []
 
 
-def test_invalid_run_start_stops_before_task_and_finalize() -> None:
+def test_invalid_started_at_stops_before_task_and_finalize() -> None:
     events: list[str] = []
-    repository = _RecordingRepository(events, run_start=cast("RunStart", RunId("run-1")))
+    repository = _RecordingRepository(events, started_at=cast("datetime", object()))
     task = _ReturningTask(TaskResult(outcome=Succeeded()), events)
 
-    with pytest.raises(TypeError, match=r"begin_run\(\) must return a RunStart"):
+    with pytest.raises(TypeError, match=r"begin_run\(\) must return a datetime"):
+        RunCoordinator(repository).execute(TaskId("reward"), ExecutionMode.SCHEDULED_JOB, _metadata(), task)
+
+    assert task.contexts == []
+    assert repository.finalize_calls == []
+
+
+def test_naive_started_at_stops_before_task_and_finalize() -> None:
+    events: list[str] = []
+    repository = _RecordingRepository(events, started_at=datetime(2026, 7, 13))
+    task = _ReturningTask(TaskResult(outcome=Succeeded()), events)
+
+    with pytest.raises(ValueError, match=r"begin_run\(\) must return a timezone-aware datetime"):
         RunCoordinator(repository).execute(TaskId("reward"), ExecutionMode.SCHEDULED_JOB, _metadata(), task)
 
     assert task.contexts == []
@@ -401,15 +366,14 @@ def test_finalize_failure_propagates_after_one_attempt() -> None:
     assert len(repository.finalize_calls) == 1
 
 
-def test_execute_injects_the_supplied_control_signals() -> None:
+def test_execute_injects_the_supplied_abort_token() -> None:
     events: list[str] = []
     repository = _RecordingRepository(
         events,
-        run_start=RunStart(RunId("run-signals"), datetime(2026, 7, 13, tzinfo=UTC)),
+        started_at=datetime(2026, 7, 13, tzinfo=UTC),
     )
     task = _ReturningTask(TaskResult(outcome=Succeeded()), events)
     abort = AbortToken()
-    preemption = PreemptionRequest()
     metadata = _metadata()
 
     RunCoordinator(repository).execute(
@@ -418,16 +382,13 @@ def test_execute_injects_the_supplied_control_signals() -> None:
         metadata,
         task,
         abort=abort,
-        preemption=preemption,
     )
 
     context = task.contexts[0]
     assert context.task_id == TaskId("opsi_daemon")
-    assert context.run_id == RunId("run-signals")
     assert context.mode is ExecutionMode.ASSIST_SESSION
     assert context.metadata is metadata
     assert context.abort is abort
-    assert context.preemption is preemption
 
 
 def test_invalid_task_result_becomes_a_finalized_fault() -> None:
@@ -444,7 +405,7 @@ def test_invalid_task_result_becomes_a_finalized_fault() -> None:
     assert isinstance(result.outcome, Faulted)
     assert isinstance(result.outcome.error, TypeError)
     assert str(result.outcome.error) == "Task.run() must return a TaskResult"
-    assert repository.finalize_calls == [(RunId("run-1"), result)]
+    assert repository.finalize_calls == [result]
 
 
 def test_task_cannot_mutate_another_task_state_namespace() -> None:
@@ -470,7 +431,7 @@ def test_task_cannot_mutate_another_task_state_namespace() -> None:
     assert isinstance(result.outcome.error, ValueError)
     assert "another task's state namespace" in str(result.outcome.error)
     assert result.state_effects == ()
-    assert repository.finalize_calls == [(RunId("run-1"), result)]
+    assert repository.finalize_calls == [result]
 
 
 def test_invalid_execute_arguments_fail_before_begin() -> None:

@@ -4,12 +4,21 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from module.bootstrap import ConfigurationCompileError, WebConfigurationCompiler
-from module.notify import DisabledNotificationConfig, NotificationConfigError, SmtpNotificationConfig, SmtpTransport
+from module.bootstrap.configuration_compiler import (
+    ConfigurationCompileError,
+    CurrentConfigurationSchema,
+    WebConfigurationCompiler,
+)
+from module.notify.configuration import (
+    DisabledNotificationConfig,
+    NotificationConfigError,
+    SmtpNotificationConfig,
+    SmtpTransport,
+)
 from module.task_registry import TASK_CATALOG
 
 if TYPE_CHECKING:
-    from module.state import JsonValue
+    from module.runtime.settings import JsonValue
 
 
 def _template() -> dict[str, object]:
@@ -19,38 +28,43 @@ def _template() -> dict[str, object]:
     )
 
 
+def test_current_schema_rejects_duplicate_json_fields(tmp_path: Path) -> None:
+    definition_path = tmp_path / "args.json"
+    definition_path.write_text('{"Main": {}, "Main": {}}', encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="duplicate JSON field: Main"):
+        CurrentConfigurationSchema(definition_path)
+
+
 def test_template_compiles_to_exact_runtime_task_and_schedule_coverage() -> None:
     compiled = WebConfigurationCompiler().compile(_template())
 
     payload = cast("dict[str, JsonValue]", compiled.payload)
     tasks = cast("dict[str, JsonValue]", payload["tasks"])
-    scheduled = {task_id for task_id, definition in TASK_CATALOG.items() if definition.priority is not None}
     assert payload["schema_version"] == 1
     assert set(tasks) == set(TASK_CATALOG)
-    assert {schedule.task_id for schedule in compiled.schedules} == scheduled
-    assert [schedule.priority for schedule in compiled.schedules] == [
-        definition.priority for definition in TASK_CATALOG.values() if definition.priority is not None
-    ]
     assert compiled.device_serial == "127.0.0.1:16384"
     assert compiled.notification == DisabledNotificationConfig()
     assert compiled.source_revision.startswith("sha256:")
-    assert compiled.assembly_revision.startswith("sha256:")
 
 
-def test_compiler_projects_legacy_notification_key_to_typed_assembly_config() -> None:
+def test_compiler_projects_explicit_smtp_fields_to_typed_notification_config() -> None:
     credential = "local-smtp-password"
     document = _template()
     baseline = WebConfigurationCompiler().compile(document)
     alas = cast("dict[str, object]", document["Alas"])
     error = cast("dict[str, object]", alas["Error"])
-    error["OnePushConfig"] = f"""
-provider: smtp
-host: smtp.example.com
-user: sender@example.com
-password: {credential}
-receiver: receiver@example.com
-port: 465
-"""
+    error.update(
+        {
+            "SmtpEnabled": True,
+            "SmtpHost": "smtp.example.com",
+            "SmtpPort": 465,
+            "SmtpTransport": "implicit_tls",
+            "SmtpUser": "sender@example.com",
+            "SmtpPassword": credential,
+            "SmtpRecipients": "receiver@example.com",
+        }
+    )
 
     compiled = WebConfigurationCompiler().compile(document)
 
@@ -63,34 +77,27 @@ port: 465
         transport=SmtpTransport.IMPLICIT_TLS,
     )
     assert compiled.source_revision == baseline.source_revision
-    assert compiled.assembly_revision != baseline.assembly_revision
-    assert credential in repr(compiled)
+    assert credential not in repr(compiled)
     assert credential not in json.dumps(compiled.payload)
 
 
-def test_notification_can_be_compiled_even_when_an_unrelated_task_setting_is_invalid() -> None:
-    document = _template()
-    alas = cast("dict[str, object]", document["Alas"])
-    emulator = cast("dict[str, object]", alas["Emulator"])
-    emulator["Serial"] = 123
-
-    notification = WebConfigurationCompiler().compile_notification(document)
-
-    assert notification == DisabledNotificationConfig()
-
-
-def test_compiler_preserves_invalid_legacy_notification_detail() -> None:
-    credential = "local-smtp-password"
+def test_compiler_reports_invalid_smtp_field() -> None:
     document = _template()
     alas = cast("dict[str, object]", document["Alas"])
     error = cast("dict[str, object]", alas["Error"])
-    error["OnePushConfig"] = f"provider: smtp\npassword: {credential}\nreceiver: ["
+    error.update(
+        {
+            "SmtpEnabled": True,
+            "SmtpHost": "",
+            "SmtpUser": "sender@example.com",
+            "SmtpPassword": "secret",
+        }
+    )
 
     with pytest.raises(ConfigurationCompileError) as caught:
         WebConfigurationCompiler().compile(document)
 
-    assert str(caught.value).startswith("$.Alas.Error.OnePushConfig SMTP config must be valid YAML:")
-    assert "receiver: [" in str(caught.value)
+    assert str(caught.value) == "$.Alas.Error SMTP host must be trimmed and non-empty"
     assert isinstance(caught.value.__cause__, NotificationConfigError)
 
 
@@ -99,26 +106,26 @@ def test_compiled_revision_changes_only_when_the_persisted_runtime_snapshot_chan
     original = WebConfigurationCompiler().compile(document)
     repeated = WebConfigurationCompiler().compile(document)
     main = cast("dict[str, object]", document["Main"])
-    scheduler = cast("dict[str, object]", main["Scheduler"])
-    scheduler["Enable"] = not cast("bool", scheduler["Enable"])
+    campaign = cast("dict[str, object]", main["Campaign"])
+    campaign["Name"] = "12-3"
     changed = WebConfigurationCompiler().compile(document)
 
     assert repeated.source_revision == original.source_revision
     assert changed.source_revision != original.source_revision
-    assert repeated.assembly_revision == original.assembly_revision
-    assert changed.assembly_revision == original.assembly_revision
 
 
-def test_assembly_revision_tracks_only_process_bound_configuration() -> None:
-    document = _template()
-    original = WebConfigurationCompiler().compile(document)
-    alas = cast("dict[str, object]", document["Alas"])
-    optimization = cast("dict[str, object]", alas["Optimization"])
-    optimization["ScreenshotInterval"] = 0.5
-    changed = WebConfigurationCompiler().compile(document)
+def test_compiled_payload_is_an_independent_snapshot_on_every_read() -> None:
+    compiled = WebConfigurationCompiler().compile(_template())
+    first = cast("dict[str, JsonValue]", compiled.payload)
+    tasks = cast("dict[str, JsonValue]", first["tasks"])
+    main = cast("dict[str, JsonValue]", tasks["main"])
+    main["stage_ids"] = ["mutated"]
 
-    assert changed.source_revision == original.source_revision
-    assert changed.assembly_revision != original.assembly_revision
+    second = cast("dict[str, JsonValue]", compiled.payload)
+    second_tasks = cast("dict[str, JsonValue]", second["tasks"])
+    second_main = cast("dict[str, JsonValue]", second_tasks["main"])
+    assert second_main["stage_ids"] == ["12-4"]
+    assert WebConfigurationCompiler().compile(_template()).source_revision == compiled.source_revision
 
 
 def test_compiler_projects_campaign_opsi_and_direct_command_settings() -> None:
@@ -174,7 +181,7 @@ def test_compiler_projects_campaign_opsi_and_direct_command_settings() -> None:
     assert execution["enemy_priority"] == {"scale_balance_weight": "default_mode"}
     assert "formation" not in cast("dict[str, JsonValue]", execution["fleets"])
     event_a = cast("dict[str, JsonValue]", tasks["event_a"])
-    assert event_a["stage_ids"] == ["a1", "a2", "a3"]
+    assert event_a["stage_ids"] == ["t1", "t2", "t3"]
     gems_execution = cast(
         "dict[str, JsonValue]",
         cast("dict[str, JsonValue]", tasks["gems_farming"])["execution"],
@@ -188,10 +195,12 @@ def test_compiler_projects_campaign_opsi_and_direct_command_settings() -> None:
     assert gems_policy["common_carrier"] == "any"
     assert gems_policy["vanguard_change"] == "ship"
     assert gems_policy["common_destroyer"] == "any"
-    assert cast("str", gems_policy["equipment_code_config"]).startswith("DD:")
+    assert "equipment_code_config" not in gems_policy
     opsi = cast("dict[str, JsonValue]", tasks["opsi_meowfficer_farming"])
     assert opsi["hazard_level"] == 5
-    assert tasks["event_story"] == {"event": "event_20260625_cn", "skip_battle": True}
+    event_story = cast("dict[str, JsonValue]", tasks["event_story"])
+    assert isinstance(event_story["event"], str)
+    assert event_story["skip_battle"] is True
     assert cast("dict[str, JsonValue]", tasks["coalition_sp"])["fleet"] == "multi"
     assert tasks["azur_lane_uncensored"] == {"package_name": "com.bilibili.azurlane"}
 
@@ -275,21 +284,59 @@ def test_compiler_preserves_scheduler_interval_bounds_in_canonical_seconds() -> 
     }
 
 
-@pytest.mark.parametrize("interval", [17, "17"])
-def test_compiler_normalizes_single_scheduler_interval_to_equal_bounds(interval: int | str) -> None:
+def test_compiler_accepts_single_interval_for_range_default() -> None:
+    document = _template()
+    tactical = cast("dict[str, object]", document["Tactical"])
+    scheduler = cast("dict[str, object]", tactical["Scheduler"])
+    scheduler["FailureInterval"] = 120
+
+    payload = cast("dict[str, JsonValue]", WebConfigurationCompiler().compile(document).payload)
+    tasks = cast("dict[str, JsonValue]", payload["tasks"])
+    tactical_settings = cast("dict[str, JsonValue]", tasks["tactical"])
+
+    assert tactical_settings["failure_retry_seconds"] == {
+        "lower_seconds": 7_200,
+        "upper_seconds": 7_200,
+    }
+
+
+def test_compiler_accepts_range_for_integer_interval_default() -> None:
     document = _template()
     hard = cast("dict[str, object]", document["Hard"])
     scheduler = cast("dict[str, object]", hard["Scheduler"])
-    scheduler["FailureInterval"] = interval
+    scheduler["FailureInterval"] = "120-240"
 
     payload = cast("dict[str, JsonValue]", WebConfigurationCompiler().compile(document).payload)
     tasks = cast("dict[str, JsonValue]", payload["tasks"])
     hard_settings = cast("dict[str, JsonValue]", tasks["hard"])
 
     assert hard_settings["failure_retry_seconds"] == {
-        "lower_seconds": 1_020,
-        "upper_seconds": 1_020,
+        "lower_seconds": 7_200,
+        "upper_seconds": 14_400,
     }
+
+
+@pytest.mark.parametrize(
+    ("task_name", "field_name", "value", "expected_type"),
+    [
+        ("Hard", "FailureInterval", "17", "int"),
+        ("Restart", "Enable", "true", "bool"),
+    ],
+)
+def test_compiler_rejects_legacy_scalar_string_coercion(
+    task_name: str,
+    field_name: str,
+    value: str,
+    expected_type: str,
+) -> None:
+    document = _template()
+    task = cast("dict[str, object]", document[task_name])
+    scheduler = cast("dict[str, object]", task["Scheduler"])
+    scheduler[field_name] = value
+
+    path = rf"\$\.{task_name}\.Scheduler\.{field_name} must be a {expected_type}"
+    with pytest.raises(ConfigurationCompileError, match=path):
+        WebConfigurationCompiler().compile(document)
 
 
 def test_compiler_rejects_reversed_scheduler_interval() -> None:
@@ -302,13 +349,101 @@ def test_compiler_rejects_reversed_scheduler_interval() -> None:
         WebConfigurationCompiler().compile(document)
 
 
-def test_compiler_preserves_disabled_schedule_due_time_as_an_aware_fact() -> None:
-    compiled = WebConfigurationCompiler().compile(_template())
-    main = next(schedule for schedule in compiled.schedules if schedule.task_id == "main")
+@pytest.mark.parametrize("triggers", ["04:00,04:00", "12:00,04:00"])
+def test_compiler_rejects_duplicate_or_unsorted_server_updates(triggers: str) -> None:
+    document = _template()
+    research = cast("dict[str, object]", document["Research"])
+    scheduler = cast("dict[str, object]", research["Scheduler"])
+    scheduler["ServerUpdate"] = triggers
 
-    assert not main.enabled
-    assert main.due_at is not None
-    assert main.due_at.utcoffset() is not None
+    with pytest.raises(ConfigurationCompileError, match="strictly increasing without duplicates"):
+        WebConfigurationCompiler().compile(document)
+
+
+@pytest.mark.parametrize("value", [0, -1])
+def test_compiler_rejects_non_positive_scheduler_interval(value: int) -> None:
+    document = _template()
+    hard = cast("dict[str, object]", document["Hard"])
+    scheduler = cast("dict[str, object]", hard["Scheduler"])
+    scheduler["FailureInterval"] = value
+
+    with pytest.raises(ConfigurationCompileError, match="must be positive"):
+        WebConfigurationCompiler().compile(document)
+
+
+def test_compiler_rejects_non_finite_float() -> None:
+    document = _template()
+    alas = cast("dict[str, object]", document["Alas"])
+    optimization = cast("dict[str, object]", alas["Optimization"])
+    optimization["ScreenshotInterval"] = float("nan")
+
+    with pytest.raises(ConfigurationCompileError, match="must be a finite number"):
+        WebConfigurationCompiler().compile(document)
+
+
+def test_compiler_normalizes_integer_json_numbers_for_float_settings() -> None:
+    document = _template()
+    exercise = cast("dict[str, object]", document["Exercise"])
+    exercise_settings = cast("dict[str, object]", exercise["Exercise"])
+    exercise_settings["LowHpThreshold"] = 0
+
+    compiled, runtime_document = WebConfigurationCompiler().compile_runtime_document(document)
+
+    payload = cast("dict[str, JsonValue]", compiled.payload)
+    tasks = cast("dict[str, JsonValue]", payload["tasks"])
+    compiled_exercise = cast("dict[str, JsonValue]", tasks["exercise"])
+    assert compiled_exercise["low_hp_threshold"] == 0.0
+    assert type(compiled_exercise["low_hp_threshold"]) is float
+    runtime_exercise = cast("dict[str, object]", runtime_document["Exercise"])
+    runtime_settings = cast("dict[str, object]", runtime_exercise["Exercise"])
+    assert runtime_settings["LowHpThreshold"] == 0.0
+    assert type(runtime_settings["LowHpThreshold"]) is float
+
+
+def test_compiler_preserves_explicit_numeric_text() -> None:
+    document = _template()
+    alas = cast("dict[str, object]", document["Alas"])
+    error = cast("dict[str, object]", alas["Error"])
+    error["SmtpPassword"] = "1234"
+    general = cast("dict[str, object]", document["General"])
+    enhance = cast("dict[str, object]", general["Enhance"])
+    enhance["Filter"] = "1234"
+
+    runtime_document = WebConfigurationCompiler().parse_runtime_document(document)
+    parsed_alas = cast("dict[str, object]", runtime_document["Alas"])
+    parsed_error = cast("dict[str, object]", parsed_alas["Error"])
+    parsed_general = cast("dict[str, object]", runtime_document["General"])
+    parsed_enhance = cast("dict[str, object]", parsed_general["Enhance"])
+
+    assert parsed_error["SmtpPassword"] == "1234"
+    assert parsed_enhance["Filter"] == "1234"
+
+
+@pytest.mark.parametrize(
+    ("group_name", "field_name", "value", "match"),
+    [
+        ("Emulator", "Serial", "127.0.0.1:7555", "MuMu12 TCP serial"),
+        ("Error", "ScreenshotLength", 0, "between 1 and 300"),
+        ("Error", "ScreenshotLength", 301, "between 1 and 300"),
+        ("Optimization", "ScreenshotInterval", 0.09, "between 0.1 and 0.3"),
+        ("Optimization", "ScreenshotInterval", 0.31, "between 0.1 and 0.3"),
+        ("Optimization", "CombatScreenshotInterval", 0.29, "between 0.3 and 1.0"),
+        ("Optimization", "CombatScreenshotInterval", 1.01, "between 0.3 and 1.0"),
+    ],
+)
+def test_compiler_rejects_invalid_personal_device_settings(
+    group_name: str,
+    field_name: str,
+    value: object,
+    match: str,
+) -> None:
+    document = _template()
+    alas = cast("dict[str, object]", document["Alas"])
+    group = cast("dict[str, object]", alas[group_name])
+    group[field_name] = value
+
+    with pytest.raises(ConfigurationCompileError, match=match):
+        WebConfigurationCompiler().compile(document)
 
 
 def test_compiler_normalizes_disabled_shop_filters_to_null() -> None:
@@ -341,7 +476,6 @@ def test_compiler_normalizes_disabled_shop_filters_to_null() -> None:
     [
         (("Alas", "Emulator", "Serial"), 1, "must be a str"),
         (("Research", "Scheduler", "ServerUpdate"), "25:00", "HH:MM"),
-        (("Main", "Scheduler", "NextRun"), "not-a-date", "ISO datetime"),
         (("Main", "Emotion", "Fleet1Record"), "not-a-date", "ISO datetime"),
         (("Main", "HpControl", "HpBalanceWeight"), "1000, 900", "exactly three"),
     ],
@@ -357,4 +491,61 @@ def test_compiler_rejects_invalid_source_values(
     group[path[2]] = value
 
     with pytest.raises(ConfigurationCompileError, match=match):
+        WebConfigurationCompiler().compile(document)
+
+
+@pytest.mark.parametrize(
+    ("path", "expected_path"),
+    [
+        (("LegacyTask",), r"\$\.LegacyTask"),
+        (("Main", "LegacyGroup"), r"\$\.Main\.LegacyGroup"),
+        (("Main", "Campaign", "LegacyField"), r"\$\.Main\.Campaign\.LegacyField"),
+    ],
+)
+def test_compiler_rejects_unknown_current_schema_fields(
+    path: tuple[str, ...],
+    expected_path: str,
+) -> None:
+    document = _template()
+    owner = document
+    for key in path[:-1]:
+        owner = cast("dict[str, object]", owner[key])
+    owner[path[-1]] = {}
+
+    with pytest.raises(
+        ConfigurationCompileError,
+        match=rf"{expected_path} is not part of the current configuration schema",
+    ):
+        WebConfigurationCompiler().compile(document)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ("Main",),
+        ("Main", "Campaign"),
+        ("Main", "Campaign", "Name"),
+    ],
+)
+def test_compiler_rejects_missing_current_schema_fields(path: tuple[str, ...]) -> None:
+    document = _template()
+    owner = document
+    for key in path[:-1]:
+        owner = cast("dict[str, object]", owner[key])
+    del owner[path[-1]]
+
+    with pytest.raises(ConfigurationCompileError, match="is required by the current configuration schema"):
+        WebConfigurationCompiler().compile(document)
+
+
+def test_compiler_rejects_invalid_current_option_instead_of_falling_back() -> None:
+    document = _template()
+    research = cast("dict[str, object]", document["Research"])
+    settings = cast("dict[str, object]", research["Research"])
+    settings["UseCube"] = "legacy-option"
+
+    with pytest.raises(
+        ConfigurationCompileError,
+        match=r"\$\.Research\.Research\.UseCube must be one of",
+    ):
         WebConfigurationCompiler().compile(document)

@@ -39,12 +39,11 @@ equipping_filter.add_state("off", check_button=equipment_assets.EQUIPPING_OFF)
 class EquipmentChange(Equipment):
     def __init__(
         self,
-        config: AzurLaneConfig | str,
-        device: Device | str | None = None,
-        task: str | None = None,
+        config: AzurLaneConfig,
+        device: Device,
     ) -> None:
         self.equipment_list: dict[int, ImageArray] = {}
-        super().__init__(config, device, task)
+        super().__init__(config, device)
 
     def equipping_set(self, *, enable: bool = False) -> None:
         if equipping_filter.set("on" if enable else "off", main=self):

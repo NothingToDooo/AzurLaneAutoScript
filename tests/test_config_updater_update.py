@@ -1,276 +1,49 @@
+import json
+from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-from module.config.config_updater import ConfigUpdater
-from module.config.deep import deep_get
-from module.config.resolved import ConfigIssue
+from module.config.config_updater import build_template
+from module.config.configuration_file import iter_config_save_updates, read_config_file, write_config_file
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-    from module.config.deep import DeepValue
+    import pytest
 
 
-def _arg(
-    value: DeepValue,
-    typ: str = "input",
-    *,
-    option: list[str] | None = None,
-    display: str | None = None,
-) -> dict[str, DeepValue]:
-    argument: dict[str, DeepValue] = {"value": value, "type": typ}
-    if option is not None:
-        argument["option"] = option
-    if display is not None:
-        argument["display"] = display
-    return argument
+def test_build_template_matches_checked_in_current_template(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    expected = json.loads(Path("config/template.json").read_text(encoding="utf-8"))
+    generated = build_template()
+    (tmp_path / "config").mkdir()
+    monkeypatch.chdir(tmp_path)
+
+    write_config_file("template", generated)
+
+    actual = json.loads((tmp_path / "config" / "template.json").read_text(encoding="utf-8"))
+    assert actual == expected
 
 
-def _make_updater(args: Mapping[str, DeepValue]) -> ConfigUpdater:
-    updater = object.__new__(ConfigUpdater)
-    vars(updater)["args"] = args
-    return updater
+def test_read_file_returns_current_document_without_migration(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    document = {"UnknownLegacyField": {"Value": 1}}
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "alas.json").write_text(json.dumps(document), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    assert read_config_file("alas") == document
 
 
-def test_config_update_preserves_visible_values_and_resets_hidden_runtime_values() -> None:
-    updater = _make_updater(
-        {
-            "Demo": {
-                "Group": {
-                    "Visible": _arg(1),
-                    "Blank": _arg(2),
-                    "Hidden": _arg(3, display="hide"),
-                    "StoredHidden": _arg(4, typ="stored", display="hide"),
-                    "Locked": _arg(5, typ="lock"),
-                }
-            }
-        }
-    )
+def test_emotion_value_save_updates_its_record_timestamp() -> None:
+    updates = list(iter_config_save_updates("Main.Emotion.Fleet1Value"))
 
-    updated = updater.config_update(
-        {
-            "Demo": {
-                "Group": {
-                    "Visible": "10",
-                    "Blank": "",
-                    "Hidden": "30",
-                    "StoredHidden": "40",
-                    "Locked": "50",
-                }
-            }
-        }
-    )
-
-    assert deep_get(updated, keys="Demo.Group") == {
-        "Visible": 10,
-        "Blank": 2,
-        "Hidden": 3,
-        "StoredHidden": 40,
-        "Locked": 5,
-    }
-
-
-def test_config_update_reports_fallbacks_and_hidden_resets_without_missing_field_noise() -> None:
-    updater = _make_updater(
-        {
-            "Demo": {
-                "Group": {
-                    "Choice": _arg("safe", typ="select", option=["safe"]),
-                    "Blank": _arg(2),
-                    "Hidden": _arg(3, display="hide"),
-                    "Locked": _arg(4, typ="lock"),
-                    "Missing": _arg(5),
-                }
-            }
-        }
-    )
-
-    updated, issues = updater.config_update_with_issues(
-        {
-            "Demo": {
-                "Group": {
-                    "Choice": "legacy",
-                    "Blank": "",
-                    "Hidden": "30",
-                    "Locked": "40",
-                }
-            }
-        }
-    )
-
-    assert deep_get(updated, keys="Demo.Group") == {
-        "Choice": "safe",
-        "Blank": 2,
-        "Hidden": 3,
-        "Locked": 4,
-        "Missing": 5,
-    }
-    assert issues == (
-        ConfigIssue(path="Demo.Group.Choice", raw="legacy", resolved="safe", reason="invalid_option"),
-        ConfigIssue(path="Demo.Group.Blank", raw="", resolved=2, reason="default_fallback"),
-        ConfigIssue(path="Demo.Group.Hidden", raw="30", resolved=3, reason="hidden_reset"),
-        ConfigIssue(path="Demo.Group.Locked", raw="40", resolved=4, reason="default_fallback"),
-    )
-    assert (
-        updater.config_update(
-            {
-                "Demo": {
-                    "Group": {
-                        "Choice": "legacy",
-                        "Blank": "",
-                        "Hidden": "30",
-                        "Locked": "40",
-                    }
-                }
-            }
-        )
-        == updated
-    )
-
-
-def test_config_update_template_uses_defaults() -> None:
-    updater = _make_updater({"Demo": {"Group": {"Value": _arg(1)}}})
-
-    updated = updater.config_update({"Demo": {"Group": {"Value": "10"}}}, is_template=True)
-
-    assert deep_get(updated, keys="Demo.Group.Value") == 1
-
-    _updated, issues = updater.config_update_with_issues(
-        {"Demo": {"Group": {"Value": "10"}}},
-        is_template=True,
-    )
-    assert issues == ()
-
-
-def test_config_update_keeps_old_hazard_leveling_enable_on_new_meowfficer_task() -> None:
-    updater = _make_updater(
-        {
-            "OpsiHazard1Leveling": {"Scheduler": {"Enable": _arg(value=False, typ="checkbox")}},
-            "OpsiMeowfficerFarming": {"Scheduler": {"Enable": _arg(value=False, typ="checkbox")}},
-        }
-    )
-
-    updated, issues = updater.config_update_with_issues({"OpsiHazard1Leveling": {"Scheduler": {"Enable": True}}})
-
-    assert deep_get(updated, keys="OpsiHazard1Leveling.Scheduler.Enable") is True
-    assert deep_get(updated, keys="OpsiMeowfficerFarming.Scheduler.Enable") is True
-    assert issues == (
-        ConfigIssue(
-            path="OpsiMeowfficerFarming.Scheduler.Enable",
-            raw=False,
-            resolved=True,
-            reason="migration",
-        ),
-    )
-
-
-def test_config_update_migrates_legacy_emulator_path_to_mumu_path() -> None:
-    updater = _make_updater(
-        {
-            "Alas": {
-                "Emulator": {
-                    "MuMuPath": _arg("C:/Program Files/Netease/MuMu Player 12/nx_main/MuMuNxMain.exe"),
-                }
-            }
-        }
-    )
-    legacy_path = "D:/MuMu/nx_main/MuMuNxMain.exe"
-
-    updated, issues = updater.config_update_with_issues(
-        {"Alas": {"EmulatorInfo": {"path": legacy_path}}},
-    )
-
-    assert deep_get(updated, keys="Alas.Emulator.MuMuPath") == legacy_path
-    assert issues == (
-        ConfigIssue(
-            path="Alas.Emulator.MuMuPath",
-            raw=None,
-            resolved=legacy_path,
-            reason="migration",
-        ),
-    )
-
-
-def test_config_update_preserves_legacy_onepush_field_for_smtp() -> None:
-    updater = _make_updater(
-        {
-            "Alas": {
-                "Error": {
-                    "OnePushConfig": _arg("provider: null", typ="textarea"),
-                }
-            }
-        }
-    )
-    smtp_config = "provider: smtp\nhost: smtp.example.com\nuser: alas@example.com\npassword: secret\nport: 465"
-
-    updated, issues = updater.config_update_with_issues(
-        {"Alas": {"Error": {"OnePushConfig": smtp_config}}},
-    )
-
-    assert deep_get(updated, keys="Alas.Error.OnePushConfig") == smtp_config
-    assert issues == ()
-
-
-def test_config_update_refreshes_event_campaign_and_stage_defaults() -> None:
-    updater = _make_updater(
-        {
-            "Event": {
-                "Campaign": {
-                    "Event": _arg("campaign_main", option=["event_2026"]),
-                    "Name": _arg("12-4"),
-                }
-            },
-            "GemsFarming": {
-                "Campaign": {
-                    "Event": _arg("campaign_main", option=["gems_event"]),
-                }
-            },
-            "Coalition": {
-                "Campaign": {
-                    "Name": _arg("12-4"),
-                }
-            },
-        }
-    )
-
-    updated, issues = updater.config_update_with_issues(
-        {
-            "Event": {"Campaign": {"Event": "old_event", "Name": "12-4"}},
-            "GemsFarming": {"Campaign": {"Event": "old_event"}},
-            "Coalition": {"Campaign": {"Name": "7-2"}},
-        }
-    )
-
-    assert deep_get(updated, keys="Event.Campaign") == {"Event": "event_2026", "Name": "D3"}
-    assert deep_get(updated, keys="GemsFarming.Campaign.Event") == "gems_event"
-    assert deep_get(updated, keys="Coalition.Campaign.Name") == "area1-normal"
-    assert issues == (
-        ConfigIssue(
-            path="Event.Campaign.Event",
-            raw="old_event",
-            resolved="event_2026",
-            reason="invalid_option",
-        ),
-        ConfigIssue(path="GemsFarming.Campaign.Event", raw="old_event", resolved="gems_event", reason="invalid_option"),
-        ConfigIssue(path="Event.Campaign.Name", raw="12-4", resolved="D3", reason="migration"),
-        ConfigIssue(path="Coalition.Campaign.Name", raw="7-2", resolved="area1-normal", reason="migration"),
-    )
-
-
-def test_config_update_keeps_war_archives_away_from_campaign_main_even_for_template() -> None:
-    updater = _make_updater(
-        {
-            "WarArchives": {
-                "Campaign": {
-                    "Event": _arg("campaign_main", option=["archive_2026"]),
-                    "Name": _arg("12-4"),
-                }
-            }
-        }
-    )
-
-    updated = updater.config_update({}, is_template=True)
-
-    assert deep_get(updated, keys="WarArchives.Campaign") == {"Event": "archive_2026", "Name": "D3"}
-
-    _updated, issues = updater.config_update_with_issues({}, is_template=True)
-    assert issues == ()
+    assert len(updates) == 1
+    path, timestamp = updates[0]
+    assert path == "Main.Emotion.Fleet1Record"
+    assert isinstance(timestamp, str)
+    assert datetime.fromisoformat(timestamp).tzinfo is None
+    assert list(iter_config_save_updates("Main.Campaign.Name")) == []

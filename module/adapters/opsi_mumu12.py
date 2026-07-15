@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from functools import singledispatch
 from typing import TYPE_CHECKING, Protocol, cast, override
@@ -9,11 +9,14 @@ from module.adapters.mumu12 import CancellationAwareMumu12Device
 from module.adapters.opsi_live import (
     LiveOperationSirenWorkflow,
     LiveOpsiStep,
+    LiveScheduleDelay,
     OpsiLiveStepDriver,
     OpsiWorldScheduleSource,
 )
+from module.application import TaskId
 from module.base.timer import Timer
 from module.config.config import AzurLaneConfig, name_to_function
+from module.config.deep import deep_get
 from module.config.utils import (
     get_nearest_weekday_date,
     get_os_next_reset,
@@ -61,7 +64,7 @@ from module.os_handler.action_point import ActionPointLimit
 from module.os_handler.assets import OS_MONTHBOSS_HARD, OS_MONTHBOSS_NORMAL
 from module.os_shop.assets import OS_SHOP_CHECK
 from module.shop.shop_voucher import VoucherShop
-from module.task_registry import command_to_config_name
+from module.task_registry import command_to_config_name, config_name_to_command
 from module.ui.page import page_reward
 
 if TYPE_CHECKING:
@@ -77,6 +80,25 @@ _ASH_BEACON_ONE_HIT_RETRY = timedelta(minutes=30)
 _ASH_BEACON_AUTO_RETRY = timedelta(minutes=15)
 _MISSION_RETRY = timedelta(minutes=1)
 _CROSS_MONTH_LEAD = timedelta(minutes=10)
+_RECON_SCAN_DELAY = timedelta(minutes=27)
+_SUBMARINE_CALL_DELAY = timedelta(minutes=60)
+_CL1_PRESERVE_DELAY = timedelta(hours=6)
+_RECON_SCAN_TASK_CONFIGS = ("OpsiExplore", "OpsiObscure", "OpsiStronghold")
+_SUBMARINE_CALL_TASK_CONFIGS = (
+    "OpsiExplore",
+    "OpsiDaily",
+    "OpsiObscure",
+    "OpsiAbyssal",
+    "OpsiArchive",
+    "OpsiStronghold",
+    "OpsiMeowfficerFarming",
+    "OpsiMonthBoss",
+)
+_CL1_PRESERVE_TASK_IDS = tuple(
+    TaskId(config_name_to_command(config_name))
+    for config_name in ("OpsiObscure", "OpsiAbyssal", "OpsiStronghold", "OpsiMeowfficerFarming")
+)
+_ASH_BEACON_TASK_ID = TaskId("opsi_ash_beacon")
 
 
 def _aware_local(value: datetime) -> datetime:
@@ -301,10 +323,14 @@ def apply_world_task_spec(
 
 class Mumu12OperationSirenSession(OperationSiren):
     _live_cross_settings: CrossMonthSettings | None = None
+    _live_schedule_delays: list[LiveScheduleDelay]
+    _live_wake_task_ids: list[TaskId]
 
     def prepare_live_step(self) -> None:
         """只恢复页面和区域事实；不隐式启动 auto-search。"""
 
+        self._live_schedule_delays = []
+        self._live_wake_task_ids = []
         self.config.apply_runtime_overlay(Submarine_Fleet=1, Submarine_Mode="every_combat", STORY_ALLOW_SKIP=False)
         self._os_init_ensure_page()
         self._os_init_prepare_current_zone()
@@ -332,7 +358,93 @@ class Mumu12OperationSirenSession(OperationSiren):
         except KeyError as exc:
             message = f"unsupported world Operation Siren step: {operation.value}"
             raise ValueError(message) from exc
-        return handler()
+        return self.attach_live_intents(handler())
+
+    def attach_live_intents(self, step: LiveOpsiStep) -> LiveOpsiStep:
+        """把 UI 期间捕获的跨任务调度事实附加到本次 step。"""
+
+        schedule_delays = getattr(self, "_live_schedule_delays", ())
+        wake_intents = getattr(self, "_live_wake_task_ids", ())
+        wake_task_ids = tuple(dict.fromkeys((*step.wake_task_ids, *wake_intents)))
+        return replace(
+            step,
+            schedule_delays=(*step.schedule_delays, *schedule_delays),
+            wake_task_ids=wake_task_ids,
+        )
+
+    def _record_schedule_delay(self, after: timedelta, task_ids: tuple[TaskId, ...]) -> None:
+        if task_ids:
+            self._live_schedule_delays.append(LiveScheduleDelay(after, task_ids))
+
+    def _is_opsi_force_run(self, config_name: str) -> bool:
+        data = self.config.data
+        return bool(
+            deep_get(data, keys=f"{config_name}.OpsiExplore.ForceRun", default=False)
+            or deep_get(data, keys=f"{config_name}.OpsiObscure.ForceRun", default=False)
+            or deep_get(data, keys=f"{config_name}.OpsiAbyssal.ForceRun", default=False)
+            or deep_get(data, keys=f"{config_name}.OpsiStronghold.ForceRun", default=False)
+        )
+
+    def _is_opsi_special_radar(self, config_name: str) -> bool:
+        return bool(deep_get(self.config.data, keys=f"{config_name}.OpsiExplore.SpecialRadar", default=False))
+
+    def _is_opsi_submarine_call(self, config_name: str) -> bool:
+        fleet_filter = deep_get(
+            self.config.data,
+            keys=f"{config_name}.OpsiFleetFilter.Filter",
+            default="",
+        )
+        return bool(
+            deep_get(self.config.data, keys=f"{config_name}.OpsiFleet.Submarine", default=False)
+            or "submarine" in str(fleet_filter).lower()
+        )
+
+    @staticmethod
+    def _task_ids(config_names: tuple[str, ...]) -> tuple[TaskId, ...]:
+        return tuple(TaskId(config_name_to_command(config_name)) for config_name in config_names)
+
+    def _recon_scan_task_ids(self) -> tuple[TaskId, ...]:
+        configs = tuple(
+            config_name
+            for config_name in _RECON_SCAN_TASK_CONFIGS
+            if not self._is_opsi_force_run(config_name) and not self._is_opsi_special_radar(config_name)
+        )
+        return self._task_ids(configs)
+
+    def _submarine_call_task_ids(self) -> tuple[TaskId, ...]:
+        configs = tuple(
+            config_name
+            for config_name in _SUBMARINE_CALL_TASK_CONFIGS
+            if self._is_opsi_submarine_call(config_name) and not self._is_opsi_force_run(config_name)
+        )
+        return self._task_ids(configs)
+
+    @override
+    def os_order_execute(self, *, recon_scan: bool = True, submarine_call: bool = True) -> tuple[bool, bool]:
+        recon_executed, submarine_executed = super().os_order_execute(
+            recon_scan=recon_scan,
+            submarine_call=submarine_call,
+        )
+        if recon_executed:
+            self._record_schedule_delay(_RECON_SCAN_DELAY, self._recon_scan_task_ids())
+        if submarine_executed:
+            self._record_schedule_delay(_SUBMARINE_CALL_DELAY, self._submarine_call_task_ids())
+        return recon_executed, submarine_executed
+
+    @override
+    def cl1_ap_preserve(self) -> None:
+        try:
+            super().cl1_ap_preserve()
+        except ActionPointLimit:
+            self._record_schedule_delay(_CL1_PRESERVE_DELAY, _CL1_PRESERVE_TASK_IDS)
+            raise
+
+    @override
+    def handle_ash_beacon_attack(self) -> bool:
+        attacked = super().handle_ash_beacon_attack()
+        if attacked and _ASH_BEACON_TASK_ID not in self._live_wake_task_ids:
+            self._live_wake_task_ids.append(_ASH_BEACON_TASK_ID)
+        return attacked
 
     def _live_explore_step(self) -> LiveOpsiStep:
         order = self._os_explore_order()
@@ -551,12 +663,12 @@ class Mumu12OperationSirenSession(OperationSiren):
                 OpsiGeneral_AkashiShopFilter="ActionPoint",
                 OpsiFleet_Submarine=False,
             )
-            cooling = self.nearest_task_cooling_down
-            if cooling is not None and get_os_reset_remain() > 0 and isinstance(cooling.next_run, datetime):
+            cooling = self.nearest_task_cooldown
+            if cooling is not None and get_os_reset_remain() > 0:
                 return LiveOpsiStep(
                     WorldOperation.MEOWFFICER_FARMING,
                     WorldTaskStatus.COOLDOWN,
-                    retry_at=_aware_local(cooling.next_run),
+                    retry_at=_aware_local(cooling.ready_at),
                 )
         self._apply_meowfficer_action_point_preserve(preserve)
         self._check_meowfficer_action_points()
@@ -632,31 +744,12 @@ class Mumu12OperationSirenSession(OperationSiren):
         self._os_voucher_exit()
         return LiveOpsiStep(WorldOperation.VOUCHER, WorldTaskStatus.COMPLETED)
 
-    def _cross_config_int(self, path: str) -> int:
+    def _cross_month_settings(self) -> CrossMonthSettings:
         settings = self._live_cross_settings
         if settings is None:
             message = "cross-month typed settings were not installed"
             raise RuntimeError(message)
-        values = {
-            "OpsiDaily.OpsiFleet.Fleet": settings.daily_fleet.fleet_index,
-            "OpsiObscure.OpsiFleet.Fleet": settings.obscure_fleet.fleet_index,
-            "OpsiMeowfficerFarming.OpsiFleet.Fleet": settings.meowfficer_fleet.fleet_index,
-        }
-        try:
-            return values[path]
-        except KeyError as exc:
-            message = f"unsupported typed cross-month integer setting: {path}"
-            raise ValueError(message) from exc
-
-    def _cross_config_str(self, path: str) -> str:
-        settings = self._live_cross_settings
-        if settings is None:
-            message = "cross-month typed settings were not installed"
-            raise RuntimeError(message)
-        if path == "OpsiAbyssal.OpsiFleetFilter.Filter":
-            return settings.abyssal_fleet_filter
-        message = f"unsupported typed cross-month string setting: {path}"
-        raise ValueError(message)
+        return settings
 
     def _live_cross_month_one_shot(self) -> LiveOpsiStep:
         next_reset = get_os_next_reset()
@@ -671,10 +764,16 @@ class Mumu12OperationSirenSession(OperationSiren):
                 retry_at=_aware_local(next_reset - _CROSS_MONTH_LEAD),
             )
         self._wait_until_opsi_reset(next_reset)
+        settings = self._cross_month_settings()
         try:
             self._live_clear_daily_after_reset()
-            self._clear_opsi_monthly_items()
-            self._run_opsi_meowfficer_farming_after_reset()
+            self._clear_opsi_monthly_items(
+                obscure_fleet=settings.obscure_fleet.fleet_index,
+                abyssal_fleet_filter=settings.abyssal_fleet_filter,
+            )
+            self._run_opsi_meowfficer_farming_after_reset(
+                fleet_index=settings.meowfficer_fleet.fleet_index,
+            )
         except ActionPointLimit:
             return LiveOpsiStep(WorldOperation.CROSS_MONTH, WorldTaskStatus.COMPLETED)
         message = "cross-month farming returned without reaching its action-point boundary"
@@ -685,7 +784,7 @@ class Mumu12OperationSirenSession(OperationSiren):
 
         self.config.apply_runtime_overlay(
             OpsiGeneral_DoRandomMapEvent=True,
-            OpsiFleet_Fleet=self._cross_config_int("OpsiDaily.OpsiFleet.Fleet"),
+            OpsiFleet_Fleet=self._cross_month_settings().daily_fleet.fleet_index,
             OpsiFleet_Submarine=False,
         )
         completed = 0
@@ -847,10 +946,12 @@ class _Mumu12OpsiExecutor(OpsiUiStepExecutor):
             surplus = False
             if spec.operation is WorldOperation.MEOWFFICER_FARMING:
                 surplus = runner.get_yellow_coins() > runner.config.OS_CL1_YELLOW_COINS_PRESERVE
-            return LiveOpsiStep(
-                spec.operation,
-                WorldTaskStatus.ACTION_POINT_LIMIT,
-                has_surplus_yellow_coins=surplus,
+            return runner.attach_live_intents(
+                LiveOpsiStep(
+                    spec.operation,
+                    WorldTaskStatus.ACTION_POINT_LIMIT,
+                    has_surplus_yellow_coins=surplus,
+                )
             )
 
 

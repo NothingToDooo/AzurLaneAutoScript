@@ -41,17 +41,6 @@ class RuntimeImplementationId:
             raise ContentValidationError(message)
 
 
-class RuntimeCapabilityKind(StrEnum):
-    NAVIGATION = "navigation"
-    EVENT_UI = "event_ui"
-    WAR_ARCHIVES_NAVIGATION = "war_archives_navigation"
-    MAP_OBSERVATION = "map_observation"
-    GRID_RECOGNITION = "grid_recognition"
-    MAP_MECHANIC = "map_mechanic"
-    HARD_MODE = "hard_mode"
-    ENGINE_EXTENSION = "engine_extension"
-
-
 class RuntimeExecutorKind(StrEnum):
     """适配器必须显式注册的细粒度执行端口；不允许按 Python 方法名反射。"""
 
@@ -64,14 +53,6 @@ class RuntimeExecutorKind(StrEnum):
     MAP_MECHANIC = "map_mechanic"
     HARD_MODE = "hard_mode"
     ENGINE_EXTENSION = "engine_extension"
-
-    @property
-    def capability(self) -> RuntimeCapabilityKind:
-        if self is RuntimeExecutorKind.MAP_GRID_RECOGNITION:
-            return RuntimeCapabilityKind.GRID_RECOGNITION
-        if self is RuntimeExecutorKind.CAMERA_GRID_RECOGNITION:
-            return RuntimeCapabilityKind.GRID_RECOGNITION
-        return RuntimeCapabilityKind(self.value)
 
 
 class RuntimeTuningKey(StrEnum):
@@ -211,14 +192,6 @@ class CampaignRuntimeExtension:
             raise ContentValidationError(message)
         object.__setattr__(self, "executors", executors)
 
-    @property
-    def capabilities(self) -> tuple[RuntimeCapabilityKind, ...]:
-        return tuple(dict.fromkeys(executor.kind.capability for executor in self.executors))
-
-    @property
-    def requires_executor(self) -> bool:
-        return True
-
 
 @dataclass(frozen=True, slots=True)
 class CampaignRuntimeProfile:
@@ -251,10 +224,6 @@ class CampaignRuntimeProfile:
     @classmethod
     def core(cls) -> CampaignRuntimeProfile:
         return cls(CampaignRuntimeProfileId("core"))
-
-    @property
-    def executor_kinds(self) -> frozenset[RuntimeExecutorKind]:
-        return frozenset(executor.kind for extension in self.extensions for executor in extension.executors)
 
 
 class CampaignRuntimeProfileRegistry:

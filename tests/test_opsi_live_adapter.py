@@ -3,16 +3,16 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast, override
 
 import pytest
+from config_factory import in_memory_config
 
 import module.adapters.opsi_mumu12 as opsi_adapters
-from module.adapters.opsi_live import LiveOperationSirenWorkflow, LiveOpsiStep, OpsiLiveClock
+from module.adapters.opsi_live import LiveOperationSirenWorkflow, LiveOpsiStep, LiveScheduleDelay, OpsiLiveClock
 from module.adapters.opsi_mumu12 import (
     CancellationAwareMumu12Device,
     Mumu12OperationSirenSession,
     apply_world_task_spec,
 )
-from module.application import AbortRequested, AbortToken, PreemptionRequest, TaskId
-from module.config.config import AzurLaneConfig
+from module.application import AbortRequested, AbortToken, TaskId
 from module.config.deep import deep_set
 from module.device.device import Device
 from module.gameplay.opsi import (
@@ -38,6 +38,7 @@ from module.gameplay.opsi import (
     WorldGeneralSettings,
     WorldOperation,
     WorldSchedule,
+    WorldScheduleDelay,
     WorldTaskSpec,
     WorldTaskStatus,
     world_task_spec,
@@ -47,6 +48,7 @@ from module.gameplay.opsi_progress import WorldProgress, WorldZoneCursor
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from module.config.config import AzurLaneConfig
     from module.gameplay.opsi import WorldTaskSettings
     from module.interaction import CancellationSignal
     from module.os.globe_zone import Zone
@@ -154,9 +156,8 @@ class _ScheduleSource:
 class _Driver:
     calls: list[tuple[WorldTaskSpec, WorldProgress | None, CancellationSignal]]
 
-    def __init__(self, step: LiveOpsiStep, after: Callable[[], None] | None = None) -> None:
+    def __init__(self, step: LiveOpsiStep) -> None:
         self.step = step
-        self.after = after
         self.calls = []
 
     def execute_step(
@@ -166,8 +167,6 @@ class _Driver:
         cancellation: CancellationSignal,
     ) -> LiveOpsiStep:
         self.calls.append((spec, progress, cancellation))
-        if self.after is not None:
-            self.after()
         return self.step
 
 
@@ -178,15 +177,14 @@ def test_live_workflow_accepts_every_typed_operation(operation: WorldOperation) 
     workflow = LiveOperationSirenWorkflow(driver, schedule, _Clock())
     abort = AbortToken()
 
-    report = workflow.execute(_spec(operation), None, abort, PreemptionRequest())
+    report = workflow.execute(_spec(operation), None, abort)
 
     assert report.status is WorldTaskStatus.EMPTY
     assert driver.calls == [(_spec(operation), None, abort)]
     assert schedule.calls == [_NOW]
 
 
-def test_live_workflow_turns_post_step_preemption_into_resumable_report() -> None:
-    preemption = PreemptionRequest()
+def test_live_workflow_preserves_resumable_in_progress_report() -> None:
     step = LiveOpsiStep(
         WorldOperation.EXPLORE,
         WorldTaskStatus.IN_PROGRESS,
@@ -194,20 +192,33 @@ def test_live_workflow_turns_post_step_preemption_into_resumable_report() -> Non
         cursor=WorldZoneCursor(7),
     )
 
-    def request_preemption() -> None:
-        preemption.request("higher priority task")
-
     workflow = LiveOperationSirenWorkflow(
-        _Driver(step, after=request_preemption),
+        _Driver(step),
         _ScheduleSource(),
         _Clock(),
     )
 
-    report = workflow.execute(_spec(WorldOperation.EXPLORE), None, AbortToken(), preemption)
+    report = workflow.execute(_spec(WorldOperation.EXPLORE), None, AbortToken())
 
-    assert report.status is WorldTaskStatus.PREEMPTED
+    assert report.status is WorldTaskStatus.IN_PROGRESS
     assert report.completed_units == 1
     assert report.cursor == WorldZoneCursor(7)
+
+
+def test_live_workflow_binds_relative_schedule_intents_to_one_observed_at() -> None:
+    delayed = (TaskId("opsi_obscure"), TaskId("opsi_stronghold"))
+    step = LiveOpsiStep(
+        WorldOperation.EXPLORE,
+        WorldTaskStatus.EMPTY,
+        schedule_delays=(LiveScheduleDelay(timedelta(minutes=27), delayed),),
+        wake_task_ids=(TaskId("opsi_ash_beacon"),),
+    )
+    workflow = LiveOperationSirenWorkflow(_Driver(step), _ScheduleSource(), _Clock())
+
+    report = workflow.execute(_spec(WorldOperation.EXPLORE), None, AbortToken())
+
+    assert report.schedule_delays == (WorldScheduleDelay(_NOW + timedelta(minutes=27), delayed),)
+    assert report.wake_task_ids == (TaskId("opsi_ash_beacon"),)
 
 
 def test_live_workflow_rejects_partial_progress_from_one_shot_driver() -> None:
@@ -215,7 +226,7 @@ def test_live_workflow_rejects_partial_progress_from_one_shot_driver() -> None:
     workflow = LiveOperationSirenWorkflow(_Driver(step), _ScheduleSource(), _Clock())
 
     with pytest.raises(ValueError, match="one-shot operation cannot expose partial progress"):
-        workflow.execute(_spec(WorldOperation.SHOP), None, AbortToken(), PreemptionRequest())
+        workflow.execute(_spec(WorldOperation.SHOP), None, AbortToken())
 
 
 def test_live_workflow_checks_cancellation_before_entering_driver() -> None:
@@ -225,7 +236,7 @@ def test_live_workflow_checks_cancellation_before_entering_driver() -> None:
     workflow = LiveOperationSirenWorkflow(driver, _ScheduleSource(), _Clock())
 
     with pytest.raises(AbortRequested, match="manual stop"):
-        workflow.execute(_spec(WorldOperation.EXPLORE), None, abort, PreemptionRequest())
+        workflow.execute(_spec(WorldOperation.EXPLORE), None, abort)
 
     assert driver.calls == []
 
@@ -233,7 +244,7 @@ def test_live_workflow_checks_cancellation_before_entering_driver() -> None:
 def test_mumu12_executor_binds_each_task_before_schedule_snapshot(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    config = AzurLaneConfig.from_snapshot("opsi-task-binding", {}, task="OpsiDaily")
+    config = in_memory_config("opsi-task-binding", {}, task="OpsiDaily")
     deep_set(config.data, "OpsiDaily.Scheduler.ServerUpdate", "13:00")
     deep_set(config.data, "OpsiExplore.Scheduler.ServerUpdate", "01:00")
     config.bind(config.task)
@@ -258,18 +269,115 @@ def test_mumu12_executor_binds_each_task_before_schedule_snapshot(
         _spec(WorldOperation.EXPLORE),
         None,
         AbortToken(),
-        PreemptionRequest(),
     )
     daily = workflow.execute(
         _spec(WorldOperation.DAILY),
         None,
         AbortToken(),
-        PreemptionRequest(),
     )
 
     assert explore.schedule.next_server_update_at.hour == 1
     assert daily.schedule.next_server_update_at.hour == 13
     assert config.task.command == "OpsiDaily"
+
+
+def test_mumu12_executor_maps_action_point_limit_to_typed_report(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = in_memory_config("opsi-action-point", {}, task="OpsiObscure")
+    deep_set(config.data, "OpsiObscure.Scheduler.ServerUpdate", "04:00")
+    config.bind(config.task)
+    device = object.__new__(Device)
+
+    class _Session:
+        def __init__(self, bound_config: AzurLaneConfig, _device: Device) -> None:
+            self.config = bound_config
+
+        @staticmethod
+        def prepare_live_step() -> None:
+            pass
+
+        @staticmethod
+        def execute_live_step(_spec: WorldTaskSpec) -> LiveOpsiStep:
+            raise opsi_adapters.ActionPointLimit
+
+        @staticmethod
+        def attach_live_intents(step: LiveOpsiStep) -> LiveOpsiStep:
+            return step
+
+    monkeypatch.setattr(opsi_adapters, "Mumu12OperationSirenSession", _Session)
+    workflow = opsi_adapters.build_mumu12_operation_siren_workflow(config, device)
+
+    report = workflow.execute(_spec(WorldOperation.OBSCURE), None, AbortToken())
+
+    assert report.status is WorldTaskStatus.ACTION_POINT_LIMIT
+
+
+def test_mumu12_session_reports_order_cooldowns_without_writing_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = in_memory_config("opsi-order-cooldown", {}, task="OpsiExplore")
+    deep_set(config.data, "OpsiExplore.OpsiFleet.Submarine", value=True)
+    deep_set(config.data, "OpsiObscure.OpsiFleet.Submarine", value=True)
+    deep_set(config.data, "OpsiObscure.OpsiObscure.ForceRun", value=True)
+    deep_set(config.data, "OpsiStronghold.OpsiExplore.SpecialRadar", value=True)
+    deep_set(config.data, "OpsiMonthBoss.OpsiFleetFilter.Filter", "Fleet-1 > submarine")
+    runner = object.__new__(Mumu12OperationSirenSession)
+    runner.config = config
+    runner._live_schedule_delays = []  # noqa: SLF001 - 构造最小 live session，隔离 UI 初始化。
+    runner._live_wake_task_ids = []  # noqa: SLF001 - 构造最小 live session，隔离 UI 初始化。
+    monkeypatch.setattr(
+        opsi_adapters.OperationSiren,
+        "os_order_execute",
+        lambda _self, **_kwargs: (True, True),
+    )
+
+    result = runner.os_order_execute()
+
+    assert result == (True, True)
+    step = runner.attach_live_intents(LiveOpsiStep(WorldOperation.EXPLORE, WorldTaskStatus.EMPTY))
+    assert step.schedule_delays == (
+        LiveScheduleDelay(timedelta(minutes=27), (TaskId("opsi_explore"),)),
+        LiveScheduleDelay(
+            timedelta(minutes=60),
+            (
+                TaskId("opsi_explore"),
+                TaskId("opsi_abyssal"),
+                TaskId("opsi_stronghold"),
+                TaskId("opsi_month_boss"),
+            ),
+        ),
+    )
+    assert config.modified == {}
+
+
+def test_mumu12_session_reports_cl1_preserve_before_propagating_action_point_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runner = object.__new__(Mumu12OperationSirenSession)
+    runner._live_schedule_delays = []  # noqa: SLF001 - 构造最小 live session，隔离 UI 初始化。
+    runner._live_wake_task_ids = []  # noqa: SLF001 - 构造最小 live session，隔离 UI 初始化。
+
+    def action_point_limit(_self: object) -> None:
+        raise opsi_adapters.ActionPointLimit
+
+    monkeypatch.setattr(opsi_adapters.OperationSiren, "cl1_ap_preserve", action_point_limit)
+
+    with pytest.raises(opsi_adapters.ActionPointLimit):
+        runner.cl1_ap_preserve()
+
+    step = runner.attach_live_intents(LiveOpsiStep(WorldOperation.OBSCURE, WorldTaskStatus.EMPTY))
+    assert step.schedule_delays == (
+        LiveScheduleDelay(
+            timedelta(hours=6),
+            (
+                TaskId("opsi_obscure"),
+                TaskId("opsi_abyssal"),
+                TaskId("opsi_stronghold"),
+                TaskId("opsi_meowfficer_farming"),
+            ),
+        ),
+    )
 
 
 class _IoTarget:

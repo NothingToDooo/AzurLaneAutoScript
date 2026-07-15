@@ -4,18 +4,10 @@ from typing import cast
 
 import pytest
 
-from module.content import (
-    AssetRef,
-    CampaignPolicy,
-    ContentId,
-    EventPack,
-    EventRelease,
-    StageProgressionRule,
-    StageRef,
-    StageSpec,
-    ValidationIssue,
-)
+from module.content.campaign_policy import CampaignPolicy, StageProgressionRule
 from module.content.errors import ContentValidationError
+from module.content.models import AssetRef, ContentId, EventPack, EventRelease, StageRef, StageSpec
+from module.content.validation import ValidationIssue
 
 
 def _set_attribute(instance: object, attribute: str, value: object) -> None:

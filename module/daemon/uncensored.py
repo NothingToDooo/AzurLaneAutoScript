@@ -49,7 +49,3 @@ class AzurLaneUncensored(LoginHandler):
         self.handle_app_login()
 
         logger.info("反和谐流程完成")
-
-
-if __name__ == "__main__":
-    AzurLaneUncensored("alas", task="AzurLaneUncensored").run()

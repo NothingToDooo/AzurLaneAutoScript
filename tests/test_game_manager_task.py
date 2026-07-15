@@ -1,4 +1,6 @@
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, cast, override
 
 import pytest
@@ -7,9 +9,7 @@ from module.application import (
     AbortRequested,
     AbortToken,
     ExecutionMode,
-    PreemptionRequest,
     RunCoordinator,
-    RunId,
     RunMetadata,
     Succeeded,
     TaskContext,
@@ -18,11 +18,10 @@ from module.application import (
 )
 from module.interaction import AppLifecycle, AppStatus, CancellationSignal
 from module.maintenance import GameManagerSettings, GameManagerTask
-from module.state import RunStatus, SQLiteRunRepository, SQLiteStateStore
+from module.state.config_repository import ConfigStateRepository
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from pathlib import Path
 
 
 class _App(AppLifecycle):
@@ -66,12 +65,10 @@ class _FixedClock:
 def _context(abort: AbortToken | None = None) -> TaskContext:
     return TaskContext(
         task_id=TaskId("game_manager"),
-        run_id=RunId("run-game-manager"),
         started_at=datetime(2026, 7, 13, tzinfo=UTC),
         mode=ExecutionMode.DIRECT_COMMAND,
-        metadata=RunMetadata(settings_revision=1, content_revision="content-1", client_ui_revision="ui-1"),
+        metadata=RunMetadata(settings_revision=1, content_revision="content-1"),
         abort=AbortToken() if abort is None else abort,
-        preemption=PreemptionRequest(),
     )
 
 
@@ -131,26 +128,25 @@ def test_game_manager_settings_reject_non_boolean_values() -> None:
         GameManagerSettings(auto_restart=cast("bool", 1))
 
 
-def test_game_manager_runs_through_coordinator_and_atomic_state_repository(tmp_path: Path) -> None:
+def test_game_manager_runs_through_coordinator_and_config_repository(tmp_path: Path) -> None:
     calls: list[str] = []
     task = GameManagerTask(_App(calls), _Login(calls), GameManagerSettings(auto_restart=True))
-    metadata = RunMetadata(settings_revision=3, content_revision="content-3", client_ui_revision="ui-2")
+    metadata = RunMetadata(settings_revision=3, content_revision="content-3")
+    config_path = tmp_path / "alas.json"
+    document = json.loads(Path("config/template.json").read_text(encoding="utf-8"))
+    config_path.write_text(json.dumps(document), encoding="utf-8")
+    repository = ConfigStateRepository(
+        _FixedClock(),
+        config_path=config_path,
+    )
 
-    with SQLiteStateStore(tmp_path / "instance.sqlite3") as store:
-        repository = SQLiteRunRepository(store, {}, _FixedClock(), lambda: RunId("run-integrated"))
-
-        result = RunCoordinator(repository).execute(
-            TaskId("game_manager"),
-            ExecutionMode.DIRECT_COMMAND,
-            metadata,
-            task,
-        )
-
-        run = store.get_run("run-integrated")
-        assert run is not None
-        assert run.status is RunStatus.SUCCEEDED
-        assert run.settings_revision == 3
-        assert tuple(message.topic for message in store.list_outbox()) == ("run.finished",)
+    result = RunCoordinator(repository).execute(
+        TaskId("game_manager"),
+        ExecutionMode.DIRECT_COMMAND,
+        metadata,
+        task,
+    )
 
     assert calls == ["stop", "start", "login"]
     assert result == TaskResult(outcome=Succeeded())
+    assert json.loads(config_path.read_text(encoding="utf-8")) == document

@@ -11,7 +11,3 @@ class GameManager(LoginHandler):
         if self.config.GameManager_AutoRestart:
             self.device.app_start()
             self.handle_app_login()
-
-
-if __name__ == "__main__":
-    GameManager("alas", task="GameManager").run()

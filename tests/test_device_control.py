@@ -6,7 +6,6 @@ from module.device import control as control_module
 from module.device.control import Control
 from module.device.control_options import Duration, SwipeVectorOptions
 from module.device.device import Device
-from module.replay import ClickAction, RecordedAction, SwipeAction
 
 if TYPE_CHECKING:
     from module.base.type_alias import Area, Point
@@ -41,16 +40,8 @@ class _Button:
 
 class _RecordingControl(Control):
     def __init__(self) -> None:
-        self.actions: list[RecordedAction] = []
-        self.unsupported_actions: list[str] = []
         self.low_level_calls: list[tuple[object, ...]] = []
         self.fail_click = False
-
-    def replay_record_action(self, action: RecordedAction) -> None:
-        self.actions.append(action)
-
-    def replay_mark_unsupported_action(self, action: str) -> None:
-        self.unsupported_actions.append(action)
 
     def click_minitouch(self, x: int, y: int) -> None:
         if self.fail_click:
@@ -120,41 +111,37 @@ def test_swipe_vector_uses_options(monkeypatch: pytest.MonkeyPatch) -> None:
     assert device.swipes == [((1, 2), (3, 4), (0.3, 0.4), "TEST_SWIPE", False)]
 
 
-def test_control_records_click_name_before_controller_call() -> None:
+def test_control_sends_click_to_controller() -> None:
     control = _RecordingControl()
     button = _Button("POPUP_CONFIRM_REPLAY")
 
     control.click(button)
-    button.name = "POPUP_CONFIRM"
 
-    assert control.actions == [ClickAction(target="POPUP_CONFIRM_REPLAY")]
     assert control.low_level_calls[0][0] == "click"
 
 
-def test_control_keeps_attempted_click_when_controller_fails() -> None:
+def test_control_propagates_controller_failure() -> None:
     control = _RecordingControl()
     control.fail_click = True
 
     with pytest.raises(RuntimeError, match="controller failed"):
         control.click(_Button("CONFIRM"))
 
-    assert control.actions == [ClickAction(target="CONFIRM")]
 
-
-def test_control_records_only_swipes_that_are_sent() -> None:
+def test_control_sends_only_valid_swipes() -> None:
     control = _RecordingControl()
 
     control.swipe((10, 20), (15, 25))
     control.swipe((10.9, 20.1), (30.8, 40.2))
 
-    assert control.actions == [SwipeAction(start=(10, 20), end=(30, 40))]
     assert control.low_level_calls == [("swipe", (10, 20), (30, 40))]
 
 
-def test_control_marks_long_click_and_drag_as_unsupported() -> None:
+def test_control_sends_long_click_and_drag() -> None:
     control = _RecordingControl()
 
     control.long_click(_Button("HOLD"), duration=1)
     control.drag((10, 20), (30, 40), point_random=(0, 0, 0, 0))
 
-    assert control.unsupported_actions == ["long_click", "drag"]
+    assert control.low_level_calls[0][0] == "long_click"
+    assert control.low_level_calls[1] == ("drag", (10, 20), (30, 40), (0, 0, 0, 0))

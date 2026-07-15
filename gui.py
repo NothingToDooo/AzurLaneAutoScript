@@ -20,9 +20,8 @@ def main() -> None:
     parser.add_argument("-k", "--key", type=str, help="WebUI 密码，默认不启用。")
     parser.add_argument(
         "--run",
-        nargs="+",
-        type=str,
-        help="启动时自动运行指定配置。",
+        action="store_true",
+        help="启动时自动运行 alas。",
     )
     args = parser.parse_args()
 

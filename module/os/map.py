@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Literal, override
 from module.base.timer import Timer
 from module.config.utils import get_os_reset_remain
 from module.exception import CampaignEnd, GameTooManyClickError, MapWalkError, RequestHumanTakeover
-from module.handler.assets import MAINTENANCE_ANNOUNCE
 from module.handler.login import LoginHandler
 from module.logger import logger
 from module.map.map import Map
@@ -12,14 +11,13 @@ from module.os.assets import FLEET_EMP_DEBUFF, MAP_GOTO_GLOBE_FOG
 from module.os.fleet import OSFleet
 from module.os.globe_camera import GlobeCamera
 from module.os.globe_operation import RewardUncollectedError, ZoneType
+from module.os_handler.action_point import ActionPointLimit
 from module.os_handler.assets import (
     AUTO_SEARCH_OS_MAP_OPTION_OFF,
     AUTO_SEARCH_OS_MAP_OPTION_OFF_DISABLED,
     AUTO_SEARCH_OS_MAP_OPTION_ON,
-    AUTO_SEARCH_REWARD,
 )
 from module.os_handler.strategic import StrategicSearchHandler
-from module.ui.assets import GOTO_MAIN
 from module.ui.page import page_os
 
 if TYPE_CHECKING:
@@ -348,8 +346,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
         ):
             logger.info("Keep 1000 AP when CL1 available")
             if not self.action_point_check(1000):
-                self.config.opsi_task_delay(cl1_preserve=True)
-                self.config.task_stop()
+                raise ActionPointLimit
 
     _auto_search_battle_count = 0
     _auto_search_round_timer: float = 0.0
@@ -367,7 +364,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 logger.attr("CL1 time cost", f"{cost}s/round")
             self._auto_search_round_timer = time.time()
 
-    def os_auto_search_daemon(self, *, strategic: bool = False) -> int:
+    def os_auto_search_daemon(self) -> int:
         """从关闭的自动搜索选项开始推进搜索，并返回完成战斗数。
 
         搜索结束抛出 CampaignEnd；没有自动搜索选项时抛出 RequestHumanTakeover。地图清空后仍在关闭选项页并等待信息栏，
@@ -401,7 +398,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
                 self.ash_popup_canceled = True
                 continue
             if self.combat_appear():
-                combat_count, fleet_died = self._os_auto_search_handle_combat(strategic=strategic)
+                combat_count, fleet_died = self._os_auto_search_handle_combat()
                 finished_combat += combat_count
                 if fleet_died:
                     success = False
@@ -442,10 +439,8 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             or self.appear(AUTO_SEARCH_OS_MAP_OPTION_ON, offset=(5, 120))
         )
 
-    def _os_auto_search_handle_combat(self, *, strategic: bool) -> tuple[int, bool]:
+    def _os_auto_search_handle_combat(self) -> tuple[int, bool]:
         self.on_auto_search_battle_count_add()
-        if strategic and self.config.task_switched():
-            self.interrupt_auto_search()
         if self.auto_search_combat():
             return 1, False
 
@@ -455,92 +450,6 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             return 0, True
         return 0, False
 
-    def interrupt_auto_search(self) -> None:
-        """从任意页面中断自动搜索并返回主页；中断成功时抛出 TaskEnd。"""
-        logger.info("Interrupting auto search")
-        is_loading = False
-        pause_interval = Timer(0.5, count=1)
-        in_main_timer = Timer(3, count=6)
-        for _ in self.loop():
-            if self.is_in_main():
-                logger.info("Auto search interrupted")
-                self.config.task_stop()
-
-            if self._interrupt_auto_search_handle_reward(in_main_timer):
-                continue
-            if self._interrupt_auto_search_handle_pause(pause_interval, in_main_timer):
-                is_loading = False
-                continue
-            if self._interrupt_auto_search_handle_quit(pause_interval, in_main_timer):
-                continue
-            if self._interrupt_auto_search_handle_navigation(in_main_timer):
-                continue
-            is_loading, handled = self._interrupt_auto_search_handle_loading(
-                is_loading=is_loading,
-                in_main_timer=in_main_timer,
-            )
-            if handled:
-                continue
-
-    def _interrupt_auto_search_handle_reward(self, in_main_timer: Timer) -> bool:
-        if not self.appear_then_click(AUTO_SEARCH_REWARD, offset=(50, 50), interval=3):
-            return False
-
-        self.interval_clear(GOTO_MAIN)
-        in_main_timer.reset()
-        return True
-
-    def _interrupt_auto_search_reset_combat_timers(self, pause_interval: Timer, in_main_timer: Timer) -> None:
-        self.interval_reset(MAINTENANCE_ANNOUNCE)
-        pause_interval.reset()
-        in_main_timer.reset()
-
-    def _interrupt_auto_search_handle_pause(self, pause_interval: Timer, in_main_timer: Timer) -> bool:
-        if not pause_interval.reached():
-            return False
-
-        pause = self.is_combat_executing()
-        if not pause:
-            return False
-
-        self.device.click(pause)
-        self._interrupt_auto_search_reset_combat_timers(pause_interval, in_main_timer)
-        return True
-
-    def _interrupt_auto_search_handle_quit(self, pause_interval: Timer, in_main_timer: Timer) -> bool:
-        if not (self.handle_combat_quit() or self.handle_combat_quit_reconfirm()):
-            return False
-
-        self._interrupt_auto_search_reset_combat_timers(pause_interval, in_main_timer)
-        return True
-
-    def _interrupt_auto_search_handle_navigation(self, in_main_timer: Timer) -> bool:
-        if self.appear_then_click(GOTO_MAIN, offset=(20, 20), interval=3):
-            in_main_timer.reset()
-            return True
-        return bool(self.ui_additional() or self.handle_map_event())
-
-    def _interrupt_auto_search_handle_loading(
-        self,
-        *,
-        is_loading: bool,
-        in_main_timer: Timer,
-    ) -> tuple[bool, bool]:
-        if is_loading:
-            if self.is_combat_executing():
-                in_main_timer.clear()
-                return False, True
-            return True, False
-
-        if self.is_combat_loading():
-            in_main_timer.clear()
-            return True, True
-        if not in_main_timer.reached():
-            return False, False
-
-        logger.info("handle_exp_info")
-        return False, self.handle_battle_status() or self.handle_exp_info()
-
     def os_auto_search_run(self, *, strategic: bool = False) -> int:
         """运行普通或战略自动搜索，并返回完成战斗数。"""
         finished_combat = 0
@@ -549,7 +458,7 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
             try:
                 if strategic:
                     self.strategic_search_start()
-                combat = self.os_auto_search_daemon(strategic=strategic)
+                combat = self.os_auto_search_daemon()
                 finished_combat += combat
             except CampaignEnd:
                 finished_combat += self._auto_search_battle_count
@@ -652,13 +561,12 @@ class OSMap(OSFleet, Map, GlobeCamera, StrategicSearchHandler):
 
     def __init__(
         self,
-        config: AzurLaneConfig | str,
-        device: Device | str | None = None,
-        task: str | None = None,
+        config: AzurLaneConfig,
+        device: Device,
     ) -> None:
         self._solved_map_event: set[OSMapEvent] = set()
         self._solved_fleet_mechanism: bool = False
-        super().__init__(config, device=device, task=task)
+        super().__init__(config, device=device)
 
     def run_strategic_search(self) -> None:
         self.handle_ash_beacon_attack()

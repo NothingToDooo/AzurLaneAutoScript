@@ -12,10 +12,8 @@ from module.application import (
     DelaySampler,
     DisableTask,
     ExecutionMode,
-    PreemptionRequest,
     RescheduleSelf,
     Retryable,
-    RunId,
     RunMetadata,
     Succeeded,
     Task,
@@ -155,12 +153,10 @@ class _SupplyPackCollector(_Collector):
 def _context(task_id: str, abort: AbortToken | None = None) -> TaskContext:
     return TaskContext(
         task_id=TaskId(task_id),
-        run_id=RunId(f"run-{task_id}"),
         started_at=datetime(2026, 7, 13, tzinfo=UTC),
         mode=ExecutionMode.SCHEDULED_JOB,
-        metadata=RunMetadata(settings_revision=1, content_revision="content-1", client_ui_revision="ui-1"),
+        metadata=RunMetadata(settings_revision=1, content_revision="content-1"),
         abort=AbortToken() if abort is None else abort,
-        preemption=PreemptionRequest(),
     )
 
 
@@ -323,7 +319,7 @@ def test_meowfficer_without_any_enabled_operation_disables_itself() -> None:
         training=None,
         schedule=_DAILY_SCHEDULE,
     )
-    workflow = _Workflow(MeowfficerReport(_OBSERVED_AT))
+    workflow = _Workflow(MeowfficerReport(_OBSERVED_AT, training_active=False))
 
     result = MeowfficerTask(workflow, settings).run(_context("meowfficer"))
 
@@ -343,7 +339,7 @@ def test_meowfficer_training_uses_earlier_periodic_check_or_server_update(
     expected_due_at: datetime,
 ) -> None:
     settings = _meowfficer_settings(training=_training(), schedule=schedule)
-    workflow = _Workflow(MeowfficerReport(_OBSERVED_AT))
+    workflow = _Workflow(MeowfficerReport(_OBSERVED_AT, training_active=True))
 
     result = MeowfficerTask(workflow, settings).run(_context("meowfficer"))
 
@@ -352,9 +348,27 @@ def test_meowfficer_training_uses_earlier_periodic_check_or_server_update(
 
 
 def test_meowfficer_without_training_waits_for_server_update() -> None:
-    workflow = _Workflow(MeowfficerReport(_OBSERVED_AT))
+    workflow = _Workflow(MeowfficerReport(_OBSERVED_AT, training_active=False))
 
     result = MeowfficerTask(workflow, _meowfficer_settings()).run(_context("meowfficer"))
+
+    assert result.effects == (RescheduleSelf(_SERVER_UPDATE_AT),)
+
+
+def test_meowfficer_completed_training_disables_task_without_other_work() -> None:
+    settings = _meowfficer_settings(training=_training(), buy_amount=0)
+    workflow = _Workflow(MeowfficerReport(_OBSERVED_AT, training_active=False))
+
+    result = MeowfficerTask(workflow, settings).run(_context("meowfficer"))
+
+    assert result.effects == (DisableTask(TaskId("meowfficer")),)
+
+
+def test_meowfficer_completed_training_keeps_daily_non_training_work() -> None:
+    settings = _meowfficer_settings(training=_training(), buy_amount=1)
+    workflow = _Workflow(MeowfficerReport(_OBSERVED_AT, training_active=False))
+
+    result = MeowfficerTask(workflow, settings).run(_context("meowfficer"))
 
     assert result.effects == (RescheduleSelf(_SERVER_UPDATE_AT),)
 
@@ -568,7 +582,7 @@ def test_composite_task_abort_before_run_prevents_external_side_effects(task_nam
         )
     elif task_name == "meowfficer":
         task = MeowfficerTask(
-            _Workflow(MeowfficerReport(_OBSERVED_AT), call_log=call_log),
+            _Workflow(MeowfficerReport(_OBSERVED_AT, training_active=False), call_log=call_log),
             _meowfficer_settings(),
         )
     elif task_name == "guild":
@@ -699,7 +713,7 @@ def test_composite_datetimes_must_be_timezone_aware() -> None:
     with pytest.raises(ValueError, match="timezone-aware"):
         DormReport(naive, 3, furniture_checked=False)
     with pytest.raises(ValueError, match="timezone-aware"):
-        MeowfficerReport(naive)
+        MeowfficerReport(naive, training_active=False)
     with pytest.raises(ValueError, match="timezone-aware"):
         RewardReport(naive)
     with pytest.raises(ValueError, match="timezone-aware"):

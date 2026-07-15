@@ -166,7 +166,6 @@ class _BoundGemsFleetReplacement:
             GemsFarming_CommonCV=policy.common_carrier.value,
             GemsFarming_ChangeVanguard=policy.vanguard_change.value,
             GemsFarming_CommonDD=policy.common_destroyer.value,
-            EquipmentCode_Config=policy.equipment_code_config,
         )
         runner.campaign = runtime
         return cls(runner, runtime, policy.emotion_after_replacement)

@@ -9,6 +9,10 @@
       "MuMuPath": {
         "type": "textarea",
         "value": "C:/Program Files/Netease/MuMu Player 12/nx_main/MuMuNxMain.exe"
+      },
+      "AdbExecutable": {
+        "type": "textarea",
+        "value": "./.venv/Lib/site-packages/adbutils/binaries/adb.exe"
       }
     },
     "Error": {
@@ -16,14 +20,41 @@
         "type": "checkbox",
         "value": true
       },
-      "SaveError": {
+      "SmtpEnabled": {
         "type": "checkbox",
-        "value": true
+        "value": false
       },
-      "OnePushConfig": {
+      "SmtpHost": {
+        "type": "input",
+        "value": "",
+        "valuetype": "str"
+      },
+      "SmtpPort": {
+        "type": "input",
+        "value": 465
+      },
+      "SmtpTransport": {
+        "type": "select",
+        "value": "implicit_tls",
+        "option": [
+          "implicit_tls",
+          "starttls"
+        ]
+      },
+      "SmtpUser": {
+        "type": "input",
+        "value": "",
+        "valuetype": "str"
+      },
+      "SmtpPassword": {
         "type": "textarea",
-        "value": "provider: null",
-        "mode": "yaml"
+        "value": "",
+        "valuetype": "str"
+      },
+      "SmtpRecipients": {
+        "type": "textarea",
+        "value": "",
+        "valuetype": "str"
       },
       "ScreenshotLength": {
         "type": "input",
@@ -38,19 +69,6 @@
       "CombatScreenshotInterval": {
         "type": "input",
         "value": 1.0
-      },
-      "TaskHoardingDuration": {
-        "type": "input",
-        "value": 0
-      },
-      "WhenTaskQueueEmpty": {
-        "type": "select",
-        "value": "goto_main",
-        "option": [
-          "stay_there",
-          "goto_main",
-          "close_game"
-        ]
       }
     },
     "Storage": {
@@ -1422,9 +1440,7 @@
         "type": "select",
         "value": "campaign_main",
         "option": [
-          "event_20260625_cn"
-        ],
-        "option_bold": [
+          "campaign_main",
           "event_20260625_cn"
         ]
       },
@@ -1809,11 +1825,11 @@
     "Campaign": {
       "Name": {
         "type": "input",
-        "value": "12-4"
+        "value": "t3"
       },
       "Event": {
         "type": "select",
-        "value": "campaign_main",
+        "value": "event_20260625_cn",
         "option": [
           "event_20260625_cn"
         ],
@@ -2192,11 +2208,11 @@
     "Campaign": {
       "Name": {
         "type": "input",
-        "value": "12-4"
+        "value": "ht3"
       },
       "Event": {
         "type": "select",
-        "value": "campaign_main",
+        "value": "event_20260625_cn",
         "option": [
           "event_20260625_cn"
         ],
@@ -2596,7 +2612,7 @@
       },
       "Event": {
         "type": "select",
-        "value": "campaign_main",
+        "value": "raid_20260212",
         "option": [
           "raid_20260212"
         ],
@@ -2983,7 +2999,7 @@
       },
       "Event": {
         "type": "select",
-        "value": "campaign_main",
+        "value": "coalition_20260122",
         "option": [
           "coalition_20260122"
         ],
@@ -3029,11 +3045,11 @@
     "Coalition": {
       "Mode": {
         "type": "select",
-        "value": "tc3",
+        "value": "hard",
         "option": [
-          "tc1",
-          "tc2",
-          "tc3",
+          "easy",
+          "normal",
+          "hard",
           "ex"
         ]
       },
@@ -3263,11 +3279,11 @@
     "Campaign": {
       "Name": {
         "type": "input",
-        "value": "12-4"
+        "value": "t3"
       },
       "Event": {
         "type": "select",
-        "value": "campaign_main",
+        "value": "war_archives_20240725_cn",
         "option": [
           "war_archives_20240725_cn",
           "war_archives_20230525_cn",
@@ -3690,7 +3706,7 @@
     "EventDaily": {
       "StageFilter": {
         "type": "textarea",
-        "value": "A1 > A2 > A3"
+        "value": "t1 > t2 > t3"
       },
       "LastStage": {
         "type": "input",
@@ -3700,12 +3716,12 @@
     "Campaign": {
       "Name": {
         "type": "input",
-        "value": "dynamic",
+        "value": "t3",
         "display": "hide"
       },
       "Event": {
         "type": "select",
-        "value": "campaign_main",
+        "value": "event_20260625_cn",
         "option": [
           "event_20260625_cn"
         ],
@@ -4090,7 +4106,7 @@
     "EventDaily": {
       "StageFilter": {
         "type": "textarea",
-        "value": "B1 > B2 > B3"
+        "value": "t1 > t2 > t3"
       },
       "LastStage": {
         "type": "input",
@@ -4100,12 +4116,12 @@
     "Campaign": {
       "Name": {
         "type": "input",
-        "value": "dynamic",
+        "value": "t3",
         "display": "hide"
       },
       "Event": {
         "type": "select",
-        "value": "campaign_main",
+        "value": "event_20260625_cn",
         "option": [
           "event_20260625_cn"
         ],
@@ -4490,7 +4506,7 @@
     "EventDaily": {
       "StageFilter": {
         "type": "textarea",
-        "value": "C1 > C2 > C3"
+        "value": "ht1 > ht2 > ht3"
       },
       "LastStage": {
         "type": "input",
@@ -4500,12 +4516,12 @@
     "Campaign": {
       "Name": {
         "type": "input",
-        "value": "dynamic",
+        "value": "t3",
         "display": "hide"
       },
       "Event": {
         "type": "select",
-        "value": "campaign_main",
+        "value": "event_20260625_cn",
         "option": [
           "event_20260625_cn"
         ],
@@ -4890,7 +4906,7 @@
     "EventDaily": {
       "StageFilter": {
         "type": "textarea",
-        "value": "D1 > D2 > D3"
+        "value": "ht1 > ht2 > ht3"
       },
       "LastStage": {
         "type": "input",
@@ -4900,12 +4916,12 @@
     "Campaign": {
       "Name": {
         "type": "input",
-        "value": "dynamic",
+        "value": "t3",
         "display": "hide"
       },
       "Event": {
         "type": "select",
-        "value": "campaign_main",
+        "value": "event_20260625_cn",
         "option": [
           "event_20260625_cn"
         ],
@@ -5295,7 +5311,7 @@
       },
       "Event": {
         "type": "select",
-        "value": "campaign_main",
+        "value": "event_20260625_cn",
         "option": [
           "event_20260625_cn"
         ],
@@ -5692,7 +5708,7 @@
       },
       "Event": {
         "type": "select",
-        "value": "campaign_main",
+        "value": "raid_20260212",
         "option": [
           "raid_20260212"
         ],
@@ -5907,7 +5923,7 @@
       },
       "Event": {
         "type": "select",
-        "value": "campaign_main",
+        "value": "coalition_20260122",
         "option": [
           "coalition_20260122"
         ],
@@ -5955,17 +5971,13 @@
         "type": "select",
         "value": "sp",
         "option": [
-          "tc1",
-          "tc2",
-          "tc3",
-          "sp",
-          "ex"
+          "sp"
         ],
         "display": "hide"
       },
       "Fleet": {
         "type": "select",
-        "value": "single",
+        "value": "multi",
         "option": [
           "single",
           "multi"
@@ -6102,13 +6114,11 @@
   "Commission": {
     "Scheduler": {
       "Enable": {
-        "type": "lock",
+        "type": "checkbox",
         "value": true,
         "option": [
-          true
-        ],
-        "option_bold": [
-          true
+          true,
+          false
         ]
       },
       "NextRun": {
@@ -6269,13 +6279,11 @@
   "Research": {
     "Scheduler": {
       "Enable": {
-        "type": "lock",
+        "type": "checkbox",
         "value": true,
         "option": [
-          true
-        ],
-        "option_bold": [
-          true
+          true,
+          false
         ]
       },
       "NextRun": {
@@ -6640,13 +6648,11 @@
   "Reward": {
     "Scheduler": {
       "Enable": {
-        "type": "lock",
+        "type": "checkbox",
         "value": true,
         "option": [
-          true
-        ],
-        "option_bold": [
-          true
+          true,
+          false
         ]
       },
       "NextRun": {

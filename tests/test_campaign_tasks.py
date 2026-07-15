@@ -16,11 +16,9 @@ from module.application import (
     ExecutionMode,
     OperatorNotificationKind,
     OperatorNotificationRequest,
-    PreemptionRequest,
     RequestAppRestart,
     RescheduleSelf,
     Retryable,
-    RunId,
     RunMetadata,
     Succeeded,
     TaskContext,
@@ -99,7 +97,6 @@ from module.gameplay.campaign import (
     GemsFleetReplacementRequest,
     GemsFleetReplacementTrigger,
     GemsVanguardChange,
-    PreemptionSignal,
     SubmarineAutoSearchMode,
     SubmarineDistanceToBoss,
     SubmarineMode,
@@ -191,10 +188,8 @@ class _Workflow:
         self,
         job: CampaignJobSpec,
         cancellation: CancellationSignal,
-        preemption: PreemptionSignal,
     ) -> CampaignRunReport:
         cancellation.raise_if_requested()
-        assert not preemption.is_requested
         self.calls += 1
         self.received_job = job
         if self._on_execute is not None:
@@ -258,7 +253,6 @@ def _spec(
             common_carrier=GemsCommonCarrier.ANY,
             vanguard_change=GemsVanguardChange.SHIP,
             common_destroyer=GemsCommonDestroyer.ANY,
-            equipment_code_config="DD: null",
         )
     elif sessions is None:
         sessions = (_session(),)
@@ -420,16 +414,13 @@ def _context(
     *,
     mode: ExecutionMode = ExecutionMode.SCHEDULED_JOB,
     abort: AbortToken | None = None,
-    preemption: PreemptionRequest | None = None,
 ) -> TaskContext:
     return TaskContext(
         task_id=TaskId(task_id),
-        run_id=RunId(f"run-{task_id}"),
         started_at=_STARTED_AT,
         mode=mode,
-        metadata=RunMetadata(settings_revision=1, content_revision="content-1", client_ui_revision="ui-1"),
+        metadata=RunMetadata(settings_revision=1, content_revision="content-1"),
         abort=AbortToken() if abort is None else abort,
-        preemption=PreemptionRequest() if preemption is None else preemption,
     )
 
 
@@ -729,22 +720,6 @@ def test_physically_unavailable_campaign_checkpoint_is_deleted_and_retried_immed
         outcome=Deferred("campaign client session no longer matches its checkpoint"),
         effects=(RescheduleSelf(_OBSERVED_AT),),
         state_effects=(_delete_effect(),),
-    )
-
-
-def test_preemption_at_a_restored_safe_point_atomically_preserves_progress() -> None:
-    progress = _progress(runs_completed=2)
-    preemption = PreemptionRequest()
-    preemption.request("higher priority task")
-    workflow = _Workflow(_report(CampaignStopReason.COMPLETED))
-
-    result = CampaignTask(workflow, _spec(progress=progress)).run(_context("main", preemption=preemption))
-
-    assert workflow.calls == 0
-    assert result == TaskResult(
-        outcome=Deferred("campaign yielded at a safe point"),
-        effects=(RescheduleSelf(_STARTED_AT),),
-        state_effects=(_progress_effect(progress),),
     )
 
 
@@ -1262,44 +1237,11 @@ def test_controlled_workflow_failure_uses_failure_retry() -> None:
     )
 
 
-def test_workflow_preemption_report_reschedules_at_the_safe_point() -> None:
-    result = CampaignTask(_Workflow(_report(CampaignStopReason.PREEMPTED)), _spec()).run(_context("main"))
-
-    assert result == TaskResult(
-        outcome=Deferred("campaign yielded at a safe point"),
-        effects=(RescheduleSelf(_OBSERVED_AT),),
-        state_effects=(_progress_effect(_progress()),),
-    )
+_REPORT_STOP_REASONS = tuple(reason for reason in CampaignStopReason if reason is not CampaignStopReason.CANCELLED)
 
 
-def test_preemption_before_scheduled_workflow_reschedules_at_the_run_start() -> None:
-    preemption = PreemptionRequest()
-    preemption.request("higher priority task")
-    workflow = _Workflow(_report(CampaignStopReason.COMPLETED))
-
-    result = CampaignTask(workflow, _spec()).run(_context("main", preemption=preemption))
-
-    assert workflow.calls == 0
-    assert result == TaskResult(
-        outcome=Deferred("campaign yielded at a safe point"),
-        effects=(RescheduleSelf(_STARTED_AT),),
-    )
-
-
-@pytest.mark.parametrize("mode", [ExecutionMode.DIRECT_COMMAND, ExecutionMode.ASSIST_SESSION])
-def test_preemption_before_non_scheduled_workflow_has_no_schedule_effects(mode: ExecutionMode) -> None:
-    preemption = PreemptionRequest()
-    preemption.request("higher priority task")
-    workflow = _Workflow(_report(CampaignStopReason.COMPLETED))
-
-    result = CampaignTask(workflow, _spec()).run(_context("main", mode=mode, preemption=preemption))
-
-    assert workflow.calls == 0
-    assert result == TaskResult(outcome=Deferred("campaign yielded at a safe point"))
-
-
-@pytest.mark.parametrize("reason", list(CampaignStopReason))
-def test_every_stop_reason_advances_its_scheduled_campaign(reason: CampaignStopReason) -> None:
+@pytest.mark.parametrize("reason", _REPORT_STOP_REASONS)
+def test_every_report_stop_reason_advances_its_scheduled_campaign(reason: CampaignStopReason) -> None:
     task_id, job, report = _case_for_stop_reason(reason)
 
     result = CampaignTask(_Workflow(report), job).run(_context(task_id))
@@ -1311,7 +1253,7 @@ def test_every_stop_reason_advances_its_scheduled_campaign(reason: CampaignStopR
 
 
 @pytest.mark.parametrize("mode", [ExecutionMode.DIRECT_COMMAND, ExecutionMode.ASSIST_SESSION])
-@pytest.mark.parametrize("reason", list(CampaignStopReason))
+@pytest.mark.parametrize("reason", _REPORT_STOP_REASONS)
 def test_non_scheduled_campaigns_do_not_mutate_schedules(
     reason: CampaignStopReason,
     mode: ExecutionMode,

@@ -14,7 +14,6 @@ def _validate_revision(revision: str, *, field: str) -> None:
 class RunMetadata:
     settings_revision: int
     content_revision: str
-    client_ui_revision: str
 
     def __post_init__(self) -> None:
         if type(self.settings_revision) is not int:
@@ -24,4 +23,3 @@ class RunMetadata:
             message = "settings_revision must be positive"
             raise ValueError(message)
         _validate_revision(self.content_revision, field="content_revision")
-        _validate_revision(self.client_ui_revision, field="client_ui_revision")

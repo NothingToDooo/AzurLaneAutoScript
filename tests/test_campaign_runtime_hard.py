@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
+from config_factory import in_memory_config
 
 from module.adapters import campaign_runtime_hard as hard_runtime
 from module.adapters.campaign_runtime_implementations import load_default_campaign_runtime_executor_registry
@@ -12,7 +13,6 @@ from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeProfileManager,
     RuntimeOperation,
 )
-from module.config.config import AzurLaneConfig
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
     CampaignRuntimeExtensionId,
@@ -207,7 +207,7 @@ def test_production_hard_profile_bind_uses_only_allowed_config_overlays() -> Non
         hard_profiles[0],
         load_default_campaign_runtime_executor_registry(),
     )
-    config = AzurLaneConfig.from_snapshot("hard-runtime-production-config", {})
+    config = in_memory_config("hard-runtime-production-config", {})
 
     manager.bind(SimpleNamespace(config=config), CampaignMap("hard-runtime-production-config"))
 

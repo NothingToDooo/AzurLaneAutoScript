@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from dev_tools.campaign_runtime_profile_validator import check_campaign_runtime_profiles
+from dev_tools.campaign_runtime_profile_validator import validate_campaign_content
 from module.adapters.campaign_profiles import validate_mumu12_campaign_runtime_profiles
 from module.adapters.campaign_runtime_implementations import (
     load_default_campaign_runtime_executor_registry,
@@ -58,7 +58,7 @@ def _executors(extension_id: str) -> dict[RuntimeExecutorKind, RuntimeExecutorBi
 
 
 def test_current_runtime_profile_sources_are_self_contained_and_valid() -> None:
-    check_campaign_runtime_profiles(ROOT)
+    validate_campaign_content(ROOT)
 
     assert not tuple((ROOT / "campaign").rglob("*.py"))
 

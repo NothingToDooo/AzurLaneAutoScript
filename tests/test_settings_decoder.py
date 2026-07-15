@@ -15,7 +15,7 @@ from module.runtime import (
     TaskStateDocument,
     TypedTaskFactory,
 )
-from module.task_registry import LaunchSurface, TaskDefinition, TaskDomain
+from module.task_registry import TaskDefinition
 
 
 class _Mode(StrEnum):
@@ -51,9 +51,7 @@ def _context(settings: dict[str, FrozenJsonValue]) -> TaskBuildContext:
         command="restart",
         config_scopes=(),
         priority=0,
-        domain=TaskDomain.MAINTENANCE,
         execution_mode=ExecutionMode.SCHEDULED_JOB,
-        allowed_launches=frozenset({LaunchSurface.SCHEDULER}),
     )
     return TaskBuildContext(definition, 3, MappingProxyType(settings), TaskStateDocument.empty("restart"))
 

@@ -2,19 +2,23 @@
   "Alas": {
     "Emulator": {
       "Serial": "127.0.0.1:16384",
-      "MuMuPath": "C:/Program Files/Netease/MuMu Player 12/nx_main/MuMuNxMain.exe"
+      "MuMuPath": "C:/Program Files/Netease/MuMu Player 12/nx_main/MuMuNxMain.exe",
+      "AdbExecutable": "./.venv/Lib/site-packages/adbutils/binaries/adb.exe"
     },
     "Error": {
       "HandleError": true,
-      "SaveError": true,
-      "OnePushConfig": "provider: null",
+      "SmtpEnabled": false,
+      "SmtpHost": "",
+      "SmtpPort": 465,
+      "SmtpTransport": "implicit_tls",
+      "SmtpUser": "",
+      "SmtpPassword": "",
+      "SmtpRecipients": "",
       "ScreenshotLength": 12
     },
     "Optimization": {
       "ScreenshotInterval": 0.3,
-      "CombatScreenshotInterval": 1.0,
-      "TaskHoardingDuration": 0,
-      "WhenTaskQueueEmpty": "goto_main"
+      "CombatScreenshotInterval": 1.0
     },
     "Storage": {
       "Storage": {}
@@ -448,8 +452,8 @@
       "ServerUpdate": "00:00"
     },
     "Campaign": {
-      "Name": "D3",
-      "Event": "campaign_main",
+      "Name": "ht3",
+      "Event": "event_20260625_cn",
       "Mode": "normal",
       "UseClearMode": true,
       "UseFleetLock": true,
@@ -671,7 +675,7 @@
       "ServerUpdate": "00:00"
     },
     "Campaign": {
-      "Name": "D3",
+      "Name": "t3",
       "Event": "war_archives_20240725_cn",
       "Mode": "normal",
       "UseClearMode": true,
@@ -745,12 +749,12 @@
       "ServerUpdate": "00:00"
     },
     "EventDaily": {
-      "StageFilter": "A1 > A2 > A3",
+      "StageFilter": "t1 > t2 > t3",
       "LastStage": 0
     },
     "Campaign": {
-      "Name": "dynamic",
-      "Event": "campaign_main",
+      "Name": "t3",
+      "Event": "event_20260625_cn",
       "Mode": "normal",
       "UseClearMode": true,
       "UseFleetLock": true,
@@ -823,12 +827,12 @@
       "ServerUpdate": "00:00"
     },
     "EventDaily": {
-      "StageFilter": "B1 > B2 > B3",
+      "StageFilter": "t1 > t2 > t3",
       "LastStage": 0
     },
     "Campaign": {
-      "Name": "dynamic",
-      "Event": "campaign_main",
+      "Name": "t3",
+      "Event": "event_20260625_cn",
       "Mode": "normal",
       "UseClearMode": true,
       "UseFleetLock": true,
@@ -901,12 +905,12 @@
       "ServerUpdate": "00:00"
     },
     "EventDaily": {
-      "StageFilter": "C1 > C2 > C3",
+      "StageFilter": "ht1 > ht2 > ht3",
       "LastStage": 0
     },
     "Campaign": {
-      "Name": "dynamic",
-      "Event": "campaign_main",
+      "Name": "t3",
+      "Event": "event_20260625_cn",
       "Mode": "normal",
       "UseClearMode": true,
       "UseFleetLock": true,
@@ -979,12 +983,12 @@
       "ServerUpdate": "00:00"
     },
     "EventDaily": {
-      "StageFilter": "D1 > D2 > D3",
+      "StageFilter": "ht1 > ht2 > ht3",
       "LastStage": 0
     },
     "Campaign": {
-      "Name": "dynamic",
-      "Event": "campaign_main",
+      "Name": "t3",
+      "Event": "event_20260625_cn",
       "Mode": "normal",
       "UseClearMode": true,
       "UseFleetLock": true,
@@ -1058,7 +1062,7 @@
     },
     "Campaign": {
       "Name": "sp",
-      "Event": "campaign_main",
+      "Event": "event_20260625_cn",
       "Mode": "normal",
       "UseClearMode": true,
       "UseFleetLock": true,

@@ -47,6 +47,18 @@ class RescheduleTask:
 
 
 @dataclass(frozen=True, slots=True)
+class DelayTask:
+    """仅把既有 due time 向后推，不提前任务，也不改变 enabled 状态。"""
+
+    task_id: TaskId
+    due_at: datetime
+
+    def __post_init__(self) -> None:
+        _validate_task_id(self.task_id)
+        _validate_due_at(self.due_at)
+
+
+@dataclass(frozen=True, slots=True)
 class WakeTask:
     task_id: TaskId
     due_at: datetime
@@ -76,4 +88,4 @@ class RequestAppRestart:
         validate_reason(self.reason)
 
 
-type ScheduleEffect = RescheduleSelf | RescheduleTask | WakeTask | DisableTask | RequestAppRestart
+type ScheduleEffect = RescheduleSelf | RescheduleTask | DelayTask | WakeTask | DisableTask | RequestAppRestart

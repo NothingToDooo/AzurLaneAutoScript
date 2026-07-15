@@ -13,9 +13,7 @@ from module.application import (
     Deferred,
     DelayRange,
     DeleteTaskState,
-    PreemptionRequest,
     RescheduleSelf,
-    RunId,
     RunMetadata,
     Succeeded,
     TaskContext,
@@ -24,7 +22,8 @@ from module.application import (
     WakePolicy,
     WakeTask,
 )
-from module.content import ActivityCatalog, CoalitionStageId
+from module.content.activity_catalog import ActivityCatalog
+from module.content.activity_profile import CoalitionStageId
 from module.content.manifest import load_event_manifests
 from module.gameplay.activity import (
     GAMEPLAY_COMMAND_PROFILES,
@@ -188,10 +187,8 @@ class _ActivityWorkflow:
         self,
         spec: ActivitySpec,
         cancellation: CancellationSignal,
-        preemption: PreemptionRequest,
     ) -> ActivityReport:
         cancellation.raise_if_requested()
-        assert not preemption.is_requested
         self.specs.append(spec)
         return ActivityReport(
             spec.command,
@@ -288,12 +285,10 @@ def _task_context(
 ) -> TaskContext:
     return TaskContext(
         task_id=TaskId(command),
-        run_id=RunId(f"run-{command}"),
         started_at=datetime(2026, 7, 13, tzinfo=UTC),
         mode=GAMEPLAY_COMMAND_PROFILES[command].execution_mode,
-        metadata=RunMetadata(settings_revision=3, content_revision="content-1", client_ui_revision="ui-1"),
+        metadata=RunMetadata(settings_revision=3, content_revision="content-1"),
         abort=AbortToken() if abort is None else abort,
-        preemption=PreemptionRequest(),
     )
 
 

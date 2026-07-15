@@ -1,20 +1,20 @@
 import os
-import sys
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+import adbutils
 from adbutils import AdbClient, AdbDevice
 
 from module.base.decorator import del_cached_property
-from module.config.config import AzurLaneConfig
-from module.device.mumu import MUMU12_SERIAL_EXAMPLE, is_mumu12_serial, revise_mumu12_serial
+from module.device.mumu import MUMU12_SERIAL_EXAMPLE, is_mumu12_serial
 from module.exception import RequestHumanTakeover
 from module.logger import logger
-from module.webui.setting import State
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from module.config.config import AzurLaneConfig
 
 
 @runtime_checkable
@@ -33,17 +33,9 @@ class ConnectionAttr:
         "adb",
     )
 
-    adb_binary_list = (
-        "./bin/adb/adb.exe",
-        "./.venv/Lib/site-packages/adbutils/binaries/adb.exe",
-    )
-
-    def __init__(self, config: AzurLaneConfig | str) -> None:
+    def __init__(self, config: AzurLaneConfig) -> None:
         logger.hr("Device", level=1)
-        if isinstance(config, str):
-            self.config = AzurLaneConfig(config, task=None)
-        else:
-            self.config = config
+        self.config = config
 
         logger.attr("AdbBinary", self.adb_binary)
         # adbutils 的各子模块在导入时会绑定 adb_path 函数；官方环境变量是唯一能让
@@ -65,8 +57,8 @@ class ConnectionAttr:
                 seen.add(name)
                 yield name
 
-    def bind_serial(self, serial: str, *, persist: bool = False) -> bool:
-        """释放旧连接状态并发布新的 serial。"""
+    def bind_serial(self, serial: str) -> bool:
+        """释放旧连接状态并发布运行期发现的新 serial。"""
         if serial == self.serial:
             return False
 
@@ -76,17 +68,10 @@ class ConnectionAttr:
         for name in self._iter_serial_bound_cached_properties():
             del_cached_property(self, name)
 
-        if persist:
-            self.config.Emulator_Serial = serial
         self.serial = serial
         return True
 
     def serial_check(self) -> None:
-        # 兼容常见手填错误。
-        new = revise_mumu12_serial(self.serial)
-        if new != self.serial:
-            logger.warning(f'Serial "{self.config.Emulator_Serial}" is revised to "{new}"')
-            self.bind_serial(new, persist=True)
         if is_mumu12_serial(self.serial):
             return
         logger.critical(f'当前个人分支只支持 MuMu12 TCP serial，例如 "{MUMU12_SERIAL_EXAMPLE}"，当前为 "{self.serial}"')
@@ -112,18 +97,15 @@ class ConnectionAttr:
 
     @cached_property
     def adb_binary(self) -> str:
-        file = State.webui_config.AdbExecutable
-        file = file.replace("\\", "/")
-        if Path(file).exists():
-            return str(Path(file).resolve())
+        configured = self.config.Emulator_AdbExecutable.strip()
+        if configured:
+            configured_path = Path(configured.replace("\\", "/"))
+            if configured_path.is_file():
+                return str(configured_path.resolve())
 
-        for file in self.adb_binary_list:
-            if Path(file).exists():
-                return str(Path(file).resolve())
-
-        file = (Path(sys.executable) / "../Lib/site-packages/adbutils/binaries/adb.exe").resolve().as_posix()
-        if Path(file).exists():
-            return file
+        bundled = Path(adbutils.__file__).resolve().parent / "binaries" / "adb.exe"
+        if bundled.is_file():
+            return bundled.as_posix()
 
         return "adb"
 

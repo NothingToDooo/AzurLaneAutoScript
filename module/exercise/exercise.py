@@ -7,7 +7,6 @@ from module.exercise import assets as exercise_assets
 from module.exercise.combat import ExerciseCombat
 from module.logger import logger
 from module.ocr.ocr import Digit, Ocr, OcrOptions, OcrRegions, OcrYuv, ocr_options
-from module.ui.page import page_exercise
 
 
 class DatedDuration(Ocr[timedelta]):
@@ -146,48 +145,3 @@ class Exercise(ExerciseCombat):
             admiral_interval = ADMIRAL_TRIAL_HOUR_INTERVAL[self.config.Exercise_ExerciseStrategy]
 
         return preserve, admiral_interval
-
-    def run(self) -> None:
-        self.ui_ensure(page_exercise)
-
-        self.opponent_change_count = self._get_opponent_change_count()
-        logger.attr("Change_opponent_count", self.opponent_change_count)
-        logger.attr("Exercise_ExerciseStrategy", self.config.Exercise_ExerciseStrategy)
-        self.preserve, admiral_interval = self._get_exercise_strategy()
-
-        remain_time = OCR_PERIOD_REMAIN.ocr_single(self.device.image)
-        logger.info(f"Exercise period remain: {remain_time}")
-
-        if admiral_interval is not None and remain_time:
-            admiral_start, admiral_end = admiral_interval
-
-            if admiral_start > int(remain_time.total_seconds() // 3600) >= admiral_end:
-                logger.info("Reach set time for admiral trial, using all attempts.")
-                self.preserve = 0
-            # 无论选择哪个策略，周期不足六小时时都耗尽剩余次数。
-            elif int(remain_time.total_seconds() // 3600) < 6:
-                logger.info("Exercise period remain less than 6 hours, using all attempts.")
-                self.preserve = 0
-            else:
-                logger.info(f"Preserve {self.preserve} exercise")
-
-        while 1:
-            self.remain = OCR_EXERCISE_REMAIN.ocr_single(self.device.image)
-            if self.remain <= self.preserve:
-                break
-
-            logger.hr(f"Exercise remain {self.remain}", level=1)
-            if self.config.Exercise_OpponentChooseMode == "easiest_else_exp":
-                success = self._exercise_easiest_else_exp()
-            else:
-                success = self._exercise_once()
-            if not success:
-                logger.info("New opponent exhausted")
-                break
-
-        with self.config.multi_set():
-            self.config.set_record(Exercise_OpponentRefreshValue=self.opponent_change_count)
-            if self.remain <= self.preserve or self.opponent_change_count >= 5:
-                self.config.task_delay(server_update=True)
-            else:
-                self.config.task_delay(success=False)

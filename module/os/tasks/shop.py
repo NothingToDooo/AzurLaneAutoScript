@@ -1,37 +1,10 @@
 from datetime import datetime, timedelta
 
 from module.config.utils import get_os_next_reset, get_os_reset_remain, get_server_next_update
-from module.logger import logger
 from module.os.map import OSMap
-from module.os_shop.assets import OS_SHOP_CHECK
 
 
 class OpsiShop(OSMap):
-    def os_shop(self) -> None:
-        """在当前或最近的己方港口购买补给；单币不足时跳过对应商品，两币均不足时停止。"""
-        logger.hr("OS port daily", level=1)
-        if not self.zone.is_azur_port:
-            self.globe_goto(self.zone_nearest_azur_port(self.zone))
-
-        self.port_enter()
-        self.port_shop_enter()
-
-        if self.appear(OS_SHOP_CHECK):
-            not_empty = self.handle_port_supply_buy()
-            next_reset = self._os_shop_delay(not_empty=not_empty)
-            logger.info("OS port daily finished, delay to next reset")
-            logger.attr("OpsiShopNextReset", next_reset)
-        else:
-            next_reset = get_os_next_reset()
-            logger.warning("There is no shop in the port, skip to the next month.")
-            logger.attr("OpsiShopNextReset", next_reset)
-
-        self.port_shop_quit()
-        self.port_quit()
-
-        self.config.task_delay(target=next_reset)
-        self.config.task_stop()
-
     def _os_shop_delay(self, *, not_empty: bool) -> datetime:
         """not_empty 表示本轮扫描过滤后存在候选商品；结合大世界重置日计算下次运行时间。"""
         next_reset = None

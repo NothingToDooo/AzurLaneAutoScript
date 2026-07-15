@@ -299,20 +299,21 @@ class MeowfficerSettings:
 
     @property
     def has_work(self) -> bool:
-        return (
-            self.buy_amount > 0
-            or self.overflow_coin_threshold is not None
-            or self.fort_chore_enabled
-            or self.training is not None
-        )
+        return self.has_non_training_work or self.training is not None
+
+    @property
+    def has_non_training_work(self) -> bool:
+        return self.buy_amount > 0 or self.overflow_coin_threshold is not None or self.fort_chore_enabled
 
 
 @dataclass(frozen=True, slots=True)
 class MeowfficerReport:
     observed_at: datetime
+    training_active: bool
 
     def __post_init__(self) -> None:
         _validate_aware_datetime(self.observed_at, field_name="observed_at")
+        _validate_bool(value=self.training_active, field_name="training_active")
 
 
 class MeowfficerWorkflow(Protocol):
@@ -341,9 +342,16 @@ class MeowfficerTask(Task):
             raise TypeError(message)
         context.abort.raise_if_requested()
 
+        training = self._settings.training
+        if report.training_active and training is None:
+            message = "MeowfficerWorkflow cannot activate training that is disabled in settings"
+            raise ValueError(message)
+        if not report.training_active and not self._settings.has_non_training_work:
+            return TaskResult(outcome=Succeeded(), effects=(DisableTask(context.task_id),))
+
         due_at = self._settings.schedule.next_after(report.observed_at)
-        if self._settings.training is not None:
-            due_at = min(due_at, report.observed_at + self._settings.training.check_delay)
+        if report.training_active and training is not None:
+            due_at = min(due_at, report.observed_at + training.check_delay)
         return TaskResult(outcome=Succeeded(), effects=(RescheduleSelf(due_at),))
 
 

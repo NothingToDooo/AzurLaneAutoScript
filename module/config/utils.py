@@ -9,6 +9,12 @@ import yaml
 from yaml.representer import SafeRepresenter
 
 from module.base.atomic import atomic_read_bytes, atomic_read_text, atomic_write
+from module.config.json_codec import (
+    DuplicateJsonFieldError,
+    NonFiniteJsonNumberError,
+    StrictJsonDecodeError,
+    decode_json,
+)
 from module.logger import logger
 
 if TYPE_CHECKING:
@@ -16,7 +22,7 @@ if TYPE_CHECKING:
 
     from yaml.nodes import ScalarNode
 
-    from module.config.deep import DeepValue, MutableDeepData, MutableDeepValue
+    from module.config.deep import MutableDeepData, MutableDeepValue
 
 type FilePath = str | Path
 type TimeScalar = int | float
@@ -75,7 +81,17 @@ def read_file(file: FilePath) -> MutableDeepData:
         content = atomic_read_bytes(file)
         if not content:
             return {}
-        return cast("MutableDeepData", json.loads(content))
+        try:
+            decoded = decode_json(content)
+        except DuplicateJsonFieldError as error:
+            message = f"duplicate JSON field: {error.field}"
+            raise ValueError(message) from error
+        except NonFiniteJsonNumberError as error:
+            message = f"JSON contains a non-finite number: {error.constant}"
+            raise ValueError(message) from error
+        except StrictJsonDecodeError as error:
+            raise ValueError(str(error)) from error
+        return cast("MutableDeepData", decoded)
     if file.suffix == ".yaml":
         content = atomic_read_text(file)
         data = list(yaml.safe_load_all(content))
@@ -88,12 +104,26 @@ def read_file(file: FilePath) -> MutableDeepData:
     return {}
 
 
+def _encode_json_value(value: object) -> str:
+    if isinstance(value, datetime):
+        return str(value)
+    message = f"unsupported JSON value type: {type(value).__name__}"
+    raise TypeError(message)
+
+
 def write_file(file: FilePath, data: MutableDeepData | list[MutableDeepData]) -> None:
     """原子写入 YAML 或 JSON；不支持的扩展名只记录警告。"""
     file = Path(file)
     logger.debug(f"write: {file}")
     if file.suffix == ".json":
-        content = json.dumps(data, indent=2, ensure_ascii=False, sort_keys=False, default=str)
+        content = json.dumps(
+            data,
+            allow_nan=False,
+            indent=2,
+            ensure_ascii=False,
+            sort_keys=False,
+            default=_encode_json_value,
+        )
         atomic_write(file, content)
     elif file.suffix == ".yaml":
         if isinstance(data, list):
@@ -122,67 +152,6 @@ def iter_folder(folder: FilePath, *, is_dir: bool = False, ext: str | None = Non
             yield sub.as_posix()
 
 
-def alas_template() -> list[str]:
-    return ["template"] if Path("./config/template.json").exists() else []
-
-
-def alas_instance() -> list[str]:
-    """列出 template 以外的顶层 JSON 实例；没有实例时回退为 `alas`。"""
-    out: list[str] = []
-    for path in Path("./config").iterdir():
-        name = path.stem
-        extension = path.suffix
-        mod_name = Path(name).suffix
-        mod_name = mod_name[1:]
-        if name != "template" and extension == ".json" and mod_name == "":
-            out.append(name)
-
-    if not out:
-        out = ["alas"]
-
-    return out
-
-
-def _parse_numeric_value(value: str) -> int | float | str:
-    parser = float if "." in value else int
-    try:
-        return parser(value)
-    except ValueError:
-        return value
-
-
-def _parse_datetime_value(value: str) -> datetime | str:
-    try:
-        return datetime.fromisoformat(value)
-    except ValueError:
-        return value
-
-
-def _parse_string_value(value: str) -> bool | int | float | str | datetime | None:
-    if value == "":
-        return None
-    if value in {"true", "True"}:
-        return True
-    if value in {"false", "False"}:
-        return False
-
-    parsed = _parse_numeric_value(value)
-    if parsed != value:
-        return parsed
-
-    return _parse_datetime_value(value)
-
-
-def parse_value(value: DeepValue, data: Mapping[str, DeepValue]) -> DeepValue:
-    """把配置字符串转换成 bool、数字或 datetime；非法选项回退到定义的默认值。"""
-    option = data.get("option")
-    if isinstance(option, list) and value not in cast("list[DeepValue]", option):
-        return data["value"]
-    if not isinstance(value, str):
-        return value
-    return _parse_string_value(value)
-
-
 def data_to_type(data: ArgumentDefinition, *, arg: str) -> InputType:
     """按值类型映射 UI 控件：bool→checkbox、有选项→select、Filter→textarea，其余为 input。"""
     if isinstance(data["value"], bool):
@@ -204,15 +173,15 @@ def path_to_arg(path: str) -> str:
 
 
 def _redact_config_value(key: str, value: MutableDeepValue) -> MutableDeepValue | str:
-    """配置日志中隐藏旧 OnePushConfig 内嵌的 SMTP 凭据。"""
+    """配置日志中隐藏 SMTP 密码。"""
     normalized = key.replace(".", "").replace("_", "").casefold()
-    if normalized.endswith("onepushconfig"):
+    if normalized.endswith("smtppassword"):
         return "<redacted>"
     return value
 
 
 def dict_to_kv(dictionary: Mapping[str, MutableDeepValue], *, allow_none: bool = True) -> str:
-    """把字典格式化为日志键值，并隐藏内嵌 SMTP 凭据。"""
+    """把字典格式化为日志键值，并隐藏 SMTP 密码。"""
     return ", ".join(
         [
             f"{key}={_redact_config_value(key, value)!r}"

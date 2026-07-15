@@ -8,14 +8,13 @@ from module.application import (
     AbortRequested,
     AbortToken,
     Deferred,
+    DelayTask,
     DeleteTaskState,
     DisableTask,
     ExecutionMode,
-    PreemptionRequest,
     RescheduleSelf,
     RescheduleTask,
     Retryable,
-    RunId,
     RunMetadata,
     Succeeded,
     TaskContext,
@@ -61,6 +60,7 @@ from module.gameplay.opsi import (
     WorldOperation,
     WorldProgress,
     WorldSchedule,
+    WorldScheduleDelay,
     WorldTaskReport,
     WorldTaskSettings,
     WorldTaskSpec,
@@ -174,21 +174,18 @@ class _Workflow:
         self.received_spec: WorldTaskSpec | None = None
         self.received_progress: WorldProgress | None = None
         self.received_cancellation: CancellationSignal | None = None
-        self.received_preemption: PreemptionRequest | None = None
 
     def execute(
         self,
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
         cancellation: CancellationSignal,
-        preemption: PreemptionRequest,
     ) -> WorldTaskReport:
         cancellation.raise_if_requested()
         self.calls += 1
         self.received_spec = spec
         self.received_progress = progress
         self.received_cancellation = cancellation
-        self.received_preemption = preemption
         if self._on_execute is not None:
             self._on_execute()
         return cast("WorldTaskReport", self._report)
@@ -214,6 +211,8 @@ def _report(  # noqa: PLR0913 - 测试构造器显式暴露 report 的独立契�
     completed_units: int = 0,
     retry_at: datetime | None = None,
     affected_task_ids: tuple[TaskId, ...] = (),
+    schedule_delays: tuple[WorldScheduleDelay, ...] = (),
+    wake_task_ids: tuple[TaskId, ...] = (),
     has_surplus_yellow_coins: bool = False,
     exploration_in_progress: bool = False,
     cursor: WorldZoneCursor | WorldMissionCursor | WorldBossCursor | None = None,
@@ -225,6 +224,8 @@ def _report(  # noqa: PLR0913 - 测试构造器显式暴露 report 的独立契�
         completed_units=completed_units,
         retry_at=retry_at,
         affected_task_ids=affected_task_ids,
+        schedule_delays=schedule_delays,
+        wake_task_ids=wake_task_ids,
         has_surplus_yellow_coins=has_surplus_yellow_coins,
         exploration_in_progress=exploration_in_progress,
         cursor=cursor,
@@ -244,10 +245,6 @@ def _last_day_report(
     )
 
 
-def _request_preemption(preemption: PreemptionRequest) -> None:
-    preemption.request("higher priority task")
-
-
 def _request_abort(abort: AbortToken) -> None:
     abort.request("stop after current action")
 
@@ -256,16 +253,13 @@ def _context(
     task_id: str,
     *,
     abort: AbortToken | None = None,
-    preemption: PreemptionRequest | None = None,
 ) -> TaskContext:
     return TaskContext(
         task_id=TaskId(task_id),
-        run_id=RunId(f"run-{task_id}"),
         started_at=_STARTED_AT,
         mode=ExecutionMode.SCHEDULED_JOB,
-        metadata=RunMetadata(settings_revision=1, content_revision="content-1", client_ui_revision="ui-1"),
+        metadata=RunMetadata(settings_revision=1, content_revision="content-1"),
         abort=AbortToken() if abort is None else abort,
-        preemption=PreemptionRequest() if preemption is None else preemption,
     )
 
 
@@ -447,10 +441,8 @@ def test_stale_progress_is_deleted_and_immediately_rescheduled_without_entering_
     progress: WorldProgress,
 ) -> None:
     workflow = _Workflow(_report())
-    preemption = PreemptionRequest()
-    preemption.request("urgent")
 
-    result = _task("opsi_daily", workflow, progress).run(_context("opsi_daily", preemption=preemption))
+    result = _task("opsi_daily", workflow, progress).run(_context("opsi_daily"))
 
     assert workflow.calls == 0
     assert result == TaskResult(
@@ -478,32 +470,6 @@ def test_waiting_state_keeps_existing_progress_unchanged() -> None:
 
     assert workflow.received_progress is existing
     assert result.state_effects == ()
-
-
-@pytest.mark.parametrize("task_id", ["opsi_shop", "opsi_voucher", "opsi_cross_month"])
-def test_one_shot_safe_point_preemption_never_creates_progress(task_id: str) -> None:
-    preemption = PreemptionRequest()
-    workflow = _Workflow(
-        _report(WorldTaskStatus.PREEMPTED),
-        on_execute=lambda: _request_preemption(preemption),
-    )
-
-    result = _task(task_id, workflow).run(_context(task_id, preemption=preemption))
-
-    assert workflow.calls == 1
-    assert workflow.received_progress is None
-    assert result.state_effects == ()
-
-
-def test_bounded_safe_point_preemption_requires_meaningful_progress() -> None:
-    preemption = PreemptionRequest()
-    workflow = _Workflow(
-        _report(WorldTaskStatus.PREEMPTED),
-        on_execute=lambda: _request_preemption(preemption),
-    )
-
-    with pytest.raises(ValueError, match="must expose a resumable safe point"):
-        _task("opsi_daily", workflow).run(_context("opsi_daily", preemption=preemption))
 
 
 def test_operation_specific_cursor_type_is_enforced() -> None:
@@ -735,6 +701,46 @@ def test_cooldown_reschedules_dependencies_without_waking_or_enabling_them() -> 
     assert not any(isinstance(effect, WakeTask) for effect in result.effects)
 
 
+def test_live_schedule_intents_merge_with_domain_schedule_without_duplicate_writes() -> None:
+    recon_due = _OBSERVED_AT + timedelta(minutes=27)
+    submarine_due = _OBSERVED_AT + timedelta(minutes=60)
+    result, _ = _run(
+        "opsi_explore",
+        _report(
+            WorldTaskStatus.COMPLETED,
+            schedule_delays=(
+                WorldScheduleDelay(recon_due, (TaskId("opsi_obscure"),)),
+                WorldScheduleDelay(submarine_due, (TaskId("opsi_daily"), TaskId("opsi_obscure"))),
+            ),
+            wake_task_ids=(TaskId("opsi_ash_beacon"),),
+        ),
+    )
+
+    assert result.effects == (
+        RescheduleSelf(_MONTH_RESET_AT),
+        WakeTask(TaskId("opsi_daily"), submarine_due, WakePolicy.RESPECT_DISABLED),
+        WakeTask(OPSI_SHOP_TASK_ID, _OBSERVED_AT, WakePolicy.RESPECT_DISABLED),
+        WakeTask(OPSI_HAZARD1_LEVELING_TASK_ID, _OBSERVED_AT, WakePolicy.RESPECT_DISABLED),
+        DelayTask(TaskId("opsi_obscure"), submarine_due),
+        WakeTask(TaskId("opsi_ash_beacon"), _OBSERVED_AT, WakePolicy.FORCE_ENABLE),
+    )
+
+
+def test_live_delay_for_current_partial_task_becomes_its_single_self_schedule() -> None:
+    due_at = _OBSERVED_AT + timedelta(minutes=27)
+    result, _ = _run(
+        "opsi_obscure",
+        _report(
+            WorldTaskStatus.IN_PROGRESS,
+            completed_units=1,
+            cursor=WorldZoneCursor(22),
+            schedule_delays=(WorldScheduleDelay(due_at, (TaskId("opsi_obscure"),)),),
+        ),
+    )
+
+    assert result.effects == (RescheduleSelf(due_at),)
+
+
 def test_cross_month_action_point_limit_returns_to_next_month_window() -> None:
     result, _ = _run("opsi_cross_month", _report(WorldTaskStatus.ACTION_POINT_LIMIT))
 
@@ -780,31 +786,25 @@ def test_every_world_task_status_advances_or_disables_the_scheduled_task(
     task_id: str,
     status: WorldTaskStatus,
 ) -> None:
-    preemption = PreemptionRequest()
-
-    def request_preemption_on_execute() -> None:
-        _request_preemption(preemption)
-
     definition = WORLD_TASK_DEFINITIONS[TaskId(task_id)]
     is_bounded = definition.checkpoint_mode is WorldCheckpointMode.BOUNDED
-    safe_point = status in {WorldTaskStatus.IN_PROGRESS, WorldTaskStatus.PREEMPTED} and is_bounded
+    safe_point = status is WorldTaskStatus.IN_PROGRESS and is_bounded
     workflow = _Workflow(
         _report(
             status,
-            completed_units=1 if safe_point or status is WorldTaskStatus.IN_PROGRESS else 0,
+            completed_units=1 if status is WorldTaskStatus.IN_PROGRESS else 0,
             retry_at=_RETRY_AT,
             cursor=_cursor_for_task(task_id) if safe_point else None,
         ),
-        on_execute=request_preemption_on_execute if status is WorldTaskStatus.PREEMPTED else None,
     )
 
     if status is WorldTaskStatus.IN_PROGRESS and not is_bounded:
         with pytest.raises(ValueError, match="one-shot operation cannot report in-progress"):
-            _task(task_id, workflow).run(_context(task_id, preemption=preemption))
+            _task(task_id, workflow).run(_context(task_id))
         assert workflow.calls == 1
         return
 
-    result = _task(task_id, workflow).run(_context(task_id, preemption=preemption))
+    result = _task(task_id, workflow).run(_context(task_id))
 
     self_schedule_effects = tuple(
         effect
@@ -817,7 +817,7 @@ def test_every_world_task_status_advances_or_disables_the_scheduled_task(
     else:
         assert isinstance(self_schedule_effects[0], RescheduleSelf)
 
-    if is_bounded and status in {WorldTaskStatus.IN_PROGRESS, WorldTaskStatus.PREEMPTED}:
+    if is_bounded and status is WorldTaskStatus.IN_PROGRESS:
         assert len(result.state_effects) == 1
         assert isinstance(result.state_effects[0], UpsertTaskState)
     elif is_bounded and status in {
@@ -828,77 +828,6 @@ def test_every_world_task_status_advances_or_disables_the_scheduled_task(
         assert result.state_effects == (DeleteTaskState(task_id, "world_progress"),)
     else:
         assert result.state_effects == ()
-
-
-def test_preemption_before_execution_does_not_enter_game_workflow() -> None:
-    preemption = PreemptionRequest()
-    preemption.request("higher priority task")
-    workflow = _Workflow(_report())
-    task = _task("opsi_daily", workflow)
-
-    context = _context("opsi_daily", preemption=preemption)
-
-    result = task.run(context)
-
-    assert workflow.calls == 0
-    assert result == TaskResult(
-        outcome=Deferred("operation siren task was preempted before execution"),
-        effects=(RescheduleSelf(context.started_at),),
-    )
-
-
-def test_preemption_before_execution_atomically_preserves_existing_progress() -> None:
-    preemption = PreemptionRequest()
-    preemption.request("higher priority task")
-    existing = _progress("opsi_daily")
-    workflow = _Workflow(_report())
-
-    result = _task("opsi_daily", workflow, existing).run(_context("opsi_daily", preemption=preemption))
-
-    assert workflow.calls == 0
-    assert result.state_effects == (
-        UpsertTaskState(
-            "opsi_daily",
-            "world_progress",
-            1,
-            existing.to_payload(),
-        ),
-    )
-
-
-def test_workflow_can_yield_at_a_safe_point_when_preemption_arrives() -> None:
-    preemption = PreemptionRequest()
-    workflow = _Workflow(
-        _report(
-            WorldTaskStatus.PREEMPTED,
-            completed_units=1,
-            cursor=WorldMissionCursor(WorldMissionEvidenceKind.PINNED_ZONE, 1),
-        ),
-        on_execute=lambda: _request_preemption(preemption),
-    )
-
-    result = _task("opsi_daily", workflow).run(_context("opsi_daily", preemption=preemption))
-
-    assert workflow.received_preemption is preemption
-    assert result == TaskResult(
-        outcome=Deferred("operation siren task yielded at a safe point"),
-        effects=(RescheduleSelf(_OBSERVED_AT),),
-        state_effects=(
-            UpsertTaskState(
-                "opsi_daily",
-                "world_progress",
-                1,
-                _progress("opsi_daily", completed_units=1).to_payload(),
-            ),
-        ),
-    )
-
-
-def test_preempted_report_without_a_request_is_rejected() -> None:
-    task = _task("opsi_daily", _Workflow(_report(WorldTaskStatus.PREEMPTED)))
-
-    with pytest.raises(ValueError, match="requires an active preemption request"):
-        task.run(_context("opsi_daily"))
 
 
 def test_abort_before_execution_prevents_workflow_side_effects() -> None:
@@ -922,15 +851,13 @@ def test_abort_at_workflow_safe_point_discards_schedule_effects() -> None:
     assert workflow.calls == 1
 
 
-def test_workflow_receives_the_same_abort_and_preemption_signals_from_context() -> None:
+def test_workflow_receives_the_same_abort_signal_from_context() -> None:
     abort = AbortToken()
-    preemption = PreemptionRequest()
     workflow = _Workflow(_report())
 
-    _task("opsi_daily", workflow).run(_context("opsi_daily", abort=abort, preemption=preemption))
+    _task("opsi_daily", workflow).run(_context("opsi_daily", abort=abort))
 
     assert workflow.received_cancellation is abort
-    assert workflow.received_preemption is preemption
 
 
 def test_task_rejects_wrong_context_id_and_invalid_workflow_report() -> None:

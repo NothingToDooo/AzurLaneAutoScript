@@ -318,10 +318,3 @@ class Daily(Combat, DailyEquipment):
             if max(self.daily_checked) >= 7:
                 logger.info("Daily clear complete.")
                 break
-
-    def run(self) -> None:
-        """从任意页面处理每日任务，结束于每日页或战役菜单。"""
-        self.daily_run()
-
-        # 不能停留在 page_daily，因为顺序已经乱掉。
-        self.config.task_delay(server_update=True)

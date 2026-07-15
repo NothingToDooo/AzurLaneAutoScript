@@ -124,7 +124,6 @@ class RewardDorm(UI):
         timeout = Timer(count // 5 + 5).start()
         x, y = random_rectangle_point(button.button)
         builder = self.device.minitouch_builder
-        self.device.replay_mark_unsupported_action("dorm_feed_long_tap")
         builder.down(x, y).commit()
         builder.send()
 
@@ -220,7 +219,6 @@ class RewardDorm(UI):
 
     def dorm_food_get(self) -> tuple[list[Food], int]:
         """在喂食页返回食物列表和待补充量；OCR 无总量时待补充量为 -1。"""
-        failure_store = OCR_FAILURE_STORE if self.config.Error_SaveError else None
         has_food = [self._dorm_has_food(button) for button in self._dorm_food.buttons]
         occupied_slots = [
             (index, area)
@@ -234,7 +232,7 @@ class RewardDorm(UI):
             results = self._dorm_food_ocr.recognize(
                 images,
                 direct_ocr=True,
-                failure_store=failure_store,
+                failure_store=OCR_FAILURE_STORE,
             )
             results = results if isinstance(results, list) else [results]
             for (index, _), result in zip(occupied_slots, results, strict=True):
@@ -246,7 +244,7 @@ class RewardDorm(UI):
         food = [Food(feed=feed, amount=amount) for feed, amount in zip(FOOD_FEED_AMOUNT, amounts, strict=True)]
         fill = -1
         if amounts_valid:
-            fill_result = OCR_FILL.recognize(self.device.image, failure_store=failure_store)
+            fill_result = OCR_FILL.recognize(self.device.image, failure_store=OCR_FAILURE_STORE)
             if fill_result.valid and fill_result.value is not None:
                 _, fill, total = fill_result.value
                 if total == 0:
@@ -446,31 +444,3 @@ class RewardDorm(UI):
             break
 
         return current
-
-    def cal_dorm_delay(self, ships: int) -> int:
-        """按 20000 食物和每 15 秒消耗量返回延迟分钟数；舰船数 1～6 对应 1000、556、417、358、313、278。"""
-        dict_delay = {
-            0: self.config.Scheduler_SuccessInterval,
-            1: 1000,
-            2: 556,
-            3: 417,
-            4: 358,
-            5: 313,
-            6: 278,
-        }
-        return dict_delay.get(ships, self.config.Scheduler_SuccessInterval)
-
-    def run(self) -> None:
-        """从任意页面执行宿舍任务，结束于宿舍页。"""
-        if not self.config.Dorm_Feed and not self.config.Dorm_Collect and not self.config.BuyFurniture_Enable:
-            self.config.Scheduler_Enable = False
-            self.config.task_stop()
-
-        self.dorm_run(
-            feed=self.config.Dorm_Feed, collect=self.config.Dorm_Collect, buy_furniture=self.config.BuyFurniture_Enable
-        )
-
-        ships = self.get_dorm_ship_amount()
-        delay = self.cal_dorm_delay(ships)
-        logger.info(f"Ships in dorm: {ships}, task to delay: {delay}")
-        self.config.task_delay(minute=delay)

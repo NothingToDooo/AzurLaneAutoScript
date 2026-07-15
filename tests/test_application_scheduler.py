@@ -12,6 +12,7 @@ from module.application import (
     SchedulerSelection,
     ScheduleSource,
     TaskId,
+    order_schedule_items,
 )
 
 _NOW = datetime(2026, 7, 13, 8, 0, tzinfo=UTC)
@@ -85,6 +86,21 @@ def test_ready_includes_boundary_and_uses_priority_due_at_task_id_order() -> Non
         item=_item("a-task", earliest, priority=1),
         wake_at=None,
     )
+
+
+def test_order_schedule_items_exposes_the_same_ready_and_waiting_order() -> None:
+    ready, waiting = order_schedule_items(
+        (
+            _item("waiting-later", _NOW + timedelta(minutes=2), priority=0),
+            _item("ready-low", _NOW - timedelta(minutes=1), priority=2),
+            _item("waiting-first", _NOW + timedelta(minutes=1), priority=5),
+            _item("ready-high", _NOW, priority=1),
+        ),
+        now=_NOW,
+    )
+
+    assert [item.task_id.value for item in ready] == ["ready-high", "ready-low"]
+    assert [item.task_id.value for item in waiting] == ["waiting-first", "waiting-later"]
 
 
 def test_aware_datetimes_compare_by_instant_at_ready_boundary() -> None:

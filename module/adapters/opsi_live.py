@@ -2,10 +2,12 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Protocol, override
 
+from module.application import TaskId
 from module.gameplay.opsi import (
     OperationSirenWorkflow,
     WorldOperation,
     WorldSchedule,
+    WorldScheduleDelay,
     WorldTaskReport,
     WorldTaskSpec,
     WorldTaskStatus,
@@ -17,7 +19,6 @@ from module.gameplay.opsi_progress import (
 )
 
 if TYPE_CHECKING:
-    from module.application import PreemptionRequest, TaskId
     from module.interaction import CancellationSignal
 
 
@@ -27,6 +28,43 @@ def _validate_aware(value: datetime, *, field_name: str) -> None:
         raise TypeError(message)
     if value.tzinfo is None or value.utcoffset() is None:
         message = f"{field_name} must be timezone-aware"
+        raise ValueError(message)
+
+
+@dataclass(frozen=True, slots=True)
+class LiveScheduleDelay:
+    """UI step 观察到的相对冷却；领域层负责绑定统一的 observed_at。"""
+
+    after: timedelta
+    task_ids: tuple[TaskId, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.after, timedelta):
+            message = "after must be a timedelta"
+            raise TypeError(message)
+        if self.after <= timedelta():
+            message = "after must be positive"
+            raise ValueError(message)
+        _validate_task_ids(self.task_ids, field_name="task_ids", require_non_empty=True)
+
+
+def _validate_task_ids(
+    task_ids: tuple[TaskId, ...],
+    *,
+    field_name: str,
+    require_non_empty: bool = False,
+) -> None:
+    if not isinstance(task_ids, tuple):
+        message = f"{field_name} must be a tuple"
+        raise TypeError(message)
+    if any(not isinstance(task_id, TaskId) for task_id in task_ids):
+        message = f"{field_name} must contain TaskId values"
+        raise TypeError(message)
+    if require_non_empty and not task_ids:
+        message = f"{field_name} must not be empty"
+        raise ValueError(message)
+    if len(set(task_ids)) != len(task_ids):
+        message = f"{field_name} must be unique"
         raise ValueError(message)
 
 
@@ -41,6 +79,8 @@ class LiveOpsiStep:
     retry_at: datetime | None = None
     retry_after: timedelta | None = None
     affected_task_ids: tuple[TaskId, ...] = ()
+    schedule_delays: tuple[LiveScheduleDelay, ...] = ()
+    wake_task_ids: tuple[TaskId, ...] = ()
     has_surplus_yellow_coins: bool = False
     exploration_in_progress: bool = False
 
@@ -60,6 +100,13 @@ class LiveOpsiStep:
         if self.status is WorldTaskStatus.IN_PROGRESS and self.completed_units != 1:
             message = "an in-progress live OpSi step must confirm exactly one safe unit"
             raise ValueError(message)
+        if not isinstance(self.schedule_delays, tuple):
+            message = "schedule_delays must be a tuple"
+            raise TypeError(message)
+        if any(not isinstance(delay, LiveScheduleDelay) for delay in self.schedule_delays):
+            message = "schedule_delays must contain LiveScheduleDelay values"
+            raise TypeError(message)
+        _validate_task_ids(self.wake_task_ids, field_name="wake_task_ids")
         self._validate_retry()
 
     def _validate_retry(self) -> None:
@@ -130,7 +177,6 @@ class LiveOperationSirenWorkflow(OperationSirenWorkflow):
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
         cancellation: CancellationSignal,
-        preemption: PreemptionRequest,
     ) -> WorldTaskReport:
         cancellation.raise_if_requested()
         step = self._driver.execute_step(spec, progress, cancellation)
@@ -150,21 +196,18 @@ class LiveOperationSirenWorkflow(OperationSirenWorkflow):
         retry_at = step.retry_at
         if step.retry_after is not None:
             retry_at = observed_at + step.retry_after
-        status = step.status
-        if (
-            preemption.is_requested
-            and spec.checkpoint_mode is WorldCheckpointMode.BOUNDED
-            and status is WorldTaskStatus.IN_PROGRESS
-        ):
-            status = WorldTaskStatus.PREEMPTED
         schedule = self._schedule_source.snapshot(observed_at)
         return WorldTaskReport(
             observed_at=observed_at,
-            status=status,
+            status=step.status,
             schedule=schedule,
             completed_units=step.completed_units,
             retry_at=retry_at,
             affected_task_ids=step.affected_task_ids,
+            schedule_delays=tuple(
+                WorldScheduleDelay(observed_at + delay.after, delay.task_ids) for delay in step.schedule_delays
+            ),
+            wake_task_ids=step.wake_task_ids,
             has_surplus_yellow_coins=step.has_surplus_yellow_coins,
             exploration_in_progress=step.exploration_in_progress,
             cursor=step.cursor,

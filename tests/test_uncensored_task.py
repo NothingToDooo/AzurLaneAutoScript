@@ -8,8 +8,6 @@ from module.application import (
     AbortRequested,
     AbortToken,
     ExecutionMode,
-    PreemptionRequest,
-    RunId,
     RunMetadata,
     Succeeded,
     TaskContext,
@@ -92,12 +90,10 @@ class _Login:
 def _context(abort: AbortToken | None = None) -> TaskContext:
     return TaskContext(
         task_id=TaskId("azur_lane_uncensored"),
-        run_id=RunId("run-uncensored"),
         started_at=datetime(2026, 7, 13, tzinfo=UTC),
         mode=ExecutionMode.DIRECT_COMMAND,
-        metadata=RunMetadata(settings_revision=1, content_revision="content-1", client_ui_revision="ui-1"),
+        metadata=RunMetadata(settings_revision=1, content_revision="content-1"),
         abort=AbortToken() if abort is None else abort,
-        preemption=PreemptionRequest(),
     )
 
 

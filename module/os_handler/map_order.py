@@ -115,7 +115,7 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
             if self.handle_map_cat_attack():
                 continue
 
-    def os_order_execute(self, *, recon_scan: bool = True, submarine_call: bool = True) -> None:
+    def os_order_execute(self, *, recon_scan: bool = True, submarine_call: bool = True) -> tuple[bool, bool]:
         """在区域地图执行指令，侦察与潜艇冷却分别为 30、60 分钟。
 
         冷却中会强制消耗行动力箱，最多分别消耗 10、39 行动力。
@@ -127,7 +127,7 @@ class MapOrderHandler(MapOperation, ActionPointHandler, MapEventHandler, ZoneMan
             if submarine_call:
                 self.wait_until_order_finished()
 
-        self.config.opsi_task_delay(recon_scan=recon_scan, submarine_call=submarine_call)
+        return recon_scan, submarine_call
 
     def handle_map_cat_attack(self) -> bool:
         """猫攻击按钮与大世界 MAP_EXIT 重叠，因此覆盖普通地图处理。"""

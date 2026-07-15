@@ -116,11 +116,9 @@ class Hospital(HospitalClue, HospitalCombat):
                 logger.info(f"is_in_daily_reward -> {hospital_assets.HOSIPITAL_CLUE_CHECK}")
                 continue
 
-    def execute_selected_investigation_once(self, *, check_emotion: bool = True) -> bool:
+    def execute_selected_investigation_once(self) -> bool:
         """完成当前侧栏任务的一次调查；无可调查项目时返回 False。"""
         self.config.apply_runtime_overlay(Fleet_FleetOrder="fleet1_all_fleet2_standby")
-        if check_emotion:
-            self.emotion.check_reduce(battle=1)
         if not self.invest_enter():
             return False
         self.hospital_combat()

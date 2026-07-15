@@ -86,8 +86,8 @@ class CoalitionExecutionResult:
 class Coalition(CoalitionCombat):
     def __init__(
         self,
-        config: AzurLaneConfig | str,
-        device: Device | str | None = None,
+        config: AzurLaneConfig,
+        device: Device,
         *,
         client: CoalitionClientSession,
     ) -> None:

@@ -2,17 +2,13 @@ from pathlib import Path
 
 import pytest
 
-from module.content import (
-    ActivityCatalog,
-    ActivityKindError,
-    CoalitionActivity,
+from module.content.activity_catalog import ActivityCatalog, CoalitionActivity, EventStoryActivity, RaidActivity
+from module.content.activity_profile import (
     CoalitionFleetMode,
     CoalitionStageId,
-    EventStoryActivity,
-    RaidActivity,
     RaidMode,
-    UnknownActivityError,
 )
+from module.content.errors import ActivityKindError, UnknownActivityError
 from module.content.manifest import load_event_manifests
 
 

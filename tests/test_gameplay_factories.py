@@ -3,17 +3,12 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from module.gameplay import (
-    CompositeWorkflows,
-    EncounterWorkflows,
-    MarketWorkflows,
-    build_composite_factories,
-    build_encounter_factories,
-    build_market_factories,
-)
 from module.gameplay.composite import DormTask, FreebiesTask, GuildTask, MeowfficerTask, PrivateQuartersTask, RewardTask
+from module.gameplay.composite_factories import CompositeWorkflows, build_composite_factories
 from module.gameplay.encounter import DailyTask, ExerciseTask, HardTask
+from module.gameplay.encounter_factories import EncounterWorkflows, build_encounter_factories
 from module.gameplay.market import AwakenTask, GachaTask, ShipyardTask, ShopFrequentTask, ShopOnceTask
+from module.gameplay.market_factories import MarketWorkflows, build_market_factories
 from module.runtime import FrozenJsonValue, SettingsDocumentError, TaskBuildContext, TaskFactory, TaskStateDocument
 from module.task_registry import TASK_CATALOG
 

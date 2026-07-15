@@ -52,9 +52,9 @@ def _validate_revision(value: str, *, field_name: str) -> None:
 
 
 class TaskFactoryRegistry:
-    """绑定同一 content/UI revision，并精确覆盖 catalog 的不可变 factory 集。"""
+    """绑定同一内容 revision，并精确覆盖 catalog 的不可变 factory 集。"""
 
-    __slots__ = ("_catalog", "_factories", "client_ui_revision", "content_revision")
+    __slots__ = ("_catalog", "_factories", "content_revision")
 
     def __init__(
         self,
@@ -62,7 +62,6 @@ class TaskFactoryRegistry:
         catalog: Mapping[str, TaskDefinition],
         factories: Mapping[str, TaskFactory],
         content_revision: str,
-        client_ui_revision: str,
     ) -> None:
         if not isinstance(catalog, Mapping):
             message = "catalog must be a mapping"
@@ -71,7 +70,6 @@ class TaskFactoryRegistry:
             message = "factories must be a mapping"
             raise TypeError(message)
         _validate_revision(content_revision, field_name="content_revision")
-        _validate_revision(client_ui_revision, field_name="client_ui_revision")
 
         catalog_copy = dict(catalog)
         if any(
@@ -102,7 +100,6 @@ class TaskFactoryRegistry:
         self._catalog = MappingProxyType(catalog_copy)
         self._factories = MappingProxyType(factory_copy)
         self.content_revision = content_revision
-        self.client_ui_revision = client_ui_revision
 
     @property
     def task_ids(self) -> tuple[str, ...]:

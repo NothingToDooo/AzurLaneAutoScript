@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 import pytest
+from config_factory import in_memory_config
 
 from module.adapters.campaign_live import CampaignActionInterrupted, CommittedCampaignUnit
 from module.adapters.gems_mumu12 import Mumu12GemsFleetReplacementExecutor, Mumu12GemsRuntimeBehavior
@@ -13,7 +14,6 @@ from module.campaign.gems_farming import (
     GemsShipReplacementFactSink,
     GemsShipReplacementResult,
 )
-from module.config.config import AzurLaneConfig
 from module.content.campaign_session import BattleInterruptionReason, CampaignSession
 from module.gameplay.campaign import (
     GemsCommonCarrier,
@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from module.adapters.campaign_live import CampaignMapRuntime
+    from module.config.config import AzurLaneConfig
     from module.device.device import Device
     from module.gameplay.campaign import CampaignJobSpec
     from module.interaction import CancellationSignal
@@ -201,7 +202,6 @@ def _policy(*, vanguard: GemsVanguardChange = GemsVanguardChange.SHIP) -> GemsFa
         GemsCommonCarrier.BOGUE,
         vanguard,
         GemsCommonDestroyer.Z20_OR_Z21,
-        "DD: test-code",
     )
 
 
@@ -286,7 +286,6 @@ def test_replacement_projects_policy_and_closes_level_trigger() -> None:
             "GemsFarming_CommonCV": "bogue",
             "GemsFarming_ChangeVanguard": "ship",
             "GemsFarming_CommonDD": "z20_or_z21",
-            "EquipmentCode_Config": "DD: test-code",
         }
     ]
     assert harness.config.records == [
@@ -670,7 +669,7 @@ class _LowEmotionRuntime:
 
 
 def _gems_behavior(*, vanguard: GemsVanguardChange) -> Mumu12GemsRuntimeBehavior:
-    config = AzurLaneConfig.from_snapshot("gems-runtime-behavior", {})
+    config = in_memory_config("gems-runtime-behavior", {})
     return Mumu12GemsRuntimeBehavior(
         config,
         _policy(vanguard=vanguard),

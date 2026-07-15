@@ -2,18 +2,17 @@ from module.application.cancellation import (
     AbortRequested,
     AbortToken,
     ExternalRequestSignal,
-    PreemptionRequest,
     SafeUnitCancellation,
 )
 from module.application.coordinator import (
     RunCoordinator,
     RunRepository,
     ScheduledTaskDidNotAdvanceError,
-    StaleRunMetadataError,
 )
 from module.application.daily_schedule import DailySchedule
 from module.application.delay import DelayRange, DelaySampler, runtime_delay_sampler
 from module.application.effects import (
+    DelayTask,
     DisableTask,
     RequestAppRestart,
     RescheduleSelf,
@@ -22,11 +21,10 @@ from module.application.effects import (
     WakePolicy,
     WakeTask,
 )
-from module.application.identifiers import RunId, TaskId
+from module.application.identifiers import TaskId
 from module.application.metadata import RunMetadata
 from module.application.notifications import OperatorNotificationKind, OperatorNotificationRequest
 from module.application.outcomes import Blocked, Cancelled, Deferred, Faulted, Retryable, RunOutcome, Succeeded
-from module.application.run_start import RunStart
 from module.application.scheduler import (
     ScheduleItem,
     SchedulePlanner,
@@ -34,6 +32,7 @@ from module.application.scheduler import (
     SchedulerDecision,
     SchedulerSelection,
     ScheduleSource,
+    order_schedule_items,
 )
 from module.application.state_effects import DeleteTaskState, StateEffect, UpsertTaskState
 from module.application.task import ExecutionMode, Task, TaskContext, TaskResult
@@ -47,6 +46,7 @@ __all__ = [
     "Deferred",
     "DelayRange",
     "DelaySampler",
+    "DelayTask",
     "DeleteTaskState",
     "DisableTask",
     "ExecutionMode",
@@ -54,17 +54,14 @@ __all__ = [
     "Faulted",
     "OperatorNotificationKind",
     "OperatorNotificationRequest",
-    "PreemptionRequest",
     "RequestAppRestart",
     "RescheduleSelf",
     "RescheduleTask",
     "Retryable",
     "RunCoordinator",
-    "RunId",
     "RunMetadata",
     "RunOutcome",
     "RunRepository",
-    "RunStart",
     "SafeUnitCancellation",
     "ScheduleEffect",
     "ScheduleItem",
@@ -74,7 +71,6 @@ __all__ = [
     "Scheduler",
     "SchedulerDecision",
     "SchedulerSelection",
-    "StaleRunMetadataError",
     "StateEffect",
     "Succeeded",
     "Task",
@@ -84,5 +80,6 @@ __all__ = [
     "UpsertTaskState",
     "WakePolicy",
     "WakeTask",
+    "order_schedule_items",
     "runtime_delay_sampler",
 ]

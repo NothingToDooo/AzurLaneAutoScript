@@ -323,6 +323,10 @@
     "MuMuPath": {
       "name": "MuMu 可执行文件",
       "help": "用于在模拟器尚未运行时定位并启动 MuMu12。"
+    },
+    "AdbExecutable": {
+      "name": "ADB 可执行文件",
+      "help": "用于连接唯一的 MuMu12 模拟器；默认使用当前 uv 环境中 adbutils 自带的 ADB。"
     }
   },
   "Error": {
@@ -334,13 +338,35 @@
       "name": "启用异常处理",
       "help": "处理部分异常，运行出错时撤退"
     },
-    "SaveError": {
-      "name": "出错时，保存 Log 和截图",
-      "help": ""
+    "SmtpEnabled": {
+      "name": "启用 SMTP 邮件通知",
+      "help": "任务崩溃或活动触发停止条件时同步发送邮件。"
     },
-    "OnePushConfig": {
-      "name": "SMTP 邮件设置",
-      "help": "发生无法处理的异常或触发停止条件时发送邮件。仅支持 provider: smtp；收件人未填写时使用 user。"
+    "SmtpHost": {
+      "name": "SMTP 服务器",
+      "help": "例如 smtp.example.com。"
+    },
+    "SmtpPort": {
+      "name": "SMTP 端口",
+      "help": "implicit TLS 通常使用 465，STARTTLS 通常使用 587。"
+    },
+    "SmtpTransport": {
+      "name": "SMTP 加密方式",
+      "help": "按邮件服务商要求选择。",
+      "implicit_tls": "Implicit TLS",
+      "starttls": "STARTTLS"
+    },
+    "SmtpUser": {
+      "name": "发件邮箱",
+      "help": "同时作为 SMTP 登录用户名。"
+    },
+    "SmtpPassword": {
+      "name": "SMTP 密码",
+      "help": "通常填写邮件服务商生成的授权码。"
+    },
+    "SmtpRecipients": {
+      "name": "收件邮箱",
+      "help": "可用逗号或换行分隔；留空时发送给发件邮箱。"
     },
     "ScreenshotLength": {
       "name": "出错时，保留最后 X 张截图",
@@ -359,17 +385,6 @@
     "CombatScreenshotInterval": {
       "name": "战斗中放慢截图速度至 X 秒一张",
       "help": "执行两次截图之间的最小间隔，限制在 0.3 ~ 1.0，能降低战斗时的 CPU 占用"
-    },
-    "TaskHoardingDuration": {
-      "name": "囤积任务 X 分钟",
-      "help": "能在收菜期间降低操作游戏的频率\n任务触发后，等待 X 分钟，再一次性执行囤积的任务"
-    },
-    "WhenTaskQueueEmpty": {
-      "name": "当任务队列清空后",
-      "help": "无任务时关闭游戏，能在收菜期间降低 CPU 占用",
-      "stay_there": "停在原处",
-      "goto_main": "前往主界面",
-      "close_game": "关闭游戏"
     }
   },
   "Retirement": {
@@ -1061,11 +1076,11 @@
     "Mode": {
       "name": "难度",
       "help": "SP图需要使用活动每日SP运行",
-      "tc1": "tc1",
-      "tc2": "tc2",
-      "tc3": "tc3",
-      "sp": "sp",
-      "ex": "ex"
+      "easy": "简单",
+      "normal": "普通",
+      "hard": "困难",
+      "sp": "SP",
+      "ex": "EX"
     },
     "Fleet": {
       "name": "出击队伍",

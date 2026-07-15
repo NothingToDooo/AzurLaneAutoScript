@@ -452,28 +452,3 @@ class RewardResearch(ResearchSelector, ResearchQueue, StorageHandler):
             return False
         self._append_6th_research_from_status()
         return True
-
-    def run(self) -> None:
-        """从任意页面执行科研，结束于科研项目页或主页。"""
-        self.ui_ensure(page_research)
-
-        self.queue_enter()
-        self.queue_receive()
-        self.end_time = self.get_research_ended()
-        self.queue_quit()
-
-        self.receive_6th_research()
-
-        self.research_fill_queue()
-        slot = self.get_queue_slot()
-        if slot == 5:
-            self.config.task_delay(server_update=True)
-            return
-        if self.end_time <= datetime.now():
-            self.queue_enter()
-            self.end_time = self.get_research_ended()
-            self.queue_quit()
-        if slot == 4:
-            # 资源不足时提前十分钟重试，避免科研队列空转。
-            self.end_time += timedelta(minutes=-10)
-        self.config.task_delay(target=self.end_time)

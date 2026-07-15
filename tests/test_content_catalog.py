@@ -3,19 +3,11 @@ from typing import TYPE_CHECKING, cast, get_type_hints
 
 import pytest
 
-from module.content import (
-    CampaignPolicy,
-    ContentCatalog,
-    ContentCatalogError,
-    ContentId,
-    EventPack,
-    StageProgressionRule,
-    StageRef,
-    StageSpec,
-    UnknownPackError,
-    UnknownStageError,
-)
+from module.content.campaign_policy import CampaignPolicy, StageProgressionRule
+from module.content.catalog import ContentCatalog
+from module.content.errors import ContentCatalogError, UnknownPackError, UnknownStageError
 from module.content.manifest import load_default_event_manifests
+from module.content.models import ContentId, EventPack, StageRef, StageSpec
 
 if TYPE_CHECKING:
     from typing import Any

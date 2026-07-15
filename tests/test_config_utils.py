@@ -1,20 +1,23 @@
 from datetime import datetime, timedelta, tzinfo
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 import module.config.utils as config_utils
 from module.config.utils import (
-    alas_template,
     dict_to_kv,
     get_server_last_update,
     get_server_next_update,
-    parse_value,
+    read_file,
     server_time_offset,
+    write_file,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
+
+    from module.config.deep import MutableDeepData
 
 
 class _FixedDatetime(datetime):
@@ -27,49 +30,58 @@ def test_cn_personal_branch_uses_local_time_as_server_time() -> None:
     assert server_time_offset() == timedelta()
 
 
-def test_alas_template_uses_plain_template_name() -> None:
-    assert alas_template() == ["template"]
+def test_write_file_serializes_datetime_explicitly(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+
+    write_file(path, {"NextRun": datetime(2026, 7, 16, 9, 30, 45)})
+
+    assert '"NextRun": "2026-07-16 09:30:45"' in path.read_text(encoding="utf-8")
 
 
-def test_parse_value_uses_default_when_option_is_invalid() -> None:
-    data = {"option": ["safe"], "value": "safe"}
+def test_write_file_rejects_unknown_object_without_overwriting(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text('{"kept": true}', encoding="utf-8")
+    invalid = cast("MutableDeepData", {"Broken": object()})
 
-    assert parse_value("legacy", data) == "safe"
+    with pytest.raises(TypeError, match="unsupported JSON value type: object"):
+        write_file(path, invalid)
 
-
-def test_parse_value_keeps_non_string_values() -> None:
-    assert parse_value(["a"], {}) == ["a"]
-
-
-def test_parse_value_converts_config_strings() -> None:
-    values = {
-        "": None,
-        "true": True,
-        "True": True,
-        "false": False,
-        "False": False,
-        "12": 12,
-        "12.5": 12.5,
-        "2026-07-08T09:10:11": datetime(2026, 7, 8, 9, 10, 11),
-        "1e3": "1e3",
-        "plain": "plain",
-    }
-
-    for raw, expected in values.items():
-        assert parse_value(raw, {}) == expected
+    assert path.read_text(encoding="utf-8") == '{"kept": true}'
 
 
-def test_config_log_redacts_legacy_smtp_yaml() -> None:
+def test_write_file_rejects_non_finite_number_without_overwriting(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text('{"kept": true}', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Out of range float values"):
+        write_file(path, {"Broken": float("nan")})
+
+    assert path.read_text(encoding="utf-8") == '{"kept": true}'
+
+
+@pytest.mark.parametrize(
+    "content",
+    ['{"value": 1, "value": 2}', '{"value": NaN}', '{"value": Infinity}'],
+)
+def test_read_file_rejects_non_canonical_json(content: str, tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(content, encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"duplicate JSON field|non-finite number"):
+        read_file(path)
+
+
+def test_config_log_redacts_smtp_password() -> None:
     credential_value = "sensitive-value-must-not-enter-logs"
     output = dict_to_kv(
         {
-            "Alas.Error.OnePushConfig": f"provider: smtp\npassword: {credential_value}",
+            "Alas.Error.SmtpPassword": credential_value,
             "GemsFarming.Scheduler.Enable": True,
         }
     )
 
     assert credential_value not in output
-    assert "Alas.Error.OnePushConfig='<redacted>'" in output
+    assert "Alas.Error.SmtpPassword='<redacted>'" in output
     assert "GemsFarming.Scheduler.Enable=True" in output
 
 

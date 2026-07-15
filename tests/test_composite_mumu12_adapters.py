@@ -138,6 +138,7 @@ def test_meowfficer_uses_typed_purchase_and_training_plan_without_legacy_run(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     config, device = runtime
+    config.MeowfficerTrain_Enable = True
     runner = _MeowRunner()
     monkeypatch.setattr(adapters, "RewardMeowfficer", lambda *_args, **_kwargs: runner)
     settings = MeowfficerSettings(
@@ -151,6 +152,7 @@ def test_meowfficer_uses_typed_purchase_and_training_plan_without_legacy_run(
     report = adapters.Mumu12MeowfficerWorkflow(config, device, _Clock()).execute(settings, AbortToken())
 
     assert report.observed_at == _NOW
+    assert report.training_active
     assert config.MeowfficerTrain_Mode == "seamlessly"
     assert runner.calls == [
         "ensure",
@@ -162,6 +164,58 @@ def test_meowfficer_uses_typed_purchase_and_training_plan_without_legacy_run(
         "train",
         "enhance",
     ]
+
+
+def test_meowfficer_live_disabled_training_is_not_reenabled_by_frozen_settings(
+    runtime: tuple[AzurLaneConfig, Device],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config, device = runtime
+    config.MeowfficerTrain_Enable = False
+    monkeypatch.setattr(
+        adapters,
+        "RewardMeowfficer",
+        lambda *_args, **_kwargs: pytest.fail("disabled training must not open the meowfficer page"),
+    )
+    settings = MeowfficerSettings(
+        buy_amount=0,
+        overflow_coin_threshold=None,
+        fort_chore_enabled=False,
+        training=MeowfficerTrainingSettings(MeowfficerTrainingMode.SEAMLESSLY, timedelta(minutes=180)),
+        schedule=_SCHEDULE,
+    )
+
+    report = adapters.Mumu12MeowfficerWorkflow(config, device, _Clock()).execute(settings, AbortToken())
+
+    assert not report.training_active
+
+
+def test_meowfficer_reports_training_disabled_by_final_enhancement(
+    runtime: tuple[AzurLaneConfig, Device],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config, device = runtime
+    config.MeowfficerTrain_Enable = True
+
+    class _DisablingRunner(_MeowRunner):
+        def meow_enhance(self) -> None:
+            super().meow_enhance()
+            config.MeowfficerTrain_Enable = False
+
+    runner = _DisablingRunner()
+    monkeypatch.setattr(adapters, "RewardMeowfficer", lambda *_args, **_kwargs: runner)
+    settings = MeowfficerSettings(
+        buy_amount=0,
+        overflow_coin_threshold=None,
+        fort_chore_enabled=False,
+        training=MeowfficerTrainingSettings(MeowfficerTrainingMode.SEAMLESSLY, timedelta(minutes=180)),
+        schedule=_SCHEDULE,
+    )
+
+    report = adapters.Mumu12MeowfficerWorkflow(config, device, _Clock()).execute(settings, AbortToken())
+
+    assert not report.training_active
+    assert runner.calls[-2:] == ["train", "enhance"]
 
 
 class _Setting:

@@ -28,17 +28,16 @@ type EventStoryResult = Literal["battle", "finish"]
 class EventStory(EventStoryUiCapability, Combat, LoginHandler):
     def __init__(
         self,
-        config: AzurLaneConfig | str,
+        config: AzurLaneConfig,
         *,
         profile: EventStoryClientProfile,
-        device: Device | str | None = None,
-        task: str | None = None,
+        device: Device,
     ) -> None:
         if not isinstance(profile, EventStoryClientProfile):
             message = "profile must be an EventStoryClientProfile"
             raise TypeError(message)
         self._client_profile = profile
-        super().__init__(config, device=device, task=task)
+        super().__init__(config, device=device)
 
     @property
     def client_profile(self) -> EventStoryClientProfile:
