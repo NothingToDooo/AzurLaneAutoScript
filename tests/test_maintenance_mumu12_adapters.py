@@ -1,7 +1,9 @@
 from typing import TYPE_CHECKING
 
 import pytest
+from config_factory import in_memory_config
 
+import module.adapters.maintenance_mumu12 as maintenance_adapters
 from module.adapters.maintenance_mumu12 import LocalUncensoredAssetBuilder, Mumu12DeviceAppLifecycle
 from module.application import AbortRequested, AbortToken
 from module.device.device import Device
@@ -88,3 +90,18 @@ def test_device_lifecycle_checks_cancellation_before_app_service_io() -> None:
         lifecycle.start(abort)
 
     assert app.calls == []
+
+
+def test_maintenance_activation_clears_the_previous_task_runtime_overlay() -> None:
+    config = in_memory_config("test", {}, task="Main")
+    config.replace_runtime_overlay(
+        MAP_CHAPTER_SWITCH_20241219=True,
+        Campaign_Mode="hard",
+    )
+    device = _Device(_AppController())
+
+    maintenance_adapters._activate(config, device, "Benchmark", AbortToken())  # noqa: SLF001
+
+    assert vars(config)["_runtime_overlay"] == {}
+    assert getattr(config, "MAP_CHAPTER_SWITCH_20241219", None) is not True
+    assert getattr(config, "Campaign_Mode", None) != "hard"

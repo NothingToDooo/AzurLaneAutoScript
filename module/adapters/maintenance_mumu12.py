@@ -42,6 +42,7 @@ def _activate(
     cancellation.raise_if_requested()
     task = name_to_function(task_name)
     config.task = task
+    config.replace_runtime_overlay()
     config.bind("Alas")
     device.config = config
     return cast("Device", CancellationAwareMumu12Device(device, cancellation))
