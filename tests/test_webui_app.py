@@ -2,14 +2,17 @@ import json
 import queue
 from copy import deepcopy
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 import module.webui.app as webui_app
-from module.bootstrap.configuration_compiler import ConfigurationCompileError
+from module.bootstrap.configuration_compiler import ConfigurationCompileError, ConfigurationDocument
 from module.config.utils import filepath_args, read_file
 from module.webui.app import AlasGUI, import_personal_configuration
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def _template() -> dict[str, object]:
@@ -17,6 +20,15 @@ def _template() -> dict[str, object]:
         "dict[str, object]",
         json.loads(Path("config/template.json").read_text(encoding="utf-8")),
     )
+
+
+def _record_validation(
+    candidates: list[ConfigurationDocument],
+) -> Callable[[ConfigurationDocument], None]:
+    def validate(candidate: ConfigurationDocument) -> None:
+        candidates.append(deepcopy(candidate))
+
+    return validate
 
 
 def test_config_listeners_are_bound_once_per_session(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -131,6 +143,7 @@ def test_webui_field_save_accepts_scheduler_number_and_range(
     vars(gui)["pin_remove_invalid_mark"] = lambda _paths: None
     vars(gui)["pin_set_invalid_mark"] = lambda _paths: None
     document = _template()
+    validated: list[ConfigurationDocument] = []
     written: list[dict[str, object]] = []
 
     class _Manager:
@@ -138,6 +151,7 @@ def test_webui_field_save_accepts_scheduler_number_and_range(
 
     monkeypatch.setattr(webui_app, "toast", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(webui_app, "read_config_file", lambda _name: deepcopy(document))
+    monkeypatch.setattr(webui_app, "validate_personal_configuration", _record_validation(validated))
     monkeypatch.setattr(webui_app.ProcessManager, "instance", _Manager)
     monkeypatch.setattr(
         webui_app,
@@ -153,6 +167,7 @@ def test_webui_field_save_accepts_scheduler_number_and_range(
     )
 
     assert len(written) == 1
+    assert validated == written
     commission = cast("dict[str, object]", written[0]["Commission"])
     commission_scheduler = cast("dict[str, object]", commission["Scheduler"])
     hard = cast("dict[str, object]", written[0]["Hard"])
@@ -176,6 +191,7 @@ def test_webui_field_save_preserves_state_written_during_process_stop(
     storage = cast("dict[str, object]", main["Storage"])
     storage["Storage"] = {"progress": {"wave": 4}}
     reads = iter([before_stop, after_stop])
+    validated: list[ConfigurationDocument] = []
     written: list[dict[str, object]] = []
 
     class _Manager:
@@ -187,6 +203,7 @@ def test_webui_field_save_preserves_state_written_during_process_stop(
     manager = _Manager()
     monkeypatch.setattr(webui_app, "toast", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(webui_app, "read_config_file", lambda _name: deepcopy(next(reads)))
+    monkeypatch.setattr(webui_app, "validate_personal_configuration", _record_validation(validated))
     monkeypatch.setattr(webui_app.ProcessManager, "instance", lambda: manager)
     monkeypatch.setattr(
         webui_app,
@@ -199,6 +216,10 @@ def test_webui_field_save_preserves_state_written_during_process_stop(
     )
 
     assert len(written) == 1
+    assert len(validated) == 2
+    assert validated[-1] == written[0]
+    first_main = cast("dict[str, object]", validated[0]["Main"])
+    assert cast("dict[str, object]", first_main["Scheduler"])["NextRun"] != "2026-07-16 01:02:03"
     saved = written[0]
     saved_alas = cast("dict[str, object]", saved["Alas"])
     saved_optimization = cast("dict[str, object]", saved_alas["Optimization"])
@@ -221,6 +242,8 @@ def test_webui_field_save_revalidates_gameplay_fields_written_during_stop(
     campaign = cast("dict[str, object]", event["Campaign"])
     campaign["Name"] = "missing-stage"
     reads = iter([before_stop, after_stop])
+    validated: list[ConfigurationDocument] = []
+    real_validator = webui_app.validate_personal_configuration
 
     class _Manager:
         alive = True
@@ -229,7 +252,14 @@ def test_webui_field_save_revalidates_gameplay_fields_written_during_stop(
             self.alive = False
 
     manager = _Manager()
+
+    def validate_after_stop(candidate: ConfigurationDocument) -> None:
+        validated.append(deepcopy(candidate))
+        if len(validated) == 2:
+            real_validator(candidate)
+
     monkeypatch.setattr(webui_app, "read_config_file", lambda _name: deepcopy(next(reads)))
+    monkeypatch.setattr(webui_app, "validate_personal_configuration", validate_after_stop)
     monkeypatch.setattr(webui_app.ProcessManager, "instance", lambda: manager)
     monkeypatch.setattr(
         webui_app,
@@ -241,6 +271,12 @@ def test_webui_field_save_revalidates_gameplay_fields_written_during_stop(
         gui._save_config_unchecked(  # noqa: SLF001 - 最终候选必须重新走内容和 factory 校验。
             {"Alas.Optimization.ScreenshotInterval": 0.2}
         )
+
+    assert len(validated) == 2
+    first_event = cast("dict[str, object]", validated[0]["Event"])
+    second_event = cast("dict[str, object]", validated[1]["Event"])
+    assert cast("dict[str, object]", first_event["Campaign"])["Name"] != "missing-stage"
+    assert cast("dict[str, object]", second_event["Campaign"])["Name"] == "missing-stage"
 
 
 def test_webui_import_validates_then_replaces_personal_configuration(tmp_path: Path) -> None:
@@ -265,7 +301,7 @@ def test_webui_import_validates_then_replaces_personal_configuration(tmp_path: P
 
 @pytest.mark.parametrize(
     "invalid_kind",
-    ["unknown-field", "invalid-option", "factory-range", "content-reference"],
+    ["unknown-field", "invalid-option", "factory-range"],
 )
 def test_webui_import_rejects_invalid_configuration_without_overwriting(
     invalid_kind: str,
@@ -284,10 +320,6 @@ def test_webui_import_rejects_invalid_configuration_without_overwriting(
         tactical = cast("dict[str, object]", document["Tactical"])
         student = cast("dict[str, object]", tactical["AddNewStudent"])
         student["MinLevel"] = 0
-    else:
-        event = cast("dict[str, object]", document["Event"])
-        campaign = cast("dict[str, object]", event["Campaign"])
-        campaign["Name"] = "missing-stage"
     calls: list[str] = []
 
     with pytest.raises(ConfigurationCompileError):
@@ -301,9 +333,48 @@ def test_webui_import_rejects_invalid_configuration_without_overwriting(
     assert calls == []
 
 
-def test_webui_import_does_not_replace_config_when_process_cannot_stop(tmp_path: Path) -> None:
+def test_webui_import_does_not_stop_or_overwrite_when_content_validation_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     destination = tmp_path / "alas.json"
     destination.write_text("original", encoding="utf-8")
+    document = _template()
+    event = cast("dict[str, object]", document["Event"])
+    campaign = cast("dict[str, object]", event["Campaign"])
+    campaign["Name"] = "missing-stage"
+    validated: list[ConfigurationDocument] = []
+    calls: list[str] = []
+
+    def reject_content_reference(candidate: ConfigurationDocument) -> None:
+        validated.append(deepcopy(candidate))
+        message = "$ compiled task settings are invalid: missing-stage"
+        raise ConfigurationCompileError(message)
+
+    monkeypatch.setattr(webui_app, "validate_personal_configuration", reject_content_reference)
+
+    with pytest.raises(ConfigurationCompileError, match="missing-stage"):
+        import_personal_configuration(
+            json.dumps(document, ensure_ascii=False).encode(),
+            destination,
+            before_replace=lambda: calls.append("stop"),
+        )
+
+    assert validated == [document]
+    assert destination.read_text(encoding="utf-8") == "original"
+    assert calls == []
+
+
+def test_webui_import_does_not_replace_config_when_process_cannot_stop(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "alas.json"
+    destination.write_text("original", encoding="utf-8")
+    document = _template()
+    validated: list[ConfigurationDocument] = []
+
+    monkeypatch.setattr(webui_app, "validate_personal_configuration", _record_validation(validated))
 
     def fail_to_stop() -> None:
         message = "process still alive"
@@ -311,9 +382,10 @@ def test_webui_import_does_not_replace_config_when_process_cannot_stop(tmp_path:
 
     with pytest.raises(RuntimeError, match="process still alive"):
         import_personal_configuration(
-            json.dumps(_template(), ensure_ascii=False).encode(),
+            json.dumps(document, ensure_ascii=False).encode(),
             destination,
             before_replace=fail_to_stop,
         )
 
+    assert validated == [document]
     assert destination.read_text(encoding="utf-8") == "original"
