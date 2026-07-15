@@ -2,7 +2,48 @@ from pathlib import Path
 
 import pytest
 
-from module.base.atomic import atomic_write, folder_rmtree
+from module.base.atomic import atomic_failure_cleanup, atomic_write, folder_rmtree, is_tmp_file
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "reportABC123.tmp",
+        "state.json-ABC123.tmp",
+        "state.json.ＡＢＣ１２３.tmp",
+        "state.json.ABC12.tmp",
+        "state.json.ABC123.tmp.bak",
+    ],
+)
+def test_is_tmp_file_rejects_similar_names(filename: str) -> None:
+    assert not is_tmp_file(filename)
+
+
+def test_is_tmp_file_accepts_atomic_suffix() -> None:
+    assert is_tmp_file("state.json.ABC123.tmp")
+
+
+def test_atomic_failure_cleanup_does_not_remove_similar_user_file(tmp_path: Path) -> None:
+    folder = tmp_path / "config"
+    folder.mkdir()
+    user_file = folder / "reportABC123.tmp"
+    atomic_temp = folder / "alas.json.ABC123.tmp"
+    user_file.write_text("keep", encoding="utf-8")
+    atomic_temp.write_text("discard", encoding="utf-8")
+
+    atomic_failure_cleanup(folder)
+
+    assert user_file.read_text(encoding="utf-8") == "keep"
+    assert not atomic_temp.exists()
+
+
+def test_atomic_failure_cleanup_does_not_remove_root_file(tmp_path: Path) -> None:
+    root_file = tmp_path / "config"
+    root_file.write_text("keep", encoding="utf-8")
+
+    atomic_failure_cleanup(root_file)
+
+    assert root_file.read_text(encoding="utf-8") == "keep"
 
 
 def test_folder_rmtree_removes_nested_directory(tmp_path: Path) -> None:

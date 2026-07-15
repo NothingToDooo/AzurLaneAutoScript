@@ -27,10 +27,10 @@ def random_id() -> str:
 def is_tmp_file(file: str) -> bool:
     if not file.endswith(".tmp"):
         return False
-    dot = file[-11:-10]
-    if not dot:
+    if len(file) < 11 or file[-11] != ".":
         return False
-    return file[-10:-4].isalnum()
+    identifier = file[-10:-4]
+    return identifier.isascii() and identifier.isalnum()
 
 
 def to_tmp_file(file: FilePath) -> str:
@@ -356,6 +356,6 @@ def atomic_failure_cleanup(folder: FilePath, *, recursive: bool = False) -> None
     except FileNotFoundError:
         return
     except NotADirectoryError:
-        file_remove(folder)
+        return
     except OSError:
         return
