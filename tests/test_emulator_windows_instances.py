@@ -1,6 +1,8 @@
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
+import pytest
+
 from module.device.platform.emulator_base import EmulatorManagerBase
 from module.device.platform.emulator_windows import Emulator, EmulatorInstance
 
@@ -113,6 +115,31 @@ def test_mumu_global_name_is_not_supported(tmp_path: Path) -> None:
     )
 
     assert instance.mumu_player_12_id is None
+
+
+def test_emulator_instance_uses_value_equality_without_type_aliasing(tmp_path: Path) -> None:
+    exe = _touch_exe(tmp_path / "nx_main" / "MuMuNxMain.exe")
+    instance = EmulatorInstance(
+        serial="127.0.0.1:16416",
+        name="MuMuPlayer-12.0-1",
+        path=exe.as_posix(),
+    )
+    same_instance = EmulatorInstance(
+        serial=instance.serial,
+        name=instance.name,
+        path=instance.path,
+    )
+
+    assert instance == same_instance
+    assert instance != Emulator.MuMuPlayer12
+    with pytest.raises(TypeError):
+        hash(instance)
+
+
+def test_emulator_object_does_not_alias_its_type_name(tmp_path: Path) -> None:
+    exe = _touch_exe(tmp_path / "nx_main" / "MuMuNxMain.exe")
+
+    assert Emulator(exe.as_posix()) != Emulator.MuMuPlayer12
 
 
 def test_iter_instances_ignores_mumu_global_folder(tmp_path: Path) -> None:

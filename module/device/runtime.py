@@ -72,7 +72,7 @@ class MumuRuntime(MumuRuntimeBase):
 
     def _emulator_start(self, instance: EmulatorInstance) -> None:
         exe: str = instance.emulator.path
-        if instance != Emulator.MuMuPlayer12:
+        if instance.type != Emulator.MuMuPlayer12:
             message = f"Cannot start an unknown emulator instance: {instance}"
             raise EmulatorUnknown(message)
         # 通过 MuMuManager 启动，避免多个 MuMuNxMain.exe 同时启动时请求被吞掉。
@@ -81,7 +81,7 @@ class MumuRuntime(MumuRuntimeBase):
 
     def _emulator_stop(self, instance: EmulatorInstance) -> None:
         exe: str = instance.emulator.path
-        if instance != Emulator.MuMuPlayer12:
+        if instance.type != Emulator.MuMuPlayer12:
             message = f"Cannot stop an unknown emulator instance: {instance}"
             raise EmulatorUnknown(message)
         instance_id = self._require_mumu_player_12_id(instance)

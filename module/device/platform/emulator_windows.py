@@ -59,7 +59,7 @@ class Emulator(EmulatorBase):
             return serial
 
     def iter_instances(self) -> Iterator[EmulatorInstance]:
-        if self == Emulator.MuMuPlayer12:
+        if self.type == Emulator.MuMuPlayer12:
             yield from self._iter_vbox_instances()
 
     def _iter_vbox_instances(self) -> Iterator[EmulatorInstance]:
@@ -97,7 +97,7 @@ class Emulator(EmulatorBase):
         return f"127.0.0.1:{16384 + 32 * instance_id}"
 
     def iter_adb_binaries(self) -> Iterator[str]:
-        if self != Emulator.MuMuPlayer12:
+        if self.type != Emulator.MuMuPlayer12:
             return
 
         # MuMu 目录内可能带有 ADB。
