@@ -1,6 +1,4 @@
-import argparse
 import json
-import time
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -25,7 +23,7 @@ from pywebio.output import (
     use_scope,
 )
 from pywebio.pin import pin, pin_on_change
-from pywebio.session import download, go_app, info, local, run_js, set_env
+from pywebio.session import download, go_app, local, run_js, set_env
 
 from module.application.scheduler import ScheduleItem, order_schedule_items
 from module.base.atomic import atomic_failure_cleanup, atomic_write
@@ -60,7 +58,6 @@ from module.webui.utils import (
     get_alas_config_listen_path,
     get_localstorage,
     get_window_visibility_state,
-    login,
     parse_pin_value,
     raise_exception,
     re_fullmatch,
@@ -919,19 +916,8 @@ def clearup() -> None:
     logger.info("Alas closed.")
 
 
-def app() -> Starlette:
-    parser = argparse.ArgumentParser(description="Alas WebUI 服务")
-    parser.add_argument("-k", "--key", type=str, help="WebUI 密码，默认不启用。")
-    parser.add_argument(
-        "--run",
-        action="store_true",
-        help="启动时自动运行 alas。",
-    )
-    args, _ = parser.parse_known_args()
-
+def app(*, auto_run: bool = False) -> Starlette:
     AlasGUI.set_theme()
-    key = args.key
-    auto_run = args.run
 
     def auto_start() -> None:
         if auto_run:
@@ -939,26 +925,15 @@ def app() -> Starlette:
 
     logger.hr("Webui configs")
     logger.attr("Theme", AlasGUI.theme)
-    logger.attr("Password", bool(key))
 
     atomic_failure_cleanup("./config")
 
     def index() -> None:
-        if key is not None and not login(key):
-            logger.warning(f"{info.user_ip} login failed.")
-            time.sleep(1.5)
-            run_js("location.reload();")
-            return
         gui = AlasGUI()
         local.gui = gui
         gui.run()
 
     def manage() -> None:
-        if key is not None and not login(key):
-            logger.warning(f"{info.user_ip} login failed.")
-            time.sleep(1.5)
-            run_js("location.reload();")
-            return
         app_manage()
 
     return asgi_app(

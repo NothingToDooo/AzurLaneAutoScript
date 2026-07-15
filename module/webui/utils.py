@@ -12,9 +12,7 @@ from typing import TYPE_CHECKING, NoReturn, TypeIs
 
 import pywebio
 from pywebio.exceptions import SessionException
-from pywebio.input import PASSWORD
-from pywebio.input import input as pywebio_input
-from pywebio.output import PopupSize, popup, put_html, toast
+from pywebio.output import PopupSize, popup, put_html
 from pywebio.session import eval_js, register_thread, run_js
 from rich.console import Console
 from rich.terminal_theme import TerminalTheme
@@ -415,17 +413,6 @@ def to_pin_value(val: MutableDeepValue) -> MutableDeepValue:
     if val is False:
         return []
     return val
-
-
-def login(password: str) -> bool:
-    if get_localstorage("password") == str(password):
-        return True
-    pwd = pywebio_input(label="Please login below.", type=PASSWORD, placeholder="PASSWORD")
-    if str(pwd) == str(password):
-        set_localstorage("password", str(pwd))
-        return True
-    toast("Wrong password!", color="error")
-    return False
 
 
 def get_window_visibility_state() -> bool:
