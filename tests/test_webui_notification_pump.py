@@ -185,7 +185,7 @@ def test_start_during_timed_out_stop_restarts_after_the_old_worker_exits() -> No
     assert len(sessions) == 2
 
 
-def test_webui_lifecycle_starts_and_stops_the_global_notification_pump(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_webui_lifecycle_flushes_after_processes_stop(monkeypatch: pytest.MonkeyPatch) -> None:
     events: list[str] = []
 
     class _Pump:
@@ -194,8 +194,13 @@ def test_webui_lifecycle_starts_and_stops_the_global_notification_pump(monkeypat
             events.append("pump-start")
 
         @staticmethod
-        def stop() -> None:
+        def stop() -> bool:
             events.append("pump-stop")
+            return True
+
+        @staticmethod
+        def run_once() -> None:
+            events.append("pump-run-once")
 
     monkeypatch.setattr(webui_app, "_notification_spool_pump", _Pump())
     monkeypatch.setattr(webui_app.State, "init", lambda: events.append("state-init"))
@@ -213,6 +218,35 @@ def test_webui_lifecycle_starts_and_stops_the_global_notification_pump(monkeypat
         "lang-reload",
         "pump-start",
         "tasks-start",
+        "processes-stop",
+        "pump-stop",
+        "pump-run-once",
+        "state-clear",
+        "tasks-stop",
+    ]
+
+
+def test_webui_lifecycle_skips_final_flush_when_pump_stop_times_out(monkeypatch: pytest.MonkeyPatch) -> None:
+    events: list[str] = []
+
+    class _Pump:
+        @staticmethod
+        def stop() -> bool:
+            events.append("pump-stop")
+            return False
+
+        @staticmethod
+        def run_once() -> None:
+            events.append("pump-run-once")
+
+    monkeypatch.setattr(webui_app, "_notification_spool_pump", _Pump())
+    monkeypatch.setattr(webui_app.State, "clearup", lambda: events.append("state-clear"))
+    monkeypatch.setattr(webui_app.task_handler, "stop", lambda: events.append("tasks-stop"))
+    monkeypatch.setattr(webui_app.ProcessManager, "stop_all", lambda: events.append("processes-stop"))
+
+    webui_app.clearup()
+
+    assert events == [
         "processes-stop",
         "pump-stop",
         "state-clear",

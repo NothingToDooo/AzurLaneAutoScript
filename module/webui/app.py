@@ -1063,7 +1063,8 @@ def clearup() -> None:
     """必须在 uvicorn 重新加载 app 前执行。"""
     logger.info("Start clearup")
     ProcessManager.stop_all()
-    _notification_spool_pump.stop()
+    if _notification_spool_pump.stop():
+        _notification_spool_pump.run_once()
     State.clearup()
     task_handler.stop()
     logger.info("Alas closed.")
