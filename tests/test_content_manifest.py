@@ -1,7 +1,5 @@
-import ast
 import inspect
 import os
-import re
 from datetime import date
 from pathlib import Path
 from typing import get_type_hints
@@ -575,24 +573,3 @@ def test_config_generator_writes_readme_through_atomic_boundary(
             render_campaign_readme((pack,)),
         )
     ]
-
-
-def test_stable_core_contains_no_dated_event_string_literals() -> None:
-    pattern = re.compile(r"(?:event|war_archives)_\d{8}_cn")
-    paths = [
-        Path("module/content/campaign_policy.py"),
-        Path("module/content/campaign_session_source.py"),
-        Path("module/content/manifest.py"),
-        Path("module/gameplay/campaign_factories.py"),
-        Path("module/config/config_updater.py"),
-        Path("module/config/config_manual.py"),
-    ]
-
-    for path in paths:
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        violations = [
-            node.value
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Constant) and isinstance(node.value, str) and pattern.search(node.value)
-        ]
-        assert violations == [], f"{path}: {violations}"

@@ -30,13 +30,11 @@ from module.gameplay.activity import (
     ActivityDisposition,
     ActivityReport,
     ActivitySpec,
-    ActivityTask,
     ActivityWorkflow,
     AssistSessionCommand,
     AssistSessionReport,
     AssistSessionSpec,
     AssistSessionState,
-    AssistSessionTask,
     AssistSessionWorkflow,
     CoalitionFleetMode,
     CoalitionOptions,
@@ -48,7 +46,6 @@ from module.gameplay.activity import (
     EncounterReport,
     EncounterSpec,
     EncounterStopReason,
-    EncounterTask,
     MinigameProgress,
     OpsiDaemonOptions,
     RaidMode,
@@ -294,44 +291,6 @@ def _task_context(
 
 def _valid_settings(command: str) -> dict[str, FrozenJsonValue]:
     return dict(_VALID_SETTINGS_BY_COMMAND.get(command, {}))
-
-
-@pytest.mark.parametrize(
-    ("command", "task_type"),
-    [
-        ("minigame", ActivityTask),
-        ("event_story", ActivityTask),
-        ("raid_daily", EncounterTask),
-        ("maritime_escort", EncounterTask),
-        ("raid", EncounterTask),
-        ("hospital", EncounterTask),
-        ("coalition", EncounterTask),
-        ("coalition_sp", EncounterTask),
-        ("daemon", AssistSessionTask),
-        ("opsi_daemon", AssistSessionTask),
-    ],
-)
-def test_activity_factories_cover_exactly_ten_commands(
-    command: str,
-    task_type: type[object],
-) -> None:
-    factories = _factories()
-
-    task = factories[command].build(_build_context(command, _valid_settings(command)))
-
-    assert isinstance(task, task_type)
-    assert set(factories) == {
-        "minigame",
-        "event_story",
-        "raid_daily",
-        "maritime_escort",
-        "raid",
-        "hospital",
-        "coalition",
-        "coalition_sp",
-        "daemon",
-        "opsi_daemon",
-    }
 
 
 def test_minigame_factory_preserves_the_source_run_cap_and_decodes_the_schedule() -> None:

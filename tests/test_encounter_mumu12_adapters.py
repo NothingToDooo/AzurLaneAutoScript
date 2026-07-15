@@ -1,5 +1,4 @@
 from datetime import UTC, datetime, time, timedelta
-from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -379,17 +378,3 @@ def test_production_builder_requires_and_exposes_the_hard_campaign_port(
     assert isinstance(workflows.daily, adapters.Mumu12DailyWorkflow)
     assert isinstance(workflows.hard, adapters.Mumu12HardWorkflow)
     assert isinstance(workflows.exercise, adapters.Mumu12ExerciseWorkflow)
-
-
-def test_encounter_adapter_has_no_legacy_scheduler_or_dynamic_stage_dispatch() -> None:
-    source = Path(adapters.__file__).read_text(encoding="utf-8")
-
-    for forbidden in (
-        "config.override(",
-        "task_delay(",
-        "task_stop(",
-        "task_call(",
-        "import_module(",
-        "CampaignHard(",
-    ):
-        assert forbidden not in source

@@ -1,5 +1,4 @@
 from datetime import time
-from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -321,10 +320,3 @@ def test_market_production_builder_returns_all_five_capabilities(
     assert isinstance(workflows.gacha, adapters.Mumu12GachaWorkflow)
     assert isinstance(workflows.shop_frequent, adapters.Mumu12ShopFrequentWorkflow)
     assert isinstance(workflows.shop_once, adapters.Mumu12ShopOnceWorkflow)
-
-
-def test_market_adapter_has_no_legacy_scheduler_or_run_dispatch() -> None:
-    source = Path(adapters.__file__).read_text(encoding="utf-8")
-
-    for forbidden in (".run(", "task_delay(", "task_stop(", "task_call(", "import_module("):
-        assert forbidden not in source

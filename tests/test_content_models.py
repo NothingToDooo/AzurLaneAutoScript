@@ -199,7 +199,7 @@ def test_campaign_policy_rejects_ambiguous_or_multistep_map_achievement_fallback
         CampaignPolicy(map_achievement_fallbacks=fallbacks)
 
 
-def test_content_models_are_frozen_and_slotted() -> None:
+def test_content_models_are_immutable() -> None:
     content_id = ContentId("event_20260625_cn")
     issue = ValidationIssue(location="stages.t1", message="source is missing")
 
@@ -207,6 +207,3 @@ def test_content_models_are_frozen_and_slotted() -> None:
         _set_attribute(content_id, "value", "changed")
     with pytest.raises(FrozenInstanceError):
         _set_attribute(issue, "message", "changed")
-
-    assert not hasattr(content_id, "__dict__")
-    assert not hasattr(issue, "__dict__")

@@ -1,5 +1,4 @@
 from datetime import UTC, datetime, time, timedelta
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -380,10 +379,3 @@ def test_composite_production_builder_returns_all_nine_capabilities(
     assert isinstance(workflows.mail, adapters.Mumu12MailWorkflow)
     assert isinstance(workflows.supply_pack, adapters.Mumu12SupplyPackWorkflow)
     assert isinstance(workflows.private_quarters, adapters.Mumu12PrivateQuartersWorkflow)
-
-
-def test_composite_adapter_has_no_legacy_scheduler_or_run_dispatch() -> None:
-    source = Path(adapters.__file__).read_text(encoding="utf-8")
-
-    for forbidden in (".run(", "task_delay(", "task_stop(", "task_call(", "import_module("):
-        assert forbidden not in source

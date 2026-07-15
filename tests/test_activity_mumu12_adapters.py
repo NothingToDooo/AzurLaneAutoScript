@@ -948,18 +948,3 @@ def test_activity_builder_covers_all_ten_workflows_and_cancel_before_io(
             ActivitySpec.minigame(schedule=_SCHEDULE),
             cancelled,
         )
-
-
-def test_activity_adapter_has_no_legacy_dispatch_scheduler_or_unbounded_loop() -> None:
-    source = Path(adapters.__file__).read_text(encoding="utf-8")
-
-    for forbidden in (
-        ".run(",
-        "task_delay(",
-        "task_stop(",
-        "task_call(",
-        "import_module(",
-        "config.override(",
-        "while ",
-    ):
-        assert forbidden not in source

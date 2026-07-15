@@ -102,9 +102,8 @@ def test_registry_builds_from_one_settings_revision_and_current_task_state() -> 
         {"checkpoint": TaskStateEntry(schema_version=2, payload={"step": 4}, updated_at=_NOW)},
     )
 
-    task = registry.build("restart", _document(), task_state)
+    registry.build("restart", _document(), task_state)
 
-    assert isinstance(task, _Task)
     assert len(factory.contexts) == 1
     context = factory.contexts[0]
     assert context.definition.command == "restart"

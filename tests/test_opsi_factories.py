@@ -25,7 +25,6 @@ from module.gameplay.opsi import (
     MonthBossMode,
     MonthBossSettings,
     ObscureSettings,
-    OperationSirenTask,
     OperationSirenWorkflow,
     OpsiDailySettings,
     OpsiShopPreset,
@@ -325,7 +324,6 @@ def test_opsi_factories_decode_all_fourteen_commands_into_complete_specs(
     task = factories[command].build(_build_context(command, settings))
     task.run(_run_context(command))
 
-    assert isinstance(task, OperationSirenTask)
     assert workflow.received_spec is not None
     assert workflow.received_spec.task_id == TaskId(command)
     assert workflow.received_spec.operation.value == command

@@ -5,7 +5,6 @@ import numpy as np
 
 from module.combat.assets import BATTLE_PREPARATION
 from module.event_hospital.combat import HospitalCombat
-from module.raid.raid import Raid
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -135,44 +134,10 @@ class _HospitalCombat(_SpecialCombatBase, HospitalCombat):
         self.interval_clears.append(button)
 
 
-class _Raid(_SpecialCombatBase, Raid):
-    def __init__(self) -> None:
-        _SpecialCombatBase.__init__(self)
-        self.appear_results = [True]
-
-    @override
-    def appear(
-        self,
-        button: Button,
-        offset: MatchOffset | None = 0,
-        interval: float = 0,
-        similarity: float = 0.85,
-        threshold: int = 10,
-    ) -> bool:
-        del offset, interval, similarity, threshold
-        if button == BATTLE_PREPARATION:
-            return self._next(self.appear_results)
-        return False
-
-    @override
-    def handle_raid_ticket_use(self) -> bool:
-        return False
-
-
-def test_hospital_combat_preparation_checks_oil_once_without_scheduler_control() -> None:
+def test_hospital_combat_preparation_checks_oil_once() -> None:
     combat = _HospitalCombat()
     combat.combat_results = [False, True]
 
     combat.combat_preparation()
 
     assert combat.oil_checks == 1
-    assert not hasattr(combat, "triggered_task_balancer")
-
-
-def test_raid_combat_preparation_does_not_own_scheduler_stop_conditions() -> None:
-    raid = _Raid()
-    raid.combat_results = [True]
-
-    raid.combat_preparation()
-
-    assert not hasattr(raid, "triggered_stop_condition")

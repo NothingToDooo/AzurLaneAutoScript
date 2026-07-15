@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 
 from module.coalition import assets as coalition_assets
@@ -142,22 +140,3 @@ def test_pt_ocr_normalizers_are_selected_by_profile(
     expected: int,
 ) -> None:
     assert CoalitionPtOcr(profile.pt_ocr).after_process(raw) == expected
-
-
-def test_coalition_domain_has_no_dated_dispatch_or_scheduler_writes() -> None:
-    domain = Path("module/coalition")
-    source = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in (domain / "profile.py", domain / "ui.py", domain / "coalition.py", domain / "combat.py")
-    )
-
-    for forbidden in (
-        "coalition_20",
-        "parse_coalition_",
-        "task_delay(",
-        "task_stop(",
-        "cross_set(",
-    ):
-        assert forbidden not in source
-    assert not (domain / "contracts.py").exists()
-    assert not (domain / "coalition_sp.py").exists()

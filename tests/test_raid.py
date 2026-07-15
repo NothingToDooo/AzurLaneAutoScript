@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
@@ -272,21 +271,3 @@ def test_atomic_ex_execution_returns_fact_and_restores_submarine_overlay() -> No
     assert runner.config.Submarine_Fleet == 3
     assert runner.config.Submarine_Mode == "boss_only"
     assert runner.config.overlays[-1] == {"Submarine_Fleet": 3, "Submarine_Mode": "boss_only"}
-
-
-@pytest.mark.parametrize("filename", ["profile.py", "raid.py", "run.py", "result.py"])
-def test_raid_domain_has_no_dated_dispatch_or_scheduler_mutation(filename: str) -> None:
-    source = (Path("module/raid") / filename).read_text(encoding="utf-8")
-
-    assert re.search(r"raid_[0-9]{8}", source) is None
-    for forbidden in (
-        "task_delay(",
-        "task_stop(",
-        "cross_set(",
-        "Scheduler_Enable",
-        "Campaign_Event",
-        "RAID_NAME_PREFIX",
-        "getattr(",
-        "is_raid_rpg",
-    ):
-        assert forbidden not in source

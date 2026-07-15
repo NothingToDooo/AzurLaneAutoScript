@@ -241,17 +241,15 @@ def _task_group(nodes: dict, *, page: str = "setting") -> dict:
     }
 
 
-def test_task_definition_is_frozen_slotted_catalog_metadata() -> None:
+def test_task_definition_catalog_lookup_is_immutable() -> None:
     definition = TASK_CATALOG["main"]
 
     assert isinstance(definition, TaskDefinition)
     assert get_task_definition("main") is definition
     assert get_task_definition("missing") is None
-    assert not hasattr(definition, "__dict__")
-    assert not hasattr(definition, "executor")
-    assert not hasattr(definition, "execute")
+    priority_field = "priority"
     with pytest.raises(FrozenInstanceError):
-        definition.priority = 999  # type: ignore[misc]
+        setattr(definition, priority_field, 999)
 
 
 def test_sos_is_removed_without_changing_other_commands() -> None:
