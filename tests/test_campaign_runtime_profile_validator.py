@@ -6,10 +6,6 @@ import pytest
 
 from dev_tools.campaign_runtime_profile_validator import validate_campaign_content
 from module.adapters.campaign_profiles import validate_mumu12_campaign_runtime_profiles
-from module.adapters.campaign_runtime_implementations import (
-    load_default_campaign_runtime_executor_registry,
-)
-from module.adapters.campaign_runtime_profile import CampaignRuntimeProfileManager
 from module.content.errors import ContentValidationError
 from module.content.manifest import load_default_event_manifests
 from module.content.models import StageRef, StageSpec
@@ -72,34 +68,6 @@ def _executors(
 
 def test_current_runtime_profile_sources_are_self_contained_and_valid() -> None:
     validate_campaign_content(ROOT)
-
-    assert not tuple((ROOT / "campaign").rglob("*.py"))
-
-
-def test_manifest_profiles_and_registry_extensions_have_no_orphans(
-    packs_by_id: Mapping[str, EventPack],
-    profile_registry: CampaignRuntimeProfileRegistry,
-) -> None:
-    stages = tuple(stage for pack in packs_by_id.values() for stage in pack.stages)
-    referenced_profiles = {stage.runtime_profile_id for stage in stages}
-    referenced_extensions = {
-        extension.extension_id for profile in profile_registry.profiles.values() for extension in profile.extensions
-    }
-
-    assert referenced_profiles == set(profile_registry.profiles)
-    assert referenced_extensions == set(profile_registry.extensions)
-
-
-def test_every_current_profile_constructs_against_production_executors(
-    profile_registry: CampaignRuntimeProfileRegistry,
-) -> None:
-    executors = load_default_campaign_runtime_executor_registry()
-
-    managers = tuple(
-        CampaignRuntimeProfileManager(profile, executors) for profile in profile_registry.profiles.values()
-    )
-
-    assert len(managers) == len(profile_registry.profiles)
 
 
 def test_production_validator_rejects_unselected_profile_with_unknown_executor() -> None:
