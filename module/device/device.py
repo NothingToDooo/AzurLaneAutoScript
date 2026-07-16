@@ -289,6 +289,9 @@ class Device(Screenshot, Control, Connection):
         try:
             yield
         finally:
+            if was_enabled:
+                self.stuck_record_clear()
+                self.click_record_clear()
             self.stuck_detection_enabled = was_enabled
             if was_enabled:
                 logger.info("Enable stuck detection")
