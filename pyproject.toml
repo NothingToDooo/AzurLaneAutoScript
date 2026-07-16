@@ -15,7 +15,7 @@ dependencies = [
     "rich",
     "pyyaml",
     "cnocr",
-    "pywebio==1.8.4",
+    "pywebio>=1.8.4",
     "starlette",
     "onnxruntime>=1.27.0",
     "uvicorn>=0.50.2",
