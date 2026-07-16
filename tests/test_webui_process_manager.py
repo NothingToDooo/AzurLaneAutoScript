@@ -159,11 +159,6 @@ def _patch_process_boundary(monkeypatch: pytest.MonkeyPatch, calls: list[tuple[o
         "set_func_logger",
         lambda *, func: calls.append(("set_func_logger", func)),
     )
-    monkeypatch.setattr(
-        process_manager_module,
-        "remove_fake_pil_module",
-        lambda: calls.append(("remove_fake_pil",)),
-    )
     monkeypatch.setattr(process_manager_module, "logger", _Logger())
 
 
@@ -202,7 +197,7 @@ def test_execute_process_delegates_to_default_command(
         calls.append((command, stop_signal))
         return expected
 
-    monkeypatch.setattr(process_manager_module, "run_default_command", run)
+    monkeypatch.setattr("module.bootstrap.production.run_default_command", run)
 
     actual = process_manager_module._execute_process(  # noqa: SLF001 - 验证命令解析边界。
         _request(ui_command),
