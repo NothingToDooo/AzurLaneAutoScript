@@ -1,11 +1,12 @@
 from typing import TYPE_CHECKING
 
 import pytest
+from config_factory import in_memory_config
 
+import module.adapters.maintenance_mumu12 as maintenance_adapters
 from module.adapters.maintenance_mumu12 import LocalUncensoredAssetBuilder, Mumu12DeviceAppLifecycle
 from module.application import AbortRequested, AbortToken
 from module.device.device import Device
-from module.interaction import AppStatus
 from module.maintenance import UncensoredPayload
 
 if TYPE_CHECKING:
@@ -15,19 +16,12 @@ if TYPE_CHECKING:
 class _AppController:
     def __init__(self) -> None:
         self.calls: list[str] = []
-        self.running = False
-
-    def is_running(self) -> bool:
-        self.calls.append("status")
-        return self.running
 
     def start(self) -> None:
         self.calls.append("start")
-        self.running = True
 
     def stop(self) -> None:
         self.calls.append("stop")
-        self.running = False
 
 
 class _Device(Device):
@@ -79,12 +73,10 @@ def test_device_lifecycle_uses_the_real_app_service_and_clears_local_records() -
     device = _Device(app)
     lifecycle = Mumu12DeviceAppLifecycle(device)
 
-    assert lifecycle.status(AbortToken()) is AppStatus.STOPPED
     lifecycle.start(AbortToken())
-    assert lifecycle.status(AbortToken()) is AppStatus.RUNNING
     lifecycle.stop(AbortToken())
 
-    assert app.calls == ["status", "start", "status", "stop"]
+    assert app.calls == ["start", "stop"]
     assert device.local_calls == ["stuck-clear", "click-clear", "stuck-clear", "click-clear"]
 
 
@@ -98,3 +90,18 @@ def test_device_lifecycle_checks_cancellation_before_app_service_io() -> None:
         lifecycle.start(abort)
 
     assert app.calls == []
+
+
+def test_maintenance_activation_clears_the_previous_task_runtime_overlay() -> None:
+    config = in_memory_config("test", {}, task="Main")
+    config.replace_runtime_overlay(
+        MAP_CHAPTER_SWITCH_20241219=True,
+        Campaign_Mode="hard",
+    )
+    device = _Device(_AppController())
+
+    maintenance_adapters._activate(config, device, "Benchmark", AbortToken())  # noqa: SLF001
+
+    assert vars(config)["_runtime_overlay"] == {}
+    assert getattr(config, "MAP_CHAPTER_SWITCH_20241219", None) is not True
+    assert getattr(config, "Campaign_Mode", None) != "hard"

@@ -30,7 +30,7 @@ from module.gameplay.facility import (
 
 if TYPE_CHECKING:
     from module.adapters.facility_live import CommissionUiDriver, ResearchUiDriver, TacticalUiDriver
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _NOW = datetime(2026, 7, 13, 12, tzinfo=UTC)
@@ -77,7 +77,7 @@ class _Driver[EvidenceT]:
         self.calls = 0
         self.settings: object | None = None
 
-    def execute(self, settings: object, cancellation: CancellationSignal) -> EvidenceT:
+    def execute(self, settings: object, cancellation: CancellationSource) -> EvidenceT:
         cancellation.raise_if_requested()
         self.settings = settings
         self.calls += 1

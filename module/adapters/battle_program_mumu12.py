@@ -75,8 +75,8 @@ if TYPE_CHECKING:
 
     from module.adapters.campaign_live import CampaignMapRuntime
     from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
+    from module.application import CancellationSource
     from module.content.cell import CellId
-    from module.interaction.ports import CancellationSignal
     from module.map_detection.grid import Grid
     from module.map_detection.grid_info import GridInfo
 
@@ -133,11 +133,11 @@ class BattleProgramMumu12AdapterError(RuntimeError):
 class RuntimeProgramState(Protocol):
     """不能从静态 profile 推断的当前地图运行事实。"""
 
-    def map_has_mob_move(self, cancellation: CancellationSignal) -> bool: ...
+    def map_has_mob_move(self, cancellation: CancellationSource) -> bool: ...
 
-    def use_single_fleet_override(self, cancellation: CancellationSignal) -> bool | None: ...
+    def use_single_fleet_override(self, cancellation: CancellationSource) -> bool | None: ...
 
-    def use_support_fleet(self, cancellation: CancellationSignal) -> bool: ...
+    def use_support_fleet(self, cancellation: CancellationSource) -> bool: ...
 
 
 class Mumu12BattleProgramPort:
@@ -149,7 +149,7 @@ class Mumu12BattleProgramPort:
         self._runtime = cast("DeclarativeCampaignMapRuntime", runtime)
         self._program_state = program_state
 
-    def initial_flags(self, cancellation: CancellationSignal) -> frozenset[program_model.ProgramFlag]:
+    def initial_flags(self, cancellation: CancellationSource) -> frozenset[program_model.ProgramFlag]:
         cancellation.raise_if_requested()
         runtime = self._runtime
         single_fleet_override = self._program_state.use_single_fleet_override(cancellation)
@@ -191,7 +191,7 @@ class Mumu12BattleProgramPort:
     def read_metric(
         self,
         metric: program_model.ProgramMetric,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> int:
         cancellation.raise_if_requested()
         runtime = self._runtime
@@ -211,7 +211,7 @@ class Mumu12BattleProgramPort:
         self,
         cell: CellId,
         cell_property: program_model.CellProperty,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> program_model.CellPropertyValue:
         cancellation.raise_if_requested()
         grid = self._grid(cell)
@@ -239,7 +239,7 @@ class Mumu12BattleProgramPort:
         self,
         cell: CellId,
         fleet: FleetRole,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool:
         cancellation.raise_if_requested()
         return self._runtime.fleet_at(self._grid(cell), fleet=self._fleet_index(fleet))
@@ -247,7 +247,7 @@ class Mumu12BattleProgramPort:
     def has_map_presence(
         self,
         presence: program_model.MapPresence,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool:
         cancellation.raise_if_requested()
         if presence is program_model.MapPresence.BOSS:
@@ -266,14 +266,14 @@ class Mumu12BattleProgramPort:
             return bool(remain)
         assert_never(presence)
 
-    def is_boss_at(self, cell: CellId, cancellation: CancellationSignal) -> bool:
+    def is_boss_at(self, cell: CellId, cancellation: CancellationSource) -> bool:
         cancellation.raise_if_requested()
         return bool(self._grid(cell).is_boss)
 
     def is_boss_accessible(
         self,
         fleet: FleetRole,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool:
         cancellation.raise_if_requested()
         boss = self._runtime.map.select(is_boss=True)
@@ -285,7 +285,7 @@ class Mumu12BattleProgramPort:
         self,
         cell: CellId,
         fleet: FleetRole,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool:
         cancellation.raise_if_requested()
         return self._runtime.check_accessibility(
@@ -297,7 +297,7 @@ class Mumu12BattleProgramPort:
         self,
         candidates: tuple[CellId, ...],
         excluded_genres: tuple[str, ...],
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool:
         cancellation.raise_if_requested()
         return any(
@@ -308,7 +308,7 @@ class Mumu12BattleProgramPort:
     def execute_battle(
         self,
         action: BattleStep,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleActionOutcome:
         cancellation.raise_if_requested()
         before = self._runtime.battle_count
@@ -335,7 +335,7 @@ class Mumu12BattleProgramPort:
     def execute_mechanic(
         self,
         action: program_model.ProgramMechanicAction,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         cancellation.raise_if_requested()
         before = self._runtime.battle_count
@@ -355,7 +355,7 @@ class Mumu12BattleProgramPort:
         self,
         action: program_model.ProgramMechanicAction,
         context: _MechanicActionContext,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         if isinstance(action, RoadblockAction):
             return self._roadblock(action, cancellation)
@@ -388,7 +388,7 @@ class Mumu12BattleProgramPort:
         self,
         action: _FleetMechanicAction,
         context: _MechanicActionContext,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         if isinstance(action, BreakSirenCaught):
             outcome = self._break_siren_caught(action, cancellation)
@@ -417,7 +417,7 @@ class Mumu12BattleProgramPort:
     def _dispatch_pickup_mechanic_action(
         self,
         action: _PickupMechanicAction,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         if isinstance(action, PickupAmmo):
             return self._pickup_ammo(action, cancellation)
@@ -428,7 +428,7 @@ class Mumu12BattleProgramPort:
     def _dispatch_map_interaction_action(
         self,
         action: _MapInteractionMechanicAction,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         if isinstance(action, ClearAllMystery):
             return self._clear_all_mystery(action, cancellation)
@@ -445,7 +445,7 @@ class Mumu12BattleProgramPort:
     def execute_preset_route(  # noqa: C901 - 固定路线的重试与事实闭合必须同处一个状态机。
         self,
         action: program_model.ExecutePresetRoute,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         cancellation.raise_if_requested()
         self._require_current_battle(action.battle, operation="preset route")
@@ -504,7 +504,7 @@ class Mumu12BattleProgramPort:
     def execute_fixed_target(
         self,
         action: program_model.ExecuteFixedTarget,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         cancellation.raise_if_requested()
         self._require_current_battle(action.battle, operation="fixed target")
@@ -536,7 +536,7 @@ class Mumu12BattleProgramPort:
                 )
         return MechanicNotApplied()
 
-    def mark_all_siren_candidates(self, cancellation: CancellationSignal) -> None:
+    def mark_all_siren_candidates(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         for grid in self._runtime.map:
             grid.may_siren = True
@@ -544,7 +544,7 @@ class Mumu12BattleProgramPort:
     def set_map_weights(
         self,
         rows: tuple[tuple[int, ...], ...],
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> None:
         cancellation.raise_if_requested()
         shape = self._runtime.definition.map.shape
@@ -558,7 +558,7 @@ class Mumu12BattleProgramPort:
     def _execute_unguarded_battle(
         self,
         action: UnguardedBattleStep,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleActionOutcome:
         before = self._runtime.battle_count
         outcome = self._dispatch_battle_action(action, cancellation)
@@ -574,7 +574,7 @@ class Mumu12BattleProgramPort:
     def _dispatch_battle_action(  # noqa: C901 - 封闭 union 在单一边界穷举，新增成员会触发静态检查。
         self,
         action: UnguardedBattleStep,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> _BattleHandlerOutcome:
         if isinstance(action, ClearSiren):
             outcome = self._handle_clear_siren(action, cancellation)
@@ -603,7 +603,7 @@ class Mumu12BattleProgramPort:
     def _handle_clear_siren(
         self,
         action: ClearSiren,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> _BattlePrimitiveOutcome:
         if action.include_hidden_candidates:
             self.mark_all_siren_candidates(cancellation)
@@ -616,7 +616,7 @@ class Mumu12BattleProgramPort:
     def _handle_clear_filtered_enemy(
         self,
         action: ClearFilteredEnemy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> _BattlePrimitiveOutcome:
         enemy_filter = action.enemy_filter or self._runtime.definition.enemy_filter
         cancellation.raise_if_requested()
@@ -627,7 +627,7 @@ class Mumu12BattleProgramPort:
     def _handle_clear_enemy(
         self,
         action: ClearEnemy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> _BattlePrimitiveOutcome:
         cancellation.raise_if_requested()
         return _BattlePrimitiveOutcome(
@@ -644,7 +644,7 @@ class Mumu12BattleProgramPort:
     def _handle_clear_any_enemy(
         self,
         action: ClearAnyEnemy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> _BattlePrimitiveOutcome:
         cancellation.raise_if_requested()
         return _BattlePrimitiveOutcome(
@@ -660,7 +660,7 @@ class Mumu12BattleProgramPort:
     def _handle_clear_chosen_enemy(
         self,
         action: ClearChosenEnemy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> _BattleHandlerOutcome:
         grid = self._grid(action.target)
         if not grid.is_accessible:
@@ -679,7 +679,7 @@ class Mumu12BattleProgramPort:
     def _handle_clear_selected_enemy(
         self,
         action: ClearSelectedEnemy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> _BattleHandlerOutcome:
         grid = next(
             (
@@ -709,7 +709,7 @@ class Mumu12BattleProgramPort:
     def _handle_clear_priority_enemy(
         self,
         action: ClearPriorityEnemy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> _BattlePrimitiveOutcome:
         return _BattlePrimitiveOutcome(
             applied=self._clear_priority_enemy(action, cancellation),
@@ -717,7 +717,7 @@ class Mumu12BattleProgramPort:
 
     def _handle_default_battle(
         self,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> _BattleHandlerOutcome:
         grid = self._default_target()
         if grid is None:
@@ -738,7 +738,7 @@ class Mumu12BattleProgramPort:
     def _handle_clear_boss_roadblock(
         self,
         action: ClearBossRoadblock,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> _BattleHandlerOutcome:
         runtime = self._runtime
         boss = runtime.map.select(is_boss=True)
@@ -766,7 +766,7 @@ class Mumu12BattleProgramPort:
     def _handle_clear_boss(
         self,
         action: ClearBoss,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> _BattleHandlerOutcome:
         runtime = self._runtime
         bosses = runtime.map.select(is_boss=True, is_accessible=True).sort("weight", "cost")
@@ -789,7 +789,7 @@ class Mumu12BattleProgramPort:
     def _roadblock(
         self,
         action: RoadblockAction,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         runtime = self._runtime
         roads = tuple(self._road_group(road.paths) for road in action.roads)
@@ -817,7 +817,7 @@ class Mumu12BattleProgramPort:
     def _push_forward(
         self,
         action: PushFleetForward,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         self._require_fleet_2(action.fleet, operation="push forward")
         before = self._runtime.battle_count
@@ -828,7 +828,7 @@ class Mumu12BattleProgramPort:
     def _break_siren_caught(
         self,
         action: BreakSirenCaught,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         self._require_current_battle(action.battle, operation="break siren caught")
         self._require_fleet_2(action.fleet, operation="break siren caught")
@@ -855,7 +855,7 @@ class Mumu12BattleProgramPort:
     def _protect(
         self,
         action: ProtectFleet,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         self._require_fleet_2(action.fleet, operation="protect fleet")
         before = self._runtime.battle_count
@@ -871,7 +871,7 @@ class Mumu12BattleProgramPort:
     def _rescue(
         self,
         action: RescueFleet,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         self._require_fleet_2(action.fleet, operation="rescue fleet")
         before = self._runtime.battle_count
@@ -887,7 +887,7 @@ class Mumu12BattleProgramPort:
     def _step_on(
         self,
         action: StepFleetOn,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         self._require_fleet_2(action.fleet, operation="step fleet on")
         candidates = SelectedGrids([self._grid(cell) for cell in action.candidates])
@@ -906,7 +906,7 @@ class Mumu12BattleProgramPort:
         self,
         action: MoveFleet | MoveFleetToBestCandidate,
         context: _MechanicActionContext,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         grid = context.resolved_grid
         if grid is None:
@@ -927,7 +927,7 @@ class Mumu12BattleProgramPort:
         expected: EncounterExpectation,
         grid: GridInfo,
         target: program_model.ProgramBattleTarget,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         executor = self._fleet_runtime(fleet, cancellation)
         before = self._runtime.battle_count
@@ -949,7 +949,7 @@ class Mumu12BattleProgramPort:
     def _switch_fleet(
         self,
         action: SwitchFleet,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         before = self._runtime.fleet_current_index
         executor = self._fleet_runtime(action.fleet, cancellation)
@@ -960,7 +960,7 @@ class Mumu12BattleProgramPort:
     def _ensure_fleet(
         self,
         action: EnsureFleet,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         index = self._fleet_index(action.fleet)
         if index is None:
@@ -976,7 +976,7 @@ class Mumu12BattleProgramPort:
     def _ensure_fleet_at(
         self,
         action: EnsureFleetAt,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         cancellation.raise_if_requested()
         if self._runtime.fleet_at(self._grid(action.target), fleet=self._fleet_index(action.fleet)):
@@ -987,7 +987,7 @@ class Mumu12BattleProgramPort:
         self,
         action: FleetClearTarget,
         context: _MechanicActionContext,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         executor = self._fleet_runtime(action.fleet, cancellation)
         before = self._runtime.battle_count
@@ -1009,7 +1009,7 @@ class Mumu12BattleProgramPort:
     def _pickup_ammo(
         self,
         action: PickupAmmo,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         executor = self._fleet_runtime(action.fleet, cancellation)
         cancellation.raise_if_requested()
@@ -1018,7 +1018,7 @@ class Mumu12BattleProgramPort:
     def _pickup_map_item(
         self,
         action: PickupMapItem,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         grid = self._grid(action.cell)
         if action.kind is MapItemKind.FLARE:
@@ -1039,7 +1039,7 @@ class Mumu12BattleProgramPort:
     def _clear_all_mystery(
         self,
         action: ClearAllMystery,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         ignored = SelectedGrids([self._grid(cell) for cell in action.ignored])
         candidates = self._runtime.map.select(is_mystery=True)
@@ -1056,7 +1056,7 @@ class Mumu12BattleProgramPort:
     def _clear_chosen_mystery(
         self,
         action: ClearChosenMystery,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         grid = self._grid(action.cell)
         if not grid.is_mystery:
@@ -1070,7 +1070,7 @@ class Mumu12BattleProgramPort:
     def _clear_mechanism(
         self,
         action: ClearMechanism,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         selected = SelectedGrids([self._grid(cell) for cell in action.cells]) if action.cells else None
         limit = len(action.cells) if action.cells else self._runtime.map.select(is_mechanism_trigger=True).count
@@ -1092,7 +1092,7 @@ class Mumu12BattleProgramPort:
     def _clear_map_items(
         self,
         action: ClearMapItems,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         grids = SelectedGrids([self._grid(cell) for cell in action.cells]).sort("cost")
         moved = False
@@ -1106,7 +1106,7 @@ class Mumu12BattleProgramPort:
     def _air_strike(
         self,
         action: AirStrike,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         grid = self._grid(action.target)
         if grid.is_land:
@@ -1131,7 +1131,7 @@ class Mumu12BattleProgramPort:
     def _move_enemy(
         self,
         action: MoveEnemy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         source = self._grid(action.source)
         target = self._grid(action.target)
@@ -1170,7 +1170,7 @@ class Mumu12BattleProgramPort:
     def _procedure(
         self,
         action: MechanicProcedure,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> MechanicActionOutcome:
         applied = False
         before = self._runtime.battle_count
@@ -1193,7 +1193,7 @@ class Mumu12BattleProgramPort:
             operation="mechanic procedure",
         )
 
-    def _select_air_strike_target(self, grid: Grid, cancellation: CancellationSignal) -> None:
+    def _select_air_strike_target(self, grid: Grid, cancellation: CancellationSource) -> None:
         interval = Timer(5, count=10)
         for index in range(180):
             cancellation.raise_if_requested()
@@ -1211,7 +1211,7 @@ class Mumu12BattleProgramPort:
         message = "air strike target did not become selectable"
         raise BattleProgramMumu12AdapterError(message)
 
-    def _confirm_air_strike(self, cancellation: CancellationSignal) -> None:
+    def _confirm_air_strike(self, cancellation: CancellationSource) -> None:
         interval = Timer(3, count=6)
         for index in range(180):
             cancellation.raise_if_requested()
@@ -1226,7 +1226,7 @@ class Mumu12BattleProgramPort:
         message = "air strike did not return to the strategy page"
         raise BattleProgramMumu12AdapterError(message)
 
-    def _select_mob_move_origin(self, grid: Grid, cancellation: CancellationSignal) -> None:
+    def _select_mob_move_origin(self, grid: Grid, cancellation: CancellationSource) -> None:
         interval = Timer(2, count=4)
         for index in range(180):
             cancellation.raise_if_requested()
@@ -1243,7 +1243,7 @@ class Mumu12BattleProgramPort:
         message = "movable enemy did not become selectable"
         raise BattleProgramMumu12AdapterError(message)
 
-    def _select_mob_move_target(self, grid: Grid, cancellation: CancellationSignal) -> None:
+    def _select_mob_move_target(self, grid: Grid, cancellation: CancellationSource) -> None:
         interval = Timer(2, count=4)
         for index in range(180):
             cancellation.raise_if_requested()
@@ -1261,7 +1261,7 @@ class Mumu12BattleProgramPort:
         message = "movable enemy target was not confirmed"
         raise BattleProgramMumu12AdapterError(message)
 
-    def _battle_condition(self, condition: object, cancellation: CancellationSignal) -> bool:
+    def _battle_condition(self, condition: object, cancellation: CancellationSource) -> bool:
         cancellation.raise_if_requested()
         if isinstance(condition, FlagCondition):
             value = self._battle_flag(condition.flag, cancellation)
@@ -1277,7 +1277,7 @@ class Mumu12BattleProgramPort:
         message = f"unsupported battle condition: {type(condition).__name__}"
         raise BattleProgramMumu12AdapterError(message)
 
-    def _battle_flag(self, flag: BattleFlag, cancellation: CancellationSignal) -> bool:
+    def _battle_flag(self, flag: BattleFlag, cancellation: CancellationSource) -> bool:
         initial = self.initial_flags(cancellation)
         if flag is BattleFlag.CLEAR_MODE:
             return program_model.ProgramFlag.CLEAR_MODE in initial
@@ -1315,7 +1315,7 @@ class Mumu12BattleProgramPort:
     def _fleet_runtime(
         self,
         fleet: FleetRole,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> DeclarativeCampaignMapRuntime:
         cancellation.raise_if_requested()
         if fleet is FleetRole.ACTIVE:
@@ -1502,7 +1502,7 @@ class Mumu12BattleProgramPort:
     def _clear_priority_enemy(
         self,
         action: ClearPriorityEnemy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool:
         if action.include_scale_1:
             cancellation.raise_if_requested()

@@ -56,7 +56,6 @@ def _pack(pack_id: str, kind: str, *releases: EventRelease) -> EventPack:
     return EventPack(
         pack_id=ContentId(pack_id),
         kind=kind,
-        ui_profile="campaign_v1",
         releases=releases,
         war_archives=(WarArchivesDefinition(WarArchivesProfileId("test")) if kind == "war_archives" else None),
     )

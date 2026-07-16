@@ -4,7 +4,6 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Protocol
 
 from module.runtime.errors import FactoryCoverageError, InvalidTaskFactoryError, UnknownTaskError
-from module.runtime.settings import TaskSettingsDocument
 from module.runtime.task_state import TaskStateDocument
 from module.task_registry import TaskDefinition
 
@@ -21,6 +20,7 @@ class TaskFactory(Protocol):
 class TaskBuildContext:
     definition: TaskDefinition
     settings_revision: int
+    content_revision: str
     settings: FrozenTaskSettings
     task_state: TaskStateDocument
 
@@ -31,6 +31,7 @@ class TaskBuildContext:
         if type(self.settings_revision) is not int or self.settings_revision <= 0:
             message = "settings_revision must be a positive integer"
             raise ValueError(message)
+        _validate_revision(self.content_revision, field_name="content_revision")
         if not isinstance(self.settings, Mapping):
             message = "settings must be a mapping"
             raise TypeError(message)
@@ -51,17 +52,61 @@ def _validate_revision(value: str, *, field_name: str) -> None:
         raise ValueError(message)
 
 
-class TaskFactoryRegistry:
-    """绑定同一内容 revision，并精确覆盖 catalog 的不可变 factory 集。"""
+def _validated_content_revisions(
+    content_revisions: Mapping[str, str],
+    *,
+    catalog: Mapping[str, TaskDefinition],
+) -> dict[str, str]:
+    if not isinstance(content_revisions, Mapping):
+        message = "content_revisions must be a mapping"
+        raise TypeError(message)
+    revision_copy = dict(content_revisions)
+    if any(not isinstance(key, str) for key in revision_copy):
+        message = "content_revisions must use task id strings"
+        raise TypeError(message)
+    if set(revision_copy) != set(catalog):
+        missing = sorted(set(catalog) - set(revision_copy))
+        unknown = sorted(set(revision_copy) - set(catalog))
+        message = f"content revision coverage mismatch: missing={missing}, unknown={unknown}"
+        raise FactoryCoverageError(message)
+    for task_id, revision in revision_copy.items():
+        _validate_revision(revision, field_name=f"content_revisions[{task_id!r}]")
+    return revision_copy
 
-    __slots__ = ("_catalog", "_factories", "content_revision")
+
+def _selected_task_ids(
+    task_ids: Iterable[str] | None,
+    *,
+    catalog: Mapping[str, TaskDefinition],
+) -> tuple[str, ...]:
+    if isinstance(task_ids, str):
+        message = "task_ids must be an iterable of task id strings"
+        raise TypeError(message)
+    selected = tuple(catalog) if task_ids is None else tuple(task_ids)
+    if any(not isinstance(task_id, str) for task_id in selected):
+        message = "task_ids must contain strings"
+        raise TypeError(message)
+    if len(set(selected)) != len(selected):
+        message = "task_ids must not contain duplicates"
+        raise ValueError(message)
+    unknown = sorted(set(selected) - set(catalog))
+    if unknown:
+        message = f"task_ids contain unknown tasks: {unknown}"
+        raise UnknownTaskError(message)
+    return selected
+
+
+class TaskFactoryRegistry:
+    """绑定各 task 内容 revision，并精确覆盖 catalog 的不可变 factory 集。"""
+
+    __slots__ = ("_catalog", "_content_revisions", "_factories")
 
     def __init__(
         self,
         *,
         catalog: Mapping[str, TaskDefinition],
         factories: Mapping[str, TaskFactory],
-        content_revision: str,
+        content_revisions: Mapping[str, str],
     ) -> None:
         if not isinstance(catalog, Mapping):
             message = "catalog must be a mapping"
@@ -69,7 +114,6 @@ class TaskFactoryRegistry:
         if not isinstance(factories, Mapping):
             message = "factories must be a mapping"
             raise TypeError(message)
-        _validate_revision(content_revision, field_name="content_revision")
 
         catalog_copy = dict(catalog)
         if any(
@@ -97,9 +141,11 @@ class TaskFactoryRegistry:
             message = f"factory coverage mismatch: missing={missing}, unknown={unknown}"
             raise FactoryCoverageError(message)
 
+        revision_copy = _validated_content_revisions(content_revisions, catalog=catalog_copy)
+
         self._catalog = MappingProxyType(catalog_copy)
         self._factories = MappingProxyType(factory_copy)
-        self.content_revision = content_revision
+        self._content_revisions = MappingProxyType(revision_copy)
 
     @property
     def task_ids(self) -> tuple[str, ...]:
@@ -123,15 +169,20 @@ class TaskFactoryRegistry:
             message = f"unknown task: {task_id}"
             raise UnknownTaskError(message) from None
 
+    def content_revision_for(self, task_id: str) -> str:
+        try:
+            return self._content_revisions[task_id]
+        except KeyError:
+            message = f"unknown task: {task_id}"
+            raise UnknownTaskError(message) from None
+
     def build(
         self,
         task_id: str,
-        document: TaskSettingsDocument,
+        settings: FrozenTaskSettings,
+        settings_revision: int,
         task_state: TaskStateDocument,
     ) -> Task:
-        if not isinstance(document, TaskSettingsDocument):
-            message = "document must be a TaskSettingsDocument"
-            raise TypeError(message)
         if not isinstance(task_state, TaskStateDocument):
             message = "task_state must be a TaskStateDocument"
             raise TypeError(message)
@@ -141,8 +192,9 @@ class TaskFactoryRegistry:
         definition = self.definition(task_id)
         context = TaskBuildContext(
             definition=definition,
-            settings_revision=document.revision,
-            settings=document.for_task(task_id),
+            settings_revision=settings_revision,
+            content_revision=self.content_revision_for(task_id),
+            settings=settings,
             task_state=task_state,
         )
         task = self.factory(task_id).build(context)
@@ -153,29 +205,36 @@ class TaskFactoryRegistry:
 
     def validate_settings(
         self,
-        document: TaskSettingsDocument,
+        settings: Mapping[str, FrozenTaskSettings],
+        settings_revisions: Mapping[str, int],
         *,
         task_ids: Iterable[str] | None = None,
     ) -> None:
-        if not isinstance(document, TaskSettingsDocument):
-            message = "document must be a TaskSettingsDocument"
+        if not isinstance(settings, Mapping):
+            message = "settings must be a mapping"
             raise TypeError(message)
-        if set(document.tasks) != set(self._catalog):
-            message = "settings document coverage does not match factory registry"
+        if not isinstance(settings_revisions, Mapping):
+            message = "settings_revisions must be a mapping"
+            raise TypeError(message)
+        if any(not isinstance(task_id, str) for task_id in settings):
+            message = "settings must use task id strings"
+            raise TypeError(message)
+        if any(not isinstance(task_id, str) for task_id in settings_revisions):
+            message = "settings_revisions must use task id strings"
+            raise TypeError(message)
+        selected = _selected_task_ids(task_ids, catalog=self._catalog)
+        missing_settings = sorted(set(selected) - set(settings))
+        missing_revisions = sorted(set(selected) - set(settings_revisions))
+        if missing_settings or missing_revisions:
+            message = (
+                "selected settings coverage mismatch: "
+                f"missing_settings={missing_settings}, missing_revisions={missing_revisions}"
+            )
             raise FactoryCoverageError(message)
-        if isinstance(task_ids, str):
-            message = "task_ids must be an iterable of task id strings"
-            raise TypeError(message)
-        selected = tuple(self._catalog) if task_ids is None else tuple(task_ids)
-        if any(not isinstance(task_id, str) for task_id in selected):
-            message = "task_ids must contain strings"
-            raise TypeError(message)
-        if len(set(selected)) != len(selected):
-            message = "task_ids must not contain duplicates"
-            raise ValueError(message)
-        unknown = sorted(set(selected) - set(self._catalog))
-        if unknown:
-            message = f"task_ids contain unknown tasks: {unknown}"
-            raise UnknownTaskError(message)
         for task_id in selected:
-            self.build(task_id, document, TaskStateDocument.empty(task_id))
+            self.build(
+                task_id,
+                settings[task_id],
+                settings_revisions[task_id],
+                TaskStateDocument.empty(task_id),
+            )

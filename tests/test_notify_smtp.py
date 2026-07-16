@@ -50,7 +50,6 @@ def _send(config: SmtpNotificationConfig) -> None:
         recipient="receiver@example.com",
         title="Alas failed",
         content="boom",
-        idempotency_key="run-1",
     )
 
 
@@ -71,7 +70,6 @@ def test_sender_uses_implicit_tls(monkeypatch: pytest.MonkeyPatch) -> None:
     assert client.login_args == ("sender@example.com", "test-credential")
     message = cast("dict[str, str]", client.messages[0])
     assert message["To"] == "receiver@example.com"
-    assert message["Message-ID"].startswith("<alas-")
 
 
 def test_sender_uses_starttls(monkeypatch: pytest.MonkeyPatch) -> None:

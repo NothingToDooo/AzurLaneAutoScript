@@ -26,7 +26,6 @@ from module.content.activity_catalog import ActivityCatalog
 from module.content.activity_profile import CoalitionStageId
 from module.content.manifest import load_event_manifests
 from module.gameplay.activity import (
-    GAMEPLAY_COMMAND_PROFILES,
     ActivityDisposition,
     ActivityReport,
     ActivitySpec,
@@ -70,7 +69,7 @@ from module.task_registry import TASK_CATALOG
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _OBSERVED_AT = datetime(2026, 7, 13, 8, tzinfo=UTC)
@@ -183,7 +182,7 @@ class _ActivityWorkflow:
     def execute(
         self,
         spec: ActivitySpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> ActivityReport:
         cancellation.raise_if_requested()
         self.specs.append(spec)
@@ -199,7 +198,7 @@ class _EncounterWorkflow:
     def __init__(self) -> None:
         self.specs: list[EncounterSpec] = []
 
-    def execute(self, spec: EncounterSpec, cancellation: CancellationSignal) -> EncounterReport:
+    def execute(self, spec: EncounterSpec, cancellation: CancellationSource) -> EncounterReport:
         cancellation.raise_if_requested()
         self.specs.append(spec)
         if spec.command in {EncounterCommand.RAID, EncounterCommand.COALITION}:
@@ -232,7 +231,7 @@ class _AssistWorkflow:
     def advance_to_safe_point(
         self,
         spec: AssistSessionSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> AssistSessionReport:
         cancellation.raise_if_requested()
         self.specs.append(spec)
@@ -270,6 +269,7 @@ def _build_context(
     return TaskBuildContext(
         definition=TASK_CATALOG[command],
         settings_revision=3,
+        content_revision="content-1",
         settings=MappingProxyType(settings),
         task_state=TaskStateDocument.empty(command) if task_state is None else task_state,
     )
@@ -283,7 +283,7 @@ def _task_context(
     return TaskContext(
         task_id=TaskId(command),
         started_at=datetime(2026, 7, 13, tzinfo=UTC),
-        mode=GAMEPLAY_COMMAND_PROFILES[command].execution_mode,
+        mode=TASK_CATALOG[command].execution_mode,
         metadata=RunMetadata(settings_revision=3, content_revision="content-1"),
         abort=AbortToken() if abort is None else abort,
     )

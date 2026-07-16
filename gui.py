@@ -17,7 +17,6 @@ def main() -> None:
         type=int,
         help=f"监听端口，默认 {DEFAULT_WEBUI_PORT}。",
     )
-    parser.add_argument("-k", "--key", type=str, help="WebUI 密码，默认不启用。")
     parser.add_argument(
         "--run",
         action="store_true",
@@ -31,7 +30,10 @@ def main() -> None:
     logger.attr("Host", DEFAULT_WEBUI_HOST)
     logger.attr("Port", port)
     prepare_pywebio_imports()
-    uvicorn.run("module.webui.app:app", host=DEFAULT_WEBUI_HOST, port=port, factory=True, log_config=None)
+    # 必须先安装轻量 PIL 占位模块，再导入依赖 PyWebIO 的应用。
+    from module.webui.app import app  # noqa: PLC0415
+
+    uvicorn.run(app(auto_run=args.run), host=DEFAULT_WEBUI_HOST, port=port, log_config=None)
 
 
 if __name__ == "__main__":

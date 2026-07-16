@@ -1,7 +1,6 @@
 schema_version: 1
 id: war_archives_20231026_cn
 kind: war_archives
-ui_profile: campaign_v1
 war_archives:
   profile: tempesta_and_the_fountain_of_youth
 releases:

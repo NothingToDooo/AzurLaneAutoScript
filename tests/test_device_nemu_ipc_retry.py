@@ -1,7 +1,6 @@
 import ctypes
 from typing import TYPE_CHECKING
 
-import numpy as np
 import pytest
 
 from module.device import nemu_ipc_service as nemu_ipc_module
@@ -87,28 +86,64 @@ def test_nemu_ipc_retry_stops_on_incompatible_version(monkeypatch: pytest.Monkey
     assert logger.criticals == ["Retry always_incompatible() failed"]
 
 
-def test_nemu_ipc_retry_extends_screenshot_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_nemu_ipc_timeout_stops_without_reusing_the_connection(monkeypatch: pytest.MonkeyPatch) -> None:
     logger = _patch_retry_runtime(monkeypatch)
     device = object.__new__(NemuIpcImpl)
+    device._timed_out = False  # noqa: SLF001 - 构造不加载本机 DLL 的最小 NemuIpc 实例。
     timeouts: list[float] = []
-    run_count = 0
 
     def screenshot_once(_device: NemuIpcImpl, timeout: float) -> ImageArray:
-        nonlocal run_count
         timeouts.append(timeout)
-        run_count += 1
-        if run_count <= 2:
-            raise JobTimeout
-        return np.full((1, 1, 4), round(timeout * 10), dtype=np.uint8)
+        raise JobTimeout
 
     monkeypatch.setattr(NemuIpcImpl, "_screenshot_once", screenshot_once)
 
-    assert device.screenshot()[0, 0, 0] == 10
-    assert timeouts == [0.5, 0.5, 1]
-    assert logger.warnings == [
-        "Func screenshot() call timeout, retrying: 0",
-        "Func screenshot() call timeout, retrying: 1",
+    with pytest.raises(RequestHumanTakeover):
+        device.screenshot()
+
+    assert timeouts == [0.5]
+    assert logger.criticals == [
+        "Func screenshot() call timeout; stop using this NemuIpc connection",
+        "NemuIpc native call timed out; this connection can no longer be used",
     ]
+
+
+def test_native_timeout_poison_prevents_later_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _TimedOutJob:
+        @staticmethod
+        def get_or_timeout(_timeout: float) -> None:
+            raise JobTimeout
+
+    class _Pool:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def start_thread_soon(self, _func: object, *_args: object) -> _TimedOutJob:
+            self.calls += 1
+            return _TimedOutJob()
+
+    pool = _Pool()
+    monkeypatch.setattr(nemu_ipc_module, "WORKER_POOL", pool)
+    device = object.__new__(NemuIpcImpl)
+    device._timed_out = False  # noqa: SLF001 - 构造不加载本机 DLL 的最小 NemuIpc 实例。
+
+    with pytest.raises(JobTimeout):
+        device.run_func(lambda: 0)
+    with pytest.raises(RequestHumanTakeover, match="can no longer be used"):
+        device.run_func(lambda: 0, on_thread=False)
+
+    assert pool.calls == 1
+
+
+def test_poisoned_disconnect_drops_handle_without_native_call() -> None:
+    device = object.__new__(NemuIpcImpl)
+    device.connect_id = 7
+    device._timed_out = True  # noqa: SLF001 - 构造不加载本机 DLL 的最小 NemuIpc 实例。
+    device.lib = object()
+
+    device.disconnect()
+
+    assert device.connect_id == 0
 
 
 def test_nemu_ipc_retry_retries_native_errors_without_reconnect(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -119,7 +119,6 @@ def _explore_settings(decoder: SettingsDecoder) -> ExploreSettings:
         fleet=_fleet(decoder),
         special_radar=decoder.boolean("special_radar"),
         force_run=decoder.boolean("force_run"),
-        last_zone=decoder.integer("last_zone", minimum=0),
     )
 
 

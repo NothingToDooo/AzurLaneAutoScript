@@ -23,7 +23,7 @@ from module.application import (
 )
 
 if TYPE_CHECKING:
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 REWARD_TASK_ID = TaskId("reward")
@@ -177,7 +177,7 @@ class DailyReport:
 
 
 class DailyWorkflow(Protocol):
-    def execute(self, settings: DailySettings, cancellation: CancellationSignal) -> DailyReport: ...
+    def execute(self, settings: DailySettings, cancellation: CancellationSource) -> DailyReport: ...
 
 
 class DailyTask(Task):
@@ -263,19 +263,19 @@ class HardCampaignPort(Protocol):
     def remaining_attempts(
         self,
         settings: HardSettings,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> int: ...
 
     def advance_one(
         self,
         settings: HardSettings,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> HardBattleOutcome: ...
 
     def exit_ui(
         self,
         settings: HardSettings,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> None: ...
 
     def release(self) -> None: ...
@@ -307,7 +307,7 @@ class HardReport:
 
 
 class HardWorkflow(Protocol):
-    def execute(self, settings: HardSettings, cancellation: CancellationSignal) -> HardReport: ...
+    def execute(self, settings: HardSettings, cancellation: CancellationSource) -> HardReport: ...
 
 
 class HardTask(Task):
@@ -455,7 +455,7 @@ class ExerciseWorkflow(Protocol):
         self,
         settings: ExerciseSettings,
         progress: ExerciseProgress,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> ExerciseReport: ...
 
 

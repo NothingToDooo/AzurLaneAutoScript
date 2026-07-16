@@ -1,15 +1,12 @@
 import abc
-import ctypes
 from collections import deque
-from functools import partial, wraps
+from functools import partial
 from itertools import count
 from threading import Lock, Thread
 from typing import TYPE_CHECKING, NoReturn, Protocol
 
-from module.logger import logger
-
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable
     from types import TracebackType
     from typing import Self
 
@@ -77,21 +74,13 @@ def capture[**P, ResultT](sync_fn: Callable[P, ResultT], *args: P.args, **kwargs
     """将 sync_fn 的返回值或任意 BaseException 封装为 Outcome。"""
     try:
         return Value(sync_fn(*args, **kwargs))
-    # 线程池 outcome 边界：需要把 _JobKill、KeyboardInterrupt 等跨线程异常传回调用方。
+    # 线程池 outcome 边界：需要把 KeyboardInterrupt 等跨线程异常传回调用方。
     except BaseException as exc:  # noqa: BLE001
         exc = remove_tb_frames(exc, 1)
         return Error(exc)
 
 
-class JobError(Exception):
-    pass
-
-
 class JobTimeout(Exception):
-    pass
-
-
-class _JobKill(Exception):
     pass
 
 
@@ -108,12 +97,11 @@ class Job[ResultT]:
 
     def __init__(self, worker: WorkerThread, func: Callable[[], ResultT]) -> None:
         # Having attribute "worker" means job is ongoing
-        # Not having attribute "worker" means job is finished or killed
+        # Not having attribute "worker" means job is finished
         self.worker: WorkerThread | None = worker
         self.func = func
 
         self.queue: deque[Outcome[ResultT]] = deque()
-        self.put_lock = Lock()
         self.notify_get = Lock()
         self.notify_get.acquire()
 
@@ -129,24 +117,12 @@ class Job[ResultT]:
         item = self.queue.popleft()
         return item.unwrap()
 
-    def get_or_kill(self, timeout: float) -> ResultT:
-        """timeout 秒内未完成则终止线程并抛出 JobTimeout。
-
-        线程池已满时，JobTimeout 可能无法立即抛出。
-        """
+    def get_or_timeout(self, timeout: float) -> ResultT:
+        """timeout 秒内未完成则抛出 JobTimeout，底层调用继续占用原 worker。"""
         if self.notify_get.acquire(timeout=timeout):
             item = self.queue.popleft()
             return item.unwrap()
-        self._kill()
         raise JobTimeout
-
-    def _kill(self) -> None:
-        with self.put_lock:
-            worker = self.worker
-            if worker is None:
-                return
-            worker.kill()
-            self.worker = None
 
     def run(self, worker: WorkerThread) -> None:
         result = capture(self.func)
@@ -155,12 +131,9 @@ class Job[ResultT]:
         worker.thread_pool.idle_workers[worker] = None
         worker.thread_pool.release_full_lock()
 
-        if isinstance(result, Error) and isinstance(result.error, _JobKill):
-            return
-        with self.put_lock:
-            self.queue.append(result)
-            self.worker = None
-            self.notify_get.release()
+        self.queue.append(result)
+        self.worker = None
+        self.notify_get.release()
 
 
 name_counter = count()
@@ -218,29 +191,6 @@ class WorkerThread:
                     del self.thread_pool.all_workers[self]
                     self.thread_pool.release_full_lock()
                     return
-
-    def kill(self) -> bool:
-        """用异步异常终止阻塞线程，调用时必须持有 job.put_lock。
-
-        返回异常是否成功注入。
-        """
-        ident = self.thread.ident
-        if ident is None:
-            logger.error(f"Failed to kill thread {ident} from job {self.job}")
-            return False
-        thread_id = ctypes.c_long(ident)
-        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, ctypes.py_object(_JobKill))
-        if res <= 1:
-            self.thread_pool.all_workers.pop(self, None)
-            self.thread_pool.release_full_lock()
-            return True
-        try:
-            job = self.job
-        except AttributeError:
-            job = None
-        logger.error(f"Failed to kill thread {self.thread.ident} from job {job}")
-        ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0)
-        return False
 
 
 class WorkerPool:
@@ -305,36 +255,9 @@ class WorkerPool:
         worker.worker_lock.release()
         return job
 
-    def run_on_thread[**P, ResultT](self, func: Callable[P, ResultT]) -> Callable[P, Job[ResultT]]:
-        """将函数包装为线程调用，每次调用返回 Job。"""
-
-        @wraps(func)
-        def thread_wrapper(*args: P.args, **kwargs: P.kwargs) -> Job[ResultT]:
-            return self.start_thread_soon(func, *args, **kwargs)
-
-        return thread_wrapper
-
     def wait_jobs(self) -> WaitJobsWrapper:
         """上下文退出时等待其中所有 Job。"""
         return WaitJobsWrapper(self)
-
-    def gather_jobs[ResultT](self) -> GatherJobsWrapper[ResultT]:
-        """上下文退出时等待所有 Job，并把结果收集到 results。"""
-        return GatherJobsWrapper(self)
-
-    def thread_map[ArgT, ResultT](self, func: Callable[[ArgT], ResultT], iterables: Iterable[ArgT]) -> list[ResultT]:
-        jobs = [self.start_thread_soon(func, arg) for arg in iterables]
-        return [job.get() for job in jobs]
-
-    def thread_starmap[*ArgsT, ResultT](
-        self, func: Callable[[*ArgsT], ResultT], iterables: Iterable[tuple[*ArgsT]]
-    ) -> list[ResultT]:
-        jobs = [self.start_thread_soon(func, *arg) for arg in iterables]
-        return [job.get() for job in jobs]
-
-    def thread_funcmap[ResultT](self, func_iterables: Iterable[Callable[[], ResultT]]) -> list[ResultT]:
-        jobs = [self.start_thread_soon(func) for func in func_iterables]
-        return [job.get() for job in jobs]
 
 
 class WaitJobsWrapper:
@@ -362,37 +285,6 @@ class WaitJobsWrapper:
     def start_thread_soon[**P, ResultT](
         self, func: Callable[P, ResultT], *args: P.args, **kwargs: P.kwargs
     ) -> Job[ResultT]:
-        job = self.pool.start_thread_soon(func, *args, **kwargs)
-        self.jobs.append(job)
-        return job
-
-
-class GatherJobsWrapper[ResultT]:
-    def __init__(self, pool: WorkerPool) -> None:
-        self.pool = pool
-        self.jobs: list[Job[ResultT]] = []
-        self.results: list[ResultT] = []
-
-    def get(self) -> None:
-        for job in self.jobs:
-            result = job.get()
-            self.results.append(result)
-        self.jobs.clear()
-
-    def __enter__(self) -> Self:
-        self.jobs.clear()
-        self.results.clear()
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> None:
-        self.get()
-
-    def start_thread_soon[**P](self, func: Callable[P, ResultT], *args: P.args, **kwargs: P.kwargs) -> Job[ResultT]:
         job = self.pool.start_thread_soon(func, *args, **kwargs)
         self.jobs.append(job)
         return job

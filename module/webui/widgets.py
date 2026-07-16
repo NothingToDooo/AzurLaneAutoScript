@@ -385,7 +385,7 @@ def put_arg_storage(kwargs: T_Output_Kwargs) -> Output | None:
 
     def clear_callback() -> None:
         alasgui: AlasGUI = local.gui
-        alasgui.modified_config_queue.put({"name": ".".join(name.split("_")), "value": {}})
+        alasgui.save_config_change(".".join(name.split("_")), {})
         # 不直接写 pin[name]，见 PyWebIO issue 459。
 
     return put_scope(

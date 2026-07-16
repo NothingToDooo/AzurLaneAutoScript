@@ -2,9 +2,11 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast, override
 
 import numpy as np
+import pytest
 
 from module.device.screenshot import Screenshot
 from module.diagnostics import ScreenshotHistory
+from module.exception import RequestHumanTakeover
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -42,7 +44,7 @@ class _CountingHistory(ScreenshotHistory):
 
 
 class _Screenshot(Screenshot):
-    def __init__(self, frames: list[ImageArray]) -> None:
+    def __init__(self, frames: list[ImageArray], *, black_checks: tuple[bool, bool] = (False, True)) -> None:
         self.config = cast(
             "AzurLaneConfig",
             SimpleNamespace(Error_ScreenshotLength=4),
@@ -51,7 +53,7 @@ class _Screenshot(Screenshot):
         self.orientation = 0
         self._screenshot_interval = _Timer()
         self._history = _CountingHistory()
-        self._black_checks = iter((False, True))
+        self._black_checks = iter(black_checks)
 
     @property
     @override
@@ -83,3 +85,26 @@ def test_screenshot_records_only_the_business_visible_retry_result() -> None:
     assert screenshot.record_calls == 1
     assert len(frames) == 1
     assert frames[0].image[0, 0].tolist() == [2, 2, 2]
+
+
+def test_black_screen_is_checked_after_a_previous_good_frame() -> None:
+    screenshot = object.__new__(Screenshot)
+    screenshot.serial = "127.0.0.1:16384"
+    screenshot.image = np.full((720, 1280, 3), 255, dtype=np.uint8)
+
+    assert screenshot.check_screen_black()
+
+    screenshot.image = np.zeros((720, 1280, 3), dtype=np.uint8)
+
+    assert not screenshot.check_screen_black()
+
+
+def test_screenshot_raises_after_two_invalid_frames() -> None:
+    black = np.zeros((720, 1280, 3), dtype=np.uint8)
+    screenshot = _Screenshot([black, black.copy()], black_checks=(False, False))
+    screenshot.serial = "127.0.0.1:16384"
+
+    with pytest.raises(RequestHumanTakeover, match="Unable to capture a valid"):
+        screenshot.screenshot()
+
+    assert screenshot.record_calls == 1

@@ -1,5 +1,5 @@
 import json
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -26,19 +26,18 @@ from module.application.state_effects import UpsertTaskState
 from module.bootstrap.assembly_source import ConfigurationLoadError, JsonConfigurationDocumentSource
 from module.bootstrap.configuration_compiler import ConfigurationCompileError, WebConfigurationCompiler
 from module.bootstrap.production import (
-    Mumu12GameRuntimeBundleSource,
+    PersonalRuntimeBuilder,
     PersonalRuntimeConfig,
     SystemLoopClock,
     ensure_personal_configuration,
     validate_personal_configuration,
 )
-from module.bootstrap.task_factories import build_game_task_registry
 from module.content.manifest import load_default_event_manifests
 from module.device.device import Device
 from module.diagnostics import ScreenshotHistory
 from module.equipment.equipment_code import EquipmentCodeHandler
 from module.notify.configuration import SmtpNotificationConfig, SmtpTransport
-from module.runtime.settings import TaskSettingsDocument
+from module.runtime.runner import CommandStatus, RuntimeRunner
 from module.state.config_repository import ConfigStateError, ConfigStateRepository
 from module.task_registry import TASK_CATALOG
 
@@ -50,6 +49,7 @@ if TYPE_CHECKING:
     from module.content.campaign_session import CampaignRunVariant, CampaignSession
     from module.content.campaign_session_source import CampaignStageSelection
     from module.content.models import EventPack, StageRef
+    from module.runtime.factories import TaskBuildContext
 
 
 class _Sessions:
@@ -83,6 +83,27 @@ class _Revision:
 
     def current(self) -> str:
         return self.value
+
+
+class _ForbiddenRevision:
+    @staticmethod
+    def current() -> str:
+        pytest.fail("benchmark composition must not calculate gameplay content revisions")
+
+
+class _SuccessfulTask:
+    @staticmethod
+    def run(_context: object) -> TaskResult:
+        return TaskResult(Succeeded())
+
+
+class _CountingFactory:
+    def __init__(self) -> None:
+        self.builds = 0
+
+    def build(self, _context: TaskBuildContext) -> _SuccessfulTask:
+        self.builds += 1
+        return _SuccessfulTask()
 
 
 def _template() -> dict[str, object]:
@@ -161,21 +182,24 @@ def test_equipment_codes_accumulate_through_one_owner_in_the_same_process(tmp_pa
     assert stored_codes == live_codes
 
 
-def _source(
+def _builder(
     *,
+    command: str = "alas",
     config_factory: Callable[[ConfigStateRepository], AzurLaneConfig],
     device_factory: Callable[[AzurLaneConfig], Device] = _test_device,
-) -> Mumu12GameRuntimeBundleSource:
-    return Mumu12GameRuntimeBundleSource(
+) -> PersonalRuntimeBuilder:
+    return PersonalRuntimeBuilder(
         Path(),
+        command,
         config_factory=config_factory,
         device_factory=device_factory,
         sessions_factory=lambda _root, _catalog, _profiles: _Sessions(),
-        content_revision=_Revision("content-test"),
+        event_revision=_Revision("event-test"),
+        campaign_revision=_Revision("campaign-test"),
     )
 
 
-def test_bundle_source_builds_every_domain_from_personal_configuration(
+def test_scheduler_builder_builds_every_domain_from_personal_configuration(
     monkeypatch: pytest.MonkeyPatch,
     production_default_event_packs: tuple[EventPack, ...],
 ) -> None:
@@ -183,14 +207,60 @@ def test_bundle_source_builds_every_domain_from_personal_configuration(
     document = _template()
     config_factory, configs = _personal_config_factory(document)
 
-    compiled, bundle, _repository = _source(config_factory=config_factory).build(
+    compiled, registry, _repository, screenshots = _builder(config_factory=config_factory).build(
         document,
         clock=SystemLoopClock(),
     )
 
-    assert bundle.content_revision == "content-test"
+    assert registry.content_revision_for("event_story") == "event-test"
+    assert registry.content_revision_for("main") == "campaign-test"
+    assert registry.content_revision_for("benchmark") == "builtin-content-v1"
+    assert isinstance(screenshots, ScreenshotHistory)
     assert configs[0].config_name == "alas"
     assert configs[0].Emulator_Serial == compiled.device_serial
+
+
+def test_direct_benchmark_skips_campaign_content_and_builds_its_factory_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = _template()
+    config_factory, _configs = _personal_config_factory(document)
+    factory = _CountingFactory()
+
+    def reject_content(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("benchmark composition must not load or validate campaign content")
+
+    monkeypatch.setattr(production_module, "load_event_manifests", reject_content)
+    monkeypatch.setattr(production_module, "compile_campaign_runtime_profile_registry", reject_content)
+    monkeypatch.setattr(production_module, "validate_mumu12_campaign_runtime_profiles", reject_content)
+    monkeypatch.setattr(
+        production_module,
+        "build_maintenance_factories",
+        lambda _services: {"benchmark": factory},
+    )
+
+    compiled, registry, repository, _screenshots = PersonalRuntimeBuilder(
+        Path(),
+        "benchmark",
+        config_factory=config_factory,
+        device_factory=_test_device,
+        event_revision=_ForbiddenRevision(),
+        campaign_revision=_ForbiddenRevision(),
+    ).build(document, clock=SystemLoopClock())
+    runner = RuntimeRunner(
+        factories=registry,
+        settings=compiled.tasks,
+        settings_revisions=compiled.task_revisions,
+        repository=repository,
+        clock=SystemLoopClock(),
+    )
+
+    outcome = runner.run("benchmark")
+
+    assert outcome.status is CommandStatus.FINISHED
+    assert outcome.last_task == "benchmark"
+    assert registry.task_ids == ("benchmark",)
+    assert factory.builds == 1
 
 
 @pytest.mark.parametrize(
@@ -218,7 +288,7 @@ def test_content_validation_precedes_device_construction(
     monkeypatch.setattr(production_module, validator_name, reject_profiles)
 
     with pytest.raises(ValueError, match=message):
-        _source(
+        _builder(
             config_factory=config_factory,
             device_factory=lambda config: created.append(config) or _test_device(config),
         ).build(document, clock=SystemLoopClock())
@@ -233,25 +303,17 @@ def test_complete_configuration_builds_the_exact_task_catalog(
     _reuse_production_default_event_packs(monkeypatch, production_default_event_packs)
     document = _template()
     config_factory, _configs = _personal_config_factory(document)
-    source = Mumu12GameRuntimeBundleSource(
+    builder = PersonalRuntimeBuilder(
         Path(),
+        "alas",
         config_factory=config_factory,
         device_factory=_test_device,
-        content_revision=_Revision("content-test"),
+        event_revision=_Revision("event-test"),
+        campaign_revision=_Revision("campaign-test"),
     )
-    compiled, bundle, _repository = source.build(document, clock=SystemLoopClock())
-    registry = build_game_task_registry(
-        bundle.tasks,
-        content_revision=bundle.content_revision,
-    )
-    settings = TaskSettingsDocument.from_payload(
-        compiled.payload,
-        revision=1,
-        updated_at=datetime(2026, 7, 13, tzinfo=UTC),
-        task_ids=registry.task_ids,
-    )
+    compiled, registry, _repository, _screenshots = builder.build(document, clock=SystemLoopClock())
 
-    registry.validate_settings(settings)
+    registry.validate_settings(compiled.tasks, compiled.task_revisions)
     assert registry.task_ids == tuple(TASK_CATALOG)
 
 

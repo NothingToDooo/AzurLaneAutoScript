@@ -22,8 +22,8 @@ from module.map_detection.grid import Grid
 from module.map_detection.grid_info import GridInfo
 
 if TYPE_CHECKING:
+    from module.application import CancellationSource
     from module.config.config_generated import ConfigOverrides
-    from module.interaction import CancellationSignal
 
 
 class CampaignRuntimeProfileError(RuntimeError):
@@ -34,8 +34,6 @@ class RuntimeOperation(StrEnum):
     """旧地图引擎允许扩展的封闭调用面；值不是可反射的 Python 路径。"""
 
     ADVANCE_ARCHIVES_SCROLL = "advance_archives_scroll"
-    AIR_STRIKE = "air_strike"
-    AIR_STRIKE_APPEAR = "air_strike_appear"
     ARCHIVES_LOADING_COMPLETE = "archives_loading_complete"
     CAMPAIGN_BALL_GET = "campaign_ball_get"
     CAMPAIGN_BALL_SET = "campaign_ball_set"
@@ -46,14 +44,8 @@ class RuntimeOperation(StrEnum):
     EXPECTED_END = "expected_end"
     GET_ARCHIVES_ENTRANCE = "get_archives_entrance"
     MAP_SWIPE = "map_swipe"
-    MOB_MOVE = "mob_move_internal"
-    MOB_MOVE_GRIDS = "mob_move_grids"
-    MOB_MOVE_INFO_CHANGE = "mob_move_info_change"
     SEARCH_ARCHIVES_ENTRANCE = "search_archives_entrance"
-    SELECT_MOB_MOVE_ORIGIN = "select_mob_move_origin"
-    SELECT_MOB_MOVE_TARGET = "select_mob_move_target"
     WAIT_ARCHIVES_LOADED = "wait_archives_loaded"
-    AIR_STRIKE_EXECUTE = "air_strike_execute"
     CAMPAIGN_ENSURE_MODE = "campaign_ensure_mode"
     CAMPAIGN_GET_CHAPTER_INDEX = "campaign_get_chapter_index"
     CAMPAIGN_GET_ENTRANCE = "campaign_get_entrance"
@@ -68,7 +60,6 @@ class RuntimeOperation(StrEnum):
     CAMPAIGN_SET_CHAPTER_SP = "campaign_set_chapter_sp"
     CATCH_CAMERA_REPOSITIONING = "catch_camera_repositioning"
     CLEAR_BOSS = "clear_boss"
-    CLEAR_MAP_ITEMS = "clear_map_items"
     ENEMY_SEARCHING_APPEAR = "enemy_searching_appear"
     ENSURE_NO_STAGE_ENTRANCE = "ensure_no_stage_entrance"
     EQUIPMENT_TAKE_OFF_WHEN_FINISHED = "equipment_take_off_when_finished"
@@ -96,10 +87,6 @@ class RuntimeOperation(StrEnum):
     MAP_DATA_INIT = "map_data_init"
     MAP_GET_INFO = "map_get_info"
     MAP_INIT = "map_init"
-    MOB_MOVABLE = "mob_movable"
-    MOB_MOVE_EXECUTE = "mob_move_execute"
-    PICK_UP_FLARE = "pick_up_flare"
-    PICK_UP_LIGHT_HOUSE = "pick_up_light_house"
     STRATEGY_SET_EXECUTE = "strategy_set_execute"
     UI_GOTO_ARCHIVES_CAMPAIGN = "ui_goto_archives_campaign"
     UI_GOTO_EVENT = "ui_goto_event"
@@ -726,6 +713,7 @@ class CampaignRuntimeProfileManager:
         self._direct_config_tunings = MappingProxyType(direct)
         self._runtime_attribute_tunings = MappingProxyType(runtime_attributes)
         self._behavior_tunings = MappingProxyType(behavior)
+        self._validate_projection_contracts()
 
     @staticmethod
     def _build_instances(
@@ -754,6 +742,17 @@ class CampaignRuntimeProfileManager:
                 instances.append(instance)
                 facets.extend(_SessionFacet(binding, instance) for binding in bindings)
         return tuple(instances), tuple(facets)
+
+    def _validate_projection_contracts(self) -> None:
+        for key, value in self._direct_config_tunings.items():
+            _integer_tuning(value, key)
+        for key, value in self._runtime_attribute_tunings.items():
+            _number_tuning(value, key)
+        _ = self.boss_appear_refocus_preset
+        _ = self.map_clear_percentage_multiplier
+        _ = self.combat_disable_stuck_detection_battle
+        _ = self.map_grid_class
+        _ = self.camera_grid_class
 
     @property
     def profile(self) -> CampaignRuntimeProfile:
@@ -951,15 +950,15 @@ class CampaignRuntimeProfileManager:
             RuntimeTuningKey.COMBAT_DISABLE_STUCK_DETECTION_BATTLE,
         )
 
-    def map_has_mob_move(self, cancellation: CancellationSignal) -> bool:
+    def map_has_mob_move(self, cancellation: CancellationSource) -> bool:
         cancellation.raise_if_requested()
         return self._shared_state.map_has_mob_move
 
-    def use_support_fleet(self, cancellation: CancellationSignal) -> bool:
+    def use_support_fleet(self, cancellation: CancellationSource) -> bool:
         cancellation.raise_if_requested()
         return self._shared_state.use_support_fleet
 
-    def use_single_fleet_override(self, cancellation: CancellationSignal) -> bool | None:
+    def use_single_fleet_override(self, cancellation: CancellationSource) -> bool | None:
         cancellation.raise_if_requested()
         return self._shared_state.use_single_fleet_override
 

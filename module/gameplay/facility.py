@@ -20,7 +20,7 @@ from module.application import (
 )
 
 if TYPE_CHECKING:
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 GEMS_FARMING_TASK_ID = TaskId("gems_farming")
@@ -139,7 +139,7 @@ class ResearchReport:
 
 
 class ResearchWorkflow(Protocol):
-    def execute(self, settings: ResearchSettings, cancellation: CancellationSignal) -> ResearchReport: ...
+    def execute(self, settings: ResearchSettings, cancellation: CancellationSource) -> ResearchReport: ...
 
 
 class ResearchTask(Task):
@@ -237,7 +237,7 @@ class CommissionReport:
 
 
 class CommissionWorkflow(Protocol):
-    def execute(self, settings: CommissionSettings, cancellation: CancellationSignal) -> CommissionReport: ...
+    def execute(self, settings: CommissionSettings, cancellation: CancellationSource) -> CommissionReport: ...
 
 
 class CommissionTask(Task):
@@ -383,7 +383,7 @@ class TacticalReport:
 
 
 class TacticalWorkflow(Protocol):
-    def execute(self, settings: TacticalSettings, cancellation: CancellationSignal) -> TacticalReport: ...
+    def execute(self, settings: TacticalSettings, cancellation: CancellationSource) -> TacticalReport: ...
 
 
 class TacticalTask(Task):

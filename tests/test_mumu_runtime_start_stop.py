@@ -17,13 +17,13 @@ class _Runtime(MumuRuntime):
         self._emulator_stop(instance)
 
 
-def _mumu12_instance(tmp_path: Path) -> EmulatorInstance:
+def _mumu12_instance(tmp_path: Path, *, name: str = "MuMuPlayer-12.0-1") -> EmulatorInstance:
     executable = tmp_path / "MuMu Player 12" / "nx_main" / "MuMuNxMain.exe"
     executable.parent.mkdir(parents=True)
     executable.touch()
     return EmulatorInstance(
         serial="127.0.0.1:16416",
-        name="MuMuPlayer-12.0-1",
+        name=name,
         path=executable.as_posix(),
     )
 
@@ -83,3 +83,20 @@ def test_legacy_emulator_instance_cannot_start_or_stop(tmp_path: Path) -> None:
         runtime.start_instance(instance)
     with pytest.raises(EmulatorUnknown):
         runtime.stop_instance(instance)
+
+
+@pytest.mark.parametrize("method_name", ["start_instance", "stop_instance"])
+def test_mumu12_instance_without_numeric_id_never_executes_manager_command(
+    method_name: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    commands: list[list[str]] = []
+    monkeypatch.setattr(MumuRuntime, "execute", classmethod(lambda _cls, command: commands.append(command)))
+    runtime = object.__new__(_Runtime)
+    instance = _mumu12_instance(tmp_path, name="unexpected-name")
+
+    with pytest.raises(EmulatorUnknown, match="Cannot get MuMu instance index"):
+        getattr(runtime, method_name)(instance)
+
+    assert commands == []

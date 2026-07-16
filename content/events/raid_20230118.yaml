@@ -1,7 +1,6 @@
 schema_version: 1
 id: raid_20230118
 kind: raid
-ui_profile: campaign_v1
 activity:
   kind: raid
   profile: kuybyshey

@@ -125,8 +125,8 @@ if TYPE_CHECKING:
     import builtins
     from collections.abc import Callable, Iterable
 
+    from module.application import CancellationSource
     from module.gameplay.campaign_live import CampaignRuntimeLifecycle
-    from module.interaction import CancellationSignal
 
 
 _NOW = datetime(2026, 7, 13, 12, tzinfo=UTC)
@@ -136,8 +136,6 @@ _DEFAULT_STAGE_REF = StageRef("campaign_main", "1-1")
 
 def _execution() -> CampaignExecutionSettings:
     fleet_emotion = CampaignFleetEmotionSettings(
-        value=119,
-        recorded_at=_NOW,
         control=EmotionControl.PREVENT_GREEN_FACE,
         recover=EmotionRecoverLocation.NOT_IN_DORMITORY,
         oath=False,
@@ -280,7 +278,7 @@ class _Observer:
         self,
         session: CampaignSession,
         state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattlefieldObservation:
         cancellation.raise_if_requested()
         self.calls.append((session, state))
@@ -298,7 +296,7 @@ class _Driver:
         self,
         session: CampaignSession,
         attempt: BattleAttempt,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleOutcome:
         del session
         cancellation.raise_if_requested()
@@ -310,7 +308,7 @@ class _UnavailableActivator:
     @staticmethod
     def activate(
         job: CampaignJobSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignCheckpointUnavailable:
         del job
         cancellation.raise_if_requested()
@@ -325,7 +323,7 @@ class _AchievementActivator:
     def activate(
         self,
         job: CampaignJobSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignMapAchievementReached:
         del job
         cancellation.raise_if_requested()
@@ -340,7 +338,7 @@ class _GemsFailureActivator:
     def activate(
         self,
         job: CampaignJobSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignGemsReplacementFailed:
         del job
         cancellation.raise_if_requested()
@@ -362,7 +360,7 @@ class _ProgramExecutor:
         self,
         session: CampaignSession,
         state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleProgramMode:
         del session, state
         cancellation.raise_if_requested()
@@ -373,7 +371,7 @@ class _ProgramExecutor:
         program: BattleProgram,
         session: CampaignSession,
         state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleProgramExecution:
         cancellation.raise_if_requested()
         self.calls.append((program, session, state))
@@ -963,7 +961,7 @@ class _GuardSource:
         job: CampaignJobSpec,
         session: CampaignSession,
         state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignGuardEvidence:
         del job, session, state
         cancellation.raise_if_requested()
@@ -991,7 +989,7 @@ class _GemsFleetExecutor:
         job: CampaignJobSpec,
         session: CampaignSession,
         trigger: GemsFleetReplacementTrigger,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> GemsFleetReplacementCompleted | GemsFleetReplacementFailed:
         cancellation.raise_if_requested()
         self.calls.append((job, session, trigger))
@@ -1552,7 +1550,7 @@ class _Runtime:
     def execute_auto_search_battle(
         self,
         battle_index: int,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleTarget:
         cancellation.raise_if_requested()
         self.calls.append(("auto_search", battle_index))
@@ -1583,7 +1581,7 @@ class _RuntimeSource:
     def active_runtime(
         self,
         session: CampaignSession,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignMapRuntime:
         del session
         cancellation.raise_if_requested()
@@ -1593,7 +1591,7 @@ class _RuntimeSource:
     def commit_active_unit(
         self,
         session: CampaignSession,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CommittedCampaignUnit:
         del session
         cancellation.raise_if_requested()

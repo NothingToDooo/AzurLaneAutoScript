@@ -66,8 +66,8 @@ from module.raid.profile import (
 from module.raid.result import RaidAttemptStatus, RaidExecutionResult
 
 if TYPE_CHECKING:
+    from module.application import CancellationSource
     from module.config.config_generated import ConfigOverrides
-    from module.interaction import CancellationSignal
 
 
 _NOW = datetime(2026, 7, 13, 8, tzinfo=UTC)
@@ -104,7 +104,7 @@ def runtime(monkeypatch: pytest.MonkeyPatch) -> tuple[AzurLaneConfig, Device]:
         _device: Device,
         _task_name: str,
         overlay: ConfigOverrides,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> Device:
         cancellation.raise_if_requested()
         _config.apply_runtime_overlay(**overlay)
@@ -411,7 +411,7 @@ def test_raid_profile_resolution_precedes_runtime_activation(
         _config: AzurLaneConfig,
         _device: Device,
         _task_name: str,
-        _cancellation: CancellationSignal,
+        _cancellation: CancellationSource,
     ) -> Device:
         nonlocal activation_calls
         activation_calls += 1
@@ -445,7 +445,7 @@ def test_raid_plan_validation_precedes_runtime_activation(
         _config: AzurLaneConfig,
         _device: Device,
         _task_name: str,
-        _cancellation: CancellationSignal,
+        _cancellation: CancellationSource,
     ) -> Device:
         nonlocal activation_calls
         activation_calls += 1

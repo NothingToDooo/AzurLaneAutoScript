@@ -32,8 +32,8 @@ from module.ui.page import page_exercise
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from module.application import CancellationSource
     from module.config.config_generated import ConfigOverrides
-    from module.interaction import CancellationSignal
 
 
 class EncounterLiveClock(Protocol):
@@ -75,7 +75,7 @@ def _activate(
     device: Device,
     task_name: str,
     overlay: ConfigOverrides,
-    cancellation: CancellationSignal,
+    cancellation: CancellationSource,
 ) -> Device:
     cancellation.raise_if_requested()
     config.replace_runtime_overlay()
@@ -199,7 +199,7 @@ class Mumu12DailyWorkflow:
         self._config = config
         self._device = device
 
-    def execute(self, settings: DailySettings, cancellation: CancellationSignal) -> DailyReport:
+    def execute(self, settings: DailySettings, cancellation: CancellationSource) -> DailyReport:
         device = _activate(self._config, self._device, "Daily", _daily_overlay(settings), cancellation)
         runner = _ReportingDaily(self._config, device=device)
         runner.daily_checked = [0]
@@ -240,7 +240,7 @@ class Mumu12HardWorkflow:
         self._hard_campaign = hard_campaign
         self._clock = selected_clock
 
-    def execute(self, settings: HardSettings, cancellation: CancellationSignal) -> HardReport:
+    def execute(self, settings: HardSettings, cancellation: CancellationSource) -> HardReport:
         _activate(self._config, self._device, "Hard", _hard_overlay(settings), cancellation)
         with cleanup_scope(
             self._hard_campaign.release,
@@ -366,7 +366,7 @@ class Mumu12ExerciseWorkflow:
         self,
         settings: ExerciseSettings,
         progress: ExerciseProgress,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> ExerciseReport:
         if not isinstance(progress, ExerciseProgress):
             message = "progress must be an ExerciseProgress"

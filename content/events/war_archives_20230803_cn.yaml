@@ -1,7 +1,6 @@
 schema_version: 1
 id: war_archives_20230803_cn
 kind: war_archives
-ui_profile: campaign_v1
 war_archives:
   profile: anthem_of_remembrance
 releases:

@@ -5,9 +5,16 @@ from typing import cast
 
 import pytest
 
-from module.application import AbortToken, ExecutionMode, RunMetadata, TaskContext, TaskId
-from module.interaction import AppLifecycle, AppStatus, CancellationSignal
+from module.application import (
+    AbortToken,
+    CancellationSource,
+    ExecutionMode,
+    RunMetadata,
+    TaskContext,
+    TaskId,
+)
 from module.maintenance import (
+    AppLifecycle,
     BenchmarkMeasurement,
     BenchmarkReady,
     BenchmarkReport,
@@ -27,24 +34,19 @@ class _Services:
     def __init__(self) -> None:
         self.calls: list[str] = []
 
-    def status(self, cancellation: CancellationSignal) -> AppStatus:
-        cancellation.raise_if_requested()
-        self.calls.append("status")
-        return AppStatus.STOPPED
-
-    def start(self, cancellation: CancellationSignal) -> None:
+    def start(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self.calls.append("start")
 
-    def stop(self, cancellation: CancellationSignal) -> None:
+    def stop(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self.calls.append("stop")
 
-    def ensure_logged_in(self, cancellation: CancellationSignal) -> None:
+    def ensure_logged_in(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self.calls.append("login")
 
-    def build(self, cancellation: CancellationSignal) -> UncensoredPayload:
+    def build(self, cancellation: CancellationSource) -> UncensoredPayload:
         cancellation.raise_if_requested()
         self.calls.append("build")
         return UncensoredPayload(Path.cwd().resolve())
@@ -53,17 +55,17 @@ class _Services:
         self,
         payload: UncensoredPayload,
         package_name: str,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> None:
         cancellation.raise_if_requested()
         self.calls.append(f"install:{payload.source}:{package_name}")
 
-    def prepare(self, safe_stage: str, cancellation: CancellationSignal) -> BenchmarkReady:
+    def prepare(self, safe_stage: str, cancellation: CancellationSource) -> BenchmarkReady:
         cancellation.raise_if_requested()
         self.calls.append(f"prepare:{safe_stage}")
         return BenchmarkReady()
 
-    def measure(self, scene: BenchmarkScene, cancellation: CancellationSignal) -> BenchmarkReport:
+    def measure(self, scene: BenchmarkScene, cancellation: CancellationSource) -> BenchmarkReport:
         cancellation.raise_if_requested()
         self.calls.append(f"measure:{scene.value}")
         category = next(iter(scene.categories))
@@ -71,7 +73,7 @@ class _Services:
         selection = BenchmarkSelection(category, "recorded")
         return BenchmarkReport((measurement,), (selection,))
 
-    def present(self, report: BenchmarkReport, cancellation: CancellationSignal) -> None:
+    def present(self, report: BenchmarkReport, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self.calls.append(f"present:{len(report.measurements)}")
 
@@ -92,6 +94,7 @@ def _context(command: str, settings: dict[str, FrozenJsonValue]) -> TaskBuildCon
     return TaskBuildContext(
         definition=TASK_CATALOG[command],
         settings_revision=5,
+        content_revision="content-1",
         settings=MappingProxyType(settings),
         task_state=TaskStateDocument.empty(command),
     )
@@ -127,7 +130,7 @@ def test_maintenance_factory_rejects_schema_drift() -> None:
 
 def test_maintenance_services_fail_fast_for_missing_ports() -> None:
     shared = _Services()
-    with pytest.raises(TypeError, match=r"app must implement status\(\)"):
+    with pytest.raises(TypeError, match=r"app must implement start\(\)"):
         MaintenanceServices(
             app=cast("AppLifecycle", object()),
             login=shared,

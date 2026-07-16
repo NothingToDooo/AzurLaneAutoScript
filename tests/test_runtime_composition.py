@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import cast, override
+from typing import TYPE_CHECKING, cast, override
 
 import pytest
 
@@ -8,19 +8,23 @@ from module.application import ExecutionMode, Succeeded, Task, TaskContext, Task
 from module.runtime import (
     FactoryCoverageError,
     FrozenJsonValue,
+    FrozenTaskSettings,
     InvalidTaskFactoryError,
     JsonValue,
     SettingsDocumentError,
     TaskBuildContext,
     TaskFactory,
     TaskFactoryRegistry,
-    TaskSettingsDocument,
     TaskStateDocument,
     TaskStateDocumentError,
     TaskStateEntry,
     UnknownTaskError,
 )
+from module.runtime.settings import freeze_task_settings
 from module.task_registry import TaskDefinition
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 _NOW = datetime(2026, 7, 13, 8, tzinfo=UTC)
 
@@ -65,23 +69,21 @@ def _catalog() -> dict[str, TaskDefinition]:
     }
 
 
-def _payload(*, tasks: JsonValue | None = None) -> JsonValue:
+def _raw_settings(*, tasks: dict[str, JsonValue] | None = None) -> dict[str, JsonValue]:
+    if tasks is not None:
+        return tasks
     return {
-        "schema_version": 1,
-        "tasks": tasks
-        if tasks is not None
-        else {
-            "restart": {"nested": {"values": [1, 2]}},
-            "benchmark": {"scenes": ["screenshot", "click"]},
-        },
+        "restart": {"nested": {"values": [1, 2]}},
+        "benchmark": {"scenes": ["screenshot", "click"]},
     }
 
 
-def _document(*, payload: JsonValue | None = None) -> TaskSettingsDocument:
-    return TaskSettingsDocument.from_payload(
-        _payload() if payload is None else payload,
-        revision=7,
-        updated_at=_NOW,
+def _settings(
+    *,
+    tasks: dict[str, JsonValue] | None = None,
+) -> tuple[Mapping[str, FrozenTaskSettings], Mapping[str, int]]:
+    return freeze_task_settings(
+        _raw_settings(tasks=tasks),
         task_ids=("restart", "benchmark"),
     )
 
@@ -90,7 +92,7 @@ def _registry(*, restart_factory: _Factory | None = None) -> TaskFactoryRegistry
     return TaskFactoryRegistry(
         catalog=_catalog(),
         factories={"restart": restart_factory or _Factory(), "benchmark": _Factory()},
-        content_revision="content-sha256:abc",
+        content_revisions={"restart": "content-restart", "benchmark": "content-benchmark"},
     )
 
 
@@ -102,12 +104,19 @@ def test_registry_builds_from_one_settings_revision_and_current_task_state() -> 
         {"checkpoint": TaskStateEntry(schema_version=2, payload={"step": 4}, updated_at=_NOW)},
     )
 
-    registry.build("restart", _document(), task_state)
+    settings, revisions = _settings()
+    registry.build(
+        "restart",
+        settings["restart"],
+        revisions["restart"],
+        task_state,
+    )
 
     assert len(factory.contexts) == 1
     context = factory.contexts[0]
     assert context.definition.command == "restart"
-    assert context.settings_revision == 7
+    assert context.settings_revision == revisions["restart"]
+    assert context.content_revision == "content-restart"
     nested = cast("dict[str, FrozenJsonValue]", context.settings["nested"])
     assert nested["values"] == (1, 2)
     assert context.task_state.get("checkpoint") == task_state.get("checkpoint")
@@ -117,27 +126,26 @@ def test_registry_settings_validation_builds_with_empty_task_state() -> None:
     factory = _Factory()
     registry = _registry(restart_factory=factory)
 
-    registry.validate_settings(_document())
+    settings, revisions = _settings()
+    registry.validate_settings(settings, revisions)
 
     assert len(factory.contexts) == 1
     assert factory.contexts[0].task_state == TaskStateDocument.empty("restart")
 
 
-def test_settings_document_is_deeply_read_only_and_detached_from_payload() -> None:
-    payload = _payload()
-    document = _document(payload=payload)
-    root = cast("dict[str, JsonValue]", payload)
-    tasks = cast("dict[str, JsonValue]", root["tasks"])
-    restart = cast("dict[str, JsonValue]", tasks["restart"])
+def test_compiled_task_settings_are_deeply_read_only_and_detached_from_input() -> None:
+    raw_settings = _raw_settings()
+    settings, _revisions = _settings(tasks=raw_settings)
+    restart = cast("dict[str, JsonValue]", raw_settings["restart"])
     raw_nested = cast("dict[str, JsonValue]", restart["nested"])
     cast("list[JsonValue]", raw_nested["values"]).append(3)
 
-    nested = cast("dict[str, FrozenJsonValue]", document.for_task("restart")["nested"])
+    nested = cast("dict[str, FrozenJsonValue]", settings["restart"]["nested"])
     assert nested["values"] == (1, 2)
     with pytest.raises(TypeError):
-        cast("dict[str, object]", document.tasks)["restart"] = {}
+        cast("dict[str, object]", settings)["restart"] = {}
     with pytest.raises(TypeError):
-        cast("dict[str, object]", document.for_task("restart"))["new"] = True
+        cast("dict[str, object]", settings["restart"])["new"] = True
 
 
 def test_task_state_document_is_deeply_read_only_and_detached_from_payload() -> None:
@@ -170,33 +178,27 @@ def test_task_state_document_rejects_invalid_entries_and_non_json_payloads() -> 
 
 
 @pytest.mark.parametrize(
-    ("payload", "match"),
+    ("tasks", "match"),
     [
-        ({"schema_version": 1}, "fields mismatch"),
-        ({"schema_version": 2, "tasks": {"restart": {}, "benchmark": {}}}, "schema_version"),
-        ({"schema_version": 1, "tasks": {"restart": {}}}, "coverage mismatch"),
-        (
-            {"schema_version": 1, "tasks": {"restart": {}, "benchmark": {}, "removed": {}}},
-            "coverage mismatch",
-        ),
-        ({"schema_version": 1, "tasks": {"restart": [], "benchmark": {}}}, "must be an object"),
+        ({"restart": {}}, "coverage mismatch"),
+        ({"restart": {}, "benchmark": {}, "removed": {}}, "coverage mismatch"),
+        ({"restart": cast("JsonValue", []), "benchmark": {}}, "must be an object"),
     ],
 )
-def test_settings_document_rejects_schema_drift(payload: JsonValue, match: str) -> None:
+def test_task_settings_reject_invalid_coverage_and_values(tasks: dict[str, JsonValue], match: str) -> None:
     with pytest.raises(SettingsDocumentError, match=match):
-        _document(payload=payload)
+        _settings(tasks=tasks)
 
 
-def test_settings_document_rejects_invalid_revision_and_timestamp() -> None:
-    with pytest.raises(ValueError, match="positive integer"):
-        TaskSettingsDocument.from_payload(_payload(), revision=0, updated_at=_NOW, task_ids=_catalog())
-    with pytest.raises(ValueError, match="timezone-aware"):
-        TaskSettingsDocument.from_payload(
-            _payload(),
-            revision=1,
-            updated_at=datetime(2026, 7, 13),
-            task_ids=_catalog(),
-        )
+def test_task_settings_revisions_change_only_with_their_task_settings() -> None:
+    _baseline_settings, baseline_revisions = _settings()
+    tasks = _raw_settings()
+    benchmark = cast("dict[str, JsonValue]", tasks["benchmark"])
+    benchmark["scenes"] = ["screenshot"]
+    _changed_settings, changed_revisions = _settings(tasks=tasks)
+
+    assert changed_revisions["restart"] == baseline_revisions["restart"]
+    assert changed_revisions["benchmark"] != baseline_revisions["benchmark"]
 
 
 def test_registry_requires_exact_factory_coverage_and_coherent_catalog_keys() -> None:
@@ -204,13 +206,20 @@ def test_registry_requires_exact_factory_coverage_and_coherent_catalog_keys() ->
         TaskFactoryRegistry(
             catalog=_catalog(),
             factories={"restart": _Factory()},
-            content_revision="content:1",
+            content_revisions={"restart": "content:1", "benchmark": "content:1"},
         )
     with pytest.raises(FactoryCoverageError, match="keys must match"):
         TaskFactoryRegistry(
             catalog={"renamed": _definition("restart", ExecutionMode.SCHEDULED_JOB, priority=0)},
             factories={"renamed": _Factory()},
-            content_revision="content:1",
+            content_revisions={"renamed": "content:1"},
+        )
+
+    with pytest.raises(FactoryCoverageError, match="content revision coverage mismatch"):
+        TaskFactoryRegistry(
+            catalog=_catalog(),
+            factories={"restart": _Factory(), "benchmark": _Factory()},
+            content_revisions={"restart": "content:1"},
         )
 
 
@@ -225,7 +234,13 @@ def test_registry_rejects_unknown_task_and_invalid_factory_result() -> None:
             "restart": cast("TaskFactory", _InvalidFactory()),
             "benchmark": registry.factory("benchmark"),
         },
-        content_revision="content-sha256:abc",
+        content_revisions={"restart": "content-restart", "benchmark": "content-benchmark"},
     )
+    settings, revisions = _settings()
     with pytest.raises(InvalidTaskFactoryError, match="must return a Task"):
-        invalid_registry.build("restart", _document(), TaskStateDocument.empty("restart"))
+        invalid_registry.build(
+            "restart",
+            settings["restart"],
+            revisions["restart"],
+            TaskStateDocument.empty("restart"),
+        )

@@ -30,17 +30,59 @@ def test_command_validation_rejects_malformed_or_unknown_commands(command: str) 
 
 def test_unknown_command_fails_before_device_composition(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    class _ForbiddenBundleSource:
-        def __init__(self, _root: Path) -> None:
-            pytest.fail("invalid command must fail before device composition")
-
-    monkeypatch.setattr(production, "Mumu12GameRuntimeBundleSource", _ForbiddenBundleSource)
-
-    outcome = production.run_default_command("missing", project_root=_project_root(tmp_path))
+    root = _project_root(tmp_path)
+    outcome = production.run_default_command("missing", project_root=root)
 
     assert outcome.status is CommandStatus.FAILED
     assert outcome.exception_type == "ValueError"
     assert outcome.error_bundle is not None
     assert Path(outcome.error_bundle).is_dir()
+    assert not (root / "config" / "alas.json").exists()
+
+
+def test_initial_configuration_write_failure_returns_failed_outcome(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _ForbiddenBuilder:
+        def __init__(self, _root: Path, _command: str) -> None:
+            pass
+
+        @staticmethod
+        def build(*_args: object, **_kwargs: object) -> None:
+            pytest.fail("failed initial write must stop before runtime composition")
+
+    def fail_write(_path: Path, _data: bytes) -> None:
+        message = "disk full"
+        raise OSError(message)
+
+    monkeypatch.setattr(production, "atomic_write", fail_write)
+    monkeypatch.setattr(production, "PersonalRuntimeBuilder", _ForbiddenBuilder)
+
+    outcome = production.run_default_command("benchmark", project_root=_project_root(tmp_path))
+
+    assert outcome.status is CommandStatus.FAILED
+    assert outcome.exception_type == "OSError"
+    assert outcome.message == "disk full"
+
+
+def test_system_exit_is_not_converted_to_a_successful_command(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _ExitingBuilder:
+        def __init__(self, _root: Path, _command: str) -> None:
+            pass
+
+        @staticmethod
+        def build(_document: object, *, clock: object) -> None:
+            del clock
+            raise SystemExit(0)
+
+    monkeypatch.setattr(production, "PersonalRuntimeBuilder", _ExitingBuilder)
+
+    with pytest.raises(SystemExit) as error:
+        production.run_default_command("benchmark", project_root=_project_root(tmp_path))
+
+    assert error.value.code == 0

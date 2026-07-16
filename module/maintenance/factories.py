@@ -11,9 +11,8 @@ from module.runtime import SettingsDecoder, TypedTaskFactory
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from module.interaction import AppLifecycle
     from module.maintenance.benchmark import BenchmarkEngine, BenchmarkEnvironment, BenchmarkPresenter
-    from module.maintenance.game_manager import LoginFlow
+    from module.maintenance.game_manager import AppLifecycle, LoginFlow
     from module.maintenance.uncensored import UncensoredAssetBuilder, UncensoredAssetInstaller
     from module.runtime import TaskFactory
 
@@ -36,7 +35,6 @@ class MaintenanceServices:
 
     def __post_init__(self) -> None:
         dependencies = (
-            (self.app, "status", "app"),
             (self.app, "start", "app"),
             (self.app, "stop", "app"),
             (self.login, "ensure_logged_in", "login"),

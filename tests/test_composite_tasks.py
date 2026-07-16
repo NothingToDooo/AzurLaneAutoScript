@@ -61,7 +61,7 @@ from module.gameplay.composite import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _OBSERVED_AT = datetime(2026, 7, 13, 12, tzinfo=UTC)
@@ -86,7 +86,7 @@ class _Workflow[SettingsT, ReportT]:
         self.calls = 0
         self.received_settings: SettingsT | None = None
 
-    def execute(self, settings: SettingsT, cancellation: CancellationSignal) -> ReportT:
+    def execute(self, settings: SettingsT, cancellation: CancellationSource) -> ReportT:
         cancellation.raise_if_requested()
         self.calls += 1
         self.received_settings = settings
@@ -104,7 +104,7 @@ class _Collector:
     report: object = FreebieCollectionReport(changed=True, observed_at=_OBSERVED_AT)
     on_collect: Callable[[], None] | None = None
 
-    def _collect(self, cancellation: CancellationSignal) -> FreebieCollectionReport:
+    def _collect(self, cancellation: CancellationSource) -> FreebieCollectionReport:
         cancellation.raise_if_requested()
         self.call_log.append(self.name)
         if self.on_collect is not None:
@@ -113,7 +113,7 @@ class _Collector:
 
 
 class _FreebieCollector(_Collector):
-    def collect(self, cancellation: CancellationSignal) -> FreebieCollectionReport:
+    def collect(self, cancellation: CancellationSource) -> FreebieCollectionReport:
         return self._collect(cancellation)
 
 
@@ -121,7 +121,7 @@ class _MailCollector(_Collector):
     def collect(
         self,
         policy: MailCollectionPolicy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> FreebieCollectionReport:
         if not isinstance(policy, MailCollectionPolicy):
             raise TypeError
@@ -132,7 +132,7 @@ class _DataKeyCollector(_Collector):
     def collect(
         self,
         plan: DataKeyPlan,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> FreebieCollectionReport:
         if not isinstance(plan, DataKeyPlan):
             raise TypeError
@@ -143,7 +143,7 @@ class _SupplyPackCollector(_Collector):
     def collect(
         self,
         plan: SupplyPackPlan,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> FreebieCollectionReport:
         if not isinstance(plan, SupplyPackPlan):
             raise TypeError

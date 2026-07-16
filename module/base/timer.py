@@ -8,8 +8,6 @@ from module.logger import logger
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-type TimeRange = tuple[datetime, datetime]
-
 
 class _NamedCallable[R, **P](Protocol):
     __name__: str
@@ -38,27 +36,6 @@ def future_time(string: str) -> datetime:
     if future < now:
         return future + timedelta(days=1)
     return future
-
-
-def past_time(string: str) -> datetime:
-    hour, minute = [int(x) for x in string.split(":")]
-    now = datetime.now()
-    past = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    if past > now:
-        return past - timedelta(days=1)
-    return past
-
-
-def future_time_range(string: str) -> TimeRange:
-    """把 `23:30-06:30` 转为未来起止时间；跨午夜时起点落在前一天。"""
-    start, end = [future_time(s) for s in string.split("-")]
-    if start > end:
-        start -= timedelta(days=1)
-    return start, end
-
-
-def time_range_active(time_range: TimeRange) -> bool:
-    return time_range[0] < datetime.now() < time_range[1]
 
 
 class Timer:
@@ -95,10 +72,6 @@ class Timer:
 
     def current_count(self) -> int:
         return self._access
-
-    def add_count(self) -> Self:
-        self._access += 1
-        return self
 
     def reached(self) -> bool:
         """每次调用计一次访问；未启动时返回 True，以允许首次立即执行。"""

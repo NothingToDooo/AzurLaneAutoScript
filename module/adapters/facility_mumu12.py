@@ -25,8 +25,8 @@ from module.ui.page import page_research, page_reward
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from module.application import CancellationSource
     from module.config.config_generated import ConfigOverrides
-    from module.interaction import CancellationSignal
 
 
 def _activate(
@@ -34,7 +34,7 @@ def _activate(
     device: Device,
     task_name: str,
     gameplay_fields: Mapping[str, object],
-    cancellation: CancellationSignal,
+    cancellation: CancellationSource,
 ) -> Device:
     cancellation.raise_if_requested()
     config.replace_runtime_overlay()
@@ -138,7 +138,7 @@ class Mumu12ResearchDriver:
         self._device = device
         self._clock = clock
 
-    def execute(self, settings: ResearchSettings, cancellation: CancellationSignal) -> ResearchQueueEvidence:
+    def execute(self, settings: ResearchSettings, cancellation: CancellationSource) -> ResearchQueueEvidence:
         device = _activate(
             self._config,
             self._device,
@@ -192,7 +192,7 @@ class Mumu12CommissionDriver:
         self._config = config
         self._device = device
 
-    def execute(self, settings: CommissionSettings, cancellation: CancellationSignal) -> CommissionEvidence:
+    def execute(self, settings: CommissionSettings, cancellation: CancellationSource) -> CommissionEvidence:
         device = _activate(
             self._config,
             self._device,
@@ -246,7 +246,7 @@ class Mumu12TacticalDriver:
         self._device = device
         self._clock = clock
 
-    def execute(self, settings: TacticalSettings, cancellation: CancellationSignal) -> TacticalEvidence:
+    def execute(self, settings: TacticalSettings, cancellation: CancellationSource) -> TacticalEvidence:
         device = _activate(
             self._config,
             self._device,

@@ -6,6 +6,7 @@ import pytest
 
 from module.bootstrap.configuration_compiler import (
     ConfigurationCompileError,
+    ConfigurationDocument,
     CurrentConfigurationSchema,
     WebConfigurationCompiler,
 )
@@ -18,6 +19,7 @@ from module.notify.configuration import (
 from module.task_registry import TASK_CATALOG
 
 if TYPE_CHECKING:
+    from module.config.deep import MutableDeepData
     from module.runtime.settings import JsonValue
 
 
@@ -39,13 +41,43 @@ def test_current_schema_rejects_duplicate_json_fields(tmp_path: Path) -> None:
 def test_template_compiles_to_exact_runtime_task_and_schedule_coverage() -> None:
     compiled = WebConfigurationCompiler().compile(_template())
 
-    payload = cast("dict[str, JsonValue]", compiled.payload)
-    tasks = cast("dict[str, JsonValue]", payload["tasks"])
-    assert payload["schema_version"] == 1
-    assert set(tasks) == set(TASK_CATALOG)
+    assert set(compiled.tasks) == set(TASK_CATALOG)
+    assert set(compiled.task_revisions) == set(TASK_CATALOG)
+    assert all(revision > 0 for revision in compiled.task_revisions.values())
     assert compiled.device_serial == "127.0.0.1:16384"
     assert compiled.notification == DisabledNotificationConfig()
-    assert compiled.source_revision.startswith("sha256:")
+
+
+def test_compiler_parses_the_source_document_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = 0
+    original_parse = CurrentConfigurationSchema.parse
+
+    def counted_parse(
+        schema: CurrentConfigurationSchema,
+        document: ConfigurationDocument,
+    ) -> MutableDeepData:
+        nonlocal calls
+        calls += 1
+        return original_parse(schema, document)
+
+    monkeypatch.setattr(CurrentConfigurationSchema, "parse", counted_parse)
+
+    WebConfigurationCompiler().compile(_template())
+
+    assert calls == 1
+
+
+def test_compiled_runtime_document_is_an_independent_snapshot_on_every_read() -> None:
+    compiled = WebConfigurationCompiler().compile(_template())
+    first = compiled.runtime_document
+    main = cast("dict[str, object]", first["Main"])
+    campaign = cast("dict[str, object]", main["Campaign"])
+    campaign["Name"] = "mutated"
+
+    second = compiled.runtime_document
+    second_main = cast("dict[str, object]", second["Main"])
+    second_campaign = cast("dict[str, object]", second_main["Campaign"])
+    assert second_campaign["Name"] == "12-4"
 
 
 def test_compiler_projects_explicit_smtp_fields_to_typed_notification_config() -> None:
@@ -76,9 +108,9 @@ def test_compiler_projects_explicit_smtp_fields_to_typed_notification_config() -
         port=465,
         transport=SmtpTransport.IMPLICIT_TLS,
     )
-    assert compiled.source_revision == baseline.source_revision
-    assert credential not in repr(compiled)
-    assert credential not in json.dumps(compiled.payload)
+    assert compiled.task_revisions == baseline.task_revisions
+    assert credential in repr(compiled)
+    assert credential not in repr(compiled.tasks)
 
 
 def test_compiler_reports_invalid_smtp_field() -> None:
@@ -101,7 +133,7 @@ def test_compiler_reports_invalid_smtp_field() -> None:
     assert isinstance(caught.value.__cause__, NotificationConfigError)
 
 
-def test_compiled_revision_changes_only_when_the_persisted_runtime_snapshot_changes() -> None:
+def test_compiled_task_revision_changes_only_for_the_changed_task() -> None:
     document = _template()
     original = WebConfigurationCompiler().compile(document)
     repeated = WebConfigurationCompiler().compile(document)
@@ -110,31 +142,110 @@ def test_compiled_revision_changes_only_when_the_persisted_runtime_snapshot_chan
     campaign["Name"] = "12-3"
     changed = WebConfigurationCompiler().compile(document)
 
-    assert repeated.source_revision == original.source_revision
-    assert changed.source_revision != original.source_revision
+    assert repeated.task_revisions == original.task_revisions
+    assert changed.task_revisions["main"] != original.task_revisions["main"]
+    assert {task_id: revision for task_id, revision in changed.task_revisions.items() if task_id != "main"} == {
+        task_id: revision for task_id, revision in original.task_revisions.items() if task_id != "main"
+    }
 
 
-def test_compiled_payload_is_an_independent_snapshot_on_every_read() -> None:
-    compiled = WebConfigurationCompiler().compile(_template())
-    first = cast("dict[str, JsonValue]", compiled.payload)
-    tasks = cast("dict[str, JsonValue]", first["tasks"])
-    main = cast("dict[str, JsonValue]", tasks["main"])
-    main["stage_ids"] = ["mutated"]
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("Fleet1Value", 73),
+        ("Fleet1Record", "2026-07-15 12:34:56"),
+        ("Fleet2Value", 91),
+        ("Fleet2Record", "2026-07-15 12:34:56"),
+    ],
+)
+def test_campaign_revision_ignores_runtime_emotion_ledger_updates(field_name: str, value: object) -> None:
+    document = _template()
+    original = WebConfigurationCompiler().compile(document)
+    main = cast("dict[str, object]", document["Main"])
+    emotion = cast("dict[str, object]", main["Emotion"])
+    emotion[field_name] = value
 
-    second = cast("dict[str, JsonValue]", compiled.payload)
-    second_tasks = cast("dict[str, JsonValue]", second["tasks"])
-    second_main = cast("dict[str, JsonValue]", second_tasks["main"])
-    assert second_main["stage_ids"] == ["12-4"]
-    assert WebConfigurationCompiler().compile(_template()).source_revision == compiled.source_revision
+    changed = WebConfigurationCompiler().compile(document)
+
+    assert changed.tasks["main"] == original.tasks["main"]
+    assert changed.task_revisions["main"] == original.task_revisions["main"]
+    changed_main = cast("dict[str, object]", changed.runtime_document["Main"])
+    changed_emotion = cast("dict[str, object]", changed_main["Emotion"])
+    if isinstance(value, str):
+        assert str(changed_emotion[field_name]) == value
+    else:
+        assert changed_emotion[field_name] == value
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("Fleet1Control", "prevent_yellow_face"),
+        ("Fleet1Recover", "dormitory_floor_1"),
+        ("Fleet1Oath", True),
+    ],
+)
+def test_campaign_revision_tracks_emotion_policy_updates(field_name: str, value: object) -> None:
+    document = _template()
+    original = WebConfigurationCompiler().compile(document)
+    main = cast("dict[str, object]", document["Main"])
+    emotion = cast("dict[str, object]", main["Emotion"])
+    emotion[field_name] = value
+
+    changed = WebConfigurationCompiler().compile(document)
+
+    assert changed.task_revisions["main"] != original.task_revisions["main"]
+
+
+def test_opsi_explore_revision_ignores_runtime_last_zone() -> None:
+    document = _template()
+    original = WebConfigurationCompiler().compile(document)
+    explore = cast("dict[str, object]", document["OpsiExplore"])
+    settings = cast("dict[str, object]", explore["OpsiExplore"])
+    settings["LastZone"] = 44
+
+    changed = WebConfigurationCompiler().compile(document)
+
+    assert changed.tasks["opsi_explore"] == original.tasks["opsi_explore"]
+    assert changed.task_revisions["opsi_explore"] == original.task_revisions["opsi_explore"]
+    changed_explore = cast("dict[str, object]", changed.runtime_document["OpsiExplore"])
+    changed_settings = cast("dict[str, object]", changed_explore["OpsiExplore"])
+    assert changed_settings["LastZone"] == 44
+
+
+def test_opsi_explore_revision_tracks_user_policy() -> None:
+    document = _template()
+    original = WebConfigurationCompiler().compile(document)
+    explore = cast("dict[str, object]", document["OpsiExplore"])
+    settings = cast("dict[str, object]", explore["OpsiExplore"])
+    settings["SpecialRadar"] = True
+
+    changed = WebConfigurationCompiler().compile(document)
+
+    assert changed.task_revisions["opsi_explore"] != original.task_revisions["opsi_explore"]
+
+
+def test_compiled_settings_are_deeply_read_only_and_detached_from_source() -> None:
+    document = _template()
+    compiled = WebConfigurationCompiler().compile(document)
+    main_source = cast("dict[str, object]", document["Main"])
+    campaign_source = cast("dict[str, object]", main_source["Campaign"])
+    campaign_source["Name"] = "12-3"
+
+    main = compiled.tasks["main"]
+    assert main["stage_ids"] == ("12-4",)
+    with pytest.raises(TypeError):
+        cast("dict[str, object]", compiled.tasks)["main"] = {}
+    with pytest.raises(TypeError):
+        cast("dict[str, object]", main)["stage_ids"] = ()
 
 
 def test_compiler_projects_campaign_opsi_and_direct_command_settings() -> None:
-    payload = cast("dict[str, JsonValue]", WebConfigurationCompiler().compile(_template()).payload)
-    tasks = cast("dict[str, JsonValue]", payload["tasks"])
+    tasks = WebConfigurationCompiler().compile(_template()).tasks
 
     main = cast("dict[str, JsonValue]", tasks["main"])
     assert main["pack_id"] == "campaign_main"
-    assert main["stage_ids"] == ["12-4"]
+    assert main["stage_ids"] == ("12-4",)
     assert main["difficulty"] == "normal"
     execution = cast("dict[str, JsonValue]", main["execution"])
     assert execution["automation"] == {
@@ -162,8 +273,6 @@ def test_compiler_projects_campaign_opsi_and_direct_command_settings() -> None:
     emotion = cast("dict[str, JsonValue]", execution["emotion"])
     assert emotion["mode"] == "calculate"
     assert emotion["fleet1"] == {
-        "value": 119,
-        "recorded_at": "2019-12-31T16:00:00+00:00",
         "control": "prevent_green_face",
         "recover": "not_in_dormitory",
         "oath": False,
@@ -173,7 +282,7 @@ def test_compiler_projects_campaign_opsi_and_direct_command_settings() -> None:
         "use_emergency_repair": False,
         "use_low_hp_retreat": False,
         "hp_balance_threshold": 0.2,
-        "hp_balance_weight": [1_000, 1_000, 1_000],
+        "hp_balance_weight": (1_000, 1_000, 1_000),
         "repair_use_single_threshold": 0.3,
         "repair_use_multi_threshold": 0.6,
         "low_hp_retreat_threshold": 0.3,
@@ -181,7 +290,7 @@ def test_compiler_projects_campaign_opsi_and_direct_command_settings() -> None:
     assert execution["enemy_priority"] == {"scale_balance_weight": "default_mode"}
     assert "formation" not in cast("dict[str, JsonValue]", execution["fleets"])
     event_a = cast("dict[str, JsonValue]", tasks["event_a"])
-    assert event_a["stage_ids"] == ["t1", "t2", "t3"]
+    assert event_a["stage_ids"] == ("t1", "t2", "t3")
     gems_execution = cast(
         "dict[str, JsonValue]",
         cast("dict[str, JsonValue]", tasks["gems_farming"])["execution"],
@@ -206,15 +315,14 @@ def test_compiler_projects_campaign_opsi_and_direct_command_settings() -> None:
 
 
 def test_compiler_projects_encounter_facility_composite_and_market_settings() -> None:
-    payload = cast("dict[str, JsonValue]", WebConfigurationCompiler().compile(_template()).payload)
-    tasks = cast("dict[str, JsonValue]", payload["tasks"])
+    tasks = WebConfigurationCompiler().compile(_template()).tasks
     daily = cast("dict[str, JsonValue]", tasks["daily"])
     assert daily["use_daily_skip"] is True
     daily_missions = cast("dict[str, JsonValue]", daily["missions"])
     assert daily_missions["escort"] == {"stage": "first", "fleet": 1}
     assert daily_missions["supply_line_disruption"] == {"stage": "second", "fleet": None}
     assert tasks["hard"] == {
-        "schedule": {"timezone": "Asia/Shanghai", "triggers": ["00:00"]},
+        "schedule": {"timezone": "Asia/Shanghai", "triggers": ("00:00",)},
         "failure_retry_seconds": {"lower_seconds": 1_800, "upper_seconds": 1_800},
         "resource_retry_seconds": 7_200,
         "stage": "11-4",
@@ -269,8 +377,7 @@ def test_compiler_projects_encounter_facility_composite_and_market_settings() ->
 
 
 def test_compiler_preserves_scheduler_interval_bounds_in_canonical_seconds() -> None:
-    payload = cast("dict[str, JsonValue]", WebConfigurationCompiler().compile(_template()).payload)
-    tasks = cast("dict[str, JsonValue]", payload["tasks"])
+    tasks = WebConfigurationCompiler().compile(_template()).tasks
 
     tactical = cast("dict[str, JsonValue]", tasks["tactical"])
     reward = cast("dict[str, JsonValue]", tasks["reward"])
@@ -290,8 +397,7 @@ def test_compiler_accepts_single_interval_for_range_default() -> None:
     scheduler = cast("dict[str, object]", tactical["Scheduler"])
     scheduler["FailureInterval"] = 120
 
-    payload = cast("dict[str, JsonValue]", WebConfigurationCompiler().compile(document).payload)
-    tasks = cast("dict[str, JsonValue]", payload["tasks"])
+    tasks = WebConfigurationCompiler().compile(document).tasks
     tactical_settings = cast("dict[str, JsonValue]", tasks["tactical"])
 
     assert tactical_settings["failure_retry_seconds"] == {
@@ -306,8 +412,7 @@ def test_compiler_accepts_range_for_integer_interval_default() -> None:
     scheduler = cast("dict[str, object]", hard["Scheduler"])
     scheduler["FailureInterval"] = "120-240"
 
-    payload = cast("dict[str, JsonValue]", WebConfigurationCompiler().compile(document).payload)
-    tasks = cast("dict[str, JsonValue]", payload["tasks"])
+    tasks = WebConfigurationCompiler().compile(document).tasks
     hard_settings = cast("dict[str, JsonValue]", tasks["hard"])
 
     assert hard_settings["failure_retry_seconds"] == {
@@ -387,10 +492,10 @@ def test_compiler_normalizes_integer_json_numbers_for_float_settings() -> None:
     exercise_settings = cast("dict[str, object]", exercise["Exercise"])
     exercise_settings["LowHpThreshold"] = 0
 
-    compiled, runtime_document = WebConfigurationCompiler().compile_runtime_document(document)
+    compiled = WebConfigurationCompiler().compile(document)
+    runtime_document = compiled.runtime_document
 
-    payload = cast("dict[str, JsonValue]", compiled.payload)
-    tasks = cast("dict[str, JsonValue]", payload["tasks"])
+    tasks = compiled.tasks
     compiled_exercise = cast("dict[str, JsonValue]", tasks["exercise"])
     assert compiled_exercise["low_hp_threshold"] == 0.0
     assert type(compiled_exercise["low_hp_threshold"]) is float
@@ -459,8 +564,7 @@ def test_compiler_normalizes_disabled_shop_filters_to_null() -> None:
         settings = cast("dict[str, object]", task[group])
         settings["Filter"] = "  "
 
-    payload = cast("dict[str, JsonValue]", WebConfigurationCompiler().compile(document).payload)
-    tasks = cast("dict[str, JsonValue]", payload["tasks"])
+    tasks = WebConfigurationCompiler().compile(document).tasks
     frequent = cast("dict[str, JsonValue]", tasks["shop_frequent"])
     assert cast("dict[str, JsonValue]", frequent["plan"])["filter"] is None
     once = cast("dict[str, JsonValue]", tasks["shop_once"])

@@ -1,16 +1,13 @@
 from collections.abc import Mapping
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from module.bootstrap.task_factories import GameTaskDependencies
 from module.config.json_codec import (
     DuplicateJsonFieldError,
     NonFiniteJsonNumberError,
     StrictJsonDecodeError,
     decode_json,
 )
-from module.diagnostics import ScreenshotHistory
 
 if TYPE_CHECKING:
     from module.bootstrap.configuration_compiler import ConfigurationDocument
@@ -18,27 +15,6 @@ if TYPE_CHECKING:
 
 class ConfigurationLoadError(ValueError):
     pass
-
-
-@dataclass(frozen=True, slots=True)
-class GameRuntimeBundle:
-    tasks: GameTaskDependencies
-    screenshots: ScreenshotHistory
-    content_revision: str
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.tasks, GameTaskDependencies):
-            message = "tasks must be GameTaskDependencies"
-            raise TypeError(message)
-        if not isinstance(self.screenshots, ScreenshotHistory):
-            message = "screenshots must be a ScreenshotHistory"
-            raise TypeError(message)
-        if not isinstance(self.content_revision, str):
-            message = "content_revision must be a string"
-            raise TypeError(message)
-        if not self.content_revision or self.content_revision != self.content_revision.strip():
-            message = "content_revision must be trimmed and non-empty"
-            raise ValueError(message)
 
 
 def parse_configuration_document(content: str, *, source: str = "configuration") -> ConfigurationDocument:

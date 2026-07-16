@@ -56,7 +56,7 @@ from module.task_registry import TASK_CATALOG
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _OBSERVED_AT = datetime(2026, 7, 13, 12, tzinfo=UTC)
@@ -121,13 +121,12 @@ _CASES: tuple[tuple[str, dict[str, FrozenJsonValue], WorldTaskSettings], ...] = 
     ),
     (
         "opsi_explore",
-        _settings(fleet=_FLEET_JSON, special_radar=True, force_run=False, last_zone=44),
+        _settings(fleet=_FLEET_JSON, special_radar=True, force_run=False),
         ExploreSettings(
             general=_GENERAL,
             fleet=_FLEET,
             special_radar=True,
             force_run=False,
-            last_zone=44,
         ),
     ),
     (
@@ -246,7 +245,7 @@ class _Workflow:
         self,
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> WorldTaskReport:
         cancellation.raise_if_requested()
         self.received_spec = spec
@@ -269,6 +268,7 @@ def _build_context(
     return TaskBuildContext(
         definition=TASK_CATALOG[command],
         settings_revision=7,
+        content_revision="content-1",
         settings=MappingProxyType(settings),
         task_state=TaskStateDocument.empty(command) if task_state is None else task_state,
     )

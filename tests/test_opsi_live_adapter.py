@@ -47,9 +47,9 @@ from module.gameplay.opsi_progress import WorldProgress, WorldZoneCursor
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from module.application import CancellationSource
     from module.config.config import AzurLaneConfig
     from module.gameplay.opsi import WorldTaskSettings
-    from module.interaction import CancellationSignal
     from module.os.globe_zone import Zone
 
 
@@ -85,7 +85,6 @@ def _settings(operation: WorldOperation) -> WorldTaskSettings:
             _FLEET,
             special_radar=False,
             force_run=False,
-            last_zone=0,
         ),
         WorldOperation.SHOP: ShopSettings(_GENERAL, OpsiShopPreset.MAX_BENEFIT, "ActionPoint"),
         WorldOperation.VOUCHER: VoucherSettings(_GENERAL, "LoggerAbyssal"),
@@ -153,7 +152,7 @@ class _ScheduleSource:
 
 
 class _Driver:
-    calls: list[tuple[WorldTaskSpec, WorldProgress | None, CancellationSignal]]
+    calls: list[tuple[WorldTaskSpec, WorldProgress | None, CancellationSource]]
 
     def __init__(self, step: LiveOpsiStep) -> None:
         self.step = step
@@ -163,7 +162,7 @@ class _Driver:
         self,
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> LiveOpsiStep:
         self.calls.append((spec, progress, cancellation))
         return self.step
@@ -447,6 +446,14 @@ def test_typed_explore_settings_and_checkpoint_drive_mumu12_overlay() -> None:
         "OpsiExplore_ForceRun": False,
         "OpsiExplore_LastZone": 42,
     }
+
+
+def test_explore_without_checkpoint_keeps_persisted_last_zone_out_of_overlay() -> None:
+    config = _Config()
+
+    apply_world_task_spec(cast("AzurLaneConfig", config), _spec(WorldOperation.EXPLORE), None)
+
+    assert "OpsiExplore_LastZone" not in config.overrides
 
 
 def test_live_prepare_does_not_run_implicit_auto_search(monkeypatch: pytest.MonkeyPatch) -> None:

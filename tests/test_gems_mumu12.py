@@ -33,10 +33,10 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from module.adapters.campaign_live import CampaignMapRuntime
+    from module.application import CancellationSource
     from module.config.config import AzurLaneConfig
     from module.device.device import Device
     from module.gameplay.campaign import CampaignJobSpec
-    from module.interaction import CancellationSignal
 
 
 @dataclass(slots=True)
@@ -161,13 +161,13 @@ class _RunnerFactory:
 @dataclass(slots=True)
 class _SafeUnitSource:
     runtime: _Runtime
-    committed_cancellation: CancellationSignal
-    calls: list[tuple[object, CancellationSignal]] = field(default_factory=list)
+    committed_cancellation: CancellationSource
+    calls: list[tuple[object, CancellationSource]] = field(default_factory=list)
 
     def commit_replacement_unit(
         self,
         session: CampaignSession,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CommittedCampaignUnit:
         cancellation.raise_if_requested()
         self.calls.append((session, cancellation))

@@ -81,7 +81,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from module.adapters.campaign_live import CampaignMapRuntime
-    from module.interaction.ports import CancellationSignal
+    from module.application import CancellationSource
 
 
 A1 = CellId(0, 0)
@@ -113,15 +113,15 @@ class _ProgramState:
     single_fleet_override: bool | None = None
     support_fleet: bool = False
 
-    def map_has_mob_move(self, cancellation: CancellationSignal) -> bool:
+    def map_has_mob_move(self, cancellation: CancellationSource) -> bool:
         cancellation.raise_if_requested()
         return self.mob_move
 
-    def use_support_fleet(self, cancellation: CancellationSignal) -> bool:
+    def use_support_fleet(self, cancellation: CancellationSource) -> bool:
         cancellation.raise_if_requested()
         return self.support_fleet
 
-    def use_single_fleet_override(self, cancellation: CancellationSignal) -> bool | None:
+    def use_single_fleet_override(self, cancellation: CancellationSource) -> bool | None:
         cancellation.raise_if_requested()
         return self.single_fleet_override
 
@@ -474,8 +474,8 @@ def _port(
     return Mumu12BattleProgramPort(cast("CampaignMapRuntime", runtime), state)
 
 
-def _cancel() -> CancellationSignal:
-    return cast("CancellationSignal", _Cancellation())
+def _cancel() -> CancellationSource:
+    return cast("CancellationSource", _Cancellation())
 
 
 def test_initial_flags_queries_and_map_state_are_explicit() -> None:
@@ -1120,7 +1120,7 @@ def test_missing_or_ambiguous_runtime_primitives_fail_typed() -> None:
 
 def test_cancellation_happens_before_any_runtime_io() -> None:
     runtime = _Runtime([_grid(A1, enemy=True)])
-    cancellation = cast("CancellationSignal", _Cancellation(requested=True))
+    cancellation = cast("CancellationSource", _Cancellation(requested=True))
 
     with pytest.raises(RequestedCancellation):
         _port(runtime).execute_battle(ClearChosenEnemy(A1), cancellation)

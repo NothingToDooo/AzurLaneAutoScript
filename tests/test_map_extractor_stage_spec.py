@@ -326,7 +326,6 @@ def test_boss_at_zero_compiles_without_touching_unrelated_legacy_strategy_file(
         """schema_version: 1
 id: event_early_cn
 kind: event
-ui_profile: campaign_v1
 activity:
   kind: event_story
   profile: standard

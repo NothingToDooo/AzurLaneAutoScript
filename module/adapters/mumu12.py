@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 class CancellationAwareMumu12Device:
@@ -9,10 +9,10 @@ class CancellationAwareMumu12Device:
 
     __slots__ = ("_cancellation", "_target")
 
-    _cancellation: CancellationSignal
+    _cancellation: CancellationSource
     _target: object
 
-    def __init__(self, target: object, cancellation: CancellationSignal) -> None:
+    def __init__(self, target: object, cancellation: CancellationSource) -> None:
         if isinstance(cancellation, type) or not callable(getattr(cancellation, "raise_if_requested", None)):
             message = "cancellation must implement raise_if_requested()"
             raise TypeError(message)

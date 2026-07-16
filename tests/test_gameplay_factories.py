@@ -43,6 +43,7 @@ from module.task_registry import TASK_CATALOG
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from module.application import CancellationSource
     from module.gameplay.composite import (
         DataKeyWorkflow,
         DormWorkflow,
@@ -62,7 +63,6 @@ if TYPE_CHECKING:
         ShopFrequentWorkflow,
         ShopOnceWorkflow,
     )
-    from module.interaction import CancellationSignal
 
 _OBSERVED_AT = datetime(2026, 7, 15, 1, tzinfo=UTC)
 _DAILY_SCHEDULE: dict[str, FrozenJsonValue] = {
@@ -84,7 +84,7 @@ class _RecordingPort[ReportT]:
         self.received: list[tuple[object, ...]] = []
 
     def execute(self, *args: object) -> ReportT:
-        cancellation = cast("CancellationSignal", args[-1])
+        cancellation = cast("CancellationSource", args[-1])
         cancellation.raise_if_requested()
         self.received.append(args[:-1])
         return self._report
@@ -133,10 +133,11 @@ def _encounter_factories(exercise: _RecordingPort[ExerciseReport] | None = None)
 
 def _context(command: str, settings: dict[str, FrozenJsonValue]) -> TaskBuildContext:
     return TaskBuildContext(
-        TASK_CATALOG[command],
-        2,
-        MappingProxyType(settings),
-        TaskStateDocument.empty(command),
+        definition=TASK_CATALOG[command],
+        settings_revision=2,
+        content_revision="content-1",
+        settings=MappingProxyType(settings),
+        task_state=TaskStateDocument.empty(command),
     )
 
 

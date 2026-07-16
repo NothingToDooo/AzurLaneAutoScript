@@ -1,7 +1,6 @@
 schema_version: 1
 id: war_archives_20200507_cn
 kind: war_archives
-ui_profile: campaign_v1
 war_archives:
   profile: the_way_home_in_the_night
 releases:

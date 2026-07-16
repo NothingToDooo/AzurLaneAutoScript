@@ -19,7 +19,7 @@ from module.gameplay.opsi_progress import (
 )
 
 if TYPE_CHECKING:
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 def _validate_aware(value: datetime, *, field_name: str) -> None:
@@ -129,7 +129,7 @@ class OpsiLiveStepDriver(Protocol):
         self,
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> LiveOpsiStep: ...
 
 
@@ -176,7 +176,7 @@ class LiveOperationSirenWorkflow(OperationSirenWorkflow):
         self,
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> WorldTaskReport:
         cancellation.raise_if_requested()
         step = self._driver.execute_step(spec, progress, cancellation)

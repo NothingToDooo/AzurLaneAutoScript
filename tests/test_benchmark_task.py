@@ -30,7 +30,7 @@ from module.maintenance import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 class _Engine:
@@ -46,7 +46,7 @@ class _Engine:
         self._after_measure = after_measure
         self.scene: BenchmarkScene | None = None
 
-    def measure(self, scene: BenchmarkScene, cancellation: CancellationSignal) -> BenchmarkReport:
+    def measure(self, scene: BenchmarkScene, cancellation: CancellationSource) -> BenchmarkReport:
         cancellation.raise_if_requested()
         self._calls.append("measure")
         self.scene = scene
@@ -68,7 +68,7 @@ class _Environment:
         self._after_prepare = after_prepare
         self.safe_stage: str | None = None
 
-    def prepare(self, safe_stage: str, cancellation: CancellationSignal) -> BenchmarkPreparation:
+    def prepare(self, safe_stage: str, cancellation: CancellationSource) -> BenchmarkPreparation:
         cancellation.raise_if_requested()
         self._calls.append("prepare")
         self.safe_stage = safe_stage
@@ -82,7 +82,7 @@ class _Presenter:
         self._calls = calls
         self.report: BenchmarkReport | None = None
 
-    def present(self, report: BenchmarkReport, cancellation: CancellationSignal) -> None:
+    def present(self, report: BenchmarkReport, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self._calls.append("present")
         self.report = report

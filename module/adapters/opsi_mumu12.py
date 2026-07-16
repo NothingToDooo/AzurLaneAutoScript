@@ -70,8 +70,8 @@ from module.ui.page import page_reward
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
+    from module.application import CancellationSource
     from module.config.config_generated import ConfigOverrides
-    from module.interaction import CancellationSignal
     from module.os.map import RescanMode
 
 
@@ -135,7 +135,7 @@ class OpsiUiStepExecutor(Protocol):
         self,
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> LiveOpsiStep: ...
 
 
@@ -153,7 +153,7 @@ class Mumu12OperationSirenStepDriver(OpsiLiveStepDriver):
         self,
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> LiveOpsiStep:
         return self._executor.execute(spec, progress, cancellation)
 
@@ -200,15 +200,14 @@ def _(settings: AshBeaconSettings, _progress: WorldProgress | None) -> dict[str,
 
 @_specific_settings_overrides.register
 def _(settings: ExploreSettings, progress: WorldProgress | None) -> dict[str, object]:
-    last_zone = settings.last_zone
-    if progress is not None and isinstance(progress.cursor, WorldZoneCursor):
-        last_zone = progress.cursor.zone_id
-    return {
+    values: dict[str, object] = {
         **_fleet_overrides(settings.fleet.fleet_index, use_submarine=settings.fleet.use_submarine),
         "OpsiExplore_SpecialRadar": settings.special_radar,
         "OpsiExplore_ForceRun": settings.force_run,
-        "OpsiExplore_LastZone": last_zone,
     }
+    if progress is not None and isinstance(progress.cursor, WorldZoneCursor):
+        values["OpsiExplore_LastZone"] = progress.cursor.zone_id
+    return values
 
 
 @_specific_settings_overrides.register
@@ -921,7 +920,7 @@ class _Mumu12OpsiExecutor(OpsiUiStepExecutor):
         self,
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> LiveOpsiStep:
         cancellation.raise_if_requested()
         self._config.replace_runtime_overlay()

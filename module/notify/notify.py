@@ -1,7 +1,6 @@
 import smtplib
 import ssl
 from email.message import EmailMessage
-from hashlib import sha256
 from typing import Final
 
 from module.notify.configuration import (
@@ -9,7 +8,7 @@ from module.notify.configuration import (
     SmtpTransport,
 )
 
-SMTP_TIMEOUT_SECONDS: Final = 15
+SMTP_TIMEOUT_SECONDS: Final = 5
 
 
 def _build_message(
@@ -17,7 +16,6 @@ def _build_message(
     *,
     title: str,
     content: str,
-    idempotency_key: str | None = None,
     recipient: str | None = None,
 ) -> EmailMessage:
     message = EmailMessage()
@@ -33,12 +31,6 @@ def _build_message(
         error_message = "recipient must be trimmed, non-empty, single-line text or None"
         raise ValueError(error_message)
     message["To"] = recipient if recipient is not None else ", ".join(config.recipients)
-    if idempotency_key is not None:
-        if not isinstance(idempotency_key, str) or not idempotency_key:
-            error_message = "idempotency_key must be a non-empty string or None"
-            raise ValueError(error_message)
-        digest = sha256(idempotency_key.encode()).hexdigest()
-        message["Message-ID"] = f"<alas-{digest}@alas.local>"
     message.set_content(content)
     return message
 
@@ -64,7 +56,7 @@ def _send_email(config: SmtpNotificationConfig, message: EmailMessage) -> None:
 
 
 class SmtpNotificationSender:
-    """严格 SMTP sender；投递异常由同步调用边界决定是否重试。"""
+    """严格 SMTP sender；投递异常由同步调用边界记录。"""
 
     __slots__ = ("_config",)
 
@@ -74,12 +66,11 @@ class SmtpNotificationSender:
             raise TypeError(message)
         self._config = config
 
-    def send(self, *, recipient: str, title: str, content: str, idempotency_key: str) -> None:
+    def send(self, *, recipient: str, title: str, content: str) -> None:
         message = _build_message(
             self._config,
             title=title,
             content=content,
-            idempotency_key=idempotency_key,
             recipient=recipient,
         )
         _send_email(self._config, message)

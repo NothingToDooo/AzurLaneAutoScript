@@ -6,18 +6,12 @@ import pytest
 
 from module.content.campaign_policy import CampaignPolicy, StageProgressionRule
 from module.content.errors import ContentValidationError
-from module.content.models import AssetRef, ContentId, EventPack, EventRelease, StageRef, StageSpec
+from module.content.models import ContentId, EventPack, EventRelease, StageRef, StageSpec
 from module.content.validation import ValidationIssue
 
 
 def _set_attribute(instance: object, attribute: str, value: object) -> None:
     setattr(instance, attribute, value)
-
-
-def _event_pack_with_finite_value(field: str, value: str) -> EventPack:
-    if field == "kind":
-        return EventPack(pack_id=ContentId("event_pack"), kind=value)
-    return EventPack(pack_id=ContentId("event_pack"), ui_profile=value)
 
 
 def _event_pack_with_invalid_member(field: str, value: object) -> EventPack:
@@ -72,16 +66,9 @@ def test_event_pack_rejects_invalid_pack_id_type(pack_id: object) -> None:
         EventPack(pack_id=cast("ContentId | str", pack_id))
 
 
-@pytest.mark.parametrize(
-    ("field", "value"),
-    [
-        ("kind", "unknown"),
-        ("ui_profile", "plugin"),
-    ],
-)
-def test_event_pack_rejects_unknown_finite_values(field: str, value: str) -> None:
-    with pytest.raises(ContentValidationError, match=field):
-        _event_pack_with_finite_value(field, value)
+def test_event_pack_rejects_unknown_kind() -> None:
+    with pytest.raises(ContentValidationError, match="kind"):
+        EventPack(pack_id=ContentId("event_pack"), kind="unknown")
 
 
 @pytest.mark.parametrize(
@@ -132,29 +119,9 @@ def test_campaign_policy_returns_only_the_declared_immediate_successor() -> None
     assert policy.next_stage("missing") is None
 
 
-def test_asset_ref_requires_content_id() -> None:
-    with pytest.raises(TypeError, match="asset_id"):
-        AssetRef(asset_id=cast("ContentId", "map"), path=Path("assets/map.yaml"))
-
-
 def test_stage_spec_requires_stage_ref() -> None:
     with pytest.raises(TypeError, match="ref"):
         StageSpec(ref=cast("StageRef", "t1"), source="stages/t1.yaml")
-
-
-def test_stage_spec_converts_assets_to_tuple_and_rejects_invalid_members() -> None:
-    ref = StageRef("event_pack", "t1")
-    asset = AssetRef(ContentId("map"), Path("assets/map.yaml"))
-
-    stage = StageSpec(ref=ref, source="stages/t1.yaml", assets=cast("tuple[AssetRef, ...]", [asset]))
-
-    assert stage.assets == (asset,)
-    with pytest.raises(TypeError, match="assets"):
-        StageSpec(
-            ref=ref,
-            source="stages/t1.yaml",
-            assets=cast("tuple[AssetRef, ...]", [asset, object()]),
-        )
 
 
 @pytest.mark.parametrize(

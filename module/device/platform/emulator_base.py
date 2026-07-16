@@ -43,21 +43,6 @@ class EmulatorInstanceBase:
     def emulator(self) -> EmulatorBase:
         return EmulatorBase(self.path)
 
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, str) and self.type == other:
-            return True
-        if isinstance(other, (list, tuple)) and self.type in other:
-            return True
-        if isinstance(other, EmulatorInstanceBase):
-            return super().__eq__(other) and self.type == other.type
-        return super().__eq__(other)
-
-    def __hash__(self) -> int:
-        return hash(str(self))
-
-    def __bool__(self) -> bool:
-        return True
-
     @cached_property
     def mumu_player_12_id(self) -> int | None:
         """支持 MuMuPlayer-12.0-* 、MuMuPlayer-15.0-* 和 YXArkNights-12.0-* ；其他名称返回 None。"""
@@ -104,23 +89,10 @@ class EmulatorBase:
         self.dir = "" if parent == Path() else str(parent).replace("\\", "/")
         self.type = self.__class__.path_to_type(path)
 
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, str) and self.type == other:
-            return True
-        if isinstance(other, (list, tuple)) and self.type in other:
-            return True
-        return super().__eq__(other)
-
     def __str__(self) -> str:
         return f'{self.type}(path="{self.path}")'
 
     __repr__ = __str__
-
-    def __hash__(self) -> int:
-        return hash(self.path)
-
-    def __bool__(self) -> bool:
-        return True
 
     def abspath(self, path: str | Path, folder: str | Path | None = None) -> str:
         if folder is None:

@@ -3,11 +3,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, override
 
-from module.application import Succeeded, Task, TaskContext, TaskResult
+from module.application import CancellationSource, Succeeded, Task, TaskContext, TaskResult
 
 if TYPE_CHECKING:
-    from module.interaction import AppLifecycle, CancellationSignal
-    from module.maintenance.game_manager import LoginFlow
+    from module.maintenance.game_manager import AppLifecycle, LoginFlow
 
 
 _PACKAGE_NAME_PATTERN = re.compile(
@@ -43,7 +42,7 @@ class UncensoredPayload:
 
 
 class UncensoredAssetBuilder(Protocol):
-    def build(self, cancellation: CancellationSignal) -> UncensoredPayload: ...
+    def build(self, cancellation: CancellationSource) -> UncensoredPayload: ...
 
 
 class UncensoredAssetInstaller(Protocol):
@@ -51,7 +50,7 @@ class UncensoredAssetInstaller(Protocol):
         self,
         payload: UncensoredPayload,
         package_name: str,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> None: ...
 
 

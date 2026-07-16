@@ -14,7 +14,7 @@ from module.maintenance.benchmark import (
     BenchmarkUnavailable,
 )
 from module.maintenance.factories import MaintenanceServices, build_maintenance_factories
-from module.maintenance.game_manager import GameManagerSettings, GameManagerTask, LoginFlow
+from module.maintenance.game_manager import AppLifecycle, GameManagerSettings, GameManagerTask, LoginFlow
 from module.maintenance.restart import RestartSettings, RestartTask
 from module.maintenance.uncensored import (
     UncensoredAssetBuilder,
@@ -25,6 +25,7 @@ from module.maintenance.uncensored import (
 )
 
 __all__ = [
+    "AppLifecycle",
     "BenchmarkCategory",
     "BenchmarkEngine",
     "BenchmarkEnvironment",

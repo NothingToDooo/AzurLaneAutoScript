@@ -29,9 +29,9 @@ from module.ui.assets import BACK_ARROW
 
 if TYPE_CHECKING:
     from module.adapters.campaign_live import CommittedCampaignUnit
+    from module.application import CancellationSource
     from module.content.campaign_session import CampaignSession
     from module.gameplay.campaign import CampaignJobSpec
-    from module.interaction import CancellationSignal
 
 
 class GemsFleetReplacementBridge(Protocol):
@@ -55,7 +55,7 @@ class GemsReplacementUnitSource(Protocol):
     def commit_replacement_unit(
         self,
         session: CampaignSession,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CommittedCampaignUnit: ...
 
 
@@ -158,7 +158,7 @@ class _BoundGemsFleetReplacement:
         runner: GemsFleetReplacementBridge,
         runtime: CampaignEngine,
         policy: GemsFarmingPolicy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> _BoundGemsFleetReplacement:
         cancellation.raise_if_requested()
         runtime.config.apply_runtime_overlay(
@@ -231,7 +231,7 @@ class _BoundGemsFleetReplacement:
         operation: Callable[[GemsShipReplacementFactSink], object],
         *,
         operation_name: str,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> GemsShipReplacementResult:
         cancellation.raise_if_requested()
         pending_fact: GemsShipReplacementResult | None = None
@@ -251,21 +251,21 @@ class _BoundGemsFleetReplacement:
             raise callback_violation
         return self._match_reported_fact(returned, pending_fact, operation=operation_name)
 
-    def replace_flagship(self, cancellation: CancellationSignal) -> GemsShipReplacementResult:
+    def replace_flagship(self, cancellation: CancellationSource) -> GemsShipReplacementResult:
         return self._replace_one(
             self.runner.flagship_change,
             operation_name="flagship_change",
             cancellation=cancellation,
         )
 
-    def replace_vanguard(self, cancellation: CancellationSignal) -> GemsShipReplacementResult:
+    def replace_vanguard(self, cancellation: CancellationSource) -> GemsShipReplacementResult:
         return self._replace_one(
             self.runner.vanguard_change,
             operation_name="vanguard_change",
             cancellation=cancellation,
         )
 
-    def prepare_hard_fleet(self, cancellation: CancellationSignal) -> bool:
+    def prepare_hard_fleet(self, cancellation: CancellationSource) -> bool:
         cancellation.raise_if_requested()
         self.runtime.emotion.update()
         self.minimum_emotion = min(self.minimum_emotion, self.runtime.emotion.fleet_1.current)
@@ -347,7 +347,7 @@ class Mumu12GemsFleetReplacementExecutor:
         job: CampaignJobSpec,
         session: CampaignSession,
         trigger: GemsFleetReplacementTrigger,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> GemsFleetReplacementResult:
         policy = self._policy(job)
         self._validate_trigger(trigger)

@@ -1,14 +1,17 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol, override
+from typing import Protocol, override
 
-from module.application import Succeeded, Task, TaskContext, TaskResult
+from module.application import CancellationSource, Succeeded, Task, TaskContext, TaskResult
 
-if TYPE_CHECKING:
-    from module.interaction import AppLifecycle, CancellationSignal
+
+class AppLifecycle(Protocol):
+    def start(self, cancellation: CancellationSource) -> None: ...
+
+    def stop(self, cancellation: CancellationSource) -> None: ...
 
 
 class LoginFlow(Protocol):
-    def ensure_logged_in(self, cancellation: CancellationSignal) -> None: ...
+    def ensure_logged_in(self, cancellation: CancellationSource) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)

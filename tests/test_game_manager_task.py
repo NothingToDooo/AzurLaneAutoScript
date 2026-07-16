@@ -8,6 +8,7 @@ import pytest
 from module.application import (
     AbortRequested,
     AbortToken,
+    CancellationSource,
     ExecutionMode,
     RunCoordinator,
     RunMetadata,
@@ -16,8 +17,7 @@ from module.application import (
     TaskId,
     TaskResult,
 )
-from module.interaction import AppLifecycle, AppStatus, CancellationSignal
-from module.maintenance import GameManagerSettings, GameManagerTask
+from module.maintenance import AppLifecycle, GameManagerSettings, GameManagerTask
 from module.state.config_repository import ConfigStateRepository
 
 if TYPE_CHECKING:
@@ -30,17 +30,12 @@ class _App(AppLifecycle):
         self.on_stop = on_stop
 
     @override
-    def status(self, cancellation: CancellationSignal) -> AppStatus:
-        cancellation.raise_if_requested()
-        return AppStatus.STOPPED
-
-    @override
-    def start(self, cancellation: CancellationSignal) -> None:
+    def start(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self.calls.append("start")
 
     @override
-    def stop(self, cancellation: CancellationSignal) -> None:
+    def stop(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self.calls.append("stop")
         if self.on_stop is not None:
@@ -51,7 +46,7 @@ class _Login:
     def __init__(self, calls: list[str]) -> None:
         self.calls = calls
 
-    def ensure_logged_in(self, cancellation: CancellationSignal) -> None:
+    def ensure_logged_in(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self.calls.append("login")
 

@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from datetime import date
-from pathlib import Path
 
 from module.content.activity_profile import (
     ActivityDefinition,
@@ -15,7 +14,6 @@ from module.content.validation import require_non_empty_identifier
 from module.content.war_archives_profile import WarArchivesDefinition
 
 EVENT_KINDS = ("event", "raid", "coalition", "war_archives", "campaign")
-EVENT_UI_PROFILES = ("campaign_v1",)
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,22 +38,9 @@ class StageRef:
 
 
 @dataclass(frozen=True, slots=True)
-class AssetRef:
-    asset_id: ContentId
-    path: Path
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.asset_id, ContentId):
-            message = "asset_id must be a ContentId"
-            raise TypeError(message)
-        object.__setattr__(self, "path", Path(self.path))
-
-
-@dataclass(frozen=True, slots=True)
 class StageSpec:
     ref: StageRef
     source: str
-    assets: tuple[AssetRef, ...] = ()
     runtime_profile_id: CampaignRuntimeProfileId = field(default_factory=lambda: CampaignRuntimeProfileId("core"))
     war_archives: WarArchivesDefinition | None = None
 
@@ -64,17 +49,12 @@ class StageSpec:
             message = "ref must be a StageRef"
             raise TypeError(message)
         require_non_empty_identifier(self.source, field_name="source")
-        assets = tuple(self.assets)
-        if any(not isinstance(asset, AssetRef) for asset in assets):
-            message = "assets must contain AssetRef instances"
-            raise TypeError(message)
         if not isinstance(self.runtime_profile_id, CampaignRuntimeProfileId):
             message = "runtime_profile_id must be a CampaignRuntimeProfileId"
             raise TypeError(message)
         if self.war_archives is not None and not isinstance(self.war_archives, WarArchivesDefinition):
             message = "war_archives must be a WarArchivesDefinition or None"
             raise TypeError(message)
-        object.__setattr__(self, "assets", assets)
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,7 +84,6 @@ class EventPack:
     pack_id: ContentId | str
     stages: tuple[StageSpec, ...] = ()
     kind: str = "event"
-    ui_profile: str = "campaign_v1"
     releases: tuple[EventRelease, ...] = ()
     policy: CampaignPolicy = field(default_factory=CampaignPolicy)
     activity: ActivityDefinition | None = None
@@ -121,9 +100,6 @@ class EventPack:
 
         if self.kind not in EVENT_KINDS:
             message = f"kind must be one of {EVENT_KINDS}"
-            raise ContentValidationError(message)
-        if self.ui_profile not in EVENT_UI_PROFILES:
-            message = f"ui_profile must be one of {EVENT_UI_PROFILES}"
             raise ContentValidationError(message)
 
         stages = tuple(self.stages)

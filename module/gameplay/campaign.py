@@ -49,7 +49,7 @@ from module.gameplay.battle_program import BattleProgramExecution, BattleProgram
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _MIN_RESOURCE_RETRY = timedelta(minutes=120)
@@ -375,15 +375,11 @@ class CampaignSubmarineSettings:
 
 @dataclass(frozen=True, slots=True)
 class CampaignFleetEmotionSettings:
-    value: int
-    recorded_at: datetime
     control: EmotionControl
     recover: EmotionRecoverLocation
     oath: bool
 
     def __post_init__(self) -> None:
-        _validate_int_range(self.value, field_name="value", minimum=0, maximum=150)
-        _validate_aware_datetime(self.recorded_at, field_name="recorded_at")
         if not isinstance(self.control, EmotionControl):
             message = "control must be an EmotionControl"
             raise TypeError(message)
@@ -977,7 +973,7 @@ class CampaignWorkflow(Protocol):
     def execute(
         self,
         job: CampaignJobSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignRunReport:
         """最多确认一个 battle，并在 pending 已清空的安全点返回。"""
 

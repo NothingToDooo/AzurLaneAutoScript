@@ -90,6 +90,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from types import TracebackType
 
+    from module.application import CancellationSource
     from module.base.button import Button
     from module.base.template import Template
     from module.base.type_alias import Area, ImageArray, Point
@@ -100,7 +101,6 @@ if TYPE_CHECKING:
     from module.content.models import StageRef
     from module.content.stage_rules import MapCalibration, StageNavigation
     from module.gameplay.campaign_factories import CampaignSessionSource
-    from module.interaction import CancellationSignal
     from module.map.camera import FullScanOptions
     from module.map.fleet import FleetLocation
     from module.map.map_grids import SelectedGrids
@@ -765,7 +765,9 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     def combat_status(self, expected_end: CombatEnd | None = None) -> None:
         threshold = self._runtime_profile.combat_disable_stuck_detection_battle
         if threshold is not None and not self.map_is_clear_mode and self.battle_count >= threshold:
-            self.device.disable_stuck_detection()
+            with self.device.suspend_stuck_detection():
+                CampaignEngine.combat_status(self, expected_end=expected_end)
+            return
         CampaignEngine.combat_status(self, expected_end=expected_end)
 
     def ensure_no_stage_entrance(self, *, skip_first_screenshot: bool = True) -> bool:
@@ -1328,15 +1330,15 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     def runtime_session_active(self) -> bool:
         return self._runtime_profile_session_active
 
-    def map_has_mob_move(self, cancellation: CancellationSignal) -> bool:
+    def map_has_mob_move(self, cancellation: CancellationSource) -> bool:
         return self._runtime_profile.map_has_mob_move(cancellation)
 
-    def use_support_fleet(self, cancellation: CancellationSignal) -> bool:
+    def use_support_fleet(self, cancellation: CancellationSource) -> bool:
         return self._runtime_profile.use_support_fleet(cancellation)
 
     def use_single_fleet_override(
         self,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> bool | None:
         return self._runtime_profile.use_single_fleet_override(cancellation)
 
@@ -1360,7 +1362,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     def handle_map_stop(self) -> None:
         """地图成就只产生事实；task disable/关卡推进由 typed workflow 提交。"""
 
-    def _pause_auto_search(self, cancellation: CancellationSignal) -> None:
+    def _pause_auto_search(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         if not self.is_auto_search_running():
             return
@@ -1374,7 +1376,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         message = "auto-search did not reach a paused map safe point"
         raise CampaignRuntimeEvidenceError(message)
 
-    def _visible_targets(self, cancellation: CancellationSignal) -> tuple[int, int, int]:
+    def _visible_targets(self, cancellation: CancellationSource) -> tuple[int, int, int]:
         cancellation.raise_if_requested()
         self.full_scan()
         cancellation.raise_if_requested()
@@ -1404,7 +1406,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     def execute_auto_search_battle(
         self,
         battle_index: int,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> BattleTarget:
         """推进一次游戏自律 battle，并以暂停后的地图差分闭合实际目标。"""
 
@@ -1443,7 +1445,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             raise CampaignRuntimeEvidenceError(message)
         return matched[0]
 
-    def execute_hard_attempt(self, cancellation: CancellationSignal) -> None:
+    def execute_hard_attempt(self, cancellation: CancellationSource) -> None:
         """完成一次困难图结算；hard clear-mode 的一次 attempt 是最小可恢复业务单元。"""
 
         cancellation.raise_if_requested()
@@ -1464,7 +1466,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             raise
         self.finish_runtime_session(RuntimeSessionOutcome.COMPLETED)
 
-    def _execute_hard_attempt_body(self, cancellation: CancellationSignal) -> None:
+    def _execute_hard_attempt_body(self, cancellation: CancellationSource) -> None:
         self.ENTRANCE.area = self.ENTRANCE.button
         self.enter_map(self.ENTRANCE, mode="hard")
         if not self.map_is_auto_search:
@@ -1600,7 +1602,7 @@ class Mumu12CampaignRuntimeProvider:
         self,
         job: CampaignJobSpec,
         session: CampaignSession,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> tuple[DeclarativeCampaignMapRuntime, SafeUnitCancellation]:
         cancellation.raise_if_requested()
         definition = compose_campaign_attempt_definition(session.definition, job.difficulty)
@@ -1624,7 +1626,7 @@ class Mumu12CampaignRuntimeProvider:
         self,
         job: CampaignJobSpec,
         runtime: DeclarativeCampaignMapRuntime,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> SafeUnitCancellation:
         unit_cancellation = SafeUnitCancellation(cancellation)
         runtime.device = cast("Device", CancellationAwareMumu12Device(self._device, unit_cancellation))
@@ -1671,7 +1673,7 @@ class Mumu12CampaignRuntimeProvider:
         job: CampaignJobSpec,
         session: CampaignSession,
         state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignGuardEvidence:
         if self._selected_session(job) != session or state != session.initial_state():
             message = "campaign pre-entry evidence requires the selected map boundary"
@@ -1729,7 +1731,7 @@ class Mumu12CampaignRuntimeProvider:
         self,
         job: CampaignJobSpec,
         runtime: DeclarativeCampaignMapRuntime,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
         *,
         event_available: bool | None,
     ) -> CampaignGuardEvidence:
@@ -1822,7 +1824,7 @@ class Mumu12CampaignRuntimeProvider:
         self,
         job: CampaignJobSpec,
         session: CampaignSession,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> tuple[DeclarativeCampaignMapRuntime | None, SafeUnitCancellation | None]:
         runtime = self._active_runtime
         if runtime is None:
@@ -1868,7 +1870,7 @@ class Mumu12CampaignRuntimeProvider:
         session: CampaignSession,
         runtime: DeclarativeCampaignMapRuntime,
         progress_state: CampaignSessionState,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignSession | CampaignCheckpointUnavailable:
         cancellation.raise_if_requested()
         runtime.device.screenshot()
@@ -1959,7 +1961,7 @@ class Mumu12CampaignRuntimeProvider:
     def activate(
         self,
         job: CampaignJobSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> (
         CampaignSession | CampaignCheckpointUnavailable | CampaignMapAchievementReached | CampaignGemsReplacementFailed
     ):
@@ -2011,7 +2013,7 @@ class Mumu12CampaignRuntimeProvider:
     def active_runtime(
         self,
         session: CampaignSession,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignMapRuntime:
         cancellation.raise_if_requested()
         if self._active_runtime is None or self._active_session != session:
@@ -2022,7 +2024,7 @@ class Mumu12CampaignRuntimeProvider:
     def commit_active_unit(
         self,
         session: CampaignSession,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CommittedCampaignUnit:
         cancellation.raise_if_requested()
         runtime = self._active_runtime
@@ -2039,7 +2041,7 @@ class Mumu12CampaignRuntimeProvider:
     def commit_replacement_unit(
         self,
         session: CampaignSession,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CommittedCampaignUnit:
         cancellation.raise_if_requested()
         if self._prepared_session == session:
@@ -2200,7 +2202,7 @@ class Mumu12HardCampaignPort:
     def remaining_attempts(
         self,
         settings: HardSettings,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> int:
         cancellation.raise_if_requested()
         if self._active_runtime is not None:
@@ -2238,7 +2240,7 @@ class Mumu12HardCampaignPort:
         self,
         runtime: DeclarativeCampaignMapRuntime,
         settings: HardSettings,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> int:
         runtime.ensure_campaign_ui(settings.stage, mode="hard")
         cancellation.raise_if_requested()
@@ -2253,7 +2255,7 @@ class Mumu12HardCampaignPort:
     def advance_one(
         self,
         settings: HardSettings,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> HardBattleOutcome:
         runtime = self._require_active(settings)
         cancellation.raise_if_requested()
@@ -2263,7 +2265,7 @@ class Mumu12HardCampaignPort:
     def exit_ui(
         self,
         settings: HardSettings,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> None:
         runtime = self._require_active(settings)
         cancellation.raise_if_requested()

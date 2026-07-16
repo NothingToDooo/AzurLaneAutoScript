@@ -61,8 +61,8 @@ from module.ui.page import (
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from module.application import CancellationSource
     from module.config.config_generated import ConfigOverrides
-    from module.interaction import CancellationSignal
 
 
 class CompositeLiveClock(Protocol):
@@ -80,7 +80,7 @@ def _activate(
     device: Device,
     task_name: str,
     overlay: ConfigOverrides,
-    cancellation: CancellationSignal,
+    cancellation: CancellationSource,
 ) -> Device:
     cancellation.raise_if_requested()
     config.replace_runtime_overlay()
@@ -187,7 +187,7 @@ class _Mumu12CompositeAdapter:
     def _device_for(
         self,
         task_name: str,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
         overlay: ConfigOverrides | None = None,
     ) -> Device:
         selected_overlay: ConfigOverrides = {} if overlay is None else overlay
@@ -201,7 +201,7 @@ class Mumu12DormWorkflow(_Mumu12CompositeAdapter, DormWorkflow):
     __slots__ = ()
 
     @override
-    def execute(self, request: DormRunRequest, cancellation: CancellationSignal) -> DormReport:
+    def execute(self, request: DormRunRequest, cancellation: CancellationSource) -> DormReport:
         if not isinstance(request, DormRunRequest):
             message = "request must be a DormRunRequest"
             raise TypeError(message)
@@ -236,7 +236,7 @@ class Mumu12MeowfficerWorkflow(_Mumu12CompositeAdapter, MeowfficerWorkflow):
     __slots__ = ()
 
     @override
-    def execute(self, settings: MeowfficerSettings, cancellation: CancellationSignal) -> MeowfficerReport:
+    def execute(self, settings: MeowfficerSettings, cancellation: CancellationSource) -> MeowfficerReport:
         if not isinstance(settings, MeowfficerSettings):
             message = "settings must be MeowfficerSettings"
             raise TypeError(message)
@@ -287,7 +287,7 @@ class Mumu12GuildWorkflow(_Mumu12CompositeAdapter, GuildWorkflow):
     __slots__ = ()
 
     @override
-    def execute(self, settings: GuildSettings, cancellation: CancellationSignal) -> GuildReport:
+    def execute(self, settings: GuildSettings, cancellation: CancellationSource) -> GuildReport:
         if not isinstance(settings, GuildSettings):
             message = "settings must be GuildSettings"
             raise TypeError(message)
@@ -328,7 +328,7 @@ class Mumu12RewardWorkflow(_Mumu12CompositeAdapter, RewardWorkflow):
     __slots__ = ()
 
     @override
-    def execute(self, settings: RewardSettings, cancellation: CancellationSignal) -> RewardReport:
+    def execute(self, settings: RewardSettings, cancellation: CancellationSource) -> RewardReport:
         if not isinstance(settings, RewardSettings):
             message = "settings must be RewardSettings"
             raise TypeError(message)
@@ -356,7 +356,7 @@ class Mumu12BattlePassWorkflow(_Mumu12CompositeAdapter, FreebieCollectionWorkflo
     __slots__ = ()
 
     @override
-    def collect(self, cancellation: CancellationSignal) -> FreebieCollectionReport:
+    def collect(self, cancellation: CancellationSource) -> FreebieCollectionReport:
         runner = BattlePass(self._config, device=self._device_for("Freebies", cancellation))
 
         cancellation.raise_if_requested()
@@ -379,7 +379,7 @@ class Mumu12DataKeyWorkflow(_Mumu12CompositeAdapter, DataKeyWorkflow):
     def collect(
         self,
         plan: DataKeyPlan,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> FreebieCollectionReport:
         if not isinstance(plan, DataKeyPlan):
             message = "plan must be a DataKeyPlan"
@@ -409,7 +409,7 @@ class Mumu12MailWorkflow(_Mumu12CompositeAdapter, MailCollectionWorkflow):
     def collect(
         self,
         policy: MailCollectionPolicy,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> FreebieCollectionReport:
         if not isinstance(policy, MailCollectionPolicy):
             message = "policy must be a MailCollectionPolicy"
@@ -471,7 +471,7 @@ class Mumu12SupplyPackWorkflow(_Mumu12CompositeAdapter, SupplyPackWorkflow):
     def collect(
         self,
         plan: SupplyPackPlan,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> FreebieCollectionReport:
         if not isinstance(plan, SupplyPackPlan):
             message = "plan must be a SupplyPackPlan"
@@ -506,7 +506,7 @@ class Mumu12PrivateQuartersWorkflow(_Mumu12CompositeAdapter, PrivateQuartersWork
     def execute(
         self,
         settings: PrivateQuartersSettings,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> PrivateQuartersReport:
         if not isinstance(settings, PrivateQuartersSettings):
             message = "settings must be PrivateQuartersSettings"

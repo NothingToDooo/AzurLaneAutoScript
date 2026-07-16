@@ -1,11 +1,8 @@
-import argparse
 import json
-import queue
-import threading
-import time
 from datetime import datetime
 from functools import partial
 from pathlib import Path
+from threading import RLock
 from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
@@ -27,7 +24,7 @@ from pywebio.output import (
     use_scope,
 )
 from pywebio.pin import pin, pin_on_change
-from pywebio.session import download, go_app, info, local, register_thread, run_js, set_env
+from pywebio.session import download, go_app, local, run_js, set_env
 
 from module.application.scheduler import ScheduleItem, order_schedule_items
 from module.base.atomic import atomic_failure_cleanup, atomic_write
@@ -62,7 +59,6 @@ from module.webui.utils import (
     get_alas_config_listen_path,
     get_localstorage,
     get_window_visibility_state,
-    login,
     parse_pin_value,
     raise_exception,
     re_fullmatch,
@@ -88,11 +84,6 @@ class MenuDefinition(TypedDict):
     page: str
     menu: str
     tasks: list[str]
-
-
-class ConfigChange(TypedDict):
-    name: str
-    value: MutableDeepValue
 
 
 def _read_menu() -> dict[str, MenuDefinition]:
@@ -129,7 +120,9 @@ class AlasGUI(Frame):
 
     def __init__(self) -> None:
         super().__init__()
-        self.modified_config_queue: queue.Queue[ConfigChange] = queue.Queue()
+        self._pending_config: dict[str, MutableDeepValue] = {}
+        self._config_save_lock = RLock()
+        self._saving_config = False
         self._config_listeners_initialized = False
         self.alas_name = ""
         self.alas_config = AzurLaneConfig("template")
@@ -441,30 +434,34 @@ class AlasGUI(Frame):
         if self._config_listeners_initialized:
             return
 
-        def put_queue(path: str, value: MutableDeepValue) -> None:
-            self.modified_config_queue.put({"name": path, "value": value})
-
         for path in get_alas_config_listen_path(self.ALAS_ARGS):
-            pin_on_change(name="_".join(path), onchange=partial(put_queue, ".".join(path)))
+            pin_on_change(name="_".join(path), onchange=partial(self.save_config_change, ".".join(path)))
         self._config_listeners_initialized = True
         logger.info("Init config listeners done.")
 
-    def _alas_thread_update_config(self) -> None:
-        modified = {}
-        while self.alive:
-            try:
-                d = self.modified_config_queue.get(timeout=10)
-            except queue.Empty:
-                continue
-            modified[d["name"]] = d["value"]
-            while True:
-                try:
-                    d = self.modified_config_queue.get(timeout=1)
-                    modified[d["name"]] = d["value"]
-                except queue.Empty:
-                    if self._save_config(modified):
-                        modified.clear()
-                    break
+    def save_config_change(self, path: str, value: MutableDeepValue) -> None:
+        # PyWebIO 的按钮回调仍可能从独立线程进入；同一 session 的配置写入必须串行。
+        with self._config_save_lock:
+            self._save_config_change_serialized(path, value)
+
+    def _save_config_change_serialized(self, path: str, value: MutableDeepValue) -> None:
+        if not self.alive:
+            return
+        self._pending_config[path] = value
+        if self._saving_config:
+            return
+
+        self._saving_config = True
+        try:
+            while self.alive and self._pending_config:
+                modified = dict(self._pending_config)
+                if not self._save_config(modified):
+                    return
+                for name, saved_value in modified.items():
+                    if name in self._pending_config and self._pending_config[name] == saved_value:
+                        del self._pending_config[name]
+        finally:
+            self._saving_config = False
 
     def _save_config(
         self,
@@ -512,14 +509,14 @@ class AlasGUI(Frame):
             return candidate
 
         if updates:
-            # 先校验输入，停机后再从磁盘重建一次，避免覆盖任务退出时写入的运行状态。
-            config = build_candidate()
+            # 先校验输入，避免无效设置导致正在运行的任务被停止。
+            build_candidate()
             manager = ProcessManager.instance()
             if manager.alive:
                 logger.info("Stop alas before writing configuration")
                 manager.stop()
-                # 退出过程也可能推进玩法字段，最终组合必须再次通过全部 factory 和内容校验。
-                config = build_candidate()
+            # 无论本轮是否主动停机都重新读盘；任务可能刚在并行退出并写入 Scheduler/Storage。
+            config = build_candidate()
             logger.info(f"Save config {filepath_config('alas')}, {dict_to_kv(updates)}")
             write_config_file("alas", config)
             toast(
@@ -792,10 +789,6 @@ class AlasGUI(Frame):
 
         self._init_config_listeners()
 
-        save_config_thread = threading.Thread(target=self._alas_thread_update_config)
-        register_thread(save_config_thread)
-        save_config_thread.start()
-
         visibility_state_switch = Switch(
             status={
                 True: [
@@ -930,19 +923,8 @@ def clearup() -> None:
     logger.info("Alas closed.")
 
 
-def app() -> Starlette:
-    parser = argparse.ArgumentParser(description="Alas WebUI 服务")
-    parser.add_argument("-k", "--key", type=str, help="WebUI 密码，默认不启用。")
-    parser.add_argument(
-        "--run",
-        action="store_true",
-        help="启动时自动运行 alas。",
-    )
-    args, _ = parser.parse_known_args()
-
+def app(*, auto_run: bool = False) -> Starlette:
     AlasGUI.set_theme()
-    key = args.key
-    auto_run = args.run
 
     def auto_start() -> None:
         if auto_run:
@@ -950,26 +932,15 @@ def app() -> Starlette:
 
     logger.hr("Webui configs")
     logger.attr("Theme", AlasGUI.theme)
-    logger.attr("Password", bool(key))
 
     atomic_failure_cleanup("./config")
 
     def index() -> None:
-        if key is not None and not login(key):
-            logger.warning(f"{info.user_ip} login failed.")
-            time.sleep(1.5)
-            run_js("location.reload();")
-            return
         gui = AlasGUI()
         local.gui = gui
         gui.run()
 
     def manage() -> None:
-        if key is not None and not login(key):
-            logger.warning(f"{info.user_ip} login failed.")
-            time.sleep(1.5)
-            run_js("location.reload();")
-            return
         app_manage()
 
     return asgi_app(

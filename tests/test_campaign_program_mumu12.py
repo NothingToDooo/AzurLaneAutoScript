@@ -27,7 +27,7 @@ from module.content.stage_definition import (
 from module.content.stage_rules import MapFeatures, RepeatableCompletion, StageRules, StarRequirements
 
 if TYPE_CHECKING:
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 class _Config:
@@ -47,17 +47,17 @@ class _Runtime:
         self.single_fleet_state_reads = 0
         self.support_state_reads = 0
 
-    def map_has_mob_move(self, cancellation: CancellationSignal) -> bool:
+    def map_has_mob_move(self, cancellation: CancellationSource) -> bool:
         cancellation.raise_if_requested()
         self.map_state_reads += 1
         return True
 
-    def use_support_fleet(self, cancellation: CancellationSignal) -> bool:
+    def use_support_fleet(self, cancellation: CancellationSource) -> bool:
         cancellation.raise_if_requested()
         self.support_state_reads += 1
         return True
 
-    def use_single_fleet_override(self, cancellation: CancellationSignal) -> bool | None:
+    def use_single_fleet_override(self, cancellation: CancellationSource) -> bool | None:
         cancellation.raise_if_requested()
         self.single_fleet_state_reads += 1
         return None
@@ -73,7 +73,7 @@ class _Units:
     def active_runtime(
         self,
         session: CampaignSession,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CampaignMapRuntime:
         del session
         cancellation.raise_if_requested()
@@ -83,7 +83,7 @@ class _Units:
     def commit_active_unit(
         self,
         session: CampaignSession,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> CommittedCampaignUnit:
         del session
         self.calls += 1

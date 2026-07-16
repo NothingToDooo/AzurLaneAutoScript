@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
@@ -7,7 +8,27 @@ from module.daemon.os_daemon import ContinuousCombat
 from module.exception import CampaignEnd
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from module.combat.combat import CombatEnd
+
+
+class _ScopedDevice:
+    def __init__(self) -> None:
+        self.enabled = True
+        self.screenshots = 0
+
+    @contextmanager
+    def suspend_stuck_detection(self) -> Iterator[None]:
+        self.enabled = False
+        try:
+            yield
+        finally:
+            self.enabled = True
+
+    def screenshot(self) -> None:
+        assert not self.enabled
+        self.screenshots += 1
 
 
 def _ignore_expected_end(expected_end: CombatEnd | None) -> None:
@@ -20,6 +41,40 @@ def _as_daemon(daemon: SimpleNamespace) -> AzurLaneDaemon:
 
 def _as_opsi_daemon(daemon: SimpleNamespace) -> OpsiDaemon:
     return cast("OpsiDaemon", daemon)
+
+
+def test_daemon_advance_scopes_stuck_detection() -> None:
+    device = _ScopedDevice()
+    daemon = SimpleNamespace(
+        device=device,
+        handle_daemon_combat=lambda: False,
+        handle_daemon_map_operation=lambda: False,
+        handle_daemon_map_preparation=lambda: False,
+        handle_daemon_misc=lambda: False,
+        handle_guild_popup_cancel=lambda: True,
+    )
+
+    assert AzurLaneDaemon.advance_once(_as_daemon(daemon))
+    assert device.enabled
+    assert device.screenshots == 1
+
+
+def test_opsi_daemon_advance_scopes_stuck_detection() -> None:
+    device = _ScopedDevice()
+    daemon = SimpleNamespace(
+        device=device,
+        handle_os_daemon_combat=lambda: False,
+        handle_os_daemon_exp_info=lambda: False,
+        handle_os_daemon_map_event=lambda: False,
+        handle_os_daemon_auto_search_reward=lambda: False,
+        handle_os_daemon_port_repair=lambda: False,
+        handle_os_daemon_enemy_selection=lambda: False,
+    )
+
+    OpsiDaemon.advance_once(_as_opsi_daemon(daemon))
+
+    assert device.enabled
+    assert device.screenshots == 1
 
 
 def test_handle_daemon_combat_prepares_and_finishes_battle_status() -> None:

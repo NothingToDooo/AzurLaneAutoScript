@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from module.config.server import CN_ACTIVITY
 from module.device.method.utils import PackageNotInstalled
 from module.device.service_retry import session_retry
+from module.exception import RequestHumanTakeover
 from module.logger import logger
 
 if TYPE_CHECKING:
@@ -66,7 +67,9 @@ class AppController:
         if self._app_start_adb_am(self.package, CN_ACTIVITY, allow_failure=False):
             return
 
-        logger.error("app_start: All trials failed")
+        message = f"Unable to start app after all strategies failed: {self.package}"
+        logger.error(message)
+        raise RequestHumanTakeover(message)
 
     def app_stop(self) -> None:
         logger.info(f"App stop: {self.package}")

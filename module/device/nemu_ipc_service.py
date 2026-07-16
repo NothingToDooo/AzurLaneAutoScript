@@ -45,6 +45,7 @@ NEMU_IPC_INSTANCE_DEAD_MESSAGE = "Emulator instance is probably dead"
 NEMU_IPC_CONNECT_FAILED_MESSAGE = "Connection failed, please check if nemu_folder is correct and emulator is running"
 NEMU_IPC_GET_RESOLUTION_FAILED_MESSAGE = "nemu_capture_display failed during get_resolution()"
 NEMU_IPC_SCREENSHOT_FAILED_MESSAGE = "nemu_capture_display failed during screenshot()"
+NEMU_IPC_TIMEOUT_MESSAGE = "NemuIpc native call timed out; this connection can no longer be used"
 
 
 class CaptureStd:
@@ -169,14 +170,13 @@ def _nemu_ipc_error_recovery(
     self: _NemuRetryTarget,
     error: NemuIpcIncompatible | JobTimeout | NemuIpcError | OSError | ValueError | ctypes.ArgumentError,
     func_name: str,
-    trial: int,
 ) -> Recovery | None:
     if isinstance(error, NemuIpcIncompatible):
         logger.error(error)
         return None
     if isinstance(error, JobTimeout):
-        logger.warning(f"Func {func_name}() call timeout, retrying: {trial}")
-        return _noop_recovery
+        logger.critical(f"Func {func_name}() call timeout; stop using this NemuIpc connection")
+        return None
     if isinstance(error, NemuIpcError):
         logger.error(error)
         return self.reconnect
@@ -190,6 +190,7 @@ def _run_with_retry[TargetT: _NemuRetryTarget, ResultT](
     target: TargetT, func_name: str, invoke: Callable[[int], ResultT]
 ) -> ResultT:
     recovery: Recovery | None = None
+    terminal_error: BaseException | None = None
     for trial in range(RETRY_TRIES):
         try:
             if recovery is not None:
@@ -197,14 +198,16 @@ def _run_with_retry[TargetT: _NemuRetryTarget, ResultT](
                 recovery()
             return invoke(trial)
         except RequestHumanTakeover:
-            break
+            raise
         except (NemuIpcIncompatible, JobTimeout, NemuIpcError, OSError, ValueError, ctypes.ArgumentError) as error:
-            recovery = _nemu_ipc_error_recovery(target, error, func_name, trial)
+            terminal_error = error
+            recovery = _nemu_ipc_error_recovery(target, error, func_name)
             if recovery is None:
                 break
 
-    logger.critical(f"Retry {func_name}() failed")
-    raise RequestHumanTakeover
+    message = NEMU_IPC_TIMEOUT_MESSAGE if isinstance(terminal_error, JobTimeout) else f"Retry {func_name}() failed"
+    logger.critical(message)
+    raise RequestHumanTakeover(message) from terminal_error
 
 
 def retry[TargetT: _NemuRetryTarget, **P, ResultT](
@@ -262,8 +265,14 @@ class NemuIpcImpl:
         self.connect_id: int = 0
         self.width = 0
         self.height = 0
+        self._timed_out = False
+
+    def _require_usable(self) -> None:
+        if self._timed_out:
+            raise RequestHumanTakeover(NEMU_IPC_TIMEOUT_MESSAGE)
 
     def connect(self, *, on_thread: bool = True) -> None:
+        self._require_usable()
         if self.connect_id > 0:
             return
 
@@ -281,6 +290,9 @@ class NemuIpcImpl:
 
     def disconnect(self) -> None:
         if self.connect_id == 0:
+            return
+        if self._timed_out:
+            self.connect_id = 0
             return
 
         self.run_func(self.lib.nemu_disconnect, self.connect_id)
@@ -303,20 +315,23 @@ class NemuIpcImpl:
     ) -> None:
         self.disconnect()
 
-    @staticmethod
     def run_func[*ArgsT, ResultT](
-        func: Callable[[*ArgsT], ResultT], *args: *ArgsT, on_thread: bool = True, timeout: float = 0.5
+        self, func: Callable[[*ArgsT], ResultT], *args: *ArgsT, on_thread: bool = True, timeout: float = 0.5
     ) -> ResultT:
         """on_thread=True 时在工作线程运行同步函数，timeout 秒后抛出 JobTimeout。
 
         底层调用还可抛出 NemuIpcIncompatible 或 NemuIpcError。
         """
-        if on_thread:
-            # nemu_ipc 偶尔会阻塞，工作线程允许超时终止。
-            job = WORKER_POOL.start_thread_soon(func, *args)
-            result = job.get_or_kill(timeout)
-        else:
-            result = func(*args)
+        self._require_usable()
+        try:
+            if on_thread:
+                job = WORKER_POOL.start_thread_soon(func, *args)
+                result = job.get_or_timeout(timeout)
+            else:
+                result = func(*args)
+        except JobTimeout:
+            self._timed_out = True
+            raise
 
         func_name = getattr(func, "__name__", type(func).__name__)
         err = False

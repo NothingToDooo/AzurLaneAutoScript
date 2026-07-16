@@ -30,7 +30,6 @@ from module.content.activity_catalog import ActivityCatalog
 from module.content.activity_profile import CoalitionStageId
 from module.content.manifest import load_event_manifests
 from module.gameplay.activity import (
-    GAMEPLAY_COMMAND_PROFILES,
     ActivityCommand,
     ActivityDisposition,
     ActivityReport,
@@ -54,7 +53,6 @@ from module.gameplay.activity import (
     EncounterStopReason,
     EncounterTask,
     EncounterWorkflow,
-    GameplayTaskFamily,
     HospitalOptions,
     MaritimeEscortOptions,
     MinigameProgress,
@@ -68,7 +66,7 @@ from module.task_registry import TASK_CATALOG
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _OBSERVED_AT = datetime(2026, 7, 13, 8, tzinfo=UTC)
@@ -140,7 +138,7 @@ class _ActivityWorkflow:
     def execute(
         self,
         spec: ActivitySpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> ActivityReport:
         cancellation.raise_if_requested()
         self.specs.append(spec)
@@ -160,7 +158,7 @@ class _EncounterWorkflow:
         self._on_execute = on_execute
         self.specs: list[EncounterSpec] = []
 
-    def execute(self, spec: EncounterSpec, cancellation: CancellationSignal) -> EncounterReport:
+    def execute(self, spec: EncounterSpec, cancellation: CancellationSource) -> EncounterReport:
         cancellation.raise_if_requested()
         self.specs.append(spec)
         if self._on_execute is not None:
@@ -182,7 +180,7 @@ class _AssistWorkflow:
     def advance_to_safe_point(
         self,
         spec: AssistSessionSpec,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> AssistSessionReport:
         cancellation.raise_if_requested()
         self.specs.append(spec)
@@ -200,7 +198,7 @@ def _context(
     abort: AbortToken | None = None,
 ) -> TaskContext:
     if mode is None:
-        mode = GAMEPLAY_COMMAND_PROFILES[command].execution_mode
+        mode = TASK_CATALOG[command].execution_mode
     return TaskContext(
         task_id=TaskId(command),
         started_at=_RUN_STARTED_AT,
@@ -294,24 +292,14 @@ def _request_abort_on_second_step(abort: AbortToken, call: int) -> None:
         abort.request("operator stop")
 
 
-def test_command_profiles_cover_the_ten_catalog_commands_with_exact_modes() -> None:
-    expected_families = {
-        "minigame": GameplayTaskFamily.ACTIVITY,
-        "event_story": GameplayTaskFamily.ACTIVITY,
-        "raid_daily": GameplayTaskFamily.ENCOUNTER,
-        "maritime_escort": GameplayTaskFamily.ENCOUNTER,
-        "raid": GameplayTaskFamily.ENCOUNTER,
-        "hospital": GameplayTaskFamily.ENCOUNTER,
-        "coalition": GameplayTaskFamily.ENCOUNTER,
-        "coalition_sp": GameplayTaskFamily.ENCOUNTER,
-        "daemon": GameplayTaskFamily.ASSIST_SESSION,
-        "opsi_daemon": GameplayTaskFamily.ASSIST_SESSION,
+def test_gameplay_command_enums_are_registered_in_the_task_catalog() -> None:
+    commands = {
+        command.value
+        for command_type in (ActivityCommand, EncounterCommand, AssistSessionCommand)
+        for command in command_type
     }
 
-    assert {command: profile.family for command, profile in GAMEPLAY_COMMAND_PROFILES.items()} == expected_families
-    assert {command: profile.execution_mode for command, profile in GAMEPLAY_COMMAND_PROFILES.items()} == {
-        command: TASK_CATALOG[command].execution_mode for command in expected_families
-    }
+    assert commands <= TASK_CATALOG.keys()
 
 
 @pytest.mark.parametrize(

@@ -4,8 +4,7 @@ from typing import TYPE_CHECKING, override
 from module.application import DailySchedule, RescheduleSelf, Succeeded, Task, TaskContext, TaskResult
 
 if TYPE_CHECKING:
-    from module.interaction import AppLifecycle
-    from module.maintenance.game_manager import LoginFlow
+    from module.maintenance.game_manager import AppLifecycle, LoginFlow
 
 
 @dataclass(frozen=True, slots=True)

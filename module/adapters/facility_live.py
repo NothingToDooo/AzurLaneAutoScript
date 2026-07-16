@@ -15,7 +15,7 @@ from module.gameplay.facility import (
 )
 
 if TYPE_CHECKING:
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 def _validate_datetime(value: datetime, *, field_name: str) -> None:
@@ -88,15 +88,15 @@ class TacticalEvidence:
 
 
 class ResearchUiDriver(Protocol):
-    def execute(self, settings: ResearchSettings, cancellation: CancellationSignal) -> ResearchQueueEvidence: ...
+    def execute(self, settings: ResearchSettings, cancellation: CancellationSource) -> ResearchQueueEvidence: ...
 
 
 class CommissionUiDriver(Protocol):
-    def execute(self, settings: CommissionSettings, cancellation: CancellationSignal) -> CommissionEvidence: ...
+    def execute(self, settings: CommissionSettings, cancellation: CancellationSource) -> CommissionEvidence: ...
 
 
 class TacticalUiDriver(Protocol):
-    def execute(self, settings: TacticalSettings, cancellation: CancellationSignal) -> TacticalEvidence: ...
+    def execute(self, settings: TacticalSettings, cancellation: CancellationSource) -> TacticalEvidence: ...
 
 
 class FacilityClock(Protocol):
@@ -126,7 +126,7 @@ class LiveResearchWorkflow(ResearchWorkflow):
         self._clock = selected_clock
 
     @override
-    def execute(self, settings: ResearchSettings, cancellation: CancellationSignal) -> ResearchReport:
+    def execute(self, settings: ResearchSettings, cancellation: CancellationSource) -> ResearchReport:
         if not isinstance(settings, ResearchSettings):
             message = "settings must be ResearchSettings"
             raise TypeError(message)
@@ -154,7 +154,7 @@ class LiveCommissionWorkflow(CommissionWorkflow):
         self._clock = selected_clock
 
     @override
-    def execute(self, settings: CommissionSettings, cancellation: CancellationSignal) -> CommissionReport:
+    def execute(self, settings: CommissionSettings, cancellation: CancellationSource) -> CommissionReport:
         if not isinstance(settings, CommissionSettings):
             message = "settings must be CommissionSettings"
             raise TypeError(message)
@@ -183,7 +183,7 @@ class LiveTacticalWorkflow(TacticalWorkflow):
         self._clock = selected_clock
 
     @override
-    def execute(self, settings: TacticalSettings, cancellation: CancellationSignal) -> TacticalReport:
+    def execute(self, settings: TacticalSettings, cancellation: CancellationSource) -> TacticalReport:
         if not isinstance(settings, TacticalSettings):
             message = "settings must be TacticalSettings"
             raise TypeError(message)

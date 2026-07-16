@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Protocol, override
 from module.application import DailySchedule, DisableTask, RescheduleSelf, Succeeded, Task, TaskContext, TaskResult
 
 if TYPE_CHECKING:
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 def _validate_bool(*, value: bool, field_name: str) -> None:
@@ -128,7 +128,7 @@ class AwakenReport:
 
 
 class AwakenWorkflow(Protocol):
-    def execute(self, settings: AwakenSettings, cancellation: CancellationSignal) -> AwakenReport: ...
+    def execute(self, settings: AwakenSettings, cancellation: CancellationSource) -> AwakenReport: ...
 
 
 class AwakenTask(Task):
@@ -228,7 +228,7 @@ class ShipyardReport:
 
 
 class ShipyardWorkflow(Protocol):
-    def execute(self, settings: ShipyardSettings, cancellation: CancellationSignal) -> ShipyardReport: ...
+    def execute(self, settings: ShipyardSettings, cancellation: CancellationSource) -> ShipyardReport: ...
 
 
 class ShipyardTask(Task):
@@ -308,7 +308,7 @@ class GachaReport:
 
 
 class GachaWorkflow(Protocol):
-    def execute(self, settings: GachaSettings, cancellation: CancellationSignal) -> GachaReport: ...
+    def execute(self, settings: GachaSettings, cancellation: CancellationSource) -> GachaReport: ...
 
 
 class GachaTask(Task):
@@ -471,7 +471,7 @@ class ShopFrequentWorkflow(Protocol):
     def execute(
         self,
         settings: ShopFrequentSettings,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> ShopFrequentReport: ...
 
 
@@ -519,7 +519,7 @@ class ShopOnceReport:
 
 
 class ShopOnceWorkflow(Protocol):
-    def execute(self, settings: ShopOnceSettings, cancellation: CancellationSignal) -> ShopOnceReport: ...
+    def execute(self, settings: ShopOnceSettings, cancellation: CancellationSource) -> ShopOnceReport: ...
 
 
 class ShopOnceTask(Task):

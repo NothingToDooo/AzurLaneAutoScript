@@ -1,10 +1,13 @@
+from contextlib import contextmanager
 from dataclasses import replace
 from datetime import UTC, datetime, time, timedelta
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, ClassVar, Unpack, cast, override
 
 import pytest
 from config_factory import in_memory_config
 
+import module.adapters.campaign_mumu12 as campaign_adapters
 import module.adapters.encounter_mumu12 as encounter_adapters
 from module.adapters.campaign_mumu12 import (
     CampaignRuntimeEvidenceError,
@@ -111,9 +114,11 @@ from module.gameplay.campaign_live import CampaignCheckpointUnavailable, Campaig
 from module.gameplay.encounter import HardBattleOutcome, HardFleet, HardSettings, HardStopReason
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from module.application import CancellationSource
     from module.config.config import AzurLaneConfig
     from module.config.config_generated import ConfigOverrides
-    from module.interaction import CancellationSignal
 
 
 def _variant(tokens: tuple[str, ...]) -> RunVariant:
@@ -123,6 +128,38 @@ def _variant(tokens: tuple[str, ...]) -> RunVariant:
         ),
         spawn_waves=(SpawnWave(0, enemy=1), SpawnWave(1, boss=1)),
     )
+
+
+def test_combat_stuck_detection_pause_is_scoped(monkeypatch: pytest.MonkeyPatch) -> None:
+    events: list[str] = []
+
+    @contextmanager
+    def suspend_stuck_detection() -> Iterator[None]:
+        events.append("disable")
+        try:
+            yield
+        finally:
+            events.append("enable")
+
+    runtime = cast(
+        "DeclarativeCampaignMapRuntime",
+        SimpleNamespace(
+            _runtime_profile=SimpleNamespace(combat_disable_stuck_detection_battle=4),
+            battle_count=4,
+            device=SimpleNamespace(suspend_stuck_detection=suspend_stuck_detection),
+            map_is_clear_mode=False,
+        ),
+    )
+
+    def combat_status(_runtime: object, expected_end: object = None) -> None:
+        assert expected_end is None
+        events.append("combat")
+
+    monkeypatch.setattr(campaign_adapters.CampaignEngine, "combat_status", combat_status)
+
+    DeclarativeCampaignMapRuntime.combat_status(runtime)
+
+    assert events == ["disable", "combat", "enable"]
 
 
 def _definition() -> CampaignStageDefinition:
@@ -184,8 +221,6 @@ def _definition() -> CampaignStageDefinition:
 
 def _execution_settings() -> CampaignExecutionSettings:
     fleet_emotion = CampaignFleetEmotionSettings(
-        value=119,
-        recorded_at=datetime(2026, 7, 13, 8, 30, tzinfo=UTC),
         control=EmotionControl.PREVENT_YELLOW_FACE,
         recover=EmotionRecoverLocation.DORMITORY_FLOOR_1,
         oath=True,
@@ -213,7 +248,7 @@ def _execution_settings() -> CampaignExecutionSettings:
             SubmarineAutoSearchMode.AUTO_CALL,
             SubmarineDistanceToBoss.ONE_GRID_TO_BOSS,
         ),
-        emotion=CampaignEmotionSettings(EmotionMode.CALCULATE, fleet_emotion, replace(fleet_emotion, value=101)),
+        emotion=CampaignEmotionSettings(EmotionMode.CALCULATE, fleet_emotion, fleet_emotion),
         hp_control=CampaignHpControlSettings(
             use_hp_balance=True,
             use_emergency_repair=True,
@@ -340,7 +375,7 @@ class _FakeDeclarativeRuntime(DeclarativeCampaignMapRuntime):
     def is_in_map(self) -> bool:
         return type(self).client_in_map
 
-    def execute_hard_attempt(self, cancellation: CancellationSignal) -> None:
+    def execute_hard_attempt(self, cancellation: CancellationSource) -> None:
         cancellation.raise_if_requested()
         self.calls.append("execute_hard_attempt")
 
@@ -353,7 +388,7 @@ class _FailingHardRuntime(_FakeDeclarativeRuntime):
     created: ClassVar[list[object]] = []
     failures: ClassVar[list[BaseException]] = []
 
-    def execute_hard_attempt(self, cancellation: CancellationSignal) -> None:
+    def execute_hard_attempt(self, cancellation: CancellationSource) -> None:
         super().execute_hard_attempt(cancellation)
         if type(self).failures:
             raise type(self).failures.pop(0)
@@ -411,7 +446,7 @@ def _disable_hard_activation(monkeypatch: pytest.MonkeyPatch, device: Device) ->
         _device: Device,
         _task_name: str,
         _overlay: object,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> Device:
         cancellation.raise_if_requested()
         return device
@@ -759,7 +794,7 @@ def test_new_runtime_refresh_failure_cleans_the_factory_result(
         provider: Mumu12CampaignRuntimeProvider,
         job: CampaignJobSpec,
         runtime: DeclarativeCampaignMapRuntime,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> SafeUnitCancellation:
         del provider, job, runtime, cancellation
         raise refresh_error

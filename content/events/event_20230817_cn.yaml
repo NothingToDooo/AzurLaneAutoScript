@@ -1,7 +1,6 @@
 schema_version: 1
 id: event_20230817_cn
 kind: event
-ui_profile: campaign_v1
 activity:
   kind: event_story
   profile: standard

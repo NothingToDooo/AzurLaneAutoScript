@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from email.errors import HeaderParseError
 from email.headerregistry import Address
 from email.utils import getaddresses
@@ -23,7 +23,7 @@ class DisabledNotificationConfig:
 class SmtpNotificationConfig:
     host: str
     user: str
-    password: str = field(repr=False)
+    password: str
     recipients: tuple[str, ...]
     port: int
     transport: SmtpTransport

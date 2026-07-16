@@ -30,7 +30,6 @@ class Screenshot:
 
     def _init_screenshot_state(self) -> None:
         self._screen_size_checked = False
-        self._screen_black_checked = False
         self._screenshot_interval = Timer(0.1)
 
     def screenshot(self) -> ImageArray:
@@ -44,7 +43,10 @@ class Screenshot:
 
             if self.check_screen_size() and self.check_screen_black():
                 break
-            continue
+        else:
+            self.error_screenshots.record(self.image)
+            message = "Unable to capture a valid 1280x720 non-black screenshot"
+            raise RequestHumanTakeover(message)
 
         self.error_screenshots.record(self.image)
 
@@ -138,8 +140,6 @@ class Screenshot:
         return False
 
     def check_screen_black(self) -> bool:
-        if self._screen_black_checked:
-            return True
         # 某些模拟器偶尔会返回纯黑截图。
         color = get_color(self.image, area=(0, 0, 1280, 720))
         if sum(color) < 1:
@@ -148,7 +148,5 @@ class Screenshot:
                 f"Screenshot method `nemu_ipc` may not work on emulator `{self.serial}`, "
                 f"or the emulator is not fully started"
             )
-            self._screen_black_checked = False
             return False
-        self._screen_black_checked = True
         return True

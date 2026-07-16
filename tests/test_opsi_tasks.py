@@ -74,7 +74,7 @@ from module.gameplay.opsi_progress import WorldBossPhase, WorldMissionEvidenceKi
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from module.interaction import CancellationSignal
+    from module.application import CancellationSource
 
 
 _OBSERVED_AT = datetime(2026, 7, 13, 12, tzinfo=UTC)
@@ -114,7 +114,6 @@ _SETTINGS_BY_TASK: dict[str, WorldTaskSettings] = {
         fleet=_FLEET,
         special_radar=False,
         force_run=False,
-        last_zone=0,
     ),
     "opsi_shop": ShopSettings(_GENERAL, OpsiShopPreset.MAX_BENEFIT_META, "ActionPoint > PurpleCoins"),
     "opsi_voucher": VoucherSettings(_GENERAL, "LoggerAbyssal > LoggerObscure > Book > Coin > Fragment"),
@@ -173,13 +172,13 @@ class _Workflow:
         self.calls = 0
         self.received_spec: WorldTaskSpec | None = None
         self.received_progress: WorldProgress | None = None
-        self.received_cancellation: CancellationSignal | None = None
+        self.received_cancellation: CancellationSource | None = None
 
     def execute(
         self,
         spec: WorldTaskSpec,
         progress: WorldProgress | None,
-        cancellation: CancellationSignal,
+        cancellation: CancellationSource,
     ) -> WorldTaskReport:
         cancellation.raise_if_requested()
         self.calls += 1

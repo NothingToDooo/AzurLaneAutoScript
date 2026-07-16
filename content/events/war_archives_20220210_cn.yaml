@@ -1,7 +1,6 @@
 schema_version: 1
 id: war_archives_20220210_cn
 kind: war_archives
-ui_profile: campaign_v1
 war_archives:
   profile: northern_overture
 releases:

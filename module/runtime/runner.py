@@ -1,16 +1,20 @@
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-from typing import Protocol, cast
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Protocol, cast
 
 from module.application import (
     AbortRequested,
     AbortToken,
+    Blocked,
     Cancelled,
+    Deferred,
     ExecutionMode,
     Faulted,
     RequestAppRestart,
+    Retryable,
     RunCoordinator,
     RunMetadata,
     RunRepository,
@@ -21,8 +25,10 @@ from module.application import (
     TaskResult,
 )
 from module.runtime.factories import TaskFactoryRegistry
-from module.runtime.settings import TaskSettingsDocument
 from module.runtime.task_state import TaskStateDocument
+
+if TYPE_CHECKING:
+    from module.runtime.settings import FrozenTaskSettings
 
 
 class CommandStatus(StrEnum):
@@ -91,6 +97,13 @@ def _require_clock(clock: object) -> RunnerClock:
     return cast("RunnerClock", clock)
 
 
+def _require_task_state(value: object) -> TaskStateDocument:
+    if not isinstance(value, TaskStateDocument):
+        message = "RuntimeRepository.task_state() must return a TaskStateDocument"
+        raise TypeError(message)
+    return value
+
+
 def _result_status(result: TaskResult) -> CommandStatus | None:
     if any(isinstance(effect, RequestAppRestart) for effect in result.effects):
         return CommandStatus.RESTART_REQUESTED
@@ -108,18 +121,19 @@ class RuntimeRunner:
         "_clock",
         "_coordinator",
         "_factories",
-        "_metadata",
         "_observer",
         "_repository",
         "_scheduler",
         "_settings",
+        "_settings_revisions",
     )
 
-    def __init__(  # noqa: PLR0913 - runner 的五个依赖在唯一 composition root 显式组装。
+    def __init__(  # noqa: PLR0913 - runner 依赖在唯一 composition root 显式组装。
         self,
         *,
         factories: TaskFactoryRegistry,
-        settings: TaskSettingsDocument,
+        settings: Mapping[str, FrozenTaskSettings],
+        settings_revisions: Mapping[str, int],
         repository: RuntimeRepository,
         clock: RunnerClock,
         hoard_window: timedelta = timedelta(seconds=30),
@@ -128,8 +142,11 @@ class RuntimeRunner:
         if not isinstance(factories, TaskFactoryRegistry):
             message = "factories must be a TaskFactoryRegistry"
             raise TypeError(message)
-        if not isinstance(settings, TaskSettingsDocument):
-            message = "settings must be a TaskSettingsDocument"
+        if not isinstance(settings, Mapping):
+            message = "settings must be a mapping"
+            raise TypeError(message)
+        if not isinstance(settings_revisions, Mapping):
+            message = "settings_revisions must be a mapping"
             raise TypeError(message)
         if isinstance(repository, type) or not all(
             callable(getattr(repository, method, None))
@@ -143,18 +160,14 @@ class RuntimeRunner:
         if observer is not None and not callable(observer):
             message = "observer must be callable or None"
             raise TypeError(message)
-        factories.validate_settings(settings)
         self._factories = factories
-        self._settings = settings
+        self._settings = MappingProxyType(dict(settings))
+        self._settings_revisions = MappingProxyType(dict(settings_revisions))
         self._repository = repository
         self._clock = _require_clock(clock)
         self._observer = observer
         self._coordinator = RunCoordinator(repository)
         self._scheduler = Scheduler(repository, hoard_window=hoard_window)
-        self._metadata = RunMetadata(
-            settings_revision=settings.revision,
-            content_revision=factories.content_revision,
-        )
 
     def run(self, command: str, *, abort: AbortToken | None = None) -> CommandOutcome:
         if not isinstance(command, str) or not command or command != command.strip():
@@ -233,18 +246,28 @@ class RuntimeRunner:
         mode: ExecutionMode,
         abort: AbortToken,
     ) -> tuple[TaskResult, str | None]:
-        task_state = self._repository.task_state(task_id)
-        if not isinstance(task_state, TaskStateDocument):
-            message = "RuntimeRepository.task_state() must return a TaskStateDocument"
-            raise TypeError(message)
-        task = self._factories.build(task_id.value, self._settings, task_state)
-        result = self._coordinator.execute(
-            task_id,
-            mode,
-            self._metadata,
-            task,
-            abort=abort,
-        )
+        try:
+            task_state = _require_task_state(self._repository.task_state(task_id))
+            task_id_value = task_id.value
+            settings_revision = self._settings_revisions[task_id_value]
+            task = self._factories.build(
+                task_id_value,
+                self._settings[task_id_value],
+                settings_revision,
+                task_state,
+            )
+            result = self._coordinator.execute(
+                task_id,
+                mode,
+                RunMetadata(
+                    settings_revision=settings_revision,
+                    content_revision=self._factories.content_revision_for(task_id_value),
+                ),
+                task,
+                abort=abort,
+            )
+        except Exception as error:  # noqa: BLE001 - task 边界必须保留 task id 并生成诊断。
+            result = TaskResult(Faulted(error))
         bundle = None if self._observer is None else self._observer(task_id, result)
         if bundle is not None and not isinstance(bundle, str):
             message = "result observer must return a string or None"
@@ -267,6 +290,9 @@ class RuntimeRunner:
             exception_type = type(result.outcome.error).__name__
             message = str(result.outcome.error)
         elif isinstance(result.outcome, Cancelled):
+            message = result.outcome.reason
+        elif isinstance(result.outcome, Blocked | Deferred | Retryable):
+            status = CommandStatus.FAILED
             message = result.outcome.reason
         return CommandOutcome(
             command=command,

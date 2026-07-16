@@ -1,7 +1,7 @@
+import hashlib
+import json
 import math
 from collections.abc import Mapping
-from dataclasses import dataclass
-from datetime import datetime
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
@@ -9,8 +9,6 @@ from module.runtime.errors import SettingsDocumentError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-
-SETTINGS_SCHEMA_VERSION = 1
 
 type JsonValue = bool | int | float | str | list[JsonValue] | dict[str, JsonValue] | None
 type FrozenJsonValue = bool | int | float | str | tuple[FrozenJsonValue, ...] | Mapping[str, FrozenJsonValue] | None
@@ -52,84 +50,52 @@ def _expected_task_ids(task_ids: Iterable[str]) -> frozenset[str]:
     return frozenset(values)
 
 
-def _raw_tasks(payload: JsonValue, *, expected: frozenset[str]) -> dict[str, JsonValue]:
-    if not isinstance(payload, dict):
-        message = "settings payload must be an object"
-        raise SettingsDocumentError(message)
-    allowed_fields = {"schema_version", "tasks"}
-    if set(payload) != allowed_fields:
-        missing = sorted(allowed_fields - set(payload))
-        unknown = sorted(set(payload) - allowed_fields)
-        message = f"settings payload fields mismatch: missing={missing}, unknown={unknown}"
-        raise SettingsDocumentError(message)
-    if type(payload["schema_version"]) is not int or payload["schema_version"] != SETTINGS_SCHEMA_VERSION:
-        message = f"settings schema_version must be {SETTINGS_SCHEMA_VERSION}"
-        raise SettingsDocumentError(message)
+def freeze_task_settings(
+    tasks: Mapping[str, JsonValue],
+    *,
+    task_ids: Iterable[str],
+) -> tuple[Mapping[str, FrozenTaskSettings], Mapping[str, int]]:
+    """冻结编译器产出的任务配置，并生成各任务自己的修订号。"""
 
-    raw_tasks = payload["tasks"]
-    if not isinstance(raw_tasks, dict):
-        message = "settings tasks must be an object"
-        raise SettingsDocumentError(message)
+    if not isinstance(tasks, Mapping):
+        message = "task settings must be a mapping"
+        raise TypeError(message)
+    if any(not isinstance(task_id, str) for task_id in tasks):
+        message = "task settings must use task id strings"
+        raise TypeError(message)
+    expected = _expected_task_ids(task_ids)
+    raw_tasks = dict(tasks)
     actual = set(raw_tasks)
     if actual != expected:
         missing = sorted(expected - actual)
         unknown = sorted(actual - expected)
-        message = f"settings task coverage mismatch: missing={missing}, unknown={unknown}"
+        message = f"task settings coverage mismatch: missing={missing}, unknown={unknown}"
         raise SettingsDocumentError(message)
-    return raw_tasks
 
-
-@dataclass(frozen=True, slots=True)
-class TaskSettingsDocument:
-    """一次 settings revision 的深度只读、按 TaskId 完整解析结果。"""
-
-    revision: int
-    updated_at: datetime
-    tasks: Mapping[str, FrozenTaskSettings]
-
-    @classmethod
-    def from_payload(
-        cls,
-        payload: JsonValue,
-        *,
-        revision: int,
-        updated_at: datetime,
-        task_ids: Iterable[str],
-    ) -> TaskSettingsDocument:
-        """直接解析当前配置，不创建数据库 snapshot。"""
-        if type(revision) is not int or revision <= 0:
-            message = "revision must be a positive integer"
-            raise ValueError(message)
-        if not isinstance(updated_at, datetime):
-            message = "updated_at must be a datetime"
-            raise TypeError(message)
-        if updated_at.utcoffset() is None:
-            message = "updated_at must be timezone-aware"
-            raise ValueError(message)
-        expected = _expected_task_ids(task_ids)
-        raw_tasks = _raw_tasks(payload, expected=expected)
-
-        frozen: dict[str, FrozenTaskSettings] = {}
-        for task_id, raw_settings in raw_tasks.items():
-            if not isinstance(raw_settings, dict):
-                message = f"settings task {task_id!r} must be an object"
-                raise SettingsDocumentError(message)
-            frozen[task_id] = MappingProxyType(
-                {key: _freeze_json(value, path=f"$.tasks.{task_id}.{key}") for key, value in raw_settings.items()}
-            )
-
-        return cls(
-            revision=revision,
-            updated_at=updated_at,
-            tasks=MappingProxyType(frozen),
+    frozen: dict[str, FrozenTaskSettings] = {}
+    revisions: dict[str, int] = {}
+    for task_id, raw_settings in raw_tasks.items():
+        if not isinstance(raw_settings, dict):
+            message = f"task settings {task_id!r} must be an object"
+            raise SettingsDocumentError(message)
+        frozen[task_id] = MappingProxyType(
+            {key: _freeze_json(value, path=f"$.tasks.{task_id}.{key}") for key, value in raw_settings.items()}
         )
+        revisions[task_id] = _task_revision(task_id, raw_settings)
 
-    def for_task(self, task_id: str) -> FrozenTaskSettings:
-        if not isinstance(task_id, str):
-            message = "task_id must be a string"
-            raise TypeError(message)
-        try:
-            return self.tasks[task_id]
-        except KeyError:
-            message = f"settings do not contain task: {task_id}"
-            raise SettingsDocumentError(message) from None
+    return MappingProxyType(frozen), MappingProxyType(revisions)
+
+
+def _task_revision(task_id: str, settings: dict[str, JsonValue]) -> int:
+    encoded = json.dumps(
+        {
+            "format": "alas-task-settings-v1",
+            "task_id": task_id,
+            "settings": settings,
+        },
+        allow_nan=False,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode()
+    return int(hashlib.sha256(encoded).hexdigest()[:15], 16) + 1

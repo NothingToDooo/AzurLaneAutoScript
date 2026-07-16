@@ -172,23 +172,9 @@ def path_to_arg(path: str) -> str:
     return path.replace(".", "_")
 
 
-def _redact_config_value(key: str, value: MutableDeepValue) -> MutableDeepValue | str:
-    """配置日志中隐藏 SMTP 密码。"""
-    normalized = key.replace(".", "").replace("_", "").casefold()
-    if normalized.endswith("smtppassword"):
-        return "<redacted>"
-    return value
-
-
 def dict_to_kv(dictionary: Mapping[str, MutableDeepValue], *, allow_none: bool = True) -> str:
-    """把字典格式化为日志键值，并隐藏 SMTP 密码。"""
-    return ", ".join(
-        [
-            f"{key}={_redact_config_value(key, value)!r}"
-            for key, value in dictionary.items()
-            if allow_none or value is not None
-        ]
-    )
+    """把字典格式化为日志键值。"""
+    return ", ".join([f"{key}={value!r}" for key, value in dictionary.items() if allow_none or value is not None])
 
 
 def server_time_offset() -> timedelta:

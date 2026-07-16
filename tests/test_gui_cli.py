@@ -12,31 +12,39 @@ if TYPE_CHECKING:
 
 
 def test_main_uses_local_webui_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[tuple[str, dict[str, object]]] = []
+    application = object()
+    calls: list[tuple[object, dict[str, object]]] = []
+    auto_run_values: list[bool] = []
 
-    def run(app: str, **kwargs: object) -> None:
+    def build_app(*, auto_run: bool = False) -> object:
+        auto_run_values.append(auto_run)
+        return application
+
+    def run(app: object, **kwargs: object) -> None:
         calls.append((app, kwargs))
 
     monkeypatch.setattr(sys, "argv", ["gui.py"])
     monkeypatch.setattr(gui, "prepare_pywebio_imports", lambda: None)
     monkeypatch.setattr(gui.uvicorn, "run", run)
+    monkeypatch.setattr(webui_app, "app", build_app)
 
     gui.main()
 
+    assert auto_run_values == [False]
     assert calls == [
         (
-            "module.webui.app:app",
+            application,
             {
                 "host": "127.0.0.1",
                 "port": 22267,
-                "factory": True,
                 "log_config": None,
             },
         )
     ]
 
 
-def test_main_forwards_auto_run_to_the_deferred_webui_factory(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_forwards_auto_run_to_the_webui_app(monkeypatch: pytest.MonkeyPatch) -> None:
+    application = object()
     starts: list[str] = []
 
     class _Manager:
@@ -51,12 +59,11 @@ def test_main_forwards_auto_run_to_the_deferred_webui_factory(monkeypatch: pytes
         assert callable(candidate)
         auto_start = cast("Callable[[], None]", candidate)
         auto_start()
-        return object()
+        return application
 
-    def run(app: str, **kwargs: object) -> None:
-        assert app == "module.webui.app:app"
-        assert kwargs["factory"] is True
-        webui_app.app()
+    def run(app: object, **kwargs: object) -> None:
+        assert app is application
+        assert "factory" not in kwargs
 
     monkeypatch.setattr(sys, "argv", ["gui.py", "--run"])
     monkeypatch.setattr(gui, "prepare_pywebio_imports", lambda: None)
@@ -76,6 +83,7 @@ def test_main_forwards_auto_run_to_the_deferred_webui_factory(monkeypatch: pytes
     [
         ["--ssl-key", "key.pem"],
         ["--host", str(IPv4Address(0))],
+        ["-k", "local-password"],
         ["--run", "alas"],
     ],
 )

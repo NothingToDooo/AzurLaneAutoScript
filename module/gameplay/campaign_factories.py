@@ -267,8 +267,6 @@ def _submarine(decoder: SettingsDecoder) -> CampaignSubmarineSettings:
 
 def _fleet_emotion(decoder: SettingsDecoder) -> CampaignFleetEmotionSettings:
     settings = CampaignFleetEmotionSettings(
-        value=decoder.integer("value", minimum=0, maximum=150),
-        recorded_at=decoder.datetime("recorded_at"),
         control=decoder.enum("control", EmotionControl),
         recover=decoder.enum("recover", EmotionRecoverLocation),
         oath=decoder.boolean("oath"),
@@ -458,7 +456,7 @@ def _decode_job(
     *,
     command: str,
     sessions: CampaignSessionSource,
-    settings_revision: int,
+    context: TaskBuildContext,
     progress: CampaignProgress | None = None,
 ) -> CampaignJobSpec:
     task_id = TaskId(command)
@@ -470,7 +468,10 @@ def _decode_job(
     limits = _limits(decoder.object("limits"))
     preferred_ref = (
         progress.stage_ref
-        if progress is not None and progress.settings_revision == settings_revision and len(refs) == 1
+        if progress is not None
+        and progress.settings_revision == context.settings_revision
+        and progress.content_revision == context.content_revision
+        and len(refs) == 1
         else None
     )
     selections = tuple(
@@ -547,7 +548,7 @@ class _CampaignTaskFactory:
             decoder,
             command=self._command,
             sessions=self._dependencies.sessions,
-            settings_revision=context.settings_revision,
+            context=context,
             progress=_campaign_progress(context),
         )
         decoder.finish()
