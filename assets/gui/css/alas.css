@@ -507,20 +507,25 @@ pre.rich-traceback-code {
     padding-right: .25rem;
 }
 
-*[style*="--loading-grow--"] {
-    width: 1.5rem;
-    height: 1.5rem;
-}
-
-*[style*="--loading-border--"] {
-    width: 1.5rem;
-    height: 1.5rem;
-    border: .2em solid currentColor;
-    border-right-color: transparent;
-}
-
+*[style*="--loading-grow--"],
+*[style*="--loading-border--"],
 *[style*="--loading-border-fill--"] {
     width: 1.5rem;
     height: 1.5rem;
+}
+
+*[style*="--loading-grow--"] > .spinner-grow,
+*[style*="--loading-border--"] > .spinner-border,
+*[style*="--loading-border-fill--"] > .spinner-border {
+    width: 100%;
+    height: 100%;
+}
+
+*[style*="--loading-border--"] > .spinner-border {
+    border-width: .2em;
+}
+
+*[style*="--loading-border-fill--"] > .spinner-border {
     border: .2em solid currentColor;
+    animation: none;
 }

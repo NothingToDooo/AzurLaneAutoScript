@@ -3,7 +3,6 @@ import argparse
 import uvicorn
 
 from module.logger import logger
-from module.webui.bootstrap import prepare_pywebio_imports
 
 DEFAULT_WEBUI_HOST = "127.0.0.1"
 DEFAULT_WEBUI_PORT = 22267
@@ -29,8 +28,6 @@ def main() -> None:
     logger.hr("启动配置")
     logger.attr("Host", DEFAULT_WEBUI_HOST)
     logger.attr("Port", port)
-    prepare_pywebio_imports()
-    # 必须先安装轻量 PIL 占位模块，再导入依赖 PyWebIO 的应用。
     from module.webui.app import app  # noqa: PLC0415
 
     uvicorn.run(app(auto_run=args.run), host=DEFAULT_WEBUI_HOST, port=port, log_config=None)

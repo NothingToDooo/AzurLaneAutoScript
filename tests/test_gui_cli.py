@@ -1,5 +1,7 @@
+import subprocess
 import sys
 from ipaddress import IPv4Address
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -9,6 +11,29 @@ import module.webui.app as webui_app
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+
+def test_main_builds_webui_app_in_fresh_process() -> None:
+    script = """
+import sys
+
+import gui
+
+
+def ignore_server_start(*_args: object, **_kwargs: object) -> None:
+    pass
+
+
+gui.uvicorn.run = ignore_server_start
+sys.argv = ["gui.py"]
+gui.main()
+"""
+
+    subprocess.run(  # noqa: S603 - 使用当前测试解释器启动隔离的导入环境。
+        [sys.executable, "-c", script],
+        check=True,
+        cwd=Path(__file__).resolve().parents[1],
+    )
 
 
 def test_main_uses_local_webui_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -24,7 +49,6 @@ def test_main_uses_local_webui_defaults(monkeypatch: pytest.MonkeyPatch) -> None
         calls.append((app, kwargs))
 
     monkeypatch.setattr(sys, "argv", ["gui.py"])
-    monkeypatch.setattr(gui, "prepare_pywebio_imports", lambda: None)
     monkeypatch.setattr(gui.uvicorn, "run", run)
     monkeypatch.setattr(webui_app, "app", build_app)
 
@@ -66,7 +90,6 @@ def test_main_forwards_auto_run_to_the_webui_app(monkeypatch: pytest.MonkeyPatch
         assert "factory" not in kwargs
 
     monkeypatch.setattr(sys, "argv", ["gui.py", "--run"])
-    monkeypatch.setattr(gui, "prepare_pywebio_imports", lambda: None)
     monkeypatch.setattr(gui.uvicorn, "run", run)
     monkeypatch.setattr(webui_app.AlasGUI, "set_theme", lambda: None)
     monkeypatch.setattr(webui_app, "atomic_failure_cleanup", lambda _path: None)

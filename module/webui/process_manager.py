@@ -8,11 +8,9 @@ from typing import TYPE_CHECKING, ClassVar, Self, cast
 
 from rich.console import ConsoleRenderable
 
-from module.bootstrap.production import run_default_command
 from module.logger import logger, set_file_logger, set_func_logger
 from module.runtime.runner import CommandOutcome, CommandStatus
 from module.task_registry import get_tool_task_command
-from module.webui.fake_pil_module import remove_fake_pil_module
 
 if TYPE_CHECKING:
     from multiprocessing.process import BaseProcess
@@ -85,6 +83,9 @@ def _execute_process(
             exception_type="LookupError",
             message=message,
         )
+    # production 依赖只在实际 worker 执行有效命令时加载。
+    from module.bootstrap.production import run_default_command  # noqa: PLC0415
+
     return run_default_command(resolved_command, stop_signal=stop_event)
 
 
@@ -307,7 +308,6 @@ class ProcessManager:
         try:
             set_file_logger(name="alas")
             set_func_logger(func=renderable_queue.put)
-            remove_fake_pil_module()
             outcome = _execute_process(request, stop_event)
         except SystemExit as error:
             outcome = _system_exit_outcome(
