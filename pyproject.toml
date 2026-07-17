@@ -48,37 +48,37 @@ preview = true
 explicit-preview-rules = false
 select = ["ALL"]
 ignore = [
-    "COM812",
+    "missing-trailing-comma",
     "CPY",
     "D",
     "DOC",
-    "DTZ001",
-    "DTZ005",
-    "FURB140",
-    "FURB189",
+    "call-datetime-without-tzinfo",
+    "call-datetime-now-without-tzinfo",
+    "reimplemented-starmap",
+    "subclass-builtin",
     "INP",
-    "N818",
-    "PLC1901",
-    "PLR0904",
-    "PLR2004",
-    "PLR6201",
-    "RUF001",
-    "RUF002",
-    "RUF003",
-    "RUF031",
-    "RUF069",
-    "S311",
-    "S404",
+    "error-suffix-on-exception-name",
+    "compare-to-empty-string",
+    "too-many-public-methods",
+    "magic-value-comparison",
+    "literal-membership",
+    "ambiguous-unicode-character-string",
+    "ambiguous-unicode-character-docstring",
+    "ambiguous-unicode-character-comment",
+    "incorrectly-parenthesized-tuple-in-subscript",
+    "float-equality-comparison",
+    "suspicious-non-cryptographic-random-usage",
+    "suspicious-subprocess-import",
 ]
 [tool.ruff.lint.per-file-ignores]
-"campaign/war_archives_*/*.py" = ["TID252"]
-"dev_tools/**/*.py" = ["T201"]
-"module/device/platform/utils.py" = ["N801"]
-"module/game_setting/setting_generated.py" = ["N815"]
-"module/webui/setting.py" = ["N801"]
-"tests/test_campaign_stage_name.py" = ["PLC2701"]
-"tests/test_webui_utils.py" = ["PLC2701"]
-"tests/**/*.py" = ["S101"]
+"campaign/war_archives_*/*.py" = ["relative-imports"]
+"dev_tools/**/*.py" = ["print"]
+"module/device/platform/utils.py" = ["invalid-class-name"]
+"module/game_setting/setting_generated.py" = ["mixed-case-variable-in-class-scope"]
+"module/webui/setting.py" = ["invalid-class-name"]
+"tests/test_campaign_stage_name.py" = ["import-private-name"]
+"tests/test_webui_utils.py" = ["import-private-name"]
+"tests/**/*.py" = ["assert"]
 
 [tool.ruff.lint.pep8-naming]
 classmethod-decorators = ["cached_class_property"]

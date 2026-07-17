@@ -50,7 +50,7 @@ def _runtime_overlay(config: _TestConfig) -> dict[str, ConfigValue]:
 
 def test_generic_personal_config_view_cannot_write_alas_json() -> None:
     config = AzurLaneConfig.__new__(AzurLaneConfig)
-    config._initialize_state("alas")  # noqa: SLF001 - 直接验证 personal config 的 writer 边界。
+    config._initialize_state("alas")  # ruff:ignore[private-member-access] - 直接验证 personal config 的 writer 边界。
     config.modified["Alas.Scheduler.Command"] = "Benchmark"
 
     assert not config.auto_update

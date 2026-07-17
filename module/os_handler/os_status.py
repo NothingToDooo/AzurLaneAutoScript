@@ -37,7 +37,9 @@ def nearest_opsi_cooldown(
             and now <= ready_at <= deadline
         ):
             candidates.append(OpsiCooldown(command=command, ready_at=ready_at))
-    return min(candidates, key=lambda item: item.ready_at, default=None)
+    if not candidates:
+        return None
+    return min(candidates, key=lambda item: item.ready_at)
 
 
 OCR_SHOP_YELLOW_COINS = Digit(SHOP_YELLOW_COINS, letter=(239, 239, 239), threshold=160, name="OCR_SHOP_YELLOW_COINS")

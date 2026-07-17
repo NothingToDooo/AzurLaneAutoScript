@@ -630,7 +630,7 @@ def test_refreshing_gems_cancellation_preserves_the_active_map_emotion_ledger() 
     )
     runtime = object.__new__(DeclarativeCampaignMapRuntime)
     runtime.config = config
-    runtime._gems_behavior = None  # noqa: SLF001 - 构造最小 runtime 以验证跨 turn 账本。
+    runtime._gems_behavior = None  # ruff:ignore[private-member-access] - 构造最小 runtime 以验证跨 turn 账本。
     first = Mumu12GemsRuntimeBehavior(config, policy, SafeUnitCancellation(AbortToken()))
     runtime.configure_gems_behavior(first)
     ledger = runtime.emotion
@@ -701,11 +701,11 @@ def test_runtime_applies_map_patches_only_to_the_declared_variant() -> None:
     runtime.map = compile_campaign_map(definition)
     runtime.session_variant = CampaignRunVariant.LOOP
 
-    runtime._apply_map_patches(MapMutationPhase.MAP_DATA_INIT)  # noqa: SLF001 - 精确验证内部 phase 过滤。
+    runtime._apply_map_patches(MapMutationPhase.MAP_DATA_INIT)  # ruff:ignore[private-member-access] - 精确验证内部 phase 过滤。
 
     assert runtime.map[(0, 1)].may_enemy is False
     runtime.session_variant = CampaignRunVariant.NORMAL
-    runtime._apply_map_patches(MapMutationPhase.MAP_DATA_INIT)  # noqa: SLF001 - 精确验证内部 phase 过滤。
+    runtime._apply_map_patches(MapMutationPhase.MAP_DATA_INIT)  # ruff:ignore[private-member-access] - 精确验证内部 phase 过滤。
     assert runtime.map[(0, 1)].may_enemy is True
 
 
@@ -721,13 +721,13 @@ def test_campaign_14_4_normal_override_is_declarative_and_does_not_leak_into_loo
     runtime.session_variant = CampaignRunVariant.NORMAL
     assert runtime.map[(7, 1)].may_enemy is False
     assert runtime.map[(5, 0)].may_enemy is True
-    runtime._apply_map_patches(MapMutationPhase.MAP_DATA_INIT)  # noqa: SLF001 - 验证物化的关卡契约。
+    runtime._apply_map_patches(MapMutationPhase.MAP_DATA_INIT)  # ruff:ignore[private-member-access] - 验证物化的关卡契约。
     assert runtime.map[(7, 1)].may_enemy is True
     assert runtime.map[(5, 0)].may_enemy is False
 
     runtime.map.load_map_data(use_loop=True)
     runtime.session_variant = CampaignRunVariant.LOOP
-    runtime._apply_map_patches(MapMutationPhase.MAP_DATA_INIT)  # noqa: SLF001 - 验证 variant 隔离。
+    runtime._apply_map_patches(MapMutationPhase.MAP_DATA_INIT)  # ruff:ignore[private-member-access] - 验证 variant 隔离。
     assert runtime.map[(7, 1)].may_enemy is False
     assert runtime.map[(5, 0)].may_enemy is True
 
@@ -764,8 +764,8 @@ def test_runtime_is_poisoned_before_session_cleanup_can_fail() -> None:
         runtime.finish_runtime_session(RuntimeSessionOutcome.FAILED)
 
     assert raised.value is cleanup_error
-    assert runtime._runtime_profile_available is False  # noqa: SLF001 - 验证失败后的所有权状态。
-    assert runtime._runtime_profile_session_active is False  # noqa: SLF001 - 失败后不能再报告 active。
+    assert runtime._runtime_profile_available is False  # ruff:ignore[private-member-access] - 验证失败后的所有权状态。
+    assert runtime._runtime_profile_session_active is False  # ruff:ignore[private-member-access] - 失败后不能再报告 active。
     assert calls == [("end_session", RuntimeSessionOutcome.FAILED), "reset"]
     with pytest.raises(CampaignRuntimeProfileError, match="already been released"):
         runtime.initialize_session(
@@ -869,7 +869,7 @@ def test_activation_guard_releases_initialized_runtime_when_final_overlay_fails(
     assert raised.value is overlay_error
     runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[-1])
     assert ("finish_runtime_session", RuntimeSessionOutcome.FAILED) in runtime.calls
-    assert provider._active_runtime is None  # noqa: SLF001 - overlay 失败前不能发布 owner。
+    assert provider._active_runtime is None  # ruff:ignore[private-member-access] - overlay 失败前不能发布 owner。
 
 
 def test_provider_enters_once_and_exposes_only_the_exact_activated_variant() -> None:
@@ -1007,7 +1007,7 @@ def test_checkpoint_probe_failure_releases_the_retained_runtime() -> None:
         provider.activate(_job(progress=progress), AbortToken())
 
     assert raised.value.exceptions == (screenshot_error, cleanup_error)
-    assert provider._active_runtime is None  # noqa: SLF001 - probe 失败后 active owner 必须清空。
+    assert provider._active_runtime is None  # ruff:ignore[private-member-access] - probe 失败后 active owner 必须清空。
 
 
 def test_provider_discards_retained_checkpoint_runtime_as_interrupted() -> None:
@@ -1081,18 +1081,18 @@ def test_provider_attempts_prepared_and_active_cleanup_after_each_failure() -> N
     active_runtime = failing_runtime("active", active_error)
     config = in_memory_config("campaign-provider-cleanup-failure", {})
     provider = Mumu12CampaignRuntimeProvider(config, object.__new__(Device))
-    provider._prepared_runtime = prepared_runtime  # noqa: SLF001 - 构造双 owner 失败状态。
-    provider._active_runtime = active_runtime  # noqa: SLF001 - 构造双 owner 失败状态。
+    provider._prepared_runtime = prepared_runtime  # ruff:ignore[private-member-access] - 构造双 owner 失败状态。
+    provider._active_runtime = active_runtime  # ruff:ignore[private-member-access] - 构造双 owner 失败状态。
 
     with pytest.raises(ExceptionGroup) as raised:
         provider.discard_checkpoint()
 
     assert raised.value.exceptions == (prepared_error, active_error)
     assert calls == ["prepared", "active"]
-    assert provider._prepared_runtime is None  # noqa: SLF001 - 验证失败后 owner 已释放。
-    assert provider._active_runtime is None  # noqa: SLF001 - 验证失败后 owner 已释放。
-    assert prepared_runtime._runtime_profile_available is False  # noqa: SLF001 - 验证 prepared owner 已失效。
-    assert active_runtime._runtime_profile_available is False  # noqa: SLF001 - 验证 active owner 已失效。
+    assert provider._prepared_runtime is None  # ruff:ignore[private-member-access] - 验证失败后 owner 已释放。
+    assert provider._active_runtime is None  # ruff:ignore[private-member-access] - 验证失败后 owner 已释放。
+    assert prepared_runtime._runtime_profile_available is False  # ruff:ignore[private-member-access] - 验证 prepared owner 已失效。
+    assert active_runtime._runtime_profile_available is False  # ruff:ignore[private-member-access] - 验证 active owner 已失效。
 
 
 def test_in_progress_completed_state_closes_the_finished_map_runtime() -> None:
@@ -1344,7 +1344,7 @@ def test_gems_policy_projects_runtime_configuration_without_overwriting_live_equ
     )
     session = job.sessions[0]
 
-    provider._activate_config(job, session.definition)  # noqa: SLF001 - 验证单一配置投影边界。
+    provider._activate_config(job, session.definition)  # ruff:ignore[private-member-access] - 验证单一配置投影边界。
 
     assert config.GemsFarming_ChangeFlagship == "ship_equip"
     assert config.GemsFarming_CommonCV == "ranger"

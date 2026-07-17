@@ -357,7 +357,7 @@ def test_fault_observer_saves_diagnostics_and_sends_all_production_notifications
     monkeypatch.setattr(production_module, "_save_error_bundle", save_error_bundle)
     monkeypatch.setattr(production_module, "send_notification", send_notification)
 
-    bundle = production_module._observe_result(  # noqa: SLF001 - 验证生产结果观察器的完整编排。
+    bundle = production_module._observe_result(  # ruff:ignore[private-member-access] - 验证生产结果观察器的完整编排。
         TaskId("main"),
         TaskResult(
             outcome=Faulted(error),

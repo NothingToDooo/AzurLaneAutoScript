@@ -106,7 +106,7 @@ def _deliver_replacement_fact(
     except BaseException as fact_error:
         try:
             restore_equipment()
-        except BaseException as restore_error:  # noqa: BLE001 - 必须把 cleanup 与原始持久化失败一起保留。
+        except BaseException as restore_error:  # ruff:ignore[blind-except] - 必须把 cleanup 与原始持久化失败一起保留。
             message = "gems replacement fact persistence and equipment restoration both failed"
             raise BaseExceptionGroup(message, (fact_error, restore_error)) from None
         raise

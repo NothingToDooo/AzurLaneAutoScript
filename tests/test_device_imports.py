@@ -16,7 +16,7 @@ import pytest
     ],
 )
 def test_device_modules_import_in_cold_interpreters(statement: str) -> None:
-    result = subprocess.run(  # noqa: S603
+    result = subprocess.run(  # ruff:ignore[subprocess-without-shell-equals-true]
         [sys.executable, "-c", statement],
         capture_output=True,
         check=False,

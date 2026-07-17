@@ -357,18 +357,18 @@ class MinitouchController:
         errors: list[BaseException] = []
         try:
             self._close_minitouch_client()
-        except BaseException as error:  # noqa: BLE001 - client 失败后仍须释放转发与 stream。
+        except BaseException as error:  # ruff:ignore[blind-except] - client 失败后仍须释放转发与 stream。
             errors.append(error)
         if self._minitouch_port:
             try:
                 self.session.adb_forward_remove(f"tcp:{self._minitouch_port}")
-            except BaseException as error:  # noqa: BLE001 - 转发失败后仍须清空本地状态。
+            except BaseException as error:  # ruff:ignore[blind-except] - 转发失败后仍须清空本地状态。
                 errors.append(error)
             finally:
                 self._minitouch_port = 0
         try:
             self._close_minitouch_stream()
-        except BaseException as error:  # noqa: BLE001 - stream 失败后仍须失效其余本地状态。
+        except BaseException as error:  # ruff:ignore[blind-except] - stream 失败后仍须失效其余本地状态。
             errors.append(error)
         self._minitouch_pid = ""
         del_cached_property(self, "_minitouch_builder")

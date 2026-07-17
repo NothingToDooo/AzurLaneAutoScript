@@ -887,7 +887,7 @@ class CampaignRuntimeProfileManager:
         for instance in reversed(self._instances):
             try:
                 instance.end_session(outcome)
-            except BaseException as error:  # noqa: BLE001 - 各 executor 必须独立结束。
+            except BaseException as error:  # ruff:ignore[blind-except] - 各 executor 必须独立结束。
                 errors.append(error)
         raise_cleanup_errors(errors, message="runtime profile session cleanup failed")
 
@@ -903,7 +903,7 @@ class CampaignRuntimeProfileManager:
         for instance in reversed(self._instances):
             try:
                 instance.reset()
-            except BaseException as error:  # noqa: BLE001 - 各 executor 必须独立重置。
+            except BaseException as error:  # ruff:ignore[blind-except] - 各 executor 必须独立重置。
                 errors.append(error)
         self._reset_shared_state()
         raise_cleanup_errors(errors, message="runtime profile reset failed")

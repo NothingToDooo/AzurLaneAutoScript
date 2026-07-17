@@ -13,8 +13,8 @@ from module.webui.process_manager import (
     STOP_GRACE_SECONDS,
     ProcessManager,
     RenderableQueueItem,
-    _ProcessRequest,  # noqa: PLC2701 - 子进程序列化契约需要直接验证。
-    _ProcessRun,  # noqa: PLC2701 - 进程生命周期状态需要直接构造。
+    _ProcessRequest,  # ruff:ignore[import-private-name] - 子进程序列化契约需要直接验证。
+    _ProcessRun,  # ruff:ignore[import-private-name] - 进程生命周期状态需要直接构造。
 )
 
 if TYPE_CHECKING:
@@ -98,7 +98,7 @@ def _request(command: str) -> _ProcessRequest:
 
 @pytest.fixture(autouse=True)
 def _reset_process_manager_singleton() -> None:
-    ProcessManager._singleton = None  # noqa: SLF001 - 每个测试需要隔离唯一进程管理器。
+    ProcessManager._singleton = None  # ruff:ignore[private-member-access] - 每个测试需要隔离唯一进程管理器。
 
 
 def _attach_run(
@@ -199,7 +199,7 @@ def test_execute_process_delegates_to_default_command(
 
     monkeypatch.setattr("module.bootstrap.production.run_default_command", run)
 
-    actual = process_manager_module._execute_process(  # noqa: SLF001 - 验证命令解析边界。
+    actual = process_manager_module._execute_process(  # ruff:ignore[private-member-access] - 验证命令解析边界。
         _request(ui_command),
         cast("StopEvent", stop_event),
     )
@@ -212,7 +212,7 @@ def test_execute_process_rejects_unknown_ui_command(monkeypatch: pytest.MonkeyPa
     critical: list[str] = []
     monkeypatch.setattr(process_manager_module.logger, "critical", critical.append)
 
-    outcome = process_manager_module._execute_process(  # noqa: SLF001 - 验证命令解析边界。
+    outcome = process_manager_module._execute_process(  # ruff:ignore[private-member-access] - 验证命令解析边界。
         _request("Main"),
         None,
     )
@@ -459,7 +459,7 @@ def test_process_manager_is_singleton() -> None:
 
 def test_stop_instance_does_not_create_a_manager(monkeypatch: pytest.MonkeyPatch) -> None:
     ProcessManager.stop_instance()
-    assert ProcessManager._singleton is None  # noqa: SLF001 - 验证 shutdown 不创建新实例。
+    assert ProcessManager._singleton is None  # ruff:ignore[private-member-access] - 验证 shutdown 不创建新实例。
 
     manager = ProcessManager.instance()
     stop_calls: list[None] = []

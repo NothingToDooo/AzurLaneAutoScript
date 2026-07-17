@@ -204,7 +204,7 @@ def _schedule(*, last_day: bool = False) -> WorldSchedule:
     )
 
 
-def _report(  # noqa: PLR0913 - 测试构造器显式暴露 report 的独立契约轴。
+def _report(  # ruff:ignore[too-many-arguments] - 测试构造器显式暴露 report 的独立契约轴。
     status: WorldTaskStatus = WorldTaskStatus.COMPLETED,
     *,
     completed_units: int = 0,

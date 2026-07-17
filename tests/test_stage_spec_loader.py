@@ -305,7 +305,7 @@ def test_loader_rejects_registered_but_undecoded_battle_step_at_its_tag(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setitem(
-        stage_behavior_codec._STEP_FIELDS,  # noqa: SLF001 - 测试验证 schema 与唯一解码入口必须同步。
+        stage_behavior_codec._STEP_FIELDS,  # ruff:ignore[private-member-access] - 测试验证 schema 与唯一解码入口必须同步。
         "future_step",
         ({"tag"}, set()),
     )

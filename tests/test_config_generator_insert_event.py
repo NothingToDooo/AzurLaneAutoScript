@@ -86,17 +86,17 @@ def test_current_activity_defaults_require_stage_and_activity_definitions() -> N
     generator = _Generator([])
 
     with pytest.raises(ValueError, match="event pack has no default stage"):
-        generator._set_latest_event_defaults(  # noqa: SLF001 - 验证 manifest 默认值边界。
+        generator._set_latest_event_defaults(  # ruff:ignore[private-member-access] - 验证 manifest 默认值边界。
             (event,), ["event_current"]
         )
     with pytest.raises(ValueError, match="raid pack has no activity definition"):
-        generator._set_latest_raid_defaults((raid,), ["raid_current"])  # noqa: SLF001 - 验证 activity 边界。
+        generator._set_latest_raid_defaults((raid,), ["raid_current"])  # ruff:ignore[private-member-access] - 验证 activity 边界。
     with pytest.raises(ValueError, match="coalition pack has no activity definition"):
-        generator._set_latest_coalition_defaults(  # noqa: SLF001 - 验证 activity 边界。
+        generator._set_latest_coalition_defaults(  # ruff:ignore[private-member-access] - 验证 activity 边界。
             (coalition,), ["coalition_current"]
         )
     with pytest.raises(ValueError, match="war archive pack has no default stage"):
-        generator._set_latest_archive_defaults(  # noqa: SLF001 - 验证 manifest 默认值边界。
+        generator._set_latest_archive_defaults(  # ruff:ignore[private-member-access] - 验证 manifest 默认值边界。
             (archive,), ["war_archives_current"]
         )
 

@@ -128,7 +128,7 @@ class RuntimeRunner:
         "_settings_revisions",
     )
 
-    def __init__(  # noqa: PLR0913 - runner 依赖在唯一 composition root 显式组装。
+    def __init__(  # ruff:ignore[too-many-arguments] - runner 依赖在唯一 composition root 显式组装。
         self,
         *,
         factories: TaskFactoryRegistry,
@@ -266,7 +266,7 @@ class RuntimeRunner:
                 task,
                 abort=abort,
             )
-        except Exception as error:  # noqa: BLE001 - task 边界必须保留 task id 并生成诊断。
+        except Exception as error:  # ruff:ignore[blind-except] - task 边界必须保留 task id 并生成诊断。
             result = TaskResult(Faulted(error))
         bundle = None if self._observer is None else self._observer(task_id, result)
         if bundle is not None and not isinstance(bundle, str):

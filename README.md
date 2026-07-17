@@ -52,7 +52,7 @@ uv run python -m dev_tools.campaign_runtime_profile_validator
 
 ```powershell
 uv run pytest
-uv run ruff check . --no-cache
+uv run ruff check .
 uv run ruff format --check .
 uv run ty check
 ```

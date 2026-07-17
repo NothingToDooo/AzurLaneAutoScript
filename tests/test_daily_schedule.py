@@ -71,7 +71,7 @@ def test_daily_schedule_is_immutable() -> None:
     schedule = DailySchedule("UTC", (time(4),))
 
     with pytest.raises(FrozenInstanceError):
-        setattr(schedule, "timezone_name", "Asia/Hong_Kong")  # noqa: B010
+        setattr(schedule, "timezone_name", "Asia/Hong_Kong")  # ruff:ignore[set-attr-with-constant]
 
 
 def test_next_after_rejects_naive_datetime() -> None:

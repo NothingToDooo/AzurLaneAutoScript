@@ -308,14 +308,14 @@ def _save_error_bundle(
             log_file=_log_path(),
             root=root / "log" / "error",
         )
-    except Exception as bundle_error:  # noqa: BLE001 - 诊断旁路不能改写原始错误。
+    except Exception as bundle_error:  # ruff:ignore[blind-except] - 诊断旁路不能改写原始错误。
         logger.exception(bundle_error)
         return None
     logger.error(f"Error bundle saved to {bundle}")
     return str(bundle)
 
 
-def _observe_result(  # noqa: PLR0913 - 结果边界需要运行命令、诊断和通知上下文。
+def _observe_result(  # ruff:ignore[too-many-arguments] - 结果边界需要运行命令、诊断和通知上下文。
     task_id: TaskId,
     result: TaskResult,
     *,
@@ -413,7 +413,7 @@ class PersonalRuntimeBuilder:
         "_sessions_factory",
     )
 
-    def __init__(  # noqa: PLR0913 - 唯一 composition root 显式接收可替换的边界依赖。
+    def __init__(  # ruff:ignore[too-many-arguments] - 唯一 composition root 显式接收可替换的边界依赖。
         self,
         project_root: Path,
         command: str,
@@ -571,7 +571,7 @@ class PersonalRuntimeBuilder:
         return activities, sessions
 
     @staticmethod
-    def _build_domain_factories(  # noqa: C901, PLR0911 - 直接分支比第二套领域注册表更清楚。
+    def _build_domain_factories(  # ruff:ignore[complex-structure, too-many-return-statements] - 直接分支比第二套领域注册表更清楚。
         domain: str,
         *,
         config: AzurLaneConfig,
@@ -668,7 +668,7 @@ def run_default_command(
             external_reason="personal runtime stop requested",
         )
         return runner.run(command, abort=abort)
-    except Exception as error:  # noqa: BLE001 - 唯一进程边界必须返回可序列化结果。
+    except Exception as error:  # ruff:ignore[blind-except] - 唯一进程边界必须返回可序列化结果。
         logger.exception(error)
         bundle_path = _save_error_bundle(
             root=root,

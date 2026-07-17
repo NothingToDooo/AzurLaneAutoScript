@@ -17,15 +17,15 @@ def _project_root(tmp_path: Path) -> Path:
 
 
 def test_command_validation_accepts_scheduler_and_every_task() -> None:
-    production._validate_command("alas")  # noqa: SLF001 - composition boundary contract.
+    production._validate_command("alas")  # ruff:ignore[private-member-access] - composition boundary contract.
     for command in TASK_CATALOG:
-        production._validate_command(command)  # noqa: SLF001 - composition boundary contract.
+        production._validate_command(command)  # ruff:ignore[private-member-access] - composition boundary contract.
 
 
 @pytest.mark.parametrize("command", ["", " missing", "missing ", "missing"])
 def test_command_validation_rejects_malformed_or_unknown_commands(command: str) -> None:
     with pytest.raises(ValueError, match="command"):
-        production._validate_command(command)  # noqa: SLF001 - composition boundary contract.
+        production._validate_command(command)  # ruff:ignore[private-member-access] - composition boundary contract.
 
 
 def test_unknown_command_fails_before_device_composition(

@@ -100,7 +100,7 @@ def test_maintenance_activation_clears_the_previous_task_runtime_overlay() -> No
     )
     device = _Device(_AppController())
 
-    maintenance_adapters._activate(config, device, "Benchmark", AbortToken())  # noqa: SLF001
+    maintenance_adapters._activate(config, device, "Benchmark", AbortToken())  # ruff:ignore[private-member-access]
 
     assert vars(config)["_runtime_overlay"] == {}
     assert getattr(config, "MAP_CHAPTER_SWITCH_20241219", None) is not True

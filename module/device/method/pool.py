@@ -75,7 +75,7 @@ def capture[**P, ResultT](sync_fn: Callable[P, ResultT], *args: P.args, **kwargs
     try:
         return Value(sync_fn(*args, **kwargs))
     # 线程池 outcome 边界：需要把 KeyboardInterrupt 等跨线程异常传回调用方。
-    except BaseException as exc:  # noqa: BLE001
+    except BaseException as exc:  # ruff:ignore[blind-except]
         exc = remove_tb_frames(exc, 1)
         return Error(exc)
 

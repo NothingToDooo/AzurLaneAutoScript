@@ -133,7 +133,7 @@ class RunCoordinator:
             _validate_state_effects(task_id, result)
         except AbortRequested as error:
             result = TaskResult(outcome=Cancelled(error.reason or _DEFAULT_ABORT_REASON))
-        except Exception as error:  # noqa: BLE001
+        except Exception as error:  # ruff:ignore[blind-except]
             result = TaskResult(outcome=Faulted(error))
 
         self.repository.finalize_run(result)

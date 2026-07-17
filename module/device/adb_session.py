@@ -144,7 +144,7 @@ class AdbSession(ConnectionAttr):
         command = [self.adb_binary, "-P", str(self.adb_server_port), "start-server"]
         logger.info(f"Start ADB server: {command}")
         try:
-            completed = subprocess.run(  # noqa: S603
+            completed = subprocess.run(  # ruff:ignore[subprocess-without-shell-equals-true]
                 command,
                 capture_output=True,
                 check=True,

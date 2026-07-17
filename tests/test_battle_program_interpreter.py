@@ -183,7 +183,7 @@ class StubBattleProgramPort:
         self._record("set_map_weights", rows, cancellation)
 
 
-def _execute(  # noqa: PLR0913 - 测试 helper 显式暴露解释器的独立输入轴。
+def _execute(  # ruff:ignore[too-many-arguments] - 测试 helper 显式暴露解释器的独立输入轴。
     statements: tuple[program_model.ProgramStatement, ...],
     *,
     port: StubBattleProgramPort | None = None,

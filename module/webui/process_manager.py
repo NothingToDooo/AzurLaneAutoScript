@@ -84,7 +84,7 @@ def _execute_process(
             message=message,
         )
     # production 依赖只在实际 worker 执行有效命令时加载。
-    from module.bootstrap.production import run_default_command  # noqa: PLC0415
+    from module.bootstrap.production import run_default_command  # ruff:ignore[import-outside-top-level]
 
     return run_default_command(resolved_command, stop_signal=stop_event)
 
@@ -325,7 +325,7 @@ class ProcessManager:
                 message=_short_message(error),
             )
             raise
-        except Exception as error:  # noqa: BLE001 - 子进程边界必须返回可序列化结果。
+        except Exception as error:  # ruff:ignore[blind-except] - 子进程边界必须返回可序列化结果。
             logger.exception(error)
             outcome = _new_outcome(
                 CommandStatus.FAILED,

@@ -69,7 +69,7 @@ def test_registered_but_undecoded_battle_step_is_rejected_at_its_tag(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setitem(
-        stage_behavior_codec._STEP_FIELDS,  # noqa: SLF001 - 测试扩展表与解码器必须同步。
+        stage_behavior_codec._STEP_FIELDS,  # ruff:ignore[private-member-access] - 测试扩展表与解码器必须同步。
         "future_step",
         ({"tag"}, set()),
     )
@@ -94,7 +94,7 @@ def test_registered_but_undecoded_program_condition_is_rejected_at_its_tag(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setitem(
-        stage_behavior_codec._PROGRAM_CONDITION_FIELDS,  # noqa: SLF001 - 测试扩展表与解码器必须同步。
+        stage_behavior_codec._PROGRAM_CONDITION_FIELDS,  # ruff:ignore[private-member-access] - 测试扩展表与解码器必须同步。
         "future_condition",
         {"tag"},
     )

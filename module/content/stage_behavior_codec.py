@@ -216,7 +216,7 @@ def _strategy(value: object, location: str) -> BossStrategy:
         raise ContentValidationError(message) from error
 
 
-def decode_battle_step(  # noqa: C901, PLR0911, PLR0912 - 封闭 tag 解码必须穷举。
+def decode_battle_step(  # ruff:ignore[complex-structure, too-many-return-statements, too-many-branches] - 封闭 tag 解码必须穷举。
     value: object,
     location: str,
 ) -> BattleStep:
@@ -446,7 +446,7 @@ _PROGRAM_CONDITION_FIELDS = {
 }
 
 
-def _program_condition(  # noqa: C901, PLR0911, PLR0912 - 封闭 condition tag 解码必须穷举。
+def _program_condition(  # ruff:ignore[complex-structure, too-many-return-statements, too-many-branches] - 封闭 condition tag 解码必须穷举。
     value: object,
     location: str,
 ) -> ProgramCondition:
@@ -556,7 +556,7 @@ def _nullable_expectation(value: object, location: str) -> EncounterExpectation 
     return _enum(EncounterExpectation, value, location)
 
 
-def _program_statement(  # noqa: C901, PLR0911, PLR0912 - 封闭 statement tag 解码必须穷举。
+def _program_statement(  # ruff:ignore[complex-structure, too-many-return-statements, too-many-branches] - 封闭 statement tag 解码必须穷举。
     value: object,
     location: str,
     rules: StageMechanicRules,

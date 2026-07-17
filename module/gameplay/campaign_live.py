@@ -1085,7 +1085,7 @@ class LiveCampaignWorkflow(CampaignWorkflow):
             return CampaignStopReason.BLOCKED
         return CampaignStopReason.IN_PROGRESS
 
-    def _report(  # noqa: PLR0913 - report 元数据保持显式，避免无类型字典。
+    def _report(  # ruff:ignore[too-many-arguments] - report 元数据保持显式，避免无类型字典。
         self,
         session: CampaignSession,
         state: CampaignSessionState,

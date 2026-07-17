@@ -226,7 +226,7 @@ def _session(
     return CampaignSession(definition, CampaignRunVariant.NORMAL)
 
 
-def _job(  # noqa: PLR0913 - 测试构造器需要独立控制各领域维度。
+def _job(  # ruff:ignore[too-many-arguments] - 测试构造器需要独立控制各领域维度。
     session: CampaignSession,
     *,
     task_id: str = "main",
