@@ -13,7 +13,7 @@ from module.ui.page import page_private_quarters
 
 
 class PrivateQuarters(PQInteract, PQShop):
-    not_supported_ships: ClassVar[tuple[str, ...]] = ("nakhimov",)
+    not_supported_ships: ClassVar[tuple[str, ...]] = ()
 
     def pq_get_daily_count(self, retry: int = 3) -> int:
         """快速设备的首张截图可能模糊或滞后，有限重试后才确认每日次数为 0。"""

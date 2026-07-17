@@ -18,10 +18,11 @@ class Filter[T]:
         self.filter: list[list[str | None]] = []
 
     def load(self, string: str) -> None:
-        """用 `>` 连接筛选项，同时接受 `＞﹥›˃ᐳ❯` 等近似字符。"""
+        """用 `>` 连接筛选项，并规范化近似的分隔符和连字符。"""
         string = str(string)
         string = re.sub(r"[ \t\r\n]", "", string)
         string = re.sub(r"[＞﹥›˃ᐳ❯]", ">", string)
+        string = re.sub(r"[‐‑‒–—―−－﹣﹘⁃]", "-", string)
         self.filter_raw = string.split(">")
         self.filter = [self.parse_filter(f) for f in self.filter_raw]
 
