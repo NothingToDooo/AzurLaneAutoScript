@@ -25,8 +25,6 @@ if TYPE_CHECKING:
     from module.config.deep import MutableDeepData, MutableDeepValue
 
 type FilePath = str | Path
-type TimeScalar = int | float
-type TimeInput = TimeScalar | str | tuple[TimeScalar, TimeScalar]
 type InputType = Literal["checkbox", "select", "textarea", "input"]
 
 
@@ -180,35 +178,6 @@ def dict_to_kv(dictionary: Mapping[str, MutableDeepValue], *, allow_none: bool =
 def server_time_offset() -> timedelta:
     """个人国区分支默认本机时间就是服务器时间。"""
     return timedelta()
-
-
-def random_normal_distribution_int(a: TimeScalar, b: TimeScalar, n: int = 3) -> int:
-    """不依赖 NumPy，取 n 个闭区间 [a, b] 内均匀随机整数的均值模拟正态分布。"""
-    a = round(a)
-    b = round(b)
-    if a < b:
-        draw_integer = random.randint  # ruff:ignore[suspicious-non-cryptographic-random-usage] - 仅用于等待扰动。
-        output = sum(draw_integer(a, b) for _ in range(n)) / n
-        return round(output)
-    return b
-
-
-def ensure_time(second: TimeInput, n: int = 3, precision: int = 3) -> TimeScalar:
-    """把秒数或 `10,30`、`10-30`、(10, 30) 归一化为秒；区间按近似正态分布取值。"""
-    if isinstance(second, tuple):
-        multiply = 10**precision
-        return random_normal_distribution_int(second[0] * multiply, second[1] * multiply, n) / multiply
-    if isinstance(second, str):
-        if "," in second:
-            lower, upper = second.replace(" ", "").split(",")
-            lower, upper = int(lower), int(upper)
-            return ensure_time((lower, upper), n=n, precision=precision)
-        if "-" in second:
-            lower, upper = second.replace(" ", "").split("-")
-            lower, upper = int(lower), int(upper)
-            return ensure_time((lower, upper), n=n, precision=precision)
-        return int(second)
-    return second
 
 
 def get_os_next_reset() -> datetime:
