@@ -1,5 +1,7 @@
 from module.equipment.assets import FLEET_ENTER, FLEET_ENTER_FLAGSHIP
 from module.freebies.assets import OCR_DATA_KEY
+from module.private_quarters.assets import PRIVATE_QUARTERS_PAGE_LOCALE_VILLA, PRIVATE_QUARTERS_SHIP_NAKHIMOV
+from module.private_quarters.private_quarters import PrivateQuarters
 
 
 def test_ocr_data_key_cn_metadata_matches_updated_asset() -> None:
@@ -38,4 +40,30 @@ def test_fleet_enter_cn_metadata_matches_updated_assets() -> None:
         (219, 196, 174),
         (577, 277, 605, 291),
         "./assets/cn/equipment/FLEET_ENTER_FLAGSHIP.png",
+    )
+
+
+def test_nakhimov_cn_private_quarters_support_matches_updated_assets() -> None:
+    assert "nakhimov" not in PrivateQuarters.not_supported_ships
+    assert (
+        PRIVATE_QUARTERS_PAGE_LOCALE_VILLA.area,
+        PRIVATE_QUARTERS_PAGE_LOCALE_VILLA.color,
+        PRIVATE_QUARTERS_PAGE_LOCALE_VILLA.button,
+        PRIVATE_QUARTERS_PAGE_LOCALE_VILLA.file,
+    ) == (
+        (23, 502, 99, 528),
+        (202, 203, 203),
+        (23, 502, 99, 528),
+        "./assets/cn/private_quarters/PRIVATE_QUARTERS_PAGE_LOCALE_VILLA.png",
+    )
+    assert (
+        PRIVATE_QUARTERS_SHIP_NAKHIMOV.area,
+        PRIVATE_QUARTERS_SHIP_NAKHIMOV.color,
+        PRIVATE_QUARTERS_SHIP_NAKHIMOV.button,
+        PRIVATE_QUARTERS_SHIP_NAKHIMOV.file,
+    ) == (
+        (944, 386, 976, 431),
+        (202, 197, 182),
+        (944, 386, 976, 431),
+        "./assets/cn/private_quarters/PRIVATE_QUARTERS_SHIP_NAKHIMOV.png",
     )

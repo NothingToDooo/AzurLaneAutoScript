@@ -121,3 +121,31 @@ git diff --check
 - 全量测试：`3005 passed, 1 skipped`。
 - hard 14-4 的 manifest 解析、normal / loop 编译、alias、runtime profile 和 `map_covered` 有独立回归测试。
 - 研究优先级、`not_available`、私宅 offset、资源元数据和 FastInputIME 非零退出均有定向测试。
+
+## 6. 2026-07-17 增量同步
+
+本次从上一轮上游核对终点继续检查到 `a97e76cab94598d5ef270372d6457b7faac073ad`，仍按国区、MuMu 12
+和当前模块化架构做选择性移植，没有合并上游历史。
+
+| 功能 | 上游提交 | 本地处理 |
+|---|---|---|
+| Gems farming 船坞升序 | [`d09a98873`](https://github.com/LmeSzinc/AzurLaneAutoScript/commit/d09a98873846dbc97cfc2c82f1d783dc0722220c) | 当前 `get_common_rarity_cv()` 已使用升序，无需重复修改 |
+| 国区纳希莫夫私宅支持 | [`d70c983ff`](https://github.com/LmeSzinc/AzurLaneAutoScript/commit/d70c983ff7aedde4f3a6a6569768425d93eb92c6) | 移除 CN-only runtime 中的 Nakhimov 禁用项，直接同步 Villa / Nakhimov 元数据和两张 CN PNG |
+| Filter 连字符规范化 | [`0f85c251a`](https://github.com/LmeSzinc/AzurLaneAutoScript/commit/0f85c251a4e5c67056fa1281283ecb110bef5a58) | 在当前泛型 `Filter.load()` 中规范化 11 种 Unicode 类连字符，并增加参数化回归测试 |
+| 上游合并节点 | [`a97e76cab`](https://github.com/LmeSzinc/AzurLaneAutoScript/commit/a97e76cab94598d5ef270372d6457b7faac073ad) | 只作为新的上游核对终点，无独立功能改动 |
+
+两张同步资源的 Git blob：
+
+| 资源 | Git blob |
+|---|---|
+| `PRIVATE_QUARTERS_PAGE_LOCALE_VILLA.png` | `4f738c80d32118eca70d5136b2b592d0f89749b9` |
+| `PRIVATE_QUARTERS_SHIP_NAKHIMOV.png` | `71487f9a28c38b03b07069a0df4444872b52c5ef` |
+
+验证结果：
+
+- 新增及相关定向测试：`24 passed`。
+- 全量测试：`2837 passed`。
+- 本次修改的 Python 文件通过 Ruff 和格式检查；全仓格式检查通过（683 files）。
+- `uv lock --check`、campaign runtime profile validator、`alas.py --help` 和 `gui.py --help` 通过。
+- 全仓 Ruff 仍有 152 个既有规则迁移问题（127 个 `RUF105`、25 个 `RUF201`）；全仓 `ty` 仍有
+  `module/device/device.py:66` 和 `module/os_handler/os_status.py:40` 两个既有诊断。本次同步路径没有新增对应错误。

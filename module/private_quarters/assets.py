@@ -46,9 +46,9 @@ PRIVATE_QUARTERS_PAGE_LOCALE_LOFT = Button(
     file="./assets/cn/private_quarters/PRIVATE_QUARTERS_PAGE_LOCALE_LOFT.png",
 )
 PRIVATE_QUARTERS_PAGE_LOCALE_VILLA = Button(
-    area=(42, 508, 80, 523),
-    color=(162, 162, 162),
-    button=(42, 508, 80, 523),
+    area=(23, 502, 99, 528),
+    color=(202, 203, 203),
+    button=(23, 502, 99, 528),
     file="./assets/cn/private_quarters/PRIVATE_QUARTERS_PAGE_LOCALE_VILLA.png",
 )
 PRIVATE_QUARTERS_PAGE_RIGHT = Button(
@@ -118,9 +118,9 @@ PRIVATE_QUARTERS_SHIP_ANCHORAGE = Button(
     file="./assets/cn/private_quarters/PRIVATE_QUARTERS_SHIP_ANCHORAGE.png",
 )
 PRIVATE_QUARTERS_SHIP_NAKHIMOV = Button(
-    area=(944, 373, 994, 431),
-    color=(181, 184, 166),
-    button=(944, 373, 994, 431),
+    area=(944, 386, 976, 431),
+    color=(202, 197, 182),
+    button=(944, 386, 976, 431),
     file="./assets/cn/private_quarters/PRIVATE_QUARTERS_SHIP_NAKHIMOV.png",
 )
 PRIVATE_QUARTERS_SHIP_NEW_JERSEY = Button(
