@@ -246,9 +246,10 @@ class SLPP:
         if self.ch in ["e", "E"]:
             n += self.ch
             self.next_chr()
-            if self.ch not in ("+", "-"):
+            if self.ch in ("+", "-"):
+                n += self._next_number_token(ERRORS["mfnumber_sci"])
+            elif not self.ch or not self.ch.isdigit():
                 raise ParseError(ERRORS["mfnumber_sci"])
-            n += self._next_number_token(ERRORS["mfnumber_sci"])
             n += self.digit()
         return n
 
