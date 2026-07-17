@@ -25,6 +25,14 @@ from module.application import (
 )
 from module.content.activity_catalog import CoalitionActivity, EventStoryActivity, RaidActivity
 from module.content.activity_profile import CoalitionFleetMode, CoalitionStageId, RaidMode
+from module.gameplay.emotion import EmotionSettings
+from module.gameplay.validation import (
+    validate_aware_datetime,
+    validate_bool,
+    validate_non_negative_integer,
+    validate_positive_duration,
+    validate_positive_integer,
+)
 from module.task_registry import TASK_CATALOG
 
 if TYPE_CHECKING:
@@ -49,48 +57,6 @@ _RECOVERY_REQUIRED = "encounter recovery is required"
 _WORKFLOW_FAILED = "encounter workflow did not complete"
 _BALANCER_SWITCH = "encounter yielded to the configured balancing task"
 _ASSIST_ABORTED = "assist session aborted"
-
-
-def _validate_aware_datetime(value: datetime, *, field_name: str) -> None:
-    if not isinstance(value, datetime):
-        message = f"{field_name} must be a datetime"
-        raise TypeError(message)
-    if value.utcoffset() is None:
-        message = f"{field_name} must be timezone-aware"
-        raise ValueError(message)
-
-
-def _validate_positive_integer(value: int, *, field_name: str) -> None:
-    if type(value) is not int:
-        message = f"{field_name} must be an integer"
-        raise TypeError(message)
-    if value <= 0:
-        message = f"{field_name} must be positive"
-        raise ValueError(message)
-
-
-def _validate_non_negative_integer(value: int, *, field_name: str) -> None:
-    if type(value) is not int:
-        message = f"{field_name} must be an integer"
-        raise TypeError(message)
-    if value < 0:
-        message = f"{field_name} must be non-negative"
-        raise ValueError(message)
-
-
-def _validate_bool(*, value: bool, field_name: str) -> None:
-    if type(value) is not bool:
-        message = f"{field_name} must be a bool"
-        raise TypeError(message)
-
-
-def _validate_positive_duration(value: timedelta, *, field_name: str) -> None:
-    if not isinstance(value, timedelta):
-        message = f"{field_name} must be a timedelta"
-        raise TypeError(message)
-    if value <= timedelta(0):
-        message = f"{field_name} must be positive"
-        raise ValueError(message)
 
 
 def _validate_trimmed_string(value: str, *, field_name: str) -> None:
@@ -141,9 +107,9 @@ class MinigameProgress:
     content_revision: str
 
     def __post_init__(self) -> None:
-        _validate_positive_integer(self.operations_completed, field_name="operations_completed")
-        _validate_aware_datetime(self.cycle_ends_at, field_name="cycle_ends_at")
-        _validate_positive_integer(self.settings_revision, field_name="settings_revision")
+        validate_positive_integer(self.operations_completed, field_name="operations_completed")
+        validate_aware_datetime(self.cycle_ends_at, field_name="cycle_ends_at")
+        validate_positive_integer(self.settings_revision, field_name="settings_revision")
         if not isinstance(self.content_revision, str):
             message = "content_revision must be a string"
             raise TypeError(message)
@@ -181,7 +147,7 @@ class ActivitySpec:
         if self.operation_limit is None:
             message = "minigame requires operation_limit"
             raise ValueError(message)
-        _validate_positive_integer(self.operation_limit, field_name="operation_limit")
+        validate_positive_integer(self.operation_limit, field_name="operation_limit")
         if self.progress is not None and not isinstance(self.progress, MinigameProgress):
             message = "progress must be MinigameProgress or None"
             raise TypeError(message)
@@ -255,8 +221,8 @@ class ActivityReport:
         if not isinstance(self.disposition, ActivityDisposition):
             message = "disposition must be an ActivityDisposition"
             raise TypeError(message)
-        _validate_aware_datetime(self.observed_at, field_name="observed_at")
-        _validate_non_negative_integer(self.operations_completed, field_name="operations_completed")
+        validate_aware_datetime(self.observed_at, field_name="observed_at")
+        validate_non_negative_integer(self.operations_completed, field_name="operations_completed")
         if self.command is ActivityCommand.EVENT_STORY and self.operations_completed:
             message = "event_story must not report completed operations"
             raise ValueError(message)
@@ -561,59 +527,6 @@ _ALLOWED_ENCOUNTER_STOPS: Mapping[EncounterCommand, frozenset[EncounterStopReaso
 )
 
 
-class EmotionMode(StrEnum):
-    CALCULATE = "calculate"
-    IGNORE = "ignore"
-    CALCULATE_IGNORE = "calculate_ignore"
-
-
-class EmotionControl(StrEnum):
-    KEEP_EXP_BONUS = "keep_exp_bonus"
-    PREVENT_GREEN_FACE = "prevent_green_face"
-    PREVENT_YELLOW_FACE = "prevent_yellow_face"
-    PREVENT_RED_FACE = "prevent_red_face"
-
-
-class EmotionRecoverLocation(StrEnum):
-    NOT_IN_DORMITORY = "not_in_dormitory"
-    DORMITORY_FLOOR_1 = "dormitory_floor_1"
-    DORMITORY_FLOOR_2 = "dormitory_floor_2"
-
-
-@dataclass(frozen=True, slots=True)
-class FleetEmotionPolicy:
-    control: EmotionControl
-    recover: EmotionRecoverLocation
-    oath: bool
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.control, EmotionControl):
-            message = "control must be an EmotionControl"
-            raise TypeError(message)
-        if not isinstance(self.recover, EmotionRecoverLocation):
-            message = "recover must be an EmotionRecoverLocation"
-            raise TypeError(message)
-        _validate_bool(value=self.oath, field_name="oath")
-
-
-@dataclass(frozen=True, slots=True)
-class EmotionPolicy:
-    mode: EmotionMode
-    fleet1: FleetEmotionPolicy
-    fleet2: FleetEmotionPolicy
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.mode, EmotionMode):
-            message = "mode must be an EmotionMode"
-            raise TypeError(message)
-        if not isinstance(self.fleet1, FleetEmotionPolicy):
-            message = "fleet1 must be a FleetEmotionPolicy"
-            raise TypeError(message)
-        if not isinstance(self.fleet2, FleetEmotionPolicy):
-            message = "fleet2 must be a FleetEmotionPolicy"
-            raise TypeError(message)
-
-
 @dataclass(frozen=True, slots=True)
 class EncounterPolicy:
     failure_retry_delay: DelayRange
@@ -622,20 +535,20 @@ class EncounterPolicy:
     event_point_limit: int = 0
     event_deadline_at: datetime | None = None
     use_2x_book: bool = False
-    emotion: EmotionPolicy | None = None
+    emotion: EmotionSettings | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.failure_retry_delay, DelayRange):
             message = "failure_retry_delay must be a DelayRange"
             raise TypeError(message)
-        _validate_positive_duration(self.resource_retry_delay, field_name="resource_retry_delay")
-        _validate_non_negative_integer(self.oil_limit, field_name="oil_limit")
-        _validate_non_negative_integer(self.event_point_limit, field_name="event_point_limit")
+        validate_positive_duration(self.resource_retry_delay, field_name="resource_retry_delay")
+        validate_non_negative_integer(self.oil_limit, field_name="oil_limit")
+        validate_non_negative_integer(self.event_point_limit, field_name="event_point_limit")
         if self.event_deadline_at is not None:
-            _validate_aware_datetime(self.event_deadline_at, field_name="event_deadline_at")
-        _validate_bool(value=self.use_2x_book, field_name="use_2x_book")
-        if self.emotion is not None and not isinstance(self.emotion, EmotionPolicy):
-            message = "emotion must be an EmotionPolicy or None"
+            validate_aware_datetime(self.event_deadline_at, field_name="event_deadline_at")
+        validate_bool(value=self.use_2x_book, field_name="use_2x_book")
+        if self.emotion is not None and not isinstance(self.emotion, EmotionSettings):
+            message = "emotion must be EmotionSettings or None"
             raise TypeError(message)
 
     @property
@@ -653,8 +566,8 @@ class EncounterBalancerPolicy:
         if not isinstance(self.target_task_id, TaskId):
             message = "target_task_id must be a TaskId"
             raise TypeError(message)
-        _validate_non_negative_integer(self.coin_limit, field_name="coin_limit")
-        _validate_positive_duration(self.retry_delay, field_name="retry_delay")
+        validate_non_negative_integer(self.coin_limit, field_name="coin_limit")
+        validate_positive_duration(self.retry_delay, field_name="retry_delay")
 
 
 @dataclass(frozen=True, slots=True)
@@ -682,8 +595,8 @@ class RaidDailyOptions:
         if definition.supports_daily and not set(self.stages).issubset(definition.daily_modes):
             message = "stages must be supported daily modes for the selected raid"
             raise ValueError(message)
-        _validate_bool(value=self.use_ticket, field_name="use_ticket")
-        _validate_bool(value=self.collect_daily_mission, field_name="collect_daily_mission")
+        validate_bool(value=self.use_ticket, field_name="use_ticket")
+        validate_bool(value=self.collect_daily_mission, field_name="collect_daily_mission")
         if not isinstance(self.policy, EncounterPolicy):
             message = "policy must be an EncounterPolicy"
             raise TypeError(message)
@@ -716,7 +629,7 @@ class RaidOptions:
         if self.mode not in self.activity.definition.modes:
             message = "mode must be supported by the selected raid"
             raise ValueError(message)
-        _validate_bool(value=self.use_ticket, field_name="use_ticket")
+        validate_bool(value=self.use_ticket, field_name="use_ticket")
         if not isinstance(self.policy, EncounterPolicy):
             message = "policy must be an EncounterPolicy"
             raise TypeError(message)
@@ -728,7 +641,7 @@ class HospitalOptions:
     policy: EncounterPolicy
 
     def __post_init__(self) -> None:
-        _validate_bool(value=self.use_recommended_fleet, field_name="use_recommended_fleet")
+        validate_bool(value=self.use_recommended_fleet, field_name="use_recommended_fleet")
         if not isinstance(self.policy, EncounterPolicy):
             message = "policy must be an EncounterPolicy"
             raise TypeError(message)
@@ -774,10 +687,10 @@ class EncounterProgress:
     content_revision: str
 
     def __post_init__(self) -> None:
-        _validate_positive_integer(self.runs_completed, field_name="runs_completed")
+        validate_positive_integer(self.runs_completed, field_name="runs_completed")
         if self.cycle_ends_at is not None:
-            _validate_aware_datetime(self.cycle_ends_at, field_name="cycle_ends_at")
-        _validate_positive_integer(self.settings_revision, field_name="settings_revision")
+            validate_aware_datetime(self.cycle_ends_at, field_name="cycle_ends_at")
+        validate_positive_integer(self.settings_revision, field_name="settings_revision")
         _validate_trimmed_string(self.content_revision, field_name="content_revision")
 
 
@@ -817,7 +730,7 @@ class EncounterSpec:
 
     def _validate_run_limit(self) -> None:
         if self.run_limit is not None:
-            _validate_positive_integer(self.run_limit, field_name="run_limit")
+            validate_positive_integer(self.run_limit, field_name="run_limit")
         if self.command is EncounterCommand.COALITION_SP:
             if self.run_limit != 1:
                 message = "coalition_sp run_limit must be one"
@@ -918,8 +831,8 @@ class EncounterReport:
         if self.stop_reason not in _ALLOWED_ENCOUNTER_STOPS[self.command]:
             message = f"{self.stop_reason.value} is not valid for {self.command.value}"
             raise ValueError(message)
-        _validate_aware_datetime(self.observed_at, field_name="observed_at")
-        _validate_non_negative_integer(self.runs_completed, field_name="runs_completed")
+        validate_aware_datetime(self.observed_at, field_name="observed_at")
+        validate_non_negative_integer(self.runs_completed, field_name="runs_completed")
         if self.runs_completed > 1:
             message = "encounter must complete at most one safe unit per run"
             raise ValueError(message)
@@ -931,7 +844,7 @@ class EncounterReport:
             if self.resume_at is None:
                 message = f"{self.stop_reason.value} requires resume_at"
                 raise ValueError(message)
-            _validate_aware_datetime(self.resume_at, field_name="resume_at")
+            validate_aware_datetime(self.resume_at, field_name="resume_at")
             if self.resume_at <= self.observed_at:
                 message = "resume_at must be later than observed_at"
                 raise ValueError(message)
@@ -1216,7 +1129,7 @@ class DaemonOptions:
     enter_map: bool
 
     def __post_init__(self) -> None:
-        _validate_bool(value=self.enter_map, field_name="enter_map")
+        validate_bool(value=self.enter_map, field_name="enter_map")
 
 
 @dataclass(frozen=True, slots=True)
@@ -1225,8 +1138,8 @@ class OpsiDaemonOptions:
     select_enemy: bool
 
     def __post_init__(self) -> None:
-        _validate_bool(value=self.repair_ship, field_name="repair_ship")
-        _validate_bool(value=self.select_enemy, field_name="select_enemy")
+        validate_bool(value=self.repair_ship, field_name="repair_ship")
+        validate_bool(value=self.select_enemy, field_name="select_enemy")
 
 
 type AssistSessionOptions = DaemonOptions | OpsiDaemonOptions

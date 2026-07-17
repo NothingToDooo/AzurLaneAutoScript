@@ -29,10 +29,13 @@ sys.argv = ["gui.py"]
 gui.main()
 """
 
+    # 桌面测试宿主没有控制台，Windows 子进程必须隐藏以免弹出 PyWebIO Application 窗口。
+    creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
     subprocess.run(  # ruff:ignore[subprocess-without-shell-equals-true] - 使用当前测试解释器启动隔离的导入环境。
         [sys.executable, "-c", script],
         check=True,
         cwd=Path(__file__).resolve().parents[1],
+        creationflags=creationflags,
     )
 
 

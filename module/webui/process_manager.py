@@ -2,7 +2,8 @@ import multiprocessing
 import queue
 import threading
 import time
-from dataclasses import dataclass
+from contextlib import contextmanager
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, ClassVar, Self, cast
 
@@ -13,12 +14,12 @@ from module.runtime.runner import CommandOutcome, CommandStatus
 from module.task_registry import get_tool_task_command
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from multiprocessing.process import BaseProcess
     from multiprocessing.queues import Queue as ProcessQueue
 
     from module.base.stop_event import StopEvent
 
-STOP_GRACE_SECONDS = 5
 KILL_JOIN_SECONDS = 1
 QUEUE_POLL_SECONDS = 0.1
 QUEUE_DRAIN_SECONDS = 1
@@ -44,7 +45,8 @@ class _ProcessRun:
     renderable_queue: ProcessQueue[RenderableQueueItem]
     outcome_queue: ProcessQueue[CommandOutcome]
     stop_event: StopEvent
-    stop_status: CommandStatus | None = None
+    stop_requested: bool = False
+    forced: bool = False
     monitor: threading.Thread | None = None
 
 
@@ -123,6 +125,7 @@ class ProcessManager:
         self.renderables_max_length = 400
         self.renderables_reduce_length = 80
         self._run: _ProcessRun | None = None
+        self._start_inhibitors = 0
         self._lifecycle_lock = threading.Lock()
         self._outcome_lock = threading.Lock()
         self._outcome: CommandOutcome | None = None
@@ -140,7 +143,7 @@ class ProcessManager:
             message = "command must be trimmed and non-empty"
             raise ValueError(message)
         with self._lifecycle_lock:
-            if self.alive:
+            if self._start_inhibitors or self.alive:
                 return
             self._join_monitor()
             request = _ProcessRequest(command)
@@ -182,33 +185,71 @@ class ProcessManager:
             self.thd_log_queue_handler = monitor
         monitor.start()
 
-    @staticmethod
-    def _stop_process(run: _ProcessRun) -> None:
-        process = run.process
-        if not process.is_alive():
-            return
+    def _request_stop(self, run: _ProcessRun) -> None:
+        with self._outcome_lock:
+            if run.stop_requested:
+                return
+            run.stop_event.set()
+            run.stop_requested = True
 
-        run.stop_status = CommandStatus.STOPPED
-        run.stop_event.set()
-        process.join(timeout=STOP_GRACE_SECONDS)
-
-        if process.is_alive():
-            run.stop_status = CommandStatus.KILLED
-            logger.warning("[alas] did not stop gracefully, killing process")
-            process.kill()
-            process.join(timeout=KILL_JOIN_SECONDS)
-            if process.is_alive():
-                message = "[alas] process is still alive after kill"
-                raise RuntimeError(message)
-
-    def stop(self) -> None:
+    def request_stop(self) -> None:
         with self._lifecycle_lock:
             run = self._run
             if run is not None and run.process.is_alive():
-                self._stop_process(run)
+                self._request_stop(run)
+
+    @contextmanager
+    def hold_start(self) -> Iterator[None]:
+        """在调用方完成一次状态替换前禁止启动新子进程。"""
+
+        with self._lifecycle_lock:
+            self._start_inhibitors += 1
+        try:
+            yield
+        finally:
+            with self._lifecycle_lock:
+                self._start_inhibitors -= 1
+
+    def stop_and_wait(self) -> None:
+        with self.hold_start():
+            with self._lifecycle_lock:
+                run = self._run
+                if run is not None and run.process.is_alive():
+                    self._request_stop(run)
+
+            # 等待期间不持有 lifecycle lock，显式 force_stop 必须始终可用。
+            if run is not None and run.process.is_alive():
+                run.process.join()
+
+            with self._lifecycle_lock:
+                self._join_monitor()
+                if run is not None:
+                    outcome_timeout = 0 if run.forced else QUEUE_DRAIN_SECONDS
+                    child_outcome = self._read_child_outcome(run, timeout=outcome_timeout)
+                    self._publish_outcome(run, child_outcome)
+        logger.info("[alas] exited")
+
+    def force_stop(self) -> None:
+        with self._lifecycle_lock:
+            run = self._run
+            if run is not None and run.process.is_alive():
+                self._request_stop(run)
+                logger.warning("[alas] force killing process")
+                run.process.kill()
+                run.forced = True
+
+        if run is not None and run.forced:
+            run.process.join(timeout=KILL_JOIN_SECONDS)
+            if run.process.is_alive():
+                message = "[alas] process is still alive after kill"
+                raise RuntimeError(message)
+
+        with self._lifecycle_lock:
             self._join_monitor()
             if run is not None:
-                self._publish_outcome(run, self._read_child_outcome(run, timeout=0))
+                outcome_timeout = 0 if run.forced else QUEUE_DRAIN_SECONDS
+                child_outcome = self._read_child_outcome(run, timeout=outcome_timeout)
+                self._publish_outcome(run, child_outcome)
         logger.info("[alas] exited")
 
     def _append_renderable(self, renderable: Renderable) -> None:
@@ -235,7 +276,7 @@ class ProcessManager:
             self._append_renderable(renderable)
 
         run.process.join(timeout=KILL_JOIN_SECONDS)
-        outcome_timeout = 0 if run.stop_status is not None else QUEUE_DRAIN_SECONDS
+        outcome_timeout = 0 if run.forced else QUEUE_DRAIN_SECONDS
         child_outcome = self._read_child_outcome(run, timeout=outcome_timeout)
         self._publish_outcome(run, child_outcome)
         logger.info("End of process monitor loop")
@@ -256,11 +297,15 @@ class ProcessManager:
         with self._outcome_lock:
             if self._run is not run:
                 return
-            if run.stop_status is not None:
-                self._outcome = _new_outcome(run.stop_status, command=run.command)
+            if run.forced:
+                self._outcome = _new_outcome(CommandStatus.KILLED, command=run.command)
                 return
             if child_outcome is not None:
-                self._outcome = child_outcome
+                self._outcome = (
+                    replace(child_outcome, status=CommandStatus.STOPPED)
+                    if run.stop_requested and child_outcome.status is CommandStatus.FINISHED
+                    else child_outcome
+                )
                 return
             if self._outcome is not None:
                 return
@@ -348,6 +393,6 @@ class ProcessManager:
                 renderable_queue.put(None)
 
     @classmethod
-    def stop_instance(cls) -> None:
+    def force_stop_instance(cls) -> None:
         if cls._singleton is not None:
-            cls._singleton.stop()
+            cls._singleton.force_stop()

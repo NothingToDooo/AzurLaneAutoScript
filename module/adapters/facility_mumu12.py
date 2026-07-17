@@ -1,6 +1,6 @@
 from datetime import datetime
 from types import MappingProxyType
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from module.adapters.facility_live import (
     CommissionEvidence,
@@ -12,9 +12,9 @@ from module.adapters.facility_live import (
     SystemFacilityClock,
     TacticalEvidence,
 )
-from module.adapters.mumu12 import CancellationAwareMumu12Device
+from module.adapters.mumu12 import activate_mumu12_task
 from module.commission.commission import RewardCommission
-from module.config.config import AzurLaneConfig, name_to_function
+from module.config.config import AzurLaneConfig
 from module.device.device import Device
 from module.gameplay.facility import CommissionSettings, ResearchSettings, TacticalSettings
 from module.gameplay.facility_factories import FacilityWorkflows
@@ -26,25 +26,6 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from module.application import CancellationSource
-    from module.config.config_generated import ConfigOverrides
-
-
-def _activate(
-    config: AzurLaneConfig,
-    device: Device,
-    task_name: str,
-    gameplay_fields: Mapping[str, object],
-    cancellation: CancellationSource,
-) -> Device:
-    cancellation.raise_if_requested()
-    config.replace_runtime_overlay()
-    task = name_to_function(task_name)
-    config.task = task
-    config.bind(task)
-    overlay = cast("ConfigOverrides", dict(gameplay_fields))
-    config.apply_runtime_overlay(**overlay)
-    device.config = config
-    return cast("Device", CancellationAwareMumu12Device(device, cancellation))
 
 
 def _require_datetime(value: object, *, field_name: str) -> datetime:
@@ -139,7 +120,7 @@ class Mumu12ResearchDriver:
         self._clock = clock
 
     def execute(self, settings: ResearchSettings, cancellation: CancellationSource) -> ResearchQueueEvidence:
-        device = _activate(
+        device = activate_mumu12_task(
             self._config,
             self._device,
             "Research",
@@ -193,7 +174,7 @@ class Mumu12CommissionDriver:
         self._device = device
 
     def execute(self, settings: CommissionSettings, cancellation: CancellationSource) -> CommissionEvidence:
-        device = _activate(
+        device = activate_mumu12_task(
             self._config,
             self._device,
             "Commission",
@@ -247,7 +228,7 @@ class Mumu12TacticalDriver:
         self._clock = clock
 
     def execute(self, settings: TacticalSettings, cancellation: CancellationSource) -> TacticalEvidence:
-        device = _activate(
+        device = activate_mumu12_task(
             self._config,
             self._device,
             "Tactical",

@@ -57,7 +57,7 @@ def runtime(monkeypatch: pytest.MonkeyPatch) -> tuple[AzurLaneConfig, Device]:
         vars(config).update(overlay)
         return device
 
-    monkeypatch.setattr(adapters, "_activate", activate)
+    monkeypatch.setattr(adapters, "activate_mumu12_task", activate)
     return config, device
 
 

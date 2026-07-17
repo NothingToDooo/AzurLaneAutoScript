@@ -1,10 +1,10 @@
 from types import MappingProxyType
 from typing import TYPE_CHECKING, cast, override
 
-from module.adapters.mumu12 import CancellationAwareMumu12Device
+from module.adapters.mumu12 import activate_mumu12_task
 from module.awaken.awaken import Awaken
 from module.base.decorator import del_cached_property
-from module.config.config import AzurLaneConfig, name_to_function
+from module.config.config import AzurLaneConfig
 from module.device.device import Device
 from module.gacha.gacha_reward import RewardGacha
 from module.gameplay.market import (
@@ -45,23 +45,6 @@ if TYPE_CHECKING:
 
     from module.application import CancellationSource
     from module.config.config_generated import ConfigOverrides
-
-
-def _activate(
-    config: AzurLaneConfig,
-    device: Device,
-    task_name: str,
-    overlay: ConfigOverrides,
-    cancellation: CancellationSource,
-) -> Device:
-    cancellation.raise_if_requested()
-    config.replace_runtime_overlay()
-    task = name_to_function(task_name)
-    config.task = task
-    config.bind(task)
-    config.apply_runtime_overlay(**overlay)
-    device.config = config
-    return cast("Device", CancellationAwareMumu12Device(device, cancellation))
 
 
 def project_gacha_settings(settings: GachaSettings) -> Mapping[str, object]:
@@ -174,7 +157,7 @@ class _Mumu12MarketAdapter:
         overlay: ConfigOverrides | None = None,
     ) -> Device:
         selected_overlay: ConfigOverrides = {} if overlay is None else overlay
-        return _activate(self._config, self._device, task_name, selected_overlay, cancellation)
+        return activate_mumu12_task(self._config, self._device, task_name, selected_overlay, cancellation)
 
 
 class Mumu12AwakenWorkflow(_Mumu12MarketAdapter, AwakenWorkflow):

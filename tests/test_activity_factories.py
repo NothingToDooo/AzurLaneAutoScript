@@ -55,6 +55,13 @@ from module.gameplay.activity_factories import (
     ActivityWorkflows,
     build_activity_factories,
 )
+from module.gameplay.emotion import (
+    EmotionControl,
+    EmotionMode,
+    EmotionRecoverLocation,
+    EmotionSettings,
+    FleetEmotionSettings,
+)
 from module.runtime import (
     FrozenJsonValue,
     SettingsDocumentError,
@@ -423,6 +430,43 @@ def test_continuous_encounter_factory_decodes_nullable_limit_and_typed_balancer_
             WakeTask(TaskId("main"), _OBSERVED_AT, WakePolicy.FORCE_ENABLE),
         ),
     )
+
+
+def test_encounter_factory_decodes_canonical_emotion_settings() -> None:
+    workflow = _EncounterWorkflow()
+    factory = _factories(replace(_workflows(), raid=workflow))["raid"]
+    settings = _valid_settings("raid")
+    policy_settings = dict(cast("dict[str, FrozenJsonValue]", settings["policy"]))
+    policy_settings["emotion"] = cast(
+        "FrozenJsonValue",
+        {
+            "mode": "calculate",
+            "fleet1": {
+                "control": "prevent_green_face",
+                "recover": "not_in_dormitory",
+                "oath": False,
+            },
+            "fleet2": {
+                "control": "keep_exp_bonus",
+                "recover": "dormitory_floor_1",
+                "oath": True,
+            },
+        },
+    )
+    settings["policy"] = policy_settings
+    task = factory.build(_build_context("raid", settings))
+
+    task.run(_task_context("raid"))
+
+    options = workflow.specs[0].options
+    assert isinstance(options, RaidOptions)
+    emotion = options.policy.emotion
+    assert type(emotion) is EmotionSettings
+    assert type(emotion.fleet1) is FleetEmotionSettings
+    assert emotion.mode is EmotionMode.CALCULATE
+    assert emotion.fleet2.control is EmotionControl.KEEP_EXP_BONUS
+    assert emotion.fleet2.recover is EmotionRecoverLocation.DORMITORY_FLOOR_1
+    assert emotion.fleet2.oath is True
 
 
 def test_continuous_encounter_factory_restores_typed_progress_checkpoint() -> None:

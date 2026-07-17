@@ -18,6 +18,12 @@ from module.application import (
     TaskResult,
     runtime_delay_sampler,
 )
+from module.gameplay.validation import (
+    validate_aware_datetime,
+    validate_bool,
+    validate_non_negative_integer,
+    validate_positive_duration,
+)
 
 if TYPE_CHECKING:
     from module.application import CancellationSource
@@ -27,33 +33,6 @@ GEMS_FARMING_TASK_ID = TaskId("gems_farming")
 _RESEARCH_EMPTY_REASON = "no research project is running"
 _COMMISSION_EMPTY_REASON = "no commission is running"
 _TACTICAL_EMPTY_REASON = "no tactical training is running"
-
-
-def _validate_aware_datetime(value: datetime, *, field_name: str) -> None:
-    if not isinstance(value, datetime):
-        message = f"{field_name} must be a datetime"
-        raise TypeError(message)
-    if value.tzinfo is None or value.utcoffset() is None:
-        message = f"{field_name} must be timezone-aware"
-        raise ValueError(message)
-
-
-def _validate_positive_duration(value: timedelta, *, field_name: str) -> None:
-    if not isinstance(value, timedelta):
-        message = f"{field_name} must be a timedelta"
-        raise TypeError(message)
-    if value <= timedelta(0):
-        message = f"{field_name} must be positive"
-        raise ValueError(message)
-
-
-def _validate_non_negative_count(value: int, *, field_name: str) -> None:
-    if type(value) is not int:
-        message = f"{field_name} must be an integer"
-        raise TypeError(message)
-    if value < 0:
-        message = f"{field_name} must be non-negative"
-        raise ValueError(message)
 
 
 def _validate_text(value: str, *, field_name: str) -> None:
@@ -90,9 +69,7 @@ class ResearchSelectionPolicy:
             if not isinstance(value, ResearchResourcePolicy):
                 message = f"{field_name} must be a ResearchResourcePolicy"
                 raise TypeError(message)
-        if type(self.allow_delay) is not bool:
-            message = "allow_delay must be a bool"
-            raise TypeError(message)
+        validate_bool(value=self.allow_delay, field_name="allow_delay")
         _validate_text(self.preset_filter, field_name="preset_filter")
         _validate_text(self.custom_filter, field_name="custom_filter")
 
@@ -118,7 +95,7 @@ class ResearchReport:
     first_finish_at: datetime | None
 
     def __post_init__(self) -> None:
-        _validate_aware_datetime(self.observed_at, field_name="observed_at")
+        validate_aware_datetime(self.observed_at, field_name="observed_at")
         if type(self.available_slots) is not int:
             message = "available_slots must be an integer"
             raise TypeError(message)
@@ -135,7 +112,7 @@ class ResearchReport:
         if self.first_finish_at is None:
             message = "a non-empty research queue must have a first finish time"
             raise ValueError(message)
-        _validate_aware_datetime(self.first_finish_at, field_name="first_finish_at")
+        validate_aware_datetime(self.first_finish_at, field_name="first_finish_at")
 
 
 class ResearchWorkflow(Protocol):
@@ -193,9 +170,7 @@ class CommissionSelectionPolicy:
             message = "preset_filter must be a CommissionPreset"
             raise TypeError(message)
         _validate_text(self.custom_filter, field_name="custom_filter")
-        if type(self.do_major_commission) is not bool:
-            message = "do_major_commission must be a bool"
-            raise TypeError(message)
+        validate_bool(value=self.do_major_commission, field_name="do_major_commission")
 
 
 @dataclass(frozen=True, slots=True)
@@ -209,13 +184,11 @@ class CommissionSettings:
         if not isinstance(self.failure_retry_delay, DelayRange):
             message = "failure_retry_delay must be a DelayRange"
             raise TypeError(message)
-        if type(self.commission_limit_enabled) is not bool:
-            message = "commission_limit_enabled must be a bool"
-            raise TypeError(message)
+        validate_bool(value=self.commission_limit_enabled, field_name="commission_limit_enabled")
         if not isinstance(self.selection, CommissionSelectionPolicy):
             message = "selection must be a CommissionSelectionPolicy"
             raise TypeError(message)
-        _validate_positive_duration(self.gems_farming_deferral, field_name="gems_farming_deferral")
+        validate_positive_duration(self.gems_farming_deferral, field_name="gems_farming_deferral")
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,14 +199,14 @@ class CommissionReport:
     filtered_urgent_pending: int
 
     def __post_init__(self) -> None:
-        _validate_aware_datetime(self.observed_at, field_name="observed_at")
+        validate_aware_datetime(self.observed_at, field_name="observed_at")
         if not isinstance(self.finish_times, tuple):
             message = "finish_times must be a tuple"
             raise TypeError(message)
         for finish_at in self.finish_times:
-            _validate_aware_datetime(finish_at, field_name="finish_times item")
-        _validate_non_negative_count(self.daily_pending, field_name="daily_pending")
-        _validate_non_negative_count(self.filtered_urgent_pending, field_name="filtered_urgent_pending")
+            validate_aware_datetime(finish_at, field_name="finish_times item")
+        validate_non_negative_integer(self.daily_pending, field_name="daily_pending")
+        validate_non_negative_integer(self.filtered_urgent_pending, field_name="filtered_urgent_pending")
 
 
 class CommissionWorkflow(Protocol):
@@ -310,16 +283,14 @@ class TacticalExperienceOverflowPolicy:
     t4_allow: int
 
     def __post_init__(self) -> None:
-        if type(self.enabled) is not bool:
-            message = "enabled must be a bool"
-            raise TypeError(message)
+        validate_bool(value=self.enabled, field_name="enabled")
         for field_name, value in (
             ("t1_allow", self.t1_allow),
             ("t2_allow", self.t2_allow),
             ("t3_allow", self.t3_allow),
             ("t4_allow", self.t4_allow),
         ):
-            _validate_non_negative_count(value, field_name=field_name)
+            validate_non_negative_integer(value, field_name=field_name)
 
 
 @dataclass(frozen=True, slots=True)
@@ -329,12 +300,8 @@ class TacticalStudentPolicy:
     minimum_level: int
 
     def __post_init__(self) -> None:
-        if type(self.enabled) is not bool:
-            message = "enabled must be a bool"
-            raise TypeError(message)
-        if type(self.favorite) is not bool:
-            message = "favorite must be a bool"
-            raise TypeError(message)
+        validate_bool(value=self.enabled, field_name="enabled")
+        validate_bool(value=self.favorite, field_name="favorite")
         if type(self.minimum_level) is not int:
             message = "minimum_level must be an integer"
             raise TypeError(message)
@@ -377,9 +344,9 @@ class TacticalReport:
     finish_at: datetime | None
 
     def __post_init__(self) -> None:
-        _validate_aware_datetime(self.observed_at, field_name="observed_at")
+        validate_aware_datetime(self.observed_at, field_name="observed_at")
         if self.finish_at is not None:
-            _validate_aware_datetime(self.finish_at, field_name="finish_at")
+            validate_aware_datetime(self.finish_at, field_name="finish_at")
 
 
 class TacticalWorkflow(Protocol):

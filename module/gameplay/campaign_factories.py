@@ -22,10 +22,8 @@ from module.gameplay.campaign import (
     CAMPAIGN_PROGRESS_SCHEMA_VERSION,
     CampaignAutomationSettings,
     CampaignDifficulty,
-    CampaignEmotionSettings,
     CampaignEnemyPrioritySettings,
     CampaignExecutionSettings,
-    CampaignFleetEmotionSettings,
     CampaignFleetSettings,
     CampaignHpControlSettings,
     CampaignJobKind,
@@ -36,9 +34,6 @@ from module.gameplay.campaign import (
     CampaignSubmarineSettings,
     CampaignTask,
     CampaignWorkflow,
-    EmotionControl,
-    EmotionMode,
-    EmotionRecoverLocation,
     EnemyPriorityMode,
     FleetMode,
     FleetOrder,
@@ -54,6 +49,13 @@ from module.gameplay.campaign import (
     SubmarineDistanceToBoss,
     SubmarineMode,
     TaskBalancerPolicy,
+)
+from module.gameplay.emotion import (
+    EmotionControl,
+    EmotionMode,
+    EmotionRecoverLocation,
+    EmotionSettings,
+    FleetEmotionSettings,
 )
 from module.runtime import (
     SettingsDecoder,
@@ -265,8 +267,8 @@ def _submarine(decoder: SettingsDecoder) -> CampaignSubmarineSettings:
     return settings
 
 
-def _fleet_emotion(decoder: SettingsDecoder) -> CampaignFleetEmotionSettings:
-    settings = CampaignFleetEmotionSettings(
+def _fleet_emotion(decoder: SettingsDecoder) -> FleetEmotionSettings:
+    settings = FleetEmotionSettings(
         control=decoder.enum("control", EmotionControl),
         recover=decoder.enum("recover", EmotionRecoverLocation),
         oath=decoder.boolean("oath"),
@@ -275,8 +277,8 @@ def _fleet_emotion(decoder: SettingsDecoder) -> CampaignFleetEmotionSettings:
     return settings
 
 
-def _emotion(decoder: SettingsDecoder) -> CampaignEmotionSettings:
-    settings = CampaignEmotionSettings(
+def _emotion(decoder: SettingsDecoder) -> EmotionSettings:
+    settings = EmotionSettings(
         mode=decoder.enum("mode", EmotionMode),
         fleet1=_fleet_emotion(decoder.object("fleet1")),
         fleet2=_fleet_emotion(decoder.object("fleet2")),

@@ -3,33 +3,10 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Protocol, override
 
 from module.application import DailySchedule, DisableTask, RescheduleSelf, Succeeded, Task, TaskContext, TaskResult
+from module.gameplay.validation import validate_bool, validate_non_negative_integer, validate_positive_integer
 
 if TYPE_CHECKING:
     from module.application import CancellationSource
-
-
-def _validate_bool(*, value: bool, field_name: str) -> None:
-    if type(value) is not bool:
-        message = f"{field_name} must be a bool"
-        raise TypeError(message)
-
-
-def _validate_non_negative_integer(value: int, *, field_name: str) -> None:
-    if type(value) is not int:
-        message = f"{field_name} must be an integer"
-        raise TypeError(message)
-    if value < 0:
-        message = f"{field_name} must be non-negative"
-        raise ValueError(message)
-
-
-def _validate_positive_integer(value: int, *, field_name: str) -> None:
-    if type(value) is not int:
-        message = f"{field_name} must be an integer"
-        raise TypeError(message)
-    if value <= 0:
-        message = f"{field_name} must be positive"
-        raise ValueError(message)
 
 
 def _validate_filter(value: str | None, *, field_name: str) -> None:
@@ -72,7 +49,7 @@ class AwakenPlan:
         if not isinstance(self.level_cap, AwakenLevelCap):
             message = "level_cap must be an AwakenLevelCap"
             raise TypeError(message)
-        _validate_bool(value=self.favourite_only, field_name="favourite_only")
+        validate_bool(value=self.favourite_only, field_name="favourite_only")
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,9 +157,9 @@ class ShipyardPurchasePlan:
     buy_amount: int
 
     def __post_init__(self) -> None:
-        _validate_positive_integer(self.research_series, field_name="research_series")
-        _validate_non_negative_integer(self.ship_index, field_name="ship_index")
-        _validate_non_negative_integer(self.buy_amount, field_name="buy_amount")
+        validate_positive_integer(self.research_series, field_name="research_series")
+        validate_non_negative_integer(self.ship_index, field_name="ship_index")
+        validate_non_negative_integer(self.buy_amount, field_name="buy_amount")
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,8 +200,8 @@ class ShipyardReport:
     dr_processed: bool
 
     def __post_init__(self) -> None:
-        _validate_bool(value=self.pr_processed, field_name="pr_processed")
-        _validate_bool(value=self.dr_processed, field_name="dr_processed")
+        validate_bool(value=self.pr_processed, field_name="pr_processed")
+        validate_bool(value=self.dr_processed, field_name="dr_processed")
 
 
 class ShipyardWorkflow(Protocol):
@@ -280,9 +257,9 @@ class GachaPlan:
         if not isinstance(self.pool, GachaPool):
             message = "pool must be a GachaPool"
             raise TypeError(message)
-        _validate_positive_integer(self.amount, field_name="amount")
-        _validate_bool(value=self.use_ticket, field_name="use_ticket")
-        _validate_bool(value=self.use_drill, field_name="use_drill")
+        validate_positive_integer(self.amount, field_name="amount")
+        validate_bool(value=self.use_ticket, field_name="use_ticket")
+        validate_bool(value=self.use_drill, field_name="use_drill")
 
 
 @dataclass(frozen=True, slots=True)
@@ -304,7 +281,7 @@ class GachaReport:
     submitted: bool
 
     def __post_init__(self) -> None:
-        _validate_bool(value=self.submitted, field_name="submitted")
+        validate_bool(value=self.submitted, field_name="submitted")
 
 
 class GachaWorkflow(Protocol):
@@ -345,10 +322,10 @@ class GeneralShopPlan:
 
     def __post_init__(self) -> None:
         _validate_filter(self.filter, field_name="filter")
-        _validate_bool(value=self.refresh, field_name="refresh")
-        _validate_bool(value=self.use_gems, field_name="use_gems")
-        _validate_bool(value=self.consume_coins, field_name="consume_coins")
-        _validate_bool(value=self.buy_skin_box, field_name="buy_skin_box")
+        validate_bool(value=self.refresh, field_name="refresh")
+        validate_bool(value=self.use_gems, field_name="use_gems")
+        validate_bool(value=self.consume_coins, field_name="consume_coins")
+        validate_bool(value=self.buy_skin_box, field_name="buy_skin_box")
 
 
 @dataclass(frozen=True, slots=True)
@@ -358,7 +335,7 @@ class MeritShopPlan:
 
     def __post_init__(self) -> None:
         _validate_filter(self.filter, field_name="filter")
-        _validate_bool(value=self.refresh, field_name="refresh")
+        validate_bool(value=self.refresh, field_name="refresh")
 
 
 @dataclass(frozen=True, slots=True)
@@ -380,7 +357,7 @@ class GuildShopPlan:
 
     def __post_init__(self) -> None:
         _validate_filter(self.filter, field_name="filter")
-        _validate_bool(value=self.refresh, field_name="refresh")
+        validate_bool(value=self.refresh, field_name="refresh")
         for field_name in (
             "box_t3",
             "box_t4",

@@ -2,9 +2,9 @@ from datetime import UTC, datetime, timedelta
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Protocol, cast, override
 
-from module.adapters.mumu12 import CancellationAwareMumu12Device
+from module.adapters.mumu12 import activate_mumu12_task
 from module.base.failure import cleanup_scope
-from module.config.config import AzurLaneConfig, name_to_function
+from module.config.config import AzurLaneConfig
 from module.daily.daily import OCR_REMAIN, Daily
 from module.device.device import Device
 from module.exception import OilExhausted, RequestHumanTakeover, ScriptEnd
@@ -68,23 +68,6 @@ def _require_hard_campaign(port: HardCampaignPort) -> None:
         if isinstance(port, type) or not callable(getattr(port, method_name, None)):
             message = f"hard_campaign must implement {method_name}()"
             raise TypeError(message)
-
-
-def _activate(
-    config: AzurLaneConfig,
-    device: Device,
-    task_name: str,
-    overlay: ConfigOverrides,
-    cancellation: CancellationSource,
-) -> Device:
-    cancellation.raise_if_requested()
-    config.replace_runtime_overlay()
-    task = name_to_function(task_name)
-    config.task = task
-    config.bind(task)
-    config.apply_runtime_overlay(**overlay)
-    device.config = config
-    return cast("Device", CancellationAwareMumu12Device(device, cancellation))
 
 
 def project_daily_settings(settings: DailySettings) -> Mapping[str, object]:
@@ -200,7 +183,7 @@ class Mumu12DailyWorkflow:
         self._device = device
 
     def execute(self, settings: DailySettings, cancellation: CancellationSource) -> DailyReport:
-        device = _activate(self._config, self._device, "Daily", _daily_overlay(settings), cancellation)
+        device = activate_mumu12_task(self._config, self._device, "Daily", _daily_overlay(settings), cancellation)
         runner = _ReportingDaily(self._config, device=device)
         runner.daily_checked = [0]
         cancellation.raise_if_requested()
@@ -241,7 +224,7 @@ class Mumu12HardWorkflow:
         self._clock = selected_clock
 
     def execute(self, settings: HardSettings, cancellation: CancellationSource) -> HardReport:
-        _activate(self._config, self._device, "Hard", _hard_overlay(settings), cancellation)
+        activate_mumu12_task(self._config, self._device, "Hard", _hard_overlay(settings), cancellation)
         with cleanup_scope(
             self._hard_campaign.release,
             message="hard campaign execution and runtime cleanup both failed",
@@ -371,7 +354,13 @@ class Mumu12ExerciseWorkflow:
         if not isinstance(progress, ExerciseProgress):
             message = "progress must be an ExerciseProgress"
             raise TypeError(message)
-        device = _activate(self._config, self._device, "Exercise", _exercise_overlay(settings), cancellation)
+        device = activate_mumu12_task(
+            self._config,
+            self._device,
+            "Exercise",
+            _exercise_overlay(settings),
+            cancellation,
+        )
         runner = _ReportingExercise(self._config, device=device)
         runner.opponent_change_count = progress.opponent_refreshes_used
 

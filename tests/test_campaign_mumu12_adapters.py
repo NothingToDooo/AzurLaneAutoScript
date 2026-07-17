@@ -83,10 +83,8 @@ from module.exception import OilExhausted, ScriptEnd
 from module.gameplay.campaign import (
     CampaignAutomationSettings,
     CampaignDifficulty,
-    CampaignEmotionSettings,
     CampaignEnemyPrioritySettings,
     CampaignExecutionSettings,
-    CampaignFleetEmotionSettings,
     CampaignFleetSettings,
     CampaignHpControlSettings,
     CampaignJobSpec,
@@ -95,9 +93,6 @@ from module.gameplay.campaign import (
     CampaignProgress,
     CampaignStopReason,
     CampaignSubmarineSettings,
-    EmotionControl,
-    EmotionMode,
-    EmotionRecoverLocation,
     EnemyPriorityMode,
     FleetMode,
     FleetOrder,
@@ -111,6 +106,13 @@ from module.gameplay.campaign import (
     SubmarineMode,
 )
 from module.gameplay.campaign_live import CampaignCheckpointUnavailable, CampaignMapAchievementReached
+from module.gameplay.emotion import (
+    EmotionControl,
+    EmotionMode,
+    EmotionRecoverLocation,
+    EmotionSettings,
+    FleetEmotionSettings,
+)
 from module.gameplay.encounter import HardBattleOutcome, HardFleet, HardSettings, HardStopReason
 
 if TYPE_CHECKING:
@@ -220,7 +222,7 @@ def _definition() -> CampaignStageDefinition:
 
 
 def _execution_settings() -> CampaignExecutionSettings:
-    fleet_emotion = CampaignFleetEmotionSettings(
+    fleet_emotion = FleetEmotionSettings(
         control=EmotionControl.PREVENT_YELLOW_FACE,
         recover=EmotionRecoverLocation.DORMITORY_FLOOR_1,
         oath=True,
@@ -248,7 +250,7 @@ def _execution_settings() -> CampaignExecutionSettings:
             SubmarineAutoSearchMode.AUTO_CALL,
             SubmarineDistanceToBoss.ONE_GRID_TO_BOSS,
         ),
-        emotion=CampaignEmotionSettings(EmotionMode.CALCULATE, fleet_emotion, fleet_emotion),
+        emotion=EmotionSettings(EmotionMode.CALCULATE, fleet_emotion, fleet_emotion),
         hp_control=CampaignHpControlSettings(
             use_hp_balance=True,
             use_emergency_repair=True,
@@ -451,7 +453,7 @@ def _disable_hard_activation(monkeypatch: pytest.MonkeyPatch, device: Device) ->
         cancellation.raise_if_requested()
         return device
 
-    monkeypatch.setattr(encounter_adapters, "_activate", activate)
+    monkeypatch.setattr(encounter_adapters, "activate_mumu12_task", activate)
 
 
 def test_compiler_materializes_both_variants_and_map_structure() -> None:

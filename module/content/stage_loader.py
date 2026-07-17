@@ -6,9 +6,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-import yaml
-from yaml.resolver import BaseResolver
-
 from module.content.battle_policy import BossStrategy
 from module.content.battle_program import BattleProgram, BattleProgramMode, BossApproachPlan
 from module.content.catalog import ContentCatalog
@@ -100,6 +97,7 @@ from module.content.stage_rules import (
     StarRequirements,
     SwipeScale,
 )
+from module.content.yaml_loader import load_strict_yaml_mapping
 
 if TYPE_CHECKING:
     from module.content.battle_policy import StagePolicy
@@ -234,29 +232,6 @@ _STAGE_RULE_FIELDS = (
 )
 
 
-class _StrictLoader(yaml.SafeLoader):
-    pass
-
-
-def _construct_unique_mapping(
-    loader: _StrictLoader,
-    node: yaml.MappingNode,
-    *,
-    deep: object = False,
-) -> dict[object, object]:
-    mapping: dict[object, object] = {}
-    for key_node, value_node in node.value:
-        key = loader.construct_object(key_node, deep=bool(deep))
-        if key in mapping:
-            message = f"duplicate YAML key: {key}"
-            raise ContentValidationError(message)
-        mapping[key] = loader.construct_object(value_node, deep=bool(deep))
-    return mapping
-
-
-_StrictLoader.add_constructor(BaseResolver.DEFAULT_MAPPING_TAG, _construct_unique_mapping)
-
-
 def _fail(path: Path, location: str, message: str) -> ContentValidationError:
     return ContentValidationError(f"{path}:{location}: {message}")
 
@@ -302,17 +277,7 @@ def _exact_integer(value: object, path: Path, location: str, *, minimum: int = 0
 
 
 def _load_yaml(path: Path) -> Mapping[str, object]:
-    try:
-        loader = _StrictLoader(path.read_text(encoding="utf-8"))
-        try:
-            raw = loader.get_single_data()
-        finally:
-            loader.dispose()
-    except (OSError, yaml.YAMLError, ContentValidationError) as error:
-        if isinstance(error, ContentValidationError):
-            raise
-        raise _fail(path, "$", str(error)) from error
-    return _fields_mapping(raw, path, "$", _TOP_LEVEL_FIELDS)
+    return _fields_mapping(load_strict_yaml_mapping(path), path, "$", _TOP_LEVEL_FIELDS)
 
 
 def _grid_node(value: object, path: Path, location: str, shape: tuple[int, int]) -> CellId:

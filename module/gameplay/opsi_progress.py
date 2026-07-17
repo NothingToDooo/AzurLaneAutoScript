@@ -6,6 +6,11 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Final, cast
 
 from module.application import DeleteTaskState, TaskId, UpsertTaskState
+from module.gameplay.validation import (
+    validate_aware_datetime,
+    validate_non_negative_integer,
+    validate_positive_integer,
+)
 from module.runtime.errors import TaskStateDocumentError
 from module.runtime.task_state import TaskStateDocument
 
@@ -81,12 +86,7 @@ class WorldZoneCursor:
     zone_id: int
 
     def __post_init__(self) -> None:
-        if type(self.zone_id) is not int:
-            message = "zone_id must be an integer"
-            raise TypeError(message)
-        if self.zone_id <= 0:
-            message = "zone_id must be positive"
-            raise ValueError(message)
+        validate_positive_integer(self.zone_id, field_name="zone_id")
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,15 +151,6 @@ def _validate_text(value: str, *, field_name: str) -> None:
         raise ValueError(message)
 
 
-def _validate_aware_datetime(value: datetime, *, field_name: str) -> None:
-    if not isinstance(value, datetime):
-        message = f"{field_name} must be a datetime"
-        raise TypeError(message)
-    if value.utcoffset() is None:
-        message = f"{field_name} must be timezone-aware"
-        raise ValueError(message)
-
-
 def expected_world_cursor_type(operation: WorldOperation) -> type[WorldProgressCursor] | None:
     if not isinstance(operation, WorldOperation):
         message = "operation must be a WorldOperation"
@@ -199,19 +190,9 @@ class WorldProgress:
         if self.task_id.value != self.operation.value:
             message = "task_id must match operation"
             raise ValueError(message)
-        if type(self.completed_units) is not int:
-            message = "completed_units must be an integer"
-            raise TypeError(message)
-        if self.completed_units < 0:
-            message = "completed_units must be non-negative"
-            raise ValueError(message)
-        _validate_aware_datetime(self.cycle_anchor, field_name="cycle_anchor")
-        if type(self.settings_revision) is not int:
-            message = "settings_revision must be an integer"
-            raise TypeError(message)
-        if self.settings_revision <= 0:
-            message = "settings_revision must be positive"
-            raise ValueError(message)
+        validate_non_negative_integer(self.completed_units, field_name="completed_units")
+        validate_aware_datetime(self.cycle_anchor, field_name="cycle_anchor")
+        validate_positive_integer(self.settings_revision, field_name="settings_revision")
         _validate_text(self.content_revision, field_name="content_revision")
         validate_world_cursor(self.operation, self.cursor)
         if self.completed_units == 0 and self.cursor is None:

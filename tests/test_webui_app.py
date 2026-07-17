@@ -1,4 +1,5 @@
 import json
+from contextlib import contextmanager, nullcontext
 from copy import deepcopy
 from pathlib import Path
 from threading import Event, RLock, Thread
@@ -12,7 +13,7 @@ from module.config.utils import filepath_args, read_file
 from module.webui.app import AlasGUI, import_personal_configuration
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
     from module.webui.utils import WebIOTaskHandler
 
@@ -31,6 +32,19 @@ def _record_validation(
         candidates.append(deepcopy(candidate))
 
     return validate
+
+
+def test_webui_clearup_uses_explicit_force_stop(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[None] = []
+    monkeypatch.setattr(
+        webui_app.ProcessManager,
+        "force_stop_instance",
+        lambda: calls.append(None),
+    )
+
+    webui_app.clearup()
+
+    assert calls == [None]
 
 
 def test_config_listeners_are_bound_once_per_session(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -246,6 +260,10 @@ def test_webui_field_save_accepts_scheduler_number_and_range(
     class _Manager:
         alive = False
 
+        @staticmethod
+        def hold_start() -> nullcontext[None]:
+            return nullcontext()
+
     monkeypatch.setattr(webui_app, "toast", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(webui_app, "read_config_file", lambda _name: deepcopy(document))
     monkeypatch.setattr(webui_app, "validate_personal_configuration", _record_validation(validated))
@@ -294,8 +312,17 @@ def test_webui_field_save_preserves_state_written_during_process_stop(
 
     class _Manager:
         alive = True
+        holding_start = False
 
-        def stop(self) -> None:
+        @contextmanager
+        def hold_start(self) -> Iterator[None]:
+            self.holding_start = True
+            try:
+                yield
+            finally:
+                self.holding_start = False
+
+        def stop_and_wait(self) -> None:
             self.alive = False
 
     manager = _Manager()
@@ -303,10 +330,15 @@ def test_webui_field_save_preserves_state_written_during_process_stop(
     monkeypatch.setattr(webui_app, "read_config_file", lambda _name: deepcopy(next(reads)))
     monkeypatch.setattr(webui_app, "validate_personal_configuration", _record_validation(validated))
     monkeypatch.setattr(webui_app.ProcessManager, "instance", lambda: manager)
+
+    def write_config(_name: str, document: object) -> None:
+        assert manager.holding_start
+        written.append(cast("dict[str, object]", document))
+
     monkeypatch.setattr(
         webui_app,
         "write_config_file",
-        lambda _name, document: written.append(cast("dict[str, object]", document)),
+        write_config,
     )
 
     gui._save_config_unchecked(  # ruff:ignore[private-member-access] - 验证停机后的最新状态参与最终写入。
@@ -344,6 +376,10 @@ def test_webui_field_save_reloads_after_a_concurrent_process_exit(
 
     class _Manager:
         alive = False
+
+        @staticmethod
+        def hold_start() -> nullcontext[None]:
+            return nullcontext()
 
     monkeypatch.setattr(webui_app, "toast", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(webui_app, "read_config_file", lambda _name: deepcopy(next(reads)))
@@ -383,7 +419,11 @@ def test_webui_field_save_revalidates_gameplay_fields_written_during_stop(
     class _Manager:
         alive = True
 
-        def stop(self) -> None:
+        @staticmethod
+        def hold_start() -> nullcontext[None]:
+            return nullcontext()
+
+        def stop_and_wait(self) -> None:
             self.alive = False
 
     manager = _Manager()

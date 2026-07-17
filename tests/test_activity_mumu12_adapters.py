@@ -110,7 +110,7 @@ def runtime(monkeypatch: pytest.MonkeyPatch) -> tuple[AzurLaneConfig, Device]:
         _config.apply_runtime_overlay(**overlay)
         return device
 
-    monkeypatch.setattr(adapters, "_activate", activate)
+    monkeypatch.setattr(adapters, "activate_mumu12_task", activate)
     return config, device
 
 
@@ -417,7 +417,7 @@ def test_raid_profile_resolution_precedes_runtime_activation(
         activation_calls += 1
         return device
 
-    monkeypatch.setattr(adapters, "_activate", activate)
+    monkeypatch.setattr(adapters, "activate_mumu12_task", activate)
 
     with pytest.raises(UnknownRaidProfileError, match="unknown raid client profile"):
         adapters.Mumu12RaidWorkflow(config, device, _Clock()).execute(spec, AbortToken())
@@ -451,7 +451,7 @@ def test_raid_plan_validation_precedes_runtime_activation(
         activation_calls += 1
         return device
 
-    monkeypatch.setattr(adapters, "_activate", activate)
+    monkeypatch.setattr(adapters, "activate_mumu12_task", activate)
 
     with pytest.raises(ContentValidationError, match="tickets are not supported"):
         adapters.Mumu12RaidWorkflow(config, device, _Clock()).execute(spec, AbortToken())
