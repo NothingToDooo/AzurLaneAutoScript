@@ -55,8 +55,6 @@ ignore = [
     "call-datetime-without-tzinfo",
     "call-datetime-now-without-tzinfo",
     "reimplemented-starmap",
-    "subclass-builtin",
-    "INP",
     "error-suffix-on-exception-name",
     "compare-to-empty-string",
     "too-many-public-methods",
@@ -66,19 +64,30 @@ ignore = [
     "ambiguous-unicode-character-docstring",
     "ambiguous-unicode-character-comment",
     "incorrectly-parenthesized-tuple-in-subscript",
-    "float-equality-comparison",
-    "suspicious-non-cryptographic-random-usage",
-    "suspicious-subprocess-import",
 ]
 [tool.ruff.lint.per-file-ignores]
-"campaign/war_archives_*/*.py" = ["relative-imports"]
-"dev_tools/**/*.py" = ["print"]
+"dev_tools/**/*.py" = ["implicit-namespace-package"]
+"dev_tools/emulator_test.py" = ["print"]
+"dev_tools/map_extractor.py" = ["print"]
+"dev_tools/os_extract.py" = ["print"]
+"dev_tools/research_extractor.py" = ["print"]
+"dev_tools/utils.py" = ["print"]
 "module/device/platform/utils.py" = ["invalid-class-name"]
 "module/game_setting/setting_generated.py" = ["mixed-case-variable-in-class-scope"]
-"module/webui/setting.py" = ["invalid-class-name"]
-"tests/test_campaign_stage_name.py" = ["import-private-name"]
+"tests/test_adb_session_start_server.py" = ["suspicious-subprocess-import"]
+"tests/test_campaign_runtime_profile_manager.py" = ["float-equality-comparison"]
+"tests/test_configuration_compiler.py" = ["float-equality-comparison"]
+"tests/test_device_imports.py" = ["suspicious-subprocess-import"]
+"tests/test_device_screenshot_interval.py" = ["float-equality-comparison"]
+"tests/test_grid_predictor_enemy_genre.py" = ["float-equality-comparison"]
+"tests/test_gui_cli.py" = ["suspicious-subprocess-import"]
+"tests/test_map_operation_helpers.py" = ["float-equality-comparison"]
+"tests/test_ocr_result.py" = ["float-equality-comparison"]
+"tests/test_stage_spec_loader.py" = ["float-equality-comparison"]
+"tests/test_task_registry.py" = ["suspicious-subprocess-import"]
+"tests/test_webui_app.py" = ["float-equality-comparison"]
 "tests/test_webui_utils.py" = ["import-private-name"]
-"tests/**/*.py" = ["assert"]
+"tests/**/*.py" = ["assert", "implicit-namespace-package"]
 
 [tool.ruff.lint.pep8-naming]
 classmethod-decorators = ["cached_class_property"]

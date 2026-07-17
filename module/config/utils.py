@@ -187,7 +187,8 @@ def random_normal_distribution_int(a: TimeScalar, b: TimeScalar, n: int = 3) -> 
     a = round(a)
     b = round(b)
     if a < b:
-        output = sum(random.randint(a, b) for _ in range(n)) / n
+        draw_integer = random.randint  # ruff:ignore[suspicious-non-cryptographic-random-usage] - 仅用于等待扰动。
+        output = sum(draw_integer(a, b) for _ in range(n)) / n
         return round(output)
     return b
 

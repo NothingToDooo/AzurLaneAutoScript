@@ -21,8 +21,8 @@ def send_notification(config: SmtpNotificationConfig, *, title: str, content: st
     for recipient in config.recipients:
         try:
             sender.send(recipient=recipient, title=title, content=content)
-        except Exception as error:  # ruff:ignore[blind-except] - 通知失败不能改变任务结果。
-            logger.error(f"SMTP notify failed for {recipient}: {type(error).__name__}: {error}")
+        except Exception:  # ruff:ignore[blind-except] - 通知失败不能改变任务结果。
+            logger.exception(f"SMTP notify failed for {recipient}")
             succeeded = False
 
     if succeeded:

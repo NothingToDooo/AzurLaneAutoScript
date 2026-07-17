@@ -26,7 +26,7 @@ def is_port_using(port_num: int) -> bool:
 
 
 def random_port(port_range: tuple[int, int]) -> int:
-    new_port = random.choice(list(range(*port_range)))
+    new_port = random.choice(list(range(*port_range)))  # ruff:ignore[suspicious-non-cryptographic-random-usage] - 本机端口探测。
     if is_port_using(new_port):
         return random_port(port_range)
     return new_port

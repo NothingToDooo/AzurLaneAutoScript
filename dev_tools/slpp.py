@@ -253,11 +253,7 @@ class SLPP:
         return n
 
     def number(self) -> int | float:
-        try:
-            n = self._number_text()
-        except ParseError as e:
-            print(e)
-            return 0
+        n = self._number_text()
         with suppress(ValueError):
             return int(n, 0)
         return float(n)
