@@ -313,7 +313,7 @@ class Enhancement(Dock):
             logger.info("No more ship types for ALAS to choose from, skipping iteration")
             return False
 
-        ship_type = choice(available_ship_types)
+        ship_type = choice(available_ship_types)  # ruff:ignore[suspicious-non-cryptographic-random-usage] - 非安全用途。
         available_ship_types.remove(ship_type)
         return ship_type
 

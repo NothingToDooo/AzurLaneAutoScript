@@ -28,7 +28,8 @@ def main() -> None:
     logger.hr("启动配置")
     logger.attr("Host", DEFAULT_WEBUI_HOST)
     logger.attr("Port", port)
-    from module.webui.app import app  # noqa: PLC0415
+    # CLI 参数校验失败时不加载 WebUI 运行期依赖。
+    from module.webui.app import app  # ruff:ignore[import-outside-top-level]
 
     uvicorn.run(app(auto_run=args.run), host=DEFAULT_WEBUI_HOST, port=port, log_config=None)
 

@@ -604,7 +604,7 @@ class Mumu12OperationSirenSession(OperationSiren):
             cursor=WorldZoneCursor(zone_id),
         )
 
-    def _live_month_boss_step(  # noqa: PLR0911 - 每个 return 对应一种真实观测终态。
+    def _live_month_boss_step(  # ruff:ignore[too-many-return-statements] - 每个 return 对应一种真实观测终态。
         self,
         settings: MonthBossSettings,
     ) -> LiveOpsiStep:

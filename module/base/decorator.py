@@ -51,7 +51,7 @@ def function_drop[R, **P](
     def decorate(func: _NamedCallable[R, P]) -> Callable[P, R | None]:
         @wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R | None:
-            if random.uniform(0, 1) > rate:
+            if random.uniform(0, 1) > rate:  # ruff:ignore[suspicious-non-cryptographic-random-usage] - 仅用于模拟卡顿。
                 return func(*args, **kwargs)
             cls = ""
             arguments = [str(arg) for arg in args]

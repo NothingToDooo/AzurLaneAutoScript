@@ -114,7 +114,7 @@ class Template(Resource):
     def match(self, image: ImageArray, scaling: float = 1.0, similarity: float = 0.85) -> bool:
         """按 scaling 缩放待测图后匹配模板；similarity 范围为 0～1。"""
         scaling = 1 / scaling
-        if scaling != 1.0:
+        if scaling != 1.0:  # ruff:ignore[float-equality-comparison] - 1.0 是无需缩放的精确 sentinel。
             image = cast("ImageArray", cv2.resize(image, None, fx=scaling, fy=scaling))
 
         if self.is_gif:
@@ -199,7 +199,7 @@ class Template(Resource):
     ) -> list[Button]:
         """返回全部匹配按钮；threshold 是合并相邻结果的像素距离。"""
         scaling = 1 / scaling
-        if scaling != 1.0:
+        if scaling != 1.0:  # ruff:ignore[float-equality-comparison] - 1.0 是无需缩放的精确 sentinel。
             image = cast("ImageArray", cv2.resize(image, None, fx=scaling, fy=scaling))
 
         raw = image
@@ -215,7 +215,7 @@ class Template(Resource):
             result = np.array(np.where(result > similarity)).T[:, ::-1]
 
         # result 形状为 (n, 2)，每行是一个 (x, y) 坐标。
-        if scaling != 1.0:
+        if scaling != 1.0:  # ruff:ignore[float-equality-comparison] - 1.0 是无需缩放的精确 sentinel。
             result = np.round(result / scaling).astype(int)
         result = Points(result).group(threshold=threshold)
         return [self._point_to_button((int(point[0]), int(point[1])), image=raw, name=name) for point in result]

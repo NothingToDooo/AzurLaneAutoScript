@@ -384,7 +384,7 @@ class Mumu12BattleProgramPort:
             return self._procedure(action, cancellation)
         assert_never(action)
 
-    def _dispatch_fleet_mechanic_action(  # noqa: C901 - 封闭的舰队机制联合类型必须在单一边界穷举。
+    def _dispatch_fleet_mechanic_action(  # ruff:ignore[complex-structure] - 封闭的舰队机制联合类型必须在单一边界穷举。
         self,
         action: _FleetMechanicAction,
         context: _MechanicActionContext,
@@ -442,7 +442,7 @@ class Mumu12BattleProgramPort:
             return self._air_strike(action, cancellation)
         assert_never(action)
 
-    def execute_preset_route(  # noqa: C901 - 固定路线的重试与事实闭合必须同处一个状态机。
+    def execute_preset_route(  # ruff:ignore[complex-structure] - 固定路线的重试与事实闭合必须同处一个状态机。
         self,
         action: program_model.ExecutePresetRoute,
         cancellation: CancellationSource,
@@ -571,7 +571,7 @@ class Mumu12BattleProgramPort:
             advances_wave=outcome.advances_wave,
         )
 
-    def _dispatch_battle_action(  # noqa: C901 - 封闭 union 在单一边界穷举，新增成员会触发静态检查。
+    def _dispatch_battle_action(  # ruff:ignore[complex-structure] - 封闭 union 在单一边界穷举，新增成员会触发静态检查。
         self,
         action: UnguardedBattleStep,
         cancellation: CancellationSource,

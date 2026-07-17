@@ -94,7 +94,7 @@ class Switch:
         message = INVALID_SWITCH_STATE_TEMPLATE.format(name=self.name, state=state)
         raise ScriptError(message)
 
-    def handle_additional(self, _main: ModuleBase) -> bool:  # noqa: PLR6301
+    def handle_additional(self, _main: ModuleBase) -> bool:  # ruff:ignore[no-self-use]
         """额外弹窗处理钩子；默认表示未处理。"""
         return False
 

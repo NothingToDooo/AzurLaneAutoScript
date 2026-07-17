@@ -52,7 +52,7 @@ class _LuaDataStore:
 _LUA_DATA = _LuaDataStore()
 
 
-class _LiteralString(str):
+class _LiteralString(str):  # ruff:ignore[subclass-builtin] - PyYAML 以 str 子类区分 literal scalar。
     __slots__ = ()
 
 

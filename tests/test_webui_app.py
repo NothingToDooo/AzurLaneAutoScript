@@ -36,7 +36,7 @@ def _record_validation(
 def test_config_listeners_are_bound_once_per_session(monkeypatch: pytest.MonkeyPatch) -> None:
     gui = AlasGUI.__new__(AlasGUI)
     gui.ALAS_ARGS = {}
-    gui._config_listeners_initialized = False  # noqa: SLF001 - 验证 session 监听初始化边界。
+    gui._config_listeners_initialized = False  # ruff:ignore[private-member-access] - 验证 session 监听初始化边界。
     bindings: list[tuple[str, object]] = []
 
     monkeypatch.setattr(
@@ -50,8 +50,8 @@ def test_config_listeners_are_bound_once_per_session(monkeypatch: pytest.MonkeyP
         lambda *, name, onchange: bindings.append((name, onchange)),
     )
 
-    gui._init_config_listeners()  # noqa: SLF001 - 验证 session 监听初始化边界。
-    gui._init_config_listeners()  # noqa: SLF001 - 验证 session 监听初始化边界。
+    gui._init_config_listeners()  # ruff:ignore[private-member-access] - 验证 session 监听初始化边界。
+    gui._init_config_listeners()  # ruff:ignore[private-member-access] - 验证 session 监听初始化边界。
 
     assert [name for name, _onchange in bindings] == ["Task_Group_Field"]
 
@@ -59,9 +59,9 @@ def test_config_listeners_are_bound_once_per_session(monkeypatch: pytest.MonkeyP
 def test_failed_synchronous_save_keeps_pending_fields_for_the_next_candidate() -> None:
     gui = AlasGUI.__new__(AlasGUI)
     gui.alive = True
-    gui._pending_config = {}  # noqa: SLF001 - 验证跨字段候选在失败后继续累积。
-    gui._config_save_lock = RLock()  # noqa: SLF001 - 绕过完整 UI 构造，仅初始化保存边界。
-    gui._saving_config = False  # noqa: SLF001 - 验证同步保存状态机。
+    gui._pending_config = {}  # ruff:ignore[private-member-access] - 验证跨字段候选在失败后继续累积。
+    gui._config_save_lock = RLock()  # ruff:ignore[private-member-access] - 绕过完整 UI 构造，仅初始化保存边界。
+    gui._saving_config = False  # ruff:ignore[private-member-access] - 验证同步保存状态机。
 
     attempts: list[dict[str, object]] = []
 
@@ -87,15 +87,15 @@ def test_failed_synchronous_save_keeps_pending_fields_for_the_next_candidate() -
             "Event.Campaign.Name": "d3",
         },
     ]
-    assert gui._pending_config == {}  # noqa: SLF001 - 成功后不得遗留旧候选。
+    assert gui._pending_config == {}  # ruff:ignore[private-member-access] - 成功后不得遗留旧候选。
 
 
 def test_config_change_saves_synchronously_without_a_background_worker() -> None:
     gui = AlasGUI.__new__(AlasGUI)
     gui.alive = True
-    gui._pending_config = {}  # noqa: SLF001 - 验证同步保存状态机。
-    gui._config_save_lock = RLock()  # noqa: SLF001 - 绕过完整 UI 构造，仅初始化保存边界。
-    gui._saving_config = False  # noqa: SLF001 - 验证同步保存状态机。
+    gui._pending_config = {}  # ruff:ignore[private-member-access] - 验证同步保存状态机。
+    gui._config_save_lock = RLock()  # ruff:ignore[private-member-access] - 绕过完整 UI 构造，仅初始化保存边界。
+    gui._saving_config = False  # ruff:ignore[private-member-access] - 验证同步保存状态机。
     saved: list[dict[str, object]] = []
 
     def save(modified: dict[str, object]) -> bool:
@@ -107,16 +107,16 @@ def test_config_change_saves_synchronously_without_a_background_worker() -> None
     gui.save_config_change("Alas.Optimization.ScreenshotInterval", 0.2)
 
     assert saved == [{"Alas.Optimization.ScreenshotInterval": 0.2}]
-    assert gui._pending_config == {}  # noqa: SLF001 - 回调返回前已经完成保存。
+    assert gui._pending_config == {}  # ruff:ignore[private-member-access] - 回调返回前已经完成保存。
     assert not hasattr(gui, "modified_config_queue")
 
 
 def test_config_change_waits_for_the_session_save_lock() -> None:
     gui = AlasGUI.__new__(AlasGUI)
     gui.alive = True
-    gui._pending_config = {}  # noqa: SLF001 - 验证跨线程保存边界。
-    gui._config_save_lock = RLock()  # noqa: SLF001 - 绕过完整 UI 构造，仅初始化保存边界。
-    gui._saving_config = False  # noqa: SLF001 - 验证同步保存状态机。
+    gui._pending_config = {}  # ruff:ignore[private-member-access] - 验证跨线程保存边界。
+    gui._config_save_lock = RLock()  # ruff:ignore[private-member-access] - 绕过完整 UI 构造，仅初始化保存边界。
+    gui._saving_config = False  # ruff:ignore[private-member-access] - 验证同步保存状态机。
     worker_started = Event()
     save_entered = Event()
 
@@ -129,7 +129,7 @@ def test_config_change_waits_for_the_session_save_lock() -> None:
         gui.save_config_change("Alas.Optimization.ScreenshotInterval", 0.2)
 
     vars(gui)["_save_config"] = save
-    with gui._config_save_lock:  # noqa: SLF001 - 主线程占有锁时，回调线程不得进入保存。
+    with gui._config_save_lock:  # ruff:ignore[private-member-access] - 主线程占有锁时，回调线程不得进入保存。
         worker = Thread(target=change_config)
         worker.start()
         assert worker_started.wait(timeout=1)
@@ -143,9 +143,9 @@ def test_config_change_waits_for_the_session_save_lock() -> None:
 def test_config_change_after_session_stop_does_not_write() -> None:
     gui = AlasGUI.__new__(AlasGUI)
     gui.alive = True
-    gui._pending_config = {}  # noqa: SLF001 - 验证 session 停止边界。
-    gui._config_save_lock = RLock()  # noqa: SLF001 - 绕过完整 UI 构造，仅初始化保存边界。
-    gui._saving_config = False  # noqa: SLF001 - 验证 session 停止边界。
+    gui._pending_config = {}  # ruff:ignore[private-member-access] - 验证 session 停止边界。
+    gui._config_save_lock = RLock()  # ruff:ignore[private-member-access] - 绕过完整 UI 构造，仅初始化保存边界。
+    gui._saving_config = False  # ruff:ignore[private-member-access] - 验证 session 停止边界。
     attempts: list[dict[str, object]] = []
 
     class _TaskHandler:
@@ -164,15 +164,15 @@ def test_config_change_after_session_stop_does_not_write() -> None:
 
     assert handler.stopped is True
     assert attempts == [{"Event.Campaign.Event": "event-next"}]
-    assert gui._pending_config == {"Event.Campaign.Event": "event-next"}  # noqa: SLF001
+    assert gui._pending_config == {"Event.Campaign.Event": "event-next"}  # ruff:ignore[private-member-access]
 
 
 def test_reentrant_config_change_is_saved_after_the_active_candidate() -> None:
     gui = AlasGUI.__new__(AlasGUI)
     gui.alive = True
-    gui._pending_config = {}  # noqa: SLF001 - 验证同步保存防重入。
-    gui._config_save_lock = RLock()  # noqa: SLF001 - 绕过完整 UI 构造，仅初始化保存边界。
-    gui._saving_config = False  # noqa: SLF001 - 验证同步保存防重入。
+    gui._pending_config = {}  # ruff:ignore[private-member-access] - 验证同步保存防重入。
+    gui._config_save_lock = RLock()  # ruff:ignore[private-member-access] - 绕过完整 UI 构造，仅初始化保存边界。
+    gui._saving_config = False  # ruff:ignore[private-member-access] - 验证同步保存防重入。
     attempts: list[dict[str, object]] = []
 
     def save(modified: dict[str, object]) -> bool:
@@ -189,7 +189,7 @@ def test_reentrant_config_change_is_saved_after_the_active_candidate() -> None:
         {"Event.Campaign.Event": "event-next"},
         {"Event.Campaign.Name": "d3"},
     ]
-    assert gui._pending_config == {}  # noqa: SLF001 - 重入变化也必须在返回前完成。
+    assert gui._pending_config == {}  # ruff:ignore[private-member-access] - 重入变化也必须在返回前完成。
 
 
 def test_webui_field_save_validates_full_current_schema_before_writing(
@@ -207,7 +207,7 @@ def test_webui_field_save_validates_full_current_schema_before_writing(
     )
 
     with pytest.raises(ConfigurationCompileError, match=r"Research\.Research\.UseCube"):
-        gui._save_config_unchecked(  # noqa: SLF001 - 验证写入前的完整 schema 边界。
+        gui._save_config_unchecked(  # ruff:ignore[private-member-access] - 验证写入前的完整 schema 边界。
             {"Research.Research.UseCube": "removed-option"}
         )
 
@@ -227,7 +227,7 @@ def test_webui_field_save_does_not_replace_empty_value_with_default(
     )
 
     with pytest.raises(ConfigurationCompileError, match=r"ScreenshotInterval"):
-        gui._save_config_unchecked(  # noqa: SLF001 - 空输入必须显式报错，不能静默恢复默认值。
+        gui._save_config_unchecked(  # ruff:ignore[private-member-access] - 空输入必须显式报错，不能静默恢复默认值。
             {"Alas.Optimization.ScreenshotInterval": ""}
         )
 
@@ -256,7 +256,7 @@ def test_webui_field_save_accepts_scheduler_number_and_range(
         lambda _name, saved: written.append(cast("dict[str, object]", saved)),
     )
 
-    gui._save_config_unchecked(  # noqa: SLF001 - 验证 interval 的 int | range 持久化契约。
+    gui._save_config_unchecked(  # ruff:ignore[private-member-access] - 验证 interval 的 int | range 持久化契约。
         {
             "Commission.Scheduler.SuccessInterval": "30",
             "Hard.Scheduler.FailureInterval": "15-30",
@@ -309,7 +309,7 @@ def test_webui_field_save_preserves_state_written_during_process_stop(
         lambda _name, document: written.append(cast("dict[str, object]", document)),
     )
 
-    gui._save_config_unchecked(  # noqa: SLF001 - 验证停机后的最新状态参与最终写入。
+    gui._save_config_unchecked(  # ruff:ignore[private-member-access] - 验证停机后的最新状态参与最终写入。
         {"Alas.Optimization.ScreenshotInterval": 0.2}
     )
 
@@ -355,7 +355,7 @@ def test_webui_field_save_reloads_after_a_concurrent_process_exit(
         lambda _name, document: written.append(cast("dict[str, object]", document)),
     )
 
-    gui._save_config_unchecked(  # noqa: SLF001 - 已退出进程的最终运行状态也必须从磁盘重读。
+    gui._save_config_unchecked(  # ruff:ignore[private-member-access] - 已退出进程的最终运行状态也必须从磁盘重读。
         {"Alas.Optimization.ScreenshotInterval": 0.2}
     )
 
@@ -403,7 +403,7 @@ def test_webui_field_save_revalidates_gameplay_fields_written_during_stop(
     )
 
     with pytest.raises(ConfigurationCompileError, match="missing-stage"):
-        gui._save_config_unchecked(  # noqa: SLF001 - 最终候选必须重新走内容和 factory 校验。
+        gui._save_config_unchecked(  # ruff:ignore[private-member-access] - 最终候选必须重新走内容和 factory 校验。
             {"Alas.Optimization.ScreenshotInterval": 0.2}
         )
 

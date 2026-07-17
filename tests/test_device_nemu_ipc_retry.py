@@ -89,7 +89,7 @@ def test_nemu_ipc_retry_stops_on_incompatible_version(monkeypatch: pytest.Monkey
 def test_nemu_ipc_timeout_stops_without_reusing_the_connection(monkeypatch: pytest.MonkeyPatch) -> None:
     logger = _patch_retry_runtime(monkeypatch)
     device = object.__new__(NemuIpcImpl)
-    device._timed_out = False  # noqa: SLF001 - 构造不加载本机 DLL 的最小 NemuIpc 实例。
+    device._timed_out = False  # ruff:ignore[private-member-access] - 构造不加载本机 DLL 的最小 NemuIpc 实例。
     timeouts: list[float] = []
 
     def screenshot_once(_device: NemuIpcImpl, timeout: float) -> ImageArray:
@@ -125,7 +125,7 @@ def test_native_timeout_poison_prevents_later_calls(monkeypatch: pytest.MonkeyPa
     pool = _Pool()
     monkeypatch.setattr(nemu_ipc_module, "WORKER_POOL", pool)
     device = object.__new__(NemuIpcImpl)
-    device._timed_out = False  # noqa: SLF001 - 构造不加载本机 DLL 的最小 NemuIpc 实例。
+    device._timed_out = False  # ruff:ignore[private-member-access] - 构造不加载本机 DLL 的最小 NemuIpc 实例。
 
     with pytest.raises(JobTimeout):
         device.run_func(lambda: 0)
@@ -138,7 +138,7 @@ def test_native_timeout_poison_prevents_later_calls(monkeypatch: pytest.MonkeyPa
 def test_poisoned_disconnect_drops_handle_without_native_call() -> None:
     device = object.__new__(NemuIpcImpl)
     device.connect_id = 7
-    device._timed_out = True  # noqa: SLF001 - 构造不加载本机 DLL 的最小 NemuIpc 实例。
+    device._timed_out = True  # ruff:ignore[private-member-access] - 构造不加载本机 DLL 的最小 NemuIpc 实例。
     device.lib = object()
 
     device.disconnect()

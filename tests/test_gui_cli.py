@@ -29,7 +29,7 @@ sys.argv = ["gui.py"]
 gui.main()
 """
 
-    subprocess.run(  # noqa: S603 - 使用当前测试解释器启动隔离的导入环境。
+    subprocess.run(  # ruff:ignore[subprocess-without-shell-equals-true] - 使用当前测试解释器启动隔离的导入环境。
         [sys.executable, "-c", script],
         check=True,
         cwd=Path(__file__).resolve().parents[1],

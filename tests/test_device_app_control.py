@@ -100,7 +100,7 @@ def test_monkey_start_interprets_the_adb_result(output: str, *, expected: bool) 
     session = _RecordingSession(output)
     app = AppController(cast("RetrySession", session))
 
-    assert app._app_start_adb_monkey(allow_failure=True) is expected  # noqa: SLF001 - 直接验证 ADB 输出协议。
+    assert app._app_start_adb_monkey(allow_failure=True) is expected  # ruff:ignore[private-member-access] - 直接验证 ADB 输出协议。
     assert session.commands == [
         [
             "monkey",
@@ -128,7 +128,7 @@ def test_activity_start_interprets_the_adb_result(output: str, *, expected: bool
     session = _RecordingSession(output)
     app = AppController(cast("RetrySession", session))
 
-    assert app._app_start_adb_am(CN_PACKAGE, CN_ACTIVITY) is expected  # noqa: SLF001 - 直接验证 ADB 输出协议。
+    assert app._app_start_adb_am(CN_PACKAGE, CN_ACTIVITY) is expected  # ruff:ignore[private-member-access] - 直接验证 ADB 输出协议。
     assert session.commands == [
         [
             "am",

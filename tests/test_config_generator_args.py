@@ -217,7 +217,7 @@ def test_generated_values_preserve_explicit_strings_and_only_parse_datetime() ->
 
     generated = {
         ".".join(path): value
-        for path, _descriptor, value in generator._code_arguments()  # noqa: SLF001 - 验证代码生成的值边界。
+        for path, _descriptor, value in generator._code_arguments()  # ruff:ignore[private-member-access] - 验证代码生成的值边界。
     }
 
     assert generated["Error.SmtpUser"] == ""

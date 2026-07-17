@@ -439,7 +439,7 @@ class _Runtime:
         return False
 
 
-def _grid(  # noqa: PLR0913 - 测试网格显式暴露互斥识别事实。
+def _grid(  # ruff:ignore[too-many-arguments] - 测试网格显式暴露互斥识别事实。
     cell: CellId,
     *,
     enemy: bool = False,

@@ -1,5 +1,5 @@
 import re
-import subprocess
+import subprocess  # ruff:ignore[suspicious-subprocess-import] - 仅以固定参数和 shell=False 启动已解析的 ADB binary。
 import time
 from functools import wraps
 from typing import TYPE_CHECKING, ClassVar, Literal, overload
@@ -144,11 +144,12 @@ class AdbSession(ConnectionAttr):
         command = [self.adb_binary, "-P", str(self.adb_server_port), "start-server"]
         logger.info(f"Start ADB server: {command}")
         try:
-            completed = subprocess.run(  # noqa: S603
+            completed = subprocess.run(  # ruff:ignore[subprocess-without-shell-equals-true] - executable 来自本地配置，参数固定且禁用 shell。
                 command,
                 capture_output=True,
                 check=True,
                 creationflags=subprocess.CREATE_NO_WINDOW,
+                shell=False,
                 text=True,
                 timeout=10,
             )

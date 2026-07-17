@@ -38,7 +38,7 @@ class Connection(MumuTcpConnection):
         if runtime is not None:
             try:
                 runtime.release_serial()
-            except Exception as error:  # noqa: BLE001
+            except Exception as error:  # ruff:ignore[blind-except]
                 # 资源回收失败不能截断 ADB 主状态迁移或新 serial 发布。
                 logger.exception(error)
 

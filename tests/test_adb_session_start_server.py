@@ -51,6 +51,7 @@ def test_adb_start_server_launches_configured_binary_on_isolated_port(monkeypatc
             "capture_output": True,
             "check": True,
             "creationflags": subprocess.CREATE_NO_WINDOW,
+            "shell": False,
             "text": True,
             "timeout": 10,
         }

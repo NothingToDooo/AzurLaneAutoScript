@@ -537,7 +537,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             lambda value: self._runtime_profile.engine.invoke(
                 RuntimeOperation.EXPECTED_END,
                 self,
-                lambda inner: CampaignEngine._expected_end(self, inner),  # noqa: SLF001 - 固定调用引擎基线。
+                lambda inner: CampaignEngine._expected_end(self, inner),  # ruff:ignore[private-member-access] - 固定调用引擎基线。
                 value,
             ),
             expected,
@@ -605,7 +605,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         result = self._runtime_profile.mechanic.invoke(
             RuntimeOperation.MAP_SWIPE,
             self,
-            lambda value, *, box: CampaignEngine._map_swipe(  # noqa: SLF001 - 固定调用引擎基线。
+            lambda value, *, box: CampaignEngine._map_swipe(  # ruff:ignore[private-member-access] - 固定调用引擎基线。
                 self,
                 value,
                 box=box,
@@ -1313,7 +1313,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         ):
             try:
                 cleanup()
-            except BaseException as error:  # noqa: BLE001 - end 与 reset 是独立的关闭阶段。
+            except BaseException as error:  # ruff:ignore[blind-except] - end 与 reset 是独立的关闭阶段。
                 errors.append(error)
         raise_cleanup_errors(errors, message="campaign runtime session cleanup failed")
 
@@ -1921,7 +1921,7 @@ class Mumu12CampaignRuntimeProvider:
         except ScriptEnd as stop_error:
             try:
                 reached = runtime.triggered_map_stop()
-            except BaseException as inspection_error:  # noqa: BLE001 - 必须保留 ScriptEnd 与检查失败。
+            except BaseException as inspection_error:  # ruff:ignore[blind-except] - 必须保留 ScriptEnd 与检查失败。
                 message = "campaign map-stop inspection failed"
                 raise BaseExceptionGroup(message, (stop_error, inspection_error)) from None
             if reached:
@@ -2133,7 +2133,7 @@ class Mumu12CampaignRuntimeProvider:
         ):
             try:
                 cleanup()
-            except BaseException as error:  # noqa: BLE001 - 两个 owner 必须独立释放。
+            except BaseException as error:  # ruff:ignore[blind-except] - 两个 owner 必须独立释放。
                 errors.append(error)
         raise_cleanup_errors(errors, message="campaign runtime ownership cleanup failed")
 

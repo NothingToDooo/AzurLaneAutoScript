@@ -25,7 +25,7 @@ class _Grid:
         return f"_Grid({self.location})"
 
 
-class _Selected(list[_Grid]):
+class _Selected(list[_Grid]):  # ruff:ignore[subclass-builtin] - 测试替身须复现生产 list 协议。
     @property
     def location(self) -> list[_Location]:
         return [grid.location for grid in self]

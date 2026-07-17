@@ -55,7 +55,7 @@ def random_normal_distribution_int(a: Scalar, b: Scalar, n: int = 3) -> int:
     if a < b:
         total = 0
         for _ in range(n):
-            total += random.randint(a, b)
+            total += random.randint(a, b)  # ruff:ignore[suspicious-non-cryptographic-random-usage] - 仅用于 UI 坐标扰动。
         return round(total / n)
     return b
 

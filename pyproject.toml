@@ -48,37 +48,46 @@ preview = true
 explicit-preview-rules = false
 select = ["ALL"]
 ignore = [
-    "COM812",
+    "missing-trailing-comma",
     "CPY",
     "D",
     "DOC",
-    "DTZ001",
-    "DTZ005",
-    "FURB140",
-    "FURB189",
-    "INP",
-    "N818",
-    "PLC1901",
-    "PLR0904",
-    "PLR2004",
-    "PLR6201",
-    "RUF001",
-    "RUF002",
-    "RUF003",
-    "RUF031",
-    "RUF069",
-    "S311",
-    "S404",
+    "call-datetime-without-tzinfo",
+    "call-datetime-now-without-tzinfo",
+    "reimplemented-starmap",
+    "error-suffix-on-exception-name",
+    "compare-to-empty-string",
+    "too-many-public-methods",
+    "magic-value-comparison",
+    "literal-membership",
+    "ambiguous-unicode-character-string",
+    "ambiguous-unicode-character-docstring",
+    "ambiguous-unicode-character-comment",
+    "incorrectly-parenthesized-tuple-in-subscript",
 ]
 [tool.ruff.lint.per-file-ignores]
-"campaign/war_archives_*/*.py" = ["TID252"]
-"dev_tools/**/*.py" = ["T201"]
-"module/device/platform/utils.py" = ["N801"]
-"module/game_setting/setting_generated.py" = ["N815"]
-"module/webui/setting.py" = ["N801"]
-"tests/test_campaign_stage_name.py" = ["PLC2701"]
-"tests/test_webui_utils.py" = ["PLC2701"]
-"tests/**/*.py" = ["S101"]
+"dev_tools/**/*.py" = ["implicit-namespace-package"]
+"dev_tools/emulator_test.py" = ["print"]
+"dev_tools/map_extractor.py" = ["print"]
+"dev_tools/os_extract.py" = ["print"]
+"dev_tools/research_extractor.py" = ["print"]
+"dev_tools/utils.py" = ["print"]
+"module/device/platform/utils.py" = ["invalid-class-name"]
+"module/game_setting/setting_generated.py" = ["mixed-case-variable-in-class-scope"]
+"tests/test_adb_session_start_server.py" = ["suspicious-subprocess-import"]
+"tests/test_campaign_runtime_profile_manager.py" = ["float-equality-comparison"]
+"tests/test_configuration_compiler.py" = ["float-equality-comparison"]
+"tests/test_device_imports.py" = ["suspicious-subprocess-import"]
+"tests/test_device_screenshot_interval.py" = ["float-equality-comparison"]
+"tests/test_grid_predictor_enemy_genre.py" = ["float-equality-comparison"]
+"tests/test_gui_cli.py" = ["suspicious-subprocess-import"]
+"tests/test_map_operation_helpers.py" = ["float-equality-comparison"]
+"tests/test_ocr_result.py" = ["float-equality-comparison"]
+"tests/test_stage_spec_loader.py" = ["float-equality-comparison"]
+"tests/test_task_registry.py" = ["suspicious-subprocess-import"]
+"tests/test_webui_app.py" = ["float-equality-comparison"]
+"tests/test_webui_utils.py" = ["import-private-name"]
+"tests/**/*.py" = ["assert", "implicit-namespace-package"]
 
 [tool.ruff.lint.pep8-naming]
 classmethod-decorators = ["cached_class_property"]

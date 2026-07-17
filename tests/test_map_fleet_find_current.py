@@ -41,7 +41,7 @@ class _LocalGrid(Grid):
         return self.current
 
 
-class _Selected(list[_Grid]):
+class _Selected(list[_Grid]):  # ruff:ignore[subclass-builtin] - 测试替身须复现生产 list 协议。
     @property
     def count(self) -> int:
         return len(self)

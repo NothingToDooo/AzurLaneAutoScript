@@ -246,18 +246,15 @@ class SLPP:
         if self.ch in ["e", "E"]:
             n += self.ch
             self.next_chr()
-            if self.ch not in ("+", "-"):
+            if self.ch in ("+", "-"):
+                n += self._next_number_token(ERRORS["mfnumber_sci"])
+            elif not self.ch or not self.ch.isdigit():
                 raise ParseError(ERRORS["mfnumber_sci"])
-            n += self._next_number_token(ERRORS["mfnumber_sci"])
             n += self.digit()
         return n
 
     def number(self) -> int | float:
-        try:
-            n = self._number_text()
-        except ParseError as e:
-            print(e)
-            return 0
+        n = self._number_text()
         with suppress(ValueError):
             return int(n, 0)
         return float(n)

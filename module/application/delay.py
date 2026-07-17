@@ -36,7 +36,8 @@ class DelaySampler:
     __slots__ = ("_randint",)
 
     def __init__(self, randint: Callable[[int, int], int] | None = None) -> None:
-        selected = random.randint if randint is None else randint
+        default_randint = random.randint  # ruff:ignore[suspicious-non-cryptographic-random-usage] - 仅用于等待扰动。
+        selected = default_randint if randint is None else randint
         if not callable(selected):
             message = "randint must be callable"
             raise TypeError(message)

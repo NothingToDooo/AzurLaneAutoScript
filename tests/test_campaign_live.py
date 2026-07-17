@@ -226,7 +226,7 @@ def _session(
     return CampaignSession(definition, CampaignRunVariant.NORMAL)
 
 
-def _job(  # noqa: PLR0913 - 测试构造器需要独立控制各领域维度。
+def _job(  # ruff:ignore[too-many-arguments] - 测试构造器需要独立控制各领域维度。
     session: CampaignSession,
     *,
     task_id: str = "main",
@@ -1730,6 +1730,21 @@ def test_map_adapter_does_not_fabricate_success_without_confirmation() -> None:
 
     assert isinstance(outcome, BattleFailed)
     assert outcome.attempt == attempt
+
+
+def test_map_adapter_accepts_one_confirmation_even_when_action_raises() -> None:
+    runtime = _Runtime((_Grid("1L", is_enemy=True),))
+    runtime.action_error = RuntimeError("action failed after battle confirmation")
+    attempt = _attempt(DefaultBattle())
+
+    outcome = ExistingCampaignMapAdapter(_RuntimeSource(runtime)).issue_and_confirm(
+        _session(),
+        attempt,
+        AbortToken(),
+    )
+
+    assert outcome == BattleSucceeded(attempt, BattleTarget.ENEMY)
+    assert runtime.battle_count == 1
 
 
 def test_map_adapter_converts_closed_low_emotion_withdrawal_to_typed_interruption() -> None:

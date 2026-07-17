@@ -315,7 +315,7 @@ class DeviceRuntime:
         ):
             try:
                 cleanup()
-            except BaseException as error:  # noqa: BLE001 - 独立清理步骤失败后仍须继续释放其余资源。
+            except BaseException as error:  # ruff:ignore[blind-except] - 独立清理步骤失败后仍须继续释放其余资源。
                 errors.append(error)
         raise_cleanup_errors(errors, message="device serial resource cleanup failed")
 

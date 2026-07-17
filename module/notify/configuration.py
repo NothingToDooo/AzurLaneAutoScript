@@ -108,7 +108,7 @@ def _single_mailbox(value: str, *, field_name: str) -> str:
     return mailboxes[0]
 
 
-def build_notification_config(  # noqa: PLR0913 - 这些字段就是 alas.json 的完整 SMTP 契约。
+def build_notification_config(  # ruff:ignore[too-many-arguments] - 这些字段就是 alas.json 的完整 SMTP 契约。
     *,
     enabled: bool,
     host: str,

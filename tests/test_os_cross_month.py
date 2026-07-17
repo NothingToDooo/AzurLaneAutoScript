@@ -155,7 +155,7 @@ def test_cross_month_waits_in_bounded_slices(monkeypatch: pytest.MonkeyPatch) ->
     ]
     monkeypatch.setattr(cross_month, "datetime", _FixedDateTime)
 
-    runner._wait_until_opsi_reset(reset)  # noqa: SLF001 - 验证跨月等待边界。
+    runner._wait_until_opsi_reset(reset)  # ruff:ignore[private-member-access] - 验证跨月等待边界。
 
     assert runner.device.sleeps == [60, 30]
 
@@ -164,7 +164,7 @@ def test_cross_month_monthly_cleanup_uses_explicit_typed_settings() -> None:
     runner = _CrossMonthRunner()
     runner.storage_results = {"ABYSSAL": [True, False], "OBSCURE": [True, False]}
 
-    runner._clear_opsi_monthly_items(  # noqa: SLF001 - 验证跨月清理边界。
+    runner._clear_opsi_monthly_items(  # ruff:ignore[private-member-access] - 验证跨月清理边界。
         obscure_fleet=2,
         abyssal_fleet_filter="fleet-1 > fleet-2",
     )
@@ -180,7 +180,7 @@ def test_cross_month_farming_uses_explicit_fleet_until_action_point_limit() -> N
     runner.stop_on_search = True
 
     with pytest.raises(ActionPointLimit):
-        runner._run_opsi_meowfficer_farming_after_reset(fleet_index=3)  # noqa: SLF001
+        runner._run_opsi_meowfficer_farming_after_reset(fleet_index=3)  # ruff:ignore[private-member-access]
 
     assert runner.config.overrides[0]["OpsiFleet_Fleet"] == 3
     assert ("fleet_set", 3) in runner.calls

@@ -302,7 +302,7 @@ def _succeed_battle(
     return session.reduce(decision.state, BattleSucceeded(decision.command, target))
 
 
-def _progress(  # noqa: PLR0913 - 测试工厂显式暴露 checkpoint 维度。
+def _progress(  # ruff:ignore[too-many-arguments] - 测试工厂显式暴露 checkpoint 维度。
     *,
     session: CampaignSession | None = None,
     runs_completed: int = 0,
@@ -323,7 +323,7 @@ def _progress(  # noqa: PLR0913 - 测试工厂显式暴露 checkpoint 维度。
     )
 
 
-def _report(  # noqa: PLR0913 - 测试工厂显式暴露 report 维度。
+def _report(  # ruff:ignore[too-many-arguments] - 测试工厂显式暴露 report 维度。
     reason: CampaignStopReason,
     *,
     runs_completed: int = 0,

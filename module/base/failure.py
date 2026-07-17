@@ -27,7 +27,7 @@ def preserve_cleanup_failure(
 
     try:
         cleanup()
-    except BaseException as cleanup_error:  # noqa: BLE001 - 清理必须覆盖取消和进程退出类异常。
+    except BaseException as cleanup_error:  # ruff:ignore[blind-except] - 清理必须覆盖取消和进程退出类异常。
         raise BaseExceptionGroup(message, (primary_error, cleanup_error)) from None
 
 

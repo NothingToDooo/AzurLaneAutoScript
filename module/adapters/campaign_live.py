@@ -611,7 +611,7 @@ class ExistingCampaignMapAdapter(CampaignBattlefieldObserver, CampaignBattleInte
             executor.clear_chosen_enemy(selected.target, expected=selected.expected)
         except CampaignActionInterrupted as error:
             interruption = error
-        except Exception as error:  # noqa: BLE001 - battle_count 可证明异常前动作已经完成。
+        except Exception as error:  # ruff:ignore[blind-except] - battle_count 可证明异常前动作已经完成。
             action_error = error
 
         confirmed = runtime.battle_count - before

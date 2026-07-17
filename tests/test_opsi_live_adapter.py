@@ -322,8 +322,8 @@ def test_mumu12_session_reports_order_cooldowns_without_writing_config(
     deep_set(config.data, "OpsiMonthBoss.OpsiFleetFilter.Filter", "Fleet-1 > submarine")
     runner = object.__new__(Mumu12OperationSirenSession)
     runner.config = config
-    runner._live_schedule_delays = []  # noqa: SLF001 - 构造最小 live session，隔离 UI 初始化。
-    runner._live_wake_task_ids = []  # noqa: SLF001 - 构造最小 live session，隔离 UI 初始化。
+    runner._live_schedule_delays = []  # ruff:ignore[private-member-access] - 构造最小 live session，隔离 UI 初始化。
+    runner._live_wake_task_ids = []  # ruff:ignore[private-member-access] - 构造最小 live session，隔离 UI 初始化。
     monkeypatch.setattr(
         opsi_adapters.OperationSiren,
         "os_order_execute",
@@ -353,8 +353,8 @@ def test_mumu12_session_reports_cl1_preserve_before_propagating_action_point_lim
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runner = object.__new__(Mumu12OperationSirenSession)
-    runner._live_schedule_delays = []  # noqa: SLF001 - 构造最小 live session，隔离 UI 初始化。
-    runner._live_wake_task_ids = []  # noqa: SLF001 - 构造最小 live session，隔离 UI 初始化。
+    runner._live_schedule_delays = []  # ruff:ignore[private-member-access] - 构造最小 live session，隔离 UI 初始化。
+    runner._live_wake_task_ids = []  # ruff:ignore[private-member-access] - 构造最小 live session，隔离 UI 初始化。
 
     def action_point_limit(_self: object) -> None:
         raise opsi_adapters.ActionPointLimit
