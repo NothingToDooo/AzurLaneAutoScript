@@ -384,7 +384,7 @@ class AlasGUI(Frame):
             BinarySwitchOptions(
                 label_on=t("Gui.Button.Stop"),
                 label_off=t("Gui.Button.Start"),
-                onclick_on=self.alas.stop,
+                onclick_on=self.alas.request_stop,
                 onclick_off=self.alas.start_default,
                 get_state=lambda: self.alas.alive,
                 color_on="off",
@@ -512,13 +512,14 @@ class AlasGUI(Frame):
             # 先校验输入，避免无效设置导致正在运行的任务被停止。
             build_candidate()
             manager = ProcessManager.instance()
-            if manager.alive:
-                logger.info("Stop alas before writing configuration")
-                manager.stop()
-            # 无论本轮是否主动停机都重新读盘；任务可能刚在并行退出并写入 Scheduler/Storage。
-            config = build_candidate()
-            logger.info(f"Save config {filepath_config('alas')}, {dict_to_kv(updates)}")
-            write_config_file("alas", config)
+            with manager.hold_start():
+                if manager.alive:
+                    logger.info("Stop alas before writing configuration")
+                    manager.stop_and_wait()
+                # 无论本轮是否主动停机都重新读盘；任务可能刚在并行退出并写入 Scheduler/Storage。
+                config = build_candidate()
+                logger.info(f"Save config {filepath_config('alas')}, {dict_to_kv(updates)}")
+                write_config_file("alas", config)
             toast(
                 t("Gui.Toast.ConfigSaved"),
                 duration=1,
@@ -619,7 +620,7 @@ class AlasGUI(Frame):
             BinarySwitchOptions(
                 label_on=t("Gui.Button.Stop"),
                 label_off=t("Gui.Button.Start"),
-                onclick_on=self.alas.stop,
+                onclick_on=self.alas.request_stop,
                 onclick_off=lambda: self.alas.start(task),
                 get_state=lambda: self.alas.alive,
                 color_on="off",
@@ -871,11 +872,13 @@ def app_manage() -> None:
             return
 
         file: bytes = resp["content"]
-        import_personal_configuration(
-            file,
-            Path(filepath_config("alas")),
-            before_replace=ProcessManager.instance().stop,
-        )
+        manager = ProcessManager.instance()
+        with manager.hold_start():
+            import_personal_configuration(
+                file,
+                Path(filepath_config("alas")),
+                before_replace=manager.stop_and_wait,
+            )
         toast(t("Gui.AppManage.ImportSuccess"), color="success")
 
     def _export() -> None:
@@ -917,9 +920,9 @@ def startup() -> None:
 
 
 def clearup() -> None:
-    """必须在 uvicorn 重新加载 app 前执行。"""
+    """uvicorn 重载或关闭整个 WebUI 时执行显式终止。"""
     logger.info("Start clearup")
-    ProcessManager.stop_instance()
+    ProcessManager.force_stop_instance()
     logger.info("Alas closed.")
 
 

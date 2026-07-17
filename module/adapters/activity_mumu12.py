@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Protocol, cast, override
+from typing import TYPE_CHECKING, Protocol, override
 
-from module.adapters.mumu12 import CancellationAwareMumu12Device
+from module.adapters.mumu12 import activate_mumu12_task, emotion_runtime_overlay
 from module.application import DelaySampler, runtime_delay_sampler
 from module.coalition.coalition import Coalition
 from module.coalition.profile import (
@@ -10,7 +10,7 @@ from module.coalition.profile import (
     CoalitionOilReadLocation,
     CoalitionPageMode,
 )
-from module.config.config import AzurLaneConfig, name_to_function
+from module.config.config import AzurLaneConfig
 from module.config.utils import DEFAULT_TIME
 from module.daemon.daemon import AzurLaneDaemon as StandardDaemon
 from module.daemon.os_daemon import AzurLaneDaemon as OpsiDaemon
@@ -33,7 +33,6 @@ from module.gameplay.activity import (
     AssistSessionWorkflow,
     CoalitionOptions,
     DaemonOptions,
-    EmotionPolicy,
     EncounterBalancerPolicy,
     EncounterCommand,
     EncounterPolicy,
@@ -64,6 +63,7 @@ from module.ui.page import page_campaign_menu, page_hospital
 if TYPE_CHECKING:
     from module.application import CancellationSource
     from module.config.config_generated import ConfigOverrides
+    from module.gameplay.emotion import EmotionSettings
 
 
 class ActivityLiveClock(Protocol):
@@ -93,39 +93,14 @@ def _observed_at(clock: ActivityLiveClock) -> datetime:
     return value.astimezone(UTC)
 
 
-def _activate(
-    config: AzurLaneConfig,
-    device: Device,
-    task_name: str,
-    overlay: ConfigOverrides,
-    cancellation: CancellationSource,
-) -> Device:
-    cancellation.raise_if_requested()
-    config.replace_runtime_overlay()
-    task = name_to_function(task_name)
-    config.task = task
-    config.bind(task)
-    config.apply_runtime_overlay(**overlay)
-    device.config = config
-    return cast("Device", CancellationAwareMumu12Device(device, cancellation))
-
-
 def _legacy_deadline(value: datetime | None) -> datetime:
     if value is None:
         return DEFAULT_TIME
     return value.astimezone().replace(tzinfo=None)
 
 
-def _apply_emotion_policy(config: AzurLaneConfig, policy: EmotionPolicy) -> None:
-    config.apply_runtime_overlay(
-        Emotion_Mode=policy.mode.value,
-        Emotion_Fleet1Control=policy.fleet1.control.value,
-        Emotion_Fleet1Recover=policy.fleet1.recover.value,
-        Emotion_Fleet1Oath=policy.fleet1.oath,
-        Emotion_Fleet2Control=policy.fleet2.control.value,
-        Emotion_Fleet2Recover=policy.fleet2.recover.value,
-        Emotion_Fleet2Oath=policy.fleet2.oath,
-    )
+def _apply_emotion_settings(config: AzurLaneConfig, settings: EmotionSettings) -> None:
+    config.apply_runtime_overlay(**emotion_runtime_overlay(settings))
 
 
 def _apply_encounter_policy(config: AzurLaneConfig, policy: EncounterPolicy) -> None:
@@ -136,7 +111,7 @@ def _apply_encounter_policy(config: AzurLaneConfig, policy: EncounterPolicy) -> 
         Campaign_Use2xBook=policy.use_2x_book,
     )
     if policy.emotion is not None:
-        _apply_emotion_policy(config, policy.emotion)
+        _apply_emotion_settings(config, policy.emotion)
 
 
 def _apply_balancer(config: AzurLaneConfig, policy: EncounterBalancerPolicy | None) -> None:
@@ -190,7 +165,7 @@ class _Mumu12ActivityAdapter:
         overlay: ConfigOverrides | None = None,
     ) -> Device:
         selected_overlay: ConfigOverrides = {} if overlay is None else overlay
-        return _activate(self._config, self._device, task_name, selected_overlay, cancellation)
+        return activate_mumu12_task(self._config, self._device, task_name, selected_overlay, cancellation)
 
     def _now(self) -> datetime:
         return _observed_at(self._clock)

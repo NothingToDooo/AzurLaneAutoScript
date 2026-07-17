@@ -76,10 +76,8 @@ from module.gameplay.battle_program import BattleProgramExecution
 from module.gameplay.campaign import (
     CampaignAutomationSettings,
     CampaignDifficulty,
-    CampaignEmotionSettings,
     CampaignEnemyPrioritySettings,
     CampaignExecutionSettings,
-    CampaignFleetEmotionSettings,
     CampaignFleetSettings,
     CampaignHpControlSettings,
     CampaignJobSpec,
@@ -88,9 +86,6 @@ from module.gameplay.campaign import (
     CampaignProgress,
     CampaignStopReason,
     CampaignSubmarineSettings,
-    EmotionControl,
-    EmotionMode,
-    EmotionRecoverLocation,
     EnemyPriorityMode,
     FleetMode,
     FleetOrder,
@@ -120,6 +115,13 @@ from module.gameplay.campaign_live import (
     GemsFleetReplacementTrigger,
     LiveCampaignWorkflow,
 )
+from module.gameplay.emotion import (
+    EmotionControl,
+    EmotionMode,
+    EmotionRecoverLocation,
+    EmotionSettings,
+    FleetEmotionSettings,
+)
 
 if TYPE_CHECKING:
     import builtins
@@ -135,7 +137,7 @@ _DEFAULT_STAGE_REF = StageRef("campaign_main", "1-1")
 
 
 def _execution() -> CampaignExecutionSettings:
-    fleet_emotion = CampaignFleetEmotionSettings(
+    fleet_emotion = FleetEmotionSettings(
         control=EmotionControl.PREVENT_GREEN_FACE,
         recover=EmotionRecoverLocation.NOT_IN_DORMITORY,
         oath=False,
@@ -163,7 +165,7 @@ def _execution() -> CampaignExecutionSettings:
             auto_search_mode=SubmarineAutoSearchMode.STANDBY,
             distance_to_boss=SubmarineDistanceToBoss.TWO_GRIDS_TO_BOSS,
         ),
-        emotion=CampaignEmotionSettings(
+        emotion=EmotionSettings(
             mode=EmotionMode.CALCULATE,
             fleet1=fleet_emotion,
             fleet2=fleet_emotion,

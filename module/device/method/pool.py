@@ -2,7 +2,7 @@ import abc
 from collections import deque
 from functools import partial
 from itertools import count
-from threading import Lock, Thread
+from threading import Condition, Lock, Thread
 from typing import TYPE_CHECKING, NoReturn, Protocol
 
 if TYPE_CHECKING:
@@ -128,8 +128,7 @@ class Job[ResultT]:
         result = capture(self.func)
 
         # 先发布空闲状态，使结果回调可以立即复用当前线程。
-        worker.thread_pool.idle_workers[worker] = None
-        worker.thread_pool.release_full_lock()
+        worker.thread_pool.mark_worker_idle(worker)
 
         self.queue.append(result)
         self.worker = None
@@ -172,25 +171,8 @@ class WorkerThread:
         while True:
             if self.worker_lock.acquire(timeout=WorkerPool.IDLE_TIMEOUT):
                 self._handle_job()
-            else:
-                # Timeout acquiring lock, so we can probably exit. But,
-                # there's a race condition: we might be assigned a job *just*
-                # as we're about to exit. So we have to check.
-                try:
-                    del self.thread_pool.idle_workers[self]
-                except KeyError:
-                    # Someone else removed us from the idle worker queue, so
-                    # they must be in the process of assigning us a job - loop
-                    # around and wait for it.
-                    self.thread_pool.release_full_lock()
-                    continue
-                else:
-                    # We successfully removed ourselves from the idle
-                    # worker queue, so no more jobs are incoming; it's safe to
-                    # exit.
-                    del self.thread_pool.all_workers[self]
-                    self.thread_pool.release_full_lock()
-                    return
+            elif self.thread_pool.retire_idle_worker(self):
+                return
 
 
 class WorkerPool:
@@ -208,41 +190,38 @@ class WorkerPool:
 
         self.idle_workers: dict[WorkerThread, None] = {}
         self.all_workers: dict[WorkerThread, None] = {}
+        self._worker_available = Condition()
 
-        self.notify_worker = Lock()
-        self.notify_worker.acquire()
-        self.notify_pool = Lock()
-        self.notify_pool.acquire()
+    def mark_worker_idle(self, worker: WorkerThread) -> None:
+        with self._worker_available:
+            self.idle_workers[worker] = None
+            self._worker_available.notify()
 
-    def release_full_lock(self) -> None:
-        """工作线程完成、退出或被终止时释放池满等待。
-
-        notify_worker 保证只有最快的一个线程通过 notify_pool 通知新槽位可用。
-        """
-        if self.notify_worker.acquire(blocking=False):
-            self.notify_pool.release()
+    def retire_idle_worker(self, worker: WorkerThread) -> bool:
+        with self._worker_available:
+            if worker not in self.idle_workers:
+                return False
+            del self.idle_workers[worker]
+            del self.all_workers[worker]
+            self._worker_available.notify()
+            return True
 
     def _get_thread_worker(self) -> WorkerThread:
-        try:
-            worker, _ = self.idle_workers.popitem()
-        except KeyError:
-            pass
-        else:
-            return worker
+        with self._worker_available:
+            while True:
+                try:
+                    worker, _ = self.idle_workers.popitem()
+                except KeyError:
+                    pass
+                else:
+                    return worker
 
-        if len(self.all_workers) >= self.pool_size:
-            self.notify_worker.release()
-            self.notify_pool.acquire()
-            try:
-                worker, _ = self.idle_workers.popitem()
-            except KeyError:
-                pass
-            else:
-                return worker
+                if len(self.all_workers) < self.pool_size:
+                    worker = WorkerThread(self)
+                    self.all_workers[worker] = None
+                    return worker
 
-        worker = WorkerThread(self)
-        self.all_workers[worker] = None
-        return worker
+                self._worker_available.wait()
 
     def start_thread_soon[**P, ResultT](
         self, func: Callable[P, ResultT], *args: P.args, **kwargs: P.kwargs

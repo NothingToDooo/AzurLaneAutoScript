@@ -35,6 +35,7 @@ from module.gameplay.opsi_progress import (
     expected_world_cursor_type,
     upsert_world_progress,
 )
+from module.gameplay.validation import validate_aware_datetime, validate_bool, validate_non_negative_integer
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -76,21 +77,6 @@ _EXPLORE_FOLLOW_UP_TASK_IDS: Final = (
     OPSI_SHOP_TASK_ID,
     OPSI_HAZARD1_LEVELING_TASK_ID,
 )
-
-
-def _validate_aware_datetime(value: datetime, *, field_name: str) -> None:
-    if not isinstance(value, datetime):
-        message = f"{field_name} must be a datetime"
-        raise TypeError(message)
-    if value.tzinfo is None or value.utcoffset() is None:
-        message = f"{field_name} must be timezone-aware"
-        raise ValueError(message)
-
-
-def _validate_bool(*, value: bool, field_name: str) -> None:
-    if type(value) is not bool:
-        message = f"{field_name} must be a bool"
-        raise TypeError(message)
 
 
 def _validate_int(
@@ -181,7 +167,7 @@ class WorldGeneralSettings:
     akashi_shop_filter: str
 
     def __post_init__(self) -> None:
-        _validate_bool(value=self.use_logger, field_name="use_logger")
+        validate_bool(value=self.use_logger, field_name="use_logger")
         _validate_int(
             self.buy_action_point_limit,
             field_name="buy_action_point_limit",
@@ -195,7 +181,7 @@ class WorldGeneralSettings:
         if not -1.0 <= self.repair_threshold <= 1.0:
             message = "repair_threshold must be between -1.0 and 1.0"
             raise ValueError(message)
-        _validate_bool(value=self.random_map_events, field_name="random_map_events")
+        validate_bool(value=self.random_map_events, field_name="random_map_events")
         _validate_normalized_string(self.akashi_shop_filter, field_name="akashi_shop_filter")
 
 
@@ -206,7 +192,7 @@ class FleetSettings:
 
     def __post_init__(self) -> None:
         _validate_int(self.fleet_index, field_name="fleet_index", minimum=1, maximum=4)
-        _validate_bool(value=self.use_submarine, field_name="use_submarine")
+        validate_bool(value=self.use_submarine, field_name="use_submarine")
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,10 +215,10 @@ class AshBeaconSettings:
         if not isinstance(self.attack_mode, AshBeaconAttackMode):
             message = "attack_mode must be an AshBeaconAttackMode"
             raise TypeError(message)
-        _validate_bool(value=self.one_hit_mode, field_name="one_hit_mode")
-        _validate_bool(value=self.dossier_auto_attack, field_name="dossier_auto_attack")
-        _validate_bool(value=self.request_assist, field_name="request_assist")
-        _validate_bool(value=self.ensure_fully_collected, field_name="ensure_fully_collected")
+        validate_bool(value=self.one_hit_mode, field_name="one_hit_mode")
+        validate_bool(value=self.dossier_auto_attack, field_name="dossier_auto_attack")
+        validate_bool(value=self.request_assist, field_name="request_assist")
+        validate_bool(value=self.ensure_fully_collected, field_name="ensure_fully_collected")
 
 
 @dataclass(frozen=True, slots=True)
@@ -245,8 +231,8 @@ class ExploreSettings:
     def __post_init__(self) -> None:
         _validate_settings_member(self.general, WorldGeneralSettings, field_name="general")
         _validate_settings_member(self.fleet, FleetSettings, field_name="fleet")
-        _validate_bool(value=self.special_radar, field_name="special_radar")
-        _validate_bool(value=self.force_run, field_name="force_run")
+        validate_bool(value=self.special_radar, field_name="special_radar")
+        validate_bool(value=self.force_run, field_name="force_run")
 
 
 @dataclass(frozen=True, slots=True)
@@ -283,8 +269,8 @@ class OpsiDailySettings:
     def __post_init__(self) -> None:
         _validate_settings_member(self.general, WorldGeneralSettings, field_name="general")
         _validate_settings_member(self.fleet, FleetSettings, field_name="fleet")
-        _validate_bool(value=self.do_missions, field_name="do_missions")
-        _validate_bool(value=self.use_tuning_samples, field_name="use_tuning_samples")
+        validate_bool(value=self.do_missions, field_name="do_missions")
+        validate_bool(value=self.use_tuning_samples, field_name="use_tuning_samples")
 
 
 @dataclass(frozen=True, slots=True)
@@ -296,7 +282,7 @@ class ObscureSettings:
     def __post_init__(self) -> None:
         _validate_settings_member(self.general, WorldGeneralSettings, field_name="general")
         _validate_settings_member(self.fleet, FleetSettings, field_name="fleet")
-        _validate_bool(value=self.force_run, field_name="force_run")
+        validate_bool(value=self.force_run, field_name="force_run")
 
 
 @dataclass(frozen=True, slots=True)
@@ -308,7 +294,7 @@ class AbyssalSettings:
     def __post_init__(self) -> None:
         _validate_settings_member(self.general, WorldGeneralSettings, field_name="general")
         _validate_normalized_string(self.fleet_filter, field_name="fleet_filter")
-        _validate_bool(value=self.force_run, field_name="force_run")
+        validate_bool(value=self.force_run, field_name="force_run")
 
 
 @dataclass(frozen=True, slots=True)
@@ -332,7 +318,7 @@ class StrongholdSettings:
     def __post_init__(self) -> None:
         _validate_settings_member(self.general, WorldGeneralSettings, field_name="general")
         _validate_normalized_string(self.fleet_filter, field_name="fleet_filter")
-        _validate_bool(value=self.force_run, field_name="force_run")
+        validate_bool(value=self.force_run, field_name="force_run")
 
 
 @dataclass(frozen=True, slots=True)
@@ -349,8 +335,8 @@ class MonthBossSettings:
         if not isinstance(self.mode, MonthBossMode):
             message = "mode must be a MonthBossMode"
             raise TypeError(message)
-        _validate_bool(value=self.check_adaptability, field_name="check_adaptability")
-        _validate_bool(value=self.force_run, field_name="force_run")
+        validate_bool(value=self.check_adaptability, field_name="check_adaptability")
+        validate_bool(value=self.force_run, field_name="force_run")
 
 
 @dataclass(frozen=True, slots=True)
@@ -376,7 +362,7 @@ class MeowfficerFarmingSettings:
             message = "hazard_level must be one of [3, 4, 5, 6, 10]"
             raise ValueError(message)
         _validate_int(self.target_zone, field_name="target_zone", minimum=0)
-        _validate_bool(
+        validate_bool(
             value=self.ensure_ash_fully_collected,
             field_name="ensure_ash_fully_collected",
         )
@@ -396,7 +382,7 @@ class Hazard1LevelingSettings:
         if self.target_zone not in {0, 22, 44}:
             message = "target_zone must be one of [0, 22, 44]"
             raise ValueError(message)
-        _validate_bool(
+        validate_bool(
             value=self.ensure_ash_fully_collected,
             field_name="ensure_ash_fully_collected",
         )
@@ -508,9 +494,9 @@ class WorldSchedule:
     next_archive_refresh_at: datetime
 
     def __post_init__(self) -> None:
-        _validate_aware_datetime(self.next_server_update_at, field_name="next_server_update_at")
-        _validate_aware_datetime(self.next_month_reset_at, field_name="next_month_reset_at")
-        _validate_aware_datetime(self.next_archive_refresh_at, field_name="next_archive_refresh_at")
+        validate_aware_datetime(self.next_server_update_at, field_name="next_server_update_at")
+        validate_aware_datetime(self.next_month_reset_at, field_name="next_month_reset_at")
+        validate_aware_datetime(self.next_archive_refresh_at, field_name="next_archive_refresh_at")
 
 
 @dataclass(frozen=True, slots=True)
@@ -521,7 +507,7 @@ class WorldScheduleDelay:
     task_ids: tuple[TaskId, ...]
 
     def __post_init__(self) -> None:
-        _validate_aware_datetime(self.due_at, field_name="due_at")
+        validate_aware_datetime(self.due_at, field_name="due_at")
         if not isinstance(self.task_ids, tuple):
             message = "task_ids must be a tuple"
             raise TypeError(message)
@@ -550,7 +536,7 @@ def _validate_schedule_after_observation(observed_at: datetime, schedule: WorldS
 def _validate_retry_at(observed_at: datetime, retry_at: datetime | None) -> None:
     if retry_at is None:
         return
-    _validate_aware_datetime(retry_at, field_name="retry_at")
+    validate_aware_datetime(retry_at, field_name="retry_at")
     if retry_at < observed_at:
         message = "retry_at must not be before observed_at"
         raise ValueError(message)
@@ -617,7 +603,7 @@ class WorldTaskReport:
     cursor: WorldProgressCursor | None = None
 
     def __post_init__(self) -> None:
-        _validate_aware_datetime(self.observed_at, field_name="observed_at")
+        validate_aware_datetime(self.observed_at, field_name="observed_at")
         if not isinstance(self.status, WorldTaskStatus):
             message = "status must be a WorldTaskStatus"
             raise TypeError(message)
@@ -625,12 +611,7 @@ class WorldTaskReport:
             message = "schedule must be a WorldSchedule"
             raise TypeError(message)
         _validate_schedule_after_observation(self.observed_at, self.schedule)
-        if type(self.completed_units) is not int:
-            message = "completed_units must be an integer"
-            raise TypeError(message)
-        if self.completed_units < 0:
-            message = "completed_units must be non-negative"
-            raise ValueError(message)
+        validate_non_negative_integer(self.completed_units, field_name="completed_units")
         if self.completed_units > 1:
             message = "a world task run may complete at most one safe unit"
             raise ValueError(message)
@@ -644,8 +625,8 @@ class WorldTaskReport:
         _validate_affected_task_ids(self.affected_task_ids, status=self.status)
         _validate_schedule_delays(self.observed_at, self.schedule_delays)
         _validate_wake_task_ids(self.wake_task_ids)
-        _validate_bool(value=self.has_surplus_yellow_coins, field_name="has_surplus_yellow_coins")
-        _validate_bool(value=self.exploration_in_progress, field_name="exploration_in_progress")
+        validate_bool(value=self.has_surplus_yellow_coins, field_name="has_surplus_yellow_coins")
+        validate_bool(value=self.exploration_in_progress, field_name="exploration_in_progress")
         if self.cursor is not None and not isinstance(
             self.cursor,
             WorldZoneCursor | WorldMissionCursor | WorldBossCursor,

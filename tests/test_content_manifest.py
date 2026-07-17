@@ -5,6 +5,7 @@ from pathlib import Path
 
 import psutil
 import pytest
+import yaml
 
 from module.config import config_updater as config_updater_module
 from module.config.config_updater import ConfigGenerator
@@ -282,8 +283,33 @@ def test_manifest_rejects_duplicate_yaml_keys(tmp_path: Path) -> None:
     )
     _write_manifest(root, "event_20260625_cn.yaml", body)
 
-    with pytest.raises(ContentValidationError, match="duplicate YAML key"):
+    with pytest.raises(ContentValidationError) as caught:
         load_event_manifests(root)
+
+    assert str(caught.value) == "duplicate YAML key: name_cn"
+    assert caught.value.__cause__ is None
+
+
+def test_manifest_wraps_yaml_parse_errors_at_the_root(tmp_path: Path) -> None:
+    root = tmp_path / "content" / "events"
+    path = _write_manifest(root, "event_20260625_cn.yaml", "schema_version: [")
+
+    with pytest.raises(ContentValidationError) as caught:
+        load_event_manifests(root)
+
+    assert str(caught.value).startswith(f"{path}:$: ")
+    assert isinstance(caught.value.__cause__, yaml.YAMLError)
+
+
+def test_manifest_rejects_non_mapping_yaml_at_the_root(tmp_path: Path) -> None:
+    root = tmp_path / "content" / "events"
+    path = _write_manifest(root, "event_20260625_cn.yaml", "- not\n- a mapping")
+
+    with pytest.raises(ContentValidationError) as caught:
+        load_event_manifests(root)
+
+    assert str(caught.value) == f"{path}:$: must be a mapping"
+    assert caught.value.__cause__ is None
 
 
 @pytest.mark.parametrize("unsafe_path", ["../outside.yaml", "C:/outside.yaml", "/outside.yaml"])

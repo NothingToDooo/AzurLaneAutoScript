@@ -5,6 +5,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
 import pytest
+import yaml
 
 from module.content import stage_behavior_codec
 from module.content.battle_policy import (
@@ -347,8 +348,35 @@ def test_loader_rejects_duplicate_yaml_keys(tmp_path: Path) -> None:
     body = _minimal_stage().replace("  name: T1", "  name: T1\n  name: OTHER")
     loader, spec = _write_stage(tmp_path / "events", body)
 
-    with pytest.raises(ContentValidationError, match="duplicate YAML key"):
+    with pytest.raises(ContentValidationError) as caught:
         loader.load(spec)
+
+    assert str(caught.value) == "duplicate YAML key: name"
+    assert caught.value.__cause__ is None
+
+
+def test_loader_wraps_yaml_parse_errors_at_the_root(tmp_path: Path) -> None:
+    content_root = tmp_path / "events"
+    loader, spec = _write_stage(content_root, "schema_version: [")
+    path = content_root / PACK_ID / "stages" / "t1.yaml"
+
+    with pytest.raises(ContentValidationError) as caught:
+        loader.load(spec)
+
+    assert str(caught.value).startswith(f"{path}:$: ")
+    assert isinstance(caught.value.__cause__, yaml.YAMLError)
+
+
+def test_loader_rejects_non_mapping_yaml_at_the_root(tmp_path: Path) -> None:
+    content_root = tmp_path / "events"
+    loader, spec = _write_stage(content_root, "- not\n- a mapping")
+    path = content_root / PACK_ID / "stages" / "t1.yaml"
+
+    with pytest.raises(ContentValidationError) as caught:
+        loader.load(spec)
+
+    assert str(caught.value) == f"{path}:$: must be a mapping"
+    assert caught.value.__cause__ is None
 
 
 def test_loader_rejects_unknown_mechanic_tags_and_removed_extension_field(tmp_path: Path) -> None:

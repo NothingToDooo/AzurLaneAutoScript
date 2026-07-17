@@ -25,7 +25,7 @@ from module.adapters.gems_mumu12 import (
     Mumu12GemsFleetReplacementExecutor,
     Mumu12GemsRuntimeBehavior,
 )
-from module.adapters.mumu12 import CancellationAwareMumu12Device
+from module.adapters.mumu12 import CancellationAwareMumu12Device, emotion_runtime_overlay
 from module.application import SafeUnitCancellation
 from module.base.decorator import cached_property
 from module.base.failure import preserve_cleanup_failure, raise_cleanup_errors
@@ -417,13 +417,6 @@ def campaign_execution_overlay(settings: CampaignExecutionSettings) -> ConfigOve
         "Submarine_Mode": submarine.mode.value,
         "Submarine_AutoSearchMode": submarine.auto_search_mode.value,
         "Submarine_DistanceToBoss": submarine.distance_to_boss.value,
-        "Emotion_Mode": emotion.mode.value,
-        "Emotion_Fleet1Control": emotion.fleet1.control.value,
-        "Emotion_Fleet1Recover": emotion.fleet1.recover.value,
-        "Emotion_Fleet1Oath": emotion.fleet1.oath,
-        "Emotion_Fleet2Control": emotion.fleet2.control.value,
-        "Emotion_Fleet2Recover": emotion.fleet2.recover.value,
-        "Emotion_Fleet2Oath": emotion.fleet2.oath,
         "HpControl_UseHpBalance": hp.use_hp_balance,
         "HpControl_UseEmergencyRepair": hp.use_emergency_repair,
         "HpControl_UseLowHpRetreat": hp.use_low_hp_retreat,
@@ -434,6 +427,7 @@ def campaign_execution_overlay(settings: CampaignExecutionSettings) -> ConfigOve
         "HpControl_LowHpRetreatThreshold": hp.low_hp_retreat_threshold,
         "EnemyPriority_EnemyScaleBalanceWeight": settings.enemy_priority.scale_balance_weight.value,
     }
+    values.update(emotion_runtime_overlay(emotion))
     return cast("ConfigOverrides", values)
 
 

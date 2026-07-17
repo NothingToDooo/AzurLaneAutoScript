@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from enum import IntEnum, StrEnum
 from typing import TYPE_CHECKING, Protocol, override
 
@@ -21,8 +20,16 @@ from module.application import (
     WakeTask,
     runtime_delay_sampler,
 )
+from module.gameplay.validation import (
+    validate_aware_datetime,
+    validate_non_negative_integer,
+    validate_positive_duration,
+    validate_positive_integer,
+)
 
 if TYPE_CHECKING:
+    from datetime import datetime, timedelta
+
     from module.application import CancellationSource
 
 
@@ -42,42 +49,6 @@ _EXERCISE_ATTEMPTS_PRESERVED = "exercise attempts are preserved"
 _EXERCISE_REFRESHES_EXHAUSTED = "exercise opponent refreshes are exhausted"
 _EXERCISE_WORKFLOW_FAILED = "exercise attempt did not settle"
 _EXERCISE_IN_PROGRESS = "exercise attempts remain"
-
-
-def _validate_aware_datetime(value: datetime, *, field_name: str) -> None:
-    if not isinstance(value, datetime):
-        message = f"{field_name} must be a datetime"
-        raise TypeError(message)
-    if value.tzinfo is None or value.utcoffset() is None:
-        message = f"{field_name} must be timezone-aware"
-        raise ValueError(message)
-
-
-def _validate_positive_duration(value: timedelta, *, field_name: str) -> None:
-    if not isinstance(value, timedelta):
-        message = f"{field_name} must be a timedelta"
-        raise TypeError(message)
-    if value <= timedelta(0):
-        message = f"{field_name} must be positive"
-        raise ValueError(message)
-
-
-def _validate_non_negative_count(value: int, *, field_name: str) -> None:
-    if type(value) is not int:
-        message = f"{field_name} must be an integer"
-        raise TypeError(message)
-    if value < 0:
-        message = f"{field_name} must be non-negative"
-        raise ValueError(message)
-
-
-def _validate_positive_count(value: int, *, field_name: str) -> None:
-    if type(value) is not int:
-        message = f"{field_name} must be an integer"
-        raise TypeError(message)
-    if value <= 0:
-        message = f"{field_name} must be positive"
-        raise ValueError(message)
 
 
 class DailyStageSelection(StrEnum):
@@ -163,8 +134,8 @@ class DailyReport:
     stop_reason: DailyStopReason = DailyStopReason.COMPLETED
 
     def __post_init__(self) -> None:
-        _validate_non_negative_count(self.attempts_available, field_name="attempts_available")
-        _validate_non_negative_count(self.attempts_completed, field_name="attempts_completed")
+        validate_non_negative_integer(self.attempts_available, field_name="attempts_available")
+        validate_non_negative_integer(self.attempts_completed, field_name="attempts_completed")
         if self.attempts_completed > self.attempts_available:
             message = "attempts_completed must not exceed attempts_available"
             raise ValueError(message)
@@ -234,7 +205,7 @@ class HardSettings:
         if not isinstance(self.failure_retry_delay, DelayRange):
             message = "failure_retry_delay must be a DelayRange"
             raise TypeError(message)
-        _validate_positive_duration(self.resource_retry_delay, field_name="resource_retry_delay")
+        validate_positive_duration(self.resource_retry_delay, field_name="resource_retry_delay")
         if not isinstance(self.stage, str):
             message = "stage must be a string"
             raise TypeError(message)
@@ -289,9 +260,9 @@ class HardReport:
     stop_reason: HardStopReason
 
     def __post_init__(self) -> None:
-        _validate_aware_datetime(self.observed_at, field_name="observed_at")
-        _validate_non_negative_count(self.attempts_available, field_name="attempts_available")
-        _validate_non_negative_count(self.attempts_completed, field_name="attempts_completed")
+        validate_aware_datetime(self.observed_at, field_name="observed_at")
+        validate_non_negative_integer(self.attempts_available, field_name="attempts_available")
+        validate_non_negative_integer(self.attempts_completed, field_name="attempts_completed")
         if not isinstance(self.stop_reason, HardStopReason):
             message = "stop_reason must be a HardStopReason"
             raise TypeError(message)
@@ -391,7 +362,7 @@ class ExerciseProgress:
     opponent_refreshes_used: int = 0
 
     def __post_init__(self) -> None:
-        _validate_non_negative_count(self.opponent_refreshes_used, field_name="opponent_refreshes_used")
+        validate_non_negative_integer(self.opponent_refreshes_used, field_name="opponent_refreshes_used")
 
 
 @dataclass(frozen=True, slots=True)
@@ -412,11 +383,11 @@ class ExerciseSettings:
         if not isinstance(self.failure_retry_delay, DelayRange):
             message = "failure_retry_delay must be a DelayRange"
             raise TypeError(message)
-        _validate_positive_count(self.opponent_refresh_limit, field_name="opponent_refresh_limit")
+        validate_positive_integer(self.opponent_refresh_limit, field_name="opponent_refresh_limit")
         if not isinstance(self.opponent_mode, ExerciseOpponentMode):
             message = "opponent_mode must be an ExerciseOpponentMode"
             raise TypeError(message)
-        _validate_positive_count(self.opponent_trials, field_name="opponent_trials")
+        validate_positive_integer(self.opponent_trials, field_name="opponent_trials")
         if not isinstance(self.strategy, ExerciseStrategy):
             message = "strategy must be an ExerciseStrategy"
             raise TypeError(message)
@@ -443,11 +414,11 @@ class ExerciseReport:
     opponent_refreshes_used: int
 
     def __post_init__(self) -> None:
-        _validate_aware_datetime(self.observed_at, field_name="observed_at")
-        _validate_non_negative_count(self.attempts_remaining, field_name="attempts_remaining")
-        _validate_non_negative_count(self.attempts_preserved, field_name="attempts_preserved")
-        _validate_non_negative_count(self.attempts_completed, field_name="attempts_completed")
-        _validate_non_negative_count(self.opponent_refreshes_used, field_name="opponent_refreshes_used")
+        validate_aware_datetime(self.observed_at, field_name="observed_at")
+        validate_non_negative_integer(self.attempts_remaining, field_name="attempts_remaining")
+        validate_non_negative_integer(self.attempts_preserved, field_name="attempts_preserved")
+        validate_non_negative_integer(self.attempts_completed, field_name="attempts_completed")
+        validate_non_negative_integer(self.opponent_refreshes_used, field_name="opponent_refreshes_used")
 
 
 class ExerciseWorkflow(Protocol):

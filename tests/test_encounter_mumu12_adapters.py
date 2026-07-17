@@ -84,7 +84,7 @@ def runtime(monkeypatch: pytest.MonkeyPatch) -> tuple[AzurLaneConfig, Device]:
         cancellation.raise_if_requested()
         return device
 
-    monkeypatch.setattr(adapters, "_activate", activate)
+    monkeypatch.setattr(adapters, "activate_mumu12_task", activate)
     return config, device
 
 
@@ -345,7 +345,7 @@ def test_exercise_advances_one_settlement_from_typed_checkpoint(
         cancellation.raise_if_requested()
         return cast("Device", screen)
 
-    monkeypatch.setattr(adapters, "_activate", activate)
+    monkeypatch.setattr(adapters, "activate_mumu12_task", activate)
     monkeypatch.setattr(adapters, "_ReportingExercise", lambda *_args, **_kwargs: runner)
     monkeypatch.setattr(adapters, "OCR_PERIOD_REMAIN", _OcrSequence(timedelta(days=1)))
     monkeypatch.setattr(adapters, "OCR_EXERCISE_REMAIN", _OcrSequence(10, 9))

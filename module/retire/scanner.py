@@ -311,7 +311,7 @@ class StatusScanner(Scanner[str]):
 
 
 class ShipScanner(Scanner[Ship]):
-    """仅用于筛选后未滚动的船坞首屏；多页扫描应使用 DockScanner。
+    """仅支持筛选后未滚动的船坞首屏，不支持多页扫描。
 
     等级、心情、舰队范围分别为 1 至 125、0 至 150、0 至 6；禁用字段返回 None。
     rarity 支持 any、common、rare、elite、super_rare，status 支持 any、free、commission、battle；any 表示不限制。

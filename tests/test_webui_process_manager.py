@@ -1,7 +1,8 @@
 import queue
+import threading
 from datetime import UTC, datetime
 from multiprocessing.reduction import ForkingPickler
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Protocol, cast, override
 
 import pytest
 from rich.text import Text
@@ -10,7 +11,6 @@ import module.webui.process_manager as process_manager_module
 from module.runtime.runner import CommandOutcome, CommandStatus
 from module.webui.process_manager import (
     KILL_JOIN_SECONDS,
-    STOP_GRACE_SECONDS,
     ProcessManager,
     RenderableQueueItem,
     _ProcessRequest,  # ruff:ignore[import-private-name] - 子进程序列化契约需要直接验证。
@@ -40,6 +40,13 @@ class _StopEvent:
 
     def is_set(self) -> bool:
         return self.set_calls > 0
+
+
+class _FailingStopEvent(_StopEvent):
+    @override
+    def set(self) -> None:
+        message = "stop signal failed"
+        raise RuntimeError(message)
 
 
 class _Process:
@@ -74,6 +81,49 @@ class _Process:
         self.kill_calls += 1
         if self.exits_on_kill:
             self._alive = False
+
+
+class _BlockingProcess(_Process):
+    def __init__(self) -> None:
+        super().__init__()
+        self.blocking_join_started = threading.Event()
+        self.killed = threading.Event()
+
+    def join(self, timeout: float | None = None) -> None:
+        self.join_calls.append(timeout)
+        if timeout is None:
+            self.blocking_join_started.set()
+            if not self.killed.wait(timeout=2):
+                message = "test process was not released"
+                raise TimeoutError(message)
+        self._alive = not self.killed.is_set()
+
+    def kill(self) -> None:
+        self.kill_calls += 1
+        self.killed.set()
+        self._alive = False
+
+
+class _ExitBeforeWaitCompletesProcess(_Process):
+    def __init__(self) -> None:
+        super().__init__()
+        self.exited = threading.Event()
+        self.release_waiter = threading.Event()
+
+    def join(self, timeout: float | None = None) -> None:
+        self.join_calls.append(timeout)
+        self._alive = False
+        self.exited.set()
+        if not self.release_waiter.wait(timeout=2):
+            message = "test stop waiter was not released"
+            raise TimeoutError(message)
+
+
+class _JoinFailureProcess(_Process):
+    def join(self, timeout: float | None = None) -> None:
+        self.join_calls.append(timeout)
+        message = "join failed"
+        raise RuntimeError(message)
 
 
 def _outcome(
@@ -390,47 +440,203 @@ def test_start_uses_fresh_ipc_resources(
     assert monitor_runs[0] is not monitor_runs[1]
 
 
-def test_stop_reports_stopped_when_process_exits_gracefully() -> None:
+def test_request_stop_is_non_blocking_and_never_kills() -> None:
+    stop_event = _StopEvent()
+    process = _Process()
+    manager = ProcessManager()
+    run = _attach_run(manager, process, stop_event=stop_event)
+
+    manager.request_stop()
+    manager.request_stop()
+
+    assert stop_event.set_calls == 1
+    assert process.join_calls == []
+    assert process.kill_calls == 0
+    assert run.stop_requested
+    assert not run.forced
+
+
+def test_stop_and_wait_reports_stopped_when_process_exits_gracefully() -> None:
     stop_event = _StopEvent()
     process = _Process(exits_on_join=True)
     manager = ProcessManager()
-    _attach_run(manager, process, stop_event=stop_event)
+    _attach_run(
+        manager,
+        process,
+        stop_event=stop_event,
+        outcome=_outcome(CommandStatus.FINISHED),
+    )
 
-    manager.stop()
+    manager.stop_and_wait()
 
     assert stop_event.set_calls == 1
-    assert process.join_calls == [STOP_GRACE_SECONDS]
+    assert process.join_calls == [None]
     assert process.kill_calls == 0
     assert manager.outcome is not None
     assert manager.outcome.status is CommandStatus.STOPPED
 
 
-def test_stop_reports_killed_after_grace_timeout() -> None:
+def test_stop_and_wait_preserves_child_failure() -> None:
+    process = _Process(exits_on_join=True)
+    manager = ProcessManager()
+    _attach_run(
+        manager,
+        process,
+        outcome=_outcome(CommandStatus.FAILED, exception_type="RuntimeError", message="checkpoint failed"),
+    )
+
+    manager.stop_and_wait()
+
+    assert manager.outcome is not None
+    assert manager.outcome.status is CommandStatus.FAILED
+    assert manager.outcome.message == "checkpoint failed"
+
+
+def test_force_stop_reports_killed() -> None:
     stop_event = _StopEvent()
     process = _Process()
     manager = ProcessManager()
-    _attach_run(manager, process, stop_event=stop_event)
+    run = _attach_run(manager, process, stop_event=stop_event)
 
-    manager.stop()
+    manager.force_stop()
 
     assert stop_event.set_calls == 1
-    assert process.join_calls == [STOP_GRACE_SECONDS, KILL_JOIN_SECONDS]
+    assert process.join_calls == [KILL_JOIN_SECONDS]
     assert process.kill_calls == 1
+    assert run.stop_requested
+    assert run.forced
     assert manager.outcome is not None
     assert manager.outcome.status is CommandStatus.KILLED
 
 
-def test_stop_fails_when_process_remains_alive_after_kill() -> None:
+def test_force_stop_fails_when_process_remains_alive_after_kill() -> None:
     process = _Process(exits_on_kill=False)
     manager = ProcessManager()
     _attach_run(manager, process)
 
     with pytest.raises(RuntimeError, match="still alive after kill"):
-        manager.stop()
+        manager.force_stop()
 
-    assert process.join_calls == [STOP_GRACE_SECONDS, KILL_JOIN_SECONDS]
+    assert process.join_calls == [KILL_JOIN_SECONDS]
     assert process.kill_calls == 1
     assert process.is_alive()
+
+
+def test_force_stop_remains_available_while_cooperative_wait_is_blocked() -> None:
+    process = _BlockingProcess()
+    manager = ProcessManager()
+    _attach_run(manager, process)
+    waiter = threading.Thread(target=manager.stop_and_wait)
+
+    waiter.start()
+    assert process.blocking_join_started.wait(timeout=1)
+
+    manager.force_stop()
+    waiter.join(timeout=1)
+
+    assert not waiter.is_alive()
+    assert process.kill_calls == 1
+    assert process.join_calls == [None, KILL_JOIN_SECONDS]
+    assert manager.outcome is not None
+    assert manager.outcome.status is CommandStatus.KILLED
+
+
+def test_start_waits_until_blocking_stop_releases_the_previous_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    process = _ExitBeforeWaitCompletesProcess()
+    manager = ProcessManager()
+    old_run = _attach_run(manager, process, outcome=_outcome(CommandStatus.FINISHED))
+    context_calls: list[str] = []
+    process_args: list[tuple[object, ...]] = []
+
+    class _StartedProcess:
+        exitcode = 0
+
+        def __init__(self, target: Callable[..., None], args: tuple[object, ...]) -> None:
+            del target
+            process_args.append(args)
+
+        @staticmethod
+        def start() -> None:
+            return None
+
+        @staticmethod
+        def is_alive() -> bool:
+            return False
+
+    class _ProcessContext:
+        Queue = staticmethod(queue.Queue)
+        Event = staticmethod(_StopEvent)
+        Process = _StartedProcess
+
+    def process_context(method: str) -> _ProcessContext:
+        context_calls.append(method)
+        return _ProcessContext()
+
+    monkeypatch.setattr(process_manager_module.multiprocessing, "get_context", process_context)
+    monkeypatch.setattr(ProcessManager, "start_log_queue_handler", lambda *_args: None)
+    waiter_errors: list[BaseException] = []
+
+    def wait_for_stop() -> None:
+        try:
+            manager.stop_and_wait()
+        except BaseException as error:  # ruff:ignore[blind-except] - 线程异常必须回传主测试。
+            waiter_errors.append(error)
+
+    waiter = threading.Thread(target=wait_for_stop)
+    waiter.start()
+    assert process.exited.wait(timeout=1)
+
+    manager.start("Benchmark")
+
+    assert context_calls == []
+    assert vars(manager)["_run"] is old_run
+
+    process.release_waiter.set()
+    waiter.join(timeout=2)
+    assert not waiter.is_alive()
+    assert waiter_errors == []
+
+    manager.start("Benchmark")
+
+    assert context_calls == ["spawn"]
+    assert process_args[0][0] == _request("Benchmark")
+    assert vars(manager)["_run"] is not old_run
+
+
+def test_blocking_stop_waiter_is_released_when_join_fails() -> None:
+    manager = ProcessManager()
+    _attach_run(manager, _JoinFailureProcess())
+
+    with pytest.raises(RuntimeError, match="join failed"):
+        manager.stop_and_wait()
+
+    assert vars(manager)["_start_inhibitors"] == 0
+
+
+def test_stop_and_wait_releases_nested_start_holds_when_stop_signal_fails() -> None:
+    manager = ProcessManager()
+    run = _attach_run(manager, _Process(), stop_event=_FailingStopEvent())
+
+    with manager.hold_start():
+        with pytest.raises(RuntimeError, match="stop signal failed"):
+            manager.stop_and_wait()
+        assert vars(manager)["_start_inhibitors"] == 1
+        assert not run.stop_requested
+
+    assert vars(manager)["_start_inhibitors"] == 0
+
+
+def test_hold_start_inhibits_start_until_the_state_update_finishes() -> None:
+    manager = ProcessManager()
+
+    with manager.hold_start():
+        manager.start("Benchmark")
+        assert vars(manager)["_run"] is None
+        assert vars(manager)["_start_inhibitors"] == 1
+
+    assert vars(manager)["_start_inhibitors"] == 0
 
 
 def test_parent_stop_intent_wins_over_late_child_success() -> None:
@@ -444,7 +650,7 @@ def test_parent_stop_intent_wins_over_late_child_success() -> None:
         outcome=_outcome(CommandStatus.FINISHED),
     )
 
-    manager.stop()
+    manager.stop_and_wait()
 
     assert manager.outcome is not None
     assert manager.outcome.status is CommandStatus.STOPPED
@@ -457,17 +663,17 @@ def test_process_manager_is_singleton() -> None:
     assert ProcessManager() is manager
 
 
-def test_stop_instance_does_not_create_a_manager(monkeypatch: pytest.MonkeyPatch) -> None:
-    ProcessManager.stop_instance()
-    assert ProcessManager._singleton is None  # ruff:ignore[private-member-access] - 验证 shutdown 不创建新实例。
+def test_force_stop_instance_does_not_create_a_manager(monkeypatch: pytest.MonkeyPatch) -> None:
+    ProcessManager.force_stop_instance()
+    assert ProcessManager._singleton is None  # ruff:ignore[private-member-access] - shutdown 不创建新实例。
 
     manager = ProcessManager.instance()
-    stop_calls: list[None] = []
-    monkeypatch.setattr(manager, "stop", lambda: stop_calls.append(None))
+    force_calls: list[None] = []
+    monkeypatch.setattr(manager, "force_stop", lambda: force_calls.append(None))
 
-    ProcessManager.stop_instance()
+    ProcessManager.force_stop_instance()
 
-    assert stop_calls == [None]
+    assert force_calls == [None]
 
 
 def test_monitor_drains_tail_logs_and_publishes_outcome() -> None:
@@ -551,7 +757,20 @@ def test_stop_after_completion_preserves_child_outcome() -> None:
     manager = ProcessManager()
     _attach_run(manager, process, outcome=_outcome(CommandStatus.FINISHED))
 
-    manager.stop()
+    manager.stop_and_wait()
 
     assert manager.outcome is not None
     assert manager.outcome.status is CommandStatus.FINISHED
+
+
+def test_force_stop_after_completion_preserves_child_outcome() -> None:
+    process = _Process(alive=False)
+    manager = ProcessManager()
+    _attach_run(manager, process, outcome=_outcome(CommandStatus.FAILED, message="child failed"))
+
+    manager.force_stop()
+
+    assert process.kill_calls == 0
+    assert manager.outcome is not None
+    assert manager.outcome.status is CommandStatus.FAILED
+    assert manager.outcome.message == "child failed"

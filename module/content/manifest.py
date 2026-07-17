@@ -6,9 +6,6 @@ from operator import itemgetter
 from pathlib import Path
 from typing import cast
 
-import yaml
-from yaml.resolver import BaseResolver
-
 from module.content.activity_profile import (
     ActivityDefinition,
     ActivityKind,
@@ -39,6 +36,7 @@ from module.content.models import (
 )
 from module.content.runtime_profile import CampaignRuntimeProfileId
 from module.content.war_archives_profile import WarArchivesDefinition, WarArchivesProfileId
+from module.content.yaml_loader import load_strict_yaml_mapping
 
 SCHEMA_VERSION = 1
 DEFAULT_EVENT_MANIFEST_PATH = Path(__file__).resolve().parents[2] / "content" / "events"
@@ -78,29 +76,6 @@ _README_INTRO = (
     "**目录**：活动地图文件所在目录。\n\n"
     "**国服名称**：WebUI 中显示的活动名称；未在国服开放时使用 `-`。\n\n"
 )
-
-
-class _StrictLoader(yaml.SafeLoader):
-    pass
-
-
-def _construct_unique_mapping(
-    loader: _StrictLoader,
-    node: yaml.MappingNode,
-    *,
-    deep: object = False,
-) -> dict[object, object]:
-    mapping: dict[object, object] = {}
-    for key_node, value_node in node.value:
-        key = loader.construct_object(key_node, deep=bool(deep))
-        if key in mapping:
-            message = f"duplicate YAML key: {key}"
-            raise ContentValidationError(message)
-        mapping[key] = loader.construct_object(value_node, deep=bool(deep))
-    return mapping
-
-
-_StrictLoader.add_constructor(BaseResolver.DEFAULT_MAPPING_TAG, _construct_unique_mapping)
 
 
 def _fail(path: Path, location: str, message: str) -> ContentValidationError:
@@ -157,17 +132,7 @@ def _safe_stage_id(value: object, path: Path, location: str) -> str:
 
 
 def _load_yaml(path: Path) -> Mapping[str, object]:
-    try:
-        loader = _StrictLoader(path.read_text(encoding="utf-8"))
-        try:
-            raw = loader.get_single_data()
-        finally:
-            loader.dispose()
-    except (OSError, yaml.YAMLError, ContentValidationError) as error:
-        if isinstance(error, ContentValidationError):
-            raise
-        raise _fail(path, "$", str(error)) from error
-    return _mapping(raw, path, "$", _TOP_LEVEL_FIELDS)
+    return _mapping(load_strict_yaml_mapping(path), path, "$", _TOP_LEVEL_FIELDS)
 
 
 def _load_releases(raw: object, path: Path) -> tuple[EventRelease, ...]:

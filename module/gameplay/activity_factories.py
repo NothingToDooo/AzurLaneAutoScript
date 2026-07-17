@@ -22,17 +22,12 @@ from module.gameplay.activity import (
     CoalitionFleetMode,
     CoalitionOptions,
     DaemonOptions,
-    EmotionControl,
-    EmotionMode,
-    EmotionPolicy,
-    EmotionRecoverLocation,
     EncounterBalancerPolicy,
     EncounterCommand,
     EncounterPolicy,
     EncounterProgress,
     EncounterSpec,
     EncounterTask,
-    FleetEmotionPolicy,
     HospitalOptions,
     MaritimeEscortOptions,
     MinigameKind,
@@ -41,6 +36,13 @@ from module.gameplay.activity import (
     RaidDailyOptions,
     RaidMode,
     RaidOptions,
+)
+from module.gameplay.emotion import (
+    EmotionControl,
+    EmotionMode,
+    EmotionRecoverLocation,
+    EmotionSettings,
+    FleetEmotionSettings,
 )
 from module.runtime import (
     SettingsDecoder,
@@ -181,26 +183,26 @@ def _event_story_spec(decoder: SettingsDecoder, catalog: ActivityCatalog) -> Act
     )
 
 
-def _fleet_emotion(decoder: SettingsDecoder) -> FleetEmotionPolicy:
-    policy = FleetEmotionPolicy(
+def _fleet_emotion(decoder: SettingsDecoder) -> FleetEmotionSettings:
+    settings = FleetEmotionSettings(
         control=decoder.enum("control", EmotionControl),
         recover=decoder.enum("recover", EmotionRecoverLocation),
         oath=decoder.boolean("oath"),
     )
     decoder.finish()
-    return policy
+    return settings
 
 
-def _emotion_policy(decoder: SettingsDecoder | None) -> EmotionPolicy | None:
+def _emotion_settings(decoder: SettingsDecoder | None) -> EmotionSettings | None:
     if decoder is None:
         return None
-    policy = EmotionPolicy(
+    settings = EmotionSettings(
         mode=decoder.enum("mode", EmotionMode),
         fleet1=_fleet_emotion(decoder.object("fleet1")),
         fleet2=_fleet_emotion(decoder.object("fleet2")),
     )
     decoder.finish()
-    return policy
+    return settings
 
 
 def _encounter_policy(decoder: SettingsDecoder) -> EncounterPolicy:
@@ -216,7 +218,7 @@ def _encounter_policy(decoder: SettingsDecoder) -> EncounterPolicy:
         event_point_limit=decoder.integer("event_point_limit", minimum=0),
         event_deadline_at=deadline_at,
         use_2x_book=decoder.boolean("use_2x_book"),
-        emotion=_emotion_policy(decoder.nullable_object("emotion")),
+        emotion=_emotion_settings(decoder.nullable_object("emotion")),
     )
     decoder.finish()
     return policy

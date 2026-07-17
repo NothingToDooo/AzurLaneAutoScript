@@ -45,6 +45,14 @@ from module.content.campaign_session import (
 from module.content.campaign_session_source import CampaignStageSelection
 from module.content.models import StageRef
 from module.gameplay.battle_program import BattleProgramExecution, BattleProgramReducer
+from module.gameplay.emotion import EmotionSettings
+from module.gameplay.validation import (
+    validate_aware_datetime,
+    validate_bool,
+    validate_non_negative_integer,
+    validate_positive_duration,
+    validate_positive_integer,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -177,25 +185,6 @@ class SubmarineDistanceToBoss(StrEnum):
     USE_OPEN_OCEAN_SUPPORT = "use_open_ocean_support"
 
 
-class EmotionMode(StrEnum):
-    CALCULATE = "calculate"
-    IGNORE = "ignore"
-    CALCULATE_IGNORE = "calculate_ignore"
-
-
-class EmotionControl(StrEnum):
-    KEEP_EXP_BONUS = "keep_exp_bonus"
-    PREVENT_GREEN_FACE = "prevent_green_face"
-    PREVENT_YELLOW_FACE = "prevent_yellow_face"
-    PREVENT_RED_FACE = "prevent_red_face"
-
-
-class EmotionRecoverLocation(StrEnum):
-    NOT_IN_DORMITORY = "not_in_dormitory"
-    DORMITORY_FLOOR_1 = "dormitory_floor_1"
-    DORMITORY_FLOOR_2 = "dormitory_floor_2"
-
-
 class EnemyPriorityMode(StrEnum):
     DEFAULT = "default_mode"
     LARGE_ENEMY_FIRST = "S3_enemy_first"
@@ -235,39 +224,6 @@ _HOSPITAL_TASK_IDS = (TaskId("hospital"),)
 _MARITIME_TASK_IDS = (TaskId("maritime_escort"),)
 _EVENT_POINT_LIMIT_TASK_IDS = _EVENT_TASK_IDS + _RAID_TASK_IDS + _COALITION_TASK_IDS + _HOSPITAL_TASK_IDS
 _EVENT_TIME_LIMIT_TASK_IDS = _EVENT_POINT_LIMIT_TASK_IDS + _MARITIME_TASK_IDS
-
-
-def _validate_aware_datetime(value: datetime, *, field_name: str) -> None:
-    if not isinstance(value, datetime):
-        message = f"{field_name} must be a datetime"
-        raise TypeError(message)
-    if value.tzinfo is None or value.utcoffset() is None:
-        message = f"{field_name} must be timezone-aware"
-        raise ValueError(message)
-
-
-def _validate_positive_duration(value: timedelta, *, field_name: str) -> None:
-    if not isinstance(value, timedelta):
-        message = f"{field_name} must be a timedelta"
-        raise TypeError(message)
-    if value <= timedelta(0):
-        message = f"{field_name} must be positive"
-        raise ValueError(message)
-
-
-def _validate_non_negative_int(value: int, *, field_name: str) -> None:
-    if type(value) is not int:
-        message = f"{field_name} must be an integer"
-        raise TypeError(message)
-    if value < 0:
-        message = f"{field_name} must be non-negative"
-        raise ValueError(message)
-
-
-def _validate_bool(*, value: bool, field_name: str) -> None:
-    if type(value) is not bool:
-        message = f"{field_name} must be a bool"
-        raise TypeError(message)
 
 
 def _validate_int_range(value: int, *, field_name: str, minimum: int, maximum: int) -> None:
@@ -324,7 +280,7 @@ class CampaignAutomationSettings:
             "use_clear_mode",
             "use_fleet_lock",
         ):
-            _validate_bool(value=getattr(self, field_name), field_name=field_name)
+            validate_bool(value=getattr(self, field_name), field_name=field_name)
 
 
 @dataclass(frozen=True, slots=True)
@@ -374,40 +330,6 @@ class CampaignSubmarineSettings:
 
 
 @dataclass(frozen=True, slots=True)
-class CampaignFleetEmotionSettings:
-    control: EmotionControl
-    recover: EmotionRecoverLocation
-    oath: bool
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.control, EmotionControl):
-            message = "control must be an EmotionControl"
-            raise TypeError(message)
-        if not isinstance(self.recover, EmotionRecoverLocation):
-            message = "recover must be an EmotionRecoverLocation"
-            raise TypeError(message)
-        _validate_bool(value=self.oath, field_name="oath")
-
-
-@dataclass(frozen=True, slots=True)
-class CampaignEmotionSettings:
-    mode: EmotionMode
-    fleet1: CampaignFleetEmotionSettings
-    fleet2: CampaignFleetEmotionSettings
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.mode, EmotionMode):
-            message = "mode must be an EmotionMode"
-            raise TypeError(message)
-        if not isinstance(self.fleet1, CampaignFleetEmotionSettings):
-            message = "fleet1 must be CampaignFleetEmotionSettings"
-            raise TypeError(message)
-        if not isinstance(self.fleet2, CampaignFleetEmotionSettings):
-            message = "fleet2 must be CampaignFleetEmotionSettings"
-            raise TypeError(message)
-
-
-@dataclass(frozen=True, slots=True)
 class CampaignHpControlSettings:
     use_hp_balance: bool
     use_emergency_repair: bool
@@ -420,7 +342,7 @@ class CampaignHpControlSettings:
 
     def __post_init__(self) -> None:
         for field_name in ("use_hp_balance", "use_emergency_repair", "use_low_hp_retreat"):
-            _validate_bool(value=getattr(self, field_name), field_name=field_name)
+            validate_bool(value=getattr(self, field_name), field_name=field_name)
         for field_name in (
             "hp_balance_threshold",
             "repair_use_single_threshold",
@@ -457,7 +379,7 @@ class CampaignExecutionSettings:
     automation: CampaignAutomationSettings
     fleets: CampaignFleetSettings
     submarine: CampaignSubmarineSettings
-    emotion: CampaignEmotionSettings
+    emotion: EmotionSettings
     hp_control: CampaignHpControlSettings
     enemy_priority: CampaignEnemyPrioritySettings
 
@@ -466,7 +388,7 @@ class CampaignExecutionSettings:
             ("automation", CampaignAutomationSettings),
             ("fleets", CampaignFleetSettings),
             ("submarine", CampaignSubmarineSettings),
-            ("emotion", CampaignEmotionSettings),
+            ("emotion", EmotionSettings),
             ("hp_control", CampaignHpControlSettings),
             ("enemy_priority", CampaignEnemyPrioritySettings),
         )
@@ -488,23 +410,19 @@ class CampaignLimits:
     stage_increase: bool = False
 
     def __post_init__(self) -> None:
-        _validate_non_negative_int(self.run_count, field_name="run_count")
-        _validate_non_negative_int(self.reach_level, field_name="reach_level")
-        _validate_non_negative_int(self.oil, field_name="oil")
-        _validate_non_negative_int(self.event_points, field_name="event_points")
-        if type(self.stop_on_new_ship) is not bool:
-            message = "stop_on_new_ship must be a bool"
-            raise TypeError(message)
+        validate_non_negative_integer(self.run_count, field_name="run_count")
+        validate_non_negative_integer(self.reach_level, field_name="reach_level")
+        validate_non_negative_integer(self.oil, field_name="oil")
+        validate_non_negative_integer(self.event_points, field_name="event_points")
+        validate_bool(value=self.stop_on_new_ship, field_name="stop_on_new_ship")
         if not isinstance(self.map_achievement, CampaignMapAchievement):
             message = "map_achievement must be a CampaignMapAchievement"
             raise TypeError(message)
-        if type(self.stage_increase) is not bool:
-            message = "stage_increase must be a bool"
-            raise TypeError(message)
+        validate_bool(value=self.stage_increase, field_name="stage_increase")
         if self.stage_increase and self.map_achievement is CampaignMapAchievement.NON_STOP:
             _invalid("stage_increase requires a map achievement stop condition")
         if self.event_deadline_at is not None:
-            _validate_aware_datetime(self.event_deadline_at, field_name="event_deadline_at")
+            validate_aware_datetime(self.event_deadline_at, field_name="event_deadline_at")
 
     @property
     def effective_oil_limit(self) -> int:
@@ -567,8 +485,8 @@ class TaskBalancerPolicy:
         if not isinstance(self.target_task_id, TaskId):
             message = "target_task_id must be a TaskId"
             raise TypeError(message)
-        _validate_non_negative_int(self.coin_limit, field_name="coin_limit")
-        _validate_positive_duration(self.retry_delay, field_name="retry_delay")
+        validate_non_negative_integer(self.coin_limit, field_name="coin_limit")
+        validate_positive_duration(self.retry_delay, field_name="retry_delay")
 
 
 @dataclass(frozen=True, slots=True)
@@ -596,7 +514,7 @@ class GemsFarmingPolicy:
         if not isinstance(self.common_destroyer, GemsCommonDestroyer):
             message = "common_destroyer must be a GemsCommonDestroyer"
             raise TypeError(message)
-        _validate_positive_duration(self.replacement_retry_delay, field_name="replacement_retry_delay")
+        validate_positive_duration(self.replacement_retry_delay, field_name="replacement_retry_delay")
 
     @property
     def changes_vanguard(self) -> bool:
@@ -642,12 +560,8 @@ class CampaignProgress:
             message = "session_state must be a CampaignSessionState"
             raise TypeError(message)
         _validate_progress_state(self.variant, self.session_state)
-        _validate_non_negative_int(self.runs_completed, field_name="runs_completed")
-        if type(self.settings_revision) is not int:
-            message = "settings_revision must be an integer"
-            raise TypeError(message)
-        if self.settings_revision <= 0:
-            _invalid("settings_revision must be positive")
+        validate_non_negative_integer(self.runs_completed, field_name="runs_completed")
+        validate_positive_integer(self.settings_revision, field_name="settings_revision")
         _validate_revision(self.content_revision, field_name="content_revision")
         if self.pending_gems_replacement is not None and not isinstance(
             self.pending_gems_replacement,
@@ -691,7 +605,7 @@ class CampaignJobSpec:
             message = "schedule must be DailySchedule"
             raise TypeError(message)
         self._validate_failure_retry_delay()
-        _validate_positive_duration(self.resource_retry_delay, field_name="resource_retry_delay")
+        validate_positive_duration(self.resource_retry_delay, field_name="resource_retry_delay")
         if not _MIN_RESOURCE_RETRY <= self.resource_retry_delay <= _MAX_RESOURCE_RETRY:
             message = "resource_retry_delay must be between 120 and 240 minutes"
             raise ValueError(message)
@@ -913,7 +827,7 @@ class CampaignRunReport:
         if not isinstance(self.stage_ref, StageRef):
             message = "stage_ref must be a StageRef"
             raise TypeError(message)
-        _validate_aware_datetime(self.observed_at, field_name="observed_at")
+        validate_aware_datetime(self.observed_at, field_name="observed_at")
         if not isinstance(self.stop_reason, CampaignStopReason):
             message = "stop_reason must be a CampaignStopReason"
             raise TypeError(message)
@@ -922,7 +836,7 @@ class CampaignRunReport:
             raise TypeError(message)
         if self.session_state.pending is not None:
             _invalid("campaign workflow report must not contain a pending battle attempt")
-        _validate_non_negative_int(self.runs_completed, field_name="runs_completed")
+        validate_non_negative_integer(self.runs_completed, field_name="runs_completed")
         if self.runs_completed > 1:
             _invalid("campaign workflow must complete at most one map run per task run")
         if self.next_stage_ref is not None and not isinstance(self.next_stage_ref, StageRef):
