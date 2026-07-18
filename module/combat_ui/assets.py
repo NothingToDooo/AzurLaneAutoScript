@@ -87,6 +87,12 @@ PAUSE_New = Button(
     button=(1231, 29, 1253, 56),
     file="./assets/cn/combat_ui/PAUSE_New.png",
 )
+PAUSE_Nier = Button(
+    area=(1220, 30, 1244, 56),
+    color=(140, 127, 100),
+    button=(1220, 30, 1244, 56),
+    file="./assets/cn/combat_ui/PAUSE_Nier.png",
+)
 PAUSE_Ninja = Button(
     area=(1230, 37, 1246, 53),
     color=(135, 109, 92),
@@ -170,6 +176,12 @@ QUIT_New = Button(
     color=(255, 180, 171),
     button=(394, 506, 467, 524),
     file="./assets/cn/combat_ui/QUIT_New.png",
+)
+QUIT_Nier = Button(
+    area=(450, 554, 536, 578),
+    color=(156, 153, 146),
+    button=(450, 554, 536, 578),
+    file="./assets/cn/combat_ui/QUIT_Nier.png",
 )
 QUIT_Ninja = Button(
     area=(398, 509, 477, 528),

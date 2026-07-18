@@ -48,6 +48,7 @@ _COMBAT_EXECUTING_BUTTONS = (
     (combat_ui_assets.PAUSE_ElvenVine, "match_template_color"),
     (combat_ui_assets.PAUSE_GildedReverie, "match_template_color"),
     (combat_ui_assets.PAUSE_AzureCore, "match_template_color"),
+    (combat_ui_assets.PAUSE_Nier, "match_template_color"),
 )
 
 # 部分暂停皮肤复用 QUIT_New；这里仅列出有独立资源图的退出按钮。
@@ -64,6 +65,7 @@ _COMBAT_QUIT_BUTTONS = (
     combat_ui_assets.QUIT_MaidCafe,
     combat_ui_assets.QUIT_SpringInn,
     combat_ui_assets.QUIT_GildedReverie,
+    combat_ui_assets.QUIT_Nier,
 )
 
 _BATTLE_STATUS_BUTTONS = (

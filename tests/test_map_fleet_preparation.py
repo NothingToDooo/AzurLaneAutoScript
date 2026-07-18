@@ -1,6 +1,7 @@
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, TypedDict, override
+from typing import TYPE_CHECKING, TypedDict, cast, override
 
+import numpy as np
 import pytest
 
 from module.exception import HardNotSatisfied, RequestHumanTakeover
@@ -10,6 +11,8 @@ from module.map.map_fleet_preparation import FleetOperator, FleetOperatorAssets,
 
 if TYPE_CHECKING:
     from module.base.button import Button, MatchOffset
+    from module.base.type_alias import ImageArray
+    from module.handler.info_handler import InfoHandler
 
 
 class _OperatorConfig(TypedDict, total=False):
@@ -108,6 +111,32 @@ class _FleetPreparation(FleetPreparation):
         return False
 
 
+def _fleet_operator_in_use(image: ImageArray) -> bool:
+    def image_crop(_area: object, *, copy: bool) -> ImageArray:
+        del copy
+        return image
+
+    main = cast(
+        "InfoHandler",
+        SimpleNamespace(
+            appear=lambda _button, **_kwargs: False,
+            image_crop=image_crop,
+        ),
+    )
+    operator = FleetOperator(
+        FleetOperatorAssets(
+            choose=map_assets.FLEET_1_CHOOSE,
+            advice=map_assets.FLEET_1_ADVICE,
+            bar=map_assets.FLEET_1_BAR,
+            clear=map_assets.FLEET_1_CLEAR,
+            in_use=map_assets.FLEET_1_IN_USE,
+            hard_satisfied=map_assets.FLEET_1_HARD_SATIESFIED,
+        ),
+        main,
+    )
+    return operator.in_use()
+
+
 def test_fleet_preparation_skips_hard_mode_and_clears_unconfigured_submarine(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(fleet_preparation_module, "FleetOperator", _FakeFleetOperator)
     preparation = _FleetPreparation()
@@ -163,3 +192,28 @@ def test_hard_not_satisfied_remains_a_human_takeover_signal(monkeypatch: pytest.
         operator.raise_hard_not_satisfied()
 
     assert isinstance(exc_info.value, RequestHumanTakeover)
+
+
+@pytest.mark.parametrize(
+    ("color", "expected"),
+    [
+        pytest.param((224, 154, 114), True, id="perseus-skin"),
+        pytest.param((124, 141, 171), True, id="akane-shinjo-skin"),
+        pytest.param((71, 70, 63), False, id="empty-fleet"),
+    ],
+)
+def test_fleet_operator_in_use_handles_flat_skin_colors(
+    color: tuple[int, int, int],
+    *,
+    expected: bool,
+) -> None:
+    image = np.full((32, 32, 3), color, dtype=np.uint8)
+
+    assert _fleet_operator_in_use(image) is expected
+
+
+def test_fleet_operator_in_use_keeps_high_variance_detection() -> None:
+    image = np.zeros((32, 32, 3), dtype=np.uint8)
+    image[:, ::2] = 255
+
+    assert _fleet_operator_in_use(image) is True

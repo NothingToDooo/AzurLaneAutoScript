@@ -1,11 +1,12 @@
 from typing import TYPE_CHECKING, cast
 
+from module.base.button import Button
+from module.base.utils import image_size, load_image
 from module.combat import combat, combat_auto, submarine
+from module.exercise import hp_daemon
 
 if TYPE_CHECKING:
     import pytest
-
-    from module.base.button import Button
 
 
 type _TestButton = _FakeButton | Button
@@ -16,13 +17,13 @@ class _FakeButton:
         self.name = name
         self.luma = luma
         self.color = color
-        self.calls: list[tuple[str, str, tuple[int, int]]] = []
+        self.calls: list[tuple[str, object, tuple[int, int]]] = []
 
-    def match_luma(self, image: str, *, offset: tuple[int, int]) -> bool:
+    def match_luma(self, image: object, *, offset: tuple[int, int]) -> bool:
         self.calls.append(("match_luma", image, offset))
         return self.luma
 
-    def match_template_color(self, image: str, *, offset: tuple[int, int]) -> bool:
+    def match_template_color(self, image: object, *, offset: tuple[int, int]) -> bool:
         self.calls.append(("match_template_color", image, offset))
         return self.color
 
@@ -31,7 +32,7 @@ class _FakeButton:
 
 
 class _FakeDevice:
-    image = "image"
+    image: object = "image"
 
     def __init__(self) -> None:
         self.clicks: list[_TestButton] = []
@@ -91,6 +92,12 @@ def _as_combat(context: _FakeCombatContext) -> combat.Combat:
     return cast("combat.Combat", context)
 
 
+def _clear_combat_ui_offsets() -> None:
+    for resource in vars(combat.combat_ui_assets).values():
+        if isinstance(resource, Button):
+            resource.clear_offset()
+
+
 def test_is_combat_executing_uses_ordered_button_table(monkeypatch: pytest.MonkeyPatch) -> None:
     miss = _FakeButton("miss")
     hit = _FakeButton("hit", color=True)
@@ -101,6 +108,33 @@ def test_is_combat_executing_uses_ordered_button_table(monkeypatch: pytest.Monke
     assert context.device.stuck_records == [combat.combat_ui_assets.PAUSE]
     assert miss.calls == [("match_luma", "image", (10, 10))]
     assert hit.calls == [("match_template_color", "image", (10, 10))]
+
+
+def test_nier_combat_resources_are_registered_and_match_source_images() -> None:
+    pause = combat.combat_ui_assets.PAUSE_Nier
+    quit_button = combat.combat_ui_assets.QUIT_Nier
+    pause_file = pause.file
+    quit_file = quit_button.file
+
+    assert pause_file is not None
+    assert quit_file is not None
+    pause_image = load_image(pause_file)
+    quit_image = load_image(quit_file)
+
+    assert image_size(pause_image) == (1280, 720)
+    assert image_size(quit_image) == (1280, 720)
+    assert hp_daemon.NEW_HP_BAR_PAUSES[-1] is pause
+
+    executing_context = _FakeCombatContext()
+    executing_context.device.image = pause_image
+    quit_context = _FakeCombatContext()
+    quit_context.device.image = quit_image
+    try:
+        assert combat.Combat.is_combat_executing(_as_combat(executing_context)) is pause
+        assert combat.Combat.handle_combat_quit(_as_combat(quit_context)) is True
+        assert quit_context.device.clicks == [quit_button]
+    finally:
+        _clear_combat_ui_offsets()
 
 
 def test_handle_combat_quit_clicks_first_matching_quit_button(monkeypatch: pytest.MonkeyPatch) -> None:
