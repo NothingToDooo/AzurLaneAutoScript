@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 class Template(Resource):
     def __init__(self, file: FilePath) -> None:
-        """file 可传模板路径或按服务器选择路径的映射。"""
+        """file 为模板资源路径。"""
         self.raw_file = file
         self._image: ImageArray | list[ImageArray] | None = None
         self._image_binary: ImageArray | list[ImageArray] | None = None

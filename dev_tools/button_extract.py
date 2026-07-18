@@ -110,14 +110,10 @@ def validate_assets(assets_folder: Path) -> None:
         raise AssetExtractionError(issues)
 
 
-def _literal_file_references(value: ast.expr) -> tuple[str, ...]:
+def _literal_file_reference(value: ast.expr) -> str | None:
     if isinstance(value, ast.Constant) and isinstance(value.value, str):
-        return (value.value,)
-    if isinstance(value, ast.Dict):
-        return tuple(
-            item.value for item in value.values if isinstance(item, ast.Constant) and isinstance(item.value, str)
-        )
-    return ()
+        return value.value
+    return None
 
 
 def collect_generated_asset_issues(module_folder: Path, *, repository_root: Path) -> tuple[AssetIssue, ...]:
@@ -136,18 +132,31 @@ def collect_generated_asset_issues(module_folder: Path, *, repository_root: Path
             file_keyword = next((keyword for keyword in node.keywords if keyword.arg == "file"), None)
             if file_keyword is None:
                 continue
-            for reference in _literal_file_references(file_keyword.value):
-                referenced_file = Path(reference)
-                if not referenced_file.is_absolute():
-                    referenced_file = repository_root / referenced_file
-                if not referenced_file.is_file():
-                    issues.append(
-                        AssetIssue(
-                            file=f"{assets_file.as_posix()}:{node.lineno}",
-                            reason=f"missing generated resource reference: {reference}",
-                        )
+            reference = _literal_file_reference(file_keyword.value)
+            if reference is None:
+                issues.append(
+                    AssetIssue(
+                        file=f"{assets_file.as_posix()}:{node.lineno}",
+                        reason="generated resource file must be a string literal",
                     )
+                )
+                continue
+            referenced_file = Path(reference)
+            if not referenced_file.is_absolute():
+                referenced_file = repository_root / referenced_file
+            if not referenced_file.is_file():
+                issues.append(
+                    AssetIssue(
+                        file=f"{assets_file.as_posix()}:{node.lineno}",
+                        reason=f"missing generated resource reference: {reference}",
+                    )
+                )
     return tuple(sorted(issues))
+
+
+def _generated_path(path: Path) -> str:
+    value = path.as_posix()
+    return value if path.is_absolute() else f"./{value}"
 
 
 class ImageExtractor:
@@ -155,23 +164,18 @@ class ImageExtractor:
         path = Path(file)
         self.module = module
         self.name = path.stem
-        self.ext = path.suffix
-        self.area: dict[str, Bounds] = {}
-        self.color: dict[str, MeanColor] = {}
-        self.button: dict[str, Bounds] = {}
-        self.file: dict[str, str] = {}
-        self.load()
+        self.area, self.color, self.button, self.file = self.load()
 
     def get_file(self, genre: str = "") -> str:
         for ext in [".png", ".gif"]:
             file = f"{self.name}.{genre}{ext}" if genre else f"{self.name}{ext}"
-            file = (Path(AzurLaneConfig.ASSETS_FOLDER) / "cn" / self.module / file).as_posix()
+            file = _generated_path(Path(AzurLaneConfig.ASSETS_FOLDER) / "cn" / self.module / file)
             if Path(file).exists():
                 return file
 
         ext = ".png"
         file = f"{self.name}.{genre}{ext}" if genre else f"{self.name}{ext}"
-        return (Path(AzurLaneConfig.ASSETS_FOLDER) / "cn" / self.module / file).as_posix()
+        return _generated_path(Path(AzurLaneConfig.ASSETS_FOLDER) / "cn" / self.module / file)
 
     @staticmethod
     def extract(file: FilePath) -> Extraction:
@@ -203,7 +207,7 @@ class ImageExtractor:
         rounded = np.rint(mean).astype(int)
         return bbox, (int(rounded[0]), int(rounded[1]), int(rounded[2]))
 
-    def load(self) -> None:
+    def load(self) -> tuple[Bounds, MeanColor, Bounds, str]:
         file = self.get_file()
         if Path(file).exists():
             area, color = self.extract(file)
@@ -218,16 +222,15 @@ class ImageExtractor:
             if Path(override).exists():
                 button, _ = self.extract(override)
 
-            self.area["cn"] = area
-            self.color["cn"] = color
-            self.button["cn"] = button
-            self.file["cn"] = file
-        else:
-            raise FileNotFoundError(file)
+            return area, color, button, file
+        raise FileNotFoundError(file)
 
     @property
     def expression(self) -> str:
-        return f"{self.name} = Button(area={self.area}, color={self.color}, button={self.button}, file={self.file})"
+        return (
+            f"{self.name} = Button(area={self.area!r}, color={self.color!r}, "
+            f"button={self.button!r}, file={self.file!r},)"
+        )
 
 
 class TemplateExtractor(ImageExtractor):
@@ -241,7 +244,7 @@ class TemplateExtractor(ImageExtractor):
 
     @property
     def expression(self) -> str:
-        return f"{self.name} = Template(file={self.file})"
+        return f"{self.name} = Template(file={self.file!r})"
 
 
 class ModuleExtractor:
