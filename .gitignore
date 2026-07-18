@@ -22,6 +22,7 @@ test.py
 test/
 .codegraph/
 AzurLaneAutoScript/
+/game_unpack/
 # Created by .ignore support plugin (hsz.mobi)
 
 ### JetBrains template
