@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING, Protocol
 
 from module.adapters.campaign_runtime_profile import (
-    CampaignRuntimeProfileError,
     RuntimeSessionContext,
     RuntimeSessionEntryKind,
     RuntimeSessionOutcome,
@@ -27,7 +26,6 @@ class Mumu12CampaignMapSessionRuntime(SubmarineFreshCombatRuntime, Protocol):
     map: CampaignMap
     session_variant: CampaignRunVariant
     map_is_clear_mode: bool
-    battle_count: int
 
     def map_init(self, map_: CampaignMap | None) -> None: ...
 
@@ -100,7 +98,6 @@ class Mumu12CampaignMapSessionOwner:
             if entry_kind is RuntimeSessionEntryKind.FRESH:
                 self._fresh_combat.start(runtime)
             runtime.map_init(runtime.MAP)
-            runtime.battle_count = state.battle_index
             apply_campaign_map_mutations(
                 runtime.map,
                 runtime.definition.mechanics.map_mutations,
@@ -117,19 +114,6 @@ class Mumu12CampaignMapSessionOwner:
                 message="campaign map session initialization and cleanup both failed",
             )
             raise
-
-    def resume(self, state: CampaignSessionState) -> None:
-        if not isinstance(state, CampaignSessionState):
-            message = "campaign map session resume requires a CampaignSessionState"
-            raise TypeError(message)
-        if not self._lease.active:
-            message = "campaign map session is not active"
-            raise CampaignRuntimeProfileError(message)
-        runtime = self._runtime
-        if state.variant is not runtime.session_variant:
-            message = "campaign map session resume variant must match the active runtime"
-            raise ValueError(message)
-        runtime.battle_count = state.battle_index
 
     def prepare_battle(self, battle_index: int) -> None:
         if type(battle_index) is not int or battle_index < 0:

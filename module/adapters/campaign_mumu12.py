@@ -98,7 +98,7 @@ from module.gameplay.campaign import (
 )
 from module.gameplay.campaign_factories import CampaignFactoryDependencies, HardCampaignSessionSource
 from module.gameplay.campaign_live import (
-    CampaignCheckpointUnavailable,
+    CampaignCheckpointReset,
     CampaignGemsReplacementFailed,
     CampaignGuardEvidence,
     CampaignGuardPhase,
@@ -112,6 +112,7 @@ from module.ocr.ocr import Digit, DigitCounter
 from module.task_registry import command_to_config_name
 from module.ui.assets import CAMPAIGN_MENU_NO_EVENT
 from module.ui.page import page_campaign_menu
+from module.ui.ui import UI
 from module.war_archives.assets import OCR_DATA_KEY_CAMPAIGN, WAR_ARCHIVES_CAMPAIGN_CHECK
 
 if TYPE_CHECKING:
@@ -183,6 +184,7 @@ class _PreparedRuntimeOwnership:
 @dataclass(frozen=True, slots=True)
 class _ActiveRuntimeOwnership:
     session: CampaignSession
+    checkpoint: CampaignSessionState
 
 
 type _RuntimeOwnership = _PreparedRuntimeOwnership | _ActiveRuntimeOwnership
@@ -863,6 +865,24 @@ class Mumu12CampaignRuntimeProvider:
         )
         self._device.config = self._config
 
+    def _reset_to_map_boundary(
+        self,
+        job: CampaignJobSpec,
+        session: CampaignSession,
+        cancellation: CancellationSource,
+    ) -> None:
+        """不构造地图 runtime，仅通过通用 UI 把客户端收口到选图页。"""
+
+        cancellation.raise_if_requested()
+        definition = compose_campaign_attempt_definition(session.definition, job.difficulty)
+        self._activate_config(job, definition)
+        device = cast("Device", CancellationAwareMumu12Device(self._device, cancellation))
+        UI(config=self._config, device=device).ui_goto(
+            page_campaign_menu,
+            skip_first_screenshot=False,
+        )
+        cancellation.raise_if_requested()
+
     def _new_handle(
         self,
         job: CampaignJobSpec,
@@ -972,6 +992,7 @@ class Mumu12CampaignRuntimeProvider:
             raise CampaignRuntimeEvidenceError(message)
         if handle is not None:
             self._release_handle(RuntimeSessionOutcome.INTERRUPTED)
+        self._reset_to_map_boundary(job, session, cancellation)
         handle = self._new_handle(job, session, cancellation)
         self._handle = handle
         runtime = handle.runtime
@@ -981,19 +1002,8 @@ class Mumu12CampaignRuntimeProvider:
         if pending is not None and pending.trigger is GemsFleetReplacementTrigger.HARD_PREPARATION:
             handle.ownership = replace(ownership, at_boundary=True)
             return CampaignGuardEvidence(CampaignGuardPhase.PRE_ENTRY)
-        if job.progress is not None:
-            cancellation.raise_if_requested()
-            runtime.device.screenshot()
-            cancellation.raise_if_requested()
-            if runtime.is_in_map():
-                return CampaignGuardEvidence(
-                    CampaignGuardPhase.PRE_ENTRY,
-                    resuming_checkpoint=True,
-                )
         event_available: bool | None = None
         if self._is_event_stage(job, session):
-            cancellation.raise_if_requested()
-            runtime.ui_goto(page_campaign_menu)
             cancellation.raise_if_requested()
             event_available = runtime.is_event_entrance_available()
             if not event_available:
@@ -1123,33 +1133,59 @@ class Mumu12CampaignRuntimeProvider:
         if ownership.session != session:
             message = "campaign checkpoint does not match the retained map runtime"
             raise CampaignRuntimeEvidenceError(message)
+        progress_state = job.progress.session_state
         expected = compose_campaign_attempt_definition(session.definition, job.difficulty)
-        if handle.runtime.definition != expected or not handle.owner.active:
+        if (
+            handle.runtime.definition != expected
+            or not handle.owner.active
+            or handle.runtime.session_variant is not progress_state.variant
+            or ownership.checkpoint != progress_state
+        ):
             message = "retained campaign runtime does not match the selected attempt"
             raise CampaignRuntimeEvidenceError(message)
         handle.cancellation = self._refresh_runtime_cancellation(job, handle.runtime, cancellation)
         return handle
 
+    def _prepare_activation_handle(
+        self,
+        job: CampaignJobSpec,
+        session: CampaignSession,
+        cancellation: CancellationSource,
+    ) -> _RuntimeHandle | CampaignCheckpointReset:
+        progress = job.progress
+        handle_missing = self._handle is None
+        if handle_missing:
+            self._reset_to_map_boundary(job, session, cancellation)
+            if progress is not None and progress.session_state != session.initial_state():
+                return CampaignCheckpointReset("cold checkpoint was reset to the campaign map boundary")
+        handle = self._handle_for_activation(job, session, cancellation)
+        if not handle_missing or progress is None:
+            return handle
+        ownership = handle.ownership
+        if not isinstance(ownership, _PreparedRuntimeOwnership):
+            message = "cold campaign activation did not create a prepared runtime"
+            raise CampaignRuntimeEvidenceError(message)
+        handle.ownership = replace(ownership, at_boundary=True)
+        return handle
+
     def _activate_checkpoint(
         self,
+        job: CampaignJobSpec,
         session: CampaignSession,
         handle: _RuntimeHandle,
         progress_state: CampaignSessionState,
         cancellation: CancellationSource,
-    ) -> CampaignSession | CampaignCheckpointUnavailable:
+    ) -> _ActivatedMap | CampaignCheckpointReset:
         runtime = handle.runtime
         cancellation.raise_if_requested()
         runtime.device.screenshot()
         cancellation.raise_if_requested()
         if not runtime.is_in_map():
             self._release_handle(RuntimeSessionOutcome.INTERRUPTED)
-            return CampaignCheckpointUnavailable("client is not inside the checkpoint map")
-        if handle.owner.active:
-            handle.owner.resume(progress_state)
-        else:
-            handle.owner.initialize(progress_state, RuntimeSessionEntryKind.RESUME)
+            self._reset_to_map_boundary(job, session, cancellation)
+            return CampaignCheckpointReset("client left the retained checkpoint map")
         handle.owner.prepare_battle(progress_state.battle_index)
-        return session
+        return _ActivatedMap(session, progress_state)
 
     def _activate_fresh(
         self,
@@ -1209,24 +1245,26 @@ class Mumu12CampaignRuntimeProvider:
         self,
         job: CampaignJobSpec,
         cancellation: CancellationSource,
-    ) -> (
-        CampaignSession | CampaignCheckpointUnavailable | CampaignMapAchievementReached | CampaignGemsReplacementFailed
-    ):
+    ) -> CampaignSession | CampaignCheckpointReset | CampaignMapAchievementReached | CampaignGemsReplacementFailed:
         session = self._selected_session(job)
         try:
-            handle = self._handle_for_activation(job, session, cancellation)
+            progress = job.progress
+            prepared = self._prepare_activation_handle(job, session, cancellation)
+            if isinstance(prepared, CampaignCheckpointReset):
+                return prepared
+            handle = prepared
             ownership = handle.ownership
             prepared_at_boundary = ownership.at_boundary if isinstance(ownership, _PreparedRuntimeOwnership) else False
             entrance = ownership.entrance if isinstance(ownership, _PreparedRuntimeOwnership) else None
-            progress = job.progress
             if progress is not None and not prepared_at_boundary:
                 result = self._activate_checkpoint(
+                    job,
                     session,
                     handle,
                     progress.session_state,
                     cancellation,
                 )
-                if isinstance(result, CampaignCheckpointUnavailable):
+                if isinstance(result, CampaignCheckpointReset):
                     return result
                 activated = result
             else:
@@ -1238,7 +1276,7 @@ class Mumu12CampaignRuntimeProvider:
                 )
                 if not isinstance(fresh, _ActivatedMap):
                     return fresh
-                activated = fresh.session
+                activated = fresh
 
             self._config.apply_runtime_overlay(
                 Campaign_UseAutoSearch=job.execution.automation.use_auto_search,
@@ -1254,8 +1292,8 @@ class Mumu12CampaignRuntimeProvider:
             )
             raise
         else:
-            handle.ownership = _ActiveRuntimeOwnership(activated)
-            return activated
+            handle.ownership = _ActiveRuntimeOwnership(activated.session, activated.state)
+            return activated.session
 
     def _active_runtime_for(
         self,
@@ -1421,7 +1459,7 @@ class Mumu12CampaignRuntimeProvider:
             ):
                 message = "resumable campaign report requires the matching active runtime"
                 raise CampaignRuntimeEvidenceError(message)
-            handle.owner.resume(state)
+            handle.ownership = replace(handle.ownership, checkpoint=state)
             return
 
         outcome = self._runtime_outcome(state, stop_reason)

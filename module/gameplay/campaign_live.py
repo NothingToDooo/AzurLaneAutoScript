@@ -129,7 +129,6 @@ class CampaignGuardEvidence:
     event_available: bool | None = None
     data_keys_remaining: int | None = None
     coin: int | None = None
-    resuming_checkpoint: bool = False
     reach_level_limit: bool = False
     new_ship: bool = False
     auto_search_oil_limit: bool = False
@@ -155,7 +154,6 @@ class CampaignGuardEvidence:
             message = "campaign guard event_available must be a bool or None"
             raise TypeError(message)
         boolean_fields = (
-            "resuming_checkpoint",
             "reach_level_limit",
             "new_ship",
             "auto_search_oil_limit",
@@ -199,9 +197,6 @@ class CampaignGuardEvidence:
             )
         ):
             message = "post-battle campaign evidence cannot contain pre-entry resources"
-            raise ValueError(message)
-        if self.phase is CampaignGuardPhase.POST_BATTLE and self.resuming_checkpoint:
-            message = "post-battle campaign evidence cannot resume a checkpoint"
             raise ValueError(message)
 
 
@@ -333,8 +328,6 @@ class CampaignGuardPolicy:
         evidence: CampaignGuardEvidence,
         observed_at: datetime,
     ) -> CampaignGuardDecision:
-        if evidence.resuming_checkpoint:
-            return CampaignGuardDecision()
         event_limits_apply = CampaignGuardPolicy._event_limits_apply(job, session)
         deadline = job.limits.event_deadline_at
         runs_completed = 0 if job.progress is None else job.progress.runs_completed
@@ -436,12 +429,12 @@ class CampaignGuardPolicy:
 
 
 @dataclass(frozen=True, slots=True)
-class CampaignCheckpointUnavailable:
+class CampaignCheckpointReset:
     reason: str
 
     def __post_init__(self) -> None:
         if not isinstance(self.reason, str) or not self.reason.strip():
-            message = "campaign checkpoint unavailable reason must be non-empty"
+            message = "campaign checkpoint reset reason must be non-empty"
             raise ValueError(message)
 
 
@@ -476,9 +469,7 @@ class CampaignSessionActivator(Protocol):
         self,
         job: CampaignJobSpec,
         cancellation: CancellationSource,
-    ) -> (
-        CampaignSession | CampaignCheckpointUnavailable | CampaignMapAchievementReached | CampaignGemsReplacementFailed
-    ):
+    ) -> CampaignSession | CampaignCheckpointReset | CampaignMapAchievementReached | CampaignGemsReplacementFailed:
         """进入目标关卡并返回客户端实际启用的 normal/loop session。"""
 
 
@@ -1010,6 +1001,15 @@ class LiveCampaignWorkflow(CampaignWorkflow):
             return session, state
         cancellation.raise_if_requested()
         activated = self._activator.activate(job, cancellation)
+        if isinstance(activated, CampaignCheckpointReset):
+            if job.progress is None:
+                message = "fresh campaign activation cannot reset a checkpoint"
+                raise ValueError(message)
+            return self._report(
+                session,
+                session.initial_state(),
+                CampaignStopReason.CHECKPOINT_RESET,
+            )
         if isinstance(activated, CampaignGemsReplacementFailed):
             if state != session.initial_state():
                 message = "gems preparation failure must occur at a fresh map boundary"
@@ -1043,12 +1043,7 @@ class LiveCampaignWorkflow(CampaignWorkflow):
                 stop_reason,
                 next_stage_ref=completion.next_stage_ref,
             )
-        if not isinstance(activated, CampaignCheckpointUnavailable):
-            return self._activated_session(job, activated)
-        if job.progress is None:
-            message = "fresh campaign activation cannot report an unavailable checkpoint"
-            raise ValueError(message)
-        return self._report(session, state, CampaignStopReason.CHECKPOINT_UNAVAILABLE)
+        return self._activated_session(job, activated)
 
     @staticmethod
     def _current_session(job: CampaignJobSpec) -> tuple[CampaignSession, CampaignSessionState]:

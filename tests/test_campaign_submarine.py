@@ -343,7 +343,7 @@ def test_session_owner_runs_fresh_hook_after_lease_start_and_before_map_init() -
     ]
 
 
-def test_session_owner_skips_cold_and_retained_resume_hooks() -> None:
+def test_session_owner_skips_fresh_hook_for_a_resume_entry() -> None:
     cold_events: list[object] = []
     cold_owner, _runtime = _owner(cold_events, lambda _runtime: cold_events.append("fresh_combat"))
 
@@ -352,19 +352,6 @@ def test_session_owner_skips_cold_and_retained_resume_hooks() -> None:
         ("lease.start", RuntimeSessionEntryKind.RESUME),
         "map_init",
     ]
-
-    retained_events: list[object] = []
-    retained_owner, retained_runtime = _owner(
-        retained_events,
-        lambda _runtime: retained_events.append("fresh_combat"),
-    )
-    retained_owner.initialize(_session_state(), RuntimeSessionEntryKind.FRESH)
-    retained_events.clear()
-
-    retained_owner.resume(_session_state(3))
-
-    assert retained_events == []
-    assert retained_runtime.battle_count == 3
 
 
 @pytest.mark.parametrize(

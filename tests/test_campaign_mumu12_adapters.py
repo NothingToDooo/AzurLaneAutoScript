@@ -39,10 +39,14 @@ from module.adapters.gems_mumu12 import (
     GemsHardRetryFleetPreparationService,
     Mumu12GemsRuntimeBehavior,
 )
+from module.adapters.mumu12 import CancellationAwareMumu12Device
 from module.application import AbortRequested, AbortToken, DailySchedule, DelayRange, SafeUnitCancellation, TaskId
 from module.base.button import Button
 from module.content.battle_policy import BossStrategy, ClearBoss, StagePolicy
 from module.content.campaign_session import (
+    BattlefieldObservation,
+    BattleSucceeded,
+    BattleTarget,
     CampaignRunVariant,
     CampaignSession,
     CampaignSessionState,
@@ -121,8 +125,9 @@ from module.gameplay.campaign import (
     SubmarineMode,
 )
 from module.gameplay.campaign_live import (
-    CampaignCheckpointUnavailable,
+    CampaignCheckpointReset,
     CampaignGemsReplacementFailed,
+    CampaignGuardPhase,
     CampaignMapAchievementReached,
 )
 from module.gameplay.emotion import (
@@ -134,7 +139,7 @@ from module.gameplay.emotion import (
 )
 from module.gameplay.encounter import HardBattleOutcome, HardFleet, HardSettings, HardStopReason
 from module.map.map_fleet_preparation import STANDARD_FLEET_PREPARATION_SERVICE
-from module.ui.page import page_event
+from module.ui.page import page_campaign_menu, page_event
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -532,6 +537,39 @@ def _job(*, progress: CampaignProgress | None = None) -> CampaignJobSpec:
         resource_retry_delay=timedelta(minutes=180),
         progress=progress,
     )
+
+
+def _after_first_battle(session: CampaignSession) -> CampaignSessionState:
+    initial = session.initial_state()
+    decision = session.decide(
+        initial,
+        BattlefieldObservation(initial.battle_index, enemy=1),
+    )
+    assert decision.command is not None
+    return session.reduce(
+        decision.state,
+        BattleSucceeded(decision.command, BattleTarget.ENEMY),
+    )
+
+
+class _FakeUI:
+    calls: ClassVar[list[tuple[object, bool]]] = []
+    devices: ClassVar[list[Device]] = []
+
+    def __init__(self, config: AzurLaneConfig, device: Device) -> None:
+        del config
+        self.device = device
+        type(self).devices.append(device)
+
+    def ui_goto(self, destination: object, *, skip_first_screenshot: bool = True) -> None:
+        type(self).calls.append((destination, skip_first_screenshot))
+
+
+@pytest.fixture(autouse=True)
+def _replace_campaign_boundary_ui(monkeypatch: pytest.MonkeyPatch) -> None:
+    _FakeUI.calls.clear()
+    _FakeUI.devices.clear()
+    monkeypatch.setattr(campaign_adapters, "UI", _FakeUI)
 
 
 class _FakeDeclarativeRuntime(DeclarativeCampaignMapRuntime):
@@ -1483,7 +1521,7 @@ def test_provider_keeps_one_runtime_across_resumable_turns_then_releases_it() ->
     provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
     activated = provider.activate(_job(), AbortToken())
     assert isinstance(activated, CampaignSession)
-    state = activated.initial_state()
+    state = _after_first_battle(activated)
 
     provider.finish(activated, state, CampaignStopReason.IN_PROGRESS)
     progress = CampaignProgress(
@@ -1494,21 +1532,50 @@ def test_provider_keeps_one_runtime_across_resumable_turns_then_releases_it() ->
         settings_revision=1,
         content_revision="content-current",
     )
+    runtime = _FakeDeclarativeRuntime.created[0]
+    assert isinstance(runtime, _FakeDeclarativeRuntime)
+    runtime.battle_count = state.battle_index + 7
     resumed = provider.activate(_job(progress=progress), AbortToken())
 
     assert resumed == activated
     assert len(_FakeDeclarativeRuntime.created) == 1
-    runtime = _FakeDeclarativeRuntime.created[0]
-    assert isinstance(runtime, _FakeDeclarativeRuntime)
     initial_context = RuntimeSessionContext(state.variant, 0, RuntimeSessionEntryKind.FRESH)
     assert runtime.calls.count(("initialize_session", initial_context)) == 1
-    assert runtime.battle_count == state.battle_index
+    assert runtime.battle_count == state.battle_index + 7
 
     provider.finish(activated, state, CampaignStopReason.CANCELLED)
 
     assert ("finish_runtime_session", RuntimeSessionOutcome.INTERRUPTED) in runtime.calls
     with pytest.raises(RuntimeError, match="not the active"):
         provider.active_runtime(activated, AbortToken())
+
+
+def test_retained_runtime_rejects_a_different_durable_checkpoint_token() -> None:
+    _FakeDeclarativeRuntime.created.clear()
+    provider = Mumu12CampaignRuntimeProvider(
+        in_memory_config("campaign-checkpoint-token", {}),
+        object.__new__(Device),
+        runtime_factory=_FakeDeclarativeRuntime,
+    )
+    activated = provider.activate(_job(), AbortToken())
+    assert isinstance(activated, CampaignSession)
+    retained_state = _after_first_battle(activated)
+    provider.finish(activated, retained_state, CampaignStopReason.IN_PROGRESS)
+    mismatched = CampaignProgress(
+        stage_ref=activated.definition.ref,
+        variant=activated.variant,
+        session_state=activated.initial_state(),
+        runs_completed=0,
+        settings_revision=1,
+        content_revision="content-current",
+    )
+
+    with pytest.raises(CampaignRuntimeEvidenceError, match="retained campaign runtime"):
+        provider.activate(_job(progress=mismatched), AbortToken())
+
+    runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[0])
+    assert ("finish_runtime_session", RuntimeSessionOutcome.FAILED) in runtime.calls
+    assert provider._handle is None  # ruff:ignore[private-member-access] - token mismatch 必须毒化并释放 retained owner。
 
 
 def test_checkpoint_probe_failure_releases_the_retained_runtime() -> None:
@@ -1953,20 +2020,55 @@ def test_provider_restarts_an_initial_checkpoint_after_evidence_proves_a_map_bou
     runtime.map_is_clear_mode = False
     activated = provider.activate(job, AbortToken())
 
-    assert evidence.resuming_checkpoint is False
+    assert evidence.phase is CampaignGuardPhase.PRE_ENTRY
+    assert _FakeUI.calls == [(page_campaign_menu, False)]
     assert len(_FakeDeclarativeRuntime.created) == 1
     assert activated == selected
     assert ("enter_map", "normal") in runtime.calls
 
 
-def test_provider_rejects_a_checkpoint_when_the_client_left_its_map() -> None:
+def test_provider_resets_a_cold_noninitial_checkpoint_without_constructing_runtime() -> None:
     _FakeDeclarativeRuntime.created.clear()
-    _FakeDeclarativeRuntime.client_in_map = False
-    config = in_memory_config("campaign-provider", {})
-    device = object.__new__(Device)
-    vars(device)["screenshot"] = lambda: None
     job = _job()
     normal = job.session_for(job.stage_refs[0], CampaignRunVariant.NORMAL)
+    assert normal is not None
+    state = _after_first_battle(normal)
+    progress = CampaignProgress(
+        stage_ref=normal.definition.ref,
+        variant=normal.variant,
+        session_state=state,
+        runs_completed=2,
+        settings_revision=1,
+        content_revision="content-current",
+    )
+
+    def fail_runtime_factory(
+        config: AzurLaneConfig,
+        device: Device,
+        definition: CampaignStageDefinition,
+    ) -> DeclarativeCampaignMapRuntime:
+        del config, device, definition
+        pytest.fail("cold noninitial checkpoint must not construct a map runtime")
+
+    provider = Mumu12CampaignRuntimeProvider(
+        in_memory_config("campaign-cold-checkpoint", {}),
+        object.__new__(Device),
+        runtime_factory=fail_runtime_factory,
+    )
+
+    result = provider.activate(_job(progress=progress), AbortToken())
+
+    assert isinstance(result, CampaignCheckpointReset)
+    assert _FakeUI.calls == [(page_campaign_menu, False)]
+    assert isinstance(_FakeUI.devices[0], CancellationAwareMumu12Device)
+    assert _FakeDeclarativeRuntime.created == []
+    assert provider._handle is None  # ruff:ignore[private-member-access] - cold reset 不得伪造 runtime owner。
+
+
+def test_provider_normalizes_an_initial_direct_activation_and_builds_one_runtime() -> None:
+    _FakeDeclarativeRuntime.created.clear()
+    base = _job()
+    normal = base.session_for(base.stage_refs[0], CampaignRunVariant.NORMAL)
     assert normal is not None
     progress = CampaignProgress(
         stage_ref=normal.definition.ref,
@@ -1976,12 +2078,94 @@ def test_provider_rejects_a_checkpoint_when_the_client_left_its_map() -> None:
         settings_revision=1,
         content_revision="content-current",
     )
-    provider = Mumu12CampaignRuntimeProvider(config, device, runtime_factory=_FakeDeclarativeRuntime)
+    provider = Mumu12CampaignRuntimeProvider(
+        in_memory_config("campaign-initial-direct", {}),
+        object.__new__(Device),
+        runtime_factory=_FakeDeclarativeRuntime,
+    )
 
     result = provider.activate(_job(progress=progress), AbortToken())
 
-    assert isinstance(result, CampaignCheckpointUnavailable)
-    assert "not inside" in result.reason
+    assert isinstance(result, CampaignSession)
+    assert _FakeUI.calls == [(page_campaign_menu, False)]
+    assert len(_FakeDeclarativeRuntime.created) == 1
+
+
+def test_provider_resets_a_retained_checkpoint_when_the_client_left_its_map(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _FakeDeclarativeRuntime.created.clear()
+    monkeypatch.setattr(_FakeDeclarativeRuntime, "client_in_map", True)
+    device = object.__new__(Device)
+    vars(device)["screenshot"] = lambda: None
+    provider = Mumu12CampaignRuntimeProvider(
+        in_memory_config("campaign-missing-retained-map", {}),
+        device,
+        runtime_factory=_FakeDeclarativeRuntime,
+    )
+    activated = provider.activate(_job(), AbortToken())
+    assert isinstance(activated, CampaignSession)
+    state = _after_first_battle(activated)
+    provider.finish(activated, state, CampaignStopReason.IN_PROGRESS)
+    progress = CampaignProgress(
+        stage_ref=activated.definition.ref,
+        variant=activated.variant,
+        session_state=state,
+        runs_completed=2,
+        settings_revision=1,
+        content_revision="content-current",
+    )
+    _FakeUI.calls.clear()
+    monkeypatch.setattr(_FakeDeclarativeRuntime, "client_in_map", False)
+
+    result = provider.activate(_job(progress=progress), AbortToken())
+
+    assert isinstance(result, CampaignCheckpointReset)
+    runtime = cast("_FakeDeclarativeRuntime", _FakeDeclarativeRuntime.created[0])
+    assert ("finish_runtime_session", RuntimeSessionOutcome.INTERRUPTED) in runtime.calls
+    assert _FakeUI.calls == [(page_campaign_menu, False)]
+    assert len(_FakeDeclarativeRuntime.created) == 1
+    assert provider._handle is None  # ruff:ignore[private-member-access] - physical mismatch 经统一 reset 释放 owner。
+
+
+@pytest.mark.parametrize(
+    "error",
+    [AbortRequested("cold reset cancelled"), RuntimeError("cold reset failed")],
+)
+def test_cold_checkpoint_reset_error_has_no_runtime_effect(
+    monkeypatch: pytest.MonkeyPatch,
+    error: BaseException,
+) -> None:
+    class _FailingUI(_FakeUI):
+        @override
+        def ui_goto(self, destination: object, *, skip_first_screenshot: bool = True) -> None:
+            del destination, skip_first_screenshot
+            raise error
+
+    monkeypatch.setattr(campaign_adapters, "UI", _FailingUI)
+    base = _job()
+    session = base.sessions[0]
+    progress = CampaignProgress(
+        stage_ref=session.definition.ref,
+        variant=session.variant,
+        session_state=_after_first_battle(session),
+        runs_completed=2,
+        settings_revision=1,
+        content_revision="content-current",
+    )
+    provider = Mumu12CampaignRuntimeProvider(
+        in_memory_config("campaign-cold-reset-error", {}),
+        object.__new__(Device),
+        runtime_factory=_FakeDeclarativeRuntime,
+    )
+    _FakeDeclarativeRuntime.created.clear()
+
+    with pytest.raises(type(error)) as raised:
+        provider.activate(_job(progress=progress), AbortToken())
+
+    assert raised.value is error
+    assert _FakeDeclarativeRuntime.created == []
+    assert provider._handle is None  # ruff:ignore[private-member-access] - UI 失败不产生可持久化 runtime 状态。
 
 
 @pytest.mark.parametrize(

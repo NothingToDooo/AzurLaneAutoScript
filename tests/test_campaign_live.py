@@ -102,7 +102,7 @@ from module.gameplay.campaign import (
     TaskBalancerPolicy,
 )
 from module.gameplay.campaign_live import (
-    CampaignCheckpointUnavailable,
+    CampaignCheckpointReset,
     CampaignGemsReplacementFailed,
     CampaignGuardDecision,
     CampaignGuardEvidence,
@@ -308,15 +308,15 @@ class _Driver:
         return self.outcome(attempt)
 
 
-class _UnavailableActivator:
+class _ResetActivator:
     @staticmethod
     def activate(
         job: CampaignJobSpec,
         cancellation: CancellationSource,
-    ) -> CampaignCheckpointUnavailable:
+    ) -> CampaignCheckpointReset:
         del job
         cancellation.raise_if_requested()
-        return CampaignCheckpointUnavailable("client is no longer inside the checkpoint map")
+        return CampaignCheckpointReset("client checkpoint was reset to the map boundary")
 
 
 class _AchievementActivator:
@@ -925,31 +925,39 @@ def test_live_workflow_resumes_the_exact_progress_session() -> None:
     assert report.stage_ref == second.definition.ref
 
 
-def test_live_workflow_reports_a_physically_unavailable_checkpoint_without_io() -> None:
-    session = _session()
+def test_live_workflow_reports_a_checkpoint_reset_without_map_io() -> None:
+    session = _session(waves=(SpawnWave(battle=0, enemy=1), SpawnWave(battle=1, boss=1)))
+    decision = session.decide(session.initial_state(), BattlefieldObservation(0, enemy=1))
+    assert decision.command is not None
+    checkpoint = session.reduce(
+        decision.state,
+        BattleSucceeded(decision.command, BattleTarget.ENEMY),
+    )
     progress = CampaignProgress(
         stage_ref=session.definition.ref,
         variant=session.variant,
-        session_state=session.initial_state(),
+        session_state=checkpoint,
         runs_completed=2,
         settings_revision=1,
         content_revision="content-1",
     )
     observer = _Observer(BattlefieldObservation(battle_index=0, enemy=1))
     driver = _Driver(lambda attempt: BattleSucceeded(attempt, BattleTarget.ENEMY))
+    lifecycle = _RuntimeLifecycle()
     workflow = LiveCampaignWorkflow(
         observer,
         driver,
         _Clock(),
-        services=CampaignLiveServices(activator=_UnavailableActivator()),
+        services=CampaignLiveServices(activator=_ResetActivator(), lifecycle=lifecycle),
     )
 
     report = workflow.execute(_job(session, progress=progress), AbortToken())
 
-    assert report.stop_reason is CampaignStopReason.CHECKPOINT_UNAVAILABLE
-    assert report.session_state == progress.session_state
+    assert report.stop_reason is CampaignStopReason.CHECKPOINT_RESET
+    assert report.session_state == session.initial_state()
     assert observer.calls == []
     assert driver.calls == []
+    assert lifecycle.calls == [(session, session.initial_state(), CampaignStopReason.CHECKPOINT_RESET)]
 
 
 class _GuardSource:
