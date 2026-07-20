@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 5
 map:
   name: 15-3
   shape: J8
@@ -121,8 +121,6 @@ mechanics:
     source: B3
     target: B4
   procedures: []
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []

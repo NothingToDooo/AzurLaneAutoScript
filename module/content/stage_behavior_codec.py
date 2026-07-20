@@ -29,9 +29,7 @@ from module.content.battle_program import (
     AllProgramConditions,
     AnyProgramCondition,
     AttemptBattleAction,
-    AttemptFixedTarget,
     AttemptMechanicAction,
-    AttemptPresetRoute,
     BattleProgram,
     BattleProgramDelegation,
     BattleProgramMode,
@@ -44,8 +42,6 @@ from module.content.battle_program import (
     ComparisonOperator,
     DelegateBattle,
     EndCampaign,
-    ExecuteFixedTarget,
-    ExecutePresetRoute,
     FleetAtCondition,
     MapPresence,
     MapPresenceCondition,
@@ -78,14 +74,10 @@ from module.content.errors import ContentValidationError
 from module.content.mechanic_rules import (
     EncounterExpectation,
     EnemyMovementRules,
-    FixedTargetSequence,
     FleetRole,
     MechanicOperation,
     MechanicProcedure,
     MoveEnemy,
-    PresetRouteBattle,
-    PresetRouteStep,
-    PresetRouteVariant,
     StageMechanicRules,
 )
 
@@ -370,65 +362,6 @@ def decode_mechanic_procedures(value: object, location: str) -> tuple[MechanicPr
     return tuple(procedures)
 
 
-def decode_preset_route_variants(value: object, location: str) -> tuple[PresetRouteVariant, ...]:
-    variants = []
-    for index, raw_variant in enumerate(_sequence(value, location)):
-        item_location = f"{location}[{index}]"
-        item = _mapping(raw_variant, item_location, {"start_column", "battles"})
-        battles = []
-        for battle_index, raw_battle in enumerate(_sequence(item["battles"], f"{item_location}.battles")):
-            battle_location = f"{item_location}.battles[{battle_index}]"
-            battle_item = _mapping(raw_battle, battle_location, {"battle", "steps"})
-            steps = []
-            for step_index, raw_step in enumerate(_sequence(battle_item["steps"], f"{battle_location}.steps")):
-                step_location = f"{battle_location}.steps[{step_index}]"
-                step = _mapping(raw_step, step_location, {"fleet", "delta_x", "delta_y", "clear_enemy"})
-                clear_enemy = step["clear_enemy"]
-                if type(clear_enemy) is not bool:
-                    message = f"{step_location}.clear_enemy must be a boolean"
-                    raise ContentValidationError(message)
-                steps.append(
-                    PresetRouteStep(
-                        _enum(FleetRole, step["fleet"], f"{step_location}.fleet"),
-                        _signed_integer(step["delta_x"], f"{step_location}.delta_x"),
-                        _signed_integer(step["delta_y"], f"{step_location}.delta_y"),
-                        clear_enemy,
-                    )
-                )
-            battles.append(
-                PresetRouteBattle(
-                    _integer(battle_item["battle"], f"{battle_location}.battle"),
-                    tuple(steps),
-                )
-            )
-        variants.append(
-            PresetRouteVariant(
-                _integer(item["start_column"], f"{item_location}.start_column"),
-                tuple(battles),
-            )
-        )
-    return tuple(variants)
-
-
-def decode_fixed_target_sequences(value: object, location: str) -> tuple[FixedTargetSequence, ...]:
-    sequences = []
-    for index, raw_sequence in enumerate(_sequence(value, location)):
-        item_location = f"{location}[{index}]"
-        item = _mapping(raw_sequence, item_location, {"battles", "targets", "fleet"})
-        battles = tuple(
-            _integer(raw_battle, f"{item_location}.battles[{battle_index}]")
-            for battle_index, raw_battle in enumerate(_sequence(item["battles"], f"{item_location}.battles"))
-        )
-        sequences.append(
-            FixedTargetSequence(
-                battles,
-                _cells(item["targets"], f"{item_location}.targets"),
-                _enum(FleetRole, item["fleet"], f"{item_location}.fleet"),
-            )
-        )
-    return tuple(sequences)
-
-
 _PROGRAM_CONDITION_FIELDS = {
     "flag": {"tag", "flag", "value"},
     "marker": {"tag", "marker", "value"},
@@ -599,32 +532,6 @@ def _program_statement(  # ruff:ignore[complex-structure, too-many-return-statem
                 )
             ),
             _nullable_expectation(item["expected_target"], f"{location}.expected_target"),
-        )
-    if tag == "attempt_preset_route":
-        item = _mapping(value, location, {"tag", "battle", "expected_target"})
-        battle = _integer(item["battle"], f"{location}.battle")
-        return AttemptPresetRoute(
-            ExecutePresetRoute(
-                battle,
-                rules.preset_routes,
-                rules.fixed_target_sequences,
-            ),
-            _enum(
-                EncounterExpectation,
-                item["expected_target"],
-                f"{location}.expected_target",
-            ),
-        )
-    if tag == "attempt_fixed_target":
-        item = _mapping(value, location, {"tag", "battle", "expected_target"})
-        battle = _integer(item["battle"], f"{location}.battle")
-        return AttemptFixedTarget(
-            ExecuteFixedTarget(battle, rules.fixed_target_sequences),
-            _enum(
-                EncounterExpectation,
-                item["expected_target"],
-                f"{location}.expected_target",
-            ),
         )
     if tag == "branch":
         item = _mapping(value, location, {"tag", "condition", "when_true", "when_false"})

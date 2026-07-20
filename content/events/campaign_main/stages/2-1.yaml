@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 5
 map:
   name: 2-1
   shape: F4
@@ -77,8 +77,6 @@ mechanics:
   - battle: 2
     operations:
     - check_accessibility
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []

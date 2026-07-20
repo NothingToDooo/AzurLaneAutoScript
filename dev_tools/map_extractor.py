@@ -722,8 +722,6 @@ class MapData:
             },
             "enemy_movement": [],
             "procedures": [],
-            "preset_routes": [],
-            "fixed_target_sequences": [],
             "map_structures": {
                 "walls": [],
                 "maze_groups": [],
@@ -735,7 +733,7 @@ class MapData:
 
     def stage_document(self) -> dict[str, StageValue]:
         return {
-            "schema_version": 4,
+            "schema_version": 5,
             "map": self._stage_map_document(),
             "config": self._stage_config_document(),
             "enemy_filter": ENEMY_FILTER,

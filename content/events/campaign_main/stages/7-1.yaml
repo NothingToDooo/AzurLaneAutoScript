@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 5
 map:
   name: 7-1
   shape: H3
@@ -83,8 +83,6 @@ mechanics:
   - battle: 5
     operations:
     - find_roadblocks
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []

@@ -23,6 +23,7 @@ from module.content.mechanic_rules import (
     EncounterExpectation,
     EnsureFleet,
     EnsureFleetAt,
+    FleetClearSelectedTarget,
     FleetClearTarget,
     FleetCoordinationAction,
     FleetCoordinationRules,
@@ -52,7 +53,6 @@ from module.content.mechanic_rules import (
     RoadPath,
     StageMechanicRules,
     StepFleetOn,
-    SwitchFleet,
     WallEdge,
 )
 from module.content.models import StageRef, StageSpec
@@ -61,9 +61,7 @@ from module.content.runtime_profile_catalog import load_default_campaign_runtime
 from module.content.stage_behavior_codec import (
     decode_battle_program,
     decode_enemy_movement_rules,
-    decode_fixed_target_sequences,
     decode_mechanic_procedures,
-    decode_preset_route_variants,
     decode_stage_policy,
 )
 from module.content.stage_definition import (
@@ -102,7 +100,7 @@ from module.content.yaml_loader import load_strict_yaml_mapping
 if TYPE_CHECKING:
     from module.content.battle_policy import StagePolicy
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 _TOP_LEVEL_FIELDS = {
     "schema_version",
@@ -149,8 +147,6 @@ _MECHANIC_FIELDS = {
     "map_structures",
     "enemy_movement",
     "procedures",
-    "preset_routes",
-    "fixed_target_sequences",
 }
 _ROADBLOCK_FIELDS = {"tag", "battle", "roads", "selection"}
 _FLEET_ACTION_FIELDS = {
@@ -160,10 +156,10 @@ _FLEET_ACTION_FIELDS = {
     "rescue": {"tag", "battle", "fleet", "target"},
     "step_on": {"tag", "battle", "fleet", "candidates", "roadblocks"},
     "move": {"tag", "battle", "fleet", "destination", "expected"},
-    "switch": {"tag", "battle", "fleet"},
     "ensure": {"tag", "battle", "fleet"},
     "ensure_at": {"tag", "battle", "fleet", "target"},
     "clear_target": {"tag", "battle", "fleet", "target", "expected"},
+    "clear_selected_target": {"tag", "battle", "fleet", "candidates", "expected"},
 }
 _PICKUP_FIELDS = {
     "ammo": {"tag", "battle", "fleet"},
@@ -824,8 +820,6 @@ def _fleet_action(
                 f"{location}.expected",
             ),
         )
-    elif tag == "switch":
-        action = SwitchFleet(battle=battle, fleet=fleet)
     elif tag == "ensure":
         action = EnsureFleet(battle=battle, fleet=fleet)
     elif tag == "ensure_at":
@@ -834,11 +828,23 @@ def _fleet_action(
             fleet=fleet,
             target=_grid_node(item["target"], path, f"{location}.target", shape),
         )
-    else:
+    elif tag == "clear_target":
         action = FleetClearTarget(
             battle=battle,
             fleet=fleet,
             target=_grid_node(item["target"], path, f"{location}.target", shape),
+            expected=_enum_value(
+                EncounterExpectation,
+                item["expected"],
+                path,
+                f"{location}.expected",
+            ),
+        )
+    else:
+        action = FleetClearSelectedTarget(
+            battle=battle,
+            fleet=fleet,
+            candidates=_grid_nodes(item["candidates"], path, f"{location}.candidates", shape),
             expected=_enum_value(
                 EncounterExpectation,
                 item["expected"],
@@ -1051,14 +1057,6 @@ def _mechanic_rules(value: object, path: Path, map_definition: MapDefinition) ->
             item["procedures"],
             "mechanics.procedures",
         )
-        preset_routes = decode_preset_route_variants(
-            item["preset_routes"],
-            "mechanics.preset_routes",
-        )
-        fixed_target_sequences = decode_fixed_target_sequences(
-            item["fixed_target_sequences"],
-            "mechanics.fixed_target_sequences",
-        )
     except ContentValidationError as error:
         raise _fail(path, "mechanics", str(error)) from error
     return StageMechanicRules(
@@ -1071,8 +1069,6 @@ def _mechanic_rules(value: object, path: Path, map_definition: MapDefinition) ->
         map_structures=_map_structure_rules(item["map_structures"], path, shape),
         enemy_movement=enemy_movement,
         procedures=procedures,
-        preset_routes=preset_routes,
-        fixed_target_sequences=fixed_target_sequences,
     )
 
 

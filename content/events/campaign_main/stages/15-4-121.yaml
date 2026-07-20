@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 5
 map:
   name: 15-4-121
   shape: K9
@@ -155,7 +155,7 @@ mechanics:
     target: D3
   - battle: 6
     fleet: fleet_1
-    tag: switch
+    tag: ensure
   pickups:
   - battle: 3
     fleet: active
@@ -173,8 +173,6 @@ mechanics:
     source: J8
     target: K8
   procedures: []
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []

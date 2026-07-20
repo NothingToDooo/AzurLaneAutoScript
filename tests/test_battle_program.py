@@ -6,9 +6,7 @@ from module.content.battle_policy import ClearSelectedEnemy, DefaultBattle
 from module.content.battle_program import (
     AllProgramConditions,
     AnyProgramCondition,
-    AttemptFixedTarget,
     AttemptMechanicAction,
-    AttemptPresetRoute,
     BattleProgram,
     BattleProgramMode,
     BossAtCondition,
@@ -144,18 +142,6 @@ def test_compiled_programs_preserve_the_known_dynamic_campaign_decisions() -> No
         for program in stage_16_4
         for statement in _walk_statements(program.statements)
     )
-
-
-def test_20230525_programs_keep_typed_preset_and_fixed_target_routes() -> None:
-    statements = tuple(
-        statement
-        for program in _stage_programs("event_20230525_cn/")
-        for statement in _walk_statements(program.statements)
-    )
-
-    assert any(isinstance(statement, AttemptPresetRoute) for statement in statements)
-    assert any(isinstance(statement, AttemptFixedTarget) for statement in statements)
-    assert not _stage_named_markers("event_20230525_cn/sp#")
 
 
 def test_compiled_program_markers_describe_persisted_business_facts() -> None:

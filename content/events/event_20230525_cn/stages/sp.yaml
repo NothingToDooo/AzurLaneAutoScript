@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 5
 map:
   name: SP
   shape: J8
@@ -83,7 +83,180 @@ battles:
       tag: clear_boss
 mechanics:
   roadblocks: []
-  fleet_coordination: []
+  fleet_coordination:
+  - battle: 0
+    candidates:
+    - H7
+    - G6
+    - D6
+    - C7
+    expected: siren
+    fleet: fleet_1
+    tag: clear_selected_target
+  - battle: 1
+    candidates:
+    - H7
+    - G6
+    - D6
+    - C7
+    expected: siren
+    fleet: fleet_1
+    tag: clear_selected_target
+  - battle: 2
+    candidates:
+    - H7
+    - G6
+    - D6
+    - C7
+    expected: siren
+    fleet: fleet_1
+    tag: clear_selected_target
+  - battle: 3
+    candidates:
+    - H7
+    - G6
+    - D6
+    - C7
+    expected: siren
+    fleet: fleet_1
+    tag: clear_selected_target
+  - battle: 4
+    candidates:
+    - H7
+    - G6
+    - D6
+    - C7
+    expected: siren
+    fleet: fleet_1
+    tag: clear_selected_target
+  - battle: 5
+    candidates:
+    - H7
+    - G6
+    - D6
+    - C7
+    expected: siren
+    fleet: fleet_1
+    tag: clear_selected_target
+  - battle: 6
+    candidates:
+    - H7
+    - G6
+    - D6
+    - C7
+    expected: siren
+    fleet: fleet_1
+    tag: clear_selected_target
+  - battle: 0
+    destination: G8
+    expected: any
+    fleet: fleet_1
+    tag: move
+  - battle: 0
+    destination: E8
+    expected: any
+    fleet: fleet_1
+    tag: move
+  - battle: 0
+    expected: any
+    fleet: fleet_1
+    tag: clear_target
+    target: G8
+  - battle: 0
+    destination: D8
+    expected: any
+    fleet: fleet_1
+    tag: move
+  - battle: 0
+    destination: F8
+    expected: any
+    fleet: fleet_1
+    tag: move
+  - battle: 0
+    expected: any
+    fleet: fleet_1
+    tag: clear_target
+    target: D8
+  - battle: 1
+    destination: F6
+    expected: any
+    fleet: fleet_2
+    tag: move
+  - battle: 1
+    expected: any
+    fleet: fleet_1
+    tag: clear_target
+    target: G8
+  - battle: 1
+    destination: E6
+    expected: any
+    fleet: fleet_2
+    tag: move
+  - battle: 1
+    expected: any
+    fleet: fleet_1
+    tag: clear_target
+    target: D8
+  - battle: 2
+    expected: any
+    fleet: fleet_1
+    tag: clear_target
+    target: F8
+  - battle: 2
+    destination: E7
+    expected: any
+    fleet: fleet_1
+    tag: move
+  - battle: 2
+    expected: any
+    fleet: fleet_1
+    tag: clear_target
+    target: F6
+  - battle: 3
+    expected: any
+    fleet: fleet_1
+    tag: clear_target
+    target: F7
+  - battle: 3
+    expected: any
+    fleet: fleet_1
+    tag: clear_target
+    target: G7
+  - battle: 4
+    destination: F5
+    expected: any
+    fleet: fleet_1
+    tag: move
+  - battle: 4
+    expected: any
+    fleet: fleet_1
+    tag: clear_target
+    target: G5
+  - battle: 5
+    destination: E5
+    expected: any
+    fleet: fleet_1
+    tag: move
+  - battle: 5
+    expected: any
+    fleet: fleet_1
+    tag: clear_target
+    target: D5
+  - battle: 6
+    destination: F5
+    expected: any
+    fleet: fleet_1
+    tag: move
+  - battle: 6
+    expected: any
+    fleet: fleet_1
+    tag: clear_target
+    target: G5
+  - battle: 6
+    expected: any
+    fleet: fleet_1
+    tag: clear_target
+    target: D5
   pickups: []
   map_interactions: []
   map_mutations: []
@@ -95,158 +268,6 @@ mechanics:
     initial_siren_cells: []
   enemy_movement: []
   procedures: []
-  preset_routes:
-  - battles:
-    - battle: 0
-      steps:
-      - clear_enemy: false
-        delta_x: 2
-        delta_y: 0
-        fleet: fleet_1
-      - clear_enemy: false
-        delta_x: -2
-        delta_y: 0
-        fleet: fleet_1
-      - clear_enemy: true
-        delta_x: 2
-        delta_y: 0
-        fleet: fleet_1
-    - battle: 1
-      steps:
-      - clear_enemy: false
-        delta_x: 0
-        delta_y: -2
-        fleet: fleet_2
-      - clear_enemy: true
-        delta_x: 0
-        delta_y: 0
-        fleet: fleet_1
-    - battle: 2
-      steps:
-      - clear_enemy: true
-        delta_x: -1
-        delta_y: 0
-        fleet: fleet_1
-    - battle: 3
-      steps:
-      - clear_enemy: true
-        delta_x: 0
-        delta_y: -1
-        fleet: fleet_1
-    - battle: 4
-      steps:
-      - clear_enemy: false
-        delta_x: 0
-        delta_y: -2
-        fleet: fleet_1
-      - clear_enemy: true
-        delta_x: 1
-        delta_y: 0
-        fleet: fleet_1
-    - battle: 5
-      steps:
-      - clear_enemy: false
-        delta_x: -2
-        delta_y: 0
-        fleet: fleet_1
-      - clear_enemy: true
-        delta_x: -1
-        delta_y: 0
-        fleet: fleet_1
-    - battle: 6
-      steps:
-      - clear_enemy: false
-        delta_x: 2
-        delta_y: 0
-        fleet: fleet_1
-      - clear_enemy: true
-        delta_x: 1
-        delta_y: 0
-        fleet: fleet_1
-    start_column: 4
-  - battles:
-    - battle: 0
-      steps:
-      - clear_enemy: false
-        delta_x: -2
-        delta_y: 0
-        fleet: fleet_1
-      - clear_enemy: false
-        delta_x: 2
-        delta_y: 0
-        fleet: fleet_1
-      - clear_enemy: true
-        delta_x: -2
-        delta_y: 0
-        fleet: fleet_1
-    - battle: 1
-      steps:
-      - clear_enemy: false
-        delta_x: 0
-        delta_y: -2
-        fleet: fleet_2
-      - clear_enemy: true
-        delta_x: 0
-        delta_y: 0
-        fleet: fleet_1
-    - battle: 2
-      steps:
-      - clear_enemy: false
-        delta_x: 1
-        delta_y: -1
-        fleet: fleet_1
-      - clear_enemy: true
-        delta_x: 1
-        delta_y: -1
-        fleet: fleet_1
-    - battle: 3
-      steps:
-      - clear_enemy: true
-        delta_x: 1
-        delta_y: 1
-        fleet: fleet_1
-    - battle: 4
-      steps:
-      - clear_enemy: true
-        delta_x: 0
-        delta_y: -2
-        fleet: fleet_1
-    - battle: 5
-      steps:
-      - clear_enemy: false
-        delta_x: -2
-        delta_y: 0
-        fleet: fleet_1
-      - clear_enemy: true
-        delta_x: -1
-        delta_y: 0
-        fleet: fleet_1
-    - battle: 6
-      steps:
-      - clear_enemy: false
-        delta_x: 2
-        delta_y: 0
-        fleet: fleet_1
-      - clear_enemy: true
-        delta_x: -2
-        delta_y: 0
-        fleet: fleet_1
-    start_column: 5
-  fixed_target_sequences:
-  - battles:
-    - 0
-    - 1
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
-    fleet: fleet_1
-    targets:
-    - H7
-    - G6
-    - D6
-    - C7
   map_structures:
     walls: []
     maze_groups: []
@@ -256,6 +277,7 @@ mechanics:
 programs:
 - activation_modes:
   - normal
+  - clear_all
   battle: 0
   statements:
   - condition:
@@ -263,17 +285,116 @@ programs:
       tag: flag
       value: true
     tag: branch
-    when_false: []
-    when_true:
+    when_false:
     - condition:
-        presence: siren
-        tag: map_presence
+        conditions:
+        - marker: named:route.started-at-e8
+          tag: marker
+          value: true
+        - marker: named:route.started-at-f8
+          tag: marker
+          value: true
+        tag: any
       tag: branch
-      when_false: []
+      when_false:
+      - condition:
+          cell: E8
+          fleet: fleet_1
+          tag: fleet_at
+        marker: named:route.started-at-e8
+        tag: set_marker_from_condition
+      - condition:
+          cell: F8
+          fleet: fleet_1
+          tag: fleet_at
+        marker: named:route.started-at-f8
+        tag: set_marker_from_condition
+      - condition:
+          conditions:
+          - conditions:
+            - marker: named:route.started-at-e8
+              tag: marker
+              value: true
+            - marker: named:route.started-at-f8
+              tag: marker
+              value: false
+            tag: all
+          - conditions:
+            - marker: named:route.started-at-e8
+              tag: marker
+              value: false
+            - marker: named:route.started-at-f8
+              tag: marker
+              value: true
+            tag: all
+          tag: any
+        tag: branch
+        when_false:
+        - tag: return_no_target
+        when_true:
+        - tag: return_continue
       when_true:
-      - battle: 0
-        expected_target: siren
-        tag: attempt_fixed_target
+      - condition:
+          conditions:
+          - marker: named:route.started-at-e8
+            tag: marker
+            value: true
+          - marker: named:route.started-at-f8
+            tag: marker
+            value: false
+          tag: all
+        tag: branch
+        when_false:
+        - condition:
+            conditions:
+            - marker: named:route.started-at-e8
+              tag: marker
+              value: false
+            - marker: named:route.started-at-f8
+              tag: marker
+              value: true
+            tag: all
+          tag: branch
+          when_false:
+          - tag: return_no_target
+          when_true:
+          - action:
+              category: fleet_coordination
+              index: 10
+            expected_target: any
+            tag: perform_mechanic
+          - action:
+              category: fleet_coordination
+              index: 11
+            expected_target: any
+            tag: perform_mechanic
+          - action:
+              category: fleet_coordination
+              index: 12
+            expected_target: any
+            tag: return_mechanic
+        when_true:
+        - action:
+            category: fleet_coordination
+            index: 7
+          expected_target: any
+          tag: perform_mechanic
+        - action:
+            category: fleet_coordination
+            index: 8
+          expected_target: any
+          tag: perform_mechanic
+        - action:
+            category: fleet_coordination
+            index: 9
+          expected_target: any
+          tag: return_mechanic
+    when_true:
+    - action:
+        category: fleet_coordination
+        index: 0
+      expected_target: siren
+      tag: attempt_mechanic
     - action:
         preserve: 0
         tag: clear_filtered_enemy
@@ -281,8 +402,387 @@ programs:
     - action:
         tag: default_battle
       tag: return_battle
-  - battle: 0
-    expected_target: any
-    tag: attempt_preset_route
+- activation_modes:
+  - normal
+  - clear_all
+  battle: 1
+  statements:
+  - condition:
+      flag: clear_mode
+      tag: flag
+      value: true
+    tag: branch
+    when_false:
+    - condition:
+        conditions:
+        - marker: named:route.started-at-e8
+          tag: marker
+          value: true
+        - marker: named:route.started-at-f8
+          tag: marker
+          value: false
+        tag: all
+      tag: branch
+      when_false:
+      - condition:
+          conditions:
+          - marker: named:route.started-at-e8
+            tag: marker
+            value: false
+          - marker: named:route.started-at-f8
+            tag: marker
+            value: true
+          tag: all
+        tag: branch
+        when_false:
+        - tag: return_no_target
+        when_true:
+        - action:
+            category: fleet_coordination
+            index: 15
+          expected_target: any
+          tag: perform_mechanic
+        - action:
+            category: fleet_coordination
+            index: 16
+          expected_target: any
+          tag: return_mechanic
+      when_true:
+      - action:
+          category: fleet_coordination
+          index: 13
+        expected_target: any
+        tag: perform_mechanic
+      - action:
+          category: fleet_coordination
+          index: 14
+        expected_target: any
+        tag: return_mechanic
+    when_true:
+    - action:
+        category: fleet_coordination
+        index: 1
+      expected_target: siren
+      tag: attempt_mechanic
+    - action:
+        preserve: 0
+        tag: clear_filtered_enemy
+      tag: attempt_battle
+    - action:
+        tag: default_battle
+      tag: return_battle
+- activation_modes:
+  - normal
+  - clear_all
+  battle: 2
+  statements:
+  - condition:
+      flag: clear_mode
+      tag: flag
+      value: true
+    tag: branch
+    when_false:
+    - condition:
+        conditions:
+        - marker: named:route.started-at-e8
+          tag: marker
+          value: true
+        - marker: named:route.started-at-f8
+          tag: marker
+          value: false
+        tag: all
+      tag: branch
+      when_false:
+      - condition:
+          conditions:
+          - marker: named:route.started-at-e8
+            tag: marker
+            value: false
+          - marker: named:route.started-at-f8
+            tag: marker
+            value: true
+          tag: all
+        tag: branch
+        when_false:
+        - tag: return_no_target
+        when_true:
+        - action:
+            category: fleet_coordination
+            index: 18
+          expected_target: any
+          tag: perform_mechanic
+        - action:
+            category: fleet_coordination
+            index: 19
+          expected_target: any
+          tag: return_mechanic
+      when_true:
+      - action:
+          category: fleet_coordination
+          index: 17
+        expected_target: any
+        tag: return_mechanic
+    when_true:
+    - action:
+        category: fleet_coordination
+        index: 2
+      expected_target: siren
+      tag: attempt_mechanic
+    - action:
+        preserve: 0
+        tag: clear_filtered_enemy
+      tag: attempt_battle
+    - action:
+        tag: default_battle
+      tag: return_battle
+- activation_modes:
+  - normal
+  - clear_all
+  battle: 3
+  statements:
+  - condition:
+      flag: clear_mode
+      tag: flag
+      value: true
+    tag: branch
+    when_false:
+    - condition:
+        conditions:
+        - marker: named:route.started-at-e8
+          tag: marker
+          value: true
+        - marker: named:route.started-at-f8
+          tag: marker
+          value: false
+        tag: all
+      tag: branch
+      when_false:
+      - condition:
+          conditions:
+          - marker: named:route.started-at-e8
+            tag: marker
+            value: false
+          - marker: named:route.started-at-f8
+            tag: marker
+            value: true
+          tag: all
+        tag: branch
+        when_false:
+        - tag: return_no_target
+        when_true:
+        - action:
+            category: fleet_coordination
+            index: 21
+          expected_target: any
+          tag: return_mechanic
+      when_true:
+      - action:
+          category: fleet_coordination
+          index: 20
+        expected_target: any
+        tag: return_mechanic
+    when_true:
+    - action:
+        category: fleet_coordination
+        index: 3
+      expected_target: siren
+      tag: attempt_mechanic
+    - action:
+        preserve: 0
+        tag: clear_filtered_enemy
+      tag: attempt_battle
+    - action:
+        tag: default_battle
+      tag: return_battle
+- activation_modes:
+  - normal
+  - clear_all
+  battle: 4
+  statements:
+  - condition:
+      flag: clear_mode
+      tag: flag
+      value: true
+    tag: branch
+    when_false:
+    - condition:
+        conditions:
+        - marker: named:route.started-at-e8
+          tag: marker
+          value: true
+        - marker: named:route.started-at-f8
+          tag: marker
+          value: false
+        tag: all
+      tag: branch
+      when_false:
+      - condition:
+          conditions:
+          - marker: named:route.started-at-e8
+            tag: marker
+            value: false
+          - marker: named:route.started-at-f8
+            tag: marker
+            value: true
+          tag: all
+        tag: branch
+        when_false:
+        - tag: return_no_target
+        when_true:
+        - action:
+            category: fleet_coordination
+            index: 23
+          expected_target: any
+          tag: return_mechanic
+      when_true:
+      - action:
+          category: fleet_coordination
+          index: 22
+        expected_target: any
+        tag: perform_mechanic
+      - action:
+          category: fleet_coordination
+          index: 23
+        expected_target: any
+        tag: return_mechanic
+    when_true:
+    - action:
+        category: fleet_coordination
+        index: 4
+      expected_target: siren
+      tag: attempt_mechanic
+    - action:
+        preserve: 0
+        tag: clear_filtered_enemy
+      tag: attempt_battle
+    - action:
+        tag: default_battle
+      tag: return_battle
+- activation_modes:
+  - normal
+  - clear_all
+  battle: 5
+  statements:
+  - condition:
+      flag: clear_mode
+      tag: flag
+      value: true
+    tag: branch
+    when_false:
+    - condition:
+        conditions:
+        - conditions:
+          - marker: named:route.started-at-e8
+            tag: marker
+            value: true
+          - marker: named:route.started-at-f8
+            tag: marker
+            value: false
+          tag: all
+        - conditions:
+          - marker: named:route.started-at-e8
+            tag: marker
+            value: false
+          - marker: named:route.started-at-f8
+            tag: marker
+            value: true
+          tag: all
+        tag: any
+      tag: branch
+      when_false:
+      - tag: return_no_target
+      when_true:
+      - action:
+          category: fleet_coordination
+          index: 24
+        expected_target: any
+        tag: perform_mechanic
+      - action:
+          category: fleet_coordination
+          index: 25
+        expected_target: any
+        tag: return_mechanic
+    when_true:
+    - action:
+        category: fleet_coordination
+        index: 5
+      expected_target: siren
+      tag: attempt_mechanic
+    - action:
+        preserve: 0
+        tag: clear_filtered_enemy
+      tag: attempt_battle
+    - action:
+        tag: default_battle
+      tag: return_battle
+- activation_modes:
+  - normal
+  - clear_all
+  battle: 6
+  statements:
+  - condition:
+      flag: clear_mode
+      tag: flag
+      value: true
+    tag: branch
+    when_false:
+    - condition:
+        conditions:
+        - marker: named:route.started-at-e8
+          tag: marker
+          value: true
+        - marker: named:route.started-at-f8
+          tag: marker
+          value: false
+        tag: all
+      tag: branch
+      when_false:
+      - condition:
+          conditions:
+          - marker: named:route.started-at-e8
+            tag: marker
+            value: false
+          - marker: named:route.started-at-f8
+            tag: marker
+            value: true
+          tag: all
+        tag: branch
+        when_false:
+        - tag: return_no_target
+        when_true:
+        - action:
+            category: fleet_coordination
+            index: 26
+          expected_target: any
+          tag: perform_mechanic
+        - action:
+            category: fleet_coordination
+            index: 28
+          expected_target: any
+          tag: return_mechanic
+      when_true:
+      - action:
+          category: fleet_coordination
+          index: 26
+        expected_target: any
+        tag: perform_mechanic
+      - action:
+          category: fleet_coordination
+          index: 27
+        expected_target: any
+        tag: return_mechanic
+    when_true:
+    - action:
+        category: fleet_coordination
+        index: 6
+      expected_target: siren
+      tag: attempt_mechanic
+    - action:
+        preserve: 0
+        tag: clear_filtered_enemy
+      tag: attempt_battle
+    - action:
+        tag: default_battle
+      tag: return_battle
 boss_approaches: []
 hard_mode: null

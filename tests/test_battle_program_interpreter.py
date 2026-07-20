@@ -10,15 +10,11 @@ from module.content.mechanic_rules import (
     CandidateSortKey,
     ClearAllMystery,
     EncounterExpectation,
-    FixedTargetSequence,
     FleetRole,
     MapItemKind,
     MoveFleet,
     MoveFleetToBestCandidate,
     PickupMapItem,
-    PresetRouteBattle,
-    PresetRouteStep,
-    PresetRouteVariant,
 )
 from module.gameplay.battle_program import (
     BattleActionOutcome,
@@ -158,20 +154,6 @@ class StubBattleProgramPort:
     ) -> MechanicActionOutcome:
         return self._mechanic("execute_mechanic", action, cancellation)
 
-    def execute_preset_route(
-        self,
-        action: program_model.ExecutePresetRoute,
-        cancellation: CancellationSource,
-    ) -> MechanicActionOutcome:
-        return self._mechanic("execute_preset_route", action, cancellation)
-
-    def execute_fixed_target(
-        self,
-        action: program_model.ExecuteFixedTarget,
-        cancellation: CancellationSource,
-    ) -> MechanicActionOutcome:
-        return self._mechanic("execute_fixed_target", action, cancellation)
-
     def mark_all_siren_candidates(self, cancellation: CancellationSource) -> None:
         self._record("mark_all_siren_candidates", cancellation)
 
@@ -209,17 +191,6 @@ def _execute(  # ruff:ignore[too-many-arguments] - 测试 helper 显式暴露解
 
 def _mechanic_action() -> ClearAllMystery:
     return ClearAllMystery(0)
-
-
-def _preset_route() -> program_model.ExecutePresetRoute:
-    step = PresetRouteStep(FleetRole.FLEET_1, 1, 0, clear_enemy=True)
-    route = PresetRouteVariant(0, (PresetRouteBattle(0, (step,)),))
-    return program_model.ExecutePresetRoute(0, (route,), ())
-
-
-def _fixed_target() -> program_model.ExecuteFixedTarget:
-    sequence = FixedTargetSequence((0,), (CELL_A,), FleetRole.FLEET_1)
-    return program_model.ExecuteFixedTarget(0, (sequence,))
 
 
 def test_attempt_battle_continues_after_no_target_and_return_battle_is_terminal() -> None:
@@ -474,40 +445,6 @@ def test_mechanic_branch_propagates_port_failure_without_running_either_block() 
 
     assert execution.result == program_model.ProgramFailed("movement failed")
     assert execution.true_flags == frozenset()
-
-
-def test_preset_and_fixed_target_attempts_share_the_strict_target_contract() -> None:
-    port = StubBattleProgramPort(
-        mechanic_outcomes=[
-            MechanicNotApplied(),
-            MechanicSettled(program_model.ProgramBattleTarget.SIREN),
-        ]
-    )
-
-    execution = _execute(
-        (
-            program_model.AttemptPresetRoute(_preset_route()),
-            program_model.AttemptFixedTarget(_fixed_target(), EncounterExpectation.SIREN),
-        ),
-        port=port,
-    )
-
-    assert execution.result == program_model.ProgramBattleSettled(program_model.ProgramBattleTarget.SIREN)
-    assert port.calls == ["execute_preset_route", "execute_fixed_target"]
-
-
-def test_applied_preset_route_returns_continue_and_fixed_target_mismatch_fails() -> None:
-    applied = _execute(
-        (program_model.AttemptPresetRoute(_preset_route()),),
-        port=StubBattleProgramPort(mechanic_outcomes=[MechanicApplied()]),
-    )
-    mismatch = _execute(
-        (program_model.AttemptFixedTarget(_fixed_target(), EncounterExpectation.BOSS),),
-        port=StubBattleProgramPort(mechanic_outcomes=[MechanicSettled(program_model.ProgramBattleTarget.SIREN)]),
-    )
-
-    assert isinstance(applied.result, program_model.ProgramContinue)
-    assert isinstance(mismatch.result, program_model.ProgramFailed)
 
 
 @pytest.mark.parametrize(

@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 5
 map:
   name: A2
   shape: K6
@@ -83,8 +83,6 @@ mechanics:
     initial_siren_cells: []
   enemy_movement: []
   procedures: []
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []

@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 5
 map:
   name: D3
   shape: N10
@@ -158,8 +158,6 @@ mechanics:
   - battle: 6
     operations:
     - find_roadblocks
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls:
     - - E1

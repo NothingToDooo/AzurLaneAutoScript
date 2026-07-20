@@ -120,18 +120,6 @@ class BattleProgramPort(Protocol):
         cancellation: CancellationSource,
     ) -> MechanicActionOutcome: ...
 
-    def execute_preset_route(
-        self,
-        action: program_model.ExecutePresetRoute,
-        cancellation: CancellationSource,
-    ) -> MechanicActionOutcome: ...
-
-    def execute_fixed_target(
-        self,
-        action: program_model.ExecuteFixedTarget,
-        cancellation: CancellationSource,
-    ) -> MechanicActionOutcome: ...
-
     def mark_all_siren_candidates(self, cancellation: CancellationSource) -> None: ...
 
     def set_map_weights(
@@ -359,8 +347,6 @@ class BattleProgramInterpreter:
                 state,
                 branch_depth=branch_depth,
             )
-        if isinstance(statement, program_model.AttemptPresetRoute | program_model.AttemptFixedTarget):
-            return self._execute_route_statement(statement, port, cancellation)
         if isinstance(
             statement,
             program_model.SetProgramFlag
@@ -493,20 +479,6 @@ class BattleProgramInterpreter:
             state,
             branch_depth=branch_depth + 1,
         )
-
-    def _execute_route_statement(
-        self,
-        statement: program_model.AttemptPresetRoute | program_model.AttemptFixedTarget,
-        port: BattleProgramPort,
-        cancellation: CancellationSource,
-    ) -> program_model.CompleteBattleProgramResult | None:
-        if isinstance(statement, program_model.AttemptPresetRoute):
-            outcome = self._execute_preset_route(port, statement.action, cancellation)
-            operation = "preset route"
-        else:
-            outcome = self._execute_fixed_target(port, statement.action, cancellation)
-            operation = "fixed target"
-        return self._attempt_outcome(outcome, statement.expected_target, operation)
 
     def _execute_state_statement(
         self,
@@ -890,26 +862,6 @@ class BattleProgramInterpreter:
     @staticmethod
     def _map_item_marker(action: PickupMapItem) -> program_model.ProgramMarker:
         return program_model.PickedMapItem(action.kind, action.cell)
-
-    @staticmethod
-    def _execute_preset_route(
-        port: BattleProgramPort,
-        action: program_model.ExecutePresetRoute,
-        cancellation: CancellationSource,
-    ) -> MechanicActionOutcome:
-        cancellation.raise_if_requested()
-        outcome = port.execute_preset_route(action, cancellation)
-        return BattleProgramInterpreter._validated_mechanic_outcome(outcome, "execute_preset_route")
-
-    @staticmethod
-    def _execute_fixed_target(
-        port: BattleProgramPort,
-        action: program_model.ExecuteFixedTarget,
-        cancellation: CancellationSource,
-    ) -> MechanicActionOutcome:
-        cancellation.raise_if_requested()
-        outcome = port.execute_fixed_target(action, cancellation)
-        return BattleProgramInterpreter._validated_mechanic_outcome(outcome, "execute_fixed_target")
 
     @staticmethod
     def _validated_mechanic_outcome(

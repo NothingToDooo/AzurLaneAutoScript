@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Literal, Self
 
 import numpy as np
 
+from module.base.failure import cleanup_scope
 from module.base.timer import Timer
 from module.base.utils import location2node
 from module.exception import MapDetectionError, MapEnemyMoved, MapWalkError
@@ -1085,49 +1086,59 @@ class Fleet(Camera, AmbushHandler):  # ruff:ignore[too-many-public-methods] - �
         if fleet == self.fleet_current_index:
             return grid.is_accessible
         backup = self.fleet_current_index
-        self.fleet_current_index = fleet
-        self.find_path_initial()
-        result = grid.is_accessible
-
-        self.fleet_current_index = backup
-        self.find_path_initial()
-        return result
+        with cleanup_scope(
+            lambda: self._restore_fleet_projection(backup),
+            message="accessibility probe and fleet projection restore both failed",
+        ):
+            self.fleet_current_index = fleet
+            self.find_path_initial()
+            return grid.is_accessible
 
     def brute_find_roadblocks(self, grid: GridInfo, fleet: int | None = None) -> SelectedGrids[GridInfo]:
         """用舰队 1/2（默认当前舰队）查找阻路格，返回 SelectedGrids。"""
-        if fleet is not None and fleet != self.fleet_current_index:
-            backup = self.fleet_current_index
+        if fleet is None or fleet == self.fleet_current_index:
+            return self._brute_find_current_fleet_roadblocks(grid)
+        backup = self.fleet_current_index
+        with cleanup_scope(
+            lambda: self._restore_fleet_projection(backup),
+            message="roadblock probe and fleet projection restore both failed",
+        ):
             self.fleet_current_index = fleet
             self.find_path_initial()
-        else:
-            backup = None
+            return self._brute_find_current_fleet_roadblocks(grid)
 
+    def _brute_find_current_fleet_roadblocks(self, grid: GridInfo) -> SelectedGrids[GridInfo]:
         if grid.is_accessible:
-            if backup is not None:
-                self.fleet_current_index = backup
-                self.find_path_initial()
             return SelectedGrids([])
 
         enemies = self.map.select(is_enemy=True)
         logger.info(f"Potential enemy roadblocks: {enemies}")
         for repeat in range(1, enemies.count + 1):
-            for select in itertools.product(enemies, repeat=repeat):
-                for block in select:
-                    block.is_enemy = False
-                self.find_path_initial()
-                for block in select:
-                    block.is_enemy = True
-
-                if grid.is_accessible:
+            for select in itertools.combinations(enemies, repeat):
+                with cleanup_scope(
+                    lambda roadblocks=select: self._restore_roadblock_projection(roadblocks),
+                    message="roadblock probe and map projection restore both failed",
+                ):
+                    for block in select:
+                        block.is_enemy = False
+                    self.find_path_initial()
+                    accessible = grid.is_accessible
+                if accessible:
                     roadblock = SelectedGrids(list(select))
                     logger.info(f"Enemy roadblock: {roadblock}")
-                    if backup is not None:
-                        self.fleet_current_index = backup
-                        self.find_path_initial()
                     return roadblock
 
         logger.warning("Enemy roadblock try exhausted.")
         return SelectedGrids([])
+
+    def _restore_fleet_projection(self, fleet: int) -> None:
+        self.fleet_current_index = fleet
+        self.find_path_initial()
+
+    def _restore_roadblock_projection(self, roadblocks: tuple[GridInfo, ...]) -> None:
+        for block in roadblocks:
+            block.is_enemy = True
+        self.find_path_initial()
 
     def catch_camera_repositioning(self) -> bool:
         """检测 Boss 出现后是否触发了地图镜头重定位。"""

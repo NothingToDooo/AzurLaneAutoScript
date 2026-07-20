@@ -3,8 +3,12 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from module.adapters.campaign_live import CampaignMapRuntime, CommittedCampaignUnit
-from module.adapters.campaign_program_mumu12 import Mumu12CampaignBattleProgramExecutor
+from module.adapters.campaign_program_mumu12 import (
+    Mumu12CampaignBattleProgramExecutor,
+    Mumu12CommittedBattleProgramUnit,
+    build_mumu12_battle_program_port,
+    read_mumu12_battle_program_mode,
+)
 from module.application import AbortToken, SafeUnitCancellation
 from module.content.battle_program import (
     BattleProgram,
@@ -27,6 +31,7 @@ from module.content.stage_definition import (
 from module.content.stage_rules import MapFeatures, RepeatableCompletion, StageRules, StarRequirements
 
 if TYPE_CHECKING:
+    from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
     from module.application import CancellationSource
 
 
@@ -36,11 +41,19 @@ class _Config:
     POOR_MAP_DATA = False
     MAP_HAS_MOVABLE_ENEMY = True
     MAP_HAS_MOVABLE_NORMAL_ENEMY = False
+    fleet_boss = 1
 
 
 class _Runtime:
     map_is_clear_mode = True
     config = _Config()
+    battle_count = 0
+    fleet_step = 0
+    mystery_count = 0
+    fleet_boss_index = 1
+    fleet_current_index = 1
+    fleet_1_location = (0, 0)
+    fleet_2_location = ()
 
     def __init__(self) -> None:
         self.map_state_reads = 0
@@ -70,28 +83,32 @@ class _Units:
         self.calls = 0
         self.active_calls = 0
 
-    def active_runtime(
+    def battle_program_mode(
         self,
         session: CampaignSession,
         cancellation: CancellationSource,
-    ) -> CampaignMapRuntime:
+    ) -> BattleProgramMode:
         del session
-        cancellation.raise_if_requested()
         self.active_calls += 1
-        return cast("CampaignMapRuntime", self.runtime)
+        runtime = cast("DeclarativeCampaignMapRuntime", self.runtime)
+        return read_mumu12_battle_program_mode(runtime, self.runtime, cancellation)
 
-    def commit_active_unit(
+    def commit_battle_program_unit(
         self,
         session: CampaignSession,
         cancellation: CancellationSource,
-    ) -> CommittedCampaignUnit:
+    ) -> Mumu12CommittedBattleProgramUnit:
         del session
         self.calls += 1
         gate = SafeUnitCancellation(cancellation)
         gate.commit()
         if self.request_after_commit:
             cast("AbortToken", cancellation).request("defer until program checkpoint")
-        return CommittedCampaignUnit(cast("CampaignMapRuntime", self.runtime), gate)
+        runtime = cast("DeclarativeCampaignMapRuntime", self.runtime)
+        return Mumu12CommittedBattleProgramUnit(
+            build_mumu12_battle_program_port(runtime, self.runtime),
+            gate,
+        )
 
 
 def _session(program: BattleProgram) -> CampaignSession:

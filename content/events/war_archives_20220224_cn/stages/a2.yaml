@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 5
 map:
   name: A2
   shape: H10
@@ -135,8 +135,6 @@ mechanics:
   - battle: 0
     operations:
     - clear_bouncing_enemy
-  preset_routes: []
-  fixed_target_sequences: []
   map_structures:
     walls: []
     maze_groups: []

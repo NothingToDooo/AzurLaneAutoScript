@@ -8,7 +8,12 @@ from module.adapters.campaign_live import (
     CommittedCampaignUnit,
     build_existing_campaign_map_workflow,
 )
-from module.adapters.campaign_program_mumu12 import Mumu12CampaignBattleProgramExecutor
+from module.adapters.campaign_program_mumu12 import (
+    Mumu12CampaignBattleProgramExecutor,
+    Mumu12CommittedBattleProgramUnit,
+    build_mumu12_battle_program_port,
+    read_mumu12_battle_program_mode,
+)
 from module.adapters.campaign_runtime_implementations import (
     load_default_campaign_runtime_executor_registry,
 )
@@ -97,6 +102,7 @@ if TYPE_CHECKING:
     from module.campaign.campaign_ocr import StageMatchOptions, StageMatchSettings
     from module.combat.combat import CombatEnd
     from module.config.config_generated import ConfigOverrides
+    from module.content.battle_program import BattleProgramMode
     from module.content.cell import CellId
     from module.content.models import StageRef
     from module.content.stage_rules import MapCalibration, StageNavigation
@@ -456,7 +462,7 @@ def compose_campaign_attempt_definition(
     return replace(definition, runtime_profile=effective_profile)
 
 
-class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-public-methods] - 当前生产运行协议尚未按能力拆分。
+class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-public-methods] - CampaignEngine 框架回调仍集中在内部运行宿主；BattleProgram 已改走能力端口，其余消费者待迁移。
     """固定运行类型；关卡差异只来自已编译 definition，不生成 Campaign 子类。"""
 
     definition: CampaignStageDefinition
@@ -1324,24 +1330,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
     def runtime_session_active(self) -> bool:
         return self._runtime_profile_session_active
 
-    def map_has_mob_move(self, cancellation: CancellationSource) -> bool:
-        return self._runtime_profile.map_has_mob_move(cancellation)
-
-    def use_support_fleet(self, cancellation: CancellationSource) -> bool:
-        return self._runtime_profile.use_support_fleet(cancellation)
-
-    def use_single_fleet_override(
-        self,
-        cancellation: CancellationSource,
-    ) -> bool | None:
-        return self._runtime_profile.use_single_fleet_override(cancellation)
-
-    def disable_mob_move(self) -> None:
-        self._runtime_profile.disable_mob_move()
-
-    def disable_support_fleet(self) -> None:
-        self._runtime_profile.disable_support_fleet()
-
     def prepare_battle(self, battle_index: int) -> None:
         if type(battle_index) is not int or battle_index < 0:
             message = "campaign battle_index must be a non-negative integer"
@@ -1997,22 +1985,42 @@ class Mumu12CampaignRuntimeProvider:
             owner.transfer()
             return activated
 
+    def _active_runtime_for(
+        self,
+        session: CampaignSession,
+        cancellation: CancellationSource,
+    ) -> DeclarativeCampaignMapRuntime:
+        cancellation.raise_if_requested()
+        if self._active_runtime is None or self._active_session != session:
+            message = "requested campaign session is not the active MuMu12 runtime"
+            raise CampaignRuntimeEvidenceError(message)
+        return self._active_runtime
+
     def active_runtime(
         self,
         session: CampaignSession,
         cancellation: CancellationSource,
     ) -> CampaignMapRuntime:
-        cancellation.raise_if_requested()
-        if self._active_runtime is None or self._active_session != session:
-            message = "requested campaign session is not the active MuMu12 runtime"
-            raise CampaignRuntimeEvidenceError(message)
-        return cast("CampaignMapRuntime", self._active_runtime)
+        runtime = self._active_runtime_for(session, cancellation)
+        return cast("CampaignMapRuntime", runtime)
 
-    def commit_active_unit(
+    def battle_program_mode(
         self,
         session: CampaignSession,
         cancellation: CancellationSource,
-    ) -> CommittedCampaignUnit:
+    ) -> BattleProgramMode:
+        runtime = self._active_runtime_for(session, cancellation)
+        return read_mumu12_battle_program_mode(
+            runtime,
+            runtime._runtime_profile,  # ruff:ignore[private-member-access] - provider owns runtime capability composition.
+            cancellation,
+        )
+
+    def _commit_active_runtime(
+        self,
+        session: CampaignSession,
+        cancellation: CancellationSource,
+    ) -> tuple[DeclarativeCampaignMapRuntime, SafeUnitCancellation]:
         cancellation.raise_if_requested()
         runtime = self._active_runtime
         unit_cancellation = self._active_unit_cancellation
@@ -2020,6 +2028,26 @@ class Mumu12CampaignRuntimeProvider:
             message = "requested campaign session has no active safe unit"
             raise CampaignRuntimeEvidenceError(message)
         unit_cancellation.commit()
+        return runtime, unit_cancellation
+
+    def commit_battle_program_unit(
+        self,
+        session: CampaignSession,
+        cancellation: CancellationSource,
+    ) -> Mumu12CommittedBattleProgramUnit:
+        runtime, unit_cancellation = self._commit_active_runtime(session, cancellation)
+        port = build_mumu12_battle_program_port(
+            runtime,
+            runtime._runtime_profile,  # ruff:ignore[private-member-access] - provider owns runtime capability composition.
+        )
+        return Mumu12CommittedBattleProgramUnit(port, unit_cancellation)
+
+    def commit_active_unit(
+        self,
+        session: CampaignSession,
+        cancellation: CancellationSource,
+    ) -> CommittedCampaignUnit:
+        runtime, unit_cancellation = self._commit_active_runtime(session, cancellation)
         return CommittedCampaignUnit(
             cast("CampaignMapRuntime", runtime),
             unit_cancellation,

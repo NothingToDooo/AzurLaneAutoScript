@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal, assert_never
@@ -13,7 +14,8 @@ type BattlePolicyName = Literal[
 
 _FILTERED_POLICIES = frozenset({"siren_then_filtered_enemy", "filtered_enemy_then_default"})
 _POLICY_NAMES = (*_FILTERED_POLICIES, "fleet_boss")
-_ENEMY_SORT_KEYS = frozenset({"weight", "cost", "cost_1", "cost_2", "enemy_scale"})
+_ENEMY_FILTER_SEPARATOR = re.compile(r"[>\uff1e\ufe65\u203a\u02c3\u1433\u276f]")
+_ENEMY_FILTER_ENTRY = re.compile(r"(?P<scale>\d+)(?P<genre>[A-Za-z])")
 
 
 class BossStrategy(StrEnum):
@@ -21,6 +23,56 @@ class BossStrategy(StrEnum):
     MAP_SEARCH = "map_search"
     FLEET_1 = "fleet_1"
     BRUTE_FORCE = "brute_force"
+
+
+class EnemySortKey(StrEnum):
+    WEIGHT = "weight"
+    EXECUTOR_COST = "cost"
+    FLEET_1_COST = "cost_1"
+    FLEET_2_COST = "cost_2"
+    ENEMY_SCALE = "enemy_scale"
+
+
+@dataclass(frozen=True, slots=True)
+class EnemyFilterEntry:
+    scale: int
+    genre_code: str
+
+    def __post_init__(self) -> None:
+        if type(self.scale) is not int or self.scale < 0:
+            message = "enemy filter scale must be a non-negative integer"
+            raise ContentValidationError(message)
+        if (
+            not isinstance(self.genre_code, str)
+            or len(self.genre_code) != 1
+            or not self.genre_code.isascii()
+            or not self.genre_code.isalpha()
+        ):
+            message = "enemy filter genre code must be one ASCII letter"
+            raise ContentValidationError(message)
+        object.__setattr__(self, "genre_code", self.genre_code.upper())
+
+    def matches(self, *, scale: int, genre: str) -> bool:
+        genre_code = genre[0].upper() if genre else "E"
+        return self.scale == scale and self.genre_code == genre_code
+
+
+def parse_enemy_filter(value: str) -> tuple[EnemyFilterEntry, ...]:
+    if not isinstance(value, str) or not value.strip():
+        message = "enemy filter must be a non-empty string"
+        raise ContentValidationError(message)
+    normalized = re.sub(r"[ \t\r\n]", "", value)
+    entries: list[EnemyFilterEntry] = []
+    for raw_entry in _ENEMY_FILTER_SEPARATOR.split(normalized):
+        match = _ENEMY_FILTER_ENTRY.fullmatch(raw_entry)
+        if match is None:
+            message = f"invalid enemy filter entry: {raw_entry!r}"
+            raise ContentValidationError(message)
+        entries.append(EnemyFilterEntry(int(match.group("scale")), match.group("genre")))
+    if len(set(entries)) != len(entries):
+        message = "enemy filter must not contain duplicate entries"
+        raise ContentValidationError(message)
+    return tuple(entries)
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,16 +113,21 @@ def _string_tuple(values: tuple[str, ...], *, field_name: str) -> tuple[str, ...
     return normalized
 
 
-def _enemy_sort(values: tuple[str, ...]) -> tuple[str, ...]:
-    normalized = _string_tuple(values, field_name="enemy sort")
-    unknown = tuple(value for value in normalized if value not in _ENEMY_SORT_KEYS)
+def _enemy_sort(values: tuple[EnemySortKey | str, ...]) -> tuple[EnemySortKey, ...]:
+    normalized: list[EnemySortKey] = []
+    unknown: list[object] = []
+    for value in tuple(values):
+        try:
+            normalized.append(EnemySortKey(value))
+        except TypeError, ValueError:
+            unknown.append(value)
     if unknown:
-        message = f"unsupported enemy sort keys: {', '.join(unknown)}"
+        message = f"unsupported enemy sort keys: {', '.join(map(str, unknown))}"
         raise ContentValidationError(message)
     if len(set(normalized)) != len(normalized):
         message = "enemy sort keys must not contain duplicates"
         raise ContentValidationError(message)
-    return normalized
+    return tuple(normalized)
 
 
 def _scales(values: tuple[int, ...]) -> tuple[int, ...]:
@@ -84,34 +141,49 @@ def _scales(values: tuple[int, ...]) -> tuple[int, ...]:
     return normalized
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, init=False)
 class ClearEnemy:
     scales: tuple[int, ...] = ()
     genres: tuple[str, ...] = ()
-    sort: tuple[str, ...] = ()
+    sort: tuple[EnemySortKey, ...] = ()
     strongest: bool = False
 
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "scales", _scales(self.scales))
-        object.__setattr__(self, "genres", _string_tuple(self.genres, field_name="enemy genres"))
-        object.__setattr__(self, "sort", _enemy_sort(self.sort))
-        if type(self.strongest) is not bool:
+    def __init__(
+        self,
+        scales: tuple[int, ...] = (),
+        genres: tuple[str, ...] = (),
+        sort: tuple[EnemySortKey | str, ...] = (),
+        *,
+        strongest: bool = False,
+    ) -> None:
+        object.__setattr__(self, "scales", _scales(scales))
+        object.__setattr__(self, "genres", _string_tuple(genres, field_name="enemy genres"))
+        object.__setattr__(self, "sort", _enemy_sort(sort))
+        if type(strongest) is not bool:
             message = "enemy strongest must be a boolean"
             raise TypeError(message)
+        object.__setattr__(self, "strongest", strongest)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, init=False)
 class ClearAnyEnemy:
     genres: tuple[str, ...] = ()
-    sort: tuple[str, ...] = ()
+    sort: tuple[EnemySortKey, ...] = ()
     strongest: bool = False
 
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "genres", _string_tuple(self.genres, field_name="enemy genres"))
-        object.__setattr__(self, "sort", _enemy_sort(self.sort))
-        if type(self.strongest) is not bool:
+    def __init__(
+        self,
+        genres: tuple[str, ...] = (),
+        sort: tuple[EnemySortKey | str, ...] = (),
+        *,
+        strongest: bool = False,
+    ) -> None:
+        object.__setattr__(self, "genres", _string_tuple(genres, field_name="enemy genres"))
+        object.__setattr__(self, "sort", _enemy_sort(sort))
+        if type(strongest) is not bool:
             message = "enemy strongest must be a boolean"
             raise TypeError(message)
+        object.__setattr__(self, "strongest", strongest)
 
 
 class TargetExpectation(StrEnum):
