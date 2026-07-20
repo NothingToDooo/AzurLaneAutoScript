@@ -8,6 +8,10 @@ from module.adapters.campaign_auto_search_mumu12 import (
     Mumu12CampaignAutoSearchExecutor,
     Mumu12CommittedAutoSearchUnit,
 )
+from module.adapters.campaign_clear_mode_config import (
+    CampaignClearModeConfigService,
+    build_campaign_clear_mode_config_service,
+)
 from module.adapters.campaign_event_ui import CampaignEventUiServices, build_campaign_event_ui_services
 from module.adapters.campaign_fleet_preparation import build_campaign_fleet_preparation_service
 from module.adapters.campaign_live import (
@@ -468,6 +472,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     session_variant: CampaignRunVariant
     _gems_behavior: Mumu12GemsRuntimeBehavior | None
     _event_ui_services: CampaignEventUiServices
+    _clear_mode_config_service: CampaignClearModeConfigService
     _map_initialization_service: CampaignMapInitializationService
     _configured_boss_fleet: int
     _profile_fleet_preparation_service: FleetPreparationService
@@ -501,6 +506,9 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         if camera_grid_class is not None:
             self.grid_class = camera_grid_class
         self._runtime_profile.apply_config(config)
+        self._clear_mode_config_service = build_campaign_clear_mode_config_service(
+            self._runtime_profile.executor_instances_in_profile_order()
+        )
         profile_boss_fleet = self._runtime_profile.configured_boss_fleet
         self._configured_boss_fleet = config.fleet_boss if profile_boss_fleet is None else profile_boss_fleet.index
         self.ENEMY_FILTER = definition.enemy_filter
@@ -540,15 +548,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     def configured_boss_fleet(self) -> int:
         return self._configured_boss_fleet
 
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object:
-        return self._runtime_profile.invoke_super(operation, self, *args, **kwargs)
-
     @staticmethod
     def _missing_runtime_base(
         operation: RuntimeOperation,
@@ -575,12 +574,9 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         return cast("CombatEnd | None", result)
 
     def handle_clear_mode_config_cover(self) -> bool:
-        result = self._runtime_profile.engine.invoke(
-            RuntimeOperation.HANDLE_CLEAR_MODE_CONFIG_COVER,
-            self,
-            lambda: CampaignEngine.handle_clear_mode_config_cover(self),
-        )
-        return bool(result)
+        handled = CampaignEngine.handle_clear_mode_config_cover(self)
+        self._clear_mode_config_service.apply(self, handled=handled)
+        return handled
 
     def map_data_init(self, map_: CampaignMap | None) -> None:
         CampaignEngine.map_data_init(self, map_)

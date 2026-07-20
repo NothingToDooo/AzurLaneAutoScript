@@ -43,7 +43,6 @@ class RuntimeOperation(StrEnum):
     EXPECTED_END = "expected_end"
     CLEAR_BOSS = "clear_boss"
     EQUIPMENT_TAKE_OFF_WHEN_FINISHED = "equipment_take_off_when_finished"
-    HANDLE_CLEAR_MODE_CONFIG_COVER = "handle_clear_mode_config_cover"
     RUNTIME_CREATED = "runtime_created"
 
 

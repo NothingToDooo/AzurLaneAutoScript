@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+from module.adapters.campaign_clear_mode_config import build_campaign_clear_mode_config_service
 from module.adapters.campaign_event_ui import build_campaign_event_ui_services
 from module.adapters.campaign_map_initialization import build_campaign_map_initialization_service
 from module.adapters.campaign_map_observer import build_campaign_map_observer
@@ -66,6 +67,7 @@ def _validate_executor_contracts(
             build_campaign_strategy_set_service(manager.executor_instances(RuntimeExecutorKind.MAP_MECHANIC))
             build_campaign_program_capability_reader(manager.executor_instances(RuntimeExecutorKind.MAP_MECHANIC))
             build_campaign_map_initialization_service(manager.executor_instances_in_profile_order())
+            build_campaign_clear_mode_config_service(manager.executor_instances_in_profile_order())
         except CampaignRuntimeProfileError as error:
             message = f"runtime profile {profile.profile_id.value} is not executable: {error}"
             raise ContentValidationError(message) from error

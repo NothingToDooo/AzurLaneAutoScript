@@ -649,9 +649,6 @@
           "kind": "engine_extension",
           "options": {
             "condition": "handled",
-            "operations": [
-              "handle_clear_mode_config_cover"
-            ],
             "overrides": {
               "MAP_HAS_SIREN": true,
               "MAP_SIREN_TEMPLATE": [
@@ -2118,9 +2115,6 @@
           "kind": "engine_extension",
           "options": {
             "condition": "always",
-            "operations": [
-              "handle_clear_mode_config_cover"
-            ],
             "overrides": {
               "MAP_HAS_MISSILE_ATTACK": false
             }
@@ -2136,9 +2130,6 @@
           "kind": "engine_extension",
           "options": {
             "condition": "always",
-            "operations": [
-              "handle_clear_mode_config_cover"
-            ],
             "overrides": {
               "MAP_HAS_MISSILE_ATTACK": false
             }
@@ -2154,9 +2145,6 @@
           "kind": "engine_extension",
           "options": {
             "condition": "always",
-            "operations": [
-              "handle_clear_mode_config_cover"
-            ],
             "overrides": {
               "MAP_HAS_MISSILE_ATTACK": true
             }
@@ -2179,9 +2167,6 @@
           "kind": "engine_extension",
           "options": {
             "condition": "handled",
-            "operations": [
-              "handle_clear_mode_config_cover"
-            ],
             "overrides": {
               "MAP_HAS_SIREN": true,
               "MAP_SIREN_TEMPLATE": [

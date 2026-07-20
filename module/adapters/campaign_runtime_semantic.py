@@ -5,6 +5,10 @@ from module.combat.assets import ALCHEMIST_MATERIAL_CONFIRM
 from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplementationId, RuntimeTuningValue
 from module.ui.page import page_campaign, page_event
 
+from .campaign_clear_mode_config import (
+    CampaignClearModeConfigContributor,
+    CampaignClearModeConfigRuntime,
+)
 from .campaign_event_ui import (
     CampaignEventCombatResultContributor,
     CampaignEventUiContributor,
@@ -21,7 +25,6 @@ from .campaign_runtime_profile import (
     RuntimeExecutorFactoryDescriptor,
     RuntimeExecutorInstance,
     RuntimeExecutorOptionsSchema,
-    RuntimeOperation,
 )
 
 if TYPE_CHECKING:
@@ -34,14 +37,6 @@ if TYPE_CHECKING:
 
 class _SemanticRuntimeHost(Protocol):
     config: AzurLaneConfig
-
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object: ...
 
     def ui_page_appear(self, page: object) -> bool: ...
 
@@ -109,20 +104,6 @@ def _number_option(
     return float(cast("int | float", value))
 
 
-def _require_operations(
-    options: Mapping[str, RuntimeTuningValue],
-    expected: frozenset[str],
-) -> None:
-    value = options["operations"]
-    if not isinstance(value, tuple) or any(not isinstance(item, str) or not item for item in value):
-        message = "runtime semantic executor operations must contain strings"
-        raise CampaignRuntimeProfileError(message)
-    actual = frozenset(cast("tuple[str, ...]", value))
-    if actual != expected:
-        message = f"runtime semantic operations mismatch: expected={sorted(expected)}, actual={sorted(actual)}"
-        raise CampaignRuntimeProfileError(message)
-
-
 def _build_exp_info_page_guard(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
     options = _required_options(context, RuntimeExecutorKind.EVENT_UI)
     blocked_page = _string_option(options, "blocked_page")
@@ -185,37 +166,35 @@ def _build_exp_info_click_guard(context: RuntimeExecutorBuildContext) -> Runtime
     )
 
 
-def _build_clear_mode_config_overlay(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    options = _required_options(context, RuntimeExecutorKind.ENGINE_EXTENSION)
-    _require_operations(options, frozenset({"handle_clear_mode_config_cover"}))
-    condition = _string_option(options, "condition")
-    if condition not in {"always", "handled"}:
-        message = f"unsupported clear-mode overlay condition: {condition}"
-        raise CampaignRuntimeProfileError(message)
-    raw_overrides = options["overrides"]
-    if not isinstance(raw_overrides, Mapping):
-        message = "clear-mode overlay overrides must be an object"
-        raise CampaignRuntimeProfileError(message)
-    overrides = dict(cast("Mapping[str, object]", raw_overrides))
+class CampaignClearModeConfigOverlayExecutor(RuntimeExecutorInstance):
+    __slots__ = ("_clear_mode_config_contributor",)
 
-    def handle_clear_mode_config_cover(runtime: object) -> object:
-        host = _host(runtime)
-        handled = host.runtime_super(RuntimeOperation.HANDLE_CLEAR_MODE_CONFIG_COVER)
-        if type(handled) is not bool:
-            message = "clear-mode config cover must return a boolean"
+    def __init__(self, context: RuntimeExecutorBuildContext) -> None:
+        options = _required_options(context, RuntimeExecutorKind.ENGINE_EXTENSION)
+        condition = _string_option(options, "condition")
+        if condition not in {"always", "handled"}:
+            message = f"unsupported clear-mode overlay condition: {condition}"
             raise CampaignRuntimeProfileError(message)
-        if condition == "always" or handled:
-            host.config.apply_runtime_overlay(**cast("ConfigOverrides", overrides))
-        return handled
+        raw_overrides = options["overrides"]
+        if not isinstance(raw_overrides, Mapping):
+            message = "clear-mode overlay overrides must be an object"
+            raise CampaignRuntimeProfileError(message)
+        overrides = dict(cast("Mapping[str, object]", raw_overrides))
 
-    return RuntimeExecutorInstance(
-        {RuntimeExecutorKind.ENGINE_EXTENSION},
-        methods={
-            RuntimeExecutorKind.ENGINE_EXTENSION: {
-                RuntimeOperation.HANDLE_CLEAR_MODE_CONFIG_COVER: handle_clear_mode_config_cover,
-            }
-        },
-    )
+        def apply(runtime: CampaignClearModeConfigRuntime, *, handled: bool) -> None:
+            if condition == "always" or handled:
+                runtime.config.apply_runtime_overlay(**cast("ConfigOverrides", overrides))
+
+        self._clear_mode_config_contributor = CampaignClearModeConfigContributor(apply)
+        super().__init__({RuntimeExecutorKind.ENGINE_EXTENSION})
+
+    @property
+    def clear_mode_config_contributor(self) -> CampaignClearModeConfigContributor:
+        return self._clear_mode_config_contributor
+
+
+def _build_clear_mode_config_overlay(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
+    return CampaignClearModeConfigOverlayExecutor(context)
 
 
 def _build_event_animation_expected_end(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
@@ -291,7 +270,7 @@ def semantic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescr
             RuntimeImplementationId("engine/clear_mode_config_overlay"),
             {
                 RuntimeExecutorKind.ENGINE_EXTENSION: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "condition", "overrides"}),
+                    required=frozenset({"condition", "overrides"}),
                 )
             },
             _build_clear_mode_config_overlay,
