@@ -1,8 +1,7 @@
-from collections.abc import Mapping
 from typing import TYPE_CHECKING, Protocol, cast, override
 
 from module.base.mask import Mask
-from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplementationId, RuntimeTuningValue
+from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplementationId
 from module.logger import logger
 from module.map.assets import FLEET_SUPPORT_EMPTY
 from module.map.map_swipe import MapSwipePolicy
@@ -10,6 +9,10 @@ from module.map.support_fleet import SupportFleetAttemptState, SupportFleetStatu
 from module.map_detection.utils_assets import ASSETS
 
 from .campaign_fleet_preparation import CampaignFleetPreparationContributor
+from .campaign_map_initialization import (
+    CampaignMapInitializationContributor,
+    CampaignMapInitializationRuntime,
+)
 from .campaign_program_capabilities import (
     CampaignProgramCapabilityContribution,
 )
@@ -19,7 +22,6 @@ from .campaign_runtime_profile import (
     RuntimeExecutorFactoryDescriptor,
     RuntimeExecutorInstance,
     RuntimeExecutorOptionsSchema,
-    RuntimeOperation,
     RuntimeSessionOutcome,
     RuntimeStateSeed,
 )
@@ -44,14 +46,6 @@ class _MechanicRuntimeHost(Protocol):
     config: AzurLaneConfig
     map_is_clear_mode: bool
 
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object: ...
-
     def appear(self, button: object, *, offset: tuple[int, int]) -> bool: ...
 
     def strategy_has_mob_move(self) -> bool: ...
@@ -59,24 +53,6 @@ class _MechanicRuntimeHost(Protocol):
 
 def _host(runtime: object) -> _MechanicRuntimeHost:
     return cast("_MechanicRuntimeHost", runtime)
-
-
-def _strings(options: Mapping[str, RuntimeTuningValue], name: str) -> tuple[str, ...]:
-    value = options[name]
-    if not isinstance(value, tuple) or any(not isinstance(item, str) or not item for item in value):
-        message = f"runtime mechanic option {name} must contain strings"
-        raise CampaignRuntimeProfileError(message)
-    return cast("tuple[str, ...]", value)
-
-
-def _require_operations(
-    options: Mapping[str, RuntimeTuningValue],
-    expected: frozenset[str],
-) -> None:
-    operations = frozenset(_strings(options, "operations"))
-    if operations != expected:
-        message = f"runtime mechanic operations mismatch: expected={sorted(expected)}, actual={sorted(operations)}"
-        raise CampaignRuntimeProfileError(message)
 
 
 class SupportFleetExecutor(RuntimeExecutorInstance):
@@ -126,11 +102,10 @@ class SupportFleetExecutor(RuntimeExecutorInstance):
 class RuntimeUiMaskExecutor(RuntimeExecutorInstance):
     """在 session 内替换地图 UI mask，并在结束时恢复全局缓存。"""
 
-    __slots__ = ("_condition", "_mask", "_saved_cache")
+    __slots__ = ("_condition", "_map_initialization_contributor", "_mask", "_saved_cache")
 
     def __init__(self, context: RuntimeExecutorBuildContext) -> None:
         options = context.options(RuntimeExecutorKind.ENGINE_EXTENSION)
-        _require_operations(options, frozenset({"map_data_init"}))
         asset = options["asset"]
         if not isinstance(asset, str) or asset not in _MASKS:
             message = f"unsupported runtime UI mask: {asset!r}"
@@ -142,22 +117,20 @@ class RuntimeUiMaskExecutor(RuntimeExecutorInstance):
         self._mask = _MASKS[asset]
         self._condition = cast("str", condition)
         self._saved_cache: dict[str, object] | None = None
-        super().__init__(
-            {RuntimeExecutorKind.ENGINE_EXTENSION},
-            methods={
-                RuntimeExecutorKind.ENGINE_EXTENSION: {
-                    RuntimeOperation.MAP_DATA_INIT: self._map_data_init,
-                }
-            },
+        self._map_initialization_contributor = CampaignMapInitializationContributor(
+            pre_control=self._install_for_session,
         )
+        super().__init__({RuntimeExecutorKind.ENGINE_EXTENSION})
 
-    def _map_data_init(self, runtime: object, map_: object) -> object:
-        host = _host(runtime)
-        result = host.runtime_super(RuntimeOperation.MAP_DATA_INIT, map_)
+    def _install_for_session(self, runtime: CampaignMapInitializationRuntime) -> None:
+        del runtime
         if self._condition == "use_support_fleet" and not self.current_use_support_fleet():
-            return result
+            return
         self._install_mask()
-        return result
+
+    @property
+    def map_initialization_contributor(self) -> CampaignMapInitializationContributor:
+        return self._map_initialization_contributor
 
     def _install_mask(self) -> None:
         if self._saved_cache is not None:
@@ -224,58 +197,34 @@ class MobMoveFeatureExecutor(RuntimeExecutorInstance):
         return self._program_capability_contribution
 
 
-class SessionStatePolicyExecutor(RuntimeExecutorInstance):
-    """在 MAP_INIT 后从本次地图运行事实计算十六图的 typed session state。"""
+class Chapter16SessionStateExecutor(RuntimeExecutorInstance):
+    """在地图控制初始化后计算十六图的 typed session state。"""
 
-    __slots__ = ("_map_has_mob_move_override",)
+    __slots__ = ("_map_has_mob_move_override", "_map_initialization_contributor")
 
     def __init__(self, context: RuntimeExecutorBuildContext) -> None:
-        options = context.options(RuntimeExecutorKind.MAP_MECHANIC)
-        _require_operations(options, frozenset({"map_init"}))
-        if _strings(options, "state") != ("use_single_fleet",):
-            message = "session-state policy must own use_single_fleet state"
-            raise CampaignRuntimeProfileError(message)
-        self._validate_rules(options["rules"])
+        _ = context.options(RuntimeExecutorKind.MAP_MECHANIC)
         self._map_has_mob_move_override = False
+        self._map_initialization_contributor = CampaignMapInitializationContributor(
+            post_control=self._update_session_state,
+        )
         super().__init__(
             {RuntimeExecutorKind.MAP_MECHANIC},
-            methods={
-                RuntimeExecutorKind.MAP_MECHANIC: {
-                    RuntimeOperation.MAP_INIT: self._map_init,
-                }
-            },
             state_seed=RuntimeStateSeed(
                 use_single_fleet_override=False,
             ),
         )
 
-    @staticmethod
-    def _validate_rules(raw: RuntimeTuningValue) -> None:
-        if not isinstance(raw, tuple) or len(raw) != 2:
-            message = "session-state policy requires exactly two rules"
-            raise CampaignRuntimeProfileError(message)
-        mob_move, single_fleet = raw
-        if not isinstance(mob_move, Mapping) or dict(mob_move) != {
-            "target": "map_has_mob_move",
-            "all": ("use_support_fleet", "clear_mode"),
-        }:
-            message = "unsupported session-state map_has_mob_move rule"
-            raise CampaignRuntimeProfileError(message)
-        if not isinstance(single_fleet, Mapping) or dict(single_fleet) != {
-            "target": "use_single_fleet",
-            "fleet_order_contains": "standby",
-        }:
-            message = "unsupported session-state use_single_fleet rule"
-            raise CampaignRuntimeProfileError(message)
-
-    def _map_init(self, runtime: object, map_: object) -> object:
+    def _update_session_state(self, runtime: CampaignMapInitializationRuntime) -> None:
         host = _host(runtime)
-        result = host.runtime_super(RuntimeOperation.MAP_INIT, map_)
         self._map_has_mob_move_override = self.current_use_support_fleet() and host.map_is_clear_mode
         self.set_use_single_fleet_override(
             enabled="standby" in host.config.Fleet_FleetOrder,
         )
-        return result
+
+    @property
+    def map_initialization_contributor(self) -> CampaignMapInitializationContributor:
+        return self._map_initialization_contributor
 
     def map_has_mob_move_override(
         self,
@@ -302,8 +251,8 @@ def _build_mob_move_feature(context: RuntimeExecutorBuildContext) -> RuntimeExec
     return MobMoveFeatureExecutor(context)
 
 
-def _build_session_state_policy(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    return SessionStatePolicyExecutor(context)
+def _build_chapter16_session_state(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
+    return Chapter16SessionStateExecutor(context)
 
 
 def mechanic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescriptor, ...]:
@@ -317,7 +266,7 @@ def mechanic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescr
             RuntimeImplementationId("engine/ui_mask"),
             {
                 RuntimeExecutorKind.ENGINE_EXTENSION: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "asset", "condition"}),
+                    required=frozenset({"asset", "condition"}),
                 )
             },
             _build_ui_mask,
@@ -328,12 +277,8 @@ def mechanic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescr
             _build_mob_move_feature,
         ),
         RuntimeExecutorFactoryDescriptor(
-            RuntimeImplementationId("map_mechanic/session_state_policy"),
-            {
-                RuntimeExecutorKind.MAP_MECHANIC: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "rules", "state"}),
-                )
-            },
-            _build_session_state_policy,
+            RuntimeImplementationId("map_mechanic/chapter16_session_state"),
+            {RuntimeExecutorKind.MAP_MECHANIC: RuntimeExecutorOptionsSchema()},
+            _build_chapter16_session_state,
         ),
     )

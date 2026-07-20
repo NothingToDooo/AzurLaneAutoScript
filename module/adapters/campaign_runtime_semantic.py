@@ -11,6 +11,10 @@ from .campaign_event_ui import (
     CampaignEventUiExecutor,
     CampaignMapTransitionContributor,
 )
+from .campaign_map_initialization import (
+    CampaignMapInitializationContributor,
+    CampaignMapInitializationRuntime,
+)
 from .campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     RuntimeExecutorBuildContext,
@@ -231,36 +235,34 @@ def _build_event_animation_expected_end(context: RuntimeExecutorBuildContext) ->
     )
 
 
-def _build_runtime_config_overlay(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    options = _required_options(context, RuntimeExecutorKind.ENGINE_EXTENSION)
-    _require_operations(options, frozenset({"map_data_init"}))
-    phase = _string_option(options, "phase")
-    if phase != "map_init":
-        message = f"unsupported runtime config overlay phase: {phase}"
-        raise CampaignRuntimeProfileError(message)
-    raw_overrides = options["overrides"]
-    if not isinstance(raw_overrides, Mapping):
-        message = "runtime config overlay overrides must be an object"
-        raise CampaignRuntimeProfileError(message)
-    overrides = dict(cast("Mapping[str, object]", raw_overrides))
-    if overrides != {"EnemyPriority_EnemyScaleBalanceWeight": "default_mode"}:
-        message = f"unsupported runtime config overlay: {overrides!r}"
-        raise CampaignRuntimeProfileError(message)
+class DefaultEnemyScaleBalanceExecutor(RuntimeExecutorInstance):
+    """在地图控制初始化前恢复活动图的默认敌人权重。"""
 
-    def map_data_init(runtime: object, map_: object) -> object:
-        host = _host(runtime)
-        result = host.runtime_super(RuntimeOperation.MAP_DATA_INIT, map_)
-        host.config.apply_runtime_overlay(**cast("ConfigOverrides", overrides))
-        return result
+    __slots__ = ("_map_initialization_contributor",)
 
-    return RuntimeExecutorInstance(
-        {RuntimeExecutorKind.ENGINE_EXTENSION},
-        methods={
-            RuntimeExecutorKind.ENGINE_EXTENSION: {
-                RuntimeOperation.MAP_DATA_INIT: map_data_init,
-            }
-        },
-    )
+    def __init__(self, context: RuntimeExecutorBuildContext) -> None:
+        _ = context.options(RuntimeExecutorKind.ENGINE_EXTENSION)
+        self._map_initialization_contributor = CampaignMapInitializationContributor(
+            pre_control=self._apply_default_enemy_scale_balance,
+        )
+        super().__init__({RuntimeExecutorKind.ENGINE_EXTENSION})
+
+    @staticmethod
+    def _apply_default_enemy_scale_balance(runtime: CampaignMapInitializationRuntime) -> None:
+        _host(runtime).config.apply_runtime_overlay(
+            **cast(
+                "ConfigOverrides",
+                {"EnemyPriority_EnemyScaleBalanceWeight": "default_mode"},
+            )
+        )
+
+    @property
+    def map_initialization_contributor(self) -> CampaignMapInitializationContributor:
+        return self._map_initialization_contributor
+
+
+def _build_default_enemy_scale_balance(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
+    return DefaultEnemyScaleBalanceExecutor(context)
 
 
 def semantic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescriptor, ...]:
@@ -304,12 +306,8 @@ def semantic_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDescr
             _build_event_animation_expected_end,
         ),
         RuntimeExecutorFactoryDescriptor(
-            RuntimeImplementationId("engine/runtime_config_overlay"),
-            {
-                RuntimeExecutorKind.ENGINE_EXTENSION: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "overrides", "phase"}),
-                )
-            },
-            _build_runtime_config_overlay,
+            RuntimeImplementationId("engine/default_enemy_scale_balance"),
+            {RuntimeExecutorKind.ENGINE_EXTENSION: RuntimeExecutorOptionsSchema()},
+            _build_default_enemy_scale_balance,
         ),
     )

@@ -1,14 +1,19 @@
+from typing import cast
+
 import pytest
 
 import module.adapters.campaign_runtime_mechanics as mechanics_module
 from module.adapters.campaign_fleet_preparation import build_campaign_fleet_preparation_service
+from module.adapters.campaign_map_initialization import (
+    CampaignMapInitializationRuntime,
+    build_campaign_map_initialization_service,
+)
 from module.adapters.campaign_program_capabilities import build_campaign_program_capability_reader
 from module.adapters.campaign_runtime_mechanics import mechanic_runtime_executor_descriptors
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
-    RuntimeOperation,
     RuntimeSessionContext,
     RuntimeSessionEntryKind,
     RuntimeSessionOutcome,
@@ -43,20 +48,6 @@ class _Runtime:
         self.mob_move_visible = True
         self.fleet_preparation_calls = 0
         self.strategy_requests: list[StrategySetRequest] = []
-        self.super_calls: list[tuple[RuntimeOperation, tuple[object, ...], dict[str, object]]] = []
-
-    def runtime_super(
-        self,
-        operation: RuntimeOperation,
-        /,
-        *args: object,
-        **kwargs: object,
-    ) -> object:
-        manager = self.manager
-        if manager is None:
-            message = "test runtime manager is not installed"
-            raise AssertionError(message)
-        return manager.invoke_super(operation, self, *args, **kwargs)
 
     def appear(self, button: object, *, offset: tuple[int, int]) -> bool:
         del button, offset
@@ -174,7 +165,6 @@ def test_runtime_ui_mask_restores_all_derived_caches() -> None:
             "engine/ui_mask",
             RuntimeExecutorKind.ENGINE_EXTENSION,
             {
-                "operations": ["map_data_init"],
                 "asset": "event_20211125",
                 "condition": "always",
             },
@@ -185,7 +175,8 @@ def test_runtime_ui_mask_restores_all_derived_caches() -> None:
     cache = ASSETS.__dict__
     original = {key: cache[key] for key in ("ui_mask", "ui_mask_stroke", "ui_mask_in_map") if key in cache}
 
-    manager.engine.invoke(RuntimeOperation.MAP_DATA_INIT, runtime, lambda map_: map_, None)
+    initialization = build_campaign_map_initialization_service(manager.executor_instances_in_profile_order())
+    initialization.pre_control(cast("CampaignMapInitializationRuntime", runtime))
 
     assert "ui_mask" in cache
     assert "ui_mask_stroke" not in cache
@@ -250,26 +241,13 @@ def test_mob_move_feature_rejects_obsolete_operation_and_state_options(
         )
 
 
-def test_session_state_policy_projects_stage_specific_fleet_order() -> None:
+def test_chapter16_session_state_projects_stage_specific_fleet_order() -> None:
     manager = _manager(
         _support_binding(),
         _binding(
-            "map_mechanic/session_state_policy",
+            "map_mechanic/chapter16_session_state",
             RuntimeExecutorKind.MAP_MECHANIC,
-            {
-                "operations": ["map_init"],
-                "state": ["use_single_fleet"],
-                "rules": [
-                    {
-                        "target": "map_has_mob_move",
-                        "all": ["use_support_fleet", "clear_mode"],
-                    },
-                    {
-                        "target": "use_single_fleet",
-                        "fleet_order_contains": "standby",
-                    },
-                ],
-            },
+            {},
         ),
     )
     runtime = _Runtime()
@@ -281,7 +259,20 @@ def test_session_state_policy_projects_stage_specific_fleet_order() -> None:
     _start(manager, runtime, RuntimeSessionEntryKind.FRESH)
 
     assert manager.use_single_fleet_override(AbortToken()) is False
-    manager.mechanic.invoke(RuntimeOperation.MAP_INIT, runtime, lambda map_: map_, None)
+    initialization = build_campaign_map_initialization_service(manager.executor_instances_in_profile_order())
+    initialization.post_control(cast("CampaignMapInitializationRuntime", runtime))
 
     assert capabilities.map_has_mob_move(AbortToken())
     assert manager.use_single_fleet_override(AbortToken()) is True
+
+
+@pytest.mark.parametrize("obsolete_option", ["operations", "rules", "state"])
+def test_chapter16_session_state_rejects_obsolete_options(obsolete_option: str) -> None:
+    with pytest.raises(CampaignRuntimeProfileError, match=rf"unknown option: {obsolete_option}"):
+        _manager(
+            _binding(
+                "map_mechanic/chapter16_session_state",
+                RuntimeExecutorKind.MAP_MECHANIC,
+                {obsolete_option: []},
+            )
+        )

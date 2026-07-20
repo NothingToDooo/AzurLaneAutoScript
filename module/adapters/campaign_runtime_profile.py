@@ -45,8 +45,6 @@ class RuntimeOperation(StrEnum):
     CLEAR_BOSS = "clear_boss"
     EQUIPMENT_TAKE_OFF_WHEN_FINISHED = "equipment_take_off_when_finished"
     HANDLE_CLEAR_MODE_CONFIG_COVER = "handle_clear_mode_config_cover"
-    MAP_DATA_INIT = "map_data_init"
-    MAP_INIT = "map_init"
     RUNTIME_CREATED = "runtime_created"
 
 
@@ -587,6 +585,11 @@ class CampaignRuntimeProfileManager:
             message = "runtime executor lookup requires a RuntimeExecutorKind"
             raise TypeError(message)
         return tuple(facet.instance for facet in self._facets if facet.binding.kind is kind)
+
+    def executor_instances_in_profile_order(self) -> tuple[RuntimeExecutorInstance, ...]:
+        """返回不可变的全部 executor；顺序与 profile 声明一致。"""
+
+        return self._instances
 
     def apply_config(self, config: AzurLaneConfig) -> None:
         if not isinstance(config, AzurLaneConfig):

@@ -511,7 +511,7 @@ def test_event_ui_executor_rejects_string_dispatched_event_ui_methods() -> None:
             CampaignEventUiContributor(),
             other_methods={
                 RuntimeExecutorKind.EVENT_UI: {
-                    RuntimeOperation.MAP_DATA_INIT: lambda runtime, map_: (runtime, map_),
+                    RuntimeOperation.CLEAR_BOSS: lambda runtime: runtime,
                 }
             },
         )

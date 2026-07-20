@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, cast, override
 
 import pytest
 
@@ -6,6 +6,10 @@ from module.adapters.campaign_event_ui import (
     CampaignEventUiContributor,
     CampaignMapTransitionContributor,
     build_campaign_event_ui_services,
+)
+from module.adapters.campaign_map_initialization import (
+    CampaignMapInitializationRuntime,
+    build_campaign_map_initialization_service,
 )
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
@@ -252,29 +256,30 @@ def test_event_animation_expected_end_delegates_outside_configured_battle() -> N
     assert delegated is None
 
 
-def test_runtime_config_overlay_runs_after_map_data_initialization() -> None:
+def test_default_enemy_scale_balance_runs_before_map_control_initialization() -> None:
     manager = _manager(
-        "engine/runtime_config_overlay",
+        "engine/default_enemy_scale_balance",
         RuntimeExecutorKind.ENGINE_EXTENSION,
-        {
-            "operations": ["map_data_init"],
-            "phase": "map_init",
-            "overrides": {"EnemyPriority_EnemyScaleBalanceWeight": "default_mode"},
-        },
+        {},
     )
     runtime = _Runtime(manager)
 
-    result = manager.engine.invoke(
-        RuntimeOperation.MAP_DATA_INIT,
-        runtime,
-        lambda map_: ("initialized", map_),
-        "map",
-    )
+    initialization = build_campaign_map_initialization_service(manager.executor_instances_in_profile_order())
+    initialization.pre_control(cast("CampaignMapInitializationRuntime", runtime))
 
-    assert result == ("initialized", "map")
     assert runtime.config.overlays == [
         {"EnemyPriority_EnemyScaleBalanceWeight": "default_mode"},
     ]
+
+
+@pytest.mark.parametrize("obsolete_option", ["operations", "overrides", "phase"])
+def test_default_enemy_scale_balance_rejects_obsolete_options(obsolete_option: str) -> None:
+    with pytest.raises(CampaignRuntimeProfileError, match=rf"unknown option: {obsolete_option}"):
+        _manager(
+            "engine/default_enemy_scale_balance",
+            RuntimeExecutorKind.ENGINE_EXTENSION,
+            {obsolete_option: []},
+        )
 
 
 def test_semantic_executor_rejects_unknown_option_value_before_binding() -> None:

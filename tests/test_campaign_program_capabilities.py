@@ -5,6 +5,10 @@ import pytest
 from config_factory import in_memory_config
 
 from module.adapters.campaign_fleet_preparation import build_campaign_fleet_preparation_service
+from module.adapters.campaign_map_initialization import (
+    CampaignMapInitializationRuntime,
+    build_campaign_map_initialization_service,
+)
 from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
 from module.adapters.campaign_program_capabilities import (
     CampaignProgramCapabilities,
@@ -259,7 +263,8 @@ def test_real_chapter_16_map_init_updates_live_override_and_reset_clears_it(
         )
     )
 
-    manager.mechanic.invoke(RuntimeOperation.MAP_INIT, runtime, lambda map_: map_, None)
+    initialization = build_campaign_map_initialization_service(manager.executor_instances_in_profile_order())
+    initialization.post_control(cast("CampaignMapInitializationRuntime", runtime))
 
     assert reader.map_has_mob_move(AbortToken()) is expected
     manager.end_session(RuntimeSessionOutcome.COMPLETED)

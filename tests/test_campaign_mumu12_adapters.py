@@ -10,6 +10,7 @@ from config_factory import in_memory_config
 import module.adapters.campaign_mumu12 as campaign_adapters
 import module.adapters.encounter_mumu12 as encounter_adapters
 from module.adapters.campaign_map_data_mumu12 import apply_normal_enemy_candidate_mask
+from module.adapters.campaign_map_initialization import CampaignMapInitializationService
 from module.adapters.campaign_map_session_mumu12 import Mumu12CampaignMapSessionOwner
 from module.adapters.campaign_mumu12 import (
     CampaignRuntimeEvidenceError,
@@ -589,6 +590,7 @@ class _FakeDeclarativeRuntime(DeclarativeCampaignMapRuntime):
         self._profile_fleet_preparation_service = STANDARD_FLEET_PREPARATION_SERVICE
         self._fleet_preparation_service = self._profile_fleet_preparation_service
         self._submarine_services = STANDARD_CAMPAIGN_SUBMARINE_SERVICES
+        self._map_initialization_service = CampaignMapInitializationService()
         self._runtime_released = False
         self.calls: list[object] = []
         self.session_variant = CampaignRunVariant.NORMAL
@@ -636,10 +638,13 @@ class _FakeDeclarativeRuntime(DeclarativeCampaignMapRuntime):
         self.calls.append("handle_map_fleet_lock")
         return True
 
-    def map_init(self, map_: CampaignMap | None) -> None:
+    def map_data_init(self, map_: CampaignMap | None) -> None:
         assert map_ is self.MAP
         self.map = self.MAP
-        self.calls.append("map_init")
+        self.calls.append("map_data_init")
+
+    def map_control_init(self) -> None:
+        self.calls.append("map_control_init")
 
     def is_in_map(self) -> bool:
         return type(self).client_in_map
@@ -1070,6 +1075,7 @@ def test_map_session_owner_is_poisoned_before_session_cleanup_can_fail() -> None
         runtime,
         lease,
         STANDARD_CAMPAIGN_SUBMARINE_SERVICES.fresh_combat,
+        CampaignMapInitializationService(),
     )
 
     with pytest.raises(RuntimeError) as raised:
@@ -1106,7 +1112,7 @@ def test_map_session_owner_preserves_initialization_and_cleanup_failures() -> No
         def reset() -> None:
             calls.append("reset")
 
-    def fail_map_init(map_: CampaignMap | None) -> None:
+    def fail_map_data_init(map_: CampaignMap | None) -> None:
         del map_
         raise initialization_error
 
@@ -1116,13 +1122,15 @@ def test_map_session_owner_preserves_initialization_and_cleanup_failures() -> No
             MAP=compile_campaign_map(_definition()),
             session_variant=CampaignRunVariant.NORMAL,
             map_is_clear_mode=False,
-            map_init=fail_map_init,
+            map_data_init=fail_map_data_init,
+            map_control_init=lambda: None,
         ),
     )
     owner = Mumu12CampaignMapSessionOwner(
         runtime,
         RuntimeProfileLease(_CleanupFailingProfile()),
         STANDARD_CAMPAIGN_SUBMARINE_SERVICES.fresh_combat,
+        CampaignMapInitializationService(),
     )
     state = CampaignSessionState(
         CampaignRunVariant.NORMAL,
@@ -1146,15 +1154,15 @@ def test_map_session_owner_preserves_initialization_and_cleanup_failures() -> No
 def test_map_session_owner_maps_map_initialization_abort_to_interrupted() -> None:
     abort = AbortRequested("map initialization cancelled")
 
-    class _AbortingMapInitRuntime(_FakeDeclarativeRuntime):
+    class _AbortingMapDataInitRuntime(_FakeDeclarativeRuntime):
         created: ClassVar[list[object]] = []
 
         @override
-        def map_init(self, map_: CampaignMap | None) -> None:
+        def map_data_init(self, map_: CampaignMap | None) -> None:
             del map_
             raise abort
 
-    runtime = _AbortingMapInitRuntime(
+    runtime = _AbortingMapDataInitRuntime(
         in_memory_config("campaign-map-init-abort", {}),
         object.__new__(Device),
         _definition(),
@@ -1163,6 +1171,7 @@ def test_map_session_owner_maps_map_initialization_abort_to_interrupted() -> Non
         runtime,
         runtime._runtime_profile_lease,  # ruff:ignore[private-member-access] - 测试显式接管 runtime lease。
         STANDARD_CAMPAIGN_SUBMARINE_SERVICES.fresh_combat,
+        CampaignMapInitializationService(),
     )
     session = CampaignSession(runtime.definition, CampaignRunVariant.NORMAL)
 
@@ -1325,12 +1334,13 @@ def test_fresh_activation_orders_entry_session_phases_overlay_and_publication(
             return super().handle_map_fleet_lock(enable=enable)
 
         @override
-        def map_init(self, map_: CampaignMap | None) -> None:
-            events.append("map_init")
-            DeclarativeCampaignMapRuntime._declarative_map_data_init(  # ruff:ignore[private-member-access] - 直接约束生产 map-data 接线。
-                self,
-                map_,
-            )
+        def map_data_init(self, map_: CampaignMap | None) -> None:
+            events.append("map_data_init")
+            DeclarativeCampaignMapRuntime.map_data_init(self, map_)
+
+        @override
+        def map_control_init(self) -> None:
+            events.append("map_control_init")
 
     original_mask = campaign_adapters.apply_normal_enemy_candidate_mask
 
@@ -1365,9 +1375,10 @@ def test_fresh_activation_orders_entry_session_phases_overlay_and_publication(
         "enter_map",
         "fleet_lock",
         ("lease.start", CampaignRunVariant.LOOP),
-        "map_init",
+        "map_data_init",
         "base_map_data_init",
         "normal_enemy_candidate_mask",
+        "map_control_init",
         "overlay",
     ]
     assert provider.active_runtime(activated, AbortToken()) is _OrderedRuntime.created[-1]

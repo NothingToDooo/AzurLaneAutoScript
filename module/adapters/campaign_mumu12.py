@@ -16,6 +16,10 @@ from module.adapters.campaign_live import (
     build_existing_campaign_map_workflow,
 )
 from module.adapters.campaign_map_data_mumu12 import apply_normal_enemy_candidate_mask
+from module.adapters.campaign_map_initialization import (
+    CampaignMapInitializationService,
+    build_campaign_map_initialization_service,
+)
 from module.adapters.campaign_map_observer import build_campaign_map_observer
 from module.adapters.campaign_map_session_mumu12 import (
     Mumu12CampaignMapSessionOwner,
@@ -466,6 +470,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     session_variant: CampaignRunVariant
     _gems_behavior: Mumu12GemsRuntimeBehavior | None
     _event_ui_services: CampaignEventUiServices
+    _map_initialization_service: CampaignMapInitializationService
     _configured_boss_fleet: int
     _profile_fleet_preparation_service: FleetPreparationService
     _program_capabilities: CampaignProgramCapabilityReader
@@ -507,6 +512,9 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         self._runtime_profile.apply_runtime_thresholds(self)
         self._runtime_profile.bind(self, self.MAP)
         self._runtime_profile_lease = RuntimeProfileLease(self._runtime_profile)
+        self._map_initialization_service = build_campaign_map_initialization_service(
+            self._runtime_profile.executor_instances_in_profile_order()
+        )
         mechanic_instances = self._runtime_profile.executor_instances(RuntimeExecutorKind.MAP_MECHANIC)
         self._profile_fleet_preparation_service = build_campaign_fleet_preparation_service(mechanic_instances)
         self._fleet_preparation_service = self._profile_fleet_preparation_service
@@ -576,7 +584,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
         )
         return bool(result)
 
-    def _declarative_map_data_init(self, map_: CampaignMap | None) -> None:
+    def map_data_init(self, map_: CampaignMap | None) -> None:
         CampaignEngine.map_data_init(self, map_)
         moving = self.definition.mechanics.moving_enemies
         for cell in moving.initial_enemy_cells:
@@ -587,19 +595,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             self.map,
             self.definition.map.normal_enemy_spawn_candidates,
             self.session_variant,
-        )
-
-    def map_data_init(self, map_: CampaignMap | None) -> None:
-        self._runtime_profile.engine.invoke(
-            RuntimeOperation.MAP_DATA_INIT,
-            self,
-            lambda value: self._runtime_profile.mechanic.invoke(
-                RuntimeOperation.MAP_DATA_INIT,
-                self,
-                self._declarative_map_data_init,
-                value,
-            ),
-            map_,
         )
 
     def clear_boss(self) -> bool:
@@ -627,14 +622,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
 
     def handle_submarine_support_popup(self) -> bool:
         return self._submarine_services.popup.handle(self)
-
-    def map_init(self, map_: CampaignMap | None) -> None:
-        self._runtime_profile.mechanic.invoke(
-            RuntimeOperation.MAP_INIT,
-            self,
-            lambda value: CampaignEngine.map_init(self, value),
-            map_,
-        )
 
     def handle_boss_appear_refocus(self, preset: GridLocation | None = None) -> None:
         selected = self._runtime_profile.boss_appear_refocus_preset if preset is None else preset
@@ -899,6 +886,7 @@ class Mumu12CampaignRuntimeProvider:
             runtime,
             runtime._runtime_profile_lease,  # ruff:ignore[private-member-access] - runtime 构造的唯一 lease 由 session owner 接管。
             runtime._submarine_services.fresh_combat,  # ruff:ignore[private-member-access] - owner 显式持有构造期编译的 fresh hook。
+            runtime._map_initialization_service,  # ruff:ignore[private-member-access] - owner 显式持有构造期编译的初始化阶段。
         )
         try:
             unit_cancellation = self._refresh_runtime_cancellation(job, runtime, cancellation)

@@ -58,29 +58,9 @@
     {
       "executors": [
         {
-          "implementation": "map_mechanic/session_state_policy",
+          "implementation": "map_mechanic/chapter16_session_state",
           "kind": "map_mechanic",
-          "options": {
-            "operations": [
-              "map_init"
-            ],
-            "rules": [
-              {
-                "all": [
-                  "use_support_fleet",
-                  "clear_mode"
-                ],
-                "target": "map_has_mob_move"
-              },
-              {
-                "fleet_order_contains": "standby",
-                "target": "use_single_fleet"
-              }
-            ],
-            "state": [
-              "use_single_fleet"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "campaign_main/campaign_16_3/campaign"
@@ -88,29 +68,9 @@
     {
       "executors": [
         {
-          "implementation": "map_mechanic/session_state_policy",
+          "implementation": "map_mechanic/chapter16_session_state",
           "kind": "map_mechanic",
-          "options": {
-            "operations": [
-              "map_init"
-            ],
-            "rules": [
-              {
-                "all": [
-                  "use_support_fleet",
-                  "clear_mode"
-                ],
-                "target": "map_has_mob_move"
-              },
-              {
-                "fleet_order_contains": "standby",
-                "target": "use_single_fleet"
-              }
-            ],
-            "state": [
-              "use_single_fleet"
-            ]
-          }
+          "options": {}
         }
       ],
       "id": "campaign_main/campaign_16_4/campaign"
@@ -171,10 +131,7 @@
           "kind": "engine_extension",
           "options": {
             "asset": "support_fleet",
-            "condition": "use_support_fleet",
-            "operations": [
-              "map_data_init"
-            ]
+            "condition": "use_support_fleet"
           }
         }
       ],
@@ -662,10 +619,7 @@
           "kind": "engine_extension",
           "options": {
             "asset": "event_20211125",
-            "condition": "always",
-            "operations": [
-              "map_data_init"
-            ]
+            "condition": "always"
           }
         }
       ],
@@ -930,17 +884,9 @@
           }
         },
         {
-          "implementation": "engine/runtime_config_overlay",
+          "implementation": "engine/default_enemy_scale_balance",
           "kind": "engine_extension",
-          "options": {
-            "operations": [
-              "map_data_init"
-            ],
-            "overrides": {
-              "EnemyPriority_EnemyScaleBalanceWeight": "default_mode"
-            },
-            "phase": "map_init"
-          }
+          "options": {}
         }
       ],
       "id": "event_20221222_cn/campaign_base/campaign_base"
@@ -2336,17 +2282,9 @@
           }
         },
         {
-          "implementation": "engine/runtime_config_overlay",
+          "implementation": "engine/default_enemy_scale_balance",
           "kind": "engine_extension",
-          "options": {
-            "operations": [
-              "map_data_init"
-            ],
-            "overrides": {
-              "EnemyPriority_EnemyScaleBalanceWeight": "default_mode"
-            },
-            "phase": "map_init"
-          }
+          "options": {}
         }
       ],
       "id": "war_archives_20221222_cn/campaign_base/campaign_base"

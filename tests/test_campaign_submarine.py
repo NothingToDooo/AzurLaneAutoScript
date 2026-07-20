@@ -5,6 +5,7 @@ import pytest
 from config_factory import in_memory_config
 
 import module.adapters.campaign_runtime_mechanics as mechanics_module
+from module.adapters.campaign_map_initialization import CampaignMapInitializationService
 from module.adapters.campaign_map_session_mumu12 import Mumu12CampaignMapSessionOwner
 from module.adapters.campaign_mumu12 import DeclarativeCampaignMapRuntime
 from module.adapters.campaign_runtime_implementations import (
@@ -279,12 +280,16 @@ class _SessionRuntime:
         self.map = self.MAP
         self.session_variant = CampaignRunVariant.NORMAL
         self.map_is_clear_mode = False
+        self.config = in_memory_config("submarine-session", {})
         self.battle_count = 0
         self.events = events
 
-    def map_init(self, map_: CampaignMap | None) -> None:
+    def map_data_init(self, map_: CampaignMap | None) -> None:
         assert map_ is self.MAP
-        self.events.append("map_init")
+        self.events.append("map_data_init")
+
+    def map_control_init(self) -> None:
+        self.events.append("map_control_init")
 
     @staticmethod
     def combat(
@@ -317,11 +322,12 @@ def _owner(
         runtime,
         RuntimeProfileLease(_SessionManager(events)),
         service,
+        CampaignMapInitializationService(),
     )
     return owner, runtime
 
 
-def test_session_owner_runs_fresh_hook_after_lease_start_and_before_map_init() -> None:
+def test_session_owner_runs_fresh_hook_before_fixed_map_initialization() -> None:
     events: list[object] = []
     owner, _runtime = _owner(events, lambda _runtime: events.append("fresh_combat"))
 
@@ -330,7 +336,8 @@ def test_session_owner_runs_fresh_hook_after_lease_start_and_before_map_init() -
     assert events == [
         ("lease.start", RuntimeSessionEntryKind.FRESH),
         "fresh_combat",
-        "map_init",
+        "map_data_init",
+        "map_control_init",
     ]
 
 
@@ -341,7 +348,8 @@ def test_session_owner_skips_fresh_hook_for_a_resume_entry() -> None:
     cold_owner.initialize(_session_state(2), RuntimeSessionEntryKind.RESUME)
     assert cold_events == [
         ("lease.start", RuntimeSessionEntryKind.RESUME),
-        "map_init",
+        "map_data_init",
+        "map_control_init",
     ]
 
 
