@@ -118,6 +118,7 @@ def test_combat_observer_receives_and_mutates_the_exact_destination_grid() -> No
             combat=observer,
             scanner=STANDARD_CAMPAIGN_MAP_OBSERVER.scanner,
             enemy_searching=STANDARD_CAMPAIGN_MAP_OBSERVER.enemy_searching,
+            viewport=STANDARD_CAMPAIGN_MAP_OBSERVER.viewport,
         )
     )
     destination = fleet.map[(0, 0)]

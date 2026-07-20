@@ -40,6 +40,7 @@ class _ScannerFleet(Fleet):
             combat=STANDARD_CAMPAIGN_MAP_OBSERVER.combat,
             scanner=scanner,
             enemy_searching=STANDARD_CAMPAIGN_MAP_OBSERVER.enemy_searching,
+            viewport=STANDARD_CAMPAIGN_MAP_OBSERVER.viewport,
         )
 
 

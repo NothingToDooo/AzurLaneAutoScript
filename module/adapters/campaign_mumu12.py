@@ -120,7 +120,6 @@ if TYPE_CHECKING:
     from module.map.fleet import FleetLocation
     from module.map.type_alias import GridLocation
     from module.map_detection.grid import Grid
-    from module.map_detection.grid_info import GridInfo
 
 
 _CHAPTER_SWITCH_FIELDS = {
@@ -688,19 +687,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
             message = "map clear percentage executor must return a number"
             raise CampaignRuntimeProfileError(message)
         return float(result) * self._runtime_profile.map_clear_percentage_multiplier
-
-    def in_sight(
-        self,
-        location: GridInfo | str | Point,
-        sight: tuple[int, int, int, int] | None = None,
-    ) -> None:
-        self._runtime_profile.observation.invoke(
-            RuntimeOperation.IN_SIGHT,
-            self,
-            lambda value, sight=None: CampaignEngine.in_sight(self, value, sight=sight),
-            location,
-            sight=sight,
-        )
 
     def map_get_info(self) -> None:
         self._runtime_profile.observation.invoke(

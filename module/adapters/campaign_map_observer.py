@@ -6,10 +6,13 @@ from module.map.map_observer import (
     STANDARD_CAMPAIGN_MAP_OBSERVER,
     CampaignMapObserver,
     CampaignMapScanner,
+    CampaignMapViewport,
     CombatMapObserver,
     EnemySearchingObserver,
+    InSightRequest,
     MapObserverRuntime,
     MapScannerRuntime,
+    MapViewportRuntime,
 )
 
 from .campaign_runtime_profile import RuntimeExecutorInstance
@@ -40,6 +43,9 @@ class FullScanRequest:
 
 type FullScanNext = Callable[[MapScannerRuntime, FullScanRequest], None]
 type FullScanHandler = Callable[[MapScannerRuntime, FullScanRequest, FullScanNext], None]
+
+type InSightNext = Callable[[MapViewportRuntime, InSightRequest], None]
+type InSightHandler = Callable[[MapViewportRuntime, InSightRequest, InSightNext], None]
 
 
 class FullScanMovableNext(Protocol):
@@ -88,6 +94,7 @@ class CampaignMapObserverContributor:
     full_scan: FullScanHandler | None = None
     full_scan_movable: FullScanMovableHandler | None = None
     enemy_searching: EnemySearchingHandler | None = None
+    in_sight: InSightHandler | None = None
 
 
 @runtime_checkable
@@ -177,6 +184,15 @@ class _ComposedEnemySearchingObserver(EnemySearchingObserver):
         )
 
 
+@dataclass(frozen=True, slots=True)
+class _ComposedCampaignMapViewport(CampaignMapViewport):
+    handler: InSightNext
+
+    @override
+    def in_sight(self, runtime: MapViewportRuntime, request: InSightRequest) -> None:
+        self.handler(runtime, request)
+
+
 def _overlay_camera_repositioning(
     handler: CameraRepositioningHandler,
     next_handler: CameraRepositioningNext,
@@ -229,6 +245,16 @@ def _overlay_enemy_searching(
     return execute
 
 
+def _overlay_in_sight(
+    handler: InSightHandler,
+    next_handler: InSightNext,
+) -> InSightNext:
+    def execute(runtime: MapViewportRuntime, request: InSightRequest) -> None:
+        handler(runtime, request, next_handler)
+
+    return execute
+
+
 def _standard_full_scan(runtime: MapScannerRuntime, request: FullScanRequest) -> None:
     STANDARD_CAMPAIGN_MAP_OBSERVER.scanner.full_scan(
         runtime,
@@ -246,6 +272,7 @@ def build_campaign_map_observer(instances: Iterable[object]) -> CampaignMapObser
     full_scan = _standard_full_scan
     full_scan_movable = STANDARD_CAMPAIGN_MAP_OBSERVER.scanner.full_scan_movable
     enemy_searching = STANDARD_CAMPAIGN_MAP_OBSERVER.enemy_searching.appears
+    in_sight = STANDARD_CAMPAIGN_MAP_OBSERVER.viewport.in_sight
     for instance in instances:
         if not isinstance(instance, CampaignMapObserverContributorSource):
             continue
@@ -267,8 +294,11 @@ def build_campaign_map_observer(instances: Iterable[object]) -> CampaignMapObser
                 contributor.enemy_searching,
                 enemy_searching,
             )
+        if contributor.in_sight is not None:
+            in_sight = _overlay_in_sight(contributor.in_sight, in_sight)
     return CampaignMapObserver(
         combat=_ComposedCombatMapObserver(camera_repositioning),
         scanner=_ComposedCampaignMapScanner(full_scan, full_scan_movable),
         enemy_searching=_ComposedEnemySearchingObserver(enemy_searching),
+        viewport=_ComposedCampaignMapViewport(in_sight),
     )

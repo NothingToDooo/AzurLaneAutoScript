@@ -43,7 +43,6 @@ class RuntimeOperation(StrEnum):
     HANDLE_CLEAR_MODE_CONFIG_COVER = "handle_clear_mode_config_cover"
     HANDLE_MYSTERY_ITEMS = "handle_mystery_items"
     HANDLE_SUBMARINE_SUPPORT_POPUP = "handle_submarine_support_popup"
-    IN_SIGHT = "in_sight"
     MAP_DATA_INIT = "map_data_init"
     MAP_GET_INFO = "map_get_info"
     MAP_INIT = "map_init"

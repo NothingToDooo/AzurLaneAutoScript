@@ -153,6 +153,7 @@ class _CanonicalEnemySearching(EnemySearchingHandler):
             combat=STANDARD_CAMPAIGN_MAP_OBSERVER.combat,
             scanner=STANDARD_CAMPAIGN_MAP_OBSERVER.scanner,
             enemy_searching=observer,
+            viewport=STANDARD_CAMPAIGN_MAP_OBSERVER.viewport,
         )
 
     def is_in_map(self) -> bool:

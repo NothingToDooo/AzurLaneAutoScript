@@ -13,6 +13,7 @@ from module.handler.assets import AUTO_SEARCH_MENU_CONTINUE, GAME_TIPS, GET_MISS
 from module.logger import logger
 from module.map.assets import MAP_PREPARATION
 from module.map.map_base import CampaignMap, location2node
+from module.map.map_observer import InSightRequest
 from module.map.map_operation import MapOperation
 from module.map.utils import location_ensure, random_direction
 from module.map_detection.grid import Grid
@@ -528,10 +529,16 @@ class Camera(MapOperation):
 
     def in_sight(self, location: GridInfo | str | Point, sight: tuple[int, int, int, int] | None = None) -> None:
         """确保格子位于相机视野矩形内；sight 形如 (-3, -1, 3, 2)。"""
-        location = location_ensure(location)
+        self._map_observer.viewport.in_sight(
+            self,
+            InSightRequest(location=location_ensure(location), sight=sight),
+        )
+
+    def _standard_in_sight(self, request: InSightRequest) -> None:
+        """执行未被 profile 规则处理的标准视野算法。"""
+        location = request.location
         logger.info(f"In sight: {location2node(location)}")
-        if sight is None:
-            sight = self.map.camera_sight
+        sight = self.map.camera_sight if request.sight is None else request.sight
 
         diff = np.array(location) - self.camera
         if diff[1] > sight[3]:

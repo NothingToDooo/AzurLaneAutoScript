@@ -1343,9 +1343,6 @@
           "implementation": "observation/focus_rules",
           "kind": "map_observation",
           "options": {
-            "operations": [
-              "in_sight"
-            ],
             "rules": [
               {
                 "focus_x": 7,
@@ -1437,9 +1434,6 @@
           "implementation": "observation/focus_rules",
           "kind": "map_observation",
           "options": {
-            "operations": [
-              "in_sight"
-            ],
             "rules": [
               {
                 "focus_x": 7,
@@ -1988,9 +1982,6 @@
           "implementation": "observation/focus_rules",
           "kind": "map_observation",
           "options": {
-            "operations": [
-              "in_sight"
-            ],
             "rules": [
               {
                 "focus_cell": "E3",
@@ -2010,9 +2001,6 @@
           "implementation": "observation/focus_rules",
           "kind": "map_observation",
           "options": {
-            "operations": [
-              "in_sight"
-            ],
             "rules": [
               {
                 "focus_cell": "E3",

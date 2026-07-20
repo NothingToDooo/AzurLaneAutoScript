@@ -7,7 +7,6 @@ from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplement
 from module.handler.assets import MAP_ENEMY_SEARCHING
 from module.handler.fast_forward import AUTO_SEARCH
 from module.logger import logger
-from module.map.utils import location_ensure
 
 from .campaign_map_observer import (
     CampaignMapObserverContributor,
@@ -16,6 +15,7 @@ from .campaign_map_observer import (
     FullScanMovableNext,
     FullScanNext,
     FullScanRequest,
+    InSightNext,
 )
 from .campaign_runtime_profile import (
     CampaignRuntimeProfileError,
@@ -27,12 +27,11 @@ from .campaign_runtime_profile import (
 )
 
 if TYPE_CHECKING:
-    from module.base.type_alias import ImageArray, Point
+    from module.base.type_alias import ImageArray
     from module.campaign.campaign_engine import CampaignEngine
     from module.config.config import AzurLaneConfig
     from module.map.map_grids import SelectedGrids
-    from module.map.map_observer import MapScannerRuntime
-    from module.map.utils import HasLocation
+    from module.map.map_observer import InSightRequest, MapScannerRuntime, MapViewportRuntime
     from module.map_detection.grid_info import GridInfo
 
 
@@ -54,8 +53,6 @@ class _ObservationRuntimeHost(Protocol):
         *args: object,
         **kwargs: object,
     ) -> object: ...
-
-    def focus_to(self, location: object) -> object: ...
 
     def map_show_info(self) -> None: ...
 
@@ -266,7 +263,6 @@ def _focus_rule(raw: RuntimeTuningValue) -> _FocusRule:
 
 def _build_focus_rules(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
     options = context.options(RuntimeExecutorKind.MAP_OBSERVATION)
-    _require_operations(options, frozenset({"in_sight"}))
     raw_rules = options["rules"]
     if not isinstance(raw_rules, tuple) or not raw_rules:
         message = "focus rules must be a non-empty array"
@@ -274,30 +270,22 @@ def _build_focus_rules(context: RuntimeExecutorBuildContext) -> RuntimeExecutorI
     rules = tuple(_focus_rule(raw) for raw in raw_rules)
 
     def in_sight(
-        runtime: object,
-        location: HasLocation | str | Point,
-        sight: object = None,
-    ) -> object:
-        host = _host(runtime)
-        normalized = location_ensure(location)
-        x, y = normalized
-        node = location2node(normalized)
-        logger.info(f"In sight: {node}")
+        runtime: MapViewportRuntime,
+        request: InSightRequest,
+        next_handler: InSightNext,
+    ) -> None:
+        x, y = request.location
+        node = location2node(request.location)
         for rule in rules:
             if rule.matches(node=node, x=x, y=y):
                 target = rule.target(y=y)
+                logger.info(f"In sight: {node}")
                 logger.info(f"Focus to: {location2node(target)}")
-                return host.focus_to(target)
-        return host.runtime_super(RuntimeOperation.IN_SIGHT, normalized, sight=sight)
+                runtime.focus_to(target)
+                return
+        next_handler(runtime, request)
 
-    return RuntimeExecutorInstance(
-        {RuntimeExecutorKind.MAP_OBSERVATION},
-        methods={
-            RuntimeExecutorKind.MAP_OBSERVATION: {
-                RuntimeOperation.IN_SIGHT: in_sight,
-            }
-        },
-    )
+    return CampaignMapObserverExecutor(CampaignMapObserverContributor(in_sight=in_sight))
 
 
 def _auto_search_options(
@@ -397,7 +385,7 @@ def observation_runtime_executor_descriptors() -> tuple[RuntimeExecutorFactoryDe
             RuntimeImplementationId("observation/focus_rules"),
             {
                 observation: RuntimeExecutorOptionsSchema(
-                    required=frozenset({"operations", "rules"}),
+                    required=frozenset({"rules"}),
                 )
             },
             _build_focus_rules,

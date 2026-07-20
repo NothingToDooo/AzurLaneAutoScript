@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from module.map.camera import FullScanOptions
     from module.map.map_base import CampaignMap
     from module.map.map_grids import SelectedGrids
-    from module.map.type_alias import GridMode
+    from module.map.type_alias import GridLocation, GridMode
     from module.map_detection.grid_info import GridInfo
 
 
@@ -72,10 +72,35 @@ class EnemySearchingObserver(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
+class InSightRequest:
+    """已经规范化的视野请求。"""
+
+    location: GridLocation
+    sight: tuple[int, int, int, int] | None = None
+
+
+class MapViewportRuntime(Protocol):
+    def focus_to(
+        self,
+        location: GridLocation,
+        swipe_limit: GridLocation = (4, 3),
+    ) -> None: ...
+
+    def _standard_in_sight(self, request: InSightRequest) -> None: ...
+
+
+class CampaignMapViewport(Protocol):
+    """调整地图视野，但不负责把调用参数规范化。"""
+
+    def in_sight(self, runtime: MapViewportRuntime, request: InSightRequest) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
 class CampaignMapObserver:
     combat: CombatMapObserver
     scanner: CampaignMapScanner
     enemy_searching: EnemySearchingObserver
+    viewport: CampaignMapViewport
 
 
 class _StandardCombatMapObserver(CombatMapObserver):
@@ -134,8 +159,17 @@ class _StandardEnemySearchingObserver(EnemySearchingObserver):
         return MAP_ENEMY_SEARCHING.match_luma(image, offset=(5, 5))
 
 
+class _StandardCampaignMapViewport(CampaignMapViewport):
+    @override
+    def in_sight(self, runtime: MapViewportRuntime, request: InSightRequest) -> None:
+        runtime._standard_in_sight(  # ruff:ignore[private-member-access] - 标准 viewport 只负责调用 Camera 私有算法原语。
+            request
+        )
+
+
 STANDARD_CAMPAIGN_MAP_OBSERVER = CampaignMapObserver(
     combat=_StandardCombatMapObserver(),
     scanner=_StandardCampaignMapScanner(),
     enemy_searching=_StandardEnemySearchingObserver(),
+    viewport=_StandardCampaignMapViewport(),
 )
