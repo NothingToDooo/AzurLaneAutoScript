@@ -21,6 +21,7 @@ from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplement
 from module.logger import logger
 from module.ui.page import page_campaign_menu, page_event, page_main_white
 
+from .campaign_event_ui import CampaignEventUiContributor, CampaignEventUiExecutor
 from .campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     RuntimeExecutorBuildContext,
@@ -32,6 +33,8 @@ from .campaign_runtime_profile import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+    from module.campaign.event_destination import EventDestinationHost
 
 
 _ANIMATION_PINK = Button(
@@ -336,7 +339,7 @@ class _DetailEventEntryExecutor:
     entrance: _EventEntrance
     detectors: tuple[_Detector, ...]
 
-    def ui_goto_event(self, runtime: object) -> object:
+    def open(self, runtime: EventDestinationHost) -> bool:
         host = _host(runtime)
         if host.appear(self.already.asset, offset=self.already.offset) and host.ui_page_appear(self.already.page):
             logger.info("Already at configured detail event")
@@ -372,7 +375,7 @@ class _DetailEventEntryExecutor:
 
 
 def _validate_detail_operations(operations: frozenset[str], *, wait_until_end: bool) -> None:
-    expected = {"ui_goto_event", "is_event_animation"}
+    expected = {"is_event_animation"}
     if wait_until_end:
         expected.add("event_animation_end")
     if operations != expected:
@@ -394,49 +397,53 @@ def _build_detail_event_entry(context: RuntimeExecutorBuildContext) -> RuntimeEx
         entrance=_EventEntrance.from_options(options["entrance"]),
         detectors=_detectors(options["animation_detectors"]),
     )
-    methods = {
-        RuntimeOperation.UI_GOTO_EVENT: executor.ui_goto_event,
-        RuntimeOperation.IS_EVENT_ANIMATION: executor.is_event_animation,
-    }
+    methods = {RuntimeOperation.IS_EVENT_ANIMATION: executor.is_event_animation}
     if wait_until_end:
         methods[RuntimeOperation.EVENT_ANIMATION_END] = executor.event_animation_end
 
-    return RuntimeExecutorInstance(
+    return CampaignEventUiExecutor(
         {RuntimeExecutorKind.EVENT_UI},
+        CampaignEventUiContributor(destination=executor),
         methods={RuntimeExecutorKind.EVENT_UI: methods},
     )
+
+
+@dataclass(frozen=True, slots=True)
+class _PageEventDestination:
+    already: _AlreadyAtEvent
+    menu_page: object
+    destination: object
+
+    def open(self, runtime: EventDestinationHost) -> bool:
+        host = _host(runtime)
+        if host.appear(self.already.asset, offset=self.already.offset) and host.ui_page_appear(self.already.page):
+            logger.info("Already at configured page event")
+            return True
+        host.ui_ensure(self.menu_page)
+        if not host.is_event_entrance_available():
+            return False
+        host.ui_goto(self.destination)
+        return True
 
 
 def _build_page_event_entry(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
     options = context.options(RuntimeExecutorKind.EVENT_UI)
     operations = _operations(options)
-    already = _mapping(options["already"], "already")
-    already_asset = _button(_string(already, "asset"))
-    already_offset = cast("tuple[int, int]", _int_tuple(already, "offset", 2))
-    already_page = _page(_string(already, "page"))
-    menu_page = _page(_string(options, "menu_page"))
-    destination = _page(_string(options, "destination"))
+    destination = _PageEventDestination(
+        already=_AlreadyAtEvent.from_options(options["already"]),
+        menu_page=_page(_string(options, "menu_page")),
+        destination=_page(_string(options, "destination")),
+    )
     blocked_page_value = options.get("exp_info_blocked_page")
     blocked_page = None if blocked_page_value is None else _page(cast("str", blocked_page_value))
-    expected = {"ui_goto_event"}
+    expected: set[str] = set()
     if blocked_page is not None:
         expected.add("handle_exp_info")
     if operations != expected:
         message = f"page event entry operations mismatch: expected={sorted(expected)}, actual={sorted(operations)}"
         raise CampaignRuntimeProfileError(message)
 
-    def ui_goto_event(runtime: object) -> object:
-        host = _host(runtime)
-        if host.appear(already_asset, offset=already_offset) and host.ui_page_appear(already_page):
-            logger.info("Already at configured page event")
-            return True
-        host.ui_ensure(menu_page)
-        if not host.is_event_entrance_available():
-            return False
-        host.ui_goto(destination)
-        return True
-
-    methods = {RuntimeOperation.UI_GOTO_EVENT: ui_goto_event}
+    methods = {}
     if blocked_page is not None:
 
         def handle_exp_info(runtime: object) -> object:
@@ -447,8 +454,9 @@ def _build_page_event_entry(context: RuntimeExecutorBuildContext) -> RuntimeExec
 
         methods[RuntimeOperation.HANDLE_EXP_INFO] = handle_exp_info
 
-    return RuntimeExecutorInstance(
+    return CampaignEventUiExecutor(
         {RuntimeExecutorKind.EVENT_UI},
+        CampaignEventUiContributor(destination=destination),
         methods={RuntimeExecutorKind.EVENT_UI: methods},
     )
 

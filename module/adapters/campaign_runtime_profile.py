@@ -65,7 +65,6 @@ class RuntimeOperation(StrEnum):
     MAP_GET_INFO = "map_get_info"
     MAP_INIT = "map_init"
     STRATEGY_SET_EXECUTE = "strategy_set_execute"
-    UI_GOTO_EVENT = "ui_goto_event"
     RUNTIME_CREATED = "runtime_created"
 
 
@@ -762,14 +761,19 @@ class CampaignRuntimeProfileManager:
     def executor_instance(self, kind: RuntimeExecutorKind) -> RuntimeExecutorInstance | None:
         """返回由 profile 编译出的唯一 typed executor。"""
 
-        if not isinstance(kind, RuntimeExecutorKind):
-            message = "runtime executor lookup requires a RuntimeExecutorKind"
-            raise TypeError(message)
-        values = tuple(facet.instance for facet in self._facets if facet.binding.kind is kind)
+        values = self.executor_instances(kind)
         if len(values) > 1:
             message = f"runtime profile contains more than one {kind.value} executor"
             raise CampaignRuntimeProfileError(message)
         return None if not values else values[0]
+
+    def executor_instances(self, kind: RuntimeExecutorKind) -> tuple[RuntimeExecutorInstance, ...]:
+        """按 profile 声明顺序返回一个 kind 的全部已编译 executor。"""
+
+        if not isinstance(kind, RuntimeExecutorKind):
+            message = "runtime executor lookup requires a RuntimeExecutorKind"
+            raise TypeError(message)
+        return tuple(facet.instance for facet in self._facets if facet.binding.kind is kind)
 
     def apply_config(self, config: AzurLaneConfig) -> None:
         if not isinstance(config, AzurLaneConfig):

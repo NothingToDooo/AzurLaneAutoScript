@@ -8,6 +8,7 @@ from module.adapters.campaign_auto_search_mumu12 import (
     Mumu12CampaignAutoSearchExecutor,
     Mumu12CommittedAutoSearchUnit,
 )
+from module.adapters.campaign_event_ui import CampaignEventUiServices, build_campaign_event_ui_services
 from module.adapters.campaign_live import (
     CampaignMapRuntime,
     CommittedCampaignUnit,
@@ -456,6 +457,7 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
     session_variant: CampaignRunVariant
     fleet_destination: object | None
     _gems_behavior: Mumu12GemsRuntimeBehavior | None
+    _event_ui_services: CampaignEventUiServices
     _runtime_profile: CampaignRuntimeProfileManager
     _runtime_profile_lease: RuntimeProfileLease
     grid_class: type[Grid]
@@ -493,7 +495,14 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
         self._runtime_profile.apply_runtime_tunings(self)
         self._runtime_profile.bind(self, self.MAP)
         self._runtime_profile_lease = RuntimeProfileLease(self._runtime_profile)
-        self.stage_navigator = build_campaign_stage_navigator(self, self._runtime_profile)
+        self._event_ui_services = build_campaign_event_ui_services(
+            self._runtime_profile.executor_instances(RuntimeExecutorKind.EVENT_UI)
+        )
+        self.stage_navigator = build_campaign_stage_navigator(
+            self,
+            self._runtime_profile,
+            self._event_ui_services,
+        )
 
     def runtime_super(
         self,

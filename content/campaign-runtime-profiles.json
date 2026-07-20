@@ -446,8 +446,7 @@
             },
             "menu_page": "campaign_menu",
             "operations": [
-              "is_event_animation",
-              "ui_goto_event"
+              "is_event_animation"
             ],
             "wait_until_animation_end": false
           }
@@ -956,9 +955,7 @@
           "implementation": "event_20221124_cn/campaign_base/campaign_base",
           "kind": "event_ui",
           "options": {
-            "operations": [
-              "ui_goto_event"
-            ]
+            "operations": []
           }
         },
         {
@@ -1780,8 +1777,7 @@
             "exp_info_blocked_page": "event",
             "menu_page": "campaign_menu",
             "operations": [
-              "handle_exp_info",
-              "ui_goto_event"
+              "handle_exp_info"
             ]
           }
         }
@@ -1804,9 +1800,7 @@
             },
             "destination": "event",
             "menu_page": "campaign_menu",
-            "operations": [
-              "ui_goto_event"
-            ]
+            "operations": []
           }
         }
       ],
@@ -2044,8 +2038,7 @@
             "menu_page": "campaign_menu",
             "operations": [
               "event_animation_end",
-              "is_event_animation",
-              "ui_goto_event"
+              "is_event_animation"
             ],
             "wait_until_animation_end": true
           }

@@ -1,12 +1,14 @@
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Protocol, cast, override
 
 from module.campaign.assets import EVENT_20221124_ENTRANCE, EVENT_20221124_PT_ICON
+from module.campaign.event_destination import EventDestination, EventDestinationHost
 from module.combat.assets import GET_ITEMS_1_RYZA
 from module.content.runtime_profile import RuntimeExecutorKind, RuntimeImplementationId, RuntimeTuningValue
 from module.handler.assets import MYSTERY_ITEM
 from module.logger import logger
 from module.ui.page import page_campaign_menu, page_event
 
+from .campaign_event_ui import CampaignEventUiContributor, CampaignEventUiExecutor
 from .campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     RuntimeExecutorBuildContext,
@@ -135,21 +137,9 @@ def _build_t4_observation(context: RuntimeExecutorBuildContext) -> RuntimeExecut
     )
 
 
-def _build_ryza_campaign(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
-    event_ui_options = context.options(RuntimeExecutorKind.EVENT_UI)
-    _require_operations(
-        event_ui_options,
-        frozenset({"ui_goto_event"}),
-        label="event_20221124 event UI",
-    )
-    mechanic_options = context.options(RuntimeExecutorKind.MAP_MECHANIC)
-    _require_operations(
-        mechanic_options,
-        frozenset({"handle_mystery_items"}),
-        label="event_20221124 map mechanic",
-    )
-
-    def ui_goto_event(runtime: object) -> bool:
+class _RyzaEventDestination(EventDestination):
+    @override
+    def open(self, runtime: EventDestinationHost) -> bool:
         host = cast("_RyzaRuntimeHost", runtime)
         if host.appear(EVENT_20221124_PT_ICON, offset=(20, 20)) and host.ui_page_appear(page_event):
             logger.info("Already at EVENT_20221124")
@@ -164,6 +154,21 @@ def _build_ryza_campaign(context: RuntimeExecutorBuildContext) -> RuntimeExecuto
         )
         return True
 
+
+def _build_ryza_campaign(context: RuntimeExecutorBuildContext) -> RuntimeExecutorInstance:
+    event_ui_options = context.options(RuntimeExecutorKind.EVENT_UI)
+    _require_operations(
+        event_ui_options,
+        frozenset(),
+        label="event_20221124 event UI",
+    )
+    mechanic_options = context.options(RuntimeExecutorKind.MAP_MECHANIC)
+    _require_operations(
+        mechanic_options,
+        frozenset({"handle_mystery_items"}),
+        label="event_20221124 map mechanic",
+    )
+
     def handle_mystery_items(runtime: object, button: object = None) -> bool:
         host = cast("_RyzaRuntimeHost", runtime)
         if host.runtime_super(RuntimeOperation.HANDLE_MYSTERY_ITEMS, button):
@@ -176,12 +181,10 @@ def _build_ryza_campaign(context: RuntimeExecutorBuildContext) -> RuntimeExecuto
         host.device.screenshot()
         return True
 
-    return RuntimeExecutorInstance(
+    return CampaignEventUiExecutor(
         {RuntimeExecutorKind.EVENT_UI, RuntimeExecutorKind.MAP_MECHANIC},
+        CampaignEventUiContributor(destination=_RyzaEventDestination()),
         methods={
-            RuntimeExecutorKind.EVENT_UI: {
-                RuntimeOperation.UI_GOTO_EVENT: ui_goto_event,
-            },
             RuntimeExecutorKind.MAP_MECHANIC: {
                 RuntimeOperation.HANDLE_MYSTERY_ITEMS: handle_mystery_items,
             },

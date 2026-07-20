@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, cast, override
 
 import numpy as np
 
+from module.adapters.campaign_event_ui import build_campaign_event_ui_services
 from module.adapters.campaign_runtime_navigation import (
     CampaignNavigationPlanExecutor,
     Event20240912NavigationPlan,
@@ -244,7 +245,8 @@ class _Event20240912Harness(ProfileCampaignStageNavigator):
         manager: CampaignRuntimeProfileManager,
         plan: Event20240912NavigationPlan,
     ) -> None:
-        super().__init__(cast("CampaignEngine", runtime), manager, plan, None)
+        event_ui = build_campaign_event_ui_services(manager.executor_instances(RuntimeExecutorKind.EVENT_UI))
+        super().__init__(cast("CampaignEngine", runtime), event_ui, plan, None)
         self.base_calls: list[tuple[str, str, str]] = []
 
     def ensure_mode(self, mode: str) -> None:

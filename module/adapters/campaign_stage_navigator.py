@@ -37,13 +37,13 @@ from .campaign_runtime_navigation import (
 from .campaign_runtime_profile import (
     CampaignRuntimeProfileError,
     CampaignRuntimeProfileManager,
-    RuntimeOperation,
 )
 from .campaign_runtime_war_archives import WarArchivesCatalogExecutor
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from module.adapters.campaign_event_ui import CampaignEventUiServices
     from module.base.button import Button
     from module.campaign.campaign_ocr import CampaignStagePage
 
@@ -51,17 +51,17 @@ if TYPE_CHECKING:
 class ProfileCampaignStageNavigator(CampaignStageNavigator):
     """把一个 runtime profile 编译结果收口成单一关卡选择接口。"""
 
-    __slots__ = ("_archives", "_manager", "_page", "_plan", "_runtime")
+    __slots__ = ("_archives", "_event_ui", "_page", "_plan", "_runtime")
 
     def __init__(
         self,
         runtime: CampaignEngine,
-        manager: CampaignRuntimeProfileManager,
+        event_ui: CampaignEventUiServices,
         plan: CampaignNavigationPlan | None,
         archives: WarArchivesCatalogExecutor | None,
     ) -> None:
         self._runtime = runtime
-        self._manager = manager
+        self._event_ui = event_ui
         self._plan = plan
         self._archives = archives
         self._page: CampaignStagePage | None = None
@@ -567,12 +567,7 @@ class ProfileCampaignStageNavigator(CampaignStageNavigator):
     def _open_event(self) -> bool:
         if self._archives is not None:
             return self._archives.open_event(self._runtime)
-        result = self._manager.event_ui.invoke(
-            RuntimeOperation.UI_GOTO_EVENT,
-            self._runtime,
-            lambda: CampaignEngine.ui_goto_event(self._runtime),
-        )
-        return bool(result)
+        return self._event_ui.destination.open(self._runtime)
 
     def _open_campaign(self) -> bool:
         return bool(CampaignEngine.ui_goto_campaign(self._runtime))
@@ -586,6 +581,7 @@ class ProfileCampaignStageNavigator(CampaignStageNavigator):
 def build_campaign_stage_navigator(
     runtime: CampaignEngine,
     manager: CampaignRuntimeProfileManager,
+    event_ui: CampaignEventUiServices,
 ) -> ProfileCampaignStageNavigator:
     navigation = manager.executor_instance(RuntimeExecutorKind.NAVIGATION)
     if navigation is not None and not isinstance(navigation, CampaignNavigationPlanExecutor):
@@ -598,7 +594,7 @@ def build_campaign_stage_navigator(
     plan = None if navigation is None else navigation.plan
     return ProfileCampaignStageNavigator(
         runtime,
-        manager,
+        event_ui,
         plan,
         archives,
     )

@@ -1,7 +1,9 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import pytest
 
+from module.adapters.campaign_event_ui import CampaignEventUiServices, build_campaign_event_ui_services
 from module.adapters.campaign_runtime_profile import (
     CampaignRuntimeExecutorRegistry,
     CampaignRuntimeProfileError,
@@ -21,7 +23,11 @@ from module.content.runtime_profile import (
     RuntimeImplementationId,
 )
 from module.handler.assets import MYSTERY_ITEM
-from module.ui.page import page_campaign_menu, page_event
+from module.ui.page import page_campaign_menu, page_event, page_main
+
+if TYPE_CHECKING:
+    from module.base.button import Button, MatchOffset
+    from module.ui.page import Page
 
 _T4_IMPLEMENTATION = "event_20211125_cn/t4/campaign"
 _RYZA_IMPLEMENTATION = "event_20221124_cn/campaign_base/campaign_base"
@@ -56,8 +62,9 @@ class _Runtime:
         self.map_is_clear_mode = False
         self.visible_asset: object | None = None
         self.visible_page: object | None = None
+        self.current_page = page_campaign_menu
         self.event_entrance_available = False
-        self.appear_calls: list[tuple[object, tuple[int, ...]]] = []
+        self.appear_calls: list[tuple[object, tuple[object, ...]]] = []
         self.ensured_pages: list[object] = []
         self.ui_clicks: list[tuple[object, object, object]] = []
 
@@ -70,15 +77,43 @@ class _Runtime:
     ) -> object:
         return self.manager.invoke_super(operation, self, *args, **kwargs)
 
-    def appear(self, button: object, *, offset: tuple[int, ...]) -> bool:
-        self.appear_calls.append((button, offset))
+    def appear(
+        self,
+        button: Button,
+        offset: MatchOffset | None = 0,
+        interval: float = 0,
+        similarity: float = 0.85,
+        threshold: int = 10,
+    ) -> bool:
+        del interval, similarity, threshold
+        recorded_offset = offset if isinstance(offset, tuple) else ()
+        self.appear_calls.append((button, recorded_offset))
         return button is self.visible_asset
+
+    def ui_get_current_page(self, *, skip_first_screenshot: bool = True) -> Page:
+        del skip_first_screenshot
+        return self.current_page
 
     def ui_page_appear(self, page: object) -> bool:
         return page is self.visible_page
 
     def ui_ensure(self, page: object) -> None:
         self.ensured_pages.append(page)
+
+    def ui_goto_main(self) -> bool:
+        self.current_page = page_main
+        return True
+
+    def ui_goto(
+        self,
+        destination: Page,
+        *,
+        get_ship: bool = True,
+        offset: MatchOffset | None = (30, 30),
+        skip_first_screenshot: bool = True,
+    ) -> None:
+        del get_ship, offset, skip_first_screenshot
+        self.current_page = destination
 
     def is_event_entrance_available(self) -> bool:
         return self.event_entrance_available
@@ -136,7 +171,7 @@ def _ryza_manager() -> CampaignRuntimeProfileManager:
         _binding(
             _RYZA_IMPLEMENTATION,
             RuntimeExecutorKind.EVENT_UI,
-            ["ui_goto_event"],
+            [],
         ),
         _binding(
             _RYZA_IMPLEMENTATION,
@@ -144,6 +179,10 @@ def _ryza_manager() -> CampaignRuntimeProfileManager:
             ["handle_mystery_items"],
         ),
     )
+
+
+def _event_ui_services(manager: CampaignRuntimeProfileManager) -> CampaignEventUiServices:
+    return build_campaign_event_ui_services(manager.executor_instances(RuntimeExecutorKind.EVENT_UI))
 
 
 def test_t4_observation_preserves_base_camera_repositioning_result() -> None:
@@ -197,11 +236,7 @@ def test_ryza_event_ui_recognizes_the_existing_event_page() -> None:
     runtime.visible_asset = EVENT_20221124_PT_ICON
     runtime.visible_page = page_event
 
-    result = manager.event_ui.invoke(
-        RuntimeOperation.UI_GOTO_EVENT,
-        runtime,
-        lambda: False,
-    )
+    result = _event_ui_services(manager).destination.open(runtime)
 
     assert result is True
     assert runtime.appear_calls == [(EVENT_20221124_PT_ICON, (20, 20))]
@@ -214,11 +249,7 @@ def test_ryza_event_ui_uses_the_closed_event_assets() -> None:
     runtime = _Runtime(manager)
     runtime.event_entrance_available = True
 
-    result = manager.event_ui.invoke(
-        RuntimeOperation.UI_GOTO_EVENT,
-        runtime,
-        lambda: False,
-    )
+    result = _event_ui_services(manager).destination.open(runtime)
 
     assert result is True
     assert runtime.ensured_pages == [page_campaign_menu]
@@ -235,11 +266,7 @@ def test_ryza_event_ui_stops_when_the_event_entrance_is_unavailable() -> None:
     manager = _ryza_manager()
     runtime = _Runtime(manager)
 
-    result = manager.event_ui.invoke(
-        RuntimeOperation.UI_GOTO_EVENT,
-        runtime,
-        lambda: False,
-    )
+    result = _event_ui_services(manager).destination.open(runtime)
 
     assert result is False
     assert runtime.ensured_pages == [page_campaign_menu]
@@ -317,6 +344,6 @@ def test_ryza_executor_requires_both_facets() -> None:
             _binding(
                 _RYZA_IMPLEMENTATION,
                 RuntimeExecutorKind.EVENT_UI,
-                ["ui_goto_event"],
+                [],
             )
         )

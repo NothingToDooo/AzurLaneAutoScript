@@ -585,7 +585,6 @@ def test_every_remaining_profile_operation_has_an_explicit_dispatch_boundary() -
         RuntimeExecutorKind.MAP_GRID_RECOGNITION,
         RuntimeExecutorKind.CAMERA_GRID_RECOGNITION,
     }
-    direct_dispatch = {(RuntimeExecutorKind.EVENT_UI, "ui_goto_event")}
     missing: set[str] = set()
     for extension in registry.extensions.values():
         for binding in extension.executors:
@@ -596,9 +595,7 @@ def test_every_remaining_profile_operation_has_an_explicit_dispatch_boundary() -
                 missing.update(
                     operation
                     for operation in operations
-                    if isinstance(operation, str)
-                    and (binding.kind, operation) not in direct_dispatch
-                    and operation not in DeclarativeCampaignMapRuntime.__dict__
+                    if isinstance(operation, str) and operation not in DeclarativeCampaignMapRuntime.__dict__
                 )
 
     assert missing == set()
