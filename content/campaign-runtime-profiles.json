@@ -3239,14 +3239,6 @@
           }
         },
         {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
-        },
-        {
           "key": "poor_map_data",
           "value": true
         },
@@ -3327,14 +3319,6 @@
         {
           "key": "homo_edge_houghlines_threshold",
           "value": 280
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 3
         },
         {
           "key": "submarine",
@@ -4038,14 +4022,6 @@
           "value": 280
         },
         {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
-        },
-        {
           "key": "submarine",
           "value": 0
         }
@@ -4295,14 +4271,6 @@
             "prominence": 10,
             "width": 1
           }
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
         },
         {
           "key": "poor_map_data",
@@ -4807,10 +4775,6 @@
         {
           "key": "map_swipe_predict_with_sea_grids",
           "value": false
-        },
-        {
-          "key": "map_walk_turning_optimize",
-          "value": false
         }
       ]
     },
@@ -5285,14 +5249,6 @@
               50
             ]
           }
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
         },
         {
           "key": "mid_diff_range_h",
@@ -5885,14 +5841,6 @@
               10
             ]
           }
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": true
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
         },
         {
           "key": "poor_map_data",
@@ -6759,14 +6707,6 @@
           }
         },
         {
-          "key": "map_has_dynamic_red_border",
-          "value": true
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
-        },
-        {
           "key": "poor_map_data",
           "value": true
         },
@@ -7181,18 +7121,6 @@
           "value": 0.3
         },
         {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_has_pt_bonus",
-          "value": true
-        },
-        {
-          "key": "map_siren_count",
-          "value": 3
-        },
-        {
           "key": "mid_diff_range_h",
           "value": [
             45,
@@ -7287,18 +7215,6 @@
         {
           "key": "map_grid_center_tolerance",
           "value": 0.3
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_has_pt_bonus",
-          "value": true
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
         },
         {
           "key": "mid_diff_range_h",
@@ -9150,14 +9066,6 @@
           }
         },
         {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
-        },
-        {
           "key": "poor_map_data",
           "value": true
         },
@@ -9227,14 +9135,6 @@
               50
             ]
           }
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 1
         },
         {
           "key": "mid_diff_range_h",
@@ -9459,14 +9359,6 @@
             ],
             "prominence": 10
           }
-        },
-        {
-          "key": "map_air_strike_overlay_transparency_threshold",
-          "value": 0.35
-        },
-        {
-          "key": "map_walk_turning_optimize",
-          "value": false
         }
       ]
     },
@@ -9614,10 +9506,6 @@
             "Carrier",
             "CarrierSpecial"
           ]
-        },
-        {
-          "key": "map_walk_turning_optimize",
-          "value": false
         }
       ]
     },
@@ -10099,14 +9987,6 @@
           }
         },
         {
-          "key": "map_has_dynamic_red_border",
-          "value": true
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
-        },
-        {
           "key": "poor_map_data",
           "value": true
         },
@@ -10148,14 +10028,6 @@
         {
           "key": "homo_edge_houghlines_threshold",
           "value": 280
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 1
         },
         {
           "key": "submarine",
@@ -10670,10 +10542,6 @@
           ]
         },
         {
-          "key": "map_walk_turning_optimize",
-          "value": false
-        },
-        {
           "key": "map_walk_use_current_fleet",
           "value": true
         }
@@ -11005,14 +10873,6 @@
         {
           "key": "homo_edge_houghlines_threshold",
           "value": 350
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
         },
         {
           "key": "submarine",
@@ -11726,14 +11586,6 @@
             ],
             "prominence": 10
           }
-        },
-        {
-          "key": "map_air_strike_overlay_transparency_threshold",
-          "value": 0.35
-        },
-        {
-          "key": "map_walk_turning_optimize",
-          "value": false
         }
       ]
     },
@@ -12663,18 +12515,6 @@
         {
           "key": "map_grid_center_tolerance",
           "value": 0.3
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_has_pt_bonus",
-          "value": true
-        },
-        {
-          "key": "map_siren_count",
-          "value": 1
         },
         {
           "key": "mid_diff_range_h",
@@ -13789,14 +13629,6 @@
         {
           "key": "homo_edge_houghlines_threshold",
           "value": 280
-        },
-        {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 1
         },
         {
           "key": "submarine",
@@ -15044,14 +14876,6 @@
           }
         },
         {
-          "key": "map_has_dynamic_red_border",
-          "value": false
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
-        },
-        {
           "key": "poor_map_data",
           "value": true
         },
@@ -16109,10 +15933,6 @@
         },
         {
           "key": "map_swipe_predict_with_sea_grids",
-          "value": false
-        },
-        {
-          "key": "map_walk_turning_optimize",
           "value": false
         },
         {
@@ -17287,10 +17107,6 @@
             "Carrier",
             "CarrierSpecial"
           ]
-        },
-        {
-          "key": "map_walk_turning_optimize",
-          "value": false
         }
       ]
     },
@@ -18883,14 +18699,6 @@
           }
         },
         {
-          "key": "map_has_dynamic_red_border",
-          "value": true
-        },
-        {
-          "key": "map_siren_count",
-          "value": 2
-        },
-        {
           "key": "poor_map_data",
           "value": true
         },
@@ -18978,10 +18786,6 @@
         {
           "key": "homo_edge_houghlines_threshold",
           "value": 210
-        },
-        {
-          "key": "map_walk_turning_optimize",
-          "value": false
         }
       ]
     },

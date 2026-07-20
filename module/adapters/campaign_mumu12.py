@@ -472,7 +472,6 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):
     _runtime_profile_lease: RuntimeProfileLease
     grid_class: type[Grid]
     MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD: float
-    MAP_AIR_STRIKE_OVERLAY_TRANSPARENCY_THRESHOLD: float
     MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD: float
     MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD: float
 

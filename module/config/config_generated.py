@@ -44,10 +44,8 @@ class ConfigOverrides(TypedDict, total=False):
     MAP_HAS_MOVABLE_ENEMY: bool
     MAP_HAS_MOVABLE_NORMAL_ENEMY: bool
     MAP_HAS_SIREN: bool
-    MAP_HAS_DYNAMIC_RED_BORDER: bool
     MAP_HAS_MAP_STORY: bool
     MAP_HAS_WALL: bool
-    MAP_HAS_PT_BONUS: bool
     MAP_IS_ONE_TIME_STAGE: bool
     MAP_HAS_PORTAL: bool
     MAP_HAS_LAND_BASED: bool
@@ -62,7 +60,6 @@ class ConfigOverrides(TypedDict, total=False):
     MAP_ENEMY_GENRE_DETECTION_SCALING: dict[str, MutableDeepValue]
     MAP_ENEMY_GENRE_SIMILARITY: float
     MAP_SIREN_MOVE_WAIT: float
-    MAP_SIREN_COUNT: int
     MAP_SIREN_HAS_BOSS_ICON: bool
     MAP_SIREN_HAS_BOSS_ICON_SMALL: bool
     MAP_HAS_MYSTERY: bool
@@ -81,7 +78,6 @@ class ConfigOverrides(TypedDict, total=False):
     MAP_SWIPE_PREDICT_WITH_SEA_GRIDS: bool
     MAP_ENSURE_EDGE_INSIGHT_CORNER: str
     MAP_WALK_USE_CURRENT_FLEET: bool
-    MAP_WALK_TURNING_OPTIMIZE: bool
     MAP_SWIPE_OPTIMIZE: bool
     MAP_BOSS_APPEAR_REFOCUS_SWIPE: tuple[int, ...]
     SCREEN_SIZE: tuple[int, ...]

@@ -91,10 +91,8 @@ class ManualConfig:
     MAP_HAS_MOVABLE_ENEMY = False
     MAP_HAS_MOVABLE_NORMAL_ENEMY = False
     MAP_HAS_SIREN = False
-    MAP_HAS_DYNAMIC_RED_BORDER = False
     MAP_HAS_MAP_STORY = False  # event_20200521_cn(穹顶下的圣咏曲) adds after-combat story.
     MAP_HAS_WALL = False  # event_20200521_cn(穹顶下的圣咏曲) adds wall between grids.
-    MAP_HAS_PT_BONUS = False  # 100% PT bonus if success to catch enemy else 50%. Retreat get 0%.
     MAP_IS_ONE_TIME_STAGE = False
     MAP_HAS_PORTAL = False
     MAP_HAS_LAND_BASED = False
@@ -110,7 +108,6 @@ class ManualConfig:
     MAP_ENEMY_GENRE_DETECTION_SCALING: ClassVar[dict[str, float]] = {}
     MAP_ENEMY_GENRE_SIMILARITY = 0.85
     MAP_SIREN_MOVE_WAIT = 1.5  # The enemy moving takes about 1.2 ~ 1.5s.
-    MAP_SIREN_COUNT = 0
     MAP_SIREN_HAS_BOSS_ICON = False  # Anonymous siren with small boss icon at bottom-right
     MAP_SIREN_HAS_BOSS_ICON_SMALL = False
     MAP_HAS_MYSTERY = True
@@ -141,8 +138,6 @@ class ManualConfig:
     MAP_ENSURE_EDGE_INSIGHT_CORNER = ""
     # Use the green arrow on current fleet to decide if fleet arrived a certain grid
     MAP_WALK_USE_CURRENT_FLEET = False
-    # Optimize walk path, reducing ambushes
-    MAP_WALK_TURNING_OPTIMIZE = True
     # Optimize swipe path, reducing swipes turn info clicks.
     MAP_SWIPE_OPTIMIZE = True
     # Swipe after boss appear. Could avoid map detection error when camera is on edge.

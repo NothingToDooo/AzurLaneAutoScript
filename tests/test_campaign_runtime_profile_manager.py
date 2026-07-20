@@ -57,7 +57,6 @@ class _Config(AzurLaneConfig):
 
 class _Runtime:
     MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD = 0.0
-    MAP_AIR_STRIKE_OVERLAY_TRANSPARENCY_THRESHOLD = 0.0
     MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD = 0.0
     MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD = 0.0
 
@@ -496,7 +495,6 @@ def test_tuning_projection_is_exhaustive_and_does_not_leak_between_runtimes() ->
     assert config.overlays[0]["Submarine_Fleet"] == 1
     assert manager.configured_boss_fleet == 1
     assert runtime.MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD == 1.0
-    assert runtime.MAP_AIR_STRIKE_OVERLAY_TRANSPARENCY_THRESHOLD == 1.0
     assert runtime.MAP_AMBUSH_OVERLAY_TRANSPARENCY_THRESHOLD == 1.0
     assert runtime.MAP_ENEMY_SEARCHING_OVERLAY_TRANSPARENCY_THRESHOLD == 1.0
     assert untouched.MAP_AIR_RAID_OVERLAY_TRANSPARENCY_THRESHOLD == 0.0
