@@ -768,58 +768,11 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
             return
         CampaignEngine.combat_status(self, expected_end=expected_end)
 
-    def ensure_no_stage_entrance(self, *, skip_first_screenshot: bool = True) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.ENSURE_NO_STAGE_ENTRANCE,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.ENSURE_NO_STAGE_ENTRANCE),
-            skip_first_screenshot=skip_first_screenshot,
-        )
-        return bool(result)
-
-    def event_20230817_story(self, *, skip_first_screenshot: bool = True) -> None:
-        self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.EVENT_20230817_STORY,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.EVENT_20230817_STORY),
-            skip_first_screenshot=skip_first_screenshot,
-        )
-
     def event_animation_end(self) -> bool:
         result = self._runtime_profile.event_ui.invoke(
             RuntimeOperation.EVENT_ANIMATION_END,
             self,
             partial(self._missing_runtime_base, RuntimeOperation.EVENT_ANIMATION_END),
-        )
-        return bool(result)
-
-    def get_story_button(self) -> object | None:
-        return self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.GET_STORY_BUTTON,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.GET_STORY_BUTTON),
-        )
-
-    def get_story_entrance(self) -> object | None:
-        return self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.GET_STORY_ENTRANCE,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.GET_STORY_ENTRANCE),
-        )
-
-    def handle_campaign_ui_additional(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.HANDLE_CAMPAIGN_UI_ADDITIONAL,
-            self,
-            lambda: CampaignEngine.handle_campaign_ui_additional(self),
-        )
-        return bool(result)
-
-    def handle_chapter_additional(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.HANDLE_CHAPTER_ADDITIONAL,
-            self,
-            CampaignEngine.handle_chapter_additional,
         )
         return bool(result)
 
@@ -831,27 +784,11 @@ class DeclarativeCampaignMapRuntime(CampaignEngine):  # ruff:ignore[too-many-pub
         )
         return bool(result)
 
-    def handle_get_chapter_additional(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.HANDLE_GET_CHAPTER_ADDITIONAL,
-            self,
-            lambda: CampaignEngine.handle_get_chapter_additional(self),
-        )
-        return bool(result)
-
     def handle_in_stage(self) -> bool:
         result = self._runtime_profile.event_ui.invoke(
             RuntimeOperation.HANDLE_IN_STAGE,
             self,
             lambda: CampaignEngine.handle_in_stage(self),
-        )
-        return bool(result)
-
-    def handle_story_entrance(self) -> bool:
-        result = self._runtime_profile.event_ui.invoke(
-            RuntimeOperation.HANDLE_STORY_ENTRANCE,
-            self,
-            partial(self._missing_runtime_base, RuntimeOperation.HANDLE_STORY_ENTRANCE),
         )
         return bool(result)
 

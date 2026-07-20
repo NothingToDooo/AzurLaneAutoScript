@@ -89,14 +89,14 @@ class ProfileCampaignStageNavigator(CampaignStageNavigator):
             except CampaignNameError:
                 pass
 
-            if self._handle_campaign_ui_additional():
+            if self._recover_campaign_selection():
                 continue
 
         logger.warning(CAMPAIGN_NAME_ERROR_MESSAGE)
         raise CampaignSelectionError(CAMPAIGN_NAME_ERROR_MESSAGE)
 
-    def _handle_campaign_ui_additional(self) -> bool:
-        return self._runtime.handle_campaign_ui_additional()
+    def _recover_campaign_selection(self) -> bool:
+        return self._event_ui.stage_recovery.recover_campaign_selection(self._runtime)
 
     def _select_chapter(self, name: str, mode: str) -> None:
         chapter, stage = self._separate_name(name)
@@ -460,7 +460,7 @@ class ProfileCampaignStageNavigator(CampaignStageNavigator):
                 skip_first_screenshot = False
             else:
                 self._runtime.device.screenshot()
-            if self._runtime.handle_chapter_additional():
+            if self._event_ui.stage_recovery.recover_chapter_selection(self._runtime):
                 continue
             page = self._current_page()
             current = self._chapter_index(page.chapter)
@@ -499,7 +499,7 @@ class ProfileCampaignStageNavigator(CampaignStageNavigator):
                     match_similarity=self._match_similarity,
                 )
             except IndexError, CampaignNameError:
-                if self._runtime.handle_get_chapter_additional():
+                if self._event_ui.stage_recovery.recover_stage_page(self._runtime):
                     continue
             else:
                 self._page = page

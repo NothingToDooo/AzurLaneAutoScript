@@ -1087,9 +1087,6 @@
           "kind": "event_ui",
           "options": {
             "operations": [
-              "event_20230817_story",
-              "get_story_button",
-              "handle_chapter_additional",
               "is_stage_page_has_entrance"
             ]
           }
@@ -1553,13 +1550,8 @@
           "options": {
             "exp_info_blocked_page": "event",
             "operations": [
-              "ensure_no_stage_entrance",
-              "get_story_entrance",
-              "handle_campaign_ui_additional",
               "handle_exp_info",
-              "handle_get_chapter_additional",
-              "handle_in_stage",
-              "handle_story_entrance"
+              "handle_in_stage"
             ],
             "state": [
               "entrance_timer"

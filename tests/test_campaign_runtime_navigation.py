@@ -4,6 +4,7 @@ from typing import cast
 
 import pytest
 
+from module.adapters.campaign_event_ui import CampaignEventUiServices
 from module.adapters.campaign_runtime_navigation import (
     BallChapterNavigationPlan,
     CampaignBallOperation,
@@ -24,6 +25,7 @@ from module.adapters.campaign_stage_navigator import ProfileCampaignStageNavigat
 from module.base.button import Button
 from module.campaign.campaign_engine import CampaignEngine
 from module.campaign.campaign_ocr import CampaignStagePage
+from module.campaign.event_destination import STANDARD_EVENT_DESTINATION
 from module.content.runtime_profile import (
     CampaignRuntimeExtension,
     CampaignRuntimeExtensionId,
@@ -35,6 +37,7 @@ from module.content.runtime_profile import (
     RuntimeTuningValue,
 )
 from module.content.runtime_profile_catalog import load_default_campaign_runtime_profile_registry
+from module.exception import CampaignNameError
 
 _ROUTE_PLAN = "navigation/chapter_route_plan"
 _BALL_ROUTE = "navigation/ball_chapter_route"
@@ -115,7 +118,7 @@ class _Runtime:
     def __init__(self) -> None:
         self.info_bar_count = 0
         self.config = SimpleNamespace(MAP_HAS_MODE_SWITCH=False)
-        self.device = SimpleNamespace(screenshot=lambda: None)
+        self.device = SimpleNamespace(image=object(), screenshot=lambda: None)
 
     def handle_info_bar(self) -> bool:
         self.info_bar_count += 1
@@ -166,6 +169,84 @@ class _NavigationHarness(ProfileCampaignStageNavigator):
 
     def ball_status(self, plan: BallChapterNavigationPlan, chapter: str, stage: str) -> str:
         return self._ball_status(plan, chapter, stage)
+
+
+class _RecordingStageRecovery:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def recover_campaign_selection(self, runtime: CampaignEngine) -> bool:
+        del runtime
+        self.calls.append("campaign")
+        return False
+
+    def recover_chapter_selection(self, runtime: CampaignEngine) -> bool:
+        del runtime
+        self.calls.append("chapter")
+        return False
+
+    def recover_stage_page(self, runtime: CampaignEngine) -> bool:
+        del runtime
+        self.calls.append("get-chapter")
+        return False
+
+
+class _DirectRecoveryNavigator(ProfileCampaignStageNavigator):
+    def handle_campaign_recovery(self) -> bool:
+        return self._recover_campaign_selection()
+
+    def ensure_chapter(self, chapter: str | int) -> None:
+        self._ensure_chapter(chapter)
+
+    def current_page(self) -> CampaignStagePage:
+        return self._current_page()
+
+
+def test_stage_navigator_calls_typed_recovery_services_directly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recovery = _RecordingStageRecovery()
+    services = CampaignEventUiServices(
+        destination=STANDARD_EVENT_DESTINATION,
+        stage_recovery=recovery,
+    )
+    runtime = cast("CampaignEngine", _Runtime())
+    navigator = _DirectRecoveryNavigator(runtime, services, None, None)
+
+    assert not navigator.handle_campaign_recovery()
+
+    def current_page(
+        _navigator: ProfileCampaignStageNavigator,
+        *,
+        skip_first_screenshot: bool = True,
+    ) -> CampaignStagePage:
+        del skip_first_screenshot
+        return CampaignStagePage("1", {})
+
+    with monkeypatch.context() as patch:
+        patch.setattr(ProfileCampaignStageNavigator, "_current_page", current_page)
+        navigator.ensure_chapter(1)
+
+    reads = 0
+
+    def read_stage_page(
+        _runtime: CampaignEngine,
+        image: object,
+        *,
+        normalize_result: Callable[[str], str],
+        separate_name: Callable[[str], tuple[str, str]],
+        match_similarity: float | None = None,
+    ) -> CampaignStagePage:
+        nonlocal reads
+        del image, normalize_result, separate_name, match_similarity
+        reads += 1
+        if reads == 1:
+            raise CampaignNameError
+        return CampaignStagePage("1", {})
+
+    monkeypatch.setattr(CampaignEngine, "read_stage_page", read_stage_page)
+    assert navigator.current_page().chapter == "1"
+    assert recovery.calls == ["campaign", "chapter", "get-chapter"]
 
 
 def test_route_plan_validates_nested_options_during_manager_construction() -> None:

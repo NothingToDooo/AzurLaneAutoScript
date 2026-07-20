@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, override, runtime_checkable
 
+from module.campaign.campaign_engine import CampaignEngine
 from module.campaign.event_destination import STANDARD_EVENT_DESTINATION, EventDestination
 from module.content.errors import ContentValidationError
 from module.content.runtime_profile import RuntimeExecutorKind
@@ -8,7 +9,28 @@ from module.content.runtime_profile import RuntimeExecutorKind
 from .campaign_runtime_profile import RuntimeExecutorInstance, RuntimeMethod, RuntimeOperation
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
+    from collections.abc import Callable, Iterable, Mapping
+
+
+class EventStageRecovery(Protocol):
+    """关卡选择循环中的活动页面恢复能力。"""
+
+    def recover_campaign_selection(self, runtime: CampaignEngine) -> bool: ...
+
+    def recover_chapter_selection(self, runtime: CampaignEngine) -> bool: ...
+
+    def recover_stage_page(self, runtime: CampaignEngine) -> bool: ...
+
+
+type EventStageRecoveryNext = Callable[[CampaignEngine], bool]
+type EventStageRecoveryHandler = Callable[[CampaignEngine, EventStageRecoveryNext], bool]
+
+
+@dataclass(frozen=True, slots=True)
+class CampaignEventStageRecoveryContributor:
+    recover_campaign_selection: EventStageRecoveryHandler | None = None
+    recover_chapter_selection: EventStageRecoveryHandler | None = None
+    recover_stage_page: EventStageRecoveryHandler | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,6 +38,7 @@ class CampaignEventUiContributor:
     """一个 runtime executor 对活动 UI typed services 的贡献。"""
 
     destination: EventDestination | None = None
+    stage_recovery: CampaignEventStageRecoveryContributor | None = None
 
 
 @runtime_checkable
@@ -56,18 +79,92 @@ class CampaignEventUiServices:
     """每个 runtime 只编译一次的活动 UI 能力集合。"""
 
     destination: EventDestination
+    stage_recovery: EventStageRecovery
+
+
+class _StandardEventStageRecovery(EventStageRecovery):
+    @override
+    def recover_campaign_selection(self, runtime: CampaignEngine) -> bool:
+        return bool(CampaignEngine.handle_campaign_ui_additional(runtime))
+
+    @override
+    def recover_chapter_selection(self, runtime: CampaignEngine) -> bool:
+        del runtime
+        return bool(CampaignEngine.handle_chapter_additional())
+
+    @override
+    def recover_stage_page(self, runtime: CampaignEngine) -> bool:
+        return bool(CampaignEngine.handle_get_chapter_additional(runtime))
+
+
+@dataclass(frozen=True, slots=True)
+class _ComposedEventStageRecovery(EventStageRecovery):
+    recover_campaign_selection_handler: EventStageRecoveryNext
+    recover_chapter_selection_handler: EventStageRecoveryNext
+    recover_stage_page_handler: EventStageRecoveryNext
+
+    @override
+    def recover_campaign_selection(self, runtime: CampaignEngine) -> bool:
+        return self.recover_campaign_selection_handler(runtime)
+
+    @override
+    def recover_chapter_selection(self, runtime: CampaignEngine) -> bool:
+        return self.recover_chapter_selection_handler(runtime)
+
+    @override
+    def recover_stage_page(self, runtime: CampaignEngine) -> bool:
+        return self.recover_stage_page_handler(runtime)
+
+
+def _overlay_recovery(
+    handler: EventStageRecoveryHandler,
+    next_handler: EventStageRecoveryNext,
+) -> EventStageRecoveryNext:
+    def execute(runtime: CampaignEngine) -> bool:
+        return handler(runtime, next_handler)
+
+    return execute
 
 
 def build_campaign_event_ui_services(
     instances: Iterable[object],
 ) -> CampaignEventUiServices:
-    """按 profile 声明顺序组合能力；同一职责由最后一个声明覆盖。"""
+    """按 profile 顺序组合能力；destination 后者覆盖，recovery 后者先处理并可续传。"""
 
     destination = STANDARD_EVENT_DESTINATION
+    standard_recovery = _StandardEventStageRecovery()
+    recover_campaign_selection = standard_recovery.recover_campaign_selection
+    recover_chapter_selection = standard_recovery.recover_chapter_selection
+    recover_stage_page = standard_recovery.recover_stage_page
     for instance in instances:
         if not isinstance(instance, CampaignEventUiContributorSource):
             continue
         contributor = instance.event_ui_contributor
         if contributor.destination is not None:
             destination = contributor.destination
-    return CampaignEventUiServices(destination=destination)
+        recovery = contributor.stage_recovery
+        if recovery is None:
+            continue
+        if recovery.recover_campaign_selection is not None:
+            recover_campaign_selection = _overlay_recovery(
+                recovery.recover_campaign_selection,
+                recover_campaign_selection,
+            )
+        if recovery.recover_chapter_selection is not None:
+            recover_chapter_selection = _overlay_recovery(
+                recovery.recover_chapter_selection,
+                recover_chapter_selection,
+            )
+        if recovery.recover_stage_page is not None:
+            recover_stage_page = _overlay_recovery(
+                recovery.recover_stage_page,
+                recover_stage_page,
+            )
+    return CampaignEventUiServices(
+        destination=destination,
+        stage_recovery=_ComposedEventStageRecovery(
+            recover_campaign_selection_handler=recover_campaign_selection,
+            recover_chapter_selection_handler=recover_chapter_selection,
+            recover_stage_page_handler=recover_stage_page,
+        ),
+    )
