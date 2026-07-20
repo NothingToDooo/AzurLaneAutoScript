@@ -215,6 +215,47 @@ def test_declarative_runtime_wires_one_event_ui_service_set_to_all_consumers(
     assert combat_result.handle_experience_result(runtime) is False
 
 
+def test_provider_runs_real_runtime_profile_map_initialization_service(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = in_memory_config("campaign-map-initialization-wiring", {})
+    device = object.__new__(Device)
+    definition = load_default_stage(StageRef("event_20221222_cn", "a1"))
+    sessions = tuple(CampaignSession(definition, variant) for variant in CampaignRunVariant)
+    job = replace(
+        _job(),
+        sessions=sessions,
+        stage_selections=(),
+        transition_sessions=(),
+    )
+    session = job.session_for(definition.ref, CampaignRunVariant.NORMAL)
+    assert session is not None
+
+    provider = Mumu12CampaignRuntimeProvider(config, device)
+    handle = provider._new_handle(job, session, AbortToken())  # ruff:ignore[private-member-access]
+    runtime = handle.runtime
+    initialization = runtime._map_initialization_service  # ruff:ignore[private-member-access]
+    assert handle.owner._initialization is initialization  # ruff:ignore[private-member-access]
+    observed_weights: list[str] = []
+
+    def map_data_init(_runtime: DeclarativeCampaignMapRuntime, map_: CampaignMap | None) -> None:
+        assert map_ is runtime.MAP
+
+    def map_control_init(_runtime: DeclarativeCampaignMapRuntime) -> None:
+        observed_weights.append(runtime.config.EnemyPriority_EnemyScaleBalanceWeight)
+
+    monkeypatch.setattr(DeclarativeCampaignMapRuntime, "map_data_init", map_data_init)
+    monkeypatch.setattr(DeclarativeCampaignMapRuntime, "map_control_init", map_control_init)
+
+    assert config.EnemyPriority_EnemyScaleBalanceWeight == "S3_enemy_first"
+    try:
+        handle.owner.initialize(CampaignRunVariant.NORMAL)
+        assert observed_weights == ["default_mode"]
+    finally:
+        if handle.owner.active:
+            handle.owner.close(RuntimeSessionOutcome.COMPLETED)
+
+
 def test_declarative_runtime_owns_boss_fleet_across_sequential_profiles_and_hard_composition() -> None:
     config = in_memory_config("campaign-boss-fleet-owner", {})
     config.replace_runtime_overlay(
